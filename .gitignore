@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+!.env.example
+.vercel/
+*.log
+.DS_Store
+# Blender source files live in Google Drive, not Git
+*.blend
+*.blend1
