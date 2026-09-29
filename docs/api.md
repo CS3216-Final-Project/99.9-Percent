@@ -6,6 +6,7 @@ Request and response types live in [`shared/`](../shared). Change a type there o
 | Method | Path | Owner | Types | Status |
 |---|---|---|---|---|
 | GET | `/api/health` | Di Heng | `HealthResponse` (`shared/common.ts`) | Done |
+| GET | `/api/health/db` | Di Heng | `HealthResponse`, or 503 if the database is unreachable | Done |
 | POST | `/api/dialogue` | Zi Yao | `DialogueRequest` → `DialogueResponse` (`shared/dialogue.ts`) | Stub |
 | POST | `/api/missions/:id/report` | Zi Yao | → `MissionReport` (`shared/scores.ts`) | Planned |
 | GET | `/api/progress` | Di Heng | TBD | Planned |

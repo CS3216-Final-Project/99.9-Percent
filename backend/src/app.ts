@@ -1,20 +1,19 @@
 import cors from 'cors';
 import express, { type NextFunction, type Request, type Response } from 'express';
+import { isAllowedOrigin, parseAllowedOrigins } from './cors.js';
 import { dialogueRouter } from './routes/dialogue.js';
 import { healthRouter } from './routes/health.js';
 
 const app = express();
 
-const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
-  .split(',')
-  .map((o) => o.trim());
+const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
 
 app.use(
   cors({
     origin: (origin, cb) => {
-      // Allow same-origin/curl (no origin), listed origins and Vercel preview URLs.
+      // Allow same-origin/curl (no origin) and origins matching CORS_ORIGINS.
       // Other origins get no CORS headers, so the browser blocks them.
-      cb(null, !origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app'));
+      cb(null, !origin || isAllowedOrigin(origin, allowedOrigins));
     },
   }),
 );

@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import app from '../src/app.js';
 
 describe('API', () => {
@@ -7,6 +7,13 @@ describe('API', () => {
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
+  });
+
+  it('GET /api/health/db returns 503 when no database is configured', async () => {
+    vi.stubEnv('DATABASE_URL', '');
+    const res = await request(app).get('/api/health/db');
+    vi.unstubAllEnvs();
+    expect(res.status).toBe(503);
   });
 
   it('POST /api/dialogue rejects a missing playerText', async () => {
