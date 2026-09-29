@@ -1,0 +1,10 @@
+# Auto-requests a reviewer for each area. Approval from the owner is NOT required
+# (the ruleset only needs 1 approval from anyone).
+# TODO: replace the placeholders with real GitHub usernames, then uncomment.
+
+# /frontend/               @QIJUN_USERNAME
+# /frontend/public/models/ @HAI_USERNAME
+# /backend/                @DIHENG_USERNAME
+# /backend/src/ai/         @ZIYAO_USERNAME
+# /shared/                 @DIHENG_USERNAME @QIJUN_USERNAME @ZIYAO_USERNAME
+# /.github/                @DIHENG_USERNAME
