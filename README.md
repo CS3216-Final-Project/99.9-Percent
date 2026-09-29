@@ -42,7 +42,7 @@ The API runs without a database. For routes that use one, put Neon's connection 
 | `npm run lint` | oxlint |
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Production build (frontend) / type check (backend) |
-| `npm test` | Tests (backend, vitest). Includes running every migration on an in-memory Postgres. |
+| `npm test` | Tests (vitest). Frontend: HUD, API client, store (the 3D scene is mocked, as jsdom has no WebGL). Backend: routes, CORS, and every migration on an in-memory Postgres. |
 
 Database scripts (`backend/` only):
 
@@ -69,14 +69,14 @@ To change the schema: edit `schema.ts`, run `npm run db:generate`, and commit th
 
 | Stage | When | Where | What |
 |---|---|---|---|
-| CI `frontend` | Every PR and push to `main` | GitHub Actions | lint, typecheck, build |
-| CI `backend` | Every PR and push to `main` | GitHub Actions | lint, typecheck, tests (incl. migrations on in-memory Postgres), migrations match schema |
+| CI `frontend` | Every PR | GitHub Actions | lint, typecheck, tests, build |
+| CI `backend` | Every PR | GitHub Actions | lint, typecheck, tests (incl. migrations on in-memory Postgres), migrations match schema |
 | Preview deploy | Every PR | Vercel | Preview URL for each project, linked on the PR |
 | Production deploy | Push to `main` | Vercel | Both projects |
 | Migrate database | Push to `main` | GitHub Actions (`cd.yml`) | `db:migrate` on the production Neon database |
 | Smoke test | After the migration | GitHub Actions (`cd.yml`) | `/api/health` and `/api/health/db` on the live API |
 
-The `frontend` and `backend` checks must pass before merging.
+The `frontend` and `backend` checks must pass, on a branch that is up to date with `main`, before merging. CI doesn't re-run after the merge because that code has already been tested.
 
 Vercel and the migration start at the same time, so keep migrations backward-compatible: add first, drop or rename in a later PR.
 

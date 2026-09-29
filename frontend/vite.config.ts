@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
@@ -7,5 +8,9 @@ export default defineConfig({
   build: {
     // three.js alone is ~600 kB; split chunks later if load time becomes a problem.
     chunkSizeWarningLimit: 1500,
+  },
+  test: {
+    // jsdom has no WebGL, so tests mock out <World /> and anything else using <Canvas>.
+    environment: 'jsdom',
   },
 })
