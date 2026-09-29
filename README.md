@@ -6,7 +6,8 @@ A 3D web game for practising a language by talking to AI characters. CS3216 Fina
 
 ```
 frontend/   React + Vite + TypeScript + Three.js (react-three-fiber) + Zustand
-backend/    Express + TypeScript API (deployed as a Vercel Function)
+backend/    Express + TypeScript API (deployed as a Vercel Function), Drizzle ORM
+  drizzle/  SQL migrations (generated, committed)
 shared/     TypeScript types shared by both sides (the handoff formats)
 docs/       API and design notes
 ```
@@ -31,6 +32,8 @@ npm run dev
 
 The page should show a grey box on a green plane and `API: ok` in the top-left corner.
 
+The API runs without a database. For routes that use one, put Neon's connection strings in `backend/.env` (ask Di Heng, or use your own Neon branch).
+
 ## Scripts (in each of `frontend/` and `backend/`)
 
 | Script | What it does |
@@ -39,9 +42,43 @@ The page should show a grey box on a green plane and `API: ok` in the top-left c
 | `npm run lint` | oxlint |
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Production build (frontend) / type check (backend) |
-| `npm test` | Tests (backend, vitest) |
+| `npm test` | Tests (vitest). Frontend: HUD, API client, store (the 3D scene is mocked, as jsdom has no WebGL). Backend: routes, CORS, and every migration on an in-memory Postgres. |
 
-CI runs lint, typecheck and build/test for both folders on every pull request. The `frontend` and `backend` checks must pass before merging.
+Database scripts (`backend/` only):
+
+| Script | What it does |
+|---|---|
+| `npm run db:generate` | Write a migration in `drizzle/` from changes to `src/db/schema.ts` |
+| `npm run db:migrate` | Apply migrations to `DATABASE_URL_UNPOOLED` |
+| `npm run db:studio` | Browse the database in the browser |
+
+## Database
+
+Postgres on [Neon](https://neon.tech) (region: Singapore), queried with [Drizzle](https://orm.drizzle.team). Tables are defined in `backend/src/db/schema.ts`:
+
+| Table | Holds |
+|---|---|
+| `players` | One row per player: name, target language, level, total XP |
+| `sessions` | One row per mission attempt |
+| `dialogue_turns` | What the player said and the NPC replied, per session (the conversation history) |
+| `mission_reports` | The `MissionReport` for a finished session |
+
+To change the schema: edit `schema.ts`, run `npm run db:generate`, and commit the new files in `backend/drizzle/`. Never edit a migration that has already been merged. The migration runs on production automatically after the merge.
+
+## CI/CD
+
+| Stage | When | Where | What |
+|---|---|---|---|
+| CI `frontend` | Every PR | GitHub Actions | lint, typecheck, tests, build |
+| CI `backend` | Every PR | GitHub Actions | lint, typecheck, tests (incl. migrations on in-memory Postgres), migrations match schema |
+| Preview deploy | Every PR | Vercel | Preview URL for each project, linked on the PR |
+| Production deploy | Push to `main` | Vercel | Both projects |
+| Migrate database | Push to `main` | GitHub Actions (`cd.yml`) | `db:migrate` on the production Neon database |
+| Smoke test | After the migration | GitHub Actions (`cd.yml`) | `/api/health` and `/api/health/db` on the live API |
+
+The `frontend` and `backend` checks must pass, on a branch that is up to date with `main`, before merging. CI doesn't re-run after the merge because that code has already been tested.
+
+Vercel and the migration start at the same time, so keep migrations backward-compatible: add first, drop or rename in a later PR.
 
 ## How we work
 
@@ -53,11 +90,20 @@ CI runs lint, typecheck and build/test for both folders on every pull request. T
 
 ## Deployment
 
-Two Vercel projects from this repo:
+Two Vercel projects from this repo, in the `hoo-di-hengs-projects` Vercel team. The backend runs in Singapore (`backend/vercel.json`) to sit next to the database. Each project only rebuilds when its own folder or `shared/` changed (`ignoreCommand` in its `vercel.json`).
 
-| Project | Root directory | Env vars |
+| Project | Root directory | Env vars (type) |
 |---|---|---|
-| `lingoquest-web` | `frontend` | `VITE_API_URL` |
-| `lingoquest-api` | `backend` | `CORS_ORIGINS`, `OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| `frontend` | `frontend` | `VITE_API_URL` (Config) |
+| `lingoquest-backend` | `backend` | `CORS_ORIGINS` (Config), `DATABASE_URL` (Secret, pooled), `OPENAI_API_KEY` (Secret) |
+
+`CORS_ORIGINS` should list the frontend's production URL and a pattern for its previews, e.g. `https://<frontend-production-domain>,https://frontend-*-hoo-di-hengs-projects.vercel.app`.
+
+GitHub Actions (Settings > Secrets and variables > Actions):
+
+| Name | Kind | Value |
+|---|---|---|
+| `DATABASE_URL_UNPOOLED` | Secret | Neon's direct connection string, used by the migration |
+| `API_URL` | Variable (optional) | Production API URL for the smoke test. Defaults to `https://lingoquest-backend.vercel.app` |
 
 Merges to `main` deploy to production. Pull requests get preview links.

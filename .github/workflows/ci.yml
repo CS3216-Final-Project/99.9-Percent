@@ -1,9 +1,10 @@
 name: CI
 
+# PRs only. main is protected: every change arrives through a PR whose
+# `frontend` and `backend` checks passed against an up-to-date main, so
+# re-running them after the merge would test the same code twice.
 on:
   pull_request:
-  push:
-    branches: [main]
 
 # A new push to the same branch cancels the older run.
 concurrency:
@@ -31,6 +32,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
 
   backend:
@@ -48,4 +50,13 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      # Also applies every migration to an in-memory Postgres (test/db.test.ts).
       - run: npm test
+      - name: Check migrations match the schema
+        run: |
+          npm run db:generate
+          if [ -n "$(git status --porcelain -- drizzle)" ]; then
+            echo "::error::src/db/schema.ts changed without a migration. Run 'npm run db:generate' in backend/ and commit the files in backend/drizzle/."
+            git status --porcelain -- drizzle
+            exit 1
+          fi
