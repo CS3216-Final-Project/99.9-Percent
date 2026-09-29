@@ -90,14 +90,14 @@ Vercel and the migration start at the same time, so keep migrations backward-com
 
 ## Deployment
 
-Two Vercel projects from this repo. The backend runs in Singapore (`backend/vercel.json`) to sit next to the database.
+Two Vercel projects from this repo, in the `hoo-di-hengs-projects` Vercel team. The backend runs in Singapore (`backend/vercel.json`) to sit next to the database. Each project only rebuilds when its own folder or `shared/` changed (`ignoreCommand` in its `vercel.json`).
 
 | Project | Root directory | Env vars (type) |
 |---|---|---|
-| `lingoquest-frontend` | `frontend` | `VITE_API_URL` (Config) |
+| `frontend` | `frontend` | `VITE_API_URL` (Config) |
 | `lingoquest-backend` | `backend` | `CORS_ORIGINS` (Config), `DATABASE_URL` (Secret, pooled), `OPENAI_API_KEY` (Secret) |
 
-`CORS_ORIGINS` should list the frontend's production URL and a pattern for its previews, e.g. `https://lingoquest-frontend.vercel.app,https://lingoquest-frontend-*-<vercel-team>.vercel.app`.
+`CORS_ORIGINS` should list the frontend's production URL and a pattern for its previews, e.g. `https://<frontend-production-domain>,https://frontend-*-hoo-di-hengs-projects.vercel.app`.
 
 GitHub Actions (Settings > Secrets and variables > Actions):
 
