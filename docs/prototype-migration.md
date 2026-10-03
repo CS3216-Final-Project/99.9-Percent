@@ -18,7 +18,9 @@ The game lives in the existing `frontend/` Vite app. `src/sim/` is pure TypeScri
 
 Next.js entry points and deployment settings are not imported. React lazy loading replaces `next/dynamic`, Vite and TypeScript resolve the prototype's `@/` imports, and locally bundled Barlow fonts replace `next/font`. Existing lint, typecheck, test, and build scripts remain the CI entry points. Simulation tests run in Node; UI tests run in jsdom with the WebGL scene mocked.
 
-The existing `backend/`, `shared/`, `.github/`, `.nvmrc`, environment examples, frontend API client, and Vercel configuration remain unchanged. No database migrations or server endpoints are added. Backend names and deployment URLs retain their existing values so this feature migration does not rename deployed resources.
+The existing backend implementation, database configuration and migrations, shared contracts, CI checks, Node version, frontend API client, and Vercel configuration are preserved. No database migrations or server endpoints are added. Package and Vercel project names retain their existing values.
+
+Production domains are now `https://99-99-percent-web.vercel.app` (frontend) and `https://99-99-percent-backend.vercel.app` (backend). The CD smoke-test fallback points to the new backend domain, and environment examples document the corresponding production API and CORS values while retaining localhost defaults. See the README's deployment section for the Vercel environment settings.
 
 Saves retain the prototype's storage format and keys. Browser storage is scoped to the origin, so moving between the prototype domain, a preview, and production does not transfer an existing run. Gameplay and analytics remain local; they do not use the preserved backend or database yet.
 

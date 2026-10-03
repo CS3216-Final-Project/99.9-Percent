@@ -100,16 +100,18 @@ Two Vercel projects from this repo, in the `hoo-di-hengs-projects` Vercel team. 
 
 | Project | Root directory | Env vars (type) |
 |---|---|---|
-| `frontend` | `frontend` | `VITE_API_URL` (Config) |
+| `frontend` | `frontend` | `VITE_API_URL=https://99-99-percent-backend.vercel.app` (Config) |
 | `lingoquest-backend` | `backend` | `CORS_ORIGINS` (Config), `DATABASE_URL` (Secret, pooled), `OPENAI_API_KEY` (Secret) |
 
-`CORS_ORIGINS` should list the frontend's production URL and a pattern for its previews, e.g. `https://<frontend-production-domain>,https://frontend-*-hoo-di-hengs-projects.vercel.app`.
+Production frontend: [99-99-percent-web.vercel.app](https://99-99-percent-web.vercel.app). Production backend: [99-99-percent-backend.vercel.app](https://99-99-percent-backend.vercel.app).
+
+Set `CORS_ORIGINS` in the backend's Vercel settings to `https://99-99-percent-web.vercel.app,https://frontend-*-hoo-di-hengs-projects.vercel.app`. The preview pattern follows the existing Vercel project name, independently of its production domain. Local `.env.example` files retain localhost values for development and document the production values separately. Changing a domain does not update Vercel environment variables; redeploy after changing those settings.
 
 GitHub Actions (Settings > Secrets and variables > Actions):
 
 | Name | Kind | Value |
 |---|---|---|
 | `DATABASE_URL_UNPOOLED` | Secret | Neon's direct connection string, used by the migration |
-| `API_URL` | Variable (optional) | Production API URL for the smoke test. Defaults to `https://lingoquest-backend.vercel.app` |
+| `API_URL` | Variable (optional) | Production API URL for the smoke test. Defaults to `https://99-99-percent-backend.vercel.app`. If set explicitly, it must use this new URL too. |
 
 Merges to `main` deploy to production. Pull requests get preview links.
