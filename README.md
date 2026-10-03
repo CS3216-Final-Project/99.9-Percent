@@ -1,6 +1,8 @@
-# LingoQuest
+# 99.99%
 
-A 3D web game for practising a language by talking to AI characters. CS3216 Final Project, Group 5.
+A software-startup infrastructure tycoon game. Grow to 50,000 users in 26 weeks, manage upgrades and engineers, and survive production incidents. CS3216 Final Project, Group 5.
+
+The playable frontend was migrated from [99.9-Percent-Prototype](https://github.com/CS3216-Final-Project/99.9-Percent-Prototype). The existing backend, database, shared contracts and CI/CD configuration are retained. See [the migration notes](docs/prototype-migration.md) for the imported features and verification steps.
 
 ## Structure
 
@@ -30,7 +32,9 @@ npm install
 npm run dev
 ```
 
-The page should show a grey box on a green plane and `API: ok` in the top-left corner.
+The frontend opens the 99.99% title screen and an isometric server room. Press Play to begin the guided first week. Drag to pan, scroll or pinch to zoom, and click equipment to inspect it. `P` pauses or resumes; `Esc` closes a view.
+
+Gameplay, saves and prototype analytics run in the browser and work without the API. Saves stay in this browser and origin; saves on the prototype deployment do not automatically move to a new domain. The backend retains its existing health and dialogue endpoints for later integration.
 
 The API runs without a database. For routes that use one, put Neon's connection strings in `backend/.env` (ask Di Heng, or use your own Neon branch).
 
@@ -42,7 +46,9 @@ The API runs without a database. For routes that use one, put Neon's connection 
 | `npm run lint` | oxlint |
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Production build (frontend) / type check (backend) |
-| `npm test` | Tests (vitest). Frontend: HUD, API client, store (the 3D scene is mocked, as jsdom has no WebGL). Backend: routes, CORS, and every migration on an in-memory Postgres. |
+| `npm test` | Tests (vitest). Frontend: simulation, scripted balance players, game startup, tutorial, save/resume, and API client (WebGL is mocked in UI tests). Backend: routes, CORS, and every migration on an in-memory Postgres. |
+
+`npm run balance` in `frontend/` runs the scripted balancing players across twelve seeds.
 
 Database scripts (`backend/` only):
 

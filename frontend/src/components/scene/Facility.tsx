@@ -1,0 +1,850 @@
+"use client";
+
+import { Line, MapControls } from "@react-three/drei";
+import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { useEffect, useMemo, useRef } from "react";
+import * as THREE from "three";
+import type { MapControls as MapControlsImpl } from "three-stdlib";
+import {
+  EQUIPMENT_ORDER,
+  equipmentInfo,
+  has,
+  metrics,
+  monitoringLevel,
+  symptomaticEquipment,
+  type EquipmentId,
+  type EquipmentState,
+  type GameState,
+} from "@/sim";
+import { inspectOrSelect, useGame } from "@/game/store";
+import {
+  appSlot,
+  DB_CABINET,
+  dbSlot,
+  deskSlot,
+  footprint,
+  MAX_TEMP_SHOWN,
+  POS,
+  RACK,
+  ROOM,
+  tempSlot,
+  type Footprint,
+} from "./layout";
+import { floorTiles, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
+
+/* ------------------------------------------------------------------ */
+/* Scene model: the few facts the 3D view needs, as a stable snapshot  */
+/* ------------------------------------------------------------------ */
+
+interface SceneModel {
+  incident: boolean;
+  hosts: Led[];
+  temp: number;
+  lb: boolean;
+  standby: boolean;
+  cache: boolean;
+  dbCabinets: number;
+  dbLed: Led;
+  replica: boolean;
+  backup: boolean;
+  monitoring: 0 | 1 | 2;
+  engineers: number;
+  busy: number;
+  releases: number;
+  promos: number;
+  flow: number;
+  states: Record<EquipmentId, EquipmentState>;
+  names: Record<EquipmentId, string>;
+  built: Record<EquipmentId, boolean>;
+  footprints: Record<EquipmentId, Footprint>;
+  symptomatic: EquipmentId[];
+  inspected: EquipmentId[];
+  inspecting: EquipmentId | null;
+}
+
+function buildModel(s: GameState): SceneModel {
+  const inc = s.phase === "incident" ? s.incident : null;
+  const inspected = inc ? inc.evidence.map((e) => e.equipment) : [];
+  const named = has(s, "monitoring") || has(s, "health_checks");
+  // During an incident the racks only show what the player has actually looked at.
+  const reveal = (id: EquipmentId) => !inc || inspected.includes(id);
+  const m = metrics(s);
+
+  const hosts: Led[] = s.infra.appHosts.map((h) => {
+    if (h.status === "failed") return reveal("app") ? "off" : "ok";
+    if (h.status === "degraded") return named ? "warn" : "ok";
+    if (!inc && m.appUtil >= 1) return "critical";
+    if (!inc && m.appUtil >= 0.85 && named) return "warn";
+    return "ok";
+  });
+  const dbStatus = s.infra.dbHost.status;
+  const dbLed: Led =
+    dbStatus === "failed"
+      ? reveal("db")
+        ? "off"
+        : "ok"
+      : dbStatus === "degraded" && named
+        ? "warn"
+        : !inc && m.dbUtil >= 1
+          ? "critical"
+          : !inc && m.dbUtil >= 0.85 && named
+            ? "warn"
+            : "ok";
+
+  const states = {} as SceneModel["states"];
+  const names = {} as SceneModel["names"];
+  const built = {} as SceneModel["built"];
+  const footprints = {} as SceneModel["footprints"];
+  for (const id of EQUIPMENT_ORDER) {
+    const info = equipmentInfo(s, id);
+    states[id] = info.state;
+    names[id] = info.name;
+    built[id] = info.built;
+    footprints[id] = footprint(s, id);
+  }
+
+  return {
+    incident: !!inc,
+    hosts,
+    temp: Math.min(inc ? (s.pendingTurn?.autoscaled ?? 0) : s.live.tempServers, MAX_TEMP_SHOWN),
+    lb: has(s, "load_balancing"),
+    standby: has(s, "standby"),
+    cache: has(s, "caching"),
+    dbCabinets: s.infra.dbTier + 1,
+    dbLed,
+    replica: has(s, "replicas"),
+    backup: has(s, "backups"),
+    monitoring: monitoringLevel(s),
+    engineers: s.engineers,
+    busy: s.tasks.reduce((n, t) => n + t.assigned, 0),
+    releases: s.releases.length,
+    promos: s.activePromos.length,
+    flow: Math.round(Math.min(1.4, Math.max(m.appUtil, 0.25)) * 10) / 10,
+    states,
+    names,
+    built,
+    footprints,
+    symptomatic: inc ? symptomaticEquipment(s) : [],
+    inspected,
+    inspecting: inc?.inspecting?.equipment ?? null,
+  };
+}
+
+function useSceneModel(): SceneModel {
+  const key = useGame((s) => JSON.stringify(buildModel(s.game)));
+  return useMemo(() => JSON.parse(key) as SceneModel, [key]);
+}
+
+/* ------------------------------------------------------------------ */
+/* Camera                                                              */
+/* ------------------------------------------------------------------ */
+
+const TARGET = new THREE.Vector3(-1, 0, 0.6);
+const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20);
+
+export const cameraApi: { zoomBy: (factor: number) => void; reset: () => void } = {
+  zoomBy: () => {},
+  reset: () => {},
+};
+
+function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean> }) {
+  const controls = useRef<MapControlsImpl>(null);
+  const camera = useThree((s) => s.camera) as THREE.OrthographicCamera;
+  const size = useThree((s) => s.size);
+  const touched = useRef(false);
+  const want = useRef({ zoom: 30, target: TARGET.clone() });
+
+  // Frame the equipment that is actually built, and widen the view as the facility grows.
+  useEffect(() => {
+    const dir = CAMERA_OFFSET.clone().normalize().negate();
+    const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+    const up = new THREE.Vector3().crossVectors(right, dir).normalize();
+    const box = new THREE.Box3();
+    for (const id of EQUIPMENT_ORDER) {
+      if (!built[id]) continue;
+      const f = footprints[id];
+      box.expandByPoint(new THREE.Vector3(f.x - f.w / 2, 0, f.z - f.d / 2));
+      box.expandByPoint(new THREE.Vector3(f.x + f.w / 2, f.h, f.z + f.d / 2));
+    }
+    if (box.isEmpty()) return;
+    const center = box.getCenter(new THREE.Vector3());
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const x of [box.min.x, box.max.x]) {
+      for (const y of [box.min.y, box.max.y]) {
+        for (const z of [box.min.z, box.max.z]) {
+          const p = new THREE.Vector3(x, y, z).sub(center);
+          minX = Math.min(minX, p.dot(right));
+          maxX = Math.max(maxX, p.dot(right));
+          minY = Math.min(minY, p.dot(up));
+          maxY = Math.max(maxY, p.dot(up));
+        }
+      }
+    }
+    // Leave room around the edges for labels, the prompt and the controls.
+    const zoom = THREE.MathUtils.clamp(Math.min(size.width / (maxX - minX + 7), size.height / (maxY - minY + 6.5)), 10, 64);
+    // Slide the centre down the view direction onto the floor, which is the plane the controls pan across.
+    const onFloor = center.clone().add(dir.clone().multiplyScalar(-center.y / dir.y));
+    want.current = { zoom, target: onFloor };
+  }, [footprints, built, size]);
+
+  useEffect(() => {
+    cameraApi.zoomBy = (factor) => {
+      touched.current = true;
+      camera.zoom = THREE.MathUtils.clamp(camera.zoom * factor, 10, 140);
+      camera.updateProjectionMatrix();
+      controls.current?.update();
+    };
+    cameraApi.reset = () => {
+      touched.current = false;
+    };
+  }, [camera]);
+
+  useFrame(() => {
+    const c = controls.current;
+    if (!c) return;
+    // Until the player takes the camera, ease toward the framing above.
+    if (!touched.current) {
+      const k = 0.1;
+      camera.zoom += (want.current.zoom - camera.zoom) * k;
+      c.target.lerp(want.current.target, k);
+      camera.position.copy(c.target).add(CAMERA_OFFSET);
+      camera.updateProjectionMatrix();
+    }
+    // Keep the view over the building while panning.
+    const t = c.target;
+    const cx = THREE.MathUtils.clamp(t.x, -ROOM.w / 2, ROOM.w / 2);
+    const cz = THREE.MathUtils.clamp(t.z, -ROOM.d / 2, ROOM.d / 2);
+    if (cx !== t.x || cz !== t.z) {
+      camera.position.x += cx - t.x;
+      camera.position.z += cz - t.z;
+      t.x = cx;
+      t.z = cz;
+    }
+  });
+
+  return (
+    <MapControls
+      ref={controls}
+      makeDefault
+      enableRotate={false}
+      enableDamping
+      dampingFactor={0.14}
+      zoomToCursor
+      zoomSpeed={1.1}
+      minZoom={10}
+      maxZoom={140}
+      target={TARGET}
+      onStart={() => {
+        touched.current = true;
+      }}
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Building blocks                                                     */
+/* ------------------------------------------------------------------ */
+
+const STEEL = "#252b32";
+
+function Rack({
+  x,
+  z,
+  led,
+  variant = "server",
+  size = RACK,
+  tint = STEEL,
+}: {
+  x: number;
+  z: number;
+  led: Led;
+  variant?: PanelVariant;
+  size?: { w: number; d: number; h: number };
+  tint?: string;
+}) {
+  const tex = useMemo(() => panelTextures(variant, led), [variant, led]);
+  return (
+    <group position={[x, 0, z]}>
+      <mesh castShadow receiveShadow position={[0, size.h / 2, 0]}>
+        <boxGeometry args={[size.w, size.h, size.d]} />
+        <meshStandardMaterial color={tint} metalness={0.6} roughness={0.45} />
+      </mesh>
+      <mesh position={[0, size.h / 2, size.d / 2 + 0.006]}>
+        <planeGeometry args={[size.w * 0.87, size.h * 0.93]} />
+        <meshStandardMaterial
+          map={tex.map}
+          emissiveMap={tex.emissive}
+          emissive="#ffffff"
+          emissiveIntensity={1.7}
+          roughness={0.5}
+          metalness={0.35}
+        />
+      </mesh>
+      {/* Side vent panel, visible from the camera's side of the rack. */}
+      <mesh position={[size.w / 2 + 0.004, size.h / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[size.d * 0.8, size.h * 0.86]} />
+        <meshStandardMaterial color="#1c2127" metalness={0.5} roughness={0.6} />
+      </mesh>
+      <mesh position={[0, size.h + 0.025, size.d / 2 - 0.09]}>
+        <boxGeometry args={[size.w * 0.72, 0.05, 0.07]} />
+        <meshStandardMaterial
+          color={LED_COLORS[led]}
+          emissive={LED_COLORS[led]}
+          emissiveIntensity={led === "off" ? 0 : 1.5}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function Screen({ kind, w, h, position, rotation }: { kind: ScreenKind; w: number; h: number; position: [number, number, number]; rotation?: [number, number, number] }) {
+  const map = useMemo(() => screenTexture(kind), [kind]);
+  return (
+    <group position={position} rotation={rotation}>
+      <mesh castShadow>
+        <boxGeometry args={[w + 0.07, h + 0.07, 0.045]} />
+        <meshStandardMaterial color="#14181c" metalness={0.4} roughness={0.5} />
+      </mesh>
+      <mesh position={[0, 0, 0.026]}>
+        <planeGeometry args={[w, h]} />
+        <meshBasicMaterial map={map} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function Desk({ x, z, screen, wide = false }: { x: number; z: number; screen: ScreenKind; wide?: boolean }) {
+  const w = wide ? 2.2 : 1.55;
+  return (
+    <group position={[x, 0, z]}>
+      <mesh castShadow receiveShadow position={[0, 0.74, 0]}>
+        <boxGeometry args={[w, 0.05, 0.8]} />
+        <meshStandardMaterial color="#6a5f52" roughness={0.7} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <mesh key={side} castShadow position={[(side * (w - 0.1)) / 2, 0.37, 0]}>
+          <boxGeometry args={[0.05, 0.74, 0.72]} />
+          <meshStandardMaterial color="#30363d" metalness={0.5} roughness={0.5} />
+        </mesh>
+      ))}
+      <mesh position={[wide ? -0.45 : 0, 0.87, -0.22]}>
+        <boxGeometry args={[0.07, 0.22, 0.07]} />
+        <meshStandardMaterial color="#1b1f24" />
+      </mesh>
+      <Screen kind={screen} w={0.6} h={0.36} position={[wide ? -0.45 : 0, 1.13, -0.2]} />
+      {wide && (
+        <>
+          <mesh position={[0.45, 0.87, -0.22]}>
+            <boxGeometry args={[0.07, 0.22, 0.07]} />
+            <meshStandardMaterial color="#1b1f24" />
+          </mesh>
+          <Screen kind={screen} w={0.6} h={0.36} position={[0.45, 1.13, -0.2]} />
+        </>
+      )}
+      {/* Chair */}
+      <mesh castShadow position={[0, 0.46, 0.72]}>
+        <boxGeometry args={[0.46, 0.08, 0.46]} />
+        <meshStandardMaterial color="#2a3037" roughness={0.8} />
+      </mesh>
+      <mesh castShadow position={[0, 0.78, 0.93]}>
+        <boxGeometry args={[0.44, 0.56, 0.06]} />
+        <meshStandardMaterial color="#2a3037" roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 0.22, 0.72]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.44, 8]} />
+        <meshStandardMaterial color="#14181c" metalness={0.7} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 0.03, 0.72]}>
+        <cylinderGeometry args={[0.26, 0.26, 0.04, 12]} />
+        <meshStandardMaterial color="#14181c" metalness={0.7} roughness={0.4} />
+      </mesh>
+    </group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Cabling with moving traffic                                         */
+/* ------------------------------------------------------------------ */
+
+type P2 = [number, number];
+
+function Cable({ points, speed, alert }: { points: P2[]; speed: number; alert: boolean }) {
+  const packets = useRef<THREE.InstancedMesh>(null);
+  const segments = useMemo(() => {
+    const out: { a: P2; b: P2; len: number; start: number }[] = [];
+    let total = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i];
+      const b = points[i + 1];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len < 0.01) continue;
+      out.push({ a, b, len, start: total });
+      total += len;
+    }
+    return { list: out, total };
+  }, [points]);
+  const count = Math.max(1, Math.round(segments.total / 2.4));
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const color = alert ? "#ff5a4f" : "#7fbfee";
+
+  useFrame(({ clock }) => {
+    const mesh = packets.current;
+    if (!mesh || segments.total <= 0) return;
+    const t = clock.elapsedTime * (0.9 + speed * 2.2);
+    for (let i = 0; i < count; i++) {
+      const d = (t + (i * segments.total) / count) % segments.total;
+      const seg = segments.list.find((s) => d >= s.start && d <= s.start + s.len) ?? segments.list[0];
+      const f = (d - seg.start) / seg.len;
+      dummy.position.set(seg.a[0] + (seg.b[0] - seg.a[0]) * f, 0.075, seg.a[1] + (seg.b[1] - seg.a[1]) * f);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <group>
+      {segments.list.map((s, i) => {
+        const horizontal = Math.abs(s.b[0] - s.a[0]) > Math.abs(s.b[1] - s.a[1]);
+        return (
+          <mesh key={i} receiveShadow position={[(s.a[0] + s.b[0]) / 2, 0.025, (s.a[1] + s.b[1]) / 2]}>
+            <boxGeometry args={horizontal ? [s.len + 0.2, 0.05, 0.2] : [0.2, 0.05, s.len + 0.2]} />
+            <meshStandardMaterial color={alert ? "#3a1a18" : "#161b20"} emissive={color} emissiveIntensity={alert ? 0.45 : 0.08} roughness={0.7} />
+          </mesh>
+        );
+      })}
+      <instancedMesh ref={packets} args={[undefined, undefined, count]} key={count}>
+        <boxGeometry args={[0.13, 0.05, 0.13]} />
+        <meshBasicMaterial color={color} toneMapped={false} />
+      </instancedMesh>
+    </group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Floor markings, hit areas and labels for each piece of equipment    */
+/* ------------------------------------------------------------------ */
+
+const ACCENT = "#8cc7f2";
+const ALERT = "#ff5a4f";
+const AMBER = "#f0b040";
+
+function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Footprint; built: boolean; symptomatic: boolean; inspecting: boolean }) {
+  const selected = useGame((s) => s.selected === id);
+  const hovered = useGame((s) => s.hovered === id);
+  const fill = useRef<THREE.MeshBasicMaterial>(null);
+  const alerting = symptomatic || inspecting;
+
+  useFrame(({ clock }) => {
+    if (!fill.current) return;
+    const base = alerting ? 0.16 : selected ? 0.13 : hovered ? 0.07 : 0;
+    fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4.2)) : base;
+  });
+
+  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered ? ACCENT : built ? "#66727f" : "#56616c";
+  const hw = f.w / 2;
+  const hd = f.d / 2;
+  const outline: [number, number, number][] = [
+    [-hw, 0, -hd],
+    [hw, 0, -hd],
+    [hw, 0, hd],
+    [-hw, 0, hd],
+    [-hw, 0, -hd],
+  ];
+
+  const onOver = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    useGame.getState().hover(id);
+    document.body.style.cursor = "pointer";
+  };
+  const onOut = () => {
+    if (useGame.getState().hovered === id) useGame.getState().hover(null);
+    document.body.style.cursor = "";
+  };
+  const onClick = (e: ThreeEvent<MouseEvent>) => {
+    if (e.delta > 6) return;
+    e.stopPropagation();
+    inspectOrSelect(id);
+  };
+
+  return (
+    <group position={[f.x, 0, f.z]}>
+      <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[f.w, f.d]} />
+        <meshBasicMaterial ref={fill} color={color} transparent opacity={0} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <group position={[0, 0.02, 0]}>
+        <Line
+          points={outline}
+          color={color}
+          lineWidth={selected || alerting ? 2.6 : hovered ? 2.2 : 1.3}
+          dashed={!built}
+          dashSize={0.32}
+          gapSize={0.22}
+          transparent
+          opacity={built || hovered || selected ? 0.95 : 0.7}
+        />
+      </group>
+      {/* Invisible volume that catches hover and click for the whole group. */}
+      <mesh position={[0, Math.max(0.4, f.h / 2), 0]} onPointerOver={onOver} onPointerOut={onOut} onClick={onClick}>
+        <boxGeometry args={[f.w, Math.max(0.8, f.h), f.d]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
+/*
+ * Labels are ordinary DOM buttons laid over the canvas. Each frame the scene
+ * projects an anchor point above every piece of equipment to screen space and
+ * moves the matching button there, so labels stay crisp and keyboard-focusable.
+ */
+const anchors = new Map<string, THREE.Vector3>();
+const labelEls = new Map<string, HTMLElement>();
+const INTERNET = "internet";
+
+function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footprint> }) {
+  const v = useMemo(() => new THREE.Vector3(), []);
+
+  useEffect(() => {
+    for (const id of EQUIPMENT_ORDER) {
+      const f = footprints[id];
+      anchors.set(id, new THREE.Vector3(f.x, f.h + 0.3, f.z));
+    }
+    anchors.set(INTERNET, new THREE.Vector3(-ROOM.w / 2 + 0.2, 1.35, -4.9));
+  }, [footprints]);
+
+  useFrame(({ camera, size }) => {
+    anchors.forEach((pos, key) => {
+      const el = labelEls.get(key);
+      if (!el) return;
+      v.copy(pos).project(camera);
+      const x = (v.x * 0.5 + 0.5) * size.width;
+      const y = (-v.y * 0.5 + 0.5) * size.height;
+      el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+      el.style.visibility = "visible";
+    });
+  });
+  return null;
+}
+
+function bindLabel(key: string) {
+  return (el: HTMLElement | null) => {
+    if (el) labelEls.set(key, el);
+    else labelEls.delete(key);
+  };
+}
+
+function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
+  const selected = useGame((s) => s.selected === id);
+  const hovered = useGame((s) => s.hovered === id);
+  const built = m.built[id];
+  const inspecting = m.inspecting === id;
+  const inspected = m.inspected.includes(id);
+  const tone = inspecting ? "busy" : m.symptomatic.includes(id) ? "alert" : !built ? "absent" : m.states[id];
+  return (
+    <button
+      type="button"
+      ref={bindLabel(id)}
+      data-eq={id}
+      className={`eq-label tone-${tone}${selected ? " is-selected" : ""}${!built && !selected && !hovered ? " is-quiet" : ""}`}
+      onClick={() => inspectOrSelect(id)}
+      onFocus={() => useGame.getState().hover(id)}
+      onBlur={() => useGame.getState().hover(null)}
+      aria-label={`${m.names[id]}${built ? "" : ", not built"}`}
+    >
+      <span className="eq-dot" aria-hidden="true" />
+      <span>{m.names[id]}</span>
+      {!built && <span className="eq-note">not built</span>}
+      {inspecting && <span className="eq-note">investigating</span>}
+      {inspected && !inspecting && <span className="eq-note">checked</span>}
+    </button>
+  );
+}
+
+function Labels() {
+  const m = useSceneModel();
+  return (
+    <div className="eq-labels">
+      <span className="wall-tag" ref={bindLabel(INTERNET)}>
+        Internet
+      </span>
+      {EQUIPMENT_ORDER.map((id) => (
+        <Label key={id} id={id} m={m} />
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* The room                                                            */
+/* ------------------------------------------------------------------ */
+
+function Room() {
+  const tiles = useMemo(() => {
+    const t = floorTiles();
+    t.repeat.set(ROOM.w / 0.9, ROOM.d / 0.9);
+    return t;
+  }, []);
+  return (
+    <group>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[ROOM.w, ROOM.d]} />
+        <meshStandardMaterial map={tiles} roughness={0.78} metalness={0.1} />
+      </mesh>
+      <mesh position={[0, -0.26, 0]}>
+        <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
+        <meshStandardMaterial color="#1b2025" roughness={0.9} />
+      </mesh>
+      {/* Back and left walls; the two nearest the camera are left open. */}
+      <mesh receiveShadow position={[0, ROOM.wallH / 2, -ROOM.d / 2 - 0.12]}>
+        <boxGeometry args={[ROOM.w + 0.5, ROOM.wallH, 0.24]} />
+        <meshStandardMaterial color="#6b7681" roughness={0.92} />
+      </mesh>
+      <mesh receiveShadow position={[-ROOM.w / 2 - 0.12, ROOM.wallH / 2, 0]}>
+        <boxGeometry args={[0.24, ROOM.wallH, ROOM.d]} />
+        <meshStandardMaterial color="#616c77" roughness={0.92} />
+      </mesh>
+      <mesh position={[0, 0.12, -ROOM.d / 2 + 0.02]}>
+        <boxGeometry args={[ROOM.w, 0.24, 0.04]} />
+        <meshStandardMaterial color="#2b3239" roughness={0.8} />
+      </mesh>
+      <mesh position={[-ROOM.w / 2 + 0.02, 0.12, 0]}>
+        <boxGeometry args={[0.04, 0.24, ROOM.d]} />
+        <meshStandardMaterial color="#2b3239" roughness={0.8} />
+      </mesh>
+      {/* Overhead cable tray along the back wall. */}
+      <mesh castShadow position={[-3, 2.75, -ROOM.d / 2 + 0.35]}>
+        <boxGeometry args={[17, 0.1, 0.5]} />
+        <meshStandardMaterial color="#2e353c" metalness={0.6} roughness={0.5} />
+      </mesh>
+      {/* Where the internet uplink enters the building. */}
+      <mesh position={[-ROOM.w / 2 + 0.1, 0.5, -4.9]}>
+        <boxGeometry args={[0.2, 1, 0.7]} />
+        <meshStandardMaterial color="#20262c" metalness={0.6} roughness={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Scene                                                               */
+/* ------------------------------------------------------------------ */
+
+function Scene() {
+  const m = useSceneModel();
+  const sym = (id: EquipmentId) => m.symptomatic.includes(id);
+
+  const appCount = Math.min(m.hosts.length, 12);
+  const appMaxX = appSlot(Math.min(appCount, 6) - 1).x;
+  const dbLastX = dbSlot(m.dbCabinets - 1).x;
+  const aisleZ = -4.9;
+  const dataZ = 4.65;
+  const trunkX = -8.3;
+  const flow = m.flow;
+
+  const edgeAlert = sym("gateway") || sym("app");
+  const dataAlert = sym("db");
+
+  return (
+    <>
+      <color attach="background" args={["#171c21"]} />
+      <hemisphereLight args={["#dbe6f0", "#4a535c", 1.55]} />
+      <directionalLight
+        position={[11, 17, 7]}
+        intensity={2.6}
+        color="#fff6ea"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0005}
+        shadow-camera-left={-22}
+        shadow-camera-right={22}
+        shadow-camera-top={22}
+        shadow-camera-bottom={-22}
+        shadow-camera-near={1}
+        shadow-camera-far={60}
+      />
+      <pointLight position={[-3, 3.4, -3.5]} intensity={26} distance={13} color="#a9cff2" />
+      <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#a9cff2" />
+
+      <Room />
+
+      {/* Network edge */}
+      <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
+      {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint="#2a3138" />}
+
+      {/* App servers */}
+      {m.hosts.slice(0, 12).map((led, i) => {
+        const p = appSlot(i);
+        return <Rack key={i} x={p.x} z={p.z} led={led} />;
+      })}
+      {Array.from({ length: m.temp }, (_, i) => {
+        const p = tempSlot(i);
+        return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint="#26323d" />;
+      })}
+      {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint="#2d2a24" />}
+
+      {/* Data tier */}
+      {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} />}
+      {Array.from({ length: m.dbCabinets }, (_, i) => {
+        const p = dbSlot(i);
+        return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint="#22282f" />;
+      })}
+      {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint="#22282f" />}
+      {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint="#2a2f35" />}
+
+      {/* Monitoring wall */}
+      {m.monitoring > 0 &&
+        [-1.6, 0, 1.6].map((dx, i) => (
+          <Screen
+            key={i}
+            kind={m.incident ? "alert" : i === 2 && m.monitoring === 2 ? "chart" : "dash"}
+            w={1.45}
+            h={0.9}
+            position={[POS.monitoring.x + dx, 2.05, -ROOM.d / 2 + 0.05]}
+          />
+        ))}
+
+      {/* Engineering desks */}
+      {Array.from({ length: m.engineers }, (_, i) => {
+        const p = deskSlot(i);
+        return <Desk key={`e${i}`} x={p.x} z={p.z} screen={i < m.busy ? "code" : "idle"} />;
+      })}
+
+      {/* Build and deploy console */}
+      <group position={[POS.deploy.x, 0, POS.deploy.z]}>
+        <mesh castShadow receiveShadow position={[0, 0.5, 0]}>
+          <boxGeometry args={[1.5, 1, 0.8]} />
+          <meshStandardMaterial color={STEEL} metalness={0.6} roughness={0.45} />
+        </mesh>
+        <Screen kind={m.releases > 0 ? "deploy-busy" : "deploy"} w={1.1} h={0.62} position={[0, 1.28, -0.12]} rotation={[-0.35, 0, 0]} />
+      </group>
+
+      {/* Growth desk with a results board */}
+      <Desk x={POS.growth.x - 0.4} z={POS.growth.z + 0.2} screen={m.promos > 0 ? "chart" : "idle"} wide />
+      <group position={[POS.growth.x + 1.15, 0, POS.growth.z - 0.55]}>
+        <mesh castShadow position={[0, 0.55, 0]}>
+          <boxGeometry args={[0.08, 1.1, 0.08]} />
+          <meshStandardMaterial color="#1b1f24" metalness={0.6} roughness={0.4} />
+        </mesh>
+        <Screen kind="chart" w={1.2} h={0.75} position={[0, 1.5, 0]} />
+      </group>
+
+      {/* Cabling: internet -> edge -> app servers -> (cache) -> database -> replica / backups */}
+      <Cable points={[[-ROOM.w / 2 + 0.2, aisleZ], [POS.gateway.x, aisleZ]]} speed={flow} alert={edgeAlert} />
+      <Cable points={[[POS.gateway.x, aisleZ], [Math.max(appMaxX, -6.6) + 0.4, aisleZ]]} speed={flow} alert={edgeAlert} />
+      <Cable
+        points={[
+          [trunkX, aisleZ],
+          [trunkX, dataZ],
+          [dbLastX + 0.4, dataZ],
+        ]}
+        speed={flow * (m.cache ? 0.7 : 1)}
+        alert={dataAlert}
+      />
+      {m.replica && <Cable points={[[dbLastX + 0.4, dataZ], [POS.replica.x + 0.3, dataZ]]} speed={0.35} alert={false} />}
+      {m.backup && <Cable points={[[m.replica ? POS.replica.x + 0.3 : dbLastX + 0.4, dataZ], [POS.backup.x + 0.4, dataZ]]} speed={0.15} alert={false} />}
+
+      {EQUIPMENT_ORDER.map((id) => (
+        <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
+      ))}
+      <LabelProjector footprints={m.footprints} />
+
+      <CameraRig footprints={m.footprints} built={m.built} />
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Hover summary (name, status, one metric)                            */
+/* ------------------------------------------------------------------ */
+
+const STATE_WORDS: Record<EquipmentState, string> = {
+  ok: "Healthy",
+  warn: "Needs attention",
+  critical: "Overloaded",
+  down: "Down",
+  absent: "Not built",
+};
+
+function HoverTip({ container }: { container: React.RefObject<HTMLDivElement | null> }) {
+  const hovered = useGame((s) => s.hovered);
+  const game = useGame((s) => s.game);
+  const tip = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = container.current;
+    if (!el) return;
+    const move = (e: PointerEvent) => {
+      if (!tip.current) return;
+      const r = el.getBoundingClientRect();
+      const x = Math.min(e.clientX - r.left + 16, r.width - 260);
+      const y = Math.min(e.clientY - r.top + 18, r.height - 110);
+      tip.current.style.transform = `translate(${Math.max(8, x)}px, ${Math.max(8, y)}px)`;
+    };
+    el.addEventListener("pointermove", move);
+    return () => el.removeEventListener("pointermove", move);
+  }, [container]);
+
+  const info = hovered ? equipmentInfo(game, hovered) : null;
+  const incident = game.phase === "incident" && game.incident;
+  let status = info ? STATE_WORDS[info.state] : "";
+  let summary = info?.summary ?? "";
+  let action = "";
+  if (info && incident) {
+    const checked = incident.evidence.some((e) => e.equipment === info.id);
+    status = symptomaticEquipment(game).includes(info.id) ? "Showing symptoms" : info.built ? "No alert" : "Not built";
+    summary = checked ? "Evidence collected" : info.built ? "Not yet investigated" : "";
+    action = checked || !info.built ? "" : "Click to investigate";
+  }
+
+  return (
+    <div ref={tip} className={`hover-tip${info ? " is-on" : ""}`} role="status" aria-live="off">
+      {info && (
+        <>
+          <strong>{info.name}</strong>
+          <span className={`hover-state tone-${incident ? (status === "Showing symptoms" ? "alert" : "ok") : info.state}`}>{status}</span>
+          {summary && <span className="hover-summary">{summary}</span>}
+          {action && <span className="hover-action">{action}</span>}
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function Facility() {
+  const container = useRef<HTMLDivElement>(null);
+  return (
+    <div className="stage-canvas" ref={container}>
+      <Canvas
+        orthographic
+        shadows="percentage"
+        dpr={[1, 1.75]}
+        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 200 }}
+        onPointerMissed={() => {
+          if (useGame.getState().game.phase !== "incident") useGame.getState().select(null);
+        }}
+        aria-label="Isometric view of the server room. Each equipment label is a button."
+      >
+        <Scene />
+      </Canvas>
+      <Labels />
+      <HoverTip container={container} />
+      <div className="camera-buttons" role="group" aria-label="Camera">
+        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" title="Zoom in">
+          +
+        </button>
+        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" title="Zoom out">
+          −
+        </button>
+        <button type="button" onClick={() => cameraApi.reset()} aria-label="Fit view" title="Fit view (drag to pan, scroll to zoom)">
+          ⌂
+        </button>
+      </div>
+    </div>
+  );
+}
