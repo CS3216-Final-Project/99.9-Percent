@@ -76,7 +76,9 @@ test('resumes an incident paused, investigates, fixes it and acknowledges the po
   await expect(panel.locator('.evidence')).toContainText('of capacity');
   await page.getByRole('button', { name: 'Pause the incident clock' }).click();
   const elapsed = (await savedGame(page)).incident!.elapsed;
+  const pausedClock = await clock.textContent();
   await page.clock.runFor(1000);
+  await expect(clock).toHaveText(pausedClock!);
   expect((await savedGame(page)).incident!.elapsed).toBe(elapsed);
   await panel.getByRole('button', { name: /^Add (a|\d+) server/ }).click();
   await page.getByRole('button', { name: '2×', exact: true }).click();
