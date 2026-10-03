@@ -50,6 +50,8 @@ The API runs without a database. For routes that use one, put Neon's connection 
 
 `npm run balance` in `frontend/` runs the scripted balancing players across twelve seeds.
 
+`npm run test:coverage` in either package generates coverage reports. For real browser tests, run `npx playwright install chromium` once in `frontend/`, then `npm run test:e2e`. See [testing guidance](docs/testing.md) for the test matrix, debugging and known gaps. Project instructions are in [AGENTS.md](AGENTS.md), with focused agent skills in `.agents/skills/`.
+
 Database scripts (`backend/` only):
 
 | Script | What it does |
@@ -75,8 +77,8 @@ To change the schema: edit `schema.ts`, run `npm run db:generate`, and commit th
 
 | Stage | When | Where | What |
 |---|---|---|---|
-| CI `frontend` | Every PR | GitHub Actions | lint, typecheck, tests, build |
-| CI `backend` | Every PR | GitHub Actions | lint, typecheck, tests (incl. migrations on in-memory Postgres), migrations match schema |
+| CI `frontend` | Every PR | GitHub Actions | lint, typecheck, coverage, build, desktop/touch browser tests |
+| CI `backend` | Every PR | GitHub Actions | lint, typecheck, coverage (incl. migrations on in-memory Postgres), migrations match schema |
 | Preview deploy | Every PR | Vercel | Preview URL for each project, linked on the PR |
 | Production deploy | Push to `main` | Vercel | Both projects |
 | Migrate database | Push to `main` | GitHub Actions (`cd.yml`) | `db:migrate` on the production Neon database |
