@@ -1,0 +1,102 @@
+import { BALANCE, type EquipmentId, type GameState } from "@/sim";
+
+/** Floor plan of the facility, in metres. X runs left to right, Z runs back to front. */
+export const ROOM = { w: 27, d: 19, wallH: 3.4 };
+
+export const RACK = { w: 0.95, d: 1.05, h: 2.1 };
+export const DB_CABINET = { w: 1.25, d: 1.2, h: 2.25 };
+
+export interface Footprint {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  /** Height of the tallest thing on the footprint; labels float above it. */
+  h: number;
+}
+
+const APP_COLS = 6;
+const APP_ORIGIN = { x: -6.6, z: -6.3 };
+const APP_PITCH = { x: 1.3, z: 2.7 };
+
+export function appSlot(index: number): { x: number; z: number } {
+  return {
+    x: APP_ORIGIN.x + (index % APP_COLS) * APP_PITCH.x,
+    z: APP_ORIGIN.z + Math.floor(index / APP_COLS) * APP_PITCH.z,
+  };
+}
+
+/** On-demand servers added by autoscaling stand in a row of their own. */
+export function tempSlot(index: number): { x: number; z: number } {
+  return { x: APP_ORIGIN.x + index * APP_PITCH.x, z: APP_ORIGIN.z + 2 * APP_PITCH.z };
+}
+
+export const MAX_TEMP_SHOWN = 6;
+
+export function dbSlot(index: number): { x: number; z: number } {
+  return { x: -3.4 + index * 1.42, z: 3.1 };
+}
+
+export function deskSlot(index: number): { x: number; z: number } {
+  return { x: -10.6 + (index % 4) * 2.15, z: 6.1 + Math.floor(index / 4) * 2.1 };
+}
+
+export const POS = {
+  gateway: { x: -11, z: -6.3 },
+  loadBalancer: { x: -9.75, z: -6.3 },
+  standby: { x: 2.7, z: -6.3 },
+  cache: { x: -6.6, z: 3.1 },
+  replica: { x: 3.9, z: 3.1 },
+  backup: { x: 6.6, z: 3.1 },
+  monitoring: { x: 8.2, z: -8.2 },
+  deploy: { x: 0.4, z: 7.1 },
+  growth: { x: 6.2, z: 7.1 },
+};
+
+function box(xs: number[], zs: number[], padX: number, padZ: number, h: number): Footprint {
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minZ = Math.min(...zs);
+  const maxZ = Math.max(...zs);
+  return { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2, w: maxX - minX + padX, d: maxZ - minZ + padZ, h };
+}
+
+export function footprint(s: GameState, id: EquipmentId): Footprint {
+  switch (id) {
+    case "gateway": {
+      const lb = s.techDone.includes("load_balancing");
+      return box([POS.gateway.x, lb ? POS.loadBalancer.x : POS.gateway.x], [POS.gateway.z], 1.5, 1.7, RACK.h);
+    }
+    case "app": {
+      const n = Math.min(s.infra.appHosts.length, BALANCE.server.maxWithLb);
+      const slots = Array.from({ length: n }, (_, i) => appSlot(i));
+      const temps = Array.from({ length: Math.min(s.live.tempServers, MAX_TEMP_SHOWN) }, (_, i) => tempSlot(i));
+      const all = [...slots, ...temps];
+      return box(all.map((p) => p.x), all.map((p) => p.z), 1.5, 1.7, RACK.h);
+    }
+    case "standby":
+      return { x: POS.standby.x, z: POS.standby.z, w: 1.5, d: 1.7, h: RACK.h };
+    case "cache":
+      return { x: POS.cache.x, z: POS.cache.z, w: 1.5, d: 1.7, h: 1.35 };
+    case "db": {
+      const n = s.infra.dbTier + 1;
+      const slots = Array.from({ length: n }, (_, i) => dbSlot(i));
+      return box(slots.map((p) => p.x), slots.map((p) => p.z), 1.8, 1.85, DB_CABINET.h);
+    }
+    case "replica":
+      return { x: POS.replica.x, z: POS.replica.z, w: 1.8, d: 1.85, h: DB_CABINET.h };
+    case "backup":
+      return { x: POS.backup.x, z: POS.backup.z, w: 2.2, d: 1.7, h: 1.3 };
+    case "monitoring":
+      return { x: POS.monitoring.x, z: POS.monitoring.z, w: 5, d: 1.5, h: 3 };
+    case "deploy":
+      return { x: POS.deploy.x, z: POS.deploy.z, w: 2, d: 1.6, h: 1.5 };
+    case "team": {
+      const n = Math.max(1, s.engineers);
+      const slots = Array.from({ length: n }, (_, i) => deskSlot(i));
+      return box(slots.map((p) => p.x), slots.map((p) => p.z), 2.1, 2.0, 1.5);
+    }
+    case "growth":
+      return { x: POS.growth.x, z: POS.growth.z, w: 3.4, d: 2.2, h: 2.1 };
+  }
+}

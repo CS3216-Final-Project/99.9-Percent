@@ -1,30 +1,61 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import App from './App.tsx';
-import { getHealth } from './lib/api.ts';
+import { StrictMode } from 'react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import App from './App';
+import { DEFAULT_META, loadGame, saveGame, saveMeta } from './game/persist';
+import { useGame } from './game/store';
+import { advanceTurn, BALANCE, newGame } from './sim';
 
-// The 3D scene needs WebGL, which jsdom doesn't have.
-vi.mock('./scene/World.tsx', () => ({ World: () => null }));
-vi.mock('./lib/api.ts', () => ({ getHealth: vi.fn() }));
+// Exercise the real game shell and store; jsdom cannot render WebGL.
+vi.mock('./components/scene/Facility', () => ({ default: () => <div data-testid="facility" /> }));
+
+beforeEach(() => {
+  localStorage.clear();
+  useGame.setState(useGame.getInitialState(), true);
+});
 
 afterEach(() => {
   cleanup();
-  vi.mocked(getHealth).mockReset();
+  localStorage.clear();
 });
 
-describe('App HUD', () => {
-  it('shows the language, level and API status', async () => {
-    vi.mocked(getHealth).mockResolvedValue({ status: 'ok', time: '2026-01-01T00:00:00Z' });
-    render(<App />);
+describe('prototype game in the Vite app', () => {
+  it('boots once under StrictMode and starts the first-run tutorial', async () => {
+    render(<StrictMode><App /></StrictMode>);
 
-    expect(screen.getByText('ja-JP · beginner')).toBeTruthy();
-    expect(await screen.findByText('API: ok (2026-01-01T00:00:00Z)')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '99.99%' })).toBeTruthy();
+    expect(await screen.findByTestId('facility')).toBeTruthy();
+    expect(useGame.getState().meta.runsStarted).toBe(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    expect(screen.getByRole('dialog', { name: /Tutorial, step 1/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(useGame.getState().meta.tutorialDone).toBe(true);
   });
 
-  it('shows the API as offline when the health check fails', async () => {
-    vi.mocked(getHealth).mockRejectedValue(new Error('API returned 503'));
+  it('advances weeks and saves progress without a backend connection', () => {
+    saveMeta({ ...DEFAULT_META, tutorialDone: true });
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next week' }));
+
+    expect(useGame.getState().game.turn).toBe(2);
+    const saved = loadGame();
+    expect(saved.status).toBe('ok');
+    if (saved.status === 'ok') expect(saved.game.turn).toBe(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tech' }));
+    expect(screen.getByRole('region', { name: 'Tech tree' })).toBeTruthy();
+  });
+
+  it('resumes an existing save instead of starting over', () => {
+    const game = advanceTurn(newGame(BALANCE.introSeed));
+    saveGame(game);
+    saveMeta({ ...DEFAULT_META, tutorialDone: true, runsStarted: 1 });
     render(<App />);
 
-    expect(await screen.findByText('API: offline: API returned 503')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue week 2' }));
+    expect(useGame.getState().game).toEqual(game);
+    expect(useGame.getState().meta.runsStarted).toBe(1);
   });
 });

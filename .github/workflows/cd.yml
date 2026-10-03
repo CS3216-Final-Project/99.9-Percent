@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      API_URL: ${{ vars.API_URL || 'https://lingoquest-backend.vercel.app' }}
+      API_URL: ${{ vars.API_URL || 'https://99-99-percent-backend.vercel.app' }}
     steps:
       # Retries while Vercel finishes deploying and Neon wakes up from idle.
       - name: API is up and reaches the database

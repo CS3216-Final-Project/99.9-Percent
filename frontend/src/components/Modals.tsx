@@ -1,0 +1,365 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { BALANCE, buildReport } from "@/sim";
+import { moneyFull, num, uptimePct } from "@/game/format";
+import { clearAnalytics, clearSave, readAnalytics, type AnalyticsEvent } from "@/game/persist";
+import { isFreshRun, useGame } from "@/game/store";
+import { Icon } from "./icons";
+import { Modal } from "./ui";
+import { OUTCOME_LABEL, outcomeTone, PostmortemBody, RunCharts } from "./Views";
+
+/* ------------------------------------------------------------------ */
+/* Title screen                                                        */
+/* ------------------------------------------------------------------ */
+
+/** The first thing anyone sees: the room, the name, the goal and one button. */
+export function TitleScreen() {
+  const game = useGame((s) => s.game);
+  const meta = useGame((s) => s.meta);
+  const play = useGame((s) => s.play);
+  const newRun = useGame((s) => s.newRun);
+  const startTutorialRun = useGame((s) => s.startTutorialRun);
+  const resumable = !isFreshRun(game) && game.phase !== "ended";
+
+  const fresh = () => (meta.tutorialDone ? newRun({}) : startTutorialRun());
+
+  return (
+    <div className="title-screen">
+      <div className="title-card">
+        <h1>99.99%</h1>
+        <p className="title-tag">Grow a startup. Keep it online.</p>
+        <p className="title-goal">
+          Reach {num(BALANCE.targetUsers)} users in {BALANCE.maxTurns} weeks.
+        </p>
+        <div className="title-actions">
+          {resumable ? (
+            <>
+              <button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}>
+                <Icon name="play" />
+                Continue week {game.turn}
+              </button>
+              <button type="button" className="btn btn-big" onClick={fresh}>
+                New game
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn-primary btn-big" autoFocus onClick={game.phase === "ended" ? fresh : play}>
+              <Icon name="play" />
+              Play
+            </button>
+          )}
+        </div>
+        {meta.tutorialDone && (
+          <button type="button" className="link-btn" onClick={startTutorialRun}>
+            Replay the tutorial
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* How to play (reference card, opened from the menu)                  */
+/* ------------------------------------------------------------------ */
+
+export function HowToPlay() {
+  const finish = useGame((s) => s.finishOnboarding);
+  return (
+    <Modal title="How to play" onClose={finish}>
+      <ul className="howto">
+        <li>
+          <Icon name="users" />
+          Reach {num(BALANCE.targetUsers)} users by week {BALANCE.maxTurns}. Do not run out of cash.
+        </li>
+        <li>
+          <Icon name="server" />
+          Click equipment to see it and act on it.
+        </li>
+        <li>
+          <Icon name="tree" />
+          Tech holds upgrades. Engineers build them, then you ship them.
+        </li>
+        <li>
+          <Icon name="next" />
+          Next week moves everything forward.
+        </li>
+        <li>
+          <Icon name="alert" />
+          In an incident, find the cause, then pick the matching fix.
+        </li>
+        <li>
+          <Icon name="pause" />
+          P pauses. Esc closes panels.
+        </li>
+      </ul>
+      <div className="modal-foot">
+        <span />
+        <button type="button" className="btn btn-primary" autoFocus onClick={finish}>
+          Got it
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Postmortem after an incident                                        */
+/* ------------------------------------------------------------------ */
+
+export function PostmortemModal() {
+  const game = useGame((s) => s.game);
+  const act = useGame((s) => s.act);
+  const pm = game.postmortems.find((p) => p.id === game.reviewId) ?? game.postmortems[game.postmortems.length - 1];
+  if (!pm) return null;
+  return (
+    <Modal title={pm.title} wide tone={pm.outcome === "failed" ? "alert" : undefined}>
+      <p className="pm-meta">
+        <span className={`tag tag-${outcomeTone(pm)}`}>{OUTCOME_LABEL[pm.outcome]}</span>
+        <span className="muted">Week {pm.turn}</span>
+      </p>
+      <PostmortemBody pm={pm} />
+      <div className="modal-foot">
+        <span />
+        <button type="button" className="btn btn-primary" autoFocus onClick={() => act({ type: "acknowledge_review" })}>
+          Continue
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* End of run                                                          */
+/* ------------------------------------------------------------------ */
+
+export function EndReport() {
+  const game = useGame((s) => s.game);
+  const newRun = useGame((s) => s.newRun);
+  const rate = useGame((s) => s.rate);
+  const rating = useGame((s) => s.rating);
+  const openView = useGame((s) => s.openView);
+  const view = useGame((s) => s.view);
+  const r = useMemo(() => buildReport(game), [game]);
+  if (view === "history") return null;
+
+  return (
+    <Modal title={r.headline} wide tone={r.outcome === "won" ? undefined : "alert"}>
+      <div className="report-top">
+        <div className={`grade grade-${r.grade}`} aria-label={`Grade ${r.grade}`}>
+          {r.grade}
+        </div>
+        <p className="report-summary">{r.summary}</p>
+      </div>
+
+      <dl className="stats">
+        <div>
+          <dt>Users</dt>
+          <dd>{num(r.users)}</dd>
+        </div>
+        <div>
+          <dt>Uptime</dt>
+          <dd>{uptimePct(r.uptime)}</dd>
+        </div>
+        <div>
+          <dt>Cash</dt>
+          <dd>{moneyFull(r.cash)}</dd>
+        </div>
+        <div>
+          <dt>Incidents</dt>
+          <dd>{r.incidents.total}</dd>
+        </div>
+      </dl>
+
+      <ul className="plain-list">
+        {r.takeaways.slice(0, 2).map((t) => (
+          <li key={t}>{t}</li>
+        ))}
+      </ul>
+
+      <div className="rating">
+        <p id="rating-label">Enjoyed it?</p>
+        <div className="rating-buttons" role="radiogroup" aria-labelledby="rating-label">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button type="button" key={n} role="radio" aria-checked={rating === n} aria-label={`${n} out of 5`} className={rating === n ? "is-on" : ""} onClick={() => rate(n)}>
+              {n}
+            </button>
+          ))}
+        </div>
+        <span className="muted">{rating ? "Thanks!" : "1 no, 5 loved it"}</span>
+      </div>
+
+      <details className="more">
+        <summary>Details</summary>
+        <dl className="rows">
+          <div className="row">
+            <dt>Score</dt>
+            <dd>{r.score} / 100</dd>
+          </div>
+          <div className="row">
+            <dt>Incidents</dt>
+            <dd>
+              {r.incidents.resolved} fixed, {r.incidents.mitigated} contained, {r.incidents.failed} failed, {r.incidents.automatic} automatic
+            </dd>
+          </div>
+          <div className="row">
+            <dt>Upgrades live</dt>
+            <dd>
+              {r.techCount} of {r.techTotal}
+            </dd>
+          </div>
+          <div className="row">
+            <dt>Deploys</dt>
+            <dd>
+              {r.releasesTested} tested, {r.releasesUntested} untested
+            </dd>
+          </div>
+          <div className="row">
+            <dt>Seed</dt>
+            <dd>{r.seed}</dd>
+          </div>
+        </dl>
+        <RunCharts game={game} compactSet />
+      </details>
+
+      <div className="modal-foot">
+        <button type="button" className="btn btn-quiet" onClick={() => openView("history")}>
+          History
+        </button>
+        <div className="btn-row">
+          <button type="button" className="btn" onClick={() => newRun({ seed: game.seed, voluntary: true })}>
+            Same seed
+          </button>
+          <button type="button" className="btn btn-primary" autoFocus onClick={() => newRun({ voluntary: true })}>
+            <Icon name="play" size={14} />
+            Play again
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Menu: save, new game, prototype data                                */
+/* ------------------------------------------------------------------ */
+
+function summarise(events: AnalyticsEvent[]) {
+  const count = (name: string) => events.filter((e) => e.name === name).length;
+  const ratings = events.filter((e) => e.name === "rating_submitted").map((e) => Number(e.data?.rating ?? 0));
+  return [
+    ["Runs started", count("run_started")],
+    ["Runs finished", count("run_finished")],
+    ["Tutorial finished", count("tutorial_completed") > 0 ? "yes" : "no"],
+    ["First incident started", count("first_incident_started") > 0 ? "yes" : "no"],
+    ["First incident completed", count("first_incident_completed") > 0 ? "yes" : "no"],
+    ["Incidents handled", count("incident_completed")],
+    ["Hints used", count("hint_used")],
+    ["Voluntary replays", count("voluntary_replay")],
+    ["Average rating", ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : "none"],
+  ] as [string, string | number][];
+}
+
+export function Menu() {
+  const game = useGame((s) => s.game);
+  const openView = useGame((s) => s.openView);
+  const saveNow = useGame((s) => s.saveNow);
+  const newRun = useGame((s) => s.newRun);
+  const showOnboarding = useGame((s) => s.showOnboarding);
+  const startTutorialRun = useGame((s) => s.startTutorialRun);
+  const notify = useGame((s) => s.notify);
+  const [seed, setSeed] = useState("");
+  const [confirm, setConfirm] = useState<"new" | "reset" | "tutorial" | null>(null);
+  const [events, setEvents] = useState<AnalyticsEvent[]>([]);
+
+  useEffect(() => setEvents(readAnalytics()), []);
+
+  const inProgress = !game.outcome && game.totals.weeks > 0;
+  const start = (kind: "new" | "reset" | "tutorial") => {
+    if (inProgress && confirm !== kind) {
+      setConfirm(kind);
+      return;
+    }
+    if (kind === "tutorial") {
+      startTutorialRun();
+    } else if (kind === "reset") {
+      clearSave();
+      newRun({ seed: BALANCE.introSeed });
+    } else {
+      newRun({ seed: seed.trim() });
+    }
+  };
+  const label = (kind: "new" | "reset" | "tutorial", text: string) => (confirm === kind ? "Lose this run? Press again" : text);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(events, null, 2));
+      notify("Copied", "success");
+    } catch {
+      notify("Could not reach the clipboard.", "error");
+    }
+  };
+
+  return (
+    <Modal title="Menu" onClose={() => openView(null)}>
+      <p className="muted">
+        Week {Math.min(game.turn, BALANCE.maxTurns)}, seed {game.seed}. Saved automatically in this browser.
+      </p>
+      <div className="btn-row">
+        <button type="button" className="btn" onClick={saveNow}>
+          Save now
+        </button>
+        <button type="button" className="btn" onClick={showOnboarding}>
+          How to play
+        </button>
+        <button type="button" className={`btn ${confirm === "tutorial" ? "btn-danger" : ""}`} onClick={() => start("tutorial")}>
+          {label("tutorial", "Tutorial")}
+        </button>
+      </div>
+
+      <h4>New game</h4>
+      <label className="field">
+        <span>Seed (optional): the same seed replays the same run.</span>
+        <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
+      </label>
+      <div className="btn-row">
+        <button type="button" className={`btn ${confirm === "new" ? "btn-danger" : "btn-primary"}`} onClick={() => start("new")}>
+          {label("new", "New game")}
+        </button>
+        <button type="button" className={`btn ${confirm === "reset" ? "btn-danger" : ""}`} onClick={() => start("reset")}>
+          {label("reset", "Reset to first run")}
+        </button>
+      </div>
+
+      <details className="more">
+        <summary>Prototype data ({events.length} events)</summary>
+        <p className="muted">Kept in this browser only.</p>
+        <dl className="rows">
+          {summarise(events).map(([k, v]) => (
+            <div className="row" key={k}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="btn-row">
+          <button type="button" className="btn" onClick={copy} disabled={events.length === 0}>
+            Copy as JSON
+          </button>
+          <button
+            type="button"
+            className="btn btn-quiet"
+            disabled={events.length === 0}
+            onClick={() => {
+              clearAnalytics();
+              setEvents([]);
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      </details>
+    </Modal>
+  );
+}

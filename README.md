@@ -1,6 +1,8 @@
-# LingoQuest
+# 99.99%
 
-A 3D web game for practising a language by talking to AI characters. CS3216 Final Project, Group 5.
+A software-startup infrastructure tycoon game. Grow to 50,000 users in 26 weeks, manage upgrades and engineers, and survive production incidents. CS3216 Final Project, Group 5.
+
+The playable frontend was migrated from [99.9-Percent-Prototype](https://github.com/CS3216-Final-Project/99.9-Percent-Prototype). The existing backend, database, shared contracts and CI/CD configuration are retained. See [the migration notes](docs/prototype-migration.md) for the imported features and verification steps.
 
 ## Structure
 
@@ -30,7 +32,9 @@ npm install
 npm run dev
 ```
 
-The page should show a grey box on a green plane and `API: ok` in the top-left corner.
+The frontend opens the 99.99% title screen and an isometric server room. Press Play to begin the guided first week. Drag to pan, scroll or pinch to zoom, and click equipment to inspect it. `P` pauses or resumes; `Esc` closes a view.
+
+Gameplay, saves and prototype analytics run in the browser and work without the API. Saves stay in this browser and origin; saves on the prototype deployment do not automatically move to a new domain. The backend retains its existing health and dialogue endpoints for later integration.
 
 The API runs without a database. For routes that use one, put Neon's connection strings in `backend/.env` (ask Di Heng, or use your own Neon branch).
 
@@ -42,7 +46,9 @@ The API runs without a database. For routes that use one, put Neon's connection 
 | `npm run lint` | oxlint |
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Production build (frontend) / type check (backend) |
-| `npm test` | Tests (vitest). Frontend: HUD, API client, store (the 3D scene is mocked, as jsdom has no WebGL). Backend: routes, CORS, and every migration on an in-memory Postgres. |
+| `npm test` | Tests (vitest). Frontend: simulation, scripted balance players, game startup, tutorial, save/resume, and API client (WebGL is mocked in UI tests). Backend: routes, CORS, and every migration on an in-memory Postgres. |
+
+`npm run balance` in `frontend/` runs the scripted balancing players across twelve seeds.
 
 Database scripts (`backend/` only):
 
@@ -94,16 +100,18 @@ Two Vercel projects from this repo, in the `hoo-di-hengs-projects` Vercel team. 
 
 | Project | Root directory | Env vars (type) |
 |---|---|---|
-| `frontend` | `frontend` | `VITE_API_URL` (Config) |
+| `frontend` | `frontend` | `VITE_API_URL=https://99-99-percent-backend.vercel.app` (Config) |
 | `lingoquest-backend` | `backend` | `CORS_ORIGINS` (Config), `DATABASE_URL` (Secret, pooled), `OPENAI_API_KEY` (Secret) |
 
-`CORS_ORIGINS` should list the frontend's production URL and a pattern for its previews, e.g. `https://<frontend-production-domain>,https://frontend-*-hoo-di-hengs-projects.vercel.app`.
+Production frontend: [99-99-percent-web.vercel.app](https://99-99-percent-web.vercel.app). Production backend: [99-99-percent-backend.vercel.app](https://99-99-percent-backend.vercel.app).
+
+Set `CORS_ORIGINS` in the backend's Vercel settings to `https://99-99-percent-web.vercel.app,https://frontend-*-hoo-di-hengs-projects.vercel.app`. The preview pattern follows the existing Vercel project name, independently of its production domain. Local `.env.example` files retain localhost values for development and document the production values separately. Changing a domain does not update Vercel environment variables; redeploy after changing those settings.
 
 GitHub Actions (Settings > Secrets and variables > Actions):
 
 | Name | Kind | Value |
 |---|---|---|
 | `DATABASE_URL_UNPOOLED` | Secret | Neon's direct connection string, used by the migration |
-| `API_URL` | Variable (optional) | Production API URL for the smoke test. Defaults to `https://lingoquest-backend.vercel.app` |
+| `API_URL` | Variable (optional) | Production API URL for the smoke test. Defaults to `https://99-99-percent-backend.vercel.app`. If set explicitly, it must use this new URL too. |
 
 Merges to `main` deploy to production. Pull requests get preview links.
