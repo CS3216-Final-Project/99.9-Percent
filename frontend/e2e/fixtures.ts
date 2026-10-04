@@ -28,12 +28,14 @@ export async function savedGame(page: Page): Promise<GameState> {
 }
 
 export async function expectRoom(page: Page) {
-  const canvas = page.locator('canvas');
+  const room = page.getByRole('main');
+  const canvas = room.locator('canvas');
   await expect(canvas).toBeVisible();
   // A visible canvas alone does not prove that WebGL initialized successfully.
   await expect.poll(() => canvas.evaluate(el => {
     const gl = (el as HTMLCanvasElement).getContext('webgl2');
     return !!gl && !gl.isContextLost();
   })).toBe(true);
-  await expect(page.getByRole('button', { name: 'Servers', exact: true })).toBeVisible();
+  // The incident panel has its own Servers control outside the room.
+  await expect(room.getByRole('button', { name: 'Servers', exact: true })).toBeVisible();
 }
