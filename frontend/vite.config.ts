@@ -16,5 +16,12 @@ export default defineConfig({
   test: {
     // UI tests mock the WebGL facility; pure simulation tests run in Node.
     environment: 'jsdom',
+    include: ['src/**/*.test.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/sim/**/*.ts', 'src/game/**/*.ts', 'src/lib/**/*.ts'],
+      exclude: ['**/__tests__/**'],
+      reporter: ['text', 'html', 'json-summary'],
+    },
   },
 })

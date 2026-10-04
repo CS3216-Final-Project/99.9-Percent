@@ -32,8 +32,27 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Browser journeys against the production build
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          if-no-files-found: ignore
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-results
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
 
   backend:
     runs-on: ubuntu-latest
@@ -51,7 +70,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       # Also applies every migration to an in-memory Postgres (test/db.test.ts).
-      - run: npm test
+      - run: npm run test:coverage
       - name: Check migrations match the schema
         run: |
           npm run db:generate
@@ -60,3 +79,10 @@ jobs:
             git status --porcelain -- drizzle
             exit 1
           fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage/
+          if-no-files-found: ignore
+          retention-days: 14

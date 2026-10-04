@@ -10,3 +10,7 @@ dist/
 # Blender source files live in Google Drive, not Git
 *.blend
 *.blend1
+coverage/
+playwright-report/
+test-results/
+blob-report/
