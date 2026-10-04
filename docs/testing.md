@@ -40,6 +40,15 @@ Coverage is a baseline report, with no arbitrary global percentage gate. Fronten
 
 Still needed as the product grows: Firefox/WebKit and real-device checks, broader keyboard/screen-reader accessibility review, performance budgets, and integration tests for any new server-backed gameplay. Add these when their features or support commitments exist; do not label the current suite comprehensive.
 
+## 🔑 Planned Google authentication coverage
+
+Google OAuth and cloud saves are roadmap work; the current suite does not cover them yet. Follow the [authentication contract](AUTHENTICATION.md) when implementation lands:
+
+- **API:** mock Google code exchange/token validation; reject invalid/replayed callbacks, expired/revoked sessions and CSRF; verify two-account save isolation and revision conflicts.
+- **Database:** test additive account/session/attempt migrations and constraints with PGlite; verify the actual Neon driver on an isolated test deployment.
+- **Browser:** Google cancellation, session restoration/sign-out, explicit guest-run attachment, offline changes and preserved legacy keys. Stub provider responses for repeatable CI.
+- **Deployment:** manually verify real Google sign-in with two test accounts on registered production/auth-test origins, exact callbacks, proxy cookies and private-response cache headers.
+
 ## Agent guidance
 
 `AGENTS.md` establishes project boundaries and validation rules. Six focused skills under `.agents/skills/` cover simulation, browser tests, gameplay UI, API tests, migrations and release checks. Their instructions support this runnable toolkit; they do not replace tests or authorize deployment.

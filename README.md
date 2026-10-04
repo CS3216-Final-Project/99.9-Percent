@@ -4,6 +4,10 @@ A software-startup infrastructure tycoon game. Grow to 50,000 users in 26 weeks,
 
 The playable frontend was migrated from [99.9-Percent-Prototype](https://github.com/CS3216-Final-Project/99.9-Percent-Prototype). The existing backend, database, shared contracts and CI/CD configuration are retained. See [the migration notes](docs/prototype-migration.md) for the imported features and verification steps.
 
+See the [Development Roadmap](docs/DEVELOPMENT_ROADMAP.md) for planned work and the [roadmap summary and proposal review](docs/DEVELOPMENT_ROADMAP_REVIEW.md) for milestones, scope alignment, and decisions to review.
+
+The [System Architecture](docs/SYSTEM_ARCHITECTURE.md) diagrams show the target MVP's frontend, simulation, Google OAuth, saves, API and Neon database, plus the infrastructure simulated inside the game. [🔑 Authentication](docs/AUTHENTICATION.md) defines the planned Google sign-in and app sessions; implementation is scheduled in the roadmap.
+
 ## Structure
 
 ```
