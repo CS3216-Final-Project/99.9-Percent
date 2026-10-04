@@ -1,4 +1,8 @@
-# Development roadmap: one continuous System Design Tycoon campaign
+# Development Roadmap: one continuous System Design Tycoon campaign
+
+> Start with the [roadmap summary and proposal review](DEVELOPMENT_ROADMAP_REVIEW.md). The detailed phase specifications are in [phases/](phases/).
+>
+> Proposal reference: [99.99% Google Doc](https://docs.google.com/document/d/1VZQgBruLhEUj_p7P7EK_jIpkQpg_v2m1Gyh0ZCr8ceo/edit?tab=t.26iodeiyag9x). The review distinguishes proposal commitments from additional implementation decisions in this roadmap.
 
 ## 1. Revised product architecture
 
@@ -9,7 +13,8 @@ The first 10–15 minutes introduce one main incident and approximately 3–4 me
 ### Decisions established
 
 - The introductory experience ends at a milestone, with the same campaign available to continue.
-- Accounts and cloud saves are required for the final MVP.
+- Authentication, accounts, and owner-scoped cloud saves are required for the final MVP. Guest play remains available.
+- Preserve existing prototype saves and their metadata; replacing the campaign must not erase them.
 - Metrics and alerts are available immediately.
 - Later mechanics appear progressively within the campaign.
 - Replay creates a new company with different seeded conditions.
@@ -48,18 +53,37 @@ By PR2, the new engine is the default campaign foundation. Remove obsolete datab
 
 Old saves remain preserved separately. Do not reinterpret old weekly-campaign saves as new simulation state.
 
+Preservation is a prerequisite for introducing the replacement loader: leave `nn.save.v1`, `nn.meta.v1`, and `nn.analytics.v1` intact, and use a separate namespace for new campaign saves, onboarding metadata, and telemetry. Offer export of the legacy save without requiring the legacy campaign to remain playable. Reset, sign-out, and failed validation must not delete legacy data. Automatic conversion is outside the MVP; any future importer must validate a copy and retain the original.
+
 ### Backend choice
 
-Use **Supabase Auth and PostgreSQL** for accounts, saves, and analytics, while keeping simulation client-side and preserving static frontend deployment where practical.
+Keep the existing **Neon PostgreSQL + Drizzle + Express API** backend and **React + Vite + TypeScript + Zustand** frontend. Simulation stays client-side; retain the two existing Vercel projects and GitHub Actions pipeline. No database-provider or Next.js migration is required.
+
+The existing repository setup supports these requirements; the integration constraints and required additions are recorded below.
 
 - Allow immediate guest play with local autosave.
-- Offer email-based sign-in to enable cloud saves.
+- Add email-based sign-in to enable cloud saves. Authentication is not implemented in the current repository; select a compatible provider or session implementation during backend foundation work without changing the database provider.
 - Associate an existing local run with its owner after sign-in.
-- Enforce ownership using database access policies.
-- Use revision checks for cloud updates; preserve both versions on conflict rather than silently overwriting.
+- Verify identity in Express and enforce ownership in every save read/write query. The browser uses the API; Neon credentials remain server-side. Database row policies may add defence in depth, but are not a substitute for verified API authorization.
+- Use an atomic owner-and-revision-conditional update for cloud saves; preserve both versions on conflict rather than silently overwriting. This fits the existing Neon HTTP driver without an interactive transaction.
 - Queue analytics and save updates during connectivity loss.
-- Use a validated ingestion endpoint for guest analytics and public sign-ups; never expose privileged database credentials.
+- Add validated Express ingestion endpoints for guest analytics and public sign-ups; never expose database credentials to the frontend.
+- Add game-specific account/run/save/event/sign-up tables through Drizzle migrations. Existing language-learning mission tables are legacy structures, not ready-made campaign storage.
+- Keep pooled `DATABASE_URL` for runtime queries and `DATABASE_URL_UNPOOLED` for migrations. Preserve the Singapore backend region and existing preview/production configuration.
+- Use new versioned local-save keys before loading the replacement campaign. The legacy loader deletes incompatible saves, so a version bump alone does not preserve them.
+- Keep the landing page in the Vite app; use an entry-screen or hash navigation initially. If introducing pathname routes, add and verify the appropriate SPA fallback on Vercel.
 - Do not build multiplayer, server-authoritative gameplay, or competitive leaderboards.
+
+### Authentication delivery and acceptance
+
+**Owner: Di Heng**, with frontend account UI integrated alongside the game UI.
+
+- **Phase 2 / PR1:** choose and configure the email authentication flow, identity/session validation, account schema, and callback origins for the existing Vite/Express deployments. PR1 gameplay remains guest-first and does not depend on authentication being complete.
+- **Phase 3 / 12–16 October:** deliver working first-time account access and returning-user sign-in, session restoration, sign-out, and owner-scoped cloud save/resume. A guest can explicitly attach their current new-format run after signing in without changing the company or run ID.
+- **Phase 5 / PR2:** complete account UI, save status, conflict handling, expired-session recovery, and production/preview configuration. Local play continues when authentication or connectivity fails.
+- **Phase 8 / evaluation freeze:** verify two-account isolation, expired/invalid sessions, sign-out, guest-to-account attachment, cloud conflicts, and cross-session resume against the chosen authentication integration and Neon API.
+
+Final-MVP acceptance requires a player to enter the email flow, return in a fresh session, resume their own cloud run, and sign out. The API rejects unauthenticated private-save requests and prevents another account reading or overwriting the run. Switching accounts must not automatically attach a previously signed-in owner's local snapshot to the next account. Preserve pending local changes for the original owner; only explicitly selected guest runs may be attached to an account.
 
 ## 2. Phased development roadmap
 
@@ -79,6 +103,7 @@ Dates below use the supplied course schedule and Singapore time. Phases overlap;
 - Define the campaign state and UI snapshot contracts.
 - Identify reusable controls, charts, scene interactions, and persistence.
 - Separate temporary legacy initialization from the new campaign constructor.
+- Inventory legacy storage keys and record old-save fixtures; agree a separate namespace and export path before replacement persistence is implemented.
 
 **Existing modules:** Simulation types, entrypoint, state initialization, store, persistence, test configuration.
 
@@ -88,7 +113,7 @@ Dates below use the supplied course schedule and Singapore time. Phases overlap;
 
 **Human validation:** Observe a small number of current-prototype sessions to identify confusing controls and useful interactions.
 
-**Definition of done:** Baseline is documented, known failures have owners, contracts are agreed, and frontend work can use fixtures.
+**Definition of done:** Baseline is documented, known failures have owners, contracts are agreed, frontend work can use fixtures, and legacy-save preservation is part of the persistence contract.
 
 **Dependencies:** Current repository.
 
@@ -148,9 +173,10 @@ Dates below use the supplied course schedule and Singapore time. Phases overlap;
 - Build a minimal 2D architecture view with fixed layout, selection, and hover details.
 - Expose only the opening controls.
 - Add local save/reset and clear bankruptcy/recovery flows.
+- Preserve legacy save/meta/analytics keys, add separate new-campaign storage, and provide legacy save export before using the new loader.
 - Award the first milestone once; preserve architecture, cash, and ongoing restrictions.
 - Introduce basic run/action/incident analytics.
-- Start backend provisioning, authentication, and cloud-save work in parallel.
+- Extend the existing Neon/Express backend with authentication and cloud-save work in parallel.
 - Publish a simple landing page with a play/sign-up call to action.
 
 **Existing modules:** Game shell, tutorial/advisor, inspectors, incident panel, views/modals, styles, store and persistence.
@@ -186,6 +212,7 @@ Dates below use the supplied course schedule and Singapore time. Phases overlap;
 - Reveal scaling options after the opening milestone.
 - Continue the same finances, architecture, and event history.
 - Deliver working account sign-in and owner-scoped cloud saves.
+- Include first-time account access, returning-user sign-in, session restoration, sign-out, and explicit guest-run attachment.
 
 **Existing modules:** State/types, step engine, actions, derived metrics, equipment controls, architecture view, persistence.
 
@@ -256,6 +283,7 @@ Dates below use the supplied course schedule and Singapore time. Phases overlap;
 - Hide unimplemented reliability nodes from normal interaction until Phase 6.
 - Remove the player-facing legacy campaign route.
 - Complete cloud-save and account usability.
+- Verify expired-session recovery and account switching without losing or reassigning local progress.
 
 **Existing modules:** Technology definitions/tree, campaign state, actions, store, reports, menu, save validation.
 

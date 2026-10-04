@@ -664,16 +664,24 @@ owner-scoped cloud saves
 
 This is a parallel release requirement, not a simulation mechanic.
 
-Recommended behavior:
+Required MVP behavior:
 
 - guest play remains available;
 - player can sign in;
+- first-time and returning players can complete the chosen email authentication flow;
+- a session can be restored after reload, and the player can sign out;
+- expired or failed authentication offers reauthentication while preserving local progress;
 - current local run can be associated with the authenticated owner;
 - cloud saves are scoped to that user;
 - one user cannot load another user's run;
 - save revisions prevent silent overwrites.
+- switching accounts does not automatically attach the previous account's local run to the next account; guest-run attachment requires an explicit selection.
 
 Use the backend foundation started in Phase 2.
+
+Retain Neon/Drizzle behind the existing Express API. Verify the account identity on the server and include the owner in every save query. Do not trust an owner ID supplied in a save payload.
+
+Perform revision checks atomically: one update matches the save ID, verified owner, and expected revision, updates the snapshot, and increments the revision. A prior SELECT followed by an unconditional UPDATE is insufficient. The existing Neon HTTP driver supports this single-statement approach; do not assume callback-style interactive transactions. Test two concurrent saves from the same revision: one succeeds and the other receives a conflict, with local copies preserved.
 
 Do not make authentication mandatory to begin the game.
 
@@ -691,6 +699,8 @@ Phase 3 save state must persist:
 - same campaign identity.
 
 If the schema version changes, migrate or safely reject incompatible saves rather than silently corrupting state.
+
+Rejection must be non-destructive: retain the original data and offer export. Preserve all legacy prototype keys, and test that sign-in, sign-out, cloud resume, and failed migration do not remove or overwrite them. Supported new-format migrations operate on a copy and replace the active save only after validation succeeds.
 
 ---
 
@@ -1102,10 +1112,14 @@ Phase 3 is complete only when all of the following are true.
 
 - [ ] Guest play still works.
 - [ ] Account sign-in works.
+- [ ] First-time account access, returning-user sign-in, session restoration, and sign-out work.
+- [ ] Expired authentication preserves local changes and can be recovered.
+- [ ] Account switching never silently reassigns an owned run.
 - [ ] Cloud save works for authenticated users.
 - [ ] Saves are owner-scoped.
 - [ ] Cloud revision handling prevents silent overwrite.
 - [ ] Cross-session resume preserves the same campaign.
+- [ ] Legacy save/meta/analytics values remain unchanged and the legacy save can be exported.
 
 ## Testing
 

@@ -670,6 +670,10 @@ Requirements:
 - no silent overwrite;
 - guest play remains possible;
 - auth errors do not destroy local progress.
+- session restoration, sign-out, and expired-session recovery work;
+- account switching does not attach another owner's local run;
+- legacy save/meta/analytics keys remain untouched, including during reset and account changes;
+- legacy save export remains available after removing the player-facing legacy campaign.
 
 ---
 

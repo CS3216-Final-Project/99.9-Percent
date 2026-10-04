@@ -610,7 +610,7 @@ Verify:
 
 - production deployment;
 - environment variables;
-- backend access policies;
+- backend identity verification and owner-filtered Neon save queries;
 - analytics endpoint;
 - auth redirects;
 - static assets;

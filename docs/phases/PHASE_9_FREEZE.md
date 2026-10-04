@@ -236,7 +236,7 @@ Check:
 - environment variables;
 - backend connectivity;
 - auth redirect URLs;
-- database access policies;
+- backend authorization and owner-filtered database queries;
 - analytics endpoint;
 - static assets;
 - cache headers where relevant;
