@@ -22,6 +22,8 @@ The first 10–15 minutes introduce one main incident and approximately 3–4 me
 
 ### Architecture to build toward
 
+See the [System Architecture diagrams](SYSTEM_ARCHITECTURE.md) for application/deployment boundaries and the separate infrastructure model inside the game.
+
 | Layer | Responsibility |
 |---|---|
 | Deterministic simulation | Traffic, component processing, backlog, latency, errors, action delays, costs, failures |

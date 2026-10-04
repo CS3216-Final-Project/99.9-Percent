@@ -6,6 +6,8 @@ The playable frontend was migrated from [99.9-Percent-Prototype](https://github.
 
 See the [Development Roadmap](docs/DEVELOPMENT_ROADMAP.md) for planned work and the [roadmap summary and proposal review](docs/DEVELOPMENT_ROADMAP_REVIEW.md) for milestones, scope alignment, and decisions to review.
 
+The [System Architecture](docs/SYSTEM_ARCHITECTURE.md) diagrams show the target MVP's frontend, simulation, authentication, saves, API and Neon database, plus the infrastructure simulated inside the game.
+
 ## Structure
 
 ```
