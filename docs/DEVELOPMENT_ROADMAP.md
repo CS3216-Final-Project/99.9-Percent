@@ -64,7 +64,7 @@ Keep the existing **Neon PostgreSQL + Drizzle + Express API** backend and **Reac
 The existing repository setup supports these requirements; the integration constraints and required additions are recorded below.
 
 - Allow immediate guest play with local autosave.
-- Add email-based sign-in to enable cloud saves. Authentication is not implemented in the current repository; select a compatible provider or session implementation during backend foundation work without changing the database provider.
+- Add **Google OAuth with OpenID Connect** to enable cloud saves. Google is the confirmed sign-in provider; implementation remains planned. Express handles the authorization code flow and issues an app session stored in Neon. See [🔑 Authentication](AUTHENTICATION.md) for identity, session, and deployment contracts.
 - Associate an existing local run with its owner after sign-in.
 - Verify identity in Express and enforce ownership in every save read/write query. The browser uses the API; Neon credentials remain server-side. Database row policies may add defence in depth, but are not a substitute for verified API authorization.
 - Use an atomic owner-and-revision-conditional update for cloud saves; preserve both versions on conflict rather than silently overwriting. This fits the existing Neon HTTP driver without an interactive transaction.
@@ -80,12 +80,12 @@ The existing repository setup supports these requirements; the integration const
 
 **Owner: Di Heng**, with frontend account UI integrated alongside the game UI.
 
-- **Phase 2 / PR1:** choose and configure the email authentication flow, identity/session validation, account schema, and callback origins for the existing Vite/Express deployments. PR1 gameplay remains guest-first and does not depend on authentication being complete.
-- **Phase 3 / 12–16 October:** deliver working first-time account access and returning-user sign-in, session restoration, sign-out, and owner-scoped cloud save/resume. A guest can explicitly attach their current new-format run after signing in without changing the company or run ID.
+- **Phase 2 / PR1:** configure the Google OAuth web client, consent screen, exact callback URLs, backend identity validation, and additive account/session schema. Plan a frontend `/api` proxy to the existing Express deployment and a local Vite proxy for cookie-based app sessions. PR1 gameplay remains guest-first and does not depend on authentication being complete.
+- **Phase 3 / 12–16 October:** deliver working Google sign-in for first-time and returning players, app-session restoration, sign-out, and owner-scoped cloud save/resume. A guest can explicitly attach their current new-format run after signing in without changing the company or run ID.
 - **Phase 5 / PR2:** complete account UI, save status, conflict handling, expired-session recovery, and production/preview configuration. Local play continues when authentication or connectivity fails.
-- **Phase 8 / evaluation freeze:** verify two-account isolation, expired/invalid sessions, sign-out, guest-to-account attachment, cloud conflicts, and cross-session resume against the chosen authentication integration and Neon API.
+- **Phase 8 / evaluation freeze:** verify Google sign-in/cancellation, invalid callbacks, two-account isolation, expired/invalid app sessions, sign-out, guest-to-account attachment, cloud conflicts, and cross-session resume against the Google integration and Neon API.
 
-Final-MVP acceptance requires a player to enter the email flow, return in a fresh session, resume their own cloud run, and sign out. The API rejects unauthenticated private-save requests and prevents another account reading or overwriting the run. Switching accounts must not automatically attach a previously signed-in owner's local snapshot to the next account. Preserve pending local changes for the original owner; only explicitly selected guest runs may be attached to an account.
+Final-MVP acceptance requires a player to sign in with Google, return in a fresh browser session and sign in again if needed, resume their own cloud run, and sign out. Reloads restore an unexpired app session. The API rejects unauthenticated private-save requests and prevents another account reading or overwriting the run. Switching accounts must not automatically attach a previously signed-in owner's local snapshot to the next account. Preserve pending local changes for the original owner; only explicitly selected guest runs may be attached to an account.
 
 ## 2. Phased development roadmap
 
@@ -213,7 +213,7 @@ Dates below use the supplied course schedule and Singapore time. Phases overlap;
 - Separate installed capacity from capacity that actually receives traffic.
 - Reveal scaling options after the opening milestone.
 - Continue the same finances, architecture, and event history.
-- Deliver working account sign-in and owner-scoped cloud saves.
+- Deliver working Google sign-in and owner-scoped cloud saves.
 - Include first-time account access, returning-user sign-in, session restoration, sign-out, and explicit guest-run attachment.
 
 **Existing modules:** State/types, step engine, actions, derived metrics, equipment controls, architecture view, persistence.

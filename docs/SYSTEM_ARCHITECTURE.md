@@ -29,19 +29,20 @@ flowchart TB
     end
 
     subgraph backend["☁️ Vercel backend · Singapore"]
-        api["🛡️ Express API"]
+        api["🛡️ Express API<br/>App sessions"]
         drizzle["🔌 Drizzle"]
         api --> drizzle
     end
 
-    auth["🔑 Email authentication<br/>Integration TBD"]
+    auth["🔑 Google OAuth<br/>OpenID Connect"]
     neon[("🐘 Neon PostgreSQL")]
 
     player --> ui
-    ui -.->|"Sign in / out"| auth
-    sync -.->|"HTTPS"| api
+    ui -.->|"Sign in / out · /api"| api
+    sync -.->|"HTTPS · /api proxy"| api
     api -.->|"Save / conflict"| sync
-    api -.->|"Verify identity"| auth
+    api -.->|"Google sign-in"| auth
+    auth -.->|"Verified identity"| api
     drizzle --> neon
 
     classDef existing fill:#e8f2ff,stroke:#2563eb,color:#172554;
@@ -52,7 +53,7 @@ flowchart TB
     class sync,auth planned;
 ```
 
-🆕 Authentication, cloud saves, centralized analytics and game tables are planned. 🛠️ The 2D UI and shared simulation engine extend the current prototype. The auth box leaves provider/session implementation open.
+🆕 Google OAuth, app sessions, cloud saves and centralized analytics are planned. 🛠️ The 2D UI and shared simulation extend the prototype. [🔑 Auth flow](AUTHENTICATION.md)
 
 | | Lives here | Handles |
 |---|---|---|
@@ -89,11 +90,11 @@ flowchart LR
 | | Rule |
 |---|---|
 | ⚙️ Gameplay | Pure, seeded browser simulation. UI reads its results; the backend stores data. |
-| 🔑 Accounts | Guest play stays available. MVP requires sign-in/out and cloud resume; the API verifies ownership. |
+| 🔑 Accounts | Google sign-in + app sessions. Guest play stays available; the API verifies save ownership. |
 | 💾 New saves | Separate storage namespace. Atomic owner + revision checks; conflicts retain local copies. |
 | 🔒 Old saves | Keep `nn.save.v1`, `nn.meta.v1`, `nn.analytics.v1` intact and exportable, including on reset/logout. |
 | 📡 Requests | Bound snapshots/events to the current 1 MB limit; queue while offline and deduplicate events. |
-| 🛡️ Secrets | Database/auth secrets stay server-side. Browser uses `VITE_API_URL`. |
+| 🛡️ Secrets | Database/auth secrets stay server-side. Planned same-origin `/api` proxy + HttpOnly session cookie. |
 | ☁️ Deployment | Keep both Vercel projects and Neon. Additive Drizzle migrations; existing CI/CD stays. |
 
 📚 Details: [roadmap](DEVELOPMENT_ROADMAP.md) · [testing](testing.md) · [setup](../README.md)

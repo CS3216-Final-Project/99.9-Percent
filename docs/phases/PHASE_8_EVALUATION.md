@@ -539,10 +539,14 @@ A temporary network failure should not destroy the player's run or the evaluatio
 
 ---
 
-## 4.15 Authentication and save validation
+## 4.15 Google authentication and save validation
 
 Recheck:
 
+- Google sign-in for new and returning players, plus consent cancellation;
+- rejected invalid/replayed callbacks and invalid Google identity tokens;
+- app-session restoration, expiry, revocation on sign-out, and account switching;
+- exact callback URLs, same-origin proxy/cookie forwarding, and uncached private responses on production and the configured auth-test preview;
 - owner-scoped cloud saves;
 - no cross-user access;
 - guest play;
@@ -612,7 +616,7 @@ Verify:
 - environment variables;
 - backend identity verification and owner-filtered Neon save queries;
 - analytics endpoint;
-- auth redirects;
+- registered Google callback URLs and app-session cookies through the `/api` proxy; see [authentication](../AUTHENTICATION.md);
 - static assets;
 - scenario/version config.
 
@@ -1032,7 +1036,7 @@ Phase 8 is complete only when all of the following are true.
 ## Persistence/security
 
 - [ ] Guest play works.
-- [ ] Auth works.
+- [ ] Google sign-in, invalid-callback rejection, and app-session restoration/expiry/sign-out work.
 - [ ] Save ownership is enforced.
 - [ ] Cloud conflicts are safe.
 - [ ] Local fallback works.

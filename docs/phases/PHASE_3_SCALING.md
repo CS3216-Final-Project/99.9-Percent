@@ -658,7 +658,7 @@ Do not implement the entire nine-node research tree yet.
 The master roadmap requires Phase 3 to deliver:
 
 ```text
-working account sign-in
+working Google sign-in
 owner-scoped cloud saves
 ```
 
@@ -667,9 +667,10 @@ This is a parallel release requirement, not a simulation mechanic.
 Required MVP behavior:
 
 - guest play remains available;
-- player can sign in;
-- first-time and returning players can complete the chosen email authentication flow;
-- a session can be restored after reload, and the player can sign out;
+- player can sign in with Google;
+- first-time sign-in creates an account; returning Google sign-in resolves the same account;
+- an unexpired app session can be restored after reload, and sign-out revokes that session;
+- cancelling Google sign-in returns to playable guest/local state;
 - expired or failed authentication offers reauthentication while preserving local progress;
 - current local run can be associated with the authenticated owner;
 - cloud saves are scoped to that user;
@@ -679,7 +680,7 @@ Required MVP behavior:
 
 Use the backend foundation started in Phase 2.
 
-Retain Neon/Drizzle behind the existing Express API. Verify the account identity on the server and include the owner in every save query. Do not trust an owner ID supplied in a save payload.
+Retain Neon/Drizzle behind the existing Express API. Implement [Google OAuth and app sessions](../AUTHENTICATION.md): validate the Google callback server-side, map the verified issuer/subject to an account, and use the app session for subsequent API requests. Include the verified owner in every save query. Do not trust an owner ID supplied in a save payload.
 
 Perform revision checks atomically: one update matches the save ID, verified owner, and expected revision, updates the snapshot, and increments the revision. A prior SELECT followed by an unconditional UPDATE is insufficient. The existing Neon HTTP driver supports this single-statement approach; do not assume callback-style interactive transactions. Test two concurrent saves from the same revision: one succeeds and the other receives a conflict, with local copies preserved.
 
@@ -930,10 +931,13 @@ Resume must reconstruct the same architecture.
 
 ---
 
-## 7.9 Cloud-save ownership
+## 7.9 Google sign-in and cloud-save ownership
 
 Test:
 
+- new and returning Google sign-in resolve the correct account;
+- cancellation, invalid/replayed callbacks, and failed token validation preserve local play;
+- app-session reload restoration, expiry, and sign-out revocation work;
 - authenticated user can save own run;
 - authenticated user can load own run;
 - one user cannot load/update another user's run;
@@ -1111,8 +1115,8 @@ Phase 3 is complete only when all of the following are true.
 ## Persistence / backend
 
 - [ ] Guest play still works.
-- [ ] Account sign-in works.
-- [ ] First-time account access, returning-user sign-in, session restoration, and sign-out work.
+- [ ] Google sign-in works for new and returning players.
+- [ ] App-session restoration and revocation on sign-out work.
 - [ ] Expired authentication preserves local changes and can be recovered.
 - [ ] Account switching never silently reassigns an owned run.
 - [ ] Cloud save works for authenticated users.

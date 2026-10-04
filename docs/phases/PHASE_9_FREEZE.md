@@ -235,7 +235,8 @@ Check:
 - production URL;
 - environment variables;
 - backend connectivity;
-- auth redirect URLs;
+- exact registered Google callback URLs for production and the configured auth-test preview;
+- `/api` proxy forwarding, app-session cookies, sign-out revocation, and uncached auth/private-save responses; see [authentication](../AUTHENTICATION.md);
 - backend authorization and owner-filtered database queries;
 - analytics endpoint;
 - static assets;

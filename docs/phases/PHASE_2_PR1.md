@@ -618,8 +618,9 @@ This means Phase 2 may begin:
 
 - verify the existing Neon connection and Drizzle migration workflow;
 - plan additive game-specific account, run/save, event, and sign-up tables;
-- select and configure authentication compatible with the Vite frontend and Express API;
-- define first-time email account access, returning-user sign-in, session restoration, sign-out, and expired-session handling for delivery in Phase 3;
+- configure the selected Google OAuth/OpenID Connect web client, consent screen, and exact registered callback URLs;
+- define Google sign-in for first-time and returning players, app-session restoration, sign-out, and expired-session handling for delivery in Phase 3;
+- plan backend-managed code exchange, Google identity validation, and durable Neon app sessions with HttpOnly cookies;
 - define backend identity verification and owner-filtered save queries;
 - design Express telemetry ingestion and shared request/response contracts.
 
@@ -631,7 +632,7 @@ However:
 
 The player should still be able to start immediately as a guest.
 
-Browser requests go through the API using `VITE_API_URL`; database credentials stay in the backend. Follow [the roadmap's backend requirements](../DEVELOPMENT_ROADMAP.md#backend-choice) for atomic save revisions, local-save namespace preservation, and deployment constraints. Preserve the existing production/preview CORS origins and configure authentication callbacks for the separate frontend and API deployments.
+The current browser uses `VITE_API_URL`; database credentials stay in the backend. For the planned Google integration, route browser API calls through a same-origin `/api` proxy to the existing Express deployment, with a local Vite proxy. Register exact callbacks on the browser-facing origin and verify cookie forwarding. Keep both Vercel projects and existing direct-API CORS rules; implement the API-base configuration change together with authentication. Follow [the authentication design](../AUTHENTICATION.md) and [roadmap backend requirements](../DEVELOPMENT_ROADMAP.md#backend-choice) for sessions, atomic save revisions, and legacy-save preservation.
 
 Authentication and owner-scoped cloud saves are required for the final MVP, owned by Di Heng; they are not stretch features. Phase 2 establishes the integration, Phase 3 delivers the working flow, and Phase 5 completes usability before PR2.
 

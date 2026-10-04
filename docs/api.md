@@ -12,6 +12,19 @@ Request and response types live in [`shared/`](../shared). Change a type there o
 | GET | `/api/progress` | Di Heng | TBD | Planned |
 | GET | `/api/areas/:id/layout` | Di Heng | → `CityLayout` (`shared/cityLayout.ts`) | Planned |
 
+## 🔑 Planned MVP authentication
+
+**Selected:** Google OAuth + OpenID Connect, with Express-managed app sessions in Neon. These routes are planned, not implemented. Owner: Di Heng. Browser-facing paths use the planned same-origin `/api` proxy; the current base URL above remains the existing setup.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/auth/google` | Start Google sign-in |
+| GET | `/api/auth/google/callback` | Validate callback, create/resolve account, issue app session |
+| GET | `/api/auth/session` | Restore account state; return signed-out state when no valid session exists |
+| POST | `/api/auth/logout` | Revoke app session and clear cookie |
+
+Private save routes validate the app session and enforce owner/revision checks. Guest play stays local. [🔑 Flow, security and deployment](AUTHENTICATION.md)
+
 ## Handoff formats
 
 - **Dialogue** (Zi Yao → Qi Jun): `shared/dialogue.ts`

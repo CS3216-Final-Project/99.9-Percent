@@ -657,7 +657,7 @@ The player should be able to:
 
 ```text
 play as guest
-→ optionally sign in
+→ optionally sign in with Google
 → associate/save current run
 → resume later
 ```
@@ -669,8 +669,9 @@ Requirements:
 - safe revision behavior;
 - no silent overwrite;
 - guest play remains possible;
-- auth errors do not destroy local progress.
-- session restoration, sign-out, and expired-session recovery work;
+- Google cancellation or auth errors do not destroy local progress;
+- app-session restoration, sign-out, and expired-session recovery work;
+- Google callbacks and cookie-based sessions work on production and the explicitly configured auth-test preview origin; see [authentication](../AUTHENTICATION.md);
 - account switching does not attach another owner's local run;
 - legacy save/meta/analytics keys remain untouched, including during reset and account changes;
 - legacy save export remains available after removing the player-facing legacy campaign.
@@ -1190,7 +1191,7 @@ Phase 5 is complete only when all of the following are true.
 ## Account/cloud usability
 
 - [ ] Guest-first play still works.
-- [ ] Sign-in works.
+- [ ] Google sign-in, cancellation, and app-session recovery work.
 - [ ] Local run can be associated safely with owner where supported.
 - [ ] Cloud save status is understandable.
 - [ ] Conflicts do not silently overwrite.
