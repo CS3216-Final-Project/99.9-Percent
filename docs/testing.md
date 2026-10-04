@@ -30,6 +30,8 @@ On Linux CI, use `npx playwright install --with-deps chromium` for browser/syste
 
 Browser contexts are isolated. Advanced scenarios use engine-generated states in the normal localStorage save envelope before boot; decisions then happen through visible controls. Tests check a working WebGL context and fail on unhandled browser errors. Playwright's clock drives incident timers without arbitrary waits.
 
+Browser journeys run one worker to avoid competing software WebGL renderers on CI. The incident journey has a 150-second budget because advancing the virtual clock also renders animation frames; other tests keep their 60-second budget. CI rejects flaky tests even if a retry passes.
+
 ## CI and diagnostics
 
 The existing required `frontend` job runs static checks, Vitest coverage, the production build and desktop/mobile browser journeys. The required `backend` job runs static checks, Vitest coverage and migration consistency. Failed browser tests retain screenshots and traces; CI uploads coverage and browser reports for 14 days. Inspect with `npx playwright show-report` or `npx playwright show-trace <trace.zip>` in `frontend/`.

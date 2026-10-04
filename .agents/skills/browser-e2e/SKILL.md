@@ -15,3 +15,5 @@ Read `frontend/playwright.config.ts`, `frontend/e2e/fixtures.ts` and `docs/testi
 - Keep desktop journeys and touch smoke checks focused. The mobile project emulates Chromium; it does not establish Safari or Firefox support.
 
 On failure inspect the HTML report, screenshot and trace; reproduce with a focused test. Determine whether the locator, fixture, environment or product is wrong before changing assertions. A retry is diagnostic, not permission to ignore a flaky journey. Rebuild before `test:e2e:ui` when app code changed.
+
+The suite runs one browser worker because SwiftShader shares the runner's CPU. The incident journey has a larger test budget: virtual clock ticks also render every animation frame. Use trace durations to distinguish that rendering cost from a stuck control. Keep assertion timeouts and gameplay checks intact; CI fails flaky tests even if a retry passes.

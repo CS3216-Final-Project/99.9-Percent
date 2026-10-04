@@ -56,6 +56,9 @@ test('confirms replacing a run and starts the supplied replay seed', async ({ pa
 });
 
 test('resumes an incident paused, investigates, fixes it and acknowledges the postmortem', async ({ page }) => {
+  // Clock.runFor also renders every WebGL animation frame. The CI trace shows
+  // several seconds of virtual time can take tens of seconds on SwiftShader.
+  test.setTimeout(150_000);
   const incident = advanceTurn({ ...newGame(1), users: 4500, techDone: ['monitoring'] });
   expect(incident.incident?.type).toBe('app_overload');
   await seedSave(page, incident);
@@ -67,7 +70,7 @@ test('resumes an incident paused, investigates, fixes it and acknowledges the po
   const panel = page.getByRole('region', { name: 'Incident', exact: true });
   const clock = panel.locator('.clock-time');
   await expect(clock).toHaveText('0:00');
-  await page.clock.runFor(2000);
+  await page.clock.runFor(1200);
   await expect(clock).toHaveText('0:00');
   await panel.getByRole('button', { name: 'Servers', exact: true }).click();
   await page.getByRole('button', { name: 'Resume the incident clock' }).click();
