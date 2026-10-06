@@ -5,7 +5,7 @@ import { BALANCE, metrics, type EventKind, type GameState, type Postmortem } fro
 import { compact, money, moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
-import { Act, Chip, Concept, Gauge, ReleaseRow, TaskRow, type ConceptKind } from "./ui";
+import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow, type ConceptKind } from "./ui";
 
 /* ------------------------------------------------------------------ */
 /* Engineer allocation                                                 */
@@ -314,25 +314,19 @@ export function PostmortemBody({ pm }: { pm: Postmortem }) {
           <dd>{moneyFull(pm.impact.revenueLost + pm.impact.moneySpent)}</dd>
         </div>
       </dl>
-      <dl className="pm-lines">
-        <div>
-          <Concept kind="critical" icon="fire" />
-          <dt>What failed</dt>
-          <dd>{pm.whatFailed}</dd>
-        </div>
-        <div>
-          <Concept kind={pm.outcome === "failed" ? "warn" : "ok"} icon={pm.outcome === "failed" ? "alert" : "wrench"} />
-          <dt>{pm.outcome === "failed" ? "What went wrong" : "What worked"}</dt>
-          <dd>{fix}</dd>
-        </div>
+      <div className="pm-lines">
+        <Callout tone="critical" icon="fire" kicker="What failed">
+          {pm.whatFailed}
+        </Callout>
+        <Callout tone={pm.outcome === "failed" ? "warn" : "success"} icon={pm.outcome === "failed" ? "alert" : "wrench"} kicker={pm.outcome === "failed" ? "What went wrong" : "What worked"}>
+          {fix}
+        </Callout>
         {pm.prevention[0] && (
-          <div>
-            <Concept kind="go" icon="bulb" />
-            <dt>Next time</dt>
-            <dd>{pm.prevention[0]}</dd>
-          </div>
+          <Callout tone="hint" icon="bulb" kicker="Next time">
+            {pm.prevention[0]}
+          </Callout>
         )}
-      </dl>
+      </div>
       <details className="more">
         <summary>Full report</summary>
         <h4>What led to it</h4>

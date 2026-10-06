@@ -17,6 +17,68 @@ export function Concept({ kind, icon, size = 24 }: { kind: ConceptKind; icon: Ic
   );
 }
 
+/**
+ * Every message in the game is a Callout: a coloured icon tile, a small category
+ * label and the text. The colour always means the same thing, wherever it appears:
+ *   info (blue)      advice and neutral facts      success (green)  something worked
+ *   warn (orange)    act soon                      critical (red)   failing now
+ *   hint (yellow)    a tip you asked for
+ */
+export type CalloutTone = "info" | "success" | "warn" | "critical" | "hint";
+
+export function Callout({
+  tone,
+  icon,
+  kicker,
+  children,
+  action,
+  onClick,
+  compact = false,
+  className,
+  title,
+  live,
+}: {
+  tone: CalloutTone;
+  icon: IconName;
+  kicker?: ReactNode;
+  children: ReactNode;
+  /** A button shown at the end of the message. Not allowed when the whole callout is clickable. */
+  action?: ReactNode;
+  /** Makes the whole callout a button, with an arrow to say so. */
+  onClick?: () => void;
+  compact?: boolean;
+  className?: string;
+  title?: string;
+  /** Announce the text (not the category label) to screen readers. */
+  live?: "alert" | "status";
+}) {
+  const cls = `callout callout-${tone}${compact ? " callout-compact" : ""}${onClick ? " callout-button" : ""}${className ? ` ${className}` : ""}`;
+  const body = (
+    <>
+      <span className="callout-icon" aria-hidden="true">
+        <Icon name={icon} size={compact ? 12 : 24} />
+      </span>
+      <span className="callout-body">
+        {kicker && <span className="callout-kicker">{kicker}</span>}
+        <span className="callout-text" role={live}>
+          {children}
+        </span>
+      </span>
+      {action}
+      {onClick && <Icon name="next" size={12} className="callout-go" />}
+    </>
+  );
+  return onClick ? (
+    <button type="button" className={cls} onClick={onClick} title={title}>
+      {body}
+    </button>
+  ) : (
+    <div className={cls} title={title}>
+      {body}
+    </div>
+  );
+}
+
 /** Plain-language explanation shown on hover, keyboard focus or tap. Detail lives here, not on screen. */
 export function Tip({ text, children, side = "below" }: { text: string; children: ReactNode; side?: "below" | "above" | "left" }) {
   return (
@@ -199,9 +261,13 @@ export function ReleaseRow({ game, release }: { game: GameState; release: Releas
         )}
       </div>
       {release.needsFix ? (
-        <p className="muted">Rolled back. Staff its fix task.</p>
+        <Callout compact tone="warn" icon="refresh" kicker="Rolled back">
+          Staff its fix task.
+        </Callout>
       ) : testing ? (
-        <p className="muted">Being tested.</p>
+        <Callout compact tone="info" icon="test" kicker="Testing">
+          Engineers are testing it.
+        </Callout>
       ) : (
         <div className="btn-row">
           <button

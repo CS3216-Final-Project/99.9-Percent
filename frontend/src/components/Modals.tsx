@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { BALANCE, buildReport } from "@/sim";
-import { moneyFull, num, uptimePct } from "@/game/format";
+import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, clearSave, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
-import { Icon } from "./icons";
-import { Concept, Modal } from "./ui";
+import { Icon, type IconName } from "./icons";
+import { Callout, Concept, Modal, type ConceptKind } from "./ui";
 import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone, PostmortemBody, RunCharts } from "./Views";
 
 /* ------------------------------------------------------------------ */
@@ -199,11 +199,13 @@ export function EndReport() {
         </div>
       </dl>
 
-      <ul className="plain-list">
+      <div className="callout-stack">
         {r.takeaways.slice(0, 2).map((t) => (
-          <li key={t}>{t}</li>
+          <Callout key={t} tone="hint" icon="bulb" kicker="Takeaway">
+            {t}
+          </Callout>
         ))}
-      </ul>
+      </div>
 
       <div className="rating">
         <p id="rating-label">Enjoyed it?</p>
@@ -290,6 +292,19 @@ function summarise(events: AnalyticsEvent[]) {
   ] as [string, string | number][];
 }
 
+/** A big, labelled menu choice: what it is, and one line on what it does. */
+function MenuTile({ icon, kind, title, text, onClick, danger = false }: { icon: IconName; kind: ConceptKind; title: string; text: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button type="button" className={`menu-tile${danger ? " is-danger" : ""}`} onClick={onClick} aria-label={title}>
+      <Concept kind={danger ? "critical" : kind} icon={danger ? "alert" : icon} />
+      <span className="menu-tile-body">
+        <strong>{title}</strong>
+        <span>{danger ? "Your current run will be replaced." : text}</span>
+      </span>
+    </button>
+  );
+}
+
 export function Menu() {
   const game = useGame((s) => s.game);
   const openView = useGame((s) => s.openView);
@@ -330,44 +345,80 @@ export function Menu() {
     }
   };
 
+  const close = () => openView(null);
+  const week = Math.min(game.turn, BALANCE.maxTurns);
+
   return (
-    <Modal title="Menu" onClose={() => openView(null)} icon={{ kind: "go", name: "menu" }}>
-      <p className="muted">
-        Week {Math.min(game.turn, BALANCE.maxTurns)}, seed {game.seed}. Saved automatically in this browser.
-      </p>
-      <div className="btn-row">
-        <button type="button" className="btn" onClick={saveNow}>
-          <Icon name="save" size={16} />
-          Save now
-        </button>
-        <button type="button" className="btn" onClick={showOnboarding}>
-          <Icon name="info" size={16} />
-          How to play
-        </button>
-        <button type="button" className={`btn ${confirm === "tutorial" ? "btn-danger" : ""}`} onClick={() => start("tutorial")}>
-          {label("tutorial", "Tutorial")}
-        </button>
+    <Modal title="Menu" onClose={close} icon={{ kind: "go", name: "menu" }} wide>
+      <section className="menu-run" aria-label="This run">
+        <div className="menu-run-head">
+          <span className="menu-run-title">This run</span>
+          <span className="tag tag-ok">
+            <Icon name="save" size={12} />
+            Autosaved
+          </span>
+        </div>
+        <dl className="menu-run-stats">
+          <div>
+            <Concept kind="go" icon="week" />
+            <dt>Week</dt>
+            <dd>
+              {week} / {BALANCE.maxTurns}
+            </dd>
+          </div>
+          <div>
+            <Concept kind="users" icon="users" />
+            <dt>Users</dt>
+            <dd>{num(game.users)}</dd>
+          </div>
+          <div>
+            <Concept kind="cash" icon="cash" />
+            <dt>Cash</dt>
+            <dd>{money(game.cash)}</dd>
+          </div>
+        </dl>
+        <p className="menu-seed">
+          Seed <code>{game.seed}</code> Playing the same seed again gives the same run.
+        </p>
+      </section>
+
+      <button type="button" className="btn btn-primary btn-big menu-resume" autoFocus onClick={close}>
+        <Icon name="play" />
+        Resume
+      </button>
+
+      <div className="menu-grid">
+        <MenuTile icon="save" kind="ok" title="Save now" text="Write this run to the browser." onClick={saveNow} />
+        <MenuTile icon="info" kind="users" title="How to play" text="The rules on one card." onClick={showOnboarding} />
+        <MenuTile icon="robot" kind="go" title={label("tutorial", "Tutorial")} text="Replay the guided first week." danger={confirm === "tutorial"} onClick={() => start("tutorial")} />
       </div>
 
-      <h4>
-        <Icon name="play" size={16} />
-        New game
-      </h4>
-      <label className="field">
-        <span>Seed (optional): the same seed replays the same run.</span>
-        <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
-      </label>
-      <div className="btn-row">
-        <button type="button" className={`btn ${confirm === "new" ? "btn-danger" : "btn-primary"}`} onClick={() => start("new")}>
-          {label("new", "New game")}
-        </button>
-        <button type="button" className={`btn ${confirm === "reset" ? "btn-danger" : ""}`} onClick={() => start("reset")}>
-          {label("reset", "Reset to first run")}
-        </button>
-      </div>
+      <section className="menu-section" aria-label="Start over">
+        <h4>
+          <Icon name="refresh" size={16} />
+          Start over
+        </h4>
+        <label className="field">
+          <span>Seed (optional): leave empty for a random run.</span>
+          <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
+        </label>
+        <div className="btn-row">
+          <button type="button" className={`btn ${confirm === "new" ? "btn-danger" : "btn-primary"}`} onClick={() => start("new")}>
+            {label("new", "New game")}
+          </button>
+          <button type="button" className={`btn ${confirm === "reset" ? "btn-danger" : ""}`} onClick={() => start("reset")}>
+            {label("reset", "Reset to first run")}
+          </button>
+        </div>
+        {confirm && (
+          <Callout compact tone="warn" icon="alert" kicker="Are you sure?">
+            This replaces your week {week} run. Press the red button again to confirm.
+          </Callout>
+        )}
+      </section>
 
       <details className="more">
-        <summary>Prototype data ({events.length} events)</summary>
+        <summary>Playtest data ({events.length} events)</summary>
         <p className="muted">Kept in this browser only.</p>
         <dl className="rows">
           {summarise(events).map(([k, v]) => (

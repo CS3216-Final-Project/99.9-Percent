@@ -32,6 +32,7 @@ import {
 } from "./layout";
 import { floorTiles, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { EQUIPMENT_ICON, Icon, STATE_META } from "../icons";
+import { DeskClutter, look, Office, Person, type Activity, type Look } from "./Office";
 
 /* ------------------------------------------------------------------ */
 /* Scene model: the few facts the 3D view needs, as a stable snapshot  */
@@ -321,10 +322,17 @@ function Screen({ kind, w, h, position, rotation }: { kind: ScreenKind; w: numbe
   );
 }
 
-function Desk({ x, z, screen, wide = false }: { x: number; z: number; screen: ScreenKind; wide?: boolean }) {
+interface Occupant {
+  activity: Activity;
+  look: Look;
+}
+
+function Desk({ x, z, screen, wide = false, index = 0, occupant }: { x: number; z: number; screen: ScreenKind; wide?: boolean; index?: number; occupant?: Occupant | null }) {
   const w = wide ? 2.2 : 1.55;
   return (
     <group position={[x, 0, z]}>
+      <DeskClutter index={index} w={w} />
+      {occupant && <Person pose="sit" activity={occupant.activity} look={occupant.look} position={[0, 0, 0.72]} phase={index * 1.7} />}
       <mesh castShadow receiveShadow position={[0, 0.74, 0]}>
         <boxGeometry args={[w, 0.05, 0.8]} />
         <meshStandardMaterial color="#c98b55" roughness={0.85} />
@@ -642,6 +650,21 @@ function Room() {
 /* Scene                                                               */
 /* ------------------------------------------------------------------ */
 
+type Seat = "type" | "relax" | "mug" | "kitchen" | "lounge";
+
+/**
+ * Where engineer i is. Assigned engineers code at their desks. The first free
+ * engineer is at the coffee machine and the second on the sofa, so idle staff
+ * show up in the room. During an incident everyone is back at a keyboard.
+ */
+function seatFor(i: number, m: SceneModel): Seat {
+  if (m.incident || i < m.busy) return "type";
+  const free = i - m.busy;
+  if (free === 0) return "kitchen";
+  if (free === 1) return "lounge";
+  return free % 2 ? "mug" : "relax";
+}
+
 function Scene() {
   const m = useSceneModel();
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
@@ -679,6 +702,7 @@ function Scene() {
       <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
       <Room />
+      <Office incident={m.incident} />
 
       {/* Network edge */}
       <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
@@ -716,13 +740,30 @@ function Scene() {
           />
         ))}
 
-      {/* Engineering desks */}
+      {/* Engineering desks: assigned engineers type; free ones relax, grab a coffee or take the sofa. */}
       {Array.from({ length: m.engineers }, (_, i) => {
         const p = deskSlot(i);
-        return <Desk key={`e${i}`} x={p.x} z={p.z} screen={i < m.busy ? "code" : "idle"} />;
+        const seat = seatFor(i, m);
+        return (
+          <Desk
+            key={`e${i}`}
+            index={i}
+            x={p.x}
+            z={p.z}
+            screen={seat === "type" ? "code" : "idle"}
+            occupant={seat === "kitchen" || seat === "lounge" ? null : { activity: seat, look: look(i) }}
+          />
+        );
+      })}
+      {Array.from({ length: m.engineers }, (_, i) => {
+        const seat = seatFor(i, m);
+        if (seat === "kitchen") return <Person key={`k${i}`} pose="stand" activity="mug" look={look(i)} position={[12.1, 0, -8.15]} rotation={-2.4} phase={i} />;
+        if (seat === "lounge") return <Person key={`l${i}`} pose="sit" activity="laptop" look={look(i)} position={[10.95, -0.05, -3.3]} rotation={Math.PI} phase={i} />;
+        return null;
       })}
 
-      {/* Build and deploy console */}
+      {/* Build and deploy console, with whoever is on release duty */}
+      <Person pose="stand" activity={m.releases > 0 || m.incident ? "type" : "chat"} look={look(11)} position={[POS.deploy.x, 0, POS.deploy.z + 0.78]} phase={3} />
       <group position={[POS.deploy.x, 0, POS.deploy.z]}>
         <mesh castShadow receiveShadow position={[0, 0.5, 0]}>
           <boxGeometry args={[1.5, 1, 0.8]} />
@@ -732,7 +773,14 @@ function Scene() {
       </group>
 
       {/* Growth desk with a results board */}
-      <Desk x={POS.growth.x - 0.4} z={POS.growth.z + 0.2} screen={m.promos > 0 ? "chart" : "idle"} wide />
+      <Desk
+        x={POS.growth.x - 0.4}
+        z={POS.growth.z + 0.2}
+        screen={m.promos > 0 ? "chart" : "idle"}
+        wide
+        index={9}
+        occupant={{ activity: m.promos > 0 ? "type" : "mug", look: look(14) }}
+      />
       <group position={[POS.growth.x + 1.15, 0, POS.growth.z - 0.55]}>
         <mesh castShadow position={[0, 0.55, 0]}>
           <boxGeometry args={[0.08, 1.1, 0.08]} />

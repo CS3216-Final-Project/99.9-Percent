@@ -4,9 +4,14 @@ import { equipmentInfo, inspectable, inspectSeconds, recoveryOptions, symptomati
 import { clock, moneyFull, num, pct } from "@/game/format";
 import { inspectOrSelect, useGame } from "@/game/store";
 import { EQUIPMENT_ICON, Icon, type IconName } from "./icons";
-import { Concept, Meter, Tip } from "./ui";
+import { Callout, Concept, Meter, Tip, type CalloutTone } from "./ui";
 
-const ATTEMPT_ICON: Record<string, IconName> = { fixed: "check", mitigated: "alert", partial: "alert", no_effect: "close" };
+const ATTEMPT: Record<string, { tone: CalloutTone; icon: IconName; word: string }> = {
+  fixed: { tone: "success", icon: "check", word: "Fixed" },
+  mitigated: { tone: "warn", icon: "alert", word: "Contained" },
+  partial: { tone: "warn", icon: "alert", word: "Helped a little" },
+  no_effect: { tone: "critical", icon: "close", word: "No effect" },
+};
 
 /**
  * The crisis workspace. The alert shows symptoms only; the player investigates
@@ -79,14 +84,13 @@ export default function IncidentPanel() {
             <dd>{moneyFull(inc.damage.moneySpent)}</dd>
           </div>
         </dl>
-        <ul className="symptoms">
-          {inc.symptoms.map((s) => (
-            <li key={s}>
-              <Icon name="alert" size={16} />
-              <span>{s}</span>
-            </li>
-          ))}
-        </ul>
+        <Callout tone="critical" icon="incident" kicker="Symptoms">
+          <ul className="symptoms">
+            {inc.symptoms.map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ul>
+        </Callout>
       </div>
 
       <div className="incident-investigate">
@@ -122,11 +126,10 @@ export default function IncidentPanel() {
         {inc.evidence.length > 0 && (
           <ul className="evidence">
             {[...inc.evidence].reverse().map((e) => (
-              <li key={e.equipment} className={e.anomalous ? "is-anomalous" : ""}>
-                <Icon name={e.anomalous ? "alert" : "search"} size={16} />
-                <span>
-                  <strong>{e.title}</strong> {e.text}
-                </span>
+              <li key={e.equipment}>
+                <Callout compact tone={e.anomalous ? "warn" : "info"} icon={e.anomalous ? "alert" : "search"} kicker={e.title}>
+                  {e.text}
+                </Callout>
               </li>
             ))}
           </ul>
@@ -178,11 +181,10 @@ export default function IncidentPanel() {
       {inc.attempts.length > 0 && (
         <ul className="attempts">
           {[...inc.attempts].reverse().map((a, i) => (
-            <li key={`${a.id}-${i}`} className={`attempt attempt-${a.outcome}`}>
-              <Icon name={ATTEMPT_ICON[a.outcome] ?? "info"} size={16} />
-              <span>
-                <strong>{a.label}</strong> {a.note}
-              </span>
+            <li key={`${a.id}-${i}`}>
+              <Callout compact tone={ATTEMPT[a.outcome]?.tone ?? "info"} icon={ATTEMPT[a.outcome]?.icon ?? "info"} kicker={`${a.label}: ${ATTEMPT[a.outcome]?.word ?? a.outcome}`}>
+                {a.note}
+              </Callout>
             </li>
           ))}
         </ul>
@@ -190,10 +192,9 @@ export default function IncidentPanel() {
 
       <div className="hint-box">
         {inc.hints.map((h) => (
-          <p key={h}>
-            <Icon name="bulb" size={16} />
-            <span>{h}</span>
-          </p>
+          <Callout key={h} tone="hint" icon="bulb" kicker="Hint">
+            {h}
+          </Callout>
         ))}
         {inc.hints.length < 2 && (
           <button type="button" className="btn btn-small" onClick={() => act({ type: "incident_hint" })}>

@@ -10,7 +10,7 @@ import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Moda
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
 import Tutorial, { BASICS_STEPS } from "./Tutorial";
-import { Concept, Meter, Tip, type ConceptKind } from "./ui";
+import { Callout, Concept, Meter, Tip, type ConceptKind } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
 
 // Keep the WebGL scene in its own chunk; Vite renders this app in the browser.
@@ -151,37 +151,39 @@ function StageHud() {
 
   return (
     <div className="hud">
-      <div className={`next-chip tone-${move.tone}`}>
-        <span className="next-avatar" aria-hidden="true">
-          <Icon name={move.tone === "go" ? "robot" : move.tone === "critical" ? "fire" : "alert"} />
-        </span>
-        <span className="next-body">
-          <span className="next-kicker">{move.tone === "go" ? "Next move" : "Heads up"}</span>
-          <span className="next-text">{move.text}</span>
-        </span>
-        {move.cta && (
-          <button type="button" className="btn btn-primary btn-small" onClick={move.cta.run}>
-            {move.cta.label}
-            {move.cta.price !== undefined && (
-              <span className="price">
-                <Icon name="cash" size={12} />
-                {moneyFull(move.cta.price)}
-              </span>
-            )}
-          </button>
-        )}
-      </div>
+      <Callout
+        className="next-chip"
+        tone={move.tone === "go" ? "info" : move.tone}
+        icon="robot"
+        kicker="Next move"
+        action={
+          move.cta && (
+            <button type="button" className="btn btn-primary btn-small" onClick={move.cta.run}>
+              {move.cta.label}
+              {move.cta.price !== undefined && (
+                <span className="price">
+                  <Icon name="cash" size={12} />
+                  {moneyFull(move.cta.price)}
+                </span>
+              )}
+            </button>
+          )
+        }
+      >
+        {move.text}
+      </Callout>
       {alerts.map((w, i) => (
-        <button
-          type="button"
+        <Callout
           key={w.code + i}
-          className={`alert-chip alert-${w.level}`}
+          className="alert-chip"
+          tone={w.level === "critical" ? "critical" : "warn"}
+          icon={WARNING_ICON[w.code] ?? "alert"}
+          kicker={w.level === "critical" ? "Critical" : "Warning"}
           title={w.detail}
           onClick={() => (w.equipment ? select(w.equipment) : openView("history"))}
         >
-          <Concept kind={w.level === "critical" ? "critical" : "warn"} icon={WARNING_ICON[w.code] ?? "alert"} size={16} />
           {w.text}
-        </button>
+        </Callout>
       ))}
     </div>
   );
@@ -310,13 +312,15 @@ function ToastHost() {
   }, [toast, dismiss]);
   if (!toast) return null;
   return (
-    <div className={`toast toast-${toast.kind}`} role={toast.kind === "error" ? "alert" : "status"} onClick={dismiss}>
-      <Concept
-        kind={toast.kind === "error" ? "critical" : toast.kind === "success" ? "ok" : "go"}
+    <div className="toast" onClick={dismiss}>
+      <Callout
+        tone={toast.kind === "error" ? "critical" : toast.kind === "success" ? "success" : "info"}
         icon={toast.kind === "error" ? "alert" : toast.kind === "success" ? "check" : "info"}
-        size={16}
-      />
-      <span>{toast.text}</span>
+        kicker={toast.kind === "error" ? "Problem" : toast.kind === "success" ? "Done" : "Note"}
+        live={toast.kind === "error" ? "alert" : "status"}
+      >
+        {toast.text}
+      </Callout>
     </div>
   );
 }

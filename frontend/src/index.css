@@ -917,112 +917,154 @@ button:disabled {
   color: var(--text-soft);
 }
 
-/* The prompt: one suggested move, then at most two warnings. */
+/* The prompt: one suggested move, then at most two warnings, all the same width. */
 .hud {
   position: absolute;
   left: 14px;
   top: 14px;
   display: grid;
-  justify-items: start;
   gap: 8px;
-  max-width: min(560px, calc(100% - 28px));
+  width: min(460px, calc(100% - 28px));
   z-index: 24;
 }
 
-.next-chip {
+/* ---------------------------------------------------------------- */
+/* Callouts: one look for every message in the game                  */
+/* ---------------------------------------------------------------- */
+
+/*
+ * Icon tile + category label + text. The tone sets the tile colour, the label
+ * colour and a light wash, and means the same everywhere:
+ * info blue, success green, warn orange, critical red, hint yellow.
+ */
+.callout {
+  --tone: var(--c-users);
+  --tone-ink: #1d6fb8;
+  --tone-wash: #eef6ff;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
   padding: 8px 10px 8px 8px;
-  background: var(--paper);
+  background: var(--tone-wash);
   color: var(--ink);
   border: 2px solid var(--ink);
   border-radius: 6px;
-  box-shadow: var(--lift);
-}
-
-.next-avatar {
-  width: 44px;
-  height: 44px;
-  flex: none;
-  display: grid;
-  place-content: center;
-  background: var(--c-users);
-  border: 2px solid var(--ink);
-  border-radius: var(--radius);
-}
-
-.next-chip.tone-warn .next-avatar {
-  background: var(--warn);
-}
-
-.next-chip.tone-critical .next-avatar {
-  background: var(--critical);
-  color: #fff;
-}
-
-.next-body {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.next-kicker {
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-soft);
-}
-
-.next-text {
-  font-weight: 500;
-  font-size: 1.02rem;
-  line-height: 1.3;
-  color: var(--ink);
-}
-
-.alert-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px 4px 4px;
-  background: var(--paper);
-  color: var(--ink);
-  border: 2px solid var(--ink);
-  border-radius: var(--radius);
   box-shadow: var(--press);
-  font-size: 0.9rem;
-  font-weight: 500;
+  font: inherit;
   text-align: left;
 }
 
-.alert-chip .concept {
-  width: 28px;
-  height: 28px;
-  box-shadow: none;
-  border-width: 0;
-  background: var(--warn);
+.callout-success {
+  --tone: var(--ok);
+  --tone-ink: var(--ok-ink);
+  --tone-wash: #eafbf1;
+}
+.callout-warn {
+  --tone: var(--warn);
+  --tone-ink: var(--warn-ink);
+  --tone-wash: #fff3e2;
+}
+.callout-critical {
+  --tone: var(--critical);
+  --tone-ink: var(--critical-ink);
+  --tone-wash: #ffedf0;
+}
+.callout-hint {
+  --tone: var(--go);
+  --tone-ink: #876300;
+  --tone-wash: #fff9da;
 }
 
-.alert-chip .concept .icon {
-  width: 16px;
-  height: 16px;
+.callout-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-content: center;
+  background: var(--tone);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.18);
 }
 
-.alert-chip.alert-critical .concept {
-  background: var(--critical);
+.callout-critical .callout-icon {
   color: #fff;
 }
 
-.alert-chip:hover {
+.callout-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.callout-kicker {
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--tone-ink);
+}
+
+.callout-text {
+  font-size: 0.96rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.callout > .btn {
+  flex: none;
+}
+
+.callout-go {
+  flex: none;
+  color: var(--tone-ink);
+}
+
+.callout-button {
+  cursor: pointer;
+  transition:
+    transform 0.05s,
+    box-shadow 0.05s;
+}
+
+.callout-button:hover {
   background: #fff;
 }
 
-.alert-chip:active {
+.callout-button:active {
   transform: translateY(2px);
   box-shadow: 0 1px 0 0 var(--ink);
+}
+
+/* Inside panels: the same message, smaller and flat. */
+.callout-compact {
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
+  box-shadow: none;
+}
+
+.callout-compact .callout-icon {
+  width: 24px;
+  height: 24px;
+  border-width: 0;
+  box-shadow: none;
+}
+
+.callout-compact .callout-text {
+  font-size: 0.88rem;
+  font-weight: 400;
+}
+
+.callout-stack {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
 }
 
 /* ---------------------------------------------------------------- */
@@ -2526,36 +2568,7 @@ button:disabled {
 .pm-lines {
   margin: 12px 0 0;
   display: grid;
-  gap: 10px;
-}
-
-.pm-lines > div {
-  display: grid;
-  grid-template-columns: 32px 1fr;
-  column-gap: 10px;
-  align-items: start;
-}
-
-.pm-lines .concept {
-  grid-row: 1 / 3;
-  width: 32px;
-  height: 32px;
-  box-shadow: none;
-}
-
-.pm-lines .concept .icon {
-  width: 16px;
-  height: 16px;
-}
-
-.pm-lines dt {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.pm-lines dd {
-  margin: 0;
+  gap: 8px;
 }
 
 /* Number tiles: icon and value on top, label underneath, so long values never collide with labels. */
@@ -2735,26 +2748,17 @@ button:disabled {
   margin-top: 12px;
 }
 
+.incident-symptoms .callout {
+  margin-top: 10px;
+}
+
 .symptoms {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 4px;
+  gap: 2px;
   font-size: 0.92rem;
-}
-
-.symptoms li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.symptoms li .icon {
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
-  color: var(--critical-ink);
 }
 
 /* The two jobs during an incident, numbered so the order is obvious. */
@@ -2865,52 +2869,6 @@ button:disabled {
   gap: 6px;
 }
 
-.evidence li,
-.attempt {
-  display: grid;
-  grid-template-columns: 16px 1fr;
-  gap: 8px;
-  padding: 7px 10px;
-  background: var(--paper-2);
-  border: 2px solid var(--paper-3);
-  border-radius: var(--radius);
-  font-size: 0.9rem;
-}
-
-.evidence li > .icon,
-.attempt > .icon {
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
-  color: var(--text-soft);
-}
-
-.evidence .is-anomalous {
-  background: #fff1d6;
-  border-color: var(--warn);
-}
-
-.evidence .is-anomalous > .icon {
-  color: var(--warn-ink);
-}
-
-.attempt-fixed {
-  border-color: var(--ok);
-}
-.attempt-fixed > .icon {
-  color: var(--ok-ink);
-}
-.attempt-mitigated,
-.attempt-partial {
-  border-color: var(--warn);
-}
-.attempt-no_effect {
-  border-color: var(--critical);
-}
-.attempt-no_effect > .icon {
-  color: var(--critical-ink);
-}
-
 .working {
   display: grid;
   gap: 6px;
@@ -2964,24 +2922,13 @@ button:disabled {
 }
 
 .hint-box {
+  display: grid;
+  gap: 8px;
   margin-top: 14px;
 }
 
-.hint-box p {
-  display: grid;
-  grid-template-columns: 16px 1fr;
-  gap: 8px;
-  padding: 8px 10px;
-  background: #fff4c2;
-  border: 2px solid var(--go);
-  border-radius: var(--radius);
-  font-size: 0.92rem;
-}
-
-.hint-box p .icon {
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
+.hint-box > .btn {
+  justify-self: start;
 }
 
 /* ---------------------------------------------------------------- */
@@ -3064,6 +3011,159 @@ button:disabled {
 
 .modal-body h4 {
   margin-top: 18px;
+}
+
+/* Menu: the run at a glance, Resume, three big choices, then starting over. */
+.menu-run {
+  padding: 12px;
+  margin-bottom: 12px;
+  background: var(--ink);
+  color: var(--on-night);
+  border-radius: 6px;
+}
+
+.menu-run-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.menu-run-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.menu-run-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.menu-run-stats > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--night-3);
+  border: 2px solid var(--night-line);
+  border-radius: var(--radius);
+}
+
+.menu-run-stats .concept {
+  grid-row: 1 / 3;
+  width: 28px;
+  height: 28px;
+  box-shadow: none;
+}
+
+.menu-run-stats .concept .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.menu-run-stats dt {
+  font-family: var(--font-num);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--on-night-soft);
+}
+
+.menu-run-stats dd {
+  margin: 0;
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+
+.menu-seed {
+  margin: 10px 0 0;
+  font-size: 0.84rem;
+  color: var(--on-night-soft);
+}
+
+.menu-seed code {
+  margin: 0 4px;
+  padding: 1px 6px;
+  font-family: var(--font-num);
+  font-weight: 600;
+  color: var(--on-night);
+  background: var(--night-3);
+  border-radius: 3px;
+}
+
+.menu-resume {
+  width: 100%;
+  margin: 2px 0 14px;
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.menu-tile {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 8px;
+  padding: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: var(--press);
+  text-align: left;
+  transition:
+    transform 0.05s,
+    box-shadow 0.05s;
+}
+
+.menu-tile:hover {
+  background: #fff;
+}
+
+.menu-tile:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 0 var(--ink);
+}
+
+.menu-tile-body {
+  display: grid;
+  gap: 2px;
+}
+
+.menu-tile-body strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.menu-tile-body span {
+  font-size: 0.84rem;
+  line-height: 1.3;
+  color: var(--text-soft);
+}
+
+.menu-tile.is-danger {
+  background: #ffedf0;
+}
+
+.menu-section {
+  margin-top: 16px;
+  padding-top: 4px;
+  border-top: 2px dashed var(--paper-3);
+}
+
+.menu-section .callout {
+  margin-top: 4px;
 }
 
 .field {
@@ -3332,32 +3432,14 @@ button:disabled {
   left: 50%;
   bottom: 84px;
   transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  width: max-content;
   max-width: min(500px, calc(100vw - 28px));
-  padding: 6px 14px 6px 6px;
-  background: var(--paper);
-  color: var(--ink);
-  border: 2px solid var(--ink);
-  border-radius: var(--radius);
-  box-shadow: var(--lift);
-  font-size: 0.95rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
   z-index: 120;
   cursor: pointer;
 }
 
-.toast .concept {
-  width: 30px;
-  height: 30px;
-  box-shadow: none;
-}
-
-.toast .concept .icon {
-  width: 16px;
-  height: 16px;
+.toast .callout {
+  box-shadow: var(--lift);
 }
 
 /* ---------------------------------------------------------------- */
@@ -3551,25 +3633,25 @@ button:disabled {
   .hud {
     left: 8px;
     top: 8px;
-    max-width: calc(100% - 16px);
+    width: calc(100% - 16px);
   }
-  .next-chip {
+  .hud {
+    gap: 6px;
+  }
+  .hud .callout {
     gap: 8px;
-    padding: 6px 8px 6px 6px;
+    padding: 5px 8px 5px 5px;
   }
-  .next-avatar {
-    width: 34px;
-    height: 34px;
+  .hud .callout-icon {
+    width: 30px;
+    height: 30px;
   }
-  .next-avatar .icon {
-    width: 24px;
-    height: 24px;
+  .hud .callout-icon .icon {
+    width: 16px;
+    height: 16px;
   }
-  .next-kicker {
-    display: none;
-  }
-  .next-text {
-    font-size: 0.92rem;
+  .hud .callout-text {
+    font-size: 0.88rem;
   }
   .title-screen {
     align-items: end;

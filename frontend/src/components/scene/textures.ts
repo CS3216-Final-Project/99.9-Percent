@@ -262,3 +262,177 @@ export function floorTiles(): THREE.CanvasTexture {
   floorTexture = t;
   return t;
 }
+
+/* ------------------------------------------------------------------ */
+/* Office textures                                                     */
+/* ------------------------------------------------------------------ */
+
+function repeating(t: THREE.CanvasTexture): THREE.CanvasTexture {
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+/** Warm wooden planks for the part of the floor where people work. */
+export function woodFloor(): THREE.CanvasTexture {
+  const S = 32;
+  const [c, g] = canvas(S, S);
+  const tones = ["#8a5a3c", "#93623f", "#7f5236", "#8d5d3a"];
+  for (let row = 0; row < 4; row++) {
+    const y = row * 8;
+    g.fillStyle = tones[row];
+    g.fillRect(0, y, S, 8);
+    g.fillStyle = "#6a4129";
+    g.fillRect(0, y + 7, S, 1);
+    g.fillRect((row * 11 + 5) % S, y, 1, 7);
+    g.fillStyle = "#a06d47";
+    for (let i = 0; i < 4; i++) g.fillRect(Math.floor(noise(row * 9 + i) * S), y + 2 + Math.floor(noise(row * 5 + i + 30) * 4), 2, 1);
+  }
+  return repeating(finish(c));
+}
+
+/** Yellow and black tape marking where the server floor begins. */
+export function hazardStripes(): THREE.CanvasTexture {
+  const [c, g] = canvas(16, 4);
+  for (let x = 0; x < 16; x++) {
+    for (let y = 0; y < 4; y++) {
+      g.fillStyle = (x + y) % 8 < 4 ? "#ffc53d" : "#1d1834";
+      g.fillRect(x, y, 1, 1);
+    }
+  }
+  return repeating(finish(c));
+}
+
+/** The city at night, seen through the office windows. */
+export function skyline(): THREE.CanvasTexture {
+  const W = 96;
+  const H = 64;
+  const [c, g] = canvas(W, H);
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, "#14112e");
+  sky.addColorStop(1, "#45307a");
+  g.fillStyle = sky;
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = "#e8e2ff";
+  for (let i = 0; i < 16; i++) g.fillRect(Math.floor(noise(i + 70) * W), Math.floor(noise(i + 90) * H * 0.4), 1, 1);
+  g.fillStyle = "#fff2c4";
+  g.fillRect(72, 6, 6, 8);
+  g.fillRect(71, 7, 8, 6);
+  let x = 0;
+  let i = 0;
+  while (x < W) {
+    const bw = 8 + Math.floor(noise(i * 3 + 1) * 12);
+    const bh = 18 + Math.floor(noise(i * 3 + 2) * 34);
+    g.fillStyle = i % 2 ? "#1d1838" : "#262050";
+    g.fillRect(x, H - bh, bw, bh);
+    for (let wy = H - bh + 3; wy < H - 2; wy += 4) {
+      for (let wx = x + 2; wx < x + bw - 2; wx += 3) {
+        if (noise(wx * 13 + wy * 7) > 0.55) {
+          g.fillStyle = noise(wx + wy * 3) > 0.3 ? "#ffd84a" : "#ff9f43";
+          g.fillRect(wx, wy, 1, 2);
+        }
+      }
+    }
+    x += bw + 1;
+    i++;
+  }
+  return finish(c);
+}
+
+/** The company's neon sign. Redrawn once the pixel font has loaded. */
+export function logoSign(): THREE.CanvasTexture {
+  const [c, g] = canvas(512, 160);
+  const draw = () => {
+    g.clearRect(0, 0, 512, 160);
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.shadowColor = "#ffd84a";
+    g.shadowBlur = 18;
+    g.fillStyle = "#ffe680";
+    g.font = '700 104px "Pixelify Sans", sans-serif';
+    g.fillText("99.99%", 256, 70);
+    g.shadowColor = "#ff7ad9";
+    g.shadowBlur = 12;
+    g.fillStyle = "#ff9be3";
+    g.font = '700 30px "Pixelify Sans", sans-serif';
+    g.fillText("keep it online", 256, 134);
+  };
+  draw();
+  const t = finish(c);
+  t.magFilter = THREE.LinearFilter;
+  document.fonts?.load('700 104px "Pixelify Sans"').then(() => {
+    draw();
+    t.needsUpdate = true;
+  });
+  return t;
+}
+
+/** Today's architecture sketch, with the next idea scribbled in red. */
+export function whiteboard(): THREE.CanvasTexture {
+  const W = 320;
+  const H = 180;
+  const [c, g] = canvas(W, H);
+  const draw = () => {
+    g.fillStyle = "#f7f4ff";
+    g.fillRect(0, 0, W, H);
+    g.lineWidth = 3;
+    g.lineJoin = "round";
+    const box = (x: number, y: number, w: number, h: number, color: string, label: string, dashed = false) => {
+      g.strokeStyle = color;
+      g.setLineDash(dashed ? [6, 5] : []);
+      g.strokeRect(x, y, w, h);
+      g.setLineDash([]);
+      g.fillStyle = color;
+      g.font = '600 14px "Rubik", sans-serif';
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.fillText(label, x + w / 2, y + h / 2);
+    };
+    const arrow = (x1: number, y1: number, x2: number, y2: number, color: string) => {
+      g.strokeStyle = color;
+      g.beginPath();
+      g.moveTo(x1, y1);
+      g.lineTo(x2, y2);
+      g.stroke();
+      const a = Math.atan2(y2 - y1, x2 - x1);
+      g.beginPath();
+      g.moveTo(x2, y2);
+      g.lineTo(x2 - 9 * Math.cos(a - 0.5), y2 - 9 * Math.sin(a - 0.5));
+      g.moveTo(x2, y2);
+      g.lineTo(x2 - 9 * Math.cos(a + 0.5), y2 - 9 * Math.sin(a + 0.5));
+      g.stroke();
+    };
+    g.fillStyle = "#1d1834";
+    g.font = '700 16px "Rubik", sans-serif';
+    g.textAlign = "left";
+    g.fillText("v2 architecture", 14, 20);
+    box(14, 70, 56, 34, "#1d1834", "users");
+    arrow(72, 87, 98, 87, "#1d1834");
+    box(100, 70, 44, 34, "#2a7fd0", "LB");
+    for (let i = 0; i < 3; i++) {
+      arrow(146, 87, 170, 50 + i * 37, "#2a7fd0");
+      box(172, 36 + i * 37, 48, 28, "#2a7fd0", "app");
+    }
+    arrow(222, 87, 244, 87, "#1a8a4a");
+    box(246, 70, 60, 34, "#1a8a4a", "DB");
+    box(246, 128, 60, 30, "#d6283b", "cache?", true);
+    arrow(276, 126, 276, 106, "#d6283b");
+    g.fillStyle = "#ffd84a";
+    g.fillRect(14, 126, 46, 40);
+    g.fillStyle = "#ff9be3";
+    g.fillRect(66, 132, 46, 40);
+    g.fillStyle = "#1d1834";
+    for (let i = 0; i < 3; i++) {
+      g.fillRect(20, 136 + i * 9, 30 - i * 6, 2);
+      g.fillRect(72, 142 + i * 9, 32 - i * 8, 2);
+    }
+  };
+  draw();
+  const t = finish(c);
+  t.magFilter = THREE.LinearFilter;
+  document.fonts?.load('600 14px "Rubik"').then(() => {
+    draw();
+    t.needsUpdate = true;
+  });
+  return t;
+}
