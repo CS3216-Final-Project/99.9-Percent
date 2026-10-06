@@ -5,10 +5,47 @@
  * ink outlines, chunky buttons that press down, and pixel type for anything
  * you read at a glance. Sentences stay in Rubik so they are easy to read.
  *
+ * Numbers use bold Rubik: Pixelify's 2, 5 and 8 are too alike to read at a glance.
+ * Digits inside pixel text fall back to Rubik too (see "Pixelify Letters").
+ *
  * Every idea has one colour and one icon (see components/icons.tsx):
  * cash is gold coins, users are blue, revenue teal, uptime a pink heart,
  * upgrades violet, engineers orange. Status is always green / orange / red.
  */
+
+/*
+ * Pixelify Sans for words, Rubik for digits: Pixelify's 2, 5 and 8 are too
+ * alike to read at a glance. The logo keeps the full face (see .brand-mark).
+ */
+@font-face {
+  font-family: "Pixelify Letters";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url("../node_modules/@fontsource/pixelify-sans/files/pixelify-sans-latin-500-normal.woff2") format("woff2");
+  /* Everything except 0-9, so digits fall through to Rubik. */
+  unicode-range: U+0020-002F, U+003A-00FF, U+2013-2014, U+2018-201E, U+2026, U+2192;
+}
+
+@font-face {
+  font-family: "Pixelify Letters";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url("../node_modules/@fontsource/pixelify-sans/files/pixelify-sans-latin-600-normal.woff2") format("woff2");
+  /* Everything except 0-9, so digits fall through to Rubik. */
+  unicode-range: U+0020-002F, U+003A-00FF, U+2013-2014, U+2018-201E, U+2026, U+2192;
+}
+
+@font-face {
+  font-family: "Pixelify Letters";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url("../node_modules/@fontsource/pixelify-sans/files/pixelify-sans-latin-700-normal.woff2") format("woff2");
+  /* Everything except 0-9, so digits fall through to Rubik. */
+  unicode-range: U+0020-002F, U+003A-00FF, U+2013-2014, U+2018-201E, U+2026, U+2192;
+}
 
 :root {
   /* Surfaces */
@@ -46,8 +83,10 @@
   --critical: #ff4d5e;
   --critical-ink: #c41d33;
 
-  --font-display: "Pixelify Sans", "Rubik", system-ui, sans-serif;
+  --font-display: "Pixelify Letters", "Rubik", system-ui, sans-serif;
+  --font-logo: "Pixelify Sans", "Rubik", system-ui, sans-serif;
   --font-body: "Rubik", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Rubik", "Segoe UI", system-ui, sans-serif;
 
   color-scheme: dark;
   --radius: 4px;
@@ -162,10 +201,10 @@ button:disabled {
   text-align: center;
 }
 
-/* Number type: pixel digits for anything you scan rather than read. */
+/* Number type: bold, tabular and unambiguous. */
 .num {
-  font-family: var(--font-display);
-  font-weight: 600;
+  font-family: var(--font-num);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -193,7 +232,7 @@ button:disabled {
 }
 
 .brand-mark {
-  font-family: var(--font-display);
+  font-family: var(--font-logo);
   font-weight: 700;
   font-size: 1.7rem;
   line-height: 1;
@@ -244,6 +283,7 @@ button:disabled {
 }
 
 .title-card h1 {
+  font-family: var(--font-logo);
   font-size: clamp(4.4rem, 12vw, 8.8rem);
   font-weight: 700;
   line-height: 0.9;
@@ -420,7 +460,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-display);
+  font-family: var(--font-num);
   font-weight: 600;
   color: var(--on-night-soft);
   font-size: 0.95rem;
@@ -430,6 +470,7 @@ button:disabled {
 
 .brand-week strong {
   color: var(--on-night);
+  font-weight: 700;
 }
 
 .is-incident .brand-week {
@@ -507,9 +548,9 @@ button:disabled {
 }
 
 .stat-body > strong {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.45rem;
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 1.4rem;
   line-height: 1.15;
   color: var(--on-night);
   font-variant-numeric: tabular-nums;
@@ -1337,8 +1378,9 @@ button:disabled {
 
 .gauge-head strong {
   margin-left: auto;
-  font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 1.3rem;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -1666,9 +1708,9 @@ button:disabled {
   justify-content: center;
   gap: 4px;
   min-width: 48px;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.02rem;
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 1rem;
 }
 
 .stepper span .icon {
@@ -1817,9 +1859,9 @@ button:disabled {
   color: var(--on-night-soft);
   border: 0;
   border-left: 2px solid var(--ink);
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1rem;
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2423,7 +2465,7 @@ button:disabled {
 }
 
 .feed-week {
-  font-family: var(--font-display);
+  font-family: var(--font-num);
   font-weight: 600;
   color: var(--text-soft);
   font-variant-numeric: tabular-nums;
@@ -2516,10 +2558,11 @@ button:disabled {
   margin: 0;
 }
 
+/* Number tiles: icon and value on top, label underneath, so long values never collide with labels. */
 .impact,
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 8px;
   margin: 10px 0;
 }
@@ -2527,10 +2570,10 @@ button:disabled {
 .impact > div,
 .stats > div {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   column-gap: 8px;
   align-items: center;
-  padding: 6px 8px;
+  padding: 8px;
   background: var(--paper-2);
   border: 2px solid var(--ink);
   border-radius: var(--radius);
@@ -2538,9 +2581,9 @@ button:disabled {
 
 .impact .concept,
 .stats .concept {
-  grid-row: 1 / 3;
-  width: 30px;
-  height: 30px;
+  grid-row: 1;
+  width: 28px;
+  height: 28px;
   box-shadow: none;
 }
 
@@ -2552,37 +2595,52 @@ button:disabled {
 
 .impact dt,
 .stats dt {
-  font-size: 0.78rem;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin-top: 5px;
+  font-size: 0.8rem;
   font-weight: 500;
   color: var(--text-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .impact dd,
 .stats dd {
+  grid-column: 2;
+  grid-row: 1;
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.28rem;
-  line-height: 1.1;
+  min-width: 0;
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 1.2rem;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* In the narrow side panel the impact tiles stack: icon and number, label underneath. */
+/* The end report's four headline numbers sit two by two so none is cut short. */
+.stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stats dd {
+  font-size: 1.35rem;
+}
+
+/* The side panel is narrow: three smaller tiles in a row. */
 .side .impact {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 
 .side .impact > div {
-  grid-template-columns: auto minmax(0, 1fr);
   column-gap: 6px;
   padding: 6px;
 }
 
 .side .impact .concept {
-  grid-row: 1;
   width: 24px;
   height: 24px;
 }
@@ -2592,23 +2650,8 @@ button:disabled {
   height: 12px;
 }
 
-.side .impact dt {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  margin-top: 4px;
-  font-size: 0.74rem;
-  text-transform: none;
-  letter-spacing: 0;
-  white-space: nowrap;
-}
-
 .side .impact dd {
-  grid-column: 2;
-  grid-row: 1;
-  font-size: 1.12rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 1.1rem;
 }
 
 /* ---------------------------------------------------------------- */
@@ -2661,7 +2704,8 @@ button:disabled {
 
 .clock-row .muted {
   color: var(--on-night-soft);
-  font-family: var(--font-display);
+  font-family: var(--font-num);
+  font-weight: 600;
 }
 
 .clock-row .btn {
@@ -2670,9 +2714,9 @@ button:disabled {
 }
 
 .clock-time {
-  font-family: var(--font-display);
+  font-family: var(--font-num);
   font-weight: 700;
-  font-size: 2.2rem;
+  font-size: 2.1rem;
   line-height: 1;
   color: #fff;
   font-variant-numeric: tabular-nums;
@@ -2732,6 +2776,8 @@ button:disabled {
   background: var(--ink);
   color: var(--go);
   border-radius: 3px;
+  font-family: var(--font-num);
+  font-weight: 700;
   font-size: 0.95rem;
 }
 
@@ -3070,15 +3116,24 @@ button:disabled {
   flex: none;
   display: grid;
   place-content: center;
+  justify-items: center;
   border: 3px solid var(--ink);
   border-radius: 6px;
   background: var(--c-users);
   box-shadow: inset 0 -6px 0 rgb(0 0 0 / 0.18);
-  font-family: var(--font-display);
+  font-family: var(--font-num);
   font-weight: 700;
-  font-size: 3.4rem;
+  font-size: 2.9rem;
   line-height: 1;
   color: var(--ink);
+}
+
+.grade::before {
+  content: "Grade";
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 2px;
 }
 
 .grade-S,
@@ -3132,9 +3187,9 @@ button:disabled {
   border: 2px solid var(--ink);
   border-radius: var(--radius);
   box-shadow: var(--press);
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.1rem;
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 1.05rem;
 }
 
 .rating-buttons button:hover {
@@ -3319,7 +3374,7 @@ button:disabled {
     height: 20px;
   }
   .stat-body > strong {
-    font-size: 1.28rem;
+    font-size: 1.25rem;
   }
   .brand {
     min-width: 112px;
@@ -3388,7 +3443,7 @@ button:disabled {
     display: none;
   }
   .stat-body > strong {
-    font-size: 1.02rem;
+    font-size: 0.98rem;
   }
   /* Phones show the four headline numbers only. */
   .stat-body > span {
