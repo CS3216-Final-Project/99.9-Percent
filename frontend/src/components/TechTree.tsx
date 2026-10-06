@@ -3,8 +3,8 @@
 import { BALANCE, BRANCHES, missingPrerequisites, TECH, TECH_ORDER, techStatus, type GameState, type TechId, type TechStatus } from "@/sim";
 import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
-import { Icon } from "./icons";
-import { Act, Chip, ReleaseRow, TaskRow } from "./ui";
+import { Icon, TECH_ICON, type IconName } from "./icons";
+import { Act, Chip, Concept, ReleaseRow, TaskRow } from "./ui";
 
 const NODE_W = 204;
 const NODE_H = 60;
@@ -32,6 +32,16 @@ function nodePos(id: TechId): { x: number; y: number } {
 
 const WIDTH = PAD_X + 2 * COL_GAP + NODE_W + 16;
 const HEIGHT = PAD_Y + 3 * ROW_GAP + 2 * LANE_GAP;
+
+const BRANCH_ICON: Record<string, IconName> = { capacity: "server", data: "database", reliability: "health" };
+
+const STATUS_ICON: Record<TechStatus, IconName> = {
+  locked: "lock",
+  available: "plus",
+  in_progress: "wrench",
+  ready: "ship",
+  done: "check",
+};
 
 const STATUS_WORD: Record<TechStatus, string> = {
   locked: "Locked",
@@ -63,8 +73,14 @@ function Detail({ game, id }: { game: GameState; id: TechId }) {
 
   return (
     <div className="tree-detail">
-      <span className={`tag tag-${status === "done" ? "ok" : status === "locked" ? "plain" : "accent"}`}>{STATUS_WORD[status]}</span>
-      <h3>{def.name}</h3>
+      <span className={`tag tag-${status === "done" ? "ok" : status === "locked" ? "plain" : status === "available" ? "accent" : "warn"}`}>
+        <Icon name={STATUS_ICON[status]} size={12} />
+        {STATUS_WORD[status]}
+      </span>
+      <div className="tree-detail-head">
+        <Concept kind={status === "locked" ? "muted" : "tech"} icon={TECH_ICON[id] ?? "tree"} />
+        <h3>{def.name}</h3>
+      </div>
       <p className="muted">{def.description}</p>
       <ul className="effects">
         {def.effects.map((e) => (
@@ -75,10 +91,14 @@ function Detail({ game, id }: { game: GameState; id: TechId }) {
         <Chip icon="cash" tip="One-off cost to start building.">
           {moneyFull(def.cost)}
         </Chip>
-        <Chip icon="wrench" tip="Engineer-weeks of work. Three engineers finish three engineer-weeks in one week.">
+        <Chip icon="team" tip="Engineer-weeks of work. Three engineers finish three engineer-weeks in one week.">
           {def.effort} engineer-weeks
         </Chip>
-        {(def.upkeep > 0 || def.upkeepNote) && <Chip tip="Running cost once it is live.">{def.upkeepNote ?? `${moneyFull(def.upkeep)}/wk`}</Chip>}
+        {(def.upkeep > 0 || def.upkeepNote) && (
+          <Chip icon="week" tip="Running cost once it is live.">
+            {def.upkeepNote ?? `${moneyFull(def.upkeep)}/wk`}
+          </Chip>
+        )}
       </div>
 
       {def.requires.length > 0 && (
@@ -87,7 +107,7 @@ function Detail({ game, id }: { game: GameState; id: TechId }) {
             const met = techStatus(game, r) === "done";
             return (
               <button type="button" key={r} className={`tech-chip tech-${met ? "done" : "locked"}`} onClick={() => focusTech(r)}>
-                <Icon name={met ? "check" : "lock"} size={12} />
+                <Icon name={met ? "check" : "lock"} size={16} />
                 Needs {TECH[r].name}
               </button>
             );
@@ -120,9 +140,12 @@ export default function TechTree() {
               const top = PAD_Y + lane.rows[0] * ROW_GAP + i * LANE_GAP - 7;
               const height = (lane.rows[1] - lane.rows[0] + 1) * ROW_GAP - 4;
               return (
-                <div key={lane.branch} className="lane" style={{ top: `${top / HEIGHT * 100}%`, height: `${height / HEIGHT * 100}%` }}>
+                <div key={lane.branch} className={`lane lane-${lane.branch}`} style={{ top: `${top / HEIGHT * 100}%`, height: `${height / HEIGHT * 100}%` }}>
                   <div className="lane-label" style={{ width: `${(PAD_X - 12) / WIDTH * 100}%` }}>
-                    <strong>{b?.name}</strong>
+                    <strong>
+                      <Icon name={BRANCH_ICON[lane.branch]} />
+                      {b?.name}
+                    </strong>
                     <span>{b?.blurb}</span>
                   </div>
                 </div>
@@ -171,7 +194,10 @@ export default function TechTree() {
                   title={missing ? `Needs ${missing}` : TECH[id].description}
                 >
                   <span className="node-mark" aria-hidden="true">
-                    <Icon name={status === "done" ? "check" : status === "locked" ? "lock" : status === "available" ? "plus" : "wrench"} size={12} />
+                    <Icon name={TECH_ICON[id] ?? "tree"} />
+                    <span className="node-badge">
+                      <Icon name={STATUS_ICON[status]} size={12} />
+                    </span>
                   </span>
                   <span className="node-name">{TECH[id].name}</span>
                   <span className="node-status">{statusLine(game, id, status)}</span>

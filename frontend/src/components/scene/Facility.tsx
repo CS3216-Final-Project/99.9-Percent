@@ -31,6 +31,7 @@ import {
   type Footprint,
 } from "./layout";
 import { floorTiles, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
+import { EQUIPMENT_ICON, Icon, STATE_META } from "../icons";
 
 /* ------------------------------------------------------------------ */
 /* Scene model: the few facts the 3D view needs, as a stable snapshot  */
@@ -248,7 +249,10 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
 /* Building blocks                                                     */
 /* ------------------------------------------------------------------ */
 
-const STEEL = "#252b32";
+/* A toy server room at night: flat indigo cabinets, warm desks and bright status lights. */
+const STEEL = "#34305c";
+const TRIM = "#2a2450";
+const BEZEL = "#1d1834";
 
 function Rack({
   x,
@@ -270,7 +274,7 @@ function Rack({
     <group position={[x, 0, z]}>
       <mesh castShadow receiveShadow position={[0, size.h / 2, 0]}>
         <boxGeometry args={[size.w, size.h, size.d]} />
-        <meshStandardMaterial color={tint} metalness={0.6} roughness={0.45} />
+        <meshStandardMaterial color={tint} metalness={0.1} roughness={0.8} />
       </mesh>
       <mesh position={[0, size.h / 2, size.d / 2 + 0.006]}>
         <planeGeometry args={[size.w * 0.87, size.h * 0.93]} />
@@ -279,14 +283,14 @@ function Rack({
           emissiveMap={tex.emissive}
           emissive="#ffffff"
           emissiveIntensity={1.7}
-          roughness={0.5}
-          metalness={0.35}
+          roughness={0.7}
+          metalness={0.05}
         />
       </mesh>
       {/* Side vent panel, visible from the camera's side of the rack. */}
       <mesh position={[size.w / 2 + 0.004, size.h / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[size.d * 0.8, size.h * 0.86]} />
-        <meshStandardMaterial color="#1c2127" metalness={0.5} roughness={0.6} />
+        <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
       </mesh>
       <mesh position={[0, size.h + 0.025, size.d / 2 - 0.09]}>
         <boxGeometry args={[size.w * 0.72, 0.05, 0.07]} />
@@ -307,7 +311,7 @@ function Screen({ kind, w, h, position, rotation }: { kind: ScreenKind; w: numbe
     <group position={position} rotation={rotation}>
       <mesh castShadow>
         <boxGeometry args={[w + 0.07, h + 0.07, 0.045]} />
-        <meshStandardMaterial color="#14181c" metalness={0.4} roughness={0.5} />
+        <meshStandardMaterial color={BEZEL} metalness={0.05} roughness={0.8} />
       </mesh>
       <mesh position={[0, 0, 0.026]}>
         <planeGeometry args={[w, h]} />
@@ -323,24 +327,24 @@ function Desk({ x, z, screen, wide = false }: { x: number; z: number; screen: Sc
     <group position={[x, 0, z]}>
       <mesh castShadow receiveShadow position={[0, 0.74, 0]}>
         <boxGeometry args={[w, 0.05, 0.8]} />
-        <meshStandardMaterial color="#6a5f52" roughness={0.7} />
+        <meshStandardMaterial color="#c98b55" roughness={0.85} />
       </mesh>
       {[-1, 1].map((side) => (
         <mesh key={side} castShadow position={[(side * (w - 0.1)) / 2, 0.37, 0]}>
           <boxGeometry args={[0.05, 0.74, 0.72]} />
-          <meshStandardMaterial color="#30363d" metalness={0.5} roughness={0.5} />
+          <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
         </mesh>
       ))}
       <mesh position={[wide ? -0.45 : 0, 0.87, -0.22]}>
         <boxGeometry args={[0.07, 0.22, 0.07]} />
-        <meshStandardMaterial color="#1b1f24" />
+        <meshStandardMaterial color={BEZEL} />
       </mesh>
       <Screen kind={screen} w={0.6} h={0.36} position={[wide ? -0.45 : 0, 1.13, -0.2]} />
       {wide && (
         <>
           <mesh position={[0.45, 0.87, -0.22]}>
             <boxGeometry args={[0.07, 0.22, 0.07]} />
-            <meshStandardMaterial color="#1b1f24" />
+            <meshStandardMaterial color={BEZEL} />
           </mesh>
           <Screen kind={screen} w={0.6} h={0.36} position={[0.45, 1.13, -0.2]} />
         </>
@@ -348,19 +352,19 @@ function Desk({ x, z, screen, wide = false }: { x: number; z: number; screen: Sc
       {/* Chair */}
       <mesh castShadow position={[0, 0.46, 0.72]}>
         <boxGeometry args={[0.46, 0.08, 0.46]} />
-        <meshStandardMaterial color="#2a3037" roughness={0.8} />
+        <meshStandardMaterial color="#ff9f43" roughness={0.85} />
       </mesh>
       <mesh castShadow position={[0, 0.78, 0.93]}>
         <boxGeometry args={[0.44, 0.56, 0.06]} />
-        <meshStandardMaterial color="#2a3037" roughness={0.8} />
+        <meshStandardMaterial color="#ff9f43" roughness={0.85} />
       </mesh>
       <mesh position={[0, 0.22, 0.72]}>
         <cylinderGeometry args={[0.04, 0.04, 0.44, 8]} />
-        <meshStandardMaterial color="#14181c" metalness={0.7} roughness={0.4} />
+        <meshStandardMaterial color={BEZEL} roughness={0.8} />
       </mesh>
       <mesh position={[0, 0.03, 0.72]}>
         <cylinderGeometry args={[0.26, 0.26, 0.04, 12]} />
-        <meshStandardMaterial color="#14181c" metalness={0.7} roughness={0.4} />
+        <meshStandardMaterial color={BEZEL} roughness={0.8} />
       </mesh>
     </group>
   );
@@ -389,7 +393,7 @@ function Cable({ points, speed, alert }: { points: P2[]; speed: number; alert: b
   }, [points]);
   const count = Math.max(1, Math.round(segments.total / 2.4));
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const color = alert ? "#ff5a4f" : "#7fbfee";
+  const color = alert ? "#ff4d5e" : "#4cb8ff";
 
   useFrame(({ clock }) => {
     const mesh = packets.current;
@@ -413,7 +417,7 @@ function Cable({ points, speed, alert }: { points: P2[]; speed: number; alert: b
         return (
           <mesh key={i} receiveShadow position={[(s.a[0] + s.b[0]) / 2, 0.025, (s.a[1] + s.b[1]) / 2]}>
             <boxGeometry args={horizontal ? [s.len + 0.2, 0.05, 0.2] : [0.2, 0.05, s.len + 0.2]} />
-            <meshStandardMaterial color={alert ? "#3a1a18" : "#161b20"} emissive={color} emissiveIntensity={alert ? 0.45 : 0.08} roughness={0.7} />
+            <meshStandardMaterial color={alert ? "#4a1630" : TRIM} emissive={color} emissiveIntensity={alert ? 0.45 : 0.1} roughness={0.8} />
           </mesh>
         );
       })}
@@ -429,9 +433,9 @@ function Cable({ points, speed, alert }: { points: P2[]; speed: number; alert: b
 /* Floor markings, hit areas and labels for each piece of equipment    */
 /* ------------------------------------------------------------------ */
 
-const ACCENT = "#8cc7f2";
-const ALERT = "#ff5a4f";
-const AMBER = "#f0b040";
+const ACCENT = "#4cb8ff";
+const ALERT = "#ff4d5e";
+const AMBER = "#ff9f1a";
 
 function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Footprint; built: boolean; symptomatic: boolean; inspecting: boolean }) {
   const selected = useGame((s) => s.selected === id);
@@ -445,7 +449,7 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
     fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4.2)) : base;
   });
 
-  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered ? ACCENT : built ? "#66727f" : "#56616c";
+  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered ? ACCENT : built ? "#8f87c9" : "#6e67a3";
   const hw = f.w / 2;
   const hd = f.d / 2;
   const outline: [number, number, number][] = [
@@ -557,7 +561,9 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       onBlur={() => useGame.getState().hover(null)}
       aria-label={`${m.names[id]}${built ? "" : ", not built"}`}
     >
-      <span className="eq-dot" aria-hidden="true" />
+      <span className="eq-icon" aria-hidden="true">
+        <Icon name={EQUIPMENT_ICON[id]} />
+      </span>
       <span>{m.names[id]}</span>
       {!built && <span className="eq-note">not built</span>}
       {inspecting && <span className="eq-note">investigating</span>}
@@ -571,6 +577,7 @@ function Labels() {
   return (
     <div className="eq-labels">
       <span className="wall-tag" ref={bindLabel(INTERNET)}>
+        <Icon name="network" />
         Internet
       </span>
       {EQUIPMENT_ORDER.filter((id) => (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
@@ -594,38 +601,38 @@ function Room() {
     <group>
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[ROOM.w, ROOM.d]} />
-        <meshStandardMaterial map={tiles} roughness={0.78} metalness={0.1} />
+        <meshStandardMaterial map={tiles} roughness={0.9} metalness={0} />
       </mesh>
       <mesh position={[0, -0.26, 0]}>
         <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
-        <meshStandardMaterial color="#1b2025" roughness={0.9} />
+        <meshStandardMaterial color="#2a2450" roughness={0.9} />
       </mesh>
       {/* Back and left walls; the two nearest the camera are left open. */}
       <mesh receiveShadow position={[0, ROOM.wallH / 2, -ROOM.d / 2 - 0.12]}>
         <boxGeometry args={[ROOM.w + 0.5, ROOM.wallH, 0.24]} />
-        <meshStandardMaterial color="#6b7681" roughness={0.92} />
+        <meshStandardMaterial color="#5d5399" roughness={0.95} />
       </mesh>
       <mesh receiveShadow position={[-ROOM.w / 2 - 0.12, ROOM.wallH / 2, 0]}>
         <boxGeometry args={[0.24, ROOM.wallH, ROOM.d]} />
-        <meshStandardMaterial color="#616c77" roughness={0.92} />
+        <meshStandardMaterial color="#4f4688" roughness={0.95} />
       </mesh>
       <mesh position={[0, 0.12, -ROOM.d / 2 + 0.02]}>
         <boxGeometry args={[ROOM.w, 0.24, 0.04]} />
-        <meshStandardMaterial color="#2b3239" roughness={0.8} />
+        <meshStandardMaterial color={TRIM} roughness={0.85} />
       </mesh>
       <mesh position={[-ROOM.w / 2 + 0.02, 0.12, 0]}>
         <boxGeometry args={[0.04, 0.24, ROOM.d]} />
-        <meshStandardMaterial color="#2b3239" roughness={0.8} />
+        <meshStandardMaterial color={TRIM} roughness={0.85} />
       </mesh>
       {/* Overhead cable tray along the back wall. */}
       <mesh castShadow position={[-3, 2.75, -ROOM.d / 2 + 0.35]}>
         <boxGeometry args={[17, 0.1, 0.5]} />
-        <meshStandardMaterial color="#2e353c" metalness={0.6} roughness={0.5} />
+        <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
       </mesh>
       {/* Where the internet uplink enters the building. */}
       <mesh position={[-ROOM.w / 2 + 0.1, 0.5, -4.9]}>
         <boxGeometry args={[0.2, 1, 0.7]} />
-        <meshStandardMaterial color="#20262c" metalness={0.6} roughness={0.5} />
+        <meshStandardMaterial color={BEZEL} metalness={0.05} roughness={0.85} />
       </mesh>
     </group>
   );
@@ -652,12 +659,12 @@ function Scene() {
 
   return (
     <>
-      <color attach="background" args={["#171c21"]} />
-      <hemisphereLight args={["#dbe6f0", "#4a535c", 1.55]} />
+      <color attach="background" args={["#1a1633"]} />
+      <hemisphereLight args={["#fff0dd", "#3b3366", 1.7]} />
       <directionalLight
         position={[11, 17, 7]}
-        intensity={2.6}
-        color="#fff6ea"
+        intensity={2.3}
+        color="#fff1de"
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0005}
@@ -668,14 +675,14 @@ function Scene() {
         shadow-camera-near={1}
         shadow-camera-far={60}
       />
-      <pointLight position={[-3, 3.4, -3.5]} intensity={26} distance={13} color="#a9cff2" />
-      <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#a9cff2" />
+      <pointLight position={[-3, 3.4, -3.5]} intensity={24} distance={13} color="#8fc3ff" />
+      <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
       <Room />
 
       {/* Network edge */}
       <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
-      {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint="#2a3138" />}
+      {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint="#3a3566" />}
 
       {/* App servers */}
       {m.hosts.slice(0, 12).map((led, i) => {
@@ -684,18 +691,18 @@ function Scene() {
       })}
       {Array.from({ length: m.temp }, (_, i) => {
         const p = tempSlot(i);
-        return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint="#26323d" />;
+        return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint="#2f4a7a" />;
       })}
-      {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint="#2d2a24" />}
+      {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint="#4d3f63" />}
 
       {/* Data tier */}
-      {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} />}
+      {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint="#2f3f73" />}
       {Array.from({ length: m.dbCabinets }, (_, i) => {
         const p = dbSlot(i);
-        return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint="#22282f" />;
+        return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint="#3f3170" />;
       })}
-      {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint="#22282f" />}
-      {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint="#2a2f35" />}
+      {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint="#3f3170" />}
+      {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint="#3b3560" />}
 
       {/* Monitoring wall */}
       {m.monitoring > 0 &&
@@ -719,7 +726,7 @@ function Scene() {
       <group position={[POS.deploy.x, 0, POS.deploy.z]}>
         <mesh castShadow receiveShadow position={[0, 0.5, 0]}>
           <boxGeometry args={[1.5, 1, 0.8]} />
-          <meshStandardMaterial color={STEEL} metalness={0.6} roughness={0.45} />
+          <meshStandardMaterial color={STEEL} metalness={0.1} roughness={0.8} />
         </mesh>
         <Screen kind={m.releases > 0 ? "deploy-busy" : "deploy"} w={1.1} h={0.62} position={[0, 1.28, -0.12]} rotation={[-0.35, 0, 0]} />
       </group>
@@ -729,7 +736,7 @@ function Scene() {
       <group position={[POS.growth.x + 1.15, 0, POS.growth.z - 0.55]}>
         <mesh castShadow position={[0, 0.55, 0]}>
           <boxGeometry args={[0.08, 1.1, 0.08]} />
-          <meshStandardMaterial color="#1b1f24" metalness={0.6} roughness={0.4} />
+          <meshStandardMaterial color={BEZEL} metalness={0.05} roughness={0.8} />
         </mesh>
         <Screen kind="chart" w={1.2} h={0.75} position={[0, 1.5, 0]} />
       </group>
@@ -763,14 +770,6 @@ function Scene() {
 /* Hover summary (name, status, one metric)                            */
 /* ------------------------------------------------------------------ */
 
-const STATE_WORDS: Record<EquipmentState, string> = {
-  ok: "Healthy",
-  warn: "Needs attention",
-  critical: "Overloaded",
-  down: "Down",
-  absent: "Not built",
-};
-
 function HoverTip({ container }: { container: React.RefObject<HTMLDivElement | null> }) {
   const hovered = useGame((s) => s.hovered);
   const game = useGame((s) => s.game);
@@ -792,7 +791,7 @@ function HoverTip({ container }: { container: React.RefObject<HTMLDivElement | n
 
   const info = hovered ? equipmentInfo(game, hovered) : null;
   const incident = game.phase === "incident" && game.incident;
-  let status = info ? STATE_WORDS[info.state] : "";
+  let status = info ? STATE_META[info.state].word : "";
   let summary = info?.summary ?? "";
   let action = "";
   if (info && incident) {
@@ -807,7 +806,10 @@ function HoverTip({ container }: { container: React.RefObject<HTMLDivElement | n
       {info && (
         <>
           <strong>{info.name}</strong>
-          <span className={`hover-state tone-${incident ? (status === "Showing symptoms" ? "alert" : "ok") : info.state}`}>{status}</span>
+          <span className={`hover-state tone-${incident ? (status === "Showing symptoms" ? "alert" : "ok") : info.state}`}>
+            <Icon name={incident ? (status === "Showing symptoms" ? "alert" : "check") : STATE_META[info.state].icon} />
+            {status}
+          </span>
           {summary && <span className="hover-summary">{summary}</span>}
           {action && <span className="hover-action">{action}</span>}
         </>

@@ -3,8 +3,10 @@
 import { equipmentInfo, inspectable, inspectSeconds, recoveryOptions, symptomaticEquipment } from "@/sim";
 import { clock, moneyFull, num, pct } from "@/game/format";
 import { inspectOrSelect, useGame } from "@/game/store";
-import { Icon } from "./icons";
-import { Meter, Tip } from "./ui";
+import { EQUIPMENT_ICON, Icon, type IconName } from "./icons";
+import { Concept, Meter, Tip } from "./ui";
+
+const ATTEMPT_ICON: Record<string, IconName> = { fixed: "check", mitigated: "alert", partial: "alert", no_effect: "close" };
 
 /**
  * The crisis workspace. The alert shows symptoms only; the player investigates
@@ -33,22 +35,26 @@ export default function IncidentPanel() {
     <section className="panel-section incident" aria-label="Incident">
       <header className="panel-head">
         <span className="panel-icon state-critical">
-          <Icon name="alert" size={22} />
+          <Icon name="incident" />
         </span>
         <div>
           <h2>{inc.title}</h2>
-          <span className="state state-critical">Incident</span>
+          <span className="state state-critical">
+            <Icon name="alert" size={12} />
+            Incident
+          </span>
         </div>
       </header>
 
       <div className="incident-clock">
         <div className="clock-row">
+          <Icon name="alarm" />
           <Tip text="One second here is one minute of outage. Customers leave while it runs. After 2:00 it is out of your hands.">
             <strong className="clock-time">{clock(inc.elapsed)}</strong>
           </Tip>
           <span className="muted">/ {clock(inc.maxDuration)}</span>
           <button type="button" className="btn btn-small" onClick={() => setRunning(!running)}>
-            <Icon name={running ? "pause" : "play"} size={13} />
+            <Icon name={running ? "pause" : "play"} size={16} />
             {running ? "Pause" : "Resume"}
           </button>
         </div>
@@ -58,29 +64,38 @@ export default function IncidentPanel() {
       <div className="incident-symptoms">
         <dl className="impact">
           <div>
+            <Concept kind="critical" icon="fire" />
             <dt>Failing</dt>
             <dd className="text-critical">{pct(inc.severity)}</dd>
           </div>
           <div>
+            <Concept kind="users" icon="users" />
             <dt>Users lost</dt>
             <dd>{num(inc.damage.usersLost)}</dd>
           </div>
           <div>
+            <Concept kind="cash" icon="cash" />
             <dt>Spent</dt>
             <dd>{moneyFull(inc.damage.moneySpent)}</dd>
           </div>
         </dl>
         <ul className="symptoms">
           {inc.symptoms.map((s) => (
-            <li key={s}>{s}</li>
+            <li key={s}>
+              <Icon name="alert" size={16} />
+              <span>{s}</span>
+            </li>
           ))}
         </ul>
       </div>
 
       <div className="incident-investigate">
-        <h4>
+        <h4 className="step-head">
+          <span className="step-num" aria-hidden="true">
+            1
+          </span>
           <Tip text={`Click equipment in the room or here. Each look takes ${lookSeconds < 2 ? "about a second" : `${Math.round(lookSeconds)} seconds`} of clock time. Monitoring makes it faster.`}>
-            Investigate
+            Find the cause
           </Tip>
         </h4>
         <div className="chips">
@@ -95,7 +110,9 @@ export default function IncidentPanel() {
                 disabled={checked || !!inc.inspecting}
                 onClick={() => inspectOrSelect(id)}
               >
-                {checked && <Icon name="check" size={11} />}
+                <span className="chip-icon" aria-hidden="true">
+                  <Icon name={checked ? "check" : busy ? "search" : EQUIPMENT_ICON[id]} size={16} />
+                </span>
                 {equipmentInfo(game, id).name}
               </button>
             );
@@ -106,14 +123,22 @@ export default function IncidentPanel() {
           <ul className="evidence">
             {[...inc.evidence].reverse().map((e) => (
               <li key={e.equipment} className={e.anomalous ? "is-anomalous" : ""}>
-                <strong>{e.title}</strong> {e.text}
+                <Icon name={e.anomalous ? "alert" : "search"} size={16} />
+                <span>
+                  <strong>{e.title}</strong> {e.text}
+                </span>
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      <h4>Fix</h4>
+      <h4 className="step-head">
+        <span className="step-num" aria-hidden="true">
+          2
+        </span>
+        Pick the fix
+      </h4>
       {pending && (
         <div className="working">
           <span>{options.find((o) => o.id === pending.id)?.label}…</span>
@@ -125,8 +150,14 @@ export default function IncidentPanel() {
           <li key={o.id}>
             <button type="button" className="action" title={o.description} disabled={!!pending} onClick={() => act({ type: "incident_action", recovery: o.id })}>
               <span className="action-title">{o.label}</span>
-              <span className="price">{o.costNote ?? (o.cost > 0 ? moneyFull(o.cost) : "Free")}</span>
-              <span className="price">{o.secondsNote ?? `${o.seconds}s`}</span>
+              <span className="price">
+                <Icon name="cash" size={12} />
+                {o.costNote ?? (o.cost > 0 ? moneyFull(o.cost) : "Free")}
+              </span>
+              <span className="price">
+                <Icon name="latency" size={12} />
+                {o.secondsNote ?? `${o.seconds}s`}
+              </span>
             </button>
           </li>
         ))}
@@ -148,7 +179,10 @@ export default function IncidentPanel() {
         <ul className="attempts">
           {[...inc.attempts].reverse().map((a, i) => (
             <li key={`${a.id}-${i}`} className={`attempt attempt-${a.outcome}`}>
-              <strong>{a.label}</strong> {a.note}
+              <Icon name={ATTEMPT_ICON[a.outcome] ?? "info"} size={16} />
+              <span>
+                <strong>{a.label}</strong> {a.note}
+              </span>
             </li>
           ))}
         </ul>
@@ -156,11 +190,14 @@ export default function IncidentPanel() {
 
       <div className="hint-box">
         {inc.hints.map((h) => (
-          <p key={h}>{h}</p>
+          <p key={h}>
+            <Icon name="bulb" size={16} />
+            <span>{h}</span>
+          </p>
         ))}
         {inc.hints.length < 2 && (
-          <button type="button" className="btn btn-quiet btn-small" onClick={() => act({ type: "incident_hint" })}>
-            <Icon name="bulb" size={13} />
+          <button type="button" className="btn btn-small" onClick={() => act({ type: "incident_hint" })}>
+            <Icon name="bulb" size={16} />
             Hint
           </button>
         )}

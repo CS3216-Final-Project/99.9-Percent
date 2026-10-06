@@ -6,6 +6,17 @@ import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 
+export type ConceptKind = "cash" | "users" | "revenue" | "health" | "tech" | "team" | "growth" | "ok" | "warn" | "critical" | "muted" | "go";
+
+/** An idea's icon on its coloured tile. The same idea always gets the same tile. */
+export function Concept({ kind, icon, size = 24 }: { kind: ConceptKind; icon: IconName; size?: number }) {
+  return (
+    <span className={`concept concept-${kind}`} aria-hidden="true">
+      <Icon name={icon} size={size} />
+    </span>
+  );
+}
+
 /** Plain-language explanation shown on hover, keyboard focus or tap. Detail lives here, not on screen. */
 export function Tip({ text, children, side = "below" }: { text: string; children: ReactNode; side?: "below" | "above" | "left" }) {
   return (
@@ -31,10 +42,11 @@ export function utilTone(util: number): "ok" | "warn" | "critical" {
 }
 
 /** A labelled bar: the main way the game shows how something is doing. */
-export function Gauge({ label, value, text, tone, tip }: { label: string; value: number; text: string; tone: Tone; tip: string }) {
+export function Gauge({ label, value, text, tone, tip, icon }: { label: string; value: number; text: string; tone: Tone; tip: string; icon?: IconName }) {
   return (
     <div className="gauge">
       <div className="gauge-head">
+        {icon && <Icon name={icon} />}
         <Tip text={tip}>{label}</Tip>
         <strong className={`text-${tone}`}>{text}</strong>
       </div>
@@ -46,7 +58,7 @@ export function Gauge({ label, value, text, tone, tip }: { label: string; value:
 export function Chip({ icon, children, tip }: { icon?: IconName; children: ReactNode; tip?: string }) {
   return (
     <span className="stat-chip" title={tip}>
-      {icon && <Icon name={icon} size={14} />}
+      {icon && <Icon name={icon} size={16} />}
       {children}
     </span>
   );
@@ -78,8 +90,18 @@ export function Act({
     <button type="button" className={`act${primary ? " act-primary" : ""}`} onClick={onClick} disabled={disabled} data-tour={tour} title={title}>
       {icon && <Icon name={icon} />}
       <span className="act-label">{label}</span>
-      {price !== undefined && <span className="price">{moneyFull(price)}</span>}
-      {note && <span className="price">{note}</span>}
+      {price !== undefined && (
+        <span className="price">
+          <Icon name="cash" size={12} />
+          {moneyFull(price)}
+        </span>
+      )}
+      {note && (
+        <span className="price">
+          <Icon name="latency" size={12} />
+          {note}
+        </span>
+      )}
     </button>
   );
 }
@@ -102,7 +124,10 @@ export function TaskRow({ game, task }: { game: GameState; task: Task }) {
   return (
     <div className="task">
       <div className="task-top">
-        <strong>{task.title}</strong>
+        <strong>
+          <Icon name={repair ? "refresh" : "wrench"} size={16} />
+          {task.title}
+        </strong>
         {!repair && (
           <button
             type="button"
@@ -118,13 +143,16 @@ export function TaskRow({ game, task }: { game: GameState; task: Task }) {
       </div>
       <Meter value={task.progress / task.effort} label={`${task.title} progress`} tone={eta === null ? "warn" : "accent"} />
       <div className="task-bottom">
-        <span className={eta === null ? "text-warn" : "muted"}>{eta === null ? "No engineers" : `${eta} wk left`}</span>
+        <span className={eta === null ? "text-warn" : "muted"}>
+          <Icon name={eta === null ? "alert" : "latency"} size={12} />
+          {eta === null ? "No engineers" : `${eta} wk left`}
+        </span>
         <div className="stepper" role="group" aria-label={`Engineers on ${task.title}`} title={`Up to ${BALANCE.engineer.maxPerTask} engineers. More finish sooner.`}>
           <button type="button" disabled={locked || task.assigned <= 0} onClick={() => act({ type: "assign_engineers", taskId: task.id, count: task.assigned - 1 })} aria-label="Remove an engineer">
             −
           </button>
           <span>
-            <Icon name="wrench" size={13} />
+            <Icon name="team" size={16} />
             {task.assigned}
           </span>
           <button
@@ -153,9 +181,22 @@ export function ReleaseRow({ game, release }: { game: GameState; release: Releas
   return (
     <div className="release">
       <div className="task-top">
-        <strong>{release.title}</strong>
-        {release.tested && !release.needsFix && <span className="tag tag-ok">Tested</span>}
-        {release.needsFix && <span className="tag tag-warn">Needs fix</span>}
+        <strong>
+          <Icon name="ship" size={16} />
+          {release.title}
+        </strong>
+        {release.tested && !release.needsFix && (
+          <span className="tag tag-ok">
+            <Icon name="check" size={12} />
+            Tested
+          </span>
+        )}
+        {release.needsFix && (
+          <span className="tag tag-warn">
+            <Icon name="alert" size={12} />
+            Needs fix
+          </span>
+        )}
       </div>
       {release.needsFix ? (
         <p className="muted">Rolled back. Staff its fix task.</p>
@@ -177,9 +218,12 @@ export function ReleaseRow({ game, release }: { game: GameState; release: Releas
           </button>
           {!release.tested && (
             <button type="button" className="act" disabled={locked} onClick={() => act({ type: "test_release", releaseId: release.id })} title="Engineers test it before it ships.">
-              <Icon name="check" />
+              <Icon name="test" />
               <span className="act-label">Test first</span>
-              <span className="price">{weeks} wk</span>
+              <span className="price">
+                <Icon name="latency" size={12} />
+                {weeks} wk
+              </span>
             </button>
           )}
         </div>
@@ -194,21 +238,27 @@ export function Modal({
   onClose,
   wide = false,
   tone,
+  icon,
 }: {
   title: string;
   children: ReactNode;
   onClose?: () => void;
   wide?: boolean;
   tone?: "alert";
+  /** The idea this dialog is about, shown beside the title. */
+  icon?: { kind: ConceptKind; name: IconName };
 }) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <div className={`modal${wide ? " modal-wide" : ""}${tone ? ` modal-${tone}` : ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <header className="modal-head">
-          <h2>{title}</h2>
+          <h2>
+            {icon && <Concept kind={icon.kind} icon={icon.name} />}
+            {title}
+          </h2>
           {onClose && (
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-              <Icon name="close" size={14} />
+              <Icon name="close" />
             </button>
           )}
         </header>

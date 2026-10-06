@@ -25,14 +25,12 @@ import {
 } from "@/sim";
 import { moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
-import { EQUIPMENT_ICON, Icon } from "./icons";
+import { EQUIPMENT_ICON, Icon, moodIcon, STATE_META, TECH_ICON } from "./icons";
 import IncidentPanel from "./IncidentPanel";
 import { Act, Chip, Gauge, ReleaseRow, Row, TaskRow, utilTone } from "./ui";
 
-const STATE_LABEL = { ok: "Healthy", warn: "Needs attention", critical: "Overloaded", down: "Down", absent: "Not built" } as const;
-
 function loadGauge(label: string, util: number, m: Metrics, tip: string) {
-  return <Gauge label={label} value={util} text={m.hasMonitoring ? pct(util) : loadBand(util)} tone={utilTone(util)} tip={tip} />;
+  return <Gauge icon="load" label={label} value={util} text={m.hasMonitoring ? pct(util) : loadBand(util)} tone={utilTone(util)} tip={tip} />;
 }
 
 /** A small link to an upgrade, shown where that upgrade would help. */
@@ -43,7 +41,7 @@ function TechChip({ id }: { id: TechId }) {
   if (!isResearchTech(id)) return null;
   return (
     <button type="button" className={`tech-chip tech-${status}`} onClick={() => focusTech(id)} title={TECH[id].description}>
-      <Icon name={status === "done" ? "check" : status === "locked" ? "lock" : "plus"} size={12} />
+      <Icon name={status === "done" ? "check" : status === "locked" ? "lock" : (TECH_ICON[id] ?? "plus")} size={16} />
       {TECH[id].name}
     </button>
   );
@@ -114,7 +112,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
             <Act primary tour="primary" icon="plus" label="Add server" price={BALANCE.server.setupCost} disabled={locked || atLimit} onClick={() => act({ type: "add_server" })} />
           )}
           {sick.map((h) => (
-            <Act key={h.id} icon="alert" label={`Replace ${h.id}`} price={BALANCE.server.replaceCost} disabled={locked} onClick={() => act({ type: "replace_host", hostId: h.id })} />
+            <Act key={h.id} icon="refresh" label={`Replace ${h.id}`} price={BALANCE.server.replaceCost} disabled={locked} onClick={() => act({ type: "replace_host", hostId: h.id })} />
           ))}
           <More>
             <p className="muted">{info.about}</p>
@@ -134,7 +132,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
               <TechChip id="load_balancing" />
               <TechChip id="autoscaling" />
             </div>
-            <Act icon="close" label="Remove a server" disabled={locked || m.servers <= 1} onClick={() => act({ type: "remove_server" })} />
+            <Act icon="minus" label="Remove a server" disabled={locked || m.servers <= 1} onClick={() => act({ type: "remove_server" })} />
           </More>
         </>
       );
@@ -163,7 +161,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
             <Act
               primary
               tour="primary"
-              icon="plus"
+              icon="scaleUp"
               label={`Upgrade to ${next.name}`}
               price={next.cost}
               disabled={locked}
@@ -174,7 +172,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
             <p className="muted">Largest tier.</p>
           )}
           {host.status !== "healthy" && (
-            <Act icon="alert" label="Replace machine" price={BALANCE.db.replaceCost} disabled={locked} onClick={() => act({ type: "replace_host", hostId: host.id })} />
+            <Act icon="refresh" label="Replace machine" price={BALANCE.db.replaceCost} disabled={locked} onClick={() => act({ type: "replace_host", hostId: host.id })} />
           )}
           <More>
             <p className="muted">{info.about}</p>
@@ -203,6 +201,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
       return (
         <>
           <Gauge
+            icon={moodIcon(sat)}
             label="Satisfaction"
             value={sat / 100}
             text={`${Math.round(sat)}`}
@@ -220,13 +219,18 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
             return (
               <div className="promo" key={pid}>
                 <div className="task-top">
-                  <strong>{def.name}</strong>
+                  <strong>
+                    <Icon name="megaphone" size={16} />
+                    {def.name}
+                  </strong>
                   <span className="muted">
                     +{num(promoUsers(game, pid))} users, +{pct(def.spike)} traffic
                   </span>
                 </div>
                 {!unlocked ? (
-                  <p className="muted">Available at {num(def.minUsers ?? 0)} users.</p>
+                  <p className="muted">
+                    <Icon name="lock" size={12} className="inline-icon" /> Available at {num(def.minUsers ?? 0)} users.
+                  </p>
                 ) : (
                   <Act
                     primary={usable}
@@ -265,6 +269,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
       return (
         <>
           <Gauge
+            icon="debt"
             label="Tech debt"
             value={debt / 100}
             text={`${Math.round(debt)}`}
@@ -272,10 +277,12 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
             tip="Shortcuts that pile up as you ship. High debt makes deploys riskier, machines fail more, and engineers slower."
           />
           <div className="chips">
-            <Chip icon="wrench" tip="Free engineers do upkeep, which slows debt growth.">
+            <Chip icon="team" tip="Free engineers do upkeep, which slows debt growth.">
               {m.freeEngineers} of {game.engineers} free
             </Chip>
-            <Chip tip="Work per engineer each week. Drops as debt passes 40, 60 and 80.">{pct(m.velocity)} speed</Chip>
+            <Chip icon="load" tip="Work per engineer each week. Drops as debt passes 40, 60 and 80.">
+              {pct(m.velocity)} speed
+            </Chip>
           </div>
           <Act primary tour="primary" icon="tree" label="Pick an upgrade" onClick={() => openView("tech")} />
           {game.tasks.map((t) => (
@@ -283,9 +290,9 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
           ))}
           <More>
             <p className="muted">{info.about}</p>
-            <Act icon="check" label={paying ? "Debt paydown queued" : "Pay down debt"} note={paying ? undefined : `${BALANCE.debt.paydownEffort} wk`} disabled={locked || paying} onClick={() => act({ type: "start_debt_paydown" })} />
+            <Act icon="debt" label={paying ? "Debt paydown queued" : "Pay down debt"} note={paying ? undefined : `${BALANCE.debt.paydownEffort} wk`} disabled={locked || paying} onClick={() => act({ type: "start_debt_paydown" })} />
             <Act
-              icon="plus"
+              icon="hire"
               label="Hire engineer"
               price={BALANCE.engineer.hireCost}
               disabled={locked || game.engineers >= BALANCE.engineer.max}
@@ -301,7 +308,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
       const recent = [...game.deploys].reverse().slice(0, 4);
       return (
         <>
-          {game.releases.length === 0 ? <p className="muted">Nothing to ship yet.</p> : game.releases.map((r) => <ReleaseRow key={r.id} game={game} release={r} />)}
+          {game.releases.length === 0 ? <p className="empty">Nothing to ship yet. Finished upgrades land here.</p> : game.releases.map((r) => <ReleaseRow key={r.id} game={game} release={r} />)}
           <More>
             <p className="muted">{info.about}</p>
             {recent.length > 0 && (
@@ -386,14 +393,17 @@ function Inspector({ id }: { id: EquipmentId }) {
     <section className="panel-section" aria-label={info.name}>
       <header className="panel-head">
         <span className={`panel-icon state-${info.state}`}>
-          <Icon name={EQUIPMENT_ICON[id]} size={22} />
+          <Icon name={EQUIPMENT_ICON[id]} />
         </span>
         <div>
           <h2>{info.name}</h2>
-          <span className={`state state-${info.state}`}>{STATE_LABEL[info.state]}</span>
+          <span className={`state state-${info.state}`}>
+            <Icon name={STATE_META[info.state].icon} size={12} />
+            {STATE_META[info.state].word}
+          </span>
         </div>
         <button type="button" className="icon-btn" onClick={() => select(null)} aria-label="Close">
-          <Icon name="close" size={14} />
+          <Icon name="close" />
         </button>
       </header>
       <Body id={id} game={game} m={metrics(game)} />

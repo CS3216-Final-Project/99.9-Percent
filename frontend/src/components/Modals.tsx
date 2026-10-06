@@ -6,8 +6,8 @@ import { moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, clearSave, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
 import { Icon } from "./icons";
-import { Modal } from "./ui";
-import { OUTCOME_LABEL, outcomeTone, PostmortemBody, RunCharts } from "./Views";
+import { Concept, Modal } from "./ui";
+import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone, PostmortemBody, RunCharts } from "./Views";
 
 /* ------------------------------------------------------------------ */
 /* Title screen                                                        */
@@ -27,11 +27,29 @@ export function TitleScreen() {
   return (
     <div className="title-screen">
       <div className="title-card">
+        <span className="title-kicker">
+          <Icon name="server" size={16} />
+          A system design tycoon
+        </span>
         <h1>99.99%</h1>
         <p className="title-tag">Grow a startup. Keep it online.</p>
         <p className="title-goal">
-          Reach {num(BALANCE.targetUsers)} users in {BALANCE.maxTurns} weeks.
+          Reach <strong>{num(BALANCE.targetUsers)} users</strong> in <strong>{BALANCE.maxTurns} weeks</strong> without running out of cash.
         </p>
+        <ul className="title-loop" aria-label="How a run works">
+          <li>
+            <Concept kind="users" icon="users" />
+            Grow users
+          </li>
+          <li>
+            <Concept kind="tech" icon="server" />
+            Scale your stack
+          </li>
+          <li>
+            <Concept kind="critical" icon="incident" />
+            Survive incidents
+          </li>
+        </ul>
         <div className="title-actions">
           {resumable ? (
             <>
@@ -67,31 +85,33 @@ export function TitleScreen() {
 export function HowToPlay() {
   const finish = useGame((s) => s.finishOnboarding);
   return (
-    <Modal title="How to play" onClose={finish}>
+    <Modal title="How to play" onClose={finish} icon={{ kind: "go", name: "info" }}>
       <ul className="howto">
         <li>
-          <Icon name="users" />
-          Reach {num(BALANCE.targetUsers)} users by week {BALANCE.maxTurns}. Do not run out of cash.
+          <Concept kind="users" icon="goal" />
+          <span>
+            Reach {num(BALANCE.targetUsers)} users by week {BALANCE.maxTurns}. Do not run out of cash.
+          </span>
         </li>
         <li>
-          <Icon name="server" />
-          Click equipment to see it and act on it.
+          <Concept kind="ok" icon="server" />
+          <span>Click equipment in the room to see it and act on it.</span>
         </li>
         <li>
-          <Icon name="tree" />
-          Tech holds upgrades. Engineers build them, then you ship them.
+          <Concept kind="tech" icon="tree" />
+          <span>Tech holds upgrades. Engineers build them, then you ship them.</span>
         </li>
         <li>
-          <Icon name="next" />
-          Next week moves everything forward.
+          <Concept kind="go" icon="next" />
+          <span>Next week moves everything forward.</span>
         </li>
         <li>
-          <Icon name="alert" />
-          In an incident, find the cause, then pick the matching fix.
+          <Concept kind="critical" icon="incident" />
+          <span>In an incident, find the cause, then pick the matching fix.</span>
         </li>
         <li>
-          <Icon name="pause" />
-          P pauses. Esc closes panels.
+          <Concept kind="muted" icon="pause" />
+          <span>P pauses. Esc closes panels.</span>
         </li>
       </ul>
       <div className="modal-foot">
@@ -114,10 +134,13 @@ export function PostmortemModal() {
   const pm = game.postmortems.find((p) => p.id === game.reviewId) ?? game.postmortems[game.postmortems.length - 1];
   if (!pm) return null;
   return (
-    <Modal title={pm.title} wide tone={pm.outcome === "failed" ? "alert" : undefined}>
+    <Modal title={pm.title} wide tone={pm.outcome === "failed" ? "alert" : undefined} icon={{ kind: outcomeTone(pm), name: "incident" }}>
       <p className="pm-meta">
-        <span className={`tag tag-${outcomeTone(pm)}`}>{OUTCOME_LABEL[pm.outcome]}</span>
-        <span className="muted">Week {pm.turn}</span>
+        <span className={`tag tag-${outcomeTone(pm)}`}>
+          <Icon name={OUTCOME_ICON[pm.outcome]} size={12} />
+          {OUTCOME_LABEL[pm.outcome]}
+        </span>
+        <span className="muted">Postmortem, week {pm.turn}</span>
       </p>
       <PostmortemBody pm={pm} />
       <div className="modal-foot">
@@ -145,7 +168,7 @@ export function EndReport() {
   if (view === "history") return null;
 
   return (
-    <Modal title={r.headline} wide tone={r.outcome === "won" ? undefined : "alert"}>
+    <Modal title={r.headline} wide tone={r.outcome === "won" ? undefined : "alert"} icon={r.outcome === "won" ? { kind: "go", name: "goal" } : { kind: "critical", name: "flag" }}>
       <div className="report-top">
         <div className={`grade grade-${r.grade}`} aria-label={`Grade ${r.grade}`}>
           {r.grade}
@@ -155,18 +178,22 @@ export function EndReport() {
 
       <dl className="stats">
         <div>
+          <Concept kind="users" icon="users" />
           <dt>Users</dt>
           <dd>{num(r.users)}</dd>
         </div>
         <div>
+          <Concept kind="health" icon="health" />
           <dt>Uptime</dt>
           <dd>{uptimePct(r.uptime)}</dd>
         </div>
         <div>
+          <Concept kind="cash" icon="cash" />
           <dt>Cash</dt>
           <dd>{moneyFull(r.cash)}</dd>
         </div>
         <div>
+          <Concept kind="critical" icon="incident" />
           <dt>Incidents</dt>
           <dd>{r.incidents.total}</dd>
         </div>
@@ -225,14 +252,16 @@ export function EndReport() {
 
       <div className="modal-foot">
         <button type="button" className="btn btn-quiet" onClick={() => openView("history")}>
+          <Icon name="history" size={16} />
           History
         </button>
         <div className="btn-row">
           <button type="button" className="btn" onClick={() => newRun({ seed: game.seed, voluntary: true })}>
+            <Icon name="refresh" size={16} />
             Same seed
           </button>
           <button type="button" className="btn btn-primary" autoFocus onClick={() => newRun({ voluntary: true })}>
-            <Icon name="play" size={14} />
+            <Icon name="play" size={16} />
             Play again
           </button>
         </div>
@@ -302,15 +331,17 @@ export function Menu() {
   };
 
   return (
-    <Modal title="Menu" onClose={() => openView(null)}>
+    <Modal title="Menu" onClose={() => openView(null)} icon={{ kind: "go", name: "menu" }}>
       <p className="muted">
         Week {Math.min(game.turn, BALANCE.maxTurns)}, seed {game.seed}. Saved automatically in this browser.
       </p>
       <div className="btn-row">
         <button type="button" className="btn" onClick={saveNow}>
+          <Icon name="save" size={16} />
           Save now
         </button>
         <button type="button" className="btn" onClick={showOnboarding}>
+          <Icon name="info" size={16} />
           How to play
         </button>
         <button type="button" className={`btn ${confirm === "tutorial" ? "btn-danger" : ""}`} onClick={() => start("tutorial")}>
@@ -318,7 +349,10 @@ export function Menu() {
         </button>
       </div>
 
-      <h4>New game</h4>
+      <h4>
+        <Icon name="play" size={16} />
+        New game
+      </h4>
       <label className="field">
         <span>Seed (optional): the same seed replays the same run.</span>
         <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />

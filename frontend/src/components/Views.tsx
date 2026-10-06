@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { BALANCE, metrics, type GameState, type Postmortem } from "@/sim";
+import { BALANCE, metrics, type EventKind, type GameState, type Postmortem } from "@/sim";
 import { compact, money, moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
-import { Act, Chip, Gauge, ReleaseRow, TaskRow } from "./ui";
+import { Icon, type IconName } from "./icons";
+import { Act, Chip, Concept, Gauge, ReleaseRow, TaskRow, type ConceptKind } from "./ui";
 
 /* ------------------------------------------------------------------ */
 /* Engineer allocation                                                 */
@@ -23,20 +24,28 @@ export function EngineersView() {
   return (
     <div className="eng">
       <section className="eng-col">
-        <h3>Team</h3>
+        <h3>
+          <Concept kind="team" icon="team" />
+          Engineers
+        </h3>
         <div className="seats" aria-label={`${assigned} of ${game.engineers} engineers assigned`}>
           {Array.from({ length: game.engineers }, (_, i) => (
-            <span key={i} className={`seat${i < assigned ? " is-busy" : ""}`} title={i < assigned ? "Assigned" : "Free"} />
+            <span key={i} className={`seat${i < assigned ? " is-busy" : ""}`} title={i < assigned ? "Assigned" : "Free"}>
+              <Icon name="team" />
+            </span>
           ))}
         </div>
         <div className="chips">
-          <Chip icon="wrench" tip="Free engineers do upkeep, which slows debt growth.">
+          <Chip icon="team" tip="Free engineers do upkeep, which slows debt growth.">
             {m.freeEngineers} of {game.engineers} free
           </Chip>
-          <Chip tip="Work per engineer each week. Drops as debt passes 40, 60 and 80.">{pct(m.velocity)} speed</Chip>
+          <Chip icon="load" tip="Work per engineer each week. Drops as debt passes 40, 60 and 80.">
+            {pct(m.velocity)} speed
+          </Chip>
           <Chip icon="cash">{moneyFull(m.costs.salaries)}/wk</Chip>
         </div>
         <Gauge
+          icon="debt"
           label="Tech debt"
           value={debt / 100}
           text={`${Math.round(debt)}`}
@@ -44,9 +53,9 @@ export function EngineersView() {
           tip="Shortcuts that pile up as you ship. High debt makes deploys riskier, machines fail more, and engineers slower."
         />
         <Act icon="tree" primary label="Pick an upgrade" onClick={() => openView("tech")} />
-        <Act icon="check" label={paying ? "Debt paydown queued" : "Pay down debt"} note={paying ? undefined : `${BALANCE.debt.paydownEffort} wk`} disabled={locked || paying} onClick={() => act({ type: "start_debt_paydown" })} />
+        <Act icon="debt" label={paying ? "Debt paydown queued" : "Pay down debt"} note={paying ? undefined : `${BALANCE.debt.paydownEffort} wk`} disabled={locked || paying} onClick={() => act({ type: "start_debt_paydown" })} />
         <Act
-          icon="plus"
+          icon="hire"
           label={game.engineers >= BALANCE.engineer.max ? "Office is full" : "Hire engineer"}
           price={game.engineers >= BALANCE.engineer.max ? undefined : BALANCE.engineer.hireCost}
           disabled={locked || game.engineers >= BALANCE.engineer.max}
@@ -56,12 +65,18 @@ export function EngineersView() {
       </section>
 
       <section className="eng-col">
-        <h3>Tasks</h3>
+        <h3>
+          <Concept kind="warn" icon="wrench" />
+          Tasks
+        </h3>
         {game.tasks.length === 0 ? <p className="empty">No tasks. Pick an upgrade.</p> : game.tasks.map((t) => <TaskRow key={t.id} game={game} task={t} />)}
       </section>
 
       <section className="eng-col">
-        <h3>Ready to ship</h3>
+        <h3>
+          <Concept kind="ok" icon="ship" />
+          Ready to ship
+        </h3>
         {game.releases.length === 0 ? <p className="empty">Finished work lands here.</p> : game.releases.map((r) => <ReleaseRow key={r.id} game={game} release={r} />)}
         {game.deploys.length > 0 && (
           <details className="more">
@@ -170,7 +185,7 @@ export function LineChart({
           )}
           {series.map((s) => (
             <g key={s.name}>
-              <polyline fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" points={s.values.map((v, i) => `${x(i)},${y(v)}`).join(" ")} />
+              <polyline fill="none" stroke={s.color} strokeWidth={2.5} strokeLinejoin="round" points={s.values.map((v, i) => `${x(i)},${y(v)}`).join(" ")} />
               {s.values.map((v, i) => (
                 <circle key={i} cx={x(i)} cy={y(v)} r={i === s.values.length - 1 ? 3 : 1.6} fill={s.color}>
                   <title>
@@ -192,7 +207,7 @@ export function LineChart({
   );
 }
 
-const C = { blue: "#8cc7f2", green: "#62d39a", amber: "#f0b040", red: "#ff7a6e" };
+const C = { users: "#1f8fe0", cash: "#d18f00", revenue: "#0f9f8f", costs: "#e46a00", db: "#7b4fe0", health: "#e0386a", mood: "#1aa35a", debt: "#c41d33" };
 
 export function RunCharts({ game, compactSet = false }: { game: GameState; compactSet?: boolean }) {
   const h = game.history;
@@ -200,15 +215,15 @@ export function RunCharts({ game, compactSet = false }: { game: GameState; compa
   const monitored = game.techDone.includes("monitoring");
   return (
     <div className="charts">
-      <LineChart title="Users" series={[{ name: "Users", color: C.blue, values: h.map((r) => r.users) }]} turns={turns} format={compact} target={BALANCE.targetUsers} targetLabel="Goal" />
-      <LineChart title="Cash" series={[{ name: "Cash", color: C.green, values: h.map((r) => r.cash) }]} turns={turns} format={money} />
+      <LineChart title="Users" series={[{ name: "Users", color: C.users, values: h.map((r) => r.users) }]} turns={turns} format={compact} target={BALANCE.targetUsers} targetLabel="Goal" />
+      <LineChart title="Cash" series={[{ name: "Cash", color: C.cash, values: h.map((r) => r.cash) }]} turns={turns} format={money} />
       {!compactSet && (
         <>
           <LineChart
             title="Revenue and costs"
             series={[
-              { name: "Revenue", color: C.green, values: h.map((r) => r.revenue) },
-              { name: "Costs", color: C.amber, values: h.map((r) => r.costs) },
+              { name: "Revenue", color: C.revenue, values: h.map((r) => r.revenue) },
+              { name: "Costs", color: C.costs, values: h.map((r) => r.costs) },
             ]}
             turns={turns}
             format={money}
@@ -217,8 +232,8 @@ export function RunCharts({ game, compactSet = false }: { game: GameState; compa
             <LineChart
               title="Peak load"
               series={[
-                { name: "Servers", color: C.blue, values: h.map((r) => Math.min(1.5, r.appUtil)) },
-                { name: "Database", color: C.amber, values: h.map((r) => Math.min(1.5, r.dbUtil)) },
+                { name: "Servers", color: C.users, values: h.map((r) => Math.min(1.5, r.appUtil)) },
+                { name: "Database", color: C.db, values: h.map((r) => Math.min(1.5, r.dbUtil)) },
               ]}
               turns={turns}
               format={(v) => pct(v)}
@@ -234,12 +249,12 @@ export function RunCharts({ game, compactSet = false }: { game: GameState; compa
               <p className="empty">Needs Monitoring.</p>
             </figure>
           )}
-          <LineChart title="Uptime" series={[{ name: "Uptime", color: C.green, values: h.map((r) => Math.max(0.9, r.availability)) }]} turns={turns} format={(v) => pct(v, 1)} max={1} min={0.9} />
+          <LineChart title="Uptime" series={[{ name: "Uptime", color: C.health, values: h.map((r) => Math.max(0.9, r.availability)) }]} turns={turns} format={(v) => pct(v, 1)} max={1} min={0.9} />
           <LineChart
             title="Satisfaction and tech debt"
             series={[
-              { name: "Satisfaction", color: C.blue, values: h.map((r) => r.satisfaction) },
-              { name: "Debt", color: C.red, values: h.map((r) => r.techDebt) },
+              { name: "Satisfaction", color: C.mood, values: h.map((r) => r.satisfaction) },
+              { name: "Debt", color: C.debt, values: h.map((r) => r.techDebt) },
             ]}
             turns={turns}
             format={(v) => String(Math.round(v))}
@@ -262,6 +277,13 @@ export const OUTCOME_LABEL: Record<Postmortem["outcome"], string> = {
   auto_mitigated: "Handled automatically",
 };
 
+export const OUTCOME_ICON: Record<Postmortem["outcome"], IconName> = {
+  resolved: "check",
+  mitigated: "alert",
+  failed: "close",
+  auto_mitigated: "robot",
+};
+
 export function outcomeTone(pm: Postmortem): "ok" | "warn" | "critical" {
   return pm.outcome === "failed" ? "critical" : pm.outcome === "mitigated" ? "warn" : "ok";
 }
@@ -277,29 +299,35 @@ export function PostmortemBody({ pm }: { pm: Postmortem }) {
     <div className="pm">
       <dl className="impact">
         <div>
+          <Concept kind="health" icon="latency" />
           <dt>Downtime</dt>
           <dd>{minutes < 10 ? minutes.toFixed(1) : Math.round(minutes)} min</dd>
         </div>
         <div>
+          <Concept kind="users" icon="users" />
           <dt>Users lost</dt>
           <dd>{num(pm.impact.usersLost)}</dd>
         </div>
         <div>
+          <Concept kind="cash" icon="cash" />
           <dt>Cost</dt>
           <dd>{moneyFull(pm.impact.revenueLost + pm.impact.moneySpent)}</dd>
         </div>
       </dl>
       <dl className="pm-lines">
         <div>
+          <Concept kind="critical" icon="fire" />
           <dt>What failed</dt>
           <dd>{pm.whatFailed}</dd>
         </div>
         <div>
+          <Concept kind={pm.outcome === "failed" ? "warn" : "ok"} icon={pm.outcome === "failed" ? "alert" : "wrench"} />
           <dt>{pm.outcome === "failed" ? "What went wrong" : "What worked"}</dt>
           <dd>{fix}</dd>
         </div>
         {pm.prevention[0] && (
           <div>
+            <Concept kind="go" icon="bulb" />
             <dt>Next time</dt>
             <dd>{pm.prevention[0]}</dd>
           </div>
@@ -338,6 +366,16 @@ export function PostmortemBody({ pm }: { pm: Postmortem }) {
 
 type Tab = "charts" | "events" | "postmortems";
 
+const EVENT_STYLE: Record<EventKind, [ConceptKind, IconName]> = {
+  info: ["muted", "info"],
+  decision: ["users", "check"],
+  warning: ["warn", "alert"],
+  incident: ["critical", "incident"],
+  success: ["ok", "party"],
+  finance: ["cash", "cash"],
+  milestone: ["go", "goal"],
+};
+
 export function HistoryView() {
   const game = useGame((s) => s.game);
   const [tab, setTab] = useState<Tab>("charts");
@@ -356,6 +394,7 @@ export function HistoryView() {
           ] as [Tab, string][]
         ).map(([id, label]) => (
           <button type="button" key={id} role="tab" aria-selected={tab === id} className={tab === id ? "is-active" : ""} onClick={() => setTab(id)}>
+            <Icon name={id === "charts" ? "history" : id === "events" ? "week" : "incident"} size={16} />
             {label}
           </button>
         ))}
@@ -367,6 +406,7 @@ export function HistoryView() {
         <ol className="feed">
           {events.map((e) => (
             <li key={e.id} className={`feed-item feed-${e.kind}`}>
+              <Concept kind={EVENT_STYLE[e.kind][0]} icon={EVENT_STYLE[e.kind][1]} />
               <span className="feed-week">Week {e.turn}</span>
               <span>{e.text}</span>
             </li>
@@ -383,9 +423,13 @@ export function HistoryView() {
               <li key={pm.id}>
                 <button type="button" className="pm-toggle" aria-expanded={open === pm.id} onClick={() => setOpen(open === pm.id ? null : pm.id)}>
                   <span>
+                    <Icon name="incident" size={16} />
                     Week {pm.turn}: {pm.title}
                   </span>
-                  <span className={`tag tag-${outcomeTone(pm)}`}>{OUTCOME_LABEL[pm.outcome]}</span>
+                  <span className={`tag tag-${outcomeTone(pm)}`}>
+                    <Icon name={OUTCOME_ICON[pm.outcome]} size={12} />
+                    {OUTCOME_LABEL[pm.outcome]}
+                  </span>
                 </button>
                 {open === pm.id && <PostmortemBody pm={pm} />}
               </li>

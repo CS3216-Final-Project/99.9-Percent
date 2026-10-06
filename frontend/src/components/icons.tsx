@@ -1,124 +1,194 @@
-import type { EquipmentId } from "@/sim";
+import type { ComponentType, SVGProps } from "react";
+import type { EquipmentId, EquipmentState, TechId } from "@/sim";
+// Pixel icons from pixelarticons (MIT). Per-icon imports keep the bundle small.
+import { AlarmClock } from "pixelarticons/react/AlarmClock.js";
+import { Analytics } from "pixelarticons/react/Analytics.js";
+import { ArrowBigUp } from "pixelarticons/react/ArrowBigUp.js";
+import { ArrowRight } from "pixelarticons/react/ArrowRight.js";
+import { Bug } from "pixelarticons/react/Bug.js";
+import { CalendarWeeks } from "pixelarticons/react/CalendarWeeks.js";
+import { ChartLine } from "pixelarticons/react/ChartLine.js";
+import { Check } from "pixelarticons/react/Check.js";
+import { CheckboxOn } from "pixelarticons/react/CheckboxOn.js";
+import { Close } from "pixelarticons/react/Close.js";
+import { Coins } from "pixelarticons/react/Coins.js";
+import { Copy } from "pixelarticons/react/Copy.js";
+import { Database } from "pixelarticons/react/Database.js";
+import { Fire } from "pixelarticons/react/Fire.js";
+import { Flag } from "pixelarticons/react/Flag.js";
+import { Frown } from "pixelarticons/react/Frown.js";
+import { GitBranch } from "pixelarticons/react/GitBranch.js";
+import { Globe } from "pixelarticons/react/Globe.js";
+import { Heart } from "pixelarticons/react/Heart.js";
+import { Hourglass } from "pixelarticons/react/Hourglass.js";
+import { InfoBox } from "pixelarticons/react/InfoBox.js";
+import { Laptop } from "pixelarticons/react/Laptop.js";
+import { Lightbulb } from "pixelarticons/react/Lightbulb.js";
+import { Lock } from "pixelarticons/react/Lock.js";
+import { Megaphone } from "pixelarticons/react/Megaphone.js";
+import { Meh } from "pixelarticons/react/Meh.js";
+import { Menu } from "pixelarticons/react/Menu.js";
+import { Minus } from "pixelarticons/react/Minus.js";
+import { Monitor } from "pixelarticons/react/Monitor.js";
+import { PartyPopper } from "pixelarticons/react/PartyPopper.js";
+import { Pause } from "pixelarticons/react/Pause.js";
+import { Play } from "pixelarticons/react/Play.js";
+import { Plug } from "pixelarticons/react/Plug.js";
+import { Plus } from "pixelarticons/react/Plus.js";
+import { PlusBox } from "pixelarticons/react/PlusBox.js";
+import { Refresh } from "pixelarticons/react/Refresh.js";
+import { RobotFaceHappy } from "pixelarticons/react/RobotFaceHappy.js";
+import { Save } from "pixelarticons/react/Save.js";
+import { Scale } from "pixelarticons/react/Scale.js";
+import { Search } from "pixelarticons/react/Search.js";
+import { Server } from "pixelarticons/react/Server.js";
+import { Ship } from "pixelarticons/react/Ship.js";
+import { Shuffle } from "pixelarticons/react/Shuffle.js";
+import { Siren } from "pixelarticons/react/Siren.js";
+import { Skull } from "pixelarticons/react/Skull.js";
+import { SlidersHorizontal } from "pixelarticons/react/SlidersHorizontal.js";
+import { Smile } from "pixelarticons/react/Smile.js";
+import { SpeedFast } from "pixelarticons/react/SpeedFast.js";
+import { Switch } from "pixelarticons/react/Switch.js";
+import { TestTube } from "pixelarticons/react/TestTube.js";
+import { Tools } from "pixelarticons/react/Tools.js";
+import { TrendingUp } from "pixelarticons/react/TrendingUp.js";
+import { Trophy } from "pixelarticons/react/Trophy.js";
+import { UserPlus } from "pixelarticons/react/UserPlus.js";
+import { Users } from "pixelarticons/react/Users.js";
+import { WarningDiamond } from "pixelarticons/react/WarningDiamond.js";
+import { Zap } from "pixelarticons/react/Zap.js";
 
-/** Small line icons, drawn on a 20x20 grid so they sit cleanly beside text. */
-const PATHS = {
-  cash: (
-    <>
-      <circle cx="10" cy="10" r="7.5" />
-      <path d="M12.4 7.7c-.5-.7-1.3-1.1-2.4-1.1-1.3 0-2.2.7-2.2 1.7 0 2.3 4.7 1.1 4.7 3.5 0 1-.9 1.7-2.4 1.7-1.2 0-2.1-.4-2.6-1.2M10 5v1.6M10 13.5V15" />
-    </>
-  ),
-  users: (
-    <>
-      <circle cx="7.5" cy="7" r="2.6" />
-      <path d="M2.5 16c.4-2.8 2.4-4.4 5-4.4s4.6 1.6 5 4.4M13 4.8a2.4 2.4 0 0 1 0 4.6M15 11.9c1.4.6 2.3 1.9 2.6 4.1" />
-    </>
-  ),
-  revenue: <path d="M3 14l4.5-4.5 3 3L17 6M12.5 6H17v4.5" />,
-  health: <path d="M2 10.5h3.5l2-5 3.5 9 2.2-5.5H18" />,
-  server: (
-    <>
-      <rect x="3.5" y="3" width="13" height="5.5" rx="1" />
-      <rect x="3.5" y="11.5" width="13" height="5.5" rx="1" />
-      <path d="M6.5 5.8h.01M6.5 14.3h.01" />
-    </>
-  ),
-  database: (
-    <>
-      <ellipse cx="10" cy="5" rx="6" ry="2.4" />
-      <path d="M4 5v10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4V5M4 10c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4" />
-    </>
-  ),
-  megaphone: <path d="M3.5 8.5v3l8.5 3.5V5L3.5 8.5zM14.5 8a2.6 2.6 0 0 1 0 4M5.8 12.4l.8 3.6h2l-.7-2.7" />,
-  wrench: <path d="M12.6 3.4a4 4 0 0 0-4.7 5.3L3 13.6 6.4 17l4.9-4.9a4 4 0 0 0 5.3-4.7l-2.4 2.4-2.3-.6-.6-2.3 2.4-2.4z" />,
-  tree: (
-    <>
-      <circle cx="5" cy="10" r="2" />
-      <circle cx="15" cy="5" r="2" />
-      <circle cx="15" cy="15" r="2" />
-      <path d="M7 10h2.5M9.5 10c0-3 1.6-5 3.5-5M9.5 10c0 3 1.6 5 3.5 5" />
-    </>
-  ),
-  history: (
-    <>
-      <circle cx="10" cy="10" r="7.5" />
-      <path d="M10 5.5V10l3 2" />
-    </>
-  ),
-  play: <path d="M6.5 4.5v11l9-5.5-9-5.5z" />,
-  pause: <path d="M7 4.5v11M13 4.5v11" />,
-  next: <path d="M4 10h11M11 5.5l4.5 4.5-4.5 4.5" />,
-  plus: <path d="M10 4v12M4 10h12" />,
-  lock: (
-    <>
-      <rect x="4.5" y="9" width="11" height="8" rx="1.5" />
-      <path d="M7 9V6.5a3 3 0 0 1 6 0V9" />
-    </>
-  ),
-  check: <path d="M4 10.5l4 4 8-9" />,
-  alert: <path d="M10 3.2l7.5 13H2.5L10 3.2zM10 8v4M10 14.3h.01" />,
-  ship: <path d="M10 14V4M6 8l4-4 4 4M4 16.5h12" />,
-  eye: (
-    <>
-      <path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10z" />
-      <circle cx="10" cy="10" r="2.3" />
-    </>
-  ),
-  menu: <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />,
-  close: <path d="M5 5l10 10M15 5L5 15" />,
-  bulb: <path d="M7.5 14.5h5M8.5 17h3M10 3a5 5 0 0 0-3 9c.5.5.8 1.2.8 2h4.4c0-.8.3-1.5.8-2a5 5 0 0 0-3-9z" />,
-  network: (
-    <>
-      <circle cx="10" cy="10" r="7.5" />
-      <path d="M2.5 10h15M10 2.5c2.3 2.2 3.3 4.7 3.3 7.5s-1 5.3-3.3 7.5c-2.3-2.2-3.3-4.7-3.3-7.5S7.7 4.7 10 2.5z" />
-    </>
-  ),
-  bolt: <path d="M11 2.5L4.5 11.5H10l-1 6 6.5-9H10l1-6z" />,
-  copy: (
-    <>
-      <rect x="6.5" y="6.5" width="10" height="10" rx="1.5" />
-      <path d="M13.5 6.5v-2a1 1 0 0 0-1-1h-8a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h2" />
-    </>
-  ),
-  search: (
-    <>
-      <circle cx="9" cy="9" r="5.5" />
-      <path d="M13.2 13.2L17 17" />
-    </>
-  ),
-} as const;
+/**
+ * One icon per idea, used everywhere that idea appears: the top bar, the room,
+ * the side panel, the tech tree and the reports. If cash is a stack of coins in
+ * one place it is a stack of coins in every place.
+ */
+const ICONS = {
+  // Run-level numbers
+  cash: Coins,
+  users: Users,
+  revenue: TrendingUp,
+  health: Heart,
+  week: CalendarWeeks,
+  goal: Trophy,
+  // Equipment
+  server: Server,
+  database: Database,
+  network: Globe,
+  bolt: Zap,
+  copy: Copy,
+  save: Save,
+  monitor: Monitor,
+  plug: Plug,
+  ship: Ship,
+  megaphone: Megaphone,
+  team: Laptop,
+  // Pressures and signals
+  load: SpeedFast,
+  latency: Hourglass,
+  debt: Bug,
+  smile: Smile,
+  meh: Meh,
+  frown: Frown,
+  incident: Siren,
+  alarm: AlarmClock,
+  alert: WarningDiamond,
+  fire: Fire,
+  skull: Skull,
+  // Upgrades
+  tree: GitBranch,
+  scaleUp: ArrowBigUp,
+  shuffle: Shuffle,
+  scale: Scale,
+  sliders: SlidersHorizontal,
+  checkbox: CheckboxOn,
+  switch: Switch,
+  test: TestTube,
+  analytics: Analytics,
+  // Controls
+  play: Play,
+  pause: Pause,
+  next: ArrowRight,
+  plus: Plus,
+  plusBox: PlusBox,
+  minus: Minus,
+  lock: Lock,
+  check: Check,
+  close: Close,
+  menu: Menu,
+  search: Search,
+  bulb: Lightbulb,
+  wrench: Tools,
+  hire: UserPlus,
+  refresh: Refresh,
+  history: ChartLine,
+  info: InfoBox,
+  flag: Flag,
+  party: PartyPopper,
+  robot: RobotFaceHappy,
+} satisfies Record<string, ComponentType<SVGProps<SVGSVGElement>>>;
 
-export type IconName = keyof typeof PATHS;
+export type IconName = keyof typeof ICONS;
 
-export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
+/** Pixel icons are drawn on a 24-unit grid; 12, 24 and 48px keep every pixel square. */
+export function Icon({ name, size = 24, className }: { name: IconName; size?: number; className?: string }) {
+  const Svg = ICONS[name];
   return (
-    <svg
-      className="icon"
-      viewBox="0 0 20 20"
+    <Svg
+      className={className ? `icon ${className}` : "icon"}
       width={size}
       height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
       aria-hidden="true"
-    >
-      {PATHS[name]}
-    </svg>
+      focusable="false"
+      shapeRendering="crispEdges"
+    />
   );
 }
 
 export const EQUIPMENT_ICON: Record<EquipmentId, IconName> = {
   gateway: "network",
   app: "server",
-  standby: "server",
+  standby: "plug",
   cache: "bolt",
   db: "database",
   replica: "copy",
-  backup: "copy",
-  monitoring: "eye",
+  backup: "save",
+  monitoring: "monitor",
   deploy: "ship",
-  team: "wrench",
+  team: "team",
   growth: "megaphone",
 };
+
+export const TECH_ICON: Partial<Record<TechId, IconName>> = {
+  larger_servers: "scaleUp",
+  load_balancing: "shuffle",
+  autoscaling: "scale",
+  larger_database: "database",
+  caching: "bolt",
+  cache_tuning: "sliders",
+  health_checks: "checkbox",
+  standby: "plug",
+  auto_failover: "switch",
+  monitoring: "monitor",
+  analytics: "analytics",
+  deploy_testing: "test",
+  backups: "save",
+  replicas: "copy",
+};
+
+export type Tone = "ok" | "warn" | "critical" | "muted";
+
+/** The one vocabulary for equipment health: same word, icon and colour in the room, the panel and the tooltips. */
+export const STATE_META: Record<EquipmentState, { word: string; icon: IconName; tone: Tone }> = {
+  ok: { word: "Healthy", icon: "check", tone: "ok" },
+  warn: { word: "Needs attention", icon: "alert", tone: "warn" },
+  critical: { word: "Overloaded", icon: "fire", tone: "critical" },
+  down: { word: "Down", icon: "skull", tone: "critical" },
+  absent: { word: "Not built", icon: "plusBox", tone: "muted" },
+};
+
+/** A face for customer satisfaction: easier to read at a glance than a number. */
+export function moodIcon(satisfaction: number): IconName {
+  return satisfaction < 55 ? "frown" : satisfaction < 70 ? "meh" : "smile";
+}
