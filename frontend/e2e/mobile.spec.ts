@@ -8,6 +8,11 @@ test('plays a first week and opens and closes Tech on a touch viewport', async (
   await page.getByRole('button', { name: 'Tech', exact: true }).tap();
   const tech = page.getByRole('region', { name: 'Tech tree' });
   await expect(tech).toBeVisible();
+  await expect(tech.locator('.node')).toHaveCount(9);
+  await tech.getByRole('button', { name: 'Read Cache: Available' }).tap();
+  await expect(tech.getByRole('heading', { name: 'Read Cache' })).toBeVisible();
+  await tech.getByRole('button', { name: /^Start/ }).tap();
+  expect((await savedGame(page)).tasks.some(task => task.techId === 'caching')).toBe(true);
   await tech.getByRole('button', { name: 'Close', exact: true }).tap();
   await page.getByRole('button', { name: 'Next week', exact: true }).tap();
   expect((await savedGame(page)).turn).toBe(2);

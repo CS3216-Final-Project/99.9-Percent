@@ -161,7 +161,7 @@ function resolveHostHealth(s: GameState): HostFailure | null {
 function absorbFailure(s: GameState, failure: HostFailure, notes: string[]): { unhandled: HostFailure | null; capacityNote?: string } {
   const A = BALANCE.incident.autoMitigatedMinutes;
   if (failure.role === "app") {
-    if (has(s, "standby") && has(s, "auto_failover")) {
+    if (has(s, "standby") && has(s, "auto_failover") && selfHealingFleet(s)) {
       s.infra.appHosts = s.infra.appHosts.filter((h) => h.id !== failure.hostId);
       const fresh = addAppHost(s);
       s.cash -= BALANCE.server.replaceCost;
@@ -176,7 +176,7 @@ function absorbFailure(s: GameState, failure: HostFailure, notes: string[]): { u
           BALANCE.server.replaceCost,
         ),
       );
-      const text = `${failure.hostId} died; the standby took over automatically. No customer impact.`;
+      const text = `${failure.hostId} died; the spare took over automatically. Total application capacity is unchanged.`;
       logEvent(s, "success", text);
       notes.push(text);
       return { unhandled: null };
@@ -236,6 +236,10 @@ export function advanceTurn(prev: GameState): GameState {
   const usersAtStart = s.users;
 
   progressTasks(s);
+  if (has(s, "caching")) {
+    const warmup = has(s, "cache_tuning") ? BALANCE.db.tunedWarmupPerWeek : BALANCE.db.cacheWarmupPerWeek;
+    s.cacheWarmth = clamp((s.cacheWarmth ?? 1) + warmup, 0, 1);
+  }
 
   // Promotions and surges bring people in during the week, so they count toward this week's peak.
   let spike = 1;

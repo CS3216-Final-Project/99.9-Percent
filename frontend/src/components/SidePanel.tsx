@@ -6,6 +6,7 @@ import {
   churnRate,
   equipmentInfo,
   has,
+  isResearchTech,
   loadBand,
   metrics,
   organicRate,
@@ -39,6 +40,7 @@ function TechChip({ id }: { id: TechId }) {
   const game = useGame((s) => s.game);
   const focusTech = useGame((s) => s.focusTech);
   const status = techStatus(game, id);
+  if (!isResearchTech(id)) return null;
   return (
     <button type="button" className={`tech-chip tech-${status}`} onClick={() => focusTech(id)} title={TECH[id].description}>
       <Icon name={status === "done" ? "check" : status === "locked" ? "lock" : "plus"} size={12} />
@@ -62,6 +64,7 @@ function NotBuilt({ id, requires }: { id: EquipmentId; requires: TechId }) {
   const focusTech = useGame((s) => s.focusTech);
   const def = TECH[requires];
   const status = techStatus(game, requires);
+  if (!isResearchTech(requires)) return <p className="muted">This equipment is retained for existing saves.</p>;
   return (
     <>
       <p>{equipmentInfo(game, id).about}</p>
@@ -187,8 +190,6 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
             </dl>
             <div className="chips">
               <TechChip id="caching" />
-              <TechChip id="replicas" />
-              <TechChip id="backups" />
             </div>
           </More>
         </>
@@ -210,7 +211,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
           />
           {PROMO_ORDER.map((pid) => {
             const def = PROMOS[pid];
-            const unlocked = !def.requires || has(game, def.requires);
+            const unlocked = (!def.requires || has(game, def.requires)) && (!def.minUsers || Math.max(game.users, game.totals.peakUsers) >= def.minUsers);
             const active = game.activePromos.includes(pid);
             const cooldown = promoCooldownLeft(game, pid);
             const usable = unlocked && !active && cooldown === 0;
@@ -224,8 +225,8 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
                     +{num(promoUsers(game, pid))} users, +{pct(def.spike)} traffic
                   </span>
                 </div>
-                {!unlocked && def.requires ? (
-                  <TechChip id={def.requires} />
+                {!unlocked ? (
+                  <p className="muted">Available at {num(def.minUsers ?? 0)} users.</p>
                 ) : (
                   <Act
                     primary={usable}
@@ -253,11 +254,6 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
                 <Row label="Growth rates" value="Needs Customer Analytics" />
               )}
             </dl>
-            <div className="chips">
-              <TechChip id="promotions" />
-              <TechChip id="analytics" />
-              <TechChip id="targeted" />
-            </div>
           </More>
         </>
       );
@@ -353,7 +349,6 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
             <Row label="Up last week" value={pct(game.live.availability, 2)} />
           </dl>
           <div className="chips">
-            <TechChip id="tracing" />
             <TechChip id="health_checks" />
           </div>
         </>

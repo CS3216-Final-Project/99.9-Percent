@@ -72,7 +72,6 @@ export const idle: Strategy = (s) => s;
 /** Chases growth and ignores infrastructure entirely. */
 export const promoOnly: Strategy = (start) => {
   let s = start;
-  if (techStatus(s, "promotions") === "available") s = act(s, { type: "start_tech", tech: "promotions" });
   for (const r of s.releases) s = act(s, { type: "deploy_release", releaseId: r.id });
   for (const t of s.tasks) s = act(s, { type: "assign_engineers", taskId: t.id, count: 3 });
   for (const p of PROMO_ORDER) s = act(s, { type: "launch_promotion", promo: p });
@@ -80,23 +79,14 @@ export const promoOnly: Strategy = (start) => {
 };
 
 const BUILD_ORDER: TechId[] = [
-  "monitoring",
-  "promotions",
   "larger_servers",
   "caching",
   "load_balancing",
-  "code_health",
-  "backups",
+  "cache_tuning",
   "standby",
   "health_checks",
-  "analytics",
-  "deploy_testing",
-  "replicas",
   "autoscaling",
-  "targeted",
   "auto_failover",
-  "tracing",
-  "safer_rollouts",
 ];
 
 /** A sensible player: keeps capacity ahead of demand, tests releases, grows steadily. */

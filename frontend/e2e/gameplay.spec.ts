@@ -10,7 +10,8 @@ test('completes the first-week tutorial, purchases equipment and resumes after r
   await page.getByRole('button', { name: /Add server/ }).click();
   await expect(page.getByRole('dialog', { name: /Tutorial, step 2/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tech', exact: true }).click();
-  await page.getByRole('button', { name: 'Monitoring: Available' }).click();
+  await expect(page.getByRole('region', { name: 'Tech tree' }).locator('.node')).toHaveCount(9);
+  await page.getByRole('button', { name: 'Scale Up: Available' }).click();
   await page.getByRole('button', { name: /^Start/ }).click();
   await expect(page.getByRole('dialog', { name: /Tutorial, step 3/ })).toBeVisible();
   await page.getByRole('button', { name: 'Growth', exact: true }).click();
@@ -22,7 +23,7 @@ test('completes the first-week tutorial, purchases equipment and resumes after r
   expect(before.turn).toBe(2);
   expect(before.infra.appHosts).toHaveLength(2);
   expect(before.totals.promosRun).toBe(1);
-  expect(before.tasks.some(task => task.techId === 'monitoring') || before.techDone.includes('monitoring')).toBe(true);
+  expect(before.tasks.some(task => task.techId === 'larger_servers') || before.releases.some(release => release.techId === 'larger_servers') || before.techDone.includes('larger_servers')).toBe(true);
   await page.reload();
   await page.getByRole('button', { name: 'Continue week 2' }).click();
   await expectRoom(page);

@@ -8,10 +8,11 @@ import type { DeployRecord, GameState, Release } from "./types";
 export function applyRelease(s: GameState, release: Release): void {
   if (release.kind === "tech" && release.techId) {
     if (!s.techDone.includes(release.techId)) s.techDone.push(release.techId);
+    if (release.techId === "caching") s.cacheWarmth = 0;
     if (release.techId === "larger_servers" || release.techId === "load_balancing") {
       s.lastCapacityTurn.app = s.turn;
     }
-    if (release.techId === "caching" || release.techId === "replicas") {
+    if (release.techId === "caching" || release.techId === "cache_tuning" || release.techId === "replicas") {
       s.lastCapacityTurn.db = s.turn;
     }
   } else if (release.kind === "db_upgrade" && release.dbTier !== undefined) {

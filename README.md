@@ -38,6 +38,8 @@ npm run dev
 
 The frontend opens the 99.99% title screen and an isometric server room. Press Play to begin the guided first week. Drag to pan, scroll or pinch to zoom, and click equipment to inspect it. `P` pauses or resumes; `Esc` closes a view.
 
+The [nine-node technology tree](docs/tech-tree.md) groups upgrades into Capacity, Data and Reliability, with metrics and alerts available from the start. It follows the proposal's reduced research scope while retaining the weekly simulation and existing saves.
+
 Gameplay, saves and prototype analytics run in the browser and work without the API. Saves stay in this browser and origin; saves on the prototype deployment do not automatically move to a new domain. The backend retains its existing health and dialogue endpoints for later integration.
 
 The API runs without a database. For routes that use one, put Neon's connection strings in `backend/.env` (ask Di Heng, or use your own Neon branch).

@@ -55,6 +55,10 @@ export const BALANCE = {
     queriesPerRequest: 1,
     /** Share of database load removed by the caching layer. */
     cacheReduction: 0.36,
+    cacheEligibleShare: 0.6,
+    tunedCacheReduction: 0.5,
+    cacheWarmupPerWeek: 0.5,
+    tunedWarmupPerWeek: 1,
     replicaCapacityMult: 1.35,
     replicaUpkeepShare: 0.5,
     replaceCost: 3_500,
@@ -189,7 +193,7 @@ export const PROMOS: Record<PromoId, PromoDef> = {
     minCost: 3_500,
     costPerUser: 2.6,
     cooldown: 3,
-    requires: "promotions",
+    minUsers: 5_000,
   },
   targeted: {
     id: "targeted",
@@ -200,7 +204,7 @@ export const PROMOS: Record<PromoId, PromoDef> = {
     minCost: 3_000,
     costPerUser: 1.6,
     cooldown: 2,
-    requires: "targeted",
+    minUsers: 10_000,
   },
 };
 

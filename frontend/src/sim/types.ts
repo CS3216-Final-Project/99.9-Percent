@@ -9,9 +9,11 @@ export const SAVE_VERSION = 1;
 
 export type Phase = "management" | "incident" | "review" | "ended";
 
-export type Branch = "growth" | "capacity" | "reliability" | "engineering";
+export type Branch = "capacity" | "data" | "reliability" | "growth" | "engineering";
 
 export type TechId =
+  | "larger_database"
+  | "cache_tuning"
   | "promotions"
   | "analytics"
   | "targeted"
@@ -66,6 +68,8 @@ export interface PromoDef {
   costPerUser: number;
   cooldown: number;
   requires?: TechId;
+  /** Operational promotions are revealed by growth, outside the research tree. */
+  minUsers?: number;
 }
 
 export type EquipmentId =
@@ -391,6 +395,8 @@ export interface GameState {
   engineers: number;
 
   infra: Infra;
+  /** Cache warm-up, 0–1. Missing in legacy saves means already warm. */
+  cacheWarmth?: number;
   techDone: TechId[];
   tasks: Task[];
   releases: Release[];

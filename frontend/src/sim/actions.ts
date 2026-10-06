@@ -13,7 +13,7 @@ import { autoPostmortem } from "./postmortem";
 import { applyRelease, releaseTitle, revertDeploy } from "./releases";
 import { rand } from "./rng";
 import { addAppHost, clone, logEvent, newId } from "./state";
-import { has, missingPrerequisites, TECH, techStatus } from "./tech";
+import { has, isResearchTech, missingPrerequisites, TECH, techStatus } from "./tech";
 import { acknowledgeReview } from "./turn";
 import type { Action, ActionResult, DeployRecord, FailureReason, GameState } from "./types";
 
@@ -55,6 +55,9 @@ const MANAGEMENT_ONLY = new Set<Action["type"]>([
  * untouched.
  */
 export function applyAction(prev: GameState, action: Action): ActionResult {
+  if (action.type === "start_tech" && action.tech === "larger_database") {
+    return applyAction(prev, { type: "start_db_upgrade" });
+  }
   if (MANAGEMENT_ONLY.has(action.type) && prev.phase !== "management") {
     return fail(
       "wrong_phase",
@@ -71,6 +74,9 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
     case "launch_promotion": {
       const def = PROMOS[action.promo];
       if (!def) return fail("invalid", "Unknown promotion.");
+      if (def.minUsers && Math.max(s.users, s.totals.peakUsers) < def.minUsers) {
+        return fail("prerequisites", `${def.name} becomes available at ${def.minUsers.toLocaleString("en-US")} users.`);
+      }
       if (def.requires && !has(s, def.requires)) {
         return fail("prerequisites", `${def.name} needs ${TECH[def.requires].name} first.`);
       }
@@ -145,6 +151,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
     case "start_tech": {
       const def = TECH[action.tech];
       if (!def) return fail("invalid", "Unknown technology.");
+      if (!isResearchTech(action.tech)) return fail("invalid", "This upgrade is no longer part of the research tree.");
       const status = techStatus(s, def.id);
       if (status === "done") return fail("already_done", `${def.name} is already live.`);
       if (status === "in_progress" || status === "ready") return fail("already_done", `${def.name} is already under way.`);
