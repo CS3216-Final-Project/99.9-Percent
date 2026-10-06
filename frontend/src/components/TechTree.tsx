@@ -1,6 +1,6 @@
 "use client";
 
-import { BRANCHES, missingPrerequisites, TECH, TECH_ORDER, techStatus, type GameState, type TechId, type TechStatus } from "@/sim";
+import { BALANCE, BRANCHES, missingPrerequisites, TECH, TECH_ORDER, techStatus, type GameState, type TechId, type TechStatus } from "@/sim";
 import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
@@ -16,10 +16,9 @@ const LANE_GAP = 14;
 
 /** Rows are grouped into one lane per branch. */
 const LANES = [
-  { branch: "growth", rows: [0, 0] },
-  { branch: "capacity", rows: [1, 2] },
-  { branch: "reliability", rows: [3, 4] },
-  { branch: "engineering", rows: [5, 6] },
+  { branch: "capacity", rows: [0, 0] },
+  { branch: "data", rows: [1, 1] },
+  { branch: "reliability", rows: [2, 2] },
 ] as const;
 
 function laneIndex(row: number): number {
@@ -32,7 +31,7 @@ function nodePos(id: TechId): { x: number; y: number } {
 }
 
 const WIDTH = PAD_X + 2 * COL_GAP + NODE_W + 16;
-const HEIGHT = PAD_Y + 7 * ROW_GAP + 3 * LANE_GAP;
+const HEIGHT = PAD_Y + 3 * ROW_GAP + 2 * LANE_GAP;
 
 const STATUS_WORD: Record<TechStatus, string> = {
   locked: "Locked",
@@ -46,20 +45,21 @@ function statusLine(game: GameState, id: TechId, status: TechStatus): string {
   if (status === "done") return "Live";
   if (status === "ready") return "Ready to ship";
   if (status === "in_progress") {
-    const task = game.tasks.find((t) => t.techId === id);
+    const task = game.tasks.find((t) => id === "larger_database" ? t.kind === "db_upgrade" : t.techId === id);
     return task ? `Building ${pct(task.progress / task.effort)}` : "Building";
   }
   if (status === "locked") return "Locked";
-  return moneyFull(TECH[id].cost);
+  return moneyFull(id === "larger_database" ? BALANCE.db.tiers[game.infra.dbTier + 1]?.cost ?? 0 : TECH[id].cost);
 }
 
 function Detail({ game, id }: { game: GameState; id: TechId }) {
   const act = useGame((s) => s.act);
   const focusTech = useGame((s) => s.focusTech);
-  const def = TECH[id];
+  const nextTier = id === "larger_database" ? BALANCE.db.tiers[game.infra.dbTier + 1] : undefined;
+  const def = nextTier ? { ...TECH[id], cost: nextTier.cost, effort: nextTier.effort, upkeepNote: `${moneyFull(nextTier.upkeep)}/wk` } : TECH[id];
   const status = techStatus(game, id);
-  const task = game.tasks.find((t) => t.kind === "tech" && t.techId === id);
-  const release = game.releases.find((r) => r.techId === id);
+  const task = game.tasks.find((t) => id === "larger_database" ? t.kind === "db_upgrade" : t.kind === "tech" && t.techId === id);
+  const release = game.releases.find((r) => id === "larger_database" ? r.kind === "db_upgrade" : r.techId === id);
 
   return (
     <div className="tree-detail">
@@ -95,8 +95,8 @@ function Detail({ game, id }: { game: GameState; id: TechId }) {
         </div>
       )}
 
-      {status === "available" && (
-        <Act primary tour="primary" icon="plus" label="Start" price={def.cost} disabled={game.phase !== "management"} onClick={() => act({ type: "start_tech", tech: id })} />
+      {(status === "available" || (status === "done" && nextTier)) && (
+        <Act primary tour="primary" icon="plus" label={nextTier ? `Upgrade to ${nextTier.name}` : "Start"} price={def.cost} disabled={game.phase !== "management"} onClick={() => act({ type: "start_tech", tech: id })} />
       )}
       {task && <TaskRow game={game} task={task} />}
       {release && <ReleaseRow game={game} release={release} />}
@@ -108,7 +108,7 @@ export default function TechTree() {
   const game = useGame((s) => s.game);
   const focus = useGame((s) => s.techFocus);
   const focusTech = useGame((s) => s.focusTech);
-  const selected: TechId = focus ?? TECH_ORDER.find((t) => techStatus(game, t) === "available") ?? "monitoring";
+  const selected: TechId = focus && TECH_ORDER.includes(focus) ? focus : TECH_ORDER.find((t) => techStatus(game, t) === "available") ?? "larger_servers";
 
   return (
     <div className="tree">
@@ -154,7 +154,7 @@ export default function TechTree() {
           {TECH_ORDER.map((id) => {
             const status = techStatus(game, id);
             const p = nodePos(id);
-            const task = game.tasks.find((t) => t.techId === id);
+            const task = game.tasks.find((t) => id === "larger_database" ? t.kind === "db_upgrade" : t.techId === id);
             const missing = status === "locked" ? missingPrerequisites(game, id).map((r) => TECH[r].name).join(" and ") : "";
             return (
               <button

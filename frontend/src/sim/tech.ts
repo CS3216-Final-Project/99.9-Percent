@@ -1,18 +1,18 @@
 import type { Branch, GameState, TechDef, TechId, TechStatus } from "./types";
+import { BALANCE } from "./balance";
 
 export const BRANCHES: { id: Branch; name: string; blurb: string }[] = [
-  { id: "growth", name: "Growth", blurb: "More users" },
   { id: "capacity", name: "Capacity", blurb: "Handle more traffic" },
+  { id: "data", name: "Data", blurb: "Relieve database load" },
   { id: "reliability", name: "Reliability", blurb: "Survive failures" },
-  { id: "engineering", name: "Engineering", blurb: "See more, ship safely" },
 ];
 
 /**
- * The technology tree. Rows 0-6 are grouped by branch; `requires` may cross
- * branches (autoscaling, automatic failover and canary rollouts all do).
- * Text is kept to a few words: the numbers carry the meaning.
+ * Legacy definitions are kept for serialized tasks and completed upgrades.
+ * TECH_ORDER below is the nine-node player-facing research tree.
  */
-export const TECH: Record<TechId, TechDef> = {
+// Retain definitions for completed upgrades, tasks and releases in old saves.
+const LEGACY_TECH = {
   promotions: {
     id: "promotions",
     name: "Launch Campaigns",
@@ -240,18 +240,71 @@ export const TECH: Record<TechId, TechDef> = {
     effort: 5,
     upkeep: 200,
   },
+} satisfies Partial<Record<TechId, TechDef>>;
+
+export const TECH: Record<TechId, TechDef> = {
+  ...LEGACY_TECH,
+  larger_servers: { ...LEGACY_TECH.larger_servers, name: "Scale Up", row: 0 },
+  load_balancing: {
+    ...LEGACY_TECH.load_balancing, name: "Scale Out + Load Balancing", row: 0,
+    requires: [], description: "Distribute traffic across extra application instances.",
+    effects: ["Server limit 3 to 12", "Removes uneven routing", "Add instances separately with Add server"],
+  },
+  autoscaling: { ...LEGACY_TECH.autoscaling, row: 0, requires: ["load_balancing"] },
+  larger_database: {
+    id: "larger_database", name: "Larger Database", branch: "data", col: 0, row: 1,
+    description: "Increase database capacity at a higher running cost.",
+    effects: ["Upgrade through Standard, Performance and Enterprise tiers", "Does not increase application capacity"],
+    requires: [], cost: BALANCE.db.tiers[1].cost, effort: BALANCE.db.tiers[1].effort,
+    upkeep: 0, upkeepNote: "depends on database tier",
+  },
+  caching: { ...LEGACY_TECH.caching, name: "Read Cache", branch: "data", col: 1, row: 1,
+    effects: ["Up to 36% less database load after warm-up", "Only eligible reads are cached; writes still reach the database"] },
+  cache_tuning: {
+    id: "cache_tuning", name: "Cache Tuning", branch: "data", col: 2, row: 1,
+    description: "Improve cache hit rate and warm the cache faster.",
+    effects: ["Up to 50% less database load", "Warm-up takes one week instead of two", "+$200 weekly running cost"],
+    requires: ["caching"], cost: 5_000, effort: 3, upkeep: 200,
+  },
+  health_checks: { ...LEGACY_TECH.health_checks, col: 0, row: 2, requires: [],
+    effects: ["With load balancing, removes failed instances from routing", "Names the failing machine", "Cannot create replacement capacity"] },
+  standby: { ...LEGACY_TECH.standby, name: "Spare Application Instance", col: 1, row: 2 },
+  auto_failover: { ...LEGACY_TECH.auto_failover, col: 2, row: 2,
+    requires: ["health_checks", "standby", "load_balancing"],
+    description: "Route application traffic to your spare after an instance fails.",
+    effects: ["Promotes the spare application instance", "Requires health checks and load balancing", "Does not fix database overload or create capacity"] },
 };
 
-export const TECH_ORDER: TechId[] = Object.keys(TECH) as TechId[];
+export const TECH_ORDER: TechId[] = [
+  "larger_servers", "load_balancing", "autoscaling",
+  "larger_database", "caching", "cache_tuning",
+  "health_checks", "standby", "auto_failover",
+];
+
+export function isResearchTech(id: TechId): boolean {
+  return TECH_ORDER.includes(id);
+}
+
+export function completedTechIds(state: GameState): TechId[] {
+  return TECH_ORDER.filter((id) => id === "larger_database" ? state.infra.dbTier > 0 : has(state, id));
+}
 
 export function has(state: Pick<GameState, "techDone">, tech: TechId): boolean {
+  // Metrics and alerts are baseline tools, including when resuming an old save.
+  if (tech === "monitoring") return true;
   return state.techDone.includes(tech);
 }
 
 export function techStatus(state: GameState, id: TechId): TechStatus {
+  if (id === "larger_database") {
+    if (state.releases.some((r) => r.kind === "db_upgrade")) return "ready";
+    if (state.tasks.some((t) => t.kind === "db_upgrade")) return "in_progress";
+    return state.infra.dbTier > 0 ? "done" : "available";
+  }
   if (has(state, id)) return "done";
   if (state.releases.some((r) => r.techId === id)) return "ready";
   if (state.tasks.some((t) => t.kind === "tech" && t.techId === id)) return "in_progress";
+  if (!isResearchTech(id)) return "locked";
   const def = TECH[id];
   return def.requires.every((r) => has(state, r)) ? "available" : "locked";
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
-import { BALANCE, currentWarnings, metrics, TECH_ORDER, type GameState } from "@/sim";
+import { BALANCE, completedTechIds, currentWarnings, metrics, TECH_ORDER, type GameState } from "@/sim";
 import { nextMove } from "@/game/advisor";
 import { clock, compact, money, moneyFull, num, signedMoney, uptimePct } from "@/game/format";
 import { useGame, type Speed, type View } from "@/game/store";
@@ -170,7 +170,7 @@ function BottomBar() {
 
   const toggle = (v: Exclude<View, null>) => openView(view === v ? null : v);
   const tabs: [Exclude<View, null>, string, IconName, string | null, boolean][] = [
-    ["tech", "Tech", "tree", `${game.techDone.length}/${TECH_ORDER.length}`, true],
+    ["tech", "Tech", "tree", `${completedTechIds(game).length}/${TECH_ORDER.length}`, true],
     ["engineers", "Team", "wrench", `${m.freeEngineers} free`, hasWork],
     ["history", "History", "history", game.postmortems.length > 0 ? String(game.postmortems.length) : null, hasPast],
   ];

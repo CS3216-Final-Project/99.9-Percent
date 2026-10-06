@@ -573,7 +573,7 @@ function Labels() {
       <span className="wall-tag" ref={bindLabel(INTERNET)}>
         Internet
       </span>
-      {EQUIPMENT_ORDER.map((id) => (
+      {EQUIPMENT_ORDER.filter((id) => (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
     </div>

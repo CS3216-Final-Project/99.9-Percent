@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { DEFAULT_META, loadGame, saveGame, saveMeta } from './game/persist';
@@ -60,6 +60,22 @@ describe('prototype game in the Vite app', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue week 2' }));
     expect(useGame.getState().game).toEqual(game);
     expect(useGame.getState().meta.runsStarted).toBe(1);
+  });
+
+  it('shows the documented tree and routes its database decision through the real store', () => {
+    saveMeta({ ...DEFAULT_META, tutorialDone: true });
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tech' }));
+    const tree = screen.getByRole('region', { name: 'Tech tree' });
+    expect(tree.querySelectorAll('.node')).toHaveLength(9);
+    expect(within(tree).queryByRole('button', { name: /Monitoring:/ })).toBeNull();
+    expect(within(tree).queryByRole('button', { name: /Database Replica:/ })).toBeNull();
+    fireEvent.click(within(tree).getByRole('button', { name: 'Larger Database: Available' }));
+    fireEvent.click(within(tree).getByRole('button', { name: /^Upgrade to Standard/ }));
+    expect(useGame.getState().game.tasks[0].kind).toBe('db_upgrade');
+    expect(useGame.getState().game.infra.dbTier).toBe(0);
+    expect(within(tree).getByRole('button', { name: 'Larger Database: Building' })).toBeTruthy();
   });
 
   it('schedules one management turn under StrictMode and cancels it when a view opens', () => {

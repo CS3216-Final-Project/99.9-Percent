@@ -45,7 +45,10 @@ export function dbCapacity(s: GameState): number {
 
 /** Database queries generated per request that the app tier serves. */
 export function dbLoadFactor(s: GameState): number {
-  return BALANCE.db.queriesPerRequest * (has(s, "caching") ? 1 - BALANCE.db.cacheReduction : 1);
+  const reduction = has(s, "cache_tuning") ? BALANCE.db.tunedCacheReduction : BALANCE.db.cacheReduction;
+  const eligibleReduction = Math.min(BALANCE.db.cacheEligibleShare, reduction);
+  const warmth = clamp(s.cacheWarmth ?? 1, 0, 1);
+  return BALANCE.db.queriesPerRequest * (has(s, "caching") ? 1 - eligibleReduction * warmth : 1);
 }
 
 export interface Utilisation {
@@ -104,7 +107,7 @@ export function costs(s: GameState, tempServers = 0): CostBreakdown {
   if (has(s, "standby")) redundancy += serverUpkeep(s);
   if (has(s, "replicas")) redundancy += Math.round(dbUpkeep * BALANCE.db.replicaUpkeepShare);
   let tooling = 0;
-  for (const id of s.techDone) tooling += TECH[id].upkeep;
+  for (const id of s.techDone) if (id !== "monitoring") tooling += TECH[id].upkeep;
   const autoscale = tempServers * BALANCE.server.autoscaleUpkeep;
   return {
     salaries,
@@ -548,7 +551,7 @@ export function equipmentInfo(s: GameState, id: EquipmentId): EquipmentInfo {
         "Cache",
         "Answers repeat requests so the database does not have to.",
         "caching",
-        `-${pct(BALANCE.db.cacheReduction)} database load`,
+        `-${pct(1 - dbLoadFactor(s) / BALANCE.db.queriesPerRequest)} database load`,
       );
     case "db": {
       let state = utilState(m.dbUtil);

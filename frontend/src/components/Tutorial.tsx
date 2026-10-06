@@ -43,13 +43,13 @@ const BASICS: Step[] = [
     done: (s) => s.game.infra.appHosts.length >= 2,
   },
   {
-    title: "Start Monitoring",
-    why: "It shows exact load and speeds up fixes.",
-    hint: (s) => (s.view !== "tech" ? "Open Tech." : s.techFocus !== "monitoring" ? "Click Monitoring." : "Press Start."),
+    title: "Explore Scale Up",
+    why: "Larger servers handle more traffic but cost more to run.",
+    hint: (s) => (s.view !== "tech" ? "Open Tech." : s.techFocus !== "larger_servers" ? "Click Scale Up." : "Press Start."),
     target: (s) =>
-      s.view !== "tech" ? '.view-tabs button[data-view="tech"]' : s.techFocus !== "monitoring" ? '.node[data-tech="monitoring"]' : `.tree-detail ${PRIMARY}`,
+      s.view !== "tech" ? '.view-tabs button[data-view="tech"]' : s.techFocus !== "larger_servers" ? '.node[data-tech="larger_servers"]' : `.tree-detail ${PRIMARY}`,
     enter: (s) => s.select(null),
-    done: (s) => s.game.tasks.some((t) => t.techId === "monitoring") || s.game.techDone.includes("monitoring"),
+    done: (s) => s.game.tasks.some((t) => t.techId === "larger_servers") || s.game.releases.some((r) => r.techId === "larger_servers") || s.game.techDone.includes("larger_servers"),
   },
   {
     title: "Get more users",

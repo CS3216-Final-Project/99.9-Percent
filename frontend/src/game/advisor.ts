@@ -107,6 +107,7 @@ export function nextMove(g: GameState): NextMove {
   const order: PromoId[] = ["targeted", "launch", "social"];
   for (const id of order) {
     const def = PROMOS[id];
+    if (def.minUsers && Math.max(g.users, g.totals.peakUsers) < def.minUsers) continue;
     if (def.requires && !has(g, def.requires)) continue;
     if (g.activePromos.includes(id) || promoCooldownLeft(g, id) > 0) continue;
     const cost = promoCost(g, id);

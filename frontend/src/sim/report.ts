@@ -1,6 +1,6 @@
 import { BALANCE } from "./balance";
 import { clamp, uptime } from "./derive";
-import { BRANCHES, TECH } from "./tech";
+import { BRANCHES, completedTechIds, TECH, TECH_ORDER } from "./tech";
 import type { Branch, GameState, Outcome } from "./types";
 
 export interface EndReport {
@@ -62,10 +62,11 @@ export function buildReport(s: GameState): EndReport {
   const grade: EndReport["grade"] =
     outcome === "won" && score >= 88 && up >= 0.999 ? "S" : score >= 75 ? "A" : score >= 58 ? "B" : score >= 40 ? "C" : "D";
 
+  const completed = completedTechIds(s);
   const focus = BRANCHES.map((b) => ({
     branch: b.id,
     name: b.name,
-    count: s.techDone.filter((t) => TECH[t].branch === b.id).length,
+    count: completed.filter((t) => TECH[t].branch === b.id).length,
   })).sort((a, b) => b.count - a.count);
 
   const takeaways: string[] = [];
@@ -111,8 +112,8 @@ export function buildReport(s: GameState): EndReport {
     uptime: up,
     nines: ninesLabel(up),
     incidents,
-    techCount: s.techDone.length,
-    techTotal: Object.keys(TECH).length,
+    techCount: completed.length,
+    techTotal: TECH_ORDER.length,
     focus,
     hintsUsed: s.totals.hintsUsed,
     promosRun: s.totals.promosRun,

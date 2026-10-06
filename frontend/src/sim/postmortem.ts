@@ -54,27 +54,24 @@ function prevention(s: GameState, inc: ActiveIncident): string[] {
       if (!has(s, "autoscaling")) out.push("Autoscaling adds servers by itself.");
       break;
     case "db_saturation":
-      if (!has(s, "caching")) out.push("Caching cuts database load by 36%.");
+      if (!has(s, "caching")) out.push("Read Cache reduces eligible read traffic after warm-up.");
+      else if (!has(s, "cache_tuning")) out.push("Cache Tuning improves hit rate and warm-up; writes still reach the database.");
       if (s.infra.dbTier < BALANCE.db.tiers.length - 1) out.push("Upgrade the database before load passes 85%.");
-      if (!has(s, "replicas")) out.push("A Database Replica adds 35% capacity.");
       if (!has(s, "monitoring")) out.push("Monitoring shows exact database load.");
       break;
     case "deploy_regression":
       if (!inc.cause.releaseTested) out.push("Test releases first: 85% less risk.");
-      if (!has(s, "deploy_testing")) out.push("Automated Testing nearly halves deploy risk.");
-      if (!has(s, "safer_rollouts")) out.push("Canary Rollouts roll bad releases back automatically.");
       if (inc.cause.techDebt >= 40) out.push("Pay down tech debt: it makes every deploy riskier.");
       break;
     case "instance_failure":
       out.push("Replace a machine as soon as it shows faults.");
       if (inc.cause.target === "db") {
-        if (!has(s, "backups")) out.push("Backups prevent data loss.");
-        if (!has(s, "replicas")) out.push("A Database Replica can take over in seconds.");
+        out.push("Application failover cannot recover a failed database; replace its machine.");
       } else {
         if (!has(s, "standby")) out.push("A Standby Server can take over in seconds.");
         if (!selfHealingFleet(s)) out.push("Load Balancing with Health Checks routes around dead servers.");
       }
-      if (!has(s, "auto_failover")) out.push("Automatic Failover switches without you.");
+      if (inc.cause.target !== "db" && !has(s, "auto_failover")) out.push("Automatic Failover switches to a spare application instance.");
       break;
   }
   return out;

@@ -58,9 +58,11 @@ function runIncident(start: GameState, id: RecoveryId, diagnose = 10): GameState
 }
 
 describe("tech tree", () => {
-  it("has 12-17 nodes, each with a cost, effort, description and effect", () => {
-    expect(TECH_ORDER.length).toBeGreaterThanOrEqual(12);
-    expect(TECH_ORDER.length).toBeLessThanOrEqual(17);
+  it("has nine research nodes across capacity, data and reliability", () => {
+    expect(TECH_ORDER).toHaveLength(9);
+    for (const branch of ["capacity", "data", "reliability"]) {
+      expect(TECH_ORDER.filter((id) => TECH[id].branch === branch)).toHaveLength(3);
+    }
     for (const id of TECH_ORDER) {
       const t = TECH[id];
       expect(t.cost).toBeGreaterThan(0);
@@ -72,9 +74,11 @@ describe("tech tree", () => {
   });
 
   it("encodes the cross-branch dependencies", () => {
-    expect(TECH.autoscaling.requires).toEqual(expect.arrayContaining(["load_balancing", "monitoring"]));
-    expect(TECH.auto_failover.requires).toEqual(expect.arrayContaining(["replicas", "health_checks"]));
-    expect(TECH.safer_rollouts.requires).toEqual(expect.arrayContaining(["deploy_testing", "standby"]));
+    expect(TECH.autoscaling.requires).toEqual(["load_balancing"]);
+    expect(TECH.auto_failover.requires).toEqual(expect.arrayContaining(["standby", "health_checks", "load_balancing"]));
+    expect(TECH.cache_tuning.requires).toEqual(["caching"]);
+    expect(techStatus(newGame(1), "larger_servers")).toBe("available");
+    expect(techStatus(newGame(1), "load_balancing")).toBe("available");
   });
 
   it("locks nodes until prerequisites are deployed", () => {
@@ -88,15 +92,16 @@ describe("tech tree", () => {
 
   it("moves a node through in-progress, ready and done", () => {
     let s = newGame(1);
-    s = must(s, { type: "start_tech", tech: "monitoring" });
-    expect(techStatus(s, "monitoring")).toBe("in_progress");
+    s = must(s, { type: "start_tech", tech: "larger_servers" });
+    const before = metrics(s).appCapacity;
+    expect(techStatus(s, "larger_servers")).toBe("in_progress");
     s = must(s, { type: "assign_engineers", taskId: s.tasks[0].id, count: 3 });
     s = advanceTurn(s);
-    expect(techStatus(s, "monitoring")).toBe("ready");
-    expect(metrics(s).hasMonitoring).toBe(false);
+    expect(techStatus(s, "larger_servers")).toBe("ready");
+    expect(metrics(s).appCapacity).toBe(before);
     s = must(s, { type: "deploy_release", releaseId: s.releases[0].id });
-    expect(techStatus(s, "monitoring")).toBe("done");
-    expect(metrics(s).hasMonitoring).toBe(true);
+    expect(techStatus(s, "larger_servers")).toBe("done");
+    expect(metrics(s).appCapacity).toBeGreaterThan(before);
   });
 });
 
@@ -106,7 +111,7 @@ describe("actions", () => {
     const poor = { ...clone(s), cash: 100 };
     const cases: [GameState, Action, string][] = [
       [poor, { type: "add_server" }, "insufficient_funds"],
-      [poor, { type: "start_tech", tech: "monitoring" }, "insufficient_funds"],
+      [poor, { type: "start_tech", tech: "larger_servers" }, "insufficient_funds"],
       [s, { type: "launch_promotion", promo: "launch" }, "prerequisites"],
       [s, { type: "remove_server" }, "limit_reached"],
       [s, { type: "assign_engineers", taskId: "nope", count: 1 }, "not_found"],
@@ -164,7 +169,7 @@ describe("actions", () => {
   it("cannot assign more engineers than the company has", () => {
     let s = newGame(1);
     s = must(s, { type: "start_tech", tech: "caching" });
-    s = must(s, { type: "start_tech", tech: "monitoring" });
+    s = must(s, { type: "start_tech", tech: "larger_servers" });
     s = must(s, { type: "assign_engineers", taskId: s.tasks[1].id, count: 1 });
     s = must(s, { type: "assign_engineers", taskId: s.tasks[0].id, count: 3 });
     expect(metrics(s).freeEngineers).toBe(0);
@@ -235,7 +240,7 @@ describe("determinism and persistence", () => {
 
   it("a save restored from JSON continues exactly like the original", () => {
     let s = newGame(77);
-    s = must(s, { type: "start_tech", tech: "monitoring" });
+    s = must(s, { type: "start_tech", tech: "larger_servers" });
     s = advanceTurn(advanceTurn(s));
     const restored = JSON.parse(JSON.stringify(s)) as GameState;
     expect(JSON.stringify(advanceTurn(advanceTurn(restored)))).toBe(JSON.stringify(advanceTurn(advanceTurn(s))));
@@ -434,7 +439,7 @@ describe("incidents", () => {
   });
 
   it("automatic failover absorbs instance failures with no incident", () => {
-    const app = failingHost((g) => withServers(grant(g, "standby", "auto_failover"), 2), "app");
+    const app = failingHost((g) => withServers(grant(g, "standby", "auto_failover", "health_checks", "load_balancing"), 2), "app");
     expect(app.phase).toBe("management");
     expect(app.postmortems[app.postmortems.length - 1].outcome).toBe("auto_mitigated");
 
@@ -456,7 +461,7 @@ describe("incidents", () => {
     expect(safe.users).toBeGreaterThan(bare.users);
   });
 
-  it("monitoring speeds up investigation and tracing flags the root cause", () => {
+  it("baseline monitoring provides fast investigation and legacy tracing still works", () => {
     const base = { ...clone(newGame(1)), users: 4500 };
     const inspect = (s: GameState) => {
       let cur = must(advanceTurn(s), { type: "incident_inspect", equipment: "app" });
@@ -470,9 +475,10 @@ describe("incidents", () => {
     const blind = inspect(base);
     const monitored = inspect(grant(base, "monitoring"));
     const traced = inspect(grant(base, "monitoring", "tracing"));
-    expect(monitored.t).toBeLessThan(blind.t);
+    expect(monitored.t).toBe(blind.t);
     expect(traced.t).toBeLessThan(monitored.t);
     expect(monitored.evidence.text).toMatch(/%/);
+    expect(blind.evidence.text).toMatch(/%/);
     expect(blind.evidence.anomalous).toBe(false);
     expect(traced.evidence.anomalous).toBe(true);
   });
