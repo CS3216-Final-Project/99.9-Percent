@@ -24,7 +24,7 @@ On Linux CI, use `npx playwright install --with-deps chromium` for browser/syste
 | Simulation | Actions, costs, upgrades, engineers, release risk, determinism, save continuation, incident families and postmortems | Seeded strategies do not prove all seeds or player enjoyment |
 | Game lifecycle/storage | Idempotent boot, corrupt/old saves, storage failures, paused incident resume, speed, completion, replay and analytics bounds | Storage validation is structural, not a security boundary |
 | React shell | Real store, first-run UI, week advancement, resume, StrictMode clocks, pause and unmount cleanup | jsdom mocks the WebGL facility |
-| Browser | Tutorial purchases/research/promotion, reload, corrupt save recovery, replay confirmation, investigation/recovery/postmortem and touch smoke | Real Chromium WebGL; mobile emulation does not cover Safari or real devices |
+| Browser | Tutorial purchases/research/promotion, reload, corrupt save recovery, failed furniture downloads, replay confirmation, investigation/recovery/postmortem and touch smoke | Real Chromium WebGL; mobile emulation does not cover Safari or real devices. CI renders without a GPU, so it checks that the room works, not how the furniture looks |
 | Backend | Route responses, invalid requests, health, origin parsing and HTTP CORS/preflight | Existing dialogue backend is retained; tycoon gameplay is browser-only |
 | Database | Every committed migration, schema defaults and relational constraints on PGlite | Not a live Neon connectivity/load test |
 
