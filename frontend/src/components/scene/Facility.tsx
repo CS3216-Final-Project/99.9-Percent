@@ -818,20 +818,34 @@ function isSoftwareRenderer(gl: THREE.WebGLRenderer): boolean {
   return /swiftshader|llvmpipe|software|softpipe|basic render/i.test(name);
 }
 
+/** Software rendering cannot keep up with 60 frames a second, so it draws 20. */
+const SOFTWARE_FPS = 20;
+
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
+  const throttle = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (throttle.current !== null) window.clearInterval(throttle.current);
+    },
+    [],
+  );
   return (
     <div className="stage-canvas" ref={container}>
       <Canvas
         orthographic
         shadows="percentage"
         dpr={[1, 1.75]}
-        onCreated={({ gl, setDpr }) => {
-          // Without a graphics card the browser draws in software, one pixel at a time. Keep it playable:
-          // no shadows and half the pixels (the labels and interface stay sharp). Machines with a GPU keep full quality.
+        onCreated={({ gl, setDpr, setFrameloop, invalidate }) => {
+          // Without a graphics card the browser draws in software, on the CPU. Keep it playable: no shadows,
+          // half the pixels (the labels and interface are HTML and stay sharp) and 20 frames a second.
+          // Machines with a GPU keep full quality.
           if (isSoftwareRenderer(gl)) {
             gl.shadowMap.enabled = false;
             setDpr(0.5);
+            setFrameloop("demand");
+            if (throttle.current !== null) window.clearInterval(throttle.current);
+            throttle.current = window.setInterval(() => invalidate(), 1000 / SOFTWARE_FPS);
           }
         }}
         camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 200 }}
