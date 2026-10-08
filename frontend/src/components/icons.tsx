@@ -36,6 +36,7 @@ import { Play } from "pixelarticons/react/Play.js";
 import { Plug } from "pixelarticons/react/Plug.js";
 import { Plus } from "pixelarticons/react/Plus.js";
 import { PlusBox } from "pixelarticons/react/PlusBox.js";
+import { Redo } from "pixelarticons/react/Redo.js";
 import { Refresh } from "pixelarticons/react/Refresh.js";
 import { RobotFaceHappy } from "pixelarticons/react/RobotFaceHappy.js";
 import { Save } from "pixelarticons/react/Save.js";
@@ -54,6 +55,7 @@ import { TestTube } from "pixelarticons/react/TestTube.js";
 import { Tools } from "pixelarticons/react/Tools.js";
 import { TrendingUp } from "pixelarticons/react/TrendingUp.js";
 import { Trophy } from "pixelarticons/react/Trophy.js";
+import { Undo } from "pixelarticons/react/Undo.js";
 import { UserPlus } from "pixelarticons/react/UserPlus.js";
 import { Users } from "pixelarticons/react/Users.js";
 import { WarningDiamond } from "pixelarticons/react/WarningDiamond.js";
@@ -122,6 +124,8 @@ const ICONS = {
   wrench: Tools,
   hire: UserPlus,
   refresh: Refresh,
+  rotateLeft: Undo,
+  rotateRight: Redo,
   history: ChartLine,
   info: InfoBox,
   flag: Flag,

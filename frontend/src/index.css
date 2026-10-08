@@ -703,6 +703,39 @@ button:disabled {
   box-shadow: 0 1px 0 0 var(--ink);
 }
 
+.camera-hint {
+  align-self: center;
+  margin-left: 4px;
+  padding: 4px 8px;
+  background: rgb(26 22 51 / 0.85);
+  border: 2px solid var(--night-line);
+  border-radius: var(--radius);
+  color: var(--on-night-soft);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.camera-hint kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 var(--ink);
+  font-family: var(--font-num);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Touch screens rotate with two fingers, so the keyboard hint is for mouse users only. */
+@media (hover: none), (max-width: 900px) {
+  .camera-hint {
+    display: none;
+  }
+}
+
 /* Equipment labels: little map markers above each machine. */
 .eq-labels {
   position: absolute;

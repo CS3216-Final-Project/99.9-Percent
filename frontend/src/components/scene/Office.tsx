@@ -5,6 +5,7 @@ import { useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { ROOM } from "./layout";
 import { hazardStripes, logoSign, skyline, whiteboard, woodFloor } from "./textures";
+import { OnWall } from "./walls";
 
 /*
  * The people and the furniture that make the facility read as a small company
@@ -577,13 +578,18 @@ export function Office({ incident }: { incident: boolean }) {
       <Floors />
       <ServerRoomFittings />
       <ServerFloorProps />
-      <WallClock position={[4.2, 2.35, -9.44]} />
       <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.55} look={look(21)} />
       <Walker from={[-2.45, 5.5]} to={[-2.45, 9.0]} speed={0.45} look={look(16)} phase={2} />
-      <NeonLogo position={[-13.34, 2.4, 2.6]} rotation={Math.PI / 2} />
-      <Whiteboard position={[-13.34, 1.55, 6.6]} rotation={Math.PI / 2} />
-      <CityWindow position={[-13.36, 1.8, 8.75]} rotation={Math.PI / 2} w={1.1} h={1.5} />
-      <CityWindow position={[12.4, 2.2, -9.42]} w={1.9} h={1.2} />
+      <OnWall wall="left">
+        <NeonLogo position={[-13.34, 2.4, 2.6]} rotation={Math.PI / 2} />
+        <Whiteboard position={[-13.34, 1.55, 6.6]} rotation={Math.PI / 2} />
+        <CityWindow position={[-13.36, 1.8, 8.75]} rotation={Math.PI / 2} w={1.1} h={1.5} />
+      </OnWall>
+      <OnWall wall="back">
+        <CityWindow position={[12.4, 2.2, -9.42]} w={1.9} h={1.2} />
+        <WallClock position={[4.2, 2.35, -9.44]} />
+        <Beacon on={incident} />
+      </OnWall>
       <Kitchen />
       <Lounge />
       <PingPong />
@@ -593,7 +599,6 @@ export function Office({ incident }: { incident: boolean }) {
       <Plant x={9.7} z={-4.45} tall />
       <Plant x={13.1} z={0.9} />
       <Plant x={9.6} z={4.4} />
-      <Beacon on={incident} />
       <pointLight position={[12, 2.8, -7.8]} intensity={8} distance={6} color="#ffcf94" />
     </group>
   );

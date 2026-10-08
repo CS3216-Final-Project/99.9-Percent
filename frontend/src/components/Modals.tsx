@@ -110,6 +110,10 @@ export function HowToPlay() {
           <span>In an incident, find the cause, then pick the matching fix.</span>
         </li>
         <li>
+          <Concept kind="tech" icon="rotateRight" />
+          <span>Drag to move and scroll to zoom. Shift + drag (or right-drag) rotates and tilts; Q and E turn the room.</span>
+        </li>
+        <li>
           <Concept kind="muted" icon="pause" />
           <span>P pauses. Esc closes panels.</span>
         </li>

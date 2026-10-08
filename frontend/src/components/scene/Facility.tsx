@@ -33,6 +33,7 @@ import {
 import { floorTiles, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { EQUIPMENT_ICON, Icon, STATE_META } from "../icons";
 import { DeskClutter, look, Office, Person, type Activity, type Look } from "./Office";
+import { OnWall, updateWalls, Wall } from "./walls";
 
 /* ------------------------------------------------------------------ */
 /* Scene model: the few facts the 3D view needs, as a stable snapshot  */
@@ -143,54 +144,71 @@ function useSceneModel(): SceneModel {
 
 const TARGET = new THREE.Vector3(-1, 0, 0.6);
 const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20);
+const HOME = CAMERA_OFFSET.clone().normalize();
+const UP = new THREE.Vector3(0, 1, 0);
+/** Tilt limits, measured from straight down: nearly top-down to a low three-quarter view. */
+const MIN_TILT = 0.22;
+const MAX_TILT = 1.2;
+/** Q, E and the rotate buttons turn the room by an eighth of a circle. */
+export const TURN = Math.PI / 4;
 
-export const cameraApi: { zoomBy: (factor: number) => void; reset: () => void } = {
+export const cameraApi: { zoomBy: (factor: number) => void; reset: () => void; rotateBy: (radians: number) => void } = {
   zoomBy: () => {},
   reset: () => {},
+  rotateBy: () => {},
 };
+
+/** Zoom and floor point that fit the box on screen when looking along `dir`. */
+function frameBox(box: THREE.Box3, dir: THREE.Vector3, width: number, height: number): { zoom: number; target: THREE.Vector3 } {
+  const right = new THREE.Vector3().crossVectors(dir, UP).normalize();
+  const up = new THREE.Vector3().crossVectors(right, dir).normalize();
+  const center = box.getCenter(new THREE.Vector3());
+  const p = new THREE.Vector3();
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const x of [box.min.x, box.max.x]) {
+    for (const y of [box.min.y, box.max.y]) {
+      for (const z of [box.min.z, box.max.z]) {
+        p.set(x, y, z).sub(center);
+        minX = Math.min(minX, p.dot(right));
+        maxX = Math.max(maxX, p.dot(right));
+        minY = Math.min(minY, p.dot(up));
+        maxY = Math.max(maxY, p.dot(up));
+      }
+    }
+  }
+  // Leave room around the edges for labels, the prompt and the controls.
+  const zoom = THREE.MathUtils.clamp(Math.min(width / (maxX - minX + 7), height / (maxY - minY + 6.5)), 10, 64);
+  // Slide the centre down the view direction onto the floor, which is the plane the controls pan across.
+  return { zoom, target: center.add(dir.clone().multiplyScalar(-center.y / dir.y)) };
+}
 
 function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean> }) {
   const controls = useRef<MapControlsImpl>(null);
   const camera = useThree((s) => s.camera) as THREE.OrthographicCamera;
   const size = useThree((s) => s.size);
+  /** The player has panned, zoomed or dragged the view, so it no longer follows the facility. */
   const touched = useRef(false);
-  const want = useRef({ zoom: 30, target: TARGET.clone() });
+  /** Turning back to the starting angle after Reset view. */
+  const homing = useRef(false);
+  /** Turn still to apply from Q, E or the rotate buttons. */
+  const spin = useRef(0);
+  const box = useRef<THREE.Box3 | null>(null);
+  const v = useMemo(() => ({ offset: new THREE.Vector3(), dir: new THREE.Vector3(), before: new THREE.Vector3() }), []);
 
   // Frame the equipment that is actually built, and widen the view as the facility grows.
   useEffect(() => {
-    const dir = CAMERA_OFFSET.clone().normalize().negate();
-    const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
-    const up = new THREE.Vector3().crossVectors(right, dir).normalize();
-    const box = new THREE.Box3();
+    const b = new THREE.Box3();
     for (const id of EQUIPMENT_ORDER) {
       if (!built[id]) continue;
       const f = footprints[id];
-      box.expandByPoint(new THREE.Vector3(f.x - f.w / 2, 0, f.z - f.d / 2));
-      box.expandByPoint(new THREE.Vector3(f.x + f.w / 2, f.h, f.z + f.d / 2));
+      b.expandByPoint(new THREE.Vector3(f.x - f.w / 2, 0, f.z - f.d / 2));
+      b.expandByPoint(new THREE.Vector3(f.x + f.w / 2, f.h, f.z + f.d / 2));
     }
-    if (box.isEmpty()) return;
-    const center = box.getCenter(new THREE.Vector3());
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    for (const x of [box.min.x, box.max.x]) {
-      for (const y of [box.min.y, box.max.y]) {
-        for (const z of [box.min.z, box.max.z]) {
-          const p = new THREE.Vector3(x, y, z).sub(center);
-          minX = Math.min(minX, p.dot(right));
-          maxX = Math.max(maxX, p.dot(right));
-          minY = Math.min(minY, p.dot(up));
-          maxY = Math.max(maxY, p.dot(up));
-        }
-      }
-    }
-    // Leave room around the edges for labels, the prompt and the controls.
-    const zoom = THREE.MathUtils.clamp(Math.min(size.width / (maxX - minX + 7), size.height / (maxY - minY + 6.5)), 10, 64);
-    // Slide the centre down the view direction onto the floor, which is the plane the controls pan across.
-    const onFloor = center.clone().add(dir.clone().multiplyScalar(-center.y / dir.y));
-    want.current = { zoom, target: onFloor };
-  }, [footprints, built, size]);
+    box.current = b.isEmpty() ? null : b;
+  }, [footprints, built]);
 
   useEffect(() => {
     cameraApi.zoomBy = (factor) => {
@@ -201,18 +219,61 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     };
     cameraApi.reset = () => {
       touched.current = false;
+      homing.current = true;
+      spin.current = 0;
+    };
+    cameraApi.rotateBy = (radians) => {
+      homing.current = false;
+      spin.current += radians;
     };
   }, [camera]);
+
+  // Q and E turn the room. Ignored while typing and before a run starts.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || !useGame.getState().started) return;
+      if (e.key === "q" || e.key === "Q") cameraApi.rotateBy(-TURN);
+      else if (e.key === "e" || e.key === "E") cameraApi.rotateBy(TURN);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useFrame(() => {
     const c = controls.current;
     if (!c) return;
-    // Until the player takes the camera, ease toward the framing above.
-    if (!touched.current) {
+    const { offset, dir, before } = v;
+    offset.copy(camera.position).sub(c.target);
+    const distance = offset.length();
+    let turned = false;
+    if (Math.abs(spin.current) > 1e-4) {
+      const step = Math.abs(spin.current) < 0.004 ? spin.current : spin.current * 0.16;
+      offset.applyAxisAngle(UP, step);
+      spin.current -= step;
+      turned = true;
+    }
+    if (homing.current) {
+      offset.normalize().lerp(HOME, 0.14).normalize();
+      if (offset.distanceTo(HOME) < 0.002) {
+        offset.copy(HOME);
+        homing.current = false;
+      }
+      offset.multiplyScalar(distance);
+      turned = true;
+    }
+    if (turned) camera.position.copy(c.target).add(offset);
+
+    // Until the player takes the camera, ease toward a framing of the built equipment from the current angle.
+    if (!touched.current && box.current) {
+      dir.copy(offset).normalize().negate();
+      const want = frameBox(box.current, dir, size.width, size.height);
       const k = 0.1;
-      camera.zoom += (want.current.zoom - camera.zoom) * k;
-      c.target.lerp(want.current.target, k);
-      camera.position.copy(c.target).add(CAMERA_OFFSET);
+      camera.zoom += (want.zoom - camera.zoom) * k;
+      before.copy(c.target);
+      c.target.lerp(want.target, k);
+      camera.position.add(c.target).sub(before);
       camera.updateProjectionMatrix();
     }
     // Keep the view over the building while panning.
@@ -225,22 +286,27 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
       t.x = cx;
       t.z = cz;
     }
+    // Lower whichever walls now stand between the camera and the room.
+    updateWalls(dir.copy(c.target).sub(camera.position).normalize());
   });
 
   return (
     <MapControls
       ref={controls}
       makeDefault
-      enableRotate={false}
       enableDamping
       dampingFactor={0.14}
       zoomToCursor
       zoomSpeed={1.1}
       minZoom={10}
       maxZoom={140}
+      rotateSpeed={0.7}
+      minPolarAngle={MIN_TILT}
+      maxPolarAngle={MAX_TILT}
       target={TARGET}
       onStart={() => {
         touched.current = true;
+        homing.current = false;
       }}
     />
   );
@@ -615,15 +681,11 @@ function Room() {
         <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
         <meshStandardMaterial color="#2a2450" roughness={0.9} />
       </mesh>
-      {/* Back and left walls; the two nearest the camera are left open. */}
-      <mesh receiveShadow position={[0, ROOM.wallH / 2, -ROOM.d / 2 - 0.12]}>
-        <boxGeometry args={[ROOM.w + 0.5, ROOM.wallH, 0.24]} />
-        <meshStandardMaterial color="#5d5399" roughness={0.95} />
-      </mesh>
-      <mesh receiveShadow position={[-ROOM.w / 2 - 0.12, ROOM.wallH / 2, 0]}>
-        <boxGeometry args={[0.24, ROOM.wallH, ROOM.d]} />
-        <meshStandardMaterial color="#4f4688" roughness={0.95} />
-      </mesh>
+      {/* Four walls; the ones between the camera and the room drop to a low rim. */}
+      <Wall wall="back" x={0} z={-ROOM.d / 2 - 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
+      <Wall wall="front" x={0} z={ROOM.d / 2 + 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
+      <Wall wall="left" x={-ROOM.w / 2 - 0.12} z={0} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
+      <Wall wall="right" x={ROOM.w / 2 + 0.12} z={0} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
       <mesh position={[0, 0.12, -ROOM.d / 2 + 0.02]}>
         <boxGeometry args={[ROOM.w, 0.24, 0.04]} />
         <meshStandardMaterial color={TRIM} roughness={0.85} />
@@ -633,10 +695,12 @@ function Room() {
         <meshStandardMaterial color={TRIM} roughness={0.85} />
       </mesh>
       {/* Overhead cable tray along the back wall. */}
-      <mesh castShadow position={[-3, 2.75, -ROOM.d / 2 + 0.35]}>
-        <boxGeometry args={[17, 0.1, 0.5]} />
-        <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
-      </mesh>
+      <OnWall wall="back">
+        <mesh castShadow position={[-3, 2.75, -ROOM.d / 2 + 0.35]}>
+          <boxGeometry args={[17, 0.1, 0.5]} />
+          <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
+        </mesh>
+      </OnWall>
       {/* Where the internet uplink enters the building. */}
       <mesh position={[-ROOM.w / 2 + 0.1, 0.5, -4.9]}>
         <boxGeometry args={[0.2, 1, 0.7]} />
@@ -891,9 +955,18 @@ export default function Facility() {
         <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" title="Zoom out">
           −
         </button>
-        <button type="button" onClick={() => cameraApi.reset()} aria-label="Fit view" title="Fit view (drag to pan, scroll to zoom)">
+        <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" title="Rotate left (Q)">
+          <Icon name="rotateLeft" size={16} />
+        </button>
+        <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" title="Rotate right (E)">
+          <Icon name="rotateRight" size={16} />
+        </button>
+        <button type="button" onClick={() => cameraApi.reset()} aria-label="Reset view" title="Reset view: fit the room and face the starting angle">
           ⌂
         </button>
+        <span className="camera-hint" aria-hidden="true">
+          <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn
+        </span>
       </div>
     </div>
   );
