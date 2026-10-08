@@ -1,8 +1,9 @@
 "use client";
 
-import { useGLTF } from "@react-three/drei";
+import { useLoader } from "@react-three/fiber";
 import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { V3 } from "./prims";
 
 /*
@@ -159,8 +160,8 @@ function PartInstances({ part, matrices, shadows }: { part: Part; matrices: THRE
 }
 
 function ModelInstances({ id, placements, shadows }: { id: ModelId; placements: Placement[]; shadows: boolean }) {
-  // Neither pack is Draco or meshopt compressed, so no decoder is fetched.
-  const { scene } = useGLTF(MODELS[id], false, false);
+  // Neither pack is compressed, so three's plain loader is enough.
+  const { scene } = useLoader(GLTFLoader, MODELS[id]);
   const prep = useMemo(() => prepare(MODELS[id], scene), [id, scene]);
   const matrices = useMemo(() => placements.map((pl) => matrixFor(pl, prep)), [placements, prep]);
   return (
@@ -192,5 +193,5 @@ export function ModelBatch({ placements, shadows = true }: { placements: Placeme
 
 /** Start fetching every model as soon as the 3D scene's code loads. */
 export function preloadModels(): void {
-  for (const url of Object.values(MODELS)) useGLTF.preload(url, false, false);
+  for (const url of Object.values(MODELS)) useLoader.preload(GLTFLoader, url);
 }
