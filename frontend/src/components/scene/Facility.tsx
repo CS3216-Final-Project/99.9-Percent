@@ -2,7 +2,7 @@
 
 import { Line, MapControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
 import {
@@ -821,31 +821,34 @@ function isSoftwareRenderer(gl: THREE.WebGLRenderer): boolean {
 /** Software rendering cannot keep up with 60 frames a second, so it draws 20. */
 const SOFTWARE_FPS = 20;
 
+/** In on-demand mode, ask for a new frame 20 times a second. */
+function SoftwareFrames() {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    const id = window.setInterval(() => invalidate(), 1000 / SOFTWARE_FPS);
+    return () => window.clearInterval(id);
+  }, [invalidate]);
+  return null;
+}
+
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
-  const throttle = useRef<number | null>(null);
-  useEffect(
-    () => () => {
-      if (throttle.current !== null) window.clearInterval(throttle.current);
-    },
-    [],
-  );
+  /** Drawing in software, without a GPU: no shadows, half the pixels, 20 frames a second. */
+  const [soft, setSoft] = useState(false);
   return (
     <div className="stage-canvas" ref={container}>
       <Canvas
         orthographic
-        shadows="percentage"
-        dpr={[1, 1.75]}
-        onCreated={({ gl, setDpr, setFrameloop, invalidate }) => {
-          // Without a graphics card the browser draws in software, on the CPU. Keep it playable: no shadows,
-          // half the pixels (the labels and interface are HTML and stay sharp) and 20 frames a second.
-          // Machines with a GPU keep full quality.
+        shadows={soft ? false : "percentage"}
+        dpr={soft ? 0.5 : [1, 1.75]}
+        frameloop={soft ? "demand" : "always"}
+        onCreated={({ gl }) => {
+          // Without a graphics card the browser draws on the CPU. Keep it playable: no shadows, half the pixels
+          // (labels and the interface are HTML and stay sharp) and 20 frames a second. A GPU keeps full quality.
           if (isSoftwareRenderer(gl)) {
+            // Before the first frame, so no material is ever compiled with shadows.
             gl.shadowMap.enabled = false;
-            setDpr(0.5);
-            setFrameloop("demand");
-            if (throttle.current !== null) window.clearInterval(throttle.current);
-            throttle.current = window.setInterval(() => invalidate(), 1000 / SOFTWARE_FPS);
+            setSoft(true);
           }
         }}
         camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 200 }}
@@ -855,6 +858,7 @@ export default function Facility() {
         aria-label="Isometric view of the server room. Each equipment label is a button."
       >
         <Scene />
+        {soft && <SoftwareFrames />}
       </Canvas>
       <Labels />
       <HoverTip container={container} />
