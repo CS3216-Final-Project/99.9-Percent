@@ -1,7 +1,6 @@
 "use client";
 
-import { useLoader } from "@react-three/fiber";
-import { Component, Suspense, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -156,30 +155,65 @@ function matrixFor(pl: Placement, prep: Prepared): THREE.Matrix4 {
   return m.multiply(new THREE.Matrix4().makeTranslation(-prep.base.x, -prep.base.y, -prep.base.z));
 }
 
+// Neither pack is compressed, so three's plain loader is enough.
+const loader = new GLTFLoader();
+const loads = new Map<string, Promise<THREE.Object3D>>();
+
+/** Fetch a model once however often it is asked for. A failed fetch is forgotten, so a later mount tries again. */
+function loadModel(url: string): Promise<THREE.Object3D> {
+  let load = loads.get(url);
+  if (!load) {
+    load = loader.loadAsync(url).then((gltf) => gltf.scene);
+    load.catch(() => loads.delete(url));
+    loads.set(url, load);
+  }
+  return load;
+}
+
 interface Batch {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
 }
 
-function MergedModels({ placements, shadows }: { placements: Placement[]; shadows: boolean }) {
-  const ids = useMemo(() => [...new Set(placements.map((p) => p.id))], [placements]);
-  // Neither pack is compressed, so three's plain loader is enough.
-  const gltfs = useLoader(GLTFLoader, ids.map((id) => MODELS[id]));
-  const batches = useMemo(() => {
-    const preps = new Map(ids.map((id, i) => [id, prepare(MODELS[id], gltfs[i].scene)]));
-    const byMaterial = new Map<THREE.Material, THREE.BufferGeometry[]>();
-    for (const pl of placements) {
-      const prep = preps.get(pl.id)!;
-      const m = matrixFor(pl, prep);
-      for (const part of prep.parts) byMaterial.set(part.material, [...(byMaterial.get(part.material) ?? []), part.geometry.clone().applyMatrix4(m)]);
-    }
-    return [...byMaterial].map(([material, list]): Batch => {
-      const geometry = mergeGeometries(list);
-      if (!geometry) throw new Error("Furniture models with one material have different vertex attributes");
-      for (const g of list) g.dispose();
-      return { geometry, material };
-    });
-  }, [ids, gltfs, placements]);
+/** Every placed model baked into one mesh per material. */
+function bake(placements: Placement[], scenes: Map<ModelId, THREE.Object3D>): Batch[] {
+  const byMaterial = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  for (const pl of placements) {
+    const prep = prepare(MODELS[pl.id], scenes.get(pl.id)!);
+    const m = matrixFor(pl, prep);
+    for (const part of prep.parts) byMaterial.set(part.material, [...(byMaterial.get(part.material) ?? []), part.geometry.clone().applyMatrix4(m)]);
+  }
+  return [...byMaterial].map(([material, list]) => {
+    const geometry = mergeGeometries(list);
+    if (!geometry) throw new Error("Furniture models with one material have different vertex attributes");
+    for (const g of list) g.dispose();
+    return { geometry, material };
+  });
+}
+
+/**
+ * Draw placed models. They appear together once all have loaded, and the rest
+ * of the room never waits for them. If they cannot be downloaded, the office is
+ * drawn without them and the game carries on.
+ */
+export function ModelBatch({ placements, shadows = true }: { placements: Placement[]; shadows?: boolean }) {
+  const [scenes, setScenes] = useState<Map<ModelId, THREE.Object3D> | null>(null);
+  useEffect(() => {
+    const ids = [...new Set(placements.map((p) => p.id))];
+    let live = true;
+    Promise.all(ids.map((id) => loadModel(MODELS[id]))).then(
+      (loaded) => {
+        if (live) setScenes(new Map(ids.map((id, i) => [id, loaded[i]])));
+      },
+      (error: unknown) => {
+        if (live) console.warn("Furniture models failed to load; drawing the office without them.", error);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [placements]);
+  const batches = useMemo(() => (scenes ? bake(placements, scenes) : []), [placements, scenes]);
   return (
     <group>
       {batches.map((b, i) => (
@@ -189,35 +223,7 @@ function MergedModels({ placements, shadows }: { placements: Placement[]; shadow
   );
 }
 
-/** If the models cannot be downloaded, the office is drawn without them and the game carries on. */
-class SkipOnError extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  componentDidCatch(error: unknown) {
-    console.warn("Furniture models failed to load; drawing the office without them.", error);
-  }
-
-  render() {
-    return this.state.failed ? null : this.props.children;
-  }
-}
-
-/** Draw placed models. They appear together once all have loaded; the rest of the room never waits for them. */
-export function ModelBatch({ placements, shadows = true }: { placements: Placement[]; shadows?: boolean }) {
-  return (
-    <SkipOnError>
-      <Suspense fallback={null}>
-        <MergedModels placements={placements} shadows={shadows} />
-      </Suspense>
-    </SkipOnError>
-  );
-}
-
 /** Start fetching every model as soon as the 3D scene's code loads. */
 export function preloadModels(): void {
-  for (const url of Object.values(MODELS)) useLoader.preload(GLTFLoader, url);
+  for (const url of Object.values(MODELS)) void loadModel(url);
 }
