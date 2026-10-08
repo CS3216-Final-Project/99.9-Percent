@@ -32,7 +32,8 @@ import {
 } from "./layout";
 import { floorTiles, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { EQUIPMENT_ICON, Icon, STATE_META } from "../icons";
-import { DeskClutter, look, Office, Person, type Activity, type Look } from "./Office";
+import { DeskClutter, Office } from "./Office";
+import { look, Person, type Activity, type Look } from "./people";
 import { OnWall, updateWalls, Wall } from "./walls";
 
 /* ------------------------------------------------------------------ */

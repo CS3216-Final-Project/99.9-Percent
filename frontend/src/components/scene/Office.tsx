@@ -1,11 +1,12 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef, type RefObject } from "react";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { ROOM } from "./layout";
 import { hazardStripes, logoSign, skyline, whiteboard, woodFloor } from "./textures";
 import { OnWall } from "./walls";
+import { look, Walker } from "./people";
 
 /*
  * The people and the furniture that make the facility read as a small company
@@ -33,169 +34,6 @@ function Cyl({ p, r, h, c, seg = 10, cast = false }: { p: Vec3; r: number; h: nu
       <cylinderGeometry args={[r, r, h, seg]} />
       <meshStandardMaterial color={c} roughness={0.85} />
     </mesh>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* People                                                              */
-/* ------------------------------------------------------------------ */
-
-export interface Look {
-  shirt: string;
-  skin: string;
-  hair: string;
-  pants: string;
-  style: 0 | 1 | 2;
-}
-
-const SHIRTS = ["#4cb8ff", "#ff7ad9", "#3ddc84", "#ffc53d", "#a985ff", "#ff9f43", "#2dd4bf", "#ff6b6b", "#e8e2ff"];
-const SKINS = ["#f3cba5", "#d9a07a", "#a86b4a", "#6e4630", "#e8b48f", "#c68863"];
-const HAIRS = ["#1d1834", "#4a2c1d", "#7a4a2a", "#d9a441", "#1d1834", "#8a3b2a", "#2b2b3a"];
-const PANTS = ["#2a2450", "#34305c", "#1f3b5c", "#3b2f2a"];
-
-/** A stable, varied look for the nth person in the office. */
-export function look(n: number): Look {
-  return {
-    shirt: SHIRTS[(n * 5 + 1) % SHIRTS.length],
-    skin: SKINS[(n * 7 + 2) % SKINS.length],
-    hair: HAIRS[(n * 3 + 1) % HAIRS.length],
-    pants: PANTS[n % PANTS.length],
-    style: (n % 3) as Look["style"],
-  };
-}
-
-export type Activity = "type" | "relax" | "mug" | "laptop" | "idle" | "chat" | "walk";
-
-const ARM = 0.42;
-
-/** Resting angles for the torso lean and each arm (radians about X; negative points the arm forward and down). */
-function restPose(pose: "sit" | "stand", activity: Activity): { lean: number; left: number; right: number } {
-  if (pose === "sit") {
-    if (activity === "type") return { lean: 0, left: -0.62, right: -0.62 };
-    if (activity === "laptop") return { lean: 0.08, left: -0.95, right: -0.95 };
-    if (activity === "mug") return { lean: 0.16, left: -1.15, right: -0.2 };
-    return { lean: 0.18, left: -1.15, right: -1.15 };
-  }
-  if (activity === "type") return { lean: -0.06, left: -0.72, right: -0.72 };
-  if (activity === "mug") return { lean: 0, left: -1.5, right: -0.3 };
-  if (activity === "chat") return { lean: 0, left: -1.5, right: -1.1 };
-  if (activity === "walk") return { lean: -0.04, left: -1.45, right: -1.45 };
-  return { lean: 0, left: -1.5, right: -1.5 };
-}
-
-export function Person({
-  pose,
-  activity,
-  look: l,
-  position,
-  rotation = 0,
-  phase = 0,
-}: {
-  pose: "sit" | "stand";
-  activity: Activity;
-  look: Look;
-  position: Vec3;
-  rotation?: number;
-  phase?: number;
-}) {
-  const root = useRef<THREE.Group>(null);
-  const upper = useRef<THREE.Group>(null);
-  const head = useRef<THREE.Group>(null);
-  const left = useRef<THREE.Group>(null);
-  const right = useRef<THREE.Group>(null);
-  const legL = useRef<THREE.Group>(null);
-  const legR = useRef<THREE.Group>(null);
-  const rest = restPose(pose, activity);
-  const sit = pose === "sit";
-  const hipY = sit ? 0.56 : 0.78;
-  const torsoZ = sit ? 0.06 : 0;
-  const torsoH = 0.52;
-
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime + phase;
-    if (!left.current || !right.current || !head.current || !upper.current || !root.current) return;
-    if (activity === "walk") {
-      const s = Math.sin(t * 7);
-      if (legL.current) legL.current.rotation.x = s * 0.45;
-      if (legR.current) legR.current.rotation.x = -s * 0.45;
-      left.current.rotation.x = rest.left - s * 0.35;
-      right.current.rotation.x = rest.right + s * 0.35;
-      upper.current.position.y = hipY + Math.abs(Math.cos(t * 7)) * 0.025;
-    } else if (activity === "type" || activity === "laptop") {
-      const k = activity === "type" ? 0.07 : 0.04;
-      left.current.rotation.x = rest.left + Math.sin(t * 15) * k;
-      right.current.rotation.x = rest.right + Math.sin(t * 15 + Math.PI) * k;
-      head.current.rotation.x = Math.sin(t * 1.1) * 0.05;
-      head.current.rotation.y = Math.sin(t * 0.37) * 0.12;
-    } else if (activity === "mug") {
-      // Look around, and every few seconds take a sip.
-      head.current.rotation.y = Math.sin(t * 0.45) * 0.45;
-      const sip = Math.max(0, Math.sin(t * 0.6) - 0.85) * 6;
-      right.current.rotation.x = rest.right + sip * 0.5;
-      head.current.rotation.x = -sip * 0.15;
-    } else if (activity === "chat") {
-      head.current.rotation.y = Math.sin(t * 0.8) * 0.3;
-      right.current.rotation.x = rest.right + Math.sin(t * 2.4) * 0.25;
-      right.current.rotation.z = -0.2 + Math.sin(t * 1.7) * 0.1;
-      root.current.position.y = position[1] + Math.abs(Math.sin(t * 2.4)) * 0.01;
-    } else {
-      head.current.rotation.y = Math.sin(t * 0.35) * 0.5;
-      upper.current.rotation.x = rest.lean + Math.sin(t * 0.5) * 0.02;
-    }
-  });
-
-  const arm = (side: 1 | -1, ref: RefObject<THREE.Group | null>, angle: number, mug: boolean) => (
-    <group ref={ref} position={[side * 0.27, torsoH - 0.07, 0]} rotation={[angle, 0, 0]}>
-      <B p={[0, 0, -ARM / 2]} s={[0.11, 0.11, ARM]} c={l.shirt} />
-      <B p={[0, 0, -ARM - 0.03]} s={[0.1, 0.09, 0.1]} c={l.skin} />
-      {mug && <Cyl p={[0, 0.05, -ARM - 0.05]} r={0.05} h={0.11} c="#fff7e8" />}
-    </group>
-  );
-
-  return (
-    <group ref={root} position={position} rotation={[0, rotation, 0]}>
-      {sit ? (
-        <>
-          <B p={[0, 0.56, -0.13]} s={[0.38, 0.14, 0.44]} c={l.pants} />
-          {[-1, 1].map((side) => (
-            <group key={side}>
-              <B p={[side * 0.1, 0.27, -0.33]} s={[0.13, 0.5, 0.13]} c={l.pants} />
-              <B p={[side * 0.1, 0.04, -0.37]} s={[0.14, 0.08, 0.22]} c="#1d1834" />
-            </group>
-          ))}
-        </>
-      ) : (
-        [-1, 1].map((side) => (
-          <group key={side} ref={side < 0 ? legL : legR} position={[side * 0.1, 0.78, 0]}>
-            <B p={[0, -0.37, 0]} s={[0.15, 0.74, 0.17]} c={l.pants} cast />
-            <B p={[0, -0.74, -0.03]} s={[0.15, 0.08, 0.24]} c="#1d1834" />
-          </group>
-        ))
-      )}
-      <group ref={upper} position={[0, hipY, torsoZ]} rotation={[rest.lean, 0, 0]}>
-        <B p={[0, torsoH / 2, 0]} s={[0.42, torsoH, 0.24]} c={l.shirt} cast />
-        <B p={[0, torsoH - 0.02, -0.005]} s={[0.24, 0.05, 0.25]} c={l.skin} />
-        <group ref={head} position={[0, torsoH + 0.18, 0]}>
-          <B p={[0, 0, 0]} s={[0.3, 0.3, 0.28]} c={l.skin} cast />
-          <B p={[0, 0.17, 0.01]} s={[0.33, 0.1, 0.31]} c={l.hair} />
-          <B p={[0, l.style === 1 ? -0.05 : 0.03, 0.13]} s={[0.33, l.style === 1 ? 0.4 : 0.26, 0.08]} c={l.hair} />
-          {l.style === 2 && <B p={[0, 0.26, 0.06]} s={[0.14, 0.1, 0.14]} c={l.hair} />}
-          {[-1, 1].map((side) => (
-            <B key={side} p={[side * 0.07, 0.01, -0.145]} s={[0.045, 0.06, 0.02]} c="#1d1834" />
-          ))}
-        </group>
-        {arm(-1, left, rest.left, false)}
-        {arm(1, right, rest.right, activity === "mug")}
-      </group>
-      {activity === "laptop" && (
-        <group position={[0, 0.64, -0.24]}>
-          <B p={[0, 0, 0]} s={[0.36, 0.025, 0.25]} c="#d9d4f0" />
-          <group position={[0, 0.01, 0.12]} rotation={[0.35, 0, 0]}>
-            <B p={[0, 0.12, 0]} s={[0.36, 0.24, 0.02]} c="#d9d4f0" />
-          </group>
-        </group>
-      )}
-    </group>
   );
 }
 
@@ -454,28 +292,6 @@ function Floors() {
   );
 }
 
-/** Someone pacing back and forth between two points. */
-function Walker({ from, to, speed, look: l, phase = 0 }: { from: [number, number]; to: [number, number]; speed: number; look: Look; phase?: number }) {
-  const g = useRef<THREE.Group>(null);
-  const dx = to[0] - from[0];
-  const dz = to[1] - from[1];
-  const len = Math.hypot(dx, dz);
-  useFrame(({ clock }) => {
-    if (!g.current) return;
-    const d = (clock.elapsedTime * speed + phase) % (2 * len);
-    const back = d > len;
-    const f = back ? 2 - d / len : d / len;
-    g.current.position.set(from[0] + dx * f, 0, from[1] + dz * f);
-    const dir = back ? -1 : 1;
-    g.current.rotation.y = Math.atan2(-dx * dir, -dz * dir);
-  });
-  return (
-    <group ref={g}>
-      <Person pose="stand" activity="walk" look={l} position={[0, 0, 0]} phase={phase} />
-    </group>
-  );
-}
-
 /** A cart of tools wheeled up to the racks, and hardware waiting to be installed. */
 function ServerFloorProps() {
   return (
@@ -606,7 +422,7 @@ export function Office({ incident }: { incident: boolean }) {
 
 /** Small things on a desk that make it someone's desk. */
 export function DeskClutter({ index, w }: { index: number; w: number }) {
-  const mug = SHIRTS[(index * 4 + 2) % SHIRTS.length];
+  const mug = ["#4cb8ff", "#ff7ad9", "#3ddc84", "#ffc53d", "#a985ff", "#ff9f43"][(index * 4 + 2) % 6];
   return (
     <group>
       <B p={[0, 0.775, 0.16]} s={[0.46, 0.02, 0.15]} c="#1d1834" />
