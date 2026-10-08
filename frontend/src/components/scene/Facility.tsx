@@ -18,10 +18,10 @@ import {
 } from "@/sim";
 import { inspectOrSelect, useGame } from "@/game/store";
 import {
+  AISLE_Z,
   appSlot,
   DB_CABINET,
   dbSlot,
-  deskSlot,
   footprint,
   MAX_TEMP_SHOWN,
   POS,
@@ -30,10 +30,9 @@ import {
   tempSlot,
   type Footprint,
 } from "./layout";
-import { floorTiles, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
+import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { EQUIPMENT_ICON, Icon, STATE_META } from "../icons";
-import { DeskClutter, Office } from "./Office";
-import { look, Person, type Activity, type Look } from "./people";
+import { Office } from "./Office";
 import { OnWall, updateWalls, Wall } from "./walls";
 
 /* ------------------------------------------------------------------ */
@@ -279,8 +278,8 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     }
     // Keep the view over the building while panning.
     const t = c.target;
-    const cx = THREE.MathUtils.clamp(t.x, -ROOM.w / 2, ROOM.w / 2);
-    const cz = THREE.MathUtils.clamp(t.z, -ROOM.d / 2, ROOM.d / 2);
+    const cx = THREE.MathUtils.clamp(t.x, ROOM.x0, ROOM.x1);
+    const cz = THREE.MathUtils.clamp(t.z, ROOM.z0, ROOM.z1);
     if (cx !== t.x || cz !== t.z) {
       camera.position.x += cx - t.x;
       camera.position.z += cz - t.z;
@@ -384,62 +383,6 @@ function Screen({ kind, w, h, position, rotation }: { kind: ScreenKind; w: numbe
       <mesh position={[0, 0, 0.026]}>
         <planeGeometry args={[w, h]} />
         <meshBasicMaterial map={map} toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
-
-interface Occupant {
-  activity: Activity;
-  look: Look;
-}
-
-function Desk({ x, z, screen, wide = false, index = 0, occupant }: { x: number; z: number; screen: ScreenKind; wide?: boolean; index?: number; occupant?: Occupant | null }) {
-  const w = wide ? 2.2 : 1.55;
-  return (
-    <group position={[x, 0, z]}>
-      <DeskClutter index={index} w={w} />
-      {occupant && <Person pose="sit" activity={occupant.activity} look={occupant.look} position={[0, 0, 0.72]} phase={index * 1.7} />}
-      <mesh castShadow receiveShadow position={[0, 0.74, 0]}>
-        <boxGeometry args={[w, 0.05, 0.8]} />
-        <meshStandardMaterial color="#c98b55" roughness={0.85} />
-      </mesh>
-      {[-1, 1].map((side) => (
-        <mesh key={side} castShadow position={[(side * (w - 0.1)) / 2, 0.37, 0]}>
-          <boxGeometry args={[0.05, 0.74, 0.72]} />
-          <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
-        </mesh>
-      ))}
-      <mesh position={[wide ? -0.45 : 0, 0.87, -0.22]}>
-        <boxGeometry args={[0.07, 0.22, 0.07]} />
-        <meshStandardMaterial color={BEZEL} />
-      </mesh>
-      <Screen kind={screen} w={0.6} h={0.36} position={[wide ? -0.45 : 0, 1.13, -0.2]} />
-      {wide && (
-        <>
-          <mesh position={[0.45, 0.87, -0.22]}>
-            <boxGeometry args={[0.07, 0.22, 0.07]} />
-            <meshStandardMaterial color={BEZEL} />
-          </mesh>
-          <Screen kind={screen} w={0.6} h={0.36} position={[0.45, 1.13, -0.2]} />
-        </>
-      )}
-      {/* Chair */}
-      <mesh castShadow position={[0, 0.46, 0.72]}>
-        <boxGeometry args={[0.46, 0.08, 0.46]} />
-        <meshStandardMaterial color="#ff9f43" roughness={0.85} />
-      </mesh>
-      <mesh castShadow position={[0, 0.78, 0.93]}>
-        <boxGeometry args={[0.44, 0.56, 0.06]} />
-        <meshStandardMaterial color="#ff9f43" roughness={0.85} />
-      </mesh>
-      <mesh position={[0, 0.22, 0.72]}>
-        <cylinderGeometry args={[0.04, 0.04, 0.44, 8]} />
-        <meshStandardMaterial color={BEZEL} roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 0.03, 0.72]}>
-        <cylinderGeometry args={[0.26, 0.26, 0.04, 12]} />
-        <meshStandardMaterial color={BEZEL} roughness={0.8} />
       </mesh>
     </group>
   );
@@ -594,7 +537,7 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
       const f = footprints[id];
       anchors.set(id, new THREE.Vector3(f.x, f.h + 0.3, f.z));
     }
-    anchors.set(INTERNET, new THREE.Vector3(-ROOM.w / 2 + 0.2, 1.35, -4.9));
+    anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, 1.35, AISLE_Z));
   }, [footprints]);
 
   useFrame(({ camera, size }) => {
@@ -668,42 +611,42 @@ function Labels() {
 
 function Room() {
   const tiles = useMemo(() => {
-    const t = floorTiles();
-    t.repeat.set(ROOM.w / 0.9, ROOM.d / 0.9);
+    const t = concreteFloor();
+    t.repeat.set(ROOM.w / 1.6, ROOM.d / 1.6);
     return t;
   }, []);
   return (
     <group>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]}>
         <planeGeometry args={[ROOM.w, ROOM.d]} />
         <meshStandardMaterial map={tiles} roughness={0.9} metalness={0} />
       </mesh>
-      <mesh position={[0, -0.26, 0]}>
+      <mesh position={[ROOM.cx, -0.26, ROOM.cz]}>
         <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
         <meshStandardMaterial color="#2a2450" roughness={0.9} />
       </mesh>
       {/* Four walls; the ones between the camera and the room drop to a low rim. */}
-      <Wall wall="back" x={0} z={-ROOM.d / 2 - 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
-      <Wall wall="front" x={0} z={ROOM.d / 2 + 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
-      <Wall wall="left" x={-ROOM.w / 2 - 0.12} z={0} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
-      <Wall wall="right" x={ROOM.w / 2 + 0.12} z={0} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
-      <mesh position={[0, 0.12, -ROOM.d / 2 + 0.02]}>
+      <Wall wall="back" x={ROOM.cx} z={ROOM.z0 - 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
+      <Wall wall="front" x={ROOM.cx} z={ROOM.z1 + 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
+      <Wall wall="left" x={ROOM.x0 - 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
+      <Wall wall="right" x={ROOM.x1 + 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
+      <mesh position={[ROOM.cx, 0.12, ROOM.z0 + 0.02]}>
         <boxGeometry args={[ROOM.w, 0.24, 0.04]} />
         <meshStandardMaterial color={TRIM} roughness={0.85} />
       </mesh>
-      <mesh position={[-ROOM.w / 2 + 0.02, 0.12, 0]}>
+      <mesh position={[ROOM.x0 + 0.02, 0.12, ROOM.cz]}>
         <boxGeometry args={[0.04, 0.24, ROOM.d]} />
         <meshStandardMaterial color={TRIM} roughness={0.85} />
       </mesh>
       {/* Overhead cable tray along the back wall. */}
       <OnWall wall="back">
-        <mesh castShadow position={[-3, 2.75, -ROOM.d / 2 + 0.35]}>
+        <mesh castShadow position={[-3, 2.75, ROOM.z0 + 0.35]}>
           <boxGeometry args={[17, 0.1, 0.5]} />
           <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
         </mesh>
       </OnWall>
       {/* Where the internet uplink enters the building. */}
-      <mesh position={[-ROOM.w / 2 + 0.1, 0.5, -4.9]}>
+      <mesh position={[ROOM.x0 + 0.1, 0.5, AISLE_Z]}>
         <boxGeometry args={[0.2, 1, 0.7]} />
         <meshStandardMaterial color={BEZEL} metalness={0.05} roughness={0.85} />
       </mesh>
@@ -715,21 +658,6 @@ function Room() {
 /* Scene                                                               */
 /* ------------------------------------------------------------------ */
 
-type Seat = "type" | "relax" | "mug" | "kitchen" | "lounge";
-
-/**
- * Where engineer i is. Assigned engineers code at their desks. The first free
- * engineer is at the coffee machine and the second on the sofa, so idle staff
- * show up in the room. During an incident everyone is back at a keyboard.
- */
-function seatFor(i: number, m: SceneModel): Seat {
-  if (m.incident || i < m.busy) return "type";
-  const free = i - m.busy;
-  if (free === 0) return "kitchen";
-  if (free === 1) return "lounge";
-  return free % 2 ? "mug" : "relax";
-}
-
 function Scene() {
   const m = useSceneModel();
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
@@ -737,7 +665,7 @@ function Scene() {
   const appCount = Math.min(m.hosts.length, 12);
   const appMaxX = appSlot(Math.min(appCount, 6) - 1).x;
   const dbLastX = dbSlot(m.dbCabinets - 1).x;
-  const aisleZ = -4.9;
+  const aisleZ = AISLE_Z;
   const dataZ = 4.65;
   const trunkX = -8.3;
   const flow = m.flow;
@@ -756,10 +684,10 @@ function Scene() {
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0005}
-        shadow-camera-left={-22}
-        shadow-camera-right={22}
-        shadow-camera-top={22}
-        shadow-camera-bottom={-22}
+        shadow-camera-left={-30}
+        shadow-camera-right={30}
+        shadow-camera-top={30}
+        shadow-camera-bottom={-30}
         shadow-camera-near={1}
         shadow-camera-far={60}
       />
@@ -767,7 +695,7 @@ function Scene() {
       <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
       <Room />
-      <Office incident={m.incident} />
+      <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
 
       {/* Network edge */}
       <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
@@ -801,61 +729,12 @@ function Scene() {
             kind={m.incident ? "alert" : i === 2 && m.monitoring === 2 ? "chart" : "dash"}
             w={1.45}
             h={0.9}
-            position={[POS.monitoring.x + dx, 2.05, -ROOM.d / 2 + 0.05]}
+            position={[POS.monitoring.x + dx, 2.05, ROOM.z0 + 0.05]}
           />
         ))}
 
-      {/* Engineering desks: assigned engineers type; free ones relax, grab a coffee or take the sofa. */}
-      {Array.from({ length: m.engineers }, (_, i) => {
-        const p = deskSlot(i);
-        const seat = seatFor(i, m);
-        return (
-          <Desk
-            key={`e${i}`}
-            index={i}
-            x={p.x}
-            z={p.z}
-            screen={seat === "type" ? "code" : "idle"}
-            occupant={seat === "kitchen" || seat === "lounge" ? null : { activity: seat, look: look(i) }}
-          />
-        );
-      })}
-      {Array.from({ length: m.engineers }, (_, i) => {
-        const seat = seatFor(i, m);
-        if (seat === "kitchen") return <Person key={`k${i}`} pose="stand" activity="mug" look={look(i)} position={[12.1, 0, -8.15]} rotation={-2.4} phase={i} />;
-        if (seat === "lounge") return <Person key={`l${i}`} pose="sit" activity="laptop" look={look(i)} position={[10.95, -0.05, -3.3]} rotation={Math.PI} phase={i} />;
-        return null;
-      })}
-
-      {/* Build and deploy console, with whoever is on release duty */}
-      <Person pose="stand" activity={m.releases > 0 || m.incident ? "type" : "chat"} look={look(11)} position={[POS.deploy.x, 0, POS.deploy.z + 0.78]} phase={3} />
-      <group position={[POS.deploy.x, 0, POS.deploy.z]}>
-        <mesh castShadow receiveShadow position={[0, 0.5, 0]}>
-          <boxGeometry args={[1.5, 1, 0.8]} />
-          <meshStandardMaterial color={STEEL} metalness={0.1} roughness={0.8} />
-        </mesh>
-        <Screen kind={m.releases > 0 ? "deploy-busy" : "deploy"} w={1.1} h={0.62} position={[0, 1.28, -0.12]} rotation={[-0.35, 0, 0]} />
-      </group>
-
-      {/* Growth desk with a results board */}
-      <Desk
-        x={POS.growth.x - 0.4}
-        z={POS.growth.z + 0.2}
-        screen={m.promos > 0 ? "chart" : "idle"}
-        wide
-        index={9}
-        occupant={{ activity: m.promos > 0 ? "type" : "mug", look: look(14) }}
-      />
-      <group position={[POS.growth.x + 1.15, 0, POS.growth.z - 0.55]}>
-        <mesh castShadow position={[0, 0.55, 0]}>
-          <boxGeometry args={[0.08, 1.1, 0.08]} />
-          <meshStandardMaterial color={BEZEL} metalness={0.05} roughness={0.8} />
-        </mesh>
-        <Screen kind="chart" w={1.2} h={0.75} position={[0, 1.5, 0]} />
-      </group>
-
       {/* Cabling: internet -> edge -> app servers -> (cache) -> database -> replica / backups */}
-      <Cable points={[[-ROOM.w / 2 + 0.2, aisleZ], [POS.gateway.x, aisleZ]]} speed={flow} alert={edgeAlert} />
+      <Cable points={[[ROOM.x0 + 0.2, aisleZ], [POS.gateway.x, aisleZ]]} speed={flow} alert={edgeAlert} />
       <Cable points={[[POS.gateway.x, aisleZ], [Math.max(appMaxX, -6.6) + 0.4, aisleZ]]} speed={flow} alert={edgeAlert} />
       <Cable
         points={[

@@ -1,7 +1,16 @@
 import { BALANCE, type EquipmentId, type GameState } from "@/sim";
 
-/** Floor plan of the facility, in metres. X runs left to right, Z runs back to front. */
-export const ROOM = { w: 27, d: 19, wallH: 3.4 };
+/**
+ * Floor plan of the building, in metres. X runs left to right, Z runs back to
+ * front. The equipment keeps to the middle so the default view frames it; the
+ * wings around it hold the network room, townhall, kitchen, lounge, meeting
+ * room and reception.
+ */
+const X0 = -22;
+const X1 = 22;
+const Z0 = -9.5;
+const Z1 = 14.5;
+export const ROOM = { x0: X0, x1: X1, z0: Z0, z1: Z1, w: X1 - X0, d: Z1 - Z0, cx: (X0 + X1) / 2, cz: (Z0 + Z1) / 2, wallH: 3.4 };
 
 export const RACK = { w: 0.95, d: 1.05, h: 2.1 };
 export const DB_CABINET = { w: 1.25, d: 1.2, h: 2.25 };
@@ -37,8 +46,19 @@ export function dbSlot(index: number): { x: number; z: number } {
   return { x: -3.4 + index * 1.42, z: 3.1 };
 }
 
-export function deskSlot(index: number): { x: number; z: number } {
-  return { x: -10.6 + (index % 4) * 2.15, z: 6.1 + Math.floor(index / 4) * 2.1 };
+/** Where the cold aisle cable runs, between the two rows of app servers. */
+export const AISLE_Z = -4.9;
+
+/**
+ * Engineers sit in pods of four: two desks facing two, monitors back to back.
+ * `rot` turns the desk; at 0 the engineer sits on the +z side facing -z.
+ */
+export function deskSlot(index: number): { x: number; z: number; rot: number } {
+  const pod = Math.floor(index / 4);
+  const k = index % 4;
+  const x = -9.6 + pod * 4.6 + (k % 2 === 0 ? -0.8 : 0.8);
+  const back = k >= 2;
+  return { x, z: 7.4 + (back ? -0.42 : 0.42), rot: back ? Math.PI : 0 };
 }
 
 export const POS = {

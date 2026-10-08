@@ -152,7 +152,7 @@ export function panelTextures(variant: PanelVariant, led: Led): PanelTextures {
   return out;
 }
 
-export type ScreenKind = "code" | "idle" | "dash" | "alert" | "chart" | "deploy" | "deploy-busy" | "off";
+export type ScreenKind = "code" | "idle" | "dash" | "alert" | "chart" | "deploy" | "deploy-busy" | "off" | "game" | "slides";
 
 export function screenTexture(kind: ScreenKind): THREE.CanvasTexture {
   const hit = screenCache.get(kind);
@@ -170,6 +170,8 @@ export function screenTexture(kind: ScreenKind): THREE.CanvasTexture {
     deploy: "#10261e",
     "deploy-busy": "#2e1d0a",
     off: "#0a0918",
+    game: "#0d0b22",
+    slides: "#f4f1ea",
   };
   g.fillStyle = bg[kind];
   g.fillRect(0, 0, W, H);
@@ -232,6 +234,36 @@ export function screenTexture(kind: ScreenKind): THREE.CanvasTexture {
       g.fillStyle = i < 3 || kind === "deploy" ? c1 : "#4a3a2a";
       g.fillRect(14, 14 + i * 27, (W - 28) * (kind === "deploy" ? 1 : [1, 1, 0.6, 0.2, 0.1][i]), 18);
     }
+  } else if (kind === "game") {
+    // A row of pixel invaders over a ground line and a little ship.
+    const alien = ["0011100", "0111110", "1101011", "1111111", "0101010"];
+    const colors = ["#ff7ad9", "#3ddc84", "#4cb8ff"];
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 6; col++) {
+        g.fillStyle = colors[row];
+        alien.forEach((line, y) =>
+          [...line].forEach((bit, x) => {
+            if (bit === "1") g.fillRect(28 + col * 36 + x * 3, 18 + row * 28 + y * 3, 3, 3);
+          }),
+        );
+      }
+    }
+    g.fillStyle = "#ffd84a";
+    g.fillRect(118, 132, 20, 8);
+    g.fillRect(125, 126, 6, 6);
+    g.fillStyle = "#3ddc84";
+    g.fillRect(0, 150, W, 3);
+  } else if (kind === "slides") {
+    g.fillStyle = "#1d1834";
+    g.fillRect(16, 16, 150, 12);
+    g.fillStyle = "#4cb8ff";
+    g.fillRect(16, 50, 70, 80);
+    g.fillStyle = "#ff7ad9";
+    g.fillRect(96, 80, 40, 50);
+    g.fillStyle = "#3ddc84";
+    g.fillRect(146, 64, 40, 66);
+    g.fillStyle = "#ffc53d";
+    g.fillRect(196, 36, 40, 94);
   }
 
   const t = finish(c);
@@ -435,4 +467,48 @@ export function whiteboard(): THREE.CanvasTexture {
     t.needsUpdate = true;
   });
   return t;
+}
+
+/** Polished concrete for corridors and the network room. */
+export function concreteFloor(): THREE.CanvasTexture {
+  const S = 32;
+  const [c, g] = canvas(S, S);
+  g.fillStyle = "#4a4475";
+  g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 40; i++) {
+    g.fillStyle = noise(i) > 0.5 ? "#504a7d" : "#443e6c";
+    g.fillRect(Math.floor(noise(i + 300) * S), Math.floor(noise(i + 600) * S), 2, 1);
+  }
+  g.fillStyle = "#3d3764";
+  g.fillRect(0, S - 1, S, 1);
+  g.fillRect(S - 1, 0, 1, S);
+  return repeating(finish(c));
+}
+
+/** Short-pile carpet in one colour with a darker fleck. */
+export function carpet(base: string, fleck: string): THREE.CanvasTexture {
+  const S = 16;
+  const [c, g] = canvas(S, S);
+  g.fillStyle = base;
+  g.fillRect(0, 0, S, S);
+  g.fillStyle = fleck;
+  for (let i = 0; i < 26; i++) g.fillRect(Math.floor(noise(i + 40) * S), Math.floor(noise(i + 80) * S), 1, 1);
+  return repeating(finish(c));
+}
+
+/** Kitchen floor: big pale tiles with dark grout. */
+export function kitchenTiles(): THREE.CanvasTexture {
+  const S = 16;
+  const [c, g] = canvas(S, S);
+  g.fillStyle = "#d9d4f0";
+  g.fillRect(0, 0, S, S);
+  g.fillStyle = "#c9c2e6";
+  g.fillRect(0, 0, S / 2, S / 2);
+  g.fillRect(S / 2, S / 2, S / 2, S / 2);
+  g.fillStyle = "#8f87c9";
+  g.fillRect(0, 0, S, 1);
+  g.fillRect(0, 0, 1, S);
+  g.fillRect(0, S / 2, S, 1);
+  g.fillRect(S / 2, 0, 1, S);
+  return repeating(finish(c));
 }
