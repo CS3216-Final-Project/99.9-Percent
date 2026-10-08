@@ -742,7 +742,7 @@ function People({ crew }: { crew: Crew }) {
       ))}
 
       {/* People walking the corridors */}
-      <Walker from={[12.6, -3.6]} to={[12.6, 12.8]} speed={0.6} look={look(21)} />
+      <Walker from={[13.2, -3.6]} to={[13.2, 12.8]} speed={0.6} look={look(21)} />
       <Walker from={[-4.4, 9.7]} to={[12.4, 9.7]} speed={0.55} look={look(16)} phase={4} />
       <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} look={look(23)} phase={2} />
     </group>
