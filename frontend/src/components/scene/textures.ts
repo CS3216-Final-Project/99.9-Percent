@@ -323,18 +323,6 @@ export function woodFloor(): THREE.CanvasTexture {
   return repeating(finish(c));
 }
 
-/** Yellow and black tape marking where the server floor begins. */
-export function hazardStripes(): THREE.CanvasTexture {
-  const [c, g] = canvas(16, 4);
-  for (let x = 0; x < 16; x++) {
-    for (let y = 0; y < 4; y++) {
-      g.fillStyle = (x + y) % 8 < 4 ? "#ffc53d" : "#1d1834";
-      g.fillRect(x, y, 1, 1);
-    }
-  }
-  return repeating(finish(c));
-}
-
 /** The city at night, seen through the office windows. */
 export function skyline(): THREE.CanvasTexture {
   const W = 96;
