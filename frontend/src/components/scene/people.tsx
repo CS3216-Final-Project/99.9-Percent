@@ -293,8 +293,8 @@ function bodyFor(l: Look): Body {
   return b;
 }
 
-/** One material for every person: colours come from the geometry. */
-const BODY_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0 });
+/** One matte material for every person: colours come from the geometry. */
+const BODY_MATERIAL = new THREE.MeshLambertMaterial({ vertexColors: true });
 
 /* ------------------------------------------------------------------ */
 /* Poses                                                               */

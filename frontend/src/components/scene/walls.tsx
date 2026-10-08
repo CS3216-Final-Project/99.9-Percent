@@ -46,7 +46,7 @@ export function Wall({ wall, x, z, size, color }: { wall: WallId; x: number; z: 
   return (
     <mesh ref={mesh} receiveShadow position={[x, (h * start) / 2, z]} scale={[1, start, 1]}>
       <boxGeometry args={size} />
-      <meshStandardMaterial color={color} roughness={0.95} />
+      <meshLambertMaterial color={color} />
     </mesh>
   );
 }

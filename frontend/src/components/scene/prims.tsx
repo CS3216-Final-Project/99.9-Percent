@@ -52,11 +52,12 @@ const GEOMETRY: Record<Shape, THREE.BufferGeometry> = {
   cone: new THREE.ConeGeometry(0.5, 1, 6),
 };
 
+// Matte Lambert shading: it suits the flat toy look and costs far less per pixel than physically based shading.
 const MATERIAL: Record<Shape, THREE.Material> = {
-  box: new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }),
-  cyl: new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0 }),
-  ball: new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0 }),
-  cone: new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0, flatShading: true }),
+  box: new THREE.MeshLambertMaterial(),
+  cyl: new THREE.MeshLambertMaterial(),
+  ball: new THREE.MeshLambertMaterial(),
+  cone: new THREE.MeshLambertMaterial({ flatShading: true }),
 };
 
 function Instances({ shape, items, shadows }: { shape: Shape; items: Prim[]; shadows: boolean }) {

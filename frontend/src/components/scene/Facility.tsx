@@ -619,7 +619,7 @@ function Room() {
     <group>
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]}>
         <planeGeometry args={[ROOM.w, ROOM.d]} />
-        <meshStandardMaterial map={tiles} roughness={0.9} metalness={0} />
+        <meshLambertMaterial map={tiles} />
       </mesh>
       <mesh position={[ROOM.cx, -0.26, ROOM.cz]}>
         <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
@@ -810,6 +810,14 @@ function HoverTip({ container }: { container: React.RefObject<HTMLDivElement | n
   );
 }
 
+/** True when WebGL is drawn on the CPU (SwiftShader, llvmpipe and similar), as on machines without a GPU. */
+function isSoftwareRenderer(gl: THREE.WebGLRenderer): boolean {
+  const ctx = gl.getContext();
+  const info = ctx.getExtension("WEBGL_debug_renderer_info");
+  const name = String(info ? ctx.getParameter(info.UNMASKED_RENDERER_WEBGL) : ctx.getParameter(ctx.RENDERER));
+  return /swiftshader|llvmpipe|software|softpipe|basic render/i.test(name);
+}
+
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
   return (
@@ -818,6 +826,14 @@ export default function Facility() {
         orthographic
         shadows="percentage"
         dpr={[1, 1.75]}
+        onCreated={({ gl, setDpr }) => {
+          // Without a graphics card the browser draws in software, one pixel at a time. Keep it playable:
+          // no shadows and fewer pixels. Machines with a GPU keep full quality.
+          if (isSoftwareRenderer(gl)) {
+            gl.shadowMap.enabled = false;
+            setDpr(0.75);
+          }
+        }}
         camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 200 }}
         onPointerMissed={() => {
           if (useGame.getState().game.phase !== "incident") useGame.getState().select(null);

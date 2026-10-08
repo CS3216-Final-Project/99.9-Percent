@@ -585,7 +585,7 @@ function Floors() {
       {ZONES.map(([, x, z, w, d], i) => (
         <mesh key={i} position={[x, 0.004, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <planeGeometry args={[w, d]} />
-          <meshStandardMaterial map={textures[i]} roughness={0.9} />
+          <meshLambertMaterial map={textures[i]} />
         </mesh>
       ))}
     </group>
@@ -613,11 +613,11 @@ function PingPongBall() {
 /** Red beacon above the monitoring wall that spins up during an incident. */
 function Beacon({ on }: { on: boolean }) {
   const lamp = useRef<THREE.MeshStandardMaterial>(null);
-  const light = useRef<THREE.PointLight>(null);
+  const halo = useRef<THREE.MeshBasicMaterial>(null);
   useFrame(({ clock }) => {
     const pulse = on ? 0.5 + 0.5 * Math.sin(clock.elapsedTime * 8) : 0;
     if (lamp.current) lamp.current.emissiveIntensity = on ? 0.6 + pulse * 2.4 : 0.15;
-    if (light.current) light.current.intensity = pulse * 30;
+    if (halo.current) halo.current.opacity = pulse * 0.45;
   });
   return (
     <group position={[5.9, 2.9, ROOM.z0 + 0.2]}>
@@ -629,7 +629,11 @@ function Beacon({ on }: { on: boolean }) {
         <sphereGeometry args={[0.16, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial ref={lamp} color="#ff4d5e" emissive="#ff4d5e" emissiveIntensity={0.15} toneMapped={false} />
       </mesh>
-      <pointLight ref={light} position={[0, 0, 0.6]} intensity={0} distance={10} color="#ff4d5e" />
+      {/* A soft red glow on the wall behind it, standing in for a light. */}
+      <mesh position={[0, 0, 0.02]}>
+        <circleGeometry args={[1.4, 24]} />
+        <meshBasicMaterial ref={halo} color="#ff4d5e" transparent opacity={0} depthWrite={false} toneMapped={false} />
+      </mesh>
     </group>
   );
 }
@@ -778,8 +782,6 @@ export function Office({ crew }: { crew: Crew }) {
         <CityWindow position={[ROOM.x1 - 0.06, 1.8, 7.5]} rot={-Math.PI / 2} w={2.2} h={1.5} />
       </OnWall>
 
-      <pointLight position={[18, 3.0, -3]} intensity={18} distance={13} color="#ffcf94" />
-      <pointLight position={[20.6, 2.2, 5.0]} intensity={8} distance={7} color="#ffcf94" />
     </group>
   );
 }
