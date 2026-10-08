@@ -828,10 +828,10 @@ export default function Facility() {
         dpr={[1, 1.75]}
         onCreated={({ gl, setDpr }) => {
           // Without a graphics card the browser draws in software, one pixel at a time. Keep it playable:
-          // no shadows and fewer pixels. Machines with a GPU keep full quality.
+          // no shadows and half the pixels (the labels and interface stay sharp). Machines with a GPU keep full quality.
           if (isSoftwareRenderer(gl)) {
             gl.shadowMap.enabled = false;
-            setDpr(0.75);
+            setDpr(0.5);
           }
         }}
         camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 200 }}
