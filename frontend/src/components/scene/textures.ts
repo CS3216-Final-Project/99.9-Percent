@@ -500,3 +500,35 @@ export function kitchenTiles(): THREE.CanvasTexture {
   g.fillRect(S / 2, 0, 1, S);
   return repeating(finish(c));
 }
+
+export type PosterKind = "launch" | "growth";
+
+/** Pixel-art posters for the picture frames: a launch-day rocket and the first growth chart. */
+export function poster(kind: PosterKind): THREE.CanvasTexture {
+  const [c, g] = canvas(24, 30);
+  const px = (x: number, y: number, w: number, h: number, color: string) => {
+    g.fillStyle = color;
+    g.fillRect(x, y, w, h);
+  };
+  if (kind === "launch") {
+    px(0, 0, 24, 30, "#2a2450");
+    for (let i = 0; i < 14; i++) px(Math.floor(noise(i + 900) * 24), Math.floor(noise(i + 950) * 22), 1, 1, i % 3 ? "#8f87c9" : "#fff7e8");
+    px(11, 4, 2, 2, "#ff4d5e");
+    px(10, 6, 4, 3, "#f4f1ea");
+    px(9, 9, 6, 9, "#f4f1ea");
+    px(11, 11, 2, 2, "#4cb8ff");
+    px(7, 14, 2, 5, "#ff4d5e");
+    px(15, 14, 2, 5, "#ff4d5e");
+    px(10, 18, 4, 2, "#ff9f43");
+    px(11, 20, 2, 3, "#ffd84a");
+    px(0, 26, 24, 4, "#3e3570");
+    px(5, 24, 5, 2, "#d9d4f0");
+    px(14, 24, 6, 2, "#d9d4f0");
+  } else {
+    px(0, 0, 24, 30, "#fff7e8");
+    [4, 7, 10, 15, 20].forEach((h, i) => px(2 + i * 4, 26 - h, 3, h, i === 4 ? "#ff7ad9" : "#2dd4bf"));
+    px(1, 26, 22, 1, "#1d1834");
+    px(19, 2, 3, 3, "#ffd84a");
+  }
+  return finish(c);
+}

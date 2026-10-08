@@ -38,6 +38,8 @@ npm run dev
 
 The frontend opens the 99.99% title screen and an isometric startup office: a glass-walled server floor surrounded by desks, a monitoring room, meeting rooms, a kitchen and a lounge, with people at work. Press Play to begin the guided first week. Drag to pan, scroll or pinch to zoom, and click equipment to inspect it. `Shift` + drag (or right-drag, or two fingers) rotates and tilts the room; `Q` and `E` turn it by 45 degrees, and the house button resets the view. Walls between the camera and the room drop out of the way. `P` pauses or resumes; `Esc` closes a view.
 
+The office furniture comes from two CC0 model packs, [Kenney's Furniture Kit](https://kenney.nl/assets/furniture-kit) and [KayKit Furniture Bits](https://kaylousberg.itch.io/furniture-bits) by Kay Lousberg. Their licences sit beside the models in `frontend/public/models/`.
+
 The [nine-node technology tree](docs/tech-tree.md) groups upgrades into Capacity, Data and Reliability, with metrics and alerts available from the start. It follows the proposal's reduced research scope while retaining the weekly simulation and existing saves.
 
 Gameplay, saves and prototype analytics run in the browser and work without the API. Saves stay in this browser and origin; saves on the prototype deployment do not automatically move to a new domain. The backend retains its existing health and dialogue endpoints for later integration.
