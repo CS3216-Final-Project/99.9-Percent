@@ -1,7 +1,7 @@
 "use client";
 
 import { useLoader } from "@react-three/fiber";
-import { Suspense, useMemo } from "react";
+import { Component, Suspense, useMemo, type ReactNode } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -189,12 +189,31 @@ function MergedModels({ placements, shadows }: { placements: Placement[]; shadow
   );
 }
 
+/** If the models cannot be downloaded, the office is drawn without them and the game carries on. */
+class SkipOnError extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.warn("Furniture models failed to load; drawing the office without them.", error);
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 /** Draw placed models. They appear together once all have loaded; the rest of the room never waits for them. */
 export function ModelBatch({ placements, shadows = true }: { placements: Placement[]; shadows?: boolean }) {
   return (
-    <Suspense fallback={null}>
-      <MergedModels placements={placements} shadows={shadows} />
-    </Suspense>
+    <SkipOnError>
+      <Suspense fallback={null}>
+        <MergedModels placements={placements} shadows={shadows} />
+      </Suspense>
+    </SkipOnError>
   );
 }
 
