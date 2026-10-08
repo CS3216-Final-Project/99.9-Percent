@@ -1,16 +1,17 @@
 "use client";
 
 import { useLoader } from "@react-three/fiber";
-import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
+import { Suspense, useMemo } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { V3 } from "./prims";
 
 /*
  * Furniture models from two CC0 packs, Kenney's Furniture Kit (kenney.nl) and
  * KayKit Furniture Bits (kaylousberg.com); the licences sit beside the files in
- * public/models. Every copy of a model is drawn with one instanced mesh per
- * material, so a room full of desks costs a few draw calls.
+ * public/models. Nothing here moves, so every placed model is baked into one
+ * mesh per material: the whole office's furniture costs a dozen draw calls.
  *
  * Models are placed by their bounding box: `p` is where the bottom centre of
  * the box goes, so it does not matter where each artist put the origin. Both
@@ -103,14 +104,22 @@ interface Prepared {
   base: THREE.Vector3;
 }
 
-/** Matte Lambert versions of the packs' materials, which cost far less per pixel than physically based shading. */
-const matte = new Map<THREE.Material, THREE.Material>();
+/**
+ * Matte Lambert versions of the packs' materials, which cost far less per pixel
+ * than physically based shading. Materials that look the same are shared across
+ * models so they can be drawn together. Every KayKit model brings its own copy
+ * of the same texture atlas, so a texture is known by its name and size.
+ */
+const matte = new Map<string, THREE.Material>();
 function toMatte(source: THREE.Material): THREE.Material {
-  let m = matte.get(source);
+  const s = source as THREE.MeshStandardMaterial;
+  const image = s.map?.image as { width?: number; height?: number } | undefined;
+  const map = s.map ? `${s.map.name}:${image?.width}x${image?.height}` : "";
+  const key = [s.color.getHexString(), map, s.vertexColors, s.transparent, s.opacity, s.side].join("|");
+  let m = matte.get(key);
   if (!m) {
-    const s = source as THREE.MeshStandardMaterial;
     m = new THREE.MeshLambertMaterial({ color: s.color, map: s.map, vertexColors: s.vertexColors, transparent: s.transparent, opacity: s.opacity, side: s.side });
-    matte.set(source, m);
+    matte.set(key, m);
   }
   return m;
 }
@@ -147,47 +156,45 @@ function matrixFor(pl: Placement, prep: Prepared): THREE.Matrix4 {
   return m.multiply(new THREE.Matrix4().makeTranslation(-prep.base.x, -prep.base.y, -prep.base.z));
 }
 
-function PartInstances({ part, matrices, shadows }: { part: Part; matrices: THREE.Matrix4[]; shadows: boolean }) {
-  const ref = useRef<THREE.InstancedMesh>(null);
-  useLayoutEffect(() => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    matrices.forEach((m, i) => mesh.setMatrixAt(i, m));
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [matrices]);
-  return <instancedMesh key={matrices.length} ref={ref} args={[part.geometry, part.material, matrices.length]} castShadow={shadows} receiveShadow />;
+interface Batch {
+  geometry: THREE.BufferGeometry;
+  material: THREE.Material;
 }
 
-function ModelInstances({ id, placements, shadows }: { id: ModelId; placements: Placement[]; shadows: boolean }) {
+function MergedModels({ placements, shadows }: { placements: Placement[]; shadows: boolean }) {
+  const ids = useMemo(() => [...new Set(placements.map((p) => p.id))], [placements]);
   // Neither pack is compressed, so three's plain loader is enough.
-  const { scene } = useLoader(GLTFLoader, MODELS[id]);
-  const prep = useMemo(() => prepare(MODELS[id], scene), [id, scene]);
-  const matrices = useMemo(() => placements.map((pl) => matrixFor(pl, prep)), [placements, prep]);
+  const gltfs = useLoader(GLTFLoader, ids.map((id) => MODELS[id]));
+  const batches = useMemo(() => {
+    const preps = new Map(ids.map((id, i) => [id, prepare(MODELS[id], gltfs[i].scene)]));
+    const byMaterial = new Map<THREE.Material, THREE.BufferGeometry[]>();
+    for (const pl of placements) {
+      const prep = preps.get(pl.id)!;
+      const m = matrixFor(pl, prep);
+      for (const part of prep.parts) byMaterial.set(part.material, [...(byMaterial.get(part.material) ?? []), part.geometry.clone().applyMatrix4(m)]);
+    }
+    return [...byMaterial].map(([material, list]): Batch => {
+      const geometry = mergeGeometries(list);
+      if (!geometry) throw new Error("Furniture models with one material have different vertex attributes");
+      for (const g of list) g.dispose();
+      return { geometry, material };
+    });
+  }, [ids, gltfs, placements]);
   return (
-    <>
-      {prep.parts.map((part, i) => (
-        <PartInstances key={i} part={part} matrices={matrices} shadows={shadows} />
+    <group>
+      {batches.map((b, i) => (
+        <mesh key={i} geometry={b.geometry} material={b.material} castShadow={shadows} receiveShadow />
       ))}
-    </>
+    </group>
   );
 }
 
-/** Draw placed models; each model loads on its own, so the rest of the room never waits for it. */
+/** Draw placed models. They appear together once all have loaded; the rest of the room never waits for them. */
 export function ModelBatch({ placements, shadows = true }: { placements: Placement[]; shadows?: boolean }) {
-  const byId = useMemo(() => {
-    const out = new Map<ModelId, Placement[]>();
-    for (const p of placements) out.set(p.id, [...(out.get(p.id) ?? []), p]);
-    return [...out.entries()];
-  }, [placements]);
   return (
-    <group>
-      {byId.map(([id, list]) => (
-        <Suspense key={id} fallback={null}>
-          <ModelInstances id={id} placements={list} shadows={shadows} />
-        </Suspense>
-      ))}
-    </group>
+    <Suspense fallback={null}>
+      <MergedModels placements={placements} shadows={shadows} />
+    </Suspense>
   );
 }
 
