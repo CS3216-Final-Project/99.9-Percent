@@ -33,6 +33,7 @@ function openTech(id: TechId): NextMove["cta"] {
 }
 
 export function nextMove(g: GameState): NextMove {
+  if(g.campaign)return {text:"Compare demand, capacity and unfinished work. Which measurement changed?",tone:g.phase==="incident"?"warn":"go"};
   const m = metrics(g);
   const warnings = currentWarnings(g);
   const find = (code: string) => warnings.find((w) => w.code === code);

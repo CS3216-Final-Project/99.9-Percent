@@ -378,6 +378,7 @@ export interface Totals {
 }
 
 export interface GameState {
+  campaign?: import("./campaignTypes").Campaign;
   version: number;
   seed: number;
   rngState: number;
@@ -428,6 +429,7 @@ export interface GameState {
 /* ------------------------------------------------------------------ */
 
 export type Action =
+  | { type: "set_traffic_limit"; enabled: boolean }
   | { type: "launch_promotion"; promo: PromoId }
   | { type: "add_server" }
   | { type: "remove_server" }

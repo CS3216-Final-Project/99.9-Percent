@@ -51,3 +51,24 @@ describe("balance", () => {
     expect(avg(expert)).toBeGreaterThan(avg(ignore));
   });
 });
+
+
+describe("opening-db financial trade-offs", () => {
+  it("supports profitable capacity recovery and costly admission relief", async () => {
+    const { newGame, applyAction } = await import("../index");
+    const { step, advanceSteps } = await import("../step");
+    for (const limiting of [false,true]) {
+      let s=advanceSteps(newGame(),6).state;
+      const result=applyAction(s,limiting?{type:"set_traffic_limit",enabled:true}:{type:"start_db_upgrade"});
+      if(!result.ok)throw Error(result.message);
+      s=result.state;
+      while(s.campaign!.step<120) {
+        if(s.phase==="review") {const ack=applyAction(s,{type:"acknowledge_review"});if(!ack.ok)throw Error(ack.message);s=ack.state;}
+        s=step(s).state;
+      }
+      expect(s.campaign!.reports).toHaveLength(1);
+      const net=s.campaign!.settlements[1].netCents;
+      expect(limiting?net<0:net>0).toBe(true);
+    }
+  });
+});

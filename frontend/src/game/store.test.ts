@@ -1,77 +1,62 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { advanceTurn, newGame } from '../sim';
-import { DEFAULT_META, loadGame, readAnalytics, saveGame, saveMeta } from './persist';
-import { useGame } from './store';
-
-beforeEach(() => {
-  localStorage.clear();
-  useGame.setState(useGame.getInitialState(), true);
+import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
+import { newGame } from "../sim";
+import { advanceSteps } from "../sim/step";
+import { loadGame, saveGame, readAnalytics } from "./persist";
+import { useGame } from "./store";
+beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
+afterEach(() => vi.restoreAllMocks());
+describe("shared campaign runtime", () => {
+  it("boots once and leaves legacy data untouched", () => {
+    localStorage.setItem("nn.save.v1", "legacy");
+    useGame.getState().boot(); const s = useGame.getState(); s.boot();
+    expect(useGame.getState()).toBe(s); expect(readAnalytics().filter(e => e.name === "run_started")).toHaveLength(1);
+    expect(localStorage.getItem("nn.save.v1")).toBe("legacy"); expect(s.running).toBe(false);
+  });
+  it("protects corrupt saves from boot and autosave, with explicit reset", () => {
+    localStorage.setItem("nn.campaign.save.v1", "{"); useGame.getState().boot();
+    useGame.getState().advance(); useGame.getState().saveNow();
+    expect(localStorage.getItem("nn.campaign.save.v1")).toBe("{");
+    useGame.getState().newRun({ seed: 1 }); expect(loadGame().status).toBe("ok");
+  });
+  it("uses same fixed steps at every speed, retains fractional pause credit", () => {
+    useGame.getState().boot(); useGame.getState().setRunning(true);
+    useGame.getState().tick(.4); expect(useGame.getState().remainderMs).toBe(400);
+    useGame.getState().setRunning(false); useGame.getState().tick(20);
+    expect(useGame.getState().remainderMs).toBe(400);
+    useGame.getState().setRunning(true); useGame.getState().setSpeed(2); useGame.getState().tick(.3);
+    expect(useGame.getState().game.campaign!.step).toBe(1);
+  });
+  it("stops batch at first incident and drops whole-step credit", () => {
+    useGame.getState().boot(); useGame.getState().setRunning(true); useGame.getState().tick(20.2);
+    expect(useGame.getState()).toMatchObject({ running: false, remainderMs: 200 });
+    expect(useGame.getState().game.campaign!.step).toBe(6);
+    useGame.getState().setRunning(true); useGame.getState().tick(.8); expect(useGame.getState().game.campaign!.step).toBe(7);
+  });
+  it("resumes incident paused, preserves timer remainder and action schedule", () => {
+    saveGame(advanceSteps(newGame(), 6).state, 300); useGame.getState().boot();
+    expect(useGame.getState().running).toBe(false); expect(useGame.getState().remainderMs).toBe(300);
+    useGame.getState().act({ type: "start_db_upgrade" }); useGame.getState().setRunning(true);
+    useGame.getState().tick(30); expect(useGame.getState().game.phase).toBe("review"); expect(useGame.getState().running).toBe(false);
+    const before = useGame.getState().game.campaign!;
+    useGame.getState().act({ type: "acknowledge_review" });
+    expect(useGame.getState().game.campaign!.cashCents).toBe(before.cashCents);
+    expect(useGame.getState().game.campaign!.step).toBe(before.step);
+  });
+  it("menu pauses, history does not, and later views are inaccessible", () => {
+    useGame.getState().boot(); useGame.getState().setRunning(true);
+    useGame.getState().openView("history"); expect(useGame.getState().running).toBe(true);
+    useGame.getState().openView("tech"); expect(useGame.getState().view).toBe("history");
+    useGame.getState().openView("menu"); expect(useGame.getState().running).toBe(false);
+  });
 });
-afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
 
-function resumeIncident() {
-  const game = advanceTurn({ ...newGame(1), users: 4500 });
-  expect(game.phase).toBe('incident');
-  saveGame(game);
-  saveMeta({ ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 });
+
+it("reports quota failures on boot and reset while allowing in-memory play",()=>{
+  vi.spyOn(Storage.prototype,"setItem").mockImplementation(()=>{throw Error("quota");});
   useGame.getState().boot();
-  return game;
-}
-
-describe('game lifecycle', () => {
-  it('boots idempotently without duplicating runs or analytics', () => {
-    useGame.getState().boot();
-    const state = useGame.getState();
-    useGame.getState().boot();
-    expect(useGame.getState()).toBe(state);
-    expect(readAnalytics().filter(e => e.name === 'run_started')).toHaveLength(1);
-    expect(state.meta.runsStarted).toBe(1);
-  });
-
-  it('starts a playable new run after a corrupt save and explains recovery', () => {
-    localStorage.setItem('nn.save.v1', '{');
-    useGame.getState().boot();
-    expect(useGame.getState().toast?.kind).toBe('error');
-    expect(useGame.getState().game.phase).toBe('management');
-    expect(loadGame().status).toBe('ok');
-  });
-
-  it('resumes an incident paused, then applies the selected speed', () => {
-    const game = resumeIncident();
-    useGame.getState().tick(1);
-    expect(useGame.getState().game).toEqual(game);
-    expect(useGame.getState().meta.runsStarted).toBe(1);
-    useGame.getState().setSpeed(2);
-    useGame.getState().setRunning(true);
-    useGame.getState().tick(1);
-    expect(useGame.getState().game.incident?.elapsed).toBeCloseTo(2);
-    useGame.getState().setRunning(false);
-    const paused = useGame.getState().game;
-    useGame.getState().tick(5);
-    expect(useGame.getState().game).toBe(paused);
-    expect(loadGame()).toMatchObject({ status: 'ok', game: paused });
-  });
-
-  it('stops at an incident outcome and records its completion once', () => {
-    resumeIncident();
-    useGame.getState().setRunning(true);
-    for (let i = 0; i < 140 && useGame.getState().game.phase === 'incident'; i++) useGame.getState().tick(1);
-    expect(useGame.getState().game.phase).not.toBe('incident');
-    expect(useGame.getState().running).toBe(false);
-    useGame.getState().tick(1);
-    expect(readAnalytics().filter(e => e.name === 'incident_completed')).toHaveLength(1);
-    expect(useGame.getState().meta.firstIncidentCompleted).toBe(true);
-    expect(loadGame()).toMatchObject({ status: 'ok', game: useGame.getState().game });
-  });
-
-  it('resets transient UI and saves the requested seed when replaying', () => {
-    resumeIncident();
-    useGame.setState({ selected: 'app', view: 'history', running: true, speed: 2, tour: { track: 'incident', step: 1 }, rating: 4 });
-    useGame.getState().newRun({ seed: 'repeatable', voluntary: true });
-    expect(useGame.getState()).toMatchObject({
-      game: newGame('repeatable'), started: true, selected: null, view: null, running: false, tour: null, rating: null,
-    });
-    expect(readAnalytics().filter(e => e.name === 'voluntary_replay')).toHaveLength(1);
-    expect(loadGame()).toMatchObject({ status: 'ok', game: newGame('repeatable') });
-  });
+  expect(useGame.getState().toast?.kind).toBe("error");
+  useGame.getState().newRun();
+  expect(useGame.getState().toast?.kind).toBe("error");
+  useGame.getState().advance();
+  expect(useGame.getState().game.campaign!.step).toBe(1);
 });

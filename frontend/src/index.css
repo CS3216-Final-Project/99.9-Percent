@@ -3712,3 +3712,19 @@ button:disabled {
     transition-duration: 0.001s !important;
   }
 }
+
+/* Opening campaign evidence uses the existing panel, buttons and theme. */
+.campaign-panel { padding: 14px; overflow-y: auto; }
+.campaign-panel p { margin: 12px 0; line-height: 1.5; }
+.campaign-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.campaign-table caption { text-align: left; padding: 8px 0; }
+.campaign-table th, .campaign-table td { padding: 6px; text-align: left; border-bottom: 1px solid #ffffff22; }
+.campaign-actions { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.campaign-panel .btn { white-space: normal; }
+
+.campaign-header .stat { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; padding: 6px; }
+.campaign-header .stat > span { font-size: 11px; }
+.campaign-header .stat > strong { font-size: 1rem; white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .campaign-header .stat > strong { font-size: 12px; }
+}

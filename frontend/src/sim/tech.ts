@@ -289,7 +289,8 @@ export function completedTechIds(state: GameState): TechId[] {
   return TECH_ORDER.filter((id) => id === "larger_database" ? state.infra.dbTier > 0 : has(state, id));
 }
 
-export function has(state: Pick<GameState, "techDone">, tech: TechId): boolean {
+export function has(state: Pick<GameState, "techDone" | "campaign">, tech: TechId): boolean {
+  if(state.campaign)return tech==="monitoring";
   // Metrics and alerts are baseline tools, including when resuming an old save.
   if (tech === "monitoring") return true;
   return state.techDone.includes(tech);

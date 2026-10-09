@@ -16,15 +16,15 @@ export { expect };
 export async function seedSave(page: Page, game: GameState) {
   await page.addInitScript(({ game, meta }) => {
     // Only create the fixture once; a reload must exercise the real saved state.
-    if (localStorage.getItem('nn.save.v1') === null) {
-      localStorage.setItem('nn.save.v1', JSON.stringify({ game, savedAt: Date.now() }));
-      localStorage.setItem('nn.meta.v1', JSON.stringify(meta));
+    if (localStorage.getItem('nn.campaign.save.v1') === null) {
+      localStorage.setItem('nn.campaign.save.v1', JSON.stringify({schemaVersion:1,scenarioId:"opening-db",scenarioVersion:1,runId:game.campaign!.runId,game,runtime:{remainderMs:0},savedAt:Date.now()}));
+      localStorage.setItem('nn.campaign.meta.v1', JSON.stringify(meta));
     }
   }, { game, meta: { ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 } });
 }
 
 export async function savedGame(page: Page): Promise<GameState> {
-  return page.evaluate(() => JSON.parse(localStorage.getItem('nn.save.v1')!).game);
+  return page.evaluate(() => JSON.parse(localStorage.getItem('nn.campaign.save.v1')!).game);
 }
 
 export async function expectRoom(page: Page) {

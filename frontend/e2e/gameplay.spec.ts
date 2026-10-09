@@ -1,112 +1,59 @@
-import { test, expect, expectRoom, savedGame, seedSave } from './fixtures';
-import { advanceTurn, newGame } from '../src/sim';
+import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
+import { newGame } from "../src/sim";
+import { advanceSteps } from "../src/sim/step";
 
-test('completes the first-week tutorial, purchases equipment and resumes after reload', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await expectRoom(page);
-  await expect(page.getByRole('dialog', { name: /Tutorial, step 1/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Servers', exact: true }).click();
-  await page.getByRole('button', { name: /Add server/ }).click();
-  await expect(page.getByRole('dialog', { name: /Tutorial, step 2/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Tech', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Tech tree' }).locator('.node')).toHaveCount(9);
-  await page.getByRole('button', { name: 'Scale Up: Available' }).click();
-  await page.getByRole('button', { name: /^Start/ }).click();
-  await expect(page.getByRole('dialog', { name: /Tutorial, step 3/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Growth', exact: true }).click();
-  await page.getByRole('button', { name: /^Launch/ }).first().click();
-  await expect(page.getByRole('dialog', { name: /Tutorial, step 4/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Next week', exact: true }).click();
-  await page.getByRole('button', { name: 'Got it', exact: true }).click();
-  const before = await savedGame(page);
-  expect(before.turn).toBe(2);
-  expect(before.infra.appHosts).toHaveLength(2);
-  expect(before.totals.promosRun).toBe(1);
-  expect(before.tasks.some(task => task.techId === 'larger_servers') || before.releases.some(release => release.techId === 'larger_servers') || before.techDone.includes('larger_servers')).toBe(true);
-  await page.reload();
-  await page.getByRole('button', { name: 'Continue week 2' }).click();
-  await expectRoom(page);
-  expect(await savedGame(page)).toEqual(before);
-  await expect(page.getByRole('dialog', { name: /Tutorial/ })).toHaveCount(0);
+for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
+  test(`opening acceptance: ${path}`, async ({ page }) => {
+    await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+    await expectRoom(page);
+    for (let i = 0; i < 6; i++)await page.getByRole("button", { name: "Advance step", exact: true }).click();
+    if (path === "upgrade") await page.screenshot({ path: "test-results/phase1-desktop.png" });
+    const opening = (await savedGame(page)).campaign!;
+    expect(opening.step).toBe(6);
+    await page.getByRole("button", { name: "Inspect metrics · free" }).click();
+    if (path === "app-then-upgrade") {
+      await page.getByRole("button", { name: /Add application/ }).click();
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      await expect.poll(async () => (await savedGame(page)).campaign!.apps.length).toBe(2);
+      await page.getByRole("button", { name: "Pause", exact: true }).click();
+      expect((await savedGame(page)).campaign!.dbCapacity).toBe(600);
+    }
+    await page.getByRole("button", { name: path === "limit" ? "Limit to 500 requests/s" : /Upgrade database/ }).click();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const report = page.getByRole("dialog", { name: "Incident postmortem" });
+    await expect(report).toBeVisible({ timeout: 25000 });
+    if (path === "app-then-upgrade") await expect(report).toContainText("did not relieve");
+    await report.getByRole("button", { name: "Continue company" }).click();
+    const after = await savedGame(page);
+    expect(after.campaign!.runId).toBe(opening.runId); expect(after.phase).toBe("management");
+    if (path === "limit") expect(after.campaign!.limit).toBe(500);
+    await page.reload(); await page.getByRole("button", { name: "Continue company" }).click();
+    expect(await savedGame(page)).toEqual(after); await expectRoom(page);
+  });
+}
+test("preserves corrupt campaign and legacy data until explicit reset", async ({ page }) => {
+  await page.addInitScript(() => { localStorage.setItem("nn.campaign.save.v1", "{"); localStorage.setItem("nn.save.v1", "legacy"); });
+  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "Advance step" }).click();
+  expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBe("{");
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menu" });
+  await expect(menu).toContainText("has been preserved");
+  const download = page.waitForEvent("download"); await menu.getByRole("button", { name: "Export original stored save" }).click(); await download;
+  await menu.getByRole("button", { name: "New company", exact: true }).click();
+  await menu.getByRole("button", { name: "Confirm new company" }).click();
+  expect((await savedGame(page)).campaign!.step).toBe(0);
+  expect(await page.evaluate(() => localStorage.getItem("nn.save.v1"))).toBe("legacy");
 });
-
-test('keeps the game playable when the furniture models cannot be downloaded', async ({ page }) => {
-  await page.route('**/models/**', route => route.abort());
-  const skipped = page.waitForEvent('console', message => message.text().includes('Furniture models failed to load'));
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await skipped;
-  await expectRoom(page);
-  await page.getByRole('button', { name: 'Next week', exact: true }).click();
-  expect((await savedGame(page)).turn).toBe(2);
-  await expectRoom(page);
+test("resumes an incident paused", async ({ page }) => {
+  const s = advanceSteps(newGame(1, "paused"), 6).state;
+  await seedSave(page, s); await page.goto("/"); await page.getByRole("button", { name: "Continue company" }).click();
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+  expect((await savedGame(page)).campaign!.step).toBe(6);
 });
-
-test('recovers from a corrupt save through the playable first-run flow', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('nn.save.v1', '{'));
-  await page.goto('/');
-  await expect(page.getByRole('alert')).toHaveText('Saved run was unreadable. Started a new one.');
-  await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await expectRoom(page);
-  await page.getByRole('button', { name: 'Next week', exact: true }).click();
-  expect((await savedGame(page)).turn).toBe(2);
-});
-
-test('confirms replacing a run and starts the supplied replay seed', async ({ page }) => {
-  await seedSave(page, advanceTurn(newGame(1)));
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Continue week 2' }).click();
-  await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  const menu = page.getByRole('dialog', { name: 'Menu' });
-  await menu.getByRole('textbox').fill('e2e-repeatable');
-  await menu.getByRole('button', { name: 'New game', exact: true }).click();
-  expect((await savedGame(page)).turn).toBe(2);
-  await menu.getByRole('button', { name: 'Lose this run? Press again', exact: true }).click();
-  await expect(menu).toHaveCount(0);
-  expect(await savedGame(page)).toEqual(newGame('e2e-repeatable'));
-});
-
-test('resumes an incident paused, investigates, fixes it and acknowledges the postmortem', async ({ page }) => {
-  // Clock.runFor also renders every WebGL animation frame. The CI trace shows
-  // several seconds of virtual time can take tens of seconds on SwiftShader.
-  test.setTimeout(150_000);
-  const incident = advanceTurn({ ...newGame(1), users: 4500, techDone: ['monitoring'] });
-  expect(incident.incident?.type).toBe('app_overload');
-  await seedSave(page, incident);
-  await page.clock.install();
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Continue week 1' }).click();
-  await expectRoom(page);
-  await page.clock.pauseAt(new Date(Date.now() + 1000));
-  const panel = page.getByRole('region', { name: 'Incident', exact: true });
-  const clock = panel.locator('.clock-time');
-  await expect(clock).toHaveText('0:00');
-  await page.clock.runFor(1200);
-  await expect(clock).toHaveText('0:00');
-  await panel.getByRole('button', { name: 'Servers', exact: true }).click();
-  await page.getByRole('button', { name: 'Resume the incident clock' }).click();
-  await page.clock.runFor(3200);
-  await expect(panel.locator('.evidence')).toContainText('CPU 100%');
-  await expect(panel.locator('.evidence')).toContainText('of capacity');
-  await page.getByRole('button', { name: 'Pause the incident clock' }).click();
-  const elapsed = (await savedGame(page)).incident!.elapsed;
-  const pausedClock = await clock.textContent();
-  await page.clock.runFor(1000);
-  await expect(clock).toHaveText(pausedClock!);
-  expect((await savedGame(page)).incident!.elapsed).toBe(elapsed);
-  await panel.getByRole('button', { name: /^Add (a|\d+) server/ }).click();
-  await page.getByRole('button', { name: '2×', exact: true }).click();
-  await page.getByRole('button', { name: 'Resume the incident clock' }).click();
-  await page.clock.runFor(8000);
-  const report = page.getByRole('dialog');
-  await expect(report).toContainText('Fixed');
-  const reviewed = await savedGame(page);
-  expect(reviewed.phase).toBe('review');
-  expect(reviewed.postmortems.at(-1)?.outcome).toBe('resolved');
-  await report.getByRole('button', { name: 'Continue', exact: true }).click();
-  expect((await savedGame(page)).phase).toBe('management');
-  expect((await savedGame(page)).turn).toBe(2);
+test("keeps the room playable without downloaded furniture", async ({ page }) => {
+  await page.route("**/models/**", route => route.abort());
+  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expectRoom(page); await page.getByRole("button", { name: "Advance step" }).click();
+  expect((await savedGame(page)).campaign!.step).toBe(1);
 });
