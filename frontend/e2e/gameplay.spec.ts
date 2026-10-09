@@ -58,8 +58,8 @@ test("keeps the room playable without downloaded furniture", async ({ page }) =>
   expect((await savedGame(page)).campaign!.step).toBe(1);
 });
 test("keeps history reachable after bankruptcy", async ({ page }) => {
-  let s = newGame(1, "paused"); s.campaign!.cashCents = 1;
-  // Cash runs out at the first weekly settlement.
+  // Leaving the opening incident unresolved loses money every week until cash runs out.
+  let s = newGame(1, "paused");
   while (s.phase !== "ended") s = advanceSteps(s, 60).state;
   expect(s.phase).toBe("ended");
   await seedSave(page, s); await page.goto("/"); await page.getByRole("button", { name: "Continue company" }).click();

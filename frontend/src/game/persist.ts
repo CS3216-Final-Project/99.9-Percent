@@ -1,4 +1,4 @@
-import { decodeSave, makeEnvelope } from "./saveMigrations";
+import { decodeSave, makeEnvelope, migrateSave, replaceable } from "./saveMigrations";
 import { type GameState } from "@/sim";
 
 /**
@@ -67,18 +67,21 @@ export function loadGame():LoadResult {
   let raw:string|null;
   try {raw=window.localStorage.getItem(SAVE_KEY);}catch{return {status:"unavailable"};}
   if(raw===null)return {status:"none"};
+  // An older schema is backed up and converted in place, so later saves can replace it.
+  if(migrateSave(window.localStorage))raw=read(SAVE_KEY)??raw;
   const result=decodeSave(raw);
   if(result.status!=="ok")return result;
-  return {status:"ok",game:result.envelope.game,savedAt:result.envelope.savedAt,remainderMs:result.envelope.runtime.remainderMs};
+  return {status:"ok",game:result.game,savedAt:result.envelope.savedAt,remainderMs:result.envelope.runtime.remainderMs};
 }
 export function rawSave():string|null {return read(SAVE_KEY);}
 export function exportLegacyData():string {
   return JSON.stringify(Object.fromEntries(["nn.save.v1","nn.meta.v1","nn.analytics.v1"].map(k=>[k,read(k)])),null,2);
 }
 export function saveGame(game:GameState,remainderMs=0,explicitReset=false):boolean {
-  const current=loadGame();
-  if(!explicitReset && (current.status==="corrupt"||current.status==="unsupported"||current.status==="unavailable"))return false;
-  try{return write(SAVE_KEY,JSON.stringify(makeEnvelope(game,remainderMs)));}catch{return false;}
+  let current:string|null;
+  try {current=window.localStorage.getItem(SAVE_KEY);}catch{return false;}
+  if(!explicitReset && !replaceable(current))return false;
+  return write(SAVE_KEY,JSON.stringify(makeEnvelope(game,remainderMs)));
 }
 export function clearSave(): void {
   remove(SAVE_KEY);

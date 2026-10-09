@@ -1,3 +1,9 @@
+import type { Action } from "./types";
+/** One player decision, recorded at the step it was made. */
+export interface CampaignInput {
+    step: number;
+    action: Action;
+}
 export interface ComponentSnapshot {
     demand: number;
     capacity: number;
@@ -104,6 +110,8 @@ export interface Campaign {
     };
     pending: ScheduledAction[];
     actions: ScheduledAction[];
+    /** Every player decision, accepted or rejected, in order. Replaying them from a new run rebuilds this one. */
+    inputs: CampaignInput[];
     consumedEvents: string[];
     overloadSteps: number;
     incident: CampaignIncident | null;

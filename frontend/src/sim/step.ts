@@ -27,7 +27,7 @@ export function initialCampaign(runId: string): Campaign {
         ledger: emptyLedger(), remainders: { app: 0, db: 0, salary: 0 }, settlements: [], lastSettledPeriod: 0,
         revenueCents: 0, costsCents: 0, investedCents: 0,
         cumulative: { admitted: 0, rejected: 0, successful: 0, failed: 0 },
-        pending: [], actions: [], consumedEvents: [], overloadSteps: 0, incident: null, reports: [],
+        pending: [], actions: [], inputs: [], consumedEvents: [], overloadSteps: 0, incident: null, reports: [],
         openingRecovered: false, firstPauseConsumed: false, snapshot, recent: [], trace: [], nextEventId: 1,
     };
     trace(c, "scenario", { scenarioId: Q.id, version: Q.version, configuration: JSON.stringify(Q) });
@@ -66,7 +66,16 @@ export function step(prev: GameState): {
         throw new Error("Physical step requires an opening-db campaign");
     if (prev.phase === "review" || prev.phase === "ended")
         return { state: prev, stopReason: prev.phase };
-    const s = clone(prev), c = s.campaign!;
+    const s = clone(prev);
+    const stopReason = stepInPlace(s);
+    return { state: projectCampaign(s), stopReason };
+}
+/**
+ * Advance one physical step by mutating `s`. The caller owns `s`, rules out
+ * review and ended phases, and projects the legacy view fields afterwards.
+ */
+export function stepInPlace(s: GameState): StopReason {
+    const c = s.campaign!;
     c.step++;
     for (const action of c.pending.filter(a => a.activationStep === c.step)) {
         const dbBefore = c.dbCapacity, appBefore = c.apps.length * Q.appCapacity;
@@ -151,7 +160,7 @@ export function step(prev: GameState): {
         }
     }
     trace(c, "metrics", { snapshotStep: c.step });
-    return { state: projectCampaign(s), stopReason };
+    return stopReason;
 }
 export function advanceSteps(prev: GameState, count: number): {
     state: GameState;
@@ -175,28 +184,49 @@ export function advanceSteps(prev: GameState, count: number): {
     }
     return { state, stepsConsumed, stopReason };
 }
+/**
+ * Apply one player decision and record it as a replayable input. A rejected
+ * decision is recorded too, because its rejection is part of the run's history.
+ */
+export function applyCampaignInput(prev: GameState, action: Action): { state: GameState; result: ActionResult } {
+    const s = clone(prev);
+    const failure = applyCampaignInputInPlace(s, action);
+    return { state: s, result: failure ?? { ok: true, state: s } };
+}
+/** `applyCampaignInput` mutating `s`. Returns the rejection, or null when the decision was accepted. */
+export function applyCampaignInputInPlace(s: GameState, action: Action): Rejection | null {
+    const failure = actInPlace(s, action), c = s.campaign!;
+    if (failure)
+        trace(c, "action-rejected", { action: action.type, reason: failure.message });
+    c.inputs.push({ step: c.step, action: clone(action) });
+    return failure;
+}
 export function campaignAction(prev: GameState, action: Action): ActionResult {
-    const fail = (message: string): ActionResult => ({ ok: false, reason: "invalid", message });
-    if (action.type === "acknowledge_review" && prev.phase === "review") {
-        const s = clone(prev);
+    const s = clone(prev);
+    return actInPlace(s, action) ?? { ok: true, state: s };
+}
+type Rejection = Extract<ActionResult, { ok: false }>;
+/** Every check runs before the first mutation, so a rejection leaves `s` untouched. */
+function actInPlace(s: GameState, action: Action): Rejection | null {
+    const fail = (message: string): Rejection => ({ ok: false, reason: "invalid", message });
+    if (action.type === "acknowledge_review" && s.phase === "review") {
         s.phase = "management";
         trace(s.campaign!, "review-acknowledged");
-        return { ok: true, state: s };
+        return null;
     }
-    if (prev.phase === "review" || prev.phase === "ended")
+    if (s.phase === "review" || s.phase === "ended")
         return fail("Finish review or start a new company before acting.");
     if (action.type === "incident_inspect") {
         if (!["app", "db", "monitoring", "gateway"].includes(action.equipment))
             return fail("That component is not active in this opening.");
-        const s = clone(prev);
         trace(s.campaign!, "inspection", { component: action.equipment, snapshotStep: s.campaign!.step, snapshot: JSON.stringify(s.campaign!.snapshot) });
-        return { ok: true, state: s };
+        return null;
     }
     const type: Intervention | null = action.type === "add_server" ? "add-app" : action.type === "start_db_upgrade" ? "upgrade-db" :
         action.type === "set_traffic_limit" ? (action.enabled ? "limit" : "unlimit") : null;
     if (!type)
         return fail("This action is unavailable during the opening.");
-    const c = prev.campaign!, infrastructure = type === "add-app" || type === "upgrade-db";
+    const c = s.campaign!, infrastructure = type === "add-app" || type === "upgrade-db";
     if (infrastructure && c.pending.some(a => a.type === "add-app" || a.type === "upgrade-db"))
         return fail("An infrastructure deployment is already pending.");
     if (type === "add-app" && c.apps.length >= Q.maxApps)
@@ -208,13 +238,13 @@ export function campaignAction(prev: GameState, action: Action): ActionResult {
     const costCents = type === "add-app" ? Q.appCostCents : type === "upgrade-db" ? Q.dbCostCents : 0;
     if (c.cashCents - costCents <= 0)
         return fail("This purchase would exhaust company cash.");
-    const s = clone(prev), n = s.campaign!;
     const delay = type === "add-app" ? Q.appDelay : type === "upgrade-db" ? Q.dbDelay : Q.admissionDelay;
-    const scheduled = { id: `action-${n.nextEventId}`, type, requestedStep: n.step, activationStep: n.step + delay, costCents, activatedStep: null };
-    n.cashCents -= costCents;
-    n.investedCents += costCents;
-    n.pending.push(scheduled);
-    n.actions.push({ ...scheduled });
-    trace(n, "action-requested", { actionId: scheduled.id, type, costCents, activationStep: scheduled.activationStep });
-    return { ok: true, state: projectCampaign(s) };
+    const scheduled = { id: `action-${c.nextEventId}`, type, requestedStep: c.step, activationStep: c.step + delay, costCents, activatedStep: null };
+    c.cashCents -= costCents;
+    c.investedCents += costCents;
+    c.pending.push(scheduled);
+    c.actions.push({ ...scheduled });
+    trace(c, "action-requested", { actionId: scheduled.id, type, costCents, activationStep: scheduled.activationStep });
+    projectCampaign(s);
+    return null;
 }

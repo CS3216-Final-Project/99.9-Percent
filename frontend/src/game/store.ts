@@ -1,7 +1,5 @@
 "use client";
-import { clone } from "@/sim/state";
-import { trace } from "@/sim/trace";
-import { advanceSteps } from "@/sim/step";
+import { advanceSteps, applyCampaignInput } from "@/sim/step";
 
 import { create } from "zustand";
 import {
@@ -233,13 +231,15 @@ export const useGame = create<Store>()((set, get) => {
     play: () => set({ started: true }),
 
     act: (action) => {
+      if (get().game.campaign) {
+        // Rejections are recorded too: they are part of the campaign's history and its replay.
+        const { state, result } = applyCampaignInput(get().game, action);
+        commit(state);
+        if (!result.ok) get().notify(result.message, "error");
+        return result.ok;
+      }
       const result = applyAction(get().game, action);
       if (!result.ok) {
-        if(get().game.campaign) {
-          const next=clone(get().game);
-          trace(next.campaign!,"action-rejected",{action:action.type,reason:result.message});
-          commit(next);
-        }
         get().notify(result.message, "error");
         return false;
       }
@@ -335,7 +335,7 @@ export const useGame = create<Store>()((set, get) => {
         get().notify(result.status === "unsupported" ? "That save is from a different version of the game." : "That file is not a readable save.", "error");
         return false;
       }
-      const { game, runtime } = result.envelope;
+      const { game, envelope: { runtime } } = result;
       const saved = saveGame(game, runtime.remainderMs, true);
       set({ game, remainderMs: runtime.remainderMs, saveBlocked: false, running: false, view: null, selected: null, hovered: null, started: true });
       track("save_imported", { step: game.campaign!.step });
