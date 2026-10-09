@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyAction, newGame, replayCampaign, type Action, type GameState } from "../index";
+import { applyAction, newGame, replayCampaign, MAX_REPLAY_INPUTS, type Action, type GameState } from "../index";
 import { advanceSteps, applyCampaignInput } from "../step";
 
 const MOVES: Action[] = [
@@ -34,12 +34,26 @@ describe("campaign replay", () => {
     expect(c.inputs).toHaveLength(30);
     expect(roundTrip(replayCampaign(live.seed, c.runId, roundTrip(live).campaign!.inputs, c.step))).toEqual(roundTrip(live));
   });
-  it("records accepted and rejected decisions through applyAction", () => {
+  it("records an accepted decision through applyAction", () => {
     const s = advanceSteps(newGame(), 2).state;
     const ok = applyAction(s, { type: "add_server" });
     if (!ok.ok) throw Error(ok.message);
     expect(ok.state.campaign!.inputs).toEqual([{ step: 2, action: { type: "add_server" } }]);
-    expect(applyAction(ok.state, { type: "add_server" }).ok).toBe(false);
+  });
+  it("records a rejected decision through applyCampaignInput", () => {
+    const s = applyCampaignInput(advanceSteps(newGame(), 2).state, { type: "add_server" }).state;
+    const { state, result } = applyCampaignInput(s, { type: "add_server" });
+    expect(result.ok).toBe(false);
+    expect(state.campaign!.inputs).toEqual([{ step: 2, action: { type: "add_server" } }, { step: 2, action: { type: "add_server" } }]);
+    expect(state.campaign!.trace.at(-1)).toMatchObject({ type: "action-rejected", data: { action: "add_server" } });
+  });
+  it("advances many steps the same as one step at a time", () => {
+    let one = newGame(3, "steps");
+    for (let i = 0; i < 200; i++) one = advanceSteps(one, 1).state;
+    // A batch stops at the first incident, so it resumes until it reaches the same step.
+    let batch = newGame(3, "steps");
+    while (batch.campaign!.step < 200) batch = advanceSteps(batch, 200 - batch.campaign!.step).state;
+    expect(batch).toEqual(one);
   });
   it.each([
     ["an input after the final step", [{ step: 5, action: { type: "add_server" } }], 4],
@@ -47,6 +61,7 @@ describe("campaign replay", () => {
     ["a step past an unacknowledged review", [{ step: 6, action: { type: "start_db_upgrade" } }], 100],
     ["a negative step", [], -1],
     ["an absurd step", [], 1e12],
+    ["too many inputs", Array.from({ length: MAX_REPLAY_INPUTS + 1 }, () => ({ step: 0, action: { type: "add_server" } })), 0],
   ] as const)("refuses %s", (_, inputs, step) => {
     expect(() => replayCampaign(1, "r", inputs as never, step)).toThrow();
   });

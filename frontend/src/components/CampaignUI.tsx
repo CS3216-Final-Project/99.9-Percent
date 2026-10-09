@@ -2,7 +2,7 @@ import { nextMove } from "@/game/advisor";
 import { useRef, useState } from "react";
 import { useGame, type Speed } from "@/game/store";
 import { rawSave, exportLegacyData } from "@/game/persist";
-import { makeEnvelope } from "@/game/saveMigrations";
+import { makeEnvelope } from "@/game/saveEnvelope";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { CampaignPostmortem } from "@/sim/campaignTypes";
 import { Icon } from "./icons";

@@ -59,8 +59,9 @@ test("keeps the room playable without downloaded furniture", async ({ page }) =>
 });
 test("keeps history reachable after bankruptcy", async ({ page }) => {
   // Leaving the opening incident unresolved loses money every week until cash runs out.
+  // Each advance stops at the first incident, so keep going until the company is bankrupt.
   let s = newGame(1, "paused");
-  while (s.phase !== "ended") s = advanceSteps(s, 60).state;
+  for (let i = 0; i < 5 && s.phase !== "ended"; i++) s = advanceSteps(s, 100_000).state;
   expect(s.phase).toBe("ended");
   await seedSave(page, s); await page.goto("/"); await page.getByRole("button", { name: "Continue company" }).click();
   const bankrupt = page.getByRole("dialog", { name: "Company bankrupt" });

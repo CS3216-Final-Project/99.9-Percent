@@ -5,6 +5,8 @@ import { applyCampaignInputInPlace, projectCampaign, stepInPlace } from "./step"
 
 /** Replays longer than this are refused rather than freezing the page on a hostile file. */
 export const MAX_REPLAY_STEPS = 1_000_000;
+/** Many inputs can share one step, so their number is limited separately. */
+export const MAX_REPLAY_INPUTS = 100_000;
 
 /**
  * Rebuild a campaign from its seed, identity and recorded inputs. The engine is
@@ -14,6 +16,8 @@ export const MAX_REPLAY_STEPS = 1_000_000;
 export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number): GameState {
     if (!Number.isSafeInteger(finalStep) || finalStep < 0 || finalStep > MAX_REPLAY_STEPS)
         throw new Error("Replay step is out of range");
+    if (inputs.length > MAX_REPLAY_INPUTS)
+        throw new Error("Replay has too many inputs");
     // The fresh state is private to this replay, so every step and input can mutate it.
     const s = newGame(seed, runId);
     for (const input of inputs) {

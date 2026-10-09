@@ -1,4 +1,4 @@
-import { step, advanceSteps, campaignAction } from "./step";
+import { step, advanceSteps } from "./step";
 import { BALANCE, PROMOS } from "./balance";
 import {
   arpu,
@@ -512,7 +512,6 @@ export function incidentTick(prev: GameState, dt: number): GameState {
 }
 
 export function acknowledgeReview(prev: GameState): GameState {
-  if (prev.campaign) { const r=campaignAction(prev,{type:"acknowledge_review"}); return r.ok?r.state:prev; }
   if (prev.phase !== "review") return prev;
   const s = clone(prev);
   s.reviewId = null;

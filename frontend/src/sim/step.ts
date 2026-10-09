@@ -169,20 +169,24 @@ export function advanceSteps(prev: GameState, count: number): {
 } {
     if (!Number.isSafeInteger(count) || count < 0)
         throw new Error("Step count must be a nonnegative integer");
-    let state = prev, stepsConsumed = 0, stopReason: StopReason = null;
-    while (stepsConsumed < count) {
-        if (state.phase === "review" || state.phase === "ended") {
-            stopReason = state.phase;
-            break;
+    if (count === 0)
+        return { state: prev, stepsConsumed: 0, stopReason: null };
+    if (!prev.campaign)
+        throw new Error("Physical step requires an opening-db campaign");
+    if (prev.phase === "review" || prev.phase === "ended")
+        return { state: prev, stepsConsumed: 0, stopReason: prev.phase };
+    // Copy once and step the copy, so a long advance costs no more than its steps.
+    const s = clone(prev);
+    let stepsConsumed = 0, stopReason: StopReason = null;
+    while (stepsConsumed < count && !stopReason) {
+        if (s.phase === "review" || s.phase === "ended")
+            stopReason = s.phase;
+        else {
+            stopReason = stepInPlace(s);
+            stepsConsumed++;
         }
-        const result = step(state);
-        state = result.state;
-        stopReason = result.stopReason;
-        stepsConsumed++;
-        if (stopReason)
-            break;
     }
-    return { state, stepsConsumed, stopReason };
+    return { state: projectCampaign(s), stepsConsumed, stopReason };
 }
 /**
  * Apply one player decision and record it as a replayable input. A rejected
@@ -200,10 +204,6 @@ export function applyCampaignInputInPlace(s: GameState, action: Action): Rejecti
         trace(c, "action-rejected", { action: action.type, reason: failure.message });
     c.inputs.push({ step: c.step, action: clone(action) });
     return failure;
-}
-export function campaignAction(prev: GameState, action: Action): ActionResult {
-    const s = clone(prev);
-    return actInPlace(s, action) ?? { ok: true, state: s };
 }
 type Rejection = Extract<ActionResult, { ok: false }>;
 /** Every check runs before the first mutation, so a rejection leaves `s` untouched. */

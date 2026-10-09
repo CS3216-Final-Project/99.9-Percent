@@ -16,7 +16,7 @@ import {
   type TechId,
 } from "@/sim";
 import { clearSave, DEFAULT_META, loadGame, loadMeta, saveGame, saveMeta, track, type Meta } from "./persist";
-import { decodeSave } from "./saveMigrations";
+import { decodeSave } from "./saveEnvelope";
 
 export type View = "tech" | "engineers" | "history" | "menu" | null;
 export type Speed = 0.5 | 1 | 2;

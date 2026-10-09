@@ -1,7 +1,7 @@
 import { test as base, expect, type Page } from '@playwright/test';
 import type { GameState } from '../src/sim';
 import { DEFAULT_META } from '../src/game/persist';
-import { decodeSave, makeEnvelope } from '../src/game/saveMigrations';
+import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
 
 // These tests render the actual WebGL scene. Unhandled browser errors fail each case.
 export const test = base.extend<{ healthyBrowser: void }>({
