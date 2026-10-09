@@ -31,8 +31,8 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     expect(await savedGame(page)).toEqual(after); await expectRoom(page);
   });
 }
-test("preserves corrupt campaign and legacy data until explicit reset", async ({ page }) => {
-  await page.addInitScript(() => { localStorage.setItem("nn.campaign.save.v1", "{"); localStorage.setItem("nn.save.v1", "legacy"); });
+test("preserves a corrupt campaign save until explicit reset", async ({ page }) => {
+  await page.addInitScript(() => { localStorage.setItem("nn.campaign.save.v1", "{"); });
   await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.getByRole("button", { name: "Advance step" }).click();
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBe("{");
@@ -43,7 +43,6 @@ test("preserves corrupt campaign and legacy data until explicit reset", async ({
   await menu.getByRole("button", { name: "New company", exact: true }).click();
   await menu.getByRole("button", { name: "Confirm new company" }).click();
   expect((await savedGame(page)).campaign!.step).toBe(0);
-  expect(await page.evaluate(() => localStorage.getItem("nn.save.v1"))).toBe("legacy");
 });
 test("resumes an incident paused", async ({ page }) => {
   const s = advanceSteps(newGame(1, "paused"), 6).state;

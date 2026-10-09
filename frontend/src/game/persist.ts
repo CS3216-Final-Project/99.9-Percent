@@ -1,5 +1,5 @@
 import { decodeSave, makeEnvelope, replaceable } from "./saveEnvelope";
-import { type GameState } from "@/sim";
+import { SAVE_VERSION, type GameState } from "@/sim";
 
 /**
  * Local browser persistence. Every read and write is wrapped because storage
@@ -10,6 +10,12 @@ import { type GameState } from "@/sim";
 const SAVE_KEY = "nn.campaign.save.v1";
 const META_KEY = "nn.campaign.meta.v1";
 const ANALYTICS_KEY = "nn.campaign.analytics.v1";
+const CLASSIC_SAVE_KEY = "nn.classic.save.v1";
+const CLASSIC_META_KEY = "nn.classic.meta.v1";
+const MODE_KEY = "nn.mode.v1";
+
+/** Campaign is the step-based simulation; classic is the original week-by-week game. */
+export type GameMode = "campaign" | "classic";
 
 export interface Meta {
   onboarded: boolean;
@@ -69,9 +75,6 @@ export function loadGame():LoadResult {
   return {status:"ok",game:result.game,savedAt:result.envelope.savedAt,remainderMs:result.envelope.runtime.remainderMs};
 }
 export function rawSave():string|null {return read(SAVE_KEY);}
-export function exportLegacyData():string {
-  return JSON.stringify(Object.fromEntries(["nn.save.v1","nn.meta.v1","nn.analytics.v1"].map(k=>[k,read(k)])),null,2);
-}
 export function saveGame(game:GameState,remainderMs=0,explicitReset=false):boolean {
   let current:string|null;
   try {current=window.localStorage.getItem(SAVE_KEY);}catch{return false;}
@@ -82,8 +85,66 @@ export function clearSave(): void {
   remove(SAVE_KEY);
 }
 
-export function loadMeta(): Meta {
-  const raw = read(META_KEY);
+/** The mode last played. Anything else, including no choice yet, means campaign. */
+export function loadMode(): GameMode {
+  return read(MODE_KEY) === "classic" ? "classic" : "campaign";
+}
+
+export function saveMode(mode: GameMode): void {
+  write(MODE_KEY, mode);
+}
+
+const PHASES = new Set(["management", "incident", "review", "ended"]);
+
+function looksLikeClassicGame(g: unknown): g is GameState {
+  if (!g || typeof g !== "object") return false;
+  const s = g as Partial<GameState>;
+  return (
+    s.version === SAVE_VERSION &&
+    s.campaign === undefined &&
+    typeof s.turn === "number" &&
+    typeof s.cash === "number" &&
+    typeof s.users === "number" &&
+    typeof s.rngState === "number" &&
+    typeof s.phase === "string" &&
+    PHASES.has(s.phase) &&
+    !!s.infra &&
+    Array.isArray(s.infra.appHosts) &&
+    s.infra.appHosts.length > 0 &&
+    Array.isArray(s.techDone) &&
+    Array.isArray(s.tasks) &&
+    Array.isArray(s.releases) &&
+    Array.isArray(s.history) &&
+    Array.isArray(s.log) &&
+    Array.isArray(s.postmortems) &&
+    !!s.live &&
+    !!s.totals &&
+    (s.phase !== "incident" || !!s.incident)
+  );
+}
+
+export type ClassicLoadResult = { status: "none" } | { status: "ok"; game: GameState } | { status: "corrupt" };
+
+/** An unreadable classic save is reported as corrupt, and the next run is written over it. */
+export function loadClassicGame(): ClassicLoadResult {
+  const raw = read(CLASSIC_SAVE_KEY);
+  if (!raw) return { status: "none" };
+  try {
+    const parsed = JSON.parse(raw) as { game?: unknown };
+    if (looksLikeClassicGame(parsed.game)) return { status: "ok", game: parsed.game };
+  } catch {
+    /* fall through to corrupt */
+  }
+  return { status: "corrupt" };
+}
+
+export function saveClassicGame(game: GameState): boolean {
+  return write(CLASSIC_SAVE_KEY, JSON.stringify({ savedAt: Date.now(), game }));
+}
+
+/** Each mode keeps its own tutorial and run counters. */
+export function loadMeta(mode: GameMode = "campaign"): Meta {
+  const raw = read(mode === "classic" ? CLASSIC_META_KEY : META_KEY);
   if (!raw) return { ...DEFAULT_META };
   try {
     return { ...DEFAULT_META, ...(JSON.parse(raw) as Partial<Meta>) };
@@ -92,8 +153,8 @@ export function loadMeta(): Meta {
   }
 }
 
-export function saveMeta(meta: Meta): void {
-  write(META_KEY, JSON.stringify(meta));
+export function saveMeta(meta: Meta, mode: GameMode = "campaign"): void {
+  write(mode === "classic" ? CLASSIC_META_KEY : META_KEY, JSON.stringify(meta));
 }
 
 /* ------------------------------------------------------------------ */
@@ -116,7 +177,8 @@ export type AnalyticsName =
   | "voluntary_replay"
   | "rating_submitted"
   | "save_resumed"
-  | "save_imported";
+  | "save_imported"
+  | "mode_switched";
 
 export interface AnalyticsEvent {
   t: string;

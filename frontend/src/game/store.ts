@@ -10,12 +10,27 @@ import {
   incidentTick,
   inspectable,
   newGame,
+  newLegacyGame,
   type Action,
   type EquipmentId,
   type GameState,
   type TechId,
 } from "@/sim";
-import { clearSave, DEFAULT_META, loadGame, loadMeta, saveGame, saveMeta, track, type Meta } from "./persist";
+import {
+  clearSave,
+  DEFAULT_META,
+  loadClassicGame,
+  loadGame,
+  loadMeta,
+  loadMode,
+  saveClassicGame,
+  saveGame,
+  saveMeta,
+  saveMode,
+  track,
+  type GameMode,
+  type Meta,
+} from "./persist";
 import { decodeSave } from "./saveEnvelope";
 
 export type View = "tech" | "engineers" | "history" | "menu" | null;
@@ -51,6 +66,8 @@ export interface Toast {
 }
 
 interface Store {
+  /** Which game is being played. The active game and meta always belong to this mode. */
+  mode: GameMode;
   remainderMs: number;
   saveBlocked: boolean;
   /** False until the saved game (if any) has been read from the browser. */
@@ -84,6 +101,11 @@ interface Store {
   setRunning: (running: boolean) => void;
   setSpeed: (speed: Speed) => void;
   newRun: (opts?: { seed?: string | number; voluntary?: boolean }) => void;
+  /**
+   * Save the current run and continue the other mode's saved run, or start one.
+   * Refuses (returning false) when the current run cannot be saved, unless `discard` accepts losing it.
+   */
+  switchMode: (mode: GameMode, opts?: { discard?: boolean }) => boolean;
   saveNow: () => void;
   /** Replace the current company with an exported save. Returns false if the file is not a usable save. */
   importSave: (raw: string) => boolean;
@@ -186,13 +208,79 @@ export const useGame = create<Store>()((set, get) => {
 
     if (meta !== get().meta) {
       patch.meta = meta;
-      saveMeta(meta);
+      saveMeta(meta, "classic");
     }
     set(patch);
-    if (opts.save !== false) saveGame(next);
+    if (opts.save !== false) saveClassicGame(next);
+  }
+
+  /** Write the active run to its mode's save slot. */
+  function persist(): boolean {
+    const { mode, game, saveBlocked, remainderMs } = get();
+    if (mode === "classic") return saveClassicGame(game);
+    return !saveBlocked && saveGame(game, remainderMs);
+  }
+
+  /** Make a mode's saved run (or a fresh one) the active game, with every view closed. */
+  function enter(mode: GameMode, started: boolean): void {
+    const meta = loadMeta(mode);
+    const fresh: Partial<Store> = {
+      ready: true,
+      mode,
+      started,
+      meta,
+      running: false,
+      remainderMs: 0,
+      saveBlocked: false,
+      selected: null,
+      hovered: null,
+      view: null,
+      techFocus: null,
+      onboarding: false,
+      tour: null,
+      rating: null,
+      toast: null,
+    };
+    if (mode === "classic") {
+      const loaded = loadClassicGame();
+      if (loaded.status === "ok") {
+        track("save_resumed", { mode, week: loaded.game.turn, phase: loaded.game.phase });
+        const offerTour = !meta.tutorialDone && isFreshRun(loaded.game);
+        if (offerTour) track("tutorial_started", { from: "resume" });
+        // A run resumed mid-incident starts paused so nothing burns while the player reorients.
+        set({ ...fresh, game: loaded.game, tour: offerTour ? { track: "basics", step: 0 } : null });
+        return;
+      }
+      const game = newLegacyGame(BALANCE.introSeed);
+      const nextMeta = { ...meta, runsStarted: meta.runsStarted + 1 };
+      saveMeta(nextMeta, mode);
+      const saved = saveClassicGame(game);
+      track("run_started", { mode, seed: game.seed, run: nextMeta.runsStarted });
+      if (!meta.tutorialDone) track("tutorial_started", { from: "first_visit" });
+      set({ ...fresh, game, meta: nextMeta, tour: meta.tutorialDone ? null : { track: "basics", step: 0 } });
+      if (!saved) get().notify("Could not save. Play continues in memory.", "error");
+      else if (loaded.status === "corrupt") get().notify("Saved classic run was unreadable. Started a new one.", "error");
+      return;
+    }
+    const loaded = loadGame();
+    if (loaded.status === "ok") {
+      set({ ...fresh, game: loaded.game, remainderMs: loaded.remainderMs });
+      track("save_resumed", { mode, step: loaded.game.campaign!.step });
+      return;
+    }
+    const game = newGame(BALANCE.introSeed, crypto.randomUUID());
+    const blocked = loaded.status !== "none";
+    const nextMeta = blocked ? meta : { ...meta, runsStarted: meta.runsStarted + 1 };
+    set({ ...fresh, game, meta: nextMeta, saveBlocked: blocked });
+    if (!blocked) {
+      saveMeta(nextMeta, mode);
+      if (!saveGame(game)) get().notify("Could not save. Play continues in memory; export your company from the menu.", "error");
+      track("run_started", { mode, seed: game.seed });
+    } else get().notify("Existing save could not be loaded. It has been preserved. Export it from the menu before explicitly starting a new company.", "error");
   }
 
   return {
+    mode: "campaign",
     remainderMs: 0,
     saveBlocked: false,
     ready: false,
@@ -211,19 +299,8 @@ export const useGame = create<Store>()((set, get) => {
     rating: null,
 
     boot: () => {
-      if(get().ready)return;
-      const meta=loadMeta(),loaded=loadGame();
-      if(loaded.status==="ok") {
-        set({ready:true,meta,game:loaded.game,running:false,remainderMs:loaded.remainderMs,tour:null,saveBlocked:false});
-        track("save_resumed",{step:loaded.game.campaign!.step});
-        return;
-      }
-      const game=newGame(BALANCE.introSeed,crypto.randomUUID());
-      const blocked=loaded.status!=="none";
-      const nextMeta=blocked?meta:{...meta,runsStarted:meta.runsStarted+1};
-      set({ready:true,game,meta:nextMeta,running:false,tour:null,saveBlocked:blocked,remainderMs:0});
-      if(!blocked){saveMeta(nextMeta);if(!saveGame(game))get().notify("Could not save. Play continues in memory; export your company from the menu.","error");track("run_started",{seed:game.seed});}
-      else get().notify("Existing save could not be loaded. It has been preserved. Export it from the menu before explicitly starting a new company.","error");
+      if (get().ready) return;
+      enter(loadMode(), false);
     },
 
     play: () => set({ started: true }),
@@ -290,19 +367,19 @@ export const useGame = create<Store>()((set, get) => {
     focusTech: (id) => set({ techFocus: id, view: id ? "tech" : get().view }),
     setRunning: (running) => {
       set({ running: running && get().view!=="menu" && !document.hidden && !["review","ended"].includes(get().game.phase) });
-      if (!running && !get().saveBlocked && !saveGame(get().game,get().remainderMs))get().notify("Could not save. Play continues in memory.","error");
+      if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
     setSpeed: (speed) => set({ speed }),
 
     newRun: (opts = {}) => {
-      const { meta, game: old } = get();
+      const { meta, mode, game: old } = get();
       const seed = opts.seed !== undefined && opts.seed !== "" ? opts.seed : Math.floor(Math.random() * 1_000_000_000);
-      const game = newGame(seed,crypto.randomUUID());
+      const game = mode === "classic" ? newLegacyGame(seed) : newGame(seed, crypto.randomUUID());
       const nextMeta = { ...meta, runsStarted: meta.runsStarted + 1 };
-      saveMeta(nextMeta);
-      const saved = saveGame(game,0,true);
+      saveMeta(nextMeta, mode);
+      const saved = mode === "classic" ? saveClassicGame(game) : saveGame(game, 0, true);
       if (opts.voluntary) track("voluntary_replay", { previousOutcome: old.outcome, previousWeeks: old.totals.weeks });
-      track("run_started", { seed: game.seed, run: nextMeta.runsStarted });
+      track("run_started", { mode, seed: game.seed, run: nextMeta.runsStarted });
       set({
         game,
         remainderMs:0,
@@ -322,8 +399,17 @@ export const useGame = create<Store>()((set, get) => {
       if(!saved)get().notify("Could not save. Play continues in memory; export your company from the menu.","error");
     },
 
+    switchMode: (mode, opts = {}) => {
+      if (mode === get().mode) return true;
+      if (!persist() && !opts.discard) return false;
+      saveMode(mode);
+      track("mode_switched", { to: mode });
+      enter(mode, true);
+      return true;
+    },
+
     saveNow: () => {
-      const okSave = !get().saveBlocked && saveGame(get().game,get().remainderMs);
+      const okSave = persist();
       get().notify(okSave ? "Saved" : "Could not save: browser storage is unavailable.", okSave ? "success" : "error");
     },
 
@@ -343,7 +429,7 @@ export const useGame = create<Store>()((set, get) => {
 
     finishOnboarding: () => {
       const meta = { ...get().meta, onboarded: true };
-      saveMeta(meta);
+      saveMeta(meta, get().mode);
       if (!get().meta.onboarded) track("onboarding_completed");
       set({ meta, onboarding: false });
     },
@@ -367,7 +453,7 @@ export const useGame = create<Store>()((set, get) => {
       } else {
         next = { ...meta, incidentGuideDone: true };
       }
-      saveMeta(next);
+      saveMeta(next, get().mode);
       // The incident guide holds the clock; closing it lets the incident run.
       set({ tour: null, meta: next, running: tour.track === "incident" && game.phase === "incident" ? true : get().running });
     },
