@@ -1,4 +1,6 @@
 "use client";
+import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
+import { archiveEvents } from "./persist";
 import { clone } from "@/sim/state";
 import { trace } from "@/sim/trace";
 import { advanceSteps } from "@/sim/step";
@@ -52,6 +54,12 @@ export interface Toast {
 }
 
 interface Store {
+  hasRun: boolean;
+  measurement: Measurement;
+  activeMark: number | null;
+  measureTime: () => void;
+  endSession: () => void;
+  observer: (source:"recruited"|"organic"|"unspecified", intervention?:string) => void;
   remainderMs: number;
   saveBlocked: boolean;
   /** False until the saved game (if any) has been read from the browser. */
@@ -72,6 +80,7 @@ interface Store {
   tour: Tour | null;
   rating: number | null;
 
+  onboardingMove: (direction: "next" | "back" | "skip") => void;
   boot: () => void;
   /** Leave the title screen and start (or continue) playing. */
   play: () => void;
@@ -85,7 +94,7 @@ interface Store {
   setRunning: (running: boolean) => void;
   setSpeed: (speed: Speed) => void;
   newRun: (opts?: { seed?: string | number; voluntary?: boolean }) => void;
-  saveNow: () => void;
+  saveNow: (quiet?:boolean) => void;
   finishOnboarding: () => void;
   showOnboarding: () => void;
   startTour: (track: TourTrack) => void;
@@ -102,6 +111,22 @@ let toastId = 1;
 let lastIncidentSave = 0;
 
 export const useGame = create<Store>()((set, get) => {
+  function persistCurrent(explicitReset=false):boolean {
+    const s=get();
+    if(s.saveBlocked)return false;
+    const saved=saveGame(s.game,s.remainderMs,explicitReset,s.measurement);
+    if(saved && archiveEvents(s.measurement.pending)) {
+      set({measurement:{...s.measurement,pending:[]}});
+      return true;
+    }
+    s.notify("Storage could not preserve all progress or playtest records. Keep this tab open and export from the menu.","error");
+    return false;
+  }
+  function uiEvent(name:string,data:Record<string,string|number|boolean|null>={}) {
+    get().measureTime();
+    const m=structuredClone(get().measurement);
+    event(m,get().game,name,data);set({measurement:m});
+  }
   /** Apply a new game state, record analytics for phase changes and save. */
   function commit(next: GameState, opts: { save?: boolean } = {}): void {
     const prev = get().game;
@@ -109,13 +134,11 @@ export const useGame = create<Store>()((set, get) => {
       const was=prev.campaign, c=next.campaign;
       const patch:Partial<Store>={game:next};
       if(!was?.firstPauseConsumed && c.firstPauseConsumed)patch.running=false;
-      if(next.phase==="review"||next.phase==="ended")patch.running=false;
-      if(prev.phase!=="incident"&&next.phase==="incident")track("incident_started",{step:c.step});
-      if(prev.phase==="incident"&&next.phase==="review")track("incident_completed",{step:c.step});
-      if(prev.phase!=="ended"&&next.phase==="ended")track("run_finished",{outcome:"bankrupt",step:c.step});
+      if(next.phase==="review"||next.phase==="ended"||(c.openingMilestone&&!c.openingMilestone.acknowledged))patch.running=false;
+      get().measureTime();
+      patch.measurement=projectEvents(get().measurement,next,new Date().toISOString());
       set(patch);
-      if(opts.save!==false&&!get().saveBlocked&&!saveGame(next,get().remainderMs))
-        get().notify("Could not save. Play continues in memory; export your campaign from the menu.","error");
+      if(opts.save!==false)persistCurrent();
       return;
     }
     let meta = get().meta;
@@ -192,6 +215,9 @@ export const useGame = create<Store>()((set, get) => {
   }
 
   return {
+    hasRun:false,
+    measurement:emptyMeasurement(),
+    activeMark:null,
     remainderMs: 0,
     saveBlocked: false,
     ready: false,
@@ -213,21 +239,66 @@ export const useGame = create<Store>()((set, get) => {
       if(get().ready)return;
       const meta=loadMeta(),loaded=loadGame();
       if(loaded.status==="ok") {
-        set({ready:true,meta,game:loaded.game,running:false,remainderMs:loaded.remainderMs,tour:null,saveBlocked:false});
-        track("save_resumed",{step:loaded.game.campaign!.step});
+        set({ready:true,hasRun:true,meta,game:loaded.game,measurement:loaded.measurement,running:false,
+          remainderMs:loaded.remainderMs,tour:null,saveBlocked:false,activeMark:null});
         return;
       }
-      const game=newGame(BALANCE.introSeed,crypto.randomUUID());
       const blocked=loaded.status!=="none";
-      const nextMeta=blocked?meta:{...meta,runsStarted:meta.runsStarted+1};
-      set({ready:true,game,meta:nextMeta,running:false,tour:null,saveBlocked:blocked,remainderMs:0});
-      if(!blocked){saveMeta(nextMeta);if(!saveGame(game))get().notify("Could not save. Play continues in memory; export your company from the menu.","error");track("run_started",{seed:game.seed});}
-      else get().notify("Existing save could not be loaded. It has been preserved. Export it from the menu before explicitly starting a new company.","error");
+      set({ready:true,hasRun:false,meta,running:false,tour:null,saveBlocked:blocked,remainderMs:0});
+      if(blocked)get().notify("Existing save could not be loaded. It has been preserved. Export it before explicitly starting a new company.","error");
+    },
+    play: () => {
+      if(get().started)return;
+      const state=get();
+      const game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID());
+      const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
+      const status=meta.openingOnboarding.status;
+      const measurement=beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString());
+      set({game,hasRun:true,meta,measurement,started:true,running:false,
+        onboarding:status==="not-started"||status==="in-progress",activeMark:document.hidden?null:performance.now()});
+      if(!saveMeta(meta))get().notify("Onboarding preferences could not be saved.","error");
+      persistCurrent();
+    },
+    measureTime: () => {
+      const s=get(),now=performance.now();
+      const m=structuredClone(s.measurement);
+      if(s.activeMark!==null&&s.started&&m.session&&!m.session.endedAt) {
+        const elapsed=Math.max(0,now-s.activeMark);
+        m.activeMs+=elapsed;m.session.activeMs+=elapsed;
+      }
+      set({measurement:m,activeMark:s.started&&!document.hidden&&m.session&&!m.session.endedAt?now:null});
+    },
+    endSession: () => {
+      if(!get().started)return;
+      uiEvent("early_exit",{outcome:get().game.phase});
+      if(get().game.campaign!.incident)uiEvent("incident_abandoned",{incidentId:get().game.campaign!.incident!.id});
+      const m=structuredClone(get().measurement);if(m.session)m.session.endedAt=new Date().toISOString();
+      set({measurement:m,running:false,activeMark:null});persistCurrent();
+      set({started:false,onboarding:false,view:null});
+    },
+    observer: (source,intervention) => {
+      const m=structuredClone(get().measurement);
+      if(!m.session)return;
+      m.session.source=source;
+      if(intervention?.trim())m.session.facilitatorInterventions++;
+      set({measurement:m});
+      if(intervention?.trim())uiEvent("facilitator_intervention",{note:intervention.trim()});
+      else uiEvent("session_context",{source});
+      persistCurrent();
+    },
+    onboardingMove: (direction) => {
+      const current=get().meta.openingOnboarding;
+      const done=direction==="skip" || (direction==="next"&&current.step===2);
+      const status=direction==="skip"?"skipped":done?"completed":"in-progress";
+      const step=done?current.step:Math.max(0,Math.min(2,current.step+(direction==="back"?-1:1)));
+      const meta={...get().meta,openingOnboarding:{version:1 as const,step,status:status as Meta["openingOnboarding"]["status"]}};
+      const saved=saveMeta(meta); set({meta,onboarding:!done,running:false});
+      if(!saved)get().notify("Onboarding preferences could not be saved.","error");
+      persistCurrent();
     },
 
-    play: () => set({ started: true }),
-
     act: (action) => {
+      if(!get().started || get().onboarding || (get().game.campaign?.openingMilestone&&!get().game.campaign!.openingMilestone!.acknowledged&&action.type!=="acknowledge_milestone"))return false;
       const result = applyAction(get().game, action);
       if (!result.ok) {
         if(get().game.campaign) {
@@ -244,7 +315,7 @@ export const useGame = create<Store>()((set, get) => {
 
     advance: () => {
       const { game } = get();
-      if (game.phase !== "management") return;
+      if (!get().started || get().onboarding || (game.campaign?.openingMilestone&&!game.campaign.openingMilestone.acknowledged) || game.phase !== "management") return;
       const next = advanceTurn(game);
       commit(next);
       const r = next.lastReport;
@@ -260,7 +331,7 @@ export const useGame = create<Store>()((set, get) => {
     tick: (dt) => {
       const { game, running, speed } = get();
       if(game.campaign) {
-        if(!running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
+        if(!get().started||(game.campaign.openingMilestone&&!game.campaign.openingMilestone.acknowledged)||get().onboarding||!running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
         const credit=get().remainderMs+Math.round(dt*1000*speed);
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
@@ -286,42 +357,39 @@ export const useGame = create<Store>()((set, get) => {
     openView: (view) => { if(get().game.campaign && view && !["menu","history"].includes(view))return; set({view,running:view==="menu"?false:get().running}); },
     focusTech: (id) => set({ techFocus: id, view: id ? "tech" : get().view }),
     setRunning: (running) => {
-      set({ running: running && get().view!=="menu" && !document.hidden && !["review","ended"].includes(get().game.phase) });
-      if (!running && !get().saveBlocked && !saveGame(get().game,get().remainderMs))get().notify("Could not save. Play continues in memory.","error");
+      set({ running: running && get().started && !(get().game.campaign?.openingMilestone&&!get().game.campaign!.openingMilestone!.acknowledged) && !get().onboarding && get().view!=="menu" && !document.hidden && !["review","ended"].includes(get().game.phase) });
+      get().measureTime();
+      if(!running&&get().started)persistCurrent();
     },
     setSpeed: (speed) => set({ speed }),
 
     newRun: (opts = {}) => {
-      const { meta, game: old } = get();
-      const seed = opts.seed !== undefined && opts.seed !== "" ? opts.seed : Math.floor(Math.random() * 1_000_000_000);
-      const game = newGame(seed,crypto.randomUUID());
-      const nextMeta = { ...meta, runsStarted: meta.runsStarted + 1 };
-      saveMeta(nextMeta);
-      const saved = saveGame(game,0,true);
-      if (opts.voluntary) track("voluntary_replay", { previousOutcome: old.outcome, previousWeeks: old.totals.weeks });
-      track("run_started", { seed: game.seed, run: nextMeta.runsStarted });
-      set({
-        game,
-        remainderMs:0,
-        saveBlocked:false,
-        meta: nextMeta,
-        selected: null,
-        hovered: null,
-        view: null,
-        techFocus: null,
-        running: false,
-        rating: null,
-        onboarding: false,
-        tour: null,
-        started: true,
-        toast: null,
-      });
-      if(!saved)get().notify("Could not save. Play continues in memory; export your company from the menu.","error");
+      const replacementRunId=crypto.randomUUID();
+      const old=get();
+      if(old.started) {
+        uiEvent("run_reset",{previousRunId:old.game.campaign!.runId,replacementRunId});
+        if(old.game.campaign!.incident)uiEvent("incident_abandoned",{incidentId:old.game.campaign!.incident!.id});
+        uiEvent("run_evidence",{campaign:JSON.stringify(old.game)});
+      }
+      const pending=get().measurement.pending;
+      const game=newGame(opts.seed??BALANCE.introSeed,replacementRunId);
+      const m=emptyMeasurement();m.replayOf=old.hasRun?old.game.campaign!.runId:null;
+      // Preserve unsaved old-run records in the same archive. Refuse reset if it cannot retain them.
+      if(pending.length&&!archiveEvents(pending)) {
+        get().notify("Export playtest records before resetting: the archive could not retain this run.","error");return;
+      }
+      const nextMeta={...old.meta,runsStarted:old.meta.runsStarted+1};
+      const measurement=beginSession(m,game,crypto.randomUUID(),new Date().toISOString());
+      set({game,measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
+        selected:null,hovered:null,view:null,techFocus:null,running:false,rating:null,
+        onboarding:["not-started","in-progress"].includes(nextMeta.openingOnboarding.status),tour:null,
+        started:true,toast:null,activeMark:document.hidden?null:performance.now()});
+      saveMeta(nextMeta);persistCurrent(true);
     },
-
-    saveNow: () => {
-      const okSave = !get().saveBlocked && saveGame(get().game,get().remainderMs);
-      get().notify(okSave ? "Saved" : "Could not save: browser storage is unavailable.", okSave ? "success" : "error");
+    saveNow: (quiet=false) => {
+      get().measureTime();
+      const saved=persistCurrent();
+      if(saved&&!quiet)get().notify("Saved","success");
     },
 
     finishOnboarding: () => {
@@ -330,7 +398,10 @@ export const useGame = create<Store>()((set, get) => {
       if (!get().meta.onboarded) track("onboarding_completed");
       set({ meta, onboarding: false });
     },
-    showOnboarding: () => set({ onboarding: true, view: null }),
+    showOnboarding: () => {
+      const meta={...get().meta,openingOnboarding:{version:1 as const,step:0,status:"in-progress" as const}};
+      saveMeta(meta);set({meta,onboarding:true,view:null,running:false});
+    },
 
     startTour: (track_) => {
       if (track_ === "basics") track("tutorial_started", { from: "menu" });

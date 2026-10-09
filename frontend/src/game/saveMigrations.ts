@@ -1,14 +1,16 @@
+import { emptyMeasurement, measurementValid, type Measurement } from "./telemetry";
 import type { GameState } from "@/sim";
 import { newGame } from "@/sim";
 export const CAMPAIGN_SAVE_KEY = "nn.campaign.save.v1";
 export interface SaveEnvelope {
-    schemaVersion: 1;
+    schemaVersion: 2;
     scenarioId: "opening-db";
     scenarioVersion: 1;
     runId: string;
     game: GameState;
     runtime: {
         remainderMs: number;
+        measurement: Measurement;
     };
     savedAt: number;
 }
@@ -53,9 +55,16 @@ export function validateEnvelope(value: unknown): Validation {
         if (!value || typeof value !== "object")
             return { status: "corrupt" };
         const e = value as SaveEnvelope;
-        if (e.schemaVersion !== 1 || e.scenarioId !== "opening-db" || e.scenarioVersion !== 1)
+        if (e.schemaVersion !== 2 || e.scenarioId !== "opening-db" || e.scenarioVersion !== 1)
             return { status: "unsupported" };
         const s = e.game, c = s.campaign!;
+        const milestone=c?.openingMilestone;
+        if(milestone===undefined || (milestone!==null&&(!c.openingRecovered||milestone.id!=="opening-stability"||
+          milestone.incidentId!==c.reports[0]?.id||!integer(milestone.awardedStep)||
+          milestone.awardedStep<c.reports[0].recoveredStep||milestone.awardedStep>c.step||
+          typeof milestone.acknowledged!=="boolean")) || !measurementValid(e.runtime?.measurement) ||
+          e.runtime.measurement.cursor>c.trace.length || e.runtime.measurement.pending.some(x=>x.runId!==c.runId))
+          return {status:"corrupt"};
         if (!finiteTree(e) || !shape(s, newGame()) || !c || !shape(c, newGame().campaign) ||
             !e.runtime || !integer(e.runtime.remainderMs) || e.runtime.remainderMs >= 1000 ||
             !Number.isFinite(e.savedAt) || typeof e.runId !== "string" || !e.runId || e.runId !== c.runId ||
@@ -105,12 +114,12 @@ export function decodeSave(raw: string): Validation {
         return { status: "corrupt" };
     }
 }
-export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.now()): SaveEnvelope {
-    return { schemaVersion: 1, scenarioId: "opening-db", scenarioVersion: 1, runId: game.campaign!.runId, game, runtime: { remainderMs }, savedAt };
+export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.now(), measurement: Measurement = emptyMeasurement()): SaveEnvelope {
+    return { schemaVersion: 2, scenarioId: "opening-db", scenarioVersion: 1, runId: game.campaign!.runId, game, runtime: { remainderMs, measurement }, savedAt };
 }
 /** Future migrations must preserve source bytes before replacing a validated slot. No v0 conversion is registered. */
 export type MigrationRegistry = Readonly<Record<number, (value: unknown) => unknown>>;
-export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migrations: MigrationRegistry = {}): boolean {
+export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migrations: MigrationRegistry = PHASE2_MIGRATIONS): boolean {
     try {
         const original = storage.getItem(CAMPAIGN_SAVE_KEY);
         if (original === null)
@@ -119,20 +128,20 @@ export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migra
             schemaVersion?: number;
         };
         const sourceVersion = value.schemaVersion;
-        if (typeof sourceVersion !== "number" || sourceVersion >= 1 || !migrations[sourceVersion])
+        if (typeof sourceVersion !== "number" || sourceVersion >= 2 || !migrations[sourceVersion])
             return false;
         const backup = `${CAMPAIGN_SAVE_KEY}.backup.v${sourceVersion}`;
         if (storage.getItem(backup) !== null && storage.getItem(backup) !== original)
             return false;
         storage.setItem(backup, original);
-        while (typeof value.schemaVersion === "number" && value.schemaVersion < 1) {
+        while (typeof value.schemaVersion === "number" && value.schemaVersion < 2) {
             const version = value.schemaVersion, migrate = migrations[version];
             if (!migrate)
                 return false;
             value = migrate(value) as {
                 schemaVersion?: number;
             };
-            if (!value || value.schemaVersion !== version + 1)
+            if (!value || (value.schemaVersion !== version + 1 && value.schemaVersion !== 2))
                 return false;
         }
         const result = validateEnvelope(value);
@@ -145,3 +154,19 @@ export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migra
         return false;
     }
 }
+
+/** Preserve scenario v1; only add milestone and application measurement metadata. */
+export const PHASE2_MIGRATIONS: MigrationRegistry = {1: value => {
+    const e=structuredClone(value) as SaveEnvelope;
+    const c=e.game.campaign!;
+    c.openingMilestone=null;
+    if(c.reports.length) {
+      const first=c.reports[0];
+      const ack=c.trace.find(t=>t.type==="review-acknowledged" && t.step>=first.recoveredStep);
+      if(ack)c.openingMilestone={id:"opening-stability",incidentId:first.id,awardedStep:ack.step,acknowledged:true};
+      else if(e.game.phase!=="review" || c.reports.length!==1)throw Error("Ambiguous report acknowledgement");
+    }
+    e.schemaVersion=2;
+    e.runtime.measurement={...emptyMeasurement(),origin:"phase1",runStarted:true,cursor:c.trace.length};
+    return e;
+}};

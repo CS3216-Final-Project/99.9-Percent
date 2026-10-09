@@ -3728,3 +3728,7 @@ button:disabled {
 @media (max-width: 900px) {
   .campaign-header .stat > strong { font-size: 12px; }
 }
+
+.dependency-strip{display:grid;grid-template-columns:1fr 12px 1.5fr 12px 1.5fr;align-items:center;gap:4px;font-size:11px}.dependency-strip .btn{min-width:0;font-size:11px;padding:6px}.dependency-strip [aria-pressed="true"],.selected-evidence{background:#e5f2ff;outline:2px solid #426788;outline-offset:-2px} .campaign-panel :focus-visible{outline:3px solid #426788;outline-offset:3px}
+
+.campaign-entry{max-height:94vh;overflow:auto;max-width:720px}.gameplay-preview{width:100%;max-height:240px;object-fit:cover;border-radius:8px}.campaign-entry h1{font-size:clamp(24px,4vw,42px)}.modal select,.modal textarea{display:block;width:100%;padding:8px;margin:8px 0}.modal :focus-visible{outline:3px solid #426788;outline-offset:2px}

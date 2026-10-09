@@ -365,7 +365,7 @@ export default function Game() {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       const s = useGame.getState();
-      if (!s.started) return;
+      if (!s.started || target?.closest('[role="dialog"]')) return;
       if (e.key === "Escape") {
         if (s.view) s.openView(null);
         else if (s.selected && s.game.phase !== "incident") s.select(null);
@@ -382,6 +382,16 @@ export default function Game() {
     document.addEventListener("visibilitychange",hidden);
     return ()=>document.removeEventListener("visibilitychange",hidden);
   }, []);
+  useEffect(() => {
+    if(!campaign || !started)return;
+    const record=()=>useGame.getState().measureTime();
+    const id=window.setInterval(record,1000);
+    const saveId=window.setInterval(()=>{const s=useGame.getState();if(s.started&&!document.hidden)s.saveNow(true);},10000);
+    const boundary=()=>{record();useGame.getState().saveNow(true);};
+    document.addEventListener("visibilitychange",boundary);
+    window.addEventListener("pagehide",boundary);
+    return ()=>{window.clearInterval(id);window.clearInterval(saveId);document.removeEventListener("visibilitychange",boundary);window.removeEventListener("pagehide",boundary);record();};
+  },[campaign,started]);
   if (!ready) {
     return (
       <main className="boot">

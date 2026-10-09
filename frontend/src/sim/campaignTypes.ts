@@ -108,6 +108,7 @@ export interface Campaign {
     overloadSteps: number;
     incident: CampaignIncident | null;
     reports: CampaignPostmortem[];
+    openingMilestone: null | {id:"opening-stability";incidentId:string;awardedStep:number;acknowledged:boolean};
     openingRecovered: boolean;
     firstPauseConsumed: boolean;
     snapshot: Snapshot;

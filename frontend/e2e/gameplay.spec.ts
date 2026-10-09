@@ -4,10 +4,22 @@ import { advanceSteps } from "../src/sim/step";
 
 for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
   test(`opening acceptance: ${path}`, async ({ page }) => {
-    await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); if(path==="upgrade"){
+      const intro=page.getByRole("dialog",{name:"Company introduction"});
+      await expect(intro).not.toContainText("Upgrade database");
+      await intro.getByRole("button",{name:"Next",exact:true}).click();
+      await intro.getByRole("button",{name:"Next",exact:true}).click();
+      await intro.getByRole("button",{name:"Finish introduction"}).click();
+      expect((await savedGame(page)).campaign!.step).toBe(0);
+    }else await page.getByRole("button",{name:"Skip introduction"}).click();
     await expectRoom(page);
+    await page.getByRole("main").getByRole("button",{name:"Database",exact:true}).click();
+    await expect(page.getByRole("button",{name:/Database.*ops\/s/})).toHaveAttribute("aria-pressed","true");
+    await page.getByRole("button",{name:/Application.*req\/s/}).click();
+    await expect(page.getByText("Selected component:",{exact:false})).toContainText("Application");
     for (let i = 0; i < 6; i++)await page.getByRole("button", { name: "Advance step", exact: true }).click();
-    if (path === "upgrade") await page.screenshot({ path: "test-results/phase1-desktop.png" });
+    await expect(page.getByRole("button",{name:/Database.*ops\/s/})).toHaveAttribute("data-tip", /Demand exceeds capacity.*Backlog: 600/);
+    if (path === "upgrade") await page.screenshot({ path: "test-results/phase2-desktop.png" });
     const opening = (await savedGame(page)).campaign!;
     expect(opening.step).toBe(6);
     await page.getByRole("button", { name: "Inspect metrics · free" }).click();
@@ -17,6 +29,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       await expect.poll(async () => (await savedGame(page)).campaign!.apps.length).toBe(2);
       await page.getByRole("button", { name: "Pause", exact: true }).click();
       expect((await savedGame(page)).campaign!.dbCapacity).toBe(600);
+      await expect(page.getByText("Added application: Installed, not receiving traffic")).toBeVisible();
     }
     await page.getByRole("button", { name: path === "limit" ? "Limit to 500 requests/s" : /Upgrade database/ }).click();
     await page.getByRole("button", { name: "Run", exact: true }).click();
@@ -24,6 +37,9 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     await expect(report).toBeVisible({ timeout: 25000 });
     if (path === "app-then-upgrade") await expect(report).toContainText("did not relieve");
     await report.getByRole("button", { name: "Continue company" }).click();
+    await expect(page.getByRole("dialog",{name:"First growth challenge handled"})).toBeVisible();
+    if(path==="upgrade"){await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();}
+    await page.getByRole("button",{name:"Continue operating"}).click();
     const after = await savedGame(page);
     expect(after.campaign!.runId).toBe(opening.runId); expect(after.phase).toBe("management");
     if (path === "limit") expect(after.campaign!.limit).toBe(500);
@@ -33,7 +49,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
 }
 test("preserves corrupt campaign and legacy data until explicit reset", async ({ page }) => {
   await page.addInitScript(() => { localStorage.setItem("nn.campaign.save.v1", "{"); localStorage.setItem("nn.save.v1", "legacy"); });
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await page.getByRole("button", { name: "Advance step" }).click();
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBe("{");
   await page.getByRole("button", { name: "Menu", exact: true }).click();
@@ -53,7 +69,39 @@ test("resumes an incident paused", async ({ page }) => {
 });
 test("keeps the room playable without downloaded furniture", async ({ page }) => {
   await page.route("**/models/**", route => route.abort());
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await expectRoom(page); await page.getByRole("button", { name: "Advance step" }).click();
   expect((await savedGame(page)).campaign!.step).toBe(1);
+});
+
+test("entry is guest-only and onboarding keyboard focus stays in the dialog", async ({page})=>{
+  await page.goto("/");
+  await expect(page.getByRole("button",{name:"Try Prototype"})).toBeVisible();
+  expect(await page.evaluate(()=>localStorage.getItem("nn.campaign.save.v1"))).toBeNull();
+  await page.screenshot({path:"test-results/phase2-entry.png"});
+  await page.getByRole("button",{name:"Try Prototype"}).click();
+  const dialog=page.getByRole("dialog",{name:"Company introduction"});
+  const next=dialog.getByRole("button",{name:"Next",exact:true});
+  await next.focus();await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button",{name:"Close",exact:true})).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  expect((await savedGame(page)).campaign!.step).toBe(0);
+});
+test("bankruptcy explains finances and explicitly restarts while preserving evidence",async({page})=>{
+  let g=advanceSteps(newGame(1,"bankrupt-test"),6).state;
+  g=advanceSteps(g,53).state;g.campaign!.cashCents=1;g.cash=.01;
+  await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company"}).click();
+  await page.getByRole("button",{name:"Run",exact:true}).click();
+  const ended=page.getByRole("dialog",{name:"Company bankrupt"});
+  await expect(ended).toBeVisible();
+  await expect(ended).toContainText("Last period revenue");
+  await ended.getByRole("button",{name:"Export or start a new company"}).click();
+  const menu=page.getByRole("dialog",{name:"Menu"});
+  const download=page.waitForEvent("download");await menu.getByRole("button",{name:"Export playtest record"}).click();await download;
+  await menu.getByRole("button",{name:"New company",exact:true}).click();
+  await menu.getByRole("button",{name:"Confirm new company"}).click();
+  expect((await savedGame(page)).campaign!.runId).not.toBe("bankrupt-test");
+  const events=await page.evaluate(()=>JSON.parse(localStorage.getItem("nn.campaign.analytics.v1")!));
+  expect(events.filter((e:{name:string})=>e.name==="run_failed")).toHaveLength(1);
 });

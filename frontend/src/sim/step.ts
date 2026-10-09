@@ -28,7 +28,7 @@ export function initialCampaign(runId: string): Campaign {
         revenueCents: 0, costsCents: 0, investedCents: 0,
         cumulative: { admitted: 0, rejected: 0, successful: 0, failed: 0 },
         pending: [], actions: [], consumedEvents: [], overloadSteps: 0, incident: null, reports: [],
-        openingRecovered: false, firstPauseConsumed: false, snapshot, recent: [], trace: [], nextEventId: 1,
+        openingMilestone: null, openingRecovered: false, firstPauseConsumed: false, snapshot, recent: [], trace: [], nextEventId: 1,
     };
     trace(c, "scenario", { scenarioId: Q.id, version: Q.version, configuration: JSON.stringify(Q) });
     return c;
@@ -180,8 +180,18 @@ export function campaignAction(prev: GameState, action: Action): ActionResult {
     if (action.type === "acknowledge_review" && prev.phase === "review") {
         const s = clone(prev);
         s.phase = "management";
-        trace(s.campaign!, "review-acknowledged");
+        const c=s.campaign!, report=c.reports.at(-1)!;
+        trace(c, "review-acknowledged", {incidentId:report.id});
+        if(!c.openingMilestone && report.id===c.reports[0].id) {
+            c.openingMilestone={id:"opening-stability",incidentId:report.id,awardedStep:c.step,acknowledged:false};
+            trace(c,"milestone-awarded",{incidentId:report.id});
+        }
         return { ok: true, state: s };
+    }
+    if(action.type==="acknowledge_milestone") {
+        if(!prev.campaign?.openingMilestone || prev.campaign.openingMilestone.acknowledged)return fail("No milestone awaits acknowledgement.");
+        const s=clone(prev);s.campaign!.openingMilestone!.acknowledged=true;
+        trace(s.campaign!,"milestone-acknowledged");return {ok:true,state:s};
     }
     if (prev.phase === "review" || prev.phase === "ended")
         return fail("Finish review or start a new company before acting.");

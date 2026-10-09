@@ -1,6 +1,6 @@
 import { test, expect, expectRoom, savedGame } from "./fixtures";
 test("inspects evidence and advances a physical step on touch", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).tap();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap(); await page.getByRole("button",{name:"Skip introduction"}).tap();
   await expectRoom(page);
   await page.screenshot({ path: "test-results/phase1-mobile.png" });
   await page.getByRole("button", { name: "Inspect metrics · free" }).tap();

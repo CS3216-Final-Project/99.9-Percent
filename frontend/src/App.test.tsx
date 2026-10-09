@@ -9,7 +9,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 describe("opening UI", () => {
   it("starts paused with immediate evidence and no later progression controls", async () => {
     render(<StrictMode><App /></StrictMode>); expect(await screen.findByTestId("facility")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", {name:"Skip introduction"}));
     expect(screen.getByRole("complementary", { name: "System metrics" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Tech" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Inspect metrics · free" }));
@@ -18,7 +18,7 @@ describe("opening UI", () => {
   });
   it("advances once and cleans up the shared clock on pause/unmount", () => {
     vi.useFakeTimers(); const view = render(<StrictMode><App /></StrictMode>);
-    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", {name:"Skip introduction"}));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(1000)); expect(useGame.getState().game.campaign!.step).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
@@ -26,7 +26,7 @@ describe("opening UI", () => {
     view.unmount(); act(() => vi.advanceTimersByTime(5000)); expect(useGame.getState().game.campaign!.step).toBe(1);
   });
   it("visible interventions lead to review and the same company", () => {
-    vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", {name:"Skip introduction"}));
     for (let i = 0; i < 6; i++)fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
     const id = useGame.getState().game.campaign!.runId;
     expect(screen.getByText(/Stable steps: 0\/5/)).toBeTruthy();
@@ -35,6 +35,7 @@ describe("opening UI", () => {
     act(() => vi.advanceTimersByTime(8000));
     expect(screen.getByRole("dialog", { name: "Incident postmortem" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
+    fireEvent.click(screen.getByRole("button", {name:"Continue operating"}));
     expect(useGame.getState().game.phase).toBe("management"); expect(useGame.getState().running).toBe(false);
     expect(useGame.getState().game.campaign!.runId).toBe(id);
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
@@ -46,7 +47,7 @@ describe("opening UI", () => {
 
   });
   it("hidden-page pause does not resume or catch up", () => {
-    render(<App />); fireEvent.click(screen.getByRole("button", { name: "Play" })); fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    render(<App />); fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", {name:"Skip introduction"})); fireEvent.click(screen.getByRole("button", { name: "Run" }));
     Object.defineProperty(document, "hidden", { configurable: true, value: true }); fireEvent(document, new Event("visibilitychange"));
     expect(useGame.getState().running).toBe(false);
     Object.defineProperty(document, "hidden", { configurable: true, value: false }); fireEvent(document, new Event("visibilitychange"));

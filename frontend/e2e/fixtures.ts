@@ -1,5 +1,6 @@
 import { test as base, expect, type Page } from '@playwright/test';
 import type { GameState } from '../src/sim';
+import { makeEnvelope } from "../src/game/saveMigrations";
 import { DEFAULT_META } from '../src/game/persist';
 
 // These tests render the actual WebGL scene. Unhandled browser errors fail each case.
@@ -14,13 +15,13 @@ export const test = base.extend<{ healthyBrowser: void }>({
 export { expect };
 
 export async function seedSave(page: Page, game: GameState) {
-  await page.addInitScript(({ game, meta }) => {
+  await page.addInitScript(({ envelope, meta }) => {
     // Only create the fixture once; a reload must exercise the real saved state.
     if (localStorage.getItem('nn.campaign.save.v1') === null) {
-      localStorage.setItem('nn.campaign.save.v1', JSON.stringify({schemaVersion:1,scenarioId:"opening-db",scenarioVersion:1,runId:game.campaign!.runId,game,runtime:{remainderMs:0},savedAt:Date.now()}));
+      localStorage.setItem('nn.campaign.save.v1', JSON.stringify(envelope));
       localStorage.setItem('nn.campaign.meta.v1', JSON.stringify(meta));
     }
-  }, { game, meta: { ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 } });
+  }, { envelope:makeEnvelope(game), meta: { ...DEFAULT_META, openingOnboarding:{version:1,step:2,status:"completed"}, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 } });
 }
 
 export async function savedGame(page: Page): Promise<GameState> {

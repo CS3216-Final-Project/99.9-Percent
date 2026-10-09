@@ -29,9 +29,9 @@ describe("campaign data preservation", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("unavailable"); });
     expect(loadGame().status).toBe("unavailable");
   });
-  it("keeps independent onboarding and bounded analytics", () => {
+  it("keeps independent onboarding and untruncated analytics", () => {
     saveMeta({ ...DEFAULT_META, tutorialDone: true }); expect(loadMeta().tutorialDone).toBe(true);
-    for (let i = 0; i < 503; i++)track("run_started"); expect(readAnalytics()).toHaveLength(500);
+    for (let i = 0; i < 503; i++)track("run_started"); expect(readAnalytics()).toHaveLength(503);
   });
   it.each(["backlog", "schedule", "identity", "nonfinite", "nested"])("rejects invalid %s without deleting", kind => {
     const e = makeEnvelope(newGame());
