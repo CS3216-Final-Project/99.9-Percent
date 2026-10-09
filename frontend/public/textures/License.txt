@@ -19,5 +19,5 @@ server-tiles   Poly Haven, "Large Square Pattern 01"   Rob Tuytel
                https://polyhaven.com/a/large_square_pattern_01
 plaster        Poly Haven, "Plastered Wall 04"         Rob Tuytel
                https://polyhaven.com/a/plastered_wall_04
-carpet         ambientCG, "Carpet 016"                 ambientCG (Lennart Demes)
+carpet         ambientCG, "Carpet 016"                 ambientCG
                https://ambientcg.com/a/Carpet016
