@@ -1,1450 +1,371 @@
-# Phase 3 — Application Scaling and Routing
+﻿# Phase 3 — Application Scaling and Routing
 
-> **Project:** 99.99% — System Design Tycoon  
-> **Target:** 12–16 October 2026  
-> **Primary learning outcomes:** LO1 Diagnose bottlenecks; LO2 Choose scaling strategies; LO4 Weigh design trade-offs  
-> **Status:** Detailed implementation plan for Phase 3 only
+> **Project:** 99.99% — System Design Tycoon
+> **Target:** 12–16 October 2026
+> **Learning outcomes:** LO1 Diagnose bottlenecks; LO2 Choose scaling strategies; LO4 Weigh trade-offs
+> **Status:** Authoritative implementation contract; implementation and validation outstanding
+> **Foundation:** Accepted playable Phase 1/2 company, opening-db v1
+> **Continuation:** application-scaling v1, on the same engine
 
----
+# 1. Authority and reuse
 
-# 1. Goal
-
-Extend the same continuous company beyond the opening database incident so that the player can encounter and respond to **application-capacity bottlenecks**.
-
-Phase 3 introduces the core distinction between:
-
-- **vertical scaling** — making one application instance stronger;
-- **horizontal scaling** — adding more application instances;
-- **routing / load balancing** — distributing traffic so added instances actually receive work.
-
-The central learning point is:
-
-> **Installed capacity is not the same as useful capacity.**
-
-Adding another application instance should not automatically improve throughput unless traffic is actually distributed to it.
-
-The phase must also preserve a key earlier lesson:
-
-> **Application scaling must not increase database capacity or fix a database bottleneck.**
-
-This phase continues the **same company, architecture, finances, history, and run identity** established in Phases 1–2.
-
-It must not become a disconnected scaling lesson.
-
----
-
-# 2. Player Experience
-
-The player has already:
-
-```text
-started a company
-→ survived the first database incident
-→ reached the first milestone
-→ continued with the same company
-```
-
-Traffic continues to grow.
-
-Eventually the application tier becomes the new limiting component.
-
-The player should then experience:
-
-```text
-Company grows
-→ app demand approaches capacity
-→ app latency/backlog rises
-→ player compares scaling options
-→ player may add capacity that is not yet routed
-→ player observes limited/no benefit
-→ player enables effective traffic distribution
-→ app bottleneck improves
-→ database remains governed by its own capacity
-→ same company continues
-```
-
-The game should teach through visible consequences, not through a tutorial that says:
-
-> "Buy load balancing now."
-
----
-
-## 2.1 Starting state for Phase 3
-
-Phase 3 begins from a recovered Phase 2 campaign state.
-
-The exact values may be tuned, but a representative setup is:
-
-```text
-Incoming traffic:          700 req/s
-Application instances:     1
-Application capacity:      600 req/s per instance
-Database capacity:         sufficient for this scenario
-Database bottleneck:       not active
-```
-
-The application tier should be the intended constraint in the main Phase 3 scenario.
-
-The database should have enough headroom that the player can clearly distinguish:
-
-```text
-application bottleneck
-vs
-database bottleneck
-```
-
-Do not create a scenario where both are equally saturated unless intentionally used later.
-
----
-
-## 2.2 Application bottleneck develops
-
-As traffic rises:
-
-- routed demand exceeds the active instance's effective capacity;
-- application backlog increases;
-- latency increases;
-- service errors may appear;
-- database demand may remain within capacity.
-
-The architecture and metric panels should make the bottleneck diagnosable.
-
-The player should be able to compare:
-
-```text
-Application demand / capacity
-Database demand / capacity
-```
-
-Example:
-
-```text
-Application: 900 / 600 req/s
-Database:    900 / 1200 ops/s
-```
-
-The player should infer:
-
-> The app tier is overloaded; the database still has headroom.
-
----
-
-## 2.3 Vertical scaling path
-
-The player can choose to **Scale Up**.
-
-Example:
-
-```text
-Application instance:
-600 req/s
-→
-1000 req/s
-```
-
-Expected effects:
-
-- one existing instance becomes stronger;
-- activation has a visible delay;
-- cost increases;
-- routed traffic remains on that instance;
-- app backlog drains if new capacity exceeds demand;
-- database capacity does not change.
-
-This should be a valid response when traffic fits within the larger instance.
-
----
-
-## 2.4 Horizontal scaling path
-
-The player can choose to **Scale Out** by adding another application instance.
-
-Example:
-
-```text
-Before:
-App A capacity = 600 req/s
-
-After adding:
-App A capacity = 600 req/s
-App B capacity = 600 req/s
-Installed total = 1200 req/s
-```
-
-However, if no load balancer / traffic distributor exists yet:
-
-```text
-traffic may still route primarily or entirely to App A
-```
-
-Therefore:
-
-```text
-installed total capacity = 1200
-effective routed capacity ≠ 1200
-```
-
-This is a deliberate teaching moment.
-
-The game must not silently distribute traffic across instances before routing has been introduced.
-
----
-
-## 2.5 Load balancing / routing path
-
-Once the relevant routing capability is available, the player can distribute traffic across healthy instances.
-
-Example:
-
-```text
-Incoming traffic = 900 req/s
-
-Without distribution:
-App A = 900 / 600
-App B = 0 / 600
-
-With balanced distribution:
-App A = 450 / 600
-App B = 450 / 600
-```
-
-Expected effects:
-
-- app utilisation drops;
-- backlog drains;
-- latency improves;
-- service errors decrease;
-- database demand remains determined by admitted application work;
-- database capacity remains unchanged.
-
-The architecture view should make traffic distribution visible enough that the player understands **why** the second instance becomes useful.
-
----
-
-## 2.6 Delayed activation
-
-Both vertical and horizontal scaling should take time.
-
-The player should see:
-
-```text
-Action requested
-→ pending
-→ activation countdown
-→ architecture/capacity change
-```
-
-This reinforces the proposal's requirement that startup or activation delays affect scaling decisions.
-
-Scaling should not happen instantly unless a temporary simplified tuning choice is justified.
-
----
-
-## 2.7 Consequences of the wrong diagnosis
-
-The player should still be able to make mistakes.
-
-For example:
-
-```text
-Database is constrained
-→ player adds app instance
-→ database remains constrained
-```
-
-Likewise:
-
-```text
-App is constrained
-→ player adds second instance
-→ no load balancing
-→ original instance remains overloaded
-```
-
-These are important causal outcomes.
-
-The simulation should not block the action merely because it is suboptimal.
-
----
-
-## 2.8 Continuing campaign identity
-
-After Phase 3 encounters and recoveries:
-
-- preserve the same run/company ID;
-- preserve earlier database upgrade choices;
-- preserve all app instances;
-- preserve cash and recurring costs;
-- preserve postmortem/event history;
-- preserve milestone/progression state.
-
-The player should feel:
-
-> "My architecture is evolving."
-
-not:
-
-> "I started a new lesson."
-
----
-
-# 3. Learning Outcomes
-
-## LO1 — Diagnose bottlenecks
-
-The player should distinguish whether:
-
-- the application tier is overloaded;
-- the database is overloaded;
-- added instances are not receiving traffic.
-
-Evidence includes:
-
-- per-instance routed demand;
-- per-instance capacity;
-- per-instance utilisation;
-- application backlog;
-- database demand/capacity;
-- latency;
-- service errors;
-- architecture/routing state.
-
----
-
-## LO2 — Choose scaling strategies
-
-The player should compare:
-
-### Vertical scaling
-
-Benefits:
-
-- simple;
-- immediate conceptual model;
-- no routing dependency after activation.
-
-Costs / limitations:
-
-- higher cost;
-- still one instance;
-- finite per-instance ceiling;
-- no redundancy benefit by itself.
-
-### Horizontal scaling
-
-Benefits:
-
-- adds instances;
-- increases potential aggregate capacity;
-- supports later redundancy/autoscaling.
-
-Costs / limitations:
-
-- extra instance alone is insufficient if traffic is not distributed;
-- incurs cost;
-- may require load balancing.
-
-### Load balancing
-
-Benefits:
-
-- distributes traffic across instances;
-- makes horizontal capacity usable.
-
-Limitations:
-
-- does not increase database capacity;
-- later reliability still depends on healthy remaining capacity.
-
----
-
-## LO4 — Weigh trade-offs
-
-The player should begin to compare:
-
-```text
-cost
-activation delay
-capacity gained
-architectural complexity
-future flexibility
-```
-
-The game should not establish a universal winner between Scale Up and Scale Out.
-
-Different conditions should support different choices.
-
----
-
-# 4. Engineering
-
-## 4.1 Per-instance application model
-
-Move from aggregate application capacity toward explicit per-instance state.
-
-Each application instance should track at least:
-
-```text
-id
-health / active state
-capacityRps
-routedDemandRps
-processedRps
-backlog
-upgrade level where applicable
-activation state
-```
-
-The simulation should derive:
-
-```text
-aggregate installed capacity
-aggregate routed demand
-effective utilised capacity
-per-instance utilisation
-```
-
-Do not represent horizontal scaling as merely:
-
-```text
-totalAppCapacity += X
-```
-
-without modeling where traffic goes.
-
----
-
-## 4.2 Installed capacity vs effective capacity
-
-The simulation/UI should explicitly distinguish:
-
-```text
-Installed capacity:
-sum of all available instance capacities
-
-Effective routed capacity:
-capacity of instances that actually receive traffic under current routing
-```
-
-This distinction is central to the phase.
-
-The player should be able to observe a second instance existing but not helping if routing is not configured.
-
----
-
-## 4.3 Routing model
-
-Introduce a small, deterministic routing helper.
-
-The routing logic should remain simple.
-
-Recommended initial policies:
-
-```text
-single-target routing
-balanced distribution across eligible instances
-```
-
-Avoid sophisticated policies such as:
-
-- least-connections;
-- weighted routing;
-- geo-routing;
-- session affinity;
-- service mesh behavior.
-
-A simple equal split is sufficient for MVP learning goals.
-
----
-
-## 4.4 Routing eligibility
-
-Traffic should only be distributed to instances that are:
-
-```text
-active
-healthy enough for this phase
-eligible under current routing configuration
-```
-
-Phase 6 will introduce richer health/detection/failover behavior.
-
-Do not prematurely implement reliability semantics here.
-
----
-
-## 4.5 Vertical upgrade action
-
-Implement a vertical scale action that:
-
-- targets an application instance;
-- costs cash;
-- has an activation delay;
-- increases that instance's capacity;
-- activates exactly once;
-- preserves instance identity where practical.
-
-Example:
-
-```text
-App A
-600 req/s
-→
-1000 req/s
-```
-
-Do not make vertical scaling instantaneous if action scheduling already exists.
-
----
-
-## 4.6 Horizontal scale action
-
-Implement an add-instance action that:
-
-- costs cash;
-- creates a pending instance;
-- activates after delay;
-- adds physical installed capacity;
-- does not automatically alter database capacity;
-- does not automatically imply traffic balancing.
-
-The new instance should become visible in the architecture when active.
-
----
-
-## 4.7 Load balancer / routing capability
-
-Implement the minimum capability needed to intentionally distribute traffic.
-
-The player-facing design may present this as:
-
-```text
-Load Balancer
-```
-
-or an equivalent routing control consistent with the project's 2D architecture.
-
-When active:
-
-- traffic can be distributed across eligible app instances;
-- each instance receives deterministic routed demand;
-- aggregate app throughput is derived from individual processing.
-
-The load balancer itself should not become a complex simulated bottleneck in this phase unless already required by the existing model.
-
----
-
-## 4.8 Preserve database constraints
-
-Critical invariant:
-
-```text
-app scaling
-≠
-database scaling
-```
-
-Adding app instances, upgrading app capacity, or load balancing must not increase:
-
-```text
-database capacity
-```
-
-If database demand exceeds capacity, the database should still accumulate backlog regardless of frontend capacity.
-
-This preserves continuity with the Phase 1 learning objective and the proposal.
-
----
-
-## 4.9 Action delays
-
-Use the same shared action scheduler introduced earlier.
-
-Each scaling action should have:
-
-```text
-requested step
-activation step
-cost
-target
-result
-```
-
-The player should be able to see pending capacity.
-
-The architecture should not update early.
-
----
-
-## 4.10 Metric updates
-
-Extend snapshots with per-instance metrics.
-
-Suggested fields:
-
-```text
-appInstances: [
-  {
-    id,
-    routedDemandRps,
-    capacityRps,
-    utilisation,
-    backlog,
-    active
-  }
-]
-```
-
-Also keep aggregate values for readability.
-
-The UI may show both:
-
-```text
-App tier total
-+
-per-instance details
-```
-
----
-
-## 4.11 Architecture visualization
-
-Update the Phase 2 architecture view so multiple app instances are visually represented.
-
-Example:
-
-```text
-             ┌→ App A ─┐
-Users → LB ──┤         ├→ Database
-             └→ App B ─┘
-```
-
-Before load balancing, a second instance might appear but show:
-
-```text
-0 routed req/s
-```
-
-or another clear indication that it is not receiving traffic.
-
-The visual should help players understand the relationship between:
-
-```text
-capacity
-routing
-utilisation
-```
-
----
-
-## 4.12 Progressive reveal
-
-Scaling controls should not appear before the opening milestone.
-
-After the milestone:
-
-- reveal Scale Up;
-- reveal Scale Out;
-- reveal load-balancing capability at the intended progression point.
-
-The exact reveal sequence may be simple in Phase 3 and formalized later in Phase 5.
-
-Do not implement the entire nine-node research tree yet.
-
----
-
-## 4.13 Account sign-in and cloud saves
-
-The master roadmap requires Phase 3 to deliver:
-
-```text
-working Google sign-in
-owner-scoped cloud saves
-```
-
-This is a parallel release requirement, not a simulation mechanic.
-
-Required MVP behavior:
-
-- guest play remains available;
-- player can sign in with Google;
-- first-time sign-in creates an account; returning Google sign-in resolves the same account;
-- an unexpired app session can be restored after reload, and sign-out revokes that session;
-- cancelling Google sign-in returns to playable guest/local state;
-- expired or failed authentication offers reauthentication while preserving local progress;
-- current local run can be associated with the authenticated owner;
-- cloud saves are scoped to that user;
-- one user cannot load another user's run;
-- save revisions prevent silent overwrites.
-- switching accounts does not automatically attach the previous account's local run to the next account; guest-run attachment requires an explicit selection.
-
-Use the backend foundation started in Phase 2.
-
-Retain Neon/Drizzle behind the existing Express API. Implement [Google OAuth and app sessions](../AUTHENTICATION.md): validate the Google callback server-side, map the verified issuer/subject to an account, and use the app session for subsequent API requests. Include the verified owner in every save query. Do not trust an owner ID supplied in a save payload.
-
-Perform revision checks atomically: one update matches the save ID, verified owner, and expected revision, updates the snapshot, and increments the revision. A prior SELECT followed by an unconditional UPDATE is insufficient. The existing Neon HTTP driver supports this single-statement approach; do not assume callback-style interactive transactions. Test two concurrent saves from the same revision: one succeeds and the other receives a conflict, with local copies preserved.
-
-Do not make authentication mandatory to begin the game.
-
----
-
-## 4.14 Save schema evolution
-
-Phase 3 save state must persist:
-
-- multiple application instances;
-- per-instance capacities;
-- routing configuration;
-- pending scaling actions;
-- architecture history;
-- same campaign identity.
-
-If the schema version changes, migrate or safely reject incompatible saves rather than silently corrupting state.
-
-Rejection must be non-destructive: retain the original data and offer export. Preserve all legacy prototype keys, and test that sign-in, sign-out, cloud resume, and failed migration do not remove or overwrite them. Supported new-format migrations operate on a copy and replace the active save only after validation succeeds.
-
----
-
-# 5. Existing Modules
-
-The IDE should inspect the current repository before implementing.
-
-Likely relevant areas:
-
-```text
-simulation state/types
-shared step engine
-action scheduler
-derived metrics
-application equipment controls
-architecture view
-campaign store
-local persistence
-backend client
-auth adapter
-cloud-save adapter
-```
-
-Likely files may include equivalents of:
-
-```text
-src/sim/types.ts
-src/sim/state.ts
-src/sim/step.ts
-src/sim/actions.ts
-src/sim/derive.ts
-src/game/store.ts
-src/game/persist.ts
-src/components/ArchitectureCanvas.tsx
-src/components/SidePanel.tsx
-src/backend/client.ts
-src/backend/saveAdapter.ts
-```
-
-Reuse existing abstractions where possible.
-
----
-
-# 6. New Modules
-
-The master roadmap calls for:
-
-```text
-small routing helper
-cloud-save revision handling
-```
-
-Possible additions:
-
-```text
-src/sim/routing.ts
-src/backend/cloudSaveRevision.ts
-```
-
-Potential supporting tests:
-
-```text
-src/sim/routing.test.ts
-src/backend/cloudSaveRevision.test.ts
-```
-
-Exact names should follow repository conventions.
-
-Do not build a broad networking abstraction.
-
----
-
-# 7. Automated Testing
-
-## 7.1 Per-instance routing
-
-Test:
-
-- one instance receives all traffic under single-target routing;
-- second inactive instance receives zero traffic;
-- active second instance still receives zero if routing is not changed;
-- balanced routing splits demand deterministically;
-- sum of routed demand equals admitted demand where capacity/routing allows.
-
----
-
-## 7.2 Vertical scaling
-
-Test:
-
-- requested vertical upgrade enters pending state;
-- capacity does not increase before activation;
-- capacity increases exactly once;
-- same instance identity is preserved where intended;
-- cost is applied once;
-- app backlog drains when upgraded capacity exceeds demand.
-
----
-
-## 7.3 Horizontal scaling
-
-Test:
-
-- adding an instance creates pending capacity;
-- new instance appears only when activated;
-- installed capacity increases;
-- without balancing, original routing behavior remains;
-- new instance does not automatically receive useful traffic.
-
----
-
-## 7.4 Load balancing
-
-Test:
-
-Example:
-
-```text
-Traffic = 900 req/s
-App A = 600 capacity
-App B = 600 capacity
-```
-
-Without load balancing:
-
-```text
-App A = 900 routed
-App B = 0 routed
-```
-
-With equal distribution:
-
-```text
-App A = 450
-App B = 450
-```
-
-Verify:
-
-- per-instance utilisation;
-- aggregate app throughput;
-- backlog reduction;
-- deterministic split.
-
----
-
-## 7.5 Database constraint preservation
-
-Test:
-
-```text
-DB capacity = 600 ops/s
-Traffic = 900 req/s
-```
-
-Even after:
-
-- app vertical scaling;
-- app horizontal scaling;
-- load balancing;
-
-database capacity remains:
-
-```text
-600 ops/s
-```
-
-If 900 DB ops/s are generated:
-
-```text
-DB remains overloaded
-```
-
-This is a critical regression test.
-
----
-
-## 7.6 Aggregate accounting
-
-Verify:
-
-```text
-sum(per-instance processed)
-=
-aggregate app processed
-```
-
-and:
-
-```text
-sum(per-instance routed demand)
-=
-aggregate routed demand
-```
-
-within defined admission/routing semantics.
-
-No traffic should be double-counted.
-
----
-
-## 7.7 Activation delays
-
-Test:
-
-- app upgrades activate on configured step;
-- new instances activate on configured step;
-- routing changes activate consistently with scheduler rules;
-- multiple pending actions do not activate twice.
-
----
-
-## 7.8 Save/resume
-
-Test persistence of:
-
-- multiple app instances;
-- capacities;
-- routing state;
-- pending actions;
-- campaign ID;
-- cash;
-- prior milestone;
-- prior postmortem/history.
-
-Resume must reconstruct the same architecture.
-
----
-
-## 7.9 Google sign-in and cloud-save ownership
-
-Test:
-
-- new and returning Google sign-in resolve the correct account;
-- cancellation, invalid/replayed callbacks, and failed token validation preserve local play;
-- app-session reload restoration, expiry, and sign-out revocation work;
-- authenticated user can save own run;
-- authenticated user can load own run;
-- one user cannot load/update another user's run;
-- guest/local play remains possible.
-
----
-
-## 7.10 Cloud-save conflicts
-
-Test:
-
-- revision increments on successful save;
-- stale revision does not silently overwrite newer state;
-- conflict produces a safe resolution path;
-- both versions are preserved where required by the master roadmap.
-
----
-
-## 7.11 Full Phase 3 acceptance paths
-
-### Path A — Vertical scale succeeds
-
-```text
-app overloaded
-→ player scales up
-→ activation delay
-→ app capacity increases
-→ backlog drains
-→ DB remains healthy
-```
-
-### Path B — Horizontal scale without routing is ineffective
-
-```text
-app overloaded
-→ player adds second instance
-→ second instance activates
-→ traffic remains on first instance
-→ first instance stays overloaded
-→ player inspects routing
-```
-
-### Path C — Horizontal scale + load balancing succeeds
-
-```text
-app overloaded
-→ add second instance
-→ activate routing/LB
-→ traffic distributes
-→ app utilisation drops
-→ backlog drains
-```
-
-### Path D — Database bottleneck remains database bottleneck
-
-```text
-DB overloaded
-→ player adds app instance
-→ player enables LB
-→ DB still overloaded
-```
-
-This confirms earlier learning has not been broken.
-
----
-
-# 8. Human Validation
-
-The main Phase 3 validation question is:
-
-> **Do players understand that adding a server and distributing traffic are separate concepts?**
-
----
-
-## 8.1 Suggested test
-
-Use a small group of fresh or returning testers.
-
-Present an application-overload situation.
-
-Before the player acts, ask:
-
-> "What do you think will happen if you add another application server?"
-
-Record the prediction before they see the result.
-
-Then allow them to add the instance.
-
-If routing is not enabled, observe whether they notice:
-
-- the new server exists;
-- it receives little/no traffic;
-- original app remains overloaded.
-
-Then allow or reveal load balancing.
-
-Ask afterward:
-
-> "What changed when traffic started being distributed?"
-
----
-
-## 8.2 Observe
-
-Record:
-
-- whether player identifies app rather than DB as bottleneck;
-- whether player assumes total installed capacity is automatically usable;
-- whether architecture visualization explains routing;
-- whether the player understands why the second server initially did not help;
-- whether they understand load balancing after seeing the consequence;
-- whether they understand DB capacity is unaffected;
-- whether action delay feels meaningful or merely annoying.
-
----
-
-## 8.3 Success signal
-
-A player should be able to explain something similar to:
-
-> "Adding the second server gave me more potential capacity, but it didn't help until traffic was actually split across both servers."
-
-and:
-
-> "That still wouldn't fix a database bottleneck because the database has its own capacity."
-
-Do not provide these statements before testing.
-
----
-
-# 9. Definition of Done
-
-Phase 3 is complete only when all of the following are true.
-
-## Application model
-
-- [ ] Application instances are modeled individually.
-- [ ] Each instance has its own capacity.
-- [ ] Each instance receives explicit routed demand.
-- [ ] Per-instance utilisation is derived correctly.
-- [ ] Aggregate app metrics equal the sum of per-instance behavior.
-
-## Vertical scaling
-
-- [ ] Scale Up action works.
-- [ ] Capacity increases only after activation delay.
-- [ ] Cost is applied correctly.
-- [ ] Vertical scaling can resolve an app bottleneck when appropriate.
-- [ ] Vertical scaling does not change DB capacity.
-
-## Horizontal scaling
-
-- [ ] Scale Out action works.
-- [ ] New instance activates after delay.
-- [ ] Installed capacity increases.
-- [ ] New instance is visually represented.
-- [ ] New instance does not silently receive balanced traffic before routing is enabled.
-
-## Routing / load balancing
-
-- [ ] Traffic distribution is explicit and deterministic.
-- [ ] Load balancing makes horizontal capacity useful.
-- [ ] Routed demand is visible.
-- [ ] Balanced routing reduces app overload when enough capacity exists.
-- [ ] Load balancing does not change DB capacity.
-
-## Player experience
-
-- [ ] Scaling options appear only after the opening milestone.
-- [ ] Player can compare Scale Up and Scale Out.
-- [ ] Player can experience ineffective horizontal scaling without routing.
-- [ ] Consequences are visible in architecture and metrics.
-- [ ] Same company continues through the phase.
-
-## Persistence / backend
-
-- [ ] Guest play still works.
-- [ ] Google sign-in works for new and returning players.
-- [ ] App-session restoration and revocation on sign-out work.
-- [ ] Expired authentication preserves local changes and can be recovered.
-- [ ] Account switching never silently reassigns an owned run.
-- [ ] Cloud save works for authenticated users.
-- [ ] Saves are owner-scoped.
-- [ ] Cloud revision handling prevents silent overwrite.
-- [ ] Cross-session resume preserves the same campaign.
-- [ ] Legacy save/meta/analytics values remain unchanged and the legacy save can be exported.
-
-## Testing
-
-- [ ] Per-instance routing tests pass.
-- [ ] Aggregate accounting tests pass.
-- [ ] Activation-delay tests pass.
-- [ ] Database-constraint regression tests pass.
-- [ ] Save ownership tests pass.
-- [ ] Cloud conflict tests pass.
-- [ ] Phase 1–2 regression tests remain healthy.
-- [ ] Typecheck passes or known pre-existing failures are documented.
-- [ ] Production build passes or known pre-existing failures are documented.
-
----
-
-# 10. Dependencies
-
-Phase 3 depends on Phases 1–2 and the backend foundation.
-
-Required simulation foundation:
-
-- deterministic shared step engine;
-- state-based incident/recovery behavior;
-- action scheduler;
-- database constraint model;
-- structured metrics;
-- same-company continuation.
-
-Required Phase 2 product foundation:
-
-- readable 2D architecture view;
-- metric UI;
-- local save/reset;
-- first milestone;
-- campaign store;
-- basic telemetry.
-
-Required backend foundation:
-
-- auth project/configuration;
-- initial save schema;
-- client/backend connection;
-- ownership model.
-
-Do not begin large Phase 3 UI work against unstable simulation contracts.
-
----
-
-# 11. Scope Guard
-
-Do not expand Phase 3 into later phases.
-
-Do not implement yet:
-
-- cache mechanics;
-- cache warm-up;
-- read/write workload strategy;
-- cache tuning;
-- autoscaling;
-- application failure;
-- health checks;
-- failover;
-- full nine-node progression tree;
-- complex milestone/research economy;
-- arbitrary drag-and-drop architecture editing;
-- advanced routing algorithms;
-- multi-region routing;
-- database failover;
-- network/security incidents;
-- leaderboards;
-- multiplayer.
-
-Keep the routing model small and teachable.
-
----
-
-# 12. Main Risks and Mitigations
-
-## Risk 1 — Horizontal scaling is secretly implemented as aggregate capacity
-
-**Mitigation:**
-
-Route demand per instance.
-
-Do not simply sum capacity and divide later.
-
----
-
-## Risk 2 — Load balancing is automatically present
-
-**Mitigation:**
-
-Make routing state explicit.
-
-A second instance should be able to exist without receiving useful traffic.
-
----
-
-## Risk 3 — Architecture visualization becomes too complex
-
-**Mitigation:**
-
-Use a fixed topology.
-
-Only show the components required for the current campaign state.
-
----
-
-## Risk 4 — Players interpret an idle second instance as a bug
-
-**Mitigation:**
-
-Show routed demand clearly.
-
-Use evidence-focused UI such as:
-
-```text
-App B
-Capacity: 600 req/s
-Routed demand: 0 req/s
-```
-
----
-
-## Risk 5 — App scaling accidentally fixes DB incidents
-
-**Mitigation:**
-
-Keep database processing independent and covered by regression tests.
-
----
-
-## Risk 6 — Auth/cloud saves consume the phase
-
-**Mitigation:**
-
-Keep guest play functional.
-
-Implement only:
-
-```text
-sign-in
-owner-scoped saves
-safe revisions
-resume
-```
-
-No advanced account ecosystem.
-
----
-
-## Risk 7 — Scale Up becomes obviously always better
-
-**Mitigation:**
-
-Tune:
-
-- costs;
-- capacity gains;
-- delays;
-- future flexibility;
-
-so both strategies can be viable under suitable conditions.
-
-Do not solve full balance in Phase 3; Phase 7 will perform broader tuning.
-
----
-
-# 13. Recommended Implementation Order
-
-1. Verify Phase 2 Definition of Done.
-2. Run current simulation/UI/backend regression suite.
-3. Inspect existing application-capacity representation.
-4. Define per-instance state contract.
-5. Refactor aggregate app processing into per-instance processing.
-6. Add per-instance metrics.
-7. Add routing helper with simple single-target behavior.
-8. Add deterministic balanced-routing mode.
-9. Add routing tests.
-10. Implement vertical scaling action.
-11. Implement activation-delay tests.
-12. Implement horizontal add-instance action.
-13. Verify second instance does not auto-balance traffic.
-14. Implement minimal load-balancer/routing action.
-15. Add DB-capacity regression tests.
-16. Update architecture visualization for multiple instances.
-17. Show routed demand/capacity per instance.
-18. Reveal scaling options after the opening milestone.
-19. Update local save schema for multi-instance/routing state.
-20. Verify local save/resume.
-21. Complete account sign-in.
-22. Implement owner-scoped cloud saves.
-23. Implement cloud revision/conflict handling.
-24. Add cloud ownership/conflict tests.
-25. Run end-to-end Phase 3 acceptance paths.
-26. Conduct player prediction test around "add another server."
-27. Fix high-impact misunderstandings.
-28. Run full tests/typecheck/build.
-29. Stop for review before Phase 4.
-
----
-
-# 14. Phase 3 Acceptance Scenario
-
-A representative player flow:
-
-```text
-Player continues same company after first milestone
-→ traffic grows
-→ app demand reaches 900 req/s
-→ one app has 600 req/s capacity
-→ DB still has headroom
-→ app bottleneck appears
-→ player adds second 600 req/s instance
-→ new instance activates
-→ routed demand remains 900 / 0
-→ player sees first app still overloaded
-→ player enables load balancing
-→ routed demand becomes 450 / 450
-→ app backlog drains
-→ latency improves
-→ company continues
-```
-
-Alternative valid route:
-
-```text
-app overloaded
-→ player scales existing instance vertically
-→ capacity becomes sufficient after activation delay
-→ app backlog drains
-→ company continues
-```
-
-Neither path should be presented as universally correct.
-
----
-
-# 15. IDE Implementation Prompt
-
-Use this file together with:
-
-```text
-docs/PROJECT_PROPOSAL.md
-docs/DEVELOPMENT_ROADMAP.md
-docs/phases/PHASE_1_SIMULATION.md
-docs/phases/PHASE_2_PR1.md
-docs/phases/PHASE_3_SCALING.md
-```
-
-Recommended prompt:
-
-```text
-Read:
+Read with:
 - docs/PROJECT_PROPOSAL.md
 - docs/DEVELOPMENT_ROADMAP.md
-- docs/phases/PHASE_1_SIMULATION.md
+- docs/phases/PHASE_1_SIMULATION_FINAL.md
+- docs/phases/PHASE_1_IMPLEMENTATION_REPORT.md
 - docs/phases/PHASE_2_PR1.md
-- docs/phases/PHASE_3_SCALING.md
+- docs/phases/PHASE_2_IMPLEMENTATION_REPORT.md
+- docs/AUTHENTICATION.md
+- AGENTS.md and docs/testing.md
 
-Treat PHASE_3_SCALING.md as the detailed gameplay, simulation, persistence, backend, and acceptance specification for this phase.
+Proposal/roadmap establish product scope; accepted Phase 1/2 contracts continue governing the opening. This contract governs the approved Phase 3 extension and replaces earlier illustrative starting values and speculative modules. Later user-approved revisions take precedence. Report concrete conflicts rather than silently retuning saves.
 
-Inspect the current repository first.
+**Installed application capacity is not useful until traffic is actually routed to it.** App scaling never changes DB capacity.
 
-Before modifying code, report:
+Extend existing simulation, scheduler, CampaignUI, Game, Facility, selection, store, persistence, telemetry and reports. Preserve office/theme/icons/camera. No parallel engine, renderer, graph editor, architecture store, clock or save system. Legacy weekly physics, implicit balancing, task/release progression, timeout recovery and inactive panels stay inactive.
 
-1. whether Phases 1–2 are fully implemented and stable;
-2. how application capacity is currently represented;
-3. exact files/functions that must change for per-instance processing and routing;
-4. current logic that incorrectly aggregates capacity or assumes implicit balancing;
-5. current auth/cloud-save foundation status;
-6. the smallest safe implementation order.
+This document update does not authorize production implementation, committing, deployment, production database migration or participant contact.
 
-Preserve the shared deterministic simulation as the source of truth.
+# 2. Actual foundation
 
-Implement Phase 3 only.
+Checkpoint: 00ebc2b. Recorded Phase 2 results: Node 22; 129 frontend tests passing, one optional TRACE skip, five balance tests, nine browser tests, passing typecheck/build, 23 pre-existing lint warnings, 18 backend tests passing. Preserve reports and run a fresh implementation baseline.
 
-Key invariants:
-- installed app capacity is not automatically useful capacity;
-- horizontal scaling does not imply load balancing;
-- app scaling never increases database capacity;
-- same company/run identity continues;
-- guest play remains available.
+| Existing foundation | Extension needed |
+|---|---|
+| Campaign.apps has ID/capacity/backlog/routed | Process all active instances; explicit routing and instance snapshots |
+| Add Application activates second unrouted app | Reuse its action, cost, delay and installed state |
+| Shared step/scheduler/60-step accounting | Targeted actions, tier/LB exposure; preserve idempotency |
+| DB overload and measured recovery | Independent app/DB streaks and component-aware reports |
+| CampaignUI inline strip; Game + Facility | Shared instance selection and routed evidence; no replacement view |
+| Schema 2 backup-first persistence | Schema 3 and version-aware history/validation |
+| Stable telemetry/session/archive/export | Exhaustive scaling/routing mappings |
+| First milestone acknowledged once | Stage reveal/entry without resource reward |
+| Express/Drizzle/Neon backend | Auth/cloud campaign groundwork is documentation only, not working endpoints |
 
-Do not proceed into:
-- caching/data strategy;
-- autoscaling;
-- reliability/failure mechanics;
-- full technology tree;
-- later phases.
+# 3. Continuous company and growth configuration
 
-After implementation:
+Preserve run/company identity, seed, current app instances/capacities/backlogs, DB tier/backlog, limit, cash, ledger/remainders, pending actions, milestone, reports, trace IDs and telemetry continuity. Never reset to a 600-capacity application scenario. One/two apps, limit-only recovery, upgraded DB and pending purchases must all remain valid continuations.
 
-- run Phase 1–2 regression tests;
-- run Phase 3 routing/scaling tests;
-- run save/auth/cloud-save tests;
-- run browser smoke tests;
-- run typecheck;
-- run production build;
-- list files changed;
-- explain deviations from this specification;
-- report any remaining Phase 3 blockers;
-- confirm whether every Phase 3 Definition of Done item is satisfied;
-- stop for review.
-```
+Use a separately versioned `application-scaling` v1 configuration, preferably `frontend/src/sim/scenarios/applicationScaling.ts`. Keep the opening reference `opening-db` v1 unchanged; add a continuation reference, not a new company.
 
----
+| Parameter | Value |
+|---|---:|
+| Persistent continuation traffic | 1,400 req/s |
+| Base app capacity | Existing 1,000 req/s |
+| Vertically upgraded app | 1,600 req/s |
+| App backlog limit, either tier | 1,000 requests per instance |
+| Maximum installed apps | 2 |
+| Additional DB tier / readiness headroom | 2,000 ops/s |
+| DB backlog limit | Existing 600 operations |
+| Observation interval before growth | 3 physical steps after readiness |
 
-# 16. Phase 3 Summary
+Keep one-second steps, 60-step operating weeks, four engineers, 2,000 users and existing recovery thresholds. Growth represents activity, not a user/cash/research reward. The additional DB tier is solely headroom for this challenge, within the existing Larger Database family. No caching, request-mix strategy or extra technology node.
 
-At the end of Phase 3, the same company should support meaningful application-scaling decisions:
+These are initial implementation values. Adjust only with concrete contradictory balance evidence and a reviewed explanation. Once referenced by saves, retuning requires another configuration version. Do not silently change opening-db v1.
+
+## Stage entry and exact event boundary
+
+New capabilities reveal after `openingMilestone.acknowledged`. On first explicit gameplay continuation with it acknowledged, record stage entry once, its configuration and entry step. During play, milestone acknowledgement may enter the stage. Boot/migration alone cannot enter, grow traffic or emit a measured stage event. Keep milestone continuation paused.
+
+After due actions activate, check readiness during the event stage: continuation entered, milestone acknowledged, DB >=2,000, management with no active incident, zero app/DB backlog, growth unconsumed. First readiness at step n records due step n+3. At/after that boundary, fire on the first step readiness holds. Retain the due step if readiness is lost; wait rather than forcing an incident. A DB activation may establish readiness that same step.
+
+Firing sets incoming traffic to 1,400 and records scheduled/actual steps, old/new traffic and a unique consumed event ID. The event never directly declares an incident. Show unmet DB prerequisite and any incident/backlog delay explicitly.
+
+Require explicit paid DB purchases. Preserve existing limits: a 500 limit may prevent overload after external growth. Proactive scaling/routing may also prevent it. Record prevention honestly without fake recovery or reward.
+
+Opening prevention still has no recovered-report milestone; Phase 3 stays locked until the real milestone is earned. This phase adds no alternative unlock or forced opening incident.
+
+# 4. Instance model and routing
+
+| Concept | Exact meaning |
+|---|---|
+| ID | Stable app-1/app-2 shared by routing, actions, selection and evidence |
+| Capacity | Positive deployed-tier requests/s rate |
+| Routed demand | New admitted request count assigned this step; separately expose its rate |
+| Processed | Count leaving app processing, including backlog drainage |
+| Backlog | Unfinished request count owned by that instance |
+| Active | Installed and processing-capable; unrouted is not inactive |
+| Deploying | Pending addition reserves ID; no installed capacity/upkeep until activation |
+| Inactive | Cannot receive/process work; no Phase 3 failure/action creates this state |
+| Installed capacity | Sum of active installed capacities, including unrouted; excludes deploying |
+| Effective routed capacity | Sum of active configured target capacities, even at zero traffic |
+
+Keep deploying placeholders derived from pending actions, not duplicate authoritative instances. Upgrading apps serve at old capacity until activation. No reliability/health-check/restart/failover behavior. Inactive states with unfinished work are not reachable Phase 3 states; reject unsupported imports rather than dropping work.
+
+Reuse processWork for each active instance. Unrouted active apps receive zero new traffic but drain their own backlog. Never transfer, discard or reprocess backlog through another app. Distinguish rate/count fields despite one-second steps.
+
+Persist LB deployment, routing policy and explicit target IDs. Any retained routed flag is derived compatibility state.
+
+- Single: all admitted traffic goes to app-1.
+- Balanced: divide over one/two explicitly configured active targets, ordered by stable instance number; requires deployed LB. One target is legal but adds no benefit.
+- Validate nonempty, known, active, unique targets at request/activation; pending apps are not eligible.
+- No weighting, least-connections, affinity or advanced policy.
 
 ```text
-Traffic grows
-→ app bottleneck appears
-→ player compares Scale Up vs Scale Out
-→ horizontal capacity may initially be unused
-→ routing/load balancing determines whether it helps
-→ app bottleneck improves
-→ database remains an independent constraint
-→ same company continues
+base = floor(D / N)
+remainder = D % N
+allocation[i] = base + (i < remainder ? 1 : 0)
+900 -> 450 / 450
+901 -> 451 / 450
 ```
 
-This establishes the application-scaling foundation required for Phase 4, where workload characteristics, database investment, and caching begin to determine which data strategy is appropriate.
+Sort by stable instance number, never array ordering. Allocation is independent of capacity: excess becomes processing backlog/overflow, never routing loss.
+
+New apps remain initially unrouted even when LB exists; explicitly change target membership. Deploying LB leaves existing single routing unchanged. A subsequent Change Routing action distributes traffic. Returning to single retains LB and its upkeep; no undeploy/refund action.
+
+# 5. Step order, metrics and incidents
+
+Reuse the existing step engine and adapters:
+1. Activate due infrastructure/routing actions; record once.
+2. Apply due events, including continuation readiness/scheduling/firing.
+3. Calculate incoming/admitted/rejected traffic.
+4. Allocate admitted traffic.
+5. Process every active app independently.
+6. Sum application-processed counts.
+7. Use that sum as new DB demand.
+8. Process DB with its existing backlog.
+9. Derive authoritative metrics, latency and outcomes.
+10. Accrue accounting and settlement.
+11. Apply bankruptcy precedence, incidents/recovery and trace.
+
+**DB demand = sum of application-processed requests**, not incoming traffic. A 600 req/s app produces at most 600 new DB operations per one-second step. Database backlog has already passed the app stage.
+
+```text
+incoming = admitted + rejected
+sum(routed demand) = admitted
+sum(app processed) = new DB demand
+previous total app/DB backlog + admitted
+= successful + app failures + DB failures + new total backlog
+successful = DB processed
+```
+
+Snapshots add instance ID/tier/state, demand rate/count, capacity, processing budget/count, backlog, failures, demand/capacity and busy utilisation. Engine-derived aggregates retain readable tier totals. Mixed capacities can overload one instance despite sufficient aggregate capacity.
+
+Busy utilisation per instance is processed/budget. An aggregate busy denominator includes active routing targets plus active apps with backlog at processing start. Unrouted draining work contributes its budget; empty idle capacity must not dilute opening utilisation. Store this denominator separately from effective routed capacity. No clamping invalid ratios; all values finite and busy <=100%.
+
+Approved end-of-step latency:
+
+```text
+100 ms + 1000 * max(active app backlog / its capacity)
+       + 1000 * (DB backlog / DB capacity)
+```
+
+Require at least one active app. This is a conservative gameplay approximation, not production latency or a percentile. Idle additions cannot lower it. Use unrounded thresholds; preserve historical snapshot interpretation.
+
+Errors remain failed/(successful+failed), with null for no terminal outcomes; deliberate rejections are separate. Zero admissions/outcomes cannot qualify for recovery.
+
+Maintain independent overload streaks for each app and DB: increment when its new demand exceeds capacity, otherwise reset. Backlog affects busy/latency, not new demand. Three consecutive overloaded steps on one component open one capacity incident. Alternating components never combine. Simultaneous triggers record all IDs and choose primary deterministically: app-number order, then DB. Keep changing constraints within one incident.
+
+Recovery remains five consecutive qualifying steps, latency strictly <500 ms, errors strictly <1%, positive admissions/outcomes. Preserve bankruptcy precedence, first-pause-consumed flag and batch/pause rules. No action-declared recovery or new Phase 3 forced pause.
+
+# 6. Actions and economics
+
+| Action | Activation effect | Setup | Delay | Weekly upkeep |
+|---|---|---:|---:|---:|
+| Scale Up | Selected base app 1,000 -> 1,600 | $2,000 | 3 steps | $1,100 total for upgraded app |
+| Add Application | New 1,000 app, unrouted | Existing $1,000 | Existing 2 | Existing $700/app |
+| Deploy LB | Installed capability; route unchanged | $1,000 | 2 | $300 |
+| Change Routing | Validated mode/targets | $0 | 1 | No extra |
+| Existing DB upgrade | 600 -> 1,000 | Existing $3,000 | Existing 3 | Existing $1,500 total |
+| Additional DB upgrade | 1,000 -> 2,000 | $3,000 | 3 | $2,500 total |
+| Limit/removal | Existing 500 cap/full admission | $0 | 1 | No extra |
+
+The additional DB price/delay/upkeep resolve previously unspecified economics. Tiers are sequential: a 600 DB first needs the existing paid upgrade. Reuse start_db_upgrade with next-tier stage validation. No automatic promotion or free overwrite.
+
+Extend ScheduledAction with target and typed effect/configuration. Persist accepted cost/timing through reload. Request after step n activates at n+d. One vertical upgrade per instance, two installed apps maximum.
+
+Retain one infrastructure deployment across app add/upgrade, DB upgrade and LB deployment. Four engineers remain the team. One routing change and one admission change may independently be pending. Routing requests require already deployed LB. Simultaneous due actions use stable acceptance order.
+
+Reject duplicates, completed upgrades, invalid targets, no-op settings, conflicting pending requests and purchases leaving cash <=0. Charge once on acceptance, never activation. No cancellation/refund/scale-in. Valid ineffective choices and inspection remain available.
+
+Sum active app tier exposure, including unrouted; pending apps incur none. Upgraded prices apply from activation. Add dedicated LB ledger/remainder/settlement fields. Preserve 60-step settlement, integer cents and rounding remainders; no settlement on stage/review/save/acknowledgement. Revenue only on DB success. Backlog drainage may transiently load DB; never script it healthy or change its capacity through app/routing actions.
+
+# 7. Progression and postmortems
+
+Keep nine technology identities: larger_servers = Scale Up; load_balancing = Scale Out + Load Balancing; DB tiers stay within larger_database. Separate capability availability, installed architecture and routing configuration. No extra node or full research/currency system.
+
+New abilities follow acknowledged opening milestone. Preserve pre-milestone Add Application and earlier DB/admission behavior. Keep caching, cache tuning, autoscaling, health checks, standby/failover and reliability inaccessible, including hidden effects. Do not set legacy techDone flags merely to activate visuals.
+
+Extend causalPostmortem rather than adding a generator. Record trigger components, event, allocation/capacity/backlog, routing before/after, request/activation times, costs and DB response. Replace unconditional DB-cause/ineffective-app assumptions for new incidents. Pending actions earn no credit; combined actions may share measured credit. Historical reports remain unchanged. No additional Phase 3 resource reward or milestone screen is required.
+
+# 8. UI integration
+
+Extend CampaignUI's existing inline strip, panel/history/reports; there is no standalone OpeningArchitecture to replace. Game retains composition/clock. Facility remains the only renderer.
+
+Display App 1/App 2, demand/capacity, processed/backlogged work, busy/overload, installed versus routed capacity, routing mode/targets, LB deployment, countdowns, DB prerequisite and retained rejection trade-off. Label idle apps "Installed - not receiving traffic"; distinguish inactive/deploying. Pending placeholders cannot imply active capacity. Show request flow only along configured routes.
+
+Extend existing selection with optional selectedAppId alongside equipment tier. Office rack and strip select the same instance and dispatcher; keep tier overview. Hover/focus/touch use the same snapshot. Users is workload context, not another component.
+
+Reuse Facility buildModel, Rack, Cable, LB position, labels and appSlot; adapt instance LEDs and selection. Capability queries must distinguish available versus deployed LB. Preserve camera/office/theme/icons. Reuse modal/layout/tooltip/chart primitives, keyboard focus and mobile layout. No UI physics or graph editor. Never require inspection or mark a choice correct.
+
+# 9. Persistence and schema 3
+
+Extend persist.ts/saveMigrations.ts, retaining nn.campaign.save.v1, nn.campaign.meta.v1 and nn.campaign.analytics.v1. Preserve all legacy keys byte-for-byte. Schema version is separate from opening/continuation configuration versions.
+
+Persist instance tier/state, LB deployment, policy/targets, targeted actions, continuation entry/due/consumed event, component streaks and added exposure/remainders. Preserve capacities/cash/backlog/milestone/reports/trace IDs/telemetry cursor.
+
+- Validate source with original schema rules; migrate a copy; back up original bytes before replacement; validate result. Backup/validation/write failures preserve source/export.
+- Support v1 -> v2 -> v3 with explicit dispatch. Freeze old migration behavior; current constructors/validators must not invalidate intermediate schemas.
+- Existing apps become active base records unchanged; single route to app-1, LB absent. Pending additions retain schedule and reserve app-2 deterministically.
+- Copy old overload streak to DB; app streaks zero because valid opening traffic cannot overload the primary. Preserve active DB incident evidence.
+- New LB exposure/remainders start zero. Never recalculate historical cash/settlements.
+- Migration never enters the stage, schedules growth, removes a limit or emits measured gameplay.
+- Retain historical/current legacy snapshots under their original interpretation; new snapshots use a versioned per-instance format. Do not fabricate historical instance observations. Until a new step, display legacy metrics plus current architecture without invented measurements.
+- Preserve trace sequence, pending telemetry and cursor. Unknown future/unsupported versions remain exportable and non-destructively rejected. Resume paused, no offline catch-up.
+
+Replace opening-only hard-coded validation through version-aware checks for capacities/traffic/tiers/actions/targets/backlogs/latency and aggregate invariants. Do not merely loosen validation or replay history to manufacture observations.
+
+# 10. Telemetry
+
+Extend telemetry.ts projectEvents and the existing store/persist archive. Retain stable event IDs, run/session/build attribution, physical step, timestamp, active/wall time, pending durability and non-destructive export.
+
+| Event | Trigger |
+|---|---|
+| vertical_scale_requested / vertical_scale_activated | Accepted target upgrade / actual capacity activation |
+| app_instance_requested / app_instance_activated | Accepted purchase / installed activation |
+| load_balancer_requested / load_balancer_deployed | Accepted LB purchase / actual deployment |
+| routing_requested | Accepted configuration change |
+| routing_enabled | First balanced-routing activation |
+| routing_changed | Subsequent activated change, including return to single |
+| scaling_stage_entered | First explicit gameplay continuation entry |
+| Existing growth/incident/recovery | Actual engine evidence with component/continuation attribution |
+
+Include action/target ID, request/activation step, cost, old/new capacity/configuration and continuation version as relevant. Specialized activation replaces overlapping generic emission; do not double-count. Replace unknown-action fallback-to-traffic-limit behavior with exhaustive typed mappings.
+
+Preserve historical timing-unknown states and attribution; do not invent old sessions. Continuation is not replay; hidden pause is not quit; guidance is not a hint unless an actual optional hint is used. Retain unexported records and report storage failure without promising impossible durability.
+
+# 11. Separate account/cloud workstream
+
+Phase 2 supplied documentation only. Express currently has health/dialogue routes; mission players/sessions are not campaign accounts/app sessions. Existing lib/api.ts is health transport, not an auth adapter.
+
+Keep auth/cloud separately reviewable and outside the scaling engine. Guest gameplay/local save/export remain independent of API/session availability. Working auth/owner-scoped cloud saves remain the roadmap's Phase 3 release requirement; report gameplay readiness separately from full completion.
+
+Follow AUTHENTICATION.md: shared account/session/save DTOs; backend-managed Google sign-in; durable app sessions/restoration/revocation; explicit guest attachment; cancellation/expiry/local preservation; owner-filtered reads/writes; atomic expected-revision updates with retained conflict copies. Account switching must not reassign another owner's pending local run.
+
+Add dedicated tables via additive reviewed migrations; retain legacy mission tables/migrations. Extend existing Express/Drizzle/Neon and frontend transport. Implement documented same-origin proxy/API-base changes with auth, retaining both Vercel projects and direct-API CORS. No mandatory login or provider/framework replacement.
+
+Apply documented callback/state/nonce, HttpOnly session, CSRF/origin and private-cache rules. Test concurrent revision writes, two-owner isolation and local network-failure continuity. Verify real callback registrations, cookies/proxy and cross-session resume on a configured test deployment. External provider/deployment inputs do not block local scaling work. Production schema execution/deployment needs separate authorization.
+
+# 12. Actual files and reuse
+
+Frontend paths below are under frontend/src unless stated otherwise.
+
+| Existing file/function | Treatment |
+|---|---|
+| sim/campaignTypes.ts; sim/types.ts | Extend instance/snapshot/incident/routing/action types |
+| sim/step.ts processWork | Reuse bounded processing unchanged |
+| step, campaignAction, initialCampaign, projectCampaign | Extend current engine/scheduler/projections |
+| advanceSteps; sim/turn.ts adapters | Preserve single clock and stop/batch boundaries |
+| sim/settlement.ts accruePeriod/settlePeriod | Extend tier/LB exposure; preserve settlement invariants |
+| sim/trace.ts trace/causalPostmortem | Preserve IDs, extend measured explanation |
+| sim/derive.ts campaign branches | Snapshot-based metrics/equipment/cost adapters only |
+| sim/tech.ts has/status queries | Stage-aware availability/deployment; nine IDs retained |
+| game/store.ts; inspectOrSelect | Extend selection/guards/lifecycle, no second store |
+| game/persist.ts; saveMigrations.ts | Existing save/archive/export and schema 3 |
+| game/telemetry.ts | Exhaustive mapping and continuation attribution |
+| components/CampaignUI.tsx; Game.tsx | Existing panels/strip/overlays/history/composition |
+| components/scene/Facility.tsx; layout.ts | Existing racks/cables/selection/projections |
+| components/ui.tsx; index.css; game/advisor.ts | Reuse primitives/theme and neutral evidence guidance |
+| frontend/src/lib/api.ts | Extend current account/save transport |
+| backend/src/app.ts; db/schema.ts; db/client.ts | Extend route registration/additive schema; reuse client |
+
+Conditional new production files:
+- sim/scenarios/applicationScaling.ts: separate immutable continuation tuning avoids rewriting the opening configuration.
+- sim/routing.ts: first implement a small pure helper in step.ts; extract only for justified reuse/test clarity.
+- backend/src/routes/auth.ts: health/dialogue routes have no auth/session responsibility.
+- backend/src/routes/runs.ts: no existing route authorizes/stores campaigns with revisions.
+- shared/campaign.ts: existing health/dialogue/mission DTOs do not describe portable account/save contracts.
+
+Do not create every candidate automatically. Justify any other extraction against existing equivalents. No new renderer, architecture store, persistence hierarchy or cloud-revision arithmetic subsystem. Legacy weekly/implicit-balancing/recovery code stays outside campaign authority; no unrelated cleanup.
+
+# 13. Tests and acceptance paths
+
+The 600-capacity examples are isolated parameterized engine fixtures, not production opening-db saves. Do not mutate production configuration or weaken save validation to create them.
+
+| Test | Required outcome |
+|---|---|
+| A: one 600 app, 900 demand | Actual app overload/backlog |
+| B: second installed, unrouted | 900/0; installed 1,200 does not relieve routed 600 constraint |
+| C: balanced two 600 apps | Exactly 450/450 |
+| D: odd 901 | Exactly 451/450, stable despite array reordering |
+| E: vertical | Target alone changes at activation; charge once |
+| F: DB independence | App/routing never alter DB capacity; DB demand equals app processing |
+| G: resume | Instances/routes/backlogs/pending actions/streaks/money preserved |
+| H: routing change | Backlog stays and drains on original instance |
+| I: conservation | No loss/double count, including simultaneous overflow/drainage |
+| J: aggregate headroom | Per-instance overload remains possible |
+| K: independent streaks | App/DB cannot combine; simultaneous attribution deterministic |
+| L: regressions | All Phase 1/2 paths remain valid |
+
+Also test retained limits/prevention, existing second apps/pending upgrades, sequential DB purchases, growth readiness/scheduling/reload/one-time event, mixed capacities, invalid targets, zero traffic, no NaN/Infinity, LB deployment without routing, activation at step 60, bankruptcy precedence, pending/combined causal credit, schema chains/backup/write failure/legacy protection, telemetry retry/deduplication, and office/strip/panel keyboard/touch consistency.
+
+Visible/headless continuation paths, after explicit DB headroom purchase:
+1. 1,400 growth -> app overload -> targeted 1,600 upgrade -> drainage -> five qualifying steps -> report -> same company.
+2. Growth -> second 1,000 app installed -> 1,400/0 remains constrained.
+3. Deploy LB -> configure both apps -> 700/700 -> drainage -> measured recovery -> same company.
+4. Controlled DB-constrained fixture -> app/routing actions leave DB capacity unchanged and constraint observable.
+5. Limit/proactive prevention -> no manufactured incident/reward.
+
+Extend existing sim step/opening/settlement/trace, store/persist/migration/phase2/App and e2e tests. Legacy progression tests do not prove new campaign routing.
+
+Run Node 22 lint/typecheck/unit/coverage/balance/build and extended CI browser journeys. Before PR run required checks for both packages. Backend changes require auth/ownership/conflict and isolated migration tests with reviewed generated SQL. Preserve optional TRACE skip and baseline warnings; report commands/counts/failures/unavailable checks honestly.
+
+Prepare prediction/evidence playtesting through the existing observer/export workflow: prediction before adding an app, observed effect after routing, DB-independence explanation, timing/confusion/intervention. Do not reveal answers or claim human understanding from automation. Sessions are separately arranged; no fabricated learning/enjoyment/duration results.
+
+# 14. Definition of Done
+
+Report each engineering item PASS / FAIL / NOT TESTED with evidence; distinguish gameplay, account integration, external release and human results.
+
+- [ ] Opening-db v1 and same company/architecture/limit/finances remain intact.
+- [ ] Phase 1/2 regressions, legacy protection and pause/batch/settlement invariants pass.
+- [ ] Per-instance processing and exact request conservation pass.
+- [ ] Targeted vertical upgrades and existing horizontal deployment activate/charge once.
+- [ ] LB deployment/configuration are distinct; deterministic single/balanced/odd routing works.
+- [ ] Backlog ownership and installed versus routed capacity remain accurate.
+- [ ] DB headroom requires explicit purchase; app/routing never change DB capacity.
+- [ ] Readiness-gated growth fires once and retained limits/prevention work honestly.
+- [ ] Component streaks, approved latency and five-step measured recovery pass.
+- [ ] Tier/LB exposure and cent remainders settle correctly.
+- [ ] Causal reports explain actual ineffective/pending/contributing actions.
+- [ ] Reveal follows acknowledged milestone, preserves earlier Add Application and nine-node scope.
+- [ ] CampaignUI/Facility/strip share instance selection/dispatcher/snapshot evidence.
+- [ ] Office/camera/theme preserved; routes/countdowns/unrouted states readable with keyboard/touch.
+- [ ] Schema 3 migration preserves history/state/trace/cursor and handles failures non-destructively.
+- [ ] Save/resume and scaling telemetry/deduplication/export pass.
+- [ ] No duplicate systems or later-phase mechanics introduced.
+- [ ] Guest play/local persistence remain independent of auth/API availability.
+- [ ] Google session lifecycle, explicit attachment and account-switch preservation work.
+- [ ] Owner-scoped cloud resume and atomic conflicts pass isolated tests.
+- [ ] Actual callback/proxy/cookie/two-account/cross-session checks pass on a recorded deployment.
+- [ ] Required static/unit/coverage/balance/build/browser checks pass with baseline exceptions identified.
+- [ ] Vertical/horizontal journeys pass visible controls.
+- [ ] Recorded build/configuration and deployed entry/assets/account flows verified.
+- [ ] Human protocol/export prepared; actual sessions/results or their absence reported honestly.
+
+# 15. Required implementation order and handoff
+
+Before production edits inspect guidance/current changes, preserve checkpoint, record fresh Node 22 baseline and confirm types/configuration/snapshot contracts.
+
+1. Update Phase 3 types/state contract.
+2. Implement per-instance processing/tests.
+3. Implement targeted vertical/horizontal actions through the existing scheduler.
+4. Implement deterministic routing and LB deployment.
+5. Extend accounting/latency/incidents/postmortems and continuation readiness/events.
+6. Implement schema 3 migration before UI integration.
+7. Integrate CampaignUI/Facility/selection/reveal.
+8. Extend telemetry, durability and export; remove incorrect fallback mappings.
+9. Integrate independently developed auth/cloud work against the stable envelope.
+10. Run full regressions/E2E and backend checks; report all DoD items and external gaps.
+
+Auth/backend work may develop independently without blocking guest engine work. No production deployment or participant contact is implied.
+
+Implementation handoff: read all references in section 1; treat this as the Phase 3 contract; report baseline/reuse/conflicts before edits; preserve opening-db v1 and the same company; reuse all active systems; use explicit paid headroom and versioned growth; keep deployment/routing distinct; keep auth separate; report validation and each DoD status. Stop before Phase 4.
+
+# 16. Readiness and external inputs
+
+Core product decisions are resolved: additional DB economics/sequential purchase, distinct LB/routing activation, growth readiness/timing, retained limits, opening-prevention behavior and two-app limit. No production reset, free capacity grant or Phase 4 curriculum.
+
+Gameplay implementation is ready after fresh baseline and ordinary code-contract review. Concrete balance conflicts require a reviewed adjustment, not silent retuning.
+
+External inputs remain Google client/consent/callback/deployment access, real VITE_PLAYTEST_URL carried over from PR1, release VITE_BUILD_ID/URL verification, and arranged human sessions. These do not block local scaling implementation; full Phase 3 completion requires the specified integration/release evidence.
