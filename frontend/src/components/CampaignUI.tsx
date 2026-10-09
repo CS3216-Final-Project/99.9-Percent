@@ -1,11 +1,12 @@
 import { nextMove } from "@/game/advisor";
 import { useRef, useState } from "react";
 import { useGame, type Speed } from "@/game/store";
-import { rawSave, exportLegacyData } from "@/game/persist";
+import { rawSave } from "@/game/persist";
 import { makeEnvelope } from "@/game/saveEnvelope";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { CampaignPostmortem } from "@/sim/campaignTypes";
 import { Icon } from "./icons";
+import { ModeSwitch } from "./ModeSwitch";
 import { Modal } from "./ui";
 const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(c / 100);
 const percent = (v: number | null) => v === null ? "No completed requests" : (v * 100).toFixed(2) + "%";
@@ -84,7 +85,6 @@ export function CampaignOverlays() {
     <div className="campaign-actions"><button className="btn" onClick={saveNow}>Save now</button>
       <button className="btn" onClick={() => download("campaign.json", JSON.stringify(makeEnvelope(game, remainderMs)))}>Export current company</button>
       <button className="btn" onClick={() => download("stored-campaign.json", rawSave() ?? "null")}>Export original stored save</button>
-      <button className="btn" onClick={() => download("legacy-browser-data.json", exportLegacyData())}>Export legacy data</button>
       <button className="btn" onClick={() => setConfirmReset(true)}>New company</button>
       {confirmReset && <><p>This replaces only the current campaign save. Export it first if you want to keep it.</p><button className="btn" onClick={() => { newRun(); setConfirmReset(false); }}>Confirm new company</button></>}
       <button className="btn" onClick={() => fileInput.current?.click()}>Import save</button>
@@ -92,6 +92,7 @@ export function CampaignOverlays() {
       {pendingImport && <><p>Replace the current company with {pendingImport.name}? Export it first if you want to keep it.</p>
         <button className="btn" onClick={() => { if (importSave(pendingImport.text)) closeMenu(); else setPendingImport(null); }}>Confirm import</button>
         <button className="btn" onClick={() => setPendingImport(null)}>Cancel import</button></>}</div>
+    <ModeSwitch to="classic" />
   </Modal>;
   if (view === "history") return <Modal title="Campaign history" onClose={() => openView(null)}>
     <p>Latency in the last {c.recent.length} steps (milliseconds)</p>
