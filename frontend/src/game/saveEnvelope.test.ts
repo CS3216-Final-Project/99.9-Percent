@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { newGame } from "../sim";
 import { advanceSteps, applyCampaignInput, step } from "../sim/step";
-import { playedRun, v1Envelope } from "./testing/saves";
-import { decodeSave, makeEnvelope, validateEnvelope, type SaveEnvelope } from "./saveMigrations";
+import { playedRun } from "./testing/saves";
+import { decodeSave, makeEnvelope, validateEnvelope, type SaveEnvelope } from "./saveEnvelope";
 
 const json = (v: unknown) => JSON.parse(JSON.stringify(v)) as unknown;
 
@@ -40,23 +40,7 @@ describe("input-log saves", () => {
   it("identifies unknown scenario and schema versions without reinterpreting saves", () => {
     const e = makeEnvelope(newGame());
     expect(validateEnvelope({ ...e, scenarioVersion: 2 }).status).toBe("unsupported");
-    expect(decodeSave(JSON.stringify({ ...e, schemaVersion: 3 })).status).toBe("unsupported");
+    expect(decodeSave(JSON.stringify({ ...e, schemaVersion: 2 })).status).toBe("unsupported");
     expect(decodeSave(JSON.stringify({ ...e, schemaVersion: 0 })).status).toBe("unsupported");
-  });
-});
-
-describe("schema 1 conversion", () => {
-  it("recovers the inputs of a full-state save and replays it exactly", () => {
-    const s = playedRun();
-    const result = decodeSave(JSON.stringify(v1Envelope(s, 300)));
-    expect(result.status).toBe("ok");
-    if (result.status !== "ok") return;
-    expect(json(result.game)).toEqual(json(s));
-    expect(result.envelope).toMatchObject({ schemaVersion: 2, seed: 4, runId: "played", step: s.campaign!.step, runtime: { remainderMs: 300 } });
-  });
-  it("refuses a full-state save that its own inputs do not reproduce", () => {
-    const e = v1Envelope(playedRun());
-    e.game.campaign.cashCents += 100; e.game.cash += 1;
-    expect(decodeSave(JSON.stringify(e)).status).not.toBe("ok");
   });
 });

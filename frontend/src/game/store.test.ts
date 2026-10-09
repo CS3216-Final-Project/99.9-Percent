@@ -2,7 +2,7 @@ import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { newGame } from "../sim";
 import { advanceSteps } from "../sim/step";
 import { loadGame, saveGame, readAnalytics } from "./persist";
-import { makeEnvelope } from "./saveMigrations";
+import { makeEnvelope } from "./saveEnvelope";
 import { useGame } from "./store";
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => vi.restoreAllMocks());
@@ -75,7 +75,7 @@ describe("importing a save", () => {
     const before = localStorage.getItem("nn.campaign.save.v1");
     expect(useGame.getState().importSave("not json")).toBe(false);
     expect(useGame.getState().toast?.text).toBe("That file is not a readable save.");
-    const future = { ...makeEnvelope(newGame()), schemaVersion: 3 };
+    const future = { ...makeEnvelope(newGame()), schemaVersion: 2 };
     expect(useGame.getState().importSave(JSON.stringify(future))).toBe(false);
     expect(useGame.getState().toast?.text).toBe("That save is from a different version of the game.");
     expect(localStorage.getItem("nn.campaign.save.v1")).toBe(before);

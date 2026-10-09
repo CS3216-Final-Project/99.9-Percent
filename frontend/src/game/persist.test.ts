@@ -2,8 +2,7 @@ import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { newGame } from "../sim";
 import { step, advanceSteps } from "../sim/step";
 import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics } from "./persist";
-import { migrateSave, CAMPAIGN_SAVE_KEY as KEY } from "./saveMigrations";
-import { playedRun, v1Envelope } from "./testing/saves";
+import { CAMPAIGN_SAVE_KEY as KEY } from "./saveEnvelope";
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 describe("campaign data preservation", () => {
@@ -41,21 +40,5 @@ describe("campaign data preservation", () => {
     if (loaded.status !== "ok") throw Error("load");
     expect(step(loaded.game)).toEqual(step(s));
     s = step(s).state; saveGame(s); expect(loadGame()).toMatchObject({ status: "ok", game: s });
-  });
-  it("backs up a schema 1 save, converts it in place and refuses unknown future versions", () => {
-    const game = playedRun(), raw = JSON.stringify(v1Envelope(game, 400)); localStorage.setItem(KEY, raw);
-    expect(loadGame()).toMatchObject({ status: "ok", remainderMs: 400 });
-    expect(localStorage.getItem(KEY + ".backup.v1")).toBe(raw);
-    expect(JSON.parse(localStorage.getItem(KEY)!)).toMatchObject({ schemaVersion: 2, step: game.campaign!.step });
-    expect(saveGame(game)).toBe(true);
-    localStorage.setItem(KEY, JSON.stringify({ schemaVersion: 8 }));
-    expect(migrateSave(localStorage)).toBe(false); expect(saveGame(game)).toBe(false);
-  });
-  it("never replaces original when migration backup fails", () => {
-    localStorage.setItem(KEY, JSON.stringify(v1Envelope(playedRun())));
-    const before = localStorage.getItem(KEY);
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
-    expect(migrateSave(localStorage)).toBe(false);
-    expect(localStorage.getItem(KEY)).toBe(before);
   });
 });

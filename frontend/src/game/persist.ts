@@ -1,4 +1,4 @@
-import { decodeSave, makeEnvelope, migrateSave, replaceable } from "./saveMigrations";
+import { decodeSave, makeEnvelope, replaceable } from "./saveEnvelope";
 import { type GameState } from "@/sim";
 
 /**
@@ -67,8 +67,6 @@ export function loadGame():LoadResult {
   let raw:string|null;
   try {raw=window.localStorage.getItem(SAVE_KEY);}catch{return {status:"unavailable"};}
   if(raw===null)return {status:"none"};
-  // An older schema is backed up and converted in place, so later saves can replace it.
-  if(migrateSave(window.localStorage))raw=read(SAVE_KEY)??raw;
   const result=decodeSave(raw);
   if(result.status!=="ok")return result;
   return {status:"ok",game:result.game,savedAt:result.envelope.savedAt,remainderMs:result.envelope.runtime.remainderMs};

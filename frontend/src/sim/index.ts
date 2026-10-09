@@ -8,7 +8,7 @@ export { BRANCHES, TECH, TECH_ORDER, has, isResearchTech, completedTechIds, tech
 export * from "./derive";
 export { newGame, newLegacyGame } from "./state";
 export { applyAction } from "./actions";
-export { replayCampaign, MAX_REPLAY_STEPS } from "./replay";
+export { replayCampaign, MAX_REPLAY_STEPS, MAX_REPLAY_INPUTS } from "./replay";
 export { advanceTurn, incidentTick } from "./turn";
 export {
   recoveryOptions,

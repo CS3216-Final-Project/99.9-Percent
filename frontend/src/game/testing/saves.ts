@@ -16,8 +16,3 @@ export function playedRun(): GameState {
   return advanceSteps(s, 70).state;
 }
 
-/** The schema 1 envelope the previous build would have written for this state. */
-export function v1Envelope(game: GameState, remainderMs = 0) {
-  const { inputs: _, ...campaign } = game.campaign!;
-  return JSON.parse(JSON.stringify({ schemaVersion: 1, scenarioId: "opening-db", scenarioVersion: 1, runId: campaign.runId, game: { ...game, campaign }, runtime: { remainderMs }, savedAt: 1 }));
-}
