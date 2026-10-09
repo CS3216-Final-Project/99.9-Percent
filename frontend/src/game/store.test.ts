@@ -1,17 +1,16 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { newGame } from "../sim";
 import { advanceSteps } from "../sim/step";
-import { loadGame, saveGame, readAnalytics } from "./persist";
+import { loadClassicGame, loadGame, saveGame, readAnalytics } from "./persist";
 import { makeEnvelope } from "./saveEnvelope";
 import { useGame } from "./store";
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => vi.restoreAllMocks());
 describe("shared campaign runtime", () => {
-  it("boots once and leaves legacy data untouched", () => {
-    localStorage.setItem("nn.save.v1", "legacy");
+  it("boots once", () => {
     useGame.getState().boot(); const s = useGame.getState(); s.boot();
     expect(useGame.getState()).toBe(s); expect(readAnalytics().filter(e => e.name === "run_started")).toHaveLength(1);
-    expect(localStorage.getItem("nn.save.v1")).toBe("legacy"); expect(s.running).toBe(false);
+    expect(s.running).toBe(false);
   });
   it("protects corrupt saves from boot and autosave, with explicit reset", () => {
     localStorage.setItem("nn.campaign.save.v1", "{"); useGame.getState().boot();
@@ -97,4 +96,67 @@ it("saves every decision so a reload replays to the same company", () => {
   expect(live.campaign!.trace.filter(t => t.type === "action-rejected")).toHaveLength(2);
   useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
   expect(JSON.parse(JSON.stringify(useGame.getState().game))).toEqual(JSON.parse(JSON.stringify(live)));
+});
+
+describe("game modes", () => {
+  it("defaults to campaign and remembers the last mode played", () => {
+    useGame.getState().boot();
+    expect(useGame.getState().mode).toBe("campaign");
+    expect(useGame.getState().game.campaign).toBeDefined();
+    useGame.getState().switchMode("classic");
+    useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+    expect(useGame.getState()).toMatchObject({ mode: "classic", started: false });
+    expect(useGame.getState().game.campaign).toBeUndefined();
+  });
+  it("keeps each mode's run when switching back and forth", () => {
+    useGame.getState().boot(); useGame.getState().advance(); useGame.getState().advance();
+    const campaign = useGame.getState().game;
+    useGame.getState().switchMode("classic");
+    expect(useGame.getState()).toMatchObject({ mode: "classic", started: true, view: null, running: false });
+    useGame.getState().advance();
+    const classic = useGame.getState().game;
+    expect(classic.turn).toBe(2);
+    useGame.getState().switchMode("campaign");
+    expect(useGame.getState().game).toEqual(campaign);
+    useGame.getState().switchMode("classic");
+    expect(useGame.getState().game).toEqual(classic);
+    expect(loadGame()).toMatchObject({ status: "ok", game: campaign });
+  });
+  it("starting a new classic run leaves the campaign save alone", () => {
+    useGame.getState().boot(); useGame.getState().advance();
+    const campaign = localStorage.getItem("nn.campaign.save.v1");
+    useGame.getState().switchMode("classic"); useGame.getState().newRun({ seed: 7 });
+    expect(useGame.getState().game).toMatchObject({ seed: 7, turn: 1 });
+    expect(localStorage.getItem("nn.campaign.save.v1")).toBe(campaign);
+    expect(loadClassicGame()).toMatchObject({ status: "ok", game: { seed: 7 } });
+  });
+  it("replaces an unreadable classic save with a new run", () => {
+    localStorage.setItem("nn.classic.save.v1", "{");
+    useGame.getState().boot(); useGame.getState().switchMode("classic");
+    expect(useGame.getState().toast).toMatchObject({ kind: "error", text: "Saved classic run was unreadable. Started a new one." });
+    expect(loadClassicGame().status).toBe("ok");
+  });
+  it("refuses to switch away from a run it cannot save unless told to discard it", () => {
+    useGame.getState().boot();
+    for (let i = 0; i < 6; i++) useGame.getState().advance();
+    const original = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+      if (key === "nn.campaign.save.v1") throw Error("quota");
+      original.call(this, key, value);
+    });
+    expect(useGame.getState().switchMode("classic")).toBe(false);
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", game: { campaign: { step: 6 } } });
+    expect(useGame.getState().switchMode("classic", { discard: true })).toBe(true);
+    expect(useGame.getState().mode).toBe("classic");
+  });
+  it("refuses to switch away from a run kept in memory beside a preserved save", () => {
+    localStorage.setItem("nn.campaign.save.v1", "{"); useGame.getState().boot();
+    expect(useGame.getState().switchMode("classic")).toBe(false);
+    expect(localStorage.getItem("nn.campaign.save.v1")).toBe("{");
+  });
+  it("clears the previous mode's toast", () => {
+    useGame.getState().boot(); useGame.getState().notify("Campaign news");
+    useGame.getState().switchMode("classic");
+    expect(useGame.getState().toast).toBeNull();
+  });
 });

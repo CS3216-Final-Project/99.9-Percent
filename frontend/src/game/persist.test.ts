@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
-import { newGame } from "../sim";
+import { newGame, newLegacyGame } from "../sim";
 import { step, advanceSteps } from "../sim/step";
-import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics } from "./persist";
+import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics, saveClassicGame, loadClassicGame } from "./persist";
 import { CAMPAIGN_SAVE_KEY as KEY } from "./saveEnvelope";
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
@@ -16,12 +16,13 @@ describe("campaign data preservation", () => {
     expect(saveGame(newGame())).toBe(false); expect(localStorage.getItem(KEY)).toBe(raw);
     expect(saveGame(newGame(), 0, true)).toBe(true);
   });
-  it("leaves legacy saves, metadata and analytics byte-for-byte unchanged", () => {
-    const keys = ["nn.save.v1", "nn.meta.v1", "nn.analytics.v1"];
-    keys.forEach(k => localStorage.setItem(k, "original-" + k));
+  it("keeps the classic save and meta apart from the campaign's", () => {
+    const classic = newLegacyGame(3);
+    saveClassicGame(classic); saveMeta({ ...DEFAULT_META, tutorialDone: true }, "classic");
     expect(loadGame().status).toBe("none"); expect(loadMeta()).toEqual(DEFAULT_META);
-    saveGame(newGame()); saveMeta({ ...DEFAULT_META, tutorialDone: true }); track("run_started"); clearSave(); clearAnalytics();
-    keys.forEach(k => expect(localStorage.getItem(k)).toBe("original-" + k));
+    saveGame(newGame()); saveMeta({ ...DEFAULT_META, runsStarted: 4 }); track("run_started"); clearSave(); clearAnalytics();
+    expect(loadClassicGame()).toEqual({ status: "ok", game: JSON.parse(JSON.stringify(classic)) });
+    expect(loadMeta("classic").tutorialDone).toBe(true);
   });
   it("handles storage failures without destroying in-memory state", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
