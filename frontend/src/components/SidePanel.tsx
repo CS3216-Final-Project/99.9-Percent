@@ -25,9 +25,10 @@ import {
 } from "@/sim";
 import { moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
-import { EQUIPMENT_ICON, Icon, moodIcon, STATE_META, TECH_ICON } from "./icons";
+import { Icon } from "./icons";
+import { EQUIPMENT_ICON, moodIcon, STATE_META, TECH_ICON, utilTone } from "./presentation";
 import IncidentPanel from "./IncidentPanel";
-import { Act, Chip, Gauge, ReleaseRow, Row, TaskRow, utilTone } from "./ui";
+import { Act, Chip, Gauge, ReleaseRow, Row, TaskRow } from "./ui";
 
 function loadGauge(label: string, util: number, m: Metrics, tip: string) {
   return <Gauge icon="load" label={label} value={util} text={m.hasMonitoring ? pct(util) : loadBand(util)} tone={utilTone(util)} tip={tip} />;
@@ -197,7 +198,15 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
     case "growth": {
       const analytics = has(game, "analytics");
       const sat = game.satisfaction;
-      let first = true;
+      const promos = PROMO_ORDER.map((pid) => {
+        const def = PROMOS[pid];
+        const unlocked = (!def.requires || has(game, def.requires)) && (!def.minUsers || Math.max(game.users, game.totals.peakUsers) >= def.minUsers);
+        const active = game.activePromos.includes(pid);
+        const cooldown = promoCooldownLeft(game, pid);
+        return { pid, def, unlocked, active, cooldown, usable: unlocked && !active && cooldown === 0 };
+      });
+      // The tutorial points at the first promotion that can be launched now.
+      const firstUsable = promos.find((p) => p.usable)?.pid;
       return (
         <>
           <Gauge
@@ -208,14 +217,8 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
             tone={sat < 55 ? "critical" : sat < 70 ? "warn" : "ok"}
             tip="How happy customers are. Slow pages and outages lower it. It drives word of mouth, churn and how well promotions work."
           />
-          {PROMO_ORDER.map((pid) => {
-            const def = PROMOS[pid];
-            const unlocked = (!def.requires || has(game, def.requires)) && (!def.minUsers || Math.max(game.users, game.totals.peakUsers) >= def.minUsers);
-            const active = game.activePromos.includes(pid);
-            const cooldown = promoCooldownLeft(game, pid);
-            const usable = unlocked && !active && cooldown === 0;
-            const tour = usable && first ? "primary" : undefined;
-            if (usable) first = false;
+          {promos.map(({ pid, def, unlocked, active, cooldown, usable }) => {
+            const tour = pid === firstUsable ? "primary" : undefined;
             return (
               <div className="promo" key={pid}>
                 <div className="task-top">

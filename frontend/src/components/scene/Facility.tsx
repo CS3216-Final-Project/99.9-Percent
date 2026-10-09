@@ -36,10 +36,12 @@ import {
 import { chooseDetail, DetailContext, detailOverride, useDetail, type Renderer } from "./detail";
 import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
-import { EQUIPMENT_ICON, Icon, STATE_META } from "../icons";
+import { Icon } from "../icons";
+import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
 import { Exterior } from "./exterior";
-import { OnWall, updateWalls, Wall } from "./walls";
+import { OnWall, Wall } from "./walls";
+import { updateWalls } from "./wallState";
 
 /* ------------------------------------------------------------------ */
 /* Scene model: the few facts the 3D view needs, as a stable snapshot  */
@@ -161,9 +163,9 @@ const UP = new THREE.Vector3(0, 1, 0);
 const MIN_TILT = 0.22;
 const MAX_TILT = 1.2;
 /** Q, E and the rotate buttons turn the room by an eighth of a circle. */
-export const TURN = Math.PI / 4;
+const TURN = Math.PI / 4;
 
-export const cameraApi: { zoomBy: (factor: number) => void; reset: () => void; rotateBy: (radians: number) => void } = {
+const cameraApi: { zoomBy: (factor: number) => void; reset: () => void; rotateBy: (radians: number) => void } = {
   zoomBy: () => {},
   reset: () => {},
   rotateBy: () => {},
@@ -199,7 +201,6 @@ function frameBox(box: THREE.Box3, dir: THREE.Vector3, width: number, height: nu
 function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean> }) {
   const controls = useRef<MapControlsImpl>(null);
   const camera = useThree((s) => s.camera) as THREE.OrthographicCamera;
-  const size = useThree((s) => s.size);
   /** The player has panned, zoomed or dragged the view, so it no longer follows the facility. */
   const touched = useRef(false);
   /** Turning back to the starting angle after Reset view. */
@@ -252,9 +253,12 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  useFrame(() => {
+  // Read the camera from the frame state: R3F expects per-frame mutation here, not on the hook's render value.
+  useFrame((state) => {
     const c = controls.current;
     if (!c) return;
+    const camera = state.camera as THREE.OrthographicCamera;
+    const { size } = state;
     const { offset, dir, before } = v;
     offset.copy(camera.position).sub(c.target);
     const distance = offset.length();

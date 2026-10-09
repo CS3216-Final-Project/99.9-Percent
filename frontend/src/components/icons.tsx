@@ -1,5 +1,4 @@
 import type { ComponentType, SVGProps } from "react";
-import type { EquipmentId, EquipmentState, TechId } from "@/sim";
 // Pixel icons from pixelarticons (MIT). Per-icon imports keep the bundle small.
 import { AlarmClock } from "pixelarticons/react/AlarmClock.js";
 import { Analytics } from "pixelarticons/react/Analytics.js";
@@ -152,51 +151,4 @@ export function Icon({ name, size = 24, className }: { name: IconName; size?: nu
       shapeRendering="crispEdges"
     />
   );
-}
-
-export const EQUIPMENT_ICON: Record<EquipmentId, IconName> = {
-  gateway: "network",
-  app: "server",
-  standby: "plug",
-  cache: "bolt",
-  db: "database",
-  replica: "copy",
-  backup: "save",
-  monitoring: "monitor",
-  deploy: "ship",
-  team: "team",
-  growth: "megaphone",
-};
-
-export const TECH_ICON: Partial<Record<TechId, IconName>> = {
-  larger_servers: "scaleUp",
-  load_balancing: "shuffle",
-  autoscaling: "scale",
-  larger_database: "database",
-  caching: "bolt",
-  cache_tuning: "sliders",
-  health_checks: "checkbox",
-  standby: "plug",
-  auto_failover: "switch",
-  monitoring: "monitor",
-  analytics: "analytics",
-  deploy_testing: "test",
-  backups: "save",
-  replicas: "copy",
-};
-
-export type Tone = "ok" | "warn" | "critical" | "muted";
-
-/** The one vocabulary for equipment health: same word, icon and colour in the room, the panel and the tooltips. */
-export const STATE_META: Record<EquipmentState, { word: string; icon: IconName; tone: Tone }> = {
-  ok: { word: "Healthy", icon: "check", tone: "ok" },
-  warn: { word: "Needs attention", icon: "alert", tone: "warn" },
-  critical: { word: "Overloaded", icon: "fire", tone: "critical" },
-  down: { word: "Down", icon: "skull", tone: "critical" },
-  absent: { word: "Not built", icon: "plusBox", tone: "muted" },
-};
-
-/** A face for customer satisfaction: easier to read at a glance than a number. */
-export function moodIcon(satisfaction: number): IconName {
-  return satisfaction < 55 ? "frown" : satisfaction < 70 ? "meh" : "smile";
 }

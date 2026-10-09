@@ -5,6 +5,7 @@ import { BALANCE, metrics, type EventKind, type GameState, type Postmortem } fro
 import { compact, money, moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow, type ConceptKind } from "./ui";
 
 /* ------------------------------------------------------------------ */
@@ -269,24 +270,6 @@ export function RunCharts({ game, compactSet = false }: { game: GameState; compa
 /* ------------------------------------------------------------------ */
 /* Postmortems                                                         */
 /* ------------------------------------------------------------------ */
-
-export const OUTCOME_LABEL: Record<Postmortem["outcome"], string> = {
-  resolved: "Fixed",
-  mitigated: "Contained",
-  failed: "Not fixed in time",
-  auto_mitigated: "Handled automatically",
-};
-
-export const OUTCOME_ICON: Record<Postmortem["outcome"], IconName> = {
-  resolved: "check",
-  mitigated: "alert",
-  failed: "close",
-  auto_mitigated: "robot",
-};
-
-export function outcomeTone(pm: Postmortem): "ok" | "warn" | "critical" {
-  return pm.outcome === "failed" ? "critical" : pm.outcome === "mitigated" ? "warn" : "ok";
-}
 
 /**
  * A postmortem is a one-screen summary first: what failed, what fixed it and

@@ -3,7 +3,8 @@
 import { equipmentInfo, inspectable, inspectSeconds, recoveryOptions, symptomaticEquipment } from "@/sim";
 import { clock, moneyFull, num, pct } from "@/game/format";
 import { inspectOrSelect, useGame } from "@/game/store";
-import { EQUIPMENT_ICON, Icon, type IconName } from "./icons";
+import { Icon, type IconName } from "./icons";
+import { EQUIPMENT_ICON } from "./presentation";
 import { Callout, Concept, Meter, Tip, type CalloutTone } from "./ui";
 
 const ATTEMPT: Record<string, { tone: CalloutTone; icon: IconName; word: string }> = {
