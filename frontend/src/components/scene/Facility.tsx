@@ -2,7 +2,7 @@
 
 import { Line, MapControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
 import {
@@ -18,10 +18,10 @@ import {
 } from "@/sim";
 import { inspectOrSelect, useGame } from "@/game/store";
 import {
+  AISLE_Z,
   appSlot,
   DB_CABINET,
   dbSlot,
-  deskSlot,
   footprint,
   MAX_TEMP_SHOWN,
   POS,
@@ -30,7 +30,10 @@ import {
   tempSlot,
   type Footprint,
 } from "./layout";
-import { floorTiles, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
+import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
+import { EQUIPMENT_ICON, Icon, STATE_META } from "../icons";
+import { Office } from "./Office";
+import { OnWall, updateWalls, Wall } from "./walls";
 
 /* ------------------------------------------------------------------ */
 /* Scene model: the few facts the 3D view needs, as a stable snapshot  */
@@ -141,54 +144,71 @@ function useSceneModel(): SceneModel {
 
 const TARGET = new THREE.Vector3(-1, 0, 0.6);
 const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20);
+const HOME = CAMERA_OFFSET.clone().normalize();
+const UP = new THREE.Vector3(0, 1, 0);
+/** Tilt limits, measured from straight down: nearly top-down to a low three-quarter view. */
+const MIN_TILT = 0.22;
+const MAX_TILT = 1.2;
+/** Q, E and the rotate buttons turn the room by an eighth of a circle. */
+export const TURN = Math.PI / 4;
 
-export const cameraApi: { zoomBy: (factor: number) => void; reset: () => void } = {
+export const cameraApi: { zoomBy: (factor: number) => void; reset: () => void; rotateBy: (radians: number) => void } = {
   zoomBy: () => {},
   reset: () => {},
+  rotateBy: () => {},
 };
+
+/** Zoom and floor point that fit the box on screen when looking along `dir`. */
+function frameBox(box: THREE.Box3, dir: THREE.Vector3, width: number, height: number): { zoom: number; target: THREE.Vector3 } {
+  const right = new THREE.Vector3().crossVectors(dir, UP).normalize();
+  const up = new THREE.Vector3().crossVectors(right, dir).normalize();
+  const center = box.getCenter(new THREE.Vector3());
+  const p = new THREE.Vector3();
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const x of [box.min.x, box.max.x]) {
+    for (const y of [box.min.y, box.max.y]) {
+      for (const z of [box.min.z, box.max.z]) {
+        p.set(x, y, z).sub(center);
+        minX = Math.min(minX, p.dot(right));
+        maxX = Math.max(maxX, p.dot(right));
+        minY = Math.min(minY, p.dot(up));
+        maxY = Math.max(maxY, p.dot(up));
+      }
+    }
+  }
+  // Leave room around the edges for labels, the prompt and the controls.
+  const zoom = THREE.MathUtils.clamp(Math.min(width / (maxX - minX + 7), height / (maxY - minY + 6.5)), 10, 64);
+  // Slide the centre down the view direction onto the floor, which is the plane the controls pan across.
+  return { zoom, target: center.add(dir.clone().multiplyScalar(-center.y / dir.y)) };
+}
 
 function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean> }) {
   const controls = useRef<MapControlsImpl>(null);
   const camera = useThree((s) => s.camera) as THREE.OrthographicCamera;
   const size = useThree((s) => s.size);
+  /** The player has panned, zoomed or dragged the view, so it no longer follows the facility. */
   const touched = useRef(false);
-  const want = useRef({ zoom: 30, target: TARGET.clone() });
+  /** Turning back to the starting angle after Reset view. */
+  const homing = useRef(false);
+  /** Turn still to apply from Q, E or the rotate buttons. */
+  const spin = useRef(0);
+  const box = useRef<THREE.Box3 | null>(null);
+  const v = useMemo(() => ({ offset: new THREE.Vector3(), dir: new THREE.Vector3(), before: new THREE.Vector3() }), []);
 
   // Frame the equipment that is actually built, and widen the view as the facility grows.
   useEffect(() => {
-    const dir = CAMERA_OFFSET.clone().normalize().negate();
-    const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
-    const up = new THREE.Vector3().crossVectors(right, dir).normalize();
-    const box = new THREE.Box3();
+    const b = new THREE.Box3();
     for (const id of EQUIPMENT_ORDER) {
       if (!built[id]) continue;
       const f = footprints[id];
-      box.expandByPoint(new THREE.Vector3(f.x - f.w / 2, 0, f.z - f.d / 2));
-      box.expandByPoint(new THREE.Vector3(f.x + f.w / 2, f.h, f.z + f.d / 2));
+      b.expandByPoint(new THREE.Vector3(f.x - f.w / 2, 0, f.z - f.d / 2));
+      b.expandByPoint(new THREE.Vector3(f.x + f.w / 2, f.h, f.z + f.d / 2));
     }
-    if (box.isEmpty()) return;
-    const center = box.getCenter(new THREE.Vector3());
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    for (const x of [box.min.x, box.max.x]) {
-      for (const y of [box.min.y, box.max.y]) {
-        for (const z of [box.min.z, box.max.z]) {
-          const p = new THREE.Vector3(x, y, z).sub(center);
-          minX = Math.min(minX, p.dot(right));
-          maxX = Math.max(maxX, p.dot(right));
-          minY = Math.min(minY, p.dot(up));
-          maxY = Math.max(maxY, p.dot(up));
-        }
-      }
-    }
-    // Leave room around the edges for labels, the prompt and the controls.
-    const zoom = THREE.MathUtils.clamp(Math.min(size.width / (maxX - minX + 7), size.height / (maxY - minY + 6.5)), 10, 64);
-    // Slide the centre down the view direction onto the floor, which is the plane the controls pan across.
-    const onFloor = center.clone().add(dir.clone().multiplyScalar(-center.y / dir.y));
-    want.current = { zoom, target: onFloor };
-  }, [footprints, built, size]);
+    box.current = b.isEmpty() ? null : b;
+  }, [footprints, built]);
 
   useEffect(() => {
     cameraApi.zoomBy = (factor) => {
@@ -199,46 +219,94 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     };
     cameraApi.reset = () => {
       touched.current = false;
+      homing.current = true;
+      spin.current = 0;
+    };
+    cameraApi.rotateBy = (radians) => {
+      homing.current = false;
+      spin.current += radians;
     };
   }, [camera]);
+
+  // Q and E turn the room. Ignored while typing and before a run starts.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || !useGame.getState().started) return;
+      if (e.key === "q" || e.key === "Q") cameraApi.rotateBy(-TURN);
+      else if (e.key === "e" || e.key === "E") cameraApi.rotateBy(TURN);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useFrame(() => {
     const c = controls.current;
     if (!c) return;
-    // Until the player takes the camera, ease toward the framing above.
-    if (!touched.current) {
+    const { offset, dir, before } = v;
+    offset.copy(camera.position).sub(c.target);
+    const distance = offset.length();
+    let turned = false;
+    if (Math.abs(spin.current) > 1e-4) {
+      const step = Math.abs(spin.current) < 0.004 ? spin.current : spin.current * 0.16;
+      offset.applyAxisAngle(UP, step);
+      spin.current -= step;
+      turned = true;
+    }
+    if (homing.current) {
+      offset.normalize().lerp(HOME, 0.14).normalize();
+      if (offset.distanceTo(HOME) < 0.002) {
+        offset.copy(HOME);
+        homing.current = false;
+      }
+      offset.multiplyScalar(distance);
+      turned = true;
+    }
+    if (turned) camera.position.copy(c.target).add(offset);
+
+    // Until the player takes the camera, ease toward a framing of the built equipment from the current angle.
+    if (!touched.current && box.current) {
+      dir.copy(offset).normalize().negate();
+      const want = frameBox(box.current, dir, size.width, size.height);
       const k = 0.1;
-      camera.zoom += (want.current.zoom - camera.zoom) * k;
-      c.target.lerp(want.current.target, k);
-      camera.position.copy(c.target).add(CAMERA_OFFSET);
+      camera.zoom += (want.zoom - camera.zoom) * k;
+      before.copy(c.target);
+      c.target.lerp(want.target, k);
+      camera.position.add(c.target).sub(before);
       camera.updateProjectionMatrix();
     }
     // Keep the view over the building while panning.
     const t = c.target;
-    const cx = THREE.MathUtils.clamp(t.x, -ROOM.w / 2, ROOM.w / 2);
-    const cz = THREE.MathUtils.clamp(t.z, -ROOM.d / 2, ROOM.d / 2);
+    const cx = THREE.MathUtils.clamp(t.x, ROOM.x0, ROOM.x1);
+    const cz = THREE.MathUtils.clamp(t.z, ROOM.z0, ROOM.z1);
     if (cx !== t.x || cz !== t.z) {
       camera.position.x += cx - t.x;
       camera.position.z += cz - t.z;
       t.x = cx;
       t.z = cz;
     }
+    // Lower whichever walls now stand between the camera and the room.
+    updateWalls(dir.copy(c.target).sub(camera.position).normalize());
   });
 
   return (
     <MapControls
       ref={controls}
       makeDefault
-      enableRotate={false}
       enableDamping
       dampingFactor={0.14}
       zoomToCursor
       zoomSpeed={1.1}
       minZoom={10}
       maxZoom={140}
+      rotateSpeed={0.7}
+      minPolarAngle={MIN_TILT}
+      maxPolarAngle={MAX_TILT}
       target={TARGET}
       onStart={() => {
         touched.current = true;
+        homing.current = false;
       }}
     />
   );
@@ -248,7 +316,10 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
 /* Building blocks                                                     */
 /* ------------------------------------------------------------------ */
 
-const STEEL = "#252b32";
+/* A toy server room at night: flat indigo cabinets, warm desks and bright status lights. */
+const STEEL = "#34305c";
+const TRIM = "#2a2450";
+const BEZEL = "#1d1834";
 
 function Rack({
   x,
@@ -270,7 +341,7 @@ function Rack({
     <group position={[x, 0, z]}>
       <mesh castShadow receiveShadow position={[0, size.h / 2, 0]}>
         <boxGeometry args={[size.w, size.h, size.d]} />
-        <meshStandardMaterial color={tint} metalness={0.6} roughness={0.45} />
+        <meshStandardMaterial color={tint} metalness={0.1} roughness={0.8} />
       </mesh>
       <mesh position={[0, size.h / 2, size.d / 2 + 0.006]}>
         <planeGeometry args={[size.w * 0.87, size.h * 0.93]} />
@@ -279,14 +350,14 @@ function Rack({
           emissiveMap={tex.emissive}
           emissive="#ffffff"
           emissiveIntensity={1.7}
-          roughness={0.5}
-          metalness={0.35}
+          roughness={0.7}
+          metalness={0.05}
         />
       </mesh>
       {/* Side vent panel, visible from the camera's side of the rack. */}
       <mesh position={[size.w / 2 + 0.004, size.h / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[size.d * 0.8, size.h * 0.86]} />
-        <meshStandardMaterial color="#1c2127" metalness={0.5} roughness={0.6} />
+        <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
       </mesh>
       <mesh position={[0, size.h + 0.025, size.d / 2 - 0.09]}>
         <boxGeometry args={[size.w * 0.72, 0.05, 0.07]} />
@@ -307,60 +378,11 @@ function Screen({ kind, w, h, position, rotation }: { kind: ScreenKind; w: numbe
     <group position={position} rotation={rotation}>
       <mesh castShadow>
         <boxGeometry args={[w + 0.07, h + 0.07, 0.045]} />
-        <meshStandardMaterial color="#14181c" metalness={0.4} roughness={0.5} />
+        <meshStandardMaterial color={BEZEL} metalness={0.05} roughness={0.8} />
       </mesh>
       <mesh position={[0, 0, 0.026]}>
         <planeGeometry args={[w, h]} />
         <meshBasicMaterial map={map} toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
-
-function Desk({ x, z, screen, wide = false }: { x: number; z: number; screen: ScreenKind; wide?: boolean }) {
-  const w = wide ? 2.2 : 1.55;
-  return (
-    <group position={[x, 0, z]}>
-      <mesh castShadow receiveShadow position={[0, 0.74, 0]}>
-        <boxGeometry args={[w, 0.05, 0.8]} />
-        <meshStandardMaterial color="#6a5f52" roughness={0.7} />
-      </mesh>
-      {[-1, 1].map((side) => (
-        <mesh key={side} castShadow position={[(side * (w - 0.1)) / 2, 0.37, 0]}>
-          <boxGeometry args={[0.05, 0.74, 0.72]} />
-          <meshStandardMaterial color="#30363d" metalness={0.5} roughness={0.5} />
-        </mesh>
-      ))}
-      <mesh position={[wide ? -0.45 : 0, 0.87, -0.22]}>
-        <boxGeometry args={[0.07, 0.22, 0.07]} />
-        <meshStandardMaterial color="#1b1f24" />
-      </mesh>
-      <Screen kind={screen} w={0.6} h={0.36} position={[wide ? -0.45 : 0, 1.13, -0.2]} />
-      {wide && (
-        <>
-          <mesh position={[0.45, 0.87, -0.22]}>
-            <boxGeometry args={[0.07, 0.22, 0.07]} />
-            <meshStandardMaterial color="#1b1f24" />
-          </mesh>
-          <Screen kind={screen} w={0.6} h={0.36} position={[0.45, 1.13, -0.2]} />
-        </>
-      )}
-      {/* Chair */}
-      <mesh castShadow position={[0, 0.46, 0.72]}>
-        <boxGeometry args={[0.46, 0.08, 0.46]} />
-        <meshStandardMaterial color="#2a3037" roughness={0.8} />
-      </mesh>
-      <mesh castShadow position={[0, 0.78, 0.93]}>
-        <boxGeometry args={[0.44, 0.56, 0.06]} />
-        <meshStandardMaterial color="#2a3037" roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 0.22, 0.72]}>
-        <cylinderGeometry args={[0.04, 0.04, 0.44, 8]} />
-        <meshStandardMaterial color="#14181c" metalness={0.7} roughness={0.4} />
-      </mesh>
-      <mesh position={[0, 0.03, 0.72]}>
-        <cylinderGeometry args={[0.26, 0.26, 0.04, 12]} />
-        <meshStandardMaterial color="#14181c" metalness={0.7} roughness={0.4} />
       </mesh>
     </group>
   );
@@ -389,7 +411,7 @@ function Cable({ points, speed, alert }: { points: P2[]; speed: number; alert: b
   }, [points]);
   const count = Math.max(1, Math.round(segments.total / 2.4));
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const color = alert ? "#ff5a4f" : "#7fbfee";
+  const color = alert ? "#ff4d5e" : "#4cb8ff";
 
   useFrame(({ clock }) => {
     const mesh = packets.current;
@@ -413,7 +435,7 @@ function Cable({ points, speed, alert }: { points: P2[]; speed: number; alert: b
         return (
           <mesh key={i} receiveShadow position={[(s.a[0] + s.b[0]) / 2, 0.025, (s.a[1] + s.b[1]) / 2]}>
             <boxGeometry args={horizontal ? [s.len + 0.2, 0.05, 0.2] : [0.2, 0.05, s.len + 0.2]} />
-            <meshStandardMaterial color={alert ? "#3a1a18" : "#161b20"} emissive={color} emissiveIntensity={alert ? 0.45 : 0.08} roughness={0.7} />
+            <meshStandardMaterial color={alert ? "#4a1630" : TRIM} emissive={color} emissiveIntensity={alert ? 0.45 : 0.1} roughness={0.8} />
           </mesh>
         );
       })}
@@ -429,9 +451,9 @@ function Cable({ points, speed, alert }: { points: P2[]; speed: number; alert: b
 /* Floor markings, hit areas and labels for each piece of equipment    */
 /* ------------------------------------------------------------------ */
 
-const ACCENT = "#8cc7f2";
-const ALERT = "#ff5a4f";
-const AMBER = "#f0b040";
+const ACCENT = "#4cb8ff";
+const ALERT = "#ff4d5e";
+const AMBER = "#ff9f1a";
 
 function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Footprint; built: boolean; symptomatic: boolean; inspecting: boolean }) {
   const selected = useGame((s) => s.selected === id);
@@ -445,7 +467,7 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
     fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4.2)) : base;
   });
 
-  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered ? ACCENT : built ? "#66727f" : "#56616c";
+  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered ? ACCENT : built ? "#8f87c9" : "#6e67a3";
   const hw = f.w / 2;
   const hd = f.d / 2;
   const outline: [number, number, number][] = [
@@ -515,7 +537,7 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
       const f = footprints[id];
       anchors.set(id, new THREE.Vector3(f.x, f.h + 0.3, f.z));
     }
-    anchors.set(INTERNET, new THREE.Vector3(-ROOM.w / 2 + 0.2, 1.35, -4.9));
+    anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, 1.35, AISLE_Z));
   }, [footprints]);
 
   useFrame(({ camera, size }) => {
@@ -557,7 +579,9 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       onBlur={() => useGame.getState().hover(null)}
       aria-label={`${m.names[id]}${built ? "" : ", not built"}`}
     >
-      <span className="eq-dot" aria-hidden="true" />
+      <span className="eq-icon" aria-hidden="true">
+        <Icon name={EQUIPMENT_ICON[id]} />
+      </span>
       <span>{m.names[id]}</span>
       {!built && <span className="eq-note">not built</span>}
       {inspecting && <span className="eq-note">investigating</span>}
@@ -571,6 +595,7 @@ function Labels() {
   return (
     <div className="eq-labels">
       <span className="wall-tag" ref={bindLabel(INTERNET)}>
+        <Icon name="network" />
         Internet
       </span>
       {EQUIPMENT_ORDER.filter((id) => (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
@@ -586,46 +611,44 @@ function Labels() {
 
 function Room() {
   const tiles = useMemo(() => {
-    const t = floorTiles();
-    t.repeat.set(ROOM.w / 0.9, ROOM.d / 0.9);
+    const t = concreteFloor();
+    t.repeat.set(ROOM.w / 1.6, ROOM.d / 1.6);
     return t;
   }, []);
   return (
     <group>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]}>
         <planeGeometry args={[ROOM.w, ROOM.d]} />
-        <meshStandardMaterial map={tiles} roughness={0.78} metalness={0.1} />
+        <meshLambertMaterial map={tiles} />
       </mesh>
-      <mesh position={[0, -0.26, 0]}>
+      <mesh position={[ROOM.cx, -0.26, ROOM.cz]}>
         <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
-        <meshStandardMaterial color="#1b2025" roughness={0.9} />
+        <meshStandardMaterial color="#2a2450" roughness={0.9} />
       </mesh>
-      {/* Back and left walls; the two nearest the camera are left open. */}
-      <mesh receiveShadow position={[0, ROOM.wallH / 2, -ROOM.d / 2 - 0.12]}>
-        <boxGeometry args={[ROOM.w + 0.5, ROOM.wallH, 0.24]} />
-        <meshStandardMaterial color="#6b7681" roughness={0.92} />
-      </mesh>
-      <mesh receiveShadow position={[-ROOM.w / 2 - 0.12, ROOM.wallH / 2, 0]}>
-        <boxGeometry args={[0.24, ROOM.wallH, ROOM.d]} />
-        <meshStandardMaterial color="#616c77" roughness={0.92} />
-      </mesh>
-      <mesh position={[0, 0.12, -ROOM.d / 2 + 0.02]}>
+      {/* Four walls; the ones between the camera and the room drop to a low rim. */}
+      <Wall wall="back" x={ROOM.cx} z={ROOM.z0 - 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
+      <Wall wall="front" x={ROOM.cx} z={ROOM.z1 + 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
+      <Wall wall="left" x={ROOM.x0 - 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
+      <Wall wall="right" x={ROOM.x1 + 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
+      <mesh position={[ROOM.cx, 0.12, ROOM.z0 + 0.02]}>
         <boxGeometry args={[ROOM.w, 0.24, 0.04]} />
-        <meshStandardMaterial color="#2b3239" roughness={0.8} />
+        <meshStandardMaterial color={TRIM} roughness={0.85} />
       </mesh>
-      <mesh position={[-ROOM.w / 2 + 0.02, 0.12, 0]}>
+      <mesh position={[ROOM.x0 + 0.02, 0.12, ROOM.cz]}>
         <boxGeometry args={[0.04, 0.24, ROOM.d]} />
-        <meshStandardMaterial color="#2b3239" roughness={0.8} />
+        <meshStandardMaterial color={TRIM} roughness={0.85} />
       </mesh>
       {/* Overhead cable tray along the back wall. */}
-      <mesh castShadow position={[-3, 2.75, -ROOM.d / 2 + 0.35]}>
-        <boxGeometry args={[17, 0.1, 0.5]} />
-        <meshStandardMaterial color="#2e353c" metalness={0.6} roughness={0.5} />
-      </mesh>
+      <OnWall wall="back">
+        <mesh castShadow position={[-3, 2.75, ROOM.z0 + 0.35]}>
+          <boxGeometry args={[17, 0.1, 0.5]} />
+          <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
+        </mesh>
+      </OnWall>
       {/* Where the internet uplink enters the building. */}
-      <mesh position={[-ROOM.w / 2 + 0.1, 0.5, -4.9]}>
+      <mesh position={[ROOM.x0 + 0.1, 0.5, AISLE_Z]}>
         <boxGeometry args={[0.2, 1, 0.7]} />
-        <meshStandardMaterial color="#20262c" metalness={0.6} roughness={0.5} />
+        <meshStandardMaterial color={BEZEL} metalness={0.05} roughness={0.85} />
       </mesh>
     </group>
   );
@@ -642,7 +665,7 @@ function Scene() {
   const appCount = Math.min(m.hosts.length, 12);
   const appMaxX = appSlot(Math.min(appCount, 6) - 1).x;
   const dbLastX = dbSlot(m.dbCabinets - 1).x;
-  const aisleZ = -4.9;
+  const aisleZ = AISLE_Z;
   const dataZ = 4.65;
   const trunkX = -8.3;
   const flow = m.flow;
@@ -652,30 +675,31 @@ function Scene() {
 
   return (
     <>
-      <color attach="background" args={["#171c21"]} />
-      <hemisphereLight args={["#dbe6f0", "#4a535c", 1.55]} />
+      <color attach="background" args={["#1a1633"]} />
+      <hemisphereLight args={["#fff0dd", "#3b3366", 1.7]} />
       <directionalLight
         position={[11, 17, 7]}
-        intensity={2.6}
-        color="#fff6ea"
+        intensity={2.3}
+        color="#fff1de"
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0005}
-        shadow-camera-left={-22}
-        shadow-camera-right={22}
-        shadow-camera-top={22}
-        shadow-camera-bottom={-22}
+        shadow-camera-left={-30}
+        shadow-camera-right={30}
+        shadow-camera-top={30}
+        shadow-camera-bottom={-30}
         shadow-camera-near={1}
         shadow-camera-far={60}
       />
-      <pointLight position={[-3, 3.4, -3.5]} intensity={26} distance={13} color="#a9cff2" />
-      <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#a9cff2" />
+      <pointLight position={[-3, 3.4, -3.5]} intensity={24} distance={13} color="#8fc3ff" />
+      <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
       <Room />
+      <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
 
       {/* Network edge */}
       <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
-      {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint="#2a3138" />}
+      {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint="#3a3566" />}
 
       {/* App servers */}
       {m.hosts.slice(0, 12).map((led, i) => {
@@ -684,18 +708,18 @@ function Scene() {
       })}
       {Array.from({ length: m.temp }, (_, i) => {
         const p = tempSlot(i);
-        return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint="#26323d" />;
+        return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint="#2f4a7a" />;
       })}
-      {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint="#2d2a24" />}
+      {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint="#4d3f63" />}
 
       {/* Data tier */}
-      {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} />}
+      {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint="#2f3f73" />}
       {Array.from({ length: m.dbCabinets }, (_, i) => {
         const p = dbSlot(i);
-        return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint="#22282f" />;
+        return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint="#3f3170" />;
       })}
-      {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint="#22282f" />}
-      {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint="#2a2f35" />}
+      {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint="#3f3170" />}
+      {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint="#3b3560" />}
 
       {/* Monitoring wall */}
       {m.monitoring > 0 &&
@@ -705,37 +729,12 @@ function Scene() {
             kind={m.incident ? "alert" : i === 2 && m.monitoring === 2 ? "chart" : "dash"}
             w={1.45}
             h={0.9}
-            position={[POS.monitoring.x + dx, 2.05, -ROOM.d / 2 + 0.05]}
+            position={[POS.monitoring.x + dx, 2.05, ROOM.z0 + 0.05]}
           />
         ))}
 
-      {/* Engineering desks */}
-      {Array.from({ length: m.engineers }, (_, i) => {
-        const p = deskSlot(i);
-        return <Desk key={`e${i}`} x={p.x} z={p.z} screen={i < m.busy ? "code" : "idle"} />;
-      })}
-
-      {/* Build and deploy console */}
-      <group position={[POS.deploy.x, 0, POS.deploy.z]}>
-        <mesh castShadow receiveShadow position={[0, 0.5, 0]}>
-          <boxGeometry args={[1.5, 1, 0.8]} />
-          <meshStandardMaterial color={STEEL} metalness={0.6} roughness={0.45} />
-        </mesh>
-        <Screen kind={m.releases > 0 ? "deploy-busy" : "deploy"} w={1.1} h={0.62} position={[0, 1.28, -0.12]} rotation={[-0.35, 0, 0]} />
-      </group>
-
-      {/* Growth desk with a results board */}
-      <Desk x={POS.growth.x - 0.4} z={POS.growth.z + 0.2} screen={m.promos > 0 ? "chart" : "idle"} wide />
-      <group position={[POS.growth.x + 1.15, 0, POS.growth.z - 0.55]}>
-        <mesh castShadow position={[0, 0.55, 0]}>
-          <boxGeometry args={[0.08, 1.1, 0.08]} />
-          <meshStandardMaterial color="#1b1f24" metalness={0.6} roughness={0.4} />
-        </mesh>
-        <Screen kind="chart" w={1.2} h={0.75} position={[0, 1.5, 0]} />
-      </group>
-
       {/* Cabling: internet -> edge -> app servers -> (cache) -> database -> replica / backups */}
-      <Cable points={[[-ROOM.w / 2 + 0.2, aisleZ], [POS.gateway.x, aisleZ]]} speed={flow} alert={edgeAlert} />
+      <Cable points={[[ROOM.x0 + 0.2, aisleZ], [POS.gateway.x, aisleZ]]} speed={flow} alert={edgeAlert} />
       <Cable points={[[POS.gateway.x, aisleZ], [Math.max(appMaxX, -6.6) + 0.4, aisleZ]]} speed={flow} alert={edgeAlert} />
       <Cable
         points={[
@@ -763,14 +762,6 @@ function Scene() {
 /* Hover summary (name, status, one metric)                            */
 /* ------------------------------------------------------------------ */
 
-const STATE_WORDS: Record<EquipmentState, string> = {
-  ok: "Healthy",
-  warn: "Needs attention",
-  critical: "Overloaded",
-  down: "Down",
-  absent: "Not built",
-};
-
 function HoverTip({ container }: { container: React.RefObject<HTMLDivElement | null> }) {
   const hovered = useGame((s) => s.hovered);
   const game = useGame((s) => s.game);
@@ -792,7 +783,7 @@ function HoverTip({ container }: { container: React.RefObject<HTMLDivElement | n
 
   const info = hovered ? equipmentInfo(game, hovered) : null;
   const incident = game.phase === "incident" && game.incident;
-  let status = info ? STATE_WORDS[info.state] : "";
+  let status = info ? STATE_META[info.state].word : "";
   let summary = info?.summary ?? "";
   let action = "";
   if (info && incident) {
@@ -807,7 +798,10 @@ function HoverTip({ container }: { container: React.RefObject<HTMLDivElement | n
       {info && (
         <>
           <strong>{info.name}</strong>
-          <span className={`hover-state tone-${incident ? (status === "Showing symptoms" ? "alert" : "ok") : info.state}`}>{status}</span>
+          <span className={`hover-state tone-${incident ? (status === "Showing symptoms" ? "alert" : "ok") : info.state}`}>
+            <Icon name={incident ? (status === "Showing symptoms" ? "alert" : "check") : STATE_META[info.state].icon} />
+            {status}
+          </span>
           {summary && <span className="hover-summary">{summary}</span>}
           {action && <span className="hover-action">{action}</span>}
         </>
@@ -816,14 +810,47 @@ function HoverTip({ container }: { container: React.RefObject<HTMLDivElement | n
   );
 }
 
+/** True when WebGL is drawn on the CPU (SwiftShader, llvmpipe and similar), as on machines without a GPU. */
+function isSoftwareRenderer(gl: THREE.WebGLRenderer): boolean {
+  const ctx = gl.getContext();
+  const info = ctx.getExtension("WEBGL_debug_renderer_info");
+  const name = String(info ? ctx.getParameter(info.UNMASKED_RENDERER_WEBGL) : ctx.getParameter(ctx.RENDERER));
+  return /swiftshader|llvmpipe|software|softpipe|basic render/i.test(name);
+}
+
+/** Software rendering cannot keep up with 60 frames a second, so it draws 20. */
+const SOFTWARE_FPS = 20;
+
+/** In on-demand mode, ask for a new frame 20 times a second. */
+function SoftwareFrames() {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    const id = window.setInterval(() => invalidate(), 1000 / SOFTWARE_FPS);
+    return () => window.clearInterval(id);
+  }, [invalidate]);
+  return null;
+}
+
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
+  /** Drawing in software, without a GPU: no shadows, half the pixels, 20 frames a second. */
+  const [soft, setSoft] = useState(false);
   return (
     <div className="stage-canvas" ref={container}>
       <Canvas
         orthographic
-        shadows="percentage"
-        dpr={[1, 1.75]}
+        shadows={soft ? false : "percentage"}
+        dpr={soft ? 0.5 : [1, 1.75]}
+        frameloop={soft ? "demand" : "always"}
+        onCreated={({ gl }) => {
+          // Without a graphics card the browser draws on the CPU. Keep it playable: no shadows, half the pixels
+          // (labels and the interface are HTML and stay sharp) and 20 frames a second. A GPU keeps full quality.
+          if (isSoftwareRenderer(gl)) {
+            // Before the first frame, so no material is ever compiled with shadows.
+            gl.shadowMap.enabled = false;
+            setSoft(true);
+          }
+        }}
         camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 200 }}
         onPointerMissed={() => {
           if (useGame.getState().game.phase !== "incident") useGame.getState().select(null);
@@ -831,6 +858,7 @@ export default function Facility() {
         aria-label="Isometric view of the server room. Each equipment label is a button."
       >
         <Scene />
+        {soft && <SoftwareFrames />}
       </Canvas>
       <Labels />
       <HoverTip container={container} />
@@ -841,9 +869,18 @@ export default function Facility() {
         <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" title="Zoom out">
           −
         </button>
-        <button type="button" onClick={() => cameraApi.reset()} aria-label="Fit view" title="Fit view (drag to pan, scroll to zoom)">
+        <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" title="Rotate left (Q)">
+          <Icon name="rotateLeft" size={16} />
+        </button>
+        <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" title="Rotate right (E)">
+          <Icon name="rotateRight" size={16} />
+        </button>
+        <button type="button" onClick={() => cameraApi.reset()} aria-label="Reset view" title="Reset view: fit the room and face the starting angle">
           ⌂
         </button>
+        <span className="camera-hint" aria-hidden="true">
+          <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn
+        </span>
       </div>
     </div>
   );

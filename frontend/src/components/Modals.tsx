@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { BALANCE, buildReport } from "@/sim";
-import { moneyFull, num, uptimePct } from "@/game/format";
+import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, clearSave, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
-import { Icon } from "./icons";
-import { Modal } from "./ui";
-import { OUTCOME_LABEL, outcomeTone, PostmortemBody, RunCharts } from "./Views";
+import { Icon, type IconName } from "./icons";
+import { Callout, Concept, Modal, type ConceptKind } from "./ui";
+import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone, PostmortemBody, RunCharts } from "./Views";
 
 /* ------------------------------------------------------------------ */
 /* Title screen                                                        */
@@ -27,11 +27,29 @@ export function TitleScreen() {
   return (
     <div className="title-screen">
       <div className="title-card">
+        <span className="title-kicker">
+          <Icon name="server" size={16} />
+          A system design tycoon
+        </span>
         <h1>99.99%</h1>
         <p className="title-tag">Grow a startup. Keep it online.</p>
         <p className="title-goal">
-          Reach {num(BALANCE.targetUsers)} users in {BALANCE.maxTurns} weeks.
+          Reach <strong>{num(BALANCE.targetUsers)} users</strong> in <strong>{BALANCE.maxTurns} weeks</strong> without running out of cash.
         </p>
+        <ul className="title-loop" aria-label="How a run works">
+          <li>
+            <Concept kind="users" icon="users" />
+            Grow users
+          </li>
+          <li>
+            <Concept kind="tech" icon="server" />
+            Scale your stack
+          </li>
+          <li>
+            <Concept kind="critical" icon="incident" />
+            Survive incidents
+          </li>
+        </ul>
         <div className="title-actions">
           {resumable ? (
             <>
@@ -67,31 +85,37 @@ export function TitleScreen() {
 export function HowToPlay() {
   const finish = useGame((s) => s.finishOnboarding);
   return (
-    <Modal title="How to play" onClose={finish}>
+    <Modal title="How to play" onClose={finish} icon={{ kind: "go", name: "info" }}>
       <ul className="howto">
         <li>
-          <Icon name="users" />
-          Reach {num(BALANCE.targetUsers)} users by week {BALANCE.maxTurns}. Do not run out of cash.
+          <Concept kind="users" icon="goal" />
+          <span>
+            Reach {num(BALANCE.targetUsers)} users by week {BALANCE.maxTurns}. Do not run out of cash.
+          </span>
         </li>
         <li>
-          <Icon name="server" />
-          Click equipment to see it and act on it.
+          <Concept kind="ok" icon="server" />
+          <span>Click equipment in the room to see it and act on it.</span>
         </li>
         <li>
-          <Icon name="tree" />
-          Tech holds upgrades. Engineers build them, then you ship them.
+          <Concept kind="tech" icon="tree" />
+          <span>Tech holds upgrades. Engineers build them, then you ship them.</span>
         </li>
         <li>
-          <Icon name="next" />
-          Next week moves everything forward.
+          <Concept kind="go" icon="next" />
+          <span>Next week moves everything forward.</span>
         </li>
         <li>
-          <Icon name="alert" />
-          In an incident, find the cause, then pick the matching fix.
+          <Concept kind="critical" icon="incident" />
+          <span>In an incident, find the cause, then pick the matching fix.</span>
         </li>
         <li>
-          <Icon name="pause" />
-          P pauses. Esc closes panels.
+          <Concept kind="tech" icon="rotateRight" />
+          <span>Drag to move and scroll to zoom. Shift + drag (or right-drag) rotates and tilts; Q and E turn the room.</span>
+        </li>
+        <li>
+          <Concept kind="muted" icon="pause" />
+          <span>P pauses. Esc closes panels.</span>
         </li>
       </ul>
       <div className="modal-foot">
@@ -114,10 +138,13 @@ export function PostmortemModal() {
   const pm = game.postmortems.find((p) => p.id === game.reviewId) ?? game.postmortems[game.postmortems.length - 1];
   if (!pm) return null;
   return (
-    <Modal title={pm.title} wide tone={pm.outcome === "failed" ? "alert" : undefined}>
+    <Modal title={pm.title} wide tone={pm.outcome === "failed" ? "alert" : undefined} icon={{ kind: outcomeTone(pm), name: "incident" }}>
       <p className="pm-meta">
-        <span className={`tag tag-${outcomeTone(pm)}`}>{OUTCOME_LABEL[pm.outcome]}</span>
-        <span className="muted">Week {pm.turn}</span>
+        <span className={`tag tag-${outcomeTone(pm)}`}>
+          <Icon name={OUTCOME_ICON[pm.outcome]} size={12} />
+          {OUTCOME_LABEL[pm.outcome]}
+        </span>
+        <span className="muted">Postmortem, week {pm.turn}</span>
       </p>
       <PostmortemBody pm={pm} />
       <div className="modal-foot">
@@ -145,7 +172,7 @@ export function EndReport() {
   if (view === "history") return null;
 
   return (
-    <Modal title={r.headline} wide tone={r.outcome === "won" ? undefined : "alert"}>
+    <Modal title={r.headline} wide tone={r.outcome === "won" ? undefined : "alert"} icon={r.outcome === "won" ? { kind: "go", name: "goal" } : { kind: "critical", name: "flag" }}>
       <div className="report-top">
         <div className={`grade grade-${r.grade}`} aria-label={`Grade ${r.grade}`}>
           {r.grade}
@@ -155,28 +182,34 @@ export function EndReport() {
 
       <dl className="stats">
         <div>
+          <Concept kind="users" icon="users" />
           <dt>Users</dt>
           <dd>{num(r.users)}</dd>
         </div>
         <div>
+          <Concept kind="health" icon="health" />
           <dt>Uptime</dt>
           <dd>{uptimePct(r.uptime)}</dd>
         </div>
         <div>
+          <Concept kind="cash" icon="cash" />
           <dt>Cash</dt>
           <dd>{moneyFull(r.cash)}</dd>
         </div>
         <div>
+          <Concept kind="critical" icon="incident" />
           <dt>Incidents</dt>
           <dd>{r.incidents.total}</dd>
         </div>
       </dl>
 
-      <ul className="plain-list">
+      <div className="callout-stack">
         {r.takeaways.slice(0, 2).map((t) => (
-          <li key={t}>{t}</li>
+          <Callout key={t} tone="hint" icon="bulb" kicker="Takeaway">
+            {t}
+          </Callout>
         ))}
-      </ul>
+      </div>
 
       <div className="rating">
         <p id="rating-label">Enjoyed it?</p>
@@ -225,14 +258,16 @@ export function EndReport() {
 
       <div className="modal-foot">
         <button type="button" className="btn btn-quiet" onClick={() => openView("history")}>
+          <Icon name="history" size={16} />
           History
         </button>
         <div className="btn-row">
           <button type="button" className="btn" onClick={() => newRun({ seed: game.seed, voluntary: true })}>
+            <Icon name="refresh" size={16} />
             Same seed
           </button>
           <button type="button" className="btn btn-primary" autoFocus onClick={() => newRun({ voluntary: true })}>
-            <Icon name="play" size={14} />
+            <Icon name="play" size={16} />
             Play again
           </button>
         </div>
@@ -259,6 +294,19 @@ function summarise(events: AnalyticsEvent[]) {
     ["Voluntary replays", count("voluntary_replay")],
     ["Average rating", ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : "none"],
   ] as [string, string | number][];
+}
+
+/** A big, labelled menu choice: what it is, and one line on what it does. */
+function MenuTile({ icon, kind, title, text, onClick, danger = false }: { icon: IconName; kind: ConceptKind; title: string; text: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button type="button" className={`menu-tile${danger ? " is-danger" : ""}`} onClick={onClick} aria-label={title}>
+      <Concept kind={danger ? "critical" : kind} icon={danger ? "alert" : icon} />
+      <span className="menu-tile-body">
+        <strong>{title}</strong>
+        <span>{danger ? "Your current run will be replaced." : text}</span>
+      </span>
+    </button>
+  );
 }
 
 export function Menu() {
@@ -301,39 +349,80 @@ export function Menu() {
     }
   };
 
+  const close = () => openView(null);
+  const week = Math.min(game.turn, BALANCE.maxTurns);
+
   return (
-    <Modal title="Menu" onClose={() => openView(null)}>
-      <p className="muted">
-        Week {Math.min(game.turn, BALANCE.maxTurns)}, seed {game.seed}. Saved automatically in this browser.
-      </p>
-      <div className="btn-row">
-        <button type="button" className="btn" onClick={saveNow}>
-          Save now
-        </button>
-        <button type="button" className="btn" onClick={showOnboarding}>
-          How to play
-        </button>
-        <button type="button" className={`btn ${confirm === "tutorial" ? "btn-danger" : ""}`} onClick={() => start("tutorial")}>
-          {label("tutorial", "Tutorial")}
-        </button>
+    <Modal title="Menu" onClose={close} icon={{ kind: "go", name: "menu" }} wide>
+      <section className="menu-run" aria-label="This run">
+        <div className="menu-run-head">
+          <span className="menu-run-title">This run</span>
+          <span className="tag tag-ok">
+            <Icon name="save" size={12} />
+            Autosaved
+          </span>
+        </div>
+        <dl className="menu-run-stats">
+          <div>
+            <Concept kind="go" icon="week" />
+            <dt>Week</dt>
+            <dd>
+              {week} / {BALANCE.maxTurns}
+            </dd>
+          </div>
+          <div>
+            <Concept kind="users" icon="users" />
+            <dt>Users</dt>
+            <dd>{num(game.users)}</dd>
+          </div>
+          <div>
+            <Concept kind="cash" icon="cash" />
+            <dt>Cash</dt>
+            <dd>{money(game.cash)}</dd>
+          </div>
+        </dl>
+        <p className="menu-seed">
+          Seed <code>{game.seed}</code> Playing the same seed again gives the same run.
+        </p>
+      </section>
+
+      <button type="button" className="btn btn-primary btn-big menu-resume" autoFocus onClick={close}>
+        <Icon name="play" />
+        Resume
+      </button>
+
+      <div className="menu-grid">
+        <MenuTile icon="save" kind="ok" title="Save now" text="Write this run to the browser." onClick={saveNow} />
+        <MenuTile icon="info" kind="users" title="How to play" text="The rules on one card." onClick={showOnboarding} />
+        <MenuTile icon="robot" kind="go" title={label("tutorial", "Tutorial")} text="Replay the guided first week." danger={confirm === "tutorial"} onClick={() => start("tutorial")} />
       </div>
 
-      <h4>New game</h4>
-      <label className="field">
-        <span>Seed (optional): the same seed replays the same run.</span>
-        <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
-      </label>
-      <div className="btn-row">
-        <button type="button" className={`btn ${confirm === "new" ? "btn-danger" : "btn-primary"}`} onClick={() => start("new")}>
-          {label("new", "New game")}
-        </button>
-        <button type="button" className={`btn ${confirm === "reset" ? "btn-danger" : ""}`} onClick={() => start("reset")}>
-          {label("reset", "Reset to first run")}
-        </button>
-      </div>
+      <section className="menu-section" aria-label="Start over">
+        <h4>
+          <Icon name="refresh" size={16} />
+          Start over
+        </h4>
+        <label className="field">
+          <span>Seed (optional): leave empty for a random run.</span>
+          <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
+        </label>
+        <div className="btn-row">
+          <button type="button" className={`btn ${confirm === "new" ? "btn-danger" : "btn-primary"}`} onClick={() => start("new")}>
+            {label("new", "New game")}
+          </button>
+          <button type="button" className={`btn ${confirm === "reset" ? "btn-danger" : ""}`} onClick={() => start("reset")}>
+            {label("reset", "Reset to first run")}
+          </button>
+        </div>
+        {confirm && (
+          <Callout compact tone="warn" icon="alert" kicker="Are you sure?">
+            This replaces your week {week} run. Press the red button again to confirm.
+          </Callout>
+        )}
+      </section>
 
       <details className="more">
-        <summary>Prototype data ({events.length} events)</summary>
+        <summary>Playtest data ({events.length} events)</summary>
         <p className="muted">Kept in this browser only.</p>
         <dl className="rows">
           {summarise(events).map(([k, v]) => (

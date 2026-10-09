@@ -10,7 +10,7 @@ import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Moda
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
 import Tutorial, { BASICS_STEPS } from "./Tutorial";
-import { Meter, Tip } from "./ui";
+import { Callout, Concept, Meter, Tip, type ConceptKind } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
 
 // Keep the WebGL scene in its own chunk; Vite renders this app in the browser.
@@ -23,21 +23,21 @@ const TICK_MS = 200;
 /* Top bar: four numbers                                               */
 /* ------------------------------------------------------------------ */
 
-function healthOf(game: GameState): { word: string; tone: "ok" | "warn" | "critical" } {
-  if (game.phase === "incident") return { word: "Incident", tone: "critical" };
+function healthOf(game: GameState): { word: string; tone: "ok" | "warn" | "critical"; icon: IconName } {
+  if (game.phase === "incident") return { word: "Incident", tone: "critical", icon: "incident" };
   const m = metrics(game);
   const worst = Math.max(m.appUtil, m.dbUtil);
   const faults = game.infra.dbHost.status !== "healthy" || game.infra.appHosts.some((h) => h.status !== "healthy");
-  if (worst >= 1 || game.live.shed > 0) return { word: "Degraded", tone: "critical" };
-  if (worst >= 0.85 || faults) return { word: "At risk", tone: "warn" };
-  return { word: "Healthy", tone: "ok" };
+  if (worst >= 1 || game.live.shed > 0) return { word: "Degraded", tone: "critical", icon: "fire" };
+  if (worst >= 0.85 || faults) return { word: "At risk", tone: "warn", icon: "alert" };
+  return { word: "Healthy", tone: "ok", icon: "health" };
 }
 
-function Stat({ icon, label, tip, tone, children, side }: { icon: IconName; label: string; tip: string; tone?: string; children: ReactNode; side?: "left" }) {
+function Stat({ icon, kind, label, tip, children, side }: { icon: IconName; kind: ConceptKind; label: string; tip: string; children: ReactNode; side?: "left" }) {
   return (
-    <div className="stat">
-      <span className={`stat-icon${tone ? ` text-${tone}` : ""}`}>
-        <Icon name={icon} size={20} />
+    <div className={`stat stat-${kind}`}>
+      <span className="stat-icon">
+        <Concept kind={kind} icon={icon} />
       </span>
       <div className="stat-body">
         <Tip text={tip} side={side}>
@@ -55,38 +55,58 @@ function TopBar() {
   const m = metrics(game);
   const health = healthOf(game);
   const inc = game.phase === "incident" ? game.incident : null;
+  const week = Math.min(game.turn, BALANCE.maxTurns);
 
   return (
     <header className={`topbar${inc ? " is-incident" : ""}`}>
       <div className="brand">
         <span className="brand-mark">99.99%</span>
-        <span className="brand-week">{inc ? `Incident ${clock(inc.elapsed)}` : `Week ${Math.min(game.turn, BALANCE.maxTurns)}/${BALANCE.maxTurns}`}</span>
+        <div className="week">
+          <span className="brand-week">
+            <Icon name={inc ? "incident" : "week"} size={16} />
+            {inc ? (
+              <>
+                Incident <strong>{clock(inc.elapsed)}</strong>
+              </>
+            ) : (
+              <>
+                Week <strong>{week}</strong>/{BALANCE.maxTurns}
+              </>
+            )}
+          </span>
+          <span className="week-track" aria-hidden="true">
+            {Array.from({ length: BALANCE.maxTurns }, (_, i) => (
+              <i key={i} className={i + 1 < week ? "is-past" : i + 1 === week ? "is-now" : ""} />
+            ))}
+          </span>
+        </div>
       </div>
 
       <div className="stats-strip">
-        <Stat icon="cash" label="Cash" tip={`Revenue comes in and ${money(m.costs.total)} of costs go out each week. Below zero, you are bankrupt.`}>
+        <Stat icon="cash" kind="cash" label="Cash" tip={`Revenue comes in and ${money(m.costs.total)} of costs go out each week. Below zero, you are bankrupt.`}>
           <strong className={game.cash < 10_000 ? "text-critical" : ""}>{money(game.cash)}</strong>
           <span className={m.net >= 0 ? "text-ok" : "text-warn"}>{signedMoney(m.net)}/wk</span>
         </Stat>
-        <Stat icon="users" label="Users" tip={`Your goal: ${num(BALANCE.targetUsers)} by week ${BALANCE.maxTurns}. Every user adds traffic.`}>
+        <Stat icon="users" kind="users" label="Users" tip={`Your goal: ${num(BALANCE.targetUsers)} by week ${BALANCE.maxTurns}. Every user adds traffic.`}>
           <strong>{num(game.users)}</strong>
           <span className="stat-goal">
             <Meter value={game.users / BALANCE.targetUsers} label="Progress to the user goal" />
+            <Icon name="goal" size={12} />
             <span className="muted">{compact(BALANCE.targetUsers)}</span>
           </span>
         </Stat>
-        <Stat icon="revenue" label="Revenue" tip="Earned from customers each week. It drops when the service is failing.">
+        <Stat icon="revenue" kind="revenue" label="Revenue" tip="Earned from customers each week. It drops when the service is failing.">
           <strong>{money(m.revenue)}</strong>
           <span className="muted">/wk</span>
         </Stat>
         <Stat
-          icon="health"
+          icon={health.icon}
+          kind={health.tone === "ok" ? "health" : health.tone}
           label="Health"
-          tone={health.tone}
           side="left"
           tip="Uptime is the share of requests served across the whole run. 99.99% allows about 26 minutes of downtime in this campaign."
         >
-          <strong className={`text-${health.tone}`}>{health.word}</strong>
+          <strong>{health.word}</strong>
           <span className="muted">{uptimePct(m.uptime)}</span>
         </Stat>
       </div>
@@ -101,6 +121,19 @@ function TopBar() {
 /* ------------------------------------------------------------------ */
 /* Stage prompts: one suggested move, and at most two warnings         */
 /* ------------------------------------------------------------------ */
+
+/** Each warning wears the icon of the thing it is about. */
+const WARNING_ICON: Record<string, IconName> = {
+  surge_incoming: "revenue",
+  app_hot: "server",
+  db_hot: "database",
+  host_degraded: "skull",
+  debt_high: "debt",
+  runway_low: "cash",
+  release_waiting: "ship",
+  unassigned_work: "wrench",
+  idle_engineers: "team",
+};
 
 function StageHud() {
   const game = useGame((s) => s.game);
@@ -118,27 +151,39 @@ function StageHud() {
 
   return (
     <div className="hud">
-      <div className={`next-chip tone-${move.tone}`}>
-        <Icon name={move.tone === "go" ? "bulb" : "alert"} />
-        <span className="next-text">{move.text}</span>
-        {move.cta && (
-          <button type="button" className="btn btn-primary btn-small" onClick={move.cta.run}>
-            {move.cta.label}
-            {move.cta.price !== undefined && <span className="price">{moneyFull(move.cta.price)}</span>}
-          </button>
-        )}
-      </div>
+      <Callout
+        className="next-chip"
+        tone={move.tone === "go" ? "info" : move.tone}
+        icon="robot"
+        kicker="Next move"
+        action={
+          move.cta && (
+            <button type="button" className="btn btn-primary btn-small" onClick={move.cta.run}>
+              {move.cta.label}
+              {move.cta.price !== undefined && (
+                <span className="price">
+                  <Icon name="cash" size={12} />
+                  {moneyFull(move.cta.price)}
+                </span>
+              )}
+            </button>
+          )
+        }
+      >
+        {move.text}
+      </Callout>
       {alerts.map((w, i) => (
-        <button
-          type="button"
+        <Callout
           key={w.code + i}
-          className={`alert-chip alert-${w.level}`}
+          className="alert-chip"
+          tone={w.level === "critical" ? "critical" : "warn"}
+          icon={WARNING_ICON[w.code] ?? "alert"}
+          kicker={w.level === "critical" ? "Critical" : "Warning"}
           title={w.detail}
           onClick={() => (w.equipment ? select(w.equipment) : openView("history"))}
         >
-          <Icon name="alert" size={14} />
           {w.text}
-        </button>
+        </Callout>
       ))}
     </div>
   );
@@ -171,7 +216,7 @@ function BottomBar() {
   const toggle = (v: Exclude<View, null>) => openView(view === v ? null : v);
   const tabs: [Exclude<View, null>, string, IconName, string | null, boolean][] = [
     ["tech", "Tech", "tree", `${completedTechIds(game).length}/${TECH_ORDER.length}`, true],
-    ["engineers", "Team", "wrench", `${m.freeEngineers} free`, hasWork],
+    ["engineers", "Team", "team", `${m.freeEngineers} free`, hasWork],
     ["history", "History", "history", game.postmortems.length > 0 ? String(game.postmortems.length) : null, hasPast],
   ];
 
@@ -182,7 +227,9 @@ function BottomBar() {
           .filter((t) => t[4])
           .map(([id, label, icon, badge]) => (
             <button type="button" key={id} data-view={id} className={view === id ? "is-active" : ""} aria-pressed={view === id} aria-label={label} title={label} disabled={incident && id !== "history"} onClick={() => toggle(id)}>
-              <Icon name={icon} />
+              <span className="tab-icon" aria-hidden="true">
+                <Icon name={icon} />
+              </span>
               <span className="tab-label">{label}</span>
               {badge && <span className="badge">{badge}</span>}
             </button>
@@ -225,6 +272,11 @@ function BottomBar() {
 /* ------------------------------------------------------------------ */
 
 const VIEW_TITLES: Record<Exclude<View, null | "menu">, string> = { tech: "Tech tree", engineers: "Team", history: "History" };
+const VIEW_ICONS: Record<Exclude<View, null | "menu">, [ConceptKind, IconName]> = {
+  tech: ["tech", "tree"],
+  engineers: ["team", "team"],
+  history: ["users", "history"],
+};
 
 function ViewSheet() {
   const view = useGame((s) => s.view);
@@ -233,9 +285,12 @@ function ViewSheet() {
   return (
     <section className={`sheet sheet-${view}`} aria-label={VIEW_TITLES[view]}>
       <header className="sheet-head">
-        <h2>{VIEW_TITLES[view]}</h2>
+        <h2>
+          <Concept kind={VIEW_ICONS[view][0]} icon={VIEW_ICONS[view][1]} />
+          {VIEW_TITLES[view]}
+        </h2>
         <button type="button" className="icon-btn" onClick={() => openView(null)} aria-label="Close">
-          <Icon name="close" size={14} />
+          <Icon name="close" />
         </button>
       </header>
       <div className="sheet-body">
@@ -257,8 +312,15 @@ function ToastHost() {
   }, [toast, dismiss]);
   if (!toast) return null;
   return (
-    <div className={`toast toast-${toast.kind}`} role={toast.kind === "error" ? "alert" : "status"} onClick={dismiss}>
-      {toast.text}
+    <div className="toast" onClick={dismiss}>
+      <Callout
+        tone={toast.kind === "error" ? "critical" : toast.kind === "success" ? "success" : "info"}
+        icon={toast.kind === "error" ? "alert" : toast.kind === "success" ? "check" : "info"}
+        kicker={toast.kind === "error" ? "Problem" : toast.kind === "success" ? "Done" : "Note"}
+        live={toast.kind === "error" ? "alert" : "status"}
+      >
+        {toast.text}
+      </Callout>
     </div>
   );
 }

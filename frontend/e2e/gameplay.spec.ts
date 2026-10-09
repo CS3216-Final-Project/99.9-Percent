@@ -31,6 +31,19 @@ test('completes the first-week tutorial, purchases equipment and resumes after r
   await expect(page.getByRole('dialog', { name: /Tutorial/ })).toHaveCount(0);
 });
 
+test('keeps the game playable when the furniture models cannot be downloaded', async ({ page }) => {
+  await page.route('**/models/**', route => route.abort());
+  const skipped = page.waitForEvent('console', message => message.text().includes('Furniture models failed to load'));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await skipped;
+  await expectRoom(page);
+  await page.getByRole('button', { name: 'Next week', exact: true }).click();
+  expect((await savedGame(page)).turn).toBe(2);
+  await expectRoom(page);
+});
+
 test('recovers from a corrupt save through the playable first-run flow', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('nn.save.v1', '{'));
   await page.goto('/');

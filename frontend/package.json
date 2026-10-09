@@ -16,10 +16,11 @@
     "balance": "vitest run src/sim/__tests__/balance.test.ts"
   },
   "dependencies": {
-    "@fontsource/barlow": "^5.3.0",
-    "@fontsource/barlow-semi-condensed": "^5.3.0",
+    "@fontsource/pixelify-sans": "^5.3.0",
+    "@fontsource/rubik": "^5.3.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
+    "pixelarticons": "^2.4.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "three": "^0.186.1",
