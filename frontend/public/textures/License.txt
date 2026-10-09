@@ -1,0 +1,23 @@
+Photo-scanned surface textures
+
+License: (Creative Commons Zero, CC0)
+http://creativecommons.org/publicdomain/zero/1.0/
+
+Free to use in personal, educational and commercial projects; credit is not
+required. The original 1K sets were downscaled and recompressed for the web.
+Sets the game tints were turned grey. Every folder holds color.jpg, normal.jpg
+(OpenGL) and arm.jpg (R = ambient occlusion, G = roughness, B = metalness).
+
+Folder         Source                                  Authors
+parquet        Poly Haven, "Herringbone Parquet"       Sergej Majboroda, Jenelle van Heerden
+               https://polyhaven.com/a/herringbone_parquet
+concrete       Poly Haven, "Concrete Floor Worn 001"   Dimitrios Savva, Rico Cilliers
+               https://polyhaven.com/a/concrete_floor_worn_001
+kitchen-tiles  Poly Haven, "Floor Tiles 06"            Rob Tuytel
+               https://polyhaven.com/a/floor_tiles_06
+server-tiles   Poly Haven, "Large Square Pattern 01"   Rob Tuytel
+               https://polyhaven.com/a/large_square_pattern_01
+plaster        Poly Haven, "Plastered Wall 04"         Rob Tuytel
+               https://polyhaven.com/a/plastered_wall_04
+carpet         ambientCG, "Carpet 016"                 ambientCG (Lennart Demes)
+               https://ambientcg.com/a/Carpet016

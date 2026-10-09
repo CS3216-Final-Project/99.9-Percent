@@ -1,12 +1,13 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { deskSlot, POS, ROOM } from "./layout";
 import { look, Person, Walker, type Activity } from "./people";
 import { ModelBatch, preloadModels, type ModelId, type Placement } from "./models";
 import { ball, bx, cy, place, PrimBatch, type Prim, type V3 } from "./prims";
+import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
 import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, whiteboard, woodFloor, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
 
@@ -532,6 +533,15 @@ const ZONES: [FloorKey, number, number, number, number, number][] = [
   ["kitchen", 18.25, -6.25, 7.5, 6.5, 0.8],
 ];
 
+/** Each finish at HD detail: a photo surface in the colours of the basic one, and how rough it is. */
+const HD_FLOORS: Record<FloorKey, { id: SurfaceId; tint?: string; roughness?: number }> = {
+  server: { id: "serverTiles", tint: "#4f4987" },
+  wood: { id: "parquet", tint: "#c39470", roughness: 1.6 },
+  noc: { id: "carpet", tint: "#2f3f73" },
+  meeting: { id: "carpet", tint: "#7652ae" },
+  kitchen: { id: "kitchenTiles", tint: "#e6e0ff", roughness: 0.9 },
+};
+
 function Floors() {
   const textures = useMemo(() => {
     const base: Record<FloorKey, THREE.CanvasTexture> = {
@@ -548,14 +558,34 @@ function Floors() {
       return t;
     });
   }, []);
+  // At HD detail, photo surfaces in world metres: one material per finish, shared by its zones.
+  const surfaces = useSurfaces();
+  const hd = useMemo(() => {
+    if (!surfaces) return null;
+    const materials = new Map<FloorKey, THREE.Material>();
+    for (const [key, f] of Object.entries(HD_FLOORS) as [FloorKey, (typeof HD_FLOORS)[FloorKey]][]) materials.set(key, surfaceMaterial(surfaces[f.id], f.tint, f.roughness));
+    const geometries = ZONES.map(([key, x, z, w, d]) => projectUV(new THREE.PlaneGeometry(w, d), surfaces[HD_FLOORS[key].id].size, [x, -z, 0]));
+    return { materials, geometries };
+  }, [surfaces]);
+  useEffect(
+    () => () => {
+      hd?.geometries.forEach((g) => g.dispose());
+      hd?.materials.forEach((m) => m.dispose());
+    },
+    [hd],
+  );
   return (
     <group>
-      {ZONES.map(([, x, z, w, d], i) => (
-        <mesh key={i} position={[x, 0.004, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[w, d]} />
-          <meshLambertMaterial map={textures[i]} />
-        </mesh>
-      ))}
+      {ZONES.map(([key, x, z, w, d], i) =>
+        hd ? (
+          <mesh key={`hd${i}`} position={[x, 0.004, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow geometry={hd.geometries[i]} material={hd.materials.get(key)} />
+        ) : (
+          <mesh key={i} position={[x, 0.004, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <planeGeometry args={[w, d]} />
+            <meshLambertMaterial map={textures[i]} />
+          </mesh>
+        ),
+      )}
     </group>
   );
 }

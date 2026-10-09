@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { useDetail, type Detail } from "./detail";
 import type { V3 } from "./prims";
 
 /*
@@ -104,28 +105,33 @@ interface Prepared {
 }
 
 /**
- * Matte Lambert versions of the packs' materials, which cost far less per pixel
- * than physically based shading. Materials that look the same are shared across
- * models so they can be drawn together. Every KayKit model brings its own copy
- * of the same texture atlas, so a texture is known by its name and size.
+ * The packs' materials, shared across models when they look the same so they
+ * can be drawn together. Basic detail turns them matte Lambert, which costs far
+ * less per pixel; HD keeps them physically based, at least satin-rough so the
+ * low-poly furniture does not look like wet plastic. Every KayKit model brings
+ * its own copy of the same texture atlas, so a texture is known by its name and size.
  */
-const matte = new Map<string, THREE.Material>();
-function toMatte(source: THREE.Material): THREE.Material {
+const shared = new Map<string, THREE.Material>();
+function toShared(source: THREE.Material, detail: Detail): THREE.Material {
   const s = source as THREE.MeshStandardMaterial;
   const image = s.map?.image as { width?: number; height?: number } | undefined;
   const map = s.map ? `${s.map.name}:${image?.width}x${image?.height}` : "";
-  const key = [s.color.getHexString(), map, s.vertexColors, s.transparent, s.opacity, s.side].join("|");
-  let m = matte.get(key);
+  const key = [detail, s.color.getHexString(), map, s.vertexColors, s.transparent, s.opacity, s.side, s.roughness, s.metalness].join("|");
+  let m = shared.get(key);
   if (!m) {
-    m = new THREE.MeshLambertMaterial({ color: s.color, map: s.map, vertexColors: s.vertexColors, transparent: s.transparent, opacity: s.opacity, side: s.side });
-    matte.set(key, m);
+    const common = { color: s.color, map: s.map, vertexColors: s.vertexColors, transparent: s.transparent, opacity: s.opacity, side: s.side };
+    m =
+      detail === "hd"
+        ? new THREE.MeshStandardMaterial({ ...common, roughness: Math.max(0.5, s.roughness ?? 1), metalness: Math.min(0.3, s.metalness ?? 0) })
+        : new THREE.MeshLambertMaterial(common);
+    shared.set(key, m);
   }
   return m;
 }
 
 const prepared = new Map<string, Prepared>();
-function prepare(url: string, scene: THREE.Object3D): Prepared {
-  const hit = prepared.get(url);
+function prepare(url: string, scene: THREE.Object3D, detail: Detail): Prepared {
+  const hit = prepared.get(`${detail}|${url}`);
   if (hit) return hit;
   scene.updateMatrixWorld(true);
   const parts: Part[] = [];
@@ -137,10 +143,10 @@ function prepare(url: string, scene: THREE.Object3D): Prepared {
     geometry.computeBoundingBox();
     box.union(geometry.boundingBox!);
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    parts.push({ geometry, material: toMatte(materials[0]) });
+    parts.push({ geometry, material: toShared(materials[0], detail) });
   });
   const out = { parts, size: box.getSize(new THREE.Vector3()), base: new THREE.Vector3((box.min.x + box.max.x) / 2, box.min.y, (box.min.z + box.max.z) / 2) };
-  prepared.set(url, out);
+  prepared.set(`${detail}|${url}`, out);
   return out;
 }
 
@@ -176,10 +182,10 @@ interface Batch {
 }
 
 /** Every placed model baked into one mesh per material. */
-function bake(placements: Placement[], scenes: Map<ModelId, THREE.Object3D>): Batch[] {
+function bake(placements: Placement[], scenes: Map<ModelId, THREE.Object3D>, detail: Detail): Batch[] {
   const byMaterial = new Map<THREE.Material, THREE.BufferGeometry[]>();
   for (const pl of placements) {
-    const prep = prepare(MODELS[pl.id], scenes.get(pl.id)!);
+    const prep = prepare(MODELS[pl.id], scenes.get(pl.id)!, detail);
     const m = matrixFor(pl, prep);
     for (const part of prep.parts) byMaterial.set(part.material, [...(byMaterial.get(part.material) ?? []), part.geometry.clone().applyMatrix4(m)]);
   }
@@ -213,7 +219,9 @@ export function ModelBatch({ placements, shadows = true }: { placements: Placeme
       live = false;
     };
   }, [placements]);
-  const batches = useMemo(() => (scenes ? bake(placements, scenes) : []), [placements, scenes]);
+  const detail = useDetail();
+  const batches = useMemo(() => (scenes ? bake(placements, scenes, detail) : []), [placements, scenes, detail]);
+  useEffect(() => () => batches.forEach((b) => b.geometry.dispose()), [batches]);
   return (
     <group>
       {batches.map((b, i) => (

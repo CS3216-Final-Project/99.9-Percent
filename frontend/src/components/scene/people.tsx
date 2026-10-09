@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { useDetail, type Detail } from "./detail";
 
 /*
  * Stylised people with human proportions: a rounded head with a face, hair,
@@ -293,8 +294,11 @@ function bodyFor(l: Look): Body {
   return b;
 }
 
-/** One matte material for every person: colours come from the geometry. */
-const BODY_MATERIAL = new THREE.MeshLambertMaterial({ vertexColors: true });
+/** One material for every person: colours come from the geometry. Matte at basic detail, satin at HD. */
+const BODY_MATERIAL: Record<Detail, THREE.Material> = {
+  basic: new THREE.MeshLambertMaterial({ vertexColors: true }),
+  hd: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.68, metalness: 0 }),
+};
 
 /* ------------------------------------------------------------------ */
 /* Poses                                                               */
@@ -367,6 +371,7 @@ export function Person({
   seat?: number;
 }) {
   const body = useMemo(() => bodyFor(l), [l]);
+  const BODY = BODY_MATERIAL[useDetail()];
   const sit = pose === "sit";
   const p = poseFor(sit, activity);
   const hipY = sit ? seat / l.height : STAND_HIP;
@@ -432,9 +437,9 @@ export function Person({
 
   const arm = (side: -1 | 1, shoulder: RefObject<THREE.Group | null>, elbow: RefObject<THREE.Group | null>, a: [number, number, number], mug: boolean) => (
     <group ref={shoulder} position={[side * SHOULDER[0] * l.build, SHOULDER[1], SHOULDER[2]]} rotation={new THREE.Euler(a[0], a[1], side * 0.06, "YXZ")}>
-      <mesh geometry={body.upperArm} material={BODY_MATERIAL} />
+      <mesh geometry={body.upperArm} material={BODY} />
       <group ref={elbow} position={[0, ELBOW, 0]} rotation={[a[2], 0, 0]}>
-        <mesh geometry={body.forearm} material={BODY_MATERIAL} />
+        <mesh geometry={body.forearm} material={BODY} />
         {mug && (
           <group position={[0, -0.3, -0.06]}>
             <mesh>
@@ -449,9 +454,9 @@ export function Person({
 
   const leg = (side: -1 | 1, hip: RefObject<THREE.Group | null>, knee: RefObject<THREE.Group | null>) => (
     <group ref={hip} position={[side * HIP_X, 0, 0]} rotation={[sit ? 1.48 : 0, 0, sit ? side * 0.05 : 0]}>
-      <mesh geometry={body.thigh} material={BODY_MATERIAL} />
+      <mesh geometry={body.thigh} material={BODY} />
       <group ref={knee} position={[0, KNEE, 0]} rotation={[sit ? -1.48 : 0, 0, 0]}>
-        <mesh geometry={body.shin} material={BODY_MATERIAL} />
+        <mesh geometry={body.shin} material={BODY} />
       </group>
     </group>
   );
@@ -459,13 +464,13 @@ export function Person({
   return (
     <group position={position} rotation={[0, rotation, 0]} scale={l.height}>
       <group ref={pelvis} position={[0, hipY, 0]}>
-        <mesh geometry={body.pelvis} material={BODY_MATERIAL} />
+        <mesh geometry={body.pelvis} material={BODY} />
         {leg(-1, hL, kL)}
         {leg(1, hR, kR)}
         <group ref={torso} rotation={[p.lean, 0, 0]}>
-          <mesh geometry={body.torso} material={BODY_MATERIAL} castShadow />
+          <mesh geometry={body.torso} material={BODY} castShadow />
           <group ref={head} position={[0, NECK_TOP, 0]}>
-            <mesh geometry={body.head} material={BODY_MATERIAL} castShadow />
+            <mesh geometry={body.head} material={BODY} castShadow />
           </group>
           {arm(-1, sL, eL, p.armL, false)}
           {arm(1, sR, eR, p.armR, activity === "mug")}

@@ -44,6 +44,45 @@ test('keeps the game playable when the furniture models cannot be downloaded', a
   await expectRoom(page);
 });
 
+test('keeps a browser without a GPU on the basic look and never downloads HD textures', async ({ page }) => {
+  // CI draws with SwiftShader, which the room detects as software rendering.
+  const textures: string[] = [];
+  page.on('request', request => { if (request.url().includes('/textures/')) textures.push(request.url()); });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await expectRoom(page);
+  await page.waitForLoadState('networkidle');
+  expect(textures).toEqual([]);
+});
+
+test('draws the photo-scanned surfaces when HD detail is forced', async ({ page }) => {
+  const loaded = new Set<string>();
+  page.on('response', response => { if (response.url().includes('/textures/') && response.ok()) loaded.add(new URL(response.url()).pathname); });
+  await page.goto('/?graphics=hd');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await expectRoom(page);
+  // Six surfaces, each with a colour, a normal and a roughness map.
+  await expect.poll(() => loaded.size).toBe(18);
+  await page.getByRole('button', { name: 'Next week', exact: true }).click();
+  expect((await savedGame(page)).turn).toBe(2);
+  await expectRoom(page);
+});
+
+test('keeps the game playable when the HD textures cannot be downloaded', async ({ page }) => {
+  await page.route('**/textures/**', route => route.abort());
+  const skipped = page.waitForEvent('console', message => message.text().includes('HD textures failed to load'));
+  await page.goto('/?graphics=hd');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  await skipped;
+  await expectRoom(page);
+  await page.getByRole('button', { name: 'Next week', exact: true }).click();
+  expect((await savedGame(page)).turn).toBe(2);
+  await expectRoom(page);
+});
+
 test('recovers from a corrupt save through the playable first-run flow', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('nn.save.v1', '{'));
   await page.goto('/');
