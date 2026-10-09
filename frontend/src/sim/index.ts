@@ -6,7 +6,7 @@ export * from "./types";
 export { BALANCE, PROMOS, PROMO_ORDER } from "./balance";
 export { BRANCHES, TECH, TECH_ORDER, has, isResearchTech, completedTechIds, techStatus, missingPrerequisites } from "./tech";
 export * from "./derive";
-export { newGame } from "./state";
+export { newGame, newLegacyGame } from "./state";
 export { applyAction } from "./actions";
 export { advanceTurn, incidentTick } from "./turn";
 export {

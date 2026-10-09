@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { advanceTurn, applyAction, buildReport, dbLoadFactor, has, metrics, newGame, techStatus, type Action, type GameState } from "../index";
+import { advanceTurn, applyAction, buildReport, dbLoadFactor, has, metrics, newLegacyGame, techStatus, type Action, type GameState } from "../index";
 
 function decide(s: GameState, action: Action): GameState {
   const result = applyAction(s, action);
@@ -23,7 +23,7 @@ function buildAndShip(s: GameState, id: "caching" | "cache_tuning"): GameState {
 
 describe("documented technology progression", () => {
   it("provides baseline metrics without research, cash or engineering work", () => {
-    const s = newGame(1);
+    const s = newLegacyGame(1);
     expect(metrics(s).hasMonitoring).toBe(true);
     expect(has(s, "monitoring")).toBe(true);
     expect(s.techDone).toEqual([]);
@@ -33,7 +33,7 @@ describe("documented technology progression", () => {
   });
 
   it("lets players choose scale out without buying scale up", () => {
-    const s = newGame(1);
+    const s = newLegacyGame(1);
     const next = decide(s, { type: "start_tech", tech: "load_balancing" });
     expect(next.cash).toBeLessThan(s.cash);
     expect(next.tasks[0].techId).toBe("load_balancing");
@@ -43,7 +43,7 @@ describe("documented technology progression", () => {
   });
 
   it("uses the same pending database upgrade from the tree and inspector", () => {
-    const s = newGame(1);
+    const s = newLegacyGame(1);
     const next = decide(s, { type: "start_tech", tech: "larger_database" });
     expect(next).toEqual(decide(s, { type: "start_db_upgrade" }));
     expect(techStatus(next, "larger_database")).toBe("in_progress");
@@ -54,7 +54,7 @@ describe("documented technology progression", () => {
   });
 
   it("warms read cache over time and makes tuning improve hit rate and warm-up", () => {
-    const s = { ...newGame(1), users: 100, upcomingSurge: null };
+    const s = { ...newLegacyGame(1), users: 100, upcomingSurge: null };
     const cached = buildAndShip(s, "caching");
     expect(cached.cacheWarmth).toBe(0);
     expect(dbLoadFactor(cached)).toBe(dbLoadFactor(s));
@@ -73,13 +73,13 @@ describe("documented technology progression", () => {
   });
 
   it("rejects cache tuning without a deployed read cache", () => {
-    const s = newGame(1);
+    const s = newLegacyGame(1);
     expect(applyAction(s, { type: "start_tech", tech: "cache_tuning" })).toMatchObject({ ok: false, reason: "prerequisites" });
     expect(s.tasks).toEqual([]);
   });
 
   it("preserves legacy completed upgrades and counts only the nine-node tree", () => {
-    const s = { ...newGame(1), techDone: ["replicas", "monitoring", "larger_servers"] as GameState["techDone"], infra: { ...newGame(1).infra, dbTier: 1 } };
+    const s = { ...newLegacyGame(1), techDone: ["replicas", "monitoring", "larger_servers"] as GameState["techDone"], infra: { ...newLegacyGame(1).infra, dbTier: 1 } };
     expect(metrics(s).dbCapacity).toBeGreaterThan(metrics({ ...s, techDone: [] }).dbCapacity);
     const upgrading = decide(s, { type: "start_db_upgrade" });
     expect(buildReport(upgrading).techCount).toBe(2);
@@ -88,14 +88,14 @@ describe("documented technology progression", () => {
   });
 
   it("continues cache warm-up identically after save serialization", () => {
-    const s = { ...newGame(1), techDone: ["caching"] as GameState["techDone"], cacheWarmth: 0 };
+    const s = { ...newLegacyGame(1), techDone: ["caching"] as GameState["techDone"], cacheWarmth: 0 };
     expect(advanceTurn(JSON.parse(JSON.stringify(s)))).toEqual(advanceTurn(s));
     // Older saves do not contain cacheWarmth; their deployed cache stays warm.
     expect(dbLoadFactor({ ...s, cacheWarmth: undefined })).toBeCloseTo(0.64);
   });
 
   it("requires a spare, health checks and routing before automatic failover can be built", () => {
-    const s = newGame(1);
+    const s = newLegacyGame(1);
     for (const missing of ["standby", "health_checks", "load_balancing"]) {
       const techDone = ["standby", "health_checks", "load_balancing"].filter((id) => id !== missing) as GameState["techDone"];
       expect(applyAction({ ...s, techDone }, { type: "start_tech", tech: "auto_failover" })).toMatchObject({ ok: false, reason: "prerequisites" });
@@ -106,7 +106,7 @@ describe("documented technology progression", () => {
   it("promotes the spare without increasing capacity or hiding a remaining overload", () => {
     let observed = false;
     for (let seed = 1; seed < 100 && !observed; seed++) {
-      const s = newGame(seed);
+      const s = newLegacyGame(seed);
       s.turn = 8;
       s.users = 10_000;
       s.upcomingSurge = null;

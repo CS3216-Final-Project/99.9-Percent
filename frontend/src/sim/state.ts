@@ -1,3 +1,4 @@
+import { initialCampaign, projectCampaign } from "./step";
 import { BALANCE } from "./balance";
 import { normaliseSeed } from "./rng";
 import { SAVE_VERSION } from "./types";
@@ -33,7 +34,7 @@ export function scriptedSurge(): Surge {
   };
 }
 
-export function newGame(seedInput: number | string = BALANCE.introSeed): GameState {
+export function newLegacyGame(seedInput: number | string = BALANCE.introSeed): GameState {
   const seed = normaliseSeed(seedInput);
   const s: GameState = {
     version: SAVE_VERSION,
@@ -105,4 +106,12 @@ export function newGame(seedInput: number | string = BALANCE.introSeed): GameSta
     `You are the technical lead. Reach ${BALANCE.targetUsers.toLocaleString("en-US")} users by week ${BALANCE.maxTurns} without running out of cash.`,
   );
   return s;
+}
+
+/** The identity is supplied by the application boundary; tests use fixed identities. */
+export function newGame(seedInput: number | string = BALANCE.introSeed, runId = "headless-run"): GameState {
+  const s = newLegacyGame(seedInput);
+  s.campaign = initialCampaign(runId);
+  s.log = []; s.upcomingSurge = null;
+  return projectCampaign(s);
 }

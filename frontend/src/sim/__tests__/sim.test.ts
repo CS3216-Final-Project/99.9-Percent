@@ -9,7 +9,7 @@ import {
   forecast,
   incidentTick,
   metrics,
-  newGame,
+  newLegacyGame,
   recoveryOptions,
   releaseRisk,
   symptomaticEquipment,
@@ -77,12 +77,12 @@ describe("tech tree", () => {
     expect(TECH.autoscaling.requires).toEqual(["load_balancing"]);
     expect(TECH.auto_failover.requires).toEqual(expect.arrayContaining(["standby", "health_checks", "load_balancing"]));
     expect(TECH.cache_tuning.requires).toEqual(["caching"]);
-    expect(techStatus(newGame(1), "larger_servers")).toBe("available");
-    expect(techStatus(newGame(1), "load_balancing")).toBe("available");
+    expect(techStatus(newLegacyGame(1), "larger_servers")).toBe("available");
+    expect(techStatus(newLegacyGame(1), "load_balancing")).toBe("available");
   });
 
   it("locks nodes until prerequisites are deployed", () => {
-    const s = newGame(1);
+    const s = newLegacyGame(1);
     expect(techStatus(s, "autoscaling")).toBe("locked");
     const r = applyAction(s, { type: "start_tech", tech: "autoscaling" });
     expect(r.ok).toBe(false);
@@ -91,7 +91,7 @@ describe("tech tree", () => {
   });
 
   it("moves a node through in-progress, ready and done", () => {
-    let s = newGame(1);
+    let s = newLegacyGame(1);
     s = must(s, { type: "start_tech", tech: "larger_servers" });
     const before = metrics(s).appCapacity;
     expect(techStatus(s, "larger_servers")).toBe("in_progress");
@@ -107,7 +107,7 @@ describe("tech tree", () => {
 
 describe("actions", () => {
   it("rejects invalid requests without changing state", () => {
-    const s = newGame(1);
+    const s = newLegacyGame(1);
     const poor = { ...clone(s), cash: 100 };
     const cases: [GameState, Action, string][] = [
       [poor, { type: "add_server" }, "insufficient_funds"],
@@ -132,7 +132,7 @@ describe("actions", () => {
   });
 
   it("enforces the server limit until load balancing exists", () => {
-    let s = newGame(1);
+    let s = newLegacyGame(1);
     s = must(s, { type: "add_server" });
     s = must(s, { type: "add_server" });
     const r = applyAction(s, { type: "add_server" });
@@ -141,7 +141,7 @@ describe("actions", () => {
   });
 
   it("promotions cost money, add traffic and go on cooldown", () => {
-    let s = newGame(1);
+    let s = newLegacyGame(1);
     const before = forecast(s).peakLow;
     s = must(s, { type: "launch_promotion", promo: "social" });
     expect(s.cash).toBeLessThan(BALANCE.start.cash);
@@ -155,7 +155,7 @@ describe("actions", () => {
   });
 
   it("more engineers finish work sooner", () => {
-    let s = newGame(1);
+    let s = newLegacyGame(1);
     s = must(s, { type: "start_tech", tech: "caching" });
     const id = s.tasks[0].id;
     const one = must(s, { type: "assign_engineers", taskId: id, count: 1 });
@@ -167,7 +167,7 @@ describe("actions", () => {
   });
 
   it("cannot assign more engineers than the company has", () => {
-    let s = newGame(1);
+    let s = newLegacyGame(1);
     s = must(s, { type: "start_tech", tech: "caching" });
     s = must(s, { type: "start_tech", tech: "larger_servers" });
     s = must(s, { type: "assign_engineers", taskId: s.tasks[1].id, count: 1 });
@@ -179,7 +179,7 @@ describe("actions", () => {
   });
 
   it("testing a release takes engineer time and cuts regression risk", () => {
-    let s = newGame(1);
+    let s = newLegacyGame(1);
     s = must(s, { type: "start_tech", tech: "caching" });
     s = must(s, { type: "assign_engineers", taskId: s.tasks[0].id, count: 3 });
     s = advanceTurn(advanceTurn(s));
@@ -196,7 +196,7 @@ describe("actions", () => {
   });
 
   it("technical debt raises deployment risk and slows engineers", () => {
-    const s = newGame(1);
+    const s = newLegacyGame(1);
     const low = { ...clone(s), techDebt: 5 };
     const high = { ...clone(s), techDebt: 80 };
     const rel = { size: 4, tested: false };
@@ -205,7 +205,7 @@ describe("actions", () => {
   });
 
   it("upgrades change capacity", () => {
-    const s = newGame(1);
+    const s = newLegacyGame(1);
     const base = metrics(s);
     expect(metrics(grant(s, "larger_servers")).appCapacity).toBeGreaterThan(base.appCapacity * 1.5);
     expect(metrics(grant(s, "caching")).dbUtil).toBeLessThan(base.dbUtil * 0.7);
@@ -231,7 +231,7 @@ describe("determinism and persistence", () => {
 
   it("every run opens with the same scripted surge", () => {
     for (const seed of [1, 2, 3]) {
-      const s = newGame(seed);
+      const s = newLegacyGame(seed);
       expect(s.users).toBe(BALANCE.start.users);
       expect(s.upcomingSurge?.turn).toBe(BALANCE.surge.scriptedTurn);
       expect(currentWarnings(s).some((w) => w.code === "surge_incoming")).toBe(true);
@@ -239,7 +239,7 @@ describe("determinism and persistence", () => {
   });
 
   it("a save restored from JSON continues exactly like the original", () => {
-    let s = newGame(77);
+    let s = newLegacyGame(77);
     s = must(s, { type: "start_tech", tech: "larger_servers" });
     s = advanceTurn(advanceTurn(s));
     const restored = JSON.parse(JSON.stringify(s)) as GameState;
@@ -247,7 +247,7 @@ describe("determinism and persistence", () => {
   });
 
   it("a mid-incident save resumes with the same clock and damage", () => {
-    let s = newGame(1);
+    let s = newLegacyGame(1);
     s = { ...clone(s), users: 9000 };
     s = advanceTurn(s);
     expect(s.phase).toBe("incident");
@@ -260,7 +260,7 @@ describe("determinism and persistence", () => {
 
 describe("incidents", () => {
   it("warns before an overload and then fires an application overload", () => {
-    let s = grant(newGame(1), "monitoring");
+    let s = grant(newLegacyGame(1), "monitoring");
     s = { ...s, users: 3600 };
     expect(currentWarnings(s).some((w) => w.code === "app_hot")).toBe(true);
     s = advanceTurn(s);
@@ -271,7 +271,7 @@ describe("incidents", () => {
   });
 
   it("scaling out fixes an overload; the postmortem records it", () => {
-    let s = advanceTurn({ ...clone(newGame(1)), users: 4500 });
+    let s = advanceTurn({ ...clone(newLegacyGame(1)), users: 4500 });
     expect(s.incident?.type).toBe("app_overload");
     const servers = s.infra.appHosts.length;
     s = runIncident(s, "scale_out");
@@ -289,7 +289,7 @@ describe("incidents", () => {
   });
 
   it("the wrong fix wastes time and money and leaves the incident active", () => {
-    let s = advanceTurn({ ...clone(newGame(1)), users: 4500 });
+    let s = advanceTurn({ ...clone(newLegacyGame(1)), users: 4500 });
     const cash = s.cash;
     s = runIncident(s, "db_upgrade");
     expect(s.phase).toBe("incident");
@@ -304,7 +304,7 @@ describe("incidents", () => {
   });
 
   it("an ignored incident fails after two hours and does lasting damage", () => {
-    const start = advanceTurn({ ...clone(newGame(1)), users: 4500 });
+    const start = advanceTurn({ ...clone(newLegacyGame(1)), users: 4500 });
     const quick = runIncident(start, "scale_out");
     let slow = start;
     let guard = 0;
@@ -318,7 +318,7 @@ describe("incidents", () => {
   });
 
   it("database saturation is not fixed by more app servers", () => {
-    let s = withServers(grant(newGame(1), "load_balancing"), 8);
+    let s = withServers(grant(newLegacyGame(1), "load_balancing"), 8);
     s = advanceTurn({ ...s, users: 9500 });
     expect(s.incident?.type).toBe("db_saturation");
     s = runIncident(s, "scale_out");
@@ -331,7 +331,7 @@ describe("incidents", () => {
   });
 
   it("caching keeps the same load off the database", () => {
-    const base = withServers(grant(newGame(1), "load_balancing"), 8);
+    const base = withServers(grant(newLegacyGame(1), "load_balancing"), 8);
     const cached = advanceTurn({ ...grant(base, "caching"), users: 9500 });
     expect(cached.phase).toBe("management");
   });
@@ -339,7 +339,7 @@ describe("incidents", () => {
   function regressedState(): GameState {
     // Find a seed where an untested deploy at high debt regresses.
     for (let seed = 1; seed < 200; seed++) {
-      let s = newGame(seed);
+      let s = newLegacyGame(seed);
       s = must(s, { type: "start_tech", tech: "caching" });
       s = must(s, { type: "assign_engineers", taskId: s.tasks[0].id, count: 3 });
       s = advanceTurn(advanceTurn(s));
@@ -371,7 +371,7 @@ describe("incidents", () => {
 
   it("canary rollouts catch a regression before it becomes an incident", () => {
     for (let seed = 1; seed < 200; seed++) {
-      let s = newGame(seed);
+      let s = newLegacyGame(seed);
       s = must(s, { type: "start_tech", tech: "caching" });
       s = must(s, { type: "assign_engineers", taskId: s.tasks[0].id, count: 3 });
       s = advanceTurn(advanceTurn(s));
@@ -390,7 +390,7 @@ describe("incidents", () => {
 
   function failingHost(setup: (s: GameState) => GameState, target: "app" | "db"): GameState {
     for (let seed = 1; seed < 100; seed++) {
-      let s = setup(newGame(seed));
+      let s = setup(newLegacyGame(seed));
       s = clone(s);
       s.turn = 8;
       s.upcomingSurge = null;
@@ -427,7 +427,7 @@ describe("incidents", () => {
   });
 
   it("replacing a degraded server in time prevents the failure", () => {
-    let s = withServers(newGame(3), 2);
+    let s = withServers(newLegacyGame(3), 2);
     s = clone(s);
     s.turn = 8;
     s.upcomingSurge = null;
@@ -462,7 +462,7 @@ describe("incidents", () => {
   });
 
   it("baseline monitoring provides fast investigation and legacy tracing still works", () => {
-    const base = { ...clone(newGame(1)), users: 4500 };
+    const base = { ...clone(newLegacyGame(1)), users: 4500 };
     const inspect = (s: GameState) => {
       let cur = must(advanceTurn(s), { type: "incident_inspect", equipment: "app" });
       let t = 0;
@@ -484,7 +484,7 @@ describe("incidents", () => {
   });
 
   it("hints are counted", () => {
-    let s = advanceTurn({ ...clone(newGame(1)), users: 4500 });
+    let s = advanceTurn({ ...clone(newLegacyGame(1)), users: 4500 });
     s = must(s, { type: "incident_hint" });
     s = must(s, { type: "incident_hint" });
     expect(s.incident?.hints.length).toBe(2);
@@ -495,7 +495,7 @@ describe("incidents", () => {
 
 describe("campaign", () => {
   it("going bankrupt ends the run", () => {
-    let s = { ...clone(newGame(1)), cash: 2000 };
+    let s = { ...clone(newLegacyGame(1)), cash: 2000 };
     s = advanceTurn(s);
     expect(s.outcome).toBe("bankrupt");
     expect(s.phase).toBe("ended");
@@ -514,7 +514,7 @@ describe("campaign", () => {
   });
 
   it("the deadline ends a run that grows too slowly", () => {
-    let s = newGame(5);
+    let s = newLegacyGame(5);
     s = { ...clone(s), cash: 5_000_000 };
     let guard = 0;
     while (s.phase !== "ended" && guard++ < 400) {

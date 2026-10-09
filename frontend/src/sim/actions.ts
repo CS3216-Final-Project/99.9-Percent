@@ -1,3 +1,4 @@
+import { campaignAction } from "./step";
 import { BALANCE, PROMOS } from "./balance";
 import {
   clamp,
@@ -55,6 +56,7 @@ const MANAGEMENT_ONLY = new Set<Action["type"]>([
  * untouched.
  */
 export function applyAction(prev: GameState, action: Action): ActionResult {
+  if (prev.campaign) return campaignAction(prev, action);
   if (action.type === "start_tech" && action.tech === "larger_database") {
     return applyAction(prev, { type: "start_db_upgrade" });
   }
@@ -71,6 +73,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
   const s = clone(prev);
 
   switch (action.type) {
+    case "set_traffic_limit": return fail("invalid", "Campaign action only.");
     case "launch_promotion": {
       const def = PROMOS[action.promo];
       if (!def) return fail("invalid", "Unknown promotion.");
