@@ -1,12 +1,23 @@
-import type { GameState } from "@/sim";
-import { newGame } from "@/sim";
+import type { Action, GameState } from "@/sim";
+import { replayCampaign } from "@/sim";
+import type { CampaignInput, Campaign } from "@/sim/campaignTypes";
+import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 export const CAMPAIGN_SAVE_KEY = "nn.campaign.save.v1";
+export const SCHEMA_VERSION = 2;
+/**
+ * A save holds the run's identity and the player's inputs, not the state they
+ * produced. Loading replays the inputs on the deterministic engine, so a save
+ * stays small however long the run, and an edited save can only describe a run
+ * the engine could actually have played.
+ */
 export interface SaveEnvelope {
-    schemaVersion: 1;
-    scenarioId: "opening-db";
-    scenarioVersion: 1;
+    schemaVersion: typeof SCHEMA_VERSION;
+    scenarioId: string;
+    scenarioVersion: number;
     runId: string;
-    game: GameState;
+    seed: number;
+    step: number;
+    inputs: CampaignInput[];
     runtime: {
         remainderMs: number;
     };
@@ -15,127 +26,153 @@ export interface SaveEnvelope {
 export type Validation = {
     status: "ok";
     envelope: SaveEnvelope;
+    game: GameState;
 } | {
     status: "corrupt" | "unsupported";
 };
-function finiteTree(v: unknown): boolean {
-    if (typeof v === "number")
-        return Number.isFinite(v);
-    if (Array.isArray(v))
-        return v.every(finiteTree);
-    if (v && typeof v === "object")
-        return Object.values(v).every(finiteTree);
-    return true;
-}
-function shape(v: unknown, t: unknown): boolean {
-    if (t === null)
-        return true;
-    if (Array.isArray(t))
-        return Array.isArray(v);
-    if (typeof t === "object")
-        return !!v && typeof v === "object" && Object.entries(t).every(([k, x]) => shape((v as Record<string, unknown>)[k], x));
-    return typeof v === typeof t;
-}
-function snapshotValid(m: import("@/sim/campaignTypes").Snapshot): boolean {
-    if (!m || !m.app || !m.db)
-        return false;
-    const components = [m.app, m.db];
-    return integer(m.step) && [m.incoming, m.admitted, m.rejected, m.successful, m.failed, m.installedAppCapacity].every(integer) &&
-        m.incoming === m.admitted + m.rejected && m.successful === m.db.processed && m.failed === m.app.failed + m.db.failed &&
-        components.every(x => [x.demand, x.capacity, x.processed, x.backlog, x.failed].every(integer) && x.capacity > 0 && x.processed <= x.capacity && x.busyUtilisation === x.processed / x.capacity && x.demandRatio === x.demand / x.capacity) &&
-        m.db.demand === m.app.processed && m.app.backlog <= 1000 && m.db.backlog <= 600 &&
-        m.latencyMs === 100 + 1000 * (m.app.backlog / m.app.capacity + m.db.backlog / m.db.capacity) &&
-        m.serviceErrorRate === (m.successful + m.failed ? m.failed / (m.successful + m.failed) : null);
-}
-const integer = (n: number) => Number.isSafeInteger(n) && n >= 0;
+const integer = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0;
+const isInput = (i: CampaignInput) => !!i && typeof i === "object" && integer(i.step) &&
+    !!i.action && typeof i.action === "object" && typeof i.action.type === "string";
 export function validateEnvelope(value: unknown): Validation {
+    if (!value || typeof value !== "object")
+        return { status: "corrupt" };
+    const e = value as SaveEnvelope;
+    if (e.schemaVersion !== SCHEMA_VERSION || e.scenarioId !== Q.id || e.scenarioVersion !== Q.version)
+        return { status: "unsupported" };
+    if (typeof e.runId !== "string" || !e.runId || !Number.isSafeInteger(e.seed) || (e.seed | 0) !== e.seed || !integer(e.step) ||
+        !Array.isArray(e.inputs) || !e.inputs.every(isInput) ||
+        !e.runtime || !integer(e.runtime.remainderMs) || e.runtime.remainderMs >= 1000 || !Number.isFinite(e.savedAt))
+        return { status: "corrupt" };
     try {
-        if (!value || typeof value !== "object")
-            return { status: "corrupt" };
-        const e = value as SaveEnvelope;
-        if (e.schemaVersion !== 1 || e.scenarioId !== "opening-db" || e.scenarioVersion !== 1)
-            return { status: "unsupported" };
-        const s = e.game, c = s.campaign!;
-        if (!finiteTree(e) || !shape(s, newGame()) || !c || !shape(c, newGame().campaign) ||
-            !e.runtime || !integer(e.runtime.remainderMs) || e.runtime.remainderMs >= 1000 ||
-            !Number.isFinite(e.savedAt) || typeof e.runId !== "string" || !e.runId || e.runId !== c.runId ||
-            c.scenarioId !== e.scenarioId || c.scenarioVersion !== e.scenarioVersion ||
-            !["management", "incident", "review", "ended"].includes(s.phase) ||
-            (s.phase === "ended" ? s.outcome !== "bankrupt" : s.outcome !== null) ||
-            (s.phase === "review" && (!c.reports.length || c.reports.at(-1)!.recoveredStep !== c.step)) ||
-            s.cash !== c.cashCents / 100 || s.users !== 2000 || s.engineers !== 4 || s.infra.appHosts.length !== c.apps.length ||
-            !integer(c.step) || !Number.isSafeInteger(c.cashCents) || !integer(c.nextEventId) ||
-            !integer(c.overloadSteps) || c.lastSettledPeriod !== Math.floor(c.step / 60) ||
-            !snapshotValid(c.snapshot) || c.snapshot.step !== c.step || ![600, 1000].includes(c.dbCapacity) ||
-            !integer(c.dbBacklog) || c.dbBacklog > 600 || ![null, 500].includes(c.limit) ||
-            c.apps.length < 1 || c.apps.length > 2 ||
-            c.apps.some((a, i) => a.id !== `app-${i + 1}` || a.capacity !== 1000 || a.routed !== (i === 0) || !integer(a.backlog) || a.backlog > 1000) ||
-            (s.phase !== "ended" && (s.phase === "incident") !== !!c.incident) ||
-            (c.incident && (!integer(c.incident.stableSteps) || c.incident.stableSteps >= 5 || (!Array.isArray(c.incident.snapshots) || !c.incident.snapshots.every(snapshotValid)))) ||
-            !Object.values(c.remainders).every(v => integer(v) && v < 60) ||
-            !Object.values(c.ledger).every(integer) ||
-            !Object.values(c.cumulative).every(integer) ||
-            c.cumulative.admitted !== c.cumulative.successful + c.cumulative.failed + c.apps.reduce((n, a) => n + a.backlog, 0) + c.dbBacklog ||
-            ![300, 800].includes(c.incomingRate) || c.upgraded !== (c.dbCapacity === 1000) ||
-            c.snapshot.db.backlog !== c.dbBacklog || c.snapshot.app.backlog !== c.apps[0].backlog ||
-            c.snapshot.db.capacity !== c.dbCapacity || c.snapshot.installedAppCapacity !== c.apps.length * 1000 ||
-            (c.step >= 4) !== c.consumedEvents.includes("opening-growth") ||
-            c.actions.some(a => typeof a.id !== "string" || !["add-app", "upgrade-db", "limit", "unlimit"].includes(a.type) || !integer(a.requestedStep) || a.requestedStep > c.step || !integer(a.activationStep) || a.activationStep <= a.requestedStep || !integer(a.costCents) || (a.activatedStep !== null && (!integer(a.activatedStep) || a.activatedStep !== a.activationStep || a.activatedStep > c.step))) ||
-            c.settlements.length !== c.lastSettledPeriod ||
-            !c.settlements.every((p, i) => p.period === i + 1 && p.step === (i + 1) * 60 && [p.revenueCents, p.appCents, p.dbCents, p.salaryCents].every(integer) && p.netCents === p.revenueCents - p.appCents - p.dbCents - p.salaryCents) ||
-            c.pending.some(a => !["add-app", "upgrade-db", "limit", "unlimit"].includes(a.type) || !integer(a.activationStep) || a.activationStep <= c.step || !integer(a.requestedStep) || a.requestedStep > c.step || !integer(a.costCents) || a.activatedStep !== null) ||
-            new Set(c.pending.map(a => a.id)).size !== c.pending.length ||
-            c.pending.some(a => !c.actions.some(b => b.id === a.id && b.activationStep === a.activationStep)) ||
-            !c.trace.every((t, i) => t.id === i + 1 && integer(t.step) && t.step <= c.step && typeof t.type === "string" && !!t.data) || c.nextEventId !== c.trace.length + 1 ||
-            !c.recent.every(snapshotValid) ||
-            !c.reports.every(p => integer(p.openedStep) && integer(p.recoveredStep) && p.openedStep <= p.recoveredStep && p.recoveredStep <= c.step &&
-            integer(p.setupCents) && typeof p.limited === "boolean" && typeof p.id === "string" && Array.isArray(p.snapshots) && p.snapshots.length > 0 && Array.isArray(p.events) && Array.isArray(p.explanations) && p.snapshots.every(snapshotValid) && p.explanations.every(t => typeof t === "string")))
-            return { status: "corrupt" };
-        return { status: "ok", envelope: e };
+        return { status: "ok", envelope: e, game: replayCampaign(e.seed, e.runId, e.inputs, e.step) };
     }
     catch {
         return { status: "corrupt" };
     }
 }
+/** Parse a stored or imported save, converting older schema versions in memory. */
 export function decodeSave(raw: string): Validation {
+    let value: unknown;
     try {
-        return validateEnvelope(JSON.parse(raw));
+        value = upgrade(JSON.parse(raw), MIGRATIONS);
     }
     catch {
         return { status: "corrupt" };
     }
+    return value === null ? { status: "unsupported" } : validateEnvelope(value);
 }
 export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.now()): SaveEnvelope {
-    return { schemaVersion: 1, scenarioId: "opening-db", scenarioVersion: 1, runId: game.campaign!.runId, game, runtime: { remainderMs }, savedAt };
+    const c = game.campaign!;
+    return { schemaVersion: SCHEMA_VERSION, scenarioId: c.scenarioId, scenarioVersion: c.scenarioVersion, runId: c.runId, seed: game.seed, step: c.step, inputs: c.inputs, runtime: { remainderMs }, savedAt };
 }
-/** Future migrations must preserve source bytes before replacing a validated slot. No v0 conversion is registered. */
+/** True when `raw` is absent or already in the current format, so writing over it loses nothing. */
+export function replaceable(raw: string | null): boolean {
+    if (raw === null)
+        return true;
+    try {
+        const header = JSON.parse(raw) as Partial<SaveEnvelope>;
+        return header.schemaVersion === SCHEMA_VERSION && header.scenarioId === Q.id && header.scenarioVersion === Q.version;
+    }
+    catch {
+        return false;
+    }
+}
+/* ------------------------------------------------------------------ */
+/* Schema 1 stored the whole state. Its trace already names every input. */
+/* ------------------------------------------------------------------ */
+interface V1Envelope {
+    schemaVersion: 1;
+    scenarioId: string;
+    scenarioVersion: number;
+    runId: string;
+    game: GameState;
+    runtime: { remainderMs: number };
+    savedAt: number;
+}
+const INTERVENTIONS: Record<string, Action> = {
+    "add-app": { type: "add_server" },
+    "upgrade-db": { type: "start_db_upgrade" },
+    "limit": { type: "set_traffic_limit", enabled: true },
+    "unlimit": { type: "set_traffic_limit", enabled: false },
+};
+function inputsFromTrace(c: Campaign): CampaignInput[] {
+    // Admission changes activate one at a time, so the last one active by a step gives the setting then.
+    const limitedAt = (step: number) => c.actions.filter(a => (a.type === "limit" || a.type === "unlimit") && a.activatedStep !== null && a.activatedStep <= step).at(-1)?.type === "limit";
+    return c.trace.flatMap((t): CampaignInput[] => {
+        const at = (action: Action) => [{ step: t.step, action }];
+        if (t.type === "action-requested")
+            return at(INTERVENTIONS[String(t.data.type)]);
+        if (t.type === "inspection")
+            return at({ type: "incident_inspect", equipment: t.data.component } as Action);
+        if (t.type === "review-acknowledged")
+            return at({ type: "acknowledge_review" });
+        // A rejection only records the action's type. Any action of that type is rejected
+        // with the same reason, except that a traffic limit change is rejected only when it
+        // re-requests the current setting. The replay check below confirms the choice.
+        if (t.type === "action-rejected") {
+            const type = String(t.data.action);
+            return at((type === "set_traffic_limit" ? { type, enabled: limitedAt(t.step) } :
+                type === "incident_inspect" ? { type, equipment: "standby" } : { type }) as Action);
+        }
+        return [];
+    });
+}
+/** Key-order-independent JSON form, for comparing a stored state with a replayed one. */
+function canonical(v: unknown): string {
+    return JSON.stringify(v, (_, x: unknown) => x && typeof x === "object" && !Array.isArray(x)
+        ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1)))
+        : x);
+}
+/** Converts only when the recovered inputs replay to exactly the stored state. */
+function v1ToV2(value: unknown): SaveEnvelope {
+    const e = value as V1Envelope, game = e.game;
+    const next: SaveEnvelope = {
+        schemaVersion: 2, scenarioId: e.scenarioId, scenarioVersion: e.scenarioVersion, runId: e.runId,
+        seed: game.seed, step: game.campaign!.step, inputs: inputsFromTrace(game.campaign!), runtime: e.runtime, savedAt: e.savedAt,
+    };
+    const result = validateEnvelope(next);
+    if (result.status !== "ok")
+        throw new Error("Schema 1 save does not replay");
+    const { inputs: _, ...replayed } = result.game.campaign!;
+    if (canonical({ ...result.game, campaign: replayed }) !== canonical(game))
+        throw new Error("Schema 1 save replays to a different state");
+    return next;
+}
+export const MIGRATIONS: MigrationRegistry = { 1: v1ToV2 };
+/** Apply registered migrations up to the current version. Null when a version has no path forward. */
+function upgrade(value: unknown, migrations: MigrationRegistry): unknown {
+    let v = value as { schemaVersion?: unknown };
+    while (v && typeof v === "object" && typeof v.schemaVersion === "number" && v.schemaVersion < SCHEMA_VERSION) {
+        const version = v.schemaVersion, migrate = migrations[version];
+        if (!migrate)
+            return null;
+        v = migrate(v) as { schemaVersion?: unknown };
+        if (!v || v.schemaVersion !== version + 1)
+            return null;
+    }
+    return v;
+}
+/** Migrations preserve the source bytes under a backup key before replacing a validated slot. */
 export type MigrationRegistry = Readonly<Record<number, (value: unknown) => unknown>>;
-export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migrations: MigrationRegistry = {}): boolean {
+export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migrations: MigrationRegistry = MIGRATIONS): boolean {
     try {
         const original = storage.getItem(CAMPAIGN_SAVE_KEY);
         if (original === null)
             return false;
-        let value = JSON.parse(original) as {
+        const value = JSON.parse(original) as {
             schemaVersion?: number;
         };
         const sourceVersion = value.schemaVersion;
-        if (typeof sourceVersion !== "number" || sourceVersion >= 1 || !migrations[sourceVersion])
+        if (typeof sourceVersion !== "number" || sourceVersion >= SCHEMA_VERSION || !migrations[sourceVersion])
             return false;
         const backup = `${CAMPAIGN_SAVE_KEY}.backup.v${sourceVersion}`;
         if (storage.getItem(backup) !== null && storage.getItem(backup) !== original)
             return false;
         storage.setItem(backup, original);
-        while (typeof value.schemaVersion === "number" && value.schemaVersion < 1) {
-            const version = value.schemaVersion, migrate = migrations[version];
-            if (!migrate)
-                return false;
-            value = migrate(value) as {
-                schemaVersion?: number;
-            };
-            if (!value || value.schemaVersion !== version + 1)
-                return false;
-        }
-        const result = validateEnvelope(value);
+        const upgraded = upgrade(value, migrations);
+        if (upgraded === null)
+            return false;
+        const result = validateEnvelope(upgraded);
         if (result.status !== "ok")
             return false;
         storage.setItem(CAMPAIGN_SAVE_KEY, JSON.stringify(result.envelope));

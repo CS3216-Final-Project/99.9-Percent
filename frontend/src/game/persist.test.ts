@@ -2,7 +2,8 @@ import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { newGame } from "../sim";
 import { step, advanceSteps } from "../sim/step";
 import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics } from "./persist";
-import { makeEnvelope, validateEnvelope, migrateSave, CAMPAIGN_SAVE_KEY as KEY } from "./saveMigrations";
+import { migrateSave, CAMPAIGN_SAVE_KEY as KEY } from "./saveMigrations";
+import { playedRun, v1Envelope } from "./testing/saves";
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 describe("campaign data preservation", () => {
@@ -33,15 +34,6 @@ describe("campaign data preservation", () => {
     saveMeta({ ...DEFAULT_META, tutorialDone: true }); expect(loadMeta().tutorialDone).toBe(true);
     for (let i = 0; i < 503; i++)track("run_started"); expect(readAnalytics()).toHaveLength(500);
   });
-  it.each(["backlog", "schedule", "identity", "nonfinite", "nested"])("rejects invalid %s without deleting", kind => {
-    const e = makeEnvelope(newGame());
-    if (kind === "backlog") e.game.campaign!.dbBacklog = 601;
-    if (kind === "identity") e.runId = "different";
-    if (kind === "nonfinite") e.game.campaign!.cashCents = NaN;
-    if (kind === "nested") delete (e.game as Partial<typeof e.game>).infra;
-    if (kind === "schedule") e.game.campaign!.pending.push({ id: "bad", type: "limit", requestedStep: 0, activationStep: 0, costCents: 0, activatedStep: null });
-    expect(validateEnvelope(e).status).toBe("corrupt");
-  });
   it("resumes before and after settlement identically", () => {
     let s = advanceSteps(newGame(), 6).state;
     for (let i = 6; i < 59; i++)s = step(s).state;
@@ -50,18 +42,20 @@ describe("campaign data preservation", () => {
     expect(step(loaded.game)).toEqual(step(s));
     s = step(s).state; saveGame(s); expect(loadGame()).toMatchObject({ status: "ok", game: s });
   });
-  it("backs up old schema before migration and refuses unknown future versions", () => {
-    const raw = JSON.stringify({ schemaVersion: 0 }); localStorage.setItem(KEY, raw);
-    expect(migrateSave(localStorage, { 0: () => makeEnvelope(newGame()) })).toBe(true);
-    expect(localStorage.getItem(KEY + ".backup.v0")).toBe(raw);
+  it("backs up a schema 1 save, converts it in place and refuses unknown future versions", () => {
+    const game = playedRun(), raw = JSON.stringify(v1Envelope(game, 400)); localStorage.setItem(KEY, raw);
+    expect(loadGame()).toMatchObject({ status: "ok", remainderMs: 400 });
+    expect(localStorage.getItem(KEY + ".backup.v1")).toBe(raw);
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toMatchObject({ schemaVersion: 2, step: game.campaign!.step });
+    expect(saveGame(game)).toBe(true);
     localStorage.setItem(KEY, JSON.stringify({ schemaVersion: 8 }));
-    expect(migrateSave(localStorage, { 0: () => makeEnvelope(newGame()) })).toBe(false);
+    expect(migrateSave(localStorage)).toBe(false); expect(saveGame(game)).toBe(false);
   });
   it("never replaces original when migration backup fails", () => {
-    localStorage.setItem(KEY, JSON.stringify({ schemaVersion: 0 }));
+    localStorage.setItem(KEY, JSON.stringify(v1Envelope(playedRun())));
     const before = localStorage.getItem(KEY);
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
-    expect(migrateSave(localStorage, { 0: () => makeEnvelope(newGame()) })).toBe(false);
+    expect(migrateSave(localStorage)).toBe(false);
     expect(localStorage.getItem(KEY)).toBe(before);
   });
 });

@@ -1,0 +1,37 @@
+import type { GameState } from "./types";
+import type { CampaignInput } from "./campaignTypes";
+import { newGame } from "./state";
+import { applyCampaignInputInPlace, projectCampaign, stepInPlace } from "./step";
+
+/** Replays longer than this are refused rather than freezing the page on a hostile file. */
+export const MAX_REPLAY_STEPS = 1_000_000;
+
+/**
+ * Rebuild a campaign from its seed, identity and recorded inputs. The engine is
+ * deterministic, so the result equals the state the inputs were recorded from.
+ * Throws when the inputs could not have been recorded by a real run.
+ */
+export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number): GameState {
+    if (!Number.isSafeInteger(finalStep) || finalStep < 0 || finalStep > MAX_REPLAY_STEPS)
+        throw new Error("Replay step is out of range");
+    // The fresh state is private to this replay, so every step and input can mutate it.
+    const s = newGame(seed, runId);
+    for (const input of inputs) {
+        if (!Number.isSafeInteger(input.step) || input.step > finalStep)
+            throw new Error("Input step is out of range");
+        advanceTo(s, input.step);
+        applyCampaignInputInPlace(s, input.action);
+    }
+    advanceTo(s, finalStep);
+    return projectCampaign(s);
+}
+
+function advanceTo(s: GameState, target: number): void {
+    if (s.campaign!.step > target)
+        throw new Error("Inputs are out of order");
+    while (s.campaign!.step < target) {
+        if (s.phase === "review" || s.phase === "ended")
+            throw new Error("The run cannot advance past a review or bankruptcy");
+        stepInPlace(s);
+    }
+}

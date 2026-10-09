@@ -75,7 +75,7 @@ describe("importing a save", () => {
     const before = localStorage.getItem("nn.campaign.save.v1");
     expect(useGame.getState().importSave("not json")).toBe(false);
     expect(useGame.getState().toast?.text).toBe("That file is not a readable save.");
-    const future = { ...makeEnvelope(newGame()), schemaVersion: 2 };
+    const future = { ...makeEnvelope(newGame()), schemaVersion: 3 };
     expect(useGame.getState().importSave(JSON.stringify(future))).toBe(false);
     expect(useGame.getState().toast?.text).toBe("That save is from a different version of the game.");
     expect(localStorage.getItem("nn.campaign.save.v1")).toBe(before);
@@ -86,4 +86,15 @@ describe("importing a save", () => {
     expect(useGame.getState().importSave(JSON.stringify(makeEnvelope(newGame())))).toBe(true);
     expect(useGame.getState().saveBlocked).toBe(false); expect(loadGame().status).toBe("ok");
   });
+});
+
+it("saves every decision so a reload replays to the same company", () => {
+  useGame.getState().boot(); useGame.getState().setRunning(true); useGame.getState().tick(6);
+  for (const action of [{ type: "incident_inspect", equipment: "db" }, { type: "add_server" }, { type: "add_server" }, { type: "start_db_upgrade" }] as const) {
+    useGame.getState().act(action); useGame.getState().advance();
+  }
+  const live = useGame.getState().game;
+  expect(live.campaign!.trace.filter(t => t.type === "action-rejected")).toHaveLength(2);
+  useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+  expect(JSON.parse(JSON.stringify(useGame.getState().game))).toEqual(JSON.parse(JSON.stringify(live)));
 });
