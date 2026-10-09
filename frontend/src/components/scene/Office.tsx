@@ -4,7 +4,8 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { deskSlot, POS, ROOM } from "./layout";
-import { look, Person, Walker, type Activity } from "./people";
+import { look } from "./cast";
+import { Person, Walker, type Activity } from "./people";
 import { ModelBatch, preloadModels, type ModelId, type Placement } from "./models";
 import { ball, bx, cy, place, PrimBatch, type Prim, type V3 } from "./prims";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
@@ -708,43 +709,43 @@ function People({ crew }: { crew: Crew }) {
         );
       })}
 
-      {/* Release engineer, marketer, on-call engineer and receptionist */}
+      {/* Release engineer, marketer, on-call SRE and receptionist */}
       <ScreenPlane kind={crew.releases > 0 ? "deploy-busy" : "deploy"} w={1.1} h={0.62} position={[POS.deploy.x, 1.28, POS.deploy.z - 0.09]} tilt={-0.35} />
-      <Person pose="stand" activity={crew.releases > 0 || crew.incident ? "type" : "chat"} look={look(11)} position={[POS.deploy.x, 0, POS.deploy.z + 0.78]} phase={3} />
+      <Person pose="stand" activity={crew.releases > 0 || crew.incident ? "type" : "chat"} look={look(11, "dev")} position={[POS.deploy.x, 0, POS.deploy.z + 0.78]} phase={3} />
       {[-0.45, 0.45].map((dx) => (
         <ScreenPlane key={dx} kind={crew.promos > 0 ? "chart" : "idle"} w={PANEL.w} h={PANEL.h} position={[POS.growth.x - 0.4 + dx, PANEL.y, POS.growth.z + 0.2 + PANEL.z]} />
       ))}
       <ScreenPlane kind="chart" w={1.2} h={0.75} position={[POS.growth.x + 1.15, 1.5, POS.growth.z - 0.52]} />
-      <Person pose="sit" activity={crew.promos > 0 ? "type" : "mug"} look={look(14)} position={[POS.growth.x - 0.4, 0, POS.growth.z + 0.92]} phase={5} />
+      <Person pose="sit" activity={crew.promos > 0 ? "type" : "mug"} look={look(14, "marketer")} position={[POS.growth.x - 0.4, 0, POS.growth.z + 0.92]} phase={5} />
       {[-0.45, 0.45].map((dx) => (
         <ScreenPlane key={dx} kind={crew.incident ? "alert" : "dash"} w={PANEL.w} h={PANEL.h} position={[8.2 + dx, PANEL.y, -6.9 + PANEL.z]} />
       ))}
-      <Person pose="sit" activity={crew.incident ? "type" : "mug"} look={look(12)} position={[8.2, 0, -6.18]} phase={7} />
+      <Person pose="sit" activity={crew.incident ? "type" : "mug"} look={look(12, "sre")} position={[8.2, 0, -6.18]} phase={7} />
       <ScreenPlane kind="idle" w={0.52} h={0.31} position={[3.2, 1.0, 11.771]} rot={Math.PI} />
-      <Person pose="sit" activity="type" look={look(18)} position={[3.2, 0, 11.3]} rotation={Math.PI} phase={2} />
+      <Person pose="sit" activity="type" look={look(18, "frontdesk")} position={[3.2, 0, 11.3]} rotation={Math.PI} phase={2} />
 
       {/* A meeting in progress */}
       <ScreenPlane kind="slides" w={meetingTv.w} h={meetingTv.h} position={meetingTv.position} rot={Math.PI / 2} />
-      <Person pose="stand" activity="present" look={look(36)} position={[-12.1, 0, 12.0]} rotation={-Math.PI / 2} phase={1} />
-      <Person pose="sit" activity="listen" look={look(33)} position={[-10.4, 0, 11.42]} rotation={Math.PI} phase={2} />
-      <Person pose="sit" activity="listen" look={look(34)} position={[-8.0, 0, 13.28]} phase={4} />
-      <Person pose="sit" activity="listen" look={look(35)} position={[-9.2, 0, 13.28]} phase={6} />
+      <Person pose="stand" activity="present" look={look(36, "pm")} position={[-12.1, 0, 12.0]} rotation={-Math.PI / 2} phase={1} />
+      <Person pose="sit" activity="listen" look={look(33, "founder")} position={[-10.4, 0, 11.42]} rotation={Math.PI} phase={2} />
+      <Person pose="sit" activity="listen" look={look(34, "designer")} position={[-8.0, 0, 13.28]} phase={4} />
+      <Person pose="sit" activity="listen" look={look(35, "data")} position={[-9.2, 0, 13.28]} phase={6} />
 
       {/* Kitchen chat, the lounge, a phone call and the townhall */}
-      <Person pose="stand" activity="chat" look={look(31)} position={[17.5, 0, -4.85]} rotation={0.81} phase={8} />
-      <Person pose="sit" activity="listen" look={look(27)} position={[19.9, 0, 7.1]} rotation={Math.PI / 2} phase={9} />
-      <Person pose="stand" activity="chat" look={look(38)} position={[-14.8, 0, 13.7]} rotation={Math.PI} phase={10} />
-      <Person pose="sit" activity="laptop" look={look(40)} position={[-18.6, 0, 3.6]} rotation={-Math.PI / 2} phase={11} seat={0.87} />
+      <Person pose="stand" activity="chat" look={look(31, "intern")} position={[17.5, 0, -4.85]} rotation={0.81} phase={8} />
+      <Person pose="sit" activity="listen" look={look(27, "dev")} position={[19.9, 0, 7.1]} rotation={Math.PI / 2} phase={9} />
+      <Person pose="stand" activity="chat" look={look(38, "marketer")} position={[-14.8, 0, 13.7]} rotation={Math.PI} phase={10} />
+      <Person pose="sit" activity="laptop" look={look(40, "data")} position={[-18.6, 0, 3.6]} rotation={-Math.PI / 2} phase={11} seat={0.87} />
       <ScreenPlane kind="slides" w={2.1} h={1.12} position={[-14.35, 1.5, 4.5]} rot={-Math.PI / 2} />
       <ScreenPlane kind="game" w={loungeTv.w} h={loungeTv.h} position={loungeTv.position} rot={Math.PI / 2} />
       {[20.4, 21.3].map((x) => (
         <ScreenPlane key={x} kind="game" w={0.54} h={0.44} position={[x, 1.25, 10.92]} tilt={-0.2} />
       ))}
 
-      {/* People walking the corridors */}
-      <Walker from={[13.2, -3.6]} to={[13.2, 12.8]} speed={0.6} look={look(21)} />
-      <Walker from={[-4.4, 9.7]} to={[12.4, 9.7]} speed={0.55} look={look(16)} phase={4} />
-      <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} look={look(23)} phase={2} />
+      {/* People walking the corridors, and a technician on the server floor */}
+      <Walker from={[13.2, -3.6]} to={[13.2, 12.8]} speed={0.6} look={look(21, "founder")} />
+      <Walker from={[-4.4, 9.7]} to={[12.4, 9.7]} speed={0.55} look={look(16, "pm")} phase={4} />
+      <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} look={look(23, "tech")} phase={2} />
     </group>
   );
 }

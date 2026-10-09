@@ -3,296 +3,20 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { bodyFor, ELBOW, HIP_X, KNEE, NECK_TOP, SHOULDER, STAND_HIP, type V3 } from "./body";
+import type { Look } from "./cast";
 import { useDetail, type Detail } from "./detail";
 
 /*
- * Stylised people with human proportions: a rounded head with a face, hair,
- * a tapered torso, and arms and legs that bend at the elbow and knee. Each
- * rigid part is merged into one vertex-coloured mesh, so a person costs about
- * eleven draw calls whatever their outfit, and all people share one material.
+ * Stylised people with human proportions, dressed by role (see cast.ts) and
+ * built from merged, vertex-coloured parts (see body.ts). This file poses and
+ * animates them: arms and legs bend at the elbow and knee, everyone breathes,
+ * and each activity has its own idle motion.
  *
  * Everyone faces -z in their own frame. Shoulders and hips rotate about X:
  * positive swings a limb forward; elbows bend forward with positive angles and
  * knees bend backward with negative ones.
  */
-
-type V3 = [number, number, number];
-
-export type HairStyle = "short" | "long" | "bun" | "curly" | "buzz" | "pony" | "bald";
-export type TopStyle = "tee" | "hoodie" | "shirt" | "jacket";
-
-export interface Look {
-  skin: string;
-  hair: string;
-  hairStyle: HairStyle;
-  top: string;
-  topStyle: TopStyle;
-  accent: string;
-  pants: string;
-  shoes: string;
-  glasses: boolean;
-  headphones: boolean;
-  beard: boolean;
-  badge: boolean;
-  /** Overall size, about 0.88 to 1. */
-  height: number;
-  /** Shoulder width, about 0.92 to 1.08. */
-  build: number;
-}
-
-const SKINS = ["#f3cba5", "#d9a07a", "#a86b4a", "#6e4630", "#e8b48f", "#c68863", "#f6d5b8", "#8d5a3b"];
-const HAIRS = ["#1d1834", "#4a2c1d", "#7a4a2a", "#d9a441", "#2b2b3a", "#8a3b2a", "#b8b2c8", "#5a3a22"];
-const STYLES: HairStyle[] = ["short", "long", "bun", "curly", "buzz", "pony", "short", "long", "bald", "short", "curly"];
-const TOPS = ["#4cb8ff", "#ff7ad9", "#3ddc84", "#ffc53d", "#a985ff", "#ff9f43", "#2dd4bf", "#ff6b6b", "#e8e2ff", "#30295a", "#f4f1ea"];
-const TOP_STYLES: TopStyle[] = ["tee", "hoodie", "shirt", "jacket", "tee", "hoodie"];
-const ACCENTS = ["#fff7e8", "#1d1834", "#ffd84a", "#4cb8ff", "#ff4d5e"];
-const PANTS = ["#2b3150", "#3b4a7a", "#24242c", "#7a6a55", "#3e3570", "#4a5568"];
-const SHOES = ["#fff7e8", "#1d1834", "#e8e2ff", "#c0392b", "#7a5a3a"];
-
-/** A stable, varied look for the nth person in the office. */
-export function look(n: number): Look {
-  const hairStyle = STYLES[(n * 7 + 3) % STYLES.length];
-  return {
-    skin: SKINS[(n * 5 + 2) % SKINS.length],
-    hair: HAIRS[(n * 3 + 1) % HAIRS.length],
-    hairStyle,
-    top: TOPS[(n * 4 + 1) % TOPS.length],
-    topStyle: TOP_STYLES[(n * 5 + 2) % TOP_STYLES.length],
-    accent: ACCENTS[(n * 3 + 2) % ACCENTS.length],
-    pants: PANTS[(n * 2 + 1) % PANTS.length],
-    shoes: SHOES[(n * 3) % SHOES.length],
-    glasses: n % 4 === 1,
-    headphones: n % 5 === 2,
-    beard: (hairStyle === "short" || hairStyle === "buzz" || hairStyle === "bald") && n % 3 === 0,
-    badge: n % 3 !== 1,
-    height: 0.88 + ((n * 37) % 13) / 100,
-    build: 0.92 + ((n * 53) % 17) / 100,
-  };
-}
-
-/* ------------------------------------------------------------------ */
-/* Geometry                                                            */
-/* ------------------------------------------------------------------ */
-
-interface Piece {
-  g: THREE.BufferGeometry;
-  c: string;
-  p?: V3;
-  r?: V3;
-  s?: V3;
-}
-
-const m4 = new THREE.Matrix4();
-const q = new THREE.Quaternion();
-const e = new THREE.Euler();
-
-/** Merge pieces into one geometry, colouring each piece through a vertex colour attribute. */
-function merge(pieces: Piece[]): THREE.BufferGeometry {
-  const parts = pieces.map(({ g, c, p = [0, 0, 0], r = [0, 0, 0], s = [1, 1, 1] }) => {
-    const out = g.clone();
-    m4.compose(new THREE.Vector3(...p), q.setFromEuler(e.set(r[0], r[1], r[2])), new THREE.Vector3(...s));
-    out.applyMatrix4(m4);
-    const color = new THREE.Color(c);
-    const n = out.attributes.position.count;
-    const data = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) {
-      data[i * 3] = color.r;
-      data[i * 3 + 1] = color.g;
-      data[i * 3 + 2] = color.b;
-    }
-    out.setAttribute("color", new THREE.BufferAttribute(data, 3));
-    return out;
-  });
-  const merged = mergeGeometries(parts, false);
-  if (!merged) throw new Error("Could not merge a person's geometry: pieces have different attributes.");
-  return merged;
-}
-
-const sphere = (r: number, w = 14, h = 10, phiStart = 0, phiLength = Math.PI * 2, thetaStart = 0, thetaLength = Math.PI) =>
-  new THREE.SphereGeometry(r, w, h, phiStart, phiLength, thetaStart, thetaLength);
-const capsule = (r: number, len: number) => new THREE.CapsuleGeometry(r, len, 4, 10);
-const cylinder = (rt: number, rb: number, h: number, seg = 12) => new THREE.CylinderGeometry(rt, rb, h, seg);
-const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d);
-
-/** Darken or lighten a colour a little, for shading details in the same material. */
-function shade(c: string, k: number): string {
-  return `#${new THREE.Color(c).multiplyScalar(k).getHexString()}`;
-}
-
-const SLEEVES_LONG: Record<TopStyle, boolean> = { tee: false, hoodie: true, shirt: true, jacket: true };
-
-interface Body {
-  pelvis: THREE.BufferGeometry;
-  torso: THREE.BufferGeometry;
-  head: THREE.BufferGeometry;
-  upperArm: THREE.BufferGeometry;
-  forearm: THREE.BufferGeometry;
-  thigh: THREE.BufferGeometry;
-  shin: THREE.BufferGeometry;
-}
-
-/** Shoulder and hip joints, in the torso and pelvis frames. */
-const SHOULDER: V3 = [0.205, 0.5, 0];
-const NECK_TOP = 0.66;
-const ELBOW = -0.28;
-const HIP_X = 0.088;
-const KNEE = -0.43;
-/** Hip height of a standing person at height 1. */
-const STAND_HIP = 0.935;
-
-function hairPieces(l: Look): Piece[] {
-  const h = l.hair;
-  const top: Piece = { g: sphere(0.126, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.36), c: h, p: [0, 0.14, 0.008], s: [0.98, 1.1, 1.04] };
-  const back: Piece = { g: sphere(0.126, 14, 8, 0, Math.PI, 0, Math.PI * 0.64), c: h, p: [0, 0.135, 0.012], s: [0.98, 1.08, 1.02] };
-  switch (l.hairStyle) {
-    case "bald":
-      return [];
-    case "buzz":
-      return [{ g: sphere(0.12, 14, 6, 0, Math.PI * 2, 0, Math.PI * 0.42), c: h, p: [0, 0.13, 0.01], s: [0.98, 1.1, 1.03] }];
-    case "short":
-      return [top, back];
-    case "long":
-      return [
-        top,
-        back,
-        { g: capsule(0.07, 0.2), c: h, p: [0, 0.0, 0.075], s: [1.55, 1, 0.55] },
-        { g: capsule(0.03, 0.14), c: h, p: [-0.105, 0.06, -0.01] },
-        { g: capsule(0.03, 0.14), c: h, p: [0.105, 0.06, -0.01] },
-      ];
-    case "bun":
-      return [top, back, { g: sphere(0.055), c: h, p: [0, 0.27, 0.07] }];
-    case "pony":
-      return [top, back, { g: capsule(0.032, 0.16), c: h, p: [0, 0.1, 0.16], r: [0.45, 0, 0] }];
-    case "curly":
-      return [
-        { g: sphere(0.14, 14, 7, 0, Math.PI * 2, 0, Math.PI * 0.5), c: h, p: [0, 0.135, 0.015], s: [1, 1.05, 1.02] },
-        ...[-1, 0, 1].flatMap((i) => [
-          { g: sphere(0.052, 8, 6), c: h, p: [i * 0.075, 0.24, 0.02 + Math.abs(i) * 0.03] as V3 },
-          { g: sphere(0.05, 8, 6), c: h, p: [i * 0.09, 0.14, 0.09] as V3 },
-        ]),
-      ];
-  }
-}
-
-function buildBody(l: Look): Body {
-  const skin = l.skin;
-  const long = SLEEVES_LONG[l.topStyle];
-  const ink = "#1d1834";
-
-  const pelvis = merge([
-    { g: cylinder(0.15, 0.158, 0.2), c: l.pants, p: [0, 0.02, 0], s: [1, 1, 0.72] },
-    { g: cylinder(0.153, 0.153, 0.03), c: shade(l.pants, 0.7), p: [0, 0.115, 0], s: [1, 1, 0.73] },
-  ]);
-
-  const torso: Piece[] = [
-    { g: cylinder(0.19, 0.155, 0.48), c: l.top, p: [0, 0.3, 0], s: [l.build, 1, 0.64] },
-    { g: sphere(0.088, 12, 8), c: l.top, p: [-0.175 * l.build, 0.49, 0] },
-    { g: sphere(0.088, 12, 8), c: l.top, p: [0.175 * l.build, 0.49, 0] },
-    { g: cylinder(0.15, 0.19, 0.06), c: l.top, p: [0, 0.545, 0], s: [l.build, 1, 0.62] },
-    { g: cylinder(0.05, 0.054, 0.12), c: skin, p: [0, 0.6, 0] },
-  ];
-  if (l.topStyle === "hoodie") {
-    torso.push(
-      { g: sphere(0.13, 12, 8, 0, Math.PI, 0, Math.PI * 0.7), c: shade(l.top, 0.82), p: [0, 0.53, 0.06], s: [1.05, 0.8, 0.9] },
-      { g: box(0.012, 0.13, 0.012), c: l.accent, p: [-0.035, 0.46, -0.122] },
-      { g: box(0.012, 0.13, 0.012), c: l.accent, p: [0.035, 0.46, -0.122] },
-      { g: box(0.2, 0.09, 0.02), c: shade(l.top, 0.85), p: [0, 0.2, -0.11] },
-    );
-  } else if (l.topStyle === "shirt") {
-    torso.push(
-      { g: box(0.07, 0.04, 0.03), c: shade(l.top, 1.1), p: [-0.045, 0.565, -0.075], r: [0, 0, 0.5] },
-      { g: box(0.07, 0.04, 0.03), c: shade(l.top, 1.1), p: [0.045, 0.565, -0.075], r: [0, 0, -0.5] },
-      ...[0.48, 0.38, 0.28, 0.18].map((y) => ({ g: box(0.018, 0.018, 0.01), c: shade(l.top, 0.6), p: [0, y, -0.117] as V3 })),
-    );
-  } else if (l.topStyle === "jacket") {
-    torso.push(
-      { g: box(0.09, 0.44, 0.02), c: l.accent, p: [0, 0.3, -0.112] },
-      { g: box(0.05, 0.22, 0.02), c: shade(l.top, 0.8), p: [-0.06, 0.44, -0.114], r: [0, 0, -0.25] },
-      { g: box(0.05, 0.22, 0.02), c: shade(l.top, 0.8), p: [0.06, 0.44, -0.114], r: [0, 0, 0.25] },
-    );
-  } else {
-    torso.push({ g: cylinder(0.062, 0.07, 0.025), c: shade(l.top, 0.8), p: [0, 0.565, -0.005] });
-  }
-  if (l.badge) {
-    torso.push(
-      { g: box(0.008, 0.2, 0.008), c: "#4cb8ff", p: [-0.03, 0.47, -0.115], r: [0, 0, 0.18] },
-      { g: box(0.008, 0.2, 0.008), c: "#4cb8ff", p: [0.03, 0.47, -0.115], r: [0, 0, -0.18] },
-      { g: box(0.055, 0.075, 0.01), c: "#fff7e8", p: [0, 0.35, -0.118] },
-      { g: box(0.035, 0.012, 0.012), c: ink, p: [0, 0.365, -0.122] },
-    );
-  }
-
-  const head: Piece[] = [
-    { g: sphere(0.112), c: skin, p: [0, 0.135, 0], s: [0.94, 1.1, 1] },
-    { g: sphere(0.085, 12, 8), c: skin, p: [0, 0.07, -0.02], s: [1, 0.85, 1] },
-    { g: sphere(0.03, 8, 6), c: shade(skin, 0.92), p: [-0.105, 0.13, 0.01], s: [0.5, 1, 0.8] },
-    { g: sphere(0.03, 8, 6), c: shade(skin, 0.92), p: [0.105, 0.13, 0.01], s: [0.5, 1, 0.8] },
-    { g: sphere(0.021, 8, 6), c: shade(skin, 0.9), p: [0, 0.112, -0.112], s: [0.8, 1, 1.2] },
-    { g: sphere(0.019, 8, 6), c: "#fff7e8", p: [-0.042, 0.145, -0.096] },
-    { g: sphere(0.019, 8, 6), c: "#fff7e8", p: [0.042, 0.145, -0.096] },
-    { g: sphere(0.012, 6, 5), c: ink, p: [-0.042, 0.145, -0.112] },
-    { g: sphere(0.012, 6, 5), c: ink, p: [0.042, 0.145, -0.112] },
-    { g: box(0.045, 0.012, 0.012), c: l.hair, p: [-0.044, 0.179, -0.104], r: [0, 0, 0.08] },
-    { g: box(0.045, 0.012, 0.012), c: l.hair, p: [0.044, 0.179, -0.104], r: [0, 0, -0.08] },
-    { g: box(0.045, 0.01, 0.01), c: "#9a4a52", p: [0, 0.073, -0.103] },
-    ...hairPieces(l),
-  ];
-  if (l.beard) {
-    head.push({ g: sphere(0.098, 12, 8, Math.PI, Math.PI, Math.PI * 0.5, Math.PI * 0.42), c: l.hair, p: [0, 0.105, -0.004], s: [1, 1.05, 1.05] });
-  }
-  if (l.glasses) {
-    head.push(
-      { g: new THREE.TorusGeometry(0.027, 0.005, 6, 14), c: ink, p: [-0.043, 0.145, -0.116] },
-      { g: new THREE.TorusGeometry(0.027, 0.005, 6, 14), c: ink, p: [0.043, 0.145, -0.116] },
-      { g: box(0.022, 0.006, 0.006), c: ink, p: [0, 0.15, -0.118] },
-      { g: box(0.006, 0.006, 0.11), c: ink, p: [-0.075, 0.15, -0.06] },
-      { g: box(0.006, 0.006, 0.11), c: ink, p: [0.075, 0.15, -0.06] },
-    );
-  }
-  if (l.headphones) {
-    head.push(
-      { g: new THREE.TorusGeometry(0.132, 0.014, 6, 16, Math.PI), c: ink, p: [0, 0.14, 0.005] },
-      { g: cylinder(0.042, 0.042, 0.04, 12), c: l.accent === "#1d1834" ? "#ff4d5e" : l.accent, p: [-0.122, 0.13, 0.005], r: [0, 0, Math.PI / 2] },
-      { g: cylinder(0.042, 0.042, 0.04, 12), c: l.accent === "#1d1834" ? "#ff4d5e" : l.accent, p: [0.122, 0.13, 0.005], r: [0, 0, Math.PI / 2] },
-    );
-  }
-
-  const sleeve = l.top;
-  const upperArm = merge(
-    long
-      ? [{ g: capsule(0.048, 0.2), c: sleeve, p: [0, -0.14, 0] }]
-      : [
-          { g: capsule(0.054, 0.06), c: sleeve, p: [0, -0.06, 0] },
-          { g: capsule(0.043, 0.18), c: skin, p: [0, -0.15, 0] },
-        ],
-  );
-  const forearm = merge([
-    { g: capsule(0.041, 0.18), c: long ? sleeve : skin, p: [0, -0.12, 0] },
-    ...(long ? [{ g: cylinder(0.044, 0.044, 0.03), c: shade(sleeve, 0.8), p: [0, -0.235, 0] as V3 }] : []),
-    { g: sphere(0.046, 10, 8), c: skin, p: [0, -0.29, -0.005], s: [0.85, 1.15, 0.62] },
-    { g: sphere(0.018, 6, 5), c: skin, p: [0, -0.27, -0.035] },
-  ]);
-  const thigh = merge([{ g: capsule(0.068, 0.3), c: l.pants, p: [0, -0.215, 0] }]);
-  const shin = merge([
-    { g: capsule(0.056, 0.32), c: l.pants, p: [0, -0.21, 0] },
-    { g: capsule(0.05, 0.13), c: l.shoes, p: [0, -0.445, -0.045], r: [Math.PI / 2, 0, 0], s: [1.05, 1, 0.75] },
-    { g: box(0.1, 0.02, 0.24), c: shade(l.shoes, 0.6), p: [0, -0.485, -0.045] },
-  ]);
-
-  return { pelvis, torso: merge(torso), head: merge(head), upperArm, forearm, thigh, shin };
-}
-
-const bodies = new Map<string, Body>();
-function bodyFor(l: Look): Body {
-  const key = JSON.stringify(l);
-  let b = bodies.get(key);
-  if (!b) {
-    b = buildBody(l);
-    bodies.set(key, b);
-  }
-  return b;
-}
 
 /** One material for every person: colours come from the geometry. Matte at basic detail, satin at HD. */
 const BODY_MATERIAL: Record<Detail, THREE.Material> = {
@@ -370,9 +94,9 @@ export function Person({
   /** Seat height for seated people. */
   seat?: number;
 }) {
-  const body = useMemo(() => bodyFor(l), [l]);
-  const BODY = BODY_MATERIAL[useDetail()];
   const sit = pose === "sit";
+  const body = useMemo(() => bodyFor(l, sit), [l, sit]);
+  const BODY = BODY_MATERIAL[useDetail()];
   const p = poseFor(sit, activity);
   const hipY = sit ? seat / l.height : STAND_HIP;
 
@@ -439,7 +163,7 @@ export function Person({
     <group ref={shoulder} position={[side * SHOULDER[0] * l.build, SHOULDER[1], SHOULDER[2]]} rotation={new THREE.Euler(a[0], a[1], side * 0.06, "YXZ")}>
       <mesh geometry={body.upperArm} material={BODY} />
       <group ref={elbow} position={[0, ELBOW, 0]} rotation={[a[2], 0, 0]}>
-        <mesh geometry={body.forearm} material={BODY} />
+        <mesh geometry={side === -1 ? body.forearmL : body.forearmR} material={BODY} />
         {mug && (
           <group position={[0, -0.3, -0.06]}>
             <mesh>

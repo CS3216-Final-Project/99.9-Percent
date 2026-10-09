@@ -38,6 +38,8 @@ npm run dev
 
 The frontend opens the 99.99% title screen and an isometric startup office: a glass-walled server floor surrounded by desks, a monitoring room, meeting rooms, a kitchen and a lounge, with people at work. Press Play to begin the guided first week. Drag to pan, scroll or pinch to zoom, and click equipment to inspect it. `Shift` + drag (or right-drag, or two fingers) rotates and tilts the room; `Q` and `E` turn it by 45 degrees, and the house button resets the view. Walls between the camera and the room drop out of the way. `P` pauses or resumes; `Esc` closes a view.
 
+The staff dress by role, so you can tell the hoodie-and-headphones developer, the SRE in flannel with a headset, the PM in a blazer, the designer in a beret, the intern with a backpack, the founder in a puffer vest and the datacentre technician in hi-vis apart at a glance.
+
 The office furniture comes from two CC0 model packs, [Kenney's Furniture Kit](https://kenney.nl/assets/furniture-kit) and [KayKit Furniture Bits](https://kaylousberg.itch.io/furniture-bits) by Kay Lousberg. Their licences sit beside the models in `frontend/public/models/`.
 
 On a machine with a graphics card the room draws in HD: photo-scanned CC0 floors and walls from [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambientcg.com) (credited in `frontend/public/textures/License.txt`), physically based materials and soft reflections. Without a GPU it keeps the lighter pixel look and never downloads the textures. Add `?graphics=hd` or `?graphics=basic` to the address to force either.
