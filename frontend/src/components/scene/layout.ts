@@ -84,7 +84,7 @@ function box(xs: number[], zs: number[], padX: number, padZ: number, h: number):
 export function footprint(s: GameState, id: EquipmentId): Footprint {
   switch (id) {
     case "gateway": {
-      const lb = s.techDone.includes("load_balancing");
+      const lb = s.campaign ? s.campaign.loadBalancer : s.techDone.includes("load_balancing");
       return box([POS.gateway.x, lb ? POS.loadBalancer.x : POS.gateway.x], [POS.gateway.z], 1.5, 1.7, RACK.h);
     }
     case "app": {

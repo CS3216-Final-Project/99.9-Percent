@@ -3,7 +3,7 @@ import { beginSession, emptyMeasurement, event, projectEvents, type Measurement 
 import { archiveEvents } from "./persist";
 import { clone } from "@/sim/state";
 import { trace } from "@/sim/trace";
-import { advanceSteps } from "@/sim/step";
+import { advanceSteps, enterScaling } from "@/sim/step";
 
 import { create } from "zustand";
 import {
@@ -69,6 +69,8 @@ interface Store {
   game: GameState;
   meta: Meta;
   selected: EquipmentId | null;
+  selectedAppId: string | null;
+  selectApp: (id:string) => void;
   hovered: EquipmentId | null;
   view: View;
   techFocus: TechId | null;
@@ -225,6 +227,8 @@ export const useGame = create<Store>()((set, get) => {
     game: newGame(BALANCE.introSeed),
     meta: loadMetaSafe(),
     selected: null,
+    selectedAppId: null,
+    selectApp: (id) => {if(get().game.campaign?.apps.some(a=>a.id===id))set({selected:"app",selectedAppId:id});},
     hovered: null,
     view: null,
     techFocus: null,
@@ -250,10 +254,10 @@ export const useGame = create<Store>()((set, get) => {
     play: () => {
       if(get().started)return;
       const state=get();
-      const game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID());
+      const game=enterScaling(state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID()));
       const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
       const status=meta.openingOnboarding.status;
-      const measurement=beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString());
+      const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
       set({game,hasRun:true,meta,measurement,started:true,running:false,
         onboarding:status==="not-started"||status==="in-progress",activeMark:document.hidden?null:performance.now()});
       if(!saveMeta(meta))get().notify("Onboarding preferences could not be saved.","error");
@@ -350,7 +354,7 @@ export const useGame = create<Store>()((set, get) => {
       commit(next, { save: ended || due });
     },
 
-    select: (id) => set({ selected: id }),
+    select: (id) => set({ selected: id, selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null }),
     hover: (id) => {
       if (get().hovered !== id) set({ hovered: id });
     },
@@ -381,7 +385,7 @@ export const useGame = create<Store>()((set, get) => {
       const nextMeta={...old.meta,runsStarted:old.meta.runsStarted+1};
       const measurement=beginSession(m,game,crypto.randomUUID(),new Date().toISOString());
       set({game,measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
-        selected:null,hovered:null,view:null,techFocus:null,running:false,rating:null,
+        selected:null,selectedAppId:null,hovered:null,view:null,techFocus:null,running:false,rating:null,
         onboarding:["not-started","in-progress"].includes(nextMeta.openingOnboarding.status),tour:null,
         started:true,toast:null,activeMark:document.hidden?null:performance.now()});
       saveMeta(nextMeta);persistCurrent(true);
@@ -445,11 +449,12 @@ export const useGame = create<Store>()((set, get) => {
  * Clicking or tapping a piece of equipment. Normally it opens the inspector;
  * during an incident it also sends the team to investigate that equipment.
  */
-export function inspectOrSelect(id: EquipmentId): void {
+export function inspectOrSelect(id: EquipmentId, appId?:string): void {
   const { game, select, act } = useGame.getState();
   if(game.campaign && !["app","db","monitoring","gateway"].includes(id))return;
   select(id);
-  if(game.campaign) { if(["app","db","monitoring","gateway"].includes(id))act({type:"incident_inspect",equipment:id}); return; }
+  if(appId)useGame.getState().selectApp(appId);
+  if(game.campaign) { if(["app","db","monitoring","gateway"].includes(id))act({type:"incident_inspect",equipment:id,...(id==="app"?{appId:useGame.getState().selectedAppId??"app-1"}:{})}); return; }
   const inc = game.incident;
   if (game.phase !== "incident" || !inc || inc.status !== "active") return;
   if (!inspectable(game).includes(id)) return;
