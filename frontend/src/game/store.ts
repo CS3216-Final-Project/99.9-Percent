@@ -18,6 +18,7 @@ import {
   type TechId,
 } from "@/sim";
 import { clearSave, DEFAULT_META, loadGame, loadMeta, saveGame, saveMeta, track, type Meta } from "./persist";
+import { decodeSave } from "./saveMigrations";
 
 export type View = "tech" | "engineers" | "history" | "menu" | null;
 export type Speed = 0.5 | 1 | 2;
@@ -86,6 +87,8 @@ interface Store {
   setSpeed: (speed: Speed) => void;
   newRun: (opts?: { seed?: string | number; voluntary?: boolean }) => void;
   saveNow: () => void;
+  /** Replace the current company with an exported save. Returns false if the file is not a usable save. */
+  importSave: (raw: string) => boolean;
   finishOnboarding: () => void;
   showOnboarding: () => void;
   startTour: (track: TourTrack) => void;
@@ -324,6 +327,20 @@ export const useGame = create<Store>()((set, get) => {
     saveNow: () => {
       const okSave = !get().saveBlocked && saveGame(get().game,get().remainderMs);
       get().notify(okSave ? "Saved" : "Could not save: browser storage is unavailable.", okSave ? "success" : "error");
+    },
+
+    importSave: (raw) => {
+      const result = decodeSave(raw);
+      if (result.status !== "ok") {
+        get().notify(result.status === "unsupported" ? "That save is from a different version of the game." : "That file is not a readable save.", "error");
+        return false;
+      }
+      const { game, runtime } = result.envelope;
+      const saved = saveGame(game, runtime.remainderMs, true);
+      set({ game, remainderMs: runtime.remainderMs, saveBlocked: false, running: false, view: null, selected: null, hovered: null, started: true });
+      track("save_imported", { step: game.campaign!.step });
+      get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
+      return true;
     },
 
     finishOnboarding: () => {

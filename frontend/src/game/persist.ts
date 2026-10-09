@@ -119,7 +119,8 @@ export type AnalyticsName =
   | "run_finished"
   | "voluntary_replay"
   | "rating_submitted"
-  | "save_resumed";
+  | "save_resumed"
+  | "save_imported";
 
 export interface AnalyticsEvent {
   t: string;

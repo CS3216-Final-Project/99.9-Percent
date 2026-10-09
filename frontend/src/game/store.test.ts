@@ -2,6 +2,7 @@ import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { newGame } from "../sim";
 import { advanceSteps } from "../sim/step";
 import { loadGame, saveGame, readAnalytics } from "./persist";
+import { makeEnvelope } from "./saveMigrations";
 import { useGame } from "./store";
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => vi.restoreAllMocks());
@@ -59,4 +60,30 @@ it("reports quota failures on boot and reset while allowing in-memory play",()=>
   expect(useGame.getState().toast?.kind).toBe("error");
   useGame.getState().advance();
   expect(useGame.getState().game.campaign!.step).toBe(1);
+});
+
+describe("importing a save", () => {
+  it("replaces the current company with an exported one", () => {
+    useGame.getState().boot();
+    const exported = advanceSteps(newGame(1, "imported-run"), 3).state;
+    expect(useGame.getState().importSave(JSON.stringify(makeEnvelope(exported, 250)))).toBe(true);
+    expect(useGame.getState()).toMatchObject({ game: exported, remainderMs: 250, running: false, started: true });
+    expect(loadGame()).toMatchObject({ status: "ok", game: exported, remainderMs: 250 });
+  });
+  it("rejects unreadable and unsupported files without touching the current company", () => {
+    useGame.getState().boot(); useGame.getState().advance();
+    const before = localStorage.getItem("nn.campaign.save.v1");
+    expect(useGame.getState().importSave("not json")).toBe(false);
+    expect(useGame.getState().toast?.text).toBe("That file is not a readable save.");
+    const future = { ...makeEnvelope(newGame()), schemaVersion: 2 };
+    expect(useGame.getState().importSave(JSON.stringify(future))).toBe(false);
+    expect(useGame.getState().toast?.text).toBe("That save is from a different version of the game.");
+    expect(localStorage.getItem("nn.campaign.save.v1")).toBe(before);
+  });
+  it("replaces a preserved unreadable save and turns saving back on", () => {
+    localStorage.setItem("nn.campaign.save.v1", "{"); useGame.getState().boot();
+    expect(useGame.getState().saveBlocked).toBe(true);
+    expect(useGame.getState().importSave(JSON.stringify(makeEnvelope(newGame())))).toBe(true);
+    expect(useGame.getState().saveBlocked).toBe(false); expect(loadGame().status).toBe("ok");
+  });
 });
