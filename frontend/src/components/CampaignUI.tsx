@@ -68,7 +68,8 @@ export function CampaignOverlays() {
   const [confirmReset, setConfirmReset] = useState(false);
   if (!started) return <div className="title-screen"><div className="title-card"><h1>99.99%</h1><p className="title-tag">Grow a startup. Keep it online.</p><p>Keep your company operating as traffic grows. Inspect evidence, choose a response and observe what changes.</p><button className="btn btn-primary btn-big" onClick={play}>{c.step ? "Continue company" : "Play"}</button></div></div>;
   if (game.phase === "review") return <Modal title="Incident postmortem" onClose={() => act({ type: "acknowledge_review" })}><Report report={c.reports[c.reports.length - 1]} /><button className="btn btn-primary" onClick={() => act({ type: "acknowledge_review" })}>Continue company</button></Modal>;
-  if (game.phase === "ended" && view !== "menu") return <Modal title="Company bankrupt" onClose={() => openView("menu")}><p>Cash reached {dollars(c.cashCents)} after settlement at step {c.step}. Final metrics and history remain available.</p><button className="btn" onClick={() => openView("menu")}>Export or start a new company</button></Modal>;
+  if (game.phase === "ended" && view === null) return <Modal title="Company bankrupt" onClose={() => openView("menu")}><p>Cash reached {dollars(c.cashCents)} after settlement at step {c.step}. Final metrics and history remain available.</p>
+    <div className="campaign-actions"><button className="btn" onClick={() => openView("history")}>View history</button><button className="btn" onClick={() => openView("menu")}>Export or start a new company</button></div></Modal>;
   if (view === "menu") return <Modal title="Menu" onClose={() => { openView(null); setConfirmReset(false); }}>
     <p>One step models one second of requests. Every 60 steps settles an operating week. Pausing freezes everything.</p>
     <p>Use the room controls to inspect equipment. Compare demand, capacity, backlog and response time before choosing an action.</p>

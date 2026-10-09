@@ -57,3 +57,18 @@ test("keeps the room playable without downloaded furniture", async ({ page }) =>
   await expectRoom(page); await page.getByRole("button", { name: "Advance step" }).click();
   expect((await savedGame(page)).campaign!.step).toBe(1);
 });
+test("keeps history reachable after bankruptcy", async ({ page }) => {
+  let s = newGame(1, "paused"); s.campaign!.cashCents = 1;
+  // Cash runs out at the first weekly settlement.
+  while (s.phase !== "ended") s = advanceSteps(s, 60).state;
+  expect(s.phase).toBe("ended");
+  await seedSave(page, s); await page.goto("/"); await page.getByRole("button", { name: "Continue company" }).click();
+  const bankrupt = page.getByRole("dialog", { name: "Company bankrupt" });
+  await expect(bankrupt).toBeVisible();
+  await bankrupt.getByRole("button", { name: "View history" }).click();
+  const history = page.getByRole("dialog", { name: "Campaign history" });
+  await expect(history).toContainText("Financial settlements");
+  await expect(bankrupt).toBeHidden();
+  await history.getByRole("button", { name: "Close" }).click();
+  await expect(bankrupt).toBeVisible();
+});
