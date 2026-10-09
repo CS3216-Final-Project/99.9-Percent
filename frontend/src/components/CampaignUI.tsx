@@ -1,5 +1,5 @@
 import { nextMove } from "@/game/advisor";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useGame, type Speed } from "@/game/store";
 import { rawSave, exportLegacyData } from "@/game/persist";
 import { makeEnvelope } from "@/game/saveMigrations";
@@ -63,14 +63,21 @@ function download(name: string, text: string) {
   const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
 }
 export function CampaignOverlays() {
-  const { game, started, play, view, openView, act, newRun, saveNow, saveBlocked, remainderMs } = useGame();
+  const { game, started, play, view, openView, act, newRun, saveNow, saveBlocked, remainderMs, importSave } = useGame();
   const c = game.campaign!;
   const [confirmReset, setConfirmReset] = useState(false);
+  const [pendingImport, setPendingImport] = useState<{ name: string; text: string } | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const pickImport = async (file: File | undefined) => {
+    if (file) setPendingImport({ name: file.name, text: await file.text() });
+    if (fileInput.current) fileInput.current.value = "";
+  };
+  const closeMenu = () => { openView(null); setConfirmReset(false); setPendingImport(null); };
   if (!started) return <div className="title-screen"><div className="title-card"><h1>99.99%</h1><p className="title-tag">Grow a startup. Keep it online.</p><p>Keep your company operating as traffic grows. Inspect evidence, choose a response and observe what changes.</p><button className="btn btn-primary btn-big" onClick={play}>{c.step ? "Continue company" : "Play"}</button></div></div>;
   if (game.phase === "review") return <Modal title="Incident postmortem" onClose={() => act({ type: "acknowledge_review" })}><Report report={c.reports[c.reports.length - 1]} /><button className="btn btn-primary" onClick={() => act({ type: "acknowledge_review" })}>Continue company</button></Modal>;
   if (game.phase === "ended" && view === null) return <Modal title="Company bankrupt" onClose={() => openView("menu")}><p>Cash reached {dollars(c.cashCents)} after settlement at step {c.step}. Final metrics and history remain available.</p>
     <div className="campaign-actions"><button className="btn" onClick={() => openView("history")}>View history</button><button className="btn" onClick={() => openView("menu")}>Export or start a new company</button></div></Modal>;
-  if (view === "menu") return <Modal title="Menu" onClose={() => { openView(null); setConfirmReset(false); }}>
+  if (view === "menu") return <Modal title="Menu" onClose={closeMenu}>
     <p>One step models one second of requests. Every 60 steps settles an operating week. Pausing freezes everything.</p>
     <p>Use the room controls to inspect equipment. Compare demand, capacity, backlog and response time before choosing an action.</p>
     {saveBlocked && <p role="alert">Your stored save is unreadable or unsupported and has been preserved. This run stays in memory until you explicitly reset.</p>}
@@ -79,7 +86,12 @@ export function CampaignOverlays() {
       <button className="btn" onClick={() => download("stored-campaign.json", rawSave() ?? "null")}>Export original stored save</button>
       <button className="btn" onClick={() => download("legacy-browser-data.json", exportLegacyData())}>Export legacy data</button>
       <button className="btn" onClick={() => setConfirmReset(true)}>New company</button>
-      {confirmReset && <><p>This replaces only the current campaign save. Export it first if you want to keep it.</p><button className="btn" onClick={() => { newRun(); setConfirmReset(false); }}>Confirm new company</button></>}</div>
+      {confirmReset && <><p>This replaces only the current campaign save. Export it first if you want to keep it.</p><button className="btn" onClick={() => { newRun(); setConfirmReset(false); }}>Confirm new company</button></>}
+      <button className="btn" onClick={() => fileInput.current?.click()}>Import save</button>
+      <input ref={fileInput} type="file" accept=".json,application/json" hidden aria-label="Save file to import" onChange={e => void pickImport(e.target.files?.[0])} />
+      {pendingImport && <><p>Replace the current company with {pendingImport.name}? Export it first if you want to keep it.</p>
+        <button className="btn" onClick={() => { if (importSave(pendingImport.text)) closeMenu(); else setPendingImport(null); }}>Confirm import</button>
+        <button className="btn" onClick={() => setPendingImport(null)}>Cancel import</button></>}</div>
   </Modal>;
   if (view === "history") return <Modal title="Campaign history" onClose={() => openView(null)}>
     <p>Latency in the last {c.recent.length} steps (milliseconds)</p>
