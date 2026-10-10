@@ -55,6 +55,11 @@ export const SPECIES: Record<Species, SpeciesInfo> = {
 
 export const ALL_SPECIES = Object.keys(SPECIES) as Species[];
 
+/** The big species are too tall for an office chair: their desks have none, and they work standing up. */
+export function standsAtDesk(species: Species): boolean {
+  return SPECIES[species].kind === "big";
+}
+
 /** The species that play each role; where there are several, people alternate between them. */
 const CASTING: Record<Role, Species[]> = {
   dev: ["cat", "birb", "greenBlob"],

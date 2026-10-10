@@ -85,8 +85,10 @@ function creatureMaterial(source: THREE.Material, detail: Detail): THREE.Materia
 const SEAT = 0.5;
 /** How high a flyer hovers. */
 const HOVER = 0.95;
-/** How far behind its chair a big creature stands when it would sit. */
-const BEHIND_CHAIR = 0.45;
+/** How far in front of a seat its desk's near edge is (a chair 0.72 m behind the middle of a 0.78 m desk). A creature standing at the desk keeps its front behind it. */
+const DESK_EDGE = 0.33;
+/** Room left between a standing creature and its desk. */
+const DESK_GAP = 0.05;
 /** How far behind a seat's centre a chair's backrest begins. A perched creature's back must stay in front of it. */
 const BACKREST = 0.1;
 /** How long a change of animation blends, in seconds. */
@@ -191,8 +193,9 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
       grip.position.y = object.getObjectByName(bone("Middle1.R"))?.position.y ?? 0;
       forearm.add(grip);
     }
-    // The model faces +z, so its back is at the box's -z side; once turned round that is how far it reaches behind.
-    return { object, scale, foot: -box.min.y * scale, back: -box.min.z * scale, mixer: new THREE.AnimationMixer(object), grip };
+    // The model faces +z, so its back is at the box's -z side and its front at the +z side; once turned round they are
+    // how far it reaches behind and ahead.
+    return { object, scale, foot: -box.min.y * scale, back: -box.min.z * scale, front: box.max.z * scale, mixer: new THREE.AnimationMixer(object), grip };
   }, [gltf, detail, info.height, holding]);
 
   const current = useRef<THREE.AnimationAction | null>(null);
@@ -261,9 +264,11 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
   });
 
   // Small creatures perch on the seat, moved forward until their backs clear the backrest; round ones move further.
-  // Big ones are too tall for that, so they stand behind the chair as if at a standing desk.
+  // Big ones are too tall for a chair and their desks have none (see standsAtDesk), so they stand where it would be,
+  // stepping back until their front clears the desk.
   const sit = pose === "sit" && info.kind === "blob";
-  const offset = sit ? -Math.max(0, model.back - BACKREST) : pose === "sit" && info.kind === "big" ? BEHIND_CHAIR : 0;
+  const stand = pose === "sit" && info.kind === "big";
+  const offset = sit ? -Math.max(0, model.back - BACKREST) : stand ? Math.max(0, model.front + DESK_GAP - DESK_EDGE) : 0;
   const y = info.kind === "flyer" ? HOVER : sit ? seat : 0;
   return (
     <group position={position} rotation={[0, rotation, 0]}>

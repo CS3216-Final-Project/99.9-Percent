@@ -72,6 +72,12 @@ export function deskSeat(i: number): Spot {
   return { x: s.x + Math.sin(s.rot) * CHAIR_OFFSET, z: s.z + Math.cos(s.rot) * CHAIR_OFFSET, rot: s.rot };
 }
 
+/**
+ * The meeting room's chairs either side of its table, as the z of each row. They stand far enough back that a
+ * creature leaning forward to clear the backrest still keeps clear of the table.
+ */
+export const MEETING_CHAIRS = { near: 11.15, far: 13.55, xs: [-10.4, -9.2, -8.0] };
+
 /** Where the crew who are not at engineering desks are. */
 export const SPOTS = {
   releaseEngineer: { x: POS.deploy.x, z: POS.deploy.z + 0.78, rot: 0 },
@@ -79,13 +85,16 @@ export const SPOTS = {
   onCall: { x: 8.2, z: -6.18, rot: 0 },
   receptionist: { x: 3.2, z: 11.3, rot: Math.PI },
   presenter: { x: -12.1, z: 12.0, rot: -Math.PI / 2 },
-  founder: { x: -10.4, z: 11.42, rot: Math.PI },
-  designerInMeeting: { x: -8.0, z: 13.28, rot: 0 },
-  analystInMeeting: { x: -9.2, z: 13.28, rot: 0 },
-  kitchenBreak: { x: 16.6, z: -5.7, rot: -2.4 },
+  founder: { x: -10.4, z: MEETING_CHAIRS.near, rot: Math.PI },
+  designerInMeeting: { x: -8.0, z: MEETING_CHAIRS.far, rot: 0 },
+  analystInMeeting: { x: -9.2, z: MEETING_CHAIRS.far, rot: 0 },
+  kitchenBreak: { x: 16.25, z: -5.35, rot: -2.4 },
   kitchenChat: { x: 17.5, z: -4.85, rot: 0.81 },
-  sofa: { x: 19.9, z: 5.9, rot: Math.PI / 2 },
-  sofaListener: { x: 19.9, z: 7.1, rot: Math.PI / 2 },
+  // On the sofa's cushions, in front of its backrest.
+  sofa: { x: 19.7, z: 5.9, rot: Math.PI / 2 },
+  sofaListener: { x: 19.7, z: 7.1, rot: Math.PI / 2 },
+  /** Where an engineer too big for the sofa stands instead, between the television and the coffee table, facing the sofa. */
+  loungeStand: { x: 16.9, z: 6.5, rot: -Math.PI / 2 },
   phoneBooth: { x: -14.8, z: 13.7, rot: Math.PI },
   townhallReader: { x: -18.6, z: 3.6, rot: -Math.PI / 2 },
   pingPlayer: { x: RALLY.x - RALLY.stand, z: RALLY.z, rot: -Math.PI / 2 },

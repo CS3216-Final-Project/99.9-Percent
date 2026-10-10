@@ -4,11 +4,11 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { deskSlot, POS, ROOM } from "./layout";
-import { creature, type Activity, type Species } from "./cast";
+import { creature, standsAtDesk, type Activity, type Species } from "./cast";
 import { Creature, preloadCreatures, Walker, Wanderer } from "./creatures";
 import { Conversation } from "./chatter";
 import { GROUPS } from "./conversations";
-import { ARCADE_Z, ARCADES, deskSeat, FIXTURES, GLASS, GLASS_H, SPOTS } from "./floorplan";
+import { ARCADE_Z, ARCADES, CHAIR_OFFSET, deskSeat, FIXTURES, GLASS, GLASS_H, MEETING_CHAIRS, SPOTS } from "./floorplan";
 import { planLoop, type WaypointId } from "./routes";
 import { BALL_RADIUS, ballAt, RALLY, RALLY_PERIOD, TABLE } from "./rally";
 import { ModelBatch, preloadModels, type ModelId, type Placement } from "./models";
@@ -193,9 +193,16 @@ const DESK_PLANTS: [ModelId, number][] = [
   ["cactusSmallB", 0.7],
 ];
 
-/** A desk facing -z with its chair on the +z side. Its Macs come from `deskGear`; their pictures are drawn by `Staff`. */
-function deskModels(w: number, i: number): Placement[] {
-  const out = [mdl("desk", 0, 0, 0, [w, DESK_TOP, 0.78]), mdl("chairDesk", 0, 0.72, Math.PI)];
+/** The on-call SRE and the receptionist, who each have a desk of their own. */
+const ON_CALL = creature(12, "sre");
+const RECEPTIONIST = creature(18, "frontdesk");
+
+/**
+ * A desk facing -z with its chair on the +z side, unless whoever works there is too big for a chair. Its Macs come
+ * from `deskGear`; their pictures are drawn by `Staff`.
+ */
+function deskModels(w: number, i: number, chair = true): Placement[] {
+  const out = [mdl("desk", 0, 0, 0, [w, DESK_TOP, 0.78]), ...(chair ? [mdl("chairDesk", 0, CHAIR_OFFSET, Math.PI)] : [])];
   if (i % 2 === 1) {
     const [id, s] = DESK_PLANTS[(i >> 1) % DESK_PLANTS.length];
     out.push(mdl(id, -w / 2 + 0.2, -0.18, i, s, DESK_TOP));
@@ -364,10 +371,11 @@ function buildModels(): Placement[] {
   // Engineering pods, the growth desk and the on-call desk
   for (let i = 0; i < 8; i++) {
     const s = deskSlot(i);
-    add(deskModels(1.5, i), s.x, s.z, s.rot);
+    // A desk whose engineer is too big for a chair is a standing desk.
+    add(deskModels(1.5, i, !standsAtDesk(creature(i))), s.x, s.z, s.rot);
   }
   add(deskModels(2.2, 9), POS.growth.x - 0.4, POS.growth.z + 0.2);
-  add(deskModels(1.8, 12), 8.2, -6.9);
+  add(deskModels(1.8, 12, !standsAtDesk(ON_CALL)), 8.2, -6.9);
   out.push(mdl("pottedPlant", -12.4, 5.6), mdl("pottedPlant", FIXTURES.plantByWhiteboard.x, FIXTURES.plantByWhiteboard.z), mdl("coatRack", -3.0, 5.6), mdl("trashcan", -3.0, 9.0, 0, 0.8));
   out.push(mdl("pottedPlant", 2.2, 8.9), mdl("cactusMedium", 8.9, 5.6, 0, 1.5));
 
@@ -388,11 +396,12 @@ function buildModels(): Placement[] {
 
   // Meeting room
   out.push(mdl("tableLong", -9.2, 12.35, 0, [3.4, 0.74, 1.3]));
-  for (const x of [-10.4, -9.2, -8.0]) out.push(mdl("chairModern", x, 11.42, 0, 1.2), mdl("chairModern", x, 13.28, Math.PI, 1.2));
+  for (const x of MEETING_CHAIRS.xs) out.push(mdl("chairModern", x, MEETING_CHAIRS.near, 0, 1.2), mdl("chairModern", x, MEETING_CHAIRS.far, Math.PI, 1.2));
   out.push(mdl("tvCabinet", MEETING_TV.x, MEETING_TV.z, Math.PI / 2, 0.9), mdl("tv", MEETING_TV.x, MEETING_TV.z, Math.PI / 2, MEETING_TV.s, MEETING_TV.y), mdl("pottedPlant", -6.0, 14.0));
 
   // Reception and the waiting area
-  out.push(mdl("chairDesk", 3.2, 11.3), mdl("pottedPlant", 6.4, 13.9), mdl("coatRack", 5.6, 13.9));
+  if (!standsAtDesk(RECEPTIONIST)) out.push(mdl("chairDesk", SPOTS.receptionist.x, SPOTS.receptionist.z));
+  out.push(mdl("pottedPlant", 6.4, 13.9), mdl("coatRack", 5.6, 13.9));
   out.push(mdl("armchair", -3.2, 12.6, Math.PI / 2, 0.85), mdl("armchair", -1.2, 12.6, -Math.PI / 2, 0.85), mdl("tableCoffee", -2.2, 12.6, Math.PI / 2, 0.9), mdl("cactusMedium", -4.4, 13.9, 0, 1.6));
 
   // Corridor
@@ -708,7 +717,12 @@ function Staff({ crew }: { crew: Crew }) {
               <Creature pose="sit" activity={crew.incident ? "panic" : (seat as Activity)} species={creature(i)} position={[deskSeat(i).x, 0, deskSeat(i).z]} rotation={slot.rot} phase={i * 1.7} />
             )}
             {seat === "kitchen" && <Creature pose="stand" activity="mug" species={creature(i)} position={[SPOTS.kitchenBreak.x, 0, SPOTS.kitchenBreak.z]} rotation={SPOTS.kitchenBreak.rot} phase={i} />}
-            {seat === "lounge" && <Creature pose="sit" activity="laptop" species={creature(i)} position={[SPOTS.sofa.x, 0, SPOTS.sofa.z]} rotation={SPOTS.sofa.rot} phase={i} />}
+            {seat === "lounge" &&
+              (standsAtDesk(creature(i)) ? (
+                <Creature pose="stand" activity="chat" species={creature(i)} position={[SPOTS.loungeStand.x, 0, SPOTS.loungeStand.z]} rotation={SPOTS.loungeStand.rot} phase={i} />
+              ) : (
+                <Creature pose="sit" activity="laptop" species={creature(i)} position={[SPOTS.sofa.x, 0, SPOTS.sofa.z]} rotation={SPOTS.sofa.rot} phase={i} />
+              ))}
           </group>
         );
       })}
@@ -724,9 +738,9 @@ function Staff({ crew }: { crew: Crew }) {
       {[-0.45, 0.45].map((dx) => (
         <ScreenPlane key={dx} kind={crew.incident ? "alert" : "dash"} w={PANEL.w} h={PANEL.h} position={[8.2 + dx, PANEL.y, -6.9 + PANEL.z]} />
       ))}
-      <Creature pose="sit" activity={crew.incident ? "type" : "mug"} species={creature(12, "sre")} position={[SPOTS.onCall.x, 0, SPOTS.onCall.z]} phase={7} />
+      <Creature pose="sit" activity={crew.incident ? "type" : "mug"} species={ON_CALL} position={[SPOTS.onCall.x, 0, SPOTS.onCall.z]} phase={7} />
       <ScreenPlane kind="idle" w={RECEPTION_SCREEN.w} h={(RECEPTION_SCREEN.w * MAC.screenH) / MAC.screenW} position={[3.2, RECEPTION_SCREEN.y, RECEPTION_SCREEN.z]} rot={Math.PI} />
-      <Creature pose="sit" activity="type" species={creature(18, "frontdesk")} position={[SPOTS.receptionist.x, 0, SPOTS.receptionist.z]} rotation={SPOTS.receptionist.rot} phase={2} />
+      <Creature pose="sit" activity="type" species={RECEPTIONIST} position={[SPOTS.receptionist.x, 0, SPOTS.receptionist.z]} rotation={SPOTS.receptionist.rot} phase={2} />
 
       {/* A meeting in progress */}
       <ScreenPlane kind="slides" w={meetingTv.w} h={meetingTv.h} position={meetingTv.position} rot={Math.PI / 2} />

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ALL_ROLES, ALL_SPECIES, CLIPS, creature, motionFor, SPECIES, type Activity, type Kind } from './cast';
+import { ALL_ROLES, ALL_SPECIES, CLIPS, creature, motionFor, SPECIES, standsAtDesk, type Activity, type Kind } from './cast';
 
 const ACTIVITIES: Activity[] = ['type', 'relax', 'mug', 'laptop', 'idle', 'chat', 'walk', 'listen', 'present', 'panic', 'play'];
 
@@ -50,5 +50,13 @@ describe('animations', () => {
     expect(motionFor('blob', 'walk').clip).toBe('Walk');
     expect(motionFor('flyer', 'walk').clip).toBe('Fast_Flying');
     expect(motionFor('flyer', 'type').clip).toBe('Flying_Idle');
+  });
+});
+
+describe('standing desks', () => {
+  it('stands exactly the big species at their desks, and seats everyone else', () => {
+    for (const s of ALL_SPECIES) expect(standsAtDesk(s), s).toBe(SPECIES[s].kind === 'big');
+    expect(standsAtDesk('yeti')).toBe(true);
+    expect(standsAtDesk('cat')).toBe(false);
   });
 });
