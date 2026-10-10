@@ -86,6 +86,8 @@ const SEAT = 0.5;
 const HOVER = 0.95;
 /** How far behind its chair a big creature stands when it would sit. */
 const BEHIND_CHAIR = 0.45;
+/** How far behind a seat's centre a chair's backrest begins. A perched creature's back must stay in front of it. */
+const BACKREST = 0.1;
 /** How long a change of animation blends, in seconds. */
 const BLEND = 0.35;
 
@@ -144,7 +146,8 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
       box.union(local.clone().applyMatrix4(mesh.matrixWorld));
     });
     const scale = info.height / Math.max(1e-6, box.max.y - box.min.y);
-    return { object, scale, foot: -box.min.y * scale, mixer: new THREE.AnimationMixer(object) };
+    // The model faces +z, so its back is at the box's -z side; once turned round that is how far it reaches behind.
+    return { object, scale, foot: -box.min.y * scale, back: -box.min.z * scale, mixer: new THREE.AnimationMixer(object) };
   }, [gltf, detail, info.height]);
 
   const current = useRef<THREE.AnimationAction | null>(null);
@@ -175,13 +178,14 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
 
   useFrame((_, dt) => model.mixer.update(Math.min(dt, 0.1)));
 
-  // Small creatures perch on the seat. Big ones are too tall for that, so they stand behind the chair as if at a standing desk.
+  // Small creatures perch on the seat, moved forward until their backs clear the backrest; round ones move further.
+  // Big ones are too tall for that, so they stand behind the chair as if at a standing desk.
   const sit = pose === "sit" && info.kind === "blob";
-  const behind = pose === "sit" && info.kind === "big" ? BEHIND_CHAIR : 0;
+  const offset = sit ? -Math.max(0, model.back - BACKREST) : pose === "sit" && info.kind === "big" ? BEHIND_CHAIR : 0;
   const y = info.kind === "flyer" ? HOVER : sit ? seat : 0;
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      <primitive object={model.object} scale={model.scale} position={[0, y + model.foot, behind]} rotation={[0, Math.PI, 0]} />
+      <primitive object={model.object} scale={model.scale} position={[0, y + model.foot, offset]} rotation={[0, Math.PI, 0]} />
     </group>
   );
 }
