@@ -99,10 +99,6 @@ export function Meter({ value, tone = "accent", label }: { value: number; tone?:
   );
 }
 
-export function utilTone(util: number): "ok" | "warn" | "critical" {
-  return util >= 1 ? "critical" : util >= 0.85 ? "warn" : "ok";
-}
-
 /** A labelled bar: the main way the game shows how something is doing. */
 export function Gauge({ label, value, text, tone, tip, icon }: { label: string; value: number; text: string; tone: Tone; tip: string; icon?: IconName }) {
   return (

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import type { V3 } from "./prims";
+import type { V3 } from "./shapes";
 
 /*
  * Detailed machines for the office, modelled piece by piece: Mac all-in-ones

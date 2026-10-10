@@ -3,7 +3,8 @@
 import { BALANCE, BRANCHES, missingPrerequisites, TECH, TECH_ORDER, techStatus, type GameState, type TechId, type TechStatus } from "@/sim";
 import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
-import { Icon, TECH_ICON, type IconName } from "./icons";
+import { Icon, type IconName } from "./icons";
+import { TECH_ICON } from "./presentation";
 import { Act, Chip, Concept, ReleaseRow, TaskRow } from "./ui";
 
 const NODE_W = 204;

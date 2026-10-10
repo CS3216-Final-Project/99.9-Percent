@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { BALANCE, buildReport } from "@/sim";
 import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, clearSave, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { Callout, Concept, Modal, type ConceptKind } from "./ui";
-import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone, PostmortemBody, RunCharts } from "./Views";
+import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
+import { PostmortemBody, RunCharts } from "./Views";
 
 /* ------------------------------------------------------------------ */
 /* Title screen                                                        */
@@ -319,9 +320,7 @@ export function Menu() {
   const notify = useGame((s) => s.notify);
   const [seed, setSeed] = useState("");
   const [confirm, setConfirm] = useState<"new" | "reset" | "tutorial" | null>(null);
-  const [events, setEvents] = useState<AnalyticsEvent[]>([]);
-
-  useEffect(() => setEvents(readAnalytics()), []);
+  const [events, setEvents] = useState<AnalyticsEvent[]>(readAnalytics);
 
   const inProgress = !game.outcome && game.totals.weeks > 0;
   const start = (kind: "new" | "reset" | "tutorial") => {
