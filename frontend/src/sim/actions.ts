@@ -383,5 +383,6 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (prev.phase !== "review") return fail("wrong_phase", "There is nothing to review.");
       return ok(acknowledgeReview(prev));
     }
+    default: return fail("invalid", "This action requires the continuous campaign.");
   }
 }

@@ -429,6 +429,10 @@ export interface GameState {
 /* ------------------------------------------------------------------ */
 
 export type Action =
+  | { type: "enter_scaling" }
+  | { type: "scale_up"; appId: string }
+  | { type: "deploy_load_balancer" }
+  | { type: "set_routing"; mode: "single" | "balanced"; targets: string[] }
   | { type: "set_traffic_limit"; enabled: boolean }
   | { type: "launch_promotion"; promo: PromoId }
   | { type: "add_server" }
@@ -442,11 +446,11 @@ export type Action =
   | { type: "hire_engineer" }
   | { type: "deploy_release"; releaseId: string }
   | { type: "test_release"; releaseId: string }
-  | { type: "incident_inspect"; equipment: EquipmentId }
+  | { type: "incident_inspect"; equipment: EquipmentId; appId?: string }
   | { type: "incident_action"; recovery: RecoveryId }
   | { type: "incident_hint" }
   | { type: "acknowledge_review" }
-  | { type: "acknowledge_milestone" };
+  | { type: "acknowledge_milestone"; enterScaling?: boolean };
 
 export type FailureReason =
   | "wrong_phase"

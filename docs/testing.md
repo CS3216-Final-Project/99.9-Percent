@@ -15,7 +15,7 @@ Use Node 22 and install with `npm ci` separately in `frontend/` and `backend/`. 
 | Frontend | `npm run test:e2e:ui` | Debug browser tests interactively using an existing build |
 | Backend | `npm run db:generate` | Verify schema and generated migrations agree |
 
-On Linux CI, use `npx playwright install --with-deps chromium` for browser/system dependencies. For interactive tests rebuild with `npm run build` after changing application code. Preview runs on port 4175; a reused local server must serve the current build.
+On Linux CI, use `npx playwright install --with-deps chromium` for browser/system dependencies. For interactive tests rebuild with `npm run build` after changing application code. Preview runs on port 4175 by default (override with PLAYWRIGHT_PORT when another checkout is active); a reused local server must serve the current build.
 
 ## What is covered
 
@@ -42,14 +42,14 @@ Coverage is a baseline report, with no arbitrary global percentage gate. Fronten
 
 Still needed as the product grows: Firefox/WebKit and real-device checks, broader keyboard/screen-reader accessibility review, performance budgets, and integration tests for any new server-backed gameplay. Add these when their features or support commitments exist; do not label the current suite comprehensive.
 
-## 🔑 Planned Google authentication coverage
+## Google authentication and cloud save coverage
 
-Google OAuth and cloud saves are roadmap work; the current suite does not cover them yet. Follow the [authentication contract](AUTHENTICATION.md) when implementation lands:
+Google OIDC and optional account-owned snapshots are implemented and tested against mocked provider exchange and isolated PGlite. Follow the [authentication contract](AUTHENTICATION.md) for deployment acceptance. The automated suite covers:
 
 - **API:** mock Google code exchange/token validation; reject invalid/replayed callbacks, expired/revoked sessions and CSRF; verify two-account save isolation and revision conflicts.
-- **Database:** test additive account/session/attempt migrations and constraints with PGlite; verify the actual Neon driver on an isolated test deployment.
+- **Database:** additive account/session/attempt/run migrations and constraints with PGlite. Actual Neon HTTP connectivity remains an isolated deployment acceptance check.
 - **Browser:** Google cancellation, session restoration/sign-out, explicit guest-run attachment, offline changes and preserved legacy keys. Stub provider responses for repeatable CI.
-- **Deployment:** manually verify real Google sign-in with two test accounts on registered production/auth-test origins, exact callbacks, proxy cookies and private-response cache headers.
+- **Remaining deployment acceptance:** real Google sign-in with two test accounts on registered production/auth-test origins, exact callbacks, proxy cookies and private-response cache headers. These checks require configured test credentials and are not established by mocked CI.
 
 ## Agent guidance
 

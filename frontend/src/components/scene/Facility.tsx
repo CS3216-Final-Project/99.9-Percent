@@ -443,6 +443,7 @@ const INTERNET = "internet";
 
 function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footprint> }) {
   const v = useMemo(() => new THREE.Vector3(), []);
+  const apps=useGame(s=>s.game.campaign?.apps);
 
   useEffect(() => {
     for (const id of EQUIPMENT_ORDER) {
@@ -450,7 +451,9 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
       anchors.set(id, new THREE.Vector3(f.x, f.h + 0.3, f.z));
     }
     anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, 1.35, AISLE_Z));
-  }, [footprints]);
+    for(const id of ["app-1","app-2"])anchors.delete(id);
+    if(apps)apps.forEach((a,i)=>{const p=appSlot(i);anchors.set(a.id,new THREE.Vector3(p.x,RACK.h+.6,p.z));});
+  }, [footprints,apps]);
 
   useFrame(({ camera, size }) => {
     anchors.forEach((pos, key) => {
@@ -458,7 +461,7 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
       if (!el) return;
       v.copy(pos).project(camera);
       const x = (v.x * 0.5 + 0.5) * size.width;
-      const y = (-v.y * 0.5 + 0.5) * size.height;
+      const y = (-v.y * 0.5 + 0.5) * size.height + (key==="app"&&labelEls.has("app-1")? -100:key==="app-1"?-10:key==="app-2"?12:0);
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
       el.style.visibility = "visible";
     });
@@ -504,6 +507,9 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
 
 function Labels() {
   const m = useSceneModel();
+  const c=useGame(s=>s.game.campaign);
+  const selectedAppId=useGame(s=>s.selectedAppId);
+  const selected=useGame(s=>s.selected);
   return (
     <div className="eq-labels">
       <span className="wall-tag" ref={bindLabel(INTERNET)}>
@@ -513,6 +519,7 @@ function Labels() {
       {EQUIPMENT_ORDER.filter((id) => m.opening ? ["gateway","app","db","monitoring"].includes(id) : (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
+      {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={a.id==="app-1"?"App 1":"App 2"} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{a.id==="app-1"?"App 1":"App 2"}<span className="eq-note">{a.routed?"routed":"unrouted"}</span></button>)}
     </div>
   );
 }
@@ -632,10 +639,12 @@ function Effects() {
 
 function Scene({ effects }: { effects: boolean }) {
   const m = useSceneModel();
+  const campaign = useGame(s => s.game.campaign);
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
 
   const appCount = Math.min(m.hosts.length, 12);
-  const appMaxX = appSlot(Math.min(appCount, 6) - 1).x;
+  const routedCount = campaign ? Math.max(...campaign.routing.targets.map(id => campaign.apps.findIndex(a=>a.id===id)+1)) : appCount;
+  const appMaxX = appSlot(Math.min(routedCount, 6) - 1).x;
   const dbLastX = dbSlot(m.dbCabinets - 1).x;
   const aisleZ = AISLE_Z;
   const dataZ = 4.65;
@@ -682,7 +691,7 @@ function Scene({ effects }: { effects: boolean }) {
       {/* App servers */}
       {m.hosts.slice(0, 12).map((led, i) => {
         const p = appSlot(i);
-        return <Rack key={i} x={p.x} z={p.z} led={led} />;
+        return <group key={i} onClick={e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",`app-${i+1}`);}}}><Rack x={p.x} z={p.z} led={led} /></group>;
       })}
       {Array.from({ length: m.temp }, (_, i) => {
         const p = tempSlot(i);
@@ -713,7 +722,7 @@ function Scene({ effects }: { effects: boolean }) {
 
       {/* Cabling: internet -> edge -> app servers -> (cache) -> database -> replica / backups */}
       <Cable points={[[ROOM.x0 + 0.2, aisleZ], [POS.gateway.x, aisleZ]]} speed={flow} alert={edgeAlert} />
-      <Cable points={[[POS.gateway.x, aisleZ], [Math.max(appMaxX, -6.6) + 0.4, aisleZ]]} speed={flow} alert={edgeAlert} />
+      {campaign ? campaign.routing.targets.map(id=>{const p=appSlot(campaign.apps.findIndex(a=>a.id===id));return <Cable key={id} points={[[POS.gateway.x,aisleZ],[p.x,aisleZ],[p.x,p.z]]} speed={flow} alert={m.hosts[campaign.apps.findIndex(a=>a.id===id)]==="critical"} />;}) : <Cable points={[[POS.gateway.x, aisleZ], [Math.max(appMaxX, -6.6) + 0.4, aisleZ]]} speed={flow} alert={edgeAlert} />}
       <Cable
         points={[
           [trunkX, aisleZ],

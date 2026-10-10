@@ -1,3 +1,4 @@
+import { APPLICATION_SCALING as S } from "./scenarios/applicationScaling";
 import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
 import { BALANCE, PROMOS } from "./balance";
 import { has, TECH } from "./tech";
@@ -109,7 +110,7 @@ export interface CostBreakdown {
 }
 
 export function costs(s: GameState, tempServers = 0): CostBreakdown {
-  if(s.campaign){const servers=s.campaign.apps.length*Q.appWeeklyCents/100,database=(s.campaign.upgraded?Q.upgradedDbWeeklyCents:Q.dbWeeklyCents)/100;return {servers,database,salaries:Q.engineers*Q.salaryWeeklyCents/100,redundancy:0,tooling:0,autoscale:0,total:servers+database+Q.engineers*Q.salaryWeeklyCents/100};}
+  if(s.campaign){const c=s.campaign,servers=c.apps.reduce((sum,a)=>sum+(a.tier==="large"?S.appWeeklyCents:Q.appWeeklyCents),0)/100,database=(c.dbCapacity===2000?S.dbWeeklyCents:c.upgraded?Q.upgradedDbWeeklyCents:Q.dbWeeklyCents)/100,redundancy=c.loadBalancer?S.lbWeeklyCents/100:0,salaries=Q.engineers*Q.salaryWeeklyCents/100;return {servers,database,salaries,redundancy,tooling:0,autoscale:0,total:servers+database+salaries+redundancy};}
   const salaries = s.engineers * BALANCE.engineer.salary;
   const servers = s.infra.appHosts.length * serverUpkeep(s);
   const dbUpkeep = BALANCE.db.tiers[s.infra.dbTier].upkeep;

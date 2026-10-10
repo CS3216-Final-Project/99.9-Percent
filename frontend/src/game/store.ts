@@ -38,6 +38,11 @@ import {
   type Meta,
 } from "./persist";
 import { decodeSave } from "./saveEnvelope";
+import { makeEnvelope, validateEnvelope, type SaveEnvelope } from "./saveEnvelope";
+import { AccountApiError, getSession, logout, listRuns, putRun, getRun } from "@/lib/api";
+import type { AppSession, CloudRun, RunSummary } from "../../../shared/campaign.ts";
+import { checkpointCloud, localCloudCopy, rememberCloud } from "./cloud";
+
 
 export type View = "tech" | "engineers" | "history" | "menu" | null;
 export type Speed = 0.5 | 1 | 2;
@@ -72,6 +77,20 @@ export interface Toast {
 }
 
 interface Store {
+  prepareSignIn: () => boolean;
+  accountSession: AppSession | null;
+  accountStatus: 'unchecked' | 'checking' | 'guest' | 'signed-in' | 'unavailable';
+  cloudStatus: string;
+  cloudBusy: boolean;
+  cloudRuns: RunSummary[];
+  cloudConflict: CloudRun | null;
+  restoreAccount: () => Promise<void>;
+  signOut: () => Promise<void>;
+  refreshCloudRuns: () => Promise<void>;
+  saveCloud: (attach?:boolean) => Promise<void>;
+  resumeCloud: (runId:string) => Promise<void>;
+  keepLocalConflict: () => Promise<void>;
+
   hasRun: boolean;
   measurement: Measurement;
   activeMark: number | null;
@@ -90,6 +109,8 @@ interface Store {
   game: GameState;
   meta: Meta;
   selected: EquipmentId | null;
+  selectedAppId: string | null;
+  selectApp: (id: string) => void;
   hovered: EquipmentId | null;
   view: View;
   techFocus: TechId | null;
@@ -143,12 +164,15 @@ let toastId = 1;
 let lastIncidentSave = 0;
 
 export const useGame = create<Store>()((set, get) => {
+  let accountRequest = 0;
   function persist(explicitReset=false):boolean {
     const s=get();
     if(s.mode === "classic") return saveClassicGame(s.game);
     if(s.saveBlocked)return false;
     if(!s.hasRun)return true;
     const saved=saveGame(s.game,s.remainderMs,explicitReset,s.measurement);
+    try { if (saved) checkpointCloud(makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement)); }
+    catch { s.notify("Local progress is saved, but its account backup could not be retained. Export account copies before replacing this company.","error"); return false; }
     if(saved && archiveEvents(s.measurement.pending)) {
       set({measurement:{...s.measurement,pending:[]}});
       return true;
@@ -261,6 +285,7 @@ export const useGame = create<Store>()((set, get) => {
       remainderMs: 0,
       saveBlocked: false,
       selected: null,
+      selectedAppId: null,
       hovered: null,
       view: null,
       techFocus: null,
@@ -300,7 +325,98 @@ export const useGame = create<Store>()((set, get) => {
     if (started) get().play();
   }
 
+  function accountFailure(error:unknown) {
+    if(error instanceof AccountApiError && error.status===401)set({accountSession:null,accountStatus:'guest'});
+    set({cloudStatus:error instanceof Error?error.message:'Cloud service unavailable. Local progress is retained.'});
+  }
+  function currentEnvelope() { const s=get();if (!s.game.campaign) throw Error("Cloud saves are available for Campaign companies. Classic progress stays local.");return makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement); }
+  function ownSession() {const session=get().accountSession;if(!session)throw Error('Sign in first. Local progress is retained.');return session;}
   return {
+    prepareSignIn:()=>{set({running:false});return !get().hasRun||persist();},
+    accountSession:null, accountStatus:'unchecked', cloudStatus:'Local progress stays in this browser.', cloudBusy:false, cloudRuns:[], cloudConflict:null,
+    restoreAccount: async()=>{
+        if(get().accountStatus==='checking'||get().cloudBusy)return;
+        const request=++accountRequest;
+        set({accountStatus:'checking'});
+        try {const session=await getSession();if(request!==accountRequest)return;set({accountSession:session,accountStatus:'signed-in',cloudRuns:[],cloudStatus:'Signed in. Guest runs are attached only when you choose.'});}
+        catch(error){if(request!==accountRequest)return;const outcome=new URLSearchParams(window.location.search).get('auth');set({accountSession:null,accountStatus:error instanceof AccountApiError&&error.status===401?'guest':'unavailable',cloudStatus:outcome==='cancelled'?'Google sign-in cancelled. Your local company is retained.':outcome==='failed'?'Google sign-in failed. Your local company is retained.':'Local play is available. Sign in or retry when accounts are available.'});}
+    },
+    signOut: async()=>{
+        if(get().cloudBusy)return;
+        ++accountRequest;
+      set({cloudBusy:true,accountStatus:get().accountSession?'signed-in':get().accountStatus});
+      try {const session=ownSession();await logout(session.csrfToken);set({accountSession:null,accountStatus:'guest',cloudRuns:[],cloudConflict:null,cloudStatus:'Signed out. Local progress and owner bindings are retained.'});}
+      catch(error){accountFailure(error);}
+      finally{set({cloudBusy:false});}
+    },
+    refreshCloudRuns: async()=>{
+      if(get().cloudBusy)return;set({cloudBusy:true});
+      try {const session=ownSession();const runs=await listRuns();if(get().accountSession===session)set({cloudRuns:runs,cloudStatus:runs.length?'Choose a cloud company to resume. Your current local company will be retained.':'No cloud companies yet.'});}
+      catch(error){accountFailure(error);}finally{set({cloudBusy:false});}
+    },
+    saveCloud: async(attach=false)=>{
+      if(get().cloudBusy)return;set({cloudBusy:true});
+      let envelope:SaveEnvelope|undefined;
+      try {
+        const session=ownSession();if(!get().hasRun||get().saveBlocked)throw Error('Start or load a valid company before attaching it.');
+        get().measureTime();envelope=currentEnvelope();
+        if(validateEnvelope(envelope).status!=='ok')throw Error('This campaign snapshot is invalid. Export it before replacing it.');
+        const copy=localCloudCopy(envelope.runId);
+        if(copy&&copy.ownerId!==session.account.id)throw Error('This local company belongs to another account. Its pending progress is retained.');
+        if(!copy&&!attach)throw Error('Choose Attach current guest company first.');
+        if(copy?.remote)throw Error('Resolve the cloud conflict before retrying. Both copies are retained.');
+        rememberCloud({ownerId:session.account.id,revision:copy?.revision??0,local:envelope});
+        const game=get().game;
+        const saved=await putRun(envelope,copy?.revision??0,session.csrfToken);
+        if(get().accountSession!==session)return;
+        if(saved.runId!==envelope.runId || !Number.isSafeInteger(saved.revision) || saved.revision<1)throw Error('Invalid cloud acknowledgement. Local progress is retained.');
+        rememberCloud({ownerId:session.account.id,revision:saved.revision,local:currentEnvelope()});
+        set({cloudConflict:null,cloudStatus:get().game===game?'Cloud save complete.':'Cloud snapshot saved. Newer local changes are pending.'});
+      } catch(error) {
+        if(error instanceof AccountApiError&&error.status===409&&error.detail.current&&envelope) {
+          set({cloudConflict:error.detail.current});
+          try {
+            const copy=localCloudCopy(envelope.runId)!;rememberCloud({...copy,local:currentEnvelope(),remote:error.detail.current});
+            set({cloudStatus:'Cloud conflict: both copies are retained. Choose which to continue.'});
+          } catch {set({cloudStatus:'Conflict copies could not be stored. Keep this tab open and export account copies before continuing.'});}
+        } else accountFailure(error);
+      } finally{set({cloudBusy:false});}
+    },
+    keepLocalConflict: async()=>{
+      if(get().cloudBusy)return;
+      try {
+        const session=ownSession(),e=currentEnvelope(),copy=localCloudCopy(e.runId);
+        if(!copy||copy.ownerId!==session.account.id||!copy.remote)throw Error('No conflict for this company.');
+        const remote=copy.remote as CloudRun;
+        // Preserve both exact versions before an explicit revision-conditional overwrite.
+        localStorage.setItem(`nn.campaign.conflict.${e.runId}.${remote.revision}`,JSON.stringify({local:e,remote}));
+        rememberCloud({...copy,local:e,revision:remote.revision,remote:undefined});set({cloudConflict:null});
+        await get().saveCloud();
+      }catch(error){accountFailure(error);}
+    },
+    resumeCloud: async(runId)=>{
+      if(get().cloudBusy)return;set({cloudBusy:true,running:false});
+      try {
+        const session=ownSession(),before=get().game,run=await getRun(runId);
+        if(get().accountSession!==session||get().game!==before)throw Error('Local company changed while loading. Retry when paused.');
+        const validated=validateEnvelope(run.envelope);
+        if(validated.status!=='ok')throw Error('This cloud save needs a compatible game version. Local progress is retained.');
+        const s=get(),e=validated.envelope,game=validated.game;
+        if(e.runId!==runId)throw Error('Cloud run identity does not match.');
+        // Refuse replacement unless current bytes and all account copies are durably retained.
+        const original=localStorage.getItem('nn.campaign.save.v1');
+        if(original!==null)localStorage.setItem(`nn.campaign.before-cloud.${s.game.campaign!.runId}`,original);
+        if(s.hasRun)localStorage.setItem(`nn.campaign.before-cloud.${s.game.campaign!.runId}.pending`,JSON.stringify(currentEnvelope()));
+        const previous=localCloudCopy(runId);
+        if(previous&&previous.ownerId!==session.account.id)throw Error('This run is bound to another local owner.');
+        if(previous)localStorage.setItem(`nn.campaign.before-cloud.${runId}.owner-copy`,JSON.stringify(previous));
+        rememberCloud({ownerId:session.account.id,revision:run.revision,local:e});
+        if(!saveGame(game,e.runtime.remainderMs,true,e.runtime.measurement))throw Error('Storage could not retain the cloud copy. Local progress is retained.');
+        saveMode("campaign");
+        set({mode:"campaign",game,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
+          running:false,started:false,onboarding:false,view:null,selected:null,selectedAppId:null,activeMark:null,cloudConflict:null,cloudStatus:'Cloud company loaded and paused. Continue when ready.'});
+      }catch(error){accountFailure(error);}finally{set({cloudBusy:false});}
+    },
     hasRun: false, measurement: emptyMeasurement(), activeMark: null,
     mode: "campaign",
     remainderMs: 0,
@@ -310,6 +426,8 @@ export const useGame = create<Store>()((set, get) => {
     game: newGame(BALANCE.introSeed),
     meta: loadMetaSafe(),
     selected: null,
+    selectedAppId: null,
+    selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({selected:"app",selectedAppId:id}); },
     hovered: null,
     view: null,
     techFocus: null,
@@ -329,10 +447,11 @@ export const useGame = create<Store>()((set, get) => {
       if(get().started)return;
       if(get().mode === "classic") { set({started:true}); return; }
       const state=get();
-      const game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID());
+      let game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID());
+      if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended") game=applyCampaignInput(game,{type:"enter_scaling"}).state;
       const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
       const status=meta.openingOnboarding.status;
-      const measurement=beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString());
+      const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
       set({game,hasRun:true,meta,measurement,started:true,running:false,
         onboarding:status==="not-started"||status==="in-progress",activeMark:document.hidden?null:performance.now()});
       if(!saveMeta(meta))get().notify("Onboarding preferences could not be saved.","error");
@@ -432,7 +551,7 @@ export const useGame = create<Store>()((set, get) => {
       commit(next, { save: ended || due });
     },
 
-    select: (id) => set({ selected: id }),
+    select: id => set({selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null}),
     hover: (id) => {
       if (get().hovered !== id) set({ hovered: id });
     },
@@ -449,6 +568,9 @@ export const useGame = create<Store>()((set, get) => {
     setSpeed: (speed) => set({ speed }),
 
     newRun: (opts = {}) => {
+      if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return;}
+      try {if(get().hasRun && get().game.campaign)checkpointCloud(currentEnvelope());}
+      catch {get().notify("Export account copies before replacing this company: its pending backup could not be saved.","error");return;}
       if (get().mode === "campaign") {
       const replacementRunId=crypto.randomUUID();
       const old=get();
@@ -502,6 +624,7 @@ export const useGame = create<Store>()((set, get) => {
     },
 
     switchMode: (mode, opts = {}) => {
+      if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return false;}
       if (mode === get().mode) return true;
       if (!persist() && !opts.discard) return false;
       saveMode(mode);
@@ -517,6 +640,7 @@ export const useGame = create<Store>()((set, get) => {
     },
 
     importSave: (raw) => {
+      if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return false;}
       const campaign = decodeSave(raw);
       const classic = campaign.status === "ok" ? null : decodeClassicSave(raw);
       if (campaign.status !== "ok" && classic?.status !== "ok") {
@@ -525,9 +649,9 @@ export const useGame = create<Store>()((set, get) => {
       }
       const game = campaign.status === "ok" ? campaign.game : (classic as Extract<ReturnType<typeof decodeClassicSave>, { status: "ok" }>).game;
       const mode: GameMode = game.campaign ? "campaign" : "classic";
-      // A cross-mode import must not strand unsaved changes in the other mode.
-      if (mode !== get().mode && !persist()) {
-        get().notify("Could not save the current run. Export it before importing another mode's save.", "error");
+        // Preserve current progress and any owner-bound pending copy before replacement.
+        if ((mode !== get().mode || get().hasRun) && !persist()) {
+          get().notify("Could not save the current run. Export it before importing a replacement.", "error");
         return false;
       }
       const remainderMs = campaign.status === "ok" ? campaign.envelope.runtime.remainderMs : 0;
@@ -616,11 +740,12 @@ export const useGame = create<Store>()((set, get) => {
  * Clicking or tapping a piece of equipment. Normally it opens the inspector;
  * during an incident it also sends the team to investigate that equipment.
  */
-export function inspectOrSelect(id: EquipmentId): void {
+export function inspectOrSelect(id: EquipmentId, appId?: string): void {
   const { game, select, act } = useGame.getState();
   if(game.campaign && !["app","db","monitoring","gateway"].includes(id))return;
   select(id);
-  if(game.campaign) { if(["app","db","monitoring","gateway"].includes(id))act({type:"incident_inspect",equipment:id}); return; }
+  if (appId) useGame.getState().selectApp(appId);
+  if(game.campaign) { if(["app","db","monitoring","gateway"].includes(id))act({type:"incident_inspect",equipment:id,...(id==="app"?{appId:useGame.getState().selectedAppId??"app-1"}:{})}); return; }
   const inc = game.incident;
   if (game.phase !== "incident" || !inc || inc.status !== "active") return;
   if (!inspectable(game).includes(id)) return;
