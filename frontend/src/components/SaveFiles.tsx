@@ -11,7 +11,7 @@ function download(name: string, text: string) {
 
 /** Shared file controls; importing validates first and asks before replacing a run. */
 export function SaveFiles() {
-  const { game, mode, remainderMs, importSave, resumeLegacySave, notify } = useGame();
+  const { game, mode, remainderMs, measurement, importSave, resumeLegacySave, notify } = useGame();
   const [pending, setPending] = useState<{ name: string; text: string } | null>(null);
   const [confirmLegacy, setConfirmLegacy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -28,7 +28,7 @@ export function SaveFiles() {
     <h4>Save files</h4>
     <p>Export a file to keep a backup or continue on another browser. Campaign and Classic files open in their matching mode.</p>
     <div className="btn-row">
-      <button className="btn" onClick={() => download(`${mode}.json`, exportGame(game, remainderMs))}>
+      <button className="btn" onClick={() => download(`${mode}.json`, exportGame(game, remainderMs, measurement))}>
         {mode === "campaign" ? "Export current company" : "Export current run"}</button>
       <button className="btn" disabled={rawSave(mode) === null} onClick={() => download(`stored-${mode}.json`, rawSave(mode) ?? "null")}>Export original stored save</button>
       <button className="btn" onClick={() => fileInput.current?.click()}>Import save</button>

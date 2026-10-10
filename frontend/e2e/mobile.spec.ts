@@ -3,7 +3,8 @@ import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
 test("inspects evidence and advances a physical step on touch", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).tap();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap();
+  await page.getByRole("button", { name: "Skip introduction" }).tap();
   await expectRoom(page);
   const music = page.getByRole("button", { name: "Music", exact: true });
   await music.tap(); await expect(music).toHaveAttribute("aria-pressed", "false");
@@ -47,7 +48,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
 });
 
 test("a tap explains a term, and tapping a button does not leave a tooltip over it", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).tap();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap(); await page.getByRole("button", { name: "Skip introduction" }).tap();
   await expectRoom(page);
   const tip = page.getByRole("tooltip");
   await page.getByRole("complementary", { name: "System metrics" }).getByText("Inspect the evidence", { exact: true }).tap();

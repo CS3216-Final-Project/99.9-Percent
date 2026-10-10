@@ -40,7 +40,7 @@ describe("input-log saves", () => {
   it("identifies unknown scenario and schema versions without reinterpreting saves", () => {
     const e = makeEnvelope(newGame());
     expect(validateEnvelope({ ...e, scenarioVersion: 2 }).status).toBe("unsupported");
-    expect(decodeSave(JSON.stringify({ ...e, schemaVersion: 2 })).status).toBe("unsupported");
+    expect(decodeSave(JSON.stringify({ ...e, schemaVersion: 99 })).status).toBe("unsupported");
     expect(decodeSave(JSON.stringify({ ...e, schemaVersion: 0 })).status).toBe("unsupported");
   });
 });

@@ -1,3 +1,4 @@
+import { emptyMeasurement, type Measurement, type PlaytestEvent } from "./telemetry";
 import { decodeSave, makeEnvelope, replaceable } from "./saveEnvelope";
 import { BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
 
@@ -24,6 +25,7 @@ let lastWrittenCampaign: string | null = null;
 export type GameMode = "campaign" | "classic";
 
 export interface Meta {
+  openingOnboarding: {version: 1; step: number; status: "not-started" | "in-progress" | "completed" | "skipped"};
   onboarded: boolean;
   runsStarted: number;
   runsFinished: number;
@@ -38,6 +40,7 @@ export interface Meta {
 }
 
 export const DEFAULT_META: Meta = {
+  openingOnboarding: {version: 1, step: 0, status: "not-started"},
   onboarded: false,
   runsStarted: 0,
   runsFinished: 0,
@@ -74,28 +77,41 @@ function remove(key: string): void {
 }
 
 
-export type LoadResult = {status:"none"} | {status:"ok";game:GameState;savedAt:number;remainderMs:number} | {status:"corrupt"|"unsupported"|"unavailable"};
+export type LoadResult = {status:"none"} | {status:"ok";game:GameState;savedAt:number;remainderMs:number;measurement:Measurement} | {status:"corrupt"|"unsupported"|"unavailable"};
 export function loadGame():LoadResult {
   let raw:string|null;
   try {raw=window.localStorage.getItem(SAVE_KEY);}catch{return {status:"unavailable"};}
   if(raw===null)return {status:"none"};
   const result=decodeSave(raw);
   if(result.status!=="ok")return result;
-  return {status:"ok",game:result.game,savedAt:result.envelope.savedAt,remainderMs:result.envelope.runtime.remainderMs};
+  return {status:"ok",game:result.game,savedAt:result.envelope.savedAt,remainderMs:result.envelope.runtime.remainderMs,measurement:result.envelope.runtime.measurement};
 }
 export function rawSave(mode: GameMode = "campaign"): string | null {
   return read(mode === "classic" ? CLASSIC_SAVE_KEY : SAVE_KEY);
 }
 /** Originals are read-only; recovery and imports write a copy into the Classic slot. */
 export function rawLegacySave(): string | null { return read(LEGACY_SAVE_KEY); }
-export function exportGame(game: GameState, remainderMs = 0): string {
-  return JSON.stringify(game.campaign ? makeEnvelope(game, remainderMs) : { savedAt: Date.now(), game });
+export function exportGame(game: GameState, remainderMs = 0, measurement: Measurement = emptyMeasurement()): string {
+  return JSON.stringify(game.campaign ? makeEnvelope(game, remainderMs, Date.now(), measurement) : { savedAt: Date.now(), game });
 }
-export function saveGame(game:GameState,remainderMs=0,explicitReset=false):boolean {
+export function saveGame(game:GameState,remainderMs=0,explicitReset=false,measurement:Measurement=emptyMeasurement()):boolean {
   let current:string|null;
   try {current=window.localStorage.getItem(SAVE_KEY);}catch{return false;}
   if(!explicitReset && current !== lastWrittenCampaign && !replaceable(current))return false;
-  const raw = JSON.stringify(makeEnvelope(game,remainderMs));
+  // Back up the actual main-format bytes before upgrading the active slot.
+  if (current !== null) {
+    let source;
+    try {source=JSON.parse(current);} catch {if(!explicitReset)return false;}
+    try {
+      if(source?.schemaVersion===1 && Array.isArray(source.inputs)) {
+        const backup=SAVE_KEY+".backup.v1."+source.runId+"."+source.savedAt;
+        const prior=window.localStorage.getItem(backup);
+        if(prior!==null && prior!==current)return false;
+        if(prior===null)window.localStorage.setItem(backup,current);
+      }
+    } catch { return false; }
+  }
+  const raw = JSON.stringify(makeEnvelope(game,remainderMs,Date.now(),measurement));
   const saved = write(SAVE_KEY, raw);
   if (saved) lastWrittenCampaign = raw;
   return saved;
@@ -191,6 +207,8 @@ function decodeMeta(raw: string | null): Meta {
   if (!raw) return { ...DEFAULT_META };
   try {
     const meta = { ...DEFAULT_META, ...(JSON.parse(raw) as Partial<Meta>) };
+    const o=meta.openingOnboarding;
+    if(!o || o.version!==1 || !Number.isInteger(o.step) || o.step<0 || o.step>2 || !["not-started","in-progress","completed","skipped"].includes(o.status)) meta.openingOnboarding=structuredClone(DEFAULT_META.openingOnboarding);
     if (typeof meta.music !== "boolean") meta.music = DEFAULT_META.music;
     return meta;
   } catch {
@@ -213,8 +231,8 @@ export function loadLegacyMeta(): Meta {
 }
 export function saveMusic(enabled: boolean): void { write(MUSIC_KEY, String(enabled)); }
 
-export function saveMeta(meta: Meta, mode: GameMode = "campaign"): void {
-  write(mode === "classic" ? CLASSIC_META_KEY : META_KEY, JSON.stringify(meta));
+export function saveMeta(meta: Meta, mode: GameMode = "campaign"): boolean {
+  return write(mode === "classic" ? CLASSIC_META_KEY : META_KEY, JSON.stringify(meta));
 }
 
 /* ------------------------------------------------------------------ */
@@ -242,7 +260,8 @@ export type AnalyticsName =
 
 export interface AnalyticsEvent {
   t: string;
-  name: AnalyticsName;
+  name: string;
+  eventId?: string;
   data?: Record<string, string | number | boolean | null>;
 }
 
@@ -260,9 +279,28 @@ export function readAnalytics(): AnalyticsEvent[] {
 export function track(name: AnalyticsName, data?: AnalyticsEvent["data"]): void {
   const events = readAnalytics();
   events.push({ t: new Date().toISOString(), name, data });
-  write(ANALYTICS_KEY, JSON.stringify(events.slice(-500)));
+  write(ANALYTICS_KEY, JSON.stringify(events));
 }
 
 export function clearAnalytics(): void {
   remove(ANALYTICS_KEY);
+}
+
+/** One archive for historical events and attributed PR1 events; never truncate unexported data. */
+export function archiveEvents(events:PlaytestEvent[]):boolean {
+  try {
+    const raw=window.localStorage.getItem(ANALYTICS_KEY);
+    const prior=raw===null?[]:JSON.parse(raw);
+    if(!Array.isArray(prior))return false;
+    const ids=new Set(prior.map(e=>e.eventId).filter(Boolean));
+    for(const e of events)if(!ids.has(e.eventId)){prior.push(e);ids.add(e.eventId);}
+    return write(ANALYTICS_KEY,JSON.stringify(prior));
+  }catch{return false;}
+}
+export function exportPlaytest(game:GameState,measurement:Measurement):string {
+  const archived=readAnalytics();
+  const ids=new Set(archived.map(e=>e.eventId));
+  return JSON.stringify({exportVersion:1,measurement,game,
+    events:[...archived,...measurement.pending.filter(e=>!ids.has(e.eventId))],
+    rawArchive:read(ANALYTICS_KEY)},null,2);
 }

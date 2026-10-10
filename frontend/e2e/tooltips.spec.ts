@@ -3,7 +3,7 @@ import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
 test("explains controls in the shared tooltip, never the browser's own", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button", { name: "Skip introduction" }).click();
   await expectRoom(page);
   await expect(page.locator("[title]")).toHaveCount(0);
 

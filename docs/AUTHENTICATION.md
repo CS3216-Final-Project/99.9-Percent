@@ -61,3 +61,27 @@ sequenceDiagram
 🔒 Preserve `nn.save.v1`, `nn.meta.v1`, `nn.analytics.v1` and legacy export. Sign-out/reset never erase them. Account switching never uploads another owner's local run.
 
 📚 [Roadmap](DEVELOPMENT_ROADMAP.md#authentication-delivery-and-acceptance) · [Architecture](SYSTEM_ARCHITECTURE.md) · [Planned API routes](api.md) · [Testing](testing.md)
+
+## Phase 2 implementation handoff — preparatory only
+
+The approved Phase 2 scope defers working authentication, cloud saves and API proxy changes to Phase 3. The guest opening, local save and local telemetry export do not depend on Express. This is a scheduling adjustment to the earlier Phase 2 foundation table above, not removal of final-MVP authentication.
+
+Extend the existing Express/Drizzle/Neon application with additive changes in Phase 3; retain legacy mission players/sessions. No schema, provider, routing or production migration was performed in Phase 2.
+
+Proposed request/response contracts for Phase 3 review:
+
+| Route | Request | Response / ownership |
+|---|---|---|
+| GET /api/auth/google | Allowlisted return destination | Backend-managed OIDC redirect; short-lived single-use state/nonce |
+| GET /api/auth/google/callback | Provider code/state | Validate identity as above; durable app session and HttpOnly cookie |
+| GET /api/session | Session cookie | Account ID/display name and CSRF token, or 401; no Google tokens |
+| POST /api/auth/logout | Session cookie, CSRF/origin check | Revoke app session; retain local/legacy browser data |
+| GET /api/runs/:runId | Session cookie | Owner-filtered envelope, revision and updatedAt; no cross-owner disclosure |
+| PUT /api/runs/:runId | expectedRevision, versioned envelope | Atomic owner/revision-checked write; new revision, or 409 with explicit conflict information |
+| POST /api/events | Bounded batch of attributed event envelopes | Accepted/duplicate event IDs; idempotent identity and owner attribution |
+
+Use verified issuer + subject for account identity. Never trust a client-supplied account owner. Authenticate every private operation. Define an explicit guest-run attachment action; no automatic upload on sign-in or account switch. Keep local copies on network errors or revision conflicts. Schema validation must distinguish save schema version from scenario version.
+
+The Phase 2 analytics bridge already supplies eventId, runId, sessionId, buildId, scenarioId/version, physicalStep, occurredAt and payload. Review batch size, retention and consent before remote ingestion. Server acknowledgements must not erase local unexported records prematurely.
+
+Phase 3 acceptance: new/returning sign-in, cancellation, session restoration/sign-out/expiry, replayed callback rejection, CSRF/origin checks, atomic revision conflict, two-owner isolation, guest attachment, offline/local preservation, and deployed cookie/cache/proxy verification. Use Supertest/PGlite locally and isolated test credentials for external checks. Keep the current VITE_API_URL and two Vercel projects until that integration is implemented and tested.

@@ -21,7 +21,7 @@ export async function seedSave(page: Page, game: GameState) {
       localStorage.setItem('nn.campaign.save.v1', save);
       localStorage.setItem('nn.campaign.meta.v1', JSON.stringify(meta));
     }
-  }, { save: JSON.stringify(makeEnvelope(game)), meta: { ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 } });
+  }, { save: JSON.stringify(makeEnvelope(game)), meta: { ...DEFAULT_META, openingOnboarding:{version:1,step:2,status:"completed"}, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 } });
 }
 
 /** The company the stored save replays to, decoded the same way the game loads it. */

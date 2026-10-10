@@ -28,7 +28,7 @@ export function initialCampaign(runId: string): Campaign {
         revenueCents: 0, costsCents: 0, investedCents: 0,
         cumulative: { admitted: 0, rejected: 0, successful: 0, failed: 0 },
         pending: [], actions: [], inputs: [], consumedEvents: [], overloadSteps: 0, incident: null, reports: [],
-        openingRecovered: false, firstPauseConsumed: false, snapshot, recent: [], trace: [], nextEventId: 1,
+        openingMilestone: null, openingRecovered: false, firstPauseConsumed: false, snapshot, recent: [], trace: [], nextEventId: 1,
     };
     trace(c, "scenario", { scenarioId: Q.id, version: Q.version, configuration: JSON.stringify(Q) });
     return c;
@@ -211,7 +211,19 @@ function actInPlace(s: GameState, action: Action): Rejection | null {
     const fail = (message: string): Rejection => ({ ok: false, reason: "invalid", message });
     if (action.type === "acknowledge_review" && s.phase === "review") {
         s.phase = "management";
-        trace(s.campaign!, "review-acknowledged");
+        const c=s.campaign!, report=c.reports.at(-1)!;
+        trace(c, "review-acknowledged", {incidentId:report.id});
+        if(!c.openingMilestone && report.id===c.reports[0].id) {
+            c.openingMilestone={id:"opening-stability",incidentId:report.id,awardedStep:c.step,acknowledged:false};
+            trace(c,"milestone-awarded",{incidentId:report.id});
+        }
+        return null;
+    }
+    if(action.type === "acknowledge_milestone") {
+        const c=s.campaign!;
+        if(!c.openingMilestone || c.openingMilestone.acknowledged) return fail("No milestone awaits acknowledgement.");
+        c.openingMilestone.acknowledged=true;
+        trace(c,"milestone-acknowledged");
         return null;
     }
     if (s.phase === "review" || s.phase === "ended")

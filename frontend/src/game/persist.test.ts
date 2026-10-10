@@ -31,9 +31,9 @@ describe("campaign data preservation", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("unavailable"); });
     expect(loadGame().status).toBe("unavailable");
   });
-  it("keeps independent onboarding and bounded analytics", () => {
+  it("keeps independent onboarding and every unexported analytics record", () => {
     saveMeta({ ...DEFAULT_META, tutorialDone: true }); expect(loadMeta().tutorialDone).toBe(true);
-    for (let i = 0; i < 503; i++)track("run_started"); expect(readAnalytics()).toHaveLength(500);
+    for (let i = 0; i < 503; i++)track("run_started"); expect(readAnalytics()).toHaveLength(503);
   });
   it("resumes before and after settlement identically", () => {
     let s = advanceSteps(newGame(), 6).state;
@@ -71,14 +71,14 @@ describe('browser metadata and analytics', () => {
     expect(readAnalytics().map(e => e.name)).toEqual(['save_resumed']);
   });
 
-  it('retains only the latest 500 events and can clear them', () => {
+  it('retains older unexported events and can explicitly clear them', () => {
     const events = Array.from({ length: 500 }, (_, i) => ({ t: '2026-01-01', name: 'run_started', data: { run: i } }));
     localStorage.setItem('nn.campaign.analytics.v1', JSON.stringify(events));
     track('save_resumed', { week: 3 });
     const saved = readAnalytics();
-    expect(saved).toHaveLength(500);
-    expect(saved[0].data).toEqual({ run: 1 });
-    expect(saved[499].name).toBe('save_resumed');
+    expect(saved).toHaveLength(501);
+    expect(saved[0].data).toEqual({ run: 0 });
+    expect(saved[500].name).toBe('save_resumed');
     clearAnalytics();
     expect(readAnalytics()).toEqual([]);
   });

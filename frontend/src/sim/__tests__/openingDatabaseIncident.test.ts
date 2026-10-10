@@ -65,7 +65,7 @@ describe("opening acceptance paths", () => {
     s = run(s, 4); expect(s.phase).toBe("incident");
     s = step(s).state; expect(s.phase).toBe("review"); expect(s.campaign!.step).toBe(14);
     const c = s.campaign!; s = act(s, { type: "acknowledge_review" });
-    expect(s.campaign).toMatchObject({ ...c, trace: s.campaign!.trace, nextEventId: s.campaign!.nextEventId, inputs: [...c.inputs, { step: 14, action: { type: "acknowledge_review" } }] });
+    expect(s.campaign).toMatchObject({ ...c, openingMilestone: s.campaign!.openingMilestone, trace: s.campaign!.trace, nextEventId: s.campaign!.nextEventId, inputs: [...c.inputs, { step: 14, action: { type: "acknowledge_review" } }] });
     s = run(s, 80); expect(s.campaign!.runId).toBe("company-a");
     expect(s.campaign!.consumedEvents).toEqual(["opening-growth"]); expect(s.campaign!.reports).toHaveLength(1);
   });
