@@ -100,7 +100,7 @@ describe("sound effects", () => {
     sfx.play("alarm");
     expect(ctx.voices).toBe(0);
     // Woken too late: the alarm is stale and is dropped.
-    t = 1000;
+    t = 2000;
     wake();
     await Promise.resolve();
     await Promise.resolve();
@@ -116,21 +116,23 @@ describe("sound effects", () => {
     sfx.dispose();
   });
 
-  it("suspend their audio at zero volume and wake when turned up", () => {
+  it("suspend their audio after a while at zero volume, and wake when turned up", () => {
     vi.useFakeTimers();
     const sfx = createSfx(() => true);
     sfx.setVolume(60);
     click();
     const ctx = FakeAudioContext.made[0];
+    // A quick mute and unmute keeps the audio awake, so the sample plays at once.
     sfx.setVolume(0);
-    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(2000);
+    expect(ctx.state).toBe("running");
+    sfx.setVolume(40);
+    sfx.play("preview");
+    expect(ctx.voices).toBeGreaterThan(0);
+    sfx.setVolume(0);
+    vi.advanceTimersByTime(10_500);
     expect(ctx.state).toBe("suspended");
     sfx.setVolume(40);
-    expect(ctx.state).toBe("running");
-    // Turning up again before the sleep timer fires keeps it awake.
-    sfx.setVolume(0);
-    sfx.setVolume(40);
-    vi.advanceTimersByTime(500);
     expect(ctx.state).toBe("running");
     sfx.dispose();
   });

@@ -179,8 +179,14 @@ const GAP: Record<Cue, number> = {
 
 /** Bus gain at full volume. The default 80% gives about 0.58. */
 const PEAK = 0.9;
-/** A cue that cannot start this soon after it was asked for is dropped, so a late wake-up never plays a pile of old sounds. */
-const FRESH_MS = 250;
+/**
+ * A cue that cannot start this soon after it was asked for is dropped, so a
+ * late wake-up never plays a pile of old sounds. Waking can take over a second
+ * on a busy page.
+ */
+const FRESH_MS = 1000;
+/** Silence this long before the audio sleeps: a mute flipped straight back needs no wake-up. */
+const SLEEP_MS = 10_000;
 /** Seconds to follow a volume slider. */
 const SLIDE = 0.05;
 
@@ -280,7 +286,7 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
       const c = ctx;
       if (gain > 0) {
         if (c.state === "suspended") c.resume().catch(() => {});
-      } else sleep = window.setTimeout(() => c.suspend().catch(() => {}), 400);
+      } else sleep = window.setTimeout(() => c.suspend().catch(() => {}), SLEEP_MS);
     },
     dispose() {
       disposed = true;

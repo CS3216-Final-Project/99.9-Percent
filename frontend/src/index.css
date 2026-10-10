@@ -3446,6 +3446,42 @@ button:disabled {
 }
 
 @media (max-width: 480px) {
+  /* Phone: the run card's numbers get the full width of their tiles, and the run tiles become one list. */
+  .menu-run-stats {
+    gap: 6px;
+  }
+
+  .menu-run-stats > div {
+    column-gap: 6px;
+    padding: 6px;
+  }
+
+  .menu-run-stats .concept {
+    grid-row: auto;
+    width: 20px;
+    height: 20px;
+  }
+
+  .menu-run-stats .concept .icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .menu-run-stats dd {
+    grid-column: 1 / -1;
+    font-size: 1rem;
+  }
+
+  .menu-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .menu-tile {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
   .volume {
     grid-template-columns: minmax(0, 1fr) 3.2rem;
     row-gap: 0;
