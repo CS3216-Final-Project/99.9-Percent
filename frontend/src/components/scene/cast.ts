@@ -86,7 +86,7 @@ export function creature(n: number, role: Role = ROTATION[n % ROTATION.length]):
 /* What each activity looks like                                       */
 /* ------------------------------------------------------------------ */
 
-export type Activity = "type" | "relax" | "mug" | "laptop" | "idle" | "chat" | "walk" | "listen" | "present" | "panic";
+export type Activity = "type" | "relax" | "mug" | "laptop" | "idle" | "chat" | "walk" | "listen" | "present" | "panic" | "play";
 
 /** The animations each body plan comes with. */
 export const CLIPS: Record<Kind, readonly string[]> = {
@@ -109,6 +109,7 @@ export interface Motion {
 export function motionFor(kind: Kind, activity: Activity): Motion {
   if (kind === "flyer") {
     if (activity === "walk") return { clip: "Fast_Flying", speed: 1 };
+    if (activity === "play") return { clip: "Headbutt", speed: 1 };
     if (activity === "panic") return { clip: "No", speed: 1.3 };
     if (activity === "listen" || activity === "chat") return { clip: "Yes", speed: 0.8 };
     return { clip: "Flying_Idle", speed: 1 };
@@ -126,6 +127,9 @@ export function motionFor(kind: Kind, activity: Activity): Motion {
       return kind === "big" ? { clip: "Wave", speed: 0.8 } : { clip: "Yes", speed: 0.9 };
     case "panic":
       return { clip: "No", speed: 1.3 };
+    case "play":
+      // A swing: the big species swing an arm, the small ones lunge.
+      return kind === "big" ? { clip: "Weapon", speed: 1 } : { clip: "Bite_Front", speed: 1 };
     case "relax":
       return kind === "blob" ? { clip: "Dance", speed: 0.5 } : { clip: "Idle", speed: 0.8 };
     default:

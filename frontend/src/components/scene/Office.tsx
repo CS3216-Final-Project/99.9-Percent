@@ -104,8 +104,6 @@ function pingPong(): Prim[] {
     bx([0, 0.795, 0], [2.74, 0.012, 0.015], "#fff7e8"),
     bx([0, 0.87, 0], [0.02, 0.15, 1.64], LILAC),
     ...[-1.1, 1.1].flatMap((dx) => [-0.6, 0.6].map((dz) => bx([dx, 0.37, dz], [0.07, 0.74, 0.07], TRIM))),
-    cy([-0.9, 0.8, 0.45], 0.18, 0.02, "#ff4d5e"),
-    cy([0.95, 0.8, -0.4], 0.18, 0.02, INK),
   ];
 }
 
@@ -607,15 +605,28 @@ function Floors() {
   );
 }
 
+/** The table-tennis rally: where the table is, how fast the ball crosses, and how far out it is hit. */
+const RALLY = { x: 18.2, z: 12.6, speed: 0.9, reach: 1.1 };
+/** Seconds for the ball to go there and back. */
+const RALLY_PERIOD = 2 / RALLY.speed;
+/** Seconds into a swing at which the paddle meets the ball. */
+const SWING_CONTACT = 0.35;
+/** How far from the table's centre each player stands. */
+const PLAYER_X = 2.0;
+
+/** The -x player hits as the ball starts out, the +x player half a rally later. */
+const PING = { period: RALLY_PERIOD, at: -SWING_CONTACT };
+const PONG = { period: RALLY_PERIOD, at: RALLY_PERIOD / 2 - SWING_CONTACT };
+
 function PingPongBall() {
   const ball = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
     if (!ball.current) return;
     // A rally that never ends: the ball crosses the net and bounces on each side.
-    const t = clock.elapsedTime * 0.9;
+    const t = clock.elapsedTime * RALLY.speed;
     const f = t % 2;
-    const x = f < 1 ? -1.1 + f * 2.2 : 1.1 - (f - 1) * 2.2;
-    ball.current.position.set(18.2 + x, 0.82 + Math.abs(Math.sin(t * Math.PI * 2)) * 0.3, 12.6 + Math.sin(t * 1.3) * 0.35);
+    const x = f < 1 ? -RALLY.reach + f * 2 * RALLY.reach : RALLY.reach - (f - 1) * 2 * RALLY.reach;
+    ball.current.position.set(RALLY.x + x, 0.82 + Math.abs(Math.sin(t * Math.PI * 2)) * 0.3, RALLY.z + Math.sin(t * 1.3) * 0.35);
   });
   return (
     <mesh ref={ball}>
@@ -788,6 +799,9 @@ export function Office({ crew }: { crew: Crew }) {
       <WhiteboardFace position={[-12.27, 1.45, 7.4]} rot={Math.PI / 2} />
       <Staff crew={crew} />
       <PingPongBall />
+      {/* Two players at the ends of the table, each swinging as the ball reaches them. */}
+      <Creature species="frog" activity="play" holding="paddle" position={[RALLY.x - PLAYER_X, 0, RALLY.z]} rotation={-Math.PI / 2} beat={PING} />
+      <Creature species="bunny" activity="play" holding="paddle" position={[RALLY.x + PLAYER_X, 0, RALLY.z]} rotation={Math.PI / 2} beat={PONG} />
 
       <OnWall wall="left">
         <PrimBatch prims={wall.leftPrims} shadows={false} />

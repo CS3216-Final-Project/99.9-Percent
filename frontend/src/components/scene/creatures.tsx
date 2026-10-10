@@ -90,6 +90,18 @@ const BEHIND_CHAIR = 0.45;
 const BACKREST = 0.1;
 /** How long a change of animation blends, in seconds. */
 const BLEND = 0.35;
+/** Seconds a creature on a beat takes to ease into its clip and back to idling. */
+const BEAT_EASE = 0.15;
+/** How much larger than life a held paddle is: the monsters' fists are huge and would hide a real one. */
+const PADDLE_SIZE = 1.8;
+/** Bone names as three.js keeps them: it drops the dots from the file's names. */
+const bone = (name: string) => THREE.PropertyBinding.sanitizeNodeName(name);
+
+/** A clip driven by the clock instead of looping freely: one play every `period` seconds, starting at time `at`. */
+export interface Beat {
+  period: number;
+  at: number;
+}
 
 export interface CreatureProps {
   species: Species;
@@ -103,6 +115,10 @@ export interface CreatureProps {
   seat?: number;
   /** Speed in metres a second, for walkers: the walk cycle keeps pace so feet do not slide. */
   pace?: number;
+  /** Something held in the right hand. */
+  holding?: "paddle";
+  /** Keep the clip in time with something else, such as a ball in play. */
+  beat?: Beat;
 }
 
 export function Creature(props: CreatureProps) {
@@ -114,7 +130,25 @@ export function Creature(props: CreatureProps) {
 /** Metres a walking creature of each kind covers per second at normal playback. */
 const STRIDE = { blob: 0.55, big: 0.9, flyer: 1.2 } as const;
 
-function CreatureModel({ gltf, species, activity, pose = "stand", position, rotation = 0, phase = 0, seat = SEAT, pace }: CreatureProps & { gltf: GLTF }) {
+/** A table-tennis paddle in metres, its handle running up +y from the grip. */
+function paddle(detail: Detail): THREE.Group {
+  const mat = (color: string, roughness: number) =>
+    detail === "hd" ? new THREE.MeshStandardMaterial({ color, roughness }) : new THREE.MeshLambertMaterial({ color });
+  const g = new THREE.Group();
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.1, 0.02), mat("#b07a4a", 0.6));
+  handle.position.y = 0.04;
+  const face = (color: string, z: number) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.008, 20), mat(color, 0.7));
+    m.rotation.x = Math.PI / 2;
+    m.position.set(0, 0.15, z);
+    return m;
+  };
+  g.add(handle, face("#d8283b", 0.005), face("#15151a", -0.004));
+  g.traverse((o) => (o.castShadow = true));
+  return g;
+}
+
+function CreatureModel({ gltf, species, activity, pose = "stand", position, rotation = 0, phase = 0, seat = SEAT, pace, holding, beat }: CreatureProps & { gltf: GLTF }) {
   const detail = useDetail();
   const info = SPECIES[species];
   const model = useMemo(() => {
@@ -146,9 +180,19 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
       box.union(local.clone().applyMatrix4(mesh.matrixWorld));
     });
     const scale = info.height / Math.max(1e-6, box.max.y - box.min.y);
+    // A paddle goes in the right hand, where the fingers start. The rig is scaled up a hundredfold and then fitted,
+    // so the paddle is scaled back down to a size measured in metres.
+    const forearm = holding ? object.getObjectByName(bone("LowerArm.R")) : undefined;
+    if (forearm) {
+      const grip = paddle(detail);
+      const ws = forearm.getWorldScale(new THREE.Vector3());
+      grip.scale.setScalar(PADDLE_SIZE / (ws.x * scale));
+      grip.position.y = object.getObjectByName(bone("Middle1.R"))?.position.y ?? 0;
+      forearm.add(grip);
+    }
     // The model faces +z, so its back is at the box's -z side; once turned round that is how far it reaches behind.
     return { object, scale, foot: -box.min.y * scale, back: -box.min.z * scale, mixer: new THREE.AnimationMixer(object) };
-  }, [gltf, detail, info.height]);
+  }, [gltf, detail, info.height, holding]);
 
   const current = useRef<THREE.AnimationAction | null>(null);
   const motion = motionFor(info.kind, activity);
@@ -157,7 +201,8 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
     if (!clip) return;
     const action = model.mixer.clipAction(clip);
     const walkSpeed = pace && activity === "walk" ? pace / STRIDE[info.kind] : 1;
-    action.timeScale = motion.speed * walkSpeed;
+    // A clip on a beat is positioned by the clock every frame, so it must not also advance by itself.
+    action.timeScale = beat ? 0 : motion.speed * walkSpeed;
     if (current.current !== action) {
       action.reset();
       action.time = (phase * 0.37) % clip.duration;
@@ -165,7 +210,22 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
       if (current.current) current.current.crossFadeTo(action, BLEND, false);
       current.current = action;
     }
-  }, [model, gltf, motion.clip, motion.speed, pace, activity, info.kind, phase]);
+  }, [model, gltf, motion.clip, motion.speed, pace, activity, info.kind, phase, beat]);
+
+  // Between beats the creature idles, so it does not freeze in the clip's last pose.
+  const rest = useRef<THREE.AnimationAction | null>(null);
+  useEffect(() => {
+    if (!beat) return;
+    const clip = THREE.AnimationClip.findByName(gltf.animations, `CharacterArmature|${motionFor(info.kind, "idle").clip}`);
+    if (!clip) return;
+    const action = model.mixer.clipAction(clip);
+    action.play();
+    rest.current = action;
+    return () => {
+      action.stop();
+      rest.current = null;
+    };
+  }, [model, gltf, info.kind, beat]);
 
   useEffect(
     () => () => {
@@ -176,7 +236,21 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
     [model],
   );
 
-  useFrame((_, dt) => model.mixer.update(Math.min(dt, 0.1)));
+  useFrame(({ clock }, dt) => {
+    const action = current.current;
+    if (beat && action) {
+      // Play the clip once per beat, easing in from the idle and back out to it.
+      const duration = action.getClip().duration;
+      const since = (((clock.elapsedTime - beat.at) % beat.period) + beat.period) % beat.period;
+      action.time = Math.min(since, duration - 0.001);
+      const w = rest.current ? smooth(since < duration ? Math.min(1, since / BEAT_EASE, (duration - since) / BEAT_EASE) : 0) : 1;
+      action.setEffectiveWeight(w);
+      rest.current?.setEffectiveWeight(1 - w);
+      model.mixer.update(Math.min(dt, 0.1));
+    } else {
+      model.mixer.update(Math.min(dt, 0.1));
+    }
+  });
 
   // Small creatures perch on the seat, moved forward until their backs clear the backrest; round ones move further.
   // Big ones are too tall for that, so they stand behind the chair as if at a standing desk.

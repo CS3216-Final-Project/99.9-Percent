@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ALL_ROLES, ALL_SPECIES, CLIPS, creature, motionFor, SPECIES, type Activity, type Kind } from './cast';
 
-const ACTIVITIES: Activity[] = ['type', 'relax', 'mug', 'laptop', 'idle', 'chat', 'walk', 'listen', 'present', 'panic'];
+const ACTIVITIES: Activity[] = ['type', 'relax', 'mug', 'laptop', 'idle', 'chat', 'walk', 'listen', 'present', 'panic', 'play'];
 
 /** The animation names inside a GLB file, without the armature prefix. */
 function clipsInFile(file: string): string[] {
