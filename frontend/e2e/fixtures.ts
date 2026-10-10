@@ -44,3 +44,17 @@ export async function expectRoom(page: Page) {
   // The incident panel has its own Servers control outside the room.
   await expect(room.getByRole('button', { name: 'Servers', exact: true })).toBeVisible();
 }
+
+/** Classic keeps the weekly state in its own save slot. */
+export async function seedClassicSave(page: Page, game: GameState) {
+  await page.addInitScript(({ game, meta }) => {
+    if (localStorage.getItem('nn.classic.save.v1') === null) {
+      localStorage.setItem('nn.classic.save.v1', JSON.stringify({ savedAt: 1, game }));
+      localStorage.setItem('nn.classic.meta.v1', JSON.stringify(meta));
+    }
+  }, { game, meta: { ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 } });
+}
+
+export async function savedClassicGame(page: Page): Promise<GameState> {
+  return page.evaluate(() => JSON.parse(localStorage.getItem('nn.classic.save.v1')!).game);
+}

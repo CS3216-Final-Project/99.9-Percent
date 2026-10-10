@@ -43,3 +43,42 @@ describe("campaign data preservation", () => {
     s = step(s).state; saveGame(s); expect(loadGame()).toMatchObject({ status: "ok", game: s });
   });
 });
+
+describe('browser metadata and analytics', () => {
+  it('fills new metadata fields when resuming an older browser profile', () => {
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ runsStarted: 4, onboarded: true }));
+    expect(loadMeta()).toEqual({ ...DEFAULT_META, runsStarted: 4, onboarded: true });
+    saveMeta({ ...DEFAULT_META, tutorialDone: true });
+    expect(loadMeta().tutorialDone).toBe(true);
+  });
+
+  it('plays music unless the player turned it off, and ignores a corrupt setting', () => {
+    expect(loadMeta().music).toBe(true);
+    saveMeta({ ...DEFAULT_META, music: false });
+    expect(loadMeta().music).toBe(false);
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ music: 'loud', onboarded: true }));
+    expect(loadMeta()).toEqual({ ...DEFAULT_META, onboarded: true });
+  });
+
+  it('recovers from malformed metadata and analytics', () => {
+    localStorage.setItem('nn.campaign.meta.v1', '{');
+    localStorage.setItem('nn.campaign.analytics.v1', '{}');
+    expect(loadMeta()).toEqual(DEFAULT_META);
+    expect(readAnalytics()).toEqual([]);
+    localStorage.setItem('nn.campaign.analytics.v1', '{');
+    track('save_resumed', { week: 2 });
+    expect(readAnalytics().map(e => e.name)).toEqual(['save_resumed']);
+  });
+
+  it('retains only the latest 500 events and can clear them', () => {
+    const events = Array.from({ length: 500 }, (_, i) => ({ t: '2026-01-01', name: 'run_started', data: { run: i } }));
+    localStorage.setItem('nn.campaign.analytics.v1', JSON.stringify(events));
+    track('save_resumed', { week: 3 });
+    const saved = readAnalytics();
+    expect(saved).toHaveLength(500);
+    expect(saved[0].data).toEqual({ run: 1 });
+    expect(saved[499].name).toBe('save_resumed');
+    clearAnalytics();
+    expect(readAnalytics()).toEqual([]);
+  });
+});

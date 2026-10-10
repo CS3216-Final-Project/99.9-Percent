@@ -466,7 +466,7 @@ export const useGame = create<Store>()((set, get) => {
 
     toggleMusic: () => {
       const meta = { ...get().meta, music: !get().meta.music };
-      saveMeta(meta);
+      saveMeta(meta, get().mode);
       set({ meta });
     },
 
