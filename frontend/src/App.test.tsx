@@ -53,3 +53,15 @@ describe("opening UI", () => {
     expect(useGame.getState().running).toBe(false);
   });
 });
+
+it("offers the same mute control beside the menu in both modes", () => {
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Play" }));
+  const music = screen.getByRole("button", { name: "Music" });
+  expect(music.getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(music); expect(music.getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  fireEvent.click(screen.getByRole("button", { name: "Switch to Classic" }));
+  const classicMusic = screen.getByRole("button", { name: "Music" });
+  expect(classicMusic.getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(classicMusic); expect(useGame.getState().meta.music).toBe(true);
+});

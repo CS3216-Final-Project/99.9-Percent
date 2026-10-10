@@ -1,5 +1,5 @@
 import { decodeSave, makeEnvelope, replaceable } from "./saveEnvelope";
-import { SAVE_VERSION, type GameState } from "@/sim";
+import { BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
 
 /**
  * Local browser persistence. Every read and write is wrapped because storage
@@ -13,6 +13,12 @@ const ANALYTICS_KEY = "nn.campaign.analytics.v1";
 const CLASSIC_SAVE_KEY = "nn.classic.save.v1";
 const CLASSIC_META_KEY = "nn.classic.meta.v1";
 const MODE_KEY = "nn.mode.v1";
+const MUSIC_KEY = "nn.music.v1";
+const LEGACY_SAVE_KEY = "nn.save.v1";
+const LEGACY_META_KEY = "nn.meta.v1";
+// Only bytes successfully written by this session are trusted without replay.
+// Any external change to the slot must pass full validation before replacement.
+let lastWrittenCampaign: string | null = null;
 
 /** Campaign is the step-based simulation; classic is the original week-by-week game. */
 export type GameMode = "campaign" | "classic";
@@ -77,12 +83,22 @@ export function loadGame():LoadResult {
   if(result.status!=="ok")return result;
   return {status:"ok",game:result.game,savedAt:result.envelope.savedAt,remainderMs:result.envelope.runtime.remainderMs};
 }
-export function rawSave():string|null {return read(SAVE_KEY);}
+export function rawSave(mode: GameMode = "campaign"): string | null {
+  return read(mode === "classic" ? CLASSIC_SAVE_KEY : SAVE_KEY);
+}
+/** Originals are read-only; recovery and imports write a copy into the Classic slot. */
+export function rawLegacySave(): string | null { return read(LEGACY_SAVE_KEY); }
+export function exportGame(game: GameState, remainderMs = 0): string {
+  return JSON.stringify(game.campaign ? makeEnvelope(game, remainderMs) : { savedAt: Date.now(), game });
+}
 export function saveGame(game:GameState,remainderMs=0,explicitReset=false):boolean {
   let current:string|null;
   try {current=window.localStorage.getItem(SAVE_KEY);}catch{return false;}
-  if(!explicitReset && !replaceable(current))return false;
-  return write(SAVE_KEY,JSON.stringify(makeEnvelope(game,remainderMs)));
+  if(!explicitReset && current !== lastWrittenCampaign && !replaceable(current))return false;
+  const raw = JSON.stringify(makeEnvelope(game,remainderMs));
+  const saved = write(SAVE_KEY, raw);
+  if (saved) lastWrittenCampaign = raw;
+  return saved;
 }
 export function clearSave(): void {
   remove(SAVE_KEY);
@@ -99,39 +115,59 @@ export function saveMode(mode: GameMode): void {
 
 const PHASES = new Set(["management", "incident", "review", "ended"]);
 
+const strings = (value: unknown): boolean => Array.isArray(value) && value.every(v => typeof v === "string");
+function finiteFields(value: unknown, keys: readonly string[]): boolean {
+  if (!value || typeof value !== "object") return false;
+  const fields = value as Record<string, unknown>;
+  return keys.every(key => Number.isFinite(fields[key]));
+}
+
 function looksLikeClassicGame(g: unknown): g is GameState {
   if (!g || typeof g !== "object") return false;
   const s = g as Partial<GameState>;
   return (
     s.version === SAVE_VERSION &&
     s.campaign === undefined &&
-    typeof s.turn === "number" &&
-    typeof s.cash === "number" &&
-    typeof s.users === "number" &&
-    typeof s.rngState === "number" &&
+    Number.isSafeInteger(s.turn) && s.turn! >= 1 &&
+    [s.seed, s.rngState, s.cash, s.users, s.satisfaction, s.techDebt, s.engineers, s.nextId].every(Number.isFinite) &&
     typeof s.phase === "string" &&
     PHASES.has(s.phase) &&
     !!s.infra &&
     Array.isArray(s.infra.appHosts) &&
     s.infra.appHosts.length > 0 &&
-    Array.isArray(s.techDone) &&
-    Array.isArray(s.tasks) &&
-    Array.isArray(s.releases) &&
-    Array.isArray(s.history) &&
-    Array.isArray(s.log) &&
-    Array.isArray(s.postmortems) &&
-    !!s.live &&
-    !!s.totals &&
-    (s.phase !== "incident" || !!s.incident)
+    [...s.infra.appHosts, s.infra.dbHost].every(h => h && typeof h.id === "string" && ["healthy", "degraded", "failed"].includes(h.status)) &&
+    Number.isSafeInteger(s.infra.dbTier) && s.infra.dbTier >= 0 && s.infra.dbTier < BALANCE.db.tiers.length &&
+    Number.isSafeInteger(s.infra.nextHostNum) &&
+    Array.isArray(s.deploys) && s.deploys.every(d => d && typeof d.title === "string") &&
+    Array.isArray(s.activePromos) && s.activePromos.every(id => typeof id === "string" && Object.hasOwn(PROMOS, id)) &&
+    Array.isArray(s.milestonesHit) &&
+    !!s.promoCooldowns && typeof s.promoCooldowns === "object" &&
+    !!s.lastCapacityTurn && Number.isFinite(s.lastCapacityTurn.app) && Number.isFinite(s.lastCapacityTurn.db) &&
+    Array.isArray(s.techDone) && s.techDone.every(id => typeof id === "string" && Object.hasOwn(TECH, id)) &&
+    Array.isArray(s.tasks) && s.tasks.every(t => t && typeof t.id === "string" && Number.isFinite(t.progress) && Number.isFinite(t.assigned)) &&
+    Array.isArray(s.releases) && s.releases.every(r => r && typeof r.id === "string" && typeof r.title === "string") &&
+    Array.isArray(s.history) && s.history.every(r => r && Number.isFinite(r.turn) && strings(r.warnings)) &&
+    Array.isArray(s.log) && s.log.every(e => e && typeof e.text === "string") &&
+    Array.isArray(s.postmortems) && s.postmortems.every(r => r && typeof r.title === "string" && typeof r.whyOutcome === "string" &&
+      strings(r.contributing) && strings(r.response) && strings(r.prevention) && finiteFields(r.impact, ["downtimeMinutes", "usersLost", "revenueLost", "moneySpent"])) &&
+    finiteFields(s.live, ["peakRps", "tempServers", "latencyMs", "errorRate", "availability", "shed"]) &&
+    finiteFields(s.totals, ["revenue", "costs", "invested", "downtimeMinutes", "weeks", "peakUsers", "hintsUsed", "incidents", "promosRun", "serversAdded", "releasesTested", "releasesUntested"]) &&
+    (s.phase !== "review" || s.postmortems.length > 0) &&
+    (s.phase !== "incident" || (!!s.incident && !!s.pendingTurn &&
+      ["app_overload", "db_saturation", "deploy_regression", "instance_failure"].includes(s.incident.type) &&
+      Number.isFinite(s.incident.elapsed) && strings(s.incident.symptoms) && strings(s.incident.hints) &&
+      Array.isArray(s.incident.evidence) && s.incident.evidence.every(e => e && typeof e.text === "string") &&
+      Array.isArray(s.incident.attempts) && s.incident.attempts.every(a => a && typeof a.label === "string") &&
+      finiteFields(s.incident.damage, ["downtimeMinutes", "usersLost", "revenueLost", "moneySpent"]) &&
+      finiteFields(s.incident.cause, ["peakRps", "appCapacity", "dbCapacity"]) &&
+      strings(s.pendingTurn.notes) && strings(s.pendingTurn.planningWarnings)))
   );
 }
 
 export type ClassicLoadResult = { status: "none" } | { status: "ok"; game: GameState } | { status: "corrupt" };
 
-/** An unreadable classic save is reported as corrupt, and the next run is written over it. */
-export function loadClassicGame(): ClassicLoadResult {
-  const raw = read(CLASSIC_SAVE_KEY);
-  if (!raw) return { status: "none" };
+/** Decode a copy of an exported Classic or pre-update save without touching storage. */
+export function decodeClassicSave(raw: string): ClassicLoadResult {
   try {
     const parsed = JSON.parse(raw) as { game?: unknown };
     if (looksLikeClassicGame(parsed.game)) return { status: "ok", game: parsed.game };
@@ -141,13 +177,17 @@ export function loadClassicGame(): ClassicLoadResult {
   return { status: "corrupt" };
 }
 
-export function saveClassicGame(game: GameState): boolean {
-  return write(CLASSIC_SAVE_KEY, JSON.stringify({ savedAt: Date.now(), game }));
+/** An unreadable classic save is reported as corrupt, and the next run is written over it. */
+export function loadClassicGame(): ClassicLoadResult {
+  const raw = read(CLASSIC_SAVE_KEY);
+  return raw === null ? { status: "none" } : decodeClassicSave(raw);
 }
 
-/** Each mode keeps its own tutorial and run counters. */
-export function loadMeta(mode: GameMode = "campaign"): Meta {
-  const raw = read(mode === "classic" ? CLASSIC_META_KEY : META_KEY);
+export function saveClassicGame(game: GameState): boolean {
+  return write(CLASSIC_SAVE_KEY, exportGame(game));
+}
+
+function decodeMeta(raw: string | null): Meta {
   if (!raw) return { ...DEFAULT_META };
   try {
     const meta = { ...DEFAULT_META, ...(JSON.parse(raw) as Partial<Meta>) };
@@ -157,6 +197,21 @@ export function loadMeta(mode: GameMode = "campaign"): Meta {
     return { ...DEFAULT_META };
   }
 }
+
+/** Each mode keeps its own tutorial/counters; music is a shared player preference. */
+export function loadMeta(mode: GameMode = "campaign"): Meta {
+  const meta = decodeMeta(read(mode === "classic" ? CLASSIC_META_KEY : META_KEY));
+  const music = read(MUSIC_KEY);
+  if (music === "true" || music === "false") meta.music = music === "true";
+  return meta;
+}
+export function loadLegacyMeta(): Meta {
+  const meta = decodeMeta(read(LEGACY_META_KEY));
+  const music = read(MUSIC_KEY);
+  if (music === "true" || music === "false") meta.music = music === "true";
+  return meta;
+}
+export function saveMusic(enabled: boolean): void { write(MUSIC_KEY, String(enabled)); }
 
 export function saveMeta(meta: Meta, mode: GameMode = "campaign"): void {
   write(mode === "classic" ? CLASSIC_META_KEY : META_KEY, JSON.stringify(meta));

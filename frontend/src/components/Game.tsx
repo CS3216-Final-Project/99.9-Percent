@@ -8,6 +8,7 @@ import { clock, compact, money, moneyFull, num, signedMoney, uptimePct } from "@
 import { createMusic, type Music } from "@/game/music";
 import { useGame, type Speed, type View } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { MusicButton } from "./MusicButton";
 import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Modals";
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
@@ -54,8 +55,6 @@ function Stat({ icon, kind, label, tip, children, side }: { icon: IconName; kind
 function TopBar() {
   const game = useGame((s) => s.game);
   const openView = useGame((s) => s.openView);
-  const music = useGame((s) => s.meta.music);
-  const toggleMusic = useGame((s) => s.toggleMusic);
   const m = metrics(game);
   const health = healthOf(game);
   const inc = game.phase === "incident" ? game.incident : null;
@@ -115,9 +114,7 @@ function TopBar() {
         </Stat>
       </div>
 
-      <button type="button" className="icon-btn music-btn" onClick={toggleMusic} aria-label="Music" aria-pressed={music} title={music ? "Turn the music off" : "Turn the music on"}>
-        <Icon name={music ? "music" : "muted"} />
-      </button>
+      <MusicButton />
       <button type="button" className="icon-btn menu-btn" onClick={() => openView("menu")} aria-label="Menu" title="Menu">
         <Icon name="menu" />
       </button>

@@ -1,8 +1,8 @@
 import { nextMove } from "@/game/advisor";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useGame, type Speed } from "@/game/store";
-import { rawSave } from "@/game/persist";
-import { makeEnvelope } from "@/game/saveEnvelope";
+import { SaveFiles } from "./SaveFiles";
+import { MusicButton } from "./MusicButton";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { CampaignPostmortem } from "@/sim/campaignTypes";
 import { Icon } from "./icons";
@@ -19,6 +19,7 @@ export function CampaignHeader() {
       <div className="stat"><span>Users</span><strong>2,000</strong></div>
       <div className="stat"><span>Pending revenue</span><strong>{dollars(c.ledger.successes * Q.revenueCents)}</strong></div>
       <div className="stat"><span>Status</span><strong>{game.phase === "incident" ? "Service degraded" : game.phase === "ended" ? "Bankrupt" : game.phase === "review" ? "Recovered" : c.snapshot.latencyMs >= 500 ? "At risk" : "Operating"}</strong></div></div>
+    <MusicButton />
     <button className="icon-btn" aria-label="Menu" onClick={() => openView("menu")}><Icon name="menu" /></button></header>;
 }
 export function CampaignPanel() {
@@ -59,21 +60,11 @@ function Report({ report }: { report: CampaignPostmortem }) {
     {report.explanations.map((text, i) => <p key={i}>{text}</p>)}
     <details><summary>Recorded incident evidence</summary><table className="campaign-table"><thead><tr><th>Step</th><th>DB demand/capacity</th><th>Backlog</th><th>Latency</th><th>Errors</th></tr></thead><tbody>{report.snapshots.map(m => <tr key={m.step}><td>{m.step}</td><td>{m.db.demand}/{m.db.capacity}</td><td>{m.db.backlog}</td><td>{m.latencyMs.toFixed(0)} ms</td><td>{percent(m.serviceErrorRate)}</td></tr>)}</tbody></table></details></div>;
 }
-function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
-}
 export function CampaignOverlays() {
-  const { game, started, play, view, openView, act, newRun, saveNow, saveBlocked, remainderMs, importSave } = useGame();
+  const { game, started, play, view, openView, act, newRun, saveNow, saveBlocked } = useGame();
   const c = game.campaign!;
   const [confirmReset, setConfirmReset] = useState(false);
-  const [pendingImport, setPendingImport] = useState<{ name: string; text: string } | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const pickImport = async (file: File | undefined) => {
-    if (file) setPendingImport({ name: file.name, text: await file.text() });
-    if (fileInput.current) fileInput.current.value = "";
-  };
-  const closeMenu = () => { openView(null); setConfirmReset(false); setPendingImport(null); };
+  const closeMenu = () => { openView(null); setConfirmReset(false); };
   if (!started) return <div className="title-screen"><div className="title-card"><h1>99.99%</h1><p className="title-tag">Grow a startup. Keep it online.</p><p>Keep your company operating as traffic grows. Inspect evidence, choose a response and observe what changes.</p><button className="btn btn-primary btn-big" onClick={play}>{c.step ? "Continue company" : "Play"}</button></div></div>;
   if (game.phase === "review") return <Modal title="Incident postmortem" onClose={() => act({ type: "acknowledge_review" })}><Report report={c.reports[c.reports.length - 1]} /><button className="btn btn-primary" onClick={() => act({ type: "acknowledge_review" })}>Continue company</button></Modal>;
   if (game.phase === "ended" && view === null) return <Modal title="Company bankrupt" onClose={() => openView("menu")}><p>Cash reached {dollars(c.cashCents)} after settlement at step {c.step}. Final metrics and history remain available.</p>
@@ -83,15 +74,10 @@ export function CampaignOverlays() {
     <p>Use the room controls to inspect equipment. Compare demand, capacity, backlog and response time before choosing an action.</p>
     {saveBlocked && <p role="alert">Your stored save is unreadable or unsupported and has been preserved. This run stays in memory until you explicitly reset.</p>}
     <div className="campaign-actions"><button className="btn" onClick={saveNow}>Save now</button>
-      <button className="btn" onClick={() => download("campaign.json", JSON.stringify(makeEnvelope(game, remainderMs)))}>Export current company</button>
-      <button className="btn" onClick={() => download("stored-campaign.json", rawSave() ?? "null")}>Export original stored save</button>
       <button className="btn" onClick={() => setConfirmReset(true)}>New company</button>
       {confirmReset && <><p>This replaces only the current campaign save. Export it first if you want to keep it.</p><button className="btn" onClick={() => { newRun(); setConfirmReset(false); }}>Confirm new company</button></>}
-      <button className="btn" onClick={() => fileInput.current?.click()}>Import save</button>
-      <input ref={fileInput} type="file" accept=".json,application/json" hidden aria-label="Save file to import" onChange={e => void pickImport(e.target.files?.[0])} />
-      {pendingImport && <><p>Replace the current company with {pendingImport.name}? Export it first if you want to keep it.</p>
-        <button className="btn" onClick={() => { if (importSave(pendingImport.text)) closeMenu(); else setPendingImport(null); }}>Confirm import</button>
-        <button className="btn" onClick={() => setPendingImport(null)}>Cancel import</button></>}</div>
+    </div>
+    <SaveFiles />
     <ModeSwitch to="classic" />
   </Modal>;
   if (view === "history") return <Modal title="Campaign history" onClose={() => openView(null)}>

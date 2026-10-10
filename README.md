@@ -52,6 +52,8 @@ On a machine with a graphics card the room draws in HD: photo-scanned CC0 floors
 
 The [nine-node technology tree](docs/tech-tree.md) groups upgrades into Capacity, Data and Reliability, with metrics and alerts available from the start. It follows the proposal's reduced research scope while retaining the weekly simulation and existing saves.
 
+In either mode, open Menu > Save files to export the current run or import a JSON save. Imports validate before replacing a run and open the matching Campaign or Classic mode. If a pre-update browser save is present, the same menu offers Resume pre-update save and Export pre-update save. Resuming copies the validated weekly run into Classic; the original save, metadata and analytics remain untouched. The music button beside Menu shares its mute setting across both modes and remembers it after reload.
+
 Gameplay, saves and prototype analytics run in the browser and work without the API. Saves stay in this browser and origin; saves on the prototype deployment do not automatically move to a new domain. The backend retains its existing health and dialogue endpoints for later integration.
 
 The API runs without a database. For routes that use one, put Neon's connection strings in `backend/.env` (ask Di Heng, or use your own Neon branch).

@@ -65,15 +65,7 @@ export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.no
     const c = game.campaign!;
     return { schemaVersion: SCHEMA_VERSION, scenarioId: c.scenarioId, scenarioVersion: c.scenarioVersion, runId: c.runId, seed: game.seed, step: c.step, inputs: c.inputs, runtime: { remainderMs }, savedAt };
 }
-/** True when `raw` is absent or already in the current format, so writing over it loses nothing. */
+/** Never replace an existing save unless its payload can actually be replayed. */
 export function replaceable(raw: string | null): boolean {
-    if (raw === null)
-        return true;
-    try {
-        const header = JSON.parse(raw) as Partial<SaveEnvelope>;
-        return header.schemaVersion === SCHEMA_VERSION && header.scenarioId === Q.id && header.scenarioVersion === Q.version;
-    }
-    catch {
-        return false;
-    }
+    return raw === null || decodeSave(raw).status === "ok";
 }

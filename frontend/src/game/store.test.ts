@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
-import { newGame } from "../sim";
+import { newGame, newLegacyGame, advanceTurn } from "../sim";
 import { advanceSteps } from "../sim/step";
 import { loadClassicGame, loadGame, saveGame, readAnalytics } from "./persist";
 import { makeEnvelope } from "./saveEnvelope";
@@ -159,4 +159,87 @@ describe("game modes", () => {
     useGame.getState().switchMode("classic");
     expect(useGame.getState().toast).toBeNull();
   });
+});
+
+
+it("persists fractional credit when the menu pauses, then resumes identically after reload", () => {
+  useGame.getState().boot(); useGame.getState().play(); useGame.getState().setRunning(true);
+  useGame.getState().tick(.4); useGame.getState().openView("menu");
+  expect(loadGame()).toMatchObject({ status: "ok", remainderMs: 400 });
+  useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+  expect(useGame.getState()).toMatchObject({ running: false, remainderMs: 400 });
+  useGame.getState().play(); useGame.getState().setRunning(true); useGame.getState().tick(.6);
+  expect(useGame.getState().game.campaign!.step).toBe(1);
+});
+
+describe("old saves and imports across modes", () => {
+  it("resumes a copy of an existing run and metadata, leaving every legacy key intact", () => {
+    const game = JSON.parse(JSON.stringify(advanceTurn(newLegacyGame(777)))) as ReturnType<typeof newGame>;
+    const originals = { "nn.save.v1": JSON.stringify({ game, savedAt: 1 }), "nn.meta.v1": JSON.stringify({ tutorialDone: true, music: false }), "nn.analytics.v1": "[legacy]" };
+    for (const [key, value] of Object.entries(originals)) localStorage.setItem(key, value);
+    useGame.getState().boot(); useGame.getState().advance();
+    const campaign = useGame.getState().game;
+    expect(useGame.getState().resumeLegacySave()).toBe(true);
+    expect(useGame.getState()).toMatchObject({ mode: "classic", game, running: false, meta: { tutorialDone: true, music: false } });
+    useGame.getState().advance();
+    const classic = useGame.getState().game;
+    useGame.getState().switchMode("campaign"); expect(useGame.getState().game).toEqual(campaign);
+    expect(useGame.getState().meta.music).toBe(false);
+    useGame.getState().switchMode("classic"); expect(useGame.getState().game).toEqual(classic);
+    for (const [key, value] of Object.entries(originals)) expect(localStorage.getItem(key)).toBe(value);
+  });
+  it("leaves a malformed legacy save available for export without replacing either run", () => {
+    localStorage.setItem("nn.save.v1", "{"); useGame.getState().boot();
+    const before = useGame.getState().game, stored = localStorage.getItem("nn.campaign.save.v1");
+    expect(useGame.getState().resumeLegacySave()).toBe(false);
+    expect(useGame.getState().game).toBe(before);
+    expect(localStorage.getItem("nn.campaign.save.v1")).toBe(stored);
+    expect(localStorage.getItem("nn.save.v1")).toBe("{");
+  });
+  it("imports files in their matching mode, preserving the other mode's progress", () => {
+    useGame.getState().boot(); useGame.getState().advance(); const campaign = useGame.getState().game;
+    const classic = JSON.parse(JSON.stringify(advanceTurn(newLegacyGame(77)))) as ReturnType<typeof newGame>;
+    expect(useGame.getState().importSave(JSON.stringify({ game: classic, savedAt: 1 }))).toBe(true);
+    expect(useGame.getState()).toMatchObject({ mode: "classic", game: classic, tour: null, running: false });
+    expect(loadGame()).toMatchObject({ status: "ok", game: campaign });
+    const imported = newGame(5, "different-company");
+    expect(useGame.getState().importSave(JSON.stringify(makeEnvelope(imported)))).toBe(true);
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", game: imported });
+    expect(loadClassicGame()).toMatchObject({ status: "ok", game: classic });
+    useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", game: imported, started: false });
+  });
+  it("refuses cross-mode import when the current run cannot be saved", () => {
+    useGame.getState().boot(); const before = useGame.getState().game;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
+    expect(useGame.getState().importSave(JSON.stringify({ game: newLegacyGame() }))).toBe(false);
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", game: before });
+  });
+  it("rejects broken Classic files without changing mode or either slot", () => {
+    useGame.getState().boot(); const before = useGame.getState().game;
+    expect(useGame.getState().importSave(JSON.stringify({ game: { ...newLegacyGame(), tasks: [null] } }))).toBe(false);
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", game: before });
+    expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
+  });
+  it("keeps music muted across mode switches and reloads", () => {
+    useGame.getState().boot(); useGame.getState().toggleMusic();
+    useGame.getState().switchMode("classic"); expect(useGame.getState().meta.music).toBe(false);
+    useGame.getState().switchMode("campaign"); expect(useGame.getState().meta.music).toBe(false);
+    useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+    expect(useGame.getState().meta.music).toBe(false);
+  });
+});
+
+
+it("imports a pre-update incident paused and preserves its recovery state", () => {
+  const game = JSON.parse(JSON.stringify(advanceTurn({ ...newLegacyGame(1), users: 4500 }))) as ReturnType<typeof newGame>;
+  expect(game.phase).toBe("incident");
+  const raw = JSON.stringify({ savedAt: 1, game });
+  localStorage.setItem("nn.save.v1", raw); useGame.getState().boot();
+  expect(useGame.getState().resumeLegacySave()).toBe(true);
+  expect(useGame.getState()).toMatchObject({ mode: "classic", game, running: false });
+  useGame.getState().tick(10); expect(useGame.getState().game).toEqual(game);
+  useGame.getState().setRunning(true); useGame.getState().tick(.2);
+  expect(useGame.getState().game.incident!.elapsed).toBeCloseTo(game.incident!.elapsed + .2);
+  expect(localStorage.getItem("nn.save.v1")).toBe(raw);
 });

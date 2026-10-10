@@ -32,3 +32,41 @@ test("exports a company and imports it into a fresh browser", async ({ page, bro
   expect(await savedGame(other)).toEqual(exported);
   await fresh.close();
 });
+
+
+test("recovers a pre-update run and exports/imports Classic files from either mode", async ({ page }) => {
+  const { advanceTurn, newLegacyGame } = await import("../src/sim");
+  const game = advanceTurn(newLegacyGame(777));
+  const original = JSON.stringify({ savedAt: 1, game });
+  await page.addInitScript(raw => {
+    if (localStorage.getItem("nn.save.v1") === null) {
+      localStorage.setItem("nn.save.v1", raw);
+      localStorage.setItem("nn.meta.v1", JSON.stringify({ tutorialDone: true, incidentGuideDone: true }));
+    }
+  }, original);
+  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expectRoom(page);
+  await page.getByRole("button", { name: "Music", exact: true }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const legacyDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export pre-update save" }).click();
+  expect(await readFile(await (await legacyDownload).path(), "utf8")).toBe(original);
+  await page.getByRole("button", { name: "Resume pre-update save" }).click();
+  await page.getByRole("button", { name: "Confirm resume", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Music", exact: true })).toHaveAttribute("aria-pressed", "false");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("nn.classic.save.v1")!).game)).toEqual(JSON.parse(JSON.stringify(game)));
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const classicDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export current run", exact: true }).click();
+  const buffer = await readFile(await (await classicDownload).path());
+  await page.getByRole("button", { name: "Switch to Campaign" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByLabel("Save file to import").setInputFiles({ name: "classic.json", mimeType: "application/json", buffer });
+  await page.getByRole("button", { name: "Confirm import" }).click();
+  await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
+  await page.reload(); await page.getByRole("button", { name: /Continue week/ }).click();
+  await expectRoom(page);
+  await expect(page.getByRole("button", { name: "Music", exact: true })).toHaveAttribute("aria-pressed", "false");
+  expect(await page.evaluate(() => localStorage.getItem("nn.save.v1"))).toBe(original);
+});

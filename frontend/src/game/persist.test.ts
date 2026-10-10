@@ -2,7 +2,8 @@ import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { newGame, newLegacyGame } from "../sim";
 import { step, advanceSteps } from "../sim/step";
 import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics, saveClassicGame, loadClassicGame } from "./persist";
-import { CAMPAIGN_SAVE_KEY as KEY } from "./saveEnvelope";
+import { CAMPAIGN_SAVE_KEY as KEY, makeEnvelope } from "./saveEnvelope";
+import { decodeClassicSave, rawLegacySave, exportGame } from "./persist";
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 describe("campaign data preservation", () => {
@@ -80,5 +81,39 @@ describe('browser metadata and analytics', () => {
     expect(saved[499].name).toBe('save_resumed');
     clearAnalytics();
     expect(readAnalytics()).toEqual([]);
+  });
+});
+
+
+describe("validated replacement and legacy files", () => {
+  it.each([
+    { inputs: null }, { runtime: { remainderMs: -1 } }, { runId: "" },
+    { inputs: [{ step: 2, action: { type: "add_server" } }], step: 1 },
+  ])("preserves a current-format save with an invalid payload: %j", patch => {
+    const raw = JSON.stringify({ ...makeEnvelope(newGame()), ...patch });
+    localStorage.setItem(KEY, raw);
+    expect(loadGame().status).toBe("corrupt");
+    expect(saveGame(newGame())).toBe(false);
+    expect(localStorage.getItem(KEY)).toBe(raw);
+    expect(saveGame(newGame(), 0, true)).toBe(true);
+  });
+  it("revalidates external changes after a successful autosave", () => {
+    saveGame(newGame());
+    const raw = JSON.stringify({ ...makeEnvelope(newGame()), inputs: null });
+    localStorage.setItem(KEY, raw);
+    expect(saveGame(step(newGame()).state)).toBe(false);
+    expect(localStorage.getItem(KEY)).toBe(raw);
+  });
+  it("exports and decodes Classic without rewriting the original legacy bytes", () => {
+    const game = newLegacyGame(777), raw = JSON.stringify({ game, savedAt: 5 });
+    localStorage.setItem("nn.save.v1", raw);
+    expect(rawLegacySave()).toBe(raw);
+    expect(decodeClassicSave(exportGame(game))).toEqual({ status: "ok", game });
+    saveClassicGame(game); clearSave();
+    expect(rawLegacySave()).toBe(raw);
+  });
+  it.each([{ cash: null }, { infra: null }, { tasks: [null] }, { phase: "other" }, { techDone: ["unknown"] }, { infra: { ...newLegacyGame().infra, dbTier: 999 } }, { history: [null] }, { postmortems: [null] }, { totals: {} }])("rejects a broken Classic payload without writing it: %j", patch => {
+    const game = { ...newLegacyGame(), ...patch };
+    expect(decodeClassicSave(JSON.stringify({ game }))).toEqual({ status: "corrupt" });
   });
 });

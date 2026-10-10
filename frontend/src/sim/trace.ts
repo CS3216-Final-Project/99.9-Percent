@@ -23,15 +23,24 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
             continue;
         }
         const d = effect.data;
+        const before = snapshots.find(m => m.step === effect.step - 1) ?? c.recent.find(m => m.step === effect.step - 1);
+        const after = snapshots.find(m => m.step === effect.step) ?? c.recent.find(m => m.step === effect.step);
+        const drainage = before && after && before.db.backlog > after.db.backlog
+            ? `Database backlog fell from ${before.db.backlog} to ${after.db.backlog} at activation (step ${effect.step}).`
+            : before?.db.backlog === 0
+                ? "Database backlog was already zero before activation; this change is not credited with clearing it."
+                : "No database backlog drainage was observed at activation; this change is not credited with clearing it.";
         if (Number(d.dbAfter) > Number(d.dbBefore))
-            explanations.push(`Database capacity increased from ${d.dbBefore} to ${d.dbAfter} ops/s, enabling backlog drainage.`);
+            explanations.push(`Database capacity increased from ${d.dbBefore} to ${d.dbAfter} ops/s. ${drainage}`);
         else if (Number(d.admittedAfter) < Number(d.admittedBefore))
-            explanations.push(`Admitted demand fell from ${d.admittedBefore} to ${d.admittedAfter} requests/s, enabling drainage while rejecting demand.`);
+            explanations.push(`Admitted demand fell from ${d.admittedBefore} to ${d.admittedAfter} requests/s, rejecting demand. ${drainage}`);
         else if (Number(d.appAfter) > Number(d.appBefore))
             explanations.push("Installed application capacity increased, but routed capacity and database demand/capacity did not change. This investment did not relieve the database constraint.");
         else
             explanations.push(`${action.type} changed admission without increasing database capacity.`);
     }
+    if (events.some(e => e.type === "action-activated" && events.some(other => other !== e && other.type === "action-activated" && other.step === e.step)))
+        explanations.push("Multiple changes activated on the same step; the observed backlog change does not isolate their individual effects.");
     explanations.push(`Backlog changed from ${start?.db.backlog ?? 0} to ${c.snapshot.db.backlog}; latency from ${start?.latencyMs ?? 100} to ${c.snapshot.latencyMs} ms. Five consecutive steps met recovery thresholds.`);
     explanations.push(c.limit === null ? "Full incoming demand is admitted. Compare dependency headroom before future traffic growth." : "Recovery retains the traffic limit. Rejected demand earns no revenue; inspect available capacity before removing the limit.");
     return {

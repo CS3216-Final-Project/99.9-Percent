@@ -18,6 +18,10 @@ import {
 } from "@/sim";
 import {
   clearSave,
+  decodeClassicSave,
+  rawLegacySave,
+  loadLegacyMeta,
+  saveMusic,
   DEFAULT_META,
   loadClassicGame,
   loadGame,
@@ -109,6 +113,8 @@ interface Store {
   saveNow: () => void;
   /** Replace the current company with an exported save. Returns false if the file is not a usable save. */
   importSave: (raw: string) => boolean;
+  /** Resume a validated copy of the pre-update save in Classic, retaining original bytes. */
+  resumeLegacySave: () => boolean;
   finishOnboarding: () => void;
   showOnboarding: () => void;
   startTour: (track: TourTrack) => void;
@@ -365,7 +371,11 @@ export const useGame = create<Store>()((set, get) => {
     hover: (id) => {
       if (get().hovered !== id) set({ hovered: id });
     },
-    openView: (view) => { if(get().game.campaign && view && !["menu","history"].includes(view))return; set({view,running:view==="menu"?false:get().running}); },
+    openView: (view) => {
+      if (get().game.campaign && view && !["menu", "history"].includes(view)) return;
+      set({ view });
+      if (view === "menu") get().setRunning(false);
+    },
     focusTech: (id) => set({ techFocus: id, view: id ? "tech" : get().view }),
     setRunning: (running) => {
       set({ running: running && get().view!=="menu" && !document.hidden && !["review","ended"].includes(get().game.phase) });
@@ -416,16 +426,40 @@ export const useGame = create<Store>()((set, get) => {
     },
 
     importSave: (raw) => {
-      const result = decodeSave(raw);
-      if (result.status !== "ok") {
-        get().notify(result.status === "unsupported" ? "That save is from a different version of the game." : "That file is not a readable save.", "error");
+      const campaign = decodeSave(raw);
+      const classic = campaign.status === "ok" ? null : decodeClassicSave(raw);
+      if (campaign.status !== "ok" && classic?.status !== "ok") {
+        get().notify(campaign.status === "unsupported" ? "That save is from a different version of the game." : "That file is not a readable save.", "error");
         return false;
       }
-      const { game, envelope: { runtime } } = result;
-      const saved = saveGame(game, runtime.remainderMs, true);
-      set({ game, remainderMs: runtime.remainderMs, saveBlocked: false, running: false, view: null, selected: null, hovered: null, started: true });
-      track("save_imported", { step: game.campaign!.step });
+      const game = campaign.status === "ok" ? campaign.game : (classic as Extract<ReturnType<typeof decodeClassicSave>, { status: "ok" }>).game;
+      const mode: GameMode = game.campaign ? "campaign" : "classic";
+      // A cross-mode import must not strand unsaved changes in the other mode.
+      if (mode !== get().mode && !persist()) {
+        get().notify("Could not save the current run. Export it before importing another mode's save.", "error");
+        return false;
+      }
+      const remainderMs = campaign.status === "ok" ? campaign.envelope.runtime.remainderMs : 0;
+      const saved = mode === "campaign" ? saveGame(game, remainderMs, true) : saveClassicGame(game);
+      saveMode(mode);
+      set({ mode, meta: loadMeta(mode), game, remainderMs, saveBlocked: false, running: false, view: null,
+        selected: null, hovered: null, started: true, tour: null, onboarding: false, techFocus: null, rating: null });
+      track("save_imported", { mode, step: game.campaign?.step ?? game.turn });
       get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
+      return true;
+    },
+
+    resumeLegacySave: () => {
+      const raw = rawLegacySave();
+      if (raw === null || decodeClassicSave(raw).status !== "ok") {
+        get().notify("The pre-update save cannot be resumed. Export the original file to keep a copy.", "error");
+        return false;
+      }
+      if (!get().importSave(raw)) return false;
+      const meta = loadLegacyMeta();
+      saveMusic(meta.music);
+      saveMeta(meta, "classic");
+      set({ meta });
       return true;
     },
 
@@ -466,6 +500,7 @@ export const useGame = create<Store>()((set, get) => {
 
     toggleMusic: () => {
       const meta = { ...get().meta, music: !get().meta.music };
+      saveMusic(meta.music);
       saveMeta(meta, get().mode);
       set({ meta });
     },

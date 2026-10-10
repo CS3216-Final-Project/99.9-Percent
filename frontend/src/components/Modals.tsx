@@ -7,6 +7,7 @@ import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persi
 import { isFreshRun, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { ModeSwitch } from "./ModeSwitch";
+import { SaveFiles } from "./SaveFiles";
 import { Callout, Concept, Modal, type ConceptKind } from "./ui";
 import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { PostmortemBody, RunCharts } from "./Views";
@@ -420,6 +421,7 @@ export function Menu() {
         )}
       </section>
 
+      <SaveFiles />
       <ModeSwitch to="campaign" />
 
       <details className="more">
