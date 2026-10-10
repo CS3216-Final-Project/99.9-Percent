@@ -4,6 +4,7 @@ import { step, advanceSteps } from "../sim/step";
 import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics, saveClassicGame, loadClassicGame } from "./persist";
 import { CAMPAIGN_SAVE_KEY as KEY, makeEnvelope } from "./saveEnvelope";
 import { decodeClassicSave, rawLegacySave, exportGame } from "./persist";
+import { DEFAULT_AUDIO, legacyMusicOff, loadAudio, saveAudio, saveMode } from "./persist";
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 describe("campaign data preservation", () => {
@@ -53,10 +54,7 @@ describe('browser metadata and analytics', () => {
     expect(loadMeta().tutorialDone).toBe(true);
   });
 
-  it('plays music unless the player turned it off, and ignores a corrupt setting', () => {
-    expect(loadMeta().music).toBe(true);
-    saveMeta({ ...DEFAULT_META, music: false });
-    expect(loadMeta().music).toBe(false);
+  it('leaves the old music switch out of the metadata it reads back', () => {
     localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ music: 'loud', onboarded: true }));
     expect(loadMeta()).toEqual({ ...DEFAULT_META, onboarded: true });
   });
@@ -115,5 +113,69 @@ describe("validated replacement and legacy files", () => {
   it.each([{ cash: null }, { infra: null }, { tasks: [null] }, { phase: "other" }, { techDone: ["unknown"] }, { infra: { ...newLegacyGame().infra, dbTier: 999 } }, { history: [null] }, { postmortems: [null] }, { totals: {} }])("rejects a broken Classic payload without writing it: %j", patch => {
     const game = { ...newLegacyGame(), ...patch };
     expect(decodeClassicSave(JSON.stringify({ game }))).toEqual({ status: "corrupt" });
+  });
+});
+
+describe("sound settings", () => {
+  it("start at the defaults and round trip, shared by both modes", () => {
+    expect(loadAudio()).toEqual(DEFAULT_AUDIO);
+    expect(DEFAULT_AUDIO).toEqual({ music: 80, effects: 80, muted: false });
+    expect(saveAudio({ music: 35, effects: 0, muted: true })).toBe(true);
+    expect(loadAudio()).toEqual({ music: 35, effects: 0, muted: true });
+    saveMode("classic");
+    expect(loadAudio()).toEqual({ music: 35, effects: 0, muted: true });
+  });
+
+  it("keep a player who turned the music off muted, at the default volumes", () => {
+    localStorage.setItem("nn.music.v1", "false");
+    expect(loadAudio()).toEqual({ ...DEFAULT_AUDIO, muted: true });
+    localStorage.setItem("nn.music.v1", "true");
+    expect(loadAudio()).toEqual(DEFAULT_AUDIO);
+  });
+
+  it("read the music switch from older metadata when the shared key is missing", () => {
+    localStorage.setItem("nn.classic.meta.v1", JSON.stringify({ music: false }));
+    expect(loadAudio().muted).toBe(false);
+    saveMode("classic");
+    expect(loadAudio().muted).toBe(true);
+    // The shared key wins over metadata, as it did before.
+    localStorage.setItem("nn.music.v1", "true");
+    expect(loadAudio().muted).toBe(false);
+  });
+
+  it("prefer the new settings over the old switch, and mirror the switch for older builds", () => {
+    localStorage.setItem("nn.music.v1", "false");
+    saveAudio({ music: 50, effects: 50, muted: false });
+    expect(loadAudio().muted).toBe(false);
+    expect(localStorage.getItem("nn.music.v1")).toBe("true");
+    saveAudio({ music: 0, effects: 50, muted: false });
+    expect(localStorage.getItem("nn.music.v1")).toBe("false");
+  });
+
+  it.each([
+    ["{", { ...DEFAULT_AUDIO, muted: true }],
+    ["null", { ...DEFAULT_AUDIO, muted: true }],
+    [JSON.stringify({ music: "loud", effects: 250, muted: "yes" }), { music: 80, effects: 100, muted: false }],
+    [JSON.stringify({ music: -4, effects: 33.4 }), { music: 0, effects: 33, muted: false }],
+  ])("tolerate a corrupt value %s", (raw, expected) => {
+    // An unreadable record falls back to the older switch, here off.
+    localStorage.setItem("nn.music.v1", "false");
+    localStorage.setItem("nn.audio.v1", raw);
+    expect(loadAudio()).toEqual(expected);
+  });
+
+  it("fall back to the defaults when storage is unavailable", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("blocked"); });
+    expect(loadAudio()).toEqual(DEFAULT_AUDIO);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
+    expect(saveAudio(DEFAULT_AUDIO)).toBe(false);
+  });
+
+  it("know when the pre-update profile had music off", () => {
+    expect(legacyMusicOff()).toBe(false);
+    localStorage.setItem("nn.meta.v1", JSON.stringify({ tutorialDone: true, music: false }));
+    expect(legacyMusicOff()).toBe(true);
+    localStorage.setItem("nn.music.v1", "true");
+    expect(legacyMusicOff()).toBe(false);
   });
 });

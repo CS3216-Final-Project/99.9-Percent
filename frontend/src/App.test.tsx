@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import App from "./App";
 import { useGame } from "./game/store";
@@ -56,12 +56,34 @@ describe("opening UI", () => {
 
 it("offers the same mute control beside the menu in both modes", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
-  const music = screen.getByRole("button", { name: "Music" });
-  expect(music.getAttribute("aria-pressed")).toBe("true");
-  fireEvent.click(music); expect(music.getAttribute("aria-pressed")).toBe("false");
+  const mute = screen.getByRole("button", { name: "Mute sound" });
+  expect(mute.getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(mute); expect(mute.getAttribute("aria-pressed")).toBe("true");
   fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  // The menu's mute is the same setting.
+  expect(screen.getByRole("button", { name: "Mute all" }).getAttribute("aria-pressed")).toBe("true");
   fireEvent.click(screen.getByRole("button", { name: "Switch to Classic" }));
-  const classicMusic = screen.getByRole("button", { name: "Music" });
-  expect(classicMusic.getAttribute("aria-pressed")).toBe("false");
-  fireEvent.click(classicMusic); expect(useGame.getState().meta.music).toBe(true);
+  const classicMute = screen.getByRole("button", { name: "Mute sound" });
+  expect(classicMute.getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(classicMute); expect(useGame.getState().audio.muted).toBe(false);
+});
+
+it("gives both menus the Sound section, applying changes live and keeping them across modes", () => {
+  render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  const campaignMenu = screen.getByRole("dialog", { name: "Menu" });
+  fireEvent.change(within(campaignMenu).getByRole("slider", { name: "Music" }), { target: { value: "25" } });
+  expect(useGame.getState().audio.music).toBe(25);
+  // Every earlier menu control is still there.
+  for (const name of ["Save now", "New company", "Export current company", "Export original stored save", "Import save", "Switch to Classic", "Replay introduction", "Export playtest record", "Save and exit to title"])
+    expect(within(campaignMenu).getByRole("button", { name })).toBeTruthy();
+  fireEvent.click(within(campaignMenu).getByRole("button", { name: "Switch to Classic" }));
+  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  const classicMenu = screen.getByRole("dialog", { name: "Menu" });
+  expect(within(classicMenu).getByRole("slider", { name: "Music" }).getAttribute("aria-valuetext")).toBe("25%");
+  for (const name of ["Resume", "Save now", "How to play", "Tutorial", "New game", "Reset to first run", "Export current run", "Import save", "Switch to Campaign"])
+    expect(within(classicMenu).getByRole("button", { name })).toBeTruthy();
+  for (const region of ["This run", "Sound", "Save files", "Start over", "Game mode"])
+    expect(within(classicMenu).getByRole("region", { name: region })).toBeTruthy();
+  expect(within(classicMenu).getAllByRole("textbox")).toHaveLength(1);
 });

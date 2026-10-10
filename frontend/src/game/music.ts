@@ -1,4 +1,5 @@
 import { compose, frequency, MOODS, secondsOf, type Mood, type Note, type Score } from "./score";
+import { envelope, filter, hissBuffer, hit, loudness, noise, onUserGesture, osc, realtimeAudio } from "./synth";
 
 /*
  * Plays the background music. Each loop in score.ts is synthesised once, off
@@ -13,69 +14,34 @@ import { compose, frequency, MOODS, secondsOf, type Mood, type Note, type Score 
  */
 
 export interface Music {
-  /** Sound on or off. Off fades out and suspends the audio. */
+  /** A run is on screen. Off fades out and suspends the audio. */
   setEnabled(on: boolean): void;
+  /** The player's music volume, 0 to 100. At 0 the audio is suspended as if off. */
+  setVolume(percent: number): void;
   setMood(mood: Mood): void;
   /** Stop for good and release the audio device. */
   dispose(): void;
 }
 
-/** Overall loudness: music sits under the game, not over it. */
-const VOLUME = 0.32;
+/**
+ * Overall loudness at full volume. Music sits under the game, not over it: the
+ * default 80% plays at 0.32, the level it had before the volume slider.
+ */
+const PEAK = 0.5;
 /** Seconds to fade between moods, and in or out. */
 const CROSSFADE = 1.4;
 const FADE_IN = 0.8;
 const FADE_OUT = 0.3;
+/** Seconds to follow a volume slider: quick, without clicks. */
+const SLIDE = 0.08;
 /** Samples a second for the loops: plenty for soft synths, at a third less memory than CD quality. */
 const RATE = 32000;
 /** Seconds rendered past the end of a loop, so notes ringing over the seam wrap round to its start. */
 const TAIL = 1.5;
 
-const SILENT: Music = { setEnabled() {}, setMood() {}, dispose() {} };
+const SILENT: Music = { setEnabled() {}, setVolume() {}, setMood() {}, dispose() {} };
 
 type Ctx = BaseAudioContext;
-
-function envelope(ctx: Ctx, at: number, length: number, peak: number, attack: number, release: number): GainNode {
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(0, at);
-  g.gain.linearRampToValueAtTime(peak, at + attack);
-  g.gain.setValueAtTime(peak, Math.max(at + attack, at + length - release));
-  g.gain.linearRampToValueAtTime(0, at + length);
-  return g;
-}
-
-/** A sound that starts loud and dies away. */
-function hit(ctx: Ctx, at: number, peak: number, decay: number): GainNode {
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(peak, at);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + decay);
-  return g;
-}
-
-function filter(ctx: Ctx, type: BiquadFilterType, hz: number): BiquadFilterNode {
-  const f = ctx.createBiquadFilter();
-  f.type = type;
-  f.frequency.value = hz;
-  return f;
-}
-
-function osc(ctx: Ctx, type: OscillatorType, hz: number, at: number, stop: number, detune = 0): OscillatorNode {
-  const o = ctx.createOscillator();
-  o.type = type;
-  o.frequency.value = hz;
-  o.detune.value = detune;
-  o.start(at);
-  o.stop(stop);
-  return o;
-}
-
-function noise(ctx: Ctx, at: number, stop: number, buffer: AudioBuffer): AudioBufferSourceNode {
-  const n = ctx.createBufferSource();
-  n.buffer = buffer;
-  n.start(at, Math.random() * 0.5);
-  n.stop(stop);
-  return n;
-}
 
 /** One note through its voice's synth, into out. */
 function play(ctx: Ctx, out: AudioNode, hiss: AudioBuffer, n: Note, secondsPerBeat: number): void {
@@ -137,9 +103,7 @@ export async function renderLoop(score: Score, rate = RATE): Promise<AudioBuffer
   const seconds = secondsOf(score);
   const loop = Math.round(seconds * rate);
   const ctx = new OfflineAudioContext(1, loop + Math.round(TAIL * rate), rate);
-  const hiss = ctx.createBuffer(1, rate, rate);
-  const data = hiss.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const hiss = hissBuffer(ctx, rate);
   const bus = ctx.createDynamicsCompressor();
   bus.connect(ctx.destination);
   for (const n of score.notes) play(ctx, bus, hiss, n, 60 / score.bpm);
@@ -155,7 +119,7 @@ export async function renderLoop(score: Score, rate = RATE): Promise<AudioBuffer
 
 /** `wanted` says whether the player has music on, so a click can start the audio before the game asks for it. */
 export function createMusic(wanted: () => boolean = () => false): Music {
-  const Available = typeof window === "undefined" ? undefined : window.AudioContext;
+  const Available = realtimeAudio();
   if (!Available || typeof OfflineAudioContext === "undefined") return SILENT;
   const AudioCtor: typeof AudioContext = Available;
 
@@ -165,6 +129,7 @@ export function createMusic(wanted: () => boolean = () => false): Music {
   const sources: AudioBufferSourceNode[] = [];
   let mood: Mood = "calm";
   let enabled = false;
+  let percent = 0;
   let disposed = false;
   let sleep = 0;
 
@@ -177,13 +142,27 @@ export function createMusic(wanted: () => boolean = () => false): Music {
   };
 
   // A click or key press is the moment audio is allowed to start: start it then, while music is wanted.
-  const wake = () => {
-    if (disposed || !(enabled || wanted())) return;
+  const stopListening = onUserGesture(() => {
+    if (disposed || !((enabled && percent > 0) || wanted())) return;
     const c = start();
     if (c.state === "suspended") c.resume().catch(() => {});
-  };
-  window.addEventListener("pointerdown", wake);
-  window.addEventListener("keydown", wake);
+  });
+
+  /** Fade towards the level the settings ask for, or out and to sleep. */
+  function apply(seconds: number): void {
+    window.clearTimeout(sleep);
+    const gain = enabled ? loudness(percent, PEAK) : 0;
+    if (gain > 0) {
+      start()
+        .resume()
+        .catch(() => {});
+      if (master) fade(master, gain, seconds);
+    } else if (ctx && master) {
+      fade(master, 0, FADE_OUT);
+      const c = ctx;
+      sleep = window.setTimeout(() => c.suspend().catch(() => {}), FADE_OUT * 1000 + 100);
+    }
+  }
 
   function start(): AudioContext {
     if (ctx) return ctx;
@@ -218,17 +197,14 @@ export function createMusic(wanted: () => boolean = () => false): Music {
     setEnabled(on) {
       if (disposed) return;
       enabled = on;
-      window.clearTimeout(sleep);
-      if (on) {
-        start()
-          .resume()
-          .catch(() => {});
-        if (master) fade(master, VOLUME, FADE_IN);
-      } else if (ctx && master) {
-        fade(master, 0, FADE_OUT);
-        const c = ctx;
-        sleep = window.setTimeout(() => c.suspend().catch(() => {}), FADE_OUT * 1000 + 100);
-      }
+      apply(FADE_IN);
+    },
+    setVolume(next) {
+      if (disposed) return;
+      // Coming up from silence fades in like switching on; otherwise follow the slider.
+      const from = percent;
+      percent = next;
+      if (enabled) apply(from > 0 ? SLIDE : FADE_IN);
     },
     setMood(next) {
       mood = next;
@@ -237,8 +213,7 @@ export function createMusic(wanted: () => boolean = () => false): Music {
     dispose() {
       disposed = true;
       window.clearTimeout(sleep);
-      window.removeEventListener("pointerdown", wake);
-      window.removeEventListener("keydown", wake);
+      stopListening();
       for (const s of sources) {
         try {
           s.stop();
