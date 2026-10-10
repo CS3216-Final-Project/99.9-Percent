@@ -8,6 +8,8 @@ import { creature, type Activity } from "./cast";
 import { Creature, preloadCreatures, Walker } from "./creatures";
 import { ModelBatch, preloadModels, type ModelId, type Placement } from "./models";
 import { ball, bx, cy, place, PrimBatch, type Prim, type V3 } from "./prims";
+import { ARCADE_SCREEN, MAC, MAC_COLOUR_NAMES, type PropItem } from "./propModels";
+import { DetailedProps } from "./props";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
 import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, whiteboard, woodFloor, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
@@ -90,19 +92,6 @@ function shelf(w: number, h: number, seed: number): Prim[] {
     }
   }
   return out;
-}
-
-/** Arcade cabinet facing +z. Its screen is drawn separately. */
-function arcade(color: string): Prim[] {
-  return [
-    bx([0, 0.9, 0], [0.72, 1.8, 0.75], color),
-    bx([0, 1.25, 0.39], [0.6, 0.5, 0.04], INK, [-0.2, 0, 0]),
-    bx([0, 0.93, 0.42], [0.66, 0.08, 0.3], INK),
-    cy([-0.15, 0.99, 0.45], 0.04, 0.08, "#ff4d5e"),
-    cy([0.1, 0.98, 0.45], 0.05, 0.03, "#ffd84a"),
-    cy([0.22, 0.98, 0.45], 0.05, 0.03, "#4cb8ff"),
-    bx([0, 1.68, 0.3], [0.66, 0.2, 0.22], "#ffd84a"),
-  ];
 }
 
 function pingPong(): Prim[] {
@@ -213,8 +202,16 @@ function placeModels(items: Placement[], x: number, z: number, rot = 0): Placeme
 }
 
 const DESK_TOP = 0.74;
-/** The lit panel of a desk monitor relative to its desk: centre height, front face and size. */
-const PANEL = { y: 1.02, z: -0.168, w: 0.6, h: 0.36 };
+/** The picture on a desk's Mac relative to its desk: centre height, front face and size. */
+const PANEL = { y: DESK_TOP + MAC.displayY, z: -0.168, w: MAC.screenW, h: MAC.screenH };
+/** The smaller Mac at reception: the centre and width of its picture. */
+const RECEPTION_SCREEN = { y: 1.0, z: 11.771, w: 0.52 };
+/** The arcade cabinets, side by side in the games corner. */
+const ARCADES: [string, number][] = [
+  ["purple", 20.4],
+  ["red", 21.3],
+];
+const ARCADE_Z = 10.5;
 const DESK_PLANTS: [ModelId, number][] = [
   ["plantSmall1", 1],
   ["cactusSmallA", 0.7],
@@ -222,20 +219,55 @@ const DESK_PLANTS: [ModelId, number][] = [
   ["cactusSmallB", 0.7],
 ];
 
-/** A desk facing -z with its chair on the +z side. The monitors' screens are drawn by `Staff`. */
-function deskModels(w: number, i: number, monitors = 1): Placement[] {
-  const xs = monitors === 1 ? [0] : [-0.45, 0.45];
-  const out = [
-    mdl("desk", 0, 0, 0, [w, DESK_TOP, 0.78]),
-    ...xs.map((x) => mdl("screen", x, -0.2, 0, 0.85, DESK_TOP)),
-    mdl("keyboard", 0, 0.14, 0, 0.85, DESK_TOP),
-    mdl("mouse", 0.36, 0.16, 0, 1.1, DESK_TOP),
-    mdl("chairDesk", 0, 0.72, Math.PI),
-  ];
+/** A desk facing -z with its chair on the +z side. Its Macs come from `deskGear`; their pictures are drawn by `Staff`. */
+function deskModels(w: number, i: number): Placement[] {
+  const out = [mdl("desk", 0, 0, 0, [w, DESK_TOP, 0.78]), mdl("chairDesk", 0, 0.72, Math.PI)];
   if (i % 2 === 1) {
     const [id, s] = DESK_PLANTS[(i >> 1) % DESK_PLANTS.length];
     out.push(mdl(id, -w / 2 + 0.2, -0.18, i, s, DESK_TOP));
   }
+  return out;
+}
+
+/** The Macs, keyboard and mouse on a desk, in the desk's frame. Each desk gets its own colour. */
+function deskGear(i: number, monitors = 1): PropItem[] {
+  const variant = MAC_COLOUR_NAMES[(i * 3) % MAC_COLOUR_NAMES.length];
+  const xs = monitors === 1 ? [0] : [-0.45, 0.45];
+  return [
+    // Each Mac stands just behind where its picture is drawn.
+    ...xs.map((x): PropItem => ({ kind: "imac", variant, p: [x, DESK_TOP, PANEL.z - MAC.gap] })),
+    { kind: "keyboard", variant, p: [0, DESK_TOP, 0.14] },
+    { kind: "mouse", variant, p: [0.36, DESK_TOP, 0.16] },
+  ];
+}
+
+/** Props built around the origin, placed at (x, z) and turned by rot. */
+function placeProps(items: PropItem[], x: number, z: number, rot = 0): PropItem[] {
+  return items.map((it) => ({ ...it, p: at(x, z, rot, it.p), rot: (it.rot ?? 0) + rot }));
+}
+
+/** The detailed machines: Macs on every desk, cooling units, vending machines, kitchen appliances and arcade cabinets. */
+function buildProps(): PropItem[] {
+  const out: PropItem[] = [];
+  const add = (items: PropItem[], x: number, z: number, rot = 0) => out.push(...placeProps(items, x, z, rot));
+  for (let i = 0; i < 8; i++) {
+    const s = deskSlot(i);
+    add(deskGear(i), s.x, s.z, s.rot);
+  }
+  add(deskGear(9, 2), POS.growth.x - 0.4, POS.growth.z + 0.2);
+  add(deskGear(12, 2), 8.2, -6.9);
+  // Reception: a smaller Mac on the lower work surface, facing the receptionist.
+  const rs = RECEPTION_SCREEN.w / MAC.screenW;
+  out.push(
+    { kind: "imac", variant: "orange", p: [3.2, RECEPTION_SCREEN.y - MAC.displayY * rs, RECEPTION_SCREEN.z + MAC.gap * rs], rot: Math.PI, s: rs },
+    { kind: "keyboard", variant: "orange", p: [3.2, 0.76, 11.65], rot: Math.PI },
+    { kind: "mouse", variant: "orange", p: [2.95, 0.76, 11.66], rot: Math.PI },
+  );
+  for (const z of [-2.6, 2.2]) out.push({ kind: "crac", p: [-12.45, 0, z], rot: Math.PI / 2 });
+  out.push({ kind: "vending", variant: "red", p: [12.6, 0, -9.0] }, { kind: "vending", variant: "blue", p: [13.7, 0, -9.0] });
+  out.push({ kind: "cooler", p: [15.0, 0, -4.0], rot: Math.PI / 2 });
+  out.push({ kind: "fridge", p: [15.35, 0, -9.1] }, { kind: "espresso", p: [17.23, 0.87, -9.15] });
+  for (const [variant, x] of ARCADES) out.push({ kind: "arcade", variant, p: [x, 0, ARCADE_Z] });
   return out;
 }
 
@@ -255,19 +287,7 @@ function buildStatic(): Prim[] {
   add([bx([0, 0.5, 0], [1.5, 1, 0.8], STEEL), bx([0, 1.28, -0.12], [1.17, 0.69, 0.05], INK, [-0.35, 0, 0]), bx([0.95, 0.6, 0.05], [0.3, 1.2, 0.6], TRIM)], POS.deploy.x, POS.deploy.z);
   add([cy([0, 0.55, 0], 0.08, 1.1, INK), bx([0, 1.5, 0], [1.27, 0.82, 0.05], INK)], POS.growth.x + 1.15, POS.growth.z - 0.55);
 
-  // Server floor: cooling units, an extinguisher, a crash cart, floor vents
-  for (const z of [-2.6, 2.2]) {
-    add(
-      [
-        bx([0, 1.0, 0], [0.9, 2.0, 1.4], "#cbc4ea"),
-        ...Array.from({ length: 7 }, (_, i) => bx([0.46, 0.45 + i * 0.18, 0], [0.02, 0.06, 1.1], "#5d5399")),
-        bx([0.47, 1.75, -0.35], [0.02, 0.18, 0.3], INK),
-        bx([0.48, 1.75, -0.35], [0.01, 0.06, 0.1], "#3ddc84"),
-      ],
-      -12.45,
-      z,
-    );
-  }
+  // Server floor: an extinguisher, a crash cart and floor vents (the cooling units are detailed props)
   add([cy([0, 0.3, 0], 0.2, 0.55, "#ff4d5e"), cy([0, 0.62, 0], 0.08, 0.1, INK)], -12.6, 4.4);
   add(
     [
@@ -327,14 +347,11 @@ function buildStatic(): Prim[] {
   out.push(bx([-2.1, 0.41, 12.6], [0.3, 0.02, 0.4], "#ffc53d", [0, 0.3, 0]));
   out.push(bx([3.2, 0.006, 13.95], [1.8, 0.012, 1.0], TRIM));
 
-  // Corridor: a low bookshelf and vending machines
+  // Corridor: a low bookshelf
   add(shelf(2.4, 1.1, 37), 11.6, 5.45);
-  add([bx([0, 0.95, 0], [0.9, 1.9, 0.8], "#ff4d5e"), bx([0, 1.25, 0.41], [0.6, 0.9, 0.02], "#a8d8ff"), bx([0, 0.35, 0.41], [0.6, 0.12, 0.02], INK)], 12.6, -9.0);
-  add([bx([0, 0.95, 0], [0.9, 1.9, 0.8], "#4cb8ff"), bx([0, 1.25, 0.41], [0.6, 0.9, 0.02], "#a8d8ff"), bx([0, 0.35, 0.41], [0.6, 0.12, 0.02], INK)], 13.7, -9.0);
 
-  // Fruit on the kitchen island and a water cooler
+  // Fruit on the kitchen island
   out.push(ball([18.4, 0.86, -6.2], [0.36, 0.12, 0.36], WHITE), ball([18.35, 0.93, -6.15], [0.1, 0.1, 0.1], "#ff4d5e"), ball([18.48, 0.93, -6.25], [0.1, 0.1, 0.1], "#ffc53d"));
-  add([bx([0, 0.5, 0], [0.38, 1.0, 0.38], LILAC), cy([0, 1.22, 0], 0.32, 0.42, "#4cb8ff")], 15.0, -4.0);
 
   // The remains of pizza night
   add(pizza(), 17.8, -0.1, 0, 0.76);
@@ -345,8 +362,6 @@ function buildStatic(): Prim[] {
   out.push(cy([-19.2, 0.007, 11.7], 2.8, 0.012, "#6b4aa0"), cy([-19.2, 0.009, 11.7], 2.4, 0.013, "#7d5bb8"));
   out.push(ball([16.9, 0.26, 4.4], [0.96, 0.58, 0.96], "#2dd4bf"), ball([16.6, 0.26, 8.6], [0.96, 0.58, 0.96], "#ff7ad9"));
   add(pingPong(), 18.2, 12.6);
-  add(arcade("#a985ff"), 20.4, 10.5);
-  add(arcade("#ff4d5e"), 21.3, 10.5);
   return out;
 }
 
@@ -377,8 +392,8 @@ function buildModels(): Placement[] {
     const s = deskSlot(i);
     add(deskModels(1.5, i), s.x, s.z, s.rot);
   }
-  add(deskModels(2.2, 9, 2), POS.growth.x - 0.4, POS.growth.z + 0.2);
-  add(deskModels(1.8, 12, 2), 8.2, -6.9);
+  add(deskModels(2.2, 9), POS.growth.x - 0.4, POS.growth.z + 0.2);
+  add(deskModels(1.8, 12), 8.2, -6.9);
   out.push(mdl("pottedPlant", -12.4, 5.6), mdl("pottedPlant", -12.4, 9.5), mdl("coatRack", -3.0, 5.6), mdl("trashcan", -3.0, 9.0, 0, 0.8));
   out.push(mdl("pottedPlant", 2.2, 8.9), mdl("cactusMedium", 8.9, 5.6, 0, 1.5));
 
@@ -403,7 +418,7 @@ function buildModels(): Placement[] {
   out.push(mdl("tvCabinet", MEETING_TV.x, MEETING_TV.z, Math.PI / 2, 0.9), mdl("tv", MEETING_TV.x, MEETING_TV.z, Math.PI / 2, MEETING_TV.s, MEETING_TV.y), mdl("pottedPlant", -6.0, 14.0));
 
   // Reception and the waiting area
-  out.push(mdl("screen", 3.2, 11.8, Math.PI, 0.75, 0.76), mdl("chairDesk", 3.2, 11.3), mdl("pottedPlant", 6.4, 13.9), mdl("coatRack", 5.6, 13.9));
+  out.push(mdl("chairDesk", 3.2, 11.3), mdl("pottedPlant", 6.4, 13.9), mdl("coatRack", 5.6, 13.9));
   out.push(mdl("armchair", -3.2, 12.6, Math.PI / 2, 0.85), mdl("armchair", -1.2, 12.6, -Math.PI / 2, 0.85), mdl("tableCoffee", -2.2, 12.6, Math.PI / 2, 0.9), mdl("cactusMedium", -4.4, 13.9, 0, 1.6));
 
   // Corridor
@@ -413,7 +428,7 @@ function buildModels(): Placement[] {
   const run: ModelId[] = ["cabinetDrawer", "cabinet", "sink", "cabinet", "stove", "cabinetDrawer", "cabinet"];
   run.forEach((id, i) => out.push(mdl(id, 16.4 + i * 0.83, -9.06)));
   for (const z of [-8.2, -7.37, -6.54]) out.push(mdl("cabinet", 21.565, z, -Math.PI / 2));
-  out.push(mdl("fridge", 15.35, -9.1), mdl("coffeeMachine", 17.23, -9.15, 0, 1, 0.87), mdl("microwave", 20.55, -9.15, 0, 1, 0.87), mdl("blender", 16.4, -9.2, 0, 1, 0.87), mdl("toaster", 21.5, -7.37, -Math.PI / 2, 1, 0.87));
+  out.push(mdl("microwave", 20.55, -9.15, 0, 1, 0.87), mdl("blender", 16.4, -9.2, 0, 1, 0.87), mdl("toaster", 21.5, -7.37, -Math.PI / 2, 1, 0.87));
   for (const x of [17.57, 18.4, 19.23]) out.push(mdl("bar", x, -6.0), mdl("bar", x, -6.4, Math.PI));
   for (const x of [17.06, 19.74]) out.push(mdl("barEnd", x, -6.0), mdl("barEnd", x, -6.4, Math.PI));
   for (const x of [18.0, 18.9]) out.push(mdl("stoolBar", x, -5.35, Math.PI));
@@ -722,7 +737,7 @@ function Staff({ crew }: { crew: Crew }) {
         <ScreenPlane key={dx} kind={crew.incident ? "alert" : "dash"} w={PANEL.w} h={PANEL.h} position={[8.2 + dx, PANEL.y, -6.9 + PANEL.z]} />
       ))}
       <Creature pose="sit" activity={crew.incident ? "type" : "mug"} species={creature(12, "sre")} position={[8.2, 0, -6.18]} phase={7} />
-      <ScreenPlane kind="idle" w={0.52} h={0.31} position={[3.2, 1.0, 11.771]} rot={Math.PI} />
+      <ScreenPlane kind="idle" w={RECEPTION_SCREEN.w} h={(RECEPTION_SCREEN.w * MAC.screenH) / MAC.screenW} position={[3.2, RECEPTION_SCREEN.y, RECEPTION_SCREEN.z]} rot={Math.PI} />
       <Creature pose="sit" activity="type" species={creature(18, "frontdesk")} position={[3.2, 0, 11.3]} rotation={Math.PI} phase={2} />
 
       {/* A meeting in progress */}
@@ -739,8 +754,8 @@ function Staff({ crew }: { crew: Crew }) {
       <Creature pose="sit" activity="laptop" species={creature(40, "data")} position={[-18.6, 0, 3.6]} rotation={-Math.PI / 2} phase={11} seat={0.8} />
       <ScreenPlane kind="slides" w={2.1} h={1.12} position={[-14.35, 1.5, 4.5]} rot={-Math.PI / 2} />
       <ScreenPlane kind="game" w={loungeTv.w} h={loungeTv.h} position={loungeTv.position} rot={Math.PI / 2} />
-      {[20.4, 21.3].map((x) => (
-        <ScreenPlane key={x} kind="game" w={0.54} h={0.44} position={[x, 1.25, 10.92]} tilt={-0.2} />
+      {ARCADES.map(([, x]) => (
+        <ScreenPlane key={x} kind="game" w={ARCADE_SCREEN.w} h={ARCADE_SCREEN.h} position={[x, ARCADE_SCREEN.y, ARCADE_Z + ARCADE_SCREEN.z]} tilt={ARCADE_SCREEN.tilt} />
       ))}
 
       {/* Crew walking the corridors, and a technician on the server floor */}
@@ -762,11 +777,13 @@ export function Office({ crew }: { crew: Crew }) {
   const prims = useMemo(() => buildStatic(), []);
   const models = useMemo(() => buildModels(), []);
   const wall = useMemo(() => buildWallMounted(), []);
+  const props = useMemo(() => buildProps(), []);
   return (
     <group>
       <Floors />
       <PrimBatch prims={prims} />
       <ModelBatch placements={models} />
+      <DetailedProps items={props} />
       <Glass />
       <WhiteboardFace position={[-12.27, 1.45, 7.4]} rot={Math.PI / 2} />
       <Staff crew={crew} />
