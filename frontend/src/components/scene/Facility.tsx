@@ -38,6 +38,7 @@ import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { EQUIPMENT_ICON, Icon, STATE_META } from "../icons";
 import { Office } from "./Office";
+import { Exterior } from "./exterior";
 import { OnWall, updateWalls, Wall } from "./walls";
 
 /* ------------------------------------------------------------------ */
@@ -148,7 +149,12 @@ function useSceneModel(): SceneModel {
 /* ------------------------------------------------------------------ */
 
 const TARGET = new THREE.Vector3(-1, 0, 0.6);
-const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20);
+/**
+ * Where the camera sits relative to what it looks at. The view is orthographic, so distance does not change what
+ * is seen, but the camera must stand far enough back that the ground outside is never behind it when zoomed out
+ * and tilted low.
+ */
+const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20).setLength(240);
 const HOME = CAMERA_OFFSET.clone().normalize();
 const UP = new THREE.Vector3(0, 1, 0);
 /** Tilt limits, measured from straight down: nearly top-down to a low three-quarter view. */
@@ -767,6 +773,7 @@ function Scene({ effects }: { effects: boolean }) {
       <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
       <Room />
+      <Exterior linear={effects} />
       <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
 
       {/* Network edge */}
@@ -929,7 +936,7 @@ export default function Facility() {
           if (software) gl.shadowMap.enabled = false;
           setRenderer(software ? "software" : "gpu");
         }}
-        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 200 }}
+        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 640 }}
         onPointerMissed={() => {
           if (useGame.getState().game.phase !== "incident") useGame.getState().select(null);
         }}
