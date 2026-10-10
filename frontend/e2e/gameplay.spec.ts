@@ -182,3 +182,22 @@ test('resumes an incident paused, investigates, fixes it and acknowledges the po
   expect((await savedGame(page)).phase).toBe('management');
   expect((await savedGame(page)).turn).toBe(2);
 });
+
+test('plays music from the first click and remembers when it is turned off', async ({ page }) => {
+  const problems: string[] = [];
+  page.on('console', message => { if (message.text().includes('music could not be prepared')) problems.push(message.text()); });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.getByRole('button', { name: 'Skip', exact: true }).click();
+  const music = page.getByRole('button', { name: 'Music' });
+  await expect(music).toHaveAttribute('aria-pressed', 'true');
+  // Give the loops time to be synthesised; a failure would be reported on the console.
+  await page.waitForTimeout(3000);
+  expect(problems).toEqual([]);
+  await music.click();
+  await expect(music).toHaveAttribute('aria-pressed', 'false');
+  await page.reload();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expectRoom(page);
+  await expect(page.getByRole('button', { name: 'Music' })).toHaveAttribute('aria-pressed', 'false');
+});

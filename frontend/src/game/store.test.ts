@@ -18,6 +18,20 @@ function resumeIncident() {
   return game;
 }
 
+describe('music setting', () => {
+  it('turns the music off and on, and remembers it for the next visit', () => {
+    useGame.getState().boot();
+    expect(useGame.getState().meta.music).toBe(true);
+    useGame.getState().toggleMusic();
+    expect(useGame.getState().meta.music).toBe(false);
+    useGame.setState(useGame.getInitialState(), true);
+    useGame.getState().boot();
+    expect(useGame.getState().meta.music).toBe(false);
+    useGame.getState().toggleMusic();
+    expect(useGame.getState().meta.music).toBe(true);
+  });
+});
+
 describe('game lifecycle', () => {
   it('boots idempotently without duplicating runs or analytics', () => {
     useGame.getState().boot();

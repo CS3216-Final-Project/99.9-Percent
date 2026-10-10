@@ -52,6 +52,14 @@ describe('browser metadata and analytics', () => {
     expect(loadMeta().tutorialDone).toBe(true);
   });
 
+  it('plays music unless the player turned it off, and ignores a corrupt setting', () => {
+    expect(loadMeta().music).toBe(true);
+    saveMeta({ ...DEFAULT_META, music: false });
+    expect(loadMeta().music).toBe(false);
+    localStorage.setItem('nn.meta.v1', JSON.stringify({ music: 'loud', onboarded: true }));
+    expect(loadMeta()).toEqual({ ...DEFAULT_META, onboarded: true });
+  });
+
   it('recovers from malformed metadata and analytics', () => {
     localStorage.setItem('nn.meta.v1', '{');
     localStorage.setItem('nn.analytics.v1', '{}');

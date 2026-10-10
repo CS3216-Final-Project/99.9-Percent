@@ -20,6 +20,8 @@ export interface Meta {
   tutorialDone: boolean;
   /** The short guide shown on the first incident has been seen. */
   incidentGuideDone: boolean;
+  /** Background music plays. */
+  music: boolean;
 }
 
 export const DEFAULT_META: Meta = {
@@ -30,6 +32,7 @@ export const DEFAULT_META: Meta = {
   firstIncidentCompleted: false,
   tutorialDone: false,
   incidentGuideDone: false,
+  music: true,
 };
 
 function read(key: string): string | null {
@@ -112,7 +115,9 @@ export function loadMeta(): Meta {
   const raw = read(META_KEY);
   if (!raw) return { ...DEFAULT_META };
   try {
-    return { ...DEFAULT_META, ...(JSON.parse(raw) as Partial<Meta>) };
+    const meta = { ...DEFAULT_META, ...(JSON.parse(raw) as Partial<Meta>) };
+    if (typeof meta.music !== "boolean") meta.music = DEFAULT_META.music;
+    return meta;
   } catch {
     return { ...DEFAULT_META };
   }
