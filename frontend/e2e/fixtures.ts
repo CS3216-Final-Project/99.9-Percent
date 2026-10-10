@@ -3,7 +3,7 @@ import type { GameState } from '../src/sim';
 import { DEFAULT_META } from '../src/game/persist';
 import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
 
-// These tests render the actual WebGL scene. Unhandled browser errors fail each case.
+// Unhandled browser errors fail each case. Journeys that call withoutRoom() skip the WebGL scene; the rest draw it.
 export const test = base.extend<{ healthyBrowser: void; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
   healthyBrowser: [async ({ page }, use) => {
     const errors: string[] = [];
@@ -49,16 +49,15 @@ export async function savedGame(page: Page): Promise<GameState> {
   return JSON.parse(JSON.stringify(result.game)) as GameState;
 }
 
-export async function expectRoom(page: Page) {
+export async function expectRoom(page: Page, timeout?: number) {
   const room = page.getByRole('main');
   const canvas = room.locator('canvas');
   await expect(canvas).toBeVisible();
   // A visible canvas alone does not prove that WebGL initialized successfully.
-  // Starting the room in software WebGL can block the page for longer than the default 10 seconds on a busy machine.
   await expect.poll(() => canvas.evaluate(el => {
     const gl = (el as HTMLCanvasElement).getContext('webgl2');
     return !!gl && !gl.isContextLost();
-  }), { timeout: 30_000 }).toBe(true);
+  }), { timeout }).toBe(true);
   // The incident panel has its own Servers control outside the room.
   await expect(room.getByRole('button', { name: 'Servers', exact: true })).toBeVisible();
 }

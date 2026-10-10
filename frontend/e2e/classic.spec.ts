@@ -77,7 +77,8 @@ test('draws the photo-scanned surfaces and furniture when HD detail is forced', 
   await page.goto('/?graphics=hd');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await expectRoom(page);
+  // Compiling the HD shaders in software can block the page for longer than the default 10 seconds.
+  await expectRoom(page, 30_000);
   // Six surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
   await expect.poll(() => textures.size).toBe(18);
   await expect.poll(() => furniture.size).toBe(9);
@@ -96,7 +97,7 @@ test('keeps the game playable when the HD textures and furniture cannot be downl
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await surfaces;
   await furniture;
-  await expectRoom(page);
+  await expectRoom(page, 30_000);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
   await expectRoom(page);
