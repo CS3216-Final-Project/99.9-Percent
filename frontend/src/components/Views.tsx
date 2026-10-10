@@ -14,7 +14,7 @@ import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow, type ConceptKi
 
 export function EngineersView() {
   const game = useGame((s) => s.game);
-  const act = useGame((s) => s.act);
+  const perform = useGame((s) => s.perform);
   const openView = useGame((s) => s.openView);
   const m = metrics(game);
   const locked = game.phase !== "management";
@@ -54,13 +54,13 @@ export function EngineersView() {
           tip="Shortcuts that pile up as you ship. High debt makes deploys riskier, machines fail more, and engineers slower."
         />
         <Act icon="tree" primary label="Pick an upgrade" onClick={() => openView("tech")} />
-        <Act icon="debt" label={paying ? "Debt paydown queued" : "Pay down debt"} note={paying ? undefined : `${BALANCE.debt.paydownEffort} wk`} disabled={locked || paying} onClick={() => act({ type: "start_debt_paydown" })} />
+        <Act icon="debt" label={paying ? "Debt paydown queued" : "Pay down debt"} note={paying ? undefined : `${BALANCE.debt.paydownEffort} wk`} disabled={locked || paying} onClick={() => perform({ type: "start_debt_paydown" })} />
         <Act
           icon="hire"
           label={game.engineers >= BALANCE.engineer.max ? "Office is full" : "Hire engineer"}
           price={game.engineers >= BALANCE.engineer.max ? undefined : BALANCE.engineer.hireCost}
           disabled={locked || game.engineers >= BALANCE.engineer.max}
-          onClick={() => act({ type: "hire_engineer" })}
+          onClick={() => perform({ type: "hire_engineer" })}
           title={`Then ${moneyFull(BALANCE.engineer.salary)} a week.`}
         />
       </section>

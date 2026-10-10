@@ -18,6 +18,7 @@ The isometric room is the main canvas. A dark purple HUD frames cream paper pane
 | Secondary evidence | Native `details.more`, rows and tables; exact values stay accessible | `SidePanel.tsx`, `CampaignUI.tsx` |
 | Trends | Shared `LineChart`, labelled units, ticks and time axis | `Views.tsx` |
 | Menu / report | Shared `Modal` with concept icon, body and footer actions | `components/ui.tsx`, `Modals.tsx` |
+| The founder (Classic) | Yellow ring under the player's character; yellow bubble over its head with the job and a green progress bar; a cream `Space` prompt button at a workable machine | `scene/Founder.tsx`, CSS `.founder-bubble` |
 
 Paths in this table are under `frontend/src/`. Shared vocabulary lives in `presentation.ts`: the same equipment gets the same name and icon in the room, investigation controls and inspector. Prefer extracting a shared primitive when extending an existing pattern to copying its markup or overriding its styles for one mode.
 
@@ -26,6 +27,7 @@ Paths in this table are under `frontend/src/`. Shared vocabulary lives in `prese
 - **Title:** room remains behind the overlay; show the title kicker, game name, short goal, three icon-led steps and a prominent Play/Continue button. Explain the current mode's loop and time units briefly. Do not carry Classic's 26-week target into Campaign.
 - **Top bar:** brand and time at the left, four familiar metric tiles, then music and Menu. Health changes to the incident icon and the whole header gets the red striped treatment during an incident. Campaign pending revenue must be clearly distinguished from available cash and settled revenue.
 - **Management:** room equipment is clickable. Selecting it gives immediate visible feedback with its name, icon and authoritative metrics. Campaign can keep a compact system overview visible because only a few opening actions exist.
+- **The founder (Classic):** the player walks the floor as the founder. A machine's action lands only after the founder has walked there and worked it, so the panel opens at once but the bubble over the founder's head carries the progress. Keep the bubble short (a verb and its object), let it follow the founder rather than the machine, and never hide the cost or result in it: those stay in the panel and the toast. Machine labels, clicks on the floor and the action buttons must all keep working without a keyboard.
 - **Incident:** retain the red banner and symptom-focused title, a compact progress area, three impact tiles, then the numbered jobs **1. Inspect the evidence** and **2. Choose a response**. Equipment controls mirror the room. Selected equipment is highlighted and its latest observation is shown. Keep the permitted responses equally prominent; no full metrics table before the response list.
 - **Bottom bar:** view tabs on the left; play/pause icon, selected speed and primary advance action on the right. Keep accessible names for icon-only buttons. Use labels that match the mode's actual time model.
 - **Review:** report in a shared modal with outcome tag, time range, spending and evidence-based explanations. Raw snapshots belong in a disclosure. Continue returns to the same company.

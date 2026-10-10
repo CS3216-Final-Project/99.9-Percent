@@ -6,13 +6,16 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('completes the first-week tutorial, purchases equipment and resumes after reload', async ({ page }) => {
+  // The founder walks to the servers and the growth desk in real time, rendered on the CPU.
+  test.setTimeout(120_000);
   await page.goto('/');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expectRoom(page);
   await expect(page.getByRole('dialog', { name: /Tutorial, step 1/ })).toBeVisible();
   await page.getByRole('button', { name: 'Servers', exact: true }).click();
   await page.getByRole('button', { name: /Add server/ }).click();
-  await expect(page.getByRole('dialog', { name: /Tutorial, step 2/ })).toBeVisible();
+  // The founder walks to the servers and works them before the server is added.
+  await expect(page.getByRole('dialog', { name: /Tutorial, step 2/ })).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: 'Tech', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Tech tree' }).locator('.node')).toHaveCount(9);
   await page.getByRole('button', { name: 'Scale Up: Available' }).click();
@@ -20,7 +23,7 @@ test('completes the first-week tutorial, purchases equipment and resumes after r
   await expect(page.getByRole('dialog', { name: /Tutorial, step 3/ })).toBeVisible();
   await page.getByRole('button', { name: 'Growth', exact: true }).click();
   await page.getByRole('button', { name: /^Launch/ }).first().click();
-  await expect(page.getByRole('dialog', { name: /Tutorial, step 4/ })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: /Tutorial, step 4/ })).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   await page.getByRole('button', { name: 'Got it', exact: true }).click();
   const before = await savedGame(page);
@@ -84,8 +87,8 @@ test('draws the photo-scanned surfaces and furniture when HD detail is forced', 
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await expectRoom(page);
   // Six surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
-  await expect.poll(() => textures.size).toBe(18);
-  await expect.poll(() => furniture.size).toBe(9);
+  await expect.poll(() => textures.size, { timeout: 30_000 }).toBe(18);
+  await expect.poll(() => furniture.size, { timeout: 30_000 }).toBe(9);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
   await expectRoom(page);
@@ -147,8 +150,9 @@ test('confirms replacing a run and starts the supplied replay seed', async ({ pa
 
 test('resumes an incident paused, investigates, fixes it and acknowledges the postmortem', async ({ page }) => {
   // Clock.runFor also renders every WebGL animation frame. The CI trace shows
-  // several seconds of virtual time can take tens of seconds on SwiftShader.
-  test.setTimeout(150_000);
+  // several seconds of virtual time can take tens of seconds on SwiftShader,
+  // and the founder's walks add about eight seconds of virtual time.
+  test.setTimeout(240_000);
   const incident = advanceTurn({ ...newGame(1), users: 4500, techDone: ['monitoring'] });
   expect(incident.incident?.type).toBe('app_overload');
   await seedSave(page, incident);
@@ -156,7 +160,9 @@ test('resumes an incident paused, investigates, fixes it and acknowledges the po
   await page.goto('/');
   await page.getByRole('button', { name: 'Continue week 1' }).click();
   await expectRoom(page);
-  await page.clock.pauseAt(new Date(Date.now() + 1000));
+  // Pause a second ahead of the page's own clock: a slow load can carry it past the test runner's time.
+  const now = await page.evaluate(() => Date.now());
+  await page.clock.pauseAt(new Date(now + 1000));
   const panel = page.getByRole('region', { name: 'Incident', exact: true });
   const clock = panel.locator('.clock-time');
   await expect(clock).toHaveText('0:00');
@@ -164,7 +170,8 @@ test('resumes an incident paused, investigates, fixes it and acknowledges the po
   await expect(clock).toHaveText('0:00');
   await panel.getByRole('button', { name: 'Servers', exact: true }).click();
   await page.getByRole('button', { name: 'Resume the incident clock' }).click();
-  await page.clock.runFor(3200);
+  // The founder walks from the door to the servers, then the look takes three seconds.
+  await page.clock.runFor(9000);
   await expect(panel.locator('.evidence')).toContainText('CPU 100%');
   await expect(panel.locator('.evidence')).toContainText('of capacity');
   await page.getByRole('button', { name: 'Pause the incident clock' }).click();
@@ -176,7 +183,8 @@ test('resumes an incident paused, investigates, fixes it and acknowledges the po
   await panel.getByRole('button', { name: /^Add (a|\d+) server/ }).click();
   await page.getByRole('button', { name: '2×', exact: true }).click();
   await page.getByRole('button', { name: 'Resume the incident clock' }).click();
-  await page.clock.runFor(8000);
+  // A moment's work at the servers, then fourteen seconds of scaling out at double speed.
+  await page.clock.runFor(10_000);
   const report = page.getByRole('dialog');
   await expect(report).toContainText('Fixed');
   const reviewed = await savedGame(page);

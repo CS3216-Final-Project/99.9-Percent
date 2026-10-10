@@ -33,6 +33,14 @@ export const GLASS: [number, number, number, number][] = [
 
 export const GLASS_H = 2.6;
 
+/** Whether a straight line from (ax, az) to (bx, bz) passes through a pane of glass. */
+export function throughGlass(ax: number, az: number, bx: number, bz: number): boolean {
+  const side = (px: number, pz: number, qx: number, qz: number, rx: number, rz: number) => Math.sign((qx - px) * (rz - pz) - (qz - pz) * (rx - px));
+  return GLASS.some(
+    ([x1, z1, x2, z2]) => side(ax, az, bx, bz, x1, z1) * side(ax, az, bx, bz, x2, z2) < 0 && side(x1, z1, x2, z2, ax, az) * side(x1, z1, x2, z2, bx, bz) < 0,
+  );
+}
+
 /** The rooms behind glass, as [x0, z0, x1, z1]. Nobody wanders into them. */
 export const CLOSED_ROOMS: [number, number, number, number][] = [
   [-13, -9.5, 9, 5],
@@ -190,4 +198,26 @@ export const OBSTACLES: Obstacle[] = [
   // Games corner
   box("ping-pong table", RALLY.x, RALLY.z, TABLE.length, TABLE.width),
   ...ARCADES.map(([variant, x]) => box(`${variant} arcade`, x, ARCADE_Z, 0.72, 0.75)),
+];
+
+/**
+ * What stands on the floors behind glass, apart from the racks themselves (nav.ts adds those as they are built):
+ * the cooling units, the crash cart, the extinguisher and spare boxes on the server floor, and the on-call desk and
+ * its engineer in the monitoring room. Only the founder goes in there; the wandering crew keep out.
+ */
+export const BEHIND_GLASS: Obstacle[] = [
+  box("cooling unit, south", -12.45, -2.6, 0.9, 1.4),
+  box("cooling unit, north", -12.45, 2.2, 0.9, 1.4),
+  disc("extinguisher", -12.6, 4.4, 0.22),
+  box("crash cart", 5.3, -2.6, 0.9, 0.7),
+  disc("boxes by the monitoring room", 7.3, -4.1, 0.45),
+  disc("open box by the monitoring room", 8.2, -4.0, 0.4),
+  box("on-call desk", 8.2, -6.9, 1.8, 0.78),
+  disc("on-call engineer", SPOTS.onCall.x, SPOTS.onCall.z, 0.4),
+];
+
+/** Rooms the founder does not go into: the network and power room and the meeting room, as [x0, z0, x1, z1]. */
+export const OFF_LIMITS: [number, number, number, number][] = [
+  [-22, -9.5, -13, -1],
+  [-13, 10.2, -5.5, 14.5],
 ];

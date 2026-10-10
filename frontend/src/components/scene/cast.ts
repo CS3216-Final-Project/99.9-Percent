@@ -91,7 +91,7 @@ export function creature(n: number, role: Role = ROTATION[n % ROTATION.length]):
 /* What each activity looks like                                       */
 /* ------------------------------------------------------------------ */
 
-export type Activity = "type" | "relax" | "mug" | "laptop" | "idle" | "chat" | "walk" | "listen" | "present" | "panic" | "play";
+export type Activity = "type" | "relax" | "mug" | "laptop" | "idle" | "chat" | "walk" | "listen" | "present" | "panic" | "play" | "work";
 
 /** The animations each body plan comes with. */
 export const CLIPS: Record<Kind, readonly string[]> = {
@@ -109,12 +109,13 @@ export interface Motion {
 /**
  * The animation for an activity. Working creatures bob quickly at their desks,
  * listeners nod, presenters wave, and during an incident everyone shakes their
- * head. Flyers hover through everything except walking, which they fly.
+ * head. Someone working a machine by hand bashes away at it. Flyers hover
+ * through everything except walking, which they fly.
  */
 export function motionFor(kind: Kind, activity: Activity): Motion {
   if (kind === "flyer") {
     if (activity === "walk") return { clip: "Fast_Flying", speed: 1 };
-    if (activity === "play") return { clip: "Headbutt", speed: 1 };
+    if (activity === "play" || activity === "work") return { clip: "Headbutt", speed: 1 };
     if (activity === "panic") return { clip: "No", speed: 1.3 };
     if (activity === "listen" || activity === "chat") return { clip: "Yes", speed: 0.8 };
     return { clip: "Flying_Idle", speed: 1 };
@@ -135,6 +136,8 @@ export function motionFor(kind: Kind, activity: Activity): Motion {
     case "play":
       // A swing: the big species swing an arm, the small ones lunge.
       return kind === "big" ? { clip: "Weapon", speed: 1 } : { clip: "Bite_Front", speed: 1 };
+    case "work":
+      return kind === "big" ? { clip: "Punch", speed: 1.3 } : { clip: "Bite_Front", speed: 1.3 };
     case "relax":
       return kind === "blob" ? { clip: "Dance", speed: 0.5 } : { clip: "Idle", speed: 0.8 };
     default:

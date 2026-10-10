@@ -848,6 +848,97 @@ button:disabled {
   color: var(--critical-ink);
   animation: blink 0.9s steps(2) infinite;
 }
+/* The founder's bubble: what the founder is doing, or the machine it can work from where it stands. */
+.founder-layer {
+  z-index: 6;
+}
+
+.founder-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 3px;
+  margin-top: -14px;
+  background: var(--go);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--press);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.founder-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 8px;
+  height: 6px;
+  margin-left: -4px;
+  background: var(--ink);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.founder-bubble-icon {
+  display: grid;
+  place-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 2px;
+  background: var(--paper);
+}
+
+.founder-bubble.is-prompt {
+  pointer-events: auto;
+  padding-left: 4px;
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.founder-bubble.is-prompt:hover,
+.founder-bubble.is-prompt:focus-visible {
+  background: #fff;
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.founder-bubble kbd {
+  padding: 2px 5px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 3px;
+  font-family: var(--font-num);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.founder-bar {
+  position: relative;
+  width: 56px;
+  height: 10px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.founder-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--ok);
+}
+
+/* Touch screens have no Space key: the prompt is a button to tap. */
+@media (hover: none) {
+  .founder-bubble kbd {
+    display: none;
+  }
+}
+
 .eq-label.tone-busy {
   background: var(--warn);
 }

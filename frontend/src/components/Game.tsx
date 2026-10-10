@@ -6,6 +6,7 @@ import { BALANCE, completedTechIds, currentWarnings, metrics, TECH_ORDER, type G
 import { nextMove } from "@/game/advisor";
 import { clock, compact, money, moneyFull, num, signedMoney, uptimePct } from "@/game/format";
 import { createMusic, type Music } from "@/game/music";
+import { useFounder } from "@/game/founder";
 import { useGame, type Speed, type View } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { MusicButton } from "./MusicButton";
@@ -346,6 +347,8 @@ export default function Game() {
   const view = useGame((s) => s.view);
   const onboarding = useGame((s) => s.onboarding);
   const touring = useGame((s) => s.tour?.track ?? null);
+  // The week waits for the founder to finish the job in hand.
+  const working = useFounder((s) => !!s.job);
   useMusic();
 
   useEffect(() => {
@@ -361,10 +364,10 @@ export default function Game() {
 
   // Auto-advance during management.
   useEffect(() => {
-    if (campaign || phase !== "management" || !running || onboarding || view || touring || !started) return;
+    if (campaign || phase !== "management" || !running || onboarding || view || touring || !started || working) return;
     const id = window.setTimeout(() => useGame.getState().advance(), (AUTO_SECONDS * 1000) / speed);
     return () => window.clearTimeout(id);
-  }, [campaign, phase, running, speed, turn, onboarding, view, touring, started]);
+  }, [campaign, phase, running, speed, turn, onboarding, view, touring, started, working]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

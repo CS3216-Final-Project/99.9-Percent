@@ -36,6 +36,7 @@ import {
   type Meta,
 } from "./persist";
 import { decodeSave } from "./saveEnvelope";
+import { newJob, stationFor, useFounder } from "./founder";
 
 export type View = "tech" | "engineers" | "history" | "menu" | null;
 export type Speed = 0.5 | 1 | 2;
@@ -96,6 +97,12 @@ interface Store {
   /** Leave the title screen and start (or continue) playing. */
   play: () => void;
   act: (action: Action) => boolean;
+  /**
+   * A decision made at a machine. In Classic the founder walks there and works it first, and the action lands when
+   * the work is done; it returns false only when the action could not happen now anyway. Everything else, and every
+   * action in Campaign, goes straight to `act`.
+   */
+  perform: (action: Action) => boolean;
   advance: () => void;
   tick: (dt: number) => void;
   select: (id: EquipmentId | null) => void;
@@ -330,6 +337,25 @@ export const useGame = create<Store>()((set, get) => {
       return true;
     },
 
+    perform: (action) => {
+      const { game } = get();
+      const founder = useFounder.getState();
+      const station = game.campaign || !founder.present ? null : stationFor(action, game);
+      if (!station) return get().act(action);
+      // Check now, so the founder never walks across the office for something that cannot happen.
+      const trial = applyAction(game, action);
+      if (!trial.ok) {
+        get().notify(trial.message, "error");
+        return false;
+      }
+      const current = founder.job;
+      if (current && JSON.stringify(current.action) === JSON.stringify(action)) return true;
+      if (current) get().notify(`Dropped: ${current.label.toLowerCase()}.`);
+      founder.assign(newJob(action, station));
+      if (get().game.phase !== "incident") set({ selected: station });
+      return true;
+    },
+
     advance: () => {
       const { game } = get();
       if (game.phase !== "management") return;
@@ -518,18 +544,19 @@ export const useGame = create<Store>()((set, get) => {
 
 /**
  * Clicking or tapping a piece of equipment. Normally it opens the inspector;
- * during an incident it also sends the team to investigate that equipment.
+ * during an incident it also sends the team to investigate that equipment. In
+ * Classic the founder walks over too, and an investigation starts on arrival.
  */
 export function inspectOrSelect(id: EquipmentId): void {
-  const { game, select, act } = useGame.getState();
+  const { game, select, act, perform } = useGame.getState();
   if(game.campaign && !["app","db","monitoring","gateway"].includes(id))return;
   select(id);
   if(game.campaign) { if(["app","db","monitoring","gateway"].includes(id))act({type:"incident_inspect",equipment:id}); return; }
   const inc = game.incident;
-  if (game.phase !== "incident" || !inc || inc.status !== "active") return;
-  if (!inspectable(game).includes(id)) return;
-  if (inc.inspecting || inc.evidence.some((e) => e.equipment === id)) return;
-  act({ type: "incident_inspect", equipment: id });
+  const inspect =
+    game.phase === "incident" && inc?.status === "active" && inspectable(game).includes(id) && !inc.inspecting && !inc.evidence.some((e) => e.equipment === id);
+  if (inspect) perform({ type: "incident_inspect", equipment: id });
+  else if (useFounder.getState().present) useFounder.getState().walkTo({ station: id });
 }
 
 function loadMetaSafe(): Meta {

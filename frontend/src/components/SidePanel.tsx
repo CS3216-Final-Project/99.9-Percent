@@ -85,7 +85,7 @@ function NotBuilt({ id, requires }: { id: EquipmentId; requires: TechId }) {
 }
 
 function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics }) {
-  const act = useGame((s) => s.act);
+  const perform = useGame((s) => s.perform);
   const openView = useGame((s) => s.openView);
   const info = equipmentInfo(game, id);
   const locked = game.phase !== "management";
@@ -110,10 +110,10 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
           {atLimit && !has(game, "load_balancing") ? (
             <Act primary tour="primary" icon="tree" label="Load Balancing lifts the limit" onClick={() => useGame.getState().focusTech("load_balancing")} />
           ) : (
-            <Act primary tour="primary" icon="plus" label="Add server" price={BALANCE.server.setupCost} disabled={locked || atLimit} onClick={() => act({ type: "add_server" })} />
+            <Act primary tour="primary" icon="plus" label="Add server" price={BALANCE.server.setupCost} disabled={locked || atLimit} onClick={() => perform({ type: "add_server" })} />
           )}
           {sick.map((h) => (
-            <Act key={h.id} icon="refresh" label={`Replace ${h.id}`} price={BALANCE.server.replaceCost} disabled={locked} onClick={() => act({ type: "replace_host", hostId: h.id })} />
+            <Act key={h.id} icon="refresh" label={`Replace ${h.id}`} price={BALANCE.server.replaceCost} disabled={locked} onClick={() => perform({ type: "replace_host", hostId: h.id })} />
           ))}
           <More>
             <p className="muted">{info.about}</p>
@@ -133,7 +133,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
               <TechChip id="load_balancing" />
               <TechChip id="autoscaling" />
             </div>
-            <Act icon="minus" label="Remove a server" disabled={locked || m.servers <= 1} onClick={() => act({ type: "remove_server" })} />
+            <Act icon="minus" label="Remove a server" disabled={locked || m.servers <= 1} onClick={() => perform({ type: "remove_server" })} />
           </More>
         </>
       );
@@ -166,14 +166,14 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
               label={`Upgrade to ${next.name}`}
               price={next.cost}
               disabled={locked}
-              onClick={() => act({ type: "start_db_upgrade" })}
+              onClick={() => perform({ type: "start_db_upgrade" })}
               title={`${num(next.capacity)} queries/s, ${moneyFull(next.upkeep)} a week. Takes ${next.effort} engineer-weeks.`}
             />
           ) : (
             <p className="muted">Largest tier.</p>
           )}
           {host.status !== "healthy" && (
-            <Act icon="refresh" label="Replace machine" price={BALANCE.db.replaceCost} disabled={locked} onClick={() => act({ type: "replace_host", hostId: host.id })} />
+            <Act icon="refresh" label="Replace machine" price={BALANCE.db.replaceCost} disabled={locked} onClick={() => perform({ type: "replace_host", hostId: host.id })} />
           )}
           <More>
             <p className="muted">{info.about}</p>
@@ -242,7 +242,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
                     label={active ? "Running this week" : cooldown > 0 ? `Ready in ${cooldown} wk` : "Launch"}
                     price={usable ? promoCost(game, pid) : undefined}
                     disabled={locked || !usable}
-                    onClick={() => act({ type: "launch_promotion", promo: pid })}
+                    onClick={() => perform({ type: "launch_promotion", promo: pid })}
                     title={def.description}
                   />
                 )}
@@ -293,13 +293,13 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
           ))}
           <More>
             <p className="muted">{info.about}</p>
-            <Act icon="debt" label={paying ? "Debt paydown queued" : "Pay down debt"} note={paying ? undefined : `${BALANCE.debt.paydownEffort} wk`} disabled={locked || paying} onClick={() => act({ type: "start_debt_paydown" })} />
+            <Act icon="debt" label={paying ? "Debt paydown queued" : "Pay down debt"} note={paying ? undefined : `${BALANCE.debt.paydownEffort} wk`} disabled={locked || paying} onClick={() => perform({ type: "start_debt_paydown" })} />
             <Act
               icon="hire"
               label="Hire engineer"
               price={BALANCE.engineer.hireCost}
               disabled={locked || game.engineers >= BALANCE.engineer.max}
-              onClick={() => act({ type: "hire_engineer" })}
+              onClick={() => perform({ type: "hire_engineer" })}
               title={`Then ${moneyFull(BALANCE.engineer.salary)} a week.`}
             />
           </More>

@@ -246,7 +246,7 @@ export function TaskRow({ game, task }: { game: GameState; task: Task }) {
 
 /** A finished release: ship it now and accept the risk, or test it first. */
 export function ReleaseRow({ game, release }: { game: GameState; release: Release }) {
-  const act = useGame((s) => s.act);
+  const perform = useGame((s) => s.perform);
   const locked = game.phase !== "management";
   const testing = game.tasks.some((t) => t.kind === "test_release" && t.releaseId === release.id);
   const risk = releaseRisk(game, release);
@@ -288,7 +288,7 @@ export function ReleaseRow({ game, release }: { game: GameState; release: Releas
             className="act act-primary"
             data-tour="primary"
             disabled={locked}
-            onClick={() => act({ type: "deploy_release", releaseId: release.id })}
+            onClick={() => perform({ type: "deploy_release", releaseId: release.id })}
             title="Risk is the chance this deploy breaks production. It rises with tech debt. Testing first cuts it by 85%."
           >
             <Icon name="ship" />
@@ -296,7 +296,7 @@ export function ReleaseRow({ game, release }: { game: GameState; release: Releas
             <span className={`price risk-${tone}`}>{pct(risk)} risk</span>
           </button>
           {!release.tested && (
-            <button type="button" className="act" disabled={locked} onClick={() => act({ type: "test_release", releaseId: release.id })} title="Engineers test it before it ships.">
+            <button type="button" className="act" disabled={locked} onClick={() => perform({ type: "test_release", releaseId: release.id })} title="Engineers test it before it ships.">
               <Icon name="test" />
               <span className="act-label">Test first</span>
               <span className="price">

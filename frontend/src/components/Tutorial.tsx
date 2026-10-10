@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useFounder } from "@/game/founder";
 import { useGame, type TourTrack } from "@/game/store";
 
 /**
@@ -156,6 +157,8 @@ export default function Tutorial() {
   const step = tour ? steps[tour.step] : undefined;
   const track = tour?.track;
   const index = tour?.step ?? -1;
+  // While the founder walks to a machine and works it, the step is done; say so instead of asking again.
+  const errand = useFounder((f) => f.job?.label ?? null);
   const phaseFits = track === "basics" ? s.game.phase === "management" : s.game.phase === "incident";
   const visible = !!step && phaseFits && !s.onboarding && s.view !== "menu";
 
@@ -250,7 +253,7 @@ export default function Tutorial() {
         </div>
         <h3>{step.title}</h3>
         {step.why && <p className="muted">{step.why}</p>}
-        <p className="tour-prompt">{step.hint(s)}</p>
+        <p className="tour-prompt">{errand && step.done ? `${errand}: the founder is on it.` : step.hint(s)}</p>
         <div className="tour-foot">
           <button type="button" className="tour-skip" onClick={() => s.endTour(false)}>
             Skip

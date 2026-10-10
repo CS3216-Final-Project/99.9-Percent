@@ -24,6 +24,7 @@ export default function IncidentPanel() {
   const running = useGame((s) => s.running);
   const setRunning = useGame((s) => s.setRunning);
   const act = useGame((s) => s.act);
+  const perform = useGame((s) => s.perform);
   const inc = game.incident;
   if (!inc) return null;
 
@@ -152,7 +153,7 @@ export default function IncidentPanel() {
       <ul className="actions">
         {usable.map((o) => (
           <li key={o.id}>
-            <button type="button" className="action" title={o.description} disabled={!!pending} onClick={() => act({ type: "incident_action", recovery: o.id })}>
+            <button type="button" className="action" title={o.description} disabled={!!pending} onClick={() => perform({ type: "incident_action", recovery: o.id })}>
               <span className="action-title">{o.label}</span>
               <span className="price">
                 <Icon name="cash" size={12} />

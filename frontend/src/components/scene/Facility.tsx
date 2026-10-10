@@ -39,6 +39,7 @@ import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type
 import { Icon } from "../icons";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
+import { Founder, FounderBubble } from "./Founder";
 import { Exterior } from "./exterior";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
@@ -753,6 +754,8 @@ function Scene({ effects }: { effects: boolean }) {
   const edgeAlert = sym("gateway") || sym("app");
   const dataAlert = sym("db");
   const hd = useDetail() === "hd";
+  // In Classic the player walks the floor as the founder.
+  const founder = useGame((s) => s.started && !s.game.campaign);
 
   return (
     <>
@@ -781,7 +784,8 @@ function Scene({ effects }: { effects: boolean }) {
 
       <Room />
       <Exterior linear={effects} />
-      <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
+      <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos, founderOut: founder }} />
+      {founder && <Founder />}
 
       {/* Network edge */}
       <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
@@ -897,6 +901,11 @@ function HoverTip({ container }: { container: React.RefObject<HTMLDivElement | n
   );
 }
 
+function FounderLayer() {
+  const founder = useGame((s) => s.started && !s.game.campaign);
+  return founder ? <FounderBubble /> : null;
+}
+
 /** True when WebGL is drawn on the CPU (SwiftShader, llvmpipe and similar), as on machines without a GPU. */
 function isSoftwareRenderer(gl: THREE.WebGLRenderer): boolean {
   const ctx = gl.getContext();
@@ -920,6 +929,7 @@ function SoftwareFrames() {
 
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
+  const founder = useGame((s) => s.started && !s.game.campaign);
   const [renderer, setRenderer] = useState<Renderer>("unknown");
   /** Drawing in software, without a GPU: no shadows, half the pixels, 20 frames a second. */
   const soft = renderer === "software";
@@ -958,6 +968,7 @@ export default function Facility() {
         {soft && <SoftwareFrames />}
       </Canvas>
       <Labels />
+      <FounderLayer />
       <HoverTip container={container} />
       <div className="camera-buttons" role="group" aria-label="Camera">
         <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" title="Zoom in">
@@ -977,6 +988,11 @@ export default function Facility() {
         </button>
         <span className="camera-hint" aria-hidden="true">
           <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn
+          {founder && (
+            <>
+              {" "}· <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> to walk · <kbd>Shift</kbd> to dash · <kbd>Space</kbd> to use
+            </>
+          )}
         </span>
       </div>
     </div>
