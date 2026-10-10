@@ -2,9 +2,10 @@ import type { Campaign, Ledger } from "./campaignTypes";
 import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
 import { APPLICATION_SCALING as P } from "./scenarios/applicationScaling";
 import { DATA_STRATEGY as D } from "./scenarios/dataStrategy";
+import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
 import { trace } from "./trace";
 export function emptyLedger(): Ledger {
-    return { successes: 0, failures: 0, rejected: 0, appNumerator: 0, dbNumerator: 0, salaryNumerator: 0, lbNumerator: 0, cacheNumerator: 0 };
+    return { successes: 0, failures: 0, rejected: 0, appNumerator: 0, dbNumerator: 0, salaryNumerator: 0, lbNumerator: 0, cacheNumerator: 0, controllerNumerator:0 };
 }
 export function accruePeriod(c: Campaign): void {
     const l = c.ledger, m = c.snapshot;
@@ -15,6 +16,7 @@ export function accruePeriod(c: Campaign): void {
     l.dbNumerator += c.dbCapacity===D.dbCapacity?D.dbWeeklyCents:c.dbCapacity >= P.dbCapacity ? P.dbWeeklyCents : c.upgraded ? Q.upgradedDbWeeklyCents : Q.dbWeeklyCents;
     l.lbNumerator = (l.lbNumerator ?? 0) + (c.loadBalancer ? P.lbWeeklyCents : 0);
     l.cacheNumerator=(l.cacheNumerator??0)+(c.readCache?D.cacheWeeklyCents:0);
+    l.controllerNumerator=(l.controllerNumerator??0)+(c.spikeStage?.controller?T.controllerWeeklyCents:0);
     l.salaryNumerator += Q.engineers * Q.salaryWeeklyCents;
 }
 export function settlePeriod(c: Campaign): void {
@@ -33,13 +35,14 @@ export function settlePeriod(c: Campaign): void {
     const salaryCents = charge("salary", c.ledger.salaryNumerator);
     const lbCents = charge("lb", c.ledger.lbNumerator ?? 0);
     const cacheCents=charge("cache",c.ledger.cacheNumerator??0);
+    const controllerCents=charge("controller",c.ledger.controllerNumerator??0);
     const revenueCents = c.ledger.successes * Q.revenueCents;
-    const netCents = revenueCents - appCents - dbCents - salaryCents - lbCents - cacheCents;
+    const netCents = revenueCents - appCents - dbCents - salaryCents - lbCents - cacheCents - controllerCents;
     c.cashCents += netCents;
     c.revenueCents += revenueCents;
-    c.costsCents += appCents + dbCents + salaryCents + lbCents + cacheCents;
+    c.costsCents += appCents + dbCents + salaryCents + lbCents + cacheCents + controllerCents;
     c.lastSettledPeriod = period;
-    c.settlements.push({ period, step: c.step, revenueCents, appCents, dbCents, salaryCents, lbCents, cacheCents, netCents });
-    trace(c, "settlement", { period, revenueCents, appCents, dbCents, salaryCents, lbCents, cacheCents, netCents });
+    c.settlements.push({ period, step: c.step, revenueCents, appCents, dbCents, salaryCents, lbCents, cacheCents, controllerCents, netCents });
+    trace(c, "settlement", { period, revenueCents, appCents, dbCents, salaryCents, lbCents, cacheCents, controllerCents, netCents });
     c.ledger = emptyLedger();
 }

@@ -8,7 +8,7 @@ function act(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error
 /** Reconstruct the accepted schema-2 format, with original aggregate snapshots only. */
 function oldEnvelope(g:GameState,version=2) {
  const e=JSON.parse(JSON.stringify(makeEnvelope(g))),c=e.game.campaign;
- e.schemaVersion=version;
+ e.schemaVersion=version;delete c.openingPrevention;
  for(const key of ["routing","loadBalancer","routingEnabledOnce","scaling","overload"])delete c[key];
  c.apps.forEach((a:Record<string,unknown>)=>{delete a.tier;delete a.state;});
  delete c.ledger.lbNumerator;delete c.remainders.lb;

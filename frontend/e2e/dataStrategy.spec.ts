@@ -17,15 +17,16 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  const guidance=page.getByRole("region",{name:"Campaign guidance"});
  await expect(page.getByRole("navigation",{name:"Campaign progression"})).toContainText("Data Strategy Available next");
  await page.getByRole("button",{name:"Continue to data strategy",exact:true}).click();
- await expect(guidance).toContainText("Current stage: Data Strategy");
+ await expect(guidance).toContainText("Current stage: Data Bottlenecks (Data Strategy)");
  await expect(guidance).toContainText("80% reads / 20% writes");
+ const requirements=page.getByRole("region",{name:"Progression requirements"});await expect(requirements.locator('[data-requirement="growth"]')).toHaveAttribute("data-met","false");await expect(requirements).toContainText("Data growth occurred");await expect(requirements).toContainText("Workload contrast is optional");await expect(page.getByRole("button",{name:"Continue to traffic spikes"})).toHaveCount(0);
  expect((await savedGame(page)).campaign!.dataStage!.profile).toBe("read-heavy");
- for(let i=0;i<6;i++)await page.getByRole("button",{name:"Advance step",exact:true}).click();
+ for(let i=0;i<6;i++)await page.getByRole("button",{name:"Advance 1 step",exact:true}).click();
  expect((await savedGame(page)).campaign!.incident!.primaryComponent).toBe("db");
  const data=page.getByRole("region",{name:"Data strategy"});
  if(strategy==="cache")await data.getByRole("button",{name:/Deploy Read Cache/}).click();
  else await page.getByRole("button",{name:/Upgrade database/}).click();
- await page.getByRole("button",{name:"Run",exact:true}).click();await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
+ await page.getByRole("button",{name:"Resume company",exact:true}).click();await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
  let c=(await savedGame(page)).campaign!;expect(c.runId).toBe("data-browser");
  if(strategy==="cache") {
   expect(c.snapshot.data!.effectiveHitRateUsed).toBe(6000);expect(c.snapshot.db.demand).toBe(1248);
@@ -36,14 +37,14 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
   await page.getByRole("navigation",{name:"Request dependencies"}).getByRole("button",{name:/Read Cache/}).click();
   await expect(page.getByRole("status").filter({hasText:"Selected component"})).toContainText("Read Cache");
   await data.getByRole("button",{name:"Observe contrasting workload",exact:true}).click();
-  await page.getByRole("button",{name:"Run",exact:true}).click();await expect.poll(async()=>(await savedGame(page)).campaign!.snapshot.db.demand).toBe(2112);
-  await expect.poll(async()=>!!(await savedGame(page)).campaign!.incident).toBe(true);await page.getByRole("button",{name:"Pause",exact:true}).click();
+  await page.getByRole("button",{name:"Resume company",exact:true}).click();await expect.poll(async()=>(await savedGame(page)).campaign!.snapshot.db.demand).toBe(2112);
+  await expect.poll(async()=>!!(await savedGame(page)).campaign!.incident).toBe(true);await page.getByRole("button",{name:"Pause company",exact:true}).click();
   await expect(data).toContainText("write-heavy");expect((await savedGame(page)).campaign!.snapshot.data!.writes).toBe(1920);
-  await page.getByRole("button",{name:/Upgrade database/}).click();await page.getByRole("button",{name:"Run",exact:true}).click();
+  await page.getByRole("button",{name:/Upgrade database/}).click();await page.getByRole("button",{name:"Resume company",exact:true}).click();
   await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
   expect((await savedGame(page)).campaign!.dbCapacity).toBe(3000);await page.getByRole("button",{name:"Continue company",exact:true}).click();
  }
  await expect(page.getByRole("navigation",{name:"Campaign progression"})).toBeInViewport();
  await page.screenshot({path:`test-results/phase4-${strategy}.png`});c=(await savedGame(page)).campaign!;
- await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);await expect(guidance).toContainText("Current stage: Data Strategy");expect(api).toEqual([]);
+ await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);await expect(guidance).toContainText("Current stage: Data Bottlenecks (Data Strategy)");expect(api).toEqual([]);
 });

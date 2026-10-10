@@ -70,7 +70,7 @@ export function loadGame():LoadResult {
   let result=decodeSave(raw);
   if(result.status==="unsupported") {
     try {
-      if([1,2,3].includes(JSON.parse(raw).schemaVersion) && migrateSave(window.localStorage))result=decodeSave(window.localStorage.getItem(SAVE_KEY)!);
+      if([1,2,3,4].includes(JSON.parse(raw).schemaVersion) && migrateSave(window.localStorage))result=decodeSave(window.localStorage.getItem(SAVE_KEY)!);
     } catch { return {status:"unavailable"}; }
   }
   if(result.status!=="ok")return result;

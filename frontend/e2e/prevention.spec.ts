@@ -1,0 +1,32 @@
+import {test,expect,expectRoom,savedGame} from "./fixtures";
+
+test("Opening prevention: fresh player, new observations, reloads and same-company Scaling without API",async({page})=>{
+ test.setTimeout(90000);await page.route("**/api/**",r=>r.abort());await page.goto("/");
+ await page.getByRole("button",{name:"Try Prototype",exact:true}).click();await page.getByRole("button",{name:"Skip introduction"}).click();await expectRoom(page);
+ const id=(await savedGame(page)).campaign!.runId;
+ await page.getByRole("button",{name:"Limit to 500 requests/s",exact:true}).click();
+ await page.getByRole("button",{name:/Upgrade database/}).click();
+ for(let i=0;i<4;i++)await page.getByRole("button",{name:"Advance 1 step",exact:true}).click();
+ let c=(await savedGame(page)).campaign!;expect(c.consumedEvents).toContain("opening-growth");expect(c.incident).toBeNull();expect(c.reports).toEqual([]);
+ const checklist=page.getByRole("region",{name:"Opening prevention progress"});await expect(checklist).toContainText("Stable service: 0 / 5");
+ await expect(checklist).toContainText("To prove the architecture can handle current demand, remove the limit and serve the full 800 req/s.");
+ await page.getByRole("button",{name:"Remove traffic limit",exact:true}).click();
+ await checklist.getByRole("button",{name:"Inspect Application evidence"}).click();await checklist.getByRole("button",{name:"Inspect Database evidence"}).click();
+ for(let i=0;i<2;i++)await page.getByRole("button",{name:"Advance 1 step",exact:true}).click();
+ await page.screenshot({path:"test-results/prevention-polish-checklist.png"});
+ await expect(checklist).toContainText("Stable service: 2 / 5");await expect(checklist.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","true");await expect(checklist).not.toContainText("You are protecting the system by rejecting traffic");c=(await savedGame(page)).campaign!;
+ await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);await expect(checklist).toContainText("Stable service: 2 / 5");
+ for(let i=0;i<3;i++)await page.getByRole("button",{name:"Advance 1 step",exact:true}).click();
+ const outcome=page.getByRole("dialog",{name:"Prevention review"});await expect(outcome).toBeVisible();await expect(outcome).toContainText("You prevented a production incident");await expect(outcome.getByRole("heading",{name:"What you prepared",exact:true})).toBeVisible();await page.screenshot({path:"test-results/prevention-polish-review.png"});
+ c=(await savedGame(page)).campaign!;expect(c.openingRecovered).toBe(false);expect(c.reports).toEqual([]);expect(c.openingMilestone).toBeNull();
+ await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(outcome).toBeVisible();expect((await savedGame(page)).campaign).toEqual(c);
+ await outcome.getByRole("button",{name:"Close",exact:true}).click();await page.getByRole("button",{name:"Review outcome",exact:true}).click();
+ await outcome.getByRole("button",{name:"Continue company",exact:true}).click();
+ const milestone=page.getByRole("dialog",{name:"First growth challenge handled"});await expect(milestone).toContainText("FIRST GROWTH PREVENTED");
+ await milestone.getByRole("button",{name:"Close",exact:true}).click();await page.getByRole("button",{name:"Complete Opening",exact:true}).click();
+ await milestone.getByRole("button",{name:"Continue operating",exact:true}).click();
+ await expect(page.getByRole("region",{name:"Campaign guidance"})).toContainText("Current stage: Scale Your App");
+ await expect(page.getByRole("navigation",{name:"Campaign progression"})).toContainText("First GrowthOpening Completed");
+ c=(await savedGame(page)).campaign!;expect(c.runId).toBe(id);expect(c.step).toBe(9);expect(c.openingRecovered).toBe(false);expect(c.scaling?.id).toBe("application-scaling");
+ await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);
+});

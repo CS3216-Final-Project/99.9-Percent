@@ -2,9 +2,13 @@ import { test, expect, expectRoom, savedGame } from "./fixtures";
 test("inspects evidence and advances a physical step on touch", async ({ page }) => {
   await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap(); await page.getByRole("button",{name:"Skip introduction"}).tap();
   await expectRoom(page);
+  await expect(page.getByRole("region",{name:"Campaign guidance"})).toBeInViewport();
+  await expect(page.getByRole("region",{name:"System status"})).toBeInViewport();
+  await expect(page.getByRole("region",{name:"Architecture"})).toBeInViewport();
+  await expect(page.getByRole("region",{name:"Actions"}).getByRole("button",{name:/Add application/})).toBeInViewport();
   await page.screenshot({ path: "test-results/phase1-mobile.png" });
   await page.getByRole("button", { name: "Inspect metrics · free" }).tap();
-  await page.getByRole("button", { name: "Advance step" }).tap();
+  await page.getByRole("button", { name: "Advance 1 step" }).tap();
   expect((await savedGame(page)).campaign!.step).toBe(1);
   await expect(page.getByRole("navigation",{name:"Campaign progression"})).toBeInViewport();
   await expect(page.getByRole("navigation",{name:"Campaign progression"})).toContainText("Opening Current");
@@ -42,4 +46,30 @@ test("selects the read cache through room and dependency evidence on touch",asyn
  await expect(page.getByRole("navigation",{name:"Campaign progression"})).toBeInViewport();
  await expect(page.getByRole("navigation",{name:"Campaign progression"})).toContainText("Data Strategy Current");
  await page.screenshot({path:"test-results/phase4-mobile.png"});expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+});
+
+test("selects autoscaled instances and reads controller guidance on touch without API",async({page})=>{
+ const {spikeCompany,untilOffset}=await import("../src/sim/__tests__/spikeFixtures");const {seedSave}=await import("./fixtures");
+ await page.route("**/api/**",r=>r.abort());await seedSave(page,untilOffset(spikeCompany(),24));await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ await expect(page.getByRole("navigation",{name:"Campaign progression"})).toContainText("Traffic Spikes & Autoscaling Current");
+ await page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 4:/}).tap();
+ await expect(page.getByRole("main").getByRole("button",{name:"App 4",exact:true})).toHaveAttribute("aria-pressed","true");
+ await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).tap();await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 3:/})).toHaveAttribute("aria-pressed","true");
+ await expect(page.getByRole("region",{name:"Traffic spikes and autoscaling"})).toContainText("Cooldown remaining");
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);await page.screenshot({path:"test-results/phase5-mobile.png"});
+});
+
+test("First Growth prevention checklist and review are understandable on touch",async({page})=>{
+ await page.route("**/api/**",r=>r.abort());await page.goto("/");await page.getByRole("button",{name:"Try Prototype",exact:true}).tap();await page.getByRole("button",{name:"Skip introduction"}).tap();await expectRoom(page);
+ await page.getByRole("button",{name:"Limit to 500 requests/s",exact:true}).tap();await page.getByRole("button",{name:/Upgrade database/}).tap();
+ for(let i=0;i<4;i++)await page.getByRole("button",{name:"Advance 1 step",exact:true}).tap();
+ const checklist=page.getByRole("region",{name:"Opening prevention progress"});await expect(checklist).toContainText("You are protecting the system by rejecting traffic");await expect(checklist).toContainText("Stable service: 0 / 5 seconds of simulated service");
+ await page.getByRole("button",{name:"Remove traffic limit",exact:true}).tap();await checklist.getByRole("button",{name:"Inspect Application evidence"}).tap();await checklist.getByRole("button",{name:"Inspect Database evidence"}).tap();
+ for(let i=0;i<3;i++)await page.getByRole("button",{name:"Advance 1 step",exact:true}).tap();
+ await expect(checklist).toContainText("Stable service: 3 / 5 seconds of simulated service");await checklist.scrollIntoViewIfNeeded();await page.screenshot({path:"test-results/prevention-polish-mobile-checklist.png"});
+ for(let i=0;i<2;i++)await page.getByRole("button",{name:"Advance 1 step",exact:true}).tap();
+ const review=page.getByRole("dialog",{name:"Prevention review"});await expect(review).toContainText("You prevented a production incident");await page.screenshot({path:"test-results/prevention-polish-mobile-review.png"});
+ await review.getByRole("button",{name:"Close",exact:true}).tap();await expect(checklist).toContainText("FIRST GROWTH PREVENTED");await checklist.getByRole("button",{name:"Review outcome"}).tap();await review.getByRole("button",{name:"Continue company"}).tap();
+ await page.getByRole("dialog",{name:"First growth challenge handled"}).getByRole("button",{name:"Continue operating"}).tap();expect((await savedGame(page)).campaign!.scaling?.id).toBe("application-scaling");
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
 });

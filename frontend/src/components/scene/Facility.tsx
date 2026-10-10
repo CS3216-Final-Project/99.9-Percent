@@ -546,7 +546,7 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
       anchors.set(id, new THREE.Vector3(f.x, f.h + 0.3, f.z));
     }
     anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, 1.35, AISLE_Z));
-    for(const id of ["app-1","app-2"])anchors.delete(id);
+    for(const id of anchors.keys())if(/^app-/.test(id))anchors.delete(id);
     if(apps)apps.forEach((a,i)=>{const p=appSlot(i);anchors.set(a.id,new THREE.Vector3(p.x,RACK.h+.6,p.z));});
   }, [footprints,apps]);
 
@@ -556,7 +556,7 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
       if (!el) return;
       v.copy(pos).project(camera);
       let x = (v.x * 0.5 + 0.5) * size.width;
-      let y = (-v.y * 0.5 + 0.5) * size.height + (key==="app"&&labelEls.has("app-1")? -100:key==="app-1"?-10:key==="app-2"?12:0);
+      let y = (-v.y * 0.5 + 0.5) * size.height + (key==="app"&&labelEls.has("app-1")? -100:/^app-/.test(key)?Number(key.slice(4))*16-26:0);
       // The mobile evidence sheet occupies the lower 56% of the room.
       // Keep the new cache label touchable in the visible room above it.
       if(key==="cache" && size.width<=900) {y=Math.min(y,size.height*.32);x=Math.max(65,Math.min(size.width-65,x));}
@@ -616,7 +616,7 @@ function Labels() {
       {EQUIPMENT_ORDER.filter((id) => m.opening ? ["gateway","app","db","monitoring",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={a.id==="app-1"?"App 1":"App 2"} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{a.id==="app-1"?"App 1":"App 2"}<span className="eq-note">{a.routed?"routed":"unrouted"}</span></button>)}
+      {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.routed?"routed":"unrouted"}</span></button>)}
     </div>
   );
 }

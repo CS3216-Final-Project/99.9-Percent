@@ -12,7 +12,7 @@ function recovered() {let g=advanceSteps(newGame(1,"phase2-test"),6).state;g=act
 function enter(){useGame.getState().boot();useGame.getState().play();useGame.getState().onboardingMove("skip");}
 function v1(g:GameState) {
  const e=JSON.parse(JSON.stringify(makeEnvelope(g)));e.schemaVersion=1;
- delete e.game.campaign.openingMilestone;delete e.runtime.measurement;
+ delete e.game.campaign.openingPrevention;delete e.game.campaign.openingMilestone;delete e.runtime.measurement;
  return JSON.stringify(e);
 }
 it("landing boot creates neither durable company nor run event; explicit entry is idempotent",()=>{

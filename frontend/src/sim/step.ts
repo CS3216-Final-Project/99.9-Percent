@@ -1,5 +1,8 @@
+import { pendingPreventionReview, observePrevention, recordPreventionInspection } from "./openingPrevention";
 import type { GameState, Action, ActionResult } from "./types";
 import type { Campaign, Snapshot, ComponentSnapshot, Intervention, Routing, ScheduledAction } from "./campaignTypes";
+import { pendingSpikeAcknowledgement, spikeAction, advanceSpikeTraffic, runAutoscaler, activateRetirement } from "./autoscaling";
+import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
 import { clone } from "./state";
 import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
 import { DATA_STRATEGY as D, DATA_PROFILES, type DataProfile } from "./scenarios/dataStrategy";
@@ -59,9 +62,9 @@ export function initialCampaign(runId: string): Campaign {
         incomingRate: Q.startingTraffic, limit: null,
         apps: [{ id: "app-1", capacity: Q.appCapacity, backlog: 0, routed: true, tier: "base", state: "active" }],
         routing: { mode: "single", targets: ["app-1"] }, loadBalancer: false, routingEnabledOnce: false,
-        scaling: null, dataStage: null, readCache: null, overload: { "app-1": 0, db: 0 },
+        scaling: null, dataStage: null, readCache: null, spikeStage:null, nextAppNumber:2, overload: { "app-1": 0, db: 0 },
         dbCapacity: Q.dbCapacity, dbBacklog: 0, upgraded: false, cashCents: Q.startingCashCents,
-        ledger: emptyLedger(), remainders: { app: 0, db: 0, salary: 0, lb: 0, cache: 0 }, settlements: [], lastSettledPeriod: 0,
+        ledger: emptyLedger(), remainders: { app: 0, db: 0, salary: 0, lb: 0, cache: 0, controller:0 }, settlements: [], lastSettledPeriod: 0,
         revenueCents: 0, costsCents: 0, investedCents: 0,
         cumulative: { admitted: 0, rejected: 0, successful: 0, failed: 0 },
         pending: [], actions: [], consumedEvents: [], overloadSteps: 0, incident: null, reports: [],
@@ -78,7 +81,7 @@ export function projectCampaign(s: GameState): GameState {
     s.engineers = Q.engineers;
     s.turn = Math.floor(c.step / Q.periodSteps) + 1;
     s.infra.appHosts = c.apps.map(a => ({ id: a.id, status: "healthy", bornTurn: 1 }));
-    s.infra.nextHostNum = c.apps.length + 1;
+    s.infra.nextHostNum = c.nextAppNumber;
     s.infra.dbTier = c.dbCapacity >= D.dbCapacity ? 3 : c.dbCapacity >= P.dbCapacity ? 2 : c.upgraded ? 1 : 0;
     s.live = {
         peakRps: c.snapshot.incoming, tempServers: 0, latencyMs: c.snapshot.latencyMs,
@@ -94,7 +97,7 @@ export function qualifiesForRecovery(m: Snapshot): boolean {
     return m.latencyMs < Q.latencyThresholdMs && m.serviceErrorRate !== null &&
         m.serviceErrorRate < Q.errorThreshold && m.admitted > 0 && m.successful + m.failed > 0;
 }
-export type StopReason = "first-incident" | "review" | "ended" | null;
+export type StopReason = "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | null;
 export function step(prev: GameState): {
     state: GameState;
     stopReason: StopReason;
@@ -103,6 +106,8 @@ export function step(prev: GameState): {
         throw new Error("Physical step requires an opening-db campaign");
     if (prev.phase === "review" || prev.phase === "ended")
         return { state: prev, stopReason: prev.phase };
+    if(pendingPreventionReview(prev.campaign))return {state:prev,stopReason:"prevention-review"};
+    if(pendingSpikeAcknowledgement(prev.campaign))return {state:prev,stopReason:"spike-acknowledgement"};
     const s = clone(prev), c = s.campaign!;
     c.step++;
     for (const action of c.pending.filter(a => a.activationStep === c.step)) {
@@ -111,6 +116,12 @@ export function step(prev: GameState): {
         const routingBefore = JSON.stringify(c.routing);
         const effectiveBefore = c.apps.filter(a=>c.routing.targets.includes(a.id)).reduce((n,a)=>n+a.capacity,0);
         const admittedBefore = Math.min(c.incomingRate, c.limit ?? c.incomingRate);
+        if(action.type==="retire-app"&&!activateRetirement(c,action))continue;
+        if(action.type==="deploy-autoscaler") {
+          c.spikeStage!.controller={activatedStep:c.step,enabled:true,highSteps:0,lowSteps:0,cooldownUntil:c.step,managedAppIds:[],joiningAppId:null,expectedRouting:JSON.stringify(c.routing),blockedReason:null};
+          trace(c,"autoscaling-enabled",{activationStep:c.step});
+        }
+        if(action.type=== "add-app"&&action.source==="autoscaler")c.spikeStage!.controller!.managedAppIds.push(action.targetId!);
         if (action.type === "add-app")
             c.apps.push({ id: action.targetId ?? "app-2", capacity: Q.appCapacity, backlog: 0, routed: false, tier: "base", state: "active" });
         if (action.type === "upgrade-db") {
@@ -130,13 +141,16 @@ export function step(prev: GameState): {
             c.routing.targets.sort((a,b)=>Number(a.split("-")[1])-Number(b.split("-")[1]));
             c.apps.forEach(a=>a.routed=c.routing.targets.includes(a.id));
         }
+        if(action.type==="routing"&&action.source==="autoscaler") {
+          const a=c.spikeStage!.controller!;a.joiningAppId=null;a.cooldownUntil=c.step+T.cooldown;a.expectedRouting=JSON.stringify(c.routing);
+        }
         if (action.type === "limit")
             c.limit = Q.admissionLimit;
         if (action.type === "unlimit")
             c.limit = null;
         c.actions.find(a => a.id === action.id)!.activatedStep = c.step;
         trace(c, "action-activated", {
-            actionId: action.id, costCents:action.costCents, dbBefore, dbAfter: c.dbCapacity, appBefore,
+            actionId: action.id, source:action.source??"player", costCents:action.costCents, dbBefore, dbAfter: c.dbCapacity, appBefore,
             appAfter: c.apps.reduce((n,a)=>n+a.capacity,0), admittedBefore, admittedAfter: Math.min(c.incomingRate, c.limit ?? c.incomingRate),
             targetId: action.targetId ?? null, capacityBefore:targetCapacityBefore, capacityAfter:action.targetId?c.apps.find(a=>a.id===action.targetId)?.capacity??null:action.capacityAfter??null, routingBefore, routingAfter: JSON.stringify(c.routing),
             effectiveBefore, effectiveAfter: c.apps.filter(a=>c.routing.targets.includes(a.id)).reduce((n,a)=>n+a.capacity,0),
@@ -176,6 +190,7 @@ export function step(prev: GameState): {
         c.consumedEvents.push("opening-growth");
         trace(c, "traffic-change", { eventId: "opening-growth", from: Q.startingTraffic, to: c.incomingRate });
     }
+    advanceSpikeTraffic(c);
     const incoming = c.incomingRate, admitted = Math.min(incoming, c.limit ?? incoming), rejected = incoming - admitted;
     const allocation = allocateTraffic(admitted, c.routing.targets);
     let appBusyBudget = 0;
@@ -203,7 +218,7 @@ export function step(prev: GameState): {
     c.dbBacklog = db.backlog;
     const successful = db.processed+(data?.hits??0), failed = app.failed + db.failed;
     c.snapshot = {
-        version: data?4:3, ...(data?{data}:{}), instances, effectiveAppCapacity, appBusyBudget, routing: clone(c.routing), step: c.step, incoming, admitted, rejected, app, db,
+        version: c.spikeStage?5:data?4:3, ...(data?{data}:{}), instances, effectiveAppCapacity, appBusyBudget, routing: clone(c.routing), step: c.step, incoming, admitted, rejected, app, db,
         installedAppCapacity: c.apps.reduce((n, a) => n + a.capacity, 0), successful, failed,
         latencyMs: Q.baseLatencyMs + 1000 * (Math.max(...instances.map(a=>a.backlog/a.capacity)) + db.backlog / c.dbCapacity),
         serviceErrorRate: successful + failed > 0 ? failed / (successful + failed) : null
@@ -256,6 +271,10 @@ export function step(prev: GameState): {
             }
         }
     }
+    observePrevention(c);
+    if(pendingPreventionReview(c))stopReason="prevention-review";
+    runAutoscaler(s);
+    if(pendingSpikeAcknowledgement(c))stopReason="spike-acknowledgement";
     trace(c, "metrics", { snapshotStep: c.step, ...(data?{profile:data.profile,hits:data.hits,eligibleMisses:data.eligibleMisses,effectiveHitRate:data.effectiveHitRateUsed,dbDemand:db.demand,dbCapacity:db.capacity}: {}) });
     return { state: projectCampaign(s), stopReason };
 }
@@ -272,6 +291,7 @@ export function advanceSteps(prev: GameState, count: number): {
             stopReason = state.phase;
             break;
         }
+        if(pendingPreventionReview(state.campaign)) {stopReason="prevention-review";break;}
         const result = step(state);
         state = result.state;
         stopReason = result.stopReason;
@@ -282,6 +302,21 @@ export function advanceSteps(prev: GameState, count: number): {
     return { state, stepsConsumed, stopReason };
 }
 export function campaignAction(prev: GameState, action: Action): ActionResult {
+    if (action.type === "acknowledge_prevention_review") {
+        if (prev.phase !== "management" || !pendingPreventionReview(prev.campaign))
+            return {ok:false,reason:"invalid",message:"No prevention outcome awaits acknowledgement."};
+        const s=clone(prev), c=s.campaign!, outcome=c.openingPrevention!.outcome!;
+        outcome.acknowledged=true;
+        trace(c,"opening-prevention-review-acknowledged",{outcomeId:outcome.id});
+        if(!c.openingMilestone) {
+            c.openingMilestone={id:"opening-stability",incidentId:null,outcomeId:outcome.id,awardedStep:c.step,acknowledged:false};
+            trace(c,"milestone-awarded",{outcomeId:outcome.id,outcome:"prevention"});
+        }
+        return {ok:true,state:s};
+    }
+    if(pendingPreventionReview(prev.campaign))return {ok:false,reason:"invalid",message:"Review the Opening prevention outcome first."};
+    const special=spikeAction(prev,action);if(special)return special.ok?{...special,state:projectCampaign(special.state)}:special;
+    if(pendingSpikeAcknowledgement(prev.campaign!))return {ok:false,reason:"invalid",message:"Acknowledge spike completion first."};
     const fail = (message: string): ActionResult => ({ ok: false, reason: "invalid", message });
     if (action.type === "acknowledge_review" && prev.phase === "review") {
         const s = clone(prev);
@@ -313,7 +348,7 @@ export function campaignAction(prev: GameState, action: Action): ActionResult {
         return {ok:true,state:s};
     }
     if(action.type==="contrast_workload") {
-        if(!prev.campaign!.dataStage?.consumed || prev.campaign!.dataStage.contrastConsumed || !canEnterData(prev))return fail("Finish review and drain backlog before changing workload.");
+        if(prev.campaign!.spikeStage || !prev.campaign!.dataStage?.consumed || prev.campaign!.dataStage.contrastConsumed || !canEnterData(prev))return fail("Finish review and drain backlog before changing workload.");
         const s=clone(prev),c=s.campaign!,d=c.dataStage!;const from=d.profile;
         d.profile=from==="read-heavy"?"write-heavy":"read-heavy";d.contrastConsumed=true;c.consumedEvents.push("data-contrast");
         trace(c,"workload-changed",{eventId:"data-contrast",fromProfile:from,profile:d.profile,...DATA_PROFILES[d.profile]});
@@ -327,6 +362,7 @@ export function campaignAction(prev: GameState, action: Action): ActionResult {
         const s = clone(prev);
         if(action.appId && !s.campaign!.apps.some(a=>a.id===action.appId))return fail("Unknown application instance.");
         trace(s.campaign!, "inspection", { component: action.equipment, appId:action.appId??null, snapshotStep: s.campaign!.step, snapshot: JSON.stringify(s.campaign!.snapshot) });
+        recordPreventionInspection(s.campaign!,action.equipment);
         return { ok: true, state: s };
     }
     const type: Intervention | null = action.type === "add_server" ? "add-app" : action.type === "start_db_upgrade" ? "upgrade-db" :
@@ -342,15 +378,15 @@ export function campaignAction(prev: GameState, action: Action): ActionResult {
     const infrastructure = !["limit","unlimit","routing"].includes(type);
     if (infrastructure && c.pending.some(a => !["limit","unlimit","routing"].includes(a.type)))
         return fail("An infrastructure deployment is already pending.");
-    if (type === "add-app" && c.apps.length >= Q.maxApps)
-        return fail("Two application instances are already installed.");
+    if (type === "add-app" && c.apps.length >= (c.spikeStage?T.maximum:Q.maxApps))
+        return fail("The stage application-instance limit is reached.");
     if (type === "upgrade-db" && (c.dbCapacity >= (c.dataStage?D.dbCapacity:P.dbCapacity) || (c.upgraded && !unlocked)))
         return fail("The database is already upgraded.");
     const target = action.type === "scale_up" ? c.apps.find(a=>a.id===action.appId) : null;
     if (type === "scale-up" && (!target || target.state !== "active" || target.tier !== "base"))return fail("Select an active base application to scale up.");
     if (type === "deploy-lb" && c.loadBalancer)return fail("Load balancing is already deployed.");
     const routing = action.type === "set_routing" ? {mode:action.mode,targets:[...action.targets].sort((a,b)=>Number(a.split("-")[1])-Number(b.split("-")[1]))} : null;
-    if (routing && (!c.loadBalancer || !routingValid(c,routing) || c.pending.some(a=>a.type==="routing") || JSON.stringify(routing)===JSON.stringify(c.routing)))return fail("Routing requires deployed load balancing, valid active targets and a changed configuration.");
+    if (routing && (!c.loadBalancer || !routingValid(c,routing) || c.pending.some(a=>a.type==="routing"||a.type==="retire-app") || JSON.stringify(routing)===JSON.stringify(c.routing)))return fail("Routing requires deployed load balancing, valid active targets and a changed configuration.");
     if (["limit","unlimit"].includes(type) && (c.pending.some(a => a.type === "limit" || a.type === "unlimit") || ((c.limit !== null) === (type === "limit"))))
         return fail("Admission setting is already active or a change is pending.");
     const costCents = type === "add-app" ? Q.appCostCents : type === "upgrade-db" ? (c.dbCapacity===2000?D.dbCostCents:Q.dbCostCents) : type === "scale-up" ? P.appCostCents : type === "deploy-lb" ? P.lbCostCents : type==="cache"?D.cacheCostCents:type==="cache-tuning"?D.tuningCostCents:0;
@@ -359,8 +395,9 @@ export function campaignAction(prev: GameState, action: Action): ActionResult {
     const s = clone(prev), n = s.campaign!;
     const delay = type === "add-app" ? Q.appDelay : type === "upgrade-db" ? (c.dbCapacity===2000?D.dbDelay:Q.dbDelay) : type === "scale-up" ? P.appDelay : type === "deploy-lb" ? P.lbDelay : type==="cache"?D.cacheDelay:type==="cache-tuning"?D.tuningDelay:Q.admissionDelay;
     const scheduled: ScheduledAction = { id: `action-${n.nextEventId}`, type, requestedStep: n.step, activationStep: n.step + delay, costCents, activatedStep: null,
-        ...(type === "add-app" ? {targetId:"app-2"} : {}), ...(target ? {targetId:target.id,capacityAfter:P.appCapacity} : {}),
+        ...(type === "add-app" ? {targetId:`app-${n.nextAppNumber++}`} : {}), ...(target ? {targetId:target.id,capacityAfter:P.appCapacity} : {}),
         ...(type === "upgrade-db" ? {capacityAfter:c.dbCapacity===Q.dbCapacity?Q.upgradedDbCapacity:c.dbCapacity===1000?P.dbCapacity:D.dbCapacity} : {}), ...(routing ? {routing} : {}) };
+    if(target&&n.spikeStage?.controller)n.spikeStage.controller.managedAppIds=n.spikeStage.controller.managedAppIds.filter(id=>id!==target.id);
     n.cashCents -= costCents;
     n.investedCents += costCents;
     n.pending.push(scheduled);

@@ -4,7 +4,7 @@ import {loadGame} from "./persist";
 import {makeEnvelope,CAMPAIGN_SAVE_KEY,validateEnvelope} from "./saveMigrations";
 beforeEach(()=>localStorage.clear());
 it("migrates schema 3 with exact source backup, no stage entry or invented observations",()=>{
- const e=JSON.parse(JSON.stringify(makeEnvelope(newGame(7,"prior-company"))));e.schemaVersion=3;
+ const e=JSON.parse(JSON.stringify(makeEnvelope(newGame(7,"prior-company"))));e.schemaVersion=3;delete e.game.campaign.openingPrevention;
  delete e.game.campaign.dataStage;delete e.game.campaign.readCache;
  delete e.game.campaign.ledger.cacheNumerator;delete e.game.campaign.remainders.cache;
  const raw=JSON.stringify(e);localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);
@@ -13,10 +13,10 @@ it("migrates schema 3 with exact source backup, no stage entry or invented obser
  expect(r.game.campaign!.dataStage).toBeNull();expect(r.game.campaign!.snapshot).toEqual(e.game.campaign.snapshot);
  expect(r.game.campaign!.trace).toEqual(e.game.campaign.trace);expect(localStorage.getItem(CAMPAIGN_SAVE_KEY+".backup.v3")).toBe(raw);
  for(const key of ["nn.save.v1","nn.meta.v1","nn.analytics.v1"])expect(localStorage.getItem(key)).toBe("legacy:"+key);
- expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(4);
+ expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(5);
 });
 it.each(["backup","replacement"])("schema 3 %s write failure leaves original bytes intact",boundary=>{
- const e=JSON.parse(JSON.stringify(makeEnvelope(newGame())));e.schemaVersion=3;
+ const e=JSON.parse(JSON.stringify(makeEnvelope(newGame())));e.schemaVersion=3;delete e.game.campaign.openingPrevention;
  const raw=JSON.stringify(e);localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);const original=Storage.prototype.setItem;
  const spy=vi.spyOn(Storage.prototype,"setItem").mockImplementation(function(this:Storage,k:string,v:string){if(boundary==="backup"?k.endsWith(".backup.v3"):k===CAMPAIGN_SAVE_KEY)throw Error("quota");original.call(this,k,v);});
  try{expect(loadGame().status).toBe("unsupported");expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBe(raw);}finally{spy.mockRestore();}
@@ -29,7 +29,7 @@ it("schema 3 migration retains the Phase 3 reports, pending actions, cash and ba
  const {dataCompany}=await import("../sim/__tests__/dataFixture");const {applyAction}=await import("../sim");
  let g=dataCompany("read-heavy",false);
  const requested=applyAction(g,{type:"set_traffic_limit",enabled:true});if(!requested.ok)throw Error(requested.message);g=requested.state;
- const e=JSON.parse(JSON.stringify(makeEnvelope(g)));e.schemaVersion=3;delete e.game.campaign.dataStage;delete e.game.campaign.readCache;delete e.game.campaign.ledger.cacheNumerator;delete e.game.campaign.remainders.cache;
+ const e=JSON.parse(JSON.stringify(makeEnvelope(g)));e.schemaVersion=3;delete e.game.campaign.openingPrevention;delete e.game.campaign.dataStage;delete e.game.campaign.readCache;delete e.game.campaign.ledger.cacheNumerator;delete e.game.campaign.remainders.cache;
  const raw=JSON.stringify(e);localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("migration");
  for(const k of ["cashCents","apps","dbBacklog","pending","trace","reports","openingMilestone","scaling"])expect((loaded.game.campaign as unknown as Record<string,unknown>)[k]).toEqual(e.game.campaign[k]);
  expect(localStorage.getItem(CAMPAIGN_SAVE_KEY+".backup.v3")).toBe(raw);

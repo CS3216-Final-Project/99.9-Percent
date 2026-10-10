@@ -3748,3 +3748,87 @@ button:disabled {
 .campaign-stages [aria-current="step"] { border: 2px solid #426788; }
 .traffic-limit-notice, .idle-app-notice { border-left: 3px solid #8b5c20; padding: 8px 10px; background: #e7bf6b22; }
 .campaign-panel .traffic-limit-notice p, .campaign-panel .idle-app-notice p { margin: 6px 0; }
+
+/* Campaign comprehension: the office remains the world view; guidance leads. */
+.campaign-app:not(.is-title) { grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); grid-template-areas: "top top" "workflow stage" "bottom bottom"; }
+.campaign-app:not(.is-title) .campaign-panel { grid-area: workflow; width: auto; justify-self: stretch; align-self: stretch; min-height: 0; max-height: none; margin: 8px; padding: 12px; }
+.campaign-app .campaign-stages { grid-template-columns: repeat(5, minmax(0,1fr)); font-size: 12px; }
+.campaign-stages li { flex-direction: column; justify-content: start; }
+.campaign-stages small { font-size: 10px; opacity: .75; }
+.campaign-stages [aria-current="step"] { background: #e5f2ff; box-shadow: inset 0 3px #426788; }
+.campaign-panel .campaign-guidance { margin-bottom: 8px; padding-bottom: 8px; }
+.campaign-panel .campaign-guidance p { margin: 6px 0; }
+.campaign-panel .current-objective { font-size: 19px; font-weight: 600; }
+.campaign-panel h2 { font-size: 17px; margin: 0 0 6px; }
+.stage-context summary,.detailed-evidence summary,.financial-evidence summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+.company-status { border: 2px solid #426788; background: #e5f2ff; border-radius: 6px; padding: 10px 12px; }
+.company-status p { margin: 4px 0; }
+.company-status.has-incident { border-color: #c54444; background: #ffe6df; }
+.company-status [role="alert"] { border-top: 1px solid #c5444488; margin-top: 6px; padding-top: 8px; }
+.campaign-panel .panel-section { padding: 10px 0; }
+.campaign-panel .dependency-strip { font-size: 13px; }
+.campaign-panel .dependency-strip .btn { font-size: 13px; min-height: 65px; }
+.campaign-panel .data-dependencies { grid-template-columns: 1fr 12px 1.3fr 12px 1.1fr 12px 1.3fr; }
+.campaign-panel .data-dependencies > span[aria-hidden="true"] { transform: none; }
+.campaign-panel .campaign-actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: start; }
+.action-card { border: 1px solid #42678855; border-radius: 6px; padding: 8px; }
+.action-card .btn { width: 100%; min-height: 46px; }
+.campaign-panel .action-card p { font-size: 12px; margin: 6px 0 0; }
+.campaign-panel .idle-app-notice { padding: 6px; }
+.campaign-panel .idle-app-notice p { font-size: 12px; margin: 4px 0; }
+.campaign-app .bottombar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+.clock-explanation { display: flex; gap: 12px; width: 100%; font-family: var(--font-body); font-size: 12px; }
+.clock-explanation strong { white-space: nowrap; color: var(--go); }
+.recovery-banner,.completion-banner { padding: 12px; border: 2px solid #426788; background: #e5f2ff; color: var(--ink); border-radius: 6px; }
+.postmortem-summary h3 { margin: 16px 0 6px; }
+@media (max-width:900px) {
+ .campaign-app:not(.is-title) { display: flex; flex-direction: column; overflow-y: auto; padding-bottom: 130px; }
+ .campaign-app:not(.is-title) .campaign-panel { order: 1; flex: none; margin: 8px; overflow: visible; width: auto; position: static; }
+ .campaign-app:not(.is-title) .stage { order: 2; flex: 0 0 300px; height: 300px; margin: 8px; }
+ .campaign-app .campaign-stages { grid-template-columns: repeat(3,minmax(0,1fr)); font-size: 11px; }
+ .campaign-app .campaign-progression { position: static; padding: 0; }
+ .campaign-app .campaign-stages li { padding: 4px; }
+ .campaign-app .campaign-stages small { display: none; }
+ .campaign-app .campaign-stages li:last-child { grid-column: auto; }
+ .campaign-app .bottombar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; }
+ .campaign-app .time-controls { flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+ .campaign-app .speed { display: flex; }
+ .campaign-app .speed button { font-size: 10px; }
+ .clock-explanation { flex-direction: column; gap: 2px; font-size: 11px; }
+ .campaign-panel .current-objective { font-size: 17px; }
+ .campaign-panel .campaign-actions { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .campaign-panel .data-dependencies { grid-template-columns: 1fr; }
+ .campaign-panel .data-dependencies > span[aria-hidden="true"] { transform: rotate(90deg); }
+}
+
+/* Keep the initial decision surface compact; detailed evidence remains disclosed below. */
+.campaign-panel .campaign-guidance h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.campaign-panel .campaign-guidance { border-bottom: 0; }
+.campaign-panel .architecture-overview > p { margin: 6px 0; font-size: 12px; }
+.clock-explanation summary { cursor: pointer; }
+@media (max-width:900px) {
+ .campaign-header .stat:last-child { display: none; }
+ .campaign-header .stats-strip { grid-template-columns: repeat(3,minmax(0,1fr)); }
+ .campaign-panel .current-stage small { display: none; }
+ .campaign-panel .campaign-guidance h3 { margin: 4px 0; }
+ .campaign-panel .campaign-guidance .current-objective { margin: 4px 0; }
+ .campaign-panel .stage-context summary { font-size: 11px; padding: 4px 0; }
+ .campaign-panel .dependency-strip .btn { min-height: 55px; font-size: 11px; padding: 4px; }
+ .campaign-panel .dependency-strip { font-size: 11px; }
+ .campaign-panel .architecture-overview > p { display: inline-block; margin-right: 6px; }
+ .campaign-panel .architecture-overview > .btn { font-size: 11px; padding: 5px; }
+ .campaign-panel .company-status { padding: 6px 8px; }
+ .campaign-panel .company-status p { font-size: 12px; }
+ .campaign-panel .action-card { padding: 5px; }
+ .campaign-panel .action-card .btn { font-size: 11px; padding: 5px; }
+ .campaign-panel .action-card p { font-size: 11px; }
+ .campaign-app .bottombar { display: grid; grid-template-columns: 70px minmax(0,1fr); gap: 4px; padding: 6px; }
+ .campaign-app .time-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+ .campaign-app .time-controls > .speed { grid-column: 1 / -1; grid-row: 2; }
+ .campaign-app .time-controls > .btn { font-size: 11px; padding: 6px; }
+ .campaign-app .clock-explanation { grid-column: 1 / -1; }
+ .campaign-app .clock-explanation details { font-size: 10px; }
+ .campaign-app .clock-explanation p { margin: 3px 0; }
+}
+
+@media (max-width:900px) { .campaign-app .campaign-progression { position: sticky; top: 0; z-index: 29; } }

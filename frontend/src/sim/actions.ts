@@ -73,6 +73,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
   const s = clone(prev);
 
   switch (action.type) {
+    case "acknowledge_prevention_review":
     case "acknowledge_milestone":
     case "set_traffic_limit": return fail("invalid", "Campaign action only.");
     case "launch_promotion": {

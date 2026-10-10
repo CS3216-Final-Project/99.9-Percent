@@ -272,8 +272,8 @@ function BottomBar() {
 /* Overlay views                                                       */
 /* ------------------------------------------------------------------ */
 
-const VIEW_TITLES: Record<Exclude<View, null | "menu">, string> = { tech: "Tech tree", engineers: "Team", history: "History" };
-const VIEW_ICONS: Record<Exclude<View, null | "menu">, [ConceptKind, IconName]> = {
+const VIEW_TITLES: Record<Exclude<View, null | "menu" | "guidance">, string> = { tech: "Tech tree", engineers: "Team", history: "History" };
+const VIEW_ICONS: Record<Exclude<View, null | "menu" | "guidance">, [ConceptKind, IconName]> = {
   tech: ["tech", "tree"],
   engineers: ["team", "team"],
   history: ["users", "history"],
@@ -282,7 +282,7 @@ const VIEW_ICONS: Record<Exclude<View, null | "menu">, [ConceptKind, IconName]> 
 function ViewSheet() {
   const view = useGame((s) => s.view);
   const openView = useGame((s) => s.openView);
-  if (!view || view === "menu") return null;
+  if (!view || view === "menu" || view === "guidance") return null;
   return (
     <section className={`sheet sheet-${view}`} aria-label={VIEW_TITLES[view]}>
       <header className="sheet-head">
@@ -401,7 +401,7 @@ export default function Game() {
   }
 
   return (
-    <div className={`app phase-${phase}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}`}>
+    <div className={`app ${campaign?"campaign-app":""} phase-${phase}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}`}>
       {campaign ? <CampaignHeader /> : <TopBar />}
       <main className="stage">
         <Suspense fallback={<div className="stage-loading">Loading…</div>}>
