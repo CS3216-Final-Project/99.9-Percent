@@ -186,7 +186,13 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
   );
 }
 
-/** A creature pacing back and forth between two points. */
+/** Seconds a walker spends turning round at each end of its path. */
+const TURN = 0.8;
+
+/** Ease in and out over 0..1. */
+const smooth = (t: number) => t * t * (3 - 2 * t);
+
+/** A creature pacing back and forth between two points, turning round on the spot at each end. */
 export function Walker({ from, to, speed, species, phase = 0 }: { from: [number, number]; to: [number, number]; speed: number; species: Species; phase?: number }) {
   const g = useRef<THREE.Group>(null);
   const dx = to[0] - from[0];
@@ -194,12 +200,26 @@ export function Walker({ from, to, speed, species, phase = 0 }: { from: [number,
   const len = Math.hypot(dx, dz);
   useFrame(({ clock }) => {
     if (!g.current) return;
-    const d = (clock.elapsedTime * speed + phase) % (2 * len);
-    const back = d > len;
-    const f = back ? 2 - d / len : d / len;
+    const walk = len / speed;
+    const t = (clock.elapsedTime + phase) % (2 * walk + 2 * TURN);
+    const out = Math.atan2(-dx, -dz);
+    let f: number;
+    let yaw: number;
+    if (t < walk) {
+      f = t / walk;
+      yaw = out;
+    } else if (t < walk + TURN) {
+      f = 1;
+      yaw = out + Math.PI * smooth((t - walk) / TURN);
+    } else if (t < 2 * walk + TURN) {
+      f = 1 - (t - walk - TURN) / walk;
+      yaw = out + Math.PI;
+    } else {
+      f = 0;
+      yaw = out + Math.PI + Math.PI * smooth((t - 2 * walk - TURN) / TURN);
+    }
     g.current.position.set(from[0] + dx * f, 0, from[1] + dz * f);
-    const dir = back ? -1 : 1;
-    g.current.rotation.y = Math.atan2(-dx * dir, -dz * dir);
+    g.current.rotation.y = yaw;
   });
   return (
     <group ref={g}>
