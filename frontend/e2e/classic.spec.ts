@@ -5,10 +5,20 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('nn.mode.v1', 'classic'));
 });
 
-test('completes the first-week tutorial, purchases equipment and resumes after reload', async ({ page }) => {
+test('completes the first-week tutorial on the basic look, purchases equipment and resumes after reload', async ({ page }) => {
+  // CI draws with SwiftShader, which the room detects as software rendering, so no HD asset may be downloaded.
+  const hd: string[] = [];
+  const crew = new Set<string>();
+  page.on('request', request => {
+    const url = request.url();
+    if (url.includes('/textures/') || url.includes('/models/polyhaven/')) hd.push(url);
+  });
+  page.on('response', response => { if (response.url().includes('/models/creatures/') && response.ok()) crew.add(response.url()); });
   await page.goto('/');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expectRoom(page);
+  // The monster crew works at every level of detail.
+  await expect.poll(() => crew.size).toBe(14);
   await expect(page.getByRole('dialog', { name: /Tutorial, step 1/ })).toBeVisible();
   await page.getByRole('button', { name: 'Servers', exact: true }).click();
   await page.getByRole('button', { name: /Add server/ }).click();
@@ -33,38 +43,23 @@ test('completes the first-week tutorial, purchases equipment and resumes after r
   await expectRoom(page);
   expect(await savedGame(page)).toEqual(before);
   await expect(page.getByRole('dialog', { name: /Tutorial/ })).toHaveCount(0);
+  await page.waitForLoadState('networkidle');
+  expect(hd).toEqual([]);
 });
 
-test('keeps the game playable when the furniture models cannot be downloaded', async ({ page }) => {
+test('keeps the game playable when the furniture and creature models cannot be downloaded', async ({ page }) => {
   await page.route('**/models/**', route => route.abort());
   const skipped = page.waitForEvent('console', message => message.text().includes('Furniture models failed to load'));
+  const crew = page.waitForEvent('console', message => message.text().includes('Creature models failed to load'));
   await page.goto('/');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await skipped;
+  await crew;
   await expectRoom(page);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
   await expectRoom(page);
-});
-
-test('keeps a browser without a GPU on the basic look and never downloads HD assets', async ({ page }) => {
-  // CI draws with SwiftShader, which the room detects as software rendering.
-  const hd: string[] = [];
-  const crew = new Set<string>();
-  page.on('request', request => {
-    const url = request.url();
-    if (url.includes('/textures/') || url.includes('/models/polyhaven/')) hd.push(url);
-  });
-  page.on('response', response => { if (response.url().includes('/models/creatures/') && response.ok()) crew.add(response.url()); });
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await expectRoom(page);
-  // The monster crew works at every level of detail.
-  await expect.poll(() => crew.size).toBe(14);
-  await page.waitForLoadState('networkidle');
-  expect(hd).toEqual([]);
 });
 
 test('draws the photo-scanned surfaces and furniture when HD detail is forced', async ({ page }) => {
@@ -101,19 +96,6 @@ test('keeps the game playable when the HD textures and furniture cannot be downl
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await surfaces;
   await furniture;
-  await expectRoom(page);
-  await page.getByRole('button', { name: 'Next week', exact: true }).click();
-  expect((await savedGame(page)).turn).toBe(2);
-  await expectRoom(page);
-});
-
-test('keeps the game playable when the creature models cannot be downloaded', async ({ page }) => {
-  await page.route('**/models/creatures/**', route => route.abort());
-  const skipped = page.waitForEvent('console', message => message.text().includes('Creature models failed to load'));
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await skipped;
   await expectRoom(page);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);

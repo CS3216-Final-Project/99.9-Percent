@@ -54,7 +54,7 @@ export async function expectRoom(page: Page) {
   const canvas = room.locator('canvas');
   await expect(canvas).toBeVisible();
   // A visible canvas alone does not prove that WebGL initialized successfully.
-  // Compiling the HD shaders in software blocks the page for longer than the default 10 seconds on a busy machine.
+  // Starting the room in software WebGL can block the page for longer than the default 10 seconds on a busy machine.
   await expect.poll(() => canvas.evaluate(el => {
     const gl = (el as HTMLCanvasElement).getContext('webgl2');
     return !!gl && !gl.isContextLost();
