@@ -37,7 +37,7 @@ import { Exterior } from "./exterior";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
 import { buildModel, type SceneModel } from "./sceneModel";
-import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT } from "./camera";
+import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
 
 function useSceneModel(): SceneModel {
   const key = useGame((s) => JSON.stringify(buildModel(s.game)));
@@ -103,7 +103,10 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
   /** Turn still to apply from Q, E or the rotate buttons. */
   const spin = useRef(0);
   const box = useRef<THREE.Box3 | null>(null);
-  const v = useMemo(() => ({ offset: new THREE.Vector3(), dir: new THREE.Vector3(), before: new THREE.Vector3() }), []);
+  const v = useMemo(
+    () => ({ offset: new THREE.Vector3(), dir: new THREE.Vector3(), before: new THREE.Vector3(), from: new THREE.Vector3(), centre: new THREE.Vector3() }),
+    [],
+  );
 
   // Frame the equipment that is actually built, and widen the view as the facility grows.
   useEffect(() => {
@@ -154,9 +157,10 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     if (!c) return;
     const camera = state.camera as THREE.OrthographicCamera;
     const { size } = state;
-    const { offset, dir, before } = v;
+    const { offset, dir, before, from, centre } = v;
     offset.copy(camera.position).sub(c.target);
     const distance = offset.length();
+    from.copy(offset).normalize().negate();
     let turned = false;
     if (Math.abs(spin.current) > 1e-4) {
       const step = Math.abs(spin.current) < 0.004 ? spin.current : spin.current * 0.16;
@@ -173,7 +177,13 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
       offset.multiplyScalar(distance);
       turned = true;
     }
-    if (turned) camera.position.copy(c.target).add(offset);
+    if (turned) {
+      // While the view follows the facility, turn about the built equipment so it holds its place on screen.
+      if (!touched.current && box.current) turnAbout(c.target, box.current.getCenter(centre), from, dir.copy(offset).normalize().negate());
+      camera.position.copy(c.target).add(offset);
+      // The controls aimed the camera earlier this frame, from where it stood before the turn.
+      camera.lookAt(c.target);
+    }
 
     // Until the player takes the camera, ease toward a framing of the built equipment from the current angle.
     if (!touched.current && box.current) {
@@ -456,6 +466,8 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
   }, [footprints,apps]);
 
   useFrame(({ camera, size }) => {
+    // The renderer only refreshes the camera's matrices when it draws, after this.
+    camera.updateMatrixWorld();
     anchors.forEach((pos, key) => {
       const el = labelEls.get(key);
       if (!el) return;
@@ -738,9 +750,9 @@ function Scene({ effects }: { effects: boolean }) {
       {EQUIPMENT_ORDER.map((id) => (
         <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
       ))}
-      <LabelProjector footprints={m.footprints} />
-
       <CameraRig footprints={m.footprints} built={m.built} />
+      {/* After the rig, so labels follow the camera it has just moved. */}
+      <LabelProjector footprints={m.footprints} />
       {effects && <Effects />}
     </>
   );
