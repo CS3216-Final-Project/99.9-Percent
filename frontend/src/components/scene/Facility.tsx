@@ -461,7 +461,7 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
       if (!el) return;
       v.copy(pos).project(camera);
       const x = (v.x * 0.5 + 0.5) * size.width;
-      const y = (-v.y * 0.5 + 0.5) * size.height + (key==="app"&&labelEls.has("app-1")? -100:key==="app-1"?-10:key==="app-2"?12:0);
+      const y = (-v.y * 0.5 + 0.5) * size.height + (labelEls.has("app-1")&&key==="app"?-100:labelEls.has("app-1")&&key==="gateway"?-30:key==="app-1"?-10:key==="app-2"?12:0);
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
       el.style.visibility = "visible";
     });

@@ -86,6 +86,7 @@ test('account controls remain usable on touch while accounts are offline',async(
   await page.goto('/');await page.getByText('Account and cloud saves',{exact:true}).tap();
   await expect(page.getByRole('link',{name:'Sign in with Google'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Retry account connection'})).toBeEnabled();
+  await page.getByRole('button',{name:'Retry account connection'}).scrollIntoViewIfNeeded();
   await page.screenshot({path:'test-results/phase3-account-mobile.png'});
   await page.getByRole('button',{name:'Try Prototype',exact:true}).tap();
   await expect(page.getByRole('dialog',{name:'Company introduction'})).toBeVisible();

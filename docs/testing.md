@@ -30,7 +30,7 @@ On Linux CI, use `npx playwright install --with-deps chromium` for browser/syste
 | Backend | Route responses, invalid requests, health, origin parsing and HTTP CORS/preflight | Existing dialogue backend is retained; tycoon gameplay is browser-only |
 | Database | Every committed migration, schema defaults and relational constraints on PGlite | Not a live Neon connectivity/load test |
 
-Browser contexts are isolated. Advanced scenarios use engine-generated states in the normal localStorage save envelope before boot; decisions then happen through visible controls. Tests check a working WebGL context and fail on unhandled browser errors. Playwright's clock drives incident timers without arbitrary waits.
+Browser contexts are isolated. Advanced scenarios use engine-generated states in the normal localStorage save envelope before boot; decisions then happen through visible controls. Journeys that inspect the room check a working WebGL context; main's `withoutRoom` fixture skips rendering for journeys that only exercise other UI. All journeys fail on unhandled browser errors. Scaling/instance-selection journeys retain the real scene. Playwright's clock drives incident timers without arbitrary waits.
 
 Browser journeys run one worker to avoid competing software WebGL renderers on CI. The incident journey has a 150-second budget because advancing the virtual clock also renders animation frames, and the forced-HD journey has 120 seconds because it draws the HD materials and models on the CPU; other tests keep their 60-second budget. CI rejects flaky tests even if a retry passes.
 
