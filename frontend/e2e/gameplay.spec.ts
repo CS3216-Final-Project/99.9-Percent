@@ -7,18 +7,45 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
     await expectRoom(page);
     for (let i = 0; i < 6; i++)await page.getByRole("button", { name: "Advance step", exact: true }).click();
-    if (path === "upgrade") await page.screenshot({ path: "test-results/phase1-desktop.png" });
+    if (path === "upgrade") {
+      await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
+      const panel = page.getByRole("complementary", { name: "System metrics" });
+      // The compact overview must leave every response visible before expanding evidence.
+      const responsesFit = await panel.locator(".actions").evaluate(el => {
+        const panelBox = el.closest("aside")!.getBoundingClientRect();
+        return [...el.querySelectorAll("button")].every(button => {
+          const box = button.getBoundingClientRect();
+          return box.top >= panelBox.top && box.bottom <= panelBox.bottom;
+        });
+      });
+      expect(responsesFit).toBe(true);
+      await page.getByRole("main").getByRole("button", { name: "Database", exact: true }).click();
+      await expect(panel.getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect(panel.getByRole("status")).toContainText("Demand 800/s · capacity 600/s · backlog 600");
+      await panel.locator("summary").filter({ hasText: "Full system evidence" }).click();
+      await expect(panel.getByRole("table")).toContainText("133.33%");
+      await expect(panel.getByText("Installed server capacity", { exact: true })).toBeVisible();
+      await panel.locator("summary").filter({ hasText: "Full system evidence" }).click();
+      // Inspection is repeatable and cannot advance the physical clock.
+      await panel.getByRole("button", { name: "Database", exact: true }).click();
+      await panel.evaluate(el => { el.scrollTop = 0; });
+      await page.screenshot({ path: "test-results/phase1-desktop.png" });
+    }
     const opening = (await savedGame(page)).campaign!;
     expect(opening.step).toBe(6);
     await page.getByRole("button", { name: "Inspect metrics · free" }).click();
     if (path === "app-then-upgrade") {
-      await page.getByRole("button", { name: /Add application/ }).click();
+      await page.getByRole("button", { name: /Add server/ }).click();
       await page.getByRole("button", { name: "Run", exact: true }).click();
       await expect.poll(async () => (await savedGame(page)).campaign!.apps.length).toBe(2);
       await page.getByRole("button", { name: "Pause", exact: true }).click();
       expect((await savedGame(page)).campaign!.dbCapacity).toBe(600);
     }
-    await page.getByRole("button", { name: path === "limit" ? "Limit to 500 requests/s" : /Upgrade database/ }).click();
+    await page.getByRole("button", { name: path === "limit" ? /Limit to 500 requests\/s/ : /Upgrade database/ }).click();
+    if (path === "upgrade") {
+      await expect(page.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("activates in 3 step(s)");
+      await expect(page.getByRole("button", { name: /Add server/ })).toBeDisabled();
+    }
     await page.getByRole("button", { name: "Run", exact: true }).click();
     const report = page.getByRole("dialog", { name: "Incident postmortem" });
     await expect(report).toBeVisible({ timeout: 25000 });

@@ -1,7 +1,7 @@
 "use client";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 
-import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { BALANCE, completedTechIds, currentWarnings, metrics, TECH_ORDER, type GameState } from "@/sim";
 import { nextMove } from "@/game/advisor";
 import { clock, compact, money, moneyFull, num, signedMoney, uptimePct } from "@/game/format";
@@ -13,7 +13,7 @@ import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Moda
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
 import Tutorial, { BASICS_STEPS } from "./Tutorial";
-import { Callout, Concept, Meter, Tip, type ConceptKind } from "./ui";
+import { Callout, Concept, Meter, Stat, type ConceptKind } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
 
 // Keep the WebGL scene in its own chunk; Vite renders this app in the browser.
@@ -34,22 +34,6 @@ function healthOf(game: GameState): { word: string; tone: "ok" | "warn" | "criti
   if (worst >= 1 || game.live.shed > 0) return { word: "Degraded", tone: "critical", icon: "fire" };
   if (worst >= 0.85 || faults) return { word: "At risk", tone: "warn", icon: "alert" };
   return { word: "Healthy", tone: "ok", icon: "health" };
-}
-
-function Stat({ icon, kind, label, tip, children, side }: { icon: IconName; kind: ConceptKind; label: string; tip: string; children: ReactNode; side?: "left" }) {
-  return (
-    <div className={`stat stat-${kind}`}>
-      <span className="stat-icon">
-        <Concept kind={kind} icon={icon} />
-      </span>
-      <div className="stat-body">
-        <Tip text={tip} side={side}>
-          {label}
-        </Tip>
-        {children}
-      </div>
-    </div>
-  );
 }
 
 function TopBar() {

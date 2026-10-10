@@ -126,6 +126,7 @@ export function LineChart({
   targetLabel,
   max,
   min,
+  axisLabel = "Week",
 }: {
   title: string;
   series: Series[];
@@ -135,6 +136,7 @@ export function LineChart({
   targetLabel?: string;
   max?: number;
   min?: number;
+  axisLabel?: "Week" | "Step";
 }) {
   const W = 340;
   const H = 170;
@@ -165,9 +167,9 @@ export function LineChart({
         </span>
       </figcaption>
       {turns.length < 2 ? (
-        <p className="empty">Play two weeks to see a trend.</p>
+        <p className="empty">Advance two {axisLabel === "Step" ? "steps" : "weeks"} to see a trend.</p>
       ) : (
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title} by week`}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title} by ${axisLabel.toLowerCase()}`}>
           {ticks.map((t) => (
             <g key={t}>
               <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} className="chart-grid" />
@@ -190,17 +192,17 @@ export function LineChart({
               {s.values.map((v, i) => (
                 <circle key={i} cx={x(i)} cy={y(v)} r={i === s.values.length - 1 ? 3 : 1.6} fill={s.color}>
                   <title>
-                    Week {turns[i]}: {s.name} {format(v)}
+                    {axisLabel} {turns[i]}: {s.name} {format(v)}
                   </title>
                 </circle>
               ))}
             </g>
           ))}
           <text x={L} y={H - 5} className="chart-tick">
-            Week {turns[0]}
+            {axisLabel} {turns[0]}
           </text>
           <text x={W - R} y={H - 5} textAnchor="end" className="chart-tick">
-            Week {turns[turns.length - 1]}
+            {axisLabel} {turns[turns.length - 1]}
           </text>
         </svg>
       )}

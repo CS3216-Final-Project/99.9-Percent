@@ -11,6 +11,7 @@ Read the relevant files first:
 - `frontend/src/sim/`: deterministic engine, balance, RNG, incidents and reports.
 - `frontend/src/game/`: Zustand lifecycle, browser persistence and advice.
 - `frontend/src/components/`: gameplay interface and WebGL room.
+- `docs/UI_DESIGN.md`: shared visual language, screen patterns and responsive review criteria for UI changes.
 - `backend/src/`, `backend/drizzle/`, `shared/`: API, database and shared contracts.
 - `docs/testing.md`: test commands, coverage boundaries and known gaps.
 - `docs/prototype-migration.md`: provenance and migrated behavior.
