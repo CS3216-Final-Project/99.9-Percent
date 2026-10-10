@@ -1,0 +1,19 @@
+Photo-scanned furniture and plants from Poly Haven (polyhaven.com)
+
+License: (Creative Commons Zero, CC0)
+http://creativecommons.org/publicdomain/zero/1.0/
+
+Free to use in personal, educational and commercial projects; credit is not
+required. The 1K glTF versions were compressed with gltf-transform (meshopt
+geometry, WebP textures at 512 or 1024 px); the large plant was simplified.
+
+File                           Model                      Authors
+potted_plant_02.glb            Potted Plant 02            Rico Cilliers
+potted_plant_04.glb            Potted Plant 04            James Ray Cock
+mid_century_lounge_chair.glb   Mid Century Lounge Chair   Kuutti Siitonen
+modern_arm_chair_01.glb        Modern Arm Chair 01        Vibrant Nordic
+sofa_02.glb                    Sofa 02                    Kirill Sannikov
+coffee_table_round_01.glb      Coffee Table Round 01      Ulan Cabanilla
+side_table_01.glb              Side Table 01              James Ray Cock
+cardboard_box_01.glb           Cardboard Box 01           Rahul Chaudhary
+desk_lamp_arm_01.glb           Desk Lamp Arm 01           Yann Kervran, Kuutti Siitonen

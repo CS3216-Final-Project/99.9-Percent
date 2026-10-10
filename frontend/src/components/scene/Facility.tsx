@@ -1,6 +1,8 @@
 "use client";
 
 import { Line, MapControls } from "@react-three/drei";
+import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
+import { ToneMappingMode } from "postprocessing";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -706,7 +708,24 @@ function Reflections() {
   return <primitive object={env} attach="environment" />;
 }
 
-function Scene() {
+/**
+ * The HD finish, on a graphics card only. Ambient occlusion darkens the creases
+ * where things meet the floor and each other, which grounds the furniture and
+ * the crew; bloom lets screens, status lights and the neon sign glow. The
+ * composer takes over tone mapping, so it ends with the same filmic curve the
+ * renderer used before.
+ */
+function Effects() {
+  return (
+    <EffectComposer multisampling={4}>
+      <N8AO aoRadius={0.9} distanceFalloff={1.2} intensity={2.4} quality="medium" halfRes />
+      <Bloom mipmapBlur luminanceThreshold={0.9} luminanceSmoothing={0.25} intensity={0.6} />
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+    </EffectComposer>
+  );
+}
+
+function Scene({ effects }: { effects: boolean }) {
   const m = useSceneModel();
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
 
@@ -733,7 +752,9 @@ function Scene() {
         intensity={2.3}
         color="#fff1de"
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        // HD gets a sharper map with softened edges.
+        shadow-mapSize={hd ? [4096, 4096] : [2048, 2048]}
+        shadow-radius={hd ? 3 : 1}
         shadow-bias={-0.0005}
         shadow-camera-left={-30}
         shadow-camera-right={30}
@@ -805,6 +826,7 @@ function Scene() {
       <LabelProjector footprints={m.footprints} />
 
       <CameraRig footprints={m.footprints} built={m.built} />
+      {effects && <Effects />}
     </>
   );
 }
@@ -916,7 +938,7 @@ export default function Facility() {
         {/* The room waits until the renderer is known, so a GPU never compiles the basic materials only to replace them. */}
         {renderer !== "unknown" && (
           <DetailContext.Provider value={detail}>
-            <Scene />
+            <Scene effects={detail === "hd" && !soft} />
           </DetailContext.Provider>
         )}
         {soft && <SoftwareFrames />}

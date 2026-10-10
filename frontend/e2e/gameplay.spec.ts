@@ -63,27 +63,40 @@ test('keeps a browser without a GPU on the basic look and never downloads HD ass
   expect(hd).toEqual([]);
 });
 
-test('draws the photo-scanned surfaces when HD detail is forced', async ({ page }) => {
-  const loaded = new Set<string>();
-  page.on('response', response => { if (response.url().includes('/textures/') && response.ok()) loaded.add(new URL(response.url()).pathname); });
+test('draws the photo-scanned surfaces and furniture when HD detail is forced', async ({ page }) => {
+  // Forcing HD on SwiftShader draws physically based materials and the detailed models on the CPU,
+  // which took up to 30 seconds locally, so it gets the same headroom as other slow journeys.
+  test.setTimeout(120_000);
+  const textures = new Set<string>();
+  const furniture = new Set<string>();
+  page.on('response', response => {
+    if (!response.ok()) return;
+    const path = new URL(response.url()).pathname;
+    if (path.includes('/textures/')) textures.add(path);
+    if (path.includes('/models/polyhaven/')) furniture.add(path);
+  });
   await page.goto('/?graphics=hd');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await expectRoom(page);
-  // Six surfaces, each with a colour, a normal and a roughness map.
-  await expect.poll(() => loaded.size).toBe(18);
+  // Six surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
+  await expect.poll(() => textures.size).toBe(18);
+  await expect.poll(() => furniture.size).toBe(9);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
   await expectRoom(page);
 });
 
-test('keeps the game playable when the HD textures cannot be downloaded', async ({ page }) => {
+test('keeps the game playable when the HD textures and furniture cannot be downloaded', async ({ page }) => {
   await page.route('**/textures/**', route => route.abort());
-  const skipped = page.waitForEvent('console', message => message.text().includes('HD textures failed to load'));
+  await page.route('**/models/polyhaven/**', route => route.abort());
+  const surfaces = page.waitForEvent('console', message => message.text().includes('HD textures failed to load'));
+  const furniture = page.waitForEvent('console', message => message.text().includes('HD furniture failed to load'));
   await page.goto('/?graphics=hd');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await skipped;
+  await surfaces;
+  await furniture;
   await expectRoom(page);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);

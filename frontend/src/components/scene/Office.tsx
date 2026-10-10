@@ -19,9 +19,10 @@ import { OnWall } from "./walls";
  * library, a meeting room, reception, a kitchen, a dining table, a lounge with
  * games, and the monster crew who use them (see creatures.tsx).
  *
- * Furniture comes from two CC0 model packs (see models.tsx); fittings with no
- * matching model are boxes and cylinders (see prims.tsx). Both are drawn as
- * instanced meshes. Only screens, glass, signs and moving things are separate.
+ * Furniture comes from CC0 model packs, with photo-scanned stand-ins at HD
+ * detail (see models.tsx); fittings with no matching model are boxes and
+ * cylinders (see prims.tsx). Both are batched. Only screens, glass, signs and
+ * moving things are separate.
  */
 
 const INK = "#1d1834";
