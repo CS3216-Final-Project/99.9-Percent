@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
-import { test, expect, expectRoom, savedGame } from "./fixtures";
+import { test, expect, savedGame } from "./fixtures";
 
-test("exports a company and imports it into a fresh browser", async ({ page, browser, baseURL }) => {
+test("exports a company and imports it into a fresh browser", async ({ page, browser, baseURL, withoutRoom }) => {
+  await withoutRoom();
   await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
-  await expectRoom(page);
   for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Advance step", exact: true }).click();
   const exported = await savedGame(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
@@ -15,6 +15,7 @@ test("exports a company and imports it into a fresh browser", async ({ page, bro
 
   // A fresh browser with nothing stored yet.
   const fresh = await browser.newContext({ baseURL });
+  await withoutRoom(fresh);
   const other = await fresh.newPage();
   await other.goto("/"); await other.getByRole("button", { name: "Play", exact: true }).click();
   expect((await savedGame(other)).campaign!.step).toBe(0);
@@ -28,13 +29,13 @@ test("exports a company and imports it into a fresh browser", async ({ page, bro
   await expect(other.getByText("Save imported")).toBeVisible();
   expect(await savedGame(other)).toEqual(exported);
   await other.reload(); await other.getByRole("button", { name: "Continue company" }).click();
-  await expectRoom(other);
   expect(await savedGame(other)).toEqual(exported);
   await fresh.close();
 });
 
 
-test("recovers a pre-update run and exports/imports Classic files from either mode", async ({ page }) => {
+test("recovers a pre-update run and exports/imports Classic files from either mode", async ({ page, withoutRoom }) => {
+  await withoutRoom();
   const { advanceTurn, newLegacyGame } = await import("../src/sim");
   const game = advanceTurn(newLegacyGame(777));
   const original = JSON.stringify({ savedAt: 1, game });
@@ -45,7 +46,6 @@ test("recovers a pre-update run and exports/imports Classic files from either mo
     }
   }, original);
   await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
-  await expectRoom(page);
   await page.getByRole("button", { name: "Music", exact: true }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const legacyDownload = page.waitForEvent("download");
@@ -66,7 +66,6 @@ test("recovers a pre-update run and exports/imports Classic files from either mo
   await page.getByRole("button", { name: "Confirm import" }).click();
   await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
   await page.reload(); await page.getByRole("button", { name: /Continue week/ }).click();
-  await expectRoom(page);
   await expect(page.getByRole("button", { name: "Music", exact: true })).toHaveAttribute("aria-pressed", "false");
   expect(await page.evaluate(() => localStorage.getItem("nn.save.v1"))).toBe(original);
 });

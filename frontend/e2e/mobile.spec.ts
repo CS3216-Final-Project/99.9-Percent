@@ -17,10 +17,10 @@ test("inspects evidence and advances a physical step on touch", async ({ page })
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
 });
 
-test("investigates and responds through the incident panel on touch", async ({ page }) => {
+test("investigates and responds through the incident panel on touch", async ({ page, withoutRoom }) => {
+  await withoutRoom();
   await seedSave(page, advanceSteps(newGame(1, "touch-incident"), 6).state);
   await page.goto("/"); await page.getByRole("button", { name: "Continue company" }).tap();
-  await expectRoom(page);
   const panel = page.getByRole("complementary", { name: "System metrics" });
   await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
   await panel.getByRole("button", { name: "Database", exact: true }).tap();

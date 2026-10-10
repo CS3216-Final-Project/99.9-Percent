@@ -120,18 +120,19 @@ test('keeps the game playable when the creature models cannot be downloaded', as
   await expectRoom(page);
 });
 
-test('recovers from a corrupt save through the playable first-run flow', async ({ page }) => {
+test('recovers from a corrupt save through the playable first-run flow', async ({ page, withoutRoom }) => {
+  await withoutRoom();
   await page.addInitScript(() => localStorage.setItem('nn.classic.save.v1', '{'));
   await page.goto('/');
   await expect(page.getByRole('alert')).toHaveText('Saved classic run was unreadable. Started a new one.');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await expectRoom(page);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
 });
 
-test('confirms replacing a run and starts the supplied replay seed', async ({ page }) => {
+test('confirms replacing a run and starts the supplied replay seed', async ({ page, withoutRoom }) => {
+  await withoutRoom();
   await seedSave(page, advanceTurn(newGame(1)));
   await page.goto('/');
   await page.getByRole('button', { name: 'Continue week 2' }).click();
@@ -145,17 +146,15 @@ test('confirms replacing a run and starts the supplied replay seed', async ({ pa
   expect(await savedGame(page)).toEqual(newGame('e2e-repeatable'));
 });
 
-test('resumes an incident paused, investigates, fixes it and acknowledges the postmortem', async ({ page }) => {
-  // Clock.runFor also renders every WebGL animation frame. The CI trace shows
-  // several seconds of virtual time can take tens of seconds on SwiftShader.
-  test.setTimeout(150_000);
+test('resumes an incident paused, investigates, fixes it and acknowledges the postmortem', async ({ page, withoutRoom }) => {
+  // Clock.runFor would also draw every WebGL animation frame, turning 13 virtual seconds into a minute.
+  await withoutRoom();
   const incident = advanceTurn({ ...newGame(1), users: 4500, techDone: ['monitoring'] });
   expect(incident.incident?.type).toBe('app_overload');
   await seedSave(page, incident);
   await page.clock.install();
   await page.goto('/');
   await page.getByRole('button', { name: 'Continue week 1' }).click();
-  await expectRoom(page);
   await page.clock.pauseAt(new Date(Date.now() + 1000));
   const panel = page.getByRole('region', { name: 'Incident', exact: true });
   const clock = panel.locator('.clock-time');
@@ -187,7 +186,8 @@ test('resumes an incident paused, investigates, fixes it and acknowledges the po
   expect((await savedGame(page)).turn).toBe(2);
 });
 
-test('plays music from the first click and remembers when it is turned off', async ({ page }) => {
+test('plays music from the first click and remembers when it is turned off', async ({ page, withoutRoom }) => {
+  await withoutRoom();
   const problems: string[] = [];
   page.on('console', message => { if (message.text().includes('music could not be prepared')) problems.push(message.text()); });
   await page.goto('/');
@@ -202,6 +202,5 @@ test('plays music from the first click and remembers when it is turned off', asy
   await expect(music).toHaveAttribute('aria-pressed', 'false');
   await page.reload();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await expectRoom(page);
   await expect(page.getByRole('button', { name: 'Music' })).toHaveAttribute('aria-pressed', 'false');
 });
