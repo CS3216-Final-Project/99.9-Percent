@@ -589,55 +589,98 @@ button:disabled {
 }
 
 /* ---------------------------------------------------------------- */
-/* Tooltip: where the explanations live                              */
+/* Tooltip: one shared bubble, never the browser's title box          */
+/* (components/Tooltip.tsx places it; any element with data-tip uses it) */
 /* ---------------------------------------------------------------- */
 
+/* A term that explains itself: dotted, and the bubble opens on hover, focus or tap. */
 .tip {
-  position: relative;
   border-bottom: 2px dotted currentColor;
   cursor: help;
 }
 
-.tip::after {
-  content: attr(data-tip);
-  position: absolute;
+.tooltip {
+  position: fixed;
   left: 0;
-  top: calc(100% + 10px);
-  width: 250px;
-  padding: 10px 12px;
-  background: var(--paper);
-  color: var(--ink);
-  border: 2px solid var(--ink);
+  top: 0;
+  z-index: 300;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: max-content;
+  max-width: min(272px, calc(100vw - 16px));
+  padding: 8px 12px 9px;
+  background: var(--night);
+  color: var(--on-night);
+  border: 2px solid var(--night-line);
   border-radius: var(--radius);
+  box-shadow:
+    0 3px 0 0 rgb(8 6 22 / 0.55),
+    0 14px 28px rgb(8 6 22 / 0.45);
   font-family: var(--font-body);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 400;
   line-height: 1.45;
-  text-transform: none;
   letter-spacing: 0;
-  box-shadow: var(--lift);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  z-index: 80;
-  white-space: normal;
   text-align: left;
+  text-transform: none;
+  white-space: normal;
+  pointer-events: none;
+  animation: tooltip-in 0.12s ease-out;
 }
 
-.tip-above::after {
-  top: auto;
-  bottom: calc(100% + 10px);
+.tooltip[data-side="above"] {
+  --tip-shift: 3px;
 }
 
-.tip-left::after {
-  left: auto;
-  right: 0;
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    translate: 0 var(--tip-shift, -3px);
+  }
 }
 
-.tip:hover::after,
-.tip:focus::after {
-  opacity: 1;
-  visibility: visible;
+.tooltip-text {
+  min-width: 0;
+}
+
+/* A shortcut such as "(Q)" shows as a key. */
+.tooltip-key {
+  flex: none;
+  min-width: 1.6em;
+  padding: 0 5px;
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 0 var(--paper-3);
+  font-family: var(--font-num);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  left: var(--tip-arrow, 50%);
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--night);
+  border: 2px solid var(--night-line);
+  transform: rotate(45deg);
+}
+
+.tooltip[data-side="below"] .tooltip-arrow {
+  top: -7px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.tooltip[data-side="above"] .tooltip-arrow {
+  bottom: -7px;
+  border-top: 0;
+  border-left: 0;
 }
 
 /* ---------------------------------------------------------------- */
@@ -3726,3 +3769,7 @@ button:disabled {
 .campaign-table caption { text-align: left; padding: 8px 0; color: var(--text-soft); }
 .campaign-table th, .campaign-table td { padding: 6px; text-align: left; border-bottom: 1px solid var(--paper-3); }
 .campaign-details { overflow-x: auto; }
+
+.campaign-panel .step-head { margin-top: 10px; }
+.request-path { margin: 0 0 4px; font-size: 12px; }
+.campaign-entry{max-height:94vh;overflow:auto;max-width:720px}.gameplay-preview{width:100%;max-height:240px;object-fit:cover;border-radius:8px}.campaign-entry h1{font-size:clamp(24px,4vw,42px)}.modal select,.modal textarea{display:block;width:100%;padding:8px;margin:8px 0}.modal :focus-visible{outline:3px solid #426788;outline-offset:2px}

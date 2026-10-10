@@ -3,7 +3,8 @@ import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
 test("inspects evidence and advances a physical step on touch", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).tap();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap();
+  await page.getByRole("button", { name: "Skip introduction" }).tap();
   await expectRoom(page);
   const music = page.getByRole("button", { name: "Music", exact: true });
   await music.tap(); await expect(music).toHaveAttribute("aria-pressed", "false");
@@ -44,4 +45,21 @@ test("investigates and responds through the incident panel on touch", async ({ p
   await expect(report).toBeVisible({ timeout: 25000 });
   await report.getByRole("button", { name: "Continue company" }).tap();
   expect((await savedGame(page)).phase).toBe("management");
+});
+
+test("a tap explains a term, and tapping a button does not leave a tooltip over it", async ({ page }) => {
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap(); await page.getByRole("button", { name: "Skip introduction" }).tap();
+  await expectRoom(page);
+  const tip = page.getByRole("tooltip");
+  await page.getByRole("complementary", { name: "System metrics" }).getByText("Inspect the evidence", { exact: true }).tap();
+  await expect(tip).toContainText("Inspection is free");
+  await expect(tip).toHaveCSS("opacity", "1");
+  const box = (await tip.boundingBox())!, view = page.viewportSize()!;
+  expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(view.width);
+  await page.screenshot({ path: "test-results/tooltip-mobile.png" });
+
+  const music = page.getByRole("button", { name: "Music", exact: true });
+  await music.tap();
+  await expect(tip).toBeHidden();
+  await expect(music).toHaveAttribute("aria-pressed", "false");
 });

@@ -445,7 +445,8 @@ export type Action =
   | { type: "incident_inspect"; equipment: EquipmentId }
   | { type: "incident_action"; recovery: RecoveryId }
   | { type: "incident_hint" }
-  | { type: "acknowledge_review" };
+  | { type: "acknowledge_review" }
+  | { type: "acknowledge_milestone" };
 
 export type FailureReason =
   | "wrong_phase"

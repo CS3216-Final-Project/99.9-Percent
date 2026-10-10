@@ -3,7 +3,7 @@ import { test, expect, savedGame } from "./fixtures";
 
 test("exports a company and imports it into a fresh browser", async ({ page, browser, baseURL, withoutRoom }) => {
   await withoutRoom();
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Advance step", exact: true }).click();
   const exported = await savedGame(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
@@ -17,7 +17,8 @@ test("exports a company and imports it into a fresh browser", async ({ page, bro
   const fresh = await browser.newContext({ baseURL });
   await withoutRoom(fresh);
   const other = await fresh.newPage();
-  await other.goto("/"); await other.getByRole("button", { name: "Play", exact: true }).click();
+  await other.goto("/"); await other.getByRole("button", { name: "Try Prototype", exact: true }).click();
+  await other.getByRole("button", { name: "Skip introduction" }).click();
   expect((await savedGame(other)).campaign!.step).toBe(0);
   await other.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = other.getByRole("dialog", { name: "Menu" });
@@ -45,7 +46,7 @@ test("recovers a pre-update run and exports/imports Classic files from either mo
       localStorage.setItem("nn.meta.v1", JSON.stringify({ tutorialDone: true, incidentGuideDone: true }));
     }
   }, original);
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await page.getByRole("button", { name: "Music", exact: true }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const legacyDownload = page.waitForEvent("download");

@@ -30,12 +30,14 @@ import { chooseDetail, DetailContext, detailOverride, useDetail, type Renderer }
 import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { Icon } from "../icons";
+import { tipProps } from "../tips";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
 import { Exterior } from "./exterior";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
 import { buildModel, type SceneModel } from "./sceneModel";
+import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT } from "./camera";
 
 function useSceneModel(): SceneModel {
   const key = useGame((s) => JSON.stringify(buildModel(s.game)));
@@ -52,12 +54,9 @@ const TARGET = new THREE.Vector3(-1, 0, 0.6);
  * is seen, but the camera must stand far enough back that the ground outside is never behind it when zoomed out
  * and tilted low.
  */
-const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20).setLength(240);
+const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20).setLength(CAMERA_DISTANCE);
 const HOME = CAMERA_OFFSET.clone().normalize();
 const UP = new THREE.Vector3(0, 1, 0);
-/** Tilt limits, measured from straight down: nearly top-down to a low three-quarter view. */
-const MIN_TILT = 0.22;
-const MAX_TILT = 1.2;
 /** Q, E and the rotate buttons turn the room by an eighth of a circle. */
 const TURN = Math.PI / 4;
 
@@ -836,7 +835,7 @@ export default function Facility() {
           if (software) gl.shadowMap.enabled = false;
           setRenderer(software ? "software" : "gpu");
         }}
-        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 640 }}
+        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: CAMERA_NEAR, far: CAMERA_FAR }}
         onPointerMissed={() => {
           if (useGame.getState().game.phase !== "incident") useGame.getState().select(null);
         }}
@@ -853,19 +852,19 @@ export default function Facility() {
       <Labels />
       <HoverTip container={container} />
       <div className="camera-buttons" role="group" aria-label="Camera">
-        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" title="Zoom in">
+        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" {...tipProps("Zoom in")}>
           +
         </button>
-        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" title="Zoom out">
+        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" {...tipProps("Zoom out")}>
           −
         </button>
-        <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" title="Rotate left (Q)">
+        <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" {...tipProps("Rotate left (Q)")}>
           <Icon name="rotateLeft" size={16} />
         </button>
-        <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" title="Rotate right (E)">
+        <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" {...tipProps("Rotate right (E)")}>
           <Icon name="rotateRight" size={16} />
         </button>
-        <button type="button" onClick={() => cameraApi.reset()} aria-label="Reset view" title="Reset view: fit the room and face the starting angle">
+        <button type="button" onClick={() => cameraApi.reset()} aria-label="Reset view" {...tipProps("Reset view: fit the room and face the starting angle")}>
           ⌂
         </button>
         <span className="camera-hint" aria-hidden="true">

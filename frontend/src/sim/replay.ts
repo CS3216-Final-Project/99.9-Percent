@@ -13,7 +13,7 @@ export const MAX_REPLAY_INPUTS = 100_000;
  * deterministic, so the result equals the state the inputs were recorded from.
  * Throws when the inputs could not have been recorded by a real run.
  */
-export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number): GameState {
+export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number, legacyMilestones = false): GameState {
     if (!Number.isSafeInteger(finalStep) || finalStep < 0 || finalStep > MAX_REPLAY_STEPS)
         throw new Error("Replay step is out of range");
     if (inputs.length > MAX_REPLAY_INPUTS)
@@ -25,6 +25,10 @@ export function replayCampaign(seed: number, runId: string, inputs: readonly Cam
             throw new Error("Input step is out of range");
         advanceTo(s, input.step);
         applyCampaignInputInPlace(s, input.action);
+        // Phase 1 acknowledgement already returned to management: preserve that state.
+        // Record the added acknowledgement so subsequent schema-2 saves replay exactly.
+        if(legacyMilestones && s.campaign!.openingMilestone && !s.campaign!.openingMilestone.acknowledged)
+            applyCampaignInputInPlace(s, {type:"acknowledge_milestone"});
     }
     advanceTo(s, finalStep);
     return projectCampaign(s);
