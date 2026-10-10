@@ -52,7 +52,11 @@ export function buildModel(s: GameState): SceneModel {
   const m = metrics(s);
 
   const hosts: Led[] = s.infra.appHosts.map((h, i) => {
-    if(s.campaign && !s.campaign.apps[i].routed) return "off";
+    if(s.campaign) {
+      const a=s.campaign.apps[i], x=s.campaign.snapshot.instances?.find(x=>x.id===a.id);
+      if(!a.routed&&a.backlog===0)return "off";
+      return x&&x.demandRatio>1?"critical":a.backlog>0?"warn":"ok";
+    }
     if (h.status === "failed") return reveal("app") ? "off" : "ok";
     if (h.status === "degraded") return named ? "warn" : "ok";
     if (!inc && m.appUtil >= 1) return "critical";
@@ -99,7 +103,7 @@ export function buildModel(s: GameState): SceneModel {
     backup: has(s, "backups"),
     monitoring: monitoringLevel(s),
     engineers: s.engineers,
-    busy: s.campaign ? (s.campaign.pending.some(a=>a.type==="add-app"||a.type==="upgrade-db")?4:0) : s.tasks.reduce((n, t) => n + t.assigned, 0),
+    busy: s.campaign ? (s.campaign.pending.some(a=>!["limit","unlimit","routing"].includes(a.type))?4:0) : s.tasks.reduce((n, t) => n + t.assigned, 0),
     releases: s.releases.length,
     promos: s.activePromos.length,
     flow: Math.round(Math.min(1.4, Math.max(m.appUtil, 0.25)) * 10) / 10,

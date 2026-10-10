@@ -17,6 +17,10 @@ function v1(g:GameState) {
  return JSON.stringify(e);
 }
 function backup(raw:string) {const e=JSON.parse(raw);return CAMPAIGN_SAVE_KEY+".backup.v1."+e.runId+"."+e.savedAt;}
+function aggregate(snapshot:NonNullable<GameState["campaign"]>["snapshot"]) {
+ const {version: _version,instances: _instances,effectiveAppCapacity: _effective,appBusyBudget: _budget,routing: _routing,...recorded}=snapshot;
+ return recorded;
+}
 
 it("landing boot creates neither durable company nor run event; explicit entry is idempotent",()=>{
  useGame.getState().boot();useGame.getState().boot();
@@ -65,7 +69,8 @@ it.each(["healthy","review","acknowledged"] as const)("migrates Phase 1 %s witho
  if(kind==="acknowledged")g=act(g,{type:"acknowledge_review"});
  const raw=v1(g);localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);localStorage.setItem("nn.save.v1","legacy");
  const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("load");
- expect(loaded.game.campaign!.snapshot).toEqual(g.campaign!.snapshot);
+ expect(loaded.game.campaign!.snapshot).toEqual(aggregate(g.campaign!.snapshot));
+ expect(loaded.game.campaign!.recent.every(m=>m.instances===undefined)).toBe(true);
  expect(loaded.game.campaign!.ledger).toEqual(g.campaign!.ledger);
 
  expect(loaded.game.campaign!.openingMilestone?.acknowledged??null).toBe(kind==="acknowledged"?true:null);
@@ -95,7 +100,12 @@ it("loads main's input-log envelope with queued work, fractional clock credit an
  localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);
  const expected=advanceSteps(act(advanceSteps(newGame(1,"main-save"),6).state,{type:"start_db_upgrade"}),1).state;
  const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("load");
- expect(loaded.game).toEqual(expected);expect(loaded.remainderMs).toBe(350);
+ expect(loaded.game.campaign).toMatchObject({runId:"main-save",step:7,cashCents:expected.campaign!.cashCents,
+  dbCapacity:600,dbBacklog:expected.campaign!.dbBacklog,pending:expected.campaign!.pending,
+  ledger:expected.campaign!.ledger,cumulative:expected.campaign!.cumulative,scaling:null});
+ expect(loaded.game.campaign!.snapshot).toEqual(aggregate(expected.campaign!.snapshot));
+ expect(loaded.game.campaign!.trace.find(e=>e.type==="action-requested")!.data).toEqual({actionId:expected.campaign!.actions[0].id,type:"upgrade-db",costCents:300000,activationStep:9});
+ expect(loaded.remainderMs).toBe(350);
  expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBe(raw);
  enter();expect(useGame.getState().running).toBe(false);
  expect(localStorage.getItem(backup(raw))).toBe(raw);
@@ -104,7 +114,7 @@ it("loads main's input-log envelope with queued work, fractional clock credit an
  expect(useGame.getState().game.campaign!.dbCapacity).toBe(1000);
  expect(loadGame()).toMatchObject({status:"ok",game:useGame.getState().game,remainderMs:0});
 });
-it("normalizes a historical acknowledgement into replayable schema 2 without re-awarding completion",()=>{
+it("normalizes a historical acknowledgement into a current replay save without re-awarding completion",()=>{
  let game=act(recovered(),{type:"acknowledge_review"});
  game=act(game,{type:"acknowledge_milestone"});game=advanceSteps(game,4).state;
  localStorage.setItem(CAMPAIGN_SAVE_KEY,v1(game));

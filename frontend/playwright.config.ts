@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const port=Number(process.env.PLAYWRIGHT_PORT ?? 4175);
+
 export default defineConfig({
   testDir: './e2e',
   tsconfig: './tsconfig.app.json',
@@ -13,7 +15,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://127.0.0.1:4175',
+    baseURL: `http://127.0.0.1:${port}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
@@ -23,8 +25,8 @@ export default defineConfig({
     { name: 'mobile-chromium', testMatch: '**/mobile.spec.ts', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    command: 'npm run preview -- --host 127.0.0.1 --port 4175 --strictPort',
-    url: 'http://127.0.0.1:4175',
+    command: `npm run preview -- --host 127.0.0.1 --port ${port} --strictPort`,
+    url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
   },

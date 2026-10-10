@@ -1,3 +1,5 @@
+import { AccountPanel } from "./AccountPanel";
+import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest } from "@/game/persist";
 import { nextMove } from "@/game/advisor";
 import { money, num } from "@/game/format";
@@ -19,7 +21,7 @@ const percent = (v: number | null) => v === null ? "No completed requests" : (v 
 const PLACES = ["gateway", "app", "db", "monitoring"] as const;
 const PLACE_NAMES = { gateway: "Network", app: "Servers", db: "Database", monitoring: "Monitoring" };
 const ACTION_NAMES: Record<Intervention, string> = {
-  "add-app": "Add server", "upgrade-db": "Database upgrade", limit: "Traffic limit", unlimit: "Remove traffic limit",
+  "add-app": "Add server", "upgrade-db": "Database upgrade", limit: "Traffic limit", unlimit: "Remove traffic limit", "scale-up":"Application scale up", "deploy-lb":"Load balancer deployment", routing:"Routing change",
 };
 
 export function CampaignHeader() {
@@ -54,9 +56,11 @@ export function CampaignHeader() {
 }
 
 export function CampaignPanel() {
-  const { game, act, selected } = useGame(), c = game.campaign!, m = c.snapshot;
+  const { game, act, selected, selectedAppId } = useGame(), c = game.campaign!, m = c.snapshot;
   const incident = game.phase === "incident";
-  const busy = c.pending.some(a => a.type === "add-app" || a.type === "upgrade-db");
+  const busy = c.pending.some(a => !["limit","unlimit","routing"].includes(a.type));
+  const unlocked = !!c.openingMilestone?.acknowledged;
+  const selectedApp = c.apps.find(a=>a.id===selectedAppId)??c.apps[0];
   const disabled = useGame(s=>s.onboarding) || !!(c.openingMilestone && !c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
   const admissionPending = c.pending.some(a => a.type === "limit" || a.type === "unlimit");
   const place = PLACES.find(id => id === selected);
@@ -92,18 +96,36 @@ export function CampaignPanel() {
         {place && <div className="campaign-evidence" role="status"><Callout compact tone="info" icon={EQUIPMENT_ICON[place]} kicker={`${PLACE_NAMES[place]} · step ${m.step}`}>
           {component ? <>Demand {num(component.demand)}/s · capacity {num(component.capacity)}/s · backlog {num(component.backlog)}.</> : place === "gateway" ? <>Incoming {num(m.incoming)}/s · admitted {num(m.admitted)}/s · rejected {num(m.rejected)}/s.</> : <>Latency {m.latencyMs.toFixed(0)} ms · errors {percent(m.serviceErrorRate)} · backlog {num(m.app.backlog + m.db.backlog)}.</>}
         </Callout></div>}
+        {unlocked && <details className="more" open={selected==="app"}><summary>Application instances · {c.routing.mode} routing</summary>
+          <section aria-label="Application instances"><p className="muted">Load balancer: {c.loadBalancer?"Deployed":"Not deployed"}. Receiving new traffic: {c.routing.targets.map(id=>id==="app-1"?"App 1":"App 2").join(", ")}.</p>
+            <div className="instance-choices">{c.apps.map(a=>{const x=m.instances?.find(x=>x.id===a.id);return <button key={a.id} className={`chip${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} {...tipProps(`Capacity ${a.capacity} req/s; backlog ${a.backlog}. ${a.routed?"Receiving traffic":"Installed - not receiving traffic"}`)} onClick={()=>inspectOrSelect("app",a.id)}>{a.id==="app-1"?"App 1":"App 2"}: {a.routed?"Receiving traffic":"Installed - not receiving traffic"}{x&&<span>{x.demand}/{x.capacity} req/s · processed {x.processed} · backlog {x.backlog}</span>}</button>;})}</div>
+          </section></details>}
       </div>
       <h4 className="step-head"><span className="step-num" aria-hidden="true">2</span>Choose a response</h4>
       <ul className="actions">
         <li><Act label="Add server" price={Q.appCostCents / 100} note={`${Q.appDelay} steps`} disabled={disabled || busy || c.apps.length >= Q.maxApps || c.cashCents <= Q.appCostCents} tip="Adds installed application capacity. Without routing, a new server does not receive traffic." onClick={() => act({ type: "add_server" })} /></li>
-        <li><Act label="Upgrade database" price={Q.dbCostCents / 100} note={`${Q.dbDelay} steps`} disabled={disabled || busy || c.upgraded || c.cashCents <= Q.dbCostCents} tip="Increases database capacity after activation. Running costs also increase." onClick={() => act({ type: "start_db_upgrade" })} /></li>
+        <li><Act label="Upgrade database" price={Q.dbCostCents / 100} note={`${Q.dbDelay} steps`} disabled={disabled || busy || (unlocked?c.dbCapacity>=P.dbCapacity:c.upgraded) || c.cashCents <= Q.dbCostCents} tip="Increases database capacity after activation. Running costs also increase." onClick={() => act({ type: "start_db_upgrade" })} /></li>
         <li><Act label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} step`} disabled={disabled || admissionPending} tip="Changes admitted traffic at the next physical step. Rejected requests earn no revenue." onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
       </ul>
+      {unlocked && <section aria-label="Scaling controls" className="scaling-controls">
+        <h4 className="step-head">Scale and route</h4>
+        <ul className="actions">
+          <li><Act label={`Scale up ${selectedApp.id==="app-1"?"App 1":"App 2"}`} price={P.appCostCents/100} note={`${P.appDelay} steps`} disabled={disabled||busy||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip="Increases only the selected application's capacity. Database capacity stays unchanged." onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>
+          <li><Act label="Deploy load balancing" price={P.lbCostCents/100} note={`${P.lbDelay} steps`} disabled={disabled||busy||c.loadBalancer||c.cashCents<=P.lbCostCents} tip="Installs a load balancer. Traffic changes only after you explicitly configure routing." onClick={()=>act({type:"deploy_load_balancer"})}/></li>
+        </ul>
+        <details className="more"><summary>Configure routing · {c.routing.mode}</summary>
+        <fieldset disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing")}><legend>Routing · activates next step</legend>
+          <button className="btn btn-small" disabled={c.routing.mode==="balanced"&&c.routing.targets.length===c.apps.length} onClick={()=>act({type:"set_routing",mode:"balanced",targets:c.apps.map(a=>a.id)})}>Balance across installed apps</button>
+          {c.apps.map(a=><button key={a.id} className="btn btn-small" disabled={c.routing.mode==="balanced"&&c.routing.targets.length===1&&c.routing.targets[0]===a.id} onClick={()=>act({type:"set_routing",mode:"balanced",targets:[a.id]})}>Balance to {a.id==="app-1"?"App 1":"App 2"} only</button>)}
+          <button className="btn btn-small" disabled={c.routing.mode==="single"} onClick={()=>act({type:"set_routing",mode:"single",targets:["app-1"]})}>Route only to App 1</button>
+        </fieldset></details>
+        <p className="muted">{c.scaling?.consumed?"Traffic growth applied: 1,400 requests/s.":c.dbCapacity<P.dbCapacity?"Next growth waits for a paid database upgrade to 2,000 ops/s.":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Growth waits until the incident and backlogs clear.":c.scaling?.dueStep?`Growth due at step ${c.scaling.dueStep} while ready.`:"Growth readiness is checked on the next step."}</p>
+      </section>}
       {c.pending.map(a => <div className="working campaign-working" role="status" key={a.id}>
         <span>{ACTION_NAMES[a.type]}: activates in {a.activationStep - c.step} step(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
       </div>)}
-      {c.apps.length>1 && <p className="muted">Added application: Installed, not receiving traffic</p>}
+      {c.apps.some(a=>!a.routed) && <p className="muted">{c.apps.filter(a=>!a.routed).map(a=>a.id.replace("app-","App ")).join(", ")}: Installed, not receiving traffic</p>}
       <details className="more campaign-details"><summary>Full system evidence</summary>
         <p>Incoming <b>{m.incoming}</b> / admitted <b>{m.admitted}</b> / rejected <b>{m.rejected}</b> requests/s</p>
         <table className="campaign-table"><caption>Component evidence, step {m.step}</caption><thead><tr><th>Metric</th><th>Servers</th><th>Database</th></tr></thead>
@@ -114,7 +136,7 @@ export function CampaignPanel() {
       <details className="more"><summary>Operating finances</summary><dl className="rows">
         <Row label="Available cash" value={dollars(c.cashCents)} />
         <Row label="Pending revenue" value={dollars(c.ledger.successes * Q.revenueCents)} />
-        <Row label="Unsettled costs" value={dollars(Math.floor((c.ledger.appNumerator + c.ledger.dbNumerator + c.ledger.salaryNumerator) / Q.periodSteps))} />
+        <Row label="Unsettled costs" value={dollars(Math.floor((c.ledger.appNumerator + c.ledger.dbNumerator + c.ledger.salaryNumerator + (c.ledger.lbNumerator??0)) / Q.periodSteps))} />
         <Row label="Next settlement" value={`Step ${(c.lastSettledPeriod + 1) * Q.periodSteps}`} />
         <Row label="Rejected this period" value={num(c.ledger.rejected)} />
         <Row label="Opportunity value" value={dollars(c.ledger.rejected * Q.revenueCents)} tip="Revenue forgone from rejected demand, not an extra cash charge." />
@@ -144,7 +166,7 @@ function Report({ report }: { report: CampaignPostmortem }) {
     <div className="pm-lines">{report.explanations.map((text, i) => <Callout compact key={i} tone="info" icon="search" kicker="Recorded evidence">
       {text.replace(/\b\d+\.\d{3,}\b/g, value => Number(value).toFixed(2))}
     </Callout>)}</div>
-    <details className="more campaign-details"><summary>Recorded incident evidence</summary><table className="campaign-table"><thead><tr><th>Step</th><th>DB demand/capacity</th><th>Backlog</th><th>Latency</th><th>Errors</th></tr></thead><tbody>{report.snapshots.map(m => <tr key={m.step}><td>{m.step}</td><td>{m.db.demand}/{m.db.capacity}</td><td>{m.db.backlog}</td><td>{m.latencyMs.toFixed(0)} ms</td><td>{percent(m.serviceErrorRate)}</td></tr>)}</tbody></table></details>
+    <details className="more campaign-details"><summary>Recorded incident evidence</summary><table className="campaign-table"><caption>Recorded observations; older steps retain aggregate evidence.</caption><thead><tr><th>Step</th><th>Applications: demand/capacity · backlog</th><th>Routing</th><th>DB demand/capacity</th><th>DB backlog</th><th>Latency</th><th>Errors</th></tr></thead><tbody>{report.snapshots.map(m => <tr key={m.step}><td>{m.step}</td><td>{m.instances?m.instances.map(a=><div key={a.id}>{a.id.replace("app-","App ")}: {a.demand}/{a.capacity} · {a.backlog}</div>):`${m.app.demand}/${m.app.capacity} · ${m.app.backlog} (aggregate)`}</td><td>{m.routing?`${m.routing.mode}: ${m.routing.targets.map(id=>id.replace("app-","App ")).join(", ")}`:"Not recorded"}</td><td>{m.db.demand}/{m.db.capacity}</td><td>{m.db.backlog}</td><td>{m.latencyMs.toFixed(0)} ms</td><td>{percent(m.serviceErrorRate)}</td></tr>)}</tbody></table></details>
   </div>;
 }
 
@@ -170,7 +192,7 @@ export function CampaignOverlays() {
     <img className="gameplay-preview" src="/opening-gameplay.png" alt="The furnished office and component evidence in the playable campaign" />
     <div className="title-actions"><button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}><Icon name="play" />{hasRun ? "Continue company" : "Try Prototype"}</button></div>
     {playtestUrl?<a className="btn" href={playtestUrl} target="_blank" rel="noopener noreferrer">Join Playtest</a>:<><button className="btn" disabled>Join Playtest</button><p className="muted">Playtest registration is not open yet.</p></>}
-    <p className="muted">Play immediately as a guest. Progress stays in this browser.</p>
+    <p className="muted">Play immediately as a guest. Progress stays in this browser until you explicitly attach it to an account.</p><AccountPanel />
   </div></div>;
   if(useGame.getState().onboarding) {
     const {meta,onboardingMove}=useGame.getState();
@@ -217,7 +239,7 @@ export function CampaignOverlays() {
         <button className="btn" disabled={!intervention.trim()} onClick={()=>{useGame.getState().observer(measurement.session?.source??"unspecified",intervention);setIntervention("");}}>Record intervention</button>
       </details>
     </section>
-    <SaveFiles /><ModeSwitch to="classic" />
+    <AccountPanel /><SaveFiles /><ModeSwitch to="classic" />
   </Modal>;
   if (view === "history") return <Modal title="Campaign history" wide icon={{ kind: "users", name: "history" }} onClose={() => openView(null)}>
     <LineChart title="Latency" axisLabel="Step" series={[{ name: "Latency", color: "var(--c-health)", values: c.recent.map(m => m.latencyMs) }]} turns={c.recent.map(m => m.step)} format={v => `${v.toFixed(0)} ms`} />

@@ -36,4 +36,16 @@ describe("scene model", () => {
     while (s.campaign!.apps.length < 2) s = step(s).state;
     expect(buildModel(s).hosts).toEqual(["ok", "off"]);
   });
+  it("shows each application's own constraint and keeps an unrouted queue visible until drained", () => {
+    let s=newGame(3,"individual-racks");const c=s.campaign!;
+    c.apps[0].capacity=1600;c.apps[0].tier="large";
+    c.apps.push({id:"app-2",capacity:600,backlog:0,routed:true,tier:"base",state:"active"});
+    c.routing={mode:"balanced",targets:["app-1","app-2"]};c.loadBalancer=true;c.dbCapacity=2000;c.incomingRate=1400;
+    s=step(s).state;
+    expect(s.campaign!.snapshot.app.demandRatio).toBeLessThan(1);
+    expect(buildModel(s).hosts).toEqual(["ok","critical"]);
+    s.campaign!.routing={mode:"single",targets:["app-1"]};s.campaign!.apps[1].routed=false;s.campaign!.apps[1].backlog=1000;
+    s=step(s).state;expect(buildModel(s).hosts).toEqual(["ok","warn"]);
+    s=step(s).state;expect(buildModel(s).hosts).toEqual(["ok","off"]);
+  });
 });

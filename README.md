@@ -6,7 +6,7 @@ The playable frontend was migrated from [99.9-Percent-Prototype](https://github.
 
 See the [Development Roadmap](docs/DEVELOPMENT_ROADMAP.md) for planned work and the [roadmap summary and proposal review](docs/DEVELOPMENT_ROADMAP_REVIEW.md) for milestones, scope alignment, and decisions to review.
 
-The [System Architecture](docs/SYSTEM_ARCHITECTURE.md) diagrams show the target MVP's frontend, simulation, Google OAuth, saves, API and Neon database, plus the infrastructure simulated inside the game. [🔑 Authentication](docs/AUTHENTICATION.md) defines the planned Google sign-in and app sessions; implementation is scheduled in the roadmap.
+The [System Architecture](docs/SYSTEM_ARCHITECTURE.md) diagrams show the target MVP's frontend, simulation, Google OAuth, saves, API and Neon database, plus the infrastructure simulated inside the game. [🔑 Authentication](docs/AUTHENTICATION.md) describes the optional Google sign-in, durable app sessions and account-owned cloud saves. Real-provider deployment acceptance remains outstanding.
 
 The [UI design guide](docs/UI_DESIGN.md) defines the shared visual language, incident and inspector layouts, responsive behaviour and review checks used by both gameplay modes.
 
@@ -58,6 +58,10 @@ In either mode, open Menu > Save files to export the current run or import a JSO
 
 Gameplay, saves and prototype analytics run in the browser and work without the API. Saves stay in this browser and origin; saves on the prototype deployment do not automatically move to a new domain. The backend retains its existing health and dialogue endpoints for later integration.
 
+Campaign continues into [Phase 3 scaling](docs/phases/PHASE_3_SCALING.md) after the opening milestone: buy database headroom, scale an application or install a second server, then explicitly deploy and configure load balancing. Classic remains available through the mode selector. Existing replay saves are backed up before conversion; historical reports retain their original aggregate observations.
+
+Account and cloud saves are optional controls on the Campaign title and menu. Sign-in never attaches a guest company automatically. The frontend's server-side `API_PROXY_TARGET` and backend Google/`APP_ORIGIN` configuration are required for account endpoints; see the authentication guide and package `.env.example` files. All `VITE_*` settings are public. Guest play remains available when accounts are unconfigured or offline.
+
 The API runs without a database. For routes that use one, put Neon's connection strings in `backend/.env` (ask Di Heng, or use your own Neon branch).
 
 ## Scripts (in each of `frontend/` and `backend/`)
@@ -92,6 +96,10 @@ Postgres on [Neon](https://neon.tech) (region: Singapore), queried with [Drizzle
 | `sessions` | One row per mission attempt |
 | `dialogue_turns` | What the player said and the NPC replied, per session (the conversation history) |
 | `mission_reports` | The `MissionReport` for a finished session |
+| `game_accounts` | Verified Google issuer/subject and display name |
+| `game_sessions` | Hashed opaque session tokens, CSRF token and expiry |
+| `game_auth_attempts` | Short-lived browser-bound OAuth state, nonce and PKCE verifier |
+| `game_runs` | Owner-scoped compact campaign replay saves and revisions |
 
 To change the schema: edit `schema.ts`, run `npm run db:generate`, and commit the new files in `backend/drizzle/`. Never edit a migration that has already been merged. The migration runs on production automatically after the merge.
 

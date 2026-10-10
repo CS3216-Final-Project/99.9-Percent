@@ -290,13 +290,18 @@ export function completedTechIds(state: GameState): TechId[] {
 }
 
 export function has(state: Pick<GameState, "techDone" | "campaign">, tech: TechId): boolean {
-  if(state.campaign)return tech==="monitoring";
+  if(state.campaign)return tech==="monitoring" || (tech==="load_balancing"&&state.campaign.loadBalancer) || (tech==="larger_servers"&&state.campaign.apps.some(a=>a.tier==="large"));
   // Metrics and alerts are baseline tools, including when resuming an old save.
   if (tech === "monitoring") return true;
   return state.techDone.includes(tech);
 }
 
 export function techStatus(state: GameState, id: TechId): TechStatus {
+  if(state.campaign) {
+    if(!["larger_database","larger_servers","load_balancing"].includes(id))return "locked";
+    if(id==="larger_database")return state.campaign.dbCapacity>=2000?"done":"available";
+    return has(state,id)?"done":state.campaign.openingMilestone?.acknowledged?"available":"locked";
+  }
   if (id === "larger_database") {
     if (state.releases.some((r) => r.kind === "db_upgrade")) return "ready";
     if (state.tasks.some((t) => t.kind === "db_upgrade")) return "in_progress";

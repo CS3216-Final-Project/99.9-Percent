@@ -1,5 +1,7 @@
 # Phase 3 — Application Scaling and Routing
 
+> Implementation note (11 October 2026): this original phase plan is retained. [The concrete implementation contract](PHASE_3_IMPLEMENTATION_CONTRACT.md) records the inherited opening capacities, paid database headroom, separate load-balancer/routing actions and current replay-save format. [The latest-main integration report](PHASE_3_MAIN_INTEGRATION_REPORT.md) records validation and outstanding real-provider/deployment and human acceptance. Illustrative 600/900-capacity examples below remain examples; the live company continues with its existing 1,000-capacity application and receives no reset or free capacity.
+
 > **Project:** 99.99% — System Design Tycoon  
 > **Target:** 12–16 October 2026  
 > **Primary learning outcomes:** LO1 Diagnose bottlenecks; LO2 Choose scaling strategies; LO4 Weigh design trade-offs  

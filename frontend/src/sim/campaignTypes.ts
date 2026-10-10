@@ -14,6 +14,12 @@ export interface ComponentSnapshot {
     demandRatio: number;
 }
 export interface Snapshot {
+    /** Missing on retained historical opening snapshots. */
+    version?: 3;
+    instances?: InstanceSnapshot[];
+    effectiveAppCapacity?: number;
+    appBusyBudget?: number;
+    routing?: Routing;
     step: number;
     incoming: number;
     admitted: number;
@@ -26,7 +32,16 @@ export interface Snapshot {
     latencyMs: number;
     serviceErrorRate: number | null;
 }
-export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit";
+export interface Routing { mode: "single" | "balanced"; targets: string[] }
+export interface AppInstance {
+    id: string; capacity: number; backlog: number; routed: boolean;
+    tier: "base" | "large"; state: "active";
+}
+export interface InstanceSnapshot extends ComponentSnapshot {
+    id: string; tier: AppInstance["tier"]; state: "active"; routed: boolean;
+    demandRate: number; demandCount: number; processingBudget: number;
+}
+export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing";
 export interface ScheduledAction {
     id: string;
     type: Intervention;
@@ -34,6 +49,9 @@ export interface ScheduledAction {
     activationStep: number;
     costCents: number;
     activatedStep: number | null;
+    targetId?: string;
+    capacityAfter?: number;
+    routing?: Routing;
 }
 export interface TraceEvent {
     id: number;
@@ -48,6 +66,7 @@ export interface Ledger {
     appNumerator: number;
     dbNumerator: number;
     salaryNumerator: number;
+    lbNumerator?: number;
 }
 export interface Settlement {
     period: number;
@@ -57,12 +76,15 @@ export interface Settlement {
     dbCents: number;
     salaryCents: number;
     netCents: number;
+    lbCents?: number;
 }
 export interface CampaignIncident {
     id: string;
     openedStep: number;
     stableSteps: number;
     snapshots: Snapshot[];
+    components?: string[];
+    primaryComponent?: string;
 }
 export interface CampaignPostmortem {
     id: string;
@@ -75,18 +97,20 @@ export interface CampaignPostmortem {
     setupCents: number;
 }
 export interface Campaign {
+    /** Boundary of observations made by the deployed Phase 1/2 engine. */
+    foundation?: { step: number; inputs: number };
     scenarioId: "opening-db";
     scenarioVersion: 1;
     runId: string;
     step: number;
     incomingRate: number;
     limit: number | null;
-    apps: {
-        id: string;
-        capacity: number;
-        backlog: number;
-        routed: boolean;
-    }[];
+    apps: AppInstance[];
+    routing: Routing;
+    loadBalancer: boolean;
+    routingEnabledOnce: boolean;
+    scaling: null | { id: "application-scaling"; version: 1; enteredStep: number; dueStep: number | null; consumed: boolean };
+    overload: Record<string, number>;
     dbCapacity: number;
     dbBacklog: number;
     upgraded: boolean;
@@ -96,6 +120,7 @@ export interface Campaign {
         app: number;
         db: number;
         salary: number;
+        lb?: number;
     };
     settlements: Settlement[];
     lastSettledPeriod: number;
