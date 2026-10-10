@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useDetail, type Detail } from "./detail";
 import { buildProp, shade, type PropItem, type Sign, type Surface } from "./propModels";
+import { letteredTexture } from "./textures";
 
 /*
  * Draws the detailed machines built in propModels.ts. Every model of one kind
@@ -60,48 +61,29 @@ function PropInstances({ geometry, surface, matrices }: { geometry: THREE.Buffer
   return <instancedMesh key={matrices.length} ref={ref} args={[geometry, undefined, matrices.length]} material={material} castShadow={shadows} receiveShadow={surface !== "glow"} />;
 }
 
-const signTextures = new Map<string, THREE.CanvasTexture>();
-
-/** A lit sign with lettering, redrawn once the pixel font has loaded. */
+/** A lit sign with lettering. */
 function signTexture(sign: Sign): THREE.CanvasTexture {
-  const key = `${sign.text}|${sign.bg}|${sign.fg}`;
-  const hit = signTextures.get(key);
-  if (hit) return hit;
-  const c = document.createElement("canvas");
-  c.width = 512;
-  c.height = Math.round((512 * sign.h) / sign.w);
-  const g = c.getContext("2d") as CanvasRenderingContext2D;
-  const draw = () => {
-    const grad = g.createLinearGradient(0, 0, 0, c.height);
+  return letteredTexture(`sign|${sign.text}|${sign.bg}|${sign.fg}`, 512, Math.round((512 * sign.h) / sign.w), (g, w, h) => {
+    const grad = g.createLinearGradient(0, 0, 0, h);
     grad.addColorStop(0, shade(sign.bg, 1.5));
     grad.addColorStop(1, sign.bg);
     g.fillStyle = grad;
-    g.fillRect(0, 0, c.width, c.height);
+    g.fillRect(0, 0, w, h);
     g.textAlign = "center";
     g.textBaseline = "middle";
     g.shadowColor = sign.fg;
     g.shadowBlur = 12;
     g.fillStyle = sign.fg;
     // As large as the sign is tall, but never wider than nine tenths of it.
-    let size = Math.round(c.height * 0.62);
+    let size = Math.round(h * 0.62);
     g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
     const width = g.measureText(sign.text).width;
-    if (width > c.width * 0.9) {
-      size = Math.floor((size * c.width * 0.9) / width);
+    if (width > w * 0.9) {
+      size = Math.floor((size * w * 0.9) / width);
       g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
     }
-    g.fillText(sign.text, c.width / 2, c.height / 2 + 2);
-  };
-  draw();
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  document.fonts?.load('700 40px "Pixelify Sans"').then(() => {
-    draw();
-    t.needsUpdate = true;
+    g.fillText(sign.text, w / 2, h / 2 + 2);
   });
-  signTextures.set(key, t);
-  return t;
 }
 
 function SignPlane({ sign, item }: { sign: Sign; item: PropItem }) {

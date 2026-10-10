@@ -359,6 +359,79 @@ export function skyline(): THREE.CanvasTexture {
   return finish(c);
 }
 
+const lettered = new Map<string, THREE.CanvasTexture>();
+
+/**
+ * A canvas texture with lettering in the pixel font, made once per key. It is
+ * drawn straight away and again once the font has loaded, so text drawn before
+ * the font arrives does not stay in the fallback face.
+ */
+export function letteredTexture(key: string, w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void): THREE.CanvasTexture {
+  const hit = lettered.get(key);
+  if (hit) return hit;
+  const [c, g] = canvas(w, h);
+  const paint = () => {
+    g.clearRect(0, 0, w, h);
+    draw(g, w, h);
+  };
+  paint();
+  const t = finish(c);
+  t.magFilter = THREE.LinearFilter;
+  document.fonts?.load('700 40px "Pixelify Sans"').then(() => {
+    paint();
+    t.needsUpdate = true;
+  });
+  lettered.set(key, t);
+  return t;
+}
+
+/** The size of a speech bubble's canvas; the bubble itself shrinks to fit its line. */
+export const BUBBLE_CANVAS: [number, number] = [384, 108];
+
+/** A speech bubble holding one line, its tail pointing down at the speaker. Alarmed ones are red. */
+export function bubbleTexture(text: string, alarmed: boolean): THREE.CanvasTexture {
+  return letteredTexture(`bubble|${alarmed}|${text}`, BUBBLE_CANVAS[0], BUBBLE_CANVAS[1], (g, w, h) => {
+    const ink = alarmed ? "#b3122a" : "#1d1834";
+    const pad = 20;
+    const tail = 18;
+    const line = 5;
+    let size = 36;
+    g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
+    let width = g.measureText(text).width;
+    const room = w - 2 * pad - 2 * line;
+    if (width > room) {
+      size = Math.floor((size * room) / width);
+      g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
+      width = g.measureText(text).width;
+    }
+    const bw = Math.min(w - 2 * line, width + 2 * pad);
+    const bh = h - tail - 2 * line;
+    const x = (w - bw) / 2;
+    const y = line;
+    const r = 16;
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + bw, y, x + bw, y + bh, r);
+    g.arcTo(x + bw, y + bh, x, y + bh, r);
+    g.lineTo(w / 2 + 12, y + bh);
+    g.lineTo(w / 2, h - line);
+    g.lineTo(w / 2 - 12, y + bh);
+    g.arcTo(x, y + bh, x, y, r);
+    g.arcTo(x, y, x + bw, y, r);
+    g.closePath();
+    g.fillStyle = alarmed ? "#ffe3e6" : "#fffdf7";
+    g.fill();
+    g.lineWidth = line;
+    g.lineJoin = "round";
+    g.strokeStyle = ink;
+    g.stroke();
+    g.fillStyle = ink;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(text, w / 2, y + bh / 2 + 2);
+  });
+}
+
 /** The company's neon sign. Redrawn once the pixel font has loaded. */
 export function logoSign(): THREE.CanvasTexture {
   const [c, g] = canvas(512, 160);

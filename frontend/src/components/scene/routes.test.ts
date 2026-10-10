@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { GROUPS } from './conversations';
 import { CLOSED_ROOMS, deskSeat, GLASS, OBSTACLES, SPOTS, type Obstacle } from './floorplan';
 import { ROOM } from './layout';
 import { heading, neighbours, PATHS, planLoop, poseAt, TURN_RATE, WAYPOINTS, wrapAngle, type WaypointId } from './routes';
@@ -54,10 +55,11 @@ const point = (id: WaypointId): P => [WAYPOINTS[id].x, WAYPOINTS[id].z];
 const paths = PATHS.map(([a, b]) => ({ name: `${a} to ${b}`, a: point(a), b: point(b) }));
 const ids = Object.keys(WAYPOINTS) as WaypointId[];
 
-/** Everyone who stays put: the engineers at their desks and the crew in SPOTS. */
+/** Everyone who stays put: the engineers at their desks, the crew in SPOTS and the groups chatting. */
 const stillCrew: { name: string; p: P }[] = [
   ...Array.from({ length: 8 }, (_, i) => ({ name: `engineer ${i}`, p: [deskSeat(i).x, deskSeat(i).z] as P })),
   ...Object.entries(SPOTS).map(([name, s]) => ({ name, p: [s.x, s.z] as P })),
+  ...GROUPS.flatMap((g) => g.members.map((m, i) => ({ name: `${g.name}, member ${i}`, p: [m.x, m.z] as P }))),
 ];
 
 describe('office walking routes', () => {

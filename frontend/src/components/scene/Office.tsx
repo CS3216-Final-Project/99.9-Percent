@@ -6,6 +6,8 @@ import * as THREE from "three";
 import { deskSlot, POS, ROOM } from "./layout";
 import { creature, type Activity, type Species } from "./cast";
 import { Creature, preloadCreatures, Walker, Wanderer } from "./creatures";
+import { Conversation } from "./chatter";
+import { GROUPS } from "./conversations";
 import { ARCADE_Z, ARCADES, deskSeat, FIXTURES, GLASS, GLASS_H, SPOTS } from "./floorplan";
 import { planLoop, type WaypointId } from "./routes";
 import { BALL_RADIUS, ballAt, RALLY, RALLY_PERIOD, TABLE } from "./rally";
@@ -744,10 +746,14 @@ function Staff({ crew }: { crew: Crew }) {
         <ScreenPlane key={x} kind="game" w={ARCADE_SCREEN.w} h={ARCADE_SCREEN.h} position={[x, ARCADE_SCREEN.y, ARCADE_Z + ARCADE_SCREEN.z]} tilt={ARCADE_SCREEN.tilt} />
       ))}
 
-      {/* Crew wandering the office, each on a loop of their own, and a technician on the server floor */}
+      {/* Small groups chatting, and crew wandering the office on loops of their own */}
+      {GROUPS.map((g) => (
+        <Conversation key={g.name} group={g} incident={crew.incident} />
+      ))}
       {WANDERERS.map((w, i) => (
         <Wanderer key={i} plan={WANDERER_PLANS[i]} species={w.species} offset={w.offset} />
       ))}
+      {/* A technician on the server floor */}
       <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} species={creature(23, "tech")} phase={2} />
     </group>
   );
