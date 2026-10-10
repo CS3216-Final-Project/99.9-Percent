@@ -4,8 +4,8 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { deskSlot, POS, ROOM } from "./layout";
-import { look } from "./cast";
-import { Person, Walker, type Activity } from "./people";
+import { creature, type Activity } from "./cast";
+import { Creature, preloadCreatures, Walker } from "./creatures";
 import { ModelBatch, preloadModels, type ModelId, type Placement } from "./models";
 import { ball, bx, cy, place, PrimBatch, type Prim, type V3 } from "./prims";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
@@ -13,11 +13,11 @@ import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyl
 import { OnWall } from "./walls";
 
 /*
- * Everything human in the building. The equipment sits on a glass-walled
- * server floor in the middle; around it are the engineering pods, the release
- * and growth desks, a monitoring room, a network and power room, townhall
- * steps, a library, a meeting room, reception, a kitchen, a dining table, a
- * lounge with games, and the people who use them.
+ * Everything around the equipment. It sits on a glass-walled server floor in
+ * the middle; around it are the engineering pods, the release and growth
+ * desks, a monitoring room, a network and power room, townhall steps, a
+ * library, a meeting room, reception, a kitchen, a dining table, a lounge with
+ * games, and the monster crew who use them (see creatures.tsx).
  *
  * Furniture comes from two CC0 model packs (see models.tsx); fittings with no
  * matching model are boxes and cylinders (see prims.tsx). Both are drawn as
@@ -221,7 +221,7 @@ const DESK_PLANTS: [ModelId, number][] = [
   ["cactusSmallB", 0.7],
 ];
 
-/** A desk facing -z with its chair on the +z side. The monitors' screens are drawn by `People`. */
+/** A desk facing -z with its chair on the +z side. The monitors' screens are drawn by `Staff`. */
 function deskModels(w: number, i: number, monitors = 1): Placement[] {
   const xs = monitors === 1 ? [0] : [-0.45, 0.45];
   const out = [
@@ -661,7 +661,7 @@ function WallClock({ position }: { position: V3 }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* People                                                              */
+/* The crew                                                            */
 /* ------------------------------------------------------------------ */
 
 export interface Crew {
@@ -687,7 +687,7 @@ function seatFor(i: number, crew: Crew): Seat {
   return free % 2 ? "mug" : "relax";
 }
 
-function People({ crew }: { crew: Crew }) {
+function Staff({ crew }: { crew: Crew }) {
   const meetingTv = tvPicture(MEETING_TV);
   const loungeTv = tvPicture(LOUNGE_TV);
   return (
@@ -701,51 +701,51 @@ function People({ crew }: { crew: Crew }) {
           <group key={i}>
             <ScreenPlane kind={screen} w={PANEL.w} h={PANEL.h} position={at(slot.x, slot.z, slot.rot, [0, PANEL.y, PANEL.z])} rot={slot.rot} />
             {seat && seat !== "kitchen" && seat !== "lounge" && (
-              <Person pose="sit" activity={seat as Activity} look={look(i)} position={at(slot.x, slot.z, slot.rot, [0, 0, 0.72])} rotation={slot.rot} phase={i * 1.7} />
+              <Creature pose="sit" activity={crew.incident ? "panic" : (seat as Activity)} species={creature(i)} position={at(slot.x, slot.z, slot.rot, [0, 0, 0.72])} rotation={slot.rot} phase={i * 1.7} />
             )}
-            {seat === "kitchen" && <Person pose="stand" activity="mug" look={look(i)} position={[16.6, 0, -5.7]} rotation={-2.4} phase={i} />}
-            {seat === "lounge" && <Person pose="sit" activity="laptop" look={look(i)} position={[19.9, 0, 5.9]} rotation={Math.PI / 2} phase={i} />}
+            {seat === "kitchen" && <Creature pose="stand" activity="mug" species={creature(i)} position={[16.6, 0, -5.7]} rotation={-2.4} phase={i} />}
+            {seat === "lounge" && <Creature pose="sit" activity="laptop" species={creature(i)} position={[19.9, 0, 5.9]} rotation={Math.PI / 2} phase={i} />}
           </group>
         );
       })}
 
       {/* Release engineer, marketer, on-call SRE and receptionist */}
       <ScreenPlane kind={crew.releases > 0 ? "deploy-busy" : "deploy"} w={1.1} h={0.62} position={[POS.deploy.x, 1.28, POS.deploy.z - 0.09]} tilt={-0.35} />
-      <Person pose="stand" activity={crew.releases > 0 || crew.incident ? "type" : "chat"} look={look(11, "dev")} position={[POS.deploy.x, 0, POS.deploy.z + 0.78]} phase={3} />
+      <Creature pose="stand" activity={crew.releases > 0 || crew.incident ? "type" : "chat"} species={creature(11, "dev")} position={[POS.deploy.x, 0, POS.deploy.z + 0.78]} phase={3} />
       {[-0.45, 0.45].map((dx) => (
         <ScreenPlane key={dx} kind={crew.promos > 0 ? "chart" : "idle"} w={PANEL.w} h={PANEL.h} position={[POS.growth.x - 0.4 + dx, PANEL.y, POS.growth.z + 0.2 + PANEL.z]} />
       ))}
       <ScreenPlane kind="chart" w={1.2} h={0.75} position={[POS.growth.x + 1.15, 1.5, POS.growth.z - 0.52]} />
-      <Person pose="sit" activity={crew.promos > 0 ? "type" : "mug"} look={look(14, "marketer")} position={[POS.growth.x - 0.4, 0, POS.growth.z + 0.92]} phase={5} />
+      <Creature pose="sit" activity={crew.promos > 0 ? "type" : "mug"} species={creature(14, "marketer")} position={[POS.growth.x - 0.4, 0, POS.growth.z + 0.92]} phase={5} />
       {[-0.45, 0.45].map((dx) => (
         <ScreenPlane key={dx} kind={crew.incident ? "alert" : "dash"} w={PANEL.w} h={PANEL.h} position={[8.2 + dx, PANEL.y, -6.9 + PANEL.z]} />
       ))}
-      <Person pose="sit" activity={crew.incident ? "type" : "mug"} look={look(12, "sre")} position={[8.2, 0, -6.18]} phase={7} />
+      <Creature pose="sit" activity={crew.incident ? "type" : "mug"} species={creature(12, "sre")} position={[8.2, 0, -6.18]} phase={7} />
       <ScreenPlane kind="idle" w={0.52} h={0.31} position={[3.2, 1.0, 11.771]} rot={Math.PI} />
-      <Person pose="sit" activity="type" look={look(18, "frontdesk")} position={[3.2, 0, 11.3]} rotation={Math.PI} phase={2} />
+      <Creature pose="sit" activity="type" species={creature(18, "frontdesk")} position={[3.2, 0, 11.3]} rotation={Math.PI} phase={2} />
 
       {/* A meeting in progress */}
       <ScreenPlane kind="slides" w={meetingTv.w} h={meetingTv.h} position={meetingTv.position} rot={Math.PI / 2} />
-      <Person pose="stand" activity="present" look={look(36, "pm")} position={[-12.1, 0, 12.0]} rotation={-Math.PI / 2} phase={1} />
-      <Person pose="sit" activity="listen" look={look(33, "founder")} position={[-10.4, 0, 11.42]} rotation={Math.PI} phase={2} />
-      <Person pose="sit" activity="listen" look={look(34, "designer")} position={[-8.0, 0, 13.28]} phase={4} />
-      <Person pose="sit" activity="listen" look={look(35, "data")} position={[-9.2, 0, 13.28]} phase={6} />
+      <Creature pose="stand" activity="present" species={creature(36, "pm")} position={[-12.1, 0, 12.0]} rotation={-Math.PI / 2} phase={1} />
+      <Creature pose="sit" activity="listen" species={creature(33, "founder")} position={[-10.4, 0, 11.42]} rotation={Math.PI} phase={2} />
+      <Creature pose="sit" activity="listen" species={creature(34, "designer")} position={[-8.0, 0, 13.28]} phase={4} />
+      <Creature pose="sit" activity="listen" species={creature(35, "data")} position={[-9.2, 0, 13.28]} phase={6} />
 
       {/* Kitchen chat, the lounge, a phone call and the townhall */}
-      <Person pose="stand" activity="chat" look={look(31, "intern")} position={[17.5, 0, -4.85]} rotation={0.81} phase={8} />
-      <Person pose="sit" activity="listen" look={look(27, "dev")} position={[19.9, 0, 7.1]} rotation={Math.PI / 2} phase={9} />
-      <Person pose="stand" activity="chat" look={look(38, "marketer")} position={[-14.8, 0, 13.7]} rotation={Math.PI} phase={10} />
-      <Person pose="sit" activity="laptop" look={look(40, "data")} position={[-18.6, 0, 3.6]} rotation={-Math.PI / 2} phase={11} seat={0.87} />
+      <Creature pose="stand" activity="chat" species={creature(31, "intern")} position={[17.5, 0, -4.85]} rotation={0.81} phase={8} />
+      <Creature pose="sit" activity="listen" species={creature(27, "dev")} position={[19.9, 0, 7.1]} rotation={Math.PI / 2} phase={9} />
+      <Creature pose="stand" activity="chat" species={creature(38, "marketer")} position={[-14.8, 0, 13.7]} rotation={Math.PI} phase={10} />
+      <Creature pose="sit" activity="laptop" species={creature(40, "data")} position={[-18.6, 0, 3.6]} rotation={-Math.PI / 2} phase={11} seat={0.8} />
       <ScreenPlane kind="slides" w={2.1} h={1.12} position={[-14.35, 1.5, 4.5]} rot={-Math.PI / 2} />
       <ScreenPlane kind="game" w={loungeTv.w} h={loungeTv.h} position={loungeTv.position} rot={Math.PI / 2} />
       {[20.4, 21.3].map((x) => (
         <ScreenPlane key={x} kind="game" w={0.54} h={0.44} position={[x, 1.25, 10.92]} tilt={-0.2} />
       ))}
 
-      {/* People walking the corridors, and a technician on the server floor */}
-      <Walker from={[13.2, -3.6]} to={[13.2, 12.8]} speed={0.6} look={look(21, "founder")} />
-      <Walker from={[-4.4, 9.7]} to={[12.4, 9.7]} speed={0.55} look={look(16, "pm")} phase={4} />
-      <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} look={look(23, "tech")} phase={2} />
+      {/* Crew walking the corridors, and a technician on the server floor */}
+      <Walker from={[13.2, -3.6]} to={[13.2, 12.8]} speed={0.6} species={creature(24, "designer")} />
+      <Walker from={[-4.4, 9.7]} to={[12.4, 9.7]} speed={0.55} species={creature(16, "dev")} phase={4} />
+      <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} species={creature(23, "tech")} phase={2} />
     </group>
   );
 }
@@ -755,6 +755,7 @@ function People({ crew }: { crew: Crew }) {
 /* ------------------------------------------------------------------ */
 
 preloadModels();
+preloadCreatures();
 
 export function Office({ crew }: { crew: Crew }) {
   const prims = useMemo(() => buildStatic(), []);
@@ -767,7 +768,7 @@ export function Office({ crew }: { crew: Crew }) {
       <ModelBatch placements={models} />
       <Glass />
       <WhiteboardFace position={[-12.27, 1.45, 7.4]} rot={Math.PI / 2} />
-      <People crew={crew} />
+      <Staff crew={crew} />
       <PingPongBall />
 
       <OnWall wall="left">
