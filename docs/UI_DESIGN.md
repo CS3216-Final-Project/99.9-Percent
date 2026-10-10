@@ -18,6 +18,7 @@ The isometric room is the main canvas. A dark purple HUD frames cream paper pane
 | Secondary evidence | Native `details.more`, rows and tables; exact values stay accessible | `SidePanel.tsx`, `CampaignUI.tsx` |
 | Trends | Shared `LineChart`, labelled units, ticks and time axis | `Views.tsx` |
 | Menu / report | Shared `Modal` with concept icon, body and footer actions | `components/ui.tsx`, `Modals.tsx` |
+| Explanation on demand | Dark HUD tooltip with an arrow and a key for shortcuts. `Tip` wraps a term; `tipProps(text)` (or the `tip` prop on `Act`, `Callout`, `Chip`) marks a control. One `TooltipLayer` draws it. Never use the native `title` attribute | `components/ui.tsx`, `tips.ts`, `Tooltip.tsx` |
 
 Paths in this table are under `frontend/src/`. Shared vocabulary lives in `presentation.ts`: the same equipment gets the same name and icon in the room, investigation controls and inspector. Prefer extracting a shared primitive when extending an existing pattern to copying its markup or overriding its styles for one mode.
 
@@ -44,7 +45,7 @@ The UI reads the simulation snapshot and routes decisions through the store. It 
 
 Use the existing desktop side panel and mobile bottom panel. At 900 px and below, the header wraps, metric tiles reduce to icon/headline pairs, view tabs become icons and the speed selector hides. The room stays usable above the mobile panel. Evidence tables may scroll inside their disclosure; the page must not overflow horizontally. Do not make tables or explanatory paragraphs push every decision far below the initial viewport.
 
-At desktop size, verify all three opening responses fit in the initial incident panel. On mobile, scrolling within the panel is expected; verify equipment selection, each response, detailed evidence, pause, history and Menu remain reachable by touch. Expanded evidence must not cover the footer. Keep tap targets consistent with the existing buttons, visible focus, named controls, `aria-pressed` on selection/toggles, labelled charts and progress bars, and status announcements for inspection and pending actions. Do not rely on colour alone. Preserve reduced-motion styling.
+At desktop size, verify all three opening responses fit in the initial incident panel. On mobile, scrolling within the panel is expected; verify equipment selection, each response, detailed evidence, pause, history and Menu remain reachable by touch. Expanded evidence must not cover the footer. Keep tap targets consistent with the existing buttons, visible focus, named controls, `aria-pressed` on selection/toggles, labelled charts and progress bars, and status announcements for inspection and pending actions. Do not rely on colour alone. Preserve reduced-motion styling. Tooltips open on hover (after a short pause) and on keyboard focus, close on Escape, and explain locked controls too. On touch a tap on a term opens its tooltip; tapping a button only acts.
 
 ## Review before changing UI
 

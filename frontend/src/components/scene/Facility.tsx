@@ -37,6 +37,7 @@ import { chooseDetail, DetailContext, detailOverride, useDetail, type Renderer }
 import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { Icon } from "../icons";
+import { tipProps } from "../tips";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
 import { Exterior } from "./exterior";
@@ -958,19 +959,19 @@ export default function Facility() {
       <Labels />
       <HoverTip container={container} />
       <div className="camera-buttons" role="group" aria-label="Camera">
-        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" title="Zoom in">
+        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" {...tipProps("Zoom in")}>
           +
         </button>
-        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" title="Zoom out">
+        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" {...tipProps("Zoom out")}>
           −
         </button>
-        <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" title="Rotate left (Q)">
+        <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" {...tipProps("Rotate left (Q)")}>
           <Icon name="rotateLeft" size={16} />
         </button>
-        <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" title="Rotate right (E)">
+        <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" {...tipProps("Rotate right (E)")}>
           <Icon name="rotateRight" size={16} />
         </button>
-        <button type="button" onClick={() => cameraApi.reset()} aria-label="Reset view" title="Reset view: fit the room and face the starting angle">
+        <button type="button" onClick={() => cameraApi.reset()} aria-label="Reset view" {...tipProps("Reset view: fit the room and face the starting angle")}>
           ⌂
         </button>
         <span className="camera-hint" aria-hidden="true">

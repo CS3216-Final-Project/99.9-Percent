@@ -6,6 +6,7 @@ import { inspectOrSelect, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { EQUIPMENT_ICON } from "./presentation";
 import { Callout, Concept, Meter, Tip, type CalloutTone } from "./ui";
+import { tipProps } from "./tips";
 
 const ATTEMPT: Record<string, { tone: CalloutTone; icon: IconName; word: string }> = {
   fixed: { tone: "success", icon: "check", word: "Fixed" },
@@ -152,7 +153,7 @@ export default function IncidentPanel() {
       <ul className="actions">
         {usable.map((o) => (
           <li key={o.id}>
-            <button type="button" className="action" title={o.description} disabled={!!pending} onClick={() => act({ type: "incident_action", recovery: o.id })}>
+            <button type="button" className="action" {...tipProps(o.description)} disabled={!!pending} onClick={() => act({ type: "incident_action", recovery: o.id })}>
               <span className="action-title">{o.label}</span>
               <span className="price">
                 <Icon name="cash" size={12} />

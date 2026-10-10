@@ -5,6 +5,7 @@ import { BALANCE, metrics, type EventKind, type GameState, type Postmortem } fro
 import { compact, money, moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { tipProps } from "./tips";
 import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow, type ConceptKind } from "./ui";
 
@@ -31,7 +32,7 @@ export function EngineersView() {
         </h3>
         <div className="seats" aria-label={`${assigned} of ${game.engineers} engineers assigned`}>
           {Array.from({ length: game.engineers }, (_, i) => (
-            <span key={i} className={`seat${i < assigned ? " is-busy" : ""}`} title={i < assigned ? "Assigned" : "Free"}>
+            <span key={i} className={`seat${i < assigned ? " is-busy" : ""}`} {...tipProps(i < assigned ? "Assigned" : "Free")}>
               <Icon name="team" />
             </span>
           ))}
@@ -61,7 +62,7 @@ export function EngineersView() {
           price={game.engineers >= BALANCE.engineer.max ? undefined : BALANCE.engineer.hireCost}
           disabled={locked || game.engineers >= BALANCE.engineer.max}
           onClick={() => act({ type: "hire_engineer" })}
-          title={`Then ${moneyFull(BALANCE.engineer.salary)} a week.`}
+          tip={`Then ${moneyFull(BALANCE.engineer.salary)} a week.`}
         />
       </section>
 
@@ -151,6 +152,7 @@ export function LineChart({
   const x = (i: number) => L + ((W - L - R) * i) / n;
   const y = (v: number) => T + (H - T - B) * (1 - (v - lo) / (hi - lo || 1));
   const ticks = [lo, lo + (hi - lo) / 2, hi];
+  const hit = Math.max(3, Math.min(8, (W - L - R) / n / 2));
 
   return (
     <figure className="chart">
@@ -190,11 +192,11 @@ export function LineChart({
             <g key={s.name}>
               <polyline fill="none" stroke={s.color} strokeWidth={2.5} strokeLinejoin="round" points={s.values.map((v, i) => `${x(i)},${y(v)}`).join(" ")} />
               {s.values.map((v, i) => (
-                <circle key={i} cx={x(i)} cy={y(v)} r={i === s.values.length - 1 ? 3 : 1.6} fill={s.color}>
-                  <title>
-                    {axisLabel} {turns[i]}: {s.name} {format(v)}
-                  </title>
-                </circle>
+                <g key={i}>
+                  <circle cx={x(i)} cy={y(v)} r={i === s.values.length - 1 ? 3 : 1.6} fill={s.color} />
+                  {/* A wider invisible target, so a point is easy to hover. */}
+                  <circle cx={x(i)} cy={y(v)} r={hit} fill="transparent" {...tipProps(`${axisLabel} ${turns[i]}: ${s.name} ${format(v)}`)} />
+                </g>
               ))}
             </g>
           ))}

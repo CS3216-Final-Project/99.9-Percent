@@ -4,6 +4,7 @@ import { BALANCE, BRANCHES, missingPrerequisites, TECH, TECH_ORDER, techStatus, 
 import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { tipProps } from "./tips";
 import { TECH_ICON } from "./presentation";
 import { Act, Chip, Concept, ReleaseRow, TaskRow } from "./ui";
 
@@ -192,7 +193,7 @@ export default function TechTree() {
                   onClick={() => focusTech(id)}
                   aria-pressed={selected === id}
                   aria-label={`${TECH[id].name}: ${STATUS_WORD[status]}`}
-                  title={missing ? `Needs ${missing}` : TECH[id].description}
+                  {...tipProps(missing ? `Needs ${missing}` : TECH[id].description)}
                 >
                   <span className="node-mark" aria-hidden="true">
                     <Icon name={TECH_ICON[id] ?? "tree"} />
