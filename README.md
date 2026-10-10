@@ -8,6 +8,8 @@ See the [Development Roadmap](docs/DEVELOPMENT_ROADMAP.md) for planned work and 
 
 The [System Architecture](docs/SYSTEM_ARCHITECTURE.md) diagrams show the target MVP's frontend, simulation, Google OAuth, saves, API and Neon database, plus the infrastructure simulated inside the game. [🔑 Authentication](docs/AUTHENTICATION.md) defines the planned Google sign-in and app sessions; implementation is scheduled in the roadmap.
 
+The [UI design guide](docs/UI_DESIGN.md) defines the shared visual language, incident and inspector layouts, responsive behaviour and review checks used by both gameplay modes.
+
 ## Structure
 
 ```
@@ -51,6 +53,8 @@ The office furniture comes from two CC0 model packs, [Kenney's Furniture Kit](ht
 On a machine with a graphics card the room draws in HD: photo-scanned CC0 floors and walls from [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambientcg.com), photo-scanned Poly Haven plants, sofas, armchairs, tables, boxes and a lamp in place of the stylised ones, physically based materials, soft reflections, softer shadows, ambient occlusion and a glow on screens and lights. Credits are in `frontend/public/textures/License.txt` and `frontend/public/models/polyhaven/License.txt`. Without a GPU it keeps the lighter pixel look and never downloads the HD assets. Add `?graphics=hd` or `?graphics=basic` to the address to force either.
 
 The [nine-node technology tree](docs/tech-tree.md) groups upgrades into Capacity, Data and Reliability, with metrics and alerts available from the start. It follows the proposal's reduced research scope while retaining the weekly simulation and existing saves.
+
+In either mode, open Menu > Save files to export the current run or import a JSON save. Imports validate before replacing a run and open the matching Campaign or Classic mode. If a pre-update browser save is present, the same menu offers Resume pre-update save and Export pre-update save. Resuming copies the validated weekly run into Classic; the original save, metadata and analytics remain untouched. The music button beside Menu shares its mute setting across both modes and remembers it after reload.
 
 Gameplay, saves and prototype analytics run in the browser and work without the API. Saves stay in this browser and origin; saves on the prototype deployment do not automatically move to a new domain. The backend retains its existing health and dialogue endpoints for later integration.
 

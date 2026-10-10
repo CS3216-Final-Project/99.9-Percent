@@ -3712,3 +3712,17 @@ button:disabled {
     transition-duration: 0.001s !important;
   }
 }
+
+/* Campaign uses the shared HUD, incident workspace and disclosure styles.
+   Only physical-step evidence needs additional layout. See docs/UI_DESIGN.md. */
+.campaign-stability strong { font-family: var(--font-num); font-size: 1.1rem; }
+.campaign-stability .clock-row { margin-bottom: 6px; }
+.campaign-inspect { margin-top: 10px; }
+.chip.is-selected { background: var(--go); border-color: var(--ink); }
+.campaign-evidence, .campaign-working { margin-top: 10px; }
+.campaign-panel .act { margin-top: 0; }
+.campaign-panel .act-label { white-space: normal; }
+.campaign-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.campaign-table caption { text-align: left; padding: 8px 0; color: var(--text-soft); }
+.campaign-table th, .campaign-table td { padding: 6px; text-align: left; border-bottom: 1px solid var(--paper-3); }
+.campaign-details { overflow-x: auto; }

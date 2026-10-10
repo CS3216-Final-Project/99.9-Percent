@@ -1,17 +1,19 @@
 "use client";
+import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 
-import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { BALANCE, completedTechIds, currentWarnings, metrics, TECH_ORDER, type GameState } from "@/sim";
 import { nextMove } from "@/game/advisor";
 import { clock, compact, money, moneyFull, num, signedMoney, uptimePct } from "@/game/format";
 import { createMusic, type Music } from "@/game/music";
 import { useGame, type Speed, type View } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { MusicButton } from "./MusicButton";
 import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Modals";
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
 import Tutorial, { BASICS_STEPS } from "./Tutorial";
-import { Callout, Concept, Meter, Tip, type ConceptKind } from "./ui";
+import { Callout, Concept, Meter, Stat, type ConceptKind } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
 
 // Keep the WebGL scene in its own chunk; Vite renders this app in the browser.
@@ -34,27 +36,9 @@ function healthOf(game: GameState): { word: string; tone: "ok" | "warn" | "criti
   return { word: "Healthy", tone: "ok", icon: "health" };
 }
 
-function Stat({ icon, kind, label, tip, children, side }: { icon: IconName; kind: ConceptKind; label: string; tip: string; children: ReactNode; side?: "left" }) {
-  return (
-    <div className={`stat stat-${kind}`}>
-      <span className="stat-icon">
-        <Concept kind={kind} icon={icon} />
-      </span>
-      <div className="stat-body">
-        <Tip text={tip} side={side}>
-          {label}
-        </Tip>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 function TopBar() {
   const game = useGame((s) => s.game);
   const openView = useGame((s) => s.openView);
-  const music = useGame((s) => s.meta.music);
-  const toggleMusic = useGame((s) => s.toggleMusic);
   const m = metrics(game);
   const health = healthOf(game);
   const inc = game.phase === "incident" ? game.incident : null;
@@ -114,9 +98,7 @@ function TopBar() {
         </Stat>
       </div>
 
-      <button type="button" className="icon-btn music-btn" onClick={toggleMusic} aria-label="Music" aria-pressed={music} title={music ? "Turn the music off" : "Turn the music on"}>
-        <Icon name={music ? "music" : "muted"} />
-      </button>
+      <MusicButton />
       <button type="button" className="icon-btn menu-btn" onClick={() => openView("menu")} aria-label="Menu" title="Menu">
         <Icon name="menu" />
       </button>
@@ -354,6 +336,7 @@ function useMusic(): void {
 }
 
 export default function Game() {
+  const campaign = useGame((s) => !!s.game.campaign);
   const ready = useGame((s) => s.ready);
   const started = useGame((s) => s.started);
   const phase = useGame((s) => s.game.phase);
@@ -371,17 +354,17 @@ export default function Game() {
 
   // Crisis clock.
   useEffect(() => {
-    if (phase !== "incident" || !running || !started) return;
+    if ((!campaign && phase !== "incident") || !running || !started) return;
     const id = window.setInterval(() => useGame.getState().tick(TICK_MS / 1000), TICK_MS);
     return () => window.clearInterval(id);
-  }, [phase, running, started]);
+  }, [campaign, phase, running, started]);
 
   // Auto-advance during management.
   useEffect(() => {
-    if (phase !== "management" || !running || onboarding || view || touring || !started) return;
+    if (campaign || phase !== "management" || !running || onboarding || view || touring || !started) return;
     const id = window.setTimeout(() => useGame.getState().advance(), (AUTO_SECONDS * 1000) / speed);
     return () => window.clearTimeout(id);
-  }, [phase, running, speed, turn, onboarding, view, touring, started]);
+  }, [campaign, phase, running, speed, turn, onboarding, view, touring, started]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -400,6 +383,11 @@ export default function Game() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  useEffect(() => {
+    const hidden=()=>{if(document.hidden)useGame.getState().setRunning(false);};
+    document.addEventListener("visibilitychange",hidden);
+    return ()=>document.removeEventListener("visibilitychange",hidden);
+  }, []);
   if (!ready) {
     return (
       <main className="boot">
@@ -410,23 +398,21 @@ export default function Game() {
 
   return (
     <div className={`app phase-${phase}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}`}>
-      <TopBar />
+      {campaign ? <CampaignHeader /> : <TopBar />}
       <main className="stage">
         <Suspense fallback={<div className="stage-loading">Loading…</div>}>
           <Facility />
         </Suspense>
-        {started && <StageHud />}
+        {started && !campaign && <StageHud />}
       </main>
-      <SidePanel />
-      <ViewSheet />
-      <BottomBar />
+      {campaign ? <>{started && <CampaignPanel />}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ViewSheet /><BottomBar /></>}
       <ToastHost />
-      {!started && <TitleScreen />}
-      {started && view === "menu" && <Menu />}
-      {started && onboarding && <HowToPlay />}
-      {started && <Tutorial />}
-      {started && phase === "review" && <PostmortemModal />}
-      {started && phase === "ended" && <EndReport />}
+      {!campaign && !started && <TitleScreen />}
+      {!campaign && started && view === "menu" && <Menu />}
+      {!campaign && started && onboarding && <HowToPlay />}
+      {!campaign && started && <Tutorial />}
+      {!campaign && started && phase === "review" && <PostmortemModal />}
+      {!campaign && started && phase === "ended" && <EndReport />}
     </div>
   );
 }

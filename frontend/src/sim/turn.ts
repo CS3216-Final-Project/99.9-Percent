@@ -1,3 +1,4 @@
+import { step, advanceSteps } from "./step";
 import { BALANCE, PROMOS } from "./balance";
 import {
   arpu,
@@ -228,6 +229,7 @@ const SURGE_LABELS = [
  * into an incident and the rest of the week is settled once it ends.
  */
 export function advanceTurn(prev: GameState): GameState {
+  if (prev.campaign) return prev.phase === "management" ? step(prev).state : prev;
   if (prev.phase !== "management") return prev;
   const s = clone(prev);
   const notes: string[] = [];
@@ -501,6 +503,7 @@ function finishTurn(s: GameState): void {
 
 /** Advance the crisis clock. When the incident ends, the week is settled and the postmortem written. */
 export function incidentTick(prev: GameState, dt: number): GameState {
+  if (prev.campaign) return advanceSteps(prev, Math.floor(dt)).state;
   if (prev.phase !== "incident" || !prev.incident) return prev;
   const s = clone(prev);
   tickIncident(s, dt);

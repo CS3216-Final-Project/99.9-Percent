@@ -88,6 +88,23 @@ export function Tip({ text, children, side = "below" }: { text: string; children
   );
 }
 
+/** Shared headline tile for both gameplay modes. */
+export function Stat({ icon, kind, label, tip, children, side }: { icon: IconName; kind: ConceptKind; label: string; tip: string; children: ReactNode; side?: "left" }) {
+  return (
+    <div className={`stat stat-${kind}`}>
+      <span className="stat-icon">
+        <Concept kind={kind} icon={icon} />
+      </span>
+      <div className="stat-body">
+        <Tip text={tip} side={side}>
+          {label}
+        </Tip>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export type Tone = "accent" | "ok" | "warn" | "critical";
 
 export function Meter({ value, tone = "accent", label }: { value: number; tone?: Tone; label?: string }) {

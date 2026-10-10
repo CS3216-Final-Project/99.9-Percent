@@ -1,3 +1,4 @@
+import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
 import { BALANCE, PROMOS } from "./balance";
 import { has, TECH } from "./tech";
 import type { EquipmentId, GameState, PromoId, Release, TechId, Warning } from "./types";
@@ -11,18 +12,22 @@ export function clamp(v: number, min: number, max: number): number {
 }
 
 export function serverCapacity(s: GameState): number {
+  if(s.campaign)return s.campaign.snapshot.app.capacity;
   return BALANCE.server.capacity * (has(s, "larger_servers") ? BALANCE.server.largeCapacityMult : 1);
 }
 
 export function serverUpkeep(s: GameState): number {
+  if(s.campaign)return Q.appWeeklyCents/100;
   return Math.round(BALANCE.server.upkeep * (has(s, "larger_servers") ? BALANCE.server.largeUpkeepMult : 1));
 }
 
 export function maxServers(s: GameState): number {
+  if(s.campaign)return Q.maxApps;
   return has(s, "load_balancing") ? BALANCE.server.maxWithLb : BALANCE.server.maxWithoutLb;
 }
 
 export function routableHosts(s: GameState): number {
+  if(s.campaign)return s.campaign.apps.filter(a=>a.routed).length;
   return s.infra.appHosts.filter((h) => h.status !== "failed").length;
 }
 
@@ -32,12 +37,14 @@ export function selfHealingFleet(s: GameState): boolean {
 }
 
 export function appCapacity(s: GameState, tempServers = 0): number {
+  if(s.campaign)return s.campaign.snapshot.app.capacity;
   const n = routableHosts(s) + tempServers;
   const balance = n > 1 && !has(s, "load_balancing") ? BALANCE.server.unbalancedPenalty : 1;
   return n * serverCapacity(s) * balance;
 }
 
 export function dbCapacity(s: GameState): number {
+  if(s.campaign)return s.campaign.snapshot.db.capacity;
   if (s.infra.dbHost.status === "failed") return 0;
   const tier = BALANCE.db.tiers[s.infra.dbTier];
   return tier.capacity * (has(s, "replicas") ? BALANCE.db.replicaCapacityMult : 1);
@@ -45,6 +52,7 @@ export function dbCapacity(s: GameState): number {
 
 /** Database queries generated per request that the app tier serves. */
 export function dbLoadFactor(s: GameState): number {
+  if(s.campaign)return 1;
   const reduction = has(s, "cache_tuning") ? BALANCE.db.tunedCacheReduction : BALANCE.db.cacheReduction;
   const eligibleReduction = Math.min(BALANCE.db.cacheEligibleShare, reduction);
   const warmth = clamp(s.cacheWarmth ?? 1, 0, 1);
@@ -61,6 +69,7 @@ export interface Utilisation {
 }
 
 export function utilisation(s: GameState, peakRps: number, tempServers = 0): Utilisation {
+  if(s.campaign){const m=s.campaign.snapshot;return {appCapacity:m.app.capacity,dbCapacity:m.db.capacity,appUtil:m.app.demandRatio,dbUtil:m.db.demandRatio,dbLoad:m.db.demand,served:m.successful};}
   const appCap = appCapacity(s, tempServers);
   const dbCap = dbCapacity(s);
   const served = Math.min(peakRps, appCap);
@@ -100,6 +109,7 @@ export interface CostBreakdown {
 }
 
 export function costs(s: GameState, tempServers = 0): CostBreakdown {
+  if(s.campaign){const servers=s.campaign.apps.length*Q.appWeeklyCents/100,database=(s.campaign.upgraded?Q.upgradedDbWeeklyCents:Q.dbWeeklyCents)/100;return {servers,database,salaries:Q.engineers*Q.salaryWeeklyCents/100,redundancy:0,tooling:0,autoscale:0,total:servers+database+Q.engineers*Q.salaryWeeklyCents/100};}
   const salaries = s.engineers * BALANCE.engineer.salary;
   const servers = s.infra.appHosts.length * serverUpkeep(s);
   const dbUpkeep = BALANCE.db.tiers[s.infra.dbTier].upkeep;
@@ -125,6 +135,7 @@ export function arpu(s: GameState): number {
 }
 
 export function weeklyRevenue(s: GameState): number {
+  if(s.campaign)return s.campaign.ledger.successes*.2;
   return s.users * arpu(s);
 }
 
@@ -210,6 +221,7 @@ export interface Forecast {
 
 /** Expected peak for the week being planned, given promotions and surges already known. */
 export function forecast(s: GameState): Forecast {
+  if(s.campaign){const m=s.campaign.snapshot;return {users:s.users,peakLow:m.incoming,peakHigh:m.incoming,appLow:m.app.demandRatio,appHigh:m.app.demandRatio,dbLow:m.db.demandRatio,dbHigh:m.db.demandRatio,tempServers:0};}
   let users = s.users;
   let mult = 1;
   for (const id of s.activePromos) {
@@ -259,6 +271,7 @@ export function churnRate(satisfaction: number): number {
 
 /** Overall availability across the run, as a fraction (0.9995 = 99.95%). */
 export function uptime(s: GameState): number {
+  if(s.campaign){const c=s.campaign.cumulative;return c.successful+c.failed?c.successful/(c.successful+c.failed):1;}
   if (s.totals.weeks === 0) return 1;
   return clamp(1 - s.totals.downtimeMinutes / (s.totals.weeks * BALANCE.minutesPerWeek), 0, 1);
 }
@@ -328,6 +341,7 @@ function pct(v: number): string {
  * up here first; monitoring decides how precise the wording is.
  */
 export function currentWarnings(s: GameState): Warning[] {
+  if(s.campaign)return [];
   const out: Warning[] = [];
   if (s.phase === "ended") return out;
   const m = metrics(s);
@@ -509,6 +523,14 @@ export const EQUIPMENT_ORDER: EquipmentId[] = [
 ];
 
 export function equipmentInfo(s: GameState, id: EquipmentId): EquipmentInfo {
+  if(s.campaign) {
+    const m=s.campaign.snapshot, names:Partial<Record<EquipmentId,string>>={app:"Servers",db:"Database",gateway:"Network",monitoring:"Monitoring",team:"Team",deploy:"Deploy",growth:"Growth"};
+    const built=["app","db","gateway","monitoring","team","deploy","growth"].includes(id);
+    const component=id==="app"?m.app:id==="db"?m.db:null;
+    return {id,name:names[id]??id,built,state:built?(component?utilState(component.demandRatio):"ok"):"absent",
+      summary:component?`${component.demand}/${component.capacity} per second; backlog ${component.backlog}`:id==="gateway"?`${m.incoming} incoming; ${m.rejected} rejected`:id==="team"?"4 engineers":"Opening campaign",
+      about:id==="app"?`Installed ${m.installedAppCapacity} requests/s; routed ${m.app.capacity} requests/s.`:"Inspect measured demand, capacity and backlog."};
+  }
   const m = metrics(s);
   const precise = m.hasMonitoring;
   const optional = (name: string, about: string, requires: TechId, on: string): EquipmentInfo => {

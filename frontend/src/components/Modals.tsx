@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import { BALANCE, buildReport } from "@/sim";
 import { money, moneyFull, num, uptimePct } from "@/game/format";
-import { clearAnalytics, clearSave, readAnalytics, type AnalyticsEvent } from "@/game/persist";
+import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { ModeSwitch } from "./ModeSwitch";
+import { SaveFiles } from "./SaveFiles";
 import { Callout, Concept, Modal, type ConceptKind } from "./ui";
 import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { PostmortemBody, RunCharts } from "./Views";
@@ -331,7 +333,6 @@ export function Menu() {
     if (kind === "tutorial") {
       startTutorialRun();
     } else if (kind === "reset") {
-      clearSave();
       newRun({ seed: BALANCE.introSeed });
     } else {
       newRun({ seed: seed.trim() });
@@ -419,6 +420,9 @@ export function Menu() {
           </Callout>
         )}
       </section>
+
+      <SaveFiles />
+      <ModeSwitch to="campaign" />
 
       <details className="more">
         <summary>Playtest data ({events.length} events)</summary>

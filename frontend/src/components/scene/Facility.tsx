@@ -48,6 +48,7 @@ import { updateWalls } from "./wallState";
 /* ------------------------------------------------------------------ */
 
 interface SceneModel {
+  opening: boolean;
   incident: boolean;
   hosts: Led[];
   temp: number;
@@ -81,7 +82,8 @@ function buildModel(s: GameState): SceneModel {
   const reveal = (id: EquipmentId) => !inc || inspected.includes(id);
   const m = metrics(s);
 
-  const hosts: Led[] = s.infra.appHosts.map((h) => {
+  const hosts: Led[] = s.infra.appHosts.map((h, i) => {
+    if(s.campaign && !s.campaign.apps[i].routed) return "off";
     if (h.status === "failed") return reveal("app") ? "off" : "ok";
     if (h.status === "degraded") return named ? "warn" : "ok";
     if (!inc && m.appUtil >= 1) return "critical";
@@ -115,7 +117,8 @@ function buildModel(s: GameState): SceneModel {
   }
 
   return {
-    incident: !!inc,
+    opening: !!s.campaign,
+    incident: s.campaign ? !!s.campaign.incident : !!inc,
     hosts,
     temp: Math.min(inc ? (s.pendingTurn?.autoscaled ?? 0) : s.live.tempServers, MAX_TEMP_SHOWN),
     lb: has(s, "load_balancing"),
@@ -127,7 +130,7 @@ function buildModel(s: GameState): SceneModel {
     backup: has(s, "backups"),
     monitoring: monitoringLevel(s),
     engineers: s.engineers,
-    busy: s.tasks.reduce((n, t) => n + t.assigned, 0),
+    busy: s.campaign ? (s.campaign.pending.some(a=>a.type==="add-app"||a.type==="upgrade-db")?4:0) : s.tasks.reduce((n, t) => n + t.assigned, 0),
     releases: s.releases.length,
     promos: s.activePromos.length,
     flow: Math.round(Math.min(1.4, Math.max(m.appUtil, 0.25)) * 10) / 10,
@@ -615,7 +618,7 @@ function Labels() {
         <Icon name="network" />
         Internet
       </span>
-      {EQUIPMENT_ORDER.filter((id) => (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
+      {EQUIPMENT_ORDER.filter((id) => m.opening ? ["gateway","app","db","monitoring"].includes(id) : (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
     </div>

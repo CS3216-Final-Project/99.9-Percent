@@ -1,52 +1,53 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { newGame } from '../sim';
-import { clearAnalytics, clearSave, DEFAULT_META, loadGame, loadMeta, readAnalytics, saveGame, saveMeta, track } from './persist';
-
+import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
+import { newGame, newLegacyGame } from "../sim";
+import { step, advanceSteps } from "../sim/step";
+import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics, saveClassicGame, loadClassicGame } from "./persist";
+import { CAMPAIGN_SAVE_KEY as KEY, makeEnvelope } from "./saveEnvelope";
+import { decodeClassicSave, rawLegacySave, exportGame } from "./persist";
 beforeEach(() => localStorage.clear());
-afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
-
-describe('saved runs', () => {
-  it('round-trips the complete seeded state and save timestamp', () => {
-    const game = newGame('resume-me');
-    vi.spyOn(Date, 'now').mockReturnValue(12345);
-    expect(saveGame(game)).toBe(true);
-    expect(loadGame()).toEqual({ status: 'ok', game, savedAt: 12345 });
-    clearSave();
-    expect(loadGame()).toEqual({ status: 'none' });
+afterEach(() => vi.restoreAllMocks());
+describe("campaign data preservation", () => {
+  it("round trips clock, queued work, incident and financial state", () => {
+    const game = advanceSteps(newGame(9, "save-company"), 6).state;
+    expect(saveGame(game, 200)).toBe(true);
+    expect(loadGame()).toMatchObject({ status: "ok", game, remainderMs: 200 });
   });
-
-  it.each([
-    ['invalid JSON', '{'],
-    ['old version', JSON.stringify({ game: { ...newGame(1), version: -1 } })],
-    ['incident without incident state', JSON.stringify({ game: { ...newGame(1), phase: 'incident', incident: null } })],
-    ['no servers', JSON.stringify({ game: { ...newGame(1), infra: { ...newGame(1).infra, appHosts: [] } } })],
-  ])('discards %s and allows a fresh save', (_label, raw) => {
-    localStorage.setItem('nn.save.v1', raw);
-    expect(loadGame()).toEqual({ status: 'corrupt' });
-    expect(loadGame()).toEqual({ status: 'none' });
-    expect(saveGame(newGame(2))).toBe(true);
-    expect(loadGame().status).toBe('ok');
+  it.each(["{", JSON.stringify({ schemaVersion: 99 })])("preserves unreadable save %s", raw => {
+    localStorage.setItem(KEY, raw); expect(["corrupt", "unsupported"]).toContain(loadGame().status);
+    expect(saveGame(newGame())).toBe(false); expect(localStorage.getItem(KEY)).toBe(raw);
+    expect(saveGame(newGame(), 0, true)).toBe(true);
   });
-
-  it('handles unavailable storage without crashing startup', () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
-    expect(loadGame()).toEqual({ status: 'none' });
-    expect(loadMeta()).toEqual(DEFAULT_META);
-    expect(readAnalytics()).toEqual([]);
+  it("keeps the classic save and meta apart from the campaign's", () => {
+    const classic = newLegacyGame(3);
+    saveClassicGame(classic); saveMeta({ ...DEFAULT_META, tutorialDone: true }, "classic");
+    expect(loadGame().status).toBe("none"); expect(loadMeta()).toEqual(DEFAULT_META);
+    saveGame(newGame()); saveMeta({ ...DEFAULT_META, runsStarted: 4 }); track("run_started"); clearSave(); clearAnalytics();
+    expect(loadClassicGame()).toEqual({ status: "ok", game: JSON.parse(JSON.stringify(classic)) });
+    expect(loadMeta("classic").tutorialDone).toBe(true);
   });
-
-  it('reports a failed save and tolerates failed cleanup', () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
-    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('blocked'); });
-    expect(saveGame(newGame(1))).toBe(false);
-    expect(() => clearSave()).not.toThrow();
-    expect(() => track('run_started')).not.toThrow();
+  it("handles storage failures without destroying in-memory state", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
+    expect(saveGame(newGame())).toBe(false);
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("unavailable"); });
+    expect(loadGame().status).toBe("unavailable");
+  });
+  it("keeps independent onboarding and bounded analytics", () => {
+    saveMeta({ ...DEFAULT_META, tutorialDone: true }); expect(loadMeta().tutorialDone).toBe(true);
+    for (let i = 0; i < 503; i++)track("run_started"); expect(readAnalytics()).toHaveLength(500);
+  });
+  it("resumes before and after settlement identically", () => {
+    let s = advanceSteps(newGame(), 6).state;
+    for (let i = 6; i < 59; i++)s = step(s).state;
+    saveGame(s); const loaded = loadGame(); expect(loaded.status).toBe("ok");
+    if (loaded.status !== "ok") throw Error("load");
+    expect(step(loaded.game)).toEqual(step(s));
+    s = step(s).state; saveGame(s); expect(loadGame()).toMatchObject({ status: "ok", game: s });
   });
 });
 
 describe('browser metadata and analytics', () => {
   it('fills new metadata fields when resuming an older browser profile', () => {
-    localStorage.setItem('nn.meta.v1', JSON.stringify({ runsStarted: 4, onboarded: true }));
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ runsStarted: 4, onboarded: true }));
     expect(loadMeta()).toEqual({ ...DEFAULT_META, runsStarted: 4, onboarded: true });
     saveMeta({ ...DEFAULT_META, tutorialDone: true });
     expect(loadMeta().tutorialDone).toBe(true);
@@ -56,23 +57,23 @@ describe('browser metadata and analytics', () => {
     expect(loadMeta().music).toBe(true);
     saveMeta({ ...DEFAULT_META, music: false });
     expect(loadMeta().music).toBe(false);
-    localStorage.setItem('nn.meta.v1', JSON.stringify({ music: 'loud', onboarded: true }));
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ music: 'loud', onboarded: true }));
     expect(loadMeta()).toEqual({ ...DEFAULT_META, onboarded: true });
   });
 
   it('recovers from malformed metadata and analytics', () => {
-    localStorage.setItem('nn.meta.v1', '{');
-    localStorage.setItem('nn.analytics.v1', '{}');
+    localStorage.setItem('nn.campaign.meta.v1', '{');
+    localStorage.setItem('nn.campaign.analytics.v1', '{}');
     expect(loadMeta()).toEqual(DEFAULT_META);
     expect(readAnalytics()).toEqual([]);
-    localStorage.setItem('nn.analytics.v1', '{');
+    localStorage.setItem('nn.campaign.analytics.v1', '{');
     track('save_resumed', { week: 2 });
     expect(readAnalytics().map(e => e.name)).toEqual(['save_resumed']);
   });
 
   it('retains only the latest 500 events and can clear them', () => {
     const events = Array.from({ length: 500 }, (_, i) => ({ t: '2026-01-01', name: 'run_started', data: { run: i } }));
-    localStorage.setItem('nn.analytics.v1', JSON.stringify(events));
+    localStorage.setItem('nn.campaign.analytics.v1', JSON.stringify(events));
     track('save_resumed', { week: 3 });
     const saved = readAnalytics();
     expect(saved).toHaveLength(500);
@@ -80,5 +81,39 @@ describe('browser metadata and analytics', () => {
     expect(saved[499].name).toBe('save_resumed');
     clearAnalytics();
     expect(readAnalytics()).toEqual([]);
+  });
+});
+
+
+describe("validated replacement and legacy files", () => {
+  it.each([
+    { inputs: null }, { runtime: { remainderMs: -1 } }, { runId: "" },
+    { inputs: [{ step: 2, action: { type: "add_server" } }], step: 1 },
+  ])("preserves a current-format save with an invalid payload: %j", patch => {
+    const raw = JSON.stringify({ ...makeEnvelope(newGame()), ...patch });
+    localStorage.setItem(KEY, raw);
+    expect(loadGame().status).toBe("corrupt");
+    expect(saveGame(newGame())).toBe(false);
+    expect(localStorage.getItem(KEY)).toBe(raw);
+    expect(saveGame(newGame(), 0, true)).toBe(true);
+  });
+  it("revalidates external changes after a successful autosave", () => {
+    saveGame(newGame());
+    const raw = JSON.stringify({ ...makeEnvelope(newGame()), inputs: null });
+    localStorage.setItem(KEY, raw);
+    expect(saveGame(step(newGame()).state)).toBe(false);
+    expect(localStorage.getItem(KEY)).toBe(raw);
+  });
+  it("exports and decodes Classic without rewriting the original legacy bytes", () => {
+    const game = newLegacyGame(777), raw = JSON.stringify({ game, savedAt: 5 });
+    localStorage.setItem("nn.save.v1", raw);
+    expect(rawLegacySave()).toBe(raw);
+    expect(decodeClassicSave(exportGame(game))).toEqual({ status: "ok", game });
+    saveClassicGame(game); clearSave();
+    expect(rawLegacySave()).toBe(raw);
+  });
+  it.each([{ cash: null }, { infra: null }, { tasks: [null] }, { phase: "other" }, { techDone: ["unknown"] }, { infra: { ...newLegacyGame().infra, dbTier: 999 } }, { history: [null] }, { postmortems: [null] }, { totals: {} }])("rejects a broken Classic payload without writing it: %j", patch => {
+    const game = { ...newLegacyGame(), ...patch };
+    expect(decodeClassicSave(JSON.stringify({ game }))).toEqual({ status: "corrupt" });
   });
 });

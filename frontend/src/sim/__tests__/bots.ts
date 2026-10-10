@@ -7,7 +7,7 @@ import {
   has,
   incidentTick,
   metrics,
-  newGame,
+  newLegacyGame,
   PROMO_ORDER,
   recoveryOptions,
   releaseRisk,
@@ -157,7 +157,7 @@ export interface RunResult {
 }
 
 export function runBot(seed: number, strategy: Strategy, skill: IncidentSkill): RunResult {
-  let s = newGame(seed);
+  let s = newLegacyGame(seed);
   let guard = 0;
   while (s.phase !== "ended" && guard++ < 200) {
     if (s.phase === "management") {
