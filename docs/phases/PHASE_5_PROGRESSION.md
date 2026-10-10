@@ -1,1558 +1,301 @@
-# Phase 5 — Progression and PR2 Integration
+# Phase 5 — Traffic Spikes, Autoscaling and Forward Progression
 
-> **Project:** 99.99% — System Design Tycoon  
-> **Target:** 20–25 October 2026  
-> **Course milestone:** PR2 — 26 October 2026, 7:59 am SGT  
-> **Primary learning outcomes:** LO1 Diagnose bottlenecks; LO2 Choose scaling strategies; LO4 Weigh design trade-offs  
-> **Reliability preparation:** Phase 5 exposes the progression structure that Phase 6 completes for LO3  
-> **Status:** Detailed implementation plan for Phase 5 only
+> **Project:** 99.99% — System Design Tycoon
+> **Target:** 20–25 October 2026; PR2 — 26 October 2026, 7:59 am SGT
+> **Learning outcomes:** LO2 Choose scaling strategies; LO4 Weigh trade-offs; supporting LO1 Diagnose bottlenecks
+> **Status:** Repository-reconciled implementation contract; implementation and validation outstanding
+> **Foundation:** One continuous company after completed Phases 1–4; local save schema 4
 
----
+# 1. Authority and repository reconciliation
 
-# 1. Goal
+Read with `docs/PROJECT_PROPOSAL.md`, `docs/DEVELOPMENT_ROADMAP.md` and these phase documents: `PHASE_1_SIMULATION_FINAL.md`, `PHASE_2_PR1.md`, `PHASE_3_SCALING.md`, `PHASE_4_DATA_STRATEGY.md`, `PHASE_4_IMPLEMENTATION_REPORT.md`. Earlier approved contracts remain authoritative for earlier stages. The user's instruction to keep auth/cloud deferred narrows the old Phase 5 release scope.
 
-Turn the mechanics built in Phases 1–4 into a **coherent continuous campaign progression system**.
+Reconciliation checkpoint: branch `ai/phase-5-progression`, commit `40aeab4906c5d8e0feb102574985763afb0de35f`, clean working tree. The deferred auth/cloud stash remains unapplied. The Phase 4 report records 210 passing unit tests, one optional TRACE skip, six balance tests, 15 E2E tests, 23 unchanged lint warnings, and passing typecheck/build/whitespace checks. These are historical results, not a fresh Phase 5 baseline or validation of the new parameters.
 
-By the end of Phase 5, the player should no longer feel like they are encountering isolated mechanics one at a time. They should feel that they are growing one software company, earning new options as the company reaches milestones, and making alternative technology investments based on the architecture they have already built.
+| Previous specification | Repository reconciliation / decision |
+| --- | --- |
+| One company, gradual availability, investment alternatives, cost and delayed deployment | Preserve these principles. |
+| Build campaign progression, milestones, continuation and reset | Already implemented. Extend existing transitions and guidance. |
+| Replace a 17-node active tree with nine nodes | Active `TECH_ORDER` already has nine identities. Retain inactive legacy code; no tenth node. |
+| Research gates for previously acquired technology | Would retroactively gate Phases 1–4 and saved purchases. Research applies only to the new autoscaling capability. |
+| Opening milestone grants cash/research | Conflicts with Phase 2's recognition-only award. Preserve it unchanged. |
+| Generic users/revenue milestone thresholds | Existing stages use actual state and consumed traffic events. Do not create a second progression score. |
+| Instant temporary autoscaling capacity | Exists only in the inactive weekly model. Reuse the tech identity/assets, not those formulas. |
+| Cache tuning accelerates warm-up | Current Phase 4 tuning raises the hit-rate ceiling. Preserve that behavior. |
+| New progression store, panels, renderer or save adapter | Duplicate active systems. Extend CampaignUI/store/Facility/persistence. |
+| Account/cloud usability delivered here | Deferred separate workstream; not delivered or claimed complete by this gameplay contract. |
 
-The phase should establish:
+Phase 5 introduces **temporary traffic spikes and delayed application autoscaling**, with the smallest forward research/recognition state needed to expose that capability. It does not rebuild campaign progression or deliver research pricing for all nine nodes.
 
-- growth milestones;
-- research-point awards;
-- the specified **9-unlock technology structure**;
-- prerequisites;
-- gradual reveal of controls;
-- deployment cost and activation delay;
-- Scale Up vs Scale Out as alternative investments;
-- delayed autoscaling with a visible threshold;
-- replay reset;
-- campaign summaries;
-- persistence of progression;
-- removal of the player-facing legacy campaign;
-- cloud-save/account usability suitable for PR2.
+# 2. Objective and learning outcome
 
-The key design principle is:
+The player prepares for variable demand, observes when new capacity actually receives traffic, and weighs delayed automation against continuing cost. Autoscaling changes application capacity; it cannot repair database pressure, cache misses, write demand or admission policy.
 
-> **Progression should reveal choices, not prescribe an upgrade order.**
+Teach that provisioning takes time, installed/routed/useful capacity differ, app relief can reveal a database bottleneck, and keeping capacity after demand falls costs money. Admission control remains a technical/business trade-off. Manual scaling, pre-provisioning, automation and limiting are legitimate alternatives; no mandatory autoscaling purchase or prescribed incident solution.
 
-The same company, finances, architecture, history, and run identity continue through the campaign.
+# 3. Entry and version identity
 
----
+Display **Traffic Spikes & Autoscaling**. Serialize stage **`traffic-spikes`, version `1`**. Retain campaign origin `opening-db` and all earlier scenario/stage versions.
 
-# 2. Player Experience
+Offer explicit `enter_spikes` through existing campaign guidance when:
 
-The player has already encountered:
+- Data Strategy exists and its growth event is consumed.
+- Campaign is solvent, in management, with no active incident or pending report/milestone acknowledgement.
+- All actual recovered reports have recorded acknowledgements and the opening recognition is acknowledged.
+- All application/DB backlogs are zero and the latest snapshot qualifies under the existing measured-recovery predicate.
 
-```text
-database overload
-→ application scaling
-→ routing/load balancing
-→ read/write workload differences
-→ caching vs database upgrade
-```
+Do not require contrast completion, cache, a 3,000 ops/s DB, load balancing, both scaling investments, or traffic-limit removal. A pending infrastructure action alone does not block readiness. Show factual unmet requirements.
 
-Phase 5 connects those mechanics into one progression loop:
+Entry is idempotent, zero-step, draws no RNG, settles no money and leaves management paused. Preserve run/company ID, seed, cash, ledger/remainders, architecture, inherited read/write profile, cache warmth/tuning, admission limit, pending actions/deadlines, trace/reports and consumed events. Never auto-enter on load/migration.
 
-```text
-Company grows
-→ milestone reached
-→ research awarded
-→ new technology choices revealed
-→ player chooses an investment
-→ deployment costs cash + engineering time
-→ architecture changes
-→ future traffic/event outcomes change
-→ next milestone reached
-→ more options revealed
-```
+Keep the inherited workload profile fixed during this stage. Phase 4's optional contrast remains available before entry, without adding a contrast prerequisite. Do not expose another contrast change after entry.
 
-The player should feel that earlier decisions create the starting conditions for later problems.
+# 4. Deterministic traffic spikes
 
----
+These are **new version-1 design parameters**, awaiting balance validation. Persist configuration and absolute deadlines; never silently retune earlier stages or resumed campaigns.
 
-## 2.1 Milestone progression
+| Parameter | Value |
+| --- | --- |
+| Baseline | 2,400 incoming requests/s |
+| Peak | 4,000 incoming requests/s |
+| First pulse | `[entryStep + 8, entryStep + 28)` |
+| Second pulse | `[entryStep + 48, entryStep + 68)` |
+| Duration | 20 physical steps each |
+| At each end | Return to 2,400 requests/s |
 
-The company should grow through a fixed sequence of milestones.
+For entry at completed step n, n+8 through n+27 use peak demand; n+28 returns to baseline. First resumed step is n+1. Show both scheduled pulses/countdowns at entry. One physical step remains one modeled second; reading/menu/review/hidden-page pauses advance nothing.
 
-Milestones may be tied to configurable growth markers such as:
+Reuse existing consumed-event records and action/event ordering. Start/end events fire exactly once. Readiness changes, incidents and pending actions after entry do not rebase the schedule. Reload preserves deadlines. Apply incoming changes before admission/processing; use existing workload/cache arithmetic and terminal-outcome accounting.
 
-```text
-users reached
-revenue reached
-incident recovered
-company stage reached
-```
+Two finite pulses only: no random promotion loop or perpetual spikes. Proactive prevention is valid; do not manufacture an incident or force recovery at a pulse end.
 
-For MVP simplicity, use a small number of clearly defined milestones.
+# 5. Forward progression and existing tech identities
 
-A milestone should be awarded only when its condition is first satisfied.
+Keep the nine identities:
 
-It should never be re-awarded after:
+| Group | IDs |
+| --- | --- |
+| Capacity | `larger_servers`, `load_balancing`, `autoscaling` |
+| Data | `larger_database`, `caching`, `cache_tuning` |
+| Reliability | `health_checks`, `standby`, `auto_failover` |
 
-- save/resume;
-- reopening the same postmortem;
-- repeated evaluation of the same condition.
+At explicit spike-stage entry, record one **data-readiness** award of one research point. Spending it unlocks the existing `autoscaling` identity once. Store earned=1/spent=0 or 1 within the new stage; derive unlock from spent=1. Reuse existing transition/trace infrastructure, not a second progression store or duplicate completion registry.
 
----
+These zero-step transitions grant no cash, instances or earlier reward. Repeated entry/unlock, recovery, report reopening and reload cannot duplicate them. Earlier technologies remain available from existing stage/architecture state, without a retroactive research bill. Unlocking is distinct from paid deployment.
 
-## 2.2 Research points
+This bounded forward research introduction explicitly defers a full all-node research economy. Reliability stays locked. Active UI must not display the inactive weekly model's autoscaling price/effort or obsolete cache-tuning rules.
 
-Milestones award **research points**.
+# 6. Autoscaling policy and scheduler
 
-Research points are used to unlock technology options.
+## 6.1 Deployment and measurement
 
-The player then spends:
+Deployment requires autoscaling unlocked, an installed load balancer and balanced routing to at least two actual apps. Use the existing infrastructure slot: **$1,000 setup**, **two-step activation**, **$100 upkeep per 60 steps** after activation. It installs no app and changes no routing itself. Activation enables the fixed version-1 policy:
 
-```text
-research points
-→ to unlock technology
+| Rule | Value |
+| --- | --- |
+| Minimum installed/routed pool for retirement | Two instances |
+| Maximum installed/reserved pool | Four instances |
+| Scale-out | Routed busy utilisation strictly >80% for three consecutive steps |
+| Scale-in | Routed busy utilisation strictly <60% for six consecutive steps |
+| Automatic provisioning | Three steps |
+| Routing activation | Existing one-step delay |
+| Cooldown | Four steps after routing activation, retirement or cancellation |
 
-cash + engineering time
-→ to deploy technology
-```
+Expose parameters read-only; no policy editor. Enable/disable is an explicit free zero-step management/incident action, resets streaks and starts four-step cooldown. Disabling retains deployed-controller upkeep and accepted actions; no refund/cancellation of paid requests.
 
-This distinction is important.
+Observe authoritative routed completed app work divided by routed capacity using existing integer/fixed-point conventions. Exclude unrouted capacity; do not use incoming traffic, DB utilisation or legacy weekly projections. Threshold equality does not qualify. Neutral steps reset the respective streak.
 
-Unlocking a technology should not instantly deploy it into the architecture.
+Evaluate after processing, settlement and incident/recovery/bankruptcy transitions against that completed snapshot. No new request in review/ended state. Pending resize/join and cooldown reset counters; blocked time does not accumulate a burst of requests. At cooldownUntil, begin fresh observations.
 
----
+## 6.2 Scale-out and routing
 
-## 2.3 Gradual reveal
+Reuse add-app scheduling with explicit `source: autoscaler`. An automatic base app costs **$1,000**, supplies **1,000 req/s**, activates after **three steps**, and incurs existing **$700/60-step upkeep** from installation. Manual add-app remains $1,000/two steps.
 
-Do not show all nine technologies at the start.
+Installation is unrouted. Request the existing free one-step balanced routing change to append the controller-created app; useful traffic is possible no earlier than request+4. Retain infrastructure/routing/admission channels and stable acceptance order. No hidden provisioning queue.
 
-The player should first see only the options relevant to the current stage of growth.
+Append only if still enabled and LB/routing membership still matches the expected pool. Wait visibly if routing is busy. A manual routing change invalidating the expected pool suspends automatic joining; preserve the paid idle app and show why. Never automatically route a previously manual idle app. Already accepted routing actions finish normally after disable.
 
-Suggested reveal logic:
+Do not add again while an installed controller app awaits routing. Missing prerequisites, busy infrastructure, unaffordable purchase or the maximum produce a visible blocked reason; trace only changes of reason. Rejection spends nothing and consumes no app ID. Existing accepted player requests retain priority.
 
-```text
-Opening:
-metrics/history/alerts only
+Generalize IDs to monotonic `app-N`, never reused after retirement. Allow four installed/reserved apps only in the new stage; earlier stages keep their two-app limit. Preserve numeric-ID ordering and existing equal quotient/remainder routing, including mixed-tier consequences. No capacity-weighted routing.
 
-After first milestone:
-basic capacity choices
+## 6.3 Safe scale-in
 
-Later:
-data choices
+Only controller-created base apps are eligible; choose the highest numeric eligible ID. Protect all entry/manual apps. An accepted manual vertical upgrade transfers that app out of controller ownership.
 
-Later:
-advanced capacity / reliability preparation
-```
+For six low observations and again at activation, require:
 
-The exact reveal thresholds may be tuned, but the player should not be overwhelmed with the full tree immediately.
+- No active incident, qualifying service measurements and zero app/DB backlogs.
+- Empty candidate still controller-owned, with at least two installed/routed apps remaining.
+- Hypothetical balanced allocation gives every remaining target at most 80% demand/capacity.
+- Unchanged routing and no incompatible routing action.
 
----
+Retirement is a **one-step**, **zero-setup-cost** action using the infrastructure slot and reserving routing for atomic removal. At activation revalidate using demand scheduled for that step, including a pulse beginning then. This safety preview does not reorder existing action/event execution. Unsafe retirement cancels with evidence and four-step cooldown.
 
-## 2.4 Alternative investments
+Remove only an empty app and its routing membership together; retire its overload-counter entry. Preserve history and repair selectedAppId via existing fallback. No dropped/transferred/reprocessed backlog, refunds or failure states. Upkeep stops on retirement. Never remove a protected app just to reach minimum size.
 
-The technology tree contains deliberate alternatives.
+# 7. Economy, incidents and causal evidence
 
-The player should be able to choose:
+Preserve prior setup prices, salaries, revenue, period length and rejected-demand opportunity values. Accepted setup is paid exactly once under existing affordability rules. Installed idle apps accrue upkeep until retirement. Controller upkeep persists while disabled. Do not also charge legacy temporary-server/autoscale costs.
 
-```text
-Scale Up
-OR
-Scale Out + Load Balancing
-```
+Extend existing exposure numerators/remainders and settlement evidence for controller cost, preserving partial-period and cent arithmetic and bankruptcy precedence. Rejected opportunity value is not an extra expense.
 
-and:
+Reuse per-component overload streaks, latency equations, conservation and measured five-step recovery. DB demand remains app-processed work minus cache hits. Controller changes app capacity only. For example, 4,000 processed req/s with a warm 60% read cache produces 2,080 DB ops/s at 80% reads, versus 3,520 at 20% reads; 3,000 ops/s can still constrain the latter. These are arithmetic examples, not guaranteed processing outcomes.
 
-```text
-Larger Database
-OR
-Read Cache
-```
+No new DB tier, cache equation or timeout recovery. Falling traffic may drain work, but actual measurements govern recovery. Existing manual/admission actions remain available. Report pauses preserve remaining physical pulse duration.
 
-"OR" means:
+Extend actual causal reports with pulse boundaries, controller observations, request/install/routing delay, blocked decisions, retirement and costs. Explain late or ineffective automation only when trace evidence supports it.
 
-> alternative investment paths that are both valid,
+# 8. Completion and same-company continuation
 
-not:
+After pulse two ends, require baseline input, management/no incident, zero backlogs, acknowledged actual reports and five consecutive qualifying baseline steps. Persist a baseline-stability counter using the existing recovery predicate.
 
-> permanently mutually exclusive choices.
+Record one **spike-response** recognition with no further cash/research/unlock. Prevention can complete without inventing an incident/report. Show pending acknowledgement through existing presentation/pause rules. Acknowledgement is zero-step and returns to the same paused company.
 
-The player may eventually combine technologies if the campaign state and resources allow.
+Controller can continue managing baseline capacity afterward; generate no additional pulses. Reliability remains locked/unimplemented. Do not end the campaign or emit a new run/opening-completion event.
 
----
+# 9. UI requirements
 
-## 2.5 Autoscaling
+Extend CampaignUI's pinned progression strip with one stage between Data Strategy and locked future stages. Derive completed/current/available-next/locked states from campaign state; retain Campaign guidance / System evidence / Actions.
 
-Autoscaling is introduced as a later capacity unlock.
+Show:
 
-It should require:
+- State-based objective: “Maintain service through changing demand while managing capacity cost.”
+- Factual entry requirements, pulse countdowns, current input and return-to-baseline timing.
+- Research/unlock separately from controller purchase/activation.
+- Enabled/disabled/suspended controller, measured utilisation, high/low counters, thresholds, limits, cooldown and blocked reason.
+- Requested/provisioning/installed-unrouted/routing-pending/serving/retired states and countdowns.
+- Installed/routed capacity and actual per-instance evidence, including apps 3/4 and retired-ID gaps.
+- Traffic-limit qualification and rejected-demand business consequence.
+- Inherited read/write profile, cache warmth/used hit rate and DB demand/capacity without prescribed investments.
+- Required report/completion acknowledgements and continuation outside History, also after reload.
 
-```text
-horizontal scaling
-+ load balancing
-+ configured scaling threshold
-```
+Reuse shared Facility/dependency selection and action dispatcher. Adapt hard-coded app label anchors using existing room positions; keep renderer, office, camera and icons. Do not use legacy instant temporary-server visuals. Preserve demand/capacity/utilisation/backlog/processed/failed/latency/errors and readable history. Keyboard, touch, focus restoration, mobile and color-independent state remain required. Reading advances no simulation and fabricates no inspections.
 
-Autoscaling should:
+# 10. Local persistence and schema 5
 
-- react only after a configured condition;
-- have an activation/startup delay;
-- add application capacity, not DB capacity;
-- be visible when pending;
-- not prevent all incidents automatically.
+Extend `persist.ts`/`saveMigrations.ts`/campaign types; no second save layer. Keep `nn.campaign.save.v1`, existing metadata/archive keys, legacy keys byte-for-byte, paused resume, raw backup/export and unexported-record retention.
 
-Teaching point:
+Envelope **schemaVersion 5** uses chained dispatch **1 → 2 → 3 → 4 → 5**. Required saved additions:
 
-> Autoscaling reacts to demand, but it cannot solve a database bottleneck and cannot create capacity instantly.
+- Nullable stage identity/configuration, entry/deadlines/consumed events, research award/spend, baseline counter and completion acknowledgement.
+- Controller state within that stage: deployment/enabled policy, counters/cooldown, managed IDs, pending join/routing expectation, blocked reason.
+- Monotonic next-app number and action provenance.
+- Controller exposure/remainder and settlement cost evidence.
+- Snapshot version 5 for stage/controller/current per-instance evidence.
 
----
+Derive redundant status from pending actions/events where possible. Validate stage consistency, action targets, controller ownership, bounds and routing; do not merely permit arbitrary instance arrays.
 
-## 2.6 Reliability branch preparation
+Migration from valid schema 4 sets new stage/controller null and new financial accumulators zero, derives next ID from greatest existing/historical app identity, and treats historical action source as player. Preserve cash/backlog/pending deadlines/trace IDs/reports/milestones/profile/cache/ledger and every old snapshot. Do not backfill research, stage completion/timing or invented per-instance/controller observations.
 
-Phase 5 should show the existence of the reliability branch in the progression structure, but unimplemented reliability mechanics should not be interactable until Phase 6.
+Retain historical snapshot-version rules, including schema-3/4 snapshot two-app limits. Version-5 snapshots permit up to four current instances and valid retired-ID gaps. Do not relabel the old origin or earlier stages.
 
-Possible behavior:
+Backup original source bytes before validated replacement. Backup, validation or write failure preserves source/export. Unknown future versions remain unsupported. Reset retains existing explicit confirmation, onboarding preference and evidence/archive protection. Cloud bindings, owner IDs and account copies are unnecessary and excluded.
 
-```text
-Reliability branch visible as "coming next" or locked
-```
+# 11. Local telemetry
 
-or:
+Extend existing trace projection/archive/export with stable event IDs, run/session/build/scenario attribution, physical step, timestamps and active/wall timing. Preserve reload/StrictMode/retry deduplication and unexported records. Add stage ID/version to new-stage events.
 
-```text
-reliability nodes hidden until Phase 6
-```
+| Occurrence | Required evidence |
+| --- | --- |
+| Entry / data-readiness award / unlock | Stage/research before-after, once-only identity |
+| Pulse announcement/start/end | Pulse ID, scheduled/actual step and input |
+| Controller request/activation/enable/disable | Action source, cost, policy and request/activation steps |
+| Trigger / blocked-reason change | Snapshot, observation/streak, limits/cooldown, reason |
+| Automatic app request/install/routing | Stable app/action IDs, source, useful-capacity delay |
+| Retirement request/cancel/complete | Candidate, safety and cost/routing consequence |
+| Completion/acknowledgement | Timing, response mix, profile, accepted limiting, cost exposure |
 
-Do not expose buttons that appear functional but have no simulation effect.
+Use distinct progression-award events. Existing `milestone-awarded` projection into `run_completed_opening` must remain opening-specific; new recognition cannot produce another opening completion. Automatic requests are not player gameplay decisions, replay evidence or user intervention counts. Preserve request versus activation semantics and existing physical trace projection. No networking is required; this feature sends no browser data externally.
 
----
+# 12. Tests and acceptance paths
 
-## 2.7 Replay / new-run flow
+Run a fresh Node 22 baseline before implementing, and repository-required checks afterward. Historical Phase 4 counts are not fresh results. Preserve all Phase 1–4 paths and storage/telemetry/conservation/pause regressions.
 
-The player should be able to start a **new company/run** without confusing this with continuing the current company.
+Unit/store/migration tests:
 
-Replay should:
+- Entry gates, idempotency, preserved state and no auto-entry.
+- Exact n+8/28/48/68 boundaries, event consumption, pause/reload and batched-step equivalence.
+- Strict threshold equality, three/six observations, four-step cooldown, blocked-counter reset.
+- Three-step automatic install plus one-step routing; unchanged manual delay; no traffic through idle capacity.
+- Numeric routing with four apps/mixed tiers/gaps; protected apps, reservation limits and earlier two-app restriction.
+- Empty-only retirement, min pool, pulse-boundary revalidation/cancellation and selection fallback.
+- Manual slot/routing priority, disabling and completion of accepted paid actions.
+- Exact setup/upkeep/partial-period exposure, retirement stopping cost, affordability and bankruptcy.
+- Continued DB constraint despite app relief; unchanged cache/latency/conservation.
+- Once-only research and completion for prevention/recovery, acknowledgements and resume.
+- Schema 1/2/3/4 chains, malformed actions/controller/snapshots, original-byte backups and failure preservation.
+- Controller telemetry deduplication/exclusion from replay and opening completion.
+- Local guest save/resume/export with backend unavailable.
 
-- create a new run ID;
-- select a new bounded scenario seed/configuration where appropriate;
-- reset company architecture and campaign progression;
-- preserve account identity;
-- preserve historical analytics;
-- preserve completed prior run summaries if stored.
+Balance fixtures compare manual response, pre-provisioning and autoscaling under identical pulses. Include mixed app tiers, read/write-heavy profiles, admission limiting, activation lag, cost tail and safe scale-in. Check documented recoverability/solvency rather than asserting automation is optimal. Retuning, if needed, affects only new stage configuration with explicit version/reporting.
 
-This is different from:
+E2E through public controls:
 
-```text
-continue same company
-```
+1. Same Data Strategy company → enter → unlock/deploy → pulse/provisioning/idle/routing → reload → second pulse → measured recovery/report if needed → recognition → same company.
+2. Manual/pre-provisioned path without autoscaling, including valid prevention/completion.
+3. Write-heavy app relief with persistent DB evidence, then adaptation through existing controls.
+4. Safe scale-in/cancellation and disable with retained accepted actions.
+5. Mobile/touch/keyboard selection of new instances, guidance and pending acknowledgement.
 
-Replay analytics must preserve that distinction.
+Keep all three opening recovery paths, scaling/routing and data/cache/contrast journeys passing. Use deterministic fixtures, not production-only shortcuts. Run frontend lint/typecheck/unit/coverage/balance/build/CI E2E under Node 22; run existing non-destructive backend checks as repository guidance requires without applying drafts or generating DB migrations.
 
----
+# 13. Human-test protocol
 
-## 2.8 Campaign summary
+Prepare approximately five target-user sessions on one recorded build/configuration, with identified workload profile. Separate fresh/returning users, recruited testers and organic sign-ups. A same-company Data Strategy entry fixture is acceptable when prior stages would consume the session; record it as setup rather than player progression/replay.
 
-At meaningful transition points, the game may show a compact campaign summary.
+Observe before coaching: expected/actual request-to-install-to-routing timing, first evidence/response, remaining DB pressure, rejected demand, interpretation of scale-in and cost tail, active/wall durations, failures/quits, confusion and intervention. Collect enjoyment 1–5 and spontaneous replay/continuation interest before prompting.
 
-Suggested summary fields:
+Ask: “When did extra capacity become useful?”, “What could automation change?”, “What remained constrained?”, and “Why keep or remove capacity after the spike?” The primary question is whether players can explain delayed app-only automation and its cost/headroom trade-off using evidence. Do not prescribe autoscaling or cache/database solutions.
 
-```text
-current company stage
-users reached
-cash
-current architecture
-technologies unlocked
-technologies deployed
-incidents recovered
-major trade-offs / recent postmortem
-```
+Counterbalanced manual/automatic comparisons are permitted but must be labeled prompted evaluation, not spontaneous replay. Report missing/negative outcomes honestly. This is not the later learning-evaluation cohort. Actual deployment and human results remain NOT TESTED until performed.
 
-The full end-of-run scorecard belongs in Phase 7.
+# 14. File plan and reuse
 
-Phase 5 only needs enough summary information to make progression understandable.
+| Responsibility | Existing extension points |
+| --- | --- |
+| Types/stage/policy/actions/snapshots/accounting | `frontend/src/sim/campaignTypes.ts`, `types.ts`, existing balance/config modules |
+| Continuation/unlock/deployment/retirement | `frontend/src/sim/actions.ts`, `turn.ts` campaign dispatcher |
+| Traffic/controller/processing/economy/recovery | `frontend/src/sim/step.ts` and current snapshot/report helpers |
+| Tech availability | Existing tech IDs/config and campaign selectors in `derive.ts` |
+| Lifecycle/selection/pause | `frontend/src/game/store.ts` |
+| Save/validation/migration | `frontend/src/game/persist.ts`, `saveMigrations.ts` |
+| Local event projection/export | `frontend/src/game/telemetry.ts` and existing archive |
+| Guidance/evidence/actions/scene | `CampaignUI.tsx`, `Game.tsx`, `scene/Facility.tsx`, `index.css` |
+| Coverage | Existing simulation/store/persistence/phase tests, `App.test.tsx`, `frontend/e2e/` |
 
----
+A small `trafficSpikes.ts` configuration/pure-helper extraction is justified only if existing scenario/step modules become unclear; it uses the same scheduler/engine. Focused autoscaling/migration tests and a playtest protocol may be extracted from existing equivalents. Do not automatically create new TechTree/ProgressionStore/save adapter/renderer/telemetry systems.
 
-# 3. Learning Outcomes
+Order: checkpoint/fresh baseline → stage/types/schema → pulse events → controller/routing/retirement/accounting → forward unlock/completion → existing UI/Facility → telemetry → regression/balance/E2E/accessibility → implementation report and review. Develop migration/transition tests alongside those changes.
 
-## LO1 — Diagnose bottlenecks
+# 15. Definition of Done
 
-Progression should not remove the need to inspect evidence.
+Report PASS / FAIL / NOT TESTED per item with evidence; unchecked items are requirements, not current claims.
 
-Unlocked technologies create more options, but players still need to diagnose the actual constraint before choosing an investment.
+- [ ] Phases 1–4 regression behavior and historical saves remain intact.
+- [ ] Explicit same-company entry preserves state and exposes factual prerequisites.
+- [ ] Pulses start/end once at the specified physical steps.
+- [ ] Nine identities retained; forward research awards/spends once without retroactive gates.
+- [ ] Deployment, thresholds, provisioning, routing, cooldown and limits follow deterministic rules.
+- [ ] Installed/routed capacity and controller blocked decisions are visible.
+- [ ] Safe scale-in preserves work, protected investments, IDs and exact cost exposure.
+- [ ] Manual/prevention paths remain valid; automation cannot silently repair DB constraints.
+- [ ] Recovery/reports/completion acknowledgement continue the same company.
+- [ ] Schema 5, source backups, unsupported data/reset/paused reload checks pass.
+- [ ] Local telemetry distinguishes player/controller decisions and preserves prior event/export semantics.
+- [ ] Existing guidance/Facility/shared selection/mobile/accessibility checks pass.
+- [ ] Node 22 checks recorded with baseline warnings/skips identified.
+- [ ] Guest gameplay/save/export works with backend unavailable.
+- [ ] Balance comparisons and human protocol ready; actual results reported honestly.
+- [ ] Deployment/build verification and human sessions evidenced or NOT TESTED.
+- [ ] No deferred auth/cloud or Phase 6 mechanics introduced.
 
-The player should understand:
+# 16. Exclusions and release boundary
 
-```text
-available technology
-≠
-appropriate technology
-```
+No app failure, unhealthy routing, health checks, redundancy/standby, failover, failure injection or reliability incidents. Reliability identities remain locked; no usable Phase 6 continuation.
 
----
+Also exclude another campaign/progression system, tenth tech, full all-node research economy, new DB/cache equations, retuned Phase 1–4 costs, random incident families, arbitrary routing/policy editor, renderer replacement, account/session/OAuth integration, cloud writes/owner binding/revision conflicts/account switching, or production proxy/cookie changes.
 
-## LO2 — Choose scaling strategies
+Keep the auth/cloud stash unapplied. Account/cloud usability remains required in its separate release workstream; this contract neither waives final-MVP requirements nor claims the old PR2 account goal complete. Local schema 5 needs no backend schema generation or migrations.
 
-The progression tree directly supports LO2.
-
-The player should compare:
-
-### Capacity branch
-
-```text
-Scale Up
-OR
-Scale Out + Load Balancing
-→ Autoscaling
-```
-
-### Data branch
-
-```text
-Larger Database
-OR
-Read Cache
-→ Cache Tuning
-```
-
-The player should choose based on:
-
-- current bottleneck;
-- workload;
-- cost;
-- activation delay;
-- existing architecture.
-
----
-
-## LO4 — Weigh trade-offs
-
-Technology unlocks should create real trade-offs between:
-
-```text
-performance
-cost
-activation delay
-future flexibility
-complexity
-```
-
-A technology should not exist only as a cosmetic badge.
-
-Every exposed technology must have a real simulation effect.
-
----
-
-## Reliability preparation for LO3
-
-The reliability branch structure should prepare for Phase 6:
-
-```text
-Health Checks
-+
-Spare Application Instance
-→ Automatic Failover
-```
-
-Do not assess or fully teach LO3 until Phase 6 mechanics are implemented.
-
----
-
-# 4. Engineering
-
-## 4.1 Replace legacy 17-node progression
-
-The master roadmap requires replacing the old progression system with the proposal's **9-unlock structure**.
-
-The new tree is:
-
-### Capacity branch
-
-1. Scale Up
-2. Scale Out + Load Balancing
-3. Autoscaling
-
-### Data branch
-
-4. Larger Database
-5. Read Cache
-6. Cache Tuning
-
-### Reliability branch
-
-7. Health Checks
-8. Spare Application Instance
-9. Automatic Failover
-
-Metrics, metric history, and alerts are baseline tools and are **not** research unlocks.
-
----
-
-## 4.2 Technology definition model
-
-Each technology should have a structured definition.
-
-Suggested fields:
-
-```text
-id
-name
-branch
-description
-learningOutcomeTags
-researchCost
-cashCost
-engineeringCost
-activationDelay
-prerequisites
-visibilityCondition
-deployable
-effectType
-```
-
-Separate:
-
-```text
-unlocked
-```
-
-from:
-
-```text
-deployed
-```
-
-A technology may be unlocked but not yet deployed.
-
----
-
-## 4.3 Progression state
-
-Campaign progression should track at least:
-
-```text
-currentMilestone
-milestonesAwarded
-researchPoints
-unlockedTechnologyIds
-deployedTechnologyIds
-availableTechnologyIds
-```
-
-The exact representation should follow existing repository conventions.
-
----
-
-## 4.4 Milestone awards
-
-A milestone should:
-
-- be deterministic;
-- award exactly once;
-- optionally award research points;
-- optionally reveal new technology nodes;
-- be recorded in campaign history.
-
-The milestone engine should not directly apply technology effects.
-
----
-
-## 4.5 Prerequisites
-
-Required prerequisite logic:
-
-### Autoscaling
-
-Requires:
-
-```text
-Scale Out + Load Balancing
-```
-
-and a configured scaling threshold.
-
-### Cache Tuning
-
-Requires:
-
-```text
-Read Cache
-```
-
-### Automatic Failover
-
-Will require in Phase 6:
-
-```text
-Health Checks
-+
-Spare Application Instance
-+
-Load Balancing
-```
-
-Until Phase 6 is implemented, Automatic Failover should not become deployable.
-
----
-
-## 4.6 Scale Up vs Scale Out
-
-Preserve both as alternative investment paths.
-
-Do not encode:
-
-```text
-Scale Up must happen before Scale Out
-```
-
-or the reverse.
-
-Both should be independently unlockable when allowed by the milestone/research state.
-
-Their value should depend on context.
-
----
-
-## 4.7 Larger Database vs Read Cache
-
-Likewise, do not force:
-
-```text
-Larger DB
-→ then Read Cache
-```
-
-or:
-
-```text
-Read Cache
-→ then Larger DB
-```
-
-These should remain alternative investments.
-
-Cache Tuning depends on Read Cache, but the DB upgrade path does not.
-
----
-
-## 4.8 Autoscaling mechanics
-
-Autoscaling should be added on top of the Phase 3 per-instance routing model.
-
-Suggested configuration:
-
-```text
-enabled
-utilisationThreshold
-requiredConsecutiveSteps
-startupDelay
-maxInstances
-```
-
-Example behavior:
-
-```text
-app utilisation > 80%
-for 3 consecutive steps
-→ schedule one new app instance
-→ instance activates after startup delay
-```
-
-Exact values are balance parameters.
-
-Autoscaling must:
-
-- use the existing scheduler;
-- add app capacity only;
-- require load balancing;
-- respect max-instance limits;
-- not scale instantly;
-- not fix DB bottlenecks.
-
----
-
-## 4.9 Technology deployment
-
-Technology deployment should use the shared action scheduling model where practical.
-
-Deploying a technology may require:
-
-```text
-cash
-engineering time
-activation delay
-```
-
-Effects should become active only after deployment completes.
-
-Do not treat research unlock as instant physical deployment.
-
----
-
-## 4.10 Engineering-time abstraction
-
-Keep engineering capacity lightweight.
-
-For Phase 5, this may simply mean:
-
-```text
-one or more available engineering slots
-```
-
-or:
-
-```text
-engineering points / action capacity
-```
-
-Do not create a separate staff-management simulator.
-
-The goal is to support deployment trade-offs, not employee micromanagement.
-
----
-
-## 4.11 Progressive UI
-
-The progression UI should show:
-
-- branch;
-- unlocked state;
-- deployed state;
-- prerequisites;
-- research cost;
-- deployment cost;
-- activation delay;
-- unavailable reason.
-
-Use clear states such as:
-
-```text
-hidden
-visible + locked
-unlocked
-deployment pending
-deployed
-```
-
-Avoid showing a technology as available when its mechanic is not implemented.
-
----
-
-## 4.12 Remove player-facing legacy campaign
-
-By PR2, the new continuous campaign should be the default player-facing experience.
-
-Remove or hide:
-
-- old weekly-campaign route;
-- obsolete monitoring unlock;
-- obsolete DB-failure progression;
-- old 17-node tree;
-- automatic incident timeout path;
-- other superseded player-facing mechanics.
-
-Legacy code may remain temporarily behind development-only adapters if required for migration/testing, but players should not encounter two competing campaign systems.
-
----
-
-## 4.13 Cloud-save/account usability
-
-Phase 5 completes usability work around the account/cloud-save flow.
-
-The player should be able to:
-
-```text
-play as guest
-→ optionally sign in with Google
-→ associate/save current run
-→ resume later
-```
-
-Requirements:
-
-- clear save status;
-- owner-scoped saves;
-- safe revision behavior;
-- no silent overwrite;
-- guest play remains possible;
-- Google cancellation or auth errors do not destroy local progress;
-- app-session restoration, sign-out, and expired-session recovery work;
-- Google callbacks and cookie-based sessions work on production and the explicitly configured auth-test preview origin; see [authentication](../AUTHENTICATION.md);
-- account switching does not attach another owner's local run;
-- legacy save/meta/analytics keys remain untouched, including during reset and account changes;
-- legacy save export remains available after removing the player-facing legacy campaign.
-
----
-
-## 4.14 Replay reset
-
-A new-run action should:
-
-- generate a new run ID;
-- reset progression;
-- reset company architecture;
-- reset run-specific research points;
-- select/configure a new valid seed;
-- retain account identity;
-- retain historical run records/analytics.
-
-Do not reset the current company when the player merely closes a milestone or postmortem.
-
----
-
-## 4.15 Campaign summaries
-
-Add lightweight summary derivation from campaign state.
-
-Do not maintain a second manually edited summary state if it can be derived safely.
-
-Possible fields:
-
-```text
-milestones reached
-research earned/spent
-technologies unlocked
-technologies deployed
-company growth stage
-current architecture
-```
-
----
-
-# 5. Existing Modules
-
-The IDE should inspect the repository before implementation.
-
-Likely relevant areas:
-
-```text
-technology definitions
-existing technology tree
-campaign state
-actions
-shared scheduler
-store
-reports
-menu
-save validation
-local persistence
-cloud-save adapter
-scenario configuration
-simulation effects
-```
-
-Likely file equivalents may include:
-
-```text
-src/game/technologies.ts
-src/game/progression.ts
-src/game/store.ts
-src/game/persist.ts
-src/sim/actions.ts
-src/sim/step.ts
-src/components/TechTree.tsx
-src/components/Menu.tsx
-src/components/CampaignSummary.tsx
-src/backend/saveAdapter.ts
-```
-
-Use actual repository conventions.
-
----
-
-# 6. New Modules
-
-The master roadmap calls for:
-
-```text
-campaign progression rules
-prerequisite tests
-```
-
-Possible additions:
-
-```text
-src/game/progression.ts
-src/game/technologyPrerequisites.ts
-```
-
-Potential tests:
-
-```text
-src/game/progression.test.ts
-src/game/technologyPrerequisites.test.ts
-```
-
-If a technology registry already exists, extend it rather than duplicating it.
-
----
-
-# 7. Automated Testing
-
-## 7.1 Milestone awards
-
-Test:
-
-- milestone is awarded when condition is first met;
-- reward occurs exactly once;
-- save/resume does not duplicate reward;
-- repeated state evaluation does not duplicate reward.
-
----
-
-## 7.2 Research points
-
-Test:
-
-- research points increase from milestone reward;
-- spending reduces available points;
-- insufficient research blocks unlock;
-- research cannot go negative;
-- duplicate spending is prevented.
-
----
-
-## 7.3 Unlock vs deploy
-
-Test:
-
-```text
-unlock technology
-≠
-deploy technology
-```
-
-Verify:
-
-- unlock changes availability;
-- simulation effect remains inactive until deployment completes.
-
----
-
-## 7.4 Prerequisites
-
-Test:
-
-### Autoscaling
-
-Cannot deploy without:
-
-```text
-Scale Out + Load Balancing
-```
-
-### Cache Tuning
-
-Cannot deploy without:
-
-```text
-Read Cache
-```
-
-### Automatic Failover
-
-Cannot deploy until all Phase 6 prerequisites/mechanics exist.
-
----
-
-## 7.5 Alternative paths
-
-Test that:
-
-```text
-Scale Up
-```
-
-does not require:
-
-```text
-Scale Out
-```
-
-and vice versa.
-
-Likewise:
-
-```text
-Larger DB
-```
-
-and:
-
-```text
-Read Cache
-```
-
-remain independently unlockable where allowed.
-
----
-
-## 7.6 Technology effect integrity
-
-For every exposed technology, test that deployment changes the intended simulation variable.
-
-Examples:
-
-```text
-Scale Up → per-instance app capacity
-Scale Out + LB → instance count/routing capacity
-Autoscaling → delayed automatic app-instance scheduling
-Larger DB → DB capacity
-Read Cache → eligible read demand reduction
-Cache Tuning → hit rate/warm-up behavior
-```
-
-No exposed technology should be cosmetic only.
-
----
-
-## 7.7 Autoscaling
-
-Test:
-
-- threshold must be met;
-- required consecutive-step condition works;
-- scale action is scheduled, not instant;
-- new instance respects startup delay;
-- max instance limit is respected;
-- LB/routing prerequisite is respected;
-- DB capacity remains unchanged.
-
----
-
-## 7.8 Progression persistence
-
-Save/resume should preserve:
-
-- milestone state;
-- research balance;
-- unlocked technologies;
-- deployed technologies;
-- pending deployments;
-- autoscaling configuration;
-- same run/company identity.
-
----
-
-## 7.9 Replay reset
-
-Test:
-
-- new run gets new run ID;
-- progression resets;
-- architecture resets;
-- research resets;
-- account identity remains;
-- historical analytics are preserved;
-- prior cloud save remains distinct.
-
----
-
-## 7.10 Legacy-path removal
-
-Test that normal production navigation no longer exposes:
-
-- legacy campaign route;
-- old 17-node tree;
-- obsolete monitoring unlock;
-- obsolete DB-failure path.
-
-Development-only migration tooling may remain inaccessible to users.
-
----
-
-## 7.11 Cloud-save usability
-
-Test:
-
-- guest run can become authenticated run;
-- save ownership remains correct;
-- local progress survives auth failure;
-- revision conflict does not silently overwrite;
-- cross-session resume restores progression accurately.
-
----
-
-## 7.12 Phase 5 acceptance paths
-
-### Path A — Capacity alternative
-
-```text
-milestone reached
-→ research awarded
-→ player unlocks Scale Up
-→ deploys upgrade
-→ app capacity increases
-```
-
-### Path B — Horizontal path
-
-```text
-milestone reached
-→ research awarded
-→ player unlocks Scale Out + LB
-→ deploys additional instance/routing
-→ later qualifies for Autoscaling
-```
-
-### Path C — Data alternative
-
-```text
-research awarded
-→ player chooses Read Cache rather than Larger DB
-→ deploys cache
-→ later unlocks Cache Tuning
-```
-
-### Path D — Autoscaling delay
-
-```text
-traffic rises
-→ threshold exceeded
-→ autoscaling condition met
-→ instance scheduled
-→ startup delay
-→ instance activates
-```
-
-### Path E — Save/resume
-
-```text
-player reaches milestone
-→ unlocks technology
-→ signs in/saves
-→ closes session
-→ resumes later
-→ same company/progression restored
-```
-
----
-
-# 8. Human Validation
-
-The core Phase 5 validation question is:
-
-> **Do players understand what they unlocked, why it became available, and why multiple investment choices remain viable?**
-
----
-
-## 8.1 Suggested participants
-
-Use a mix of:
-
-- fresh users;
-- returning users from earlier tests.
-
-The master roadmap also requires reviewing organic beta activity around PR2.
-
----
-
-## 8.2 Observe
-
-Record:
-
-- whether players notice new unlocks;
-- whether they understand prerequisites;
-- whether "unlock" vs "deploy" is clear;
-- whether research points make sense;
-- whether Scale Up vs Scale Out feels like a meaningful choice;
-- whether DB upgrade vs cache feels like a meaningful choice;
-- whether too many nodes appear at once;
-- whether players feel pushed toward one obvious upgrade path;
-- whether autoscaling delay is understandable;
-- whether players willingly continue after milestones.
-
----
-
-## 8.3 Ask after play
-
-Possible questions:
-
-1. What did the milestone give you?
-2. Why did you choose this technology?
-3. What other option could you have taken?
-4. What would make the other option more attractive?
-5. Did anything in the tech tree feel confusing?
-6. Did any option look available before you understood why?
-7. Would you continue playing this company?
-
----
-
-## 8.4 PR2 organic-beta validation
-
-The proposal/master roadmap targets:
-
-```text
-At least 20 organic beta players by PR2
-```
-
-An organic beta player counts when they:
-
-- independently start a run;
-- make at least one gameplay decision;
-- are not a team member;
-- are not a recruited test participant.
-
-Track organic activity separately from structured playtests.
-
----
-
-## 8.5 Replay signal
-
-Continue distinguishing:
-
-```text
-continue same company
-```
-
-from:
-
-```text
-start second run
-```
-
-For beta replay measurement, a replay requires:
-
-- new run started;
-- at least one gameplay decision made;
-- no prompting/reward.
-
----
-
-## 8.6 Human validation success signal
-
-Players should be able to explain something like:
-
-> "I unlocked a new option because I reached the milestone, but I still had to choose whether it was worth spending resources to deploy."
-
-and:
-
-> "Scale Up and Scale Out solve similar capacity problems differently, so I don't always need both."
-
-The exact wording is not important.
-
-Understanding of choice and prerequisite structure is.
-
----
-
-# 9. Definition of Done
-
-Phase 5 is complete only when all of the following are true.
-
-## Campaign progression
-
-- [ ] Growth milestones exist.
-- [ ] Milestones award exactly once.
-- [ ] Research points are awarded and spendable.
-- [ ] Unlock and deployment are separate concepts.
-- [ ] Gradual reveal works.
-- [ ] Same company continues through milestones.
-
-## Nine-unlock structure
-
-- [ ] Scale Up exists.
-- [ ] Scale Out + Load Balancing exists.
-- [ ] Autoscaling exists.
-- [ ] Larger Database exists.
-- [ ] Read Cache exists.
-- [ ] Cache Tuning exists.
-- [ ] Health Checks is represented correctly for Phase 6.
-- [ ] Spare Application Instance is represented correctly for Phase 6.
-- [ ] Automatic Failover is represented correctly for Phase 6.
-- [ ] No exposed unimplemented reliability technology pretends to work.
-
-## Prerequisites
-
-- [ ] Autoscaling requires horizontal scaling/load balancing.
-- [ ] Cache Tuning requires Read Cache.
-- [ ] Automatic Failover remains gated until Phase 6 prerequisites are real.
-- [ ] Scale Up and Scale Out remain alternative investments.
-- [ ] Larger DB and Read Cache remain alternative investments.
-
-## Autoscaling
-
-- [ ] Threshold is visible/configurable as intended.
-- [ ] Trigger requires sustained condition.
-- [ ] Scaling is delayed.
-- [ ] Autoscaling adds app capacity only.
-- [ ] Autoscaling cannot fix DB capacity.
-- [ ] Max-instance bounds exist.
-
-## Persistence
-
-- [ ] Progression survives local save/resume.
-- [ ] Progression survives cloud save/resume.
-- [ ] Pending deployments survive save/resume.
-- [ ] Run/company identity remains stable.
-- [ ] New-run reset produces new run identity.
-
-## Player-facing migration
-
-- [ ] New campaign is default.
-- [ ] Legacy campaign route is not player-facing.
-- [ ] Old 17-node tree is removed from normal play.
-- [ ] Obsolete monitoring unlock is removed.
-- [ ] Obsolete DB-failure progression is removed.
-
-## Account/cloud usability
-
-- [ ] Guest-first play still works.
-- [ ] Google sign-in, cancellation, and app-session recovery work.
-- [ ] Local run can be associated safely with owner where supported.
-- [ ] Cloud save status is understandable.
-- [ ] Conflicts do not silently overwrite.
-- [ ] Auth failure does not destroy local progress.
-
-## PR2 validation
-
-- [ ] Tech-tree usability tested with users.
-- [ ] Gradual reveal tested.
-- [ ] Alternative-investment understanding tested.
-- [ ] Organic beta activity reviewed.
-- [ ] Target of 20 organic beta players is measured and reported honestly.
-- [ ] Organic replay is measured separately from recruited testing.
-
-## Engineering quality
-
-- [ ] Milestone tests pass.
-- [ ] Research spending tests pass.
-- [ ] Prerequisite tests pass.
-- [ ] Autoscaling tests pass.
-- [ ] Progression persistence tests pass.
-- [ ] Replay-reset tests pass.
-- [ ] Phase 1–4 regression tests remain healthy.
-- [ ] Typecheck/build pass or known pre-existing failures are documented.
-
----
-
-# 10. Dependencies
-
-Phase 5 depends on Phases 3–4 being stable.
-
-Required from Phase 3:
-
-- per-instance application model;
-- explicit routing/load balancing;
-- delayed scaling actions;
-- account sign-in;
-- owner-scoped cloud-save foundation.
-
-Required from Phase 4:
-
-- database upgrade;
-- read cache;
-- cache tuning mechanics or their stable effect contracts;
-- seeded scenario configuration;
-- analytics run/session attribution.
-
-Required from earlier phases:
-
-- continuous campaign identity;
-- milestone-compatible store;
-- deterministic simulation;
-- save schema/versioning;
-- causal postmortems.
-
-The reliability UI may use agreed fixtures while Phase 6 mechanics are being developed, but real reliability actions must not be exposed prematurely.
-
----
-
-# 11. Scope Guard
-
-Do not expand Phase 5 into:
-
-- application-failure simulation;
-- health-check behavior;
-- failover behavior;
-- database failure;
-- database failover;
-- network/security incidents;
-- queues;
-- multi-region;
-- microservices;
-- full management/staff simulator;
-- arbitrary scenario editor;
-- achievements;
-- leaderboards;
-- extra tech-tree branches;
-- cosmetic upgrades with no simulation effect;
-- reward systems that prescribe one solution.
-
-The purpose of Phase 5 is:
-
-> **coherent progression and gradual choice integration**
-
-not adding more mechanic families.
-
----
-
-# 12. Main Risks and Mitigations
-
-## Risk 1 — Tech tree becomes a checklist
-
-**Mitigation:**
-
-Keep alternative investments viable.
-
-Do not require all nodes in a fixed order.
-
----
-
-## Risk 2 — Too many options appear at once
-
-**Mitigation:**
-
-Use milestone-based gradual reveal.
-
-Hide later branches until relevant.
-
----
-
-## Risk 3 — Research unlock is confused with deployment
-
-**Mitigation:**
-
-Use distinct UI states and separate costs.
-
----
-
-## Risk 4 — Autoscaling becomes a universal safety net
-
-**Mitigation:**
-
-Require:
-
-- threshold;
-- sustained trigger;
-- startup delay;
-- LB;
-- max instance count.
-
-Keep DB bottlenecks independent.
-
----
-
-## Risk 5 — Reliability nodes appear functional before Phase 6
-
-**Mitigation:**
-
-Hide or clearly lock them.
-
-Never expose fake functionality.
-
----
-
-## Risk 6 — Old and new campaign systems coexist visibly
-
-**Mitigation:**
-
-Remove legacy route from player navigation by PR2.
-
-Keep migration adapters development-only.
-
----
-
-## Risk 7 — Cloud-save work destabilizes progression
-
-**Mitigation:**
-
-Version save schema and test progression persistence before PR2.
-
----
-
-## Risk 8 — PR2 adds too much scope
-
-**Mitigation:**
-
-Prioritize:
-
-```text
-progression coherence
-→ 9-node structure
-→ prerequisites
-→ save/resume
-→ replay flow
-→ organic beta testing
-```
-
-before decorative polish.
-
----
-
-# 13. Recommended Implementation Order
-
-1. Verify Phase 4 Definition of Done.
-2. Run Phase 1–4 regression suite.
-3. Inspect current technology/progression implementation.
-4. Identify and isolate the old 17-node progression path.
-5. Define the 9-technology registry.
-6. Define milestone state.
-7. Define research-point state.
-8. Implement milestone award logic.
-9. Add exactly-once milestone tests.
-10. Implement research earning/spending.
-11. Separate unlock from deployment.
-12. Implement prerequisite engine.
-13. Add Scale Up / Scale Out alternative paths.
-14. Integrate existing DB upgrade / Read Cache alternatives.
-15. Integrate Cache Tuning prerequisite.
-16. Implement autoscaling threshold/configuration.
-17. Implement delayed autoscaling using existing scheduler.
-18. Add autoscaling tests.
-19. Add progressive reveal UI.
-20. Add technology-state UI: locked/unlocked/pending/deployed.
-21. Keep reliability nodes hidden/locked pending Phase 6.
-22. Update save schema for progression.
-23. Verify local save/resume.
-24. Complete cloud-save/account usability.
-25. Implement replay/new-run reset.
-26. Add campaign summary.
-27. Remove player-facing legacy campaign route.
-28. Verify every exposed technology has a real effect.
-29. Run acceptance paths.
-30. Conduct progression/tech-tree playtests.
-31. Review organic beta analytics.
-32. Fix high-impact confusion.
-33. Run typecheck/tests/build.
-34. Freeze PR2 candidate.
-35. Stop for review before Phase 6.
-
----
-
-# 14. Phase 5 Acceptance Scenario
-
-A representative flow:
-
-```text
-Player continues same company
-→ reaches growth milestone
-→ earns research points
-→ sees Scale Up and Scale Out as alternatives
-→ chooses one
-→ unlocks technology
-→ spends cash/engineering time to deploy
-→ architecture changes after delay
-→ later milestone reveals more options
-→ player unlocks Read Cache
-→ later qualifies for Cache Tuning
-→ horizontal path can later qualify for Autoscaling
-→ same company and history continue
-```
-
-Autoscaling example:
-
-```text
-app utilisation stays above threshold
-→ trigger counter increases
-→ autoscaling schedules new instance
-→ startup delay
-→ instance activates
-→ LB distributes traffic
-```
-
-Database invariant:
-
-```text
-DB becomes bottleneck
-→ autoscaling may add app instances
-→ DB capacity remains unchanged
-→ DB bottleneck remains
-```
-
----
-
-# 15. IDE Implementation Prompt
-
-Use this file with:
-
-```text
-docs/PROJECT_PROPOSAL.md
-docs/DEVELOPMENT_ROADMAP.md
-docs/phases/PHASE_1_SIMULATION.md
-docs/phases/PHASE_2_PR1.md
-docs/phases/PHASE_3_SCALING.md
-docs/phases/PHASE_4_DATA_STRATEGY.md
-docs/phases/PHASE_5_PROGRESSION.md
-```
-
-Recommended prompt:
-
-```text
-Read:
-- docs/PROJECT_PROPOSAL.md
-- docs/DEVELOPMENT_ROADMAP.md
-- docs/phases/PHASE_1_SIMULATION.md
-- docs/phases/PHASE_2_PR1.md
-- docs/phases/PHASE_3_SCALING.md
-- docs/phases/PHASE_4_DATA_STRATEGY.md
-- docs/phases/PHASE_5_PROGRESSION.md
-
-Treat PHASE_5_PROGRESSION.md as the detailed progression, persistence, PR2, and acceptance specification for this phase.
-
-Inspect the current repository first.
-
-Before modifying code, report:
-
-1. whether Phases 1–4 are fully implemented and stable;
-2. how the current technology/progression system works;
-3. where the old 17-node tree and legacy campaign assumptions live;
-4. which existing technologies can be reused directly;
-5. exact files/functions that must change;
-6. current save-schema implications;
-7. the smallest safe implementation order for PR2.
-
-Preserve these invariants:
-- one continuous company/run;
-- milestones award exactly once;
-- unlock is separate from deployment;
-- Scale Up and Scale Out remain alternative investments;
-- Larger DB and Read Cache remain alternative investments;
-- Autoscaling requires horizontal scaling/load balancing and acts after a delay;
-- Autoscaling cannot fix a database bottleneck;
-- every exposed technology has a real simulation effect;
-- reliability mechanics remain gated until Phase 6;
-- guest-first play remains available.
-
-Implement Phase 5 only.
-
-Do not proceed into:
-- temporary application failure;
-- health checks;
-- failover;
-- extra incident families;
-- combined full-campaign balance work from Phase 7;
-- later phases.
-
-After implementation:
-- run Phase 1–4 regression tests;
-- run milestone/research/prerequisite tests;
-- run autoscaling tests;
-- run progression persistence tests;
-- run replay/reset tests;
-- run cloud-save/account tests;
-- run browser smoke tests;
-- run typecheck;
-- run production build;
-- list files changed;
-- explain deviations from this specification;
-- report remaining PR2 blockers;
-- confirm whether every Phase 5 Definition of Done item is satisfied;
-- stop for review.
-```
-
----
-
-# 16. Phase 5 Summary
-
-At the end of Phase 5, the project should feel like one coherent growing-company campaign:
-
-```text
-Company grows
-→ milestone reached
-→ research earned
-→ new options revealed
-→ player chooses alternative investment
-→ technology unlocks
-→ deployment costs resources and takes time
-→ architecture evolves
-→ future situations change
-→ same company continues
-```
-
-The 9-unlock structure should now organize the campaign, with the reliability branch prepared but not falsely implemented.
-
-Phase 6 can then complete the reliability branch by introducing temporary application failures, health checks, spare capacity, and automatic failover.
+This reconciliation changes documentation only. Implementation, fresh baseline, deployment and participant contact remain separate authorized work. Stop for review before implementation or Phase 6.
