@@ -342,7 +342,7 @@ function useMusic(): void {
   const incident = useGame((s) => s.game.phase === "incident");
   const music = useRef<Music | null>(null);
   useEffect(() => {
-    const m = createMusic();
+    const m = createMusic(() => useGame.getState().meta.music);
     music.current = m;
     return () => {
       m.dispose();

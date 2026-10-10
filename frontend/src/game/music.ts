@@ -6,9 +6,10 @@ import { compose, frequency, MOODS, secondsOf, type Mood, type Note, type Score 
  * loops run side by side and a change of mood crossfades between them.
  *
  * Browsers only let a page make sound after the player has interacted with it,
- * so the audio starts on the first click or key press (the title screen's Play
- * button). Where the Web Audio API is missing, as in tests, there is no music
- * and nothing fails.
+ * and the strictest (Safari) only start audio from inside the click itself. So
+ * while music is wanted, the first click or key press (the title screen's Play
+ * button) starts the audio, silent until a run is on screen. Where the Web Audio
+ * API is missing, as in tests, there is no music and nothing fails.
  */
 
 export interface Music {
@@ -152,7 +153,8 @@ export async function renderLoop(score: Score, rate = RATE): Promise<AudioBuffer
   return out;
 }
 
-export function createMusic(): Music {
+/** `wanted` says whether the player has music on, so a click can start the audio before the game asks for it. */
+export function createMusic(wanted: () => boolean = () => false): Music {
   const Available = typeof window === "undefined" ? undefined : window.AudioContext;
   if (!Available || typeof OfflineAudioContext === "undefined") return SILENT;
   const AudioCtor: typeof AudioContext = Available;
@@ -174,9 +176,11 @@ export function createMusic(): Music {
     g.gain.linearRampToValueAtTime(to, now + seconds);
   };
 
-  // The first click or key press after music is wanted lets the audio start.
+  // A click or key press is the moment audio is allowed to start: start it then, while music is wanted.
   const wake = () => {
-    if (ctx && enabled && ctx.state === "suspended") ctx.resume().catch(() => {});
+    if (disposed || !(enabled || wanted())) return;
+    const c = start();
+    if (c.state === "suspended") c.resume().catch(() => {});
   };
   window.addEventListener("pointerdown", wake);
   window.addEventListener("keydown", wake);
