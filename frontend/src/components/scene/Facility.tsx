@@ -1,9 +1,12 @@
 "use client";
 
 import { Line, MapControls } from "@react-three/drei";
+import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
+import { ToneMappingMode } from "postprocessing";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
 import {
   EQUIPMENT_ORDER,
@@ -30,9 +33,12 @@ import {
   tempSlot,
   type Footprint,
 } from "./layout";
+import { chooseDetail, DetailContext, detailOverride, useDetail, type Renderer } from "./detail";
+import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { EQUIPMENT_ICON, Icon, STATE_META } from "../icons";
 import { Office } from "./Office";
+import { Exterior } from "./exterior";
 import { OnWall, updateWalls, Wall } from "./walls";
 
 /* ------------------------------------------------------------------ */
@@ -143,7 +149,12 @@ function useSceneModel(): SceneModel {
 /* ------------------------------------------------------------------ */
 
 const TARGET = new THREE.Vector3(-1, 0, 0.6);
-const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20);
+/**
+ * Where the camera sits relative to what it looks at. The view is orthographic, so distance does not change what
+ * is seen, but the camera must stand far enough back that the ground outside is never behind it when zoomed out
+ * and tilted low.
+ */
+const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20).setLength(240);
 const HOME = CAMERA_OFFSET.clone().normalize();
 const UP = new THREE.Vector3(0, 1, 0);
 /** Tilt limits, measured from straight down: nearly top-down to a low three-quarter view. */
@@ -337,11 +348,13 @@ function Rack({
   tint?: string;
 }) {
   const tex = useMemo(() => panelTextures(variant, led), [variant, led]);
+  // In HD the cabinets are powder-coated steel that catches the room's reflections.
+  const hd = useDetail() === "hd";
   return (
     <group position={[x, 0, z]}>
       <mesh castShadow receiveShadow position={[0, size.h / 2, 0]}>
         <boxGeometry args={[size.w, size.h, size.d]} />
-        <meshStandardMaterial color={tint} metalness={0.1} roughness={0.8} />
+        <meshStandardMaterial color={tint} metalness={hd ? 0.45 : 0.1} roughness={hd ? 0.42 : 0.8} />
       </mesh>
       <mesh position={[0, size.h / 2, size.d / 2 + 0.006]}>
         <planeGeometry args={[size.w * 0.87, size.h * 0.93]} />
@@ -609,18 +622,38 @@ function Labels() {
 /* The room                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Tint of the polished concrete under the corridors in HD. */
+const CONCRETE_TINT = "#4c4679";
+
 function Room() {
   const tiles = useMemo(() => {
     const t = concreteFloor();
     t.repeat.set(ROOM.w / 1.6, ROOM.d / 1.6);
     return t;
   }, []);
+  const surfaces = useSurfaces();
+  const hd = useMemo(() => {
+    if (!surfaces) return null;
+    const s = surfaces.concrete;
+    return { geometry: projectUV(new THREE.PlaneGeometry(ROOM.w, ROOM.d), s.size, [ROOM.cx, -ROOM.cz, 0]), material: surfaceMaterial(s, CONCRETE_TINT, 0.9) };
+  }, [surfaces]);
+  useEffect(
+    () => () => {
+      hd?.geometry.dispose();
+      hd?.material.dispose();
+    },
+    [hd],
+  );
   return (
     <group>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]}>
-        <planeGeometry args={[ROOM.w, ROOM.d]} />
-        <meshLambertMaterial map={tiles} />
-      </mesh>
+      {hd ? (
+        <mesh key="hd" receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]} geometry={hd.geometry} material={hd.material} />
+      ) : (
+        <mesh key="basic" receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]}>
+          <planeGeometry args={[ROOM.w, ROOM.d]} />
+          <meshLambertMaterial map={tiles} />
+        </mesh>
+      )}
       <mesh position={[ROOM.cx, -0.26, ROOM.cz]}>
         <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
         <meshStandardMaterial color="#2a2450" roughness={0.9} />
@@ -658,7 +691,47 @@ function Room() {
 /* Scene                                                               */
 /* ------------------------------------------------------------------ */
 
-function Scene() {
+/** Sky light and reflection strength at HD detail. */
+const HD_SKY = 1.45;
+const HD_REFLECTIONS = 0.3;
+
+/**
+ * Soft reflections of a generic bright room for the HD materials. It is built
+ * on the graphics card from three's procedural room, so nothing is downloaded.
+ * Attached as the scene's environment, and detached again at basic detail.
+ */
+function Reflections() {
+  const gl = useThree((s) => s.gl);
+  const env = useMemo(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const room = new RoomEnvironment();
+    const texture = pmrem.fromScene(room, 0.04).texture;
+    room.dispose();
+    pmrem.dispose();
+    return texture;
+  }, [gl]);
+  useEffect(() => () => env.dispose(), [env]);
+  return <primitive object={env} attach="environment" />;
+}
+
+/**
+ * The HD finish, on a graphics card only. Ambient occlusion darkens the creases
+ * where things meet the floor and each other, which grounds the furniture and
+ * the crew; bloom lets screens, status lights and the neon sign glow. The
+ * composer takes over tone mapping, so it ends with the same filmic curve the
+ * renderer used before.
+ */
+function Effects() {
+  return (
+    <EffectComposer multisampling={4}>
+      <N8AO aoRadius={1.5} distanceFalloff={1} intensity={5} quality="medium" halfRes />
+      <Bloom mipmapBlur luminanceThreshold={0.9} luminanceSmoothing={0.25} intensity={0.6} />
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+    </EffectComposer>
+  );
+}
+
+function Scene({ effects }: { effects: boolean }) {
   const m = useSceneModel();
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
 
@@ -672,17 +745,22 @@ function Scene() {
 
   const edgeAlert = sym("gateway") || sym("app");
   const dataAlert = sym("db");
+  const hd = useDetail() === "hd";
 
   return (
     <>
       <color attach="background" args={["#1a1633"]} />
-      <hemisphereLight args={["#fff0dd", "#3b3366", 1.7]} />
+      {hd && <Reflections />}
+      {/* Reflections light the HD materials too, so the sky light is turned down to keep the same brightness. */}
+      <hemisphereLight args={["#fff0dd", "#3b3366", hd ? HD_SKY : 1.7]} />
       <directionalLight
         position={[11, 17, 7]}
         intensity={2.3}
         color="#fff1de"
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        // HD gets a sharper map with softened edges.
+        shadow-mapSize={hd ? [4096, 4096] : [2048, 2048]}
+        shadow-radius={hd ? 3 : 1}
         shadow-bias={-0.0005}
         shadow-camera-left={-30}
         shadow-camera-right={30}
@@ -695,6 +773,7 @@ function Scene() {
       <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
       <Room />
+      <Exterior linear={effects} />
       <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
 
       {/* Network edge */}
@@ -754,6 +833,7 @@ function Scene() {
       <LabelProjector footprints={m.footprints} />
 
       <CameraRig footprints={m.footprints} built={m.built} />
+      {effects && <Effects />}
     </>
   );
 }
@@ -833,8 +913,11 @@ function SoftwareFrames() {
 
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
+  const [renderer, setRenderer] = useState<Renderer>("unknown");
   /** Drawing in software, without a GPU: no shadows, half the pixels, 20 frames a second. */
-  const [soft, setSoft] = useState(false);
+  const soft = renderer === "software";
+  const [override] = useState(() => detailOverride(window.location.search));
+  const detail = chooseDetail(renderer, override);
   return (
     <div className="stage-canvas" ref={container}>
       <Canvas
@@ -842,22 +925,29 @@ export default function Facility() {
         shadows={soft ? false : "percentage"}
         dpr={soft ? 0.5 : [1, 1.75]}
         frameloop={soft ? "demand" : "always"}
+        // How strongly the HD environment lights materials; without one it has no effect.
+        scene={{ environmentIntensity: HD_REFLECTIONS }}
         onCreated={({ gl }) => {
           // Without a graphics card the browser draws on the CPU. Keep it playable: no shadows, half the pixels
           // (labels and the interface are HTML and stay sharp) and 20 frames a second. A GPU keeps full quality.
-          if (isSoftwareRenderer(gl)) {
-            // Before the first frame, so no material is ever compiled with shadows.
-            gl.shadowMap.enabled = false;
-            setSoft(true);
-          }
+          // A GPU also gets HD detail: photo textures, physically based shading and reflections.
+          const software = isSoftwareRenderer(gl);
+          // Before the first frame, so no material is ever compiled with shadows.
+          if (software) gl.shadowMap.enabled = false;
+          setRenderer(software ? "software" : "gpu");
         }}
-        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 200 }}
+        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 640 }}
         onPointerMissed={() => {
           if (useGame.getState().game.phase !== "incident") useGame.getState().select(null);
         }}
         aria-label="Isometric view of the server room. Each equipment label is a button."
       >
-        <Scene />
+        {/* The room waits until the renderer is known, so a GPU never compiles the basic materials only to replace them. */}
+        {renderer !== "unknown" && (
+          <DetailContext.Provider value={detail}>
+            <Scene effects={detail === "hd" && !soft} />
+          </DetailContext.Provider>
+        )}
         {soft && <SoftwareFrames />}
       </Canvas>
       <Labels />

@@ -1,0 +1,348 @@
+"use client";
+
+import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
+import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { ALL_SPECIES, motionFor, SPECIES, type Activity, type Species } from "./cast";
+import { useDetail, type Detail } from "./detail";
+import { loadGltf } from "./gltf";
+import { poseAt, type Plan } from "./routes";
+
+/*
+ * The office crew: animated monsters (see cast.ts). Every creature is a copy of
+ * its species' rigged model with its own animation mixer, so the walk cycles
+ * and idles are the artist's own. A creature costs one draw call per material,
+ * about five, and its skeleton is animated on the CPU.
+ *
+ * Creatures face -z in their own frame, like the rest of the room's people
+ * used to. The models face +z, so each is turned round once.
+ */
+
+const CREATURES = "/models/creatures/";
+const url = (s: Species) => `${CREATURES}${SPECIES[s].file}.glb`;
+
+type Crew = Map<Species, GLTF>;
+let crew: Promise<Crew> | null = null;
+
+/** Fetch every species once. A failure is reported once and forgotten, so a later mount tries again. */
+function loadCrew(): Promise<Crew> {
+  if (crew) return crew;
+  const attempt = Promise.all(ALL_SPECIES.map((s) => loadGltf(url(s)))).then((list) => new Map(ALL_SPECIES.map((s, i) => [s, list[i]])));
+  crew = attempt;
+  attempt.catch((error: unknown) => {
+    if (crew === attempt) crew = null;
+    console.warn("Creature models failed to load; the office carries on without its crew.", error);
+  });
+  return attempt;
+}
+
+/** Start fetching the crew as soon as the 3D scene's code loads. */
+export function preloadCreatures(): void {
+  loadCrew().catch(() => {});
+}
+
+function useCrew(): Crew | null {
+  const [loaded, setLoaded] = useState<Crew | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadCrew().then(
+      (c) => {
+        if (live) setLoaded(c);
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  return loaded;
+}
+
+/**
+ * Creature materials: the pack's flat colours. Basic detail makes them matte
+ * Lambert like the rest of the pixel look; HD keeps them physically based, with
+ * a soft sheen. Materials are shared between creatures of a species.
+ */
+const materials = new Map<string, THREE.Material>();
+function creatureMaterial(source: THREE.Material, detail: Detail): THREE.Material {
+  const s = source as THREE.MeshStandardMaterial;
+  const key = `${detail}|${s.uuid}`;
+  let m = materials.get(key);
+  if (!m) {
+    m =
+      detail === "hd"
+        ? new THREE.MeshStandardMaterial({ color: s.color, map: s.map, roughness: 0.55, metalness: 0 })
+        : new THREE.MeshLambertMaterial({ color: s.color, map: s.map });
+    m.name = s.name;
+    materials.set(key, m);
+  }
+  return m;
+}
+
+/** Height of a chair seat; seated creatures perch here. */
+const SEAT = 0.5;
+/** How high a flyer hovers. */
+const HOVER = 0.95;
+/** How far in front of a seat its desk's near edge is (a chair 0.72 m behind the middle of a 0.78 m desk). A creature standing at the desk keeps its front behind it. */
+const DESK_EDGE = 0.33;
+/** Room left between a standing creature and its desk. */
+const DESK_GAP = 0.05;
+/** How far behind a seat's centre a chair's backrest begins. A perched creature's back must stay in front of it. */
+const BACKREST = 0.1;
+/** How long a change of animation blends, in seconds. */
+const BLEND = 0.35;
+/** Seconds a creature on a beat takes to ease into its clip and back to idling. */
+const BEAT_EASE = 0.15;
+/** How much larger than life a held paddle is: the monsters' fists are huge and would hide a real one. */
+const PADDLE_SIZE = 1.8;
+/** Bone names as three.js keeps them: it drops the dots from the file's names. */
+const bone = (name: string) => THREE.PropertyBinding.sanitizeNodeName(name);
+
+/** A clip driven by the clock instead of looping freely: one play every `period` seconds, starting at time `at`. */
+export interface Beat {
+  period: number;
+  at: number;
+}
+
+export interface CreatureProps {
+  species: Species;
+  activity: Activity;
+  pose?: "sit" | "stand";
+  position: [number, number, number];
+  rotation?: number;
+  /** Offsets the animation so neighbours do not move in step. */
+  phase?: number;
+  /** Seat height for seated creatures. */
+  seat?: number;
+  /** Speed in metres a second, for walkers: the walk cycle keeps pace so feet do not slide. */
+  pace?: number;
+  /** Something held in the right hand. */
+  holding?: "paddle";
+  /** Keep the clip in time with something else, such as a ball in play. */
+  beat?: Beat;
+}
+
+export function Creature(props: CreatureProps) {
+  const loaded = useCrew();
+  const gltf = loaded?.get(props.species);
+  return gltf ? <CreatureModel {...props} gltf={gltf} /> : null;
+}
+
+/** Metres a walking creature of each kind covers per second at normal playback. */
+const STRIDE = { blob: 0.55, big: 0.9, flyer: 1.2 } as const;
+
+/** A table-tennis paddle in metres, its handle running up +y from the grip. */
+function paddle(detail: Detail): THREE.Group {
+  const mat = (color: string, roughness: number) =>
+    detail === "hd" ? new THREE.MeshStandardMaterial({ color, roughness }) : new THREE.MeshLambertMaterial({ color });
+  const g = new THREE.Group();
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.1, 0.02), mat("#b07a4a", 0.6));
+  handle.position.y = 0.04;
+  const face = (color: string, z: number) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.008, 20), mat(color, 0.7));
+    m.rotation.x = Math.PI / 2;
+    m.position.set(0, 0.15, z);
+    return m;
+  };
+  g.add(handle, face("#d8283b", 0.005), face("#15151a", -0.004));
+  g.traverse((o) => (o.castShadow = true));
+  return g;
+}
+
+function CreatureModel({ gltf, species, activity, pose = "stand", position, rotation = 0, phase = 0, seat = SEAT, pace, holding, beat }: CreatureProps & { gltf: GLTF }) {
+  const detail = useDetail();
+  const info = SPECIES[species];
+  const model = useMemo(() => {
+    const object = cloneSkinned(gltf.scene);
+    object.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      // Animated skins move outside their bind-pose bounds; culling them would make limbs pop.
+      mesh.frustumCulled = false;
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map((m) => creatureMaterial(m, detail)) : creatureMaterial(mesh.material, detail);
+    });
+    // Measure the rest pose. The compressed vertices only reach their true size through the skeleton, which is not
+    // posed until the first frame, so pose it now and measure the skinned result.
+    object.updateMatrixWorld(true);
+    const box = new THREE.Box3();
+    object.traverse((o) => {
+      const mesh = o as THREE.SkinnedMesh;
+      if (!mesh.isMesh) return;
+      let local: THREE.Box3;
+      if (mesh.isSkinnedMesh) {
+        mesh.skeleton.update();
+        mesh.computeBoundingBox();
+        local = mesh.boundingBox!;
+      } else {
+        mesh.geometry.computeBoundingBox();
+        local = mesh.geometry.boundingBox!;
+      }
+      box.union(local.clone().applyMatrix4(mesh.matrixWorld));
+    });
+    const scale = info.height / Math.max(1e-6, box.max.y - box.min.y);
+    // A paddle goes in the right hand, where the fingers start. The rig is scaled up a hundredfold and then fitted,
+    // so the paddle is scaled back down to a size measured in metres.
+    const forearm = holding ? object.getObjectByName(bone("LowerArm.R")) : undefined;
+    const grip = forearm ? paddle(detail) : undefined;
+    if (forearm && grip) {
+      const ws = forearm.getWorldScale(new THREE.Vector3());
+      grip.scale.setScalar(PADDLE_SIZE / (ws.x * scale));
+      grip.position.y = object.getObjectByName(bone("Middle1.R"))?.position.y ?? 0;
+      forearm.add(grip);
+    }
+    // The model faces +z, so its back is at the box's -z side and its front at the +z side; once turned round they are
+    // how far it reaches behind and ahead.
+    return { object, scale, foot: -box.min.y * scale, back: -box.min.z * scale, front: box.max.z * scale, mixer: new THREE.AnimationMixer(object), grip };
+  }, [gltf, detail, info.height, holding]);
+
+  const current = useRef<THREE.AnimationAction | null>(null);
+  const motion = motionFor(info.kind, activity);
+  useEffect(() => {
+    const clip = THREE.AnimationClip.findByName(gltf.animations, `CharacterArmature|${motion.clip}`) ?? gltf.animations[0];
+    if (!clip) return;
+    const action = model.mixer.clipAction(clip);
+    const walkSpeed = pace && activity === "walk" ? pace / STRIDE[info.kind] : 1;
+    // A clip on a beat is positioned by the clock every frame, so it must not also advance by itself.
+    action.timeScale = beat ? 0 : motion.speed * walkSpeed;
+    if (current.current !== action) {
+      action.reset();
+      action.time = (phase * 0.37) % clip.duration;
+      action.play();
+      if (current.current) current.current.crossFadeTo(action, BLEND, false);
+      current.current = action;
+    }
+  }, [model, gltf, motion.clip, motion.speed, pace, activity, info.kind, phase, beat]);
+
+  // Between beats the creature idles, so it does not freeze in the clip's last pose.
+  const rest = useRef<THREE.AnimationAction | null>(null);
+  useEffect(() => {
+    if (!beat) return;
+    const clip = THREE.AnimationClip.findByName(gltf.animations, `CharacterArmature|${motionFor(info.kind, "idle").clip}`);
+    if (!clip) return;
+    const action = model.mixer.clipAction(clip);
+    action.play();
+    rest.current = action;
+    return () => {
+      action.stop();
+      rest.current = null;
+    };
+  }, [model, gltf, info.kind, beat]);
+
+  useEffect(
+    () => () => {
+      model.mixer.stopAllAction();
+      model.mixer.uncacheRoot(model.object);
+      current.current = null;
+      // The paddle is this creature's own; the species' meshes and materials are shared and stay.
+      model.grip?.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+      });
+    },
+    [model],
+  );
+
+  useFrame(({ clock }, dt) => {
+    const action = current.current;
+    if (beat && action) {
+      // Play the clip once per beat, easing in from the idle and back out to it.
+      const duration = action.getClip().duration;
+      const since = (((clock.elapsedTime - beat.at) % beat.period) + beat.period) % beat.period;
+      action.time = Math.min(since, duration - 0.001);
+      const w = rest.current ? smooth(since < duration ? Math.min(1, since / BEAT_EASE, (duration - since) / BEAT_EASE) : 0) : 1;
+      action.setEffectiveWeight(w);
+      rest.current?.setEffectiveWeight(1 - w);
+      model.mixer.update(Math.min(dt, 0.1));
+    } else {
+      model.mixer.update(Math.min(dt, 0.1));
+    }
+  });
+
+  // Small creatures perch on the seat, moved forward until their backs clear the backrest; round ones move further.
+  // Big ones are too tall for a chair and their desks have none (see standsAtDesk), so they stand where it would be,
+  // stepping back until their front clears the desk.
+  const sit = pose === "sit" && info.kind === "blob";
+  const stand = pose === "sit" && info.kind === "big";
+  const offset = sit ? -Math.max(0, model.back - BACKREST) : stand ? Math.max(0, model.front + DESK_GAP - DESK_EDGE) : 0;
+  const y = info.kind === "flyer" ? HOVER : sit ? seat : 0;
+  return (
+    <group position={position} rotation={[0, rotation, 0]}>
+      <primitive object={model.object} scale={model.scale} position={[0, y + model.foot, offset]} rotation={[0, Math.PI, 0]} />
+    </group>
+  );
+}
+
+/** Seconds a walker spends turning round at each end of its path. */
+const TURN = 0.8;
+
+/** Ease in and out over 0..1. */
+const smooth = (t: number) => t * t * (3 - 2 * t);
+
+/** A creature pacing back and forth between two points, turning round on the spot at each end. */
+export function Walker({ from, to, speed, species, phase = 0 }: { from: [number, number]; to: [number, number]; speed: number; species: Species; phase?: number }) {
+  const g = useRef<THREE.Group>(null);
+  const dx = to[0] - from[0];
+  const dz = to[1] - from[1];
+  const len = Math.hypot(dx, dz);
+  useFrame(({ clock }) => {
+    if (!g.current) return;
+    const walk = len / speed;
+    const t = (clock.elapsedTime + phase) % (2 * walk + 2 * TURN);
+    const out = Math.atan2(-dx, -dz);
+    let f: number;
+    let yaw: number;
+    if (t < walk) {
+      f = t / walk;
+      yaw = out;
+    } else if (t < walk + TURN) {
+      f = 1;
+      yaw = out + Math.PI * smooth((t - walk) / TURN);
+    } else if (t < 2 * walk + TURN) {
+      f = 1 - (t - walk - TURN) / walk;
+      yaw = out + Math.PI;
+    } else {
+      f = 0;
+      yaw = out + Math.PI + Math.PI * smooth((t - 2 * walk - TURN) / TURN);
+    }
+    g.current.position.set(from[0] + dx * f, 0, from[1] + dz * f);
+    g.current.rotation.y = yaw;
+  });
+  return (
+    <group ref={g}>
+      <Creature species={species} activity="walk" position={[0, 0, 0]} phase={phase} pace={speed} />
+    </group>
+  );
+}
+
+/**
+ * A creature on a wandering loop (see routes.ts): walking the corridors,
+ * turning at corners and pausing at whatever it visits. Its place comes from
+ * the clock alone, so a remount carries on where it was.
+ */
+export function Wanderer({ plan, species, offset = 0 }: { plan: Plan; species: Species; offset?: number }) {
+  const g = useRef<THREE.Group>(null);
+  const [activity, setActivity] = useState<Activity>(() => poseAt(plan, offset).activity);
+  const shown = useRef(activity);
+  useFrame(({ clock }) => {
+    const pose = poseAt(plan, clock.elapsedTime + offset);
+    if (g.current) {
+      g.current.position.set(pose.x, 0, pose.z);
+      g.current.rotation.y = pose.yaw;
+    }
+    // Only a change of what it is doing needs React; moving does not.
+    if (pose.activity !== shown.current) {
+      shown.current = pose.activity;
+      setActivity(pose.activity);
+    }
+  });
+  return (
+    <group ref={g}>
+      <Creature species={species} activity={activity} position={[0, 0, 0]} phase={offset} pace={plan.speed} />
+    </group>
+  );
+}

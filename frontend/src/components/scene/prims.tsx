@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { useDetail, type Detail } from "./detail";
 
 /*
  * Static furniture is described as data, a list of boxes, cylinders, balls and
@@ -52,16 +53,26 @@ const GEOMETRY: Record<Shape, THREE.BufferGeometry> = {
   cone: new THREE.ConeGeometry(0.5, 1, 6),
 };
 
-// Matte Lambert shading: it suits the flat toy look and costs far less per pixel than physically based shading.
-const MATERIAL: Record<Shape, THREE.Material> = {
-  box: new THREE.MeshLambertMaterial(),
-  cyl: new THREE.MeshLambertMaterial(),
-  ball: new THREE.MeshLambertMaterial(),
-  cone: new THREE.MeshLambertMaterial({ flatShading: true }),
+// Basic detail uses matte Lambert shading: it suits the flat toy look and costs far less per pixel than
+// physically based shading. HD uses satin physically based materials that pick up the room's reflections.
+const MATERIAL: Record<Detail, Record<Shape, THREE.Material>> = {
+  basic: {
+    box: new THREE.MeshLambertMaterial(),
+    cyl: new THREE.MeshLambertMaterial(),
+    ball: new THREE.MeshLambertMaterial(),
+    cone: new THREE.MeshLambertMaterial({ flatShading: true }),
+  },
+  hd: {
+    box: new THREE.MeshStandardMaterial({ roughness: 0.7 }),
+    cyl: new THREE.MeshStandardMaterial({ roughness: 0.55 }),
+    ball: new THREE.MeshStandardMaterial({ roughness: 0.8 }),
+    cone: new THREE.MeshStandardMaterial({ roughness: 0.8, flatShading: true }),
+  },
 };
 
 function Instances({ shape, items, shadows }: { shape: Shape; items: Prim[]; shadows: boolean }) {
   const ref = useRef<THREE.InstancedMesh>(null);
+  const material = MATERIAL[useDetail()][shape];
   useLayoutEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;
@@ -80,7 +91,8 @@ function Instances({ shape, items, shadows }: { shape: Shape; items: Prim[]; sha
     mesh.computeBoundingSphere();
   }, [items]);
   if (items.length === 0) return null;
-  return <instancedMesh key={items.length} ref={ref} args={[GEOMETRY[shape], MATERIAL[shape], items.length]} castShadow={shadows} receiveShadow />;
+  // The material is a prop rather than a constructor argument, so changing detail swaps it without rebuilding the instances.
+  return <instancedMesh key={items.length} ref={ref} args={[GEOMETRY[shape], undefined, items.length]} material={material} castShadow={shadows} receiveShadow />;
 }
 
 /** Draw many static prims: one instanced mesh per shape. */

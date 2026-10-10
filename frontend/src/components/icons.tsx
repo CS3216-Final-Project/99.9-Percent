@@ -58,6 +58,8 @@ import { Trophy } from "pixelarticons/react/Trophy.js";
 import { Undo } from "pixelarticons/react/Undo.js";
 import { UserPlus } from "pixelarticons/react/UserPlus.js";
 import { Users } from "pixelarticons/react/Users.js";
+import { Volume3 } from "pixelarticons/react/Volume3.js";
+import { VolumeX } from "pixelarticons/react/VolumeX.js";
 import { WarningDiamond } from "pixelarticons/react/WarningDiamond.js";
 import { Zap } from "pixelarticons/react/Zap.js";
 
@@ -119,6 +121,8 @@ const ICONS = {
   check: Check,
   close: Close,
   menu: Menu,
+  music: Volume3,
+  muted: VolumeX,
   search: Search,
   bulb: Lightbulb,
   wrench: Tools,

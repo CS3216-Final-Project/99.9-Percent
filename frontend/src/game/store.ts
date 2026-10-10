@@ -88,6 +88,8 @@ interface Store {
   /** Begin the walkthrough, restarting the intro run first if this one is already under way. */
   startTutorialRun: () => void;
   rate: (rating: number) => void;
+  /** Turn the background music on or off, remembered for next time. */
+  toggleMusic: () => void;
   notify: (text: string, kind?: Toast["kind"]) => void;
   dismissToast: () => void;
 }
@@ -340,6 +342,12 @@ export const useGame = create<Store>()((set, get) => {
     startTutorialRun: () => {
       if (!isFreshRun(get().game)) get().newRun({ seed: BALANCE.introSeed });
       get().startTour("basics");
+    },
+
+    toggleMusic: () => {
+      const meta = { ...get().meta, music: !get().meta.music };
+      saveMeta(meta);
+      set({ meta });
     },
 
     rate: (rating) => {

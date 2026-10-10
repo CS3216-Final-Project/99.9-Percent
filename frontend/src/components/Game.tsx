@@ -1,9 +1,10 @@
 "use client";
 
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
 import { BALANCE, completedTechIds, currentWarnings, metrics, TECH_ORDER, type GameState } from "@/sim";
 import { nextMove } from "@/game/advisor";
 import { clock, compact, money, moneyFull, num, signedMoney, uptimePct } from "@/game/format";
+import { createMusic, type Music } from "@/game/music";
 import { useGame, type Speed, type View } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Modals";
@@ -52,6 +53,8 @@ function Stat({ icon, kind, label, tip, children, side }: { icon: IconName; kind
 function TopBar() {
   const game = useGame((s) => s.game);
   const openView = useGame((s) => s.openView);
+  const music = useGame((s) => s.meta.music);
+  const toggleMusic = useGame((s) => s.toggleMusic);
   const m = metrics(game);
   const health = healthOf(game);
   const inc = game.phase === "incident" ? game.incident : null;
@@ -111,6 +114,9 @@ function TopBar() {
         </Stat>
       </div>
 
+      <button type="button" className="icon-btn music-btn" onClick={toggleMusic} aria-label="Music" aria-pressed={music} title={music ? "Turn the music off" : "Turn the music on"}>
+        <Icon name={music ? "music" : "muted"} />
+      </button>
       <button type="button" className="icon-btn menu-btn" onClick={() => openView("menu")} aria-label="Menu" title="Menu">
         <Icon name="menu" />
       </button>
@@ -329,6 +335,24 @@ function ToastHost() {
 /* Shell                                                               */
 /* ------------------------------------------------------------------ */
 
+/** Background music once a run is on screen: calm while building, tense during an incident. */
+function useMusic(): void {
+  const on = useGame((s) => s.meta.music);
+  const started = useGame((s) => s.started);
+  const incident = useGame((s) => s.game.phase === "incident");
+  const music = useRef<Music | null>(null);
+  useEffect(() => {
+    const m = createMusic(() => useGame.getState().meta.music);
+    music.current = m;
+    return () => {
+      m.dispose();
+      music.current = null;
+    };
+  }, []);
+  useEffect(() => music.current?.setEnabled(on && started), [on, started]);
+  useEffect(() => music.current?.setMood(incident ? "tense" : "calm"), [incident]);
+}
+
 export default function Game() {
   const ready = useGame((s) => s.ready);
   const started = useGame((s) => s.started);
@@ -339,6 +363,7 @@ export default function Game() {
   const view = useGame((s) => s.view);
   const onboarding = useGame((s) => s.onboarding);
   const touring = useGame((s) => s.tour?.track ?? null);
+  useMusic();
 
   useEffect(() => {
     useGame.getState().boot();
