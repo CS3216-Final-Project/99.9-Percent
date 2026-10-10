@@ -178,4 +178,11 @@ describe("sound settings", () => {
     localStorage.setItem("nn.music.v1", "true");
     expect(legacyMusicOff()).toBe(false);
   });
+
+  it("never let the pre-update switch override settings chosen since", () => {
+    localStorage.setItem("nn.meta.v1", JSON.stringify({ tutorialDone: true, music: false }));
+    // Music at zero mirrors the old switch as off, but that is the player's new choice, not the old one.
+    saveAudio({ music: 0, effects: 80, muted: false });
+    expect(legacyMusicOff()).toBe(false);
+  });
 });

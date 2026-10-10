@@ -197,6 +197,15 @@ describe("old saves and imports across modes", () => {
     useGame.getState().switchMode("classic"); expect(useGame.getState().game).toEqual(classic);
     for (const [key, value] of Object.entries(originals)) expect(localStorage.getItem(key)).toBe(value);
   });
+  it("keeps sound settings chosen since the update when resuming the pre-update save", () => {
+    const game = JSON.parse(JSON.stringify(advanceTurn(newLegacyGame(777)))) as ReturnType<typeof newGame>;
+    localStorage.setItem("nn.save.v1", JSON.stringify({ game, savedAt: 1 }));
+    localStorage.setItem("nn.meta.v1", JSON.stringify({ tutorialDone: true, music: false }));
+    useGame.getState().boot();
+    useGame.getState().setAudio({ music: 0, muted: false });
+    expect(useGame.getState().resumeLegacySave()).toBe(true);
+    expect(useGame.getState().audio).toEqual({ music: 0, effects: 80, muted: false });
+  });
   it("leaves a malformed legacy save available for export without replacing either run", () => {
     localStorage.setItem("nn.save.v1", "{"); useGame.getState().boot();
     const before = useGame.getState().game, stored = localStorage.getItem("nn.campaign.save.v1");

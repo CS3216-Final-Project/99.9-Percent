@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { advanceTurn, applyAction, incidentTick, newGame, newLegacyGame, type Action, type ActionAttempt, type GameState } from "../sim";
 import { advanceSteps, applyCampaignInput } from "../sim/step";
 import { dataCompany } from "../sim/__tests__/dataFixture";
@@ -221,7 +221,10 @@ describe("watching the store", () => {
     heard.length = 0;
     stop = watchCues(useGame.subscribe, (cue) => heard.push(cue));
   });
-  afterEach(() => stop());
+  afterEach(() => {
+    stop();
+    vi.restoreAllMocks();
+  });
 
   it("stays quiet through boot, loading, importing, new runs and mode switches", async () => {
     // A saved campaign that is mid-incident, a classic run mid-incident and a pre-update save with music off.
@@ -276,6 +279,23 @@ describe("watching the store", () => {
     expect(s().act({ type: "add_server" })).toBe(true);
     await settle();
     expect(heard).toEqual(["alarm", "buzz", "clunk"]);
+  });
+
+  it("buzzes once for a save that keeps failing, not on every step", async () => {
+    const s = () => useGame.getState();
+    s().boot();
+    s().play();
+    await settle();
+    s().onboardingMove("skip");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
+    s().setRunning(true);
+    for (let i = 0; i < 3; i++) {
+      s().tick(1);
+      await settle();
+    }
+    expect(s().game.campaign!.step).toBe(3);
+    expect(s().toast?.kind).toBe("error");
+    expect(heard).toEqual(["buzz"]);
   });
 
   it("plays the classic decisions and the slider sample, and stops when asked", async () => {

@@ -70,7 +70,8 @@ export function cuesBetween(prev: CueState, next: CueState): Cue[] {
     const cue = decided.ok ? ACTION_CUE[decided.type] : "buzz";
     if (cue) cues.push(cue);
   }
-  if (next.toast && next.toast !== prev.toast && next.toast.kind === "error") cues.push("buzz");
+  // A problem that repeats, like a save failing on every step, buzzes once while its notice stays up.
+  if (next.toast && next.toast !== prev.toast && next.toast.kind === "error" && next.toast.text !== prev.toast?.text) cues.push("buzz");
   if (next.game !== prev.game) cues.push(...(next.game.campaign ? campaignCues(prev.game, next.game) : classicCues(prev.game, next.game)));
   return cues;
 }

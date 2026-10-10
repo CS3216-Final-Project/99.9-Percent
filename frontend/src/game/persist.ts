@@ -248,9 +248,9 @@ function musicWasOn(metaKey: string): boolean {
   return parseMeta(read(metaKey))?.music !== false;
 }
 
-/** True when the pre-update profile had music off and nothing since has turned it back on. */
+/** True when the pre-update profile had music off and the player has not chosen sound settings since. */
 export function legacyMusicOff(): boolean {
-  return !musicWasOn(LEGACY_META_KEY);
+  return read(AUDIO_KEY) === null && !musicWasOn(LEGACY_META_KEY);
 }
 
 const percent = (value: unknown, fallback: number): number =>
