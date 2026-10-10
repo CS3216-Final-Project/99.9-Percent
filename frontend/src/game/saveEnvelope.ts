@@ -2,8 +2,9 @@ import type { GameState } from "@/sim";
 import { replayCampaign } from "@/sim";
 import type { CampaignInput } from "@/sim/campaignTypes";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
+import { emptyMeasurement, measurementValid, type Measurement } from "./telemetry";
 export const CAMPAIGN_SAVE_KEY = "nn.campaign.save.v1";
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 /**
  * A save holds the run's identity and the player's inputs, not the state they
  * produced. Loading replays the inputs on the deterministic engine, so a save
@@ -20,6 +21,7 @@ export interface SaveEnvelope {
     inputs: CampaignInput[];
     runtime: {
         remainderMs: number;
+        measurement: Measurement;
     };
     savedAt: number;
 }
@@ -37,14 +39,21 @@ export function validateEnvelope(value: unknown): Validation {
     if (!value || typeof value !== "object")
         return { status: "corrupt" };
     const e = value as SaveEnvelope;
-    if (e.schemaVersion !== SCHEMA_VERSION || e.scenarioId !== Q.id || e.scenarioVersion !== Q.version)
+    const legacy = (e as {schemaVersion: number}).schemaVersion === 1;
+    if ((!legacy && e.schemaVersion !== SCHEMA_VERSION) || e.scenarioId !== Q.id || e.scenarioVersion !== Q.version)
         return { status: "unsupported" };
     if (typeof e.runId !== "string" || !e.runId || !Number.isSafeInteger(e.seed) || (e.seed | 0) !== e.seed || !integer(e.step) ||
         !Array.isArray(e.inputs) || !e.inputs.every(isInput) ||
         !e.runtime || !integer(e.runtime.remainderMs) || e.runtime.remainderMs >= 1000 || !Number.isFinite(e.savedAt))
         return { status: "corrupt" };
     try {
-        return { status: "ok", envelope: e, game: replayCampaign(e.seed, e.runId, e.inputs, e.step) };
+        const game = replayCampaign(e.seed, e.runId, e.inputs, e.step, legacy);
+        const measurement: Measurement = legacy
+            ? {...emptyMeasurement(), origin:"phase1", runStarted:true, cursor:game.campaign!.trace.length}
+            : e.runtime.measurement;
+        if(!measurementValid(measurement) || measurement.cursor > game.campaign!.trace.length ||
+            measurement.pending.some(event => event.runId !== e.runId)) return {status:"corrupt"};
+        return { status: "ok", envelope: makeEnvelope(game, e.runtime.remainderMs, e.savedAt, measurement), game };
     }
     catch {
         return { status: "corrupt" };
@@ -61,9 +70,9 @@ export function decodeSave(raw: string): Validation {
     }
     return validateEnvelope(value);
 }
-export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.now()): SaveEnvelope {
+export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.now(), measurement: Measurement = emptyMeasurement()): SaveEnvelope {
     const c = game.campaign!;
-    return { schemaVersion: SCHEMA_VERSION, scenarioId: c.scenarioId, scenarioVersion: c.scenarioVersion, runId: c.runId, seed: game.seed, step: c.step, inputs: c.inputs, runtime: { remainderMs }, savedAt };
+    return { schemaVersion: SCHEMA_VERSION, scenarioId: c.scenarioId, scenarioVersion: c.scenarioVersion, runId: c.runId, seed: game.seed, step: c.step, inputs: c.inputs, runtime: { remainderMs, measurement }, savedAt };
 }
 /** Never replace an existing save unless its payload can actually be replayed. */
 export function replaceable(raw: string | null): boolean {

@@ -28,16 +28,16 @@ describe("causal evidence", () => {
 });
 
 
-it("does not credit a late database upgrade when the limit already cleared the backlog", () => {
+it.each([10, 11])("does not credit a database upgrade requested at step %i after limiting already drained the backlog", requestedStep => {
   const act = (s: ReturnType<typeof newGame>, action: Parameters<typeof applyAction>[1]) => {
     const r = applyAction(s, action); if (!r.ok) throw Error(r.message); return r.state;
   };
   let limited = act(advanceSteps(newGame(1, "late-upgrade"), 6).state, { type: "set_traffic_limit", enabled: true });
-  limited = advanceSteps(limited, 5).state;
-  expect(limited.campaign!.incident!.stableSteps).toBe(2);
+  limited = advanceSteps(limited, requestedStep - 6).state;
+  expect(limited.campaign!.incident!.stableSteps).toBe(requestedStep - 9);
   let upgraded = act(limited, { type: "start_db_upgrade" });
-  upgraded = advanceSteps(upgraded, 3).state;
-  const baseline = advanceSteps(limited, 3).state;
+  upgraded = advanceSteps(upgraded, 14 - requestedStep).state;
+  const baseline = advanceSteps(limited, 14 - requestedStep).state;
   expect(upgraded.phase).toBe("review"); expect(baseline.phase).toBe("review");
   expect(upgraded.campaign!.step).toBe(baseline.campaign!.step);
   const report = upgraded.campaign!.reports[0];

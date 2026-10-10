@@ -4,24 +4,25 @@ import { advanceSteps } from "../src/sim/step";
 
 for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
   test(`opening acceptance: ${path}`, async ({ page }) => {
-    await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
     await expectRoom(page);
     for (let i = 0; i < 6; i++)await page.getByRole("button", { name: "Advance step", exact: true }).click();
     if (path === "upgrade") {
       await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
       const panel = page.getByRole("complementary", { name: "System metrics" });
       // The compact overview must leave every response visible before expanding evidence.
-      const responsesFit = await panel.locator(".actions").evaluate(el => {
+      const responsesFit = () => panel.locator(".actions").evaluate(el => {
         const panelBox = el.closest("aside")!.getBoundingClientRect();
         return [...el.querySelectorAll("button")].every(button => {
           const box = button.getBoundingClientRect();
-          return box.top >= panelBox.top && box.bottom <= panelBox.bottom;
+          return box.top >= panelBox.top + 3 && box.bottom <= panelBox.bottom - 3;
         });
       });
-      expect(responsesFit).toBe(true);
+      expect(await responsesFit()).toBe(true);
       await page.getByRole("main").getByRole("button", { name: "Database", exact: true }).click();
       await expect(panel.getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");
       await expect(panel.getByRole("status")).toContainText("Demand 800/s · capacity 600/s · backlog 600");
+      expect(await responsesFit()).toBe(true);
       await panel.locator("summary").filter({ hasText: "Full system evidence" }).click();
       await expect(panel.getByRole("table")).toContainText("133.33%");
       await expect(panel.getByText("Installed server capacity", { exact: true })).toBeVisible();
@@ -51,6 +52,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     await expect(report).toBeVisible({ timeout: 25000 });
     if (path === "app-then-upgrade") await expect(report).toContainText("did not relieve");
     await report.getByRole("button", { name: "Continue company" }).click();
+    await page.getByRole("button",{name:"Continue operating"}).click();
     const after = await savedGame(page);
     expect(after.campaign!.runId).toBe(opening.runId); expect(after.phase).toBe("management");
     if (path === "limit") expect(after.campaign!.limit).toBe(500);
@@ -60,7 +62,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
 }
 test("preserves a corrupt campaign save until explicit reset", async ({ page }) => {
   await page.addInitScript(() => { localStorage.setItem("nn.campaign.save.v1", "{"); });
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await page.getByRole("button", { name: "Advance step" }).click();
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBe("{");
   await page.getByRole("button", { name: "Menu", exact: true }).click();
@@ -79,7 +81,7 @@ test("resumes an incident paused", async ({ page }) => {
 });
 test("keeps the room playable without downloaded furniture", async ({ page }) => {
   await page.route("**/models/**", route => route.abort());
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await expectRoom(page); await page.getByRole("button", { name: "Advance step" }).click();
   expect((await savedGame(page)).campaign!.step).toBe(1);
 });

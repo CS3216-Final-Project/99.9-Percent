@@ -3769,3 +3769,7 @@ button:disabled {
 .campaign-table caption { text-align: left; padding: 8px 0; color: var(--text-soft); }
 .campaign-table th, .campaign-table td { padding: 6px; text-align: left; border-bottom: 1px solid var(--paper-3); }
 .campaign-details { overflow-x: auto; }
+
+.campaign-panel .step-head { margin-top: 10px; }
+.request-path { margin: 0 0 4px; font-size: 12px; }
+.campaign-entry{max-height:94vh;overflow:auto;max-width:720px}.gameplay-preview{width:100%;max-height:240px;object-fit:cover;border-radius:8px}.campaign-entry h1{font-size:clamp(24px,4vw,42px)}.modal select,.modal textarea{display:block;width:100%;padding:8px;margin:8px 0}.modal :focus-visible{outline:3px solid #426788;outline-offset:2px}

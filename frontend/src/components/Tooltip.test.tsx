@@ -167,7 +167,8 @@ describe("game interface", () => {
   it("uses no native title tooltips on the title screen, in play or in an incident", () => {
     render(<App />);
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try Prototype" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
     for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
     expect(screen.getByText(/Stable steps: 0\/5/)).toBeTruthy();
@@ -176,7 +177,8 @@ describe("game interface", () => {
 
   it("explains a header metric and a locked time control in the shared bubble", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try Prototype" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
 
     over(screen.getByText("Cash"));
     settle();

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { BALANCE, releaseRisk, taskEta, testEffort, type GameState, type Release, type Task } from "@/sim";
 import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
@@ -330,9 +330,24 @@ export function Modal({
   /** The idea this dialog is about, shown beside the title. */
   icon?: { kind: ConceptKind; name: IconName };
 }) {
+  const dialog=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    const previous=document.activeElement as HTMLElement|null;
+    const node=dialog.current;
+    node?.querySelector<HTMLElement>("button, a[href], input, select, textarea, [tabindex]")?.focus();
+    return ()=>{if(previous?.isConnected)previous.focus();};
+  },[title]);
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className={`modal${wide ? " modal-wide" : ""}${tone ? ` modal-${tone}` : ""}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`modal${wide ? " modal-wide" : ""}${tone ? ` modal-${tone}` : ""}`} ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={e=>{
+        if(e.key==="Escape"){e.stopPropagation();onClose?.();}
+        if(e.key==="Tab"){
+          const nodes=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,select,textarea,[tabindex="0"]')??[]);
+          const first=nodes[0],last=nodes.at(-1);
+          if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}
+          else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}
+        }
+      }}>
         <header className="modal-head">
           <h2>
             {icon && <Concept kind={icon.kind} icon={icon.name} />}

@@ -1,7 +1,7 @@
 import { test, expect, expectRoom, savedGame } from "./fixtures";
 
 test("switches between campaign and classic from the menu, keeping each run", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await expectRoom(page);
   await page.getByRole("button", { name: "Advance step", exact: true }).click();
   const campaign = await savedGame(page);
@@ -28,7 +28,7 @@ test("switches between campaign and classic from the menu, keeping each run", as
 
 test("asks before switching away from a run that cannot be saved", async ({ page }) => {
   await page.addInitScript(() => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("nn.campaign.save.v1", "{"); } });
-  await page.goto("/"); await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await expectRoom(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
