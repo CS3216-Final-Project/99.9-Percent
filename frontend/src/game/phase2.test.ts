@@ -61,7 +61,7 @@ it.each(["healthy","review","acknowledged"] as const)("migrates Phase 1 %s witho
  const raw=v1(g);localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);localStorage.setItem("nn.save.v1","legacy");
  const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("load");
  expect(loaded.game.campaign!.snapshot).toEqual(g.campaign!.snapshot);
- expect(loaded.game.campaign!.ledger).toEqual(g.campaign!.ledger);
+ expect(loaded.game.campaign!.ledger).toEqual({...g.campaign!.ledger,checksNumerator:0,failoverNumerator:0});
  expect(loaded.game.campaign!.trace).toEqual(g.campaign!.trace);
  expect(loaded.game.campaign!.openingMilestone?.acknowledged??null).toBe(kind==="acknowledged"?true:null);
  expect(loaded.measurement).toMatchObject({origin:"phase1",openingStartedAt:null});

@@ -46,7 +46,7 @@ describe("shared campaign runtime", () => {
   it("menu pauses, history does not, and later views are inaccessible", () => {
     useGame.getState().boot(); useGame.getState().play(); useGame.getState().onboardingMove("skip"); useGame.getState().setRunning(true);
     useGame.getState().openView("history"); expect(useGame.getState().running).toBe(true);
-    useGame.getState().openView("tech"); expect(useGame.getState().view).toBe("history");
+    useGame.getState().openView("tech"); expect(useGame.getState().view).toBe("tech");expect(useGame.getState().running).toBe(false);
     useGame.getState().openView("menu"); expect(useGame.getState().running).toBe(false);
   });
 });

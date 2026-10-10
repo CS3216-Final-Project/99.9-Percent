@@ -1,4 +1,4 @@
-import { test, expect, expectRoom, savedGame } from "./fixtures";
+import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 test("inspects evidence and advances a physical step on touch", async ({ page }) => {
   await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap(); await page.getByRole("button",{name:"Skip introduction"}).tap();
   await expectRoom(page);
@@ -72,4 +72,8 @@ test("First Growth prevention checklist and review are understandable on touch",
  await review.getByRole("button",{name:"Close",exact:true}).tap();await expect(checklist).toContainText("FIRST GROWTH PREVENTED");await checklist.getByRole("button",{name:"Review outcome"}).tap();await review.getByRole("button",{name:"Continue company"}).tap();
  await page.getByRole("dialog",{name:"First growth challenge handled"}).getByRole("button",{name:"Continue operating"}).tap();expect((await savedGame(page)).campaign!.scaling?.id).toBe("application-scaling");
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+});
+
+test("touch: reliability tree ownership and real health evidence without API",async({page})=>{
+ const {preparedReliability}=await import("../src/sim/__tests__/reliabilityFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,preparedReliability());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);await page.getByRole("banner").getByRole("button",{name:"Technology tree",exact:true}).tap();const d=page.getByRole("dialog",{name:"Technology tree"});await expect(d.locator("[data-tech]")).toHaveCount(9);await d.getByRole("button",{name:"Health Checks: Owned",exact:true}).tap();await expect(d).toContainText("Deployed");await d.getByRole("button",{name:"Close",exact:true}).tap();await expect(page.getByRole("region",{name:"Stay Online"})).toContainText("healthy");
 });

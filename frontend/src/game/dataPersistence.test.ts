@@ -13,7 +13,7 @@ it("migrates schema 3 with exact source backup, no stage entry or invented obser
  expect(r.game.campaign!.dataStage).toBeNull();expect(r.game.campaign!.snapshot).toEqual(e.game.campaign.snapshot);
  expect(r.game.campaign!.trace).toEqual(e.game.campaign.trace);expect(localStorage.getItem(CAMPAIGN_SAVE_KEY+".backup.v3")).toBe(raw);
  for(const key of ["nn.save.v1","nn.meta.v1","nn.analytics.v1"])expect(localStorage.getItem(key)).toBe("legacy:"+key);
- expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(5);
+ expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(6);
 });
 it.each(["backup","replacement"])("schema 3 %s write failure leaves original bytes intact",boundary=>{
  const e=JSON.parse(JSON.stringify(makeEnvelope(newGame())));e.schemaVersion=3;delete e.game.campaign.openingPrevention;
@@ -31,7 +31,8 @@ it("schema 3 migration retains the Phase 3 reports, pending actions, cash and ba
  const requested=applyAction(g,{type:"set_traffic_limit",enabled:true});if(!requested.ok)throw Error(requested.message);g=requested.state;
  const e=JSON.parse(JSON.stringify(makeEnvelope(g)));e.schemaVersion=3;delete e.game.campaign.openingPrevention;delete e.game.campaign.dataStage;delete e.game.campaign.readCache;delete e.game.campaign.ledger.cacheNumerator;delete e.game.campaign.remainders.cache;
  const raw=JSON.stringify(e);localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("migration");
- for(const k of ["cashCents","apps","dbBacklog","pending","trace","reports","openingMilestone","scaling"])expect((loaded.game.campaign as unknown as Record<string,unknown>)[k]).toEqual(e.game.campaign[k]);
+ expect(loaded.game.campaign!.apps.map(({health:_health,detectedHealth:_detectedHealth,healthChangedStep:_healthChangedStep,detectedStep:_detectedStep,role:_role,...a})=>a)).toEqual(e.game.campaign.apps);
+ for(const k of ["cashCents","dbBacklog","pending","trace","reports","openingMilestone","scaling"])expect((loaded.game.campaign as unknown as Record<string,unknown>)[k]).toEqual(e.game.campaign[k]);
  expect(localStorage.getItem(CAMPAIGN_SAVE_KEY+".backup.v3")).toBe(raw);
 });
 it("rejects forged workload observations and cache warmth",async()=>{

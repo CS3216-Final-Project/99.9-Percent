@@ -24,7 +24,7 @@ it("surfaces stable spike count and reopenable explicit recognition without auto
  renderAct(()=>useGame.setState({game:tick(g,4)}));const dialog=screen.getByRole("dialog",{name:"Spike response handled"});fireEvent.click(within(dialog).getByRole("button",{name:"Close"}));
  expect(screen.queryByRole("dialog")).toBeNull();expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(false);
  fireEvent.click(within(requirements()).getByRole("button",{name:"Review spike recognition"}));fireEvent.click(within(screen.getByRole("dialog",{name:"Spike response handled"})).getByRole("button",{name:"Continue operating"}));
- expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(true);expect(requirements().textContent).toContain("No player action can unlock Reliability");
+ expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(true);expect(requirements().textContent).toContain("available through Continue to reliability");
 });
 it("pending recovery review remains prominent rather than inside History or collapsed details",()=>{
  const g=advanceSteps(decision(advanceSteps(newGame(),6).state,{type:"start_db_upgrade"}),30).state;show(g);

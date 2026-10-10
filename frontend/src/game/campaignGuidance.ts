@@ -1,3 +1,4 @@
+import { canEnterReliability, pendingReliability } from "@/sim/reliability";
 import type { GameState, Action } from "@/sim";
 import { canEnterData, qualifiesForRecovery } from "@/sim/step";
 import { canEnterSpikes, pendingSpikeAcknowledgement } from "@/sim/autoscaling";
@@ -11,7 +12,7 @@ export interface GuidanceAction { label: string; action?: Action }
 export function campaignGuidance(g: GameState) {
  const c=g.campaign!;
  const openingDone=!!c.openingMilestone?.acknowledged;
- const stage=c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":openingDone?"Scaling & Routing":"Opening";
+ const stage=c.reliabilityStage?"Stay Online":c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":openingDone?"Scaling & Routing":"Opening";
  const dataAvailable=!c.dataStage&&canEnterData(g),spikesAvailable=canEnterSpikes(g);
  const prevention=preventionAvailable(c);
  const pendingMilestone=!!c.openingMilestone&&!openingDone;
@@ -21,8 +22,8 @@ export function campaignGuidance(g: GameState) {
  const add=(id:string,label:string,met:boolean)=>requirements.push({id,label,met});
  let waiting:string|null=null,notice:string|null=null,optional:string|null=null;
  let pendingAction:GuidanceAction|null=null;
- const nextStage=c.spikeStage?"Stay Online":c.dataStage?"Survive Traffic Spikes":openingDone?"Data Bottlenecks":"Scale Your App";
- if(c.spikeStage) {
+ const nextStage=c.reliabilityStage?"Combined campaign":c.spikeStage?"Stay Online":c.dataStage?"Survive Traffic Spikes":openingDone?"Data Bottlenecks":"Scale Your App";
+ if(c.reliabilityStage){const d=c.reliabilityStage;add("cash","Positive company cash",c.cashCents>0);add("management","Management resumed after any report",g.phase==="management");add("incident","No active incident",!c.incident);add("queues","All retained Application and Database queues empty",queuesEmpty);add("healthy","Measured healthy latency and service errors",qualifiesForRecovery(c.snapshot));if(!d.fault)add("pending","Accepted actions finish before arming",c.pending.length===0);add("armed","Reliability test started",!!d.fault);add("observed","Application failure observed",d.fault?.startedStep!==null&&!!d.fault);add("restored","Failed application restored",d.fault?.restoredStep!==null&&!!d.fault);add("reports","Recovered reports acknowledged",reportsAcknowledged);add("observations",`Stable service: ${d.stableSteps} / 5`,d.completedStep!==null);add("recognition","Reliability outcome acknowledged",d.acknowledged);if(pendingReliability(c))pendingAction={label:"Review reliability outcome"};else if(!d.fault)pendingAction={label:"Start reliability test",action:{type:"arm_reliability"}};else waiting=d.fault.startedStep===null?"Reliability test scheduled. Resume to observe it.":d.fault.restoredStep===null?"Inspect actual health and surviving capacity. Manual restoration, routing or admission relief remain available.":"Observe stable service after restoration and acknowledge actual reports.";if(d.acknowledged){waiting=null;notice="Stay Online completed. Combined campaign content is not implemented in this build; the same company can continue operating.";}optional="Reliability purchases are optional; natural and free manual restoration remain available.";} else if(c.spikeStage) {
   const d=c.spikeStage;
   add("pulses","Both traffic pulses completed",c.step>=d.deadlines[3]);
   add("management","Operating in management, not a pending review",g.phase==="management");
@@ -33,7 +34,7 @@ export function campaignGuidance(g: GameState) {
   add("healthy","Healthy latency and service errors with completed requests",qualifiesForRecovery(c.snapshot));
   add("observations",`Stable baseline observations: ${d.baselineStableSteps} / 5`,d.completedStep!==null);
   add("recognition","Spike response acknowledged",d.acknowledged);
-  notice="Stay Online is not implemented. No player action can unlock Reliability in this build.";
+  notice=canEnterReliability(g)?"Stay Online is available through Continue to reliability.":"Stay Online requires acknowledged spike completion, stable baseline management and empty queues.";
   optional="Autoscaling is optional. Manual capacity, admission relief and hybrid responses remain valid.";
   if(c.step<d.deadlines[3])waiting="Waiting for both announced traffic pulses to end.";
   else if(d.completedStep===null&&!c.incident&&queuesEmpty&&reportsAcknowledged&&g.phase==="management"&&qualifiesForRecovery(c.snapshot))waiting="Observe new stable baseline steps with Resume company or Advance 1 step. Pausing adds no observations.";

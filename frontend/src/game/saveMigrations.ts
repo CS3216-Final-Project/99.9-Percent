@@ -1,3 +1,5 @@
+import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
+import { effectiveTargets, initializeHealth } from "@/sim/reliability";
 import { emptyMeasurement, measurementValid, type Measurement } from "./telemetry";
 import type { GameState } from "@/sim";
 import { newGame } from "@/sim";
@@ -7,7 +9,7 @@ import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { spikeInput } from "@/sim/autoscaling";
 export const CAMPAIGN_SAVE_KEY = "nn.campaign.save.v1";
 export interface SaveEnvelope {
-    schemaVersion: 5;
+    schemaVersion: 5 | 6;
     scenarioId: "opening-db";
     scenarioVersion: 1;
     runId: string;
@@ -43,6 +45,7 @@ function shape(v: unknown, t: unknown): boolean {
     return typeof v === typeof t;
 }
 function snapshotValid(m: import("@/sim/campaignTypes").Snapshot): boolean {
+    if(m?.version===6)return reliabilitySnapshotValid(m);
     if (!m || !m.app || !m.db)
         return false;
     if(m.version===3 || m.version===4 || m.version===5) {
@@ -130,7 +133,7 @@ function preventionValid(c: import("@/sim/campaignTypes").Campaign, phase: GameS
 }
 
 const integer = (n: number) => Number.isSafeInteger(n) && n >= 0;
-function validateVersion(value: unknown, version: 2 | 3 | 4 | 5): Validation {
+function validateVersion(value: unknown, version: 2 | 3 | 4 | 5 | 6): Validation {
     try {
         if (!value || typeof value !== "object")
             return { status: "corrupt" };
@@ -139,7 +142,7 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5): Validation {
             return { status: "unsupported" };
         const s = e.game, c = s.campaign!;
         const milestone=c?.openingMilestone;
-        const preventionMilestone=version===5&&milestone?.incidentId===null;
+        const preventionMilestone=version>=5&&milestone?.incidentId===null;
         if(milestone===undefined || (milestone!==null&&(milestone.id!=="opening-stability"||!integer(milestone.awardedStep)||
           milestone.awardedStep>c.step||typeof milestone.acknowledged!=="boolean"||
           (preventionMilestone?(!c.openingPrevention?.outcome?.acknowledged||milestone.outcomeId!==c.openingPrevention.outcome.id||
@@ -167,6 +170,8 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5): Validation {
             delete (old.remainders as Record<string,unknown>).lb;
             delete (old.ledger as Record<string,unknown>).lbNumerator;
         }
+        if(version<6&&(c.reliabilityStage!=null||c.apps.some(a=>a.health!==undefined||a.detectedHealth!==undefined||a.role!==undefined)))return {status:"corrupt"};
+        if(version===6&&!reliabilityValid(c))return {status:"corrupt"};
         if (!finiteTree(e) || !shape(s, template) || !c || !shape(c, template.campaign) ||
             !e.runtime || !integer(e.runtime.remainderMs) || e.runtime.remainderMs >= 1000 ||
             !Number.isFinite(e.savedAt) || typeof e.runId !== "string" || !e.runId || e.runId !== c.runId ||
@@ -179,21 +184,21 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5): Validation {
             !integer(c.overloadSteps) || c.lastSettledPeriod !== Math.floor(c.step / 60) ||
             !snapshotValid(c.snapshot) || c.snapshot.step !== c.step || !(version>=4?[600,1000,2000,3000]:version===3?[600,1000,2000]:[600,1000]).includes(c.dbCapacity) ||
             !integer(c.dbBacklog) || c.dbBacklog > 600 || ![null, 500].includes(c.limit) ||
-            c.apps.length < 1 || c.apps.length > (version===5&&c.spikeStage?4:2) ||
-            c.apps.some((a, i) => (version===5&&c.spikeStage?!/^app-[1-9][0-9]*$/.test(a.id):a.id !== `app-${i + 1}`) || (version===2?(a.capacity!==1000||a.routed!==(i===0)):(a.state!=="active"||!["base","large"].includes(a.tier)||a.capacity!==(a.tier==="base"?1000:1600)||a.routed!==c.routing.targets.includes(a.id))) || !integer(a.backlog) || a.backlog > 1000) ||
+            c.apps.length < 1 || c.apps.length > (version>=5&&c.spikeStage?4:2) ||
+            c.apps.some((a, i) => (version>=5&&c.spikeStage?!/^app-[1-9][0-9]*$/.test(a.id):a.id !== `app-${i + 1}`) || (version===2?(a.capacity!==1000||a.routed!==(i===0)):(a.state!=="active"||!["base","large"].includes(a.tier)||a.capacity!==(a.tier==="base"?1000:1600)||a.routed!==c.routing.targets.includes(a.id))) || !integer(a.backlog) || a.backlog > 1000) ||
             (s.phase !== "ended" && (s.phase === "incident") !== !!c.incident) ||
             (c.incident && (!integer(c.incident.stableSteps) || c.incident.stableSteps >= 5 || (!Array.isArray(c.incident.snapshots) || !c.incident.snapshots.every(snapshotValid)))) ||
             !Object.values(c.remainders).every(v => integer(v) && v < 60) ||
             !Object.values(c.ledger).every(integer) ||
             !Object.values(c.cumulative).every(integer) ||
             c.cumulative.admitted !== c.cumulative.successful + c.cumulative.failed + c.apps.reduce((n, a) => n + a.backlog, 0) + c.dbBacklog ||
-            !(version>=4?[300,800,1400,2400,...(version===5?[4000]:[])]:version===3?[300,800,1400]:[300,800]).includes(c.incomingRate) || c.upgraded !== (c.dbCapacity >= 1000) ||
+            !(version>=4?[300,800,1400,2400,...(version>=5?[4000]:[])]:version===3?[300,800,1400]:[300,800]).includes(c.incomingRate) || c.upgraded !== (c.dbCapacity >= 1000) ||
             c.snapshot.db.backlog !== c.dbBacklog || c.snapshot.app.backlog !== c.apps.reduce((n,a)=>n+a.backlog,0) ||
             c.snapshot.db.capacity !== c.dbCapacity || c.snapshot.installedAppCapacity !== c.apps.reduce((n,a)=>n+a.capacity,0) ||
             (c.step >= 4) !== c.consumedEvents.includes("opening-growth") ||
-            c.actions.some(a => typeof a.id !== "string" || !(version>=3?["add-app","upgrade-db","limit","unlimit","scale-up","deploy-lb","routing",...(version>=4?["cache","cache-tuning"]:[]),...(version===5?["deploy-autoscaler","retire-app"]:[])]:["add-app", "upgrade-db", "limit", "unlimit"]).includes(a.type) || !integer(a.requestedStep) || a.requestedStep > c.step || !integer(a.activationStep) || a.activationStep <= a.requestedStep || !integer(a.costCents) || (a.activatedStep !== null && (!integer(a.activatedStep) || a.activatedStep !== a.activationStep || a.activatedStep > c.step))) ||
+            c.actions.some(a => typeof a.id !== "string" || !(version>=3?["add-app","upgrade-db","limit","unlimit","scale-up","deploy-lb","routing",...(version>=4?["cache","cache-tuning"]:[]),...(version>=5?["deploy-autoscaler","retire-app"]:[]),...(version===6?["health-checks","create-spare","reserve-spare","release-spare","failover","promote-spare","restore-app"]:[])]:["add-app", "upgrade-db", "limit", "unlimit"]).includes(a.type) || !integer(a.requestedStep) || a.requestedStep > c.step || !integer(a.activationStep) || a.activationStep <= a.requestedStep || !integer(a.costCents) || (a.activatedStep !== null && (!integer(a.activatedStep) || a.activatedStep !== a.activationStep || a.activatedStep > c.step))) ||
             c.settlements.length !== c.lastSettledPeriod ||
-            !c.settlements.every((p, i) => p.period === i + 1 && p.step === (i + 1) * 60 && [p.revenueCents, p.appCents, p.dbCents, p.salaryCents,p.lbCents??0,p.cacheCents??0,p.controllerCents??0].every(integer) && p.netCents === p.revenueCents - p.appCents - p.dbCents - p.salaryCents - (p.lbCents??0) - (p.cacheCents??0) - (p.controllerCents??0)) ||
+            !c.settlements.every((p, i) => p.period === i + 1 && p.step === (i + 1) * 60 && [p.revenueCents, p.appCents, p.dbCents, p.salaryCents,p.lbCents??0,p.cacheCents??0,p.controllerCents??0,p.checksCents??0,p.failoverCents??0].every(integer) && p.netCents === p.revenueCents - p.appCents - p.dbCents - p.salaryCents - (p.lbCents??0) - (p.cacheCents??0) - (p.controllerCents??0) - (p.checksCents??0) - (p.failoverCents??0)) ||
             c.pending.some(a => !c.actions.some(b=>JSON.stringify(a)===JSON.stringify(b)) || !integer(a.activationStep) || a.activationStep <= c.step || !integer(a.requestedStep) || a.requestedStep > c.step || !integer(a.costCents) || a.activatedStep !== null) ||
             new Set(c.pending.map(a => a.id)).size !== c.pending.length ||
             c.pending.some(a => !c.actions.some(b => b.id === a.id && b.activationStep === a.activationStep)) ||
@@ -205,14 +210,16 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5): Validation {
         if(version>=3) {
             if(c.actions.some(a=>{
                 const dataUpgrade=a.type==="upgrade-db"&&a.capacityAfter===3000;
-                const delay=dataUpgrade?4:a.type==="cache"||a.type==="cache-tuning"?2:a.type==="add-app"&&a.source==="autoscaler"?3:a.type==="add-app"||a.type==="deploy-lb"||a.type==="deploy-autoscaler"?2:a.type==="upgrade-db"||a.type==="scale-up"?3:1;
-                const cost=dataUpgrade?400000:a.type==="cache"?150000:a.type==="cache-tuning"?100000:a.type==="add-app"||a.type==="deploy-lb"||a.type==="deploy-autoscaler"?100000:a.type==="upgrade-db"?300000:a.type==="scale-up"?200000:0;
+                const reliabilityDelay=({"health-checks":2,"create-spare":2,"reserve-spare":1,"release-spare":1,"failover":2,"promote-spare":1,"restore-app":3} as Record<string,number>)[a.type];
+                const delay=reliabilityDelay??(dataUpgrade?4:a.type==="cache"||a.type==="cache-tuning"?2:a.type==="add-app"&&a.source==="autoscaler"?3:a.type==="add-app"||a.type==="deploy-lb"||a.type==="deploy-autoscaler"?2:a.type==="upgrade-db"||a.type==="scale-up"?3:1);
+                const reliabilityCost=({"health-checks":50000,"create-spare":100000,"reserve-spare":0,"release-spare":0,"failover":100000,"promote-spare":0,"restore-app":0} as Record<string,number>)[a.type];
+                const cost=reliabilityCost??(dataUpgrade?400000:a.type==="cache"?150000:a.type==="cache-tuning"?100000:a.type==="add-app"||a.type==="deploy-lb"||a.type==="deploy-autoscaler"?100000:a.type==="upgrade-db"?300000:a.type==="scale-up"?200000:0);
                 return a.activationStep!==a.requestedStep+delay || a.costCents!==cost ||
-                    (a.type==="add-app"&&(!(version===5&&c.spikeStage)?a.targetId!=="app-2":!/^app-[1-9][0-9]*$/.test(a.targetId??""))) ||
+                    (a.type==="add-app"&&(!(version>=5&&c.spikeStage)?a.targetId!=="app-2":!/^app-[1-9][0-9]*$/.test(a.targetId??""))) ||
                     (a.type==="upgrade-db"&&!(version>=4?[1000,2000,3000]:[1000,2000]).includes(a.capacityAfter!)) ||
                     ((["scale-up","deploy-lb","routing"].includes(a.type)||a.capacityAfter===2000)&&!c.openingMilestone?.acknowledged);
-            }) || c.pending.filter(a=>!["limit","unlimit","routing"].includes(a.type)).length>1 ||
-                c.pending.filter(a=>a.type==="routing"||a.type==="retire-app").length>1 || c.pending.filter(a=>a.type==="limit"||a.type==="unlimit").length>1 ||
+            }) || c.pending.filter(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type)).length>1 ||
+                c.pending.filter(a=>a.type==="routing"||a.type==="retire-app"||a.type==="promote-spare").length>1 || c.pending.filter(a=>a.type==="limit"||a.type==="unlimit").length>1 ||
                 (c.dbCapacity===2000&&!c.openingMilestone?.acknowledged))return {status:"corrupt"};
             if(!routingValid(c,c.routing)||typeof c.loadBalancer!=="boolean"||typeof c.routingEnabledOnce!=="boolean"||
                 !c.overload||Object.keys(c.overload).some(id=>id!=="db"&&!c.apps.some(a=>a.id===id))||!["db",...c.apps.map(a=>a.id)].every(id=>integer(c.overload[id]))||c.overload.db!==c.overloadSteps||
@@ -221,7 +228,7 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5): Validation {
                 (c.scaling.dueStep!==null&&(!integer(c.scaling.dueStep)||c.scaling.dueStep<=c.scaling.enteredStep))||typeof c.scaling.consumed!=="boolean"||c.scaling.consumed!==c.consumedEvents.includes("scaling-growth")))||
                 (!c.scaling&&c.consumedEvents.includes("scaling-growth"))||
                 ((c.snapshot.version===3||c.snapshot.version===4||c.snapshot.version===5)&&(!c.snapshot.instances!.every(x=>c.apps.some(a=>a.id===x.id&&a.capacity===x.capacity&&a.backlog===x.backlog&&a.routed===x.routed))||JSON.stringify(c.snapshot.routing)!==JSON.stringify(c.routing)))||
-                c.actions.some(a=>(a.type==="scale-up"&&(!c.apps.some(x=>x.id===a.targetId)||a.capacityAfter!==1600))||(a.type==="routing"&&(!a.routing||(version===5&&c.spikeStage?!a.routing.targets.every(id=>/^app-[1-9][0-9]*$/.test(id)&&Number(id.slice(4))<c.nextAppNumber):!routingValid(c,a.routing))))))return {status:"corrupt"};
+                c.actions.some(a=>(a.type==="scale-up"&&(!c.apps.some(x=>x.id===a.targetId)||a.capacityAfter!==1600))||(a.type==="routing"&&(!a.routing||(version>=5&&c.spikeStage?!a.routing.targets.every(id=>/^app-[1-9][0-9]*$/.test(id)&&Number(id.slice(4))<c.nextAppNumber):!routingValid(c,a.routing))))))return {status:"corrupt"};
         }
         if(version>=4) {
             const d=c.dataStage,k=c.readCache;
@@ -234,21 +241,21 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5): Validation {
             if(!d&&(k||c.dbCapacity===3000||c.consumedEvents.includes("data-growth")||c.actions.some(a=>["cache","cache-tuning"].includes(a.type)||a.capacityAfter===3000)))return {status:"corrupt"};
             if(k&&(!c.actions.some(a=>a.type==="cache"&&a.activatedStep===k.activatedStep)||(k.tuned&&!c.actions.some(a=>a.type==="cache-tuning"&&a.activatedStep!==null))||!d||!integer(k.activatedStep)||k.activatedStep>c.step||!integer(k.warmth)||k.warmth>k.target||
                 typeof k.tuned!=="boolean"||k.target!==(k.tuned?7500:6000)||(!k.tuned&&k.warmth%1200!==0)))return {status:"corrupt"};
-            if(d?.consumed&&((c.spikeStage?c.incomingRate!==spikeInput(c):c.incomingRate!==2400)||!(c.spikeStage?[4,5]:[4]).includes(c.snapshot.version!)||(c.snapshot.data?.profile!==d.profile&&!c.trace.some(t=>t.type==="workload-changed"&&t.data.eventId==="data-contrast"&&t.step===c.step&&t.id>(c.trace.filter(x=>x.type==="metrics").at(-1)?.id??0)))||
+            if(d?.consumed&&((c.spikeStage?c.incomingRate!==spikeInput(c):c.incomingRate!==2400)||!(c.reliabilityStage?[4,5,6]:c.spikeStage?[4,5]:[4]).includes(c.snapshot.version!)||(c.snapshot.data?.profile!==d.profile&&!c.trace.some(t=>t.type==="workload-changed"&&t.data.eventId==="data-contrast"&&t.step===c.step&&t.id>(c.trace.filter(x=>x.type==="metrics").at(-1)?.id??0)))||
                 c.snapshot.data!.deployed!==!!k||c.snapshot.data!.warmthAfterStep!==(k?.warmth??0)||c.snapshot.data!.target!==(k?.target??0)))return {status:"corrupt"};
             if(!d?.consumed&&(c.snapshot.version===4||c.snapshot.version===5))return {status:"corrupt"};
             if(c.actions.some(a=>["cache","cache-tuning"].includes(a.type)&&(!d||a.requestedStep<d.enteredStep))||
                 c.actions.some(a=>a.type==="cache-tuning"&&(!k||a.requestedStep<k.activatedStep)))return {status:"corrupt"};
         }
-        if((version===5?!preventionValid(c,s.phase):c.openingPrevention!==undefined))return {status:"corrupt"};
-        if(version===5&&!phase5Valid(c))return {status:"corrupt"};
+        if((version>=5?!preventionValid(c,s.phase):c.openingPrevention!==undefined))return {status:"corrupt"};
+        if(version>=5&&!phase5Valid(c))return {status:"corrupt"};
         return { status: "ok", envelope: e };
     }
     catch {
         return { status: "corrupt" };
     }
 }
-export function validateEnvelope(value: unknown): Validation { return validateVersion(value,5); }
+export function validateEnvelope(value: unknown): Validation { return validateVersion(value,6); }
 export function decodeSave(raw: string): Validation {
     try {
         return validateEnvelope(JSON.parse(raw));
@@ -258,11 +265,11 @@ export function decodeSave(raw: string): Validation {
     }
 }
 export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.now(), measurement: Measurement = emptyMeasurement()): SaveEnvelope {
-    return { schemaVersion: 5, scenarioId: "opening-db", scenarioVersion: 1, runId: game.campaign!.runId, game, runtime: { remainderMs, measurement }, savedAt };
+    return { schemaVersion: 6, scenarioId: "opening-db", scenarioVersion: 1, runId: game.campaign!.runId, game, runtime: { remainderMs, measurement }, savedAt };
 }
 /** Future migrations must preserve source bytes before replacing a validated slot. No v0 conversion is registered. */
 export type MigrationRegistry = Readonly<Record<number, (value: unknown) => unknown>>;
-export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migrations: MigrationRegistry = PHASE5_MIGRATIONS): boolean {
+export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migrations: MigrationRegistry = PHASE6_MIGRATIONS): boolean {
     try {
         const original = storage.getItem(CAMPAIGN_SAVE_KEY);
         if (original === null)
@@ -271,20 +278,20 @@ export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migra
             schemaVersion?: number;
         };
         const sourceVersion = value.schemaVersion;
-        if (typeof sourceVersion !== "number" || sourceVersion >= 5 || !migrations[sourceVersion])
+        if (typeof sourceVersion !== "number" || sourceVersion >= 6 || !migrations[sourceVersion])
             return false;
         const backup = `${CAMPAIGN_SAVE_KEY}.backup.v${sourceVersion}`;
         if (storage.getItem(backup) !== null && storage.getItem(backup) !== original)
             return false;
         storage.setItem(backup, original);
-        while (typeof value.schemaVersion === "number" && value.schemaVersion < 5) {
+        while (typeof value.schemaVersion === "number" && value.schemaVersion < 6) {
             const version = value.schemaVersion, migrate = migrations[version];
             if (!migrate)
                 return false;
             value = migrate(value) as {
                 schemaVersion?: number;
             };
-            if (!value || (value.schemaVersion !== version + 1 && value.schemaVersion !== 5))
+            if (!value || (value.schemaVersion !== version + 1 && value.schemaVersion !== 6))
                 return false;
         }
         const result = validateEnvelope(value);
@@ -366,14 +373,55 @@ function phase5Valid(c:import("@/sim/campaignTypes").Campaign):boolean {
    typeof a.expectedRouting!=="string"||!(a.blockedReason===null||typeof a.blockedReason==="string")||
    !c.actions.some(x=>x.type==="deploy-autoscaler"&&x.activatedStep===a.activatedStep))return false;
  }
- if(c.actions.some(x=>(x.type==="deploy-autoscaler"&&d.researchSpent!==1)||(x.source!==undefined&&!["player","autoscaler"].includes(x.source))||
+ if(c.actions.some(x=>(x.type==="deploy-autoscaler"&&d.researchSpent!==1)||(x.source!==undefined&&!["player","autoscaler",...(c.reliabilityStage?["failover"]:[])].includes(x.source))||
   ((x.source==="autoscaler"||["deploy-autoscaler","retire-app"].includes(x.type))&&x.requestedStep<d.enteredStep)||
-  (x.cancelledStep!==undefined&&(x.type!=="retire-app"||x.cancelledStep!==x.activationStep||x.activatedStep!==null||x.cancelledStep>c.step))||
+  (x.cancelledStep!==undefined&&(!["retire-app","promote-spare"].includes(x.type)||(x.type==="retire-app"&&x.cancelledStep!==x.activationStep)||x.activatedStep!==null||x.cancelledStep>c.step))||
   (x.source==="autoscaler"&&!a)))return false;
  if(c.pending.some(x=>x.routing&&!routingValid(c,x.routing)))return false;
  if(c.snapshot.version===5) {
   const o=c.snapshot.spikes;if(!o||o.installed!==c.apps.length||o.routed!==c.routing.targets.length||!integer(o.routedBusyBasisPoints)||o.routedBusyBasisPoints>10000||
    typeof o.enabled!=="boolean"||!integer(o.highSteps)||o.highSteps>=3||!integer(o.lowSteps)||o.lowSteps>=6||!integer(o.cooldownUntil)||!(o.blockedReason===null||typeof o.blockedReason==="string"))return false;
  }
+ return true;
+}
+
+export const PHASE6_MIGRATIONS:MigrationRegistry={...PHASE5_MIGRATIONS,5:value=>{
+ if(validateVersion(value,5).status!=="ok")throw Error("Invalid Phase 5 source");
+ const e=structuredClone(value) as SaveEnvelope,c=e.game.campaign!;
+ c.reliabilityStage=null;c.apps.forEach(a=>initializeHealth(a,c.step));
+ c.ledger.checksNumerator=0;c.ledger.failoverNumerator=0;c.remainders.checks=0;c.remainders.failover=0;
+ e.schemaVersion=6;return e;
+}};
+function reliabilitySnapshotValid(m:import("@/sim/campaignTypes").Snapshot):boolean {
+ const xs=m.instances,o=m.reliability,w=m.data,d=m.db;
+ if(!xs?.length||xs.length>4||!o||!w||!m.routing||!finiteTree(m)||new Set(xs.map(x=>x.id)).size!==xs.length)return false;
+ if(!["single","balanced"].includes(m.routing.mode)||!m.routing.targets.length||new Set(m.routing.targets).size!==m.routing.targets.length||m.routing.targets.some(id=>!xs.some(a=>a.id===id))||JSON.stringify(o.configured)!==JSON.stringify(m.routing.targets)||new Set(o.effective).size!==o.effective.length||o.effective.some(id=>!o.configured.includes(id)))return false;
+ const sum=(key:"demand"|"processed"|"backlog"|"failed"|"capacity")=>xs.reduce((n,a)=>n+a[key],0);
+ if(xs.some(a=>!/^app-[1-9][0-9]*$/.test(a.id)||a.state!=="active"||!["base","large"].includes(a.tier)||a.capacity!==(a.tier==="base"?1000:1600)||!["healthy","failed"].includes(a.health!)||!["healthy","unhealthy","unknown"].includes(a.detectedHealth!)||!["serving","spare"].includes(a.role!)||a.configured!==o.configured.includes(a.id)||a.routed!==o.effective.includes(a.id)||a.processingBudget!==(a.health==="failed"?0:a.capacity)||![a.demand,a.processed,a.backlog,a.failed].every(integer)||a.backlog>1000||a.processed>a.processingBudget||a.busyUtilisation!==a.processed/a.capacity||a.demandRatio!==a.demand/a.capacity||a.demandRate!==a.demand||a.demandCount!==a.demand||(!a.routed&&a.demand!==0)||(a.health==="failed"&&(a.processed!==0||a.failed!==a.demand))||(a.role==="spare"&&(a.routed||a.backlog||a.demand))))return false;
+ const routed=xs.filter(a=>a.routed&&a.health==="healthy").reduce((n,a)=>n+a.capacity,0);
+ const budget=xs.filter(a=>a.health==="healthy"&&(a.routed||a.backlog>0||a.processed>0)).reduce((n,a)=>n+a.capacity,0);
+ if(o.unroutable!==(o.effective.length?0:m.admitted)||o.failedDeliveries!==xs.filter(a=>a.health==="failed").reduce((n,a)=>n+a.failed,0)+o.unroutable||o.healthyCapacity!==xs.filter(a=>a.health==="healthy").reduce((n,a)=>n+a.capacity,0)||o.healthyRoutedCapacity!==routed||o.spareCapacity!==xs.filter(a=>a.role==="spare").reduce((n,a)=>n+a.capacity,0))return false;
+ const data=classifyData(sum("processed"),w.readShare,w.cacheableReadShare,w.effectiveHitRateUsed);
+ if(!["read-heavy","write-heavy"].includes(w.profile)||w.readShare!==DATA_PROFILES[w.profile].readShare||w.cacheableReadShare!==10000||Object.entries(data).some(([k,v])=>w[k as keyof typeof w]!==v)||![w.warmthUsed,w.warmthAfterStep,w.target].every(integer)||w.effectiveHitRateUsed!==w.warmthUsed||w.warmthUsed>w.target||w.warmthAfterStep!==(w.deployed&&w.eligibleReads>0?Math.min(w.target,w.warmthUsed+1200):w.warmthUsed))return false;
+ return [m.step,m.incoming,m.admitted,m.rejected,m.successful,m.failed].every(integer)&&m.incoming===m.admitted+m.rejected&&sum("demand")+o.unroutable===m.admitted&&m.app.demand===m.admitted&&m.app.capacity===routed&&m.effectiveAppCapacity===routed&&m.installedAppCapacity===sum("capacity")&&m.app.processed===sum("processed")&&m.app.backlog===sum("backlog")&&m.app.failed===sum("failed")+o.unroutable&&integer(m.appBusyBudget!)&&m.appBusyBudget!>=budget&&m.appBusyBudget!<=sum("capacity")&&m.app.busyUtilisation===(m.appBusyBudget?m.app.processed/m.appBusyBudget:0)&&m.app.demandRatio===(routed?m.admitted/routed:0)&&[d.demand,d.capacity,d.processed,d.backlog,d.failed].every(integer)&&[600,1000,2000,3000].includes(d.capacity)&&d.backlog<=600&&d.processed<=d.capacity&&d.busyUtilisation===d.processed/d.capacity&&d.demandRatio===d.demand/d.capacity&&d.demand===data.databaseNewDemand&&m.successful===d.processed+w.hits&&m.failed===m.app.failed+d.failed&&m.latencyMs===100+1000*(Math.max(...xs.map(a=>a.backlog/a.capacity))+d.backlog/d.capacity)&&m.serviceErrorRate===(m.successful+m.failed?m.failed/(m.successful+m.failed):null);
+}
+function reliabilityValid(c:import("@/sim/campaignTypes").Campaign):boolean {
+ const d=c.reliabilityStage;
+ // Current schema-6 saves created directly by older in-memory fixtures may lack health until entry; no historical observations inferred.
+ if(d==null)return !c.apps.some(a=>a.health==="failed"||a.role==="spare")&&!c.actions.some(a=>["health-checks","create-spare","reserve-spare","release-spare","failover","promote-spare","restore-app"].includes(a.type));
+ if(!c.spikeStage?.acknowledged||d.id!==R.id||d.version!==1||d.configuration!==JSON.stringify(R)||!integer(d.enteredStep)||d.enteredStep>c.step||d.researchEarned!==3||new Set(d.owned).size!==d.owned.length||d.owned.some(id=>!["health_checks","standby","auto_failover"].includes(id))||!c.trace.some(t=>t.type==="reliability-research-awarded"&&t.step===d.enteredStep)||d.owned.some(id=>!c.trace.some(t=>t.type==="reliability-tech-unlocked"&&t.data.techId===id))||(!d.owned.includes("health_checks")&&d.checksStep!==null)||(!d.owned.includes("standby")&&d.spareId!==null)||(!d.owned.includes("auto_failover")&&d.failover))return false;
+ if(!integer(d.stableSteps)||d.stableSteps>5||!integer(d.failureSteps)||typeof d.acknowledged!=="boolean"||(d.completedStep===null?d.acknowledged:(!integer(d.completedStep)||d.completedStep>c.step||d.stableSteps!==5||!c.trace.some(t=>t.type==="reliability-stage-completed"&&t.step===d.completedStep))))return false;
+ if(c.apps.some(a=>!["healthy","failed"].includes(a.health!)||!["unknown","healthy","unhealthy"].includes(a.detectedHealth!)||!["serving","spare"].includes(a.role!)||!integer(a.healthChangedStep!)||a.healthChangedStep!>c.step||(a.detectedStep!==null&&(!integer(a.detectedStep!)||a.detectedStep!>c.step))))return false;
+ const spares=c.apps.filter(a=>a.role==="spare");if(spares.length>1||(d.spareId===null?spares.length!==0:spares[0]?.id!==d.spareId)||spares.some(a=>a.backlog||a.routed))return false;
+ const f=d.fault;
+ if(f&&(!c.apps.some(a=>a.id===f.targetId)||!integer(f.armedStep)||f.startStep!==f.armedStep+8||f.naturalStep!==f.startStep+20||f.armedStep<d.enteredStep||f.armedStep>c.step||(f.startedStep===null?c.step>=f.startStep:(f.startedStep!==f.startStep||f.startedStep>c.step))||(f.restoredStep!==null&&(!integer(f.restoredStep)||f.restoredStep<f.startStep||f.restoredStep>f.naturalStep||f.restoredStep>c.step||!["manual","natural"].includes(f.restoreSource!)))||c.apps.some(a=>a.health==="failed"&&(a.id!==f.targetId||f.startedStep===null||f.restoredStep!==null))))return false;
+ if(!f&&(c.apps.some(a=>a.health==="failed")||d.completedStep!==null))return false;
+ if(f&&f.startedStep!==null&&f.restoredStep===null&&c.step>=f.naturalStep)return false;
+ if(d.completedStep!==null&&(!f||f.restoredStep===null||d.completedStep<f.restoredStep+4))return false;
+ if(d.checksStep!==null&&(!integer(d.checksStep)||d.checksStep>c.step||!c.actions.some(a=>a.type==="health-checks"&&a.activatedStep===d.checksStep)))return false;
+ if(d.failover&&(!integer(d.failover.activatedStep)||d.failover.activatedStep>c.step||typeof d.failover.enabled!=="boolean"||!c.actions.some(a=>a.type==="failover"&&a.activatedStep===d.failover!.activatedStep)))return false;
+ if(d.owned.includes("auto_failover")&&(!d.owned.includes("health_checks")||!d.owned.includes("standby")||!c.loadBalancer))return false;
+ const inspectedAfterMetrics=c.trace.some(t=>t.type==="health-change-detected"&&t.data.source==="manual"&&t.step===c.step&&t.id>(c.trace.filter(x=>x.type==="metrics").at(-1)?.id??0));
+ if(c.snapshot.version===6&&!inspectedAfterMetrics&&(JSON.stringify(c.snapshot.reliability?.effective)!==JSON.stringify(effectiveTargets(c))||JSON.stringify(c.snapshot.routing)!==JSON.stringify(c.routing)))return false;
  return true;
 }

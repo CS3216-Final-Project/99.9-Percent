@@ -286,11 +286,12 @@ export function isResearchTech(id: TechId): boolean {
 }
 
 export function completedTechIds(state: GameState): TechId[] {
-  return TECH_ORDER.filter((id) => id === "larger_database" ? state.infra.dbTier > 0 : has(state, id));
+  return TECH_ORDER.filter((id) => has(state, id));
 }
 
 export function has(state: Pick<GameState, "techDone" | "campaign">, tech: TechId): boolean {
-  if(state.campaign)return (tech==="autoscaling"&&state.campaign.spikeStage?.researchSpent===1)||(tech==="caching"&&!!state.campaign.readCache)||(tech==="cache_tuning"&&!!state.campaign.readCache?.tuned)||tech==="monitoring" || (tech==="load_balancing"&&state.campaign.loadBalancer) || (tech==="larger_servers"&&state.campaign.apps.some(a=>a.tier==="large"));
+  if(state.campaign)return (!!state.campaign.reliabilityStage?.owned.includes(tech as import("./campaignTypes").ReliabilityTech))||(tech==="larger_database"&&state.campaign.dbCapacity>=1000)||(tech==="autoscaling"&&state.campaign.spikeStage?.researchSpent===1)||(tech==="caching"&&!!state.campaign.readCache)||(tech==="cache_tuning"&&!!state.campaign.readCache?.tuned)||tech==="monitoring" || (tech==="load_balancing"&&state.campaign.loadBalancer) || (tech==="larger_servers"&&state.campaign.apps.some(a=>a.tier==="large"));
+  if (tech === "larger_database") return "infra" in state && (state as GameState).infra.dbTier > 0;
   // Metrics and alerts are baseline tools, including when resuming an old save.
   if (tech === "monitoring") return true;
   return state.techDone.includes(tech);
@@ -298,8 +299,9 @@ export function has(state: Pick<GameState, "techDone" | "campaign">, tech: TechI
 
 export function techStatus(state: GameState, id: TechId): TechStatus {
   if(state.campaign) {
+    if(state.campaign.reliabilityStage&&["health_checks","standby","auto_failover"].includes(id)){if(has(state,id))return "done";return TECH[id].requires.every(t=>has(state,t))?"available":"locked";}
     if(![...(state.campaign.spikeStage?["autoscaling"]:[]),"larger_database","larger_servers","load_balancing",...(state.campaign.dataStage?["caching","cache_tuning"]:[])].includes(id))return "locked";
-    if(id==="larger_database")return state.campaign.dbCapacity>=(state.campaign.dataStage?3000:2000)?"done":"available";
+    if(id==="larger_database")return has(state,id)?"done":"available";
     if(id==="cache_tuning"&&!state.campaign.readCache)return "locked";
     return has(state,id)?"done":state.campaign.openingMilestone?.acknowledged?"available":"locked";
   }

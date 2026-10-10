@@ -67,7 +67,7 @@ it("Spikes observes completion and acknowledgement without requiring automation"
  let g=spikeCompany(false);g=act(g,{type:"set_traffic_limit",enabled:true});g=untilOffset(g,68);
  expect(row(g,"pulses").met).toBe(true);expect(row(g,"observations").label).toBe("Stable baseline observations: 1 / 5");expect(campaignGuidance(g).pendingAction).toBeNull();expect(campaignGuidance(g).optional).toContain("optional");
  g=tick(g,4);expect(campaignGuidance(g).pendingAction?.label).toBe("Review spike recognition");expect(g.campaign!.spikeStage!.acknowledged).toBe(false);
- g=act(g,{type:"acknowledge_spikes"});expect(row(g,"recognition").met).toBe(true);expect(campaignGuidance(g).notice).toContain("not implemented");
+ g=act(g,{type:"acknowledge_spikes"});expect(row(g,"recognition").met).toBe(true);expect(campaignGuidance(g).notice).toContain("available through Continue to reliability");
 });
 it("Spikes future timing never enters guidance",()=>{
  const g=spikeCompany(false);g.campaign!.spikeStage!.deadlines=[991111,992222,993333,994444];expect(JSON.stringify(campaignGuidance(g))).not.toMatch(/991111|992222|993333|994444/);expect(row(g,"pulses").met).toBe(false);

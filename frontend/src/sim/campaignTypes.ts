@@ -9,7 +9,8 @@ export interface ComponentSnapshot {
 }
 export interface Snapshot {
     /** Missing on retained historical opening snapshots. */
-    version?: 3 | 4 | 5;
+    version?: 3 | 4 | 5 | 6;
+    reliability?: ReliabilityObservation;
     spikes?: SpikeObservation;
     data?: DataSnapshot;
     instances?: InstanceSnapshot[];
@@ -56,12 +57,14 @@ export interface Routing { mode: "single" | "balanced"; targets: string[] }
 export interface AppInstance {
     id: string; capacity: number; backlog: number; routed: boolean;
     tier: "base" | "large"; state: "active";
+    health?: "healthy" | "failed"; detectedHealth?: "unknown" | "healthy" | "unhealthy"; healthChangedStep?: number; detectedStep?: number | null; role?: "serving" | "spare";
 }
 export interface InstanceSnapshot extends ComponentSnapshot {
     id: string; tier: AppInstance["tier"]; state: "active"; routed: boolean;
     demandRate: number; demandCount: number; processingBudget: number;
+    health?: AppInstance["health"]; detectedHealth?: AppInstance["detectedHealth"]; role?: AppInstance["role"]; configured?: boolean;
 }
-export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing" | "cache" | "cache-tuning" | "deploy-autoscaler" | "retire-app";
+export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing" | "cache" | "cache-tuning" | "deploy-autoscaler" | "retire-app" | "health-checks" | "create-spare" | "reserve-spare" | "release-spare" | "failover" | "promote-spare" | "restore-app";
 export interface ScheduledAction {
     id: string;
     type: Intervention;
@@ -69,7 +72,8 @@ export interface ScheduledAction {
     activationStep: number;
     costCents: number;
     activatedStep: number | null;
-    source?: "player" | "autoscaler";
+    source?: "player" | "autoscaler" | "failover";
+    expectedRouting?: string; failureId?: string;
     cancelledStep?: number;
     targetId?: string;
     capacityAfter?: number;
@@ -91,6 +95,7 @@ export interface Ledger {
     lbNumerator?: number;
     cacheNumerator?: number;
     controllerNumerator?: number;
+    checksNumerator?: number; failoverNumerator?: number;
 }
 export interface Settlement {
     period: number;
@@ -103,8 +108,10 @@ export interface Settlement {
     lbCents?: number;
     cacheCents?: number;
     controllerCents?: number;
+    checksCents?: number; failoverCents?: number;
 }
 export interface CampaignIncident {
+    kind?: "application-failure"; failureId?: string;
     id: string;
     openedStep: number;
     stableSteps: number;
@@ -145,6 +152,7 @@ export interface Campaign {
     dataStage: DataStage | null;
     readCache: ReadCache | null;
     spikeStage: SpikeStage | null;
+    reliabilityStage?: ReliabilityStage | null;
     nextAppNumber: number;
     overload: Record<string, number>;
     dbCapacity: number;
@@ -159,6 +167,7 @@ export interface Campaign {
         lb?: number;
         cache?: number;
         controller?: number;
+        checks?: number; failover?: number;
     };
     settlements: Settlement[];
     lastSettledPeriod: number;
@@ -185,4 +194,20 @@ export interface Campaign {
     recent: Snapshot[];
     trace: TraceEvent[];
     nextEventId: number;
+}
+
+export type ReliabilityTech = "health_checks" | "standby" | "auto_failover";
+export interface ReliabilityFault {
+ id:string; targetId:string; armedStep:number; startStep:number; naturalStep:number;
+ startedStep:number|null; restoredStep:number|null; restoreSource:"manual"|"natural"|null; promoted:boolean;
+}
+export interface ReliabilityStage {
+ id:"application-reliability"; version:1; configuration:string; enteredStep:number;
+ researchEarned:3; owned:ReliabilityTech[]; checksStep:number|null;
+ failover:null|{activatedStep:number;enabled:boolean}; spareId:string|null; fault:ReliabilityFault|null;
+ failureSteps:number; stableSteps:number; completedStep:number|null; acknowledged:boolean;
+}
+export interface ReliabilityObservation {
+ configured:string[]; effective:string[]; healthyCapacity:number; healthyRoutedCapacity:number; spareCapacity:number;
+ failedDeliveries:number; unroutable:number; faultId:string|null;
 }

@@ -77,6 +77,7 @@ function buildModel(s: GameState): SceneModel {
   const hosts: Led[] = s.infra.appHosts.map((h, i) => {
     if(s.campaign) {
       const a=s.campaign.apps[i], x=s.campaign.snapshot.instances?.find(x=>x.id===a.id);
+      if(a.health==="failed")return "critical";
       if(!a.routed&&a.backlog===0)return "off";
       return x&&x.demandRatio>1?"critical":a.backlog>0?"warn":"ok";
     }
@@ -616,7 +617,7 @@ function Labels() {
       {EQUIPMENT_ORDER.filter((id) => m.opening ? ["gateway","app","db","monitoring",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.routed?"routed":"unrouted"}</span></button>)}
+      {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span></button>)}
     </div>
   );
 }
@@ -722,7 +723,7 @@ function Scene() {
       {/* App servers */}
       {m.hosts.slice(0, 12).map((led, i) => {
         const p = appSlot(i);
-        return <group key={i} onClick={e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",`app-${i+1}`);}}}><Rack x={p.x} z={p.z} led={led} /></group>;
+        return <group key={i} onClick={e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",campaign?.apps[i]?.id??`app-${i+1}`);}}}><Rack x={p.x} z={p.z} led={led} /></group>;
       })}
       {Array.from({ length: m.temp }, (_, i) => {
         const p = tempSlot(i);

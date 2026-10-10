@@ -1,3 +1,5 @@
+import TechTree from "./TechTree";
+import { canEnterReliability, pendingReliability, researchBalance } from "@/sim/reliability";
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { pendingSpikeAcknowledgement, spikeInput } from "@/sim/autoscaling";
@@ -20,12 +22,12 @@ const percent = (v: number | null) => v === null ? "No completed requests" : (v 
 // Labels and status are presentation of existing observations, never engine inputs.
 function stageName(g: GameState) {
  const c=g.campaign!;
- return c.spikeStage?"Survive Traffic Spikes":c.dataStage?"Data Bottlenecks":c.openingMilestone?.acknowledged?"Scale Your App":"First Growth";
+ return c.reliabilityStage?"Stay Online":c.spikeStage?"Survive Traffic Spikes":c.dataStage?"Data Bottlenecks":c.openingMilestone?.acknowledged?"Scale Your App":"First Growth";
 }
 function serviceStatus(g: GameState) {
  const c=g.campaign!,m=c.snapshot;
  if(g.phase==="ended")return "Bankrupt";
- if(pendingPreventionReview(c)||g.phase==="review"||c.openingMilestone&&!c.openingMilestone.acknowledged||pendingSpikeAcknowledgement(c))return "Paused for review";
+ if(pendingReliability(c)||pendingPreventionReview(c)||g.phase==="review"||c.openingMilestone&&!c.openingMilestone.acknowledged||pendingSpikeAcknowledgement(c))return "Paused for review";
  if(c.incident)return c.incident.stableSteps>0?"Recovering":"Incident";
  if(m.latencyMs>=Q.latencyThresholdMs||(m.serviceErrorRate??0)>=Q.errorThreshold||m.app.demandRatio>1||m.db.demandRatio>1)return "Degraded";
  if(c.limit!==null)return "Stable — traffic limited";
@@ -100,6 +102,7 @@ function CampaignGuidance() {
     : spikesPending ? "Acknowledge the spike response to continue this company."
     : pendingMilestone ? "Complete First Growth to continue."
     : c.incident ? c.incident.stableSteps>0?"Service is recovering. Keep it stable.":"Customers are experiencing slow or failed requests. Find the bottleneck."
+    : c.reliabilityStage ? "Keep stable service through an application failure, then review the evidence."
     : c.spikeStage ? "Prepare for temporary demand spikes without wasting capacity."
     : c.dataStage ? "Reduce pressure on the database as workload grows."
     : dataAvailable ? "Review the scaling evidence, then continue to data strategy when ready."
@@ -110,8 +113,9 @@ function CampaignGuidance() {
       <li aria-current={!openingDone ? "step" : undefined}>1. First Growth<small>Opening</small>{" "}<strong>{openingDone ? "Completed" : "Current"}</strong></li>
       <li aria-current={openingDone && !c.dataStage ? "step" : undefined}>2. Scale Your App<small>Scaling &amp; Routing</small>{" "}<strong>{c.dataStage ? "Completed" : openingDone ? "Current" : pendingMilestone ? "Available next · acknowledge milestone" : "Locked"}</strong></li>
       <li aria-current={c.dataStage&&!c.spikeStage ? "step" : undefined}>3. Data Bottlenecks<small>Data Strategy</small>{" "}<strong>{c.spikeStage?"Completed":c.dataStage ? "Current" : dataAvailable ? "Available next" : "Locked"}</strong></li>
-      <li aria-current={c.spikeStage?"step":undefined}>4. Survive Traffic Spikes<small>Traffic Spikes &amp; Autoscaling</small>{" "}<strong>{c.spikeStage?(c.spikeStage.acknowledged?"Completed":"Current"):spikesAvailable?"Available next":"Locked"}</strong></li>
+      <li aria-current={c.spikeStage&&!c.reliabilityStage?"step":undefined}>4. Survive Traffic Spikes<small>Traffic Spikes &amp; Autoscaling</small>{" "}<strong>{c.spikeStage?(c.spikeStage.acknowledged?"Completed":"Current"):spikesAvailable?"Available next":"Locked"}</strong></li>
       <li>5. Stay Online<small>Later stages · Reliability</small>{" "}<strong>Locked · not implemented</strong></li>
+      {c.reliabilityStage&&<li>6. Combined campaign <strong>Locked · not implemented</strong></li>}
     </ol></nav>
     <section className="campaign-guidance" aria-label="Campaign guidance"><h2>Campaign guidance</h2>
     <p className="current-stage">Current stage: <strong>{stageName(game)}</strong> <small>({stage})</small></p>
@@ -127,6 +131,8 @@ function CampaignGuidance() {
     {game.phase==="review"&&<p role="status">Incident recovered. Recovery recorded. Pending acknowledgement: Incident postmortem. Review the report and acknowledge it with Continue company; simulation remains paused.</p>}
     {pendingMilestone&&<p role="status">{c.openingMilestone?.outcomeId?"Growth outcome reviewed.":"Incident recovered. Postmortem acknowledged."} Pending acknowledgement: First growth challenge handled. Complete Opening by acknowledging the milestone; your company continues into Scaling &amp; Routing.</p>}
     <ProgressionGuardrail model={model}/>
+    {!c.reliabilityStage&&c.spikeStage?.acknowledged&&<button className="btn" disabled={!canEnterReliability(game)} onClick={()=>useGame.getState().act({type:"enter_reliability"})}>Continue to reliability</button>}
+    {c.reliabilityStage&&<p>Stay Online · {c.reliabilityStage.acknowledged?"Completed":"Current"}. Capacity is not the same as reliability.</p>}
     {c.limit !== null && <div className="traffic-limit-notice" role="note" aria-label="Traffic limit trade-off"><strong>Traffic limit active</strong>
       <p>Incoming: {c.snapshot.incoming} req/s · Admitted: {c.snapshot.admitted} req/s · Rejected: {c.snapshot.rejected} req/s</p>
       <p>Rejected demand this period: {c.ledger.rejected}; potential revenue not served {dollars(c.ledger.rejected * 20)} — opportunity value (not an extra charge). Service can be stable while sacrificing growth.</p>
@@ -139,7 +145,7 @@ function CampaignGuidance() {
 
 export function CampaignHeader() {
   const { game, openView } = useGame(), c = game.campaign!;
-  return <header className="topbar campaign-header"><div className="brand"><span className="brand-mark">99.99%</span>
+  return <header className="topbar campaign-header"><button className="btn" onClick={()=>openView("tech")}>Technology tree</button><div className="brand"><span className="brand-mark">99.99%</span>
     <span>{stageName(game)} · Week {game.turn} · Step <strong data-testid="physical-step">{c.step}</strong></span></div>
     <div className="stats-strip"><div className="stat"><span>Cash</span><strong>{dollars(c.cashCents)}</strong></div>
       <div className="stat"><span>Users</span><strong>2,000</strong></div>
@@ -156,7 +162,7 @@ export function CampaignPanel() {
   const dbDelay=c.dbCapacity===2000?4:3;
   const selectedApp=c.apps.find(a=>a.id===selectedAppId)??c.apps[0];
   const onboarding = useGame(s=>s.onboarding);
-  const disabled = pendingPreventionReview(c) || pendingSpikeAcknowledgement(c) || onboarding || !!(c.openingMilestone&&!c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
+  const disabled = pendingReliability(c) || pendingPreventionReview(c) || pendingSpikeAcknowledgement(c) || onboarding || !!(c.openingMilestone&&!c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
   const [evidenceOpen,setEvidenceOpen]=useState(false);
   const investigate=()=>{ act({type:"incident_inspect",equipment:"monitoring"});setEvidenceOpen(true);document.getElementById("campaign-architecture")?.focus(); };
   const admissionPending = c.pending.some(a => a.type === "limit" || a.type === "unlimit");
@@ -166,7 +172,7 @@ export function CampaignPanel() {
 <section className="panel-section architecture-overview" aria-label="Architecture" id="campaign-architecture" tabIndex={-1}><h2>Architecture</h2>
       <nav className={`dependency-strip${c.dataStage?" data-dependencies":""}`} aria-label="Request dependencies">
         <span>Users<br/>{m.incoming} req/s</span><span aria-hidden="true">&rarr;</span>
-        <button className="btn tip tip-left" data-tip={`${m.app.demandRatio>1?"Demand exceeds capacity":"Demand within capacity"}. Backlog: ${m.app.backlog}. Busy: ${percent(m.app.busyUtilisation)}`} aria-pressed={selected==="app"} onClick={()=>inspectOrSelect("app","app-1")}>Application<br/>{m.app.demand} / {m.app.capacity} req/s<br/>{percent(m.app.demandRatio)} · {m.app.demandRatio>1?"Over capacity":utilTone(m.app.demandRatio)!=="ok"?"Near capacity":"Headroom available"}</button>
+        <button className="btn tip tip-left" data-tip={`${m.app.demandRatio>1?"Demand exceeds capacity":"Demand within capacity"}. Backlog: ${m.app.backlog}. Busy: ${(m.appBusyBudget===0?"Not applicable — no processing budget":percent(m.app.busyUtilisation))}`} aria-pressed={selected==="app"} onClick={()=>inspectOrSelect("app","app-1")}>Application<br/>{m.app.demand} / {m.app.capacity} req/s<br/>{(m.app.capacity?percent(m.app.demandRatio):"Not applicable — no healthy routed capacity")} · {m.app.demandRatio>1?"Over capacity":utilTone(m.app.demandRatio)!=="ok"?"Near capacity":"Headroom available"}</button>
         {c.dataStage&&<><span aria-hidden="true">&rarr;</span><button className="btn" aria-pressed={selected==="cache"} onClick={()=>inspectOrSelect("cache")}>Read Cache<br/>{c.readCache?"Deployed":"Not deployed — all work reaches DB"}</button></>}
         <span aria-hidden="true">&rarr;</span><button className="btn tip tip-left" data-tip={`${m.db.demandRatio>1?"Demand exceeds capacity":"Demand within capacity"}. Backlog: ${m.db.backlog}. Busy: ${percent(m.db.busyUtilisation)}`} aria-pressed={selected==="db"} onClick={()=>inspectOrSelect("db")}>Database<br/>{m.db.demand} / {m.db.capacity} ops/s<br/>{percent(m.db.demandRatio)} · {m.db.demandRatio>1?"Over capacity":utilTone(m.db.demandRatio)!=="ok"?"Near capacity":"Headroom available"}</button>
       </nav>
@@ -177,7 +183,7 @@ export function CampaignPanel() {
         {!unlocked&&<p>Routing controls become available after acknowledging the opening postmortem and milestone.</p>}
       </div>)}
       {unlocked&&<section aria-label="Application instances"><p>Routing: <strong>{c.routing.mode}</strong>; targets: {c.routing.targets.join(", ")}. Load balancer: {c.loadBalancer?"Deployed":"Not deployed"}.</p>
-        {c.apps.map(a=>{const x=m.instances?.find(x=>x.id===a.id);return <button key={a.id} className="btn tip tip-left" aria-pressed={selected==="app"&&selectedAppId===a.id} data-tip={`Backlog: ${a.backlog}; capacity: ${a.capacity} req/s`} onClick={()=>inspectOrSelect("app",a.id)}>{`App ${a.id.slice(4)}`}: {a.routed?"Receiving traffic":"Installed - not receiving traffic"}<br/>{x?`${x.demand} / ${x.capacity} req/s; processed ${x.processed}; busy ${percent(x.busyUtilisation)}`:`${a.capacity} req/s; no per-instance observation yet`}; backlog {a.backlog}</button>;})}
+        {c.apps.map(a=>{const x=m.instances?.find(x=>x.id===a.id);return <button key={a.id} className="btn tip tip-left" aria-pressed={selected==="app"&&selectedAppId===a.id} data-tip={`Backlog: ${a.backlog}; capacity: ${a.capacity} req/s`} onClick={()=>inspectOrSelect("app",a.id)}>{`App ${a.id.slice(4)}`}: {a.routed?"Receiving traffic":"Installed - not receiving traffic"}<br/>{x?`${x.demand} / ${x.capacity} req/s; processed ${x.processed}; busy ${x.processingBudget===0?"not applicable — failed instance":percent(x.busyUtilisation)}`:`${a.capacity} req/s; no per-instance observation yet`}; backlog {a.backlog}</button>;})}
         {c.pending.filter(a=>a.type==="add-app").map(a=><p key={a.id}>{a.targetId}: Deploying - no installed capacity yet</p>)}
         <p>Selected app: {selectedApp.id}. Capacity {selectedApp.capacity} req/s; backlog {selectedApp.backlog} requests.</p>
       </section>}
@@ -213,12 +219,13 @@ export function CampaignPanel() {
         <div className="action-card"><button className="btn" disabled={disabled||busy||!c.readCache||c.readCache.tuned||c.cashCents<=100000} onClick={()=>act({type:"tune_cache"})}>Tune cache ceiling to 75% · $1,000 · 2 steps</button><p>Raises the cache ceiling from 60% to 75%; warm-up still applies. No additional upkeep.</p></div>
         <button className="btn" disabled={disabled||!c.dataStage.consumed||c.dataStage.contrastConsumed||!!c.spikeStage||!canEnterData(game)} onClick={()=>act({type:"contrast_workload"})}>Observe contrasting workload</button>
       </section>}
+      {c.reliabilityStage&&<ReliabilityControls disabled={disabled}/>}
       {c.spikeStage&&<SpikeControls disabled={disabled} busy={busy}/>}
-      {c.pending.map(a => <p role="status" key={a.id}>{{"add-app":"Application installation","upgrade-db":"Database upgrade",limit:"Traffic limit",unlimit:"Remove traffic limit","scale-up":"Application scale up","deploy-lb":"Load balancer deployment",routing:"Routing change",cache:"Read Cache deployment","cache-tuning":"Cache tuning","deploy-autoscaler":"Autoscaling controller deployment","retire-app":"Safe application retirement"}[a.type]}{a.targetId?` (${a.targetId})`:""}: activates in {a.activationStep - c.step} step(s)</p>)}
+      {c.pending.map(a => <p role="status" key={a.id}>{{"health-checks":"Deploy Health Checks","create-spare":"Install spare application","reserve-spare":"Reserve spare","release-spare":"Release spare","failover":"Deploy Automatic Failover","promote-spare":"Promote spare","restore-app":"Restore application","add-app":"Application installation","upgrade-db":"Database upgrade",limit:"Traffic limit",unlimit:"Remove traffic limit","scale-up":"Application scale up","deploy-lb":"Load balancer deployment",routing:"Routing change",cache:"Read Cache deployment","cache-tuning":"Cache tuning","deploy-autoscaler":"Autoscaling controller deployment","retire-app":"Safe application retirement"}[a.type]}{a.targetId?` (${a.targetId})`:""}: activates in {a.activationStep - c.step} step(s)</p>)}
     </section>
     <details className="detailed-evidence" open={evidenceOpen} onToggle={e=>setEvidenceOpen(e.currentTarget.open)}><summary>Detailed system evidence</summary><section className="panel-section" aria-label="System evidence"><p>{nextMove(game).text}</p><p>Incoming {m.incoming} / admitted {m.admitted} / rejected {m.rejected} requests/s</p>
       <table className="campaign-table"><caption>Component evidence, step {c.step}</caption><thead><tr><th>Metric</th><th>Application</th><th>Database</th></tr></thead>
-        <tbody>{[["Demand /s", m.app.demand, m.db.demand], ["Capacity /s", m.app.capacity, m.db.capacity], ["Demand/capacity", percent(m.app.demandRatio), percent(m.db.demandRatio)], ["Busy", percent(m.app.busyUtilisation), percent(m.db.busyUtilisation)], ["Backlog", m.app.backlog, m.db.backlog], ["Processed", m.app.processed, m.db.processed], ["Failed", m.app.failed, m.db.failed]].map(([label, a, b]) => <tr key={label}><th>{label}</th><td className={selected==="app"?"selected-evidence":""}>{a}</td><td className={selected==="db"?"selected-evidence":""}>{b}</td></tr>)}</tbody></table>
+        <tbody>{[["Demand /s", m.app.demand, m.db.demand], ["Capacity /s", m.app.capacity, m.db.capacity], ["Demand/capacity", (m.app.capacity?percent(m.app.demandRatio):"Not applicable — no healthy routed capacity"), percent(m.db.demandRatio)], ["Busy", (m.appBusyBudget===0?"Not applicable — no processing budget":percent(m.app.busyUtilisation)), percent(m.db.busyUtilisation)], ["Backlog", m.app.backlog, m.db.backlog], ["Processed", m.app.processed, m.db.processed], ["Failed", m.app.failed, m.db.failed]].map(([label, a, b]) => <tr key={label}><th>{label}</th><td className={selected==="app"?"selected-evidence":""}>{a}</td><td className={selected==="db"?"selected-evidence":""}>{b}</td></tr>)}</tbody></table>
       <p>Application installed capacity: {m.installedAppCapacity} req/s. Routed capacity: {m.effectiveAppCapacity??m.app.capacity} req/s.</p>
       <p>Latency: <strong>{m.latencyMs.toFixed(0)} ms</strong> · Service errors: <strong>{percent(m.serviceErrorRate)}</strong></p>
       {c.incident && <p role="status">Stable steps: {c.incident.stableSteps}/5 · requires &lt;500 ms and &lt;1% service errors with traffic and completed outcomes.</p>}
@@ -233,7 +240,7 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
  return <section aria-label="Traffic spikes and autoscaling"><h3>Traffic Spikes &amp; Autoscaling</h3>
   <p role="status">{spikeInput(c)===T.peak?"TRAFFIC SPIKE ACTIVE":"Baseline demand"}: {c.snapshot.incoming} req/s. Normal {T.baseline}; spike {T.peak} req/s.</p>
   <p>Two temporary demand pulses are part of this stage. New capacity takes time to become useful.</p>{c.step>=d.deadlines[3]&&<p>Both pulses ended.</p>}
-  <p>Research: {d.researchEarned-d.researchSpent} point available. Autoscaling {d.researchSpent?"unlocked":"locked"}.</p>
+  <p>Research: {researchBalance(c)} point available. Autoscaling {d.researchSpent?"unlocked":"locked"}.</p>
   <button className="btn" disabled={disabled||!!d.researchSpent} onClick={()=>act({type:"unlock_autoscaling"})}>Unlock autoscaling · 1 research point</button>
   <button className="btn" disabled={disabled||busy||!d.researchSpent||!!a||!c.loadBalancer||c.routing.mode!=="balanced"||c.routing.targets.length<2||c.cashCents<=T.controllerCostCents} onClick={()=>act({type:"deploy_autoscaler"})}>Deploy autoscaling · $1,000 · 2 steps</button>
   <p>Deployment requires balanced routing to at least two apps. Controller upkeep: $100 per operating week, including while disabled.</p>
@@ -249,7 +256,7 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
 }
 export function CampaignControls() {
   const { game, running, setRunning, speed, setSpeed, advance, openView, started, onboarding } = useGame();
-  const active = !pendingPreventionReview(game.campaign) && !pendingSpikeAcknowledgement(game.campaign!) && started && !onboarding && !(game.campaign!.openingMilestone&&!game.campaign!.openingMilestone!.acknowledged) && (game.phase === "management" || game.phase === "incident");
+  const active = !pendingReliability(game.campaign) && !pendingPreventionReview(game.campaign) && !pendingSpikeAcknowledgement(game.campaign!) && started && !onboarding && !(game.campaign!.openingMilestone&&!game.campaign!.openingMilestone!.acknowledged) && (game.phase === "management" || game.phase === "incident");
   return <footer className="bottombar"><button className="btn" onClick={() => openView("history")}>History</button>
     <div className="time-controls"><button className="btn" disabled={!active} onClick={() => setRunning(!running)}>{running ? "Pause company" : "Resume company"}</button>
       <div className="speed" role="group" aria-label="Game speed">{([.5, 1, 2] as Speed[]).map(v => <button key={v} aria-pressed={speed === v} onClick={() => setSpeed(v)}>{v===.5?"Slow":v===1?"Normal":"Fast"} · {v}×</button>)}</div>
@@ -297,6 +304,8 @@ export function CampaignOverlays() {
       <button className="btn btn-primary" onClick={()=>onboardingMove("next")}>{meta.openingOnboarding.step===2?"Start company":"Next"}</button></div>
     </Modal>;
   }
+  if(view==="tech")return <Modal title="Technology tree" onClose={()=>openView(null)}><TechTree/></Modal>;
+  if(pendingReliability(c)&&!["guidance","menu","history"].includes(view??""))return <Modal title="Reliability outcome" onClose={()=>openView("guidance")}><p>The application test has ended. Service met five stable management observations after restoration.</p><p>Installed capacity did not guarantee healthy routed capacity. Health Checks detect; spares and routing provide surviving capacity. Failover creates no capacity.</p><p>{c.limit!==null?"Stable — traffic limited":"Full demand admitted"}. Rejected requests: {c.cumulative.rejected}. Setup spending: {dollars(c.investedCents)}.</p><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_reliability"})}>Continue operating</button></Modal>;
   if(pendingPreventionReview(c)&&!["guidance","menu","history"].includes(view??""))return <Modal title="Prevention review" onClose={()=>openView("guidance")}><PreventionOutcome campaign={c}/><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_prevention_review"})}>Continue company</button></Modal>;
   if (game.phase === "review" && !["guidance", "menu", "history"].includes(view ?? "")) return <Modal title="Incident postmortem" onClose={() => openView("guidance")}><p className="recovery-banner">SERVICE RECOVERED · Review the evidence before continuing.</p><Report report={c.reports[c.reports.length - 1]} /><button className="btn btn-primary" onClick={() => act({ type: "acknowledge_review" })}>Continue company</button></Modal>;
   if(c.openingMilestone&&!c.openingMilestone.acknowledged&&!["guidance", "menu", "history"].includes(view ?? ""))return <Modal title="First growth challenge handled" onClose={() => openView("guidance")}>
@@ -341,4 +350,27 @@ export function CampaignOverlays() {
     <details><summary>Action and event history</summary>{c.trace.filter(e => e.type !== "metrics").map(e => <p key={e.id}>Step {e.step}: {e.type} {e.data.reason ? String(e.data.reason) : e.data.type ? String(e.data.type) : ""}</p>)}</details>
   </Modal>;
   return null;
+}
+
+function ReliabilityControls({disabled}:{disabled:boolean}) {
+ const {game,act,openView}=useGame(),c=game.campaign!,d=c.reliabilityStage!,f=d.fault;
+ return <section aria-label="Stay Online"><h3>Stay Online</h3><p>Keep service stable when an application becomes unavailable. Choose preparation or a manual response.</p>
+ <p>{!f?"Prepare, then explicitly start the reliability test.":f.startedStep===null?"Reliability test scheduled. Resume company to observe it.":f.restoredStep===null?`Application ${f.targetId} failed. Inspect health, surviving capacity and routing.`:"Application restored. Review reports and observe stable service."}</p>
+ <p>Stable service after restoration: {d.stableSteps} / 5 seconds. Research available: {researchBalance(c)}.</p>
+ {c.spikeStage?.controller&&f&&!d.acknowledged&&<p>Autoscaling waiting — reliability test in progress. Existing enabled state and upkeep are preserved.</p>}
+
+ <button className="btn" onClick={()=>openView("tech")}>Technology tree</button>
+ <button className="btn" disabled={disabled||d.checksStep!==null||!d.owned.includes("health_checks")} onClick={()=>act({type:"deploy_health_checks"})}>Deploy Health Checks · $500 · 2 steps</button>
+ <button className="btn" disabled={disabled||!!d.spareId||!d.owned.includes("standby")} onClick={()=>act({type:"install_spare"})}>Install spare · $1,000 · 2 steps</button>
+ <button className="btn" disabled={disabled||!!d.failover||!d.owned.includes("auto_failover")} onClick={()=>act({type:"deploy_failover"})}>Deploy Automatic Failover · $1,000 · 2 steps</button>
+ {d.failover&&<button className="btn" disabled={disabled} onClick={()=>act({type:"set_failover",enabled:!d.failover!.enabled})}>{d.failover.enabled?"Disable":"Enable"} failover</button>}
+ {c.apps.map(a=><div key={a.id}><strong>{a.id}</strong> · {a.health??"healthy"} · detected {a.detectedHealth??"unknown"} · {a.role??"serving"} · configured {a.routed?"yes":"no"} · effective {c.snapshot.reliability?.effective.includes(a.id)?"yes":"no"}
+ <button className="btn" disabled={disabled} onClick={()=>act({type:"incident_inspect",equipment:"app",appId:a.id})}>Inspect {a.id} health · free</button>
+ {a.health==="failed"&&<button className="btn" disabled={disabled} onClick={()=>act({type:"restore_app",appId:a.id})}>Restore {a.id} · free · 3 steps</button>}
+ {!a.routed&&a.role!=="spare"&&<button className="btn" disabled={disabled||!d.owned.includes("standby")||!!d.spareId} onClick={()=>act({type:"reserve_spare",appId:a.id})}>Reserve {a.id} as spare · 1 step</button>}
+ {a.role==="spare"&&<button className="btn" disabled={disabled} onClick={()=>act({type:"release_spare"})}>Release spare · 1 step</button>}</div>)}
+ <p>Installed: {c.snapshot.installedAppCapacity} req/s · Healthy: {c.snapshot.reliability?.healthyCapacity??c.snapshot.installedAppCapacity} · Healthy routed: {c.snapshot.reliability?.healthyRoutedCapacity??c.snapshot.effectiveAppCapacity} · Spare: {c.snapshot.reliability?.spareCapacity??0}.</p>
+ {d.checksStep!==null&&!c.loadBalancer&&<p>Checks detect health; load balancing is required for automatic routing exclusion.</p>}
+ {pendingReliability(c)&&<button className="btn" onClick={()=>openView(null)}>Review reliability outcome</button>}
+ </section>;
 }
