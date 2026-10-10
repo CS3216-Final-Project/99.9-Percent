@@ -6,6 +6,8 @@ test("inspects evidence and advances a physical step on touch", async ({ page })
   await page.getByRole("button", { name: "Inspect metrics · free" }).tap();
   await page.getByRole("button", { name: "Advance step" }).tap();
   expect((await savedGame(page)).campaign!.step).toBe(1);
+  await expect(page.getByRole("navigation",{name:"Campaign progression"})).toBeInViewport();
+  await expect(page.getByRole("navigation",{name:"Campaign progression"})).toContainText("Opening Current");
   await page.getByRole("button", { name: "History", exact: true }).tap();
   await expect(page.getByRole("dialog", { name: "Campaign history" })).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).tap();
@@ -27,4 +29,17 @@ test("selects scaling instances through room and evidence on touch",async({page}
  await expect(page.getByRole("main").getByRole("button",{name:"App 1",exact:true})).toHaveAttribute("aria-pressed","true");
  await page.screenshot({path:"test-results/phase3-mobile.png"});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+});
+
+test("selects the read cache through room and dependency evidence on touch",async({page})=>{
+ const {dataCompany}=await import("../src/sim/__tests__/dataFixture");const {applyAction}=await import("../src/sim");const {advanceSteps}=await import("../src/sim/step");const {seedSave}=await import("./fixtures");
+ let g=advanceSteps(dataCompany(),6).state;let r=applyAction(g,{type:"deploy_cache"});if(!r.ok)throw Error(r.message);g=advanceSteps(r.state,30).state;
+ r=applyAction(g,{type:"acknowledge_review"});if(!r.ok)throw Error(r.message);g=r.state;
+ await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ await page.getByRole("main").getByRole("button",{name:"Read Cache",exact:true}).tap();
+ await expect(page.getByRole("navigation",{name:"Request dependencies"}).getByRole("button",{name:/Read Cache/})).toHaveAttribute("aria-pressed","true");
+ await expect(page.getByRole("status").filter({hasText:"Selected component"})).toContainText("Read Cache");
+ await expect(page.getByRole("navigation",{name:"Campaign progression"})).toBeInViewport();
+ await expect(page.getByRole("navigation",{name:"Campaign progression"})).toContainText("Data Strategy Current");
+ await page.screenshot({path:"test-results/phase4-mobile.png"});expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
 });

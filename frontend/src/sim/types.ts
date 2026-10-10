@@ -429,6 +429,10 @@ export interface GameState {
 /* ------------------------------------------------------------------ */
 
 export type Action =
+  | { type: "enter_data"; profile?: "read-heavy" | "write-heavy" }
+  | { type: "contrast_workload" }
+  | { type: "deploy_cache" }
+  | { type: "tune_cache" }
   | { type: "enter_scaling" }
   | { type: "scale_up"; appId: string }
   | { type: "deploy_load_balancer" }

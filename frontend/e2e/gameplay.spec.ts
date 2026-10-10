@@ -29,7 +29,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       await expect.poll(async () => (await savedGame(page)).campaign!.apps.length).toBe(2);
       await page.getByRole("button", { name: "Pause", exact: true }).click();
       expect((await savedGame(page)).campaign!.dbCapacity).toBe(600);
-      await expect(page.getByText("Added application: Installed, not receiving traffic")).toBeVisible();
+      await expect(page.getByRole("note",{name:"App 2 routing status"})).toContainText("Installed ✓ · Receiving traffic ✗");
     }
     await page.getByRole("button", { name: path === "limit" ? "Limit to 500 requests/s" : /Upgrade database/ }).click();
     await page.getByRole("button", { name: "Run", exact: true }).click();

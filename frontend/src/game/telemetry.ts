@@ -41,11 +41,15 @@ export function projectEvents(previous:Measurement,g:GameState,now:string):Measu
   const m=structuredClone(previous),c=g.campaign!;
   if(!m.session || m.session.endedAt)return m;
   const timing=()=>({wallMs:m.openingStartedAt?Math.max(0,Date.parse(now)-Date.parse(m.openingStartedAt)):null,timingKnown:m.openingStartedAt!==null});
+  const dataEntry=c.trace.find(x=>x.type==="data-stage-entered");
   for(const t of c.trace.filter(t=>t.id>m.cursor)) {
     const id=`${c.runId}:trace:${t.id}`;
-    const emit=(name:string,payload:Payload=t.data,suffix="")=>{event(m,g,name,{...payload,...(c.scaling&&t.step>=c.scaling.enteredStep?{continuationId:c.scaling.id,continuationVersion:c.scaling.version}:{})},now,id+suffix);m.pending[m.pending.length-1].physicalStep=t.step;};
+    const inData=!!dataEntry&&t.id>=dataEntry.id;
+    const emit=(name:string,payload:Payload=t.data,suffix="")=>{event(m,g,name,{...payload,...(c.dataStage&&inData?{dataStageId:c.dataStage.id,dataStageVersion:c.dataStage.version,profile:t.data.profile??c.trace.filter(x=>x.id<=t.id&&(x.type==="workload-changed"||x.type==="data-stage-entered")).at(-1)?.data.profile??c.dataStage.profile}:{}),...(c.scaling&&t.step>=c.scaling.enteredStep?{continuationId:c.scaling.id,continuationVersion:c.scaling.version}:{})},now,id+suffix);m.pending[m.pending.length-1].physicalStep=t.step;};
     switch(t.type) {
       case "inspection": emit("component_inspected",{...t.data,snapshotStep:t.step});break;
+      case "data-stage-entered":emit("data_stage_entered");break;
+      case "workload-changed":emit("workload_changed");break;
       case "scaling-stage-entered":emit("scaling_stage_entered");break;
       case "traffic-change":emit("traffic_changed");break;
       case "incident-opened":emit("incident_opened");break;
@@ -53,14 +57,14 @@ export function projectEvents(previous:Measurement,g:GameState,now:string):Measu
       case "bankruptcy":emit("run_failed",{...t.data,...timing()});break;
       case "action-requested": {
         const a=c.actions.find(a=>a.id===t.data.actionId)!;
-        const names:Record<typeof a.type,string>={"add-app":"app_instance_requested","upgrade-db":"database_upgrade_requested",limit:"traffic_limit_requested",unlimit:"traffic_limit_requested","scale-up":"vertical_scale_requested","deploy-lb":"load_balancer_requested",routing:"routing_requested"};
+        const names:Record<typeof a.type,string>={"add-app":"app_instance_requested","upgrade-db":"database_upgrade_requested",limit:"traffic_limit_requested",unlimit:"traffic_limit_requested","scale-up":"vertical_scale_requested","deploy-lb":"load_balancer_requested",routing:"routing_requested",cache:"cache_requested","cache-tuning":"cache_tuning_requested"};
         emit(names[a.type],
           {...t.data,action_requested_step:a.requestedStep});
         emit("gameplay_decision",{actionId:a.id,replayOf:m.replayOf},":decision");break;
       }
       case "action-activated": {
         const a=c.actions.find(a=>a.id===t.data.actionId)!;
-        const names:Record<typeof a.type,string>={"add-app":"app_instance_activated","upgrade-db":"action_activated",limit:"traffic_limit_applied",unlimit:"traffic_limit_removed","scale-up":"vertical_scale_activated","deploy-lb":"load_balancer_deployed",routing:t.data.routingFirstEnabled?"routing_enabled":"routing_changed"};
+        const names:Record<typeof a.type,string>={"add-app":"app_instance_activated","upgrade-db":c.dataStage&&inData?"database_upgrade_activated":"action_activated",limit:"traffic_limit_applied",unlimit:"traffic_limit_removed","scale-up":"vertical_scale_activated","deploy-lb":"load_balancer_deployed",cache:"cache_activated","cache-tuning":"cache_tuning_activated",routing:t.data.routingFirstEnabled?"routing_enabled":"routing_changed"};
         emit(names[a.type],
           {...t.data,action_requested_step:a.requestedStep,action_activated_step:a.activatedStep});
         break;

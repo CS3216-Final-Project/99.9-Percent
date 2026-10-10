@@ -313,6 +313,7 @@ export const useGame = create<Store>()((set, get) => {
         get().notify(result.message, "error");
         return false;
       }
+      if(action.type==="enter_data")set({running:false});
       commit(result.state);
       return true;
     },
@@ -451,10 +452,10 @@ export const useGame = create<Store>()((set, get) => {
  */
 export function inspectOrSelect(id: EquipmentId, appId?:string): void {
   const { game, select, act } = useGame.getState();
-  if(game.campaign && !["app","db","monitoring","gateway"].includes(id))return;
+  if(game.campaign && !["app","db","monitoring","gateway",...(game.campaign.dataStage?["cache"]:[])].includes(id))return;
   select(id);
   if(appId)useGame.getState().selectApp(appId);
-  if(game.campaign) { if(["app","db","monitoring","gateway"].includes(id))act({type:"incident_inspect",equipment:id,...(id==="app"?{appId:useGame.getState().selectedAppId??"app-1"}:{})}); return; }
+  if(game.campaign) { if(["app","db","monitoring","gateway",...(game.campaign.dataStage?["cache"]:[])].includes(id))act({type:"incident_inspect",equipment:id,...(id==="app"?{appId:useGame.getState().selectedAppId??"app-1"}:{})}); return; }
   const inc = game.incident;
   if (game.phase !== "incident" || !inc || inc.status !== "active") return;
   if (!inspectable(game).includes(id)) return;
