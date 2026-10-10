@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { deskSlot, POS, ROOM } from "./layout";
 import { creature, type Activity } from "./cast";
 import { Creature, preloadCreatures, Walker } from "./creatures";
+import { BALL_RADIUS, ballAt, RALLY, RALLY_PERIOD, TABLE } from "./rally";
 import { ModelBatch, preloadModels, type ModelId, type Placement } from "./models";
 import { ball, bx, cy, place, PrimBatch, type Prim, type V3 } from "./prims";
 import { ARCADE_SCREEN, MAC, MAC_COLOUR_NAMES, type PropItem } from "./propModels";
@@ -95,14 +96,16 @@ function shelf(w: number, h: number, seed: number): Prim[] {
 }
 
 function pingPong(): Prim[] {
+  const { length: l, width: w, top, netTop } = TABLE;
+  const line = top + 0.005;
   return [
-    bx([0, 0.76, 0], [2.74, 0.06, 1.52], "#1f7a5c"),
-    bx([0, 0.795, 0.745], [2.74, 0.012, 0.03], "#fff7e8"),
-    bx([0, 0.795, -0.745], [2.74, 0.012, 0.03], "#fff7e8"),
-    bx([1.355, 0.795, 0], [0.03, 0.012, 1.52], "#fff7e8"),
-    bx([-1.355, 0.795, 0], [0.03, 0.012, 1.52], "#fff7e8"),
-    bx([0, 0.795, 0], [2.74, 0.012, 0.015], "#fff7e8"),
-    bx([0, 0.87, 0], [0.02, 0.15, 1.64], LILAC),
+    bx([0, top - 0.03, 0], [l, 0.06, w], "#1f7a5c"),
+    bx([0, line, w / 2 - 0.015], [l, 0.012, 0.03], "#fff7e8"),
+    bx([0, line, -w / 2 + 0.015], [l, 0.012, 0.03], "#fff7e8"),
+    bx([l / 2 - 0.015, line, 0], [0.03, 0.012, w], "#fff7e8"),
+    bx([-l / 2 + 0.015, line, 0], [0.03, 0.012, w], "#fff7e8"),
+    bx([0, line, 0], [l, 0.012, 0.015], "#fff7e8"),
+    bx([0, (top + netTop) / 2, 0], [0.02, netTop - top, w + 0.12], LILAC),
     ...[-1.1, 1.1].flatMap((dx) => [-0.6, 0.6].map((dz) => bx([dx, 0.37, dz], [0.07, 0.74, 0.07], TRIM))),
   ];
 }
@@ -359,7 +362,7 @@ function buildStatic(): Prim[] {
   add(rug(5.0, 4.6, "#6b4aa0", "#7d5bb8"), 18.4, 6.5);
   out.push(cy([-19.2, 0.007, 11.7], 2.8, 0.012, "#6b4aa0"), cy([-19.2, 0.009, 11.7], 2.4, 0.013, "#7d5bb8"));
   out.push(ball([16.9, 0.26, 4.4], [0.96, 0.58, 0.96], "#2dd4bf"), ball([16.6, 0.26, 8.6], [0.96, 0.58, 0.96], "#ff7ad9"));
-  add(pingPong(), 18.2, 12.6);
+  add(pingPong(), RALLY.x, RALLY.z);
   return out;
 }
 
@@ -605,10 +608,6 @@ function Floors() {
   );
 }
 
-/** The table-tennis rally: where the table is, how fast the ball crosses, and how far out it is hit. */
-const RALLY = { x: 18.2, z: 12.6, speed: 0.9, reach: 1.1 };
-/** Seconds for the ball to go there and back. */
-const RALLY_PERIOD = 2 / RALLY.speed;
 /** Seconds into a swing at which the paddle meets the ball. */
 const SWING_CONTACT = 0.35;
 /** How far from the table's centre each player stands. */
@@ -621,16 +620,12 @@ const PONG = { period: RALLY_PERIOD, at: RALLY_PERIOD / 2 - SWING_CONTACT };
 function PingPongBall() {
   const ball = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
-    if (!ball.current) return;
-    // A rally that never ends: the ball crosses the net and bounces on each side.
-    const t = clock.elapsedTime * RALLY.speed;
-    const f = t % 2;
-    const x = f < 1 ? -RALLY.reach + f * 2 * RALLY.reach : RALLY.reach - (f - 1) * 2 * RALLY.reach;
-    ball.current.position.set(RALLY.x + x, 0.82 + Math.abs(Math.sin(t * Math.PI * 2)) * 0.3, RALLY.z + Math.sin(t * 1.3) * 0.35);
+    // A rally that never ends.
+    ball.current?.position.set(...ballAt(clock.elapsedTime));
   });
   return (
     <mesh ref={ball}>
-      <sphereGeometry args={[0.035, 8, 6]} />
+      <sphereGeometry args={[BALL_RADIUS, 8, 6]} />
       <meshBasicMaterial color="#fff7e8" />
     </mesh>
   );

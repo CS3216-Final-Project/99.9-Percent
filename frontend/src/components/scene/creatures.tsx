@@ -183,15 +183,15 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
     // A paddle goes in the right hand, where the fingers start. The rig is scaled up a hundredfold and then fitted,
     // so the paddle is scaled back down to a size measured in metres.
     const forearm = holding ? object.getObjectByName(bone("LowerArm.R")) : undefined;
-    if (forearm) {
-      const grip = paddle(detail);
+    const grip = forearm ? paddle(detail) : undefined;
+    if (forearm && grip) {
       const ws = forearm.getWorldScale(new THREE.Vector3());
       grip.scale.setScalar(PADDLE_SIZE / (ws.x * scale));
       grip.position.y = object.getObjectByName(bone("Middle1.R"))?.position.y ?? 0;
       forearm.add(grip);
     }
     // The model faces +z, so its back is at the box's -z side; once turned round that is how far it reaches behind.
-    return { object, scale, foot: -box.min.y * scale, back: -box.min.z * scale, mixer: new THREE.AnimationMixer(object) };
+    return { object, scale, foot: -box.min.y * scale, back: -box.min.z * scale, mixer: new THREE.AnimationMixer(object), grip };
   }, [gltf, detail, info.height, holding]);
 
   const current = useRef<THREE.AnimationAction | null>(null);
@@ -232,6 +232,13 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
       model.mixer.stopAllAction();
       model.mixer.uncacheRoot(model.object);
       current.current = null;
+      // The paddle is this creature's own; the species' meshes and materials are shared and stay.
+      model.grip?.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+      });
     },
     [model],
   );
