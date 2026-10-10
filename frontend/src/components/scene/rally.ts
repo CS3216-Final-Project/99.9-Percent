@@ -20,6 +20,8 @@ export const RALLY = {
   bounce: 0.75,
   /** Height at which the ball is struck. */
   hit: 1.0,
+  /** How far from the table's centre each player stands. */
+  stand: 2.0,
 };
 
 export const BALL_RADIUS = 0.035;

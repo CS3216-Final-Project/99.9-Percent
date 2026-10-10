@@ -4,8 +4,10 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { deskSlot, POS, ROOM } from "./layout";
-import { creature, type Activity } from "./cast";
-import { Creature, preloadCreatures, Walker } from "./creatures";
+import { creature, type Activity, type Species } from "./cast";
+import { Creature, preloadCreatures, Walker, Wanderer } from "./creatures";
+import { ARCADE_Z, ARCADES, deskSeat, FIXTURES, GLASS, GLASS_H, SPOTS } from "./floorplan";
+import { planLoop, type WaypointId } from "./routes";
 import { BALL_RADIUS, ballAt, RALLY, RALLY_PERIOD, TABLE } from "./rally";
 import { ModelBatch, preloadModels, type ModelId, type Placement } from "./models";
 import { ball, bx, cy, place, PrimBatch, type Prim, type V3 } from "./prims";
@@ -127,31 +129,6 @@ function booth(color: string): Prim[] {
 /* The whole floor plan                                                */
 /* ------------------------------------------------------------------ */
 
-/** Glass partition runs as [x1, z1, x2, z2]. Gaps for doors are already left out. */
-const GLASS: [number, number, number, number][] = [
-  // Server floor
-  [-13, 5, -2.0, 5],
-  [-0.8, 5, 9, 5],
-  [9, -4.6, 9, -0.2],
-  [9, 1.0, 9, 5],
-  [-13, -9.5, -13, -0.6],
-  [-13, 0.6, -13, 5],
-  // Monitoring room
-  [5.5, -9.5, 5.5, -4.6],
-  [5.5, -4.6, 9.6, -4.6],
-  [10.6, -4.6, 11.5, -4.6],
-  [11.5, -9.5, 11.5, -4.6],
-  // Network and power room
-  [-22, -1, -15.2, -1],
-  [-14.0, -1, -13, -1],
-  // Meeting room
-  [-13, 10.2, -6.8, 10.2],
-  [-5.9, 10.2, -5.5, 10.2],
-  [-5.5, 10.2, -5.5, 14.5],
-  [-13, 10.2, -13, 14.5],
-];
-
-const GLASS_H = 2.6;
 
 function glassFrames(): Prim[] {
   const out: Prim[] = [];
@@ -207,12 +184,6 @@ const DESK_TOP = 0.74;
 const PANEL = { y: DESK_TOP + MAC.displayY, z: -0.168, w: MAC.screenW, h: MAC.screenH };
 /** The smaller Mac at reception: the centre and width of its picture. */
 const RECEPTION_SCREEN = { y: 1.0, z: 11.771, w: 0.52 };
-/** The arcade cabinets, side by side in the games corner. */
-const ARCADES: [string, number][] = [
-  ["purple", 20.4],
-  ["red", 21.3],
-];
-const ARCADE_Z = 10.5;
 const DESK_PLANTS: [ModelId, number][] = [
   ["plantSmall1", 1],
   ["cactusSmallA", 0.7],
@@ -395,7 +366,7 @@ function buildModels(): Placement[] {
   }
   add(deskModels(2.2, 9), POS.growth.x - 0.4, POS.growth.z + 0.2);
   add(deskModels(1.8, 12), 8.2, -6.9);
-  out.push(mdl("pottedPlant", -12.4, 5.6), mdl("pottedPlant", -12.4, 9.5), mdl("coatRack", -3.0, 5.6), mdl("trashcan", -3.0, 9.0, 0, 0.8));
+  out.push(mdl("pottedPlant", -12.4, 5.6), mdl("pottedPlant", FIXTURES.plantByWhiteboard.x, FIXTURES.plantByWhiteboard.z), mdl("coatRack", -3.0, 5.6), mdl("trashcan", -3.0, 9.0, 0, 0.8));
   out.push(mdl("pottedPlant", 2.2, 8.9), mdl("cactusMedium", 8.9, 5.6, 0, 1.5));
 
   // Hardware waiting to be installed
@@ -411,7 +382,7 @@ function buildModels(): Placement[] {
 
   // Library corner
   out.push(mdl("armchair", -19.6, 10.8, Math.PI / 2, 0.95), mdl("armchair", -18.4, 12.6, Math.PI, 0.95));
-  out.push(mdl("sideTable", -19.1, 11.9, Math.PI / 4, 0.7), mdl("lampTable", -19.1, 11.9, 0, 0.9, 0.52), mdl("lampRoundFloor", -20.9, 13.7), mdl("pottedPlant", -14.0, 9.5, 0, 1.1));
+  out.push(mdl("sideTable", -19.1, 11.9, Math.PI / 4, 0.7), mdl("lampTable", -19.1, 11.9, 0, 0.9, 0.52), mdl("lampRoundFloor", -20.9, 13.7), mdl("pottedPlant", FIXTURES.plantByLibrary.x, FIXTURES.plantByLibrary.z, 0, 1.1));
 
   // Meeting room
   out.push(mdl("tableLong", -9.2, 12.35, 0, [3.4, 0.74, 1.3]));
@@ -433,7 +404,7 @@ function buildModels(): Placement[] {
   for (const x of [17.57, 18.4, 19.23]) out.push(mdl("bar", x, -6.0), mdl("bar", x, -6.4, Math.PI));
   for (const x of [17.06, 19.74]) out.push(mdl("barEnd", x, -6.0), mdl("barEnd", x, -6.4, Math.PI));
   for (const x of [18.0, 18.9]) out.push(mdl("stoolBar", x, -5.35, Math.PI));
-  out.push(mdl("trashcan", 15.1, -7.6, 0, 0.8));
+  out.push(mdl("trashcan", FIXTURES.kitchenBin.x, FIXTURES.kitchenBin.z, -Math.PI / 2, 0.8));
 
   // Dining table and chairs
   out.push(mdl("tableLong", 18.5, 0, 0, [4.0, 0.75, 1.1]));
@@ -610,8 +581,6 @@ function Floors() {
 
 /** Seconds into a swing at which the paddle meets the ball. */
 const SWING_CONTACT = 0.35;
-/** How far from the table's centre each player stands. */
-const PLAYER_X = 2.0;
 
 /** The -x player hits as the ball starts out, the +x player half a rally later. */
 const PING = { period: RALLY_PERIOD, at: -SWING_CONTACT };
@@ -696,6 +665,17 @@ export interface Crew {
 
 type Seat = "type" | "relax" | "mug" | "kitchen" | "lounge";
 
+/** Crew who wander the office: where each loop starts, its seed, walking speed, and how far into it they begin. */
+const WANDERERS: { species: Species; start: WaypointId; seed: number; speed: number; offset: number }[] = [
+  { species: creature(24, "designer"), start: "spineCooler", seed: 3, speed: 0.5, offset: 0 },
+  { species: creature(16, "dev"), start: "frontDeploy", seed: 11, speed: 0.5, offset: 17 },
+  { species: creature(9, "pm"), start: "gamesLane", seed: 23, speed: 0.65, offset: 34 },
+  { species: creature(30, "intern"), start: "kitchenMid", seed: 31, speed: 0.45, offset: 51 },
+  { species: creature(43, "marketer"), start: "frontGap", seed: 47, speed: 0.7, offset: 68 },
+  { species: creature(45, "security"), start: "libraryLane", seed: 59, speed: 0.55, offset: 85 },
+];
+const WANDERER_PLANS = WANDERERS.map((w) => planLoop(w.start, w.seed, { legs: 30, speed: w.speed }));
+
 /**
  * Where engineer i is. Assigned engineers code at their desks. The first free
  * engineer is in the kitchen and the second on the lounge sofa, so idle staff
@@ -723,50 +703,51 @@ function Staff({ crew }: { crew: Crew }) {
           <group key={i}>
             <ScreenPlane kind={screen} w={PANEL.w} h={PANEL.h} position={at(slot.x, slot.z, slot.rot, [0, PANEL.y, PANEL.z])} rot={slot.rot} />
             {seat && seat !== "kitchen" && seat !== "lounge" && (
-              <Creature pose="sit" activity={crew.incident ? "panic" : (seat as Activity)} species={creature(i)} position={at(slot.x, slot.z, slot.rot, [0, 0, 0.72])} rotation={slot.rot} phase={i * 1.7} />
+              <Creature pose="sit" activity={crew.incident ? "panic" : (seat as Activity)} species={creature(i)} position={[deskSeat(i).x, 0, deskSeat(i).z]} rotation={slot.rot} phase={i * 1.7} />
             )}
-            {seat === "kitchen" && <Creature pose="stand" activity="mug" species={creature(i)} position={[16.6, 0, -5.7]} rotation={-2.4} phase={i} />}
-            {seat === "lounge" && <Creature pose="sit" activity="laptop" species={creature(i)} position={[19.9, 0, 5.9]} rotation={Math.PI / 2} phase={i} />}
+            {seat === "kitchen" && <Creature pose="stand" activity="mug" species={creature(i)} position={[SPOTS.kitchenBreak.x, 0, SPOTS.kitchenBreak.z]} rotation={SPOTS.kitchenBreak.rot} phase={i} />}
+            {seat === "lounge" && <Creature pose="sit" activity="laptop" species={creature(i)} position={[SPOTS.sofa.x, 0, SPOTS.sofa.z]} rotation={SPOTS.sofa.rot} phase={i} />}
           </group>
         );
       })}
 
       {/* Release engineer, marketer, on-call SRE and receptionist */}
       <ScreenPlane kind={crew.releases > 0 ? "deploy-busy" : "deploy"} w={1.1} h={0.62} position={[POS.deploy.x, 1.28, POS.deploy.z - 0.09]} tilt={-0.35} />
-      <Creature pose="stand" activity={crew.releases > 0 || crew.incident ? "type" : "chat"} species={creature(11, "dev")} position={[POS.deploy.x, 0, POS.deploy.z + 0.78]} phase={3} />
+      <Creature pose="stand" activity={crew.releases > 0 || crew.incident ? "type" : "chat"} species={creature(11, "dev")} position={[SPOTS.releaseEngineer.x, 0, SPOTS.releaseEngineer.z]} phase={3} />
       {[-0.45, 0.45].map((dx) => (
         <ScreenPlane key={dx} kind={crew.promos > 0 ? "chart" : "idle"} w={PANEL.w} h={PANEL.h} position={[POS.growth.x - 0.4 + dx, PANEL.y, POS.growth.z + 0.2 + PANEL.z]} />
       ))}
       <ScreenPlane kind="chart" w={1.2} h={0.75} position={[POS.growth.x + 1.15, 1.5, POS.growth.z - 0.52]} />
-      <Creature pose="sit" activity={crew.promos > 0 ? "type" : "mug"} species={creature(14, "marketer")} position={[POS.growth.x - 0.4, 0, POS.growth.z + 0.92]} phase={5} />
+      <Creature pose="sit" activity={crew.promos > 0 ? "type" : "mug"} species={creature(14, "marketer")} position={[SPOTS.marketer.x, 0, SPOTS.marketer.z]} phase={5} />
       {[-0.45, 0.45].map((dx) => (
         <ScreenPlane key={dx} kind={crew.incident ? "alert" : "dash"} w={PANEL.w} h={PANEL.h} position={[8.2 + dx, PANEL.y, -6.9 + PANEL.z]} />
       ))}
-      <Creature pose="sit" activity={crew.incident ? "type" : "mug"} species={creature(12, "sre")} position={[8.2, 0, -6.18]} phase={7} />
+      <Creature pose="sit" activity={crew.incident ? "type" : "mug"} species={creature(12, "sre")} position={[SPOTS.onCall.x, 0, SPOTS.onCall.z]} phase={7} />
       <ScreenPlane kind="idle" w={RECEPTION_SCREEN.w} h={(RECEPTION_SCREEN.w * MAC.screenH) / MAC.screenW} position={[3.2, RECEPTION_SCREEN.y, RECEPTION_SCREEN.z]} rot={Math.PI} />
-      <Creature pose="sit" activity="type" species={creature(18, "frontdesk")} position={[3.2, 0, 11.3]} rotation={Math.PI} phase={2} />
+      <Creature pose="sit" activity="type" species={creature(18, "frontdesk")} position={[SPOTS.receptionist.x, 0, SPOTS.receptionist.z]} rotation={SPOTS.receptionist.rot} phase={2} />
 
       {/* A meeting in progress */}
       <ScreenPlane kind="slides" w={meetingTv.w} h={meetingTv.h} position={meetingTv.position} rot={Math.PI / 2} />
-      <Creature pose="stand" activity="present" species={creature(36, "pm")} position={[-12.1, 0, 12.0]} rotation={-Math.PI / 2} phase={1} />
-      <Creature pose="sit" activity="listen" species={creature(33, "founder")} position={[-10.4, 0, 11.42]} rotation={Math.PI} phase={2} />
-      <Creature pose="sit" activity="listen" species={creature(34, "designer")} position={[-8.0, 0, 13.28]} phase={4} />
-      <Creature pose="sit" activity="listen" species={creature(35, "data")} position={[-9.2, 0, 13.28]} phase={6} />
+      <Creature pose="stand" activity="present" species={creature(36, "pm")} position={[SPOTS.presenter.x, 0, SPOTS.presenter.z]} rotation={SPOTS.presenter.rot} phase={1} />
+      <Creature pose="sit" activity="listen" species={creature(33, "founder")} position={[SPOTS.founder.x, 0, SPOTS.founder.z]} rotation={SPOTS.founder.rot} phase={2} />
+      <Creature pose="sit" activity="listen" species={creature(34, "designer")} position={[SPOTS.designerInMeeting.x, 0, SPOTS.designerInMeeting.z]} phase={4} />
+      <Creature pose="sit" activity="listen" species={creature(35, "data")} position={[SPOTS.analystInMeeting.x, 0, SPOTS.analystInMeeting.z]} phase={6} />
 
       {/* Kitchen chat, the lounge, a phone call and the townhall */}
-      <Creature pose="stand" activity="chat" species={creature(31, "intern")} position={[17.5, 0, -4.85]} rotation={0.81} phase={8} />
-      <Creature pose="sit" activity="listen" species={creature(27, "dev")} position={[19.9, 0, 7.1]} rotation={Math.PI / 2} phase={9} />
-      <Creature pose="stand" activity="chat" species={creature(38, "marketer")} position={[-14.8, 0, 13.7]} rotation={Math.PI} phase={10} />
-      <Creature pose="sit" activity="laptop" species={creature(40, "data")} position={[-18.6, 0, 3.6]} rotation={-Math.PI / 2} phase={11} seat={0.8} />
+      <Creature pose="stand" activity="chat" species={creature(31, "intern")} position={[SPOTS.kitchenChat.x, 0, SPOTS.kitchenChat.z]} rotation={SPOTS.kitchenChat.rot} phase={8} />
+      <Creature pose="sit" activity="listen" species={creature(27, "dev")} position={[SPOTS.sofaListener.x, 0, SPOTS.sofaListener.z]} rotation={SPOTS.sofaListener.rot} phase={9} />
+      <Creature pose="stand" activity="chat" species={creature(38, "marketer")} position={[SPOTS.phoneBooth.x, 0, SPOTS.phoneBooth.z]} rotation={SPOTS.phoneBooth.rot} phase={10} />
+      <Creature pose="sit" activity="laptop" species={creature(40, "data")} position={[SPOTS.townhallReader.x, 0, SPOTS.townhallReader.z]} rotation={SPOTS.townhallReader.rot} phase={11} seat={0.8} />
       <ScreenPlane kind="slides" w={2.1} h={1.12} position={[-14.35, 1.5, 4.5]} rot={-Math.PI / 2} />
       <ScreenPlane kind="game" w={loungeTv.w} h={loungeTv.h} position={loungeTv.position} rot={Math.PI / 2} />
       {ARCADES.map(([, x]) => (
         <ScreenPlane key={x} kind="game" w={ARCADE_SCREEN.w} h={ARCADE_SCREEN.h} position={[x, ARCADE_SCREEN.y, ARCADE_Z + ARCADE_SCREEN.z]} tilt={ARCADE_SCREEN.tilt} />
       ))}
 
-      {/* Crew walking the corridors, and a technician on the server floor */}
-      <Walker from={[13.2, -3.6]} to={[13.2, 12.8]} speed={0.6} species={creature(24, "designer")} />
-      <Walker from={[-4.4, 9.7]} to={[12.4, 9.7]} speed={0.55} species={creature(16, "dev")} phase={4} />
+      {/* Crew wandering the office, each on a loop of their own, and a technician on the server floor */}
+      {WANDERERS.map((w, i) => (
+        <Wanderer key={i} plan={WANDERER_PLANS[i]} species={w.species} offset={w.offset} />
+      ))}
       <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} species={creature(23, "tech")} phase={2} />
     </group>
   );
@@ -795,8 +776,8 @@ export function Office({ crew }: { crew: Crew }) {
       <Staff crew={crew} />
       <PingPongBall />
       {/* Two players at the ends of the table, each swinging as the ball reaches them. */}
-      <Creature species="frog" activity="play" holding="paddle" position={[RALLY.x - PLAYER_X, 0, RALLY.z]} rotation={-Math.PI / 2} beat={PING} />
-      <Creature species="bunny" activity="play" holding="paddle" position={[RALLY.x + PLAYER_X, 0, RALLY.z]} rotation={Math.PI / 2} beat={PONG} />
+      <Creature species="frog" activity="play" holding="paddle" position={[SPOTS.pingPlayer.x, 0, SPOTS.pingPlayer.z]} rotation={SPOTS.pingPlayer.rot} beat={PING} />
+      <Creature species="bunny" activity="play" holding="paddle" position={[SPOTS.pongPlayer.x, 0, SPOTS.pongPlayer.z]} rotation={SPOTS.pongPlayer.rot} beat={PONG} />
 
       <OnWall wall="left">
         <PrimBatch prims={wall.leftPrims} shadows={false} />

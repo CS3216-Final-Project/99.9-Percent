@@ -8,6 +8,7 @@ import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js
 import { ALL_SPECIES, motionFor, SPECIES, type Activity, type Species } from "./cast";
 import { useDetail, type Detail } from "./detail";
 import { loadGltf } from "./gltf";
+import { poseAt, type Plan } from "./routes";
 
 /*
  * The office crew: animated monsters (see cast.ts). Every creature is a copy of
@@ -309,6 +310,34 @@ export function Walker({ from, to, speed, species, phase = 0 }: { from: [number,
   return (
     <group ref={g}>
       <Creature species={species} activity="walk" position={[0, 0, 0]} phase={phase} pace={speed} />
+    </group>
+  );
+}
+
+/**
+ * A creature on a wandering loop (see routes.ts): walking the corridors,
+ * turning at corners and pausing at whatever it visits. Its place comes from
+ * the clock alone, so a remount carries on where it was.
+ */
+export function Wanderer({ plan, species, offset = 0 }: { plan: Plan; species: Species; offset?: number }) {
+  const g = useRef<THREE.Group>(null);
+  const [activity, setActivity] = useState<Activity>(() => poseAt(plan, offset).activity);
+  const shown = useRef(activity);
+  useFrame(({ clock }) => {
+    const pose = poseAt(plan, clock.elapsedTime + offset);
+    if (g.current) {
+      g.current.position.set(pose.x, 0, pose.z);
+      g.current.rotation.y = pose.yaw;
+    }
+    // Only a change of what it is doing needs React; moving does not.
+    if (pose.activity !== shown.current) {
+      shown.current = pose.activity;
+      setActivity(pose.activity);
+    }
+  });
+  return (
+    <group ref={g}>
+      <Creature species={species} activity={activity} position={[0, 0, 0]} phase={offset} pace={plan.speed} />
     </group>
   );
 }
