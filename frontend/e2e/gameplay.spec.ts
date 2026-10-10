@@ -3,9 +3,12 @@ import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
 for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
-  test(`opening acceptance: ${path}`, async ({ page }) => {
+  test(`opening acceptance: ${path}`, async ({ page, withoutRoom }) => {
+    // Only the upgrade path inspects a machine by clicking it in the room.
+    const room = path === "upgrade";
+    if (!room) await withoutRoom();
     await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
-    await expectRoom(page);
+    if (room) await expectRoom(page);
     for (let i = 0; i < 6; i++)await page.getByRole("button", { name: "Advance step", exact: true }).click();
     if (path === "upgrade") {
       await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
@@ -57,10 +60,11 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     expect(after.campaign!.runId).toBe(opening.runId); expect(after.phase).toBe("management");
     if (path === "limit") expect(after.campaign!.limit).toBe(500);
     await page.reload(); await page.getByRole("button", { name: "Continue company" }).click();
-    expect(await savedGame(page)).toEqual(after); await expectRoom(page);
+    expect(await savedGame(page)).toEqual(after); if (room) await expectRoom(page);
   });
 }
-test("preserves a corrupt campaign save until explicit reset", async ({ page }) => {
+test("preserves a corrupt campaign save until explicit reset", async ({ page, withoutRoom }) => {
+  await withoutRoom();
   await page.addInitScript(() => { localStorage.setItem("nn.campaign.save.v1", "{"); });
   await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await page.getByRole("button", { name: "Advance step" }).click();
@@ -73,7 +77,8 @@ test("preserves a corrupt campaign save until explicit reset", async ({ page }) 
   await menu.getByRole("button", { name: "Confirm new company" }).click();
   expect((await savedGame(page)).campaign!.step).toBe(0);
 });
-test("resumes an incident paused", async ({ page }) => {
+test("resumes an incident paused", async ({ page, withoutRoom }) => {
+  await withoutRoom();
   const s = advanceSteps(newGame(1, "paused"), 6).state;
   await seedSave(page, s); await page.goto("/"); await page.getByRole("button", { name: "Continue company" }).click();
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
@@ -85,7 +90,8 @@ test("keeps the room playable without downloaded furniture", async ({ page }) =>
   await expectRoom(page); await page.getByRole("button", { name: "Advance step" }).click();
   expect((await savedGame(page)).campaign!.step).toBe(1);
 });
-test("keeps history reachable after bankruptcy", async ({ page }) => {
+test("keeps history reachable after bankruptcy", async ({ page, withoutRoom }) => {
+  await withoutRoom();
   // Leaving the opening incident unresolved loses money every week until cash runs out.
   // Each advance stops at the first incident, so keep going until the company is bankrupt.
   let s = newGame(1, "paused");

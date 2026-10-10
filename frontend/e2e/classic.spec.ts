@@ -5,10 +5,20 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('nn.mode.v1', 'classic'));
 });
 
-test('completes the first-week tutorial, purchases equipment and resumes after reload', async ({ page }) => {
+test('completes the first-week tutorial on the basic look, purchases equipment and resumes after reload', async ({ page }) => {
+  // CI draws with SwiftShader, which the room detects as software rendering, so no HD asset may be downloaded.
+  const hd: string[] = [];
+  const crew = new Set<string>();
+  page.on('request', request => {
+    const url = request.url();
+    if (url.includes('/textures/') || url.includes('/models/polyhaven/')) hd.push(url);
+  });
+  page.on('response', response => { if (response.url().includes('/models/creatures/') && response.ok()) crew.add(response.url()); });
   await page.goto('/');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expectRoom(page);
+  // The monster crew works at every level of detail.
+  await expect.poll(() => crew.size).toBe(14);
   await expect(page.getByRole('dialog', { name: /Tutorial, step 1/ })).toBeVisible();
   await page.getByRole('button', { name: 'Servers', exact: true }).click();
   await page.getByRole('button', { name: /Add server/ }).click();
@@ -33,38 +43,23 @@ test('completes the first-week tutorial, purchases equipment and resumes after r
   await expectRoom(page);
   expect(await savedGame(page)).toEqual(before);
   await expect(page.getByRole('dialog', { name: /Tutorial/ })).toHaveCount(0);
+  await page.waitForLoadState('networkidle');
+  expect(hd).toEqual([]);
 });
 
-test('keeps the game playable when the furniture models cannot be downloaded', async ({ page }) => {
+test('keeps the game playable when the furniture and creature models cannot be downloaded', async ({ page }) => {
   await page.route('**/models/**', route => route.abort());
   const skipped = page.waitForEvent('console', message => message.text().includes('Furniture models failed to load'));
+  const crew = page.waitForEvent('console', message => message.text().includes('Creature models failed to load'));
   await page.goto('/');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await skipped;
+  await crew;
   await expectRoom(page);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
   await expectRoom(page);
-});
-
-test('keeps a browser without a GPU on the basic look and never downloads HD assets', async ({ page }) => {
-  // CI draws with SwiftShader, which the room detects as software rendering.
-  const hd: string[] = [];
-  const crew = new Set<string>();
-  page.on('request', request => {
-    const url = request.url();
-    if (url.includes('/textures/') || url.includes('/models/polyhaven/')) hd.push(url);
-  });
-  page.on('response', response => { if (response.url().includes('/models/creatures/') && response.ok()) crew.add(response.url()); });
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await expectRoom(page);
-  // The monster crew works at every level of detail.
-  await expect.poll(() => crew.size).toBe(14);
-  await page.waitForLoadState('networkidle');
-  expect(hd).toEqual([]);
 });
 
 test('draws the photo-scanned surfaces and furniture when HD detail is forced', async ({ page }) => {
@@ -82,7 +77,8 @@ test('draws the photo-scanned surfaces and furniture when HD detail is forced', 
   await page.goto('/?graphics=hd');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await expectRoom(page);
+  // Compiling the HD shaders in software can block the page for longer than the default 10 seconds.
+  await expectRoom(page, 30_000);
   // Six surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
   await expect.poll(() => textures.size).toBe(18);
   await expect.poll(() => furniture.size).toBe(9);
@@ -101,37 +97,25 @@ test('keeps the game playable when the HD textures and furniture cannot be downl
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await surfaces;
   await furniture;
-  await expectRoom(page);
+  await expectRoom(page, 30_000);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
   await expectRoom(page);
 });
 
-test('keeps the game playable when the creature models cannot be downloaded', async ({ page }) => {
-  await page.route('**/models/creatures/**', route => route.abort());
-  const skipped = page.waitForEvent('console', message => message.text().includes('Creature models failed to load'));
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await skipped;
-  await expectRoom(page);
-  await page.getByRole('button', { name: 'Next week', exact: true }).click();
-  expect((await savedGame(page)).turn).toBe(2);
-  await expectRoom(page);
-});
-
-test('recovers from a corrupt save through the playable first-run flow', async ({ page }) => {
+test('recovers from a corrupt save through the playable first-run flow', async ({ page, withoutRoom }) => {
+  await withoutRoom();
   await page.addInitScript(() => localStorage.setItem('nn.classic.save.v1', '{'));
   await page.goto('/');
   await expect(page.getByRole('alert')).toHaveText('Saved classic run was unreadable. Started a new one.');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  await expectRoom(page);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
 });
 
-test('confirms replacing a run and starts the supplied replay seed', async ({ page }) => {
+test('confirms replacing a run and starts the supplied replay seed', async ({ page, withoutRoom }) => {
+  await withoutRoom();
   await seedSave(page, advanceTurn(newGame(1)));
   await page.goto('/');
   await page.getByRole('button', { name: 'Continue week 2' }).click();
@@ -145,17 +129,15 @@ test('confirms replacing a run and starts the supplied replay seed', async ({ pa
   expect(await savedGame(page)).toEqual(newGame('e2e-repeatable'));
 });
 
-test('resumes an incident paused, investigates, fixes it and acknowledges the postmortem', async ({ page }) => {
-  // Clock.runFor also renders every WebGL animation frame. The CI trace shows
-  // several seconds of virtual time can take tens of seconds on SwiftShader.
-  test.setTimeout(150_000);
+test('resumes an incident paused, investigates, fixes it and acknowledges the postmortem', async ({ page, withoutRoom }) => {
+  // Clock.runFor would also draw every WebGL animation frame, turning 13 virtual seconds into a minute.
+  await withoutRoom();
   const incident = advanceTurn({ ...newGame(1), users: 4500, techDone: ['monitoring'] });
   expect(incident.incident?.type).toBe('app_overload');
   await seedSave(page, incident);
   await page.clock.install();
   await page.goto('/');
   await page.getByRole('button', { name: 'Continue week 1' }).click();
-  await expectRoom(page);
   await page.clock.pauseAt(new Date(Date.now() + 1000));
   const panel = page.getByRole('region', { name: 'Incident', exact: true });
   const clock = panel.locator('.clock-time');
@@ -187,7 +169,8 @@ test('resumes an incident paused, investigates, fixes it and acknowledges the po
   expect((await savedGame(page)).turn).toBe(2);
 });
 
-test('plays music from the first click and remembers when it is turned off', async ({ page }) => {
+test('plays music from the first click and remembers when it is turned off', async ({ page, withoutRoom }) => {
+  await withoutRoom();
   const problems: string[] = [];
   page.on('console', message => { if (message.text().includes('music could not be prepared')) problems.push(message.text()); });
   await page.goto('/');
@@ -202,6 +185,5 @@ test('plays music from the first click and remembers when it is turned off', asy
   await expect(music).toHaveAttribute('aria-pressed', 'false');
   await page.reload();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await expectRoom(page);
   await expect(page.getByRole('button', { name: 'Music' })).toHaveAttribute('aria-pressed', 'false');
 });

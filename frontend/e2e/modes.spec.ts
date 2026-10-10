@@ -1,5 +1,6 @@
 import { test, expect, expectRoom, savedGame } from "./fixtures";
 
+// The room stays mounted while the game underneath it is swapped, so this journey keeps drawing it.
 test("switches between campaign and classic from the menu, keeping each run", async ({ page }) => {
   await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await expectRoom(page);
@@ -11,6 +12,7 @@ test("switches between campaign and classic from the menu, keeping each run", as
   await page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: "Switch to Classic" }).click();
   await expect(page.getByRole("dialog", { name: "Menu" })).toBeHidden();
   await page.getByRole("button", { name: "Skip" }).click();
+  await expectRoom(page);
   await page.getByRole("button", { name: /Next week/ }).click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("nn.classic.save.v1")!).game.turn)).toBe(2);
 
@@ -26,10 +28,10 @@ test("switches between campaign and classic from the menu, keeping each run", as
   expect(await page.evaluate(() => localStorage.getItem("nn.mode.v1"))).toBe("campaign");
 });
 
-test("asks before switching away from a run that cannot be saved", async ({ page }) => {
+test("asks before switching away from a run that cannot be saved", async ({ page, withoutRoom }) => {
+  await withoutRoom();
   await page.addInitScript(() => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("nn.campaign.save.v1", "{"); } });
   await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
-  await expectRoom(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
   await menu.getByRole("button", { name: "Switch to Classic" }).click();
