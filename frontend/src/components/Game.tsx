@@ -8,6 +8,7 @@ import { clock, compact, money, moneyFull, num, signedMoney, uptimePct } from "@
 import { createMusic, type Music } from "@/game/music";
 import { useGame, type Speed, type View } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { tipProps } from "./tips";
 import { MusicButton } from "./MusicButton";
 import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Modals";
 import SidePanel from "./SidePanel";
@@ -90,7 +91,6 @@ function TopBar() {
           icon={health.icon}
           kind={health.tone === "ok" ? "health" : health.tone}
           label="Health"
-          side="left"
           tip="Uptime is the share of requests served across the whole run. 99.99% allows about 26 minutes of downtime in this campaign."
         >
           <strong>{health.word}</strong>
@@ -99,7 +99,7 @@ function TopBar() {
       </div>
 
       <MusicButton />
-      <button type="button" className="icon-btn menu-btn" onClick={() => openView("menu")} aria-label="Menu" title="Menu">
+      <button type="button" className="icon-btn menu-btn" onClick={() => openView("menu")} aria-label="Menu" {...tipProps("Menu")}>
         <Icon name="menu" />
       </button>
     </header>
@@ -167,7 +167,7 @@ function StageHud() {
           tone={w.level === "critical" ? "critical" : "warn"}
           icon={WARNING_ICON[w.code] ?? "alert"}
           kicker={w.level === "critical" ? "Critical" : "Warning"}
-          title={w.detail}
+          tip={w.detail}
           onClick={() => (w.equipment ? select(w.equipment) : openView("history"))}
         >
           {w.text}
@@ -214,7 +214,7 @@ function BottomBar() {
         {tabs
           .filter((t) => t[4])
           .map(([id, label, icon, badge]) => (
-            <button type="button" key={id} data-view={id} className={view === id ? "is-active" : ""} aria-pressed={view === id} aria-label={label} title={label} disabled={incident && id !== "history"} onClick={() => toggle(id)}>
+            <button type="button" key={id} data-view={id} className={view === id ? "is-active" : ""} aria-pressed={view === id} aria-label={label} {...tipProps(label)} disabled={incident && id !== "history"} onClick={() => toggle(id)}>
               <span className="tab-icon" aria-hidden="true">
                 <Icon name={icon} />
               </span>
@@ -232,13 +232,13 @@ function BottomBar() {
               className={`icon-btn${running ? " is-on" : ""}`}
               onClick={() => setRunning(!running)}
               aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : running ? "Stop auto-advance" : "Auto-advance weeks"}
-              title={incident ? "Pause or resume the clock (P)" : "Advance weeks automatically (P)"}
+              {...tipProps(incident ? "Pause or resume the clock (P)" : "Advance weeks automatically (P)")}
             >
               <Icon name={running ? "pause" : "play"} />
             </button>
             <div className="speed" role="group" aria-label="Game speed">
               {SPEEDS.map((s) => (
-                <button type="button" key={s} className={speed === s ? "is-active" : ""} aria-pressed={speed === s} onClick={() => setSpeed(s)} title={`${s}× speed`}>
+                <button type="button" key={s} className={speed === s ? "is-active" : ""} aria-pressed={speed === s} onClick={() => setSpeed(s)} {...tipProps(`${s}× speed`)}>
                   {s}×
                 </button>
               ))}

@@ -26,6 +26,7 @@ import {
 import { moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
+import { tipProps } from "./tips";
 import { EQUIPMENT_ICON, moodIcon, STATE_META, TECH_ICON, utilTone } from "./presentation";
 import IncidentPanel from "./IncidentPanel";
 import { Act, Chip, Gauge, ReleaseRow, Row, TaskRow } from "./ui";
@@ -41,7 +42,7 @@ function TechChip({ id }: { id: TechId }) {
   const status = techStatus(game, id);
   if (!isResearchTech(id)) return null;
   return (
-    <button type="button" className={`tech-chip tech-${status}`} onClick={() => focusTech(id)} title={TECH[id].description}>
+    <button type="button" className={`tech-chip tech-${status}`} onClick={() => focusTech(id)} {...tipProps(TECH[id].description)}>
       <Icon name={status === "done" ? "check" : status === "locked" ? "lock" : (TECH_ICON[id] ?? "plus")} size={16} />
       {TECH[id].name}
     </button>
@@ -167,7 +168,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
               price={next.cost}
               disabled={locked}
               onClick={() => act({ type: "start_db_upgrade" })}
-              title={`${num(next.capacity)} queries/s, ${moneyFull(next.upkeep)} a week. Takes ${next.effort} engineer-weeks.`}
+              tip={`${num(next.capacity)} queries/s, ${moneyFull(next.upkeep)} a week. Takes ${next.effort} engineer-weeks.`}
             />
           ) : (
             <p className="muted">Largest tier.</p>
@@ -243,7 +244,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
                     price={usable ? promoCost(game, pid) : undefined}
                     disabled={locked || !usable}
                     onClick={() => act({ type: "launch_promotion", promo: pid })}
-                    title={def.description}
+                    tip={def.description}
                   />
                 )}
               </div>
@@ -300,7 +301,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
               price={BALANCE.engineer.hireCost}
               disabled={locked || game.engineers >= BALANCE.engineer.max}
               onClick={() => act({ type: "hire_engineer" })}
-              title={`Then ${moneyFull(BALANCE.engineer.salary)} a week.`}
+              tip={`Then ${moneyFull(BALANCE.engineer.salary)} a week.`}
             />
           </More>
         </>

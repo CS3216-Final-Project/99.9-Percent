@@ -7,6 +7,7 @@ import { MusicButton } from "./MusicButton";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { CampaignPostmortem, Intervention } from "@/sim/campaignTypes";
 import { Icon } from "./icons";
+import { tipProps } from "./tips";
 import { EQUIPMENT_ICON } from "./presentation";
 import { ModeSwitch } from "./ModeSwitch";
 import { LineChart } from "./Views";
@@ -42,12 +43,12 @@ export function CampaignHeader() {
       <Stat icon="revenue" kind="revenue" label="Pending revenue" tip={`${dollars(c.ledger.successes * Q.revenueCents)} earned this operating week, not yet added to cash. Only successful requests earn revenue.`}>
         <strong>{money(c.ledger.successes * Q.revenueCents / 100)}</strong><span className="muted">unsettled</span>
       </Stat>
-      <Stat icon={incident ? "incident" : atRisk ? "alert" : "health"} kind={tone} label="Health" side="left" tip="Recovery needs five consecutive steps below 500 ms latency and 1% service errors, with admitted traffic and completed requests. There is no incident timeout.">
+      <Stat icon={incident ? "incident" : atRisk ? "alert" : "health"} kind={tone} label="Health" tip="Recovery needs five consecutive steps below 500 ms latency and 1% service errors, with admitted traffic and completed requests. There is no incident timeout.">
         <strong>{word}</strong>
       </Stat>
     </div>
     <MusicButton />
-    <button type="button" className="icon-btn menu-btn" aria-label="Menu" title="Menu" onClick={() => openView("menu")}><Icon name="menu" /></button>
+    <button type="button" className="icon-btn menu-btn" aria-label="Menu" {...tipProps("Menu")} onClick={() => openView("menu")}><Icon name="menu" /></button>
   </header>;
 }
 
@@ -92,9 +93,9 @@ export function CampaignPanel() {
       </div>
       <h4 className="step-head"><span className="step-num" aria-hidden="true">2</span>Choose a response</h4>
       <ul className="actions">
-        <li><Act label="Add server" price={Q.appCostCents / 100} note={`${Q.appDelay} steps`} disabled={disabled || busy || c.apps.length >= Q.maxApps || c.cashCents <= Q.appCostCents} title="Adds installed application capacity. Without routing, a new server does not receive traffic." onClick={() => act({ type: "add_server" })} /></li>
-        <li><Act label="Upgrade database" price={Q.dbCostCents / 100} note={`${Q.dbDelay} steps`} disabled={disabled || busy || c.upgraded || c.cashCents <= Q.dbCostCents} title="Increases database capacity after activation. Running costs also increase." onClick={() => act({ type: "start_db_upgrade" })} /></li>
-        <li><Act label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} step`} disabled={disabled || admissionPending} title="Changes admitted traffic at the next physical step. Rejected requests earn no revenue." onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
+        <li><Act label="Add server" price={Q.appCostCents / 100} note={`${Q.appDelay} steps`} disabled={disabled || busy || c.apps.length >= Q.maxApps || c.cashCents <= Q.appCostCents} tip="Adds installed application capacity. Without routing, a new server does not receive traffic." onClick={() => act({ type: "add_server" })} /></li>
+        <li><Act label="Upgrade database" price={Q.dbCostCents / 100} note={`${Q.dbDelay} steps`} disabled={disabled || busy || c.upgraded || c.cashCents <= Q.dbCostCents} tip="Increases database capacity after activation. Running costs also increase." onClick={() => act({ type: "start_db_upgrade" })} /></li>
+        <li><Act label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} step`} disabled={disabled || admissionPending} tip="Changes admitted traffic at the next physical step. Rejected requests earn no revenue." onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
       </ul>
       {c.pending.map(a => <div className="working campaign-working" role="status" key={a.id}>
         <span>{ACTION_NAMES[a.type]}: activates in {a.activationStep - c.step} step(s)</span>
@@ -123,12 +124,12 @@ export function CampaignControls() {
   const { game, view, running, setRunning, speed, setSpeed, advance, openView } = useGame();
   const active = game.phase === "management" || game.phase === "incident";
   return <footer className="bottombar">
-    <nav className="view-tabs" aria-label="Views"><button type="button" className={view === "history" ? "is-active" : ""} aria-pressed={view === "history"} aria-label="History" title="History" onClick={() => openView(view === "history" ? null : "history")}>
+    <nav className="view-tabs" aria-label="Views"><button type="button" className={view === "history" ? "is-active" : ""} aria-pressed={view === "history"} aria-label="History" {...tipProps("History")} onClick={() => openView(view === "history" ? null : "history")}>
       <span className="tab-icon" aria-hidden="true"><Icon name="history" /></span><span className="tab-label">History</span>
     </button></nav>
-    <div className="time-controls"><button type="button" className={`icon-btn${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} title="Run or pause physical steps (P)" disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /></button>
-      <div className="speed" role="group" aria-label="Game speed">{([.5, 1, 2] as Speed[]).map(v => <button type="button" key={v} className={speed === v ? "is-active" : ""} aria-pressed={speed === v} onClick={() => setSpeed(v)} title={`${v}× speed`}>{v}×</button>)}</div>
-      <button type="button" className="btn btn-primary advance" disabled={game.phase !== "management"} onClick={advance} title="Advance one physical step. One step models one second of requests; 60 steps settle an operating week."><span className="advance-label">{game.phase === "incident" ? "Incident" : game.phase === "ended" ? "Company closed" : game.phase === "review" ? "Review" : "Advance step"}</span><Icon name="next" /></button>
+    <div className="time-controls"><button type="button" className={`icon-btn${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps("Run or pause physical steps (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /></button>
+      <div className="speed" role="group" aria-label="Game speed">{([.5, 1, 2] as Speed[]).map(v => <button type="button" key={v} className={speed === v ? "is-active" : ""} aria-pressed={speed === v} onClick={() => setSpeed(v)} {...tipProps(`${v}× speed`)}>{v}×</button>)}</div>
+      <button type="button" className="btn btn-primary advance" disabled={game.phase !== "management"} onClick={advance} {...tipProps("Advance one physical step. One step models one second of requests; 60 steps settle an operating week.")}><span className="advance-label">{game.phase === "incident" ? "Incident" : game.phase === "ended" ? "Company closed" : game.phase === "review" ? "Review" : "Advance step"}</span><Icon name="next" /></button>
     </div>
   </footer>;
 }
