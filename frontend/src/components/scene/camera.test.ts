@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT } from "./camera";
+import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
 import { buildings, FADE, GROUND_Y, REACH, ROOF_HEADROOM, TOWER } from "./city";
 import { ROOM } from "./layout";
 
@@ -63,5 +63,50 @@ describe("city camera clipping", () => {
       expect(b.x).toBeCloseTo(a.x, 10);
       expect(b.y).toBeCloseTo(a.y, 10);
     }
+  });
+});
+
+describe("turning the camera", () => {
+  const towards = (camera: THREE.Camera, target: THREE.Vector3) => target.clone().sub(camera.position).normalize();
+  const yaws = [0, Math.PI / 4, -Math.PI / 4, Math.PI, 2.6];
+
+  it("holds the anchor at the same place on screen through turns and tilts", () => {
+    const anchor = new THREE.Vector3(-2.4, 1.1, 1.3);
+    for (const [tilt, nextTilt] of [[Math.PI / 4, Math.PI / 4], [MIN_TILT, MAX_TILT], [MAX_TILT, 0.7]]) {
+      for (const yaw of yaws) {
+        const target = new THREE.Vector3(-1, 0, 0.6);
+        const before = cameraAt(target, tilt, yaw);
+        const turned = turnAbout(target.clone(), anchor, towards(before, target), towards(cameraAt(target, nextTilt, yaw + Math.PI / 4), target));
+        expect(turned.y).toBeCloseTo(0, 10);
+        const after = cameraAt(turned, nextTilt, yaw + Math.PI / 4);
+        const a = anchor.clone().project(before);
+        const b = anchor.clone().project(after);
+        expect(b.x).toBeCloseTo(a.x, 10);
+        expect(b.y).toBeCloseTo(a.y, 10);
+      }
+    }
+  });
+
+  it("turns about the middle of the screen when the anchor is the floor point in view", () => {
+    for (const yaw of yaws) {
+      const target = new THREE.Vector3(3, 0, -2);
+      const from = towards(cameraAt(target, 0.9, yaw), target);
+      const to = towards(cameraAt(target, 0.9, yaw + 1), target);
+      const turned = turnAbout(target.clone(), target, from, to);
+      expect(turned.distanceTo(target)).toBeCloseTo(0, 10);
+    }
+  });
+
+  it("keeps a raised anchor in the middle of the screen, which orbiting the floor point beneath it would not", () => {
+    // The framing looks at the floor point straight behind the middle of the equipment, as seen from the camera.
+    const anchor = new THREE.Vector3(-1, 1.5, 0.6);
+    const view = new THREE.Vector3().setFromSphericalCoords(1, Math.PI / 4, Math.PI / 4).negate();
+    const target = anchor.clone().addScaledVector(view, -anchor.y / view.y);
+    const before = cameraAt(target, Math.PI / 4, Math.PI / 4);
+    expect(anchor.clone().project(before).x).toBeCloseTo(0, 10);
+    const orbit = cameraAt(target, Math.PI / 4, Math.PI / 2);
+    expect(Math.abs(anchor.clone().project(orbit).x)).toBeGreaterThan(0.01);
+    const turned = turnAbout(target.clone(), anchor, towards(before, target), towards(orbit, target));
+    expect(anchor.clone().project(cameraAt(turned, Math.PI / 4, Math.PI / 2)).x).toBeCloseTo(0, 10);
   });
 });
