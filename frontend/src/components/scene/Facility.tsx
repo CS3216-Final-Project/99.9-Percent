@@ -42,6 +42,7 @@ import { Office } from "./Office";
 import { Exterior } from "./exterior";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
+import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT } from "./camera";
 
 /* ------------------------------------------------------------------ */
 /* Scene model: the few facts the 3D view needs, as a stable snapshot  */
@@ -159,12 +160,9 @@ const TARGET = new THREE.Vector3(-1, 0, 0.6);
  * is seen, but the camera must stand far enough back that the ground outside is never behind it when zoomed out
  * and tilted low.
  */
-const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20).setLength(240);
+const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20).setLength(CAMERA_DISTANCE);
 const HOME = CAMERA_OFFSET.clone().normalize();
 const UP = new THREE.Vector3(0, 1, 0);
-/** Tilt limits, measured from straight down: nearly top-down to a low three-quarter view. */
-const MIN_TILT = 0.22;
-const MAX_TILT = 1.2;
 /** Q, E and the rotate buttons turn the room by an eighth of a circle. */
 const TURN = Math.PI / 4;
 
@@ -943,7 +941,7 @@ export default function Facility() {
           if (software) gl.shadowMap.enabled = false;
           setRenderer(software ? "software" : "gpu");
         }}
-        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 640 }}
+        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: CAMERA_NEAR, far: CAMERA_FAR }}
         onPointerMissed={() => {
           if (useGame.getState().game.phase !== "incident") useGame.getState().select(null);
         }}
