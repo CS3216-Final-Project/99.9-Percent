@@ -35,15 +35,23 @@ describe("Opening prevention",()=>{
   expect(c.openingRecovered).toBe(false);expect(c.incident).toBeNull();expect(c.reports).toEqual([]);expect(c.trace.some(t=>t.type==="incident-recovered")).toBe(false);
   expect(advanceSteps(r.state,100).stepsConsumed).toBe(0);expect(step(r.state).state).toBe(r.state);expect(c.openingMilestone).toBeNull();
  });
- it("acknowledges prevention then the same milestone/Scaling transition without time or cash reward",()=>{
+ it("acknowledges prevention separately and rejects Scaling without a recovered report",()=>{
   const g=tick(prepared(),5),c=g.campaign!,before=structuredClone(g);
   expect(applyAction(g,{type:"acknowledge_milestone"}).ok).toBe(false);expect(applyAction(g,{type:"enter_scaling"}).ok).toBe(false);
   const reviewed=act(g,{type:"acknowledge_prevention_review"});expect(g).toEqual(before);
-  expect(reviewed.campaign!.openingPrevention!.outcome!.acknowledged).toBe(true);expect(reviewed.campaign!.openingMilestone).toMatchObject({id:"opening-stability",incidentId:null,outcomeId:"opening-prevention",acknowledged:false});
+  expect(reviewed.campaign!.openingPrevention!.outcome!.acknowledged).toBe(true);expect(reviewed.campaign!.openingMilestone).toBeNull();
   expect(applyAction(reviewed,{type:"acknowledge_prevention_review"}).ok).toBe(false);expect(enterScaling(reviewed)).toBe(reviewed);
-  const done=act(reviewed,{type:"acknowledge_milestone"});expect(done.campaign!.scaling?.id).toBe("application-scaling");
+  expect(applyAction(reviewed,{type:"acknowledge_milestone"}).ok).toBe(false);expect(applyAction(reviewed,{type:"enter_scaling"}).ok).toBe(false);const done=reviewed;expect(done.campaign!.scaling).toBeNull();
   expect(done.campaign!.cashCents).toBe(c.cashCents);expect(done.campaign!.step).toBe(c.step);expect(done.campaign!.runId).toBe(c.runId);expect(done.campaign!.openingRecovered).toBe(false);expect(done.campaign!.reports).toEqual([]);
-  expect(done.campaign!.trace.filter(t=>t.type==="milestone-awarded")).toHaveLength(1);expect(applyAction(done,{type:"acknowledge_milestone"}).ok).toBe(false);
+  expect(done.campaign!.trace.filter(t=>t.type==="milestone-awarded")).toHaveLength(0);expect(applyAction(done,{type:"acknowledge_milestone"}).ok).toBe(false);
+ });
+ it("requires real report evidence even if a milestone flag is present",()=>{
+  const g=tick(prepared(),5),c=g.campaign!;c.openingPrevention!.outcome!.acknowledged=true;
+  c.openingMilestone={id:"opening-stability",incidentId:"missing-report",awardedStep:c.step,acknowledged:false};
+  const before=structuredClone(g);
+  expect(applyAction(g,{type:"acknowledge_milestone"}).ok).toBe(false);expect(g).toEqual(before);
+  c.openingMilestone.acknowledged=true;
+  expect(applyAction(g,{type:"enter_scaling"}).ok).toBe(false);expect(enterScaling(g)).toBe(g);
  });
  it("rejects premature or reactive prevention acknowledgement",()=>{
   expect(applyAction(prepared(),{type:"acknowledge_prevention_review"}).ok).toBe(false);

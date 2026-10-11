@@ -2,7 +2,7 @@
 
 Reviewed on 11 October 2026 against PR #28, the original [Phase 6 plan](PHASE_6_RELIABILITY.md), [UI design](../UI_DESIGN.md), and `main` at `76f0c31` (including the latest title/overview layout, #33). The later PR documentation commit `ad7ac41` is included. The original plan is preserved; the PR's adapted contract and its earlier rebase notes are in [PHASE_6_IMPLEMENTATION_CONTRACT.md](PHASE_6_IMPLEMENTATION_CONTRACT.md).
 
-The additional [Phases 1–5 requirements audit](PHASE_1_TO_5_REQUIREMENTS_AUDIT.md) maps the earlier plans to physical campaign code and observable tests. Their bounded gameplay is implemented, but full acceptance is not established: human sessions, a verified playtest signup destination and live Google/cloud/deployment checks remain outstanding. PR #28 deliberately extends the earlier recovered-incident-only progression rule with acknowledged opening prevention; the audit records that deviation explicitly.
+The additional [Phases 1–5 requirements audit](PHASE_1_TO_5_REQUIREMENTS_AUDIT.md) maps the earlier plans to physical campaign code and observable tests. Their bounded gameplay is implemented, but full acceptance is not established: human sessions, a verified playtest signup destination and live Google/cloud/deployment checks remain outstanding. Following the user's review, Scaling entry now follows the earlier recovered-incident-only plan. Prevention recognition remains separate. See the [Scaling entry follow-up](SCALING_ENTRY_PLAN_RECONCILIATION.md) for the changed gate, schema-7 compatibility and fresh validation; the validation below records the preceding review checkpoint.
 
 ## Fixes from this review
 
@@ -43,7 +43,7 @@ These statuses cover the implementation contract's sixteen checklist items. They
 
 | Checklist item | Status / evidence |
 | --- | --- |
-| Node 22 baseline and Phase 1–5 paths / both Opening routes | PASS: unit, balance and 51-browser suite; earlier-phase audit records acceptance boundaries |
+| Node 22 baseline and Phase 1–5 paths / Opening outcomes | Historical checkpoint passed; follow-up restores recovery-only progression and retains separate prevention evidence |
 | Same-company entry, arming, completion and acknowledgement | PASS: reliability engine, persistence and browser tests preserve identity/resources/history |
 | Versioned single fault, actual/detected health, fixed reload deadlines | PASS: fault/probe/restoration boundary replay tests |
 | Failed deliveries, frozen queues, empty recipients and rejection distinction | PASS: exact conservation and failure/rejection regressions |

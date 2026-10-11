@@ -1,5 +1,8 @@
 # Phase 6 — Stay Online: reliability and technology tree v1
 
+> **User-approved follow-up, 11 October 2026:** the Phase 2/3 recovered-incident-only Scaling entry rule takes precedence over the prevention progression variant described in this historical contract. Prevention recognition remains separate and grants no milestone. Save schema 7 records a bounded historical input prefix to retain already-entered schema-6 companies. See [Scaling entry reconciliation](SCALING_ENTRY_PLAN_RECONCILIATION.md). Historical rebase notes below describe the earlier checkpoint.
+
+
 > **Project:** 99.99% — System Design Tycoon
 > **Target:** 23–28 October 2026; scheduling target, not completion evidence
 > **Learning outcomes:** LO3 Improve reliability; LO4 Weigh trade-offs; reinforce LO1

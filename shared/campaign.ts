@@ -1,6 +1,6 @@
 /** Portable compact campaign contract. Clients replay and validate before loading. */
 export interface CampaignEnvelope {
-  schemaVersion: 3 | 4 | 5 | 6;
+  schemaVersion: 3 | 4 | 5 | 6 | 7;
   scenarioId: "opening-db";
   scenarioVersion: 1;
   runId: string;
@@ -8,6 +8,7 @@ export interface CampaignEnvelope {
   step: number;
   inputs: { step: number; action: { type: string } }[];
   foundation?: { step: number; inputs: number };
+  legacyPreventionInputs?: number;
   runtime: { remainderMs: number };
   savedAt: number;
 }

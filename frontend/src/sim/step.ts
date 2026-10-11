@@ -32,8 +32,13 @@ export function routingValid(c: Campaign, r: Routing): boolean {
         new Set(r.targets).size === r.targets.length && r.targets.every(id => c.apps.some(a => a.id === id && a.state === "active" && a.role!=="spare")) &&
         (r.mode === "single" ? r.targets.length === 1 && r.targets[0] === "app-1" : c.loadBalancer);
 }
+function recoveredOpening(c: Campaign): boolean {
+    const id=c.openingMilestone?.incidentId;
+    return c.openingRecovered && !!id && c.reports.some(r=>r.id===id) &&
+        c.trace.some(t=>t.type==="review-acknowledged" && t.data.incidentId===id);
+}
 export function enterScaling(s: GameState): GameState {
-    if (!s.campaign?.openingMilestone?.acknowledged || s.campaign.scaling || s.phase==="ended") return s;
+    if (!s.campaign?.openingMilestone?.acknowledged || !recoveredOpening(s.campaign) || s.campaign.scaling || s.phase==="ended") return s;
     const next = clone(s);
     enterScalingInPlace(next);
     return next;
@@ -384,9 +389,9 @@ export function applyCampaignInput(prev: GameState, action: Action): { state: Ga
     return { state: s, result: failure ?? { ok: true, state: s } };
 }
 /** `applyCampaignInput` mutating `s`. Returns the rejection, or null when the decision was accepted. */
-export function applyCampaignInputInPlace(s: GameState, action: Action): Rejection | null {
+export function applyCampaignInputInPlace(s: GameState, action: Action, legacyPreventionMilestone = false): Rejection | null {
     const traceStart=s.campaign!.trace.length;
-    const failure = actInPlace(s, action), c = s.campaign!;
+    const failure = actInPlace(s, action, legacyPreventionMilestone), c = s.campaign!;
     if (failure)
         trace(c, "action-rejected", { action: action.type, reason: failure.message });
     if(c.foundation && c.inputs.length<c.foundation.inputs)retainFoundationTrace(c,traceStart);
@@ -395,7 +400,7 @@ export function applyCampaignInputInPlace(s: GameState, action: Action): Rejecti
 }
 type Rejection = Extract<ActionResult, { ok: false }>;
 /** Every check runs before the first mutation, so a rejection leaves `s` untouched. */
-function actInPlace(s: GameState, action: Action): Rejection | null {
+function actInPlace(s: GameState, action: Action, legacyPreventionMilestone: boolean): Rejection | null {
     const fail = (message: string): Rejection => ({ ok: false, reason: "invalid", message });
     const c0 = s.campaign!;
     const reliability = reliabilityAction(s, action);
@@ -406,7 +411,8 @@ function actInPlace(s: GameState, action: Action): Rejection | null {
         const outcome = c0.openingPrevention!.outcome!;
         outcome.acknowledged = true;
         trace(c0, "opening-prevention-review-acknowledged", {outcomeId:outcome.id});
-        if(!c0.openingMilestone) {
+        // Historical inputs replay the old award; new decisions only recognise prevention.
+        if(legacyPreventionMilestone && !c0.openingMilestone) {
             c0.openingMilestone={id:"opening-stability",incidentId:null,outcomeId:outcome.id,awardedStep:c0.step,acknowledged:false};
             trace(c0,"milestone-awarded",{outcomeId:outcome.id,outcome:"prevention"});
         }
@@ -430,13 +436,14 @@ function actInPlace(s: GameState, action: Action): Rejection | null {
     if (action.type === "acknowledge_milestone") {
         const c = s.campaign!;
         if (!c.openingMilestone || c.openingMilestone.acknowledged) return fail("No milestone awaits acknowledgement.");
+        if (!legacyPreventionMilestone && !recoveredOpening(c)) return fail("Recover an Opening incident and acknowledge its postmortem first.");
         c.openingMilestone.acknowledged = true;
         trace(c, "milestone-acknowledged");
         if (action.enterScaling !== false) enterScalingInPlace(s);
         return null;
     }
     if (action.type === "enter_scaling") {
-        if (!s.campaign?.openingMilestone?.acknowledged || s.campaign.scaling || s.phase === "ended") return fail("Scaling stage is locked or already entered.");
+        if (!s.campaign?.openingMilestone?.acknowledged || (!legacyPreventionMilestone && !recoveredOpening(s.campaign)) || s.campaign.scaling || s.phase === "ended") return fail("Scaling requires an acknowledged recovered-incident milestone and must not already be entered.");
         enterScalingInPlace(s);
         return null;
     }

@@ -198,6 +198,8 @@ export interface Campaign {
     reports: CampaignPostmortem[];
     openingMilestone: null | {id:"opening-stability";incidentId:string|null;outcomeId?:"opening-prevention";awardedStep:number;acknowledged:boolean};
     openingPrevention?: OpeningPrevention;
+    /** Input prefix recorded under schema 6's former prevention progression rule. */
+    legacyPreventionInputs?: number;
     openingRecovered: boolean;
     firstPauseConsumed: boolean;
     snapshot: Snapshot;

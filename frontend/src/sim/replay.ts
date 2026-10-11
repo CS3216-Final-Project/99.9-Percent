@@ -14,20 +14,25 @@ export const MAX_REPLAY_INPUTS = 100_000;
  * deterministic, so the result equals the state the inputs were recorded from.
  * Throws when the inputs could not have been recorded by a real run.
  */
-export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number, legacyMilestones = false, foundation?: {step:number;inputs:number}, legacyPrevention = false): GameState {
+export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number, legacyMilestones = false, foundation?: {step:number;inputs:number}, legacyPrevention = false, legacyPreventionInputs = 0): GameState {
     if (!Number.isSafeInteger(finalStep) || finalStep < 0 || finalStep > MAX_REPLAY_STEPS)
         throw new Error("Replay step is out of range");
     if (inputs.length > MAX_REPLAY_INPUTS)
         throw new Error("Replay has too many inputs");
     // The fresh state is private to this replay, so every step and input can mutate it.
     const s = newGame(seed, runId);
+    if (!Number.isSafeInteger(legacyPreventionInputs) || legacyPreventionInputs<0 || legacyPreventionInputs>inputs.length)
+        throw new Error("Legacy prevention input prefix is out of range");
+    if(legacyPreventionInputs)s.campaign!.legacyPreventionInputs=legacyPreventionInputs;
     if(foundation)s.campaign!.foundation={...foundation};
+    let inputIndex=0;
     for (const input of inputs) {
+        if(inputIndex===legacyPreventionInputs)clearUnenteredPreventionMilestone(s);
         if (!Number.isSafeInteger(input.step) || input.step > finalStep)
             throw new Error("Input step is out of range");
         advanceTo(s, input.step, legacyPrevention);
         if (legacyPrevention && input.action.type !== "acknowledge_prevention_review") acknowledgeUnseenPrevention(s);
-        applyCampaignInputInPlace(s, input.action);
+        applyCampaignInputInPlace(s, input.action, inputIndex++<legacyPreventionInputs);
         // Phase 1 acknowledgement already returned to management: preserve that state.
         // Record the added acknowledgement so subsequent saves replay exactly.
         if(legacyMilestones && s.campaign!.openingMilestone?.incidentId && !s.campaign!.openingMilestone.acknowledged) {
@@ -35,8 +40,15 @@ export function replayCampaign(seed: number, runId: string, inputs: readonly Cam
             applyCampaignInputInPlace(s, {type:"acknowledge_milestone", enterScaling:false});
         }
     }
+    clearUnenteredPreventionMilestone(s);
     advanceTo(s, finalStep, legacyPrevention);
     return projectCampaign(s);
+}
+
+/** Keep already-entered companies intact; prevention alone cannot grant a new continuation. */
+function clearUnenteredPreventionMilestone(s: GameState): void {
+    const c=s.campaign!;
+    if(!c.scaling && c.openingMilestone?.outcomeId==="opening-prevention")c.openingMilestone=null;
 }
 
 function advanceTo(s: GameState, target: number, legacyPrevention: boolean): void {
