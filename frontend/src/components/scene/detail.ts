@@ -17,15 +17,6 @@ export function detailOverride(search: string): Detail | null {
   return value === "hd" || value === "basic" ? value : null;
 }
 
-/**
- * The detail to draw with. Until the renderer is known it stays basic, so a
- * machine without a GPU never starts downloading HD textures.
- */
-export function chooseDetail(renderer: Renderer, override: Detail | null): Detail {
-  if (renderer === "unknown") return "basic";
-  return override ?? (renderer === "gpu" ? "hd" : "basic");
-}
-
 export const DetailContext = createContext<Detail>("basic");
 
 export function useDetail(): Detail {

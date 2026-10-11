@@ -15,6 +15,7 @@ const CLASSIC_SAVE_KEY = "nn.classic.save.v1";
 const CLASSIC_META_KEY = "nn.classic.meta.v1";
 const MODE_KEY = "nn.mode.v1";
 const AUDIO_KEY = "nn.audio.v1";
+const GRAPHICS_KEY = "nn.graphics.v1";
 /** Music on or off, from before the volume settings. Still written, so an older build keeps the player's choice. */
 const MUSIC_KEY = "nn.music.v1";
 const LEGACY_SAVE_KEY = "nn.save.v1";
@@ -59,6 +60,17 @@ export interface AudioSettings {
 }
 
 export const DEFAULT_AUDIO: AudioSettings = { music: 80, effects: 80, muted: false };
+
+/** How much the room is drawn with. Auto picks by what draws the canvas; the others are the player's choice. */
+export const GRAPHICS_QUALITIES = ["auto", "high", "medium", "low"] as const;
+export type GraphicsQuality = (typeof GRAPHICS_QUALITIES)[number];
+
+/** Graphics settings, shared by both modes. */
+export interface GraphicsSettings {
+  quality: GraphicsQuality;
+}
+
+export const DEFAULT_GRAPHICS: GraphicsSettings = { quality: "auto" };
 
 function read(key: string): string | null {
   try {
@@ -282,6 +294,25 @@ export function loadAudio(): AudioSettings {
 export function saveAudio(settings: AudioSettings): boolean {
   write(MUSIC_KEY, String(!settings.muted && settings.music > 0));
   return write(AUDIO_KEY, JSON.stringify(settings));
+}
+
+/** The graphics settings. Missing, corrupt or unknown values fall back to Auto. */
+export function loadGraphics(): GraphicsSettings {
+  const stored = read(GRAPHICS_KEY);
+  if (stored !== null) {
+    try {
+      const s = JSON.parse(stored) as { quality?: unknown } | null;
+      const quality = GRAPHICS_QUALITIES.find((q) => q === s?.quality);
+      if (quality) return { quality };
+    } catch {
+      /* unreadable: use the default */
+    }
+  }
+  return { ...DEFAULT_GRAPHICS };
+}
+
+export function saveGraphics(settings: GraphicsSettings): boolean {
+  return write(GRAPHICS_KEY, JSON.stringify(settings));
 }
 
 export function saveMeta(meta: Meta, mode: GameMode = "campaign"): boolean {

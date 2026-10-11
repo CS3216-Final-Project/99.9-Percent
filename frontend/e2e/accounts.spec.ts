@@ -24,6 +24,7 @@ test('explicit guest attachment, conflicts, owner switching and fresh-session cl
   await page.getByRole('button',{name:'Attach current guest company',exact:true}).click();await expect(page.getByText('Cloud save complete.',{exact:true})).toBeVisible();expect(putCount).toBe(1);
   await page.getByRole('button',{name:'Continue company',exact:true}).click();await expectRoom(page);
   await page.getByRole('button',{name:'Advance step',exact:true}).click();await page.getByRole('button',{name:'Menu',exact:true}).click();
+  await page.getByRole('tab',{name:'Saves'}).click();
   await page.getByText('Account and cloud saves',{exact:true}).click();
   // Another browser has saved revision 2 since this tab attached revision 1.
   cloud={...cloud!,revision:2};await page.getByRole('button',{name:'Save company to cloud',exact:true}).click();

@@ -35,11 +35,11 @@ export function SoundSettings() {
     <section className={`menu-section menu-sound${audio.muted ? " is-muted" : ""}`} aria-label="Sound">
       <div className="menu-section-head">
         <h4>
-          <Icon name={audio.muted ? "muted" : "music"} size={16} />
+          <Icon name={audio.muted ? "muted" : "music"} size={20} />
           Sound
         </h4>
         <button type="button" className={`btn btn-small menu-toggle${audio.muted ? " is-on" : ""}`} aria-pressed={audio.muted} onClick={toggleMute}>
-          <Icon name="muted" size={16} />
+          <Icon name="muted" size={20} />
           Mute all
         </button>
       </div>

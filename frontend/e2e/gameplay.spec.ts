@@ -72,6 +72,7 @@ test("preserves a corrupt campaign save until explicit reset", async ({ page, wi
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
   await expect(menu).toContainText("has been preserved");
+  await menu.getByRole("tab", { name: "Saves" }).click();
   const download = page.waitForEvent("download"); await menu.getByRole("button", { name: "Export original stored save" }).click(); await download;
   await menu.getByRole("button", { name: "New company", exact: true }).click();
   await menu.getByRole("button", { name: "Confirm new company" }).click();
