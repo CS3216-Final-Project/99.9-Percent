@@ -19,7 +19,6 @@ import TechTree from "./TechTree";
 import Tutorial, { BASICS_STEPS } from "./Tutorial";
 import { Callout, Concept, Meter, Stat, type ConceptKind } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
-import WorkTracker from "./WorkTracker";
 
 // Keep the WebGL scene in its own chunk; Vite renders this app in the browser.
 const Facility = lazy(() => import("./scene/Facility"));
@@ -112,7 +111,7 @@ function StageHud() {
   const tour = useGame((s) => s.tour);
   const select = useGame((s) => s.select);
   const openView = useGame((s) => s.openView);
-  if (game.phase !== "management" && game.phase !== "incident") return null;
+  if (game.phase !== "management") return null;
   // The walkthrough introduces this prompt in its last step; before that it would compete with it.
   if (tour?.track === "basics" && tour.step < BASICS_STEPS - 1) return null;
 
@@ -123,7 +122,6 @@ function StageHud() {
 
   return (
     <div className="hud">
-      {game.phase === "management" && <>
       <Callout
         className="next-chip"
         tone={move.tone === "go" ? "info" : move.tone}
@@ -158,8 +156,6 @@ function StageHud() {
           {w.text}
         </Callout>
       ))}
-      </>}
-      <WorkTracker />
     </div>
   );
 }
