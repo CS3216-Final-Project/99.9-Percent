@@ -39,7 +39,7 @@ sequenceDiagram
 
 ## ☁️ Deployment contract
 
-Both Vercel projects are retained. `frontend/api/[...path].ts` forwards only the documented account/session/run paths to the HTTPS origin configured by the server-only `API_PROXY_TARGET`. There is no hard-coded production destination. Configure and verify destination ownership before enabling it. The proxy forwards separate Set-Cookie headers, redirects, cookies, Origin and CSRF, and disables caching. Local Vite `/api` requests forward to localhost:3001. Browser account requests always use `/api`; `VITE_API_URL` remains the independent health-client setting.
+Both Vercel projects are retained. Explicit function files under `frontend/api/` serve session, Google sign-in/callback, logout and run routes through the shared `frontend/src/lib/accountProxyHandler.ts`. Vercel's plain Vite functions do not support Next.js-style `[...path].ts` catch-all routing; nested endpoints must have their own route files. The proxy forwards only the documented account/session/run paths to the HTTPS origin configured by the server-only `API_PROXY_TARGET`. There is no hard-coded production destination. Configure and verify destination ownership before enabling it. The proxy forwards separate Set-Cookie headers, redirects, cookies, Origin and CSRF, and disables caching. Local Vite `/api` requests forward to localhost:3001. Browser account requests always use `/api`; `VITE_API_URL` remains the independent health-client setting.
 
 | | Setup / verification |
 |---|---|
