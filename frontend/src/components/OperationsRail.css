@@ -1,0 +1,114 @@
+/* The room gets the remaining grid column: this rail never covers its canvas. */
+.app.has-operations-rail {
+  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-areas: "top top" "operations stage" "bottom bottom";
+}
+
+.operations-rail {
+  grid-area: operations;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+  background: var(--paper);
+  border-right: 3px solid var(--ink);
+  overflow: hidden;
+}
+
+.operations-title,
+.operations-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 14px;
+  background: var(--night-2);
+  color: var(--on-night);
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  font-size: 1.2rem;
+}
+
+.operations-toggle { display: none; }
+
+.operations-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.operations-section {
+  margin: 0;
+  padding: 16px 14px;
+  border-bottom: 1px solid var(--paper-3);
+}
+
+.operations-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+}
+
+.operations-section p {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.operations-section .btn {
+  width: 100%;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.operations-empty {
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.operations-section p:last-child { margin-bottom: 0; }
+
+.operations-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.operations-warning + .operations-warning { border-top: 1px solid var(--paper-3); }
+.operations-warning .icon { flex: none; margin-top: 2px; }
+.operations-warning > span { flex: 1; overflow-wrap: anywhere; }
+.operations-warning > .icon:first-child { color: var(--warn-ink); }
+.operations-warning.tone-critical > .icon:first-child { color: var(--critical-ink); }
+.operations-warning:hover { text-decoration: underline; }
+.operations-section.tone-warn h3 .icon { color: var(--warn-ink); }
+.operations-section.tone-critical h3 .icon { color: var(--critical-ink); }
+
+/* A flush bottom dock preserves room width on phones. Details expand in their
+ * own grid row, never over the scene or the week controls. */
+@media (max-width: 900px) {
+  .app.has-operations-rail {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "top" "stage" "operations" "bottom";
+  }
+
+  .operations-rail { border-right: 0; border-top: 2px solid var(--ink); }
+  .operations-title { display: none; }
+  .operations-toggle { display: flex; width: 100%; min-height: 48px; padding: 10px; text-align: left; }
+  .operations-toggle strong { font-family: var(--font-display); font-size: 1rem; }
+  .operations-toggle > span { margin-left: auto; font-size: 0.78rem; color: var(--on-night-soft); }
+  .operations-body { display: none; max-height: 30dvh; }
+  .operations-rail.is-expanded .operations-body { display: block; }
+  .operations-section { padding: 12px; }
+}
