@@ -35,6 +35,16 @@ it("acknowledges the prevention review for a run recorded before it existed, ins
  const resaved=decodeSave(JSON.stringify(makeEnvelope(loaded.game)));if(resaved.status!=="ok")throw Error(resaved.status);
  expect(resaved.game).toEqual(loaded.game);
 });
+it("leaves a replayed prevention milestone for the player in a legacy save instead of acknowledging it",()=>{
+ // Schema 1 acknowledged incident milestones implicitly; a milestone earned by prevention was never shown, so it must stay pending.
+ const raw=JSON.stringify({schemaVersion:1,scenarioId:"opening-db",scenarioVersion:1,runId:"legacy-prevention",seed:0,step:40,
+  inputs:[{step:0,action:{type:"start_db_upgrade"}},{step:4,action:{type:"incident_inspect",equipment:"app"}},{step:4,action:{type:"incident_inspect",equipment:"db"}},{step:20,action:{type:"start_db_upgrade"}}],
+  runtime:{remainderMs:0,measurement:emptyMeasurement()},savedAt:1});
+ const loaded=decodeSave(raw);if(loaded.status!=="ok")throw Error(loaded.status);
+ const c=loaded.game.campaign!;
+ expect(c.openingMilestone).toMatchObject({outcomeId:"opening-prevention",acknowledged:false});
+ expect(c.dbCapacity).toBe(1000);expect(c.trace.filter(t=>t.type==="action-rejected"&&t.data.action==="start_db_upgrade")).toHaveLength(1);
+});
 it("preserves a partial streak, inspections and a pending review through reload",()=>{
  let g=inspecting(deadEnd());g=act(g,{type:"set_traffic_limit",enabled:false});g=advanceSteps(g,2).state;
  expect(saveGame(g)).toBe(true);let loaded=loadGame();if(loaded.status!=="ok")throw Error("load");expect(loaded.game.campaign).toEqual(g.campaign);

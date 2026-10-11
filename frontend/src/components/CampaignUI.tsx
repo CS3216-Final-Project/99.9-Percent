@@ -53,10 +53,9 @@ function CampaignGuidance() {
   const model=campaignGuidance(game),action=model.pendingAction;
   const objective=game.phase==="ended"?"Review the company's finances and recorded evidence."
     :game.phase==="review"?"Read the postmortem before continuing the same company."
-    :c.spikeStage?"Maintain service through changing demand while managing capacity cost."
     :c.incident?"Restore stable service while weighing cost and rejected demand."
     :c.reliabilityStage?"Keep stable service through an application failure, then review the evidence."
-    :c.spikeStage?"Prepare for temporary demand spikes without wasting capacity."
+    :c.spikeStage?"Maintain service through changing demand while managing capacity cost."
     :c.dataStage?"Compare logical work, cache hits and database pressure as demand grows."
     :model.openingDone?"Prepare the system for the next growth wave."
     :model.prevention?"Handle the traffic increase without an incident: inspect the Application and Database, then keep service healthy at full demand."
@@ -207,7 +206,7 @@ export function CampaignPanel() {
           <button className="btn" disabled={disabled||!c.dataStage.consumed||c.dataStage.contrastConsumed||!!c.spikeStage||!canEnterData(game)} onClick={()=>act({type:"contrast_workload"})}>Observe contrasting workload</button>
         </details>
       </section>}
-      {c.reliabilityStage&&<ReliabilityControls disabled={disabled} />}
+      {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type))} />}
       {c.pending.map(a => <div className="working campaign-working" role="status" key={a.id}>
         <span>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} step(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
@@ -433,24 +432,24 @@ function PreventionOutcome({campaign}:{campaign:Campaign}) {
   </div>;
 }
 
-function ReliabilityControls({disabled}:{disabled:boolean}) {
+function ReliabilityControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
   const {game,act}=useGame(),c=game.campaign!,d=c.reliabilityStage!,f=d.fault,r=c.snapshot.reliability;
   return <section aria-label="Stay Online" className="scaling-controls">
     <h4 className="step-head"><Icon name="health" size={16} />Stay online</h4>
     <p role="status">{!f?"Prepare, then explicitly start the reliability test.":f.startedStep===null?"Reliability test scheduled. Run to observe it.":f.restoredStep===null?`${appName(f.targetId)} failed. Inspect health, surviving capacity and routing.`:"Application restored. Observe stable service."} Stable after restoration: {d.stableSteps} / {Q.stableSteps}.</p>
     {c.spikeStage?.controller&&f&&!d.acknowledged&&<p className="muted">Autoscaling waits while the reliability test runs; its enabled state and upkeep are preserved.</p>}
     <ul className="actions">
-      <li><Act label="Deploy Health Checks" price={R.checksCostCents/100} note="2 steps" disabled={disabled||d.checksStep!==null||!d.owned.includes("health_checks")} tip="Unlock in the technology tree. Detects health changes; load balancing is required for routing exclusion." onClick={()=>act({type:"deploy_health_checks"})} /></li>
-      <li><Act label="Install spare" price={R.spareCostCents/100} note="2 steps" disabled={disabled||!!d.spareId||!d.owned.includes("standby")} tip="Unlock Spare Application in the technology tree. A spare receives no traffic until promoted." onClick={()=>act({type:"install_spare"})} /></li>
-      <li><Act label="Deploy Automatic Failover" price={R.failoverCostCents/100} note="2 steps" disabled={disabled||!!d.failover||!d.owned.includes("auto_failover")} tip="Promotes a real spare after detection. Creates no capacity." onClick={()=>act({type:"deploy_failover"})} /></li>
+      <li><Act label="Deploy Health Checks" price={R.checksCostCents/100} note="2 steps" disabled={disabled||busy||d.checksStep!==null||!d.owned.includes("health_checks")} tip="Unlock in the technology tree. Detects health changes; load balancing is required for routing exclusion." onClick={()=>act({type:"deploy_health_checks"})} /></li>
+      <li><Act label="Install spare" price={R.spareCostCents/100} note="2 steps" disabled={disabled||busy||!!d.spareId||c.apps.length>=T.maximum||!d.owned.includes("standby")} tip="Unlock Spare Application in the technology tree. A spare receives no traffic until promoted." onClick={()=>act({type:"install_spare"})} /></li>
+      <li><Act label="Deploy Automatic Failover" price={R.failoverCostCents/100} note="2 steps" disabled={disabled||busy||!!d.failover||!d.owned.includes("auto_failover")} tip="Promotes a real spare after detection. Creates no capacity." onClick={()=>act({type:"deploy_failover"})} /></li>
       {d.failover&&<li><Act label={d.failover.enabled?"Disable failover":"Enable failover"} price={0} disabled={disabled} onClick={()=>act({type:"set_failover",enabled:!d.failover!.enabled})} /></li>}
     </ul>
     <div className="instance-choices">{c.apps.map(a=><div key={a.id} className="chip">
       <span>{appName(a.id)} · {a.health??"healthy"} · detected {a.detectedHealth??"unknown"} · {a.role??"serving"} · {r?.effective.includes(a.id)?"receiving traffic":"not receiving traffic"}</span>
       <button className="btn btn-small" disabled={disabled} onClick={()=>act({type:"incident_inspect",equipment:"app",appId:a.id})}>Inspect {appName(a.id)} health · free</button>
       {a.health==="failed"&&<button className="btn btn-small" disabled={disabled} onClick={()=>act({type:"restore_app",appId:a.id})}>Restore {appName(a.id)} · free · 3 steps</button>}
-      {!a.routed&&a.role!=="spare"&&<button className="btn btn-small" disabled={disabled||!d.owned.includes("standby")||!!d.spareId} onClick={()=>act({type:"reserve_spare",appId:a.id})}>Reserve {appName(a.id)} as spare · 1 step</button>}
-      {a.role==="spare"&&<button className="btn btn-small" disabled={disabled} onClick={()=>act({type:"release_spare"})}>Release spare · 1 step</button>}
+      {!a.routed&&a.role!=="spare"&&<button className="btn btn-small" disabled={disabled||busy||!d.owned.includes("standby")||!!d.spareId} onClick={()=>act({type:"reserve_spare",appId:a.id})}>Reserve {appName(a.id)} as spare · 1 step</button>}
+      {a.role==="spare"&&<button className="btn btn-small" disabled={disabled||busy} onClick={()=>act({type:"release_spare"})}>Release spare · 1 step</button>}
     </div>)}</div>
     <dl className="rows">
       <Row label="Installed / healthy" value={`${num(c.snapshot.installedAppCapacity)} / ${num(r?.healthyCapacity??c.snapshot.installedAppCapacity)} req/s`} />

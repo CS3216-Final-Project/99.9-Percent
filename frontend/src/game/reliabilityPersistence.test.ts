@@ -1,4 +1,5 @@
 import {it,expect,beforeEach} from "vitest";
+import {makeEnvelope,validateEnvelope} from "./saveEnvelope";
 import {loadGame,saveGame} from "./persist";
 import {useGame} from "./store";
 import {preparedReliability,act,tick} from "../sim/__tests__/reliabilityFixture";
@@ -31,4 +32,9 @@ it("pending and acknowledged reliability outcome reload without repeating comple
   expect(JSON.stringify(useGame.getState().game)).toBe(before);expect(useGame.getState().running).toBe(false);
   expect(g.campaign!.trace.filter(t=>t.type==="reliability-stage-completed")).toHaveLength(1);
  }
+});
+it("rejects reliability decisions in replay contracts older than schema 6",()=>{
+ const e=makeEnvelope(act(preparedReliability(),{type:"arm_reliability"}));
+ expect(validateEnvelope(e).status).toBe("ok");
+ for(const schemaVersion of [1,2,3,4,5])expect(validateEnvelope({...e,schemaVersion}).status).toBe("corrupt");
 });

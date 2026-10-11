@@ -644,15 +644,15 @@ export const useGame = create<Store>()((set, get) => {
       if (campaign && view === "tech" && get().view !== "tech") uiEvent("technology_tree_opened");
       if (campaign && view && !["menu", "history", "tech"].includes(view)) return;
       set({ view });
-      if (view === "menu" || view === "tech") get().setRunning(false);
+      if (view === "menu" || (campaign && view === "tech")) get().setRunning(false);
     },
     focusTech: (id) => {
       if (id && get().game.campaign) uiEvent("technology_node_selected", { techId: id });
       set({ techFocus: id, view: id ? "tech" : get().view });
-      if (id) get().setRunning(false);
+      if (id && get().game.campaign) get().setRunning(false);
     },
     setRunning: (running) => {
-      set({ running: running && (!get().game.campaign || (get().started && !get().onboarding && !awaitingAcknowledgement(get().game.campaign!))) && get().view!=="menu" && get().view!=="tech" && !document.hidden && !["review","ended"].includes(get().game.phase) });
+      set({ running: running && (!get().game.campaign || (get().started && !get().onboarding && !awaitingAcknowledgement(get().game.campaign!))) && get().view!=="menu" && !(get().game.campaign && get().view==="tech") && !document.hidden && !["review","ended"].includes(get().game.phase) });
       if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
     setSpeed: (speed) => set({ speed }),

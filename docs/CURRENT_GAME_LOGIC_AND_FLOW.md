@@ -216,7 +216,10 @@ Thus **Stable â€” traffic limited** can be technically successful and finan
 
 The optional prevention extension stays in schema 5; old saves are not rewritten merely to initialize it. Updated validation accepts both absent extensions and evidence-backed prevention milestones. Builds predating this feature do not support the new prevention milestone format; export the company before any rollback.
 
-Campaign saves currently use envelope schema 5 at `nn.campaign.save.v1`, with separately stored onboarding metadata and local analytics. Schema 1â€“4 migration chains to 5 with source-byte backup and validation. Migration does not automatically enter spikes or grant research. Legacy `nn.save.v1`, `nn.meta.v1` and `nn.analytics.v1` remain separate.
+Campaign saves use envelope schema 6 at `nn.campaign.save.v1`, with separately stored onboarding metadata and local analytics.
+A save holds the seed and the recorded player inputs; loading replays them on the deterministic engine, so older schemas 1-5 load through the same replay.
+An older schema cannot contain decisions introduced after it, and before replacing an older save its exact bytes are backed up.
+Legacy `nn.save.v1`, `nn.meta.v1` and `nn.analytics.v1` remain separate.
 
 Autosave runs through existing transitions and a ten-second foreground timer, with page lifecycle saves. Resume is paused and preserves pending action deadlines, queues, progression, acknowledgements and measurement. Corrupt/unsupported saves are protected and exportable; unavailable storage cannot guarantee durable reload recovery.
 
@@ -246,7 +249,7 @@ Deployment and human sessions remain NOT TESTED. These checks do not prove enjoy
 | Controller/pulses and spike completion | [autoscaling.ts](../frontend/src/sim/autoscaling.ts) |
 | Cash settlement/exposure | [settlement.ts](../frontend/src/sim/settlement.ts) |
 | Causal reports | [trace.ts](../frontend/src/sim/trace.ts) |
-| Save/metadata/export and migrations | [persist.ts](../frontend/src/game/persist.ts), [saveMigrations.ts](../frontend/src/game/saveMigrations.ts) |
+| Save/metadata/export and migrations | [persist.ts](../frontend/src/game/persist.ts), [saveEnvelope.ts](../frontend/src/game/saveEnvelope.ts), [replay.ts](../frontend/src/sim/replay.ts) |
 | Opening prevention eligibility, observations and outcome | [openingPrevention.ts](../frontend/src/sim/openingPrevention.ts) |
 | Local event measurement | [telemetry.ts](../frontend/src/game/telemetry.ts) |
 | Existing tech identities/gating | [tech.ts](../frontend/src/sim/tech.ts) |
