@@ -1,7 +1,9 @@
-import {newGame,applyAction,type GameState,type Action} from "../index";
+import {newGame,applyAction,replayCampaign,type GameState,type Action} from "../index";
 import {step} from "../step";
 import {pendingSpikeAcknowledgement} from "../autoscaling";
 export function act(g:GameState,a:Action):GameState {const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
+/** The state a save would reload: the run rebuilt from its recorded inputs. */
+export function replay(g:GameState):GameState {const c=g.campaign!;return JSON.parse(JSON.stringify(replayCampaign(g.seed,c.runId,c.inputs,c.step,false,c.foundation)));}
 export function tick(g:GameState,n=1):GameState {for(let i=0;i<n;i++)g=step(g).state;return g;}
 /** Public decisions create a solvent, warm Data Strategy company; no Phase 5 state injection. */
 export function dataCompany(profile:"read-heavy"|"write-heavy"="read-heavy"):GameState {

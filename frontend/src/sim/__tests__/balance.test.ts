@@ -118,3 +118,25 @@ describe("traffic-spikes financial alternatives",()=>{
   expect(g.campaign!.cashCents).toBeGreaterThan(0);expect(g.campaign!.dbCapacity).toBe(3000);expect(g.campaign!.readCache!.target).toBe(6000);expect(g.campaign!.reports.at(-1)!.limited).toBe(true);
  });
 });
+
+describe("reliability financial alternatives",()=>{
+ it.each(["manual","checks","spare","automatic","mixed","limit"] as const)("validates solvent %s response without injected money",async(choice)=>{
+  const {reliabilityCompany,preparedReliability,act,tick}=await import("./reliabilityFixture");const {pendingReliability}=await import("../reliability");const rows=[];
+
+   let g=choice==="automatic"?preparedReliability():reliabilityCompany();
+   if(choice==="checks"){g=act(g,{type:"unlock_reliability",tech:"health_checks"});g=tick(act(g,{type:"deploy_health_checks"}),2);}
+   if(choice==="spare"||choice==="mixed"){g=act(g,{type:"unlock_reliability",tech:"standby"});g=tick(act(g,{type:"install_spare"}),2);if(choice==="mixed"){g=act(g,{type:"unlock_reliability",tech:"health_checks"});g=tick(act(g,{type:"deploy_health_checks"}),2);g=act(g,{type:"unlock_reliability",tech:"auto_failover"});g=tick(act(g,{type:"deploy_failover"}),2);}}
+   if(choice==="checks"||choice==="mixed")g=tick(act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2"]}),1);
+   g=act(g,{type:"arm_reliability"});const start=g.campaign!.step;
+   for(let i=0;i<100&&!pendingReliability(g.campaign);i++){
+    if(g.phase==="review")g=act(g,{type:"acknowledge_review"});
+    const f=g.campaign!.reliabilityStage!.fault!;
+    if(choice==="mixed"&&f.restoredStep!==null&&g.campaign!.routing.targets.includes("app-4")&&!g.campaign!.pending.length)g=act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]});
+    if(choice==="manual"&&f.startedStep!==null&&f.restoredStep===null&&!g.campaign!.pending.length)g=act(g,{type:"restore_app",appId:f.targetId});
+    if(choice==="limit"&&f.startedStep!==null&&g.campaign!.limit===null&&!g.campaign!.pending.length)g=act(g,{type:"set_traffic_limit",enabled:true});
+    expect(g.phase).not.toBe("ended");g=tick(g);
+   }
+   expect(pendingReliability(g.campaign)).toBe(true);expect(g.campaign!.cashCents).toBeGreaterThan(0);rows.push({choice,duration:g.campaign!.step-start,cash:g.campaign!.cashCents,failures:g.campaign!.cumulative.failed,rejected:g.campaign!.cumulative.rejected,setup:g.campaign!.investedCents,checksExposure:g.campaign!.ledger.checksNumerator??0,failoverExposure:g.campaign!.ledger.failoverNumerator??0});
+  console.log("Phase 6 reliability alternatives",rows);
+ });
+});

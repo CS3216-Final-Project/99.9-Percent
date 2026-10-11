@@ -1,3 +1,4 @@
+import { researchBalance } from "./reliability";
 import type { Action, ActionResult, GameState } from "./types";
 import type { Campaign, ScheduledAction, SpikeObservation } from "./campaignTypes";
 import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
@@ -51,6 +52,8 @@ function blocked(c:Campaign,reason:string|null):void {
 }
 export function canRetire(c:Campaign,id:string,preview=false):boolean {
  const a=c.spikeStage?.controller, target=c.apps.find(x=>x.id===id);
+ if(c.reliabilityStage?.fault&&(c.reliabilityStage.fault.targetId===id&&c.reliabilityStage.fault.restoredStep===null))return false;
+ if(target?.health==="failed"||target?.role==="spare")return false;
  if(!a || !target || !a.managedAppIds.includes(id)||target.tier!=="base"||target.backlog || c.incident || c.dbBacklog || c.apps.some(x=>x.backlog) ||
  !qualifiesForRecovery(c.snapshot)||c.routing.mode!=="balanced"||c.apps.length-1<T.minimum)return false;
  const targets=c.routing.targets.filter(x=>x!==id);if(targets.length<T.minimum||targets.length===c.routing.targets.length)return false;
@@ -71,7 +74,8 @@ export function activateRetirement(c:Campaign,action:ScheduledAction):boolean {
 export function runAutoscaler(s:GameState):void {
  const c=s.campaign!,d=c.spikeStage,a=d?.controller;if(!d)return;
  if(s.phase!=="review"&&s.phase!=="ended"&&a){
-  if(!a.enabled)blocked(c,"Controller disabled");
+  if(c.reliabilityStage?.fault&&!c.reliabilityStage.acknowledged)blocked(c,"Reliability test in progress");
+  else if(!a.enabled)blocked(c,"Controller disabled");
   else if(!c.loadBalancer||c.routing.mode!=="balanced"||c.routing.targets.length<T.minimum)blocked(c,"Balanced routing to two apps required");
   else if(a.joiningAppId) {
    a.highSteps=0;a.lowSteps=0;
@@ -111,13 +115,15 @@ export function runAutoscaler(s:GameState):void {
  }
  c.snapshot.spikes=spikeObservation(c);
 }
-export function spikeAction(prev:GameState,action:Action):ActionResult|null {
- if(!["enter_spikes","unlock_autoscaling","deploy_autoscaler","set_autoscaling","acknowledge_spikes"].includes(action.type))return null;
- const fail=(message:string):ActionResult=>({ok:false,reason:"invalid",message});
- if(prev.phase==="review"||prev.phase==="ended")return fail("Finish review before changing progression.");
- const s=clone(prev),c=s.campaign!,d=c.spikeStage;
+type Rejection=Extract<ActionResult,{ok:false}>;
+/** Applies a spike decision to `s` in place. `undefined` means the action belongs elsewhere; checks precede mutation. */
+export function spikeAction(s:GameState,action:Action):Rejection|null|undefined {
+ if(!["enter_spikes","unlock_autoscaling","deploy_autoscaler","set_autoscaling","acknowledge_spikes"].includes(action.type))return undefined;
+ const fail=(message:string):Rejection=>({ok:false,reason:"invalid",message});
+ if(s.phase==="review"||s.phase==="ended")return fail("Finish review before changing progression.");
+ const c=s.campaign!,d=c.spikeStage;
  if(action.type==="enter_spikes"){
-  if(!canEnterSpikes(prev))return fail("Requires consumed data growth, stable service, drained work and acknowledged reports.");
+  if(!canEnterSpikes(s))return fail("Requires consumed data growth, stable service, drained work and acknowledged reports.");
   c.spikeStage={id:T.id,version:T.version,configuration:JSON.stringify(T),enteredStep:c.step,deadlines:T.offsets.map(x=>c.step+x),consumed:[],researchEarned:1,researchSpent:0,controller:null,baselineStableSteps:0,completedStep:null,acknowledged:false};
   trace(c,"spike-stage-entered",{stageId:T.id,stageVersion:T.version,configuration:JSON.stringify(T),cashCents:c.cashCents,investedCents:c.investedCents,settledCostCents:c.costsCents,rejected:c.cumulative.rejected});
   trace(c,"progression-awarded",{recognitionId:"data-readiness",research:1});trace(c,"traffic-spikes-announced",{deadlines:JSON.stringify(c.spikeStage.deadlines),baseline:T.baseline,peak:T.peak});
@@ -126,7 +132,7 @@ export function spikeAction(prev:GameState,action:Action):ActionResult|null {
   if(!pendingSpikeAcknowledgement(c))return fail("No spike recognition awaits acknowledgement.");d.acknowledged=true;trace(c,"spike-stage-acknowledged");
  } else if(pendingSpikeAcknowledgement(c))return fail("Acknowledge spike completion first.");
  else if(action.type==="unlock_autoscaling"){
-  if(d.researchSpent)return fail("Autoscaling already unlocked.");d.researchSpent=1;trace(c,"autoscaling-unlocked",{researchSpent:1});
+  if(d.researchSpent||researchBalance(c)<1)return fail("Autoscaling already unlocked or no research points available.");d.researchSpent=1;trace(c,"autoscaling-unlocked",{researchSpent:1});
  } else if(action.type==="deploy_autoscaler"){
   if(!d.researchSpent||d.controller||infraBusy(c)||!c.loadBalancer||c.routing.mode!=="balanced"||c.routing.targets.length<T.minimum||c.cashCents<=T.controllerCostCents)return fail("Requires unlock, balanced routing to two apps, free infrastructure slot and cash.");
   schedule(c,"deploy-autoscaler",T.controllerDelay,T.controllerCostCents,{source:"player"});
@@ -135,5 +141,5 @@ export function spikeAction(prev:GameState,action:Action):ActionResult|null {
   d.controller.enabled=action.enabled;d.controller.highSteps=0;d.controller.lowSteps=0;d.controller.cooldownUntil=c.step+T.cooldown;
   trace(c,action.enabled?"autoscaling-enabled":"autoscaling-disabled");
  }
- return {ok:true,state:s};
+ return null;
 }

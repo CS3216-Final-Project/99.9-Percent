@@ -1,3 +1,5 @@
+import { activateReliability, advanceHealth, detect, effectiveTargets, initializeHealth, observeReliability, pendingReliability, recoverySafe, reliabilityAction } from "./reliability";
+import { pendingPreventionReview, observePrevention, recordPreventionInspection } from "./openingPrevention";
 import type { GameState, Action, ActionResult } from "./types";
 import type { Campaign, Snapshot, ComponentSnapshot, Intervention, Routing, ScheduledAction, TraceEvent } from "./campaignTypes";
 import { pendingSpikeAcknowledgement, spikeAction, advanceSpikeTraffic, runAutoscaler, activateRetirement } from "./autoscaling";
@@ -27,7 +29,7 @@ export function allocateTraffic(demand: number, targets: string[]): Record<strin
 }
 export function routingValid(c: Campaign, r: Routing): boolean {
     return ["single", "balanced"].includes(r.mode) && Array.isArray(r.targets) && r.targets.length > 0 &&
-        new Set(r.targets).size === r.targets.length && r.targets.every(id => c.apps.some(a => a.id === id && a.state === "active")) &&
+        new Set(r.targets).size === r.targets.length && r.targets.every(id => c.apps.some(a => a.id === id && a.state === "active" && a.role!=="spare")) &&
         (r.mode === "single" ? r.targets.length === 1 && r.targets[0] === "app-1" : c.loadBalancer);
 }
 export function enterScaling(s: GameState): GameState {
@@ -108,7 +110,7 @@ export function qualifiesForRecovery(m: Snapshot): boolean {
     return m.latencyMs < Q.latencyThresholdMs && m.serviceErrorRate !== null &&
         m.serviceErrorRate < Q.errorThreshold && m.admitted > 0 && m.successful + m.failed > 0;
 }
-export type StopReason = "first-incident" | "review" | "ended" | "spike-acknowledgement" | null;
+export type StopReason = "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | "reliability-review" | null;
 export function step(prev: GameState): {
     state: GameState;
     stopReason: StopReason;
@@ -117,10 +119,16 @@ export function step(prev: GameState): {
         throw new Error("Physical step requires an opening-db campaign");
     if (prev.phase === "review" || prev.phase === "ended")
         return { state: prev, stopReason: prev.phase };
-    if (pendingSpikeAcknowledgement(prev.campaign)) return {state:prev,stopReason:"spike-acknowledgement"};
+    const pending = pendingStop(prev.campaign);
+    if (pending)
+        return { state: prev, stopReason: pending };
     const s = clone(prev);
     const stopReason = stepInPlace(s);
     return { state: projectCampaign(s), stopReason };
+}
+/** A recognition the player must acknowledge before time can advance again. */
+export function pendingStop(c: Campaign | undefined): "reliability-review" | "prevention-review" | "spike-acknowledgement" | null {
+    return pendingReliability(c) ? "reliability-review" : pendingPreventionReview(c) ? "prevention-review" : pendingSpikeAcknowledgement(c) ? "spike-acknowledgement" : null;
 }
 /**
  * Advance one physical step by mutating `s`. The caller owns `s`, rules out
@@ -128,7 +136,8 @@ export function step(prev: GameState): {
  */
 export function stepInPlace(s: GameState): StopReason {
     const c = s.campaign!;
-    if(pendingSpikeAcknowledgement(c)) return "spike-acknowledgement";
+    const pending = pendingStop(c);
+    if (pending) return pending;
     const traceStart = c.trace.length;
     const priorBacklogs = new Map(c.apps.map(a => [a.id, a.backlog]));
     const priorDbBacklog = c.dbBacklog;
@@ -140,6 +149,7 @@ export function stepInPlace(s: GameState): StopReason {
         const routingBefore = JSON.stringify(c.routing);
         const effectiveBefore = c.apps.filter(a=>c.routing.targets.includes(a.id)).reduce((n,a)=>n+a.capacity,0);
         const admittedBefore = Math.min(c.incomingRate, c.limit ?? c.incomingRate);
+        if(["health-checks","create-spare","reserve-spare","release-spare","failover","promote-spare","restore-app"].includes(action.type)&&!activateReliability(c,action))continue;
         if(action.type==="retire-app"&&!activateRetirement(c,action))continue;
         if(action.type==="deploy-autoscaler") {
           c.spikeStage!.controller={activatedStep:c.step,enabled:true,highSteps:0,lowSteps:0,cooldownUntil:c.step,managedAppIds:[],joiningAppId:null,expectedRouting:JSON.stringify(c.routing),blockedReason:null};
@@ -148,6 +158,7 @@ export function stepInPlace(s: GameState): StopReason {
         if(action.type=== "add-app"&&action.source==="autoscaler")c.spikeStage!.controller!.managedAppIds.push(action.targetId!);
         if (action.type === "add-app")
             c.apps.push({ id: action.targetId ?? "app-2", capacity: Q.appCapacity, backlog: 0, routed: false, tier: "base", state: "active" });
+        if(c.reliabilityStage&&action.type==="add-app")initializeHealth(c.apps.at(-1)!,c.step);
         if (action.type === "upgrade-db") {
             c.dbCapacity = action.capacityAfter ?? Q.upgradedDbCapacity;
             c.upgraded = true;
@@ -216,20 +227,24 @@ export function stepInPlace(s: GameState): StopReason {
         trace(c, "traffic-change", { eventId: "opening-growth", from: Q.startingTraffic, to: c.incomingRate });
     }
     advanceSpikeTraffic(c);
+    advanceHealth(c);
     const incoming = c.incomingRate, admitted = Math.min(incoming, c.limit ?? incoming), rejected = incoming - admitted;
-    const allocation = allocateTraffic(admitted, c.routing.targets);
+    const recipients=c.reliabilityStage?effectiveTargets(c):c.routing.targets;
+    const allocation = recipients.length?allocateTraffic(admitted, recipients):{};
+    const unroutable=recipients.length?0:admitted;
     let appBusyBudget = 0;
     const instances = c.apps.map(a => {
         const demand = allocation[a.id] ?? 0;
-        if (a.routed || a.backlog > 0) appBusyBudget += a.capacity;
-        const result = processWork(a.backlog, demand, a.capacity, Q.appBacklogLimit);
+        const available=a.health!=="failed";
+        if (available&&(recipients.includes(a.id) || a.backlog > 0)) appBusyBudget += a.capacity;
+        const result = available?processWork(a.backlog, demand, a.capacity, Q.appBacklogLimit):{demand,capacity:a.capacity,processed:0,backlog:a.backlog,failed:demand,busyUtilisation:0,demandRatio:demand/a.capacity};
         a.backlog = result.backlog;
-        return { ...result, id:a.id, tier:a.tier, state:a.state, routed:a.routed, demandRate:demand, demandCount:demand, processingBudget:a.capacity };
+        return { ...result, id:a.id, tier:a.tier, state:a.state, routed:recipients.includes(a.id), demandRate:demand, demandCount:demand, processingBudget:available?a.capacity:0, ...(c.reliabilityStage?{health:a.health??"healthy",detectedHealth:a.detectedHealth??"unknown",role:a.role??"serving",configured:a.routed}:{}) };
     });
-    const effectiveAppCapacity = c.apps.filter(a=>a.routed).reduce((n,a)=>n+a.capacity,0);
+    const effectiveAppCapacity = c.apps.filter(a=>recipients.includes(a.id)&&a.health!=="failed").reduce((n,a)=>n+a.capacity,0);
     const sum = (key: "processed" | "backlog" | "failed") => instances.reduce((n,a)=>n+a[key],0);
-    const app: ComponentSnapshot = { demand:admitted,capacity:effectiveAppCapacity,processed:sum("processed"),backlog:sum("backlog"),failed:sum("failed"),
-        busyUtilisation:sum("processed")/appBusyBudget,demandRatio:admitted/effectiveAppCapacity };
+    const app: ComponentSnapshot = { demand:admitted,capacity:effectiveAppCapacity,processed:sum("processed"),backlog:sum("backlog"),failed:sum("failed")+unroutable,
+        busyUtilisation:appBusyBudget?sum("processed")/appBusyBudget:0,demandRatio:effectiveAppCapacity?admitted/effectiveAppCapacity:0 };
     let data: DataSnapshot | undefined;
     if(c.dataStage?.consumed) {
         const profile=c.dataStage.profile,shares=DATA_PROFILES[profile],warmth=c.readCache?.warmth??0;
@@ -243,7 +258,7 @@ export function stepInPlace(s: GameState): StopReason {
     c.dbBacklog = db.backlog;
     const successful = db.processed+(data?.hits??0), failed = app.failed + db.failed;
     c.snapshot = {
-        version: c.spikeStage?5:data?4:3, ...(data?{data}:{}), instances, effectiveAppCapacity, appBusyBudget, routing: clone(c.routing), step: c.step, incoming, admitted, rejected, app, db,
+        version: c.reliabilityStage?6:c.spikeStage?5:data?4:3, ...(c.reliabilityStage?{reliability:{configured:[...c.routing.targets],effective:recipients,healthyCapacity:c.apps.filter(a=>a.health!=="failed").reduce((n,a)=>n+a.capacity,0),healthyRoutedCapacity:effectiveAppCapacity,spareCapacity:c.apps.filter(a=>a.role==="spare").reduce((n,a)=>n+a.capacity,0),failedDeliveries:instances.filter(a=>a.health==="failed").reduce((n,a)=>n+a.failed,0)+unroutable,unroutable,faultId:c.reliabilityStage.fault?.id??null}}:{}), ...(data?{data}:{}), instances, effectiveAppCapacity, appBusyBudget, routing: clone(c.routing), step: c.step, incoming, admitted, rejected, app, db,
         installedAppCapacity: c.apps.reduce((n, a) => n + a.capacity, 0), successful, failed,
         latencyMs: Q.baseLatencyMs + 1000 * (Math.max(...instances.map(a=>a.backlog/a.capacity)) + db.backlog / c.dbCapacity),
         serviceErrorRate: successful + failed > 0 ? failed / (successful + failed) : null
@@ -279,7 +294,8 @@ export function stepInPlace(s: GameState): StopReason {
         c.incident.snapshots.push(c.snapshot);
     accruePeriod(c);
     settlePeriod(c);
-    for (const a of instances) c.overload[a.id] = a.demand > a.capacity ? (c.overload[a.id] ?? 0) + 1 : 0;
+    if(c.reliabilityStage)c.reliabilityStage.failureSteps=c.snapshot.reliability!.failedDeliveries>0?c.reliabilityStage.failureSteps+1:0;
+    for (const a of instances) c.overload[a.id] = a.health!=="failed"&&a.demand > a.capacity ? (c.overload[a.id] ?? 0) + 1 : 0;
     c.overload.db = db.demand > db.capacity ? (c.overload.db ?? 0) + 1 : 0;
     c.overloadSteps = c.overload.db;
     let stopReason: StopReason = null;
@@ -291,7 +307,7 @@ export function stepInPlace(s: GameState): StopReason {
     }
     else if (c.incident) {
         const prior = c.incident.stableSteps;
-        c.incident.stableSteps = qualifiesForRecovery(c.snapshot) ? prior + 1 : 0;
+        c.incident.stableSteps = qualifiesForRecovery(c.snapshot)&&recoverySafe(c) ? prior + 1 : 0;
         if (prior !== c.incident.stableSteps)
             trace(c, "recovery-streak", { from: prior, to: c.incident.stableSteps });
         if (c.incident.stableSteps >= Q.stableSteps) {
@@ -307,8 +323,11 @@ export function stepInPlace(s: GameState): StopReason {
     }
     else {
         const components = [...instances].sort((a,b)=>Number(a.id.split("-")[1])-Number(b.id.split("-")[1])).map(a=>a.id).concat("db").filter(id=>c.overload[id]>=Q.overloadSteps);
+        const failure=c.reliabilityStage?.fault;
+        const failedIncident=(c.reliabilityStage?.failureSteps??0)>=3&&!!failure;
+        if(failedIncident&&!components.includes(failure!.targetId))components.unshift(failure!.targetId);
         if (components.length) {
-            c.incident = { id: `incident-${c.nextEventId}`, openedStep: c.step, stableSteps: 0, snapshots: c.recent.slice(-3), components, primaryComponent:components[0] };
+            c.incident = { id: `incident-${c.nextEventId}`, openedStep: c.step, stableSteps: 0, snapshots: c.recent.slice(-3), components, primaryComponent:components[0],...(failedIncident?{kind:"application-failure" as const,failureId:failure!.id}:{}) };
             s.phase = "incident";
             trace(c, "incident-opened", { incidentId: c.incident.id, component: components[0], components: JSON.stringify(components) });
             if (!c.firstPauseConsumed) {
@@ -317,7 +336,11 @@ export function stepInPlace(s: GameState): StopReason {
             }
         }
     }
+    observePrevention(c);
+    if(pendingPreventionReview(c))stopReason="prevention-review";
     runAutoscaler(s);
+    observeReliability(s);
+    if(pendingReliability(c))stopReason="reliability-review";
     if(pendingSpikeAcknowledgement(c))stopReason="spike-acknowledgement";
     trace(c, "metrics", { snapshotStep: c.step, ...(data?{profile:data.profile,hits:data.hits,eligibleMisses:data.eligibleMisses,effectiveHitRate:data.effectiveHitRateUsed,dbDemand:db.demand,dbCapacity:db.capacity}: {}) });
     if(c.foundation && c.step<=c.foundation.step)retainFoundationTrace(c,traceStart);
@@ -336,7 +359,8 @@ export function advanceSteps(prev: GameState, count: number): {
         throw new Error("Physical step requires an opening-db campaign");
     if (prev.phase === "review" || prev.phase === "ended")
         return { state: prev, stepsConsumed: 0, stopReason: prev.phase };
-    if(pendingSpikeAcknowledgement(prev.campaign)) return {state:prev,stepsConsumed:0,stopReason:"spike-acknowledgement"};
+    const pending = pendingStop(prev.campaign);
+    if (pending) return { state: prev, stepsConsumed: 0, stopReason: pending };
     // Copy once and step the copy, so a long advance costs no more than its steps.
     const s = clone(prev);
     let stepsConsumed = 0, stopReason: StopReason = null;
@@ -373,9 +397,26 @@ type Rejection = Extract<ActionResult, { ok: false }>;
 /** Every check runs before the first mutation, so a rejection leaves `s` untouched. */
 function actInPlace(s: GameState, action: Action): Rejection | null {
     const fail = (message: string): Rejection => ({ ok: false, reason: "invalid", message });
-    const special=spikeAction(s,action);
-    if(special) { if(!special.ok)return special; Object.assign(s,special.state); projectCampaign(s); return null; }
-    if(pendingSpikeAcknowledgement(s.campaign))return fail("Acknowledge spike completion first.");
+    const c0 = s.campaign!;
+    const reliability = reliabilityAction(s, action);
+    if (reliability !== undefined) return reliability;
+    if (action.type === "acknowledge_prevention_review") {
+        if (s.phase !== "management" || !pendingPreventionReview(c0))
+            return fail("No prevention outcome awaits acknowledgement.");
+        const outcome = c0.openingPrevention!.outcome!;
+        outcome.acknowledged = true;
+        trace(c0, "opening-prevention-review-acknowledged", {outcomeId:outcome.id});
+        if(!c0.openingMilestone) {
+            c0.openingMilestone={id:"opening-stability",incidentId:null,outcomeId:outcome.id,awardedStep:c0.step,acknowledged:false};
+            trace(c0,"milestone-awarded",{outcomeId:outcome.id,outcome:"prevention"});
+        }
+        return null;
+    }
+    if (pendingReliability(c0)) return fail("Review the reliability outcome first.");
+    if (pendingPreventionReview(c0)) return fail("Review the Opening prevention outcome first.");
+    const spike = spikeAction(s, action);
+    if (spike !== undefined) return spike;
+    if (pendingSpikeAcknowledgement(c0)) return fail("Acknowledge spike completion first.");
     if (action.type === "acknowledge_review" && s.phase === "review") {
         s.phase = "management";
         const c=s.campaign!, report=c.reports.at(-1)!;
@@ -424,6 +465,8 @@ function actInPlace(s: GameState, action: Action): Rejection | null {
             return fail("That component is not active in this opening.");
         if (action.appId && !s.campaign!.apps.some(a => a.id === action.appId)) return fail("Unknown application instance.");
         trace(s.campaign!, "inspection", { component: action.equipment, appId: action.appId ?? null, snapshotStep: s.campaign!.step, snapshot: JSON.stringify(s.campaign!.snapshot) });
+        recordPreventionInspection(s.campaign!,action.equipment);
+        if(s.campaign!.reliabilityStage&&action.equipment==="app"&&action.appId)detect(s.campaign!,s.campaign!.apps.find(a=>a.id===action.appId)!,"manual");
         return null;
     }
     const type: Intervention | null = action.type === "add_server" ? "add-app" : action.type === "start_db_upgrade" ? "upgrade-db" :
@@ -459,6 +502,7 @@ function actInPlace(s: GameState, action: Action): Rejection | null {
         ...(type === "add-app" ? {targetId:`app-${n.nextAppNumber++}`} : {}), ...(target ? {targetId:target.id,capacityAfter:P.appCapacity} : {}),
         ...(type === "upgrade-db" ? {capacityAfter:databaseUpgrade(c)!.capacity} : {}), ...(routing ? {routing} : {}) };
     if(target&&n.spikeStage?.controller)n.spikeStage.controller.managedAppIds=n.spikeStage.controller.managedAppIds.filter(id=>id!==target.id);
+    if(routing){for(const p of n.pending.filter(a=>a.type==="promote-spare")){n.actions.find(a=>a.id===p.id)!.cancelledStep=n.step;trace(n,"failover-cancelled",{actionId:p.id,reason:"Superseded by explicit manual routing"});}n.pending=n.pending.filter(a=>a.type!=="promote-spare");}
     n.cashCents -= costCents;
     n.investedCents += costCents;
     n.pending.push(scheduled);

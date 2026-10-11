@@ -4311,3 +4311,6 @@ button:disabled {
 
 /* Campaign progress uses the existing HUD typography and stays visible while evidence scrolls. */
 .campaign-stage { color: var(--on-night-soft); font-family: var(--font-num); font-size: .75rem; font-weight: 600; }
+.progression-requirements { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; font-size: .8rem; }
+.progression-requirements li { display: flex; align-items: center; gap: 6px; }
+.progression-requirements [data-met="false"] { color: var(--text-soft); }
