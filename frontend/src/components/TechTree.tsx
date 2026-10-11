@@ -1,4 +1,5 @@
 "use client";
+import { researchBalance } from "@/sim/reliability";
 
 import { BALANCE, BRANCHES, missingPrerequisites, TECH, TECH_ORDER, techStatus, type GameState, type TechId, type TechStatus } from "@/sim";
 import { moneyFull, pct } from "@/game/format";
@@ -54,19 +55,21 @@ const STATUS_WORD: Record<TechStatus, string> = {
 };
 
 function statusLine(game: GameState, id: TechId, status: TechStatus): string {
-  if (status === "done") return "Live";
+  if (status === "done") return game.campaign?"Owned":"Live";
   if (status === "ready") return "Ready to ship";
   if (status === "in_progress") {
     const task = game.tasks.find((t) => id === "larger_database" ? t.kind === "db_upgrade" : t.techId === id);
     return task ? `Building ${pct(task.progress / task.effort)}` : "Building";
   }
   if (status === "locked") return "Locked";
+  if(game.campaign)return "Available";
   return moneyFull(id === "larger_database" ? BALANCE.db.tiers[game.infra.dbTier + 1]?.cost ?? 0 : TECH[id].cost);
 }
 
 function Detail({ game, id }: { game: GameState; id: TechId }) {
   const act = useGame((s) => s.act);
   const focusTech = useGame((s) => s.focusTech);
+  if(game.campaign)return <CampaignDetail game={game} id={id}/>;
   const nextTier = id === "larger_database" ? BALANCE.db.tiers[game.infra.dbTier + 1] : undefined;
   const def = nextTier ? { ...TECH[id], cost: nextTier.cost, effort: nextTier.effort, upkeepNote: `${moneyFull(nextTier.upkeep)}/wk` } : TECH[id];
   const status = techStatus(game, id);
@@ -192,7 +195,7 @@ export default function TechTree() {
                   style={{ left: `${p.x / WIDTH * 100}%`, top: `${p.y / HEIGHT * 100}%`, width: `${NODE_W / WIDTH * 100}%`, height: `${NODE_H / HEIGHT * 100}%` }}
                   onClick={() => focusTech(id)}
                   aria-pressed={selected === id}
-                  aria-label={`${TECH[id].name}: ${STATUS_WORD[status]}`}
+                  aria-label={`${TECH[id].name}: ${game.campaign&&status==="done"?"Owned":STATUS_WORD[status]}`}
                   {...tipProps(missing ? `Needs ${missing}` : TECH[id].description)}
                 >
                   <span className="node-mark" aria-hidden="true">
@@ -212,7 +215,7 @@ export default function TechTree() {
             <li><span className="swatch node-locked" />Locked</li>
             <li><span className="swatch node-available" />Available</li>
             <li><span className="swatch node-in_progress" />Building</li>
-            <li><span className="swatch node-done" />Live</li>
+            <li><span className="swatch node-done" />{game.campaign?"Owned":"Live"}</li>
             <li><span className="swatch swatch-dash" />Needs another branch</li>
           </ul>
         </div>
@@ -220,4 +223,19 @@ export default function TechTree() {
       <Detail game={game} id={selected} />
     </div>
   );
+}
+
+function CampaignDetail({game,id}:{game:GameState;id:TechId}) {
+ const {act,select,openView}=useGame(),c=game.campaign!,status=techStatus(game,id);
+ const reliability=["health_checks","standby","auto_failover"].includes(id);
+ const effect:Partial<Record<TechId,string>>={larger_servers:"Scale a selected base app to 1,600 req/s. $2,000; 3 steps; $1,100/week for that app.",load_balancing:"Deploy for $1,000; 2 steps; $300/week. Installed apps still need routing.",autoscaling:"Unlock for 1 research point; deploy for $1,000; 2 steps; $100/week including disabled periods. Provisioning and routing take time.",larger_database:c.dbCapacity>=3000?"Current capacity: 3,000 ops/s. Owned. Maximum available DB tier; $3,500/week upkeep.":`Owned from 1,000 ops/s. Current capacity: ${c.dbCapacity} ops/s. Next upgrade costs $${c.dbCapacity===2000?"4,000":"3,000"}; ${c.dbCapacity===2000?4:3} steps. DB upkeep: $500/$1,500/$2,500/$3,500 per week by tier.`,caching:"$1,500; 2 steps; $400/week. Eligible reads warm toward 60%; writes still reach DB.",cache_tuning:"$1,000; 2 steps. Raises ceiling to 75%; further warm-up required. No extra upkeep.",health_checks:"Unlock: 1 research point. Deployment $500; 2 steps; $100/week. Detects changes after one step; load balancing is required for exclusion. Creates no capacity.",standby:"Unlock: 1 research point. Install a base spare for $1,000; 2 steps; $700/week, or reserve an existing healthy unrouted app free in 1 step. Spare receives no traffic until promoted.",auto_failover:"Unlock: 1 research point; requires Health Checks, Spare Application and deployed Load Balancing. Deployment $1,000; 2 steps; $100/week. Promotes a real spare after detection in 1 step; creates no capacity."};
+ const choose=()=>{select(id==="larger_database"?"db":id==="caching"||id==="cache_tuning"?"cache":"app");openView(null);};
+ return <div className="tree-detail"><h3>{TECH[id].name}</h3><strong>{status==="done"?"Owned":status==="locked"?"Locked":"Available"}</strong><p>{effect[id]}</p><p>Research available: {researchBalance(c)}</p><p>{c.pending.filter(a=>({larger_servers:"scale-up",larger_database:"upgrade-db",load_balancing:"deploy-lb",caching:"cache",cache_tuning:"cache-tuning",autoscaling:"deploy-autoscaler",health_checks:"health-checks",standby:"create-spare",auto_failover:"failover"} as Record<string,string>)[id]===a.type).map(a=>`Pending activation: ${a.activationStep-c.step} steps`).join("; ")}</p>
+ {TECH[id].requires.length>0&&<p>Requires: {TECH[id].requires.map(t=>TECH[t].name).join(", ")}</p>}
+ {status==="locked"&&<p>{reliability&&!c.reliabilityStage?"Enter Stay Online to unlock this capability.":"Meet the displayed prerequisite or campaign stage first."}</p>}
+ {reliability&&status==="available"&&<button className="btn" disabled={researchBalance(c)<1} onClick={()=>act({type:"unlock_reliability",tech:id as "health_checks"|"standby"|"auto_failover"})}>Unlock {TECH[id].name} · 1 research point</button>}
+ {id==="autoscaling"&&status==="available"&&<button className="btn" disabled={researchBalance(c)<1} onClick={()=>act({type:"unlock_autoscaling"})}>Unlock autoscaling · 1 research point</button>}
+ {!reliability&&<button className="btn" onClick={choose}>View existing actions</button>}
+ <p>{id==="health_checks"?c.reliabilityStage?.checksStep!==null&&c.reliabilityStage?.checksStep!==undefined?"Deployed":"Not deployed":id==="standby"?c.reliabilityStage?.spareId?`Standing by: ${c.reliabilityStage.spareId}`:"No reserved spare":id==="auto_failover"?c.reliabilityStage?.failover?c.reliabilityStage.failover.enabled?"Deployed and enabled":"Deployed and disabled":"Not deployed":id==="autoscaling"?c.spikeStage?.controller?c.spikeStage.controller.enabled?"Deployed and enabled":"Deployed and disabled":"Not deployed":""}</p>
+ </div>;
 }
