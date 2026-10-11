@@ -49,7 +49,6 @@ export function ModeChoice() {
             <FeedbackButton />
           </div>
         </div>
-        <img className="gameplay-preview" src="/opening-gameplay.png" alt="The furnished office and component evidence in the playable campaign" />
       </div>
     </div>
   </div>;

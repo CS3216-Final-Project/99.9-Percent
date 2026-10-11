@@ -6,8 +6,7 @@ test("keyboard introduction stays paused, contains focus and remembers completio
   await page.goto("/");
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBeNull();
   const preview = page.getByRole("img", { name: /furnished office/ });
-  await expect(preview).toBeVisible();
-  await expect.poll(() => preview.evaluate(el => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect(preview).toHaveCount(0);
   await page.screenshot({ path: "test-results/phase2-title.png" });
   await page.getByRole("button", { name: "Play Campaign" }).press("Enter");
   const intro = page.getByRole("dialog", { name: "Company introduction" });
