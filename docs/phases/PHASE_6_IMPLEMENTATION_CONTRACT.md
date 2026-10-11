@@ -6,6 +6,25 @@
 > **Status:** PR #28 implementation contract; review and validation recorded in PHASE_6_IMPLEMENTATION_REPORT.md
 > **Repository checkpoint inspected:** `ai/phase-5-progression`, `8be77e220b9b130cdcc6812a5975bd2127ca851a`, 10 October 2026
 
+# 0. Recorded deviations in the merged implementation
+
+This contract was written against the PR #28 branch, before main merged Phases 1-5 separately (#10, #11, #17, #18, #20).
+The implementation was rebased onto main, and these sections no longer describe the shipped code:
+
+- **Persistence (section 10, file plan in section 12, acceptance in sections 13.1 and 15).** There is no `saveMigrations.ts`, migration registry or snapshot validator.
+  Main's saves hold the seed and recorded player inputs, and loading replays them on the deterministic engine (`frontend/src/game/saveEnvelope.ts`, `frontend/src/sim/replay.ts`).
+  Schema 6 is still used, so a build without reliability cannot load these saves; schemas 1-5 load through the same replay and are rejected if they contain prevention or reliability decisions.
+  Replay cannot be forged into an inconsistent state, so the per-field validators and migration failure cases in section 10 are not needed.
+  Before an older save is replaced, its exact bytes are still backed up.
+- **Opening prevention on old saves.** A run recorded before prevention existed can qualify for it when replayed today, although that run never paused for the review.
+  Replay records the prevention acknowledgement on its behalf instead of refusing the save; the resulting milestone stays pending for the player.
+- **Shared contract.** `shared/campaign.ts` and `backend/src/routes/runs.ts` accept schema 6 for cloud copies, contrary to the "no backend change" note in section 10.
+- **Presentation (sections 4.3 and 9).** Main's campaign layout and components are kept.
+  Reliability controls, the prevention and reliability outcome modals, the technology tree view and the requirement checklist are presented in that layout, not in the separate PR UI rewrite.
+- **Browser coverage (section 13.3).** The mobile browser cases for spikes, prevention and reliability were not carried over, so Phase 6 has no mobile browser coverage yet.
+
+> This section preserves the earlier rebase record from ad7ac41. The current review adds narrow-screen reliability coverage and fixes current-schema review gating; consult PHASE_6_IMPLEMENTATION_REPORT.md for final evidence.
+
 # 1. Authority and repository reconciliation
 
 Read this with `docs/PROJECT_PROPOSAL.md`, `docs/DEVELOPMENT_ROADMAP.md`, the approved Phase 1–5 contracts, `docs/CURRENT_GAME_LOGIC_AND_FLOW.md`, `docs/phases/PHASE_5_IMPLEMENTATION_REPORT.md` and the Opening/UX/guardrail reports. Current campaign implementation and subsequent user-approved scope take precedence over stale roadmap assumptions. This contract records PR #28 choices. The original Phase 6 plan remains in PHASE_6_RELIABILITY.md; the implementation report distinguishes verified behavior from remaining acceptance work.
