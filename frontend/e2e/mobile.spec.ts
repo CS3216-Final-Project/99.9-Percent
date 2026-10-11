@@ -91,3 +91,23 @@ test('account controls remain usable on touch while accounts are offline',async(
   await page.getByRole('button',{name:'Try Prototype',exact:true}).tap();
   await expect(page.getByRole('dialog',{name:'Company introduction'})).toBeVisible();
 });
+
+
+test("cache selection, paid activation and warmth reload on touch",async({page})=>{
+ const {dataCompany}=await import("../src/sim/__tests__/dataFixture");
+ await page.route("**/api/**",route=>route.abort());await seedSave(page,dataCompany());
+ await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ const panel=page.getByRole("complementary",{name:"System metrics"}),data=page.getByRole("region",{name:"Data strategy"});
+ await data.getByRole("button",{name:/Deploy Read Cache/}).tap();
+ for(let i=0;i<2;i++)await page.getByRole("button",{name:"Advance step",exact:true}).tap();
+ const roomCache=page.getByRole("main").getByRole("button",{name:/Read Cache/});
+ await roomCache.tap();await expect(roomCache).toHaveAttribute("aria-pressed","true");await expect(panel.getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");
+ await page.getByRole("button",{name:"Advance step",exact:true}).tap();
+ const before=(await savedGame(page)).campaign!;expect(before.readCache).not.toBeNull();expect(before.readCache!.warmth).toBe(0);
+ await page.getByRole("button",{name:"Advance step",exact:true}).tap();
+ expect((await savedGame(page)).campaign!.readCache!.warmth).toBe(1200);
+ await data.scrollIntoViewIfNeeded();await page.screenshot({path:"test-results/phase4-mobile-cache.png"});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+ const saved=(await savedGame(page)).campaign!;await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
+ expect((await savedGame(page)).campaign).toEqual(saved);
+});

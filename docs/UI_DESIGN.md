@@ -41,6 +41,14 @@ Show latency, service errors and total backlog as the compact symptom summary. F
 
 The UI reads the simulation snapshot and routes decisions through the store. It must not compute a second outcome, reveal a scripted root cause, recommend the matching fix, or restore weekly/timeout mechanics to make the layout look familiar. Costs, delays, unavailable actions and pending progress must reflect the existing rules. Use player-facing names such as “Database upgrade”, never internal IDs such as `upgrade-db`.
 
+## Phase 4 data strategy
+
+Keep the current campaign stage in the HUD while evidence scrolls. Detailed progression and next-stage prerequisites use a shared disclosure after the response workspace, so the opening incident's three responses remain visible. Continue to Data Strategy is explicit and leaves the company paused.
+
+Reveal the Read Cache inspection chip and room label only after data entry. They select the same component through the existing dispatcher. The request path includes optional Read Cache; nearby evidence explains that eligible misses, writes and non-cacheable reads still reach the database. A cache is not an independent queue or failure source.
+
+Until actual workload growth, show “Waiting for workload growth.” Once applied, show the observed profile/mix, rate used, hits, misses and DB pressure in a compact callout. Keep logical operations, warmth used/after, read/write demand and historical details in disclosures. History with no data observations says the detail was not recorded. Cache/tuning use the same action rows and cost/delay badges as other investments; unavailable database tiers do not advertise a locked purchase.
+
 ## Responsive and accessible behaviour
 
 Use the existing desktop side panel and mobile bottom panel. At 900 px and below, the header wraps, metric tiles reduce to icon/headline pairs, view tabs become icons and the speed selector hides. The room stays usable above the mobile panel. Evidence tables may scroll inside their disclosure; the page must not overflow horizontally. Do not make tables or explanatory paragraphs push every decision far below the initial viewport.

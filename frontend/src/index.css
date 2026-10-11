@@ -3781,3 +3781,6 @@ button:disabled {
 .scaling-controls fieldset { display: grid; gap: 6px; min-width: 0; border: 1px solid var(--paper-3); padding: 8px; }
 .scaling-controls legend { font-size: 0.85rem; }
 .scaling-controls .btn { white-space: normal; }
+
+/* Campaign progress uses the existing HUD typography and stays visible while evidence scrolls. */
+.campaign-stage { color: var(--on-night-soft); font-family: var(--font-num); font-size: .75rem; font-weight: 600; }

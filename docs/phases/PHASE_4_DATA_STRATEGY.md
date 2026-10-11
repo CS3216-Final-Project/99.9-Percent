@@ -1,1576 +1,274 @@
 # Phase 4 — Data Strategy and Parameter Variation
 
-> **Project:** 99.99% — System Design Tycoon  
-> **Target:** 16–20 October 2026  
-> **Primary learning outcomes:** LO1 Diagnose bottlenecks; LO2 Choose scaling strategies; LO4 Weigh design trade-offs  
-> **Status:** Detailed implementation plan for Phase 4 only
+> **Project:** 99.99% — System Design Tycoon
+> **Target:** 16–20 October 2026 (planning target, not a completion claim)
+> **Learning outcomes:** LO1 Diagnose bottlenecks; LO2 Choose scaling strategies; LO4 Weigh design trade-offs
+> **Status:** Authoritative repository-specific contract; implementation reviewed in PR #18; validation and external acceptance recorded in PHASE_4_IMPLEMENTATION_REPORT.md
+> **Continuation:** data-strategy v1; local save envelope schema 4
 
----
+## Integration with merged main (10 October 2026)
 
-# 1. Goal
+PR #17 is now merged as `c554c8b`. The PR #18 review/update against latest main supersedes the draft snapshot persistence assumptions below: schema 4 extends main's deterministic **replay envelope**, using `seed`, `step`, player `inputs`, the existing foundation boundary and runtime measurement. It does not serialize a second authoritative game snapshot or restore `saveMigrations.ts`. Schema 1/2/3 replay saves remain readable with exact source-byte backups before replacement. Old inputs do not enter Data Strategy; retained historical observations stay aggregate where appropriate.
 
-Extend the continuous campaign so that **workload characteristics and timing determine whether database upgrades or caching are useful**.
+Keep main's Classic mode, import/export, music, shared tooltips, action rows, incident layout, extracted scene model and account lifecycle. The shared cloud contract and existing transport validator accept replay schemas 3 and 4 so Phase 4 can use the already-merged account features. This is compatibility work requested with the main integration, not a new auth/ingestion workstream or database migration. Invalid/future/draft snapshot saves remain preserved and exportable; an unreplayable pre-merge snapshot is not silently converted into invented inputs. The implementation report records validation and outstanding external acceptance.
 
-Phase 4 should make the player reason about the **kind of traffic** reaching the data layer, not merely the amount of traffic.
+# 1. Authority, goal and reuse
 
-The central idea is:
+Read with docs/PROJECT_PROPOSAL.md, docs/DEVELOPMENT_ROADMAP.md, docs/phases/PHASE_1_SIMULATION_FINAL.md, docs/phases/PHASE_1_IMPLEMENTATION_REPORT.md, docs/phases/PHASE_2_PR1.md, docs/phases/PHASE_2_IMPLEMENTATION_REPORT.md, docs/phases/PHASE_3_SCALING.md and docs/phases/PHASE_3_IMPLEMENTATION_REPORT.md.
 
-> **The same amount of traffic can require different responses depending on read/write mix, cacheability, warm-up, architecture, and timing.**
+Earlier approved contracts continue to govern their scenarios. This contract incorporates the user-approved Phase 4 workload, cache, economics, migration and local-only boundary. Later user-approved revisions take precedence. It explicitly narrows earlier roadmap/proposal expectations: tuning changes only hit-rate ceiling, and centralized ingestion/auth/cloud remain separate deferred workstreams unless approved later.
 
-The player should no longer be able to rely on one repeated upgrade sequence.
+Extend the SAME company and deterministic engine. No standalone cache lesson, second campaign, engine, store, persistence layer, telemetry pipeline or renderer. Keep the Three.js office, Facility, camera, theme, icons and existing UI primitives. Teach demand reduction versus capacity investment through measured evidence. Application scaling may increase work reaching DB; it never directly reduces DB demand.
 
-This phase should establish:
+Keep opening-db v1 and application-scaling v1 immutable. Legacy weekly cache/research physics remain outside authoritative campaign processing. No later controls or hidden effects.
 
-- read-heavy vs write-heavy workload differences;
-- cacheable-read share;
-- cache hit rate;
-- cache warm-up;
-- database upgrade vs cache trade-offs;
-- seeded but bounded workload variation;
-- the same event producing different outcomes under different architectures;
-- centralized analytics attribution for runs/sessions.
+# 2. Existing foundation and checkpoint
 
-The company, architecture, finances, history, and campaign identity continue from earlier phases.
+Preserve existing per-instance processing, two-app maximum, 1,000/1,600 app capacities, deterministic routing, separate load-balancer deployment/routing activation, sequential DB upgrades 600 → 1,000 → 2,000, versioned growth, component overload counters, measured recovery, causal reports, cent-based 60-step finances, schema 3 persistence, shared UI selection and local telemetry/export.
 
-This is not a standalone data-layer lesson.
+The nine-node identities already include larger_database, caching and cache_tuning. Cache identities and a Facility rack asset exist; authoritative campaign cache processing does not. Legacy cacheWarmth, weekly tasks and DB load factors must not become the new physics.
 
----
+Recorded Phase 3 results: 162 passing unit tests, one optional TRACE skip, five balance tests, 12 E2E tests and 23 unchanged lint warnings. These are historical, not a fresh Phase 4 baseline.
 
-# 2. Player Experience
+Inspect branch, HEAD, index and worktree before implementation. Do not assume the Phase 3 PR is merged. Preserve user changes and deferred drafts. Establish a reviewable Phase 3 checkpoint and fresh Node 22 baseline before gameplay edits; never automatically stage, commit, stash or discard changes.
 
-The player has already experienced:
+# 3. Explicit entry and same-company continuity
 
-```text
-database bottleneck
-→ app scaling
-→ routing/load balancing
-```
-
-Now the same company begins facing different workload profiles.
-
-A representative flow:
-
-```text
-Company grows
-→ traffic spike arrives
-→ player sees read/write characteristics
-→ data-layer pressure increases
-→ player compares DB upgrade vs cache
-→ player chooses a response
-→ cache may warm gradually
-→ DB demand changes
-→ outcome depends on workload
-→ postmortem explains why the choice worked or did not work
-→ same company continues
-```
-
-The player should learn that:
-
-```text
-cache works well for repeated eligible reads
-```
-
-but:
-
-```text
-cache helps less for writes or non-cacheable traffic
-```
-
-and:
-
-```text
-database capacity upgrades are broader but costlier/slower
-```
-
----
-
-## 2.1 Starting state for Phase 4
-
-The player enters Phase 4 with:
-
-- the same company from Phases 1–3;
-- application scaling options already introduced;
-- routing/load balancing available where unlocked;
-- one database;
-- no read cache deployed by default.
-
-The database should still be a single database component for MVP simplicity.
-
-The phase should not introduce database sharding, replicas, or database failover.
-
----
-
-## 2.2 Workload profiles
-
-At minimum, support distinct workload profiles such as:
-
-### Read-heavy
-
-Example:
-
-```text
-Traffic:              900 req/s
-Read share:            80%
-Write share:           20%
-Cacheable read share: 100% of reads
-```
-
-This workload should strongly benefit from caching once the cache is warm.
-
----
-
-### Write-heavy
-
-Example:
-
-```text
-Traffic:              900 req/s
-Read share:            30%
-Write share:           70%
-Cacheable read share: 100% of reads
-```
-
-This workload should benefit much less from caching.
-
-The player should be able to observe that the same cache technology has different value under different traffic.
-
----
-
-## 2.3 Cache introduction
-
-The player can deploy a **Read Cache**.
-
-The cache should not instantly remove all database work.
-
-Its value depends on:
-
-```text
-read share
-× cacheable-read share
-× cache hit rate
-```
-
-A simple model is sufficient.
-
-The proposal's worked example uses:
-
-```text
-900 requests/s
-80% reads
-60% cache hit rate
-```
-
-which gives:
-
-```text
-DB demand
-= 900 × (1 − 0.8 × 0.6)
-= 468 ops/s
-```
-
-This relationship should be preserved conceptually.
-
----
-
-## 2.4 Cache warm-up
-
-A newly deployed cache should begin cold or partially warm.
-
-Suggested behavior:
-
-```text
-initial hit rate = low
-target hit rate = configured value
-hit rate increases over several simulation steps
-```
-
-This means:
-
-```text
-cache installed
-≠
-instant full benefit
-```
-
-The player should be able to see:
-
-- current hit rate;
-- target hit rate;
-- warm-up progress;
-- resulting database demand.
-
-Warm-up should be deterministic for a given run state.
-
----
-
-## 2.5 Database upgrade remains viable
-
-The existing database upgrade remains a valid option.
-
-Example:
-
-```text
-DB capacity:
-600
-→
-1000 ops/s
-```
-
-This may be preferable when:
-
-- write share is high;
-- cacheable share is low;
-- immediate broad capacity is required;
-- cache warm-up is too slow for the situation.
-
-The game should not label database upgrades as the "boring" or "wrong" choice.
-
----
-
-## 2.6 Cache tuning
-
-Introduce a simple **Cache Tuning** effect consistent with the proposal's 9-unlock tree.
-
-In Phase 4, this may initially exist as a mechanic or controlled option even if the full tree arrives in Phase 5.
-
-Cache tuning may modify:
-
-```text
-target hit rate
-warm-up speed
-```
-
-Keep the model simple.
-
-Do not implement:
-
-- eviction algorithms;
-- TTL policy simulators;
-- cache coherence;
-- distributed cache topology.
-
----
-
-## 2.7 Same event, different outcome
-
-The same traffic spike should be able to produce:
-
-```text
-application overload
-database overload
-no incident
-```
-
-depending on architecture and workload.
-
-Example:
-
-### Architecture A
-
-```text
-weak app tier
-strong DB
-```
-
-Result:
-
-```text
-application bottleneck
-```
-
-### Architecture B
-
-```text
-strong app tier
-weak DB
-```
-
-Result:
-
-```text
-database bottleneck
-```
-
-### Architecture C
-
-```text
-strong app tier
-warm cache
-strong DB
-```
-
-Result:
-
-```text
-no incident
-```
-
-This is a central replayability requirement.
-
-Events should not encode a predetermined "correct purchase."
-
----
-
-## 2.8 Read-heavy vs write-heavy consequence
-
-A player should be able to experience:
-
-```text
-Read-heavy spike
-→ cache becomes highly effective
-```
-
-and later:
-
-```text
-Write-heavy spike
-→ same cache provides limited benefit
-```
-
-The postmortem should explain this using the actual workload and hit-rate evidence.
-
----
-
-## 2.9 Continuous campaign identity
-
-Preserve:
-
-- same run/company ID;
-- app instances;
-- routing state;
-- DB upgrades;
-- cache state;
-- cash;
-- recurring costs;
-- event history;
-- milestone history;
-- previous postmortems.
-
-The player should feel that the architecture they built earlier changes the outcome of later events.
-
----
-
-# 3. Learning Outcomes
-
-## LO1 — Diagnose bottlenecks
-
-The player should identify whether the limiting factor is:
-
-- application processing;
-- database capacity;
-- insufficient cache benefit;
-- cache warm-up delay.
-
-Evidence should include:
-
-- app demand/capacity;
-- DB demand/capacity;
-- read/write mix;
-- cacheable-read share;
-- current cache hit rate;
-- warm-up state;
-- backlog;
-- latency;
-- errors.
-
----
-
-## LO2 — Choose scaling strategies
-
-The player should compare:
-
-### Database upgrade
-
-Useful when:
-
-- total DB demand is high;
-- workload is write-heavy;
-- many reads are not cacheable;
-- broader capacity is needed.
-
-Trade-offs:
-
-- activation delay;
-- recurring cost;
-- does not reduce work generated by the workload.
-
-### Read cache
-
-Useful when:
-
-- workload is read-heavy;
-- reads are cacheable;
-- hit rate becomes sufficiently high.
-
-Trade-offs:
-
-- warm-up delay;
-- cache cost;
-- limited value for writes;
-- limited value for non-cacheable reads.
-
-### Cache tuning
-
-Useful when:
-
-- cache already exists;
-- improving hit rate or warm-up meaningfully changes DB demand.
-
-The player should reason from workload evidence rather than use a fixed upgrade order.
-
----
-
-## LO4 — Weigh trade-offs
-
-The player should compare:
-
-```text
-cost
-activation delay
-warm-up delay
-workload fit
-capacity gained
-future usefulness
-```
-
-The phase should reinforce:
-
-> A good architecture decision depends on context.
-
----
-
-# 4. Engineering
-
-## 4.1 Extend the existing database model
-
-Do not create a second database-upgrade system.
-
-Extend the existing database model with workload-aware demand.
-
-Database demand should be derived from application-processed requests after cache effects.
-
----
-
-## 4.2 Workload state
-
-Add or formalize:
-
-```text
-readShare
-writeShare
-cacheableReadShare
-```
-
-Require:
-
-```text
-readShare + writeShare = 1
-```
-
-or equivalent normalized representation.
-
-The workload should be part of scenario/run state and reproducible from the seed/configuration.
-
----
-
-## 4.3 Cache state
-
-A cache should track at least:
-
-```text
-deployed
-currentHitRate
-targetHitRate
-warmupProgress
-warmupDuration
-cost
-```
-
-Optional simple fields:
-
-```text
-enabled
-tuningLevel
-```
-
-Keep this small.
-
----
-
-## 4.4 Database demand calculation
-
-A simple initial model:
-
-```text
-cacheableReadFraction
-=
-readShare × cacheableReadShare
-```
-
-Then:
-
-```text
-cacheHitFraction
-=
-cacheableReadFraction × currentHitRate
-```
-
-Then:
-
-```text
-DB operations per processed request
-=
-1 − cacheHitFraction
-```
-
-Therefore:
-
-```text
-dbDemandOps
-=
-processedAppRequests × (1 − readShare × cacheableReadShare × currentHitRate)
-```
-
-Example:
-
-```text
-processedAppRequests = 900
-readShare = 0.8
-cacheableReadShare = 1.0
-currentHitRate = 0.6
-```
-
-Then:
-
-```text
-dbDemandOps
-=
-900 × (1 − 0.8 × 1.0 × 0.6)
-=
-468 ops/s
-```
-
-Writes always reach the database in this simplified model.
-
----
-
-## 4.5 Cache warm-up calculation
-
-Use deterministic warm-up.
-
-Example:
-
-```text
-currentHitRate =
-min(
-  targetHitRate,
-  previousHitRate + warmupIncrementPerStep
-)
-```
-
-Alternative deterministic model is acceptable if simple and testable.
-
-The important invariant is:
-
-```text
-cold cache
-→ lower hit rate
-→ higher DB demand
-```
-
-and:
-
-```text
-warm cache
-→ higher hit rate
-→ lower DB demand
-```
-
----
-
-## 4.6 Cache tuning
-
-Cache tuning may modify:
-
-```text
-targetHitRate
-warmupIncrementPerStep
-```
-
-For example:
-
-```text
-Base cache:
-target hit rate = 0.60
-
-Tuned cache:
-target hit rate = 0.75
-```
-
-or:
-
-```text
-Base warm-up = 5 steps
-Tuned warm-up = 3 steps
-```
-
-Exact values are balance parameters.
-
-Do not turn this into a detailed cache-engine simulator.
-
----
-
-## 4.7 Seeded workload/event configuration
-
-Introduce bounded scenario configuration.
-
-A scenario should define or derive:
-
-```text
-baseline traffic
-growth rate
-spike magnitude
-spike duration
-read share
-write share
-cacheable share
-event timing
-```
-
-The random seed should choose values within approved ranges.
-
-The same:
-
-```text
-seed
-+ starting architecture
-+ action sequence
-```
-
-must reproduce the same run.
-
----
-
-## 4.8 Evaluation scenario vs normal variation
-
-Separate:
-
-### Fixed evaluation configuration
-
-Used later for formal testing.
+Preserve run/company ID, seed, scenario origin, step, cash, apps/tiers, routing, load balancer, DB tier, traffic limit, backlog, pending actions/due steps, accounting exposure/remainders, milestones, trace, reports and telemetry. No reset, free capacity, DB downgrade, forced limit removal, traffic reward or fabricated incident.
 
-Properties:
+Create a separately versioned data-strategy continuation; origin remains opening-db v1. Persist its identity/version, selected configuration, entry step, event deadlines and consumption. Explicit entry requires:
 
-- stable;
-- recorded;
-- reproducible;
-- same first incident where needed.
+- Phase 3 growth actually occurred (application-scaling growth consumed).
+- Management, not ended, with no unresolved incident/review.
+- All app and DB backlogs drained.
+- Any actual report requiring acknowledgement acknowledged.
 
-### Normal replay configuration
+Prevention paths remain eligible without a fabricated report. openingRecovered is not a Phase 3 completion fact. Derive entry eligibility from stage/event and lifecycle facts. Entry is idempotent, preserves pending work and leaves management paused. Boot/migration cannot enter, advance or fire growth. Reading/inspection never advances time.
 
-May vary:
+Reveal data controls after explicit entry; keep existing app/routing/limit controls. Tuning requires deployed cache. Larger Database and Read Cache are not permanently mutually exclusive. No full research tree or extra technology node.
 
-- workload mix;
-- spike magnitude;
-- spike duration;
-- timing;
-- budget where later enabled.
+# 4. Versioned workload and architecture-dependent outcomes
 
-Do not accidentally randomize formal evaluation conditions.
+Retire 900 req/s as the live continuation. Fixed data growth is 2,400 incoming req/s; actual application-processed P still depends on capacity, routing and admission. Never substitute incoming for P.
 
----
+| Fixed profile | Read basis points | Writes | Cacheable-read basis points |
+|---|---:|---:|---:|
+| read-heavy | 8,000 | 20% | 10,000 |
+| write-heavy | 2,000 | 80% | 10,000 |
 
-## 4.9 Same event under different architectures
+At P=2,400 and eligible-read hit rate 60%, DB demand is exactly 1,248 read-heavy or 2,112 write-heavy. Cache helps writes-heavy traffic less and may remain insufficient for DB 2,000. DB 3,000 serves either fixture if applications suffice.
 
-Scenario generation should describe external demand.
+One large app remains app-limited; two base balanced apps also constrain. Mixed tiers can constrain the smaller app and DB together. Two large balanced apps can expose DB overload. Warm cache, DB 3,000 or a retained admission limit can prevent an incident. Preserve all these outcomes; never grant capacity or manufacture a DB incident. Headless fixtures can supply explicit sufficient architecture; browser paths must achieve it through actual actions.
 
-The simulation determines the bottleneck.
+## Event timing and minimal bounded variation
 
-Do not encode:
+Keep v1 traffic fixed at 2,400 and observation interval at three physical steps. On the first post-entry step with management/no incident and drained backlogs, record due step = current step +3. At/after it, fire once on the first step readiness holds. Preserve deadline across lost readiness. Check after due action activation, following existing continuation semantics. Do not require sufficient app capacity or removal of admission limit to fire.
 
-```text
-eventType = DATABASE_INCIDENT
-```
-
-if the event is really:
-
-```text
-traffic spike
-```
-
-Instead:
-
-```text
-traffic event
-→ simulation evaluates architecture
-→ resulting bottleneck emerges
-```
-
-This is essential to the project's "same event, different solution" design.
-
----
-
-## 4.10 Postmortem updates
-
-Extend postmortems to include workload context.
-
-For example:
-
-```text
-Traffic was 900 req/s.
-80% of requests were reads.
-The cache reached a 60% hit rate.
-DB demand fell from 900 to 468 ops/s.
-```
-
-For a write-heavy scenario:
-
-```text
-Only 30% of traffic was read traffic, so the cache could remove only a limited share of DB operations.
-```
-
-Postmortems should explain actual outcomes rather than recommend one technology universally.
-
----
-
-## 4.11 Metric/UI updates
-
-Display enough workload information for decision-making.
-
-Suggested visible fields:
-
-```text
-read %
-write %
-cacheable read %
-cache hit rate
-cache warm-up progress
-DB demand
-DB capacity
-```
-
-Do not overload the main dashboard.
-
-A component/details panel can hold secondary information.
-
----
-
-## 4.12 Centralized analytics ingestion
-
-The master roadmap requires Phase 4 to centralize analytics ingestion and run/session attribution.
-
-Analytics should reliably associate events with:
-
-```text
-session ID
-run ID
-build version
-scenario version
-seed
-user/guest identifier where allowed
-event sequence
-timestamp
-```
-
-The backend should validate event payloads.
-
-Do not expose privileged database credentials to the browser.
-
----
-
-## 4.13 Session/run distinction
-
-Maintain clear identity:
-
-```text
-session = one browser/play session
-run = one company campaign attempt
-```
-
-A resumed run may occur in a new session.
-
-Analytics should preserve this distinction.
-
----
-
-# 5. Existing Modules
-
-Likely relevant areas:
-
-```text
-shared step engine
-scenario configuration
-database model
-actions
-metrics derivation
-architecture view
-charts
-postmortem generation
-telemetry client
-backend ingestion
-campaign store
-save schema
-```
-
-Likely file equivalents:
-
-```text
-src/sim/step.ts
-src/sim/scenarios/*
-src/sim/actions.ts
-src/sim/derive.ts
-src/sim/postmortem.ts
-src/game/store.ts
-src/analytics/telemetry.ts
-src/backend/*
-src/components/*
-```
-
-The IDE should inspect actual repository conventions first.
-
----
-
-# 6. New Modules
-
-The master roadmap calls for:
-
-```text
-cache calculation helper
-bounded scenario generator
-```
-
-Possible additions:
-
-```text
-src/sim/cache.ts
-src/sim/scenarioGenerator.ts
-```
-
-Potential supporting tests:
-
-```text
-src/sim/cache.test.ts
-src/sim/scenarioGenerator.test.ts
-```
-
-A schema/config file may also be appropriate:
-
-```text
-src/sim/scenarios/schema.ts
-```
-
-Do not add a large generic simulation framework unless the current codebase clearly requires it.
-
----
-
-# 7. Automated Testing
-
-## 7.1 Cache arithmetic
-
-Test:
-
-```text
-no cache
-cold cache
-partially warm cache
-fully warm cache
-```
-
-Verify exact DB-demand calculations.
-
-Example:
-
-```text
-900 req/s
-80% reads
-100% cacheable reads
-60% hit rate
-→ 468 DB ops/s
-```
-
----
-
-## 7.2 Write-heavy limitation
-
-Example:
-
-```text
-900 req/s
-30% reads
-100% cacheable reads
-60% hit rate
-```
-
-Expected:
-
-```text
-dbDemand
-=
-900 × (1 − 0.3 × 0.6)
-=
-738 ops/s
-```
-
-The test should prove that the same cache is much less effective here.
-
----
-
-## 7.3 Non-cacheable reads
-
-Test:
-
-```text
-high read share
-low cacheable share
-```
-
-and verify that DB demand remains high despite cache deployment.
-
----
-
-## 7.4 Warm-up
-
-Test:
-
-- cache starts at configured initial hit rate;
-- hit rate increases deterministically;
-- target hit rate is never exceeded;
-- DB demand falls step by step;
-- save/resume preserves warm-up state.
-
----
-
-## 7.5 Cache tuning
-
-Test:
-
-- tuning changes only intended parameters;
-- tuning does not activate before action completion;
-- tuned hit rate/warm-up produces expected DB-demand change;
-- cost is applied exactly once.
-
----
-
-## 7.6 Database upgrade
-
-Regression test:
-
-- DB upgrade still changes DB capacity;
-- cache changes DB demand;
-- the two mechanisms remain distinct.
-
-This distinction is important:
-
-```text
-DB upgrade → capacity ↑
-Cache → demand ↓
-```
-
----
-
-## 7.7 Seed reproducibility
-
-Test:
+Apply selected read/write profile when growth fires. Before that, preserve preceding one-operation-per-request behavior. Growth is persistent. Record old/new traffic/profile, due and actual step; loading alone cannot fire it.
 
-```text
-same seed
-→ same workload/event configuration
-```
-
-including:
-
-- traffic profile;
-- spike timing;
-- spike duration;
-- read/write mix;
-- cacheable share.
-
----
-
-## 7.8 Different seeds
-
-Test that different allowed seeds can produce bounded variation without invalid scenarios.
-
-Avoid:
-
-- impossible recovery;
-- instant unavoidable bankruptcy;
-- events with no useful warning;
-- values outside configured ranges.
-
----
-
-## 7.9 Same event, different architecture
-
-Use one external traffic event with at least three architectures.
-
-Verify:
-
-### Weak app / strong DB
-
-```text
-application bottleneck
-```
-
-### Strong app / weak DB
-
-```text
-database bottleneck
-```
-
-### Strong app / warm cache / sufficient DB
-
-```text
-no incident
-```
-
-The event itself must not hard-code the incident result.
-
----
-
-## 7.10 Evaluation configuration
-
-Test:
-
-- fixed evaluation configuration never changes with random normal replay generation;
-- evaluation seed/config version is recorded;
-- normal replay generation cannot overwrite fixed evaluation values.
-
----
-
-## 7.11 Postmortem
+Minimal normal replay variation selects deterministically between the two approved profiles, using existing seeded RNG conventions. Keep traffic, cacheability and interval fixed; store chosen config/generation version once. Different seeds may select the same profile. No invented continuous ranges or changed earlier RNG behavior. Fixed evaluation pins seed/profile/version separately and cannot be overwritten by replay selection.
 
-Test:
+A contrasting profile can use a separate fixed evaluation session. An optional same-company contrast, if implemented, requires explicit action after growth, management/no review and drained backlogs; switches only profile at unchanged traffic, once, with consumed-event evidence. No automatic second spike, architecture reset, required purchase or reward. Broader traffic/timing/cacheability variation requires later approval/versioning.
 
-- workload mix appears correctly;
-- cache hit rate appears correctly;
-- DB demand before/after is correct;
-- cache is not credited when it had negligible effect;
-- DB upgrade is not described as reducing workload;
-- write-heavy limitation is explained accurately.
+# 5. Integer logical operations and conservation
 
----
+Every application-processed request represents one logical data operation. Shares/rates are integer basis points in [0,10,000]. Apply the current profile when application processing completes, including app backlog; do not claim operation type was tracked at arrival. Apply floors once to aggregate P after per-instance processing, not separately per instance.
 
-## 7.12 Analytics attribution
-
-Test:
-
-- every event has run ID;
-- every event has session ID;
-- build/scenario version is recorded;
-- event ordering is preserved;
-- duplicate event IDs are rejected/deduplicated where intended;
-- resumed run retains run identity across sessions.
-
----
-
-## 7.13 Full Phase 4 acceptance paths
-
-### Path A — Read-heavy + cache
-
-```text
-read-heavy spike
-→ DB overload
-→ deploy cache
-→ cache warms
-→ DB demand falls
-→ backlog drains
-→ recovery
-```
-
-### Path B — Write-heavy + cache is insufficient
-
-```text
-write-heavy spike
-→ DB overload
-→ deploy cache
-→ limited DB-demand reduction
-→ DB remains constrained
-→ player upgrades DB
-→ recovery
-```
-
-### Path C — DB upgrade only
-
 ```text
-DB overload
-→ DB upgrade
-→ capacity increases
-→ backlog drains
-→ recovery
-```
-
-### Path D — Same traffic, different prior architecture
+reads             = floor(P × readShare / 10,000)
+writes            = P - reads
+eligibleReads     = floor(reads × cacheableReadShare / 10,000)
+nonCacheableReads = reads - eligibleReads
+hits              = floor(eligibleReads × effectiveHitRate / 10,000)
+eligibleMisses    = eligibleReads - hits
 
-```text
-same external spike
-→ architecture A: app overload
-→ architecture B: DB overload
-→ architecture C: no incident
+databaseReadDemand  = nonCacheableReads + eligibleMisses
+databaseWriteDemand = writes
+databaseNewDemand   = P - hits
 ```
-
----
-
-# 8. Human Validation
-
-The core validation question is:
-
-> **Do players change their decisions when workload characteristics change?**
-
----
-
-## 8.1 Suggested test design
-
-Use both fresh and returning testers.
 
-Present two scenarios with similar traffic but different workload mixes.
+Without active cache effectiveHitRate=0. All counts are nonnegative integers; no fractional requests or hidden rounding remainder. Small-work rounding is documented behavior. Cache misses means eligibleMisses; display non-cacheable reads separately.
 
-Example:
+Existing DB backlog is previously submitted uncached work. Never turn it retroactively into hits or reclassify it when profile changes. Process DB backlog + databaseNewDemand with the existing bounded processor. Each DB operation still corresponds to one pending request outcome.
 
-### Scenario A
-
-```text
-80% reads
-high cacheable share
-```
-
-### Scenario B
-
 ```text
-30% reads
-high write share
+successful = hits + completed DB operations
+failed = sum(application overflow) + DB overflow
+starting total backlog + admitted = successful + failed + ending total backlog
+reads + writes = P
+hits + databaseNewDemand = P
 ```
-
-Ask before action:
-
-> "Which response seems most appropriate here, and why?"
-
-Do not reveal the answer.
 
----
+Rejected incoming demand stays separate. Hits complete once, earn revenue once and never also enter DB demand. Preserve outcome/error denominators and pending-request accounting. Zero admissions/outcomes cannot force recovery.
 
-## 8.2 Observe
+# 6. Cache model, warmth and one-dimensional tuning
 
-Record:
+Applications → optional Cache lookup → Database. Only cacheable/repeated reads hit. Misses, non-cacheable reads and all writes reach DB. Cacheability abstracts valid repeated reads; no invalidation/coherence is simulated. Writes do not change cache state in this model.
 
-- whether player notices read/write mix;
-- whether player understands cacheable share;
-- whether player expects cache to help writes;
-- whether warm-up is understood;
-- whether DB upgrade vs cache feels like a real trade-off;
-- whether changed conditions change the player's choice;
-- whether extra metrics feel useful or overwhelming.
+No cache queue, throughput bottleneck, failure, TTL, eviction, invalidation, consistency gameplay, size knob or independent incident. No added lookup latency. Hit ceiling represents effectiveness for the workload, not unlimited real-world storage.
 
----
+Persist deployment/activation step, warmth, target and tuning state. Base target=6,000 basis points; tuned=7,500; increment=1,200 per qualifying eligible-work step.
 
-## 8.3 Begin paired learning assessment
+Exact boundary:
 
-The master roadmap specifies that equivalent pre/post questions begin around this period for implemented concepts.
+1. Activate due actions before work. Deployment starts warmth at 0 and target 6,000. Tuning raises ceiling to 7,500 without resetting warmth.
+2. Process apps/classify logical work. Use stored warmth bounded by active ceiling for this step's effective rate; deployment activation step uses 0%.
+3. Compute hits/DB input, DB outcomes, latency and accounting.
+4. Snapshot effectiveHitRateUsed and warmthUsed for this completed step.
+5. If activated cache and eligibleReads>0, advance stored warmth by 1,200 up to target for NEXT step. Snapshot also records warmthAfterStep and target to distinguish used evidence from future state.
 
-Use only concepts already present in the game.
+Successive eligible-work steps use 0%,12%,24%,36%,48%,60%. Five qualifying steps advance warmth to 60%; the following step uses it. Pause, review, zero eligible reads and reload never increment warmth. Fully warm cache uses 60% on tuning activation, then advances toward 75% at unchanged speed. Workload changes do not reset warmth; eligibility still determines hits.
 
-Possible question focus:
+Tuning changes ONLY ceiling. Remove stale Phase 4/campaign copy claiming faster warm-up or extra tuning upkeep. Preserve inactive legacy mechanics/history rather than rewriting them.
 
-- identify bottleneck;
-- choose scaling/cache strategy;
-- explain one benefit and one limitation.
+# 7. Approved actions and economics
 
-Do not assess reliability concepts before Phase 6 is implemented.
+Extend current accepted-action dispatch, IDs, scheduling and spending; UI never mutates money/capacity/warmth directly.
 
----
+| Action | Effect | Setup | Delay | Upkeep per 60-step financial period |
+|---|---|---:|---:|---:|
+| Further DB tier | 2,000 → 3,000 ops/s | $4,000 | 4 steps | $3,500 total DB upkeep |
+| Read Cache | Cold cache, target 60% | $1,500 | 2 steps | $400 cache upkeep |
+| Cache Tuning | Target 60% → 75% | $1,000 | 2 steps | No additional upkeep |
 
-## 8.4 Human validation success signal
+Earlier tiers/prices/actions remain unchanged. Sequential upgrades only; no jumps/repeated terminal purchase. New tier/cache/tuning require data entry; tuning also deployed untuned cache. Reuse single infrastructure scheduling slot alongside app/LB work; routing/admission retain their existing independent channels.
 
-A player should be able to explain something like:
+Request at completed step n activates at beginning n+delay. Charge setup exactly once on accepted request; rejected requests spend nothing. Availability follows resources/prerequisites/scheduling, never strategic suitability. Accrue upkeep only after activation. DB $3,500 is total tier upkeep, not additive surcharge. Keep salary, request revenue, exposure/remainders, exactly-once settlement and bankruptcy precedence. No bailout/refund/new failure physics.
 
-> "Caching works better here because most requests are cacheable reads."
+# 8. Incidents, latency and causal postmortem
 
-and in another scenario:
+Reuse component overload streaks, existing capacity family and measured recovery. DB offered demand becomes databaseNewDemand; old backlog still influences latency. Cache cannot erase backlog, force recovery or produce a cache incident.
 
-> "This workload is mostly writes, so the cache will not reduce enough database work. A database upgrade makes more sense."
+Keep latency: 100 ms + maximum application backlog delay + DB backlog delay, with current capacities/units. It is a conservative dependency-queue estimate, not a hit-weighted mean/percentile. Cache helps indirectly through lower DB pressure. Preserve strict latency <500 ms, service errors <1%, positive admissions/completed outcomes and five qualifying steps, plus bankruptcy precedence and earlier mandatory pauses.
 
-The exact wording does not matter.
+Record actual profile/shares, eligibility, logical P, reads/writes, hits/misses, used hit rate, warmth before/after, target, DB demand/capacity/backlog and request/activation timing. Preserve per-instance/routing evidence. Explain capacity increase versus demand reduction, combined contributions and continued rejection/revenue trade-offs. Never claim app scaling reduces DB demand, unactivated cache helped, or writes-heavy cache is universally useless. No fabricated report for prevention; historical reports remain read-only.
 
-Context-sensitive reasoning does.
+# 9. Actual UI and file reuse plan
 
----
+Adapt CampaignUI, Game, Facility, dependency strip, existing selection and history. Logical view: Users → Applications → optional Cache → Database; show miss/non-cacheable/write DB paths without implying all traffic bypasses DB.
 
-# 9. Definition of Done
+Show profile/read-write mix, cache/pending state, effective rate USED, hits, eligible misses, warmth/target, DB demand/capacity/backlog and existing app/latency/errors/admission/countdown evidence. Inspection can expose extra details. Snapshot history lacking new fields displays unavailable historical detail, never invented zeros.
 
-Phase 4 is complete only when all of the following are true.
+Facility and strip select the same underlying cache through existing state/dispatcher. Reuse rack/location and office renderer. Preserve keyboard/touch, non-color evidence and actual app routing.
 
-## Workload model
+| Existing files | Required extension/adaptation |
+|---|---|
+| frontend/src/sim/campaignTypes.ts, types.ts | Serializable data-stage/cache/actions/evidence |
+| frontend/src/sim/step.ts | Data calculation/downstream DB input, warmth, entry and conserved outcomes |
+| frontend/src/sim/actions.ts | Existing dispatch/prerequisites/scheduling |
+| frontend/src/sim/settlement.ts | DB/cache exposure without changing settlement arithmetic |
+| frontend/src/sim/derive.ts | Snapshot selectors; no parallel demand formulas |
+| frontend/src/sim/trace.ts | Actual cache/workload causal evidence |
+| frontend/src/sim/tech.ts | Existing nine identities, reveal and accurate copy |
+| frontend/src/game/store.ts | Explicit entry, shared selection and local lifecycle |
+| frontend/src/game/persist.ts, saveEnvelope.ts | Existing schema dispatch/validation/backup/export |
+| frontend/src/game/telemetry.ts | Existing local projection/archive |
+| frontend/src/components/CampaignUI.tsx | Existing actions, inspection, history and report flow |
+| frontend/src/components/Game.tsx | Single clock/composition; only necessary integration |
+| frontend/src/components/scene/Facility.tsx, scene/layout.ts | Existing cache asset/selection/dependency cues |
+| frontend/src/index.css | Minimal responsive/accessibility styles if needed |
 
-- [ ] Read/write mix exists in simulation state.
-- [ ] Cacheable-read share exists.
-- [ ] Workload parameters affect DB demand.
-- [ ] Values are deterministic for a given scenario/seed.
+Reuse processWork, routing/allocation, pause cleanup and settlement. One new production file is justified: frontend/src/sim/scenarios/dataStrategy.ts, following separately versioned scenario conventions. Consider a local pure cache helper first; extract only for readability. No general generator framework, graph/editor, account client, new persistence/store or telemetry system. Extend existing tests; focused data-strategy test files are acceptable.
 
-## Cache
+# 10. Schema 4 local migration
 
-- [ ] Read cache can be deployed.
-- [ ] Cache hit rate is modeled.
-- [ ] Cache warm-up is modeled.
-- [ ] Cache only reduces eligible read work.
-- [ ] Writes always reach the DB in this simplified model.
-- [ ] Cache tuning modifies intended cache behavior.
-- [ ] Cache state survives save/resume.
+Retain `nn.campaign.save.v1`. Schema 4 extends main's compact deterministic replay envelope: scenario/run identity, seed, final physical step, ordered player inputs, optional foundation boundary, runtime remainder/measurement and saved timestamp. Replaying these inputs reconstructs the data-stage configuration/events/deadlines, profile, cache activation/warmth/target/tuning, pending actions, 3,000 tier, accounting exposure, snapshots, traces and reports; do not serialize a second authoritative snapshot.
 
-## Database
+Extend `saveEnvelope.ts` validation/dispatch and `persist.ts` together. Deployed schema 1/2/3 replay envelopes load as schema 4 in memory. Existing Phase 1/2 milestone acknowledgements retain their opening-only meaning and foundation observations. Schema 3 inputs preserve Phase 3 behavior. Earlier schemas cannot contain Phase 4 decisions; validation rejects such payloads. Data entry occurs only through an explicit recorded action, never on boot/migration.
 
-- [ ] Existing DB upgrade remains functional.
-- [ ] DB upgrade changes capacity, not workload.
-- [ ] Cache changes workload, not DB capacity.
-- [ ] Both strategies can be viable under suitable conditions.
+Preserve ID, cash, apps, routing, limits, backlogs, pending work/due steps, exposure/remainders, reports, trace, milestones and measurement cursor. Preserve old snapshot versions and aggregate history; do not invent read/write/cache observations, revenue or completion events. Replaying a new save must reproduce uninterrupted warmth, demand, outcomes, finances and actions exactly.
 
-## Scenario variation
+Before replacing an old active slot, back up its exact original bytes using its schema/run/timestamp identity. Validation, backup collision, storage and replacement failures preserve the source. Unknown/future/corrupt saves, including obsolete unmerged snapshot drafts with no replayable inputs, remain protected and exportable. Keep `nn.save.v1`, `nn.meta.v1` and `nn.analytics.v1` unchanged. Reset is explicit and retains unexported evidence.
 
-- [ ] Seeded bounded workload variation works.
-- [ ] Same seed reproduces same event parameters.
-- [ ] Different seeds can vary workload safely.
-- [ ] Same external event can produce app overload, DB overload, or no incident depending on architecture.
-- [ ] No event hard-codes a required purchase.
+The merged account transport accepts schema 3 and 4 replay envelopes. Cloud resume validates/replays before changing local progress, retains the original cloud response, stays paused and never uploads a converted copy automatically. Ownership/session behavior remains the merged Phase 3 implementation. No database schema or production migration is required.
 
-## UI / player experience
+# 11. Local telemetry and deferred backend boundary
 
-- [ ] Read/write mix is understandable.
-- [ ] Cache hit rate is visible.
-- [ ] Warm-up progress is visible.
-- [ ] DB demand/capacity is visible.
-- [ ] Player can compare cache vs DB upgrade.
-- [ ] Same company continues through the phase.
+Extend existing stable IDs/run/session/build/scenario/step/timestamp attribution, adding data continuation/config/profile. Preserve active/wall timing and unknown historical fields. Required events:
 
-## Postmortem
+- data_stage_entered: explicit accepted entry once.
+- workload_changed: actual growth/contrast with old/new config, due/actual step and event ID.
+- database_upgrade_requested / database_upgrade_activated: accepted request versus actual capacity change.
+- cache_requested / cache_activated: accepted request versus actual cold deployment.
+- cache_tuning_requested / cache_tuning_activated: accepted request versus target change/preserved warmth.
 
-- [ ] Workload context appears.
-- [ ] Cache effectiveness is quantified from actual state.
-- [ ] Write-heavy limitations are explained.
-- [ ] Postmortem remains causal rather than prescriptive.
+Reuse current bridge/names where supported; no double emission. Link request IDs/cost/due step, capacity, workload and cache evidence. Preserve stable trace identity, StrictMode/reload/retry deduplication, archive/write-failure durability and unexported records. Local snapshots/export supply detailed per-step evidence without unnecessary events each tick.
 
-## Analytics
+Do not mix deferred Phase 3 auth/cloud drafts: account restoration, OAuth, attachment, owner binding, upload/resume, revision conflicts, account switching and proxy/cookie deployment. No centralized-ingestion service, API-routing change or fixed production rewrite is approved here. Guest gameplay/local persistence/export must work with API unavailable. Centralized ingestion remains a separately reported deferred task; local export is not a claim of central ingestion. Broader MVP auth/cloud obligations remain.
 
-- [ ] Centralized ingestion is working.
-- [ ] Run/session attribution is reliable.
-- [ ] Build/scenario/seed metadata is recorded.
-- [ ] Resume preserves run identity across sessions.
+# 12. Automated and browser acceptance
 
-## Validation
+Record fresh Node 22 lint/typecheck/unit/coverage/balance/build/E2E baseline per AGENTS.md and docs/testing.md. Preserve optional TRACE skip and unrelated warnings. No dependency/audit cleanup.
 
-- [ ] At least two contrasting workload scenarios are tested with users.
-- [ ] Players' reasoning is recorded.
-- [ ] Paired assessment begins only for implemented concepts.
-- [ ] Confusion from new metrics is documented.
+| Test | Required assertion |
+|---|---|
+| A | Sufficient apps expose actual DB bottleneck |
+| B | App scaling changes neither DB capacity nor cache rules; DB demand may increase |
+| C | Without cache all P logical operations reach DB |
+| D | Exact fixed cache arithmetic: 1,248 read-heavy at P=2,400/hit=60% |
+| E | Eligible misses reach DB |
+| F | Writes/non-cacheable reads reach DB; write-heavy yields 2,112 |
+| G | Sequential DB capacity changes only on scheduled activation |
+| H | Cache has no preactivation effect and activates cold |
+| I | Tuning changes only ceiling at activation, no reset/speed/upkeep effect |
+| J | Request/operation/revenue conservation including backlog/overflow |
+| K | Identical state/config/seed/actions reproduce results; bounded replay choice |
+| L | Exact save/resume for warmth/config/actions/workload/finances |
+| M | Phase 1 physics/settlement/trace and all three recovery paths |
+| N | Phase 2 onboarding/milestone/selection/telemetry/migration/entry/failure |
+| O | Phase 3 per-instance/routing/growth/selection/local persistence |
 
-## Engineering quality
+Also test zero eligibility, integer rounding, warmth/tuning boundaries, profile changes with old backlog, retained limits, same event/different architecture, simultaneous constraints, prevention, lost readiness/deadline, boot safety, fixed evaluation isolation, source-byte backup/write failures and telemetry retry.
 
-- [ ] Cache arithmetic tests pass.
-- [ ] Warm-up tests pass.
-- [ ] Write-heavy limitation tests pass.
-- [ ] Seed reproducibility tests pass.
-- [ ] Same-event/different-architecture tests pass.
-- [ ] Analytics attribution tests pass.
-- [ ] Phase 1–3 regression tests remain healthy.
-- [ ] Typecheck/build pass or pre-existing failures are documented.
+Both DB-only and cache browser journeys are required: same-company continue → explicit data entry → growth/workload → inspect → adapt actual apps/routing if needed → paid DB or cache → activation/consequences → measured recovery if incident exists → actual report → continue → reload. Add write-heavy cache-insufficient then DB recovery, mobile/touch/cache selection, warmth reload and blocked-API guest coverage. Never force an incident for prevention. Headless controlled architectures complement actual browser purchases. Balance tests must assess approved prices against preserved cash/salaries and cost/rejection trade-offs.
 
----
+# 13. Human validation and Definition of Done
 
-# 10. Dependencies
+Prepare contrasting pinned-profile sessions using recorded build/configuration, fresh/returning testers and evidence export. Record cause/evidence reasoning, choices, warmth understanding, confusion, help, timing and actual prevention/failure/quit/interruption. Paired questions cover only implemented concepts, not reliability. No automatic recruitment/contact or fabricated outcomes.
 
-Phase 4 depends on a stable foundation from Phases 1–3.
+Report each item PASS / FAIL / NOT TESTED with evidence:
 
-Required:
+- [ ] Same-company/state continuity and immutable earlier scenarios.
+- [ ] Explicit entry/prevention gates; no advancement/entry on boot or migration.
+- [ ] Versioned seeded configuration and exactly-once workload events.
+- [ ] Integer workload/cache arithmetic and outcome/revenue conservation.
+- [ ] Cold activation, eligible-work warmth, used-rate snapshots and tuning rules.
+- [ ] Sequential 3,000 tier and approved scheduling/economics.
+- [ ] Preserved incidents/latency/recovery/bankruptcy precedence.
+- [ ] Actual causal workload/cache/capacity/app trade-off evidence.
+- [ ] Shared UI/Facility/strip selection and accessible workload/cache presentation.
+- [ ] No duplicate engine/store/renderer/persistence/telemetry.
+- [ ] Schema 4 chain/exact resume/history and failure/source preservation.
+- [ ] Legacy keys and unexported evidence protected.
+- [ ] Attributed local events deduplicate and distinguish request/activation.
+- [ ] DB/cache/write-heavy browser paths, mobile and API-unavailable guest play.
+- [ ] Phase 1–3 and Node 22 checks reported; baseline exceptions identified.
+- [ ] No deferred backend/auth/cloud/proxy or later mechanics mixed into gameplay.
+- [ ] Human protocol/export ready; actual contrasting sessions/reasoning reported honestly.
 
-### From Phase 1
+Engineering checks do not prove human understanding or deployment. Unperformed human/deployment checks remain NOT TESTED. Central ingestion/auth/cloud are separate deferred work, not satisfied by local export.
 
-- deterministic step engine;
-- DB demand/capacity model;
-- backlog;
-- recovery rules;
-- trace/postmortem foundation.
+# 14. Implementation order
 
-### From Phase 2
+1. Inspect Git/checkpoint/index; isolate deferred work and preserve user changes.
+2. Record fresh Node 22 baseline and approved contract/configuration.
+3. Define serializable workload/cache/data-stage types and versioned scenario.
+4. Implement pure integer cache/workload/warmth and conservation tests.
+5. Integrate DB demand/outcomes, scheduled actions and accounting.
+6. Extend incidents/postmortem evidence without retuning earlier rules.
+7. Implement schema 4 validation/migration/backups and continuation tests.
+8. Integrate explicit progression/reveal in current lifecycle.
+9. Adapt existing UI/Facility/selection/history and accessibility.
+10. Extend local telemetry/export.
+11. Run regressions/balance/browser/manual checks; prepare human protocol/build.
+12. Report changed files/reuse/baseline/deviations/issues/every DoD status. Stop before Phase 5.
 
-- metrics UI;
-- architecture view;
-- local persistence;
-- telemetry basics;
-- continuous campaign flow.
+# 15. Implementation handoff
 
-### From Phase 3
+Read repository guidance/testing, proposal/roadmap and approved Phase 1–4 contracts/reports. Treat this as authoritative Phase 4 local gameplay scope. Before edits report actual Git state, baseline and concrete conflicts. Extend existing modules only; preserve earlier scenarios and browser data. Implement approved integer physics, cold/warm timing, ceiling-only tuning, prices and schema 4. Keep auth/cloud/ingestion/proxy and later mechanics deferred. Run required Node 22 checks and both data strategies. Report PASS/FAIL/NOT TESTED honestly; stop before Phase 5.
 
-- per-instance application processing;
-- routing/load balancing;
-- correct app-vs-DB bottleneck behavior;
-- account/cloud-save foundation;
-- save schema capable of evolving safely.
+# 16. Readiness and scope guard
 
-Do not implement Phase 4 workload variation on top of unstable app-routing logic.
-
----
-
-# 11. Scope Guard
-
-Do not expand Phase 4 into:
-
-- cache eviction algorithms;
-- TTL design;
-- distributed cache clusters;
-- consistency models;
-- cache invalidation gameplay;
-- database replicas;
-- database sharding;
-- database failover;
-- queues;
-- microservices;
-- autoscaling;
-- application failure;
-- health checks;
-- failover;
-- full progression tree;
-- complex staff simulation;
-- arbitrary scenario editor;
-- new incident families.
-
-The phase only needs enough data-layer behavior to support meaningful workload-dependent decisions.
-
----
-
-# 12. Main Risks and Mitigations
-
-## Risk 1 — Cache becomes a universal best answer
-
-**Mitigation:**
-
-Make effectiveness depend on:
-
-```text
-read share
-cacheable share
-hit rate
-warm-up
-```
-
----
-
-## Risk 2 — Too many new metrics overwhelm players
-
-**Mitigation:**
-
-Keep primary dashboard simple.
-
-Put detailed workload/cache information in component details.
-
----
-
-## Risk 3 — Scenario variation becomes random noise
-
-**Mitigation:**
-
-Use bounded parameter ranges and deterministic seeds.
-
-Variation should change decisions, not merely cosmetic numbers.
-
----
-
-## Risk 4 — Events hard-code the answer
-
-**Mitigation:**
-
-Events describe workload.
-
-Architecture determines bottleneck/outcome.
-
----
-
-## Risk 5 — Cache warm-up feels arbitrary
-
-**Mitigation:**
-
-Show current hit rate and warm-up progress.
-
-Keep deterministic timing.
-
----
-
-## Risk 6 — DB upgrade and cache become mechanically identical
-
-**Mitigation:**
-
-Preserve the conceptual distinction:
-
-```text
-DB upgrade → capacity ↑
-Cache → demand ↓
-```
-
----
-
-## Risk 7 — Analytics identity becomes unreliable
-
-**Mitigation:**
-
-Define run/session/build/scenario IDs centrally and test resume behavior.
-
----
-
-# 13. Recommended Implementation Order
-
-1. Verify Phase 3 Definition of Done.
-2. Run full simulation/routing regression suite.
-3. Inspect existing workload/scenario representation.
-4. Define workload state contract.
-5. Add read/write/cacheable-share fields.
-6. Add cache state contract.
-7. Implement cache-demand helper.
-8. Add exact cache arithmetic tests.
-9. Implement deterministic cache warm-up.
-10. Add warm-up tests.
-11. Add cache deployment action.
-12. Add cache tuning action/effect.
-13. Confirm DB upgrade remains separate.
-14. Add workload metrics to simulation snapshots.
-15. Add workload/cache UI.
-16. Extend postmortems with workload/cache evidence.
-17. Define bounded scenario parameter ranges.
-18. Implement seeded scenario generator.
-19. Add reproducibility tests.
-20. Add same-event/different-architecture tests.
-21. Separate fixed evaluation config from replay config.
-22. Update save schema for workload/cache state.
-23. Verify local/cloud save-resume.
-24. Centralize analytics ingestion.
-25. Add run/session/build/scenario attribution.
-26. Add analytics tests.
-27. Run full Phase 4 acceptance paths.
-28. Test read-heavy and write-heavy cases with users.
-29. Begin paired assessment for implemented concepts.
-30. Fix high-impact confusion only.
-31. Run typecheck/tests/build.
-32. Stop for review before Phase 5.
-
----
-
-# 14. Phase 4 Acceptance Scenario
-
-A representative read-heavy path:
-
-```text
-Same company continues
-→ 900 req/s spike arrives
-→ 80% reads
-→ DB demand exceeds capacity
-→ player inspects workload
-→ deploys read cache
-→ cache warms toward 60% hit rate
-→ DB demand falls toward 468 ops/s
-→ backlog drains
-→ system recovers
-→ postmortem explains why cache worked
-```
-
-A contrasting write-heavy path:
-
-```text
-same traffic
-→ only 30% reads
-→ cache deployed
-→ DB demand remains high
-→ player sees limited benefit
-→ upgrades DB
-→ capacity rises
-→ backlog drains
-→ postmortem explains why workload changed the best response
-```
-
-Neither path should be scripted as the only legal solution.
-
----
-
-# 15. IDE Implementation Prompt
-
-Use this file with:
-
-```text
-docs/PROJECT_PROPOSAL.md
-docs/DEVELOPMENT_ROADMAP.md
-docs/phases/PHASE_1_SIMULATION.md
-docs/phases/PHASE_2_PR1.md
-docs/phases/PHASE_3_SCALING.md
-docs/phases/PHASE_4_DATA_STRATEGY.md
-```
-
-Recommended prompt:
-
-```text
-Read:
-- docs/PROJECT_PROPOSAL.md
-- docs/DEVELOPMENT_ROADMAP.md
-- docs/phases/PHASE_1_SIMULATION.md
-- docs/phases/PHASE_2_PR1.md
-- docs/phases/PHASE_3_SCALING.md
-- docs/phases/PHASE_4_DATA_STRATEGY.md
-
-Treat PHASE_4_DATA_STRATEGY.md as the detailed gameplay, simulation, scenario, analytics, and acceptance specification for this phase.
-
-Inspect the current repository first.
-
-Before modifying code, report:
-
-1. whether Phases 1–3 are fully implemented and stable;
-2. how workload and database demand are currently represented;
-3. where cache mechanics should integrate into the existing step engine;
-4. exact files/functions that must change;
-5. current analytics/session/run attribution status;
-6. any conflict between current implementation and this phase plan;
-7. the smallest safe implementation order.
-
-Preserve these invariants:
-- cache reduces eligible read demand rather than increasing DB capacity;
-- DB upgrades increase capacity rather than reducing workload;
-- writes are not served by the read cache in this simplified MVP model;
-- workload variation is deterministic from scenario/seed;
-- events describe external workload, not a hard-coded incident answer;
-- the same company continues.
-
-Implement Phase 4 only.
-
-Do not proceed into:
-- full progression tree;
-- autoscaling;
-- reliability/failure mechanics;
-- extra incident families;
-- later phases.
-
-After implementation:
-- run Phase 1–3 regression tests;
-- run Phase 4 cache/workload/scenario tests;
-- run analytics attribution tests;
-- run browser smoke tests;
-- run typecheck;
-- run production build;
-- list files changed;
-- explain deviations from this phase specification;
-- report remaining Phase 4 blockers;
-- confirm whether every Phase 4 Definition of Done item is satisfied;
-- stop for review.
-```
-
----
-
-# 16. Phase 4 Summary
-
-At the end of Phase 4, the same company should support workload-sensitive data decisions:
-
-```text
-Traffic changes
-→ read/write mix matters
-→ cacheability matters
-→ cache warms over time
-→ DB demand changes
-→ cache and DB upgrades have different strengths
-→ same event produces different outcomes under different architectures
-→ player adapts rather than repeats one solution
-→ same company continues
-```
+Product/physics design is implementation-ready. Operational prerequisites are a reviewable Phase 3 checkpoint and fresh baseline; do not assume PR state. Minimal replay profiles are bounded and concrete. Optional broader variation or automatic profile progression requires later approval.
 
-This establishes the scenario variation and data-strategy foundation required for Phase 5, where the campaign's full milestone/research progression and nine-unlock structure are integrated for PR2.
+No health checks, failures, failover, spare-capacity curriculum, multi-region, replication/sharding, queues, autoscaling, arbitrary graph editing, multiplayer, AI-generated gameplay or full progression tree. Preserve later code inactive. Do not clean unrelated warnings or edit deferred backend/package/proxy files. Deployment and participant sessions need separate authority/evidence.

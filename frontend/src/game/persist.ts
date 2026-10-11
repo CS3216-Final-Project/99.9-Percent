@@ -103,7 +103,7 @@ export function saveGame(game:GameState,remainderMs=0,explicitReset=false,measur
     let source;
     try {source=JSON.parse(current);} catch {if(!explicitReset)return false;}
     try {
-      if([1,2].includes(source?.schemaVersion) && Array.isArray(source.inputs)) {
+      if([1,2,3].includes(source?.schemaVersion) && Array.isArray(source.inputs)) {
         const backup=SAVE_KEY+".backup.v"+source.schemaVersion+"."+source.runId+"."+source.savedAt;
         const prior=window.localStorage.getItem(backup);
         if(prior!==null && prior!==current)return false;

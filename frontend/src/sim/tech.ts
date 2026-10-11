@@ -1,3 +1,5 @@
+import { DATA_STRATEGY as D } from "./scenarios/dataStrategy";
+import { APPLICATION_SCALING as P } from "./scenarios/applicationScaling";
 import type { Branch, GameState, TechDef, TechId, TechStatus } from "./types";
 import { BALANCE } from "./balance";
 
@@ -290,7 +292,7 @@ export function completedTechIds(state: GameState): TechId[] {
 }
 
 export function has(state: Pick<GameState, "techDone" | "campaign">, tech: TechId): boolean {
-  if(state.campaign)return tech==="monitoring" || (tech==="load_balancing"&&state.campaign.loadBalancer) || (tech==="larger_servers"&&state.campaign.apps.some(a=>a.tier==="large"));
+  if(state.campaign)return (tech==="caching"&&!!state.campaign.readCache)||(tech==="cache_tuning"&&!!state.campaign.readCache?.tuned)||tech==="monitoring" || (tech==="load_balancing"&&state.campaign.loadBalancer) || (tech==="larger_servers"&&state.campaign.apps.some(a=>a.tier==="large"));
   // Metrics and alerts are baseline tools, including when resuming an old save.
   if (tech === "monitoring") return true;
   return state.techDone.includes(tech);
@@ -298,8 +300,9 @@ export function has(state: Pick<GameState, "techDone" | "campaign">, tech: TechI
 
 export function techStatus(state: GameState, id: TechId): TechStatus {
   if(state.campaign) {
-    if(!["larger_database","larger_servers","load_balancing"].includes(id))return "locked";
-    if(id==="larger_database")return state.campaign.dbCapacity>=2000?"done":"available";
+    if(!["larger_database","larger_servers","load_balancing",...(state.campaign.dataStage?["caching","cache_tuning"]:[])].includes(id))return "locked";
+    if(id==="larger_database")return state.campaign.dbCapacity>=(state.campaign.dataStage?D.dbCapacity:P.dbCapacity)?"done":"available";
+    if(id==="cache_tuning"&&!state.campaign.readCache)return "locked";
     return has(state,id)?"done":state.campaign.openingMilestone?.acknowledged?"available":"locked";
   }
   if (id === "larger_database") {

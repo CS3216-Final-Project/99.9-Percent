@@ -472,8 +472,9 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
       const el = labelEls.get(key);
       if (!el) return;
       v.copy(pos).project(camera);
-      const x = (v.x * 0.5 + 0.5) * size.width;
-      const y = (-v.y * 0.5 + 0.5) * size.height + (labelEls.has("app-1")&&key==="app"?-100:labelEls.has("app-1")&&key==="gateway"?-30:key==="app-1"?-10:key==="app-2"?12:0);
+      let x = (v.x * 0.5 + 0.5) * size.width;
+      let y = (-v.y * 0.5 + 0.5) * size.height + (labelEls.has("app-1")&&key==="app"?-100:labelEls.has("app-1")&&key==="gateway"?-30:key==="app-1"?-10:key==="app-2"?12:0);
+      if(key==="cache" && apps && size.width<=900) {y=Math.min(y,size.height*.32);x=Math.max(65,Math.min(size.width-65,x));}
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
       el.style.visibility = "visible";
     });
@@ -504,6 +505,7 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       onClick={() => inspectOrSelect(id)}
       onFocus={() => useGame.getState().hover(id)}
       onBlur={() => useGame.getState().hover(null)}
+      aria-pressed={selected}
       aria-label={`${m.names[id]}${built ? "" : ", not built"}`}
     >
       <span className="eq-icon" aria-hidden="true">
@@ -528,7 +530,7 @@ function Labels() {
         <Icon name="network" />
         Internet
       </span>
-      {EQUIPMENT_ORDER.filter((id) => m.opening ? ["gateway","app","db","monitoring"].includes(id) : (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
+      {EQUIPMENT_ORDER.filter((id) => m.opening ? ["gateway","app","db","monitoring",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
       {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={a.id==="app-1"?"App 1":"App 2"} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{a.id==="app-1"?"App 1":"App 2"}<span className="eq-note">{a.routed?"routed":"unrouted"}</span></button>)}
@@ -741,9 +743,10 @@ function Scene({ effects }: { effects: boolean }) {
           [trunkX, dataZ],
           [dbLastX + 0.4, dataZ],
         ]}
-        speed={flow * (m.cache ? 0.7 : 1)}
+        speed={flow * (campaign?Math.max(.1,(campaign.snapshot.data?.databaseNewDemand??campaign.snapshot.app.processed)/Math.max(1,campaign.snapshot.app.processed)):(m.cache ? 0.7 : 1))}
         alert={dataAlert}
       />
+      {campaign?.readCache&&<Cable points={[[trunkX,aisleZ],[POS.cache.x,aisleZ],[POS.cache.x,POS.cache.z],[POS.cache.x,dataZ],[dbLastX+.4,dataZ]]} speed={flow} alert={dataAlert} />}
       {m.replica && <Cable points={[[dbLastX + 0.4, dataZ], [POS.replica.x + 0.3, dataZ]]} speed={0.35} alert={false} />}
       {m.backup && <Cable points={[[m.replica ? POS.replica.x + 0.3 : dbLastX + 0.4, dataZ], [POS.backup.x + 0.4, dataZ]]} speed={0.15} alert={false} />}
 

@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { advanceTurn, applyAction, incidentTick, newGame, newLegacyGame, type Action, type GameState } from "@/sim";
 import { advanceSteps, step } from "@/sim/step";
 import { buildModel } from "./sceneModel";
+import {dataCompany} from "@/sim/__tests__/dataFixture";
+import {footprint,dbSlot,DB_CABINET} from "./layout";
 
 function must(s: GameState, action: Action): GameState {
   const r = applyAction(s, action);
@@ -12,6 +14,12 @@ function must(s: GameState, action: Action): GameState {
 
 // E2E skips drawing the room in most journeys, so the incident rules of the scene are pinned here.
 describe("scene model", () => {
+  it("renders the fourth campaign DB cabinet in the same footprint as the activated tier",()=>{
+    let s=dataCompany();s=must(s,{type:"start_db_upgrade"});s=advanceSteps(s,4).state;
+    expect(s.campaign!.dbCapacity).toBe(3000);const m=buildModel(s),pad=footprint(s,"db");
+    expect(m.dbCabinets).toBe(4);expect(m.footprints.db).toEqual(pad);
+    for(let i=0;i<m.dbCabinets;i++)expect(Math.abs(dbSlot(i).x-pad.x)+DB_CABINET.w/2).toBeLessThanOrEqual(pad.w/2);
+  });
   it("shows a Classic incident only as far as the player has investigated", () => {
     let s = advanceTurn({ ...newLegacyGame(1), users: 4500 });
     expect(s.phase).toBe("incident");

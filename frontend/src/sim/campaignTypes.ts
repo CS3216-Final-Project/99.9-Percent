@@ -15,7 +15,8 @@ export interface ComponentSnapshot {
 }
 export interface Snapshot {
     /** Missing on retained historical opening snapshots. */
-    version?: 3;
+    version?: 3 | 4;
+    data?: DataSnapshot;
     instances?: InstanceSnapshot[];
     effectiveAppCapacity?: number;
     appBusyBudget?: number;
@@ -32,6 +33,17 @@ export interface Snapshot {
     latencyMs: number;
     serviceErrorRate: number | null;
 }
+export interface DataSnapshot {
+ profile: "read-heavy" | "write-heavy"; readShare: number; cacheableReadShare: number;
+ logical: number; reads: number; writes: number; eligibleReads: number; nonCacheableReads: number;
+ hits: number; eligibleMisses: number; databaseReadDemand: number; databaseWriteDemand: number; databaseNewDemand: number;
+ effectiveHitRateUsed: number; warmthUsed: number; warmthAfterStep: number; target: number; deployed: boolean;
+}
+export interface DataStage {
+ id: "data-strategy"; version: 1; enteredStep: number; dueStep: number | null; consumed: boolean;
+ profile: "read-heavy" | "write-heavy"; source: "seeded" | "evaluation"; configuration: string; contrastConsumed: boolean;
+}
+export interface ReadCache { activatedStep: number; warmth: number; target: number; tuned: boolean }
 export interface Routing { mode: "single" | "balanced"; targets: string[] }
 export interface AppInstance {
     id: string; capacity: number; backlog: number; routed: boolean;
@@ -41,7 +53,7 @@ export interface InstanceSnapshot extends ComponentSnapshot {
     id: string; tier: AppInstance["tier"]; state: "active"; routed: boolean;
     demandRate: number; demandCount: number; processingBudget: number;
 }
-export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing";
+export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing" | "cache" | "cache-tuning";
 export interface ScheduledAction {
     id: string;
     type: Intervention;
@@ -67,6 +79,7 @@ export interface Ledger {
     dbNumerator: number;
     salaryNumerator: number;
     lbNumerator?: number;
+    cacheNumerator?: number;
 }
 export interface Settlement {
     period: number;
@@ -77,6 +90,7 @@ export interface Settlement {
     salaryCents: number;
     netCents: number;
     lbCents?: number;
+    cacheCents?: number;
 }
 export interface CampaignIncident {
     id: string;
@@ -110,6 +124,8 @@ export interface Campaign {
     loadBalancer: boolean;
     routingEnabledOnce: boolean;
     scaling: null | { id: "application-scaling"; version: 1; enteredStep: number; dueStep: number | null; consumed: boolean };
+    dataStage: DataStage | null;
+    readCache: ReadCache | null;
     overload: Record<string, number>;
     dbCapacity: number;
     dbBacklog: number;
@@ -121,6 +137,7 @@ export interface Campaign {
         db: number;
         salary: number;
         lb?: number;
+        cache?: number;
     };
     settlements: Settlement[];
     lastSettledPeriod: number;
