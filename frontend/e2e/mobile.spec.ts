@@ -9,7 +9,7 @@ test("inspects evidence and advances a physical step on touch", async ({ page })
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await mute.tap(); await expect(mute).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: "test-results/phase1-mobile.png" });
-  await page.getByRole("button", { name: "Inspect metrics · free" }).tap();
+  await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).tap();
   await page.getByRole("button", { name: "Advance step" }).tap();
   expect((await savedGame(page)).campaign!.step).toBe(1);
   await page.getByRole("button", { name: "History", exact: true }).tap();

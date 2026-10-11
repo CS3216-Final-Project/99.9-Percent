@@ -16,6 +16,7 @@ import { SoundButton } from "./SoundButton";
 import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { CampaignPostmortem, Intervention } from "@/sim/campaignTypes";
+import type { GameState } from "@/sim";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
 import { EQUIPMENT_ICON } from "./presentation";
@@ -32,9 +33,14 @@ const ACTION_NAMES: Record<Intervention, string> = {
 };
 
 // Progress is derived from the engine; reading this panel never advances the run.
+function stageOf(game: GameState) {
+  const c=game.campaign!;
+  return {openingDone:!!c.openingMilestone?.acknowledged,available:!c.dataStage&&canEnterData(game)};
+}
+
 function CampaignGuidance() {
   const {game,act,onboarding}=useGame(),c=game.campaign!;
-  const openingDone=!!c.openingMilestone?.acknowledged,available=!c.dataStage&&canEnterData(game);
+  const {openingDone,available}=stageOf(game);
   const stage=c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":openingDone?"Scaling & Routing":"Opening";
   const objective=game.phase==="ended"?"Review the company's finances and recorded evidence."
     :game.phase==="review"?"Read the postmortem before continuing the same company."
@@ -42,28 +48,33 @@ function CampaignGuidance() {
     :c.incident?"Restore stable service while weighing cost and rejected demand."
     :c.dataStage?"Compare logical work, cache hits and database pressure as demand grows."
     :openingDone?"Prepare the system for the next growth wave.":"Observe demand and compare component evidence.";
-  return <section className="panel-section campaign-guidance" aria-label="Campaign guidance">
+  return <section className="campaign-guidance" aria-label="Campaign guidance">
     <Callout compact tone="info" icon="monitor" kicker={`Current stage: ${stage}`}>{objective}</Callout>
     {canEnterSpikes(game)&&<button className="btn btn-primary" disabled={onboarding} onClick={()=>act({type:"enter_spikes"})}>Continue to traffic spikes</button>}
     {available&&<button className="btn btn-primary" disabled={onboarding} onClick={()=>act({type:"enter_data"})}>Continue to data strategy<Icon name="next" /></button>}
-    <details className="more"><summary>Campaign progression and next requirements</summary>
-      <nav aria-label="Campaign progression"><ol className="campaign-stages">
-        <li aria-current={!openingDone?"step":undefined}>Opening <strong>{openingDone?"Completed":"Current"}</strong></li>
-        <li aria-current={openingDone&&!c.dataStage?"step":undefined}>Scaling &amp; Routing <strong>{c.dataStage?"Completed":openingDone?"Current":"Locked · acknowledge opening milestone"}</strong></li>
-        <li aria-current={c.dataStage&&!c.spikeStage?"step":undefined}>Data Strategy <strong>{c.spikeStage?"Completed":c.dataStage?"Current":available?"Available next":"Locked"}</strong></li>
-        <li aria-current={c.spikeStage?"step":undefined}>Traffic Spikes &amp; Autoscaling <strong>{c.spikeStage?(c.spikeStage.acknowledged?"Completed":"Current"):canEnterSpikes(game)?"Available next":"Locked · complete data growth and restore stable service"}</strong></li>
-        <li>Later stages <strong>Locked · not implemented</strong></li>
-      </ol></nav>
-      {game.phase==="review"?<p role="status">Pending acknowledgement: Incident postmortem. Simulation remains paused.</p>
-        :c.openingMilestone&&!openingDone?<p role="status">Pending acknowledgement: First growth challenge handled.</p>
-        :!openingDone?<p>Next stage requires acknowledgement of the opening postmortem and milestone.</p>
-        :!c.scaling?<button className="btn" disabled={onboarding||game.phase==="ended"} onClick={()=>act({type:"enter_scaling"})}>Continue to scaling and routing</button>
-        :!c.scaling.consumed?<p>Database headroom: {num(c.dbCapacity)} / {num(P.dbCapacity)} ops/s. Growth waits for management and drained backlogs.</p>
-        :!c.dataStage&&!available?<p>Data strategy requires completed scaling growth, management, drained backlogs and acknowledged reports.</p>
-        :c.dataStage&&!c.dataStage.consumed?<p>Workload: Waiting for workload growth. Management, drained backlogs and acknowledged reports are required.</p>:null}
-      {c.limit!==null&&<Callout compact tone="warn" icon="network" kicker="Traffic limit active">Incoming {num(c.snapshot.incoming)} / admitted {num(c.snapshot.admitted)} / rejected {num(c.snapshot.rejected)} req/s. Rejected demand earns no revenue; its opportunity value is not an extra charge.</Callout>}
-    </details>
   </section>;
+}
+
+function CampaignProgression() {
+  const {game,act,onboarding}=useGame(),c=game.campaign!;
+  const {openingDone,available}=stageOf(game);
+  return <details className="more"><summary>Campaign progression</summary>
+    <nav aria-label="Campaign progression"><ol className="campaign-stages">
+      <li aria-current={!openingDone?"step":undefined}>Opening <strong>{openingDone?"Completed":"Current"}</strong></li>
+      <li aria-current={openingDone&&!c.dataStage?"step":undefined}>Scaling &amp; Routing <strong>{c.dataStage?"Completed":openingDone?"Current":"Locked · acknowledge opening milestone"}</strong></li>
+      <li aria-current={c.dataStage&&!c.spikeStage?"step":undefined}>Data Strategy <strong>{c.spikeStage?"Completed":c.dataStage?"Current":available?"Available next":"Locked"}</strong></li>
+      <li aria-current={c.spikeStage?"step":undefined}>Traffic Spikes &amp; Autoscaling <strong>{c.spikeStage?(c.spikeStage.acknowledged?"Completed":"Current"):canEnterSpikes(game)?"Available next":"Locked · complete data growth and restore stable service"}</strong></li>
+      <li>Later stages <strong>Locked · not implemented</strong></li>
+    </ol></nav>
+    {game.phase==="review"?<p role="status">Pending acknowledgement: Incident postmortem. Simulation remains paused.</p>
+      :c.openingMilestone&&!openingDone?<p role="status">Pending acknowledgement: First growth challenge handled.</p>
+      :!openingDone?<p>Next stage requires acknowledgement of the opening postmortem and milestone.</p>
+      :!c.scaling?<button className="btn" disabled={onboarding||game.phase==="ended"} onClick={()=>act({type:"enter_scaling"})}>Continue to scaling and routing</button>
+      :!c.scaling.consumed?<p>Database headroom: {num(c.dbCapacity)} / {num(P.dbCapacity)} ops/s. Growth waits for management and drained backlogs.</p>
+      :!c.dataStage&&!available?<p>Data strategy requires completed scaling growth, management, drained backlogs and acknowledged reports.</p>
+      :c.dataStage&&!c.dataStage.consumed?<p>Workload: Waiting for workload growth. Management, drained backlogs and acknowledged reports are required.</p>:null}
+    {c.limit!==null&&<Callout compact tone="warn" icon="network" kicker="Traffic limit active">Incoming {num(c.snapshot.incoming)} / admitted {num(c.snapshot.admitted)} / rejected {num(c.snapshot.rejected)} req/s. Rejected demand earns no revenue; its opportunity value is not an extra charge.</Callout>}
+  </details>;
 }
 
 export function CampaignHeader() {
@@ -112,9 +123,10 @@ export function CampaignPanel() {
       <header className="panel-head">
         <span className={`panel-icon${incident ? " state-critical" : ""}`}><Icon name={incident ? "incident" : "monitor"} /></span>
         <div><h2>{incident ? "Service slowdown" : "System overview"}</h2>
-          <span className={`state${incident ? " state-critical" : ""}`}><Icon name={incident ? "alert" : "health"} size={12} />{incident ? "Incident" : "Live metrics"}</span>
+          {incident && <span className="state state-critical"><Icon name="alert" size={12} />Incident</span>}
         </div>
       </header>
+      {!incident && <CampaignGuidance />}
       {c.incident && <div className="incident-clock campaign-stability">
         <div className="clock-row"><Icon name="health" /><Tip text="Recovery requires five consecutive physical steps below 500 ms and 1% service errors, with traffic and completed requests. A failing step resets this counter.">
           <strong>Stable steps: {c.incident.stableSteps}/{Q.stableSteps}</strong>
@@ -134,7 +146,6 @@ export function CampaignPanel() {
         <div className="chips">{PLACES.filter(id=>id!=="cache"||c.dataStage).map(id => <button type="button" key={id} className={`chip${place === id ? " is-selected" : ""}`} aria-pressed={place === id} disabled={disabled} onClick={() => inspectOrSelect(id)}>
           <span className="chip-icon" aria-hidden="true"><Icon name={EQUIPMENT_ICON[id]} size={16} /></span>{PLACE_NAMES[id]}
         </button>)}</div>
-        <button type="button" className="btn btn-small campaign-inspect" disabled={disabled} onClick={() => inspectOrSelect(place ?? "monitoring")}><Icon name="search" size={16} />Inspect metrics · free</button>
         {place && <div className="campaign-evidence" role="status"><Callout compact tone="info" icon={EQUIPMENT_ICON[place]} kicker={`${PLACE_NAMES[place]} · step ${m.step}`}>
           {component ? <>Demand {num(component.demand)}/s · capacity {num(component.capacity)}/s · backlog {num(component.backlog)}.</> : place === "cache" ? <>Cache {c.readCache?"deployed":"not deployed"} · effective rate used {m.data?`${m.data.effectiveHitRateUsed/100}%`:"not yet observed"} · hits {m.data?.hits??"not yet observed"}. Misses and writes reach the database.</> : place === "gateway" ? <>Incoming {num(m.incoming)}/s · admitted {num(m.admitted)}/s · rejected {num(m.rejected)}/s.</> : <>Latency {m.latencyMs.toFixed(0)} ms · errors {percent(m.serviceErrorRate)} · backlog {num(m.app.backlog + m.db.backlog)}.</>}
         </Callout></div>}
@@ -190,6 +201,8 @@ export function CampaignPanel() {
         <span>{ACTION_NAMES[a.type]}{a.targetId ? ` (${a.targetId.replace("app-", "App ")})` : ""}: activates in {a.activationStep - c.step} step(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
       </div>)}
+      {/* During an incident the banner and stability meter lead; guidance follows the responses. */}
+      {incident && <CampaignGuidance />}
       {c.apps.some(a=>!a.routed) && <p className="muted">{c.apps.filter(a=>!a.routed).map(a=>a.id.replace("app-","App ")).join(", ")}: Installed, not receiving traffic</p>}
       <details className="more campaign-details"><summary>Full system evidence</summary>
         <p>Incoming <b>{m.incoming}</b> / admitted <b>{m.admitted}</b> / rejected <b>{m.rejected}</b> requests/s</p>
@@ -206,9 +219,9 @@ export function CampaignPanel() {
         <Row label="Rejected this period" value={num(c.ledger.rejected)} />
         <Row label="Opportunity value" value={dollars(c.ledger.rejected * Q.revenueCents)} tip="Revenue forgone from rejected demand, not an extra cash charge." />
       </dl></details>
+      <CampaignProgression />
     </section>
     {c.spikeStage&&<SpikeControls disabled={disabled} busy={busy}/>}
-    <CampaignGuidance />
   </aside>;
 }
 
@@ -331,16 +344,21 @@ export function CampaignOverlays() {
   const {hasRun}=useGame();
   const configured=import.meta.env.VITE_PLAYTEST_URL as string|undefined;
   const playtestUrl=configured&&/^https?:\/\//.test(configured)?configured:null;
-  if (!started) return <div className="title-screen"><div className="title-card campaign-entry">
-    <span className="title-kicker"><Icon name="server" size={16} />A system design tycoon</span>
-    <h1>99.99%</h1><p className="title-tag">Grow a startup. Keep it online.</p>
-    <p className="title-goal">Keep your company online as traffic grows, without running out of cash.</p>
-    <ul className="title-loop" aria-label="How a run works"><li><Concept kind="users" icon="search" />Inspect evidence</li><li><Concept kind="tech" icon="server" />Choose a response</li><li><Concept kind="critical" icon="incident" />Run and observe</li></ul>
-    <p className="title-goal">Click room equipment to inspect it for free. One step models one second of traffic; 60 steps settle an operating week. Run advances time, and P pauses. The first incident pauses for your response.</p>
-    <img className="gameplay-preview" src="/opening-gameplay.png" alt="The furnished office and component evidence in the playable campaign" />
-    <div className="title-actions"><button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}><Icon name="play" />{hasRun ? "Continue company" : "Try Prototype"}</button></div>
-    {playtestUrl?<a className="btn" href={playtestUrl} target="_blank" rel="noopener noreferrer">Join Playtest</a>:<><button className="btn" disabled>Join Playtest</button><p className="muted">Playtest registration is not open yet.</p></>}
-    <p className="muted">Play immediately as a guest. Progress stays in this browser until you explicitly attach it to an account.</p><AccountPanel />
+  if (!started) return <div className="title-screen campaign-title"><div className="title-card campaign-entry">
+    <div className="title-copy">
+      <span className="title-kicker"><Icon name="server" size={16} />A system design tycoon</span>
+      <h1>99.99%</h1><p className="title-tag">Grow a startup. Keep it online.</p>
+      <p className="title-goal">Keep your company online as traffic grows, without running out of cash.</p>
+      <ul className="title-loop" aria-label="How a run works"><li><Concept kind="users" icon="search" />Inspect evidence</li><li><Concept kind="tech" icon="server" />Choose a response</li><li><Concept kind="critical" icon="incident" />Run and observe</li></ul>
+      <p className="title-goal">Click room equipment to inspect it for free. One step models one second of traffic; 60 steps settle an operating week. Run advances time, and P pauses. The first incident pauses for your response.</p>
+    </div>
+    <div className="title-start">
+      <img className="gameplay-preview" src="/opening-gameplay.png" alt="The furnished office and component evidence in the playable campaign" />
+      <div className="title-cta"><div className="title-actions"><button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}><Icon name="play" />{hasRun ? "Continue company" : "Try Prototype"}</button>
+        {playtestUrl?<a className="btn" href={playtestUrl} target="_blank" rel="noopener noreferrer">Join Playtest</a>:<button className="btn" disabled>Join Playtest</button>}</div>
+        {!playtestUrl&&<p className="muted">Playtest registration is not open yet.</p>}</div>
+      <p className="muted">Play immediately as a guest. Progress stays in this browser until you explicitly attach it to an account.</p><AccountPanel />
+    </div>
   </div></div>;
   if(useGame.getState().onboarding) {
     const {meta,onboardingMove}=useGame.getState();

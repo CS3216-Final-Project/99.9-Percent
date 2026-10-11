@@ -43,7 +43,7 @@ test("sounds the company starting, each introduction prompt and the alarm, and n
   await expect.poll(voices).toBeGreaterThanOrEqual(introduced + 3);
   const alarm = await voices();
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
-  const inspect = page.getByRole("button", { name: "Inspect metrics · free" });
+  const inspect = page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true });
   await mute.click();
   await inspect.click();
   await page.waitForTimeout(300);

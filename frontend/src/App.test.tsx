@@ -12,7 +12,7 @@ describe("opening UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
     expect(screen.getByRole("complementary", { name: "System metrics" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Tech" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Inspect metrics · free" }));
+    fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
     expect(useGame.getState().game.campaign!.step).toBe(0);
     expect(useGame.getState().meta.runsStarted).toBe(1);
   });
