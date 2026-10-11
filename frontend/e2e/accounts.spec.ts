@@ -104,3 +104,18 @@ test('signs in with email after a wrong password, and refuses a duplicate accoun
   // Signing in neither starts a game nor uploads anything.
   expect(await page.evaluate(()=>localStorage.getItem('nn.campaign.save.v1'))).toBeNull();
 });
+test('the landing page account link opens Sign in for a guest and nothing for a signed-in player',async({page,withoutRoom})=>{
+  await withoutRoom();
+  let session:AppSession|null=null;
+  await page.route('**/api/session',route=>route.fulfill({status:session?200:401,json:session??{error:'guest'}}));
+  await page.goto('/?signin=1');
+  const dialog=page.getByRole('dialog',{name:'Account'});
+  await expect(dialog.getByRole('link',{name:'Continue with Google'})).toBeVisible();
+  await expect(page).toHaveURL(url=>!url.searchParams.has('signin'));
+  await dialog.getByRole('button',{name:'Close'}).click();await expect(dialog).toBeHidden();
+  // The flag is gone, so a reload stays on the home screen.
+  await page.reload();await expect(page.getByRole('button',{name:/Sign in/})).toBeVisible();await expect(dialog).toBeHidden();
+  session={account:{id:'landing-ada',displayName:'Ada'},csrfToken:'csrf-landing'};
+  await page.goto('/?signin=1');await expect(page.getByRole('button',{name:/Ada/})).toBeVisible();
+  await expect(page).toHaveURL(url=>!url.searchParams.has('signin'));await expect(dialog).toBeHidden();
+});

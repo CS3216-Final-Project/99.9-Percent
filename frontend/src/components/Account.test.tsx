@@ -21,7 +21,7 @@ beforeEach(() => {
   vi.mocked(api.logout).mockResolvedValue();
   useGame.getState().boot();
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); });
 
 async function openAccount() {
   render(<StrictMode><AccountButton /></StrictMode>);
@@ -68,6 +68,47 @@ it("creates an account with an optional name and a new password", async () => {
   fireEvent.click(within(dialog).getByRole("button", { name: "Create account" }));
   await waitFor(() => expect(useGame.getState().accountSession).toBe(ada));
   expect(api.emailRegister).toHaveBeenCalledWith("ada@example.com", "analytical-engine", "Ada Lovelace");
+});
+
+it("opens the account dialog for a guest arriving from the landing page, once the account check answers", async () => {
+  let answer!: (error: unknown) => void;
+  vi.mocked(api.getSession).mockReturnValue(new Promise((_, reject) => { answer = reject; }));
+  window.history.replaceState(null, "", "/?signin=1&ref=landing#top");
+  render(<StrictMode><AccountButton /></StrictMode>);
+  await screen.findByRole("button", { name: /Account/ });
+  // Still checking: a signed-in player must not see the dialog flash open.
+  expect(screen.queryByRole("dialog")).toBeNull();
+  answer(new api.AccountApiError(401, { error: "guest" }));
+  const dialog = await screen.findByRole("dialog", { name: "Account" });
+  expect(within(dialog).getByRole("link", { name: "Continue with Google" })).toBeTruthy();
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(api.getSession).toHaveBeenCalledTimes(1);
+  // The flag leaves the address, so a reload or a later visit to the home screen does not ask again.
+  expect(window.location.search).toBe("?ref=landing");
+  expect(window.location.hash).toBe("#top");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+  cleanup();
+  render(<StrictMode><AccountButton /></StrictMode>);
+  expect(await screen.findByRole("button", { name: /Sign in/ })).toBeTruthy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("leaves a signed-in player on the home screen when they arrive from the landing page", async () => {
+  vi.mocked(api.getSession).mockResolvedValue(ada);
+  window.history.replaceState(null, "", "/?signin=1");
+  render(<StrictMode><AccountButton /></StrictMode>);
+  expect(await screen.findByRole("button", { name: /Ada Lovelace/ })).toBeTruthy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(window.location.search).toBe("");
+});
+
+it("opens the dialog with the offline notice when accounts cannot be checked", async () => {
+  vi.mocked(api.getSession).mockRejectedValue(TypeError("Failed to fetch"));
+  window.history.replaceState(null, "", "/?signin=1");
+  render(<StrictMode><AccountButton /></StrictMode>);
+  const dialog = await screen.findByRole("dialog", { name: "Account" });
+  expect(within(dialog).getByText(/Accounts are unavailable right now/)).toBeTruthy();
+  expect(window.location.search).toBe("");
 });
 
 it("lists cloud saves once signed in, loads one and closes, and signs out", async () => {
