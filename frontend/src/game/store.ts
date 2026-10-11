@@ -94,6 +94,18 @@ export interface LastAction {
   ok: boolean;
 }
 
+/**
+ * How a run begins, so a sound can mark it: "begin" is a company starting,
+ * "step" the introduction's prompts moving on, "finish" the introduction done.
+ */
+export type IntroKind = "begin" | "step" | "finish";
+
+/** The latest of those, with an id so two in a row can be told apart. */
+export interface LastIntro {
+  id: number;
+  kind: IntroKind;
+}
+
 interface Store {
   prepareSignIn: () => boolean;
   accountSession: AppSession | null;
@@ -131,6 +143,8 @@ interface Store {
    */
   generation: number;
   lastAction: LastAction | null;
+  /** Only the player's own starts and introduction steps: loading, importing and resuming leave it empty. */
+  lastIntro: LastIntro | null;
   meta: Meta;
   /** Sound settings, shared by both modes and kept across mode switches. */
   audio: AudioSettings;
@@ -194,6 +208,8 @@ interface Store {
 
 let toastId = 1;
 let actionId = 1;
+let introId = 1;
+const intro = (kind: IntroKind): LastIntro => ({ id: introId++, kind });
 let lastIncidentSave = 0;
 
 export const useGame = create<Store>()((set, get) => {
@@ -316,6 +332,7 @@ export const useGame = create<Store>()((set, get) => {
       started,
       generation: get().generation + 1,
       lastAction: null,
+      lastIntro: null,
       meta,
       running: false,
       remainderMs: 0,
@@ -346,7 +363,8 @@ export const useGame = create<Store>()((set, get) => {
       const saved = saveClassicGame(game);
       track("run_started", { mode, seed: game.seed, run: nextMeta.runsStarted });
       if (!meta.tutorialDone) track("tutorial_started", { from: "first_visit" });
-      set({ ...fresh, game, meta: nextMeta, tour: meta.tutorialDone ? null : { track: "basics", step: 0 } });
+      // Switching into an empty classic mode starts a company; boot, which only shows the title, does not.
+      set({ ...fresh, game, meta: nextMeta, tour: meta.tutorialDone ? null : { track: "basics", step: 0 }, lastIntro: started ? intro("begin") : null });
       if (!saved) get().notify("Could not save. Play continues in memory.", "error");
       else if (loaded.status === "corrupt") get().notify("Saved classic run was unreadable. Started a new one.", "error");
       return;
@@ -450,7 +468,7 @@ export const useGame = create<Store>()((set, get) => {
         rememberCloud({ownerId:session.account.id,revision:run.revision,local:e});
         if(!saveGame(game,e.runtime.remainderMs,true,e.runtime.measurement))throw Error('Storage could not retain the cloud copy. Local progress is retained.');
         saveMode("campaign");
-        set({mode:"campaign",game,generation:get().generation+1,lastAction:null,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
+        set({mode:"campaign",game,generation:get().generation+1,lastAction:null,lastIntro:null,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
           running:false,started:false,onboarding:false,view:null,selected:null,selectedAppId:null,activeMark:null,cloudConflict:null,cloudStatus:'Cloud company loaded and paused. Continue when ready.'});
       }catch(error){accountFailure(error);}finally{set({cloudBusy:false});}
     },
@@ -463,6 +481,7 @@ export const useGame = create<Store>()((set, get) => {
     game: newGame(BALANCE.introSeed),
     generation: 0,
     lastAction: null,
+    lastIntro: null,
     meta: loadMetaSafe(),
     audio: loadAudioSafe(),
     graphics: loadGraphicsSafe(),
@@ -488,7 +507,8 @@ export const useGame = create<Store>()((set, get) => {
 
     play: () => {
       if(get().started)return;
-      if(get().mode === "classic") { set({started:true}); return; }
+      // A fresh classic run says "Play" on the title screen and a resumed one "Continue", so only the first is a start.
+      if(get().mode === "classic") { set({started:true,...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
       const state=get();
       let game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID());
       if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended") game=applyCampaignInput(game,{type:"enter_scaling"}).state;
@@ -497,7 +517,7 @@ export const useGame = create<Store>()((set, get) => {
       const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
       set({game,hasRun:true,meta,measurement,started:true,running:false,
         // Starting a fresh company replaces the game, like a new run.
-        ...(state.hasRun?{}:{generation:state.generation+1,lastAction:null}),
+        ...(state.hasRun?{}:{generation:state.generation+1,lastAction:null,lastIntro:intro("begin")}),
         onboarding:status==="not-started"||status==="in-progress",activeMark:document.hidden?null:performance.now()});
       if(!saveMeta(meta))get().notify("Onboarding preferences could not be saved.","error");
       persist();
@@ -535,7 +555,7 @@ export const useGame = create<Store>()((set, get) => {
       const status=direction==="skip"?"skipped":done?"completed":"in-progress";
       const step=done?current.step:Math.max(0,Math.min(2,current.step+(direction==="back"?-1:1)));
       const meta={...get().meta,openingOnboarding:{version:1 as const,step,status:status as Meta["openingOnboarding"]["status"]}};
-      const saved=saveMeta(meta); set({meta,onboarding:!done,running:false});
+      const saved=saveMeta(meta); set({meta,onboarding:!done,running:false,lastIntro:intro(status==="completed"?"finish":"step")});
       if(!saved)get().notify("Onboarding preferences could not be saved.","error");
       persist();
     },
@@ -638,7 +658,7 @@ export const useGame = create<Store>()((set, get) => {
       }
       const nextMeta={...old.meta,runsStarted:old.meta.runsStarted+1};
       const measurement=beginSession(m,game,crypto.randomUUID(),new Date().toISOString());
-      set({game,generation:get().generation+1,lastAction:null,measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
+      set({game,generation:get().generation+1,lastAction:null,lastIntro:intro("begin"),measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
         selected:null,hovered:null,view:null,techFocus:null,running:false,rating:null,
         onboarding:["not-started","in-progress"].includes(nextMeta.openingOnboarding.status),tour:null,
         started:true,toast:null,activeMark:document.hidden?null:performance.now()});
@@ -658,6 +678,7 @@ export const useGame = create<Store>()((set, get) => {
         game,
         generation: get().generation + 1,
         lastAction: null,
+        lastIntro: intro("begin"),
         remainderMs:0,
         saveBlocked:false,
         meta: nextMeta,
@@ -710,7 +731,7 @@ export const useGame = create<Store>()((set, get) => {
       const measurement = campaign.status === "ok" ? beginSession(campaign.envelope.runtime.measurement, game, crypto.randomUUID(), new Date().toISOString()) : emptyMeasurement();
       const saved = mode === "campaign" ? saveGame(game, remainderMs, true, measurement) && archiveEvents(measurement.pending) : saveClassicGame(game);
       saveMode(mode);
-      set({ mode, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, remainderMs, saveBlocked: false, running: false, view: null,
+      set({ mode, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, view: null,
         selected: null, hovered: null, started: true, tour: null, onboarding: false, techFocus: null, rating: null });
       track("save_imported", { mode, step: game.campaign?.step ?? game.turn });
       get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
@@ -740,14 +761,14 @@ export const useGame = create<Store>()((set, get) => {
       set({ meta, onboarding: false });
     },
     showOnboarding: () => {
-      if(!get().game.campaign) { set({onboarding:true,view:null}); return; }
+      if(!get().game.campaign) { set({onboarding:true,view:null,lastIntro:intro("step")}); return; }
       const meta={...get().meta,openingOnboarding:{version:1 as const,step:0,status:"in-progress" as const}};
-      saveMeta(meta);set({meta,onboarding:true,view:null,running:false});
+      saveMeta(meta);set({meta,onboarding:true,view:null,running:false,lastIntro:intro("step")});
     },
 
     startTour: (track_) => {
       if (track_ === "basics") track("tutorial_started", { from: "menu" });
-      set({ tour: { track: track_, step: 0 }, view: null, selected: null, running: false, onboarding: false, started: true });
+      set({ tour: { track: track_, step: 0 }, view: null, selected: null, running: false, onboarding: false, started: true, lastIntro: intro("begin") });
     },
     tourNext: () => {
       const tour = get().tour;
@@ -765,7 +786,8 @@ export const useGame = create<Store>()((set, get) => {
       }
       saveMeta(next, get().mode);
       // The incident guide holds the clock; closing it lets the incident run.
-      set({ tour: null, meta: next, running: tour.track === "incident" && game.phase === "incident" ? true : get().running });
+      // Only finishing the first-week walkthrough is marked; skipping it, like its steps, stays quiet (the steps' own decisions already sound).
+      set({ tour: null, meta: next, running: tour.track === "incident" && game.phase === "incident" ? true : get().running, ...(completed && tour.track === "basics" ? { lastIntro: intro("finish") } : {}) });
     },
     startTutorialRun: () => {
       if (!isFreshRun(get().game)) get().newRun({ seed: BALANCE.introSeed });
