@@ -94,6 +94,18 @@ it("lists cloud saves once signed in, loads one and closes, and signs out", asyn
   expect(useGame.getState().game.campaign!.runId).toBe("cloud-company");
 });
 
+it("does not claim the account is empty when its cloud saves cannot be listed", async () => {
+  vi.mocked(api.getSession).mockResolvedValue(ada);
+  vi.mocked(api.listRuns).mockRejectedValueOnce(TypeError("Failed to fetch"));
+  render(<StrictMode><AccountSection /></StrictMode>);
+  expect(await screen.findByText(/could not be listed/)).toBeTruthy();
+  expect(screen.queryByText("No cloud saves yet.")).toBeNull();
+  expect(screen.getByText("Cloud saves are unavailable right now. Your local save is unchanged.")).toBeTruthy();
+  vi.mocked(api.listRuns).mockResolvedValue([]);
+  fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  expect(await screen.findByText("No cloud saves yet.")).toBeTruthy();
+});
+
 it("explains in Menu, Saves that Classic progress stays in this browser", async () => {
   vi.mocked(api.getSession).mockResolvedValue(ada);
   useGame.getState().switchMode("classic");

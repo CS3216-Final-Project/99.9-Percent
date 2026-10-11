@@ -119,7 +119,8 @@ interface Store {
   signInWithEmail: (email:string, password:string) => Promise<string|null>;
   registerWithEmail: (name:string, email:string, password:string) => Promise<string|null>;
   signOut: () => Promise<void>;
-  refreshCloudRuns: () => Promise<void>;
+  /** Resolves true once the list reflects the account. */
+  refreshCloudRuns: () => Promise<boolean>;
   saveCloud: (attach?:boolean) => Promise<void>;
   /** Resolves true once the cloud save is the local Campaign save. */
   resumeCloud: (runId:string) => Promise<boolean>;
@@ -404,7 +405,9 @@ export const useGame = create<Store>()((set, get) => {
   const SIGNED_IN='Signed in. Nothing is uploaded until you choose Save to cloud.';
   function accountFailure(error:unknown) {
     if(error instanceof AccountApiError && error.status===401)set({accountSession:null,accountStatus:'guest'});
-    set({cloudStatus:error instanceof Error?error.message:'Cloud saves are unavailable right now. Your local save is unchanged.'});
+    // fetch failures (TypeError) and unreadable responses (SyntaxError) carry browser wording, not ours.
+    const ours=error instanceof Error&&!(error instanceof TypeError)&&!(error instanceof SyntaxError);
+    set({cloudStatus:ours?error.message:'Cloud saves are unavailable right now. Your local save is unchanged.'});
   }
   /** Email sign-in answers in place, so the session is set here instead of after a page reload. */
   async function emailSession(request:()=>Promise<AppSession>):Promise<string|null> {
@@ -438,9 +441,9 @@ export const useGame = create<Store>()((set, get) => {
       finally{set({cloudBusy:false});}
     },
     refreshCloudRuns: async()=>{
-      if(get().cloudBusy)return;set({cloudBusy:true});
-      try {const session=ownSession();const runs=await listRuns();if(get().accountSession===session)set({cloudRuns:runs});}
-      catch(error){accountFailure(error);}finally{set({cloudBusy:false});}
+      if(get().cloudBusy)return false;set({cloudBusy:true});
+      try {const session=ownSession();const runs=await listRuns();if(get().accountSession!==session)return false;set({cloudRuns:runs});return true;}
+      catch(error){accountFailure(error);return false;}finally{set({cloudBusy:false});}
     },
     saveCloud: async(attach=false)=>{
       if(get().cloudBusy)return;set({cloudBusy:true});

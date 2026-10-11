@@ -190,13 +190,14 @@ function SignedIn({ onLoaded, Heading }: { onLoaded?: () => void; Heading: Headi
 function CloudSaves({ onLoaded, Heading }: { onLoaded?: () => void; Heading: HeadingTag }) {
   const s = useGame();
   const session = s.accountSession!;
-  const [listed, setListed] = useState(false);
+  // Only a successful refresh may say the account has no cloud saves.
+  const [listing, setListing] = useState<"loading" | "listed" | "failed">("loading");
   const listedFor = useRef<typeof session | null>(null);
   useEffect(() => {
     if (listedFor.current === session) return;
     listedFor.current = session;
-    setListed(false);
-    void useGame.getState().refreshCloudRuns().then(() => setListed(true));
+    setListing("loading");
+    void useGame.getState().refreshCloudRuns().then((ok) => setListing(ok ? "listed" : "failed"));
   }, [session]);
 
   const campaign = s.mode === "campaign" ? s.game.campaign : undefined;
@@ -207,7 +208,7 @@ function CloudSaves({ onLoaded, Heading }: { onLoaded?: () => void; Heading: Hea
     catch { ownershipError = true; }
   }
   const mismatch = !!owner && owner !== session.account.id;
-  const refresh = () => { void s.refreshCloudRuns().then(() => setListed(true)); };
+  const refresh = () => { void s.refreshCloudRuns().then((ok) => setListing(ok ? "listed" : "failed")); };
   const save = async () => { await s.saveCloud(!owner); refresh(); };
   const load = async (runId: string) => { if (await s.resumeCloud(runId)) onLoaded?.(); };
   const download = () => {
@@ -257,7 +258,7 @@ function CloudSaves({ onLoaded, Heading }: { onLoaded?: () => void; Heading: Hea
       ? <ul className="cloud-list">
           {s.cloudRuns.map((run) => <CloudRunRow key={run.runId} run={run} current={run.runId === local} busy={s.cloudBusy} onLoad={() => void load(run.runId)} />)}
         </ul>
-      : <p className="cloud-note">{listed ? "No cloud saves yet." : "Looking for your cloud saves…"}</p>}
+      : <p className="cloud-note">{{ loading: "Looking for your cloud saves…", listed: "No cloud saves yet.", failed: "Your cloud saves could not be listed. Choose Refresh to try again." }[listing]}</p>}
     {s.cloudRuns.length > 0 && <p className="cloud-note">Loading a cloud save replaces this browser’s Campaign save. A backup copy of it is kept first.</p>}
 
     <details className="more cloud-backup">
