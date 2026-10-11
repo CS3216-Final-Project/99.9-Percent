@@ -38,6 +38,7 @@ import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
 import { buildModel, type SceneModel } from "./sceneModel";
 import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
+import { screenPoint } from "./labels";
 
 function useSceneModel(): SceneModel {
   const key = useGame((s) => JSON.stringify(buildModel(s.game)));
@@ -208,6 +209,8 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     }
     // Lower whichever walls now stand between the camera and the room.
     updateWalls(dir.copy(c.target).sub(camera.position).normalize());
+    // Last, so the labels follow the camera as it ends up this frame.
+    placeLabels(camera, size);
   });
 
   return (
@@ -450,10 +453,12 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
 const anchors = new Map<string, THREE.Vector3>();
 const labelEls = new Map<string, HTMLElement>();
 const INTERNET = "internet";
+const labelAt = new THREE.Vector2();
+/** A campaign run is on screen, which lays its labels out differently. */
+let inCampaign = false;
 
-function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footprint> }) {
-  const v = useMemo(() => new THREE.Vector3(), []);
-  const apps=useGame(s=>s.game.campaign?.apps);
+function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprint> }) {
+  const apps = useGame((s) => s.game.campaign?.apps);
 
   useEffect(() => {
     for (const id of EQUIPMENT_ORDER) {
@@ -461,25 +466,37 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
       anchors.set(id, new THREE.Vector3(f.x, f.h + 0.3, f.z));
     }
     anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, 1.35, AISLE_Z));
-    for(const id of ["app-1","app-2"])anchors.delete(id);
-    if(apps)apps.forEach((a,i)=>{const p=appSlot(i);anchors.set(a.id,new THREE.Vector3(p.x,RACK.h+.6,p.z));});
-  }, [footprints,apps]);
-
-  useFrame(({ camera, size }) => {
-    // The renderer only refreshes the camera's matrices when it draws, after this.
-    camera.updateMatrixWorld();
-    anchors.forEach((pos, key) => {
-      const el = labelEls.get(key);
-      if (!el) return;
-      v.copy(pos).project(camera);
-      let x = (v.x * 0.5 + 0.5) * size.width;
-      let y = (-v.y * 0.5 + 0.5) * size.height + (labelEls.has("app-1")&&key==="app"?-100:labelEls.has("app-1")&&key==="gateway"?-30:key==="app-1"?-10:key==="app-2"?12:0);
-      if(key==="cache" && apps && size.width<=900) {y=Math.min(y,size.height*.32);x=Math.max(65,Math.min(size.width-65,x));}
-      el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
-      el.style.visibility = "visible";
-    });
-  });
+    for (const id of ["app-1", "app-2"]) anchors.delete(id);
+    if (apps) {
+      apps.forEach((a, i) => {
+        const p = appSlot(i);
+        anchors.set(a.id, new THREE.Vector3(p.x, RACK.h + 0.6, p.z));
+      });
+    }
+    inCampaign = !!apps;
+  }, [footprints, apps]);
   return null;
+}
+
+/**
+ * Moves every label to its anchor as the camera stands right now. `CameraRig` calls this once it has finished moving
+ * the camera for the frame, so a label is placed for the view the renderer is about to draw rather than the last one.
+ */
+function placeLabels(camera: THREE.Camera, size: { width: number; height: number }) {
+  anchors.forEach((pos, key) => {
+    const el = labelEls.get(key);
+    if (!el) return;
+    screenPoint(pos, camera, size.width, size.height, labelAt);
+    let { x, y } = labelAt;
+    // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
+    y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : key === "app-1" ? -10 : key === "app-2" ? 12 : 0;
+    if (key === "cache" && inCampaign && size.width <= 900) {
+      y = Math.min(y, size.height * 0.32);
+      x = Math.max(65, Math.min(size.width - 65, x));
+    }
+    el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+    el.style.visibility = "visible";
+  });
 }
 
 function bindLabel(key: string) {
@@ -753,9 +770,9 @@ function Scene({ effects }: { effects: boolean }) {
       {EQUIPMENT_ORDER.map((id) => (
         <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
       ))}
+      <LabelAnchors footprints={m.footprints} />
+
       <CameraRig footprints={m.footprints} built={m.built} />
-      {/* After the rig, so labels follow the camera it has just moved. */}
-      <LabelProjector footprints={m.footprints} />
       {effects && <Effects />}
     </>
   );
