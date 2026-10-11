@@ -184,7 +184,7 @@ interface Store {
   rate: (rating: number) => void;
   /** Change the sound settings, remembered for next time. Volumes are clamped to 0–100. */
   setAudio: (patch: Partial<AudioSettings>) => void;
-  /** Silence music and effects, or bring them back at their volumes. */
+  /** Silence music and effects, or bring them back at their volumes. With both volumes at 0 there is nothing to bring back, so they return to the defaults. */
   toggleMute: () => void;
   /** Change the graphics settings, remembered for next time. An unknown quality is ignored. */
   setGraphics: (patch: Partial<GraphicsSettings>) => void;
