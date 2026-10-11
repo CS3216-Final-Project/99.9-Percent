@@ -2,9 +2,8 @@
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 
 import { lazy, Suspense, useEffect, useRef } from "react";
-import { BALANCE, completedTechIds, currentWarnings, metrics, TECH_ORDER, type GameState } from "@/sim";
-import { nextMove } from "@/game/advisor";
-import { clock, compact, money, moneyFull, num, signedMoney, uptimePct } from "@/game/format";
+import { BALANCE, completedTechIds, metrics, TECH_ORDER, type GameState } from "@/sim";
+import { clock, compact, money, num, signedMoney, uptimePct } from "@/game/format";
 import { watchCues } from "@/game/cues";
 import { createMusic, type Music } from "@/game/music";
 import type { AudioSettings } from "@/game/persist";
@@ -16,9 +15,10 @@ import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Modals";
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
-import Tutorial, { BASICS_STEPS } from "./Tutorial";
+import Tutorial from "./Tutorial";
 import { Callout, Concept, Meter, Stat, type ConceptKind } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
+import OperationsRail from "./OperationsRail";
 
 // Keep the WebGL scene in its own chunk; Vite renders this app in the browser.
 const Facility = lazy(() => import("./scene/Facility"));
@@ -86,77 +86,6 @@ function TopBar() {
         <Icon name="menu" />
       </button>
     </header>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Stage prompts: one suggested move, and at most two warnings         */
-/* ------------------------------------------------------------------ */
-
-/** Each warning wears the icon of the thing it is about. */
-const WARNING_ICON: Record<string, IconName> = {
-  surge_incoming: "revenue",
-  app_hot: "server",
-  db_hot: "database",
-  host_degraded: "skull",
-  debt_high: "debt",
-  runway_low: "cash",
-  release_waiting: "ship",
-  unassigned_work: "wrench",
-  idle_engineers: "team",
-};
-
-function StageHud() {
-  const game = useGame((s) => s.game);
-  const tour = useGame((s) => s.tour);
-  const select = useGame((s) => s.select);
-  const openView = useGame((s) => s.openView);
-  if (game.phase !== "management") return null;
-  // The walkthrough introduces this prompt in its last step; before that it would compete with it.
-  if (tour?.track === "basics" && tour.step < BASICS_STEPS - 1) return null;
-
-  const move = nextMove(game);
-  const alerts = currentWarnings(game)
-    .filter((w) => w.level !== "notice" && w.text !== move.text)
-    .slice(0, 2);
-
-  return (
-    <div className="hud">
-      <Callout
-        className="next-chip"
-        tone={move.tone === "go" ? "info" : move.tone}
-        icon="robot"
-        kicker="Next move"
-        action={
-          move.cta && (
-            <button type="button" className="btn btn-primary btn-small" onClick={move.cta.run}>
-              {move.cta.label}
-              {move.cta.price !== undefined && (
-                <span className="price">
-                  <Icon name="cash" size={12} />
-                  {moneyFull(move.cta.price)}
-                </span>
-              )}
-            </button>
-          )
-        }
-      >
-        {move.text}
-      </Callout>
-      {alerts.map((w, i) => (
-        <Callout
-          key={w.code + i}
-          className="alert-chip"
-          tone={w.level === "critical" ? "critical" : "warn"}
-          icon={WARNING_ICON[w.code] ?? "alert"}
-          kicker={w.level === "critical" ? "Critical" : "Warning"}
-          tip={w.detail}
-          onClick={() => (w.equipment ? select(w.equipment) : openView("history"))}
-        >
-          {w.text}
-        </Callout>
-      ))}
-    </div>
   );
 }
 
@@ -445,13 +374,13 @@ export default function Game() {
   }
 
   return (
-    <div className={`app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}`}>
+    <div className={`app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`}>
       {campaign ? <CampaignHeader /> : <TopBar />}
+      {started && !campaign && <OperationsRail />}
       <main className="stage">
         <Suspense fallback={<div className="stage-loading">Loading…</div>}>
           <Facility />
         </Suspense>
-        {started && !campaign && <StageHud />}
       </main>
       {campaign ? <>{started && <CampaignPanel />}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ViewSheet /><BottomBar /></>}
       <ToastHost />

@@ -20,7 +20,7 @@ Schema 7 distinguishes the new entry rule from schema 6's historical prevention 
 
 ## Validation
 
-Validation uses the isolated source copy documented in the preceding Phase 6 report, with Node 22.20.0. The remote mode chooser and chapter UI commit e3bc662 arrived during validation and is preserved beneath this follow-up. Unrelated local WorkTracker/OperationsRail edits remain outside the committed tree.
+Validation uses the isolated source copy documented in the preceding Phase 6 report, with Node 22.20.0. The remote mode chooser and chapter UI commit e3bc662 arrived during validation and is preserved beneath this follow-up. Latest main 9ebb202 is subsequently merged, preserving its Classic operations dock and WorkTracker together with Campaign chapters. The only merge conflict combined the two mode-specific layout classes.
 
 | Check | Result |
 | --- | --- |
@@ -30,10 +30,11 @@ Validation uses the isolated source copy documented in the preceding Phase 6 rep
 | Deterministic balance | All 14 passed |
 | Backend lint, typecheck and coverage | 39 passed |
 | Complete desktop and touch browser suite before the remote UI update | All 52 passed, including the new touch prevention gate; no retries, failures or skips in the successful complete run |
-| Final integrated browser checks | New mode/chapter, prevention and touch checks rerun locally; the complete exact-commit CI result is recorded in the PR |
+| Integrated mode/chapter, prevention and touch browser checks before the final main merge | All 17 passed |
+| Final main merge | Checks skipped at the user's explicit request |
 | Whitespace | Passed |
 
-Sandboxed attempts encountered loopback restrictions and timing failures. The successful complete suites ran outside that sandbox with unchanged timeouts and assertions; local browser validation ran after the coverage suite to avoid contention. No product failure is accepted as a baseline exception. Exact pushed-commit CI is recorded in the PR.
+Sandboxed attempts encountered loopback restrictions and timing failures. The successful complete suites ran outside that sandbox with unchanged timeouts and assertions; local browser validation ran after the coverage suite to avoid contention. No product failure is accepted as a baseline exception. These results precede the final main merge; no new verification or CI result is claimed for that merge.
 
 ## Playtest controls
 
