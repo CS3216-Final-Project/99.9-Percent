@@ -36,7 +36,9 @@ Validation uses the isolated source copy documented in the preceding Phase 6 rep
 
 Sandboxed attempts encountered loopback restrictions and timing failures. The successful complete suites ran outside that sandbox with unchanged timeouts and assertions; local browser validation ran after the coverage suite to avoid contention. No product failure is accepted as a baseline exception. These results precede the final main merge; no new verification or CI result is claimed for that merge.
 
-## Playtest controls
+## Playtest controls at the Scaling update
+
+A subsequent user-requested feedback change replaces this registration CTA with a database-backed form; see [Player feedback](../PLAYER_FEEDBACK.md). The description below records behavior before that follow-up.
 
 `Join Playtest` opens the HTTP(S) registration destination supplied through the public frontend build variable `VITE_PLAYTEST_URL`, in a new tab. Without a configured valid destination it is disabled and says registration is not open. It does not start gameplay. The separate Menu → Playtest → Export playtest record action downloads local session evidence as JSON. No signup destination is invented or configured by this change.
 

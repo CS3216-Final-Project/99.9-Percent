@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useGame } from "@/game/store";
 import { AccountPanel } from "./AccountPanel";
+import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
 import { Callout } from "./ui";
 
@@ -9,8 +10,6 @@ export function ModeChoice() {
   const play = useGame((s) => s.play);
   const switchMode = useGame((s) => s.switchMode);
   const [unsaved, setUnsaved] = useState(false);
-  const configured = import.meta.env.VITE_PLAYTEST_URL as string | undefined;
-  const playtestUrl = configured && /^https?:\/\//.test(configured) ? configured : null;
 
   return <div className="title-screen campaign-title mode-title">
     <div className="title-card mode-entry">
@@ -47,9 +46,8 @@ export function ModeChoice() {
           <p className="muted">Play as a guest. Progress saves in this browser.</p>
           <AccountPanel />
           <div className="title-actions">
-            {playtestUrl ? <a className="btn" href={playtestUrl} target="_blank" rel="noopener noreferrer">Join Playtest</a> : <button className="btn" disabled>Join Playtest</button>}
+            <FeedbackButton />
           </div>
-          {!playtestUrl && <p className="muted">Playtest registration is not open yet.</p>}
         </div>
         <img className="gameplay-preview" src="/opening-gameplay.png" alt="The furnished office and component evidence in the playable campaign" />
       </div>
