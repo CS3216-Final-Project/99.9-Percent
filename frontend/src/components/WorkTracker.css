@@ -1,0 +1,81 @@
+.work-tracker {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.work-tracker-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 0;
+  text-align: left;
+}
+
+.work-tracker-heading strong {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+
+.work-tracker-heading .badge {
+  color: var(--on-night);
+  background: var(--night-3);
+}
+
+.work-tracker-item {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-top: 1px solid var(--paper-3);
+  color: var(--ink);
+  background: var(--paper);
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.work-tracker-item:hover:enabled {
+  background: var(--paper-2);
+}
+
+.work-tracker-item:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.work-tracker-title,
+.work-tracker-meta,
+.work-tracker-meta span,
+.work-tracker-item > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.work-tracker-title .icon {
+  flex: none;
+}
+
+.work-tracker-title strong {
+  overflow-wrap: anywhere;
+}
+
+.work-tracker-meta {
+  justify-content: space-between;
+  color: var(--text-soft);
+}
+
+.work-tracker-notice {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--paper-2);
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
