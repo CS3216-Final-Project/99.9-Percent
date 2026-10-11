@@ -20,16 +20,22 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
     const episodeStart = c.reports.at(-1)?.recoveredStep ?? 0;
     const events = c.trace.filter(e => e.step >= episodeStart);
     const opening = snapshots.find(m => m.step === inc.openedStep)!;
-    const demandEvent = events.filter(e => e.step <= inc.openedStep && (e.type === "traffic-change" || e.type === "action-activated")).at(-1);
+    const demandEvent = events.filter(e => e.step <= inc.openedStep && (e.type === "traffic-change" || e.type === "traffic-spike-started" || e.type === "traffic-spike-ended" || e.type === "action-activated")).at(-1);
+    const spikeEvent=events.filter(e=>e.type==="traffic-spike-started"&&e.step<=inc.openedStep).at(-1);
     const workloadEvent=events.filter(e=>e.type==="workload-changed"&&e.step<=inc.openedStep).at(-1);
     const primary = inc.primaryComponent ?? "db";
     const constraint = primary === "db" ? opening.db : opening.instances!.find(a=>a.id===primary)!;
     const explanations = [
         !opening.instances ? `At step ${inc.openedStep}, database demand was ${opening.db.demand} ops/s against ${opening.db.capacity} ops/s capacity. Three consecutive overloaded steps opened the incident.` :
             `At step ${inc.openedStep}, ${primary === "db" ? "database" : primary.replace("app-","App ")} demand was ${constraint.demand} ${primary==="db"?"ops/s":"requests/s"} against ${constraint.capacity} capacity. Three consecutive overloaded steps on this component opened the incident.`,
-        opening.data&&workloadEvent?`Workload changed to ${workloadEvent.data.profile} at step ${workloadEvent.step}; compare logical work and uncached DB demand with capacity.`:events.some(e => e.type === "traffic-change") ? "The recorded traffic increase initiated the overload." :
+        opening.spikes?.activePulse&&spikeEvent?`Temporary demand pulse ${spikeEvent.data.pulse} began at step ${spikeEvent.step}, changing incoming traffic to ${spikeEvent.data.to} req/s; compare admitted demand and each dependency.`:opening.data&&workloadEvent?`Workload changed to ${workloadEvent.data.profile} at step ${workloadEvent.step}; compare logical work and uncached DB demand with capacity.`:events.some(e => e.type === "traffic-change") ? "The recorded traffic increase initiated the overload." :
             `The incident followed an admission or capacity change at step ${demandEvent?.step ?? start?.step}; compare its recorded effect with the opening metrics.`,
     ];
+    if(c.spikeStage) {
+      for(const e of events.filter(x=>["traffic-spike-started","traffic-spike-ended","autoscale-scale-out-decided","autoscaler-blocked","autoscale-instance-retired"].includes(x.type)))
+        explanations.push(`Step ${e.step}: ${e.type}. ${e.data.reason??""} ${e.data.to?`Incoming demand ${e.data.to} req/s.`:""}`);
+      explanations.push("Automatic application capacity still requires provisioning and routing. It does not increase database capacity or cache effectiveness; compare actual per-instance and database evidence.");
+    }
     if(opening.data) {
         const w=opening.data;
         explanations.push(`Workload ${w.profile}: ${w.readShare/100}% reads, ${(10000-w.readShare)/100}% writes; ${w.cacheableReadShare/100}% of reads eligible. Raw logical demand ${w.logical}; hits ${w.hits}, eligible misses ${w.eligibleMisses}; DB demand ${w.databaseNewDemand} ops/s.`);
@@ -39,7 +45,7 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
     for (const action of c.actions.filter(a => a.requestedStep <= c.step && (a.activatedStep === null || a.activatedStep >= episodeStart))) {
         const effect = events.find(e => e.type === "action-activated" && e.data.actionId === action.id);
         if (!effect) {
-            if (action.activatedStep === null)
+            if (action.activatedStep === null && action.cancelledStep===undefined)
                 explanations.push(`${action.type} is pending and has not contributed to recovery.`);
             continue;
         }
@@ -63,6 +69,8 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
             explanations.push(!opening.instances ? "Installed application capacity increased, but routed capacity and database demand/capacity did not change. This investment did not relieve the database constraint." : "Installed application capacity increased, but the added application remained unrouted. Routed capacity did not change; installation alone did not relieve the active constraint.");
         else if (action.type === "deploy-lb")
             explanations.push("Load balancing was deployed; routing remained unchanged until an explicit routing configuration activated.");
+        else if(action.type==="deploy-autoscaler"||action.type==="retire-app")
+            explanations.push(`${action.type} activated at step ${effect.step}; inspect automatic decisions and recurring cost, not a promised recovery.`);
         else
             explanations.push(`${action.type} changed admission without increasing database capacity.`);
     }

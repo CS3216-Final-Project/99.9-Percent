@@ -1,4 +1,5 @@
 "use client";
+import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
 import { advanceSteps, applyCampaignInput } from "@/sim/step";
@@ -214,7 +215,8 @@ export const useGame = create<Store>()((set, get) => {
       const was=prev.campaign, c=next.campaign;
       const patch:Partial<Store>={game:next};
       if(!was?.firstPauseConsumed && c.firstPauseConsumed)patch.running=false;
-      if(next.phase==="review"||next.phase==="ended"||(c.openingMilestone&&!c.openingMilestone.acknowledged))patch.running=false;
+      if(get().selectedAppId&&!c.apps.some(a=>a.id===get().selectedAppId))patch.selectedAppId=c.apps[0].id;
+      if(pendingSpikeAcknowledgement(c)||next.phase==="review"||next.phase==="ended"||(c.openingMilestone&&!c.openingMilestone.acknowledged))patch.running=false;
       get().measureTime();
       patch.measurement=projectEvents(get().measurement,next,new Date().toISOString());
       set(patch);
@@ -529,12 +531,13 @@ export const useGame = create<Store>()((set, get) => {
 
 
     act: (action) => {
+      if(pendingSpikeAcknowledgement(get().game.campaign) && action.type!=="acknowledge_spikes")return false;
       if(get().game.campaign && (!get().started || get().onboarding || (get().game.campaign!.openingMilestone && !get().game.campaign!.openingMilestone!.acknowledged && action.type !== "acknowledge_milestone"))) return false;
       const record = (ok: boolean) => set({ lastAction: { id: actionId++, type: action.type, ok } });
       if (get().game.campaign) {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
-        if (result.ok && action.type === "enter_data") set({running:false});
+        if (result.ok && ["enter_data", "enter_spikes", "acknowledge_spikes"].includes(action.type)) set({running:false});
         record(result.ok);
         commit(state);
         if (!result.ok) get().notify(result.message, "error");
@@ -552,7 +555,7 @@ export const useGame = create<Store>()((set, get) => {
 
     advance: () => {
       const { game } = get();
-      if (game.phase !== "management" || (game.campaign && (!get().started || get().onboarding || (game.campaign.openingMilestone && !game.campaign.openingMilestone.acknowledged)))) return;
+      if (pendingSpikeAcknowledgement(game.campaign) || game.phase !== "management" || (game.campaign && (!get().started || get().onboarding || (game.campaign.openingMilestone && !game.campaign.openingMilestone.acknowledged)))) return;
       const next = advanceTurn(game);
       commit(next);
       const r = next.lastReport;
@@ -568,7 +571,7 @@ export const useGame = create<Store>()((set, get) => {
     tick: (dt) => {
       const { game, running, speed } = get();
       if(game.campaign) {
-        if(!get().started || get().onboarding || (game.campaign.openingMilestone && !game.campaign.openingMilestone.acknowledged) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
+        if(pendingSpikeAcknowledgement(game.campaign) || !get().started || get().onboarding || (game.campaign.openingMilestone && !game.campaign.openingMilestone.acknowledged) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
         const credit=get().remainderMs+Math.round(dt*1000*speed);
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
@@ -598,7 +601,7 @@ export const useGame = create<Store>()((set, get) => {
     },
     focusTech: (id) => set({ techFocus: id, view: id ? "tech" : get().view }),
     setRunning: (running) => {
-      set({ running: running && (!get().game.campaign || (get().started && !get().onboarding && !(get().game.campaign!.openingMilestone && !get().game.campaign!.openingMilestone!.acknowledged))) && get().view!=="menu" && !document.hidden && !["review","ended"].includes(get().game.phase) });
+      set({ running: running && !pendingSpikeAcknowledgement(get().game.campaign) && (!get().game.campaign || (get().started && !get().onboarding && !(get().game.campaign!.openingMilestone && !get().game.campaign!.openingMilestone!.acknowledged))) && get().view!=="menu" && !document.hidden && !["review","ended"].includes(get().game.phase) });
       if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
     setSpeed: (speed) => set({ speed }),

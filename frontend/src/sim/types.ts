@@ -429,6 +429,11 @@ export interface GameState {
 /* ------------------------------------------------------------------ */
 
 export type Action =
+  | { type: "enter_spikes" }
+  | { type: "unlock_autoscaling" }
+  | { type: "deploy_autoscaler" }
+  | { type: "set_autoscaling"; enabled: boolean }
+  | { type: "acknowledge_spikes" }
   | { type: "enter_data"; profile?: "read-heavy" | "write-heavy" }
   | { type: "contrast_workload" }
   | { type: "deploy_cache" }

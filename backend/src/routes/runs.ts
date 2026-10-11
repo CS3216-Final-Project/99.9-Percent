@@ -17,7 +17,7 @@ function finite(value:unknown,depth=0):boolean {
 export function envelopeValid(value:unknown,id:string):value is CampaignEnvelope {
   if(!value || typeof value!=='object')return false;
   const e=value as CampaignEnvelope;
-  return [3,4].includes(e.schemaVersion) && e.scenarioId==='opening-db' && e.scenarioVersion===1 && e.runId===id &&
+  return [3,4,5].includes(e.schemaVersion) && e.scenarioId==='opening-db' && e.scenarioVersion===1 && e.runId===id &&
     Number.isSafeInteger(e.seed) && (e.seed|0)===e.seed && Number.isSafeInteger(e.step) && e.step>=0 && e.step<=1_000_000 &&
     Array.isArray(e.inputs) && e.inputs.length<=100_000 && e.inputs.every(i=>i&&Number.isSafeInteger(i.step)&&i.step>=0&&i.step<=e.step&&i.action&&typeof i.action.type==='string') &&
     !!e.runtime && Number.isSafeInteger(e.runtime.remainderMs) && e.runtime.remainderMs>=0 && e.runtime.remainderMs<1000 && Number.isFinite(e.savedAt) && finite(e);

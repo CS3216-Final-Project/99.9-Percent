@@ -111,3 +111,17 @@ test("cache selection, paid activation and warmth reload on touch",async({page})
  const saved=(await savedGame(page)).campaign!;await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  expect((await savedGame(page)).campaign).toEqual(saved);
 });
+
+test("traffic spikes: touch selects an instance after retirement leaves an ID gap",async({page})=>{
+ const {spikeCompany,untilOffset}=await import("../src/sim/__tests__/spikeFixtures");
+ const g=untilOffset(spikeCompany(),54);expect(g.campaign!.apps.map(a=>a.id)).toContain("app-5");
+ await page.route("**/api/**",r=>r.abort());await seedSave(page,g);await page.goto("/");
+ await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ const room=page.getByRole("main"),app=room.getByRole("button",{name:"App 5",exact:true});
+ await app.tap();await expect(app).toHaveAttribute("aria-pressed","true");
+ await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 5:/})).toHaveAttribute("aria-pressed","true");
+ await page.getByRole("region",{name:"Traffic spikes and autoscaling"}).scrollIntoViewIfNeeded();
+ await page.screenshot({path:"test-results/phase5-mobile.png"});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+ await page.getByRole("button",{name:"Menu",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Menu",exact:true})).toBeVisible();
+});

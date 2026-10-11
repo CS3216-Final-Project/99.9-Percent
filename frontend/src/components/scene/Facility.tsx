@@ -456,9 +456,12 @@ const INTERNET = "internet";
 const labelAt = new THREE.Vector2();
 /** A campaign run is on screen, which lays its labels out differently. */
 let inCampaign = false;
+let inSpikes = false;
+let campaignAppIds: string[] = [];
 
 function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprint> }) {
   const apps = useGame((s) => s.game.campaign?.apps);
+  const spikes = useGame((s) => !!s.game.campaign?.spikeStage);
 
   useEffect(() => {
     for (const id of EQUIPMENT_ORDER) {
@@ -466,7 +469,7 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
       anchors.set(id, new THREE.Vector3(f.x, f.h + 0.3, f.z));
     }
     anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, 1.35, AISLE_Z));
-    for (const id of ["app-1", "app-2"]) anchors.delete(id);
+    for (const id of anchors.keys()) if (/^app-/.test(id)) anchors.delete(id);
     if (apps) {
       apps.forEach((a, i) => {
         const p = appSlot(i);
@@ -474,7 +477,9 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
       });
     }
     inCampaign = !!apps;
-  }, [footprints, apps]);
+    inSpikes = spikes;
+    campaignAppIds = apps?.map(a => a.id) ?? [];
+  }, [footprints, apps, spikes]);
   return null;
 }
 
@@ -489,7 +494,14 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
     screenPoint(pos, camera, size.width, size.height, labelAt);
     let { x, y } = labelAt;
     // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
-    y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : key === "app-1" ? -10 : key === "app-2" ? 12 : 0;
+    const slot = campaignAppIds.indexOf(key);
+    y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : slot >= 0 ? slot * 22 - 10 : 0;
+    // The mobile bottom panel occupies at most 56% of the room. Spread the
+    // growing pool above it by slot order, even when permanent IDs have gaps.
+    if (inSpikes && slot >= 0 && size.width <= 900) {
+      y = Math.min(y, size.height * 0.40 - (campaignAppIds.length - 1 - slot) * 26);
+      x = Math.max(size.width * 0.78, Math.min(size.width - 65, x));
+    }
     if (key === "cache" && inCampaign && size.width <= 900) {
       y = Math.min(y, size.height * 0.32);
       x = Math.max(65, Math.min(size.width - 65, x));
@@ -550,7 +562,7 @@ function Labels() {
       {EQUIPMENT_ORDER.filter((id) => m.opening ? ["gateway","app","db","monitoring",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={a.id==="app-1"?"App 1":"App 2"} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{a.id==="app-1"?"App 1":"App 2"}<span className="eq-note">{a.routed?"routed":"unrouted"}</span></button>)}
+      {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.routed?"routed":"unrouted"}</span></button>)}
     </div>
   );
 }
@@ -722,7 +734,7 @@ function Scene({ effects }: { effects: boolean }) {
       {/* App servers */}
       {m.hosts.slice(0, 12).map((led, i) => {
         const p = appSlot(i);
-        return <group key={i} onClick={e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",`app-${i+1}`);}}}><Rack x={p.x} z={p.z} led={led} /></group>;
+        return <group key={i} onClick={e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",campaign?.apps[i]?.id??`app-${i+1}`);}}}><Rack x={p.x} z={p.z} led={led} /></group>;
       })}
       {Array.from({ length: m.temp }, (_, i) => {
         const p = tempSlot(i);

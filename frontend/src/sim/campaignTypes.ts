@@ -15,7 +15,8 @@ export interface ComponentSnapshot {
 }
 export interface Snapshot {
     /** Missing on retained historical opening snapshots. */
-    version?: 3 | 4;
+    version?: 3 | 4 | 5;
+    spikes?: SpikeObservation;
     data?: DataSnapshot;
     instances?: InstanceSnapshot[];
     effectiveAppCapacity?: number;
@@ -43,6 +44,19 @@ export interface DataStage {
  id: "data-strategy"; version: 1; enteredStep: number; dueStep: number | null; consumed: boolean;
  profile: "read-heavy" | "write-heavy"; source: "seeded" | "evaluation"; configuration: string; contrastConsumed: boolean;
 }
+export interface SpikeObservation {
+ activePulse: number | null; routedBusyBasisPoints: number; installed: number; routed: number;
+ enabled: boolean; highSteps: number; lowSteps: number; cooldownUntil: number; blockedReason: string | null;
+}
+export interface Autoscaler {
+ activatedStep: number; enabled: boolean; highSteps: number; lowSteps: number; cooldownUntil: number;
+ managedAppIds: string[]; joiningAppId: string | null; expectedRouting: string; blockedReason: string | null;
+}
+export interface SpikeStage {
+ id: "traffic-spikes"; version: 1; configuration: string; enteredStep: number;
+ deadlines: number[]; consumed: string[]; researchEarned: 1; researchSpent: 0 | 1;
+ controller: Autoscaler | null; baselineStableSteps: number; completedStep: number | null; acknowledged: boolean;
+}
 export interface ReadCache { activatedStep: number; warmth: number; target: number; tuned: boolean }
 export interface Routing { mode: "single" | "balanced"; targets: string[] }
 export interface AppInstance {
@@ -53,7 +67,7 @@ export interface InstanceSnapshot extends ComponentSnapshot {
     id: string; tier: AppInstance["tier"]; state: "active"; routed: boolean;
     demandRate: number; demandCount: number; processingBudget: number;
 }
-export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing" | "cache" | "cache-tuning";
+export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing" | "cache" | "cache-tuning" | "deploy-autoscaler" | "retire-app";
 export interface ScheduledAction {
     id: string;
     type: Intervention;
@@ -61,6 +75,8 @@ export interface ScheduledAction {
     activationStep: number;
     costCents: number;
     activatedStep: number | null;
+    source?: "player" | "autoscaler";
+    cancelledStep?: number;
     targetId?: string;
     capacityAfter?: number;
     routing?: Routing;
@@ -80,6 +96,7 @@ export interface Ledger {
     salaryNumerator: number;
     lbNumerator?: number;
     cacheNumerator?: number;
+    controllerNumerator?: number;
 }
 export interface Settlement {
     period: number;
@@ -91,6 +108,7 @@ export interface Settlement {
     netCents: number;
     lbCents?: number;
     cacheCents?: number;
+    controllerCents?: number;
 }
 export interface CampaignIncident {
     id: string;
@@ -126,6 +144,8 @@ export interface Campaign {
     scaling: null | { id: "application-scaling"; version: 1; enteredStep: number; dueStep: number | null; consumed: boolean };
     dataStage: DataStage | null;
     readCache: ReadCache | null;
+    spikeStage: SpikeStage | null;
+    nextAppNumber: number;
     overload: Record<string, number>;
     dbCapacity: number;
     dbBacklog: number;
@@ -138,6 +158,7 @@ export interface Campaign {
         salary: number;
         lb?: number;
         cache?: number;
+        controller?: number;
     };
     settlements: Settlement[];
     lastSettledPeriod: number;

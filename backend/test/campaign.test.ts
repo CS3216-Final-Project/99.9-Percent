@@ -65,12 +65,12 @@ it('stores, lists and resumes only the owner’s run',async()=>{
   const denied=await put(b,0);expect(denied.status).toBe(409);expect(denied.body.current).toBeUndefined();
   expect((await put(b,1)).status).toBe(409);expect((await db.select().from(gameRuns))[0].revision).toBe(1);
 });
-it('accepts schema 4 replay saves with Phase 4 inputs and preserves their payload',async()=>{
-  const s=await session(),value={...envelope(),schemaVersion:4,inputs:[{step:0,action:{type:'enter_data'}}]};
+it.each([4,5])('accepts schema %s replay saves and preserves their payload',async(schemaVersion)=>{
+  const s=await session(),value={...envelope(),schemaVersion,inputs:[{step:0,action:{type:'enter_data'}}]};
   const saved=await put(s,0,'company',value);expect(saved.status).toBe(200);expect(saved.body.envelope).toEqual(value);
   const resumed=await request(app).get('/api/runs/company').set('Cookie',s.cookie);
   expect(resumed.body.envelope).toEqual(value);
-  expect((await put(s,1,'company',{...value,schemaVersion:5})).status).toBe(400);
+  expect((await put(s,1,'company',{...value,schemaVersion:6})).status).toBe(400);
   expect((await db.select().from(gameRuns))[0].revision).toBe(1);
 });
 it('atomically accepts one of two concurrent revisions and returns the winner on conflict',async()=>{
@@ -86,7 +86,7 @@ it('atomically claims a guest run once without reassignment',async()=>{
 });
 it('rejects incompatible saves, mismatched IDs and invalid revisions',async()=>{
   const s=await session();
-  for(const e of [{...envelope(),schemaVersion:1}, {...envelope(),schemaVersion:5}, {...envelope(),runId:'other'}, {...envelope(),inputs:null}, {...envelope(),step:1_000_001}, {...envelope(),runtime:{remainderMs:1000}}])
+  for(const e of [{...envelope(),schemaVersion:1}, {...envelope(),schemaVersion:6}, {...envelope(),runId:'other'}, {...envelope(),inputs:null}, {...envelope(),step:1_000_001}, {...envelope(),runtime:{remainderMs:1000}}])
     expect((await put(s,0,'company',e as ReturnType<typeof envelope>)).status).toBe(400);
   expect((await put(s,-1)).status).toBe(400);expect(await db.select().from(gameRuns)).toEqual([]);
 });
