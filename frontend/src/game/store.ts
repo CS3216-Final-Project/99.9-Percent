@@ -25,9 +25,12 @@ import {
   rawLegacySave,
   legacyMusicOff,
   loadAudio,
+  loadGraphics,
   loadLegacyMeta,
   saveAudio,
+  saveGraphics,
   DEFAULT_AUDIO,
+  DEFAULT_GRAPHICS,
   DEFAULT_META,
   loadClassicGame,
   loadGame,
@@ -38,8 +41,10 @@ import {
   saveMeta,
   saveMode,
   track,
+  GRAPHICS_QUALITIES,
   type AudioSettings,
   type GameMode,
+  type GraphicsSettings,
   type Meta,
 } from "./persist";
 import { decodeSave } from "./saveEnvelope";
@@ -128,6 +133,8 @@ interface Store {
   meta: Meta;
   /** Sound settings, shared by both modes and kept across mode switches. */
   audio: AudioSettings;
+  /** Graphics settings, shared by both modes and kept across mode switches. */
+  graphics: GraphicsSettings;
   selected: EquipmentId | null;
   selectedAppId: string | null;
   selectApp: (id: string) => void;
@@ -178,6 +185,8 @@ interface Store {
   setAudio: (patch: Partial<AudioSettings>) => void;
   /** Silence music and effects, or bring them back at their volumes. */
   toggleMute: () => void;
+  /** Change the graphics settings, remembered for next time. An unknown quality is ignored. */
+  setGraphics: (patch: Partial<GraphicsSettings>) => void;
   notify: (text: string, kind?: Toast["kind"]) => void;
   dismissToast: () => void;
 }
@@ -455,6 +464,7 @@ export const useGame = create<Store>()((set, get) => {
     lastAction: null,
     meta: loadMetaSafe(),
     audio: loadAudioSafe(),
+    graphics: loadGraphicsSafe(),
     selected: null,
     selectedAppId: null,
     selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({selected:"app",selectedAppId:id}); },
@@ -471,7 +481,7 @@ export const useGame = create<Store>()((set, get) => {
     boot: () => {
       if (get().ready) return;
       // Read once here, not on every mode switch: if storage fails, the in-memory settings are the ones to keep.
-      set({ audio: loadAudio() });
+      set({ audio: loadAudio(), graphics: loadGraphics() });
       enter(loadMode(), false);
     },
 
@@ -776,6 +786,15 @@ export const useGame = create<Store>()((set, get) => {
     },
     toggleMute: () => get().setAudio({ muted: !get().audio.muted }),
 
+    setGraphics: (patch) => {
+      const quality = GRAPHICS_QUALITIES.find((q) => q === patch.quality) ?? get().graphics.quality;
+      if (quality === get().graphics.quality) return;
+      const graphics: GraphicsSettings = { quality };
+      set({ graphics });
+      // Unsaved settings still apply for this visit.
+      saveGraphics(graphics);
+    },
+
     rate: (rating) => {
       const { game } = get();
       track("rating_submitted", { rating, outcome: game.outcome, weeks: game.totals.weeks, seed: game.seed });
@@ -813,6 +832,10 @@ function loadMetaSafe(): Meta {
 
 function loadAudioSafe(): AudioSettings {
   return typeof window === "undefined" ? { ...DEFAULT_AUDIO } : loadAudio();
+}
+
+function loadGraphicsSafe(): GraphicsSettings {
+  return typeof window === "undefined" ? { ...DEFAULT_GRAPHICS } : loadGraphics();
 }
 
 export { clearSave };
