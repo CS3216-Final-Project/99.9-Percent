@@ -4403,11 +4403,10 @@ button:disabled {
 .mode-option .btn { width: 100%; margin-top: auto; }
 .mode-note, .mode-entry .muted { color: var(--on-night-soft); }
 .mode-note { margin: 0; }
-.mode-extras { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 24px; }
-.mode-extras .gameplay-preview { max-height: 190px; }
+.mode-extras { width: 100%; }
 .mode-extras .title-actions { margin-block: 12px; }
 @media (max-width: 640px) {
-  .mode-options, .mode-extras { grid-template-columns: minmax(0, 1fr); }
+  .mode-options { grid-template-columns: minmax(0, 1fr); }
   .mode-title { padding: 12px; }
   .mode-entry { max-height: calc(100dvh - 24px); gap: 16px; }
   .mode-option { padding: 16px; gap: 10px; }
