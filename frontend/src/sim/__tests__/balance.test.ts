@@ -139,3 +139,6 @@ describe("reliability financial alternatives",()=>{
   console.log("Phase 6 reliability alternatives",rows);
  });
 });
+
+// Phase 7 strategy checks use the same public actions and physical engine.
+import "./combinedBalanceCases";

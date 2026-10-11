@@ -1,3 +1,5 @@
+import CampaignScorecard from "./CampaignScorecard";
+import { canEnterCombined, canPromote, combinedProfile, currentFault, pendingCombined } from "@/sim/combinedCampaign";
 import TechTree from "./TechTree";
 import { canEnterReliability, pendingReliability, researchBalance } from "@/sim/reliability";
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
@@ -22,12 +24,12 @@ const percent = (v: number | null) => v === null ? "No completed requests" : (v 
 // Labels and status are presentation of existing observations, never engine inputs.
 function stageName(g: GameState) {
  const c=g.campaign!;
- return c.reliabilityStage?"Stay Online":c.spikeStage?"Survive Traffic Spikes":c.dataStage?"Data Bottlenecks":c.openingMilestone?.acknowledged?"Scale Your App":"First Growth";
+ return c.combinedStage?"Grow the Company":c.reliabilityStage?"Stay Online":c.spikeStage?"Survive Traffic Spikes":c.dataStage?"Data Bottlenecks":c.openingMilestone?.acknowledged?"Scale Your App":"First Growth";
 }
 function serviceStatus(g: GameState) {
  const c=g.campaign!,m=c.snapshot;
- if(g.phase==="ended")return "Bankrupt";
- if(pendingReliability(c)||pendingPreventionReview(c)||g.phase==="review"||c.openingMilestone&&!c.openingMilestone.acknowledged||pendingSpikeAcknowledgement(c))return "Paused for review";
+ if(g.phase==="ended")return g.outcome==="won"?"Campaign complete":"Bankrupt";
+ if(pendingCombined(c)||pendingCombined(c)||pendingReliability(c)||pendingPreventionReview(c)||g.phase==="review"||c.openingMilestone&&!c.openingMilestone.acknowledged||pendingSpikeAcknowledgement(c))return "Paused for review";
  if(c.incident)return c.incident.stableSteps>0?"Recovering":"Incident";
  if(m.latencyMs>=Q.latencyThresholdMs||(m.serviceErrorRate??0)>=Q.errorThreshold||m.app.demandRatio>1||m.db.demandRatio>1)return "Degraded";
  if(c.limit!==null)return "Stable — traffic limited";
@@ -96,12 +98,13 @@ function CampaignGuidance() {
   const model=campaignGuidance(game);
   const {openingDone,dataAvailable,spikesAvailable,stage,pendingMilestone}=model;
   const spikesPending=pendingSpikeAcknowledgement(c);
-  const objective = game.phase === "ended" ? "Review why the company became insolvent before deciding whether to restart."
+  const objective = game.phase === "ended" ? game.outcome==="won"?"Inspect the final architecture and scorecard, then choose whether to start a new company.":"Review why the company became insolvent before deciding whether to restart."
     : game.phase === "review" ? "Review what caused the incident."
     : pendingPreventionReview(c) ? "Review how the company handled Opening growth without an incident."
     : spikesPending ? "Acknowledge the spike response to continue this company."
     : pendingMilestone ? "Complete First Growth to continue."
     : c.incident ? c.incident.stableSteps>0?"Service is recovering. Keep it stable.":"Customers are experiencing slow or failed requests. Find the bottleneck."
+    : c.combinedStage ? "Grow the company while serving full demand, managing cost and reviewing each outcome."
     : c.reliabilityStage ? "Keep stable service through an application failure, then review the evidence."
     : c.spikeStage ? "Prepare for temporary demand spikes without wasting capacity."
     : c.dataStage ? "Reduce pressure on the database as workload grows."
@@ -114,8 +117,8 @@ function CampaignGuidance() {
       <li aria-current={openingDone && !c.dataStage ? "step" : undefined}>2. Scale Your App<small>Scaling &amp; Routing</small>{" "}<strong>{c.dataStage ? "Completed" : openingDone ? "Current" : pendingMilestone ? "Available next · acknowledge milestone" : "Locked"}</strong></li>
       <li aria-current={c.dataStage&&!c.spikeStage ? "step" : undefined}>3. Data Bottlenecks<small>Data Strategy</small>{" "}<strong>{c.spikeStage?"Completed":c.dataStage ? "Current" : dataAvailable ? "Available next" : "Locked"}</strong></li>
       <li aria-current={c.spikeStage&&!c.reliabilityStage?"step":undefined}>4. Survive Traffic Spikes<small>Traffic Spikes &amp; Autoscaling</small>{" "}<strong>{c.spikeStage?(c.spikeStage.acknowledged?"Completed":"Current"):spikesAvailable?"Available next":"Locked"}</strong></li>
-      <li>5. Stay Online<small>Later stages · Reliability</small>{" "}<strong>Locked · not implemented</strong></li>
-      {c.reliabilityStage&&<li>6. Combined campaign <strong>Locked · not implemented</strong></li>}
+      <li aria-current={c.reliabilityStage&&!c.reliabilityStage.acknowledged?"step":undefined}>5. Stay Online<small>Reliability</small>{" "}<strong>{c.reliabilityStage?.acknowledged?"Completed":c.reliabilityStage?"Current":canEnterReliability(game)?"Available next":"Locked"}</strong></li>
+      <li aria-current={c.combinedStage&&!c.combinedStage.acknowledged?"step":undefined}>6. Grow the Company<small>Combined campaign</small>{" "}<strong>{c.combinedStage?.acknowledged?"Completed":c.combinedStage?"Current":canEnterCombined(game)?"Available next":"Locked"}</strong></li>
     </ol></nav>
     <section className="campaign-guidance" aria-label="Campaign guidance"><h2>Campaign guidance</h2>
     <p className="current-stage">Current stage: <strong>{stageName(game)}</strong> <small>({stage})</small></p>
@@ -131,13 +134,15 @@ function CampaignGuidance() {
     {game.phase==="review"&&<p role="status">Incident recovered. Recovery recorded. Pending acknowledgement: Incident postmortem. Review the report and acknowledge it with Continue company; simulation remains paused.</p>}
     {pendingMilestone&&<p role="status">{c.openingMilestone?.outcomeId?"Growth outcome reviewed.":"Incident recovered. Postmortem acknowledged."} Pending acknowledgement: First growth challenge handled. Complete Opening by acknowledging the milestone; your company continues into Scaling &amp; Routing.</p>}
     <ProgressionGuardrail model={model}/>
+    {openingDone&&!c.dataStage&&!c.scaling?.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
+    {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}>View run scorecard</button>}
     {!c.reliabilityStage&&c.spikeStage?.acknowledged&&<button className="btn" disabled={!canEnterReliability(game)} onClick={()=>useGame.getState().act({type:"enter_reliability"})}>Continue to reliability</button>}
     {c.reliabilityStage&&<p>Stay Online · {c.reliabilityStage.acknowledged?"Completed":"Current"}. Capacity is not the same as reliability.</p>}
     {c.limit !== null && <div className="traffic-limit-notice" role="note" aria-label="Traffic limit trade-off"><strong>Traffic limit active</strong>
       <p>Incoming: {c.snapshot.incoming} req/s · Admitted: {c.snapshot.admitted} req/s · Rejected: {c.snapshot.rejected} req/s</p>
       <p>Rejected demand this period: {c.ledger.rejected}; potential revenue not served {dollars(c.ledger.rejected * 20)} — opportunity value (not an extra charge). Service can be stable while sacrificing growth.</p>
     </div>}
-    {c.dataStage && <div aria-label="Data stage context"><p>Workload: {DATA_PROFILES[c.dataStage.profile].readShare / 100}% reads / {100 - DATA_PROFILES[c.dataStage.profile].readShare / 100}% writes.</p>
+    {c.dataStage && <div aria-label="Data stage context"><p>Workload: {DATA_PROFILES[c.combinedStage?combinedProfile(c):c.dataStage.profile].readShare / 100}% reads / {100 - DATA_PROFILES[c.combinedStage?combinedProfile(c):c.dataStage.profile].readShare / 100}% writes.</p>
       <p>Cache: {!c.readCache ? "Not deployed" : c.readCache.warmth === 0 ? "Cold" : c.readCache.warmth < c.readCache.target ? "Warming" : "Warm"}. Effective hit rate used: {c.snapshot.data ? `${c.snapshot.data.effectiveHitRateUsed / 100}%` : "No completed workload observation yet"}.</p>
       <p>Database: {c.snapshot.db.demand} / {c.snapshot.db.capacity} ops/s.</p></div>}
   </section></>;
@@ -148,7 +153,7 @@ export function CampaignHeader() {
   return <header className="topbar campaign-header"><button className="btn" onClick={()=>openView("tech")}>Technology tree</button><div className="brand"><span className="brand-mark">99.99%</span>
     <span>{stageName(game)} · Week {game.turn} · Step <strong data-testid="physical-step">{c.step}</strong></span></div>
     <div className="stats-strip"><div className="stat"><span>Cash</span><strong>{dollars(c.cashCents)}</strong></div>
-      <div className="stat"><span>Users</span><strong>2,000</strong></div>
+      <div className="stat"><span>Users</span><strong>{game.users.toLocaleString("en-US")}</strong></div>
       <div className="stat"><span>Pending revenue</span><strong>{dollars(c.ledger.successes * Q.revenueCents)}</strong></div>
       <div className="stat"><span>Company role</span><strong>Keep service running</strong></div></div>
     <button className="icon-btn" aria-label="Menu" onClick={() => openView("menu")}><Icon name="menu" /></button></header>;
@@ -162,7 +167,7 @@ export function CampaignPanel() {
   const dbDelay=c.dbCapacity===2000?4:3;
   const selectedApp=c.apps.find(a=>a.id===selectedAppId)??c.apps[0];
   const onboarding = useGame(s=>s.onboarding);
-  const disabled = pendingReliability(c) || pendingPreventionReview(c) || pendingSpikeAcknowledgement(c) || onboarding || !!(c.openingMilestone&&!c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
+  const disabled = pendingCombined(c) || pendingReliability(c) || pendingPreventionReview(c) || pendingSpikeAcknowledgement(c) || onboarding || !!(c.openingMilestone&&!c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
   const [evidenceOpen,setEvidenceOpen]=useState(false);
   const investigate=()=>{ act({type:"incident_inspect",equipment:"monitoring"});setEvidenceOpen(true);document.getElementById("campaign-architecture")?.focus(); };
   const admissionPending = c.pending.some(a => a.type === "limit" || a.type === "unlimit");
@@ -206,7 +211,7 @@ export function CampaignPanel() {
           {c.apps.map(a=><button key={a.id} className="btn" disabled={c.routing.mode==="balanced"&&c.routing.targets.length===1&&c.routing.targets[0]===a.id} onClick={()=>act({type:"set_routing",mode:"balanced",targets:[a.id]})}>Balance to {a.id} only</button>)}
           <button className="btn" disabled={c.routing.mode==="single"} onClick={()=>act({type:"set_routing",mode:"single",targets:["app-1"]})}>Route only to App 1</button>
         </fieldset>
-        <p>Scaling growth: {c.scaling?.consumed?"1,400 req/s event applied":c.dbCapacity<2000?"Waiting for an explicitly purchased 2,000 ops/s database":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Waiting for management and empty backlogs":c.scaling?.dueStep?"Waiting for the next company growth event":"Readiness will be checked on the next step"}.</p>
+        <p>Scaling growth: {c.scaling?.consumed?"1,400 req/s event applied":c.dbCapacity<2000&&!c.scalingConsent?"Waiting for paid database headroom or explicit risk consent":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Waiting for management and empty backlogs":c.scaling?.dueStep?"Waiting for the next company growth event":"Readiness will be checked on the next step"}.</p>
       </section>}
       {c.dataStage&&<section aria-label="Data strategy"><h3>Data strategy</h3>
         <p>Workload: {c.dataStage.consumed?c.dataStage.profile:"Waiting for workload growth"}. {c.dataStage.dueStep!==null&&!c.dataStage.consumed?"Waiting for the next company growth event.":""}</p>
@@ -219,9 +224,10 @@ export function CampaignPanel() {
         <div className="action-card"><button className="btn" disabled={disabled||busy||!c.readCache||c.readCache.tuned||c.cashCents<=100000} onClick={()=>act({type:"tune_cache"})}>Tune cache ceiling to 75% · $1,000 · 2 steps</button><p>Raises the cache ceiling from 60% to 75%; warm-up still applies. No additional upkeep.</p></div>
         <button className="btn" disabled={disabled||!c.dataStage.consumed||c.dataStage.contrastConsumed||!!c.spikeStage||!canEnterData(game)} onClick={()=>act({type:"contrast_workload"})}>Observe contrasting workload</button>
       </section>}
+      {c.combinedStage&&<CombinedControls disabled={disabled}/>}
       {c.reliabilityStage&&<ReliabilityControls disabled={disabled}/>}
       {c.spikeStage&&<SpikeControls disabled={disabled} busy={busy}/>}
-      {c.pending.map(a => <p role="status" key={a.id}>{{"health-checks":"Deploy Health Checks","create-spare":"Install spare application","reserve-spare":"Reserve spare","release-spare":"Release spare","failover":"Deploy Automatic Failover","promote-spare":"Promote spare","restore-app":"Restore application","add-app":"Application installation","upgrade-db":"Database upgrade",limit:"Traffic limit",unlimit:"Remove traffic limit","scale-up":"Application scale up","deploy-lb":"Load balancer deployment",routing:"Routing change",cache:"Read Cache deployment","cache-tuning":"Cache tuning","deploy-autoscaler":"Autoscaling controller deployment","retire-app":"Safe application retirement"}[a.type]}{a.targetId?` (${a.targetId})`:""}: activates in {a.activationStep - c.step} step(s)</p>)}
+      {c.pending.map(a => <p role="status" key={a.id}>{{promotion:"Promotion","health-checks":"Deploy Health Checks","create-spare":"Install spare application","reserve-spare":"Reserve spare","release-spare":"Release spare","failover":"Deploy Automatic Failover","promote-spare":"Promote spare","restore-app":"Restore application","add-app":"Application installation","upgrade-db":"Database upgrade",limit:"Traffic limit",unlimit:"Remove traffic limit","scale-up":"Application scale up","deploy-lb":"Load balancer deployment",routing:"Routing change",cache:"Read Cache deployment","cache-tuning":"Cache tuning","deploy-autoscaler":"Autoscaling controller deployment","retire-app":"Safe application retirement"}[a.type]}{a.targetId?` (${a.targetId})`:""}: activates in {a.activationStep - c.step} step(s)</p>)}
     </section>
     <details className="detailed-evidence" open={evidenceOpen} onToggle={e=>setEvidenceOpen(e.currentTarget.open)}><summary>Detailed system evidence</summary><section className="panel-section" aria-label="System evidence"><p>{nextMove(game).text}</p><p>Incoming {m.incoming} / admitted {m.admitted} / rejected {m.rejected} requests/s</p>
       <table className="campaign-table"><caption>Component evidence, step {c.step}</caption><thead><tr><th>Metric</th><th>Application</th><th>Database</th></tr></thead>
@@ -256,7 +262,7 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
 }
 export function CampaignControls() {
   const { game, running, setRunning, speed, setSpeed, advance, openView, started, onboarding } = useGame();
-  const active = !pendingReliability(game.campaign) && !pendingPreventionReview(game.campaign) && !pendingSpikeAcknowledgement(game.campaign!) && started && !onboarding && !(game.campaign!.openingMilestone&&!game.campaign!.openingMilestone!.acknowledged) && (game.phase === "management" || game.phase === "incident");
+  const active = !pendingCombined(game.campaign) && !pendingReliability(game.campaign) && !pendingPreventionReview(game.campaign) && !pendingSpikeAcknowledgement(game.campaign!) && started && !onboarding && !(game.campaign!.openingMilestone&&!game.campaign!.openingMilestone!.acknowledged) && (game.phase === "management" || game.phase === "incident");
   return <footer className="bottombar"><button className="btn" onClick={() => openView("history")}>History</button>
     <div className="time-controls"><button className="btn" disabled={!active} onClick={() => setRunning(!running)}>{running ? "Pause company" : "Resume company"}</button>
       <div className="speed" role="group" aria-label="Game speed">{([.5, 1, 2] as Speed[]).map(v => <button key={v} aria-pressed={speed === v} onClick={() => setSpeed(v)}>{v===.5?"Slow":v===1?"Normal":"Fast"} · {v}×</button>)}</div>
@@ -304,6 +310,8 @@ export function CampaignOverlays() {
       <button className="btn btn-primary" onClick={()=>onboardingMove("next")}>{meta.openingOnboarding.step===2?"Start company":"Next"}</button></div>
     </Modal>;
   }
+  if(view==="scorecard"&&(c.scorecard||c.combinedStage?.finalReview))return <Modal title="Company scorecard" onClose={()=>openView("guidance")}><CampaignScorecard card={(c.scorecard??c.combinedStage!.finalReview)!} pendingReview={!c.scorecard}/></Modal>;
+  if(pendingCombined(c)&&!["guidance","menu","history"].includes(view??"")){const d=c.combinedStage!,r=d.currentRound;return <Modal title={d.finalReview?"Final campaign review":"Growth outcome"} onClose={()=>openView("guidance")}>{d.finalReview?<><CampaignScorecard card={d.finalReview} pendingReview/><button className="btn btn-primary" onClick={()=>act({type:"complete_campaign"})}>Complete campaign</button></>:<><h3>What happened</h3><p>{r!.scenario.template}: registered users reached {r!.users.toLocaleString("en-US")}. Temporary pressure has ended.</p><h3>What the evidence showed</h3><p>All applications restored; five stable full-demand baseline steps; actual incident reports acknowledged.</p><h3>Trade-offs</h3><p>Rejected requests during this round: {c.cumulative.rejected-r!.rejectedBefore}; setup spending {dollars(c.investedCents-r!.setupBefore)}. Review actual actions and causal reports in History.</p><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_growth"})}>Continue company</button></>}</Modal>;}
   if(view==="tech")return <Modal title="Technology tree" onClose={()=>openView(null)}><TechTree/></Modal>;
   if(pendingReliability(c)&&!["guidance","menu","history"].includes(view??""))return <Modal title="Reliability outcome" onClose={()=>openView("guidance")}><p>The application test has ended. Service met five stable management observations after restoration.</p><p>Installed capacity did not guarantee healthy routed capacity. Health Checks detect; spares and routing provide surviving capacity. Failover creates no capacity.</p><p>{c.limit!==null?"Stable — traffic limited":"Full demand admitted"}. Rejected requests: {c.cumulative.rejected}. Setup spending: {dollars(c.investedCents)}.</p><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_reliability"})}>Continue operating</button></Modal>;
   if(pendingPreventionReview(c)&&!["guidance","menu","history"].includes(view??""))return <Modal title="Prevention review" onClose={()=>openView("guidance")}><PreventionOutcome campaign={c}/><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_prevention_review"})}>Continue company</button></Modal>;
@@ -318,8 +326,10 @@ export function CampaignOverlays() {
     <p>No additional resource reward. Reliability remains locked; installed capacity and the deployed controller continue to incur cost.</p>
     <button className="btn btn-primary" onClick={()=>act({type:"acknowledge_spikes"})}>Continue operating</button>
   </Modal>;
-  if (game.phase === "ended" && view !== "menu" && view !== "history") return <Modal title="Company bankrupt" onClose={() => openView("menu")}><p>Cash reached {dollars(c.cashCents)} after settlement at step {c.step}. Final metrics and history remain available.</p><p>Last period revenue: {dollars(c.settlements.at(-1)?.revenueCents??0)}. Infrastructure: {dollars((c.settlements.at(-1)?.appCents??0)+(c.settlements.at(-1)?.dbCents??0)+(c.settlements.at(-1)?.lbCents??0)+(c.settlements.at(-1)?.cacheCents??0)+(c.settlements.at(-1)?.controllerCents??0))}. Salaries: {dollars(c.settlements.at(-1)?.salaryCents??0)}.</p><p>Upfront investment: {dollars(c.investedCents)}. Rejected demand: {c.cumulative.rejected} requests (not an extra cash charge).</p><button className="btn" onClick={()=>openView("history")}>View final history</button><button className="btn" onClick={() => openView("menu")}>Export or start a new company</button></Modal>;
+  if(game.phase==="ended"&&game.outcome==="won"&&!["guidance","menu","history","tech"].includes(view??""))return <Modal title="Campaign complete" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard!}/><button className="btn" onClick={()=>openView("guidance")}>Inspect final company</button><button className="btn" onClick={()=>openView("menu")}>Export or start a new company</button></Modal>;
+  if (game.phase === "ended" && game.outcome!=="won" && view !== "menu" && view !== "history") return <Modal title="Company bankrupt" onClose={() => openView("menu")}><p>Cash reached {dollars(c.cashCents)} after settlement at step {c.step}. Final metrics and history remain available.</p><p>Last period revenue: {dollars(c.settlements.at(-1)?.revenueCents??0)}. Infrastructure: {dollars((c.settlements.at(-1)?.appCents??0)+(c.settlements.at(-1)?.dbCents??0)+(c.settlements.at(-1)?.lbCents??0)+(c.settlements.at(-1)?.cacheCents??0)+(c.settlements.at(-1)?.controllerCents??0))}. Salaries: {dollars(c.settlements.at(-1)?.salaryCents??0)}.</p><p>Upfront investment: {dollars(c.investedCents)}. Rejected demand: {c.cumulative.rejected} requests (not an extra cash charge).</p><button className="btn" onClick={()=>openView("history")}>View final history</button><button className="btn" onClick={() => openView("menu")}>Export or start a new company</button></Modal>;
   if (view === "menu") return <Modal title="Menu" onClose={() => { openView(null); setConfirmReset(false); }}>
+    {(c.scorecard||c.combinedStage?.finalReview)&&<button className="btn" onClick={()=>openView("scorecard")}>View run scorecard</button>}
     <p>One step models one second of requests. Every 60 steps settles an operating week. Pausing freezes everything.</p>
     <p>Use the room controls to inspect equipment. Compare demand, capacity, backlog and response time before choosing an action.</p>
 
@@ -353,10 +363,10 @@ export function CampaignOverlays() {
 }
 
 function ReliabilityControls({disabled}:{disabled:boolean}) {
- const {game,act,openView}=useGame(),c=game.campaign!,d=c.reliabilityStage!,f=d.fault;
+ const {game,act,openView}=useGame(),c=game.campaign!,d=c.reliabilityStage!,f=currentFault(c);
  return <section aria-label="Stay Online"><h3>Stay Online</h3><p>Keep service stable when an application becomes unavailable. Choose preparation or a manual response.</p>
  <p>{!f?"Prepare, then explicitly start the reliability test.":f.startedStep===null?"Reliability test scheduled. Resume company to observe it.":f.restoredStep===null?`Application ${f.targetId} failed. Inspect health, surviving capacity and routing.`:"Application restored. Review reports and observe stable service."}</p>
- <p>Stable service after restoration: {d.stableSteps} / 5 seconds. Research available: {researchBalance(c)}.</p>
+ <p>Stable service after restoration: {c.combinedStage?.currentRound?.stableSteps??d.stableSteps} / 5 seconds. Research available: {researchBalance(c)}.</p>
  {c.spikeStage?.controller&&f&&!d.acknowledged&&<p>Autoscaling waiting — reliability test in progress. Existing enabled state and upkeep are preserved.</p>}
 
  <button className="btn" onClick={()=>openView("tech")}>Technology tree</button>
@@ -374,3 +384,6 @@ function ReliabilityControls({disabled}:{disabled:boolean}) {
  {pendingReliability(c)&&<button className="btn" onClick={()=>openView(null)}>Review reliability outcome</button>}
  </section>;
 }
+
+function ScalingRiskConsent(){const {act,onboarding}=useGame();const [confirm,setConfirm]=useState(false);return <section aria-label="Scaling growth risk"><p>You may prepare 2,000 ops/s database headroom, or explicitly accept the next 1,400 req/s growth wave with your current capacity. Overload, rejected demand and insolvency remain possible. No cash or capacity is granted.</p><button className="btn" disabled={onboarding} onClick={()=>setConfirm(true)}>Consider growth with current capacity</button>{confirm&&<><p>Accept growth risk? This waives only the database-headroom requirement. Existing timing, costs and service rules remain.</p><button className="btn" onClick={()=>{if(act({type:"accept_scaling_risk"}))setConfirm(false);}}>Accept growth risk</button><button className="btn" onClick={()=>setConfirm(false)}>Keep preparing</button></>}</section>;}
+function CombinedControls({disabled}:{disabled:boolean}){const {game,act}=useGame(),c=game.campaign!,d=c.combinedStage!,r=d.currentRound;return <section aria-label="Grow the Company"><h3>Grow the Company</h3><p>Registered users: {d.users.toLocaleString("en-US")} / {d.finalUserTarget.toLocaleString("en-US")}. Growth outcomes acknowledged: {d.completedRounds.length} / 3.</p><p>{r?r.startedStep===null?"Growth wave announced. Prepare the architecture before pressure arrives.":`Current pressure: ${r.scenario.template}. Inspect actual workload and healthy routed capacity.`:"Between growth waves: operate full baseline demand and choose when to continue."}</p><p>Promotion costs $500, activates next step and adds 400 req/s for 12 modeled seconds; it does not add registered users. Maximum additional gross revenue is $960 if every extra request succeeds. Existing operating costs still apply. Available only between growth waves; cooldown 30 steps after it ends.</p><button className="btn" disabled={disabled||!canPromote(game)} onClick={()=>act({type:"run_promotion"})}>Run promotion · $500 · 1 step</button>{c.promotion&&<p>{c.promotion.activatedStep===null?"Promotion pending":c.step<c.promotion.endStep?"Promotion active":"Promotion ended"}; cooldown remaining {Math.max(0,c.promotion.cooldownUntil-c.step)} steps.</p>}</section>;}

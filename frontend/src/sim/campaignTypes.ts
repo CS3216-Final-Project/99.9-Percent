@@ -9,7 +9,7 @@ export interface ComponentSnapshot {
 }
 export interface Snapshot {
     /** Missing on retained historical opening snapshots. */
-    version?: 3 | 4 | 5 | 6;
+    version?: 3 | 4 | 5 | 6 | 7;
     reliability?: ReliabilityObservation;
     spikes?: SpikeObservation;
     data?: DataSnapshot;
@@ -64,7 +64,7 @@ export interface InstanceSnapshot extends ComponentSnapshot {
     demandRate: number; demandCount: number; processingBudget: number;
     health?: AppInstance["health"]; detectedHealth?: AppInstance["detectedHealth"]; role?: AppInstance["role"]; configured?: boolean;
 }
-export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing" | "cache" | "cache-tuning" | "deploy-autoscaler" | "retire-app" | "health-checks" | "create-spare" | "reserve-spare" | "release-spare" | "failover" | "promote-spare" | "restore-app";
+export type Intervention = "add-app" | "upgrade-db" | "limit" | "unlimit" | "scale-up" | "deploy-lb" | "routing" | "cache" | "cache-tuning" | "deploy-autoscaler" | "retire-app" | "health-checks" | "create-spare" | "reserve-spare" | "release-spare" | "failover" | "promote-spare" | "restore-app" | "promotion";
 export interface ScheduledAction {
     id: string;
     type: Intervention;
@@ -137,7 +137,45 @@ export interface OpeningPrevention {
     outcome: null | { id: "opening-prevention"; qualifiedStep: number; acknowledged: boolean;
         snapshots: Snapshot[]; rejectedDemand: number; setupCents: number };
 }
+export interface ServiceMeasurement {
+ scope:"full-run"|"since-upgrade"|"combined-stage"; fromStep:number; lastStep:number;
+ eligibleSteps:number; healthySteps:number; degradedSteps:number; longestDegradedSteps:number;
+}
+export interface CampaignScorecard {
+ runId:string; seed:number; outcome:"won"|"bankrupt"; capturedStep:number;
+ users:number; finalUserTarget:number|null; cashCents:number; revenueCents:number; pendingRevenueCents:number;
+ infrastructureSetupCents:number; infrastructureOperatingCents:number; salaryCents:number; promotionCents:number;
+ rejectedDemand:number; opportunityCents:number; failedDemand:number; incidentCount:number; recurringCents:number;
+ measurement:ServiceMeasurement; combinedMeasurement:ServiceMeasurement|null;
+ wholeRunUptime:number|null; wholeRunLargestOutage:number|null;
+ ownedTechIds:string[]; deployedTechIds:string[];
+ architecture:{apps:AppInstance[];routing:Routing;loadBalancer:boolean;dbCapacity:number;readCache:ReadCache|null;
+  controller:Autoscaler|null;checksStep:number|null;failover:ReliabilityStage["failover"]};
+}
+export interface CombinedRound {
+ id:string;index:number;scenario:import("./scenarios/combinedCampaign").CombinedScenario;
+ scheduledStep:number;startStep:number;endStep:number;users:number;baseline:number;
+ startedStep:number|null;pressureEndedStep:number|null;fault:ReliabilityFault|null;
+ stableSteps:number;completedStep:number|null;acknowledged:boolean;
+ rejectedBefore:number;setupBefore:number;observations:Snapshot[];
+}
+export interface CombinedStage {
+ id:"combined-campaign";version:1;configuration:string;enteredStep:number;source:"seeded"|"evaluation";
+ finalUserTarget:number;users:number;sequence:import("./scenarios/combinedCampaign").CombinedScenario[];
+ nextRoundIndex:number;currentRound:CombinedRound|null;completedRounds:CombinedRound[];
+ readinessSteps:number;finalStableSteps:number;targetReachedStep:number|null;
+ finalReview:CampaignScorecard|null;acknowledged:boolean;service:ServiceMeasurement;
+}
+export interface CampaignPromotion {
+ actionId:string;requestedStep:number;activationStep:number;activatedStep:number|null;
+ endStep:number;endedStep:number|null;cooldownUntil:number;costCents:number;
+}
 export interface Campaign {
+    combinedStage?:CombinedStage|null;
+    scalingConsent?:{policyVersion:1;acceptedStep:number}|null;
+    promotion?:CampaignPromotion|null;
+    serviceMeasurement?:ServiceMeasurement;
+    scorecard?:CampaignScorecard|null;
     scenarioId: "opening-db";
     scenarioVersion: 1;
     runId: string;

@@ -272,11 +272,11 @@ function BottomBar() {
 /* Overlay views                                                       */
 /* ------------------------------------------------------------------ */
 
-const VIEW_TITLES: Record<Exclude<View, null | "menu" | "guidance">, string> = { tech: "Tech tree", engineers: "Team", history: "History" };
+const VIEW_TITLES: Record<Exclude<View, null | "menu" | "guidance">, string> = { tech: "Tech tree", engineers: "Team", history: "History", scorecard: "Scorecard" };
 const VIEW_ICONS: Record<Exclude<View, null | "menu" | "guidance">, [ConceptKind, IconName]> = {
   tech: ["tech", "tree"],
   engineers: ["team", "team"],
-  history: ["users", "history"],
+  history: ["users", "history"], scorecard: ["users", "history"],
 };
 
 function ViewSheet() {

@@ -11,7 +11,7 @@ it("migrates schema 4 with original-byte backup and no automatic spike entry or 
  for(const key of ["nn.save.v1","nn.meta.v1","nn.analytics.v1"])localStorage.setItem(key,"legacy bytes");
  const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("load");
  expect(loaded.game.campaign!.spikeStage).toBeNull();expect(loaded.game.campaign!.snapshot).toEqual(old.game.campaign.snapshot);expect(loaded.game.campaign!.trace).toEqual(old.game.campaign.trace);expect(loaded.game.campaign!.cashCents).toBe(old.game.campaign.cashCents);expect(loaded.game.campaign!.nextAppNumber).toBe(3);
- expect(localStorage.getItem(`${CAMPAIGN_SAVE_KEY}.backup.v4`)).toBe(raw);expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(6);
+ expect(localStorage.getItem(`${CAMPAIGN_SAVE_KEY}.backup.v4`)).toBe(raw);expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(7);
  for(const key of ["nn.save.v1","nn.meta.v1","nn.analytics.v1"])expect(localStorage.getItem(key)).toBe("legacy bytes");
 });
 it.each(["backup","replacement"])("preserves schema 4 source when %s fails",failure=>{

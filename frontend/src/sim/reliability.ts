@@ -1,3 +1,4 @@
+import { currentFault } from "./combinedCampaign";
 import type { Action, ActionResult, GameState } from "./types";
 import type { Campaign, AppInstance, ScheduledAction } from "./campaignTypes";
 import { APPLICATION_RELIABILITY as R } from "./scenarios/applicationReliability";
@@ -21,13 +22,13 @@ export function detect(c:Campaign,a:AppInstance,source:"manual"|"probe"):void {
  if(a.detectedHealth!==health){a.detectedHealth=health;a.detectedStep=c.step;trace(c,"health-change-detected",{appId:a.id,actualHealth:a.health??"healthy",detectedHealth:health,source,changedStep:a.healthChangedStep??0,delay:c.step-(a.healthChangedStep??0)});}
 }
 function restore(c:Campaign,source:"manual"|"natural"):void {
- const f=c.reliabilityStage!.fault!,a=c.apps.find(a=>a.id===f.targetId)!;
+ const f=currentFault(c)!,a=c.apps.find(a=>a.id===f.targetId)!;
  if(f.restoredStep!==null)return;
  a.health="healthy";a.healthChangedStep=c.step;f.restoredStep=c.step;f.restoreSource=source;
  trace(c,"instance-restored",{appId:a.id,eventId:f.id,source,backlog:a.backlog});
 }
 export function advanceHealth(c:Campaign):void {
- const d=c.reliabilityStage;if(!d)return;const f=d.fault;
+ const d=c.reliabilityStage;if(!d)return;const f=currentFault(c);
  if(f&&f.startedStep===null&&c.step>=f.startStep){const a=c.apps.find(a=>a.id===f.targetId)!;a.health="failed";a.healthChangedStep=c.step;f.startedStep=c.step;if(c.incident){c.incident.failureId=f.id;c.incident.components=[...new Set([...(c.incident.components??[]),a.id])];}trace(c,"reliability-failure-started",{eventId:f.id,appId:a.id});}
  if(f&&f.startedStep!==null&&f.restoredStep===null&&c.step>=f.naturalStep)restore(c,"natural");
  if(d.checksStep!==null&&c.step>d.checksStep)for(const a of c.apps)if(c.step>(a.healthChangedStep??0))detect(c,a,"probe");
@@ -48,9 +49,9 @@ export function activateReliability(c:Campaign,a:ScheduledAction):boolean {
  }
  if(a.type==="release-spare"){c.apps.find(x=>x.id===a.targetId)!.role="serving";d.spareId=null;}
  if(a.type==="failover")d.failover={activatedStep:c.step,enabled:true};
- if(a.type==="restore-app"){if(d.fault?.restoredStep===null)restore(c,"manual");else trace(c,"restoration-superseded",{actionId:a.id,targetId:a.targetId!});}
+ if(a.type==="restore-app"){if(currentFault(c)?.restoredStep===null)restore(c,"manual");else trace(c,"restoration-superseded",{actionId:a.id,targetId:a.targetId!});}
  if(a.type==="promote-spare"){
-  const f=d.fault!,spare=c.apps.find(x=>x.id===a.targetId);
+  const f=currentFault(c)!,spare=c.apps.find(x=>x.id===a.targetId);
   const restoring=c.pending.some(x=>x.type==="restore-app"&&x.activationStep===c.step);
   if(f.restoredStep!==null||c.step>=f.naturalStep||restoring||!spare||!healthy(spare)||spare.backlog||spare.role!=="spare"||d.spareId!==spare.id||JSON.stringify(c.routing)!==a.expectedRouting||c.apps.find(x=>x.id===f.targetId)?.detectedHealth!=="unhealthy"){
    c.actions.find(x=>x.id===a.id)!.cancelledStep=c.step;trace(c,"failover-cancelled",{actionId:a.id,reason:"Restoration, spare or configured route changed"});return false;
@@ -62,16 +63,16 @@ export function activateReliability(c:Campaign,a:ScheduledAction):boolean {
  return true;
 }
 export function recoverySafe(c:Campaign):boolean {
- const f=c.reliabilityStage?.fault;if(!f||f.startedStep===null||f.restoredStep!==null)return true;
+ const f=currentFault(c);if(!f||f.startedStep===null||f.restoredStep!==null)return true;
  return !effectiveTargets(c).includes(f.targetId)&&c.apps.find(a=>a.id===f.targetId)!.backlog===0;
 }
 export function observeReliability(s:GameState):void {
- const c=s.campaign!,d=c.reliabilityStage;if(!d||s.phase==="ended"||s.phase==="review")return;const f=d.fault;
+ const c=s.campaign!,d=c.reliabilityStage;if(!d||s.phase==="ended"||s.phase==="review")return;const f=currentFault(c);
  if(d.failover?.enabled&&d.checksStep!==null&&c.loadBalancer&&f?.startedStep!==null&&f&&f.restoredStep===null&&!f.promoted&&c.routing.targets.includes(f.targetId)&&c.apps.find(a=>a.id===f.targetId)!.detectedHealth==="unhealthy"&&!c.pending.some(a=>["routing","retire-app","promote-spare"].includes(a.type))){
   const spare=c.apps.find(a=>a.id===d.spareId);
   if(spare&&healthy(spare)&&!spare.backlog)schedule(c,"promote-spare",1,0,{source:"failover",targetId:spare.id,expectedRouting:JSON.stringify(c.routing),failureId:f.id});
  }
- if(f?.restoredStep!==null&&f&&d.completedStep===null){
+ if(!c.combinedStage&&f?.restoredStep!==null&&f&&d.completedStep===null){
   const ready=s.phase==="management"&&c.cashCents>0&&!c.incident&&!c.dbBacklog&&c.apps.every(a=>!a.backlog)&&reportsAcknowledged(c)&&qualifiesForRecovery(c.snapshot);
   d.stableSteps=ready?d.stableSteps+1:0;
   if(d.stableSteps===5){d.completedStep=c.step;trace(c,"reliability-stage-completed",{eventId:f.id,restoredStep:f.restoredStep!,limited:c.limit!==null,rejected:c.cumulative.rejected,setupCents:c.investedCents,incidentOccurred:c.trace.some(t=>t.type==="incident-opened"&&t.step>=f.startStep)});}
@@ -113,7 +114,7 @@ export function reliabilityAction(prev:GameState,action:Action):ActionResult|nul
  if(type==="reserve-spare"&&(!target||!healthy(target)||target.routed||target.backlog||c.pending.some(a=>a.targetId===target.id||a.routing?.targets.includes(target.id))))return fail("Reserve a healthy, unrouted, empty application without pending work.");
  if(type==="release-spare"&&(!target||c.pending.some(a=>a.type==="promote-spare"||a.targetId===target.id)))return fail("A free reserved spare is required.");
  if(type==="failover"&&(!d.owned.includes("auto_failover")||d.failover||d.checksStep===null||!c.loadBalancer||!d.spareId||!healthy(c.apps.find(a=>a.id===d.spareId)!)))return fail("Requires owned Failover, deployed checks/load balancer and a healthy real spare.");
- if(type==="restore-app"&&(!target||healthy(target)||target.id!==d.fault?.targetId))return fail("Select the actually failed application to restore.");
+ if(type==="restore-app"&&(!target||healthy(target)||target.id!==currentFault(c)?.targetId))return fail("Select the actually failed application to restore.");
  const cost=type==="health-checks"?R.checksCostCents:type==="create-spare"?R.spareCostCents:type==="failover"?R.failoverCostCents:0;
  if(c.cashCents<=cost)return fail("This purchase would exhaust company cash.");
  schedule(c,type,type==="restore-app"?3:["reserve-spare","release-spare"].includes(type)?1:2,cost,{...(target?{targetId:target.id}:{}),...(type==="create-spare"?{targetId:`app-${c.nextAppNumber++}`}:{})});return {ok:true,state:s};

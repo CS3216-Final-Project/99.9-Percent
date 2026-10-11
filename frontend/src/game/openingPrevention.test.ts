@@ -24,7 +24,7 @@ it("lets the dead-ended company progress forward with the same run and schema, n
  let g=oldDeadEnd();const id=g.campaign!.runId;
  g=inspecting(g);g=act(g,{type:"set_traffic_limit",enabled:false});g=advanceSteps(g,5).state;
  expect(g.campaign!.openingPrevention!.outcome).not.toBeNull();expect(g.campaign!.openingPrevention!.outcome!.qualifiedStep).toBe(410);
- expect(saveGame(g)).toBe(true);expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).schemaVersion).toBe(6);
+ expect(saveGame(g)).toBe(true);expect(JSON.parse(localStorage.getItem("nn.campaign.save.v1")!).schemaVersion).toBe(7);
  g=act(g,{type:"acknowledge_prevention_review"});expect(saveGame(g)).toBe(true);g=act(g,{type:"acknowledge_milestone"});expect(saveGame(g)).toBe(true);
  const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("load");
  expect(loaded.game.campaign!.runId).toBe(id);expect(loaded.game.campaign!.scaling?.id).toBe("application-scaling");expect(loaded.game.campaign!.openingRecovered).toBe(false);

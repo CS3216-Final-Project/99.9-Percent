@@ -16,7 +16,7 @@ it("labels the opening current and future stages locked without mutating campaig
  const g=newGame(),before=structuredClone(g);show(g);
  const nav=screen.getByRole("navigation",{name:"Campaign progression"});
  expect(nav.querySelector('[aria-current="step"]')?.textContent).toBe("1. First GrowthOpening Current");
- expect(within(nav).getByText(/Later stages/).closest("li")!.textContent).toContain("Locked");
+ expect(within(nav).getByText("Reliability",{exact:true}).closest("li")!.textContent).toContain("Locked");
  expect(within(guidance()).getByText(/Current stage:/).textContent).toContain("Opening");
  expect(within(guidance()).getByText(/Next stage requires acknowledgement/)).toBeTruthy();
  fireEvent.click(screen.getByText("Detailed system evidence"));

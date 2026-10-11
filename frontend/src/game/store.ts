@@ -1,4 +1,5 @@
 "use client";
+import { pendingCombined } from "@/sim/combinedCampaign";
 import { pendingReliability } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
@@ -24,7 +25,7 @@ import {
 } from "@/sim";
 import { clearSave, DEFAULT_META, loadGame, loadMeta, saveGame, saveMeta, track, type Meta } from "./persist";
 
-export type View = "tech" | "engineers" | "history" | "menu" | "guidance" | null;
+export type View = "tech" | "engineers" | "history" | "menu" | "guidance" | "scorecard" | null;
 export type Speed = 0.5 | 1 | 2;
 
 /** The first-week walkthrough ("basics") and the first-incident guide ("incident"). */
@@ -140,7 +141,7 @@ export const useGame = create<Store>()((set, get) => {
       const patch:Partial<Store>={game:next};
       if(!was?.firstPauseConsumed && c.firstPauseConsumed)patch.running=false;
       if(get().selectedAppId&&!c.apps.some(a=>a.id===get().selectedAppId))patch.selectedAppId=c.apps[0].id;
-      if(pendingReliability(c)||pendingPreventionReview(c)||pendingSpikeAcknowledgement(c)||next.phase==="review"||next.phase==="ended"||(c.openingMilestone&&!c.openingMilestone.acknowledged))patch.running=false;
+      if(pendingCombined(c)||pendingReliability(c)||pendingPreventionReview(c)||pendingSpikeAcknowledgement(c)||next.phase==="review"||next.phase==="ended"||(c.openingMilestone&&!c.openingMilestone.acknowledged))patch.running=false;
       get().measureTime();
       patch.measurement=projectEvents(get().measurement,next,new Date().toISOString());
       set(patch);
@@ -306,7 +307,7 @@ export const useGame = create<Store>()((set, get) => {
     },
 
     act: (action) => {
-      if((pendingReliability(get().game.campaign)&&action.type!=="acknowledge_reliability")||(pendingPreventionReview(get().game.campaign)&&action.type!=="acknowledge_prevention_review")||(pendingSpikeAcknowledgement(get().game.campaign!)&&action.type!=="acknowledge_spikes")||!get().started || get().onboarding || (get().game.campaign?.openingMilestone&&!get().game.campaign!.openingMilestone!.acknowledged&&action.type!=="acknowledge_milestone"))return false;
+      if((pendingCombined(get().game.campaign)&&!["acknowledge_growth","complete_campaign"].includes(action.type))||(pendingReliability(get().game.campaign)&&action.type!=="acknowledge_reliability")||(pendingPreventionReview(get().game.campaign)&&action.type!=="acknowledge_prevention_review")||(pendingSpikeAcknowledgement(get().game.campaign!)&&action.type!=="acknowledge_spikes")||!get().started || get().onboarding || (get().game.campaign?.openingMilestone&&!get().game.campaign!.openingMilestone!.acknowledged&&action.type!=="acknowledge_milestone"))return false;
       const result = applyAction(get().game, action);
       if (!result.ok) {
         if(get().game.campaign) {
@@ -317,6 +318,7 @@ export const useGame = create<Store>()((set, get) => {
         get().notify(result.message, "error");
         return false;
       }
+      if(["enter_combined","start_growth_wave","acknowledge_growth","complete_campaign","accept_scaling_risk"].includes(action.type))set({running:false});
       if(action.type==="enter_reliability"||action.type==="acknowledge_reliability"||action.type==="enter_data"||action.type==="enter_spikes"||action.type==="acknowledge_spikes")set({running:false});
       commit(result.state);
       return true;
@@ -324,7 +326,7 @@ export const useGame = create<Store>()((set, get) => {
 
     advance: () => {
       const { game } = get();
-      if (pendingReliability(game.campaign)||pendingPreventionReview(game.campaign) || pendingSpikeAcknowledgement(game.campaign!) || !get().started || get().onboarding || (game.campaign?.openingMilestone&&!game.campaign.openingMilestone.acknowledged) || game.phase !== "management") return;
+      if (pendingCombined(game.campaign)||pendingReliability(game.campaign)||pendingPreventionReview(game.campaign) || pendingSpikeAcknowledgement(game.campaign!) || !get().started || get().onboarding || (game.campaign?.openingMilestone&&!game.campaign.openingMilestone.acknowledged) || game.phase !== "management") return;
       const next = advanceTurn(game);
       commit(next);
       const r = next.lastReport;
@@ -340,7 +342,7 @@ export const useGame = create<Store>()((set, get) => {
     tick: (dt) => {
       const { game, running, speed } = get();
       if(game.campaign) {
-        if(pendingReliability(game.campaign)||pendingPreventionReview(game.campaign)||pendingSpikeAcknowledgement(game.campaign)||!get().started||(game.campaign.openingMilestone&&!game.campaign.openingMilestone.acknowledged)||get().onboarding||!running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
+        if(pendingCombined(game.campaign)||pendingReliability(game.campaign)||pendingPreventionReview(game.campaign)||pendingSpikeAcknowledgement(game.campaign)||!get().started||(game.campaign.openingMilestone&&!game.campaign.openingMilestone.acknowledged)||get().onboarding||!running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
         const credit=get().remainderMs+Math.round(dt*1000*speed);
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
@@ -363,10 +365,10 @@ export const useGame = create<Store>()((set, get) => {
     hover: (id) => {
       if (get().hovered !== id) set({ hovered: id });
     },
-    openView: (view) => { if(view==="tech"&&get().game.campaign&&get().view!=="tech")uiEvent("technology_tree_opened"); if(get().game.campaign && view && !["menu","history","guidance","tech"].includes(view))return; set({view,running:view==="menu"||view==="tech"?false:get().running}); },
+    openView: (view) => { if(view==="scorecard"&&get().view!==view)uiEvent("scorecard_viewed"); if(view==="tech"&&get().game.campaign&&get().view!=="tech")uiEvent("technology_tree_opened"); if(get().game.campaign && view && !["menu","history","guidance","tech","scorecard"].includes(view))return; set({view,running:view==="menu"||view==="tech"||view==="scorecard"?false:get().running}); },
     focusTech: (id) => {if(id&&get().game.campaign)uiEvent("technology_node_selected",{techId:id});set({ techFocus: id, view: id ? "tech" : get().view,running:id?false:get().running });},
     setRunning: (running) => {
-      set({ running: running && !pendingReliability(get().game.campaign) && !pendingPreventionReview(get().game.campaign) && !pendingSpikeAcknowledgement(get().game.campaign!) && get().started && !(get().game.campaign?.openingMilestone&&!get().game.campaign!.openingMilestone!.acknowledged) && !get().onboarding && get().view!=="menu" && get().view!=="tech" && !document.hidden && !["review","ended"].includes(get().game.phase) });
+      set({ running: running && !pendingCombined(get().game.campaign) && !pendingReliability(get().game.campaign) && !pendingPreventionReview(get().game.campaign) && !pendingSpikeAcknowledgement(get().game.campaign!) && get().started && !(get().game.campaign?.openingMilestone&&!get().game.campaign!.openingMilestone!.acknowledged) && !get().onboarding && get().view!=="menu" && get().view!=="tech" && !document.hidden && !["review","ended"].includes(get().game.phase) });
       get().measureTime();
       if(!running&&get().started)persistCurrent();
     },
@@ -379,9 +381,12 @@ export const useGame = create<Store>()((set, get) => {
         uiEvent("run_reset",{previousRunId:old.game.campaign!.runId,replacementRunId});
         if(old.game.campaign!.incident)uiEvent("incident_abandoned",{incidentId:old.game.campaign!.incident!.id});
         uiEvent("run_evidence",{campaign:JSON.stringify(old.game)});
+        if(old.game.campaign?.scorecard)uiEvent("run_scorecard",{scorecard:JSON.stringify(old.game.campaign.scorecard)});
       }
       const pending=get().measurement.pending;
-      const game=newGame(opts.seed??BALANCE.introSeed,replacementRunId);
+      let replaySeed=crypto.getRandomValues(new Uint32Array(1))[0]|0;
+      if(replaySeed===old.game.seed)replaySeed=(replaySeed+1)|0;
+      const game=newGame(opts.seed??replaySeed,replacementRunId);
       const m=emptyMeasurement();m.replayOf=old.hasRun?old.game.campaign!.runId:null;
       // Preserve unsaved old-run records in the same archive. Refuse reset if it cannot retain them.
       if(pending.length&&!archiveEvents(pending)) {
@@ -389,6 +394,7 @@ export const useGame = create<Store>()((set, get) => {
       }
       const nextMeta={...old.meta,runsStarted:old.meta.runsStarted+1};
       const measurement=beginSession(m,game,crypto.randomUUID(),new Date().toISOString());
+      if(m.replayOf)event(measurement,game,"replay_started",{previousRunId:m.replayOf,seed:game.seed});
       set({game,measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
         selected:null,selectedAppId:null,hovered:null,view:null,techFocus:null,running:false,rating:null,
         onboarding:["not-started","in-progress"].includes(nextMeta.openingOnboarding.status),tour:null,

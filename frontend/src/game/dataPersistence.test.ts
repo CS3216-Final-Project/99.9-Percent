@@ -13,7 +13,7 @@ it("migrates schema 3 with exact source backup, no stage entry or invented obser
  expect(r.game.campaign!.dataStage).toBeNull();expect(r.game.campaign!.snapshot).toEqual(e.game.campaign.snapshot);
  expect(r.game.campaign!.trace).toEqual(e.game.campaign.trace);expect(localStorage.getItem(CAMPAIGN_SAVE_KEY+".backup.v3")).toBe(raw);
  for(const key of ["nn.save.v1","nn.meta.v1","nn.analytics.v1"])expect(localStorage.getItem(key)).toBe("legacy:"+key);
- expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(6);
+ expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(7);
 });
 it.each(["backup","replacement"])("schema 3 %s write failure leaves original bytes intact",boundary=>{
  const e=JSON.parse(JSON.stringify(makeEnvelope(newGame())));e.schemaVersion=3;delete e.game.campaign.openingPrevention;

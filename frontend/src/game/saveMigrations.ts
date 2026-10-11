@@ -1,3 +1,7 @@
+import { qualifiesForRecovery } from "@/sim/step";
+import { currentFault, combinedInput, combinedProfile } from "@/sim/combinedCampaign";
+import { emptyServiceMeasurement, captureScorecard } from "@/sim/campaignScorecard";
+import { COMBINED_CAMPAIGN as C, baselineDemand, growthUsers, targetValid, sequenceValid } from "@/sim/scenarios/combinedCampaign";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { effectiveTargets, initializeHealth } from "@/sim/reliability";
 import { emptyMeasurement, measurementValid, type Measurement } from "./telemetry";
@@ -9,7 +13,7 @@ import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { spikeInput } from "@/sim/autoscaling";
 export const CAMPAIGN_SAVE_KEY = "nn.campaign.save.v1";
 export interface SaveEnvelope {
-    schemaVersion: 5 | 6;
+    schemaVersion: 5 | 6 | 7;
     scenarioId: "opening-db";
     scenarioVersion: 1;
     runId: string;
@@ -45,7 +49,7 @@ function shape(v: unknown, t: unknown): boolean {
     return typeof v === typeof t;
 }
 function snapshotValid(m: import("@/sim/campaignTypes").Snapshot): boolean {
-    if(m?.version===6)return reliabilitySnapshotValid(m);
+    if(m?.version===6||m?.version===7)return reliabilitySnapshotValid(m);
     if (!m || !m.app || !m.db)
         return false;
     if(m.version===3 || m.version===4 || m.version===5) {
@@ -133,7 +137,7 @@ function preventionValid(c: import("@/sim/campaignTypes").Campaign, phase: GameS
 }
 
 const integer = (n: number) => Number.isSafeInteger(n) && n >= 0;
-function validateVersion(value: unknown, version: 2 | 3 | 4 | 5 | 6): Validation {
+function validateVersion(value: unknown, version: 2 | 3 | 4 | 5 | 6 | 7): Validation {
     try {
         if (!value || typeof value !== "object")
             return { status: "corrupt" };
@@ -151,6 +155,8 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5 | 6): Validation
           e.runtime.measurement.cursor>c.trace.length || e.runtime.measurement.pending.some(x=>x.runId!==c.runId))
           return {status:"corrupt"};
         const template = newGame();
+        if(version<7){const old=template.campaign! as unknown as Record<string,unknown>;for(const k of ["combinedStage","scalingConsent","promotion","serviceMeasurement","scorecard"])delete old[k];}
+        if(version>=7&&!phase7Valid(s))return {status:"corrupt"};
         if(version<5) {
             const old=template.campaign! as unknown as Record<string,unknown>;
             delete old.spikeStage;delete old.nextAppNumber;
@@ -171,15 +177,15 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5 | 6): Validation
             delete (old.ledger as Record<string,unknown>).lbNumerator;
         }
         if(version<6&&(c.reliabilityStage!=null||c.apps.some(a=>a.health!==undefined||a.detectedHealth!==undefined||a.role!==undefined)))return {status:"corrupt"};
-        if(version===6&&!reliabilityValid(c))return {status:"corrupt"};
+        if(version>=6&&!reliabilityValid(c))return {status:"corrupt"};
         if (!finiteTree(e) || !shape(s, template) || !c || !shape(c, template.campaign) ||
             !e.runtime || !integer(e.runtime.remainderMs) || e.runtime.remainderMs >= 1000 ||
             !Number.isFinite(e.savedAt) || typeof e.runId !== "string" || !e.runId || e.runId !== c.runId ||
             c.scenarioId !== e.scenarioId || c.scenarioVersion !== e.scenarioVersion ||
             !["management", "incident", "review", "ended"].includes(s.phase) ||
-            (s.phase === "ended" ? s.outcome !== "bankrupt" : s.outcome !== null) ||
+            (s.phase === "ended" ? (s.outcome !== "bankrupt" && !(version>=7&&s.outcome==="won"&&c.combinedStage?.acknowledged)) : s.outcome !== null) ||
             (s.phase === "review" && (!c.reports.length || c.reports.at(-1)!.recoveredStep !== c.step)) ||
-            s.cash !== c.cashCents / 100 || s.users !== 2000 || s.engineers !== 4 || s.infra.appHosts.length !== c.apps.length ||
+            s.cash !== c.cashCents / 100 || s.users !== (version>=7?c.combinedStage?.users??2000:2000) || s.engineers !== 4 || s.infra.appHosts.length !== c.apps.length ||
             !integer(c.step) || !Number.isSafeInteger(c.cashCents) || !integer(c.nextEventId) ||
             !integer(c.overloadSteps) || c.lastSettledPeriod !== Math.floor(c.step / 60) ||
             !snapshotValid(c.snapshot) || c.snapshot.step !== c.step || !(version>=4?[600,1000,2000,3000]:version===3?[600,1000,2000]:[600,1000]).includes(c.dbCapacity) ||
@@ -192,11 +198,11 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5 | 6): Validation
             !Object.values(c.ledger).every(integer) ||
             !Object.values(c.cumulative).every(integer) ||
             c.cumulative.admitted !== c.cumulative.successful + c.cumulative.failed + c.apps.reduce((n, a) => n + a.backlog, 0) + c.dbBacklog ||
-            !(version>=4?[300,800,1400,2400,...(version>=5?[4000]:[])]:version===3?[300,800,1400]:[300,800]).includes(c.incomingRate) || c.upgraded !== (c.dbCapacity >= 1000) ||
+            !(version>=7&&c.combinedStage?[combinedInput(c)]:version>=4?[300,800,1400,2400,...(version>=5?[4000]:[])]:version===3?[300,800,1400]:[300,800]).includes(c.incomingRate) || c.upgraded !== (c.dbCapacity >= 1000) ||
             c.snapshot.db.backlog !== c.dbBacklog || c.snapshot.app.backlog !== c.apps.reduce((n,a)=>n+a.backlog,0) ||
             c.snapshot.db.capacity !== c.dbCapacity || c.snapshot.installedAppCapacity !== c.apps.reduce((n,a)=>n+a.capacity,0) ||
             (c.step >= 4) !== c.consumedEvents.includes("opening-growth") ||
-            c.actions.some(a => typeof a.id !== "string" || !(version>=3?["add-app","upgrade-db","limit","unlimit","scale-up","deploy-lb","routing",...(version>=4?["cache","cache-tuning"]:[]),...(version>=5?["deploy-autoscaler","retire-app"]:[]),...(version===6?["health-checks","create-spare","reserve-spare","release-spare","failover","promote-spare","restore-app"]:[])]:["add-app", "upgrade-db", "limit", "unlimit"]).includes(a.type) || !integer(a.requestedStep) || a.requestedStep > c.step || !integer(a.activationStep) || a.activationStep <= a.requestedStep || !integer(a.costCents) || (a.activatedStep !== null && (!integer(a.activatedStep) || a.activatedStep !== a.activationStep || a.activatedStep > c.step))) ||
+            c.actions.some(a => typeof a.id !== "string" || !(version>=3?["add-app","upgrade-db","limit","unlimit","scale-up","deploy-lb","routing",...(version>=4?["cache","cache-tuning"]:[]),...(version>=5?["deploy-autoscaler","retire-app"]:[]),...(version>=7?["promotion"]:[]),...(version>=6?["health-checks","create-spare","reserve-spare","release-spare","failover","promote-spare","restore-app"]:[])]:["add-app", "upgrade-db", "limit", "unlimit"]).includes(a.type) || !integer(a.requestedStep) || a.requestedStep > c.step || !integer(a.activationStep) || a.activationStep <= a.requestedStep || !integer(a.costCents) || (a.activatedStep !== null && (!integer(a.activatedStep) || a.activatedStep !== a.activationStep || a.activatedStep > c.step))) ||
             c.settlements.length !== c.lastSettledPeriod ||
             !c.settlements.every((p, i) => p.period === i + 1 && p.step === (i + 1) * 60 && [p.revenueCents, p.appCents, p.dbCents, p.salaryCents,p.lbCents??0,p.cacheCents??0,p.controllerCents??0,p.checksCents??0,p.failoverCents??0].every(integer) && p.netCents === p.revenueCents - p.appCents - p.dbCents - p.salaryCents - (p.lbCents??0) - (p.cacheCents??0) - (p.controllerCents??0) - (p.checksCents??0) - (p.failoverCents??0)) ||
             c.pending.some(a => !c.actions.some(b=>JSON.stringify(a)===JSON.stringify(b)) || !integer(a.activationStep) || a.activationStep <= c.step || !integer(a.requestedStep) || a.requestedStep > c.step || !integer(a.costCents) || a.activatedStep !== null) ||
@@ -210,9 +216,9 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5 | 6): Validation
         if(version>=3) {
             if(c.actions.some(a=>{
                 const dataUpgrade=a.type==="upgrade-db"&&a.capacityAfter===3000;
-                const reliabilityDelay=({"health-checks":2,"create-spare":2,"reserve-spare":1,"release-spare":1,"failover":2,"promote-spare":1,"restore-app":3} as Record<string,number>)[a.type];
+                const reliabilityDelay=({"promotion":1,"health-checks":2,"create-spare":2,"reserve-spare":1,"release-spare":1,"failover":2,"promote-spare":1,"restore-app":3} as Record<string,number>)[a.type];
                 const delay=reliabilityDelay??(dataUpgrade?4:a.type==="cache"||a.type==="cache-tuning"?2:a.type==="add-app"&&a.source==="autoscaler"?3:a.type==="add-app"||a.type==="deploy-lb"||a.type==="deploy-autoscaler"?2:a.type==="upgrade-db"||a.type==="scale-up"?3:1);
-                const reliabilityCost=({"health-checks":50000,"create-spare":100000,"reserve-spare":0,"release-spare":0,"failover":100000,"promote-spare":0,"restore-app":0} as Record<string,number>)[a.type];
+                const reliabilityCost=({"promotion":50000,"health-checks":50000,"create-spare":100000,"reserve-spare":0,"release-spare":0,"failover":100000,"promote-spare":0,"restore-app":0} as Record<string,number>)[a.type];
                 const cost=reliabilityCost??(dataUpgrade?400000:a.type==="cache"?150000:a.type==="cache-tuning"?100000:a.type==="add-app"||a.type==="deploy-lb"||a.type==="deploy-autoscaler"?100000:a.type==="upgrade-db"?300000:a.type==="scale-up"?200000:0);
                 return a.activationStep!==a.requestedStep+delay || a.costCents!==cost ||
                     (a.type==="add-app"&&(!(version>=5&&c.spikeStage)?a.targetId!=="app-2":!/^app-[1-9][0-9]*$/.test(a.targetId??""))) ||
@@ -241,7 +247,7 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5 | 6): Validation
             if(!d&&(k||c.dbCapacity===3000||c.consumedEvents.includes("data-growth")||c.actions.some(a=>["cache","cache-tuning"].includes(a.type)||a.capacityAfter===3000)))return {status:"corrupt"};
             if(k&&(!c.actions.some(a=>a.type==="cache"&&a.activatedStep===k.activatedStep)||(k.tuned&&!c.actions.some(a=>a.type==="cache-tuning"&&a.activatedStep!==null))||!d||!integer(k.activatedStep)||k.activatedStep>c.step||!integer(k.warmth)||k.warmth>k.target||
                 typeof k.tuned!=="boolean"||k.target!==(k.tuned?7500:6000)||(!k.tuned&&k.warmth%1200!==0)))return {status:"corrupt"};
-            if(d?.consumed&&((c.spikeStage?c.incomingRate!==spikeInput(c):c.incomingRate!==2400)||!(c.reliabilityStage?[4,5,6]:c.spikeStage?[4,5]:[4]).includes(c.snapshot.version!)||(c.snapshot.data?.profile!==d.profile&&!c.trace.some(t=>t.type==="workload-changed"&&t.data.eventId==="data-contrast"&&t.step===c.step&&t.id>(c.trace.filter(x=>x.type==="metrics").at(-1)?.id??0)))||
+            if(d?.consumed&&((c.spikeStage?c.incomingRate!==spikeInput(c):c.incomingRate!==2400)||!(c.combinedStage?[4,5,6,7]:c.reliabilityStage?[4,5,6]:c.spikeStage?[4,5]:[4]).includes(c.snapshot.version!)||(c.snapshot.data?.profile!==(c.combinedStage&&c.snapshot.version===7?combinedProfile(c):d.profile)&&!c.trace.some(t=>t.type==="workload-changed"&&t.data.eventId==="data-contrast"&&t.step===c.step&&t.id>(c.trace.filter(x=>x.type==="metrics").at(-1)?.id??0)))||
                 c.snapshot.data!.deployed!==!!k||c.snapshot.data!.warmthAfterStep!==(k?.warmth??0)||c.snapshot.data!.target!==(k?.target??0)))return {status:"corrupt"};
             if(!d?.consumed&&(c.snapshot.version===4||c.snapshot.version===5))return {status:"corrupt"};
             if(c.actions.some(a=>["cache","cache-tuning"].includes(a.type)&&(!d||a.requestedStep<d.enteredStep))||
@@ -255,7 +261,7 @@ function validateVersion(value: unknown, version: 2 | 3 | 4 | 5 | 6): Validation
         return { status: "corrupt" };
     }
 }
-export function validateEnvelope(value: unknown): Validation { return validateVersion(value,6); }
+export function validateEnvelope(value: unknown): Validation { return validateVersion(value,7); }
 export function decodeSave(raw: string): Validation {
     try {
         return validateEnvelope(JSON.parse(raw));
@@ -265,11 +271,11 @@ export function decodeSave(raw: string): Validation {
     }
 }
 export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.now(), measurement: Measurement = emptyMeasurement()): SaveEnvelope {
-    return { schemaVersion: 6, scenarioId: "opening-db", scenarioVersion: 1, runId: game.campaign!.runId, game, runtime: { remainderMs, measurement }, savedAt };
+    return { schemaVersion: 7, scenarioId: "opening-db", scenarioVersion: 1, runId: game.campaign!.runId, game, runtime: { remainderMs, measurement }, savedAt };
 }
 /** Future migrations must preserve source bytes before replacing a validated slot. No v0 conversion is registered. */
 export type MigrationRegistry = Readonly<Record<number, (value: unknown) => unknown>>;
-export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migrations: MigrationRegistry = PHASE6_MIGRATIONS): boolean {
+export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migrations: MigrationRegistry = PHASE7_MIGRATIONS): boolean {
     try {
         const original = storage.getItem(CAMPAIGN_SAVE_KEY);
         if (original === null)
@@ -278,20 +284,20 @@ export function migrateSave(storage: Pick<Storage, "getItem" | "setItem">, migra
             schemaVersion?: number;
         };
         const sourceVersion = value.schemaVersion;
-        if (typeof sourceVersion !== "number" || sourceVersion >= 6 || !migrations[sourceVersion])
+        if (typeof sourceVersion !== "number" || sourceVersion >= 7 || !migrations[sourceVersion])
             return false;
         const backup = `${CAMPAIGN_SAVE_KEY}.backup.v${sourceVersion}`;
         if (storage.getItem(backup) !== null && storage.getItem(backup) !== original)
             return false;
         storage.setItem(backup, original);
-        while (typeof value.schemaVersion === "number" && value.schemaVersion < 6) {
+        while (typeof value.schemaVersion === "number" && value.schemaVersion < 7) {
             const version = value.schemaVersion, migrate = migrations[version];
             if (!migrate)
                 return false;
             value = migrate(value) as {
                 schemaVersion?: number;
             };
-            if (!value || (value.schemaVersion !== version + 1 && value.schemaVersion !== 6))
+            if (!value || (value.schemaVersion !== version + 1 && value.schemaVersion !== 7))
                 return false;
         }
         const result = validateEnvelope(value);
@@ -414,7 +420,7 @@ function reliabilityValid(c:import("@/sim/campaignTypes").Campaign):boolean {
  if(c.apps.some(a=>!["healthy","failed"].includes(a.health!)||!["unknown","healthy","unhealthy"].includes(a.detectedHealth!)||!["serving","spare"].includes(a.role!)||!integer(a.healthChangedStep!)||a.healthChangedStep!>c.step||(a.detectedStep!==null&&(!integer(a.detectedStep!)||a.detectedStep!>c.step))))return false;
  const spares=c.apps.filter(a=>a.role==="spare");if(spares.length>1||(d.spareId===null?spares.length!==0:spares[0]?.id!==d.spareId)||spares.some(a=>a.backlog||a.routed))return false;
  const f=d.fault;
- if(f&&(!c.apps.some(a=>a.id===f.targetId)||!integer(f.armedStep)||f.startStep!==f.armedStep+8||f.naturalStep!==f.startStep+20||f.armedStep<d.enteredStep||f.armedStep>c.step||(f.startedStep===null?c.step>=f.startStep:(f.startedStep!==f.startStep||f.startedStep>c.step))||(f.restoredStep!==null&&(!integer(f.restoredStep)||f.restoredStep<f.startStep||f.restoredStep>f.naturalStep||f.restoredStep>c.step||!["manual","natural"].includes(f.restoreSource!)))||c.apps.some(a=>a.health==="failed"&&(a.id!==f.targetId||f.startedStep===null||f.restoredStep!==null))))return false;
+ if(f&&((!c.apps.some(a=>a.id===f.targetId)&&f.restoredStep===null)||!integer(f.armedStep)||f.startStep!==f.armedStep+8||f.naturalStep!==f.startStep+20||f.armedStep<d.enteredStep||f.armedStep>c.step||(f.startedStep===null?c.step>=f.startStep:(f.startedStep!==f.startStep||f.startedStep>c.step))||(f.restoredStep!==null&&(!integer(f.restoredStep)||f.restoredStep<f.startStep||f.restoredStep>f.naturalStep||f.restoredStep>c.step||!["manual","natural"].includes(f.restoreSource!)))||(!c.combinedStage&&c.apps.some(a=>a.health==="failed"&&(a.id!==f.targetId||f.startedStep===null||f.restoredStep!==null)))))return false;
  if(!f&&(c.apps.some(a=>a.health==="failed")||d.completedStep!==null))return false;
  if(f&&f.startedStep!==null&&f.restoredStep===null&&c.step>=f.naturalStep)return false;
  if(d.completedStep!==null&&(!f||f.restoredStep===null||d.completedStep<f.restoredStep+4))return false;
@@ -422,6 +428,78 @@ function reliabilityValid(c:import("@/sim/campaignTypes").Campaign):boolean {
  if(d.failover&&(!integer(d.failover.activatedStep)||d.failover.activatedStep>c.step||typeof d.failover.enabled!=="boolean"||!c.actions.some(a=>a.type==="failover"&&a.activatedStep===d.failover!.activatedStep)))return false;
  if(d.owned.includes("auto_failover")&&(!d.owned.includes("health_checks")||!d.owned.includes("standby")||!c.loadBalancer))return false;
  const inspectedAfterMetrics=c.trace.some(t=>t.type==="health-change-detected"&&t.data.source==="manual"&&t.step===c.step&&t.id>(c.trace.filter(x=>x.type==="metrics").at(-1)?.id??0));
- if(c.snapshot.version===6&&!inspectedAfterMetrics&&(JSON.stringify(c.snapshot.reliability?.effective)!==JSON.stringify(effectiveTargets(c))||JSON.stringify(c.snapshot.routing)!==JSON.stringify(c.routing)))return false;
+ if((c.snapshot.version===6||c.snapshot.version===7)&&!inspectedAfterMetrics&&(JSON.stringify(c.snapshot.reliability?.effective)!==JSON.stringify(effectiveTargets(c))||JSON.stringify(c.snapshot.routing)!==JSON.stringify(c.routing)))return false;
+ return true;
+}
+
+export const PHASE7_MIGRATIONS:MigrationRegistry={...PHASE6_MIGRATIONS,6:value=>{
+ if(validateVersion(value,6).status!=="ok")throw Error("Invalid Phase 6 source");
+ const e=structuredClone(value) as SaveEnvelope,c=e.game.campaign!;
+ c.combinedStage=null;c.scalingConsent=null;c.promotion=null;c.scorecard=null;
+ c.serviceMeasurement=emptyServiceMeasurement(c.step+1,"since-upgrade");
+ e.schemaVersion=7;return e;
+}};
+function serviceValid(m:import("@/sim/campaignTypes").ServiceMeasurement,step:number):boolean {
+ return !!m&&["full-run","since-upgrade","combined-stage"].includes(m.scope)&&
+ [m.fromStep,m.lastStep,m.eligibleSteps,m.healthySteps,m.degradedSteps,m.longestDegradedSteps].every(integer)&&
+ m.fromStep>=1&&m.fromStep<=step+1&&m.lastStep===step&&m.eligibleSteps<=step-m.fromStep+1&&
+ m.healthySteps<=m.eligibleSteps&&m.longestDegradedSteps<=m.eligibleSteps-m.healthySteps&&m.degradedSteps<=m.longestDegradedSteps&&
+ (m.scope!=="full-run"||m.fromStep===1);
+}
+function phase7Valid(s:GameState):boolean {
+ const c=s.campaign!,d=c.combinedStage,p=c.promotion,consent=c.scalingConsent;
+ if(d===undefined||p===undefined||consent===undefined||c.scorecard===undefined||!serviceValid(c.serviceMeasurement!,c.step))return false;
+ if(consent&&(!c.scaling||consent.policyVersion!==1||!integer(consent.acceptedStep)||consent.acceptedStep<c.scaling.enteredStep||consent.acceptedStep>c.step||
+  !c.trace.some(t=>t.type==="scaling-growth-risk-accepted"&&t.step===consent.acceptedStep)))return false;
+ if(p){
+  const a=c.actions.find(a=>a.id===p.actionId);
+  if(!d||!a||a.type!=="promotion"||p.requestedStep<d.enteredStep||a.requestedStep!==p.requestedStep||a.activationStep!==p.activationStep||
+   p.activationStep!==p.requestedStep+1||p.endStep!==p.activationStep+12||p.cooldownUntil!==p.endStep+30||p.costCents!==50000||
+   p.activatedStep!==a.activatedStep||(p.activatedStep!==null&&p.activatedStep!==p.activationStep)||
+   (p.endedStep===null?c.step>=p.endStep:p.endedStep!==p.endStep)||!integer(p.requestedStep))return false;
+ }
+ if(c.actions.some(a=>a.type==="promotion"&&(!d||a.requestedStep<d.enteredStep||a.costCents!==50000)))return false;
+ if(!d){if(p||c.snapshot.version===7||s.outcome==="won"||c.trace.some(t=>t.type==="late-game-entered"))return false;}
+ else {
+  if(d.id!==C.id||d.version!==1||d.configuration!==JSON.stringify(C)||!integer(d.enteredStep)||d.enteredStep>c.step||
+   !c.reliabilityStage?.acknowledged||!targetValid(d.finalUserTarget)||!sequenceValid(d.sequence)||!["seeded","evaluation"].includes(d.source)||
+   !integer(d.nextRoundIndex)||d.nextRoundIndex>3||!Array.isArray(d.completedRounds)||d.completedRounds.length!==d.nextRoundIndex||
+   !integer(d.readinessSteps)||d.readinessSteps>5||!integer(d.finalStableSteps)||d.finalStableSteps>5||typeof d.acknowledged!=="boolean"||
+   !serviceValid(d.service,c.step)||d.service.scope!=="combined-stage"||d.service.fromStep!==d.enteredStep+1||
+   !c.trace.some(t=>t.type==="late-game-entered"&&t.step===d.enteredStep)||
+   (d.targetReachedStep!==null&&(!integer(d.targetReachedStep)||d.targetReachedStep>c.step||!c.trace.some(t=>t.type==="final-target-reached"&&t.step===d.targetReachedStep))))return false;
+  const rounds=[...d.completedRounds,...(d.currentRound?[d.currentRound]:[])];
+  if(new Set(rounds.map(r=>r.id)).size!==rounds.length)return false;
+  for(const [index,r] of rounds.entries()){
+   if(r.index!==index||r.index>2||JSON.stringify(r.scenario)!==JSON.stringify(d.sequence[index])||!integer(r.scheduledStep)||r.scheduledStep<d.enteredStep||r.scheduledStep>c.step||
+    r.startStep!==r.scheduledStep+8||r.endStep!==r.startStep+r.scenario.duration||r.users!==growthUsers(d.finalUserTarget,index)||r.baseline!==baselineDemand(r.users,d.finalUserTarget)||
+    (r.startedStep===null?c.step>=r.startStep:r.startedStep!==r.startStep||r.startedStep>c.step)||
+    (r.pressureEndedStep===null?c.step>=r.endStep:r.pressureEndedStep!==r.endStep||r.pressureEndedStep>c.step)||
+    !integer(r.stableSteps)||r.stableSteps>5||typeof r.acknowledged!=="boolean"||!integer(r.rejectedBefore)||!integer(r.setupBefore)||
+    !Array.isArray(r.observations)||!r.observations.every(snapshotValid)||r.observations.some((m,i)=>m.step!==r.startStep+i)||
+    r.observations.length!==(r.startedStep===null?0:(r.completedStep??c.step)-r.startStep+1)||
+    (r.completedStep!==null&&!r.observations.slice(-5).every(m=>m.admitted===m.incoming&&m.rejected===0&&m.app.backlog===0&&m.db.backlog===0&&(m.instances??[]).every(x=>x.health!=="failed"&&x.backlog===0)&&qualifiesForRecovery(m)))||
+    (r.completedStep===null?r.acknowledged||r.stableSteps===5:!integer(r.completedStep)||r.completedStep<r.endStep+4||r.completedStep>c.step||r.stableSteps!==5)||
+    (index<d.nextRoundIndex&&!r.acknowledged)||!c.trace.some(t=>t.type==="scenario-scheduled"&&t.data.roundId===r.id&&t.step===r.scheduledStep))return false;
+   const f=r.fault;
+   if((r.scenario.template==="failure-under-load")!==!!f)return false;
+   if(f&&(!integer(f.armedStep)||f.armedStep!==r.scheduledStep||f.startStep!==r.startStep||f.naturalStep!==f.startStep+20||
+    (f.startedStep===null?c.step>=f.startStep:f.startedStep!==f.startStep)||typeof f.promoted!=="boolean"||
+    (f.restoredStep===null?(c.step>=f.naturalStep||!c.apps.some(a=>a.id===f.targetId)):!integer(f.restoredStep)||f.restoredStep<f.startStep||f.restoredStep>f.naturalStep||f.restoredStep>c.step||!["natural","manual"].includes(f.restoreSource!))))return false;
+   if(r.acknowledged&&!c.trace.some(t=>t.type==="scenario-acknowledged"&&t.data.roundId===r.id))return false;
+  }
+  const started=rounds.filter(r=>r.startedStep!==null);
+  if(d.users!==(started.at(-1)?.users??2000)||c.incomingRate!==combinedInput(c)||
+   (d.targetReachedStep===null)!==(d.users<d.finalUserTarget)||
+   (d.currentRound&&p&&p.endStep>d.currentRound.scheduledStep)||
+   (d.finalReview&&(!d.completedRounds.every(r=>r.acknowledged)||d.completedRounds.length!==3||d.currentRound||d.finalStableSteps!==5||
+    JSON.stringify(d.finalReview)!==JSON.stringify(captureScorecard(s,"won"))))||
+   (d.acknowledged&&(!d.finalReview||s.phase!=="ended"||s.outcome!=="won"||!c.trace.some(t=>t.type==="campaign-completed")))||
+   (s.outcome==="won"&&!d.acknowledged))return false;
+  const f=currentFault(c);
+  if(c.apps.some(a=>a.health==="failed"&&(!f||a.id!==f.targetId||f.startedStep===null||f.restoredStep!==null)))return false;
+ }
+ if(c.scorecard&&(s.phase!=="ended"||!["won","bankrupt"].includes(s.outcome!)||JSON.stringify(c.scorecard)!==JSON.stringify(captureScorecard(s,s.outcome as "won"|"bankrupt"))))return false;
+ if(s.phase==="ended"&&c.serviceMeasurement!.scope==="full-run"&&!c.scorecard)return false;
  return true;
 }
