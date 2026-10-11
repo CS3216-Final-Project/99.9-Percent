@@ -17,7 +17,7 @@ permissions:
 # No `paths:` filters on purpose: both jobs are required checks, and a skipped
 # required check stays "pending" and blocks the merge.
 jobs:
-  frontend:
+  frontend-checks:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -33,10 +33,6 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:coverage
-      - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - name: Browser journeys against the production build
-        run: npx playwright test
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -44,15 +40,56 @@ jobs:
           path: frontend/coverage/
           if-no-files-found: ignore
           retention-days: 14
+
+  frontend-browser:
+    runs-on: ubuntu-latest
+    strategy:
+      # Collect failures from every shard instead of cancelling the others.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      # Each runner keeps one worker: software WebGL needs its CPU to itself.
+      - name: Browser journeys against the production build
+        run: npx playwright test --shard=${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: browser-results
+          name: browser-results-${{ matrix.shard }}
           path: |
             frontend/playwright-report/
             frontend/test-results/
           if-no-files-found: ignore
           retention-days: 14
+
+  # Keep the existing branch-protection check, including every browser shard.
+  # always() makes a failed/skipped dependency fail this gate instead of skipping it.
+  frontend:
+    needs: [frontend-checks, frontend-browser]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require static checks, coverage and all browser shards
+        env:
+          CHECKS_RESULT: ${{ needs.frontend-checks.result }}
+          BROWSER_RESULT: ${{ needs.frontend-browser.result }}
+        run: |
+          if [ "$CHECKS_RESULT" != "success" ] || [ "$BROWSER_RESULT" != "success" ]; then
+            echo "::error::Frontend checks: $CHECKS_RESULT; browser journeys: $BROWSER_RESULT"
+            exit 1
+          fi
 
   backend:
     runs-on: ubuntu-latest
