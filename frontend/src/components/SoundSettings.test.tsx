@@ -63,4 +63,38 @@ describe("the Sound section", () => {
     fireEvent.click(header);
     expect(muteAll.getAttribute("aria-pressed")).toBe("true");
   });
+
+  it("shows the header button and Mute all as muted when both sliders reach 0, and sound comes back with one click", () => {
+    render(
+      <>
+        <SoundButton />
+        <SoundSettings />
+      </>,
+    );
+    const header = screen.getByRole("button", { name: "Mute sound" });
+    const muteAll = screen.getByRole("button", { name: "Mute all" });
+    const music = screen.getByRole("slider", { name: "Music" });
+    const effects = screen.getByRole("slider", { name: "Sound effects" });
+    // One channel at 0 is still audible: nothing reads as muted yet.
+    fireEvent.change(music, { target: { value: "0" } });
+    expect(header.getAttribute("aria-pressed")).toBe("false");
+    expect(muteAll.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.change(effects, { target: { value: "0" } });
+    expect(useGame.getState().audio).toEqual({ music: 0, effects: 0, muted: false });
+    expect(header.getAttribute("aria-pressed")).toBe("true");
+    expect(muteAll.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Both volumes are at 0. Raise one to hear sound.")).toBeTruthy();
+    // The button then turns sound on rather than muting what is already silent.
+    fireEvent.click(header);
+    expect(useGame.getState().audio).toEqual({ music: 80, effects: 80, muted: false });
+    expect(header.getAttribute("aria-pressed")).toBe("false");
+    expect(muteAll.getAttribute("aria-pressed")).toBe("false");
+    expect(music).toHaveProperty("value", "80");
+    // Raising a slider from silence works too.
+    fireEvent.change(music, { target: { value: "0" } });
+    fireEvent.change(effects, { target: { value: "0" } });
+    fireEvent.change(effects, { target: { value: "5" } });
+    expect(header.getAttribute("aria-pressed")).toBe("false");
+    expect(muteAll.getAttribute("aria-pressed")).toBe("false");
+  });
 });
