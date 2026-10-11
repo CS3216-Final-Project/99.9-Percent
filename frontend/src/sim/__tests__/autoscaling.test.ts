@@ -50,9 +50,12 @@ it("save/resume retains provisioning, routing, cooldown and deterministic contin
  let g=spikeCompany();for(let i=0;i<68;i++){
   if(pendingSpikeAcknowledgement(g.campaign!))break;
   if(g.phase==="review")g=act(g,{type:"acknowledge_review"});
-  expect(validateEnvelope(makeEnvelope(g)).status).toBe("ok");const reloaded=JSON.parse(JSON.stringify(g));expect(step(reloaded)).toEqual(step(g));g=tick(g);
+  const loaded=validateEnvelope(makeEnvelope(g));expect(loaded.status).toBe("ok");
+  if(loaded.status!=="ok")throw Error("Save could not be replayed");
+  expect(loaded.game).toEqual(g);expect(step(loaded.game)).toEqual(step(g));g=tick(g);
  }
-});
+ // This bounded case reconstructs 68 complete saves on CI, rather than advancing one state.
+},15_000);
 it("spends setup exactly once and stops app upkeep at retirement",()=>{
  let g=spikeCompany();const baseline=g.campaign!.investedCents;
  g=untilOffset(g,14);expect(g.campaign!.investedCents-baseline).toBe(100000);expect(g.campaign!.ledger.controllerNumerator).toBe(13*10000);
