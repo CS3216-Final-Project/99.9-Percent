@@ -1,5 +1,7 @@
 # Phase 1 implementation and verification report
 
+Review fixes added 10 October 2026: persistence now validates the full input-log payload before replacing untrusted stored bytes; both menus offer save-file import/export and explicit recovery of a preserved pre-update save into Classic. Campaign and Classic share a music control and mute preference. Menu pauses persist fractional clock credit. Recovery explanations use observed before/after backlog at activation and identify late or simultaneous interventions without inventing drainage credit. The command counts below record the original implementation run; current PR checks are reported with the review-fix commit.
+
 Recorded 9 October 2026. Repository: `C:\Users\user\99.9-Percent`.
 Branch: `ai/phase-1-simulation`; baseline commit: `13bb125`.
 Changes are local and uncommitted. No push, merge, deployment, backend or Phase 2 work was performed.
@@ -33,8 +35,9 @@ Coverage run: 81.91% lines across the configured scope, including retained inact
 ## Files added
 
 - `frontend/src/components/CampaignUI.tsx`
-- `frontend/src/game/saveMigrations.test.ts`
-- `frontend/src/game/saveMigrations.ts`
+- `frontend/src/game/saveEnvelope.test.ts`
+- `frontend/src/game/saveEnvelope.ts`
+- `frontend/src/sim/replay.ts`
 - `frontend/src/sim/__tests__/openingDatabaseIncident.test.ts`
 - `frontend/src/sim/__tests__/settlement.test.ts`
 - `frontend/src/sim/__tests__/step.test.ts`
@@ -53,7 +56,7 @@ New responsibilities:
 - `step.ts`: initialization, pure physical steps, stop boundaries, shared action scheduling and compatibility projections.
 - `settlement.ts`: exposure accumulation, periodic settlement and integer-cent remainders.
 - `trace.ts`: deterministic event IDs and causal postmortems.
-- `saveMigrations.ts`: validation, envelope/schema dispatch, migration registry and backup boundary.
+- `saveEnvelope.ts` and `replay.ts`: input-log envelope validation, schema/scenario dispatch and deterministic reconstruction. Unsupported or corrupt bytes remain available for raw export; there is no automatic legacy conversion or migration registry.
 - `CampaignUI.tsx`: opening-specific controls, metrics, history, review and preservation/export flows using the existing theme and modal components.
 
 ## Files modified
@@ -92,10 +95,10 @@ New tests:
 - `sim/__tests__/settlement.test.ts`: activation on step 60, exact proration, serialized cent remainders, cross-period completion revenue and idle-instance costs.
 - `sim/__tests__/openingDatabaseIncident.test.ts`: arithmetic, timing, opening/recovery boundaries, determinism, bankruptcy and all three headless acceptance paths.
 - `sim/__tests__/traceCampaign.test.ts`: shared causal credit, recorded inspections and retention of unresolved incident evidence beyond the chart window.
-- `game/saveMigrations.test.ts`: nested-state consistency, supported versions and valid continuation snapshots.
+- `game/saveEnvelope.test.ts`: input-log validation, supported versions and exact deterministic replay of continuation states.
 
 Rewritten integration tests:
-- `game/persist.test.ts`: preservation of legacy bytes and unreadable new saves, export/reset boundary, storage failure, migration backup and settlement resume.
+- `game/persist.test.ts`: preservation of legacy bytes and unreadable new saves, export/reset boundary, storage failure, legacy raw export and settlement resume.
 - `game/store.test.ts`: single clock, fractional timing, mandatory pause boundaries, safe boot, review continuation and inaccessible later views.
 - `App.test.tsx`: real store and shell with WebGL mocked, StrictMode, visible actions, hidden-page pause, cleanup, one activation and one settlement.
 - `e2e/gameplay.spec.ts`, `e2e/mobile.spec.ts`, `e2e/fixtures.ts`: real WebGL, all three visible paths, reload, corrupt-save export/reset, paused resume, furniture fallback and mobile layout.

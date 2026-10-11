@@ -131,7 +131,7 @@ export function spikeAction(prev:GameState,action:Action):ActionResult|null {
   if(!d.researchSpent||d.controller||infraBusy(c)||!c.loadBalancer||c.routing.mode!=="balanced"||c.routing.targets.length<T.minimum||c.cashCents<=T.controllerCostCents)return fail("Requires unlock, balanced routing to two apps, free infrastructure slot and cash.");
   schedule(c,"deploy-autoscaler",T.controllerDelay,T.controllerCostCents,{source:"player"});
  } else if(action.type==="set_autoscaling"){
-  if(!d.controller||d.controller.enabled===action.enabled)return fail("Controller is unavailable or already set.");
+  if(typeof action.enabled!=="boolean"||!d.controller||d.controller.enabled===action.enabled)return fail("Controller is unavailable or already set.");
   d.controller.enabled=action.enabled;d.controller.highSteps=0;d.controller.lowSteps=0;d.controller.cooldownUntil=c.step+T.cooldown;
   trace(c,action.enabled?"autoscaling-enabled":"autoscaling-disabled");
  }

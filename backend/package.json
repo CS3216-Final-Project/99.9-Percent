@@ -1,5 +1,5 @@
 {
-  "name": "lingoquest-backend",
+  "name": "99-99-percent-backend",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -21,7 +21,8 @@
     "@neondatabase/serverless": "^1.1.0",
     "cors": "^2.8.6",
     "drizzle-orm": "^0.45.3",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "openid-client": "^6.8.8"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

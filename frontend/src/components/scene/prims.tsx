@@ -2,6 +2,8 @@
 
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { useDetail, type Detail } from "./detail";
+import type { Prim, Shape } from "./shapes";
 
 /*
  * Static furniture is described as data, a list of boxes, cylinders, balls and
@@ -10,41 +12,6 @@ import * as THREE from "three";
  * smooth on modest laptops and in software rendering.
  */
 
-export type V3 = [number, number, number];
-export type Shape = "box" | "cyl" | "ball" | "cone";
-
-export interface Prim {
-  k: Shape;
-  /** Centre position. */
-  p: V3;
-  /** Size: width, height and depth (diameters for round shapes). */
-  s: V3;
-  c: string;
-  /** Rotation, applied after any rotation from `place`. */
-  q?: THREE.Quaternion;
-}
-
-const euler = new THREE.Euler();
-const toQuat = (r?: V3) => (r ? new THREE.Quaternion().setFromEuler(euler.set(r[0], r[1], r[2])) : undefined);
-
-export const bx = (p: V3, s: V3, c: string, r?: V3): Prim => ({ k: "box", p, s, c, q: toQuat(r) });
-/** Upright cylinder of diameter `d` and height `h`. */
-export const cy = (p: V3, d: number, h: number, c: string, r?: V3): Prim => ({ k: "cyl", p, s: [d, h, d], c, q: toQuat(r) });
-export const ball = (p: V3, s: V3, c: string): Prim => ({ k: "ball", p, s, c });
-export const cone = (p: V3, d: number, h: number, c: string): Prim => ({ k: "cone", p, s: [d, h, d], c });
-
-const UP = new THREE.Vector3(0, 1, 0);
-
-/** Move a group of prims built around the origin to (x, y, z), turned by `rot` about the vertical. */
-export function place(prims: Prim[], x: number, z: number, rot = 0, y = 0): Prim[] {
-  const turn = new THREE.Quaternion().setFromAxisAngle(UP, rot);
-  const v = new THREE.Vector3();
-  return prims.map((m) => {
-    v.set(m.p[0], m.p[1], m.p[2]).applyQuaternion(turn);
-    return { ...m, p: [v.x + x, v.y + y, v.z + z], q: m.q ? turn.clone().multiply(m.q) : rot ? turn.clone() : undefined };
-  });
-}
-
 const GEOMETRY: Record<Shape, THREE.BufferGeometry> = {
   box: new THREE.BoxGeometry(1, 1, 1),
   cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 14),
@@ -52,16 +19,26 @@ const GEOMETRY: Record<Shape, THREE.BufferGeometry> = {
   cone: new THREE.ConeGeometry(0.5, 1, 6),
 };
 
-// Matte Lambert shading: it suits the flat toy look and costs far less per pixel than physically based shading.
-const MATERIAL: Record<Shape, THREE.Material> = {
-  box: new THREE.MeshLambertMaterial(),
-  cyl: new THREE.MeshLambertMaterial(),
-  ball: new THREE.MeshLambertMaterial(),
-  cone: new THREE.MeshLambertMaterial({ flatShading: true }),
+// Basic detail uses matte Lambert shading: it suits the flat toy look and costs far less per pixel than
+// physically based shading. HD uses satin physically based materials that pick up the room's reflections.
+const MATERIAL: Record<Detail, Record<Shape, THREE.Material>> = {
+  basic: {
+    box: new THREE.MeshLambertMaterial(),
+    cyl: new THREE.MeshLambertMaterial(),
+    ball: new THREE.MeshLambertMaterial(),
+    cone: new THREE.MeshLambertMaterial({ flatShading: true }),
+  },
+  hd: {
+    box: new THREE.MeshStandardMaterial({ roughness: 0.7 }),
+    cyl: new THREE.MeshStandardMaterial({ roughness: 0.55 }),
+    ball: new THREE.MeshStandardMaterial({ roughness: 0.8 }),
+    cone: new THREE.MeshStandardMaterial({ roughness: 0.8, flatShading: true }),
+  },
 };
 
 function Instances({ shape, items, shadows }: { shape: Shape; items: Prim[]; shadows: boolean }) {
   const ref = useRef<THREE.InstancedMesh>(null);
+  const material = MATERIAL[useDetail()][shape];
   useLayoutEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;
@@ -80,7 +57,8 @@ function Instances({ shape, items, shadows }: { shape: Shape; items: Prim[]; sha
     mesh.computeBoundingSphere();
   }, [items]);
   if (items.length === 0) return null;
-  return <instancedMesh key={items.length} ref={ref} args={[GEOMETRY[shape], MATERIAL[shape], items.length]} castShadow={shadows} receiveShadow />;
+  // The material is a prop rather than a constructor argument, so changing detail swaps it without rebuilding the instances.
+  return <instancedMesh key={items.length} ref={ref} args={[GEOMETRY[shape], undefined, items.length]} material={material} castShadow={shadows} receiveShadow />;
 }
 
 /** Draw many static prims: one instanced mesh per shape. */

@@ -3,8 +3,14 @@
 > **Project:** 99.99% — System Design Tycoon
 > **Target:** 16–20 October 2026 (planning target, not a completion claim)
 > **Learning outcomes:** LO1 Diagnose bottlenecks; LO2 Choose scaling strategies; LO4 Weigh design trade-offs
-> **Status:** Authoritative repository-specific contract; implementation and validation outstanding
+> **Status:** Authoritative repository-specific contract; implementation reviewed in PR #18; validation and external acceptance recorded in PHASE_4_IMPLEMENTATION_REPORT.md
 > **Continuation:** data-strategy v1; local save envelope schema 4
+
+## Integration with merged main (10 October 2026)
+
+PR #17 is now merged as `c554c8b`. The PR #18 review/update against latest main supersedes the draft snapshot persistence assumptions below: schema 4 extends main's deterministic **replay envelope**, using `seed`, `step`, player `inputs`, the existing foundation boundary and runtime measurement. It does not serialize a second authoritative game snapshot or restore `saveMigrations.ts`. Schema 1/2/3 replay saves remain readable with exact source-byte backups before replacement. Old inputs do not enter Data Strategy; retained historical observations stay aggregate where appropriate.
+
+Keep main's Classic mode, import/export, music, shared tooltips, action rows, incident layout, extracted scene model and account lifecycle. The shared cloud contract and existing transport validator accept replay schemas 3 and 4 so Phase 4 can use the already-merged account features. This is compatibility work requested with the main integration, not a new auth/ingestion workstream or database migration. Invalid/future/draft snapshot saves remain preserved and exportable; an unreplayable pre-merge snapshot is not silently converted into invented inputs. The implementation report records validation and outstanding external acceptance.
 
 # 1. Authority, goal and reuse
 
@@ -155,7 +161,7 @@ Facility and strip select the same underlying cache through existing state/dispa
 | frontend/src/sim/trace.ts | Actual cache/workload causal evidence |
 | frontend/src/sim/tech.ts | Existing nine identities, reveal and accurate copy |
 | frontend/src/game/store.ts | Explicit entry, shared selection and local lifecycle |
-| frontend/src/game/persist.ts, saveMigrations.ts | Existing schema dispatch/validation/backup/export |
+| frontend/src/game/persist.ts, saveEnvelope.ts | Existing schema dispatch/validation/backup/export |
 | frontend/src/game/telemetry.ts | Existing local projection/archive |
 | frontend/src/components/CampaignUI.tsx | Existing actions, inspection, history and report flow |
 | frontend/src/components/Game.tsx | Single clock/composition; only necessary integration |
@@ -166,15 +172,15 @@ Reuse processWork, routing/allocation, pause cleanup and settlement. One new pro
 
 # 10. Schema 4 local migration
 
-Retain nn.campaign.save.v1; envelope schemaVersion becomes 4, independently of scenario versions. Extend existing registry/validator/dispatch together: v1 → v2 → v3 → v4.
+Retain `nn.campaign.save.v1`. Schema 4 extends main's compact deterministic replay envelope: scenario/run identity, seed, final physical step, ordered player inputs, optional foundation boundary, runtime remainder/measurement and saved timestamp. Replaying these inputs reconstructs the data-stage configuration/events/deadlines, profile, cache activation/warmth/target/tuning, pending actions, 3,000 tier, accounting exposure, snapshots, traces and reports; do not serialize a second authoritative snapshot.
 
-Persist data-stage/version/config/consumed events/deadlines, workload/profile shares, cache deployment/activation/warmth/target/tuning, data pending actions, 3,000 tier, cache accounting exposure and snapshot/trace evidence. Session/wall timestamps stay outside physics.
+Extend `saveEnvelope.ts` validation/dispatch and `persist.ts` together. Deployed schema 1/2/3 replay envelopes load as schema 4 in memory. Existing Phase 1/2 milestone acknowledgements retain their opening-only meaning and foundation observations. Schema 3 inputs preserve Phase 3 behavior. Earlier schemas cannot contain Phase 4 decisions; validation rejects such payloads. Data entry occurs only through an explicit recorded action, never on boot/migration.
 
-Existing saves migrate with data stage absent/not entered and cache absent. Preserve ID/cash/apps/routing/limits/backlog/actions/due steps/exposure/remainders/trace/reports/milestone/telemetry cursor. Preserve historical snapshot versions; no fabricated per-instance/read/write/cache observations or measured completion/session events. Do not reinterpret historical revenue/outcomes.
+Preserve ID, cash, apps, routing, limits, backlogs, pending work/due steps, exposure/remainders, reports, trace, milestones and measurement cursor. Preserve old snapshot versions and aggregate history; do not invent read/write/cache observations, revenue or completion events. Replaying a new save must reproduce uninterrupted warmth, demand, outcomes, finances and actions exactly.
 
-Maintain exact source-byte backups before replacement, validation before writes, incompatible-backup protection, corrupt/future save export and storage errors. Backup/validation/write failures preserve source. Keep nn.save.v1, nn.meta.v1 and nn.analytics.v1 byte-for-byte unchanged. Reset remains explicit and retains unexported evidence. Loading/migration cannot enter/grow/advance. Resume must match uninterrupted warmth, demand, outcomes, finances and actions exactly.
+Before replacing an old active slot, back up its exact original bytes using its schema/run/timestamp identity. Validation, backup collision, storage and replacement failures preserve the source. Unknown/future/corrupt saves, including obsolete unmerged snapshot drafts with no replayable inputs, remain protected and exportable. Keep `nn.save.v1`, `nn.meta.v1` and `nn.analytics.v1` unchanged. Reset is explicit and retains unexported evidence.
 
-This is a browser envelope change, not a database migration: no Drizzle generation, production migrations or cloud binding is required.
+The merged account transport accepts schema 3 and 4 replay envelopes. Cloud resume validates/replays before changing local progress, retains the original cloud response, stays paused and never uploads a converted copy automatically. Ownership/session behavior remains the merged Phase 3 implementation. No database schema or production migration is required.
 
 # 11. Local telemetry and deferred backend boundary
 

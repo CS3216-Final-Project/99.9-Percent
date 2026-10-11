@@ -2,7 +2,7 @@
 import {it,expect} from "vitest";
 import {newGame,applyAction,type GameState,type Action} from "../index";
 import {step,advanceSteps,classifyData} from "../step";
-import {makeEnvelope,validateEnvelope} from "../../game/saveMigrations";
+import {makeEnvelope,validateEnvelope} from "../../game/saveEnvelope";
 import {beginSession,emptyMeasurement,projectEvents} from "../../game/telemetry";
 import {dataCompany} from "./dataFixture";
 function act(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
@@ -145,4 +145,21 @@ it("does not attribute a same-step pre-entry request to the data stage",()=>{
  g=act(g,{type:"enter_data",profile:"read-heavy"});const m=projectEvents(beginSession(emptyMeasurement(),g,"boundary","2026-10-10T00:00:00Z"),g,"2026-10-10T00:00:00Z");
  expect(m.pending.find(e=>e.name==="traffic_limit_requested"&&e.payload.actionId===actionId)!.payload.dataStageId).toBeUndefined();
  expect(m.pending.find(e=>e.name==="data_stage_entered")!.payload.dataStageId).toBe("data-strategy");
+});
+
+it("does not credit a late app upgrade for drainage supplied by an already warm cache",()=>{
+ // Controlled same-step comparison: both app tiers already serve this admitted load;
+ // existing DB backlog drains because of read hits, independently of the app purchase.
+ let g=install(incident(),{type:"deploy_cache"},2);g=advanceSteps(g,30).state;g=act(g,{type:"acknowledge_review"});
+ g.campaign!.apps[1].tier="base";g.campaign!.apps[1].capacity=1000;g.campaign!.incomingRate=1400;
+ g=act(g,{type:"scale_up",appId:"app-2"});g=ticks(g,2);g.campaign!.dbBacklog=1500;
+ g=step(g).state;const effect=g.campaign!.trace.findLast(t=>t.type==="action-activated");
+ expect(g.campaign!.snapshot.data!.hits).toBe(672);expect(g.campaign!.dbBacklog).toBe(228);
+ expect(effect!.data.withoutChangeDbBacklog).toBe(228);expect(effect!.data.measuredRelief).toBe(false);
+});
+
+it("rejects an unknown evaluation profile before consuming RNG or entering data",()=>{
+ const g=dataCompany("read-heavy",false),before=structuredClone(g);
+ expect(applyAction(g,{type:"enter_data",profile:"unknown"} as unknown as Action).ok).toBe(false);
+ expect(g).toEqual(before);expect(g.campaign!.dataStage).toBeNull();
 });

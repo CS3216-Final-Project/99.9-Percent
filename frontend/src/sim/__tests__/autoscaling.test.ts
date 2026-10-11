@@ -3,7 +3,7 @@ import {it,expect} from "vitest";
 import {act,tick,dataCompany,spikeCompany,untilOffset} from "./spikeFixtures";
 import {canEnterSpikes,pendingSpikeAcknowledgement,canRetire} from "../autoscaling";
 import {newGame,applyAction,has} from "../index";
-import {makeEnvelope,validateEnvelope} from "../../game/saveMigrations";
+import {makeEnvelope,validateEnvelope} from "../../game/saveEnvelope";
 import {beginSession,emptyMeasurement,projectEvents} from "../../game/telemetry";
 import {step} from "../step";
 

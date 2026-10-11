@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { BALANCE, buildReport } from "@/sim";
 import { money, moneyFull, num, uptimePct } from "@/game/format";
-import { clearAnalytics, clearSave, readAnalytics, type AnalyticsEvent } from "@/game/persist";
+import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { ModeSwitch } from "./ModeSwitch";
+import { SaveFiles } from "./SaveFiles";
+import { SoundSettings } from "./SoundSettings";
 import { Callout, Concept, Modal, type ConceptKind } from "./ui";
-import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone, PostmortemBody, RunCharts } from "./Views";
+import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
+import { PostmortemBody, RunCharts } from "./Views";
 
 /* ------------------------------------------------------------------ */
 /* Title screen                                                        */
@@ -277,7 +281,7 @@ export function EndReport() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Menu: save, new game, prototype data                                */
+/* Menu: the run, sound, save files, mode, starting over, playtest data */
 /* ------------------------------------------------------------------ */
 
 function summarise(events: AnalyticsEvent[]) {
@@ -319,9 +323,7 @@ export function Menu() {
   const notify = useGame((s) => s.notify);
   const [seed, setSeed] = useState("");
   const [confirm, setConfirm] = useState<"new" | "reset" | "tutorial" | null>(null);
-  const [events, setEvents] = useState<AnalyticsEvent[]>([]);
-
-  useEffect(() => setEvents(readAnalytics()), []);
+  const [events, setEvents] = useState<AnalyticsEvent[]>(readAnalytics);
 
   const inProgress = !game.outcome && game.totals.weeks > 0;
   const start = (kind: "new" | "reset" | "tutorial") => {
@@ -332,7 +334,6 @@ export function Menu() {
     if (kind === "tutorial") {
       startTutorialRun();
     } else if (kind === "reset") {
-      clearSave();
       newRun({ seed: BALANCE.introSeed });
     } else {
       newRun({ seed: seed.trim() });
@@ -351,9 +352,15 @@ export function Menu() {
 
   const close = () => openView(null);
   const week = Math.min(game.turn, BALANCE.maxTurns);
+  // Shown beside whichever control asked for the confirmation.
+  const warning = (
+    <Callout compact tone="warn" icon="alert" kicker="Are you sure?">
+      This replaces your week {week} run. Press the red button again to confirm.
+    </Callout>
+  );
 
   return (
-    <Modal title="Menu" onClose={close} icon={{ kind: "go", name: "menu" }} wide>
+    <Modal title="Menu" onClose={close} icon={{ kind: "go", name: "menu" }} className="modal-menu">
       <section className="menu-run" aria-label="This run">
         <div className="menu-run-head">
           <span className="menu-run-title">This run</span>
@@ -391,35 +398,43 @@ export function Menu() {
         Resume
       </button>
 
-      <div className="menu-grid">
+      <div className="menu-grid" role="group" aria-label="Run">
         <MenuTile icon="save" kind="ok" title="Save now" text="Write this run to the browser." onClick={saveNow} />
         <MenuTile icon="info" kind="users" title="How to play" text="The rules on one card." onClick={showOnboarding} />
         <MenuTile icon="robot" kind="go" title={label("tutorial", "Tutorial")} text="Replay the guided first week." danger={confirm === "tutorial"} onClick={() => start("tutorial")} />
       </div>
+      {confirm === "tutorial" && warning}
 
-      <section className="menu-section" aria-label="Start over">
-        <h4>
-          <Icon name="refresh" size={16} />
-          Start over
-        </h4>
-        <label className="field">
-          <span>Seed (optional): leave empty for a random run.</span>
-          <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
-        </label>
-        <div className="btn-row">
-          <button type="button" className={`btn ${confirm === "new" ? "btn-danger" : "btn-primary"}`} onClick={() => start("new")}>
-            {label("new", "New game")}
-          </button>
-          <button type="button" className={`btn ${confirm === "reset" ? "btn-danger" : ""}`} onClick={() => start("reset")}>
-            {label("reset", "Reset to first run")}
-          </button>
+      <div className="menu-columns">
+        <div className="menu-col">
+          <SoundSettings />
+          <SaveFiles />
         </div>
-        {confirm && (
-          <Callout compact tone="warn" icon="alert" kicker="Are you sure?">
-            This replaces your week {week} run. Press the red button again to confirm.
-          </Callout>
-        )}
-      </section>
+        <div className="menu-col">
+          <ModeSwitch to="campaign" />
+          <section className="menu-section menu-danger" aria-label="Start over">
+            <h4>
+              <Icon name="refresh" size={16} />
+              Start over
+            </h4>
+            <label className="field">
+              <span>Seed (optional): leave empty for a random run.</span>
+              <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
+            </label>
+            <div className="menu-actions">
+              <button type="button" className={`btn${confirm === "new" ? " btn-danger" : ""}`} onClick={() => start("new")}>
+                <Icon name="play" size={16} />
+                {label("new", "New game")}
+              </button>
+              <button type="button" className={`btn${confirm === "reset" ? " btn-danger" : ""}`} onClick={() => start("reset")}>
+                <Icon name="refresh" size={16} />
+                {label("reset", "Reset to first run")}
+              </button>
+            </div>
+            {(confirm === "new" || confirm === "reset") && warning}
+          </section>
+        </div>
+      </div>
 
       <details className="more">
         <summary>Playtest data ({events.length} events)</summary>

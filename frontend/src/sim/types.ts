@@ -459,8 +459,7 @@ export type Action =
   | { type: "incident_action"; recovery: RecoveryId }
   | { type: "incident_hint" }
   | { type: "acknowledge_review" }
-  | { type: "acknowledge_milestone" }
-  | { type: "acknowledge_prevention_review" };
+  | { type: "acknowledge_milestone"; enterScaling?: boolean };
 
 export type FailureReason =
   | "wrong_phase"

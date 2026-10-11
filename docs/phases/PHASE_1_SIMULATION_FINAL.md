@@ -511,7 +511,7 @@ Update existing sim tests/bots, frontend/src/game/store.test.ts, frontend/src/ga
 - Charts, labels, scene indicators and inspector consume one snapshot.
 - Review shows causal evidence and remaining restrictions.
 
-No renderer, office, theme, icon-system, or camera redesign.
+No renderer, office, theme, icon-system, or camera redesign. Follow [the shared UI design guide](../UI_DESIGN.md): retain the existing HUD, incident banner, investigation controls and response rows while displaying the new physical-step metrics and recovery rules.
 
 # 11. Automated acceptance and Definition of Done
 

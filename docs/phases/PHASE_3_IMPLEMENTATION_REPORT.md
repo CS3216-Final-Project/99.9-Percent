@@ -1,3 +1,5 @@
+> Historical core-only report. Its checkpoint, save format and validation counts are superseded by [the latest-main integration report](PHASE_3_MAIN_INTEGRATION_REPORT.md). The account/cloud deferral below was superseded by [the account follow-up](PHASE_3_AUTH_CLOUD_REPORT.md); live release acceptance remains outstanding.
+
 # Phase 3 core gameplay implementation report
 
 Status: Core gameplay implemented and validated under Node 22. Auth/cloud integration is DEFERRED by the latest user instruction. This is not a claim that the entire Phase 3 release is complete.

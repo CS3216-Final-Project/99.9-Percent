@@ -1,3 +1,9 @@
+import type { Action } from "./types";
+/** One player decision, recorded at the step it was made. */
+export interface CampaignInput {
+    step: number;
+    action: Action;
+}
 export interface ComponentSnapshot {
     demand: number;
     capacity: number;
@@ -122,15 +128,9 @@ export interface CampaignPostmortem {
     limited: boolean;
     setupCents: number;
 }
-export interface OpeningPrevention {
-    eligibleStep: number;
-    appInspectedStep: number | null;
-    dbInspectedStep: number | null;
-    stableSteps: number;
-    outcome: null | { id: "opening-prevention"; qualifiedStep: number; acknowledged: boolean;
-        snapshots: Snapshot[]; rejectedDemand: number; setupCents: number };
-}
 export interface Campaign {
+    /** Boundary of observations made by the deployed Phase 1/2 engine. */
+    foundation?: { step: number; inputs: number };
     scenarioId: "opening-db";
     scenarioVersion: 1;
     runId: string;
@@ -173,12 +173,13 @@ export interface Campaign {
     };
     pending: ScheduledAction[];
     actions: ScheduledAction[];
+    /** Every player decision, accepted or rejected, in order. Replaying them from a new run rebuilds this one. */
+    inputs: CampaignInput[];
     consumedEvents: string[];
     overloadSteps: number;
     incident: CampaignIncident | null;
     reports: CampaignPostmortem[];
-    openingMilestone: null | {id:"opening-stability";incidentId:string|null;outcomeId?:"opening-prevention";awardedStep:number;acknowledged:boolean};
-    openingPrevention?: OpeningPrevention;
+    openingMilestone: null | { id: "opening-stability"; incidentId: string; awardedStep: number; acknowledged: boolean };
     openingRecovered: boolean;
     firstPauseConsumed: boolean;
     snapshot: Snapshot;

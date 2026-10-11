@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { newGame, applyAction, type GameState, type Action } from "../index";
 import { step, advanceSteps, allocateTraffic } from "../step";
-import { makeEnvelope, validateEnvelope } from "../../game/saveMigrations";
+import { makeEnvelope, validateEnvelope } from "../../game/saveEnvelope";
 import { beginSession, emptyMeasurement, projectEvents } from "../../game/telemetry";
 function act(g:GameState,a:Action) {const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 function ticks(g:GameState,n:number) {for(let i=0;i<n;i++)g=step(g).state;return g;}
@@ -94,6 +94,14 @@ describe("continuous scaling campaign",()=>{
   const copy=JSON.parse(JSON.stringify(g));expect(advanceSteps(copy,40)).toEqual(advanceSteps(g,40));
   g=advanceSteps(g,40).state;expect(g.phase).toBe("review");expect(validateEnvelope(makeEnvelope(g)).status).toBe("ok");
   const report=g.campaign!.reports.at(-1)!.explanations.join(" ");expect(report).toContain("remained unrouted");expect(report).toContain("Routing changed");
+ });
+ it("does not credit a late vertical upgrade for queues already drained by a traffic limit",()=>{
+  let g=ticks(headroom(),6);expect(g.phase).toBe("incident");
+  g=act(g,{type:"set_traffic_limit",enabled:true});g=act(g,{type:"scale_up",appId:"app-1"});g=ticks(g,3);
+  const effect=g.campaign!.trace.find(e=>e.type==="action-activated"&&e.data.targetId==="app-1")!;
+  expect(effect.data.measuredRelief).toBe(false);expect(effect.data.withoutChangeAppBacklog).toBe(0);
+  g=advanceSteps(g,30).state;expect(g.phase).toBe("review");
+  expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("no measured relief");
  });
  it("retains a traffic limit and reports prevention without manufacturing an incident",()=>{
   let g=headroom();g=act(g,{type:"set_traffic_limit",enabled:true});g=ticks(g,8);

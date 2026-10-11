@@ -1,6 +1,6 @@
 // CORS_ORIGINS is a comma-separated list of exact origins or patterns where `*`
 // matches one run of letters, digits and dashes, e.g.
-//   https://lingoquest.vercel.app,https://lingoquest-*-myteam.vercel.app
+//   https://99-99-percent.vercel.app,https://99-99-percent-*-myteam.vercel.app
 // The second entry covers our own Vercel preview URLs without allowing every *.vercel.app site.
 
 function toRegExp(pattern: string): RegExp {

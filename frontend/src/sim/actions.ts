@@ -1,4 +1,4 @@
-import { campaignAction } from "./step";
+import { applyCampaignInput } from "./step";
 import { BALANCE, PROMOS } from "./balance";
 import {
   clamp,
@@ -56,7 +56,10 @@ const MANAGEMENT_ONLY = new Set<Action["type"]>([
  * untouched.
  */
 export function applyAction(prev: GameState, action: Action): ActionResult {
-  if (prev.campaign) return campaignAction(prev, action);
+  if (prev.campaign) {
+    const { state, result } = applyCampaignInput(prev, action);
+    return result.ok ? { ok: true, state } : result;
+  }
   if (action.type === "start_tech" && action.tech === "larger_database") {
     return applyAction(prev, { type: "start_db_upgrade" });
   }
@@ -73,7 +76,6 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
   const s = clone(prev);
 
   switch (action.type) {
-    case "acknowledge_prevention_review":
     case "acknowledge_milestone":
     case "set_traffic_limit": return fail("invalid", "Campaign action only.");
     case "launch_promotion": {

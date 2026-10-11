@@ -1,20 +1,18 @@
 "use client";
 
 import { Line, MapControls } from "@react-three/drei";
+import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
+import { ToneMappingMode } from "postprocessing";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
 import {
   EQUIPMENT_ORDER,
   equipmentInfo,
-  has,
-  metrics,
-  monitoringLevel,
   symptomaticEquipment,
   type EquipmentId,
-  type EquipmentState,
-  type GameState,
 } from "@/sim";
 import { inspectOrSelect, useGame } from "@/game/store";
 import {
@@ -22,123 +20,25 @@ import {
   appSlot,
   DB_CABINET,
   dbSlot,
-  footprint,
-  MAX_TEMP_SHOWN,
   POS,
   RACK,
   ROOM,
   tempSlot,
   type Footprint,
 } from "./layout";
+import { chooseDetail, DetailContext, detailOverride, useDetail, type Renderer } from "./detail";
+import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
-import { EQUIPMENT_ICON, Icon, STATE_META } from "../icons";
+import { Icon } from "../icons";
+import { tipProps } from "../tips";
+import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
-import { OnWall, updateWalls, Wall } from "./walls";
-
-/* ------------------------------------------------------------------ */
-/* Scene model: the few facts the 3D view needs, as a stable snapshot  */
-/* ------------------------------------------------------------------ */
-
-interface SceneModel {
-  opening: boolean;
-  incident: boolean;
-  hosts: Led[];
-  temp: number;
-  lb: boolean;
-  standby: boolean;
-  cache: boolean;
-  dbCabinets: number;
-  dbLed: Led;
-  replica: boolean;
-  backup: boolean;
-  monitoring: 0 | 1 | 2;
-  engineers: number;
-  busy: number;
-  releases: number;
-  promos: number;
-  flow: number;
-  states: Record<EquipmentId, EquipmentState>;
-  names: Record<EquipmentId, string>;
-  built: Record<EquipmentId, boolean>;
-  footprints: Record<EquipmentId, Footprint>;
-  symptomatic: EquipmentId[];
-  inspected: EquipmentId[];
-  inspecting: EquipmentId | null;
-}
-
-function buildModel(s: GameState): SceneModel {
-  const inc = s.phase === "incident" ? s.incident : null;
-  const inspected = inc ? inc.evidence.map((e) => e.equipment) : [];
-  const named = has(s, "monitoring") || has(s, "health_checks");
-  // During an incident the racks only show what the player has actually looked at.
-  const reveal = (id: EquipmentId) => !inc || inspected.includes(id);
-  const m = metrics(s);
-
-  const hosts: Led[] = s.infra.appHosts.map((h, i) => {
-    if(s.campaign) {
-      const a=s.campaign.apps[i], x=s.campaign.snapshot.instances?.find(x=>x.id===a.id);
-      if(!a.routed&&a.backlog===0)return "off";
-      return x&&x.demandRatio>1?"critical":a.backlog>0?"warn":"ok";
-    }
-    if (h.status === "failed") return reveal("app") ? "off" : "ok";
-    if (h.status === "degraded") return named ? "warn" : "ok";
-    if (!inc && m.appUtil >= 1) return "critical";
-    if (!inc && m.appUtil >= 0.85 && named) return "warn";
-    return "ok";
-  });
-  const dbStatus = s.infra.dbHost.status;
-  const dbLed: Led =
-    dbStatus === "failed"
-      ? reveal("db")
-        ? "off"
-        : "ok"
-      : dbStatus === "degraded" && named
-        ? "warn"
-        : !inc && m.dbUtil >= 1
-          ? "critical"
-          : !inc && m.dbUtil >= 0.85 && named
-            ? "warn"
-            : "ok";
-
-  const states = {} as SceneModel["states"];
-  const names = {} as SceneModel["names"];
-  const built = {} as SceneModel["built"];
-  const footprints = {} as SceneModel["footprints"];
-  for (const id of EQUIPMENT_ORDER) {
-    const info = equipmentInfo(s, id);
-    states[id] = info.state;
-    names[id] = info.name;
-    built[id] = info.built;
-    footprints[id] = footprint(s, id);
-  }
-
-  return {
-    opening: !!s.campaign,
-    incident: s.campaign ? !!s.campaign.incident : !!inc,
-    hosts,
-    temp: Math.min(inc ? (s.pendingTurn?.autoscaled ?? 0) : s.live.tempServers, MAX_TEMP_SHOWN),
-    lb: has(s, "load_balancing"),
-    standby: has(s, "standby"),
-    cache: has(s, "caching"),
-    dbCabinets: s.campaign?Math.min(3,s.infra.dbTier+1):s.infra.dbTier+1,
-    dbLed,
-    replica: has(s, "replicas"),
-    backup: has(s, "backups"),
-    monitoring: monitoringLevel(s),
-    engineers: s.engineers,
-    busy: s.campaign ? (s.campaign.pending.some(a=>a.type==="add-app"||a.type==="upgrade-db")?4:0) : s.tasks.reduce((n, t) => n + t.assigned, 0),
-    releases: s.releases.length,
-    promos: s.activePromos.length,
-    flow: Math.round(Math.min(1.4, Math.max(m.appUtil, 0.25)) * 10) / 10,
-    states,
-    names,
-    built,
-    footprints,
-    symptomatic: inc ? symptomaticEquipment(s) : [],
-    inspected,
-    inspecting: inc?.inspecting?.equipment ?? null,
-  };
-}
+import { Exterior } from "./exterior";
+import { OnWall, Wall } from "./walls";
+import { updateWalls } from "./wallState";
+import { buildModel, type SceneModel } from "./sceneModel";
+import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
+import { screenPoint } from "./labels";
 
 function useSceneModel(): SceneModel {
   const key = useGame((s) => JSON.stringify(buildModel(s.game)));
@@ -150,16 +50,18 @@ function useSceneModel(): SceneModel {
 /* ------------------------------------------------------------------ */
 
 const TARGET = new THREE.Vector3(-1, 0, 0.6);
-const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20);
+/**
+ * Where the camera sits relative to what it looks at. The view is orthographic, so distance does not change what
+ * is seen, but the camera must stand far enough back that the ground outside is never behind it when zoomed out
+ * and tilted low.
+ */
+const CAMERA_OFFSET = new THREE.Vector3(20, 18, 20).setLength(CAMERA_DISTANCE);
 const HOME = CAMERA_OFFSET.clone().normalize();
 const UP = new THREE.Vector3(0, 1, 0);
-/** Tilt limits, measured from straight down: nearly top-down to a low three-quarter view. */
-const MIN_TILT = 0.22;
-const MAX_TILT = 1.2;
 /** Q, E and the rotate buttons turn the room by an eighth of a circle. */
-export const TURN = Math.PI / 4;
+const TURN = Math.PI / 4;
 
-export const cameraApi: { zoomBy: (factor: number) => void; reset: () => void; rotateBy: (radians: number) => void } = {
+const cameraApi: { zoomBy: (factor: number) => void; reset: () => void; rotateBy: (radians: number) => void } = {
   zoomBy: () => {},
   reset: () => {},
   rotateBy: () => {},
@@ -195,7 +97,6 @@ function frameBox(box: THREE.Box3, dir: THREE.Vector3, width: number, height: nu
 function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean> }) {
   const controls = useRef<MapControlsImpl>(null);
   const camera = useThree((s) => s.camera) as THREE.OrthographicCamera;
-  const size = useThree((s) => s.size);
   /** The player has panned, zoomed or dragged the view, so it no longer follows the facility. */
   const touched = useRef(false);
   /** Turning back to the starting angle after Reset view. */
@@ -203,7 +104,10 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
   /** Turn still to apply from Q, E or the rotate buttons. */
   const spin = useRef(0);
   const box = useRef<THREE.Box3 | null>(null);
-  const v = useMemo(() => ({ offset: new THREE.Vector3(), dir: new THREE.Vector3(), before: new THREE.Vector3() }), []);
+  const v = useMemo(
+    () => ({ offset: new THREE.Vector3(), dir: new THREE.Vector3(), before: new THREE.Vector3(), from: new THREE.Vector3(), centre: new THREE.Vector3() }),
+    [],
+  );
 
   // Frame the equipment that is actually built, and widen the view as the facility grows.
   useEffect(() => {
@@ -248,12 +152,16 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  useFrame(() => {
+  // Read the camera from the frame state: R3F expects per-frame mutation here, not on the hook's render value.
+  useFrame((state) => {
     const c = controls.current;
     if (!c) return;
-    const { offset, dir, before } = v;
+    const camera = state.camera as THREE.OrthographicCamera;
+    const { size } = state;
+    const { offset, dir, before, from, centre } = v;
     offset.copy(camera.position).sub(c.target);
     const distance = offset.length();
+    from.copy(offset).normalize().negate();
     let turned = false;
     if (Math.abs(spin.current) > 1e-4) {
       const step = Math.abs(spin.current) < 0.004 ? spin.current : spin.current * 0.16;
@@ -270,7 +178,13 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
       offset.multiplyScalar(distance);
       turned = true;
     }
-    if (turned) camera.position.copy(c.target).add(offset);
+    if (turned) {
+      // While the view follows the facility, turn about the built equipment so it holds its place on screen.
+      if (!touched.current && box.current) turnAbout(c.target, box.current.getCenter(centre), from, dir.copy(offset).normalize().negate());
+      camera.position.copy(c.target).add(offset);
+      // The controls aimed the camera earlier this frame, from where it stood before the turn.
+      camera.lookAt(c.target);
+    }
 
     // Until the player takes the camera, ease toward a framing of the built equipment from the current angle.
     if (!touched.current && box.current) {
@@ -295,6 +209,8 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     }
     // Lower whichever walls now stand between the camera and the room.
     updateWalls(dir.copy(c.target).sub(camera.position).normalize());
+    // Last, so the labels follow the camera as it ends up this frame.
+    placeLabels(camera, size);
   });
 
   return (
@@ -344,11 +260,13 @@ function Rack({
   tint?: string;
 }) {
   const tex = useMemo(() => panelTextures(variant, led), [variant, led]);
+  // In HD the cabinets are powder-coated steel that catches the room's reflections.
+  const hd = useDetail() === "hd";
   return (
     <group position={[x, 0, z]}>
       <mesh castShadow receiveShadow position={[0, size.h / 2, 0]}>
         <boxGeometry args={[size.w, size.h, size.d]} />
-        <meshStandardMaterial color={tint} metalness={0.1} roughness={0.8} />
+        <meshStandardMaterial color={tint} metalness={hd ? 0.45 : 0.1} roughness={hd ? 0.42 : 0.8} />
       </mesh>
       <mesh position={[0, size.h / 2, size.d / 2 + 0.006]}>
         <planeGeometry args={[size.w * 0.87, size.h * 0.93]} />
@@ -535,10 +453,15 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
 const anchors = new Map<string, THREE.Vector3>();
 const labelEls = new Map<string, HTMLElement>();
 const INTERNET = "internet";
+const labelAt = new THREE.Vector2();
+/** A campaign run is on screen, which lays its labels out differently. */
+let inCampaign = false;
+let inSpikes = false;
+let campaignAppIds: string[] = [];
 
-function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footprint> }) {
-  const v = useMemo(() => new THREE.Vector3(), []);
-  const apps=useGame(s=>s.game.campaign?.apps);
+function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprint> }) {
+  const apps = useGame((s) => s.game.campaign?.apps);
+  const spikes = useGame((s) => !!s.game.campaign?.spikeStage);
 
   useEffect(() => {
     for (const id of EQUIPMENT_ORDER) {
@@ -546,25 +469,46 @@ function LabelProjector({ footprints }: { footprints: Record<EquipmentId, Footpr
       anchors.set(id, new THREE.Vector3(f.x, f.h + 0.3, f.z));
     }
     anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, 1.35, AISLE_Z));
-    for(const id of anchors.keys())if(/^app-/.test(id))anchors.delete(id);
-    if(apps)apps.forEach((a,i)=>{const p=appSlot(i);anchors.set(a.id,new THREE.Vector3(p.x,RACK.h+.6,p.z));});
-  }, [footprints,apps]);
-
-  useFrame(({ camera, size }) => {
-    anchors.forEach((pos, key) => {
-      const el = labelEls.get(key);
-      if (!el) return;
-      v.copy(pos).project(camera);
-      let x = (v.x * 0.5 + 0.5) * size.width;
-      let y = (-v.y * 0.5 + 0.5) * size.height + (key==="app"&&labelEls.has("app-1")? -100:/^app-/.test(key)?Number(key.slice(4))*16-26:0);
-      // The mobile evidence sheet occupies the lower 56% of the room.
-      // Keep the new cache label touchable in the visible room above it.
-      if(key==="cache" && size.width<=900) {y=Math.min(y,size.height*.32);x=Math.max(65,Math.min(size.width-65,x));}
-      el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
-      el.style.visibility = "visible";
-    });
-  });
+    for (const id of anchors.keys()) if (/^app-/.test(id)) anchors.delete(id);
+    if (apps) {
+      apps.forEach((a, i) => {
+        const p = appSlot(i);
+        anchors.set(a.id, new THREE.Vector3(p.x, RACK.h + 0.6, p.z));
+      });
+    }
+    inCampaign = !!apps;
+    inSpikes = spikes;
+    campaignAppIds = apps?.map(a => a.id) ?? [];
+  }, [footprints, apps, spikes]);
   return null;
+}
+
+/**
+ * Moves every label to its anchor as the camera stands right now. `CameraRig` calls this once it has finished moving
+ * the camera for the frame, so a label is placed for the view the renderer is about to draw rather than the last one.
+ */
+function placeLabels(camera: THREE.Camera, size: { width: number; height: number }) {
+  anchors.forEach((pos, key) => {
+    const el = labelEls.get(key);
+    if (!el) return;
+    screenPoint(pos, camera, size.width, size.height, labelAt);
+    let { x, y } = labelAt;
+    // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
+    const slot = campaignAppIds.indexOf(key);
+    y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : slot >= 0 ? slot * 22 - 10 : 0;
+    // The mobile bottom panel occupies at most 56% of the room. Spread the
+    // growing pool above it by slot order, even when permanent IDs have gaps.
+    if (inSpikes && slot >= 0 && size.width <= 900) {
+      y = Math.min(y, size.height * 0.40 - (campaignAppIds.length - 1 - slot) * 26);
+      x = Math.max(size.width * 0.78, Math.min(size.width - 65, x));
+    }
+    if (key === "cache" && inCampaign && size.width <= 900) {
+      y = Math.min(y, size.height * 0.32);
+      x = Math.max(65, Math.min(size.width - 65, x));
+    }
+    el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+    el.style.visibility = "visible";
+  });
 }
 
 function bindLabel(key: string) {
@@ -590,6 +534,7 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       onClick={() => inspectOrSelect(id)}
       onFocus={() => useGame.getState().hover(id)}
       onBlur={() => useGame.getState().hover(null)}
+      aria-pressed={selected}
       aria-label={`${m.names[id]}${built ? "" : ", not built"}`}
     >
       <span className="eq-icon" aria-hidden="true">
@@ -605,8 +550,9 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
 
 function Labels() {
   const m = useSceneModel();
-  const {game,selectedAppId,selected}=useGame();
-  const c=game.campaign;
+  const c=useGame(s=>s.game.campaign);
+  const selectedAppId=useGame(s=>s.selectedAppId);
+  const selected=useGame(s=>s.selected);
   return (
     <div className="eq-labels">
       <span className="wall-tag" ref={bindLabel(INTERNET)}>
@@ -625,18 +571,38 @@ function Labels() {
 /* The room                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Tint of the polished concrete under the corridors in HD. */
+const CONCRETE_TINT = "#4c4679";
+
 function Room() {
   const tiles = useMemo(() => {
     const t = concreteFloor();
     t.repeat.set(ROOM.w / 1.6, ROOM.d / 1.6);
     return t;
   }, []);
+  const surfaces = useSurfaces();
+  const hd = useMemo(() => {
+    if (!surfaces) return null;
+    const s = surfaces.concrete;
+    return { geometry: projectUV(new THREE.PlaneGeometry(ROOM.w, ROOM.d), s.size, [ROOM.cx, -ROOM.cz, 0]), material: surfaceMaterial(s, CONCRETE_TINT, 0.9) };
+  }, [surfaces]);
+  useEffect(
+    () => () => {
+      hd?.geometry.dispose();
+      hd?.material.dispose();
+    },
+    [hd],
+  );
   return (
     <group>
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]}>
-        <planeGeometry args={[ROOM.w, ROOM.d]} />
-        <meshLambertMaterial map={tiles} />
-      </mesh>
+      {hd ? (
+        <mesh key="hd" receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]} geometry={hd.geometry} material={hd.material} />
+      ) : (
+        <mesh key="basic" receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]}>
+          <planeGeometry args={[ROOM.w, ROOM.d]} />
+          <meshLambertMaterial map={tiles} />
+        </mesh>
+      )}
       <mesh position={[ROOM.cx, -0.26, ROOM.cz]}>
         <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
         <meshStandardMaterial color="#2a2450" roughness={0.9} />
@@ -674,7 +640,47 @@ function Room() {
 /* Scene                                                               */
 /* ------------------------------------------------------------------ */
 
-function Scene() {
+/** Sky light and reflection strength at HD detail. */
+const HD_SKY = 1.45;
+const HD_REFLECTIONS = 0.3;
+
+/**
+ * Soft reflections of a generic bright room for the HD materials. It is built
+ * on the graphics card from three's procedural room, so nothing is downloaded.
+ * Attached as the scene's environment, and detached again at basic detail.
+ */
+function Reflections() {
+  const gl = useThree((s) => s.gl);
+  const env = useMemo(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const room = new RoomEnvironment();
+    const texture = pmrem.fromScene(room, 0.04).texture;
+    room.dispose();
+    pmrem.dispose();
+    return texture;
+  }, [gl]);
+  useEffect(() => () => env.dispose(), [env]);
+  return <primitive object={env} attach="environment" />;
+}
+
+/**
+ * The HD finish, on a graphics card only. Ambient occlusion darkens the creases
+ * where things meet the floor and each other, which grounds the furniture and
+ * the crew; bloom lets screens, status lights and the neon sign glow. The
+ * composer takes over tone mapping, so it ends with the same filmic curve the
+ * renderer used before.
+ */
+function Effects() {
+  return (
+    <EffectComposer multisampling={4}>
+      <N8AO aoRadius={1.5} distanceFalloff={1} intensity={5} quality="medium" halfRes />
+      <Bloom mipmapBlur luminanceThreshold={0.9} luminanceSmoothing={0.25} intensity={0.6} />
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+    </EffectComposer>
+  );
+}
+
+function Scene({ effects }: { effects: boolean }) {
   const m = useSceneModel();
   const campaign = useGame(s => s.game.campaign);
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
@@ -690,17 +696,22 @@ function Scene() {
 
   const edgeAlert = sym("gateway") || sym("app");
   const dataAlert = sym("db");
+  const hd = useDetail() === "hd";
 
   return (
     <>
       <color attach="background" args={["#1a1633"]} />
-      <hemisphereLight args={["#fff0dd", "#3b3366", 1.7]} />
+      {hd && <Reflections />}
+      {/* Reflections light the HD materials too, so the sky light is turned down to keep the same brightness. */}
+      <hemisphereLight args={["#fff0dd", "#3b3366", hd ? HD_SKY : 1.7]} />
       <directionalLight
         position={[11, 17, 7]}
         intensity={2.3}
         color="#fff1de"
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        // HD gets a sharper map with softened edges.
+        shadow-mapSize={hd ? [4096, 4096] : [2048, 2048]}
+        shadow-radius={hd ? 3 : 1}
         shadow-bias={-0.0005}
         shadow-camera-left={-30}
         shadow-camera-right={30}
@@ -713,6 +724,7 @@ function Scene() {
       <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
       <Room />
+      <Exterior linear={effects} />
       <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
 
       {/* Network edge */}
@@ -722,7 +734,7 @@ function Scene() {
       {/* App servers */}
       {m.hosts.slice(0, 12).map((led, i) => {
         const p = appSlot(i);
-        return <group key={i} onClick={e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",`app-${i+1}`);}}}><Rack x={p.x} z={p.z} led={led} /></group>;
+        return <group key={i} onClick={e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",campaign?.apps[i]?.id??`app-${i+1}`);}}}><Rack x={p.x} z={p.z} led={led} /></group>;
       })}
       {Array.from({ length: m.temp }, (_, i) => {
         const p = tempSlot(i);
@@ -770,9 +782,10 @@ function Scene() {
       {EQUIPMENT_ORDER.map((id) => (
         <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
       ))}
-      <LabelProjector footprints={m.footprints} />
+      <LabelAnchors footprints={m.footprints} />
 
       <CameraRig footprints={m.footprints} built={m.built} />
+      {effects && <Effects />}
     </>
   );
 }
@@ -852,8 +865,11 @@ function SoftwareFrames() {
 
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
+  const [renderer, setRenderer] = useState<Renderer>("unknown");
   /** Drawing in software, without a GPU: no shadows, half the pixels, 20 frames a second. */
-  const [soft, setSoft] = useState(false);
+  const soft = renderer === "software";
+  const [override] = useState(() => detailOverride(window.location.search));
+  const detail = chooseDetail(renderer, override);
   return (
     <div className="stage-canvas" ref={container}>
       <Canvas
@@ -861,40 +877,47 @@ export default function Facility() {
         shadows={soft ? false : "percentage"}
         dpr={soft ? 0.5 : [1, 1.75]}
         frameloop={soft ? "demand" : "always"}
+        // How strongly the HD environment lights materials; without one it has no effect.
+        scene={{ environmentIntensity: HD_REFLECTIONS }}
         onCreated={({ gl }) => {
           // Without a graphics card the browser draws on the CPU. Keep it playable: no shadows, half the pixels
           // (labels and the interface are HTML and stay sharp) and 20 frames a second. A GPU keeps full quality.
-          if (isSoftwareRenderer(gl)) {
-            // Before the first frame, so no material is ever compiled with shadows.
-            gl.shadowMap.enabled = false;
-            setSoft(true);
-          }
+          // A GPU also gets HD detail: photo textures, physically based shading and reflections.
+          const software = isSoftwareRenderer(gl);
+          // Before the first frame, so no material is ever compiled with shadows.
+          if (software) gl.shadowMap.enabled = false;
+          setRenderer(software ? "software" : "gpu");
         }}
-        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: 0.1, far: 200 }}
+        camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: CAMERA_NEAR, far: CAMERA_FAR }}
         onPointerMissed={() => {
           if (useGame.getState().game.phase !== "incident") useGame.getState().select(null);
         }}
         aria-label="Isometric view of the server room. Each equipment label is a button."
       >
-        <Scene />
+        {/* The room waits until the renderer is known, so a GPU never compiles the basic materials only to replace them. */}
+        {renderer !== "unknown" && (
+          <DetailContext.Provider value={detail}>
+            <Scene effects={detail === "hd" && !soft} />
+          </DetailContext.Provider>
+        )}
         {soft && <SoftwareFrames />}
       </Canvas>
       <Labels />
       <HoverTip container={container} />
       <div className="camera-buttons" role="group" aria-label="Camera">
-        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" title="Zoom in">
+        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" {...tipProps("Zoom in")}>
           +
         </button>
-        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" title="Zoom out">
+        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" {...tipProps("Zoom out")}>
           −
         </button>
-        <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" title="Rotate left (Q)">
+        <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" {...tipProps("Rotate left (Q)")}>
           <Icon name="rotateLeft" size={16} />
         </button>
-        <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" title="Rotate right (E)">
+        <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" {...tipProps("Rotate right (E)")}>
           <Icon name="rotateRight" size={16} />
         </button>
-        <button type="button" onClick={() => cameraApi.reset()} aria-label="Reset view" title="Reset view: fit the room and face the starting angle">
+        <button type="button" onClick={() => cameraApi.reset()} aria-label="Reset view" {...tipProps("Reset view: fit the room and face the starting angle")}>
           ⌂
         </button>
         <span className="camera-hint" aria-hidden="true">

@@ -1,17 +1,23 @@
 "use client";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { BALANCE, completedTechIds, currentWarnings, metrics, TECH_ORDER, type GameState } from "@/sim";
 import { nextMove } from "@/game/advisor";
 import { clock, compact, money, moneyFull, num, signedMoney, uptimePct } from "@/game/format";
+import { watchCues } from "@/game/cues";
+import { createMusic, type Music } from "@/game/music";
+import type { AudioSettings } from "@/game/persist";
+import { createSfx } from "@/game/sfx";
 import { useGame, type Speed, type View } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { SoundButton } from "./SoundButton";
+import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Modals";
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
 import Tutorial, { BASICS_STEPS } from "./Tutorial";
-import { Callout, Concept, Meter, Tip, type ConceptKind } from "./ui";
+import { Callout, Concept, Meter, Stat, type ConceptKind } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
 
 // Keep the WebGL scene in its own chunk; Vite renders this app in the browser.
@@ -32,22 +38,6 @@ function healthOf(game: GameState): { word: string; tone: "ok" | "warn" | "criti
   if (worst >= 1 || game.live.shed > 0) return { word: "Degraded", tone: "critical", icon: "fire" };
   if (worst >= 0.85 || faults) return { word: "At risk", tone: "warn", icon: "alert" };
   return { word: "Healthy", tone: "ok", icon: "health" };
-}
-
-function Stat({ icon, kind, label, tip, children, side }: { icon: IconName; kind: ConceptKind; label: string; tip: string; children: ReactNode; side?: "left" }) {
-  return (
-    <div className={`stat stat-${kind}`}>
-      <span className="stat-icon">
-        <Concept kind={kind} icon={icon} />
-      </span>
-      <div className="stat-body">
-        <Tip text={tip} side={side}>
-          {label}
-        </Tip>
-        {children}
-      </div>
-    </div>
-  );
 }
 
 function TopBar() {
@@ -104,7 +94,6 @@ function TopBar() {
           icon={health.icon}
           kind={health.tone === "ok" ? "health" : health.tone}
           label="Health"
-          side="left"
           tip="Uptime is the share of requests served across the whole run. 99.99% allows about 26 minutes of downtime in this campaign."
         >
           <strong>{health.word}</strong>
@@ -112,7 +101,8 @@ function TopBar() {
         </Stat>
       </div>
 
-      <button type="button" className="icon-btn menu-btn" onClick={() => openView("menu")} aria-label="Menu" title="Menu">
+      <SoundButton />
+      <button type="button" className="icon-btn menu-btn" onClick={() => openView("menu")} aria-label="Menu" {...tipProps("Menu")}>
         <Icon name="menu" />
       </button>
     </header>
@@ -180,7 +170,7 @@ function StageHud() {
           tone={w.level === "critical" ? "critical" : "warn"}
           icon={WARNING_ICON[w.code] ?? "alert"}
           kicker={w.level === "critical" ? "Critical" : "Warning"}
-          title={w.detail}
+          tip={w.detail}
           onClick={() => (w.equipment ? select(w.equipment) : openView("history"))}
         >
           {w.text}
@@ -227,7 +217,7 @@ function BottomBar() {
         {tabs
           .filter((t) => t[4])
           .map(([id, label, icon, badge]) => (
-            <button type="button" key={id} data-view={id} className={view === id ? "is-active" : ""} aria-pressed={view === id} aria-label={label} title={label} disabled={incident && id !== "history"} onClick={() => toggle(id)}>
+            <button type="button" key={id} data-view={id} className={view === id ? "is-active" : ""} aria-pressed={view === id} aria-label={label} {...tipProps(label)} disabled={incident && id !== "history"} onClick={() => toggle(id)}>
               <span className="tab-icon" aria-hidden="true">
                 <Icon name={icon} />
               </span>
@@ -245,13 +235,13 @@ function BottomBar() {
               className={`icon-btn${running ? " is-on" : ""}`}
               onClick={() => setRunning(!running)}
               aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : running ? "Stop auto-advance" : "Auto-advance weeks"}
-              title={incident ? "Pause or resume the clock (P)" : "Advance weeks automatically (P)"}
+              {...tipProps(incident ? "Pause or resume the clock (P)" : "Advance weeks automatically (P)")}
             >
               <Icon name={running ? "pause" : "play"} />
             </button>
             <div className="speed" role="group" aria-label="Game speed">
               {SPEEDS.map((s) => (
-                <button type="button" key={s} className={speed === s ? "is-active" : ""} aria-pressed={speed === s} onClick={() => setSpeed(s)} title={`${s}× speed`}>
+                <button type="button" key={s} className={speed === s ? "is-active" : ""} aria-pressed={speed === s} onClick={() => setSpeed(s)} {...tipProps(`${s}× speed`)}>
                   {s}×
                 </button>
               ))}
@@ -272,8 +262,8 @@ function BottomBar() {
 /* Overlay views                                                       */
 /* ------------------------------------------------------------------ */
 
-const VIEW_TITLES: Record<Exclude<View, null | "menu" | "guidance">, string> = { tech: "Tech tree", engineers: "Team", history: "History" };
-const VIEW_ICONS: Record<Exclude<View, null | "menu" | "guidance">, [ConceptKind, IconName]> = {
+const VIEW_TITLES: Record<Exclude<View, null | "menu">, string> = { tech: "Tech tree", engineers: "Team", history: "History" };
+const VIEW_ICONS: Record<Exclude<View, null | "menu">, [ConceptKind, IconName]> = {
   tech: ["tech", "tree"],
   engineers: ["team", "team"],
   history: ["users", "history"],
@@ -282,7 +272,7 @@ const VIEW_ICONS: Record<Exclude<View, null | "menu" | "guidance">, [ConceptKind
 function ViewSheet() {
   const view = useGame((s) => s.view);
   const openView = useGame((s) => s.openView);
-  if (!view || view === "menu" || view === "guidance") return null;
+  if (!view || view === "menu") return null;
   return (
     <section className={`sheet sheet-${view}`} aria-label={VIEW_TITLES[view]}>
       <header className="sheet-head">
@@ -330,6 +320,49 @@ function ToastHost() {
 /* Shell                                                               */
 /* ------------------------------------------------------------------ */
 
+const musicLevel = (a: AudioSettings) => (a.muted ? 0 : a.music);
+const effectsLevel = (a: AudioSettings) => (a.muted ? 0 : a.effects);
+
+/** Background music once a run is on screen: calm while building, tense during an incident. */
+function useMusic(): void {
+  const level = useGame((s) => musicLevel(s.audio));
+  const started = useGame((s) => s.started);
+  const incident = useGame((s) => s.game.phase === "incident");
+  const music = useRef<Music | null>(null);
+  useEffect(() => {
+    const m = createMusic(() => musicLevel(useGame.getState().audio) > 0);
+    music.current = m;
+    return () => {
+      m.dispose();
+      music.current = null;
+    };
+  }, []);
+  useEffect(() => music.current?.setVolume(level), [level]);
+  useEffect(() => music.current?.setEnabled(started), [started]);
+  useEffect(() => music.current?.setMood(incident ? "tense" : "calm"), [incident]);
+}
+
+/**
+ * Sound effects for what just happened in the game. Driven by a store
+ * subscription rather than renders, so the volume is already set when a cue
+ * plays and nothing is heard twice under StrictMode.
+ */
+function useSoundEffects(): void {
+  useEffect(() => {
+    const sfx = createSfx(() => effectsLevel(useGame.getState().audio) > 0);
+    sfx.setVolume(effectsLevel(useGame.getState().audio));
+    const stopVolume = useGame.subscribe((s, prev) => {
+      if (s.audio !== prev.audio) sfx.setVolume(effectsLevel(s.audio));
+    });
+    const stopCues = watchCues(useGame.subscribe, (cue) => sfx.play(cue));
+    return () => {
+      stopCues();
+      stopVolume();
+      sfx.dispose();
+    };
+  }, []);
+}
+
 export default function Game() {
   const campaign = useGame((s) => !!s.game.campaign);
   const ready = useGame((s) => s.ready);
@@ -341,6 +374,8 @@ export default function Game() {
   const view = useGame((s) => s.view);
   const onboarding = useGame((s) => s.onboarding);
   const touring = useGame((s) => s.tour?.track ?? null);
+  useMusic();
+  useSoundEffects();
 
   useEffect(() => {
     useGame.getState().boot();
@@ -401,7 +436,7 @@ export default function Game() {
   }
 
   return (
-    <div className={`app ${campaign?"campaign-app":""} phase-${phase}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}`}>
+    <div className={`app phase-${phase}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}`}>
       {campaign ? <CampaignHeader /> : <TopBar />}
       <main className="stage">
         <Suspense fallback={<div className="stage-loading">Loading…</div>}>

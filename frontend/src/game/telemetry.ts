@@ -56,13 +56,6 @@ export function projectEvents(previous:Measurement,g:GameState,now:string):Measu
       "autoscale-retirement-cancelled":"autoscale_retirement_cancelled","autoscale-instance-retired":"autoscale_instance_retired",
       "traffic-spike-stage-completed":"traffic_spike_stage_completed","spike-stage-acknowledged":"traffic_spike_stage_acknowledged"};
     if(spikeNames[t.type])emit(spikeNames[t.type],{...t.data,...(t.type==="traffic-spike-stage-completed"?timing():{})});
-    const preventionNames:Record<string,string>={
-      "opening-prevention-eligible":"opening_prevention_eligible",
-      "opening-prevention-application-inspected":"opening_prevention_application_inspected",
-      "opening-prevention-database-inspected":"opening_prevention_database_inspected",
-      "opening-prevention-qualified":"opening_prevention_qualified",
-      "opening-prevention-review-acknowledged":"opening_prevention_review_acknowledged"};
-    if(preventionNames[t.type])emit(preventionNames[t.type]);
     switch(t.type) {
       case "inspection": emit("component_inspected",{...t.data,snapshotStep:t.step});break;
       case "data-stage-entered":emit("data_stage_entered");break;

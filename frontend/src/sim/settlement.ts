@@ -42,7 +42,8 @@ export function settlePeriod(c: Campaign): void {
     c.revenueCents += revenueCents;
     c.costsCents += appCents + dbCents + salaryCents + lbCents + cacheCents + controllerCents;
     c.lastSettledPeriod = period;
-    c.settlements.push({ period, step: c.step, revenueCents, appCents, dbCents, salaryCents, lbCents, cacheCents, controllerCents, netCents });
-    trace(c, "settlement", { period, revenueCents, appCents, dbCents, salaryCents, lbCents, cacheCents, controllerCents, netCents });
+    c.settlements.push({ period, step: c.step, revenueCents, appCents, dbCents, salaryCents,
+        ...(c.foundation && c.step<=c.foundation.step ? {} : {lbCents}), ...(c.dataStage?{cacheCents}:{}), ...(c.spikeStage?{controllerCents}:{}), netCents });
+    trace(c, "settlement", { period, revenueCents, appCents, dbCents, salaryCents, lbCents, ...(c.dataStage?{cacheCents}:{}), ...(c.spikeStage?{controllerCents}:{}), netCents });
     c.ledger = emptyLedger();
 }

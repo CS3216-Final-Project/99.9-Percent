@@ -6,7 +6,9 @@ The playable frontend was migrated from [99.9-Percent-Prototype](https://github.
 
 See the [Development Roadmap](docs/DEVELOPMENT_ROADMAP.md) for planned work and the [roadmap summary and proposal review](docs/DEVELOPMENT_ROADMAP_REVIEW.md) for milestones, scope alignment, and decisions to review.
 
-The [System Architecture](docs/SYSTEM_ARCHITECTURE.md) diagrams show the target MVP's frontend, simulation, Google OAuth, saves, API and Neon database, plus the infrastructure simulated inside the game. [🔑 Authentication](docs/AUTHENTICATION.md) defines the planned Google sign-in and app sessions; implementation is scheduled in the roadmap.
+The [System Architecture](docs/SYSTEM_ARCHITECTURE.md) diagrams show the target MVP's frontend, simulation, Google OAuth, saves, API and Neon database, plus the infrastructure simulated inside the game. [🔑 Authentication](docs/AUTHENTICATION.md) describes the optional Google sign-in, durable app sessions and account-owned cloud saves. Real-provider deployment acceptance remains outstanding.
+
+The [UI design guide](docs/UI_DESIGN.md) defines the shared visual language, incident and inspector layouts, responsive behaviour and review checks used by both gameplay modes.
 
 ## Structure
 
@@ -38,11 +40,27 @@ npm run dev
 
 The frontend opens the 99.99% title screen and an isometric startup office: a glass-walled server floor surrounded by desks, a monitoring room, meeting rooms, a kitchen and a lounge, with people at work. Press Play to begin the guided first week. Drag to pan, scroll or pinch to zoom, and click equipment to inspect it. `Shift` + drag (or right-drag, or two fingers) rotates and tilts the room; `Q` and `E` turn it by 45 degrees, and the house button resets the view. Walls between the camera and the room drop out of the way. `P` pauses or resumes; `Esc` closes a view.
 
+The office is staffed by a crew of animated monsters from Quaternius's CC0 [Ultimate Monsters](https://quaternius.com/packs/ultimatemonsters.html) pack, one species per role: cats and birds write the code, a yeti is on call, a monkey runs the meetings, a mushroom crunches data, a chick is the intern, a ninja handles security, a frog fixes hardware, a bunny runs reception and a bee does marketing. They walk, idle, nod and wave with the pack's own animations, and shake their heads during an incident. Six of them wander the office on seeded loops of their own, stopping at the vending machines, the coffee machine, the water cooler, a colleague's desk, the whiteboard or the window; small groups stand chatting with speech bubbles that turn to the outage during an incident; and a frog and a bunny keep the ping-pong rally going. Licences are in `frontend/public/models/creatures/`.
+
+The office is the top floor of a sixteen-storey glass tower downtown at night, with the "99.99%" sign on the storey below it. Around the tower's plaza is a grid of four-lane streets with lamps, trees, zebra crossings and traffic that takes turns at the junctions, a park, and blocks of glass towers, concrete offices and older stone buildings. Lit offices vary floor by floor, and rooftops carry plant, water tanks, crown lights and blinking red beacons. Buildings grow taller with distance, so none ever stands between the camera and the crew. The city is generated in `frontend/src/components/scene/city.ts` and drawn without any downloads; a light haze settles over the street below, and the whole city fades into the night with distance, so it has no edge.
+
+The game has its own music, written as notes in `frontend/src/game/score.ts` and synthesised in the browser with the Web Audio API: a mellow groove while you build and a tense loop during incidents. It starts when you press Play, and the speaker button beside the menu turns it off; the choice is remembered.
+
+Every desk has an iMac-style all-in-one in its own colour with a matching keyboard and mouse, and the vending machines (stocked behind lit glass), water cooler, arcade cabinets, server-room cooling units, fridge and espresso machine are modelled part by part in `frontend/src/components/scene/propModels.ts`.
+
 The office furniture comes from two CC0 model packs, [Kenney's Furniture Kit](https://kenney.nl/assets/furniture-kit) and [KayKit Furniture Bits](https://kaylousberg.itch.io/furniture-bits) by Kay Lousberg. Their licences sit beside the models in `frontend/public/models/`.
+
+On a machine with a graphics card the room draws in HD: photo-scanned CC0 floors and walls from [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambientcg.com), photo-scanned Poly Haven plants, sofas, armchairs, tables, boxes and a lamp in place of the stylised ones, physically based materials, soft reflections, softer shadows, ambient occlusion and a glow on screens and lights. Credits are in `frontend/public/textures/License.txt` and `frontend/public/models/polyhaven/License.txt`. Without a GPU it keeps the lighter pixel look and never downloads the HD assets. Add `?graphics=hd` or `?graphics=basic` to the address to force either.
 
 The [nine-node technology tree](docs/tech-tree.md) groups upgrades into Capacity, Data and Reliability, with metrics and alerts available from the start. It follows the proposal's reduced research scope while retaining the weekly simulation and existing saves.
 
+In either mode, open Menu > Save files to export the current run or import a JSON save. Imports validate before replacing a run and open the matching Campaign or Classic mode. If a pre-update browser save is present, the same menu offers Resume pre-update save and Export pre-update save. Resuming copies the validated weekly run into Classic; the original save, metadata and analytics remain untouched. The music button beside Menu shares its mute setting across both modes and remembers it after reload.
+
 Gameplay, saves and prototype analytics run in the browser and work without the API. Saves stay in this browser and origin; saves on the prototype deployment do not automatically move to a new domain. The backend retains its existing health and dialogue endpoints for later integration.
+
+Campaign continues into [Phase 3 scaling](docs/phases/PHASE_3_SCALING.md) after the opening milestone: buy database headroom, scale an application or install a second server, then explicitly deploy and configure load balancing. After scaling growth, acknowledged reports and drained backlogs, explicitly continue into [Phase 4 data strategy](docs/phases/PHASE_4_DATA_STRATEGY.md): compare read/write workloads, a warming Read Cache, ceiling tuning and the paid 3,000 ops/s database tier. See the [implementation report](docs/phases/PHASE_4_IMPLEMENTATION_REPORT.md) for validation and remaining acceptance work. Classic remains available through the mode selector. Existing replay saves are backed up before conversion to schema 4; historical reports retain their original observations.
+
+Account and cloud saves are optional controls on the Campaign title and menu. Sign-in never attaches a guest company automatically. The frontend's server-side `API_PROXY_TARGET` and backend Google/`APP_ORIGIN` configuration are required for account endpoints; see the authentication guide and package `.env.example` files. All `VITE_*` settings are public. Guest play remains available when accounts are unconfigured or offline.
 
 The API runs without a database. For routes that use one, put Neon's connection strings in `backend/.env` (ask Di Heng, or use your own Neon branch).
 
@@ -78,6 +96,10 @@ Postgres on [Neon](https://neon.tech) (region: Singapore), queried with [Drizzle
 | `sessions` | One row per mission attempt |
 | `dialogue_turns` | What the player said and the NPC replied, per session (the conversation history) |
 | `mission_reports` | The `MissionReport` for a finished session |
+| `game_accounts` | Verified Google issuer/subject and display name |
+| `game_sessions` | Hashed opaque session tokens, CSRF token and expiry |
+| `game_auth_attempts` | Short-lived browser-bound OAuth state, nonce and PKCE verifier |
+| `game_runs` | Owner-scoped compact campaign replay saves and revisions |
 
 To change the schema: edit `schema.ts`, run `npm run db:generate`, and commit the new files in `backend/drizzle/`. Never edit a migration that has already been merged. The migration runs on production automatically after the merge.
 

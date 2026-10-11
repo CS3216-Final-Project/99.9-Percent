@@ -112,7 +112,7 @@ export interface CostBreakdown {
 }
 
 export function costs(s: GameState, tempServers = 0): CostBreakdown {
-  if(s.campaign){const c=s.campaign,servers=c.apps.reduce((sum,a)=>sum+(a.tier==="large"?S.appWeeklyCents:Q.appWeeklyCents),0)/100,database=(c.dbCapacity===3000?D.dbWeeklyCents:c.dbCapacity===2000?S.dbWeeklyCents:c.upgraded?Q.upgradedDbWeeklyCents:Q.dbWeeklyCents)/100,redundancy=c.loadBalancer?S.lbWeeklyCents/100:0,salaries=Q.engineers*Q.salaryWeeklyCents/100;return {servers,database,salaries,redundancy,tooling:c.readCache?D.cacheWeeklyCents/100:0,autoscale:c.spikeStage?.controller?T.controllerWeeklyCents/100:0,total:servers+database+salaries+redundancy+(c.readCache?D.cacheWeeklyCents/100:0)+(c.spikeStage?.controller?T.controllerWeeklyCents/100:0)};}
+  if(s.campaign){const c=s.campaign,servers=c.apps.reduce((sum,a)=>sum+(a.tier==="large"?S.appWeeklyCents:Q.appWeeklyCents),0)/100,database=(c.dbCapacity===D.dbCapacity?D.dbWeeklyCents:c.dbCapacity===S.dbCapacity?S.dbWeeklyCents:c.upgraded?Q.upgradedDbWeeklyCents:Q.dbWeeklyCents)/100,redundancy=c.loadBalancer?S.lbWeeklyCents/100:0,salaries=Q.engineers*Q.salaryWeeklyCents/100;return {servers,database,salaries,redundancy,tooling:c.readCache?D.cacheWeeklyCents/100:0,autoscale:c.spikeStage?.controller?T.controllerWeeklyCents/100:0,total:servers+database+salaries+redundancy+(c.readCache?D.cacheWeeklyCents/100:0)+(c.spikeStage?.controller?T.controllerWeeklyCents/100:0)};}
   const salaries = s.engineers * BALANCE.engineer.salary;
   const servers = s.infra.appHosts.length * serverUpkeep(s);
   const dbUpkeep = BALANCE.db.tiers[s.infra.dbTier].upkeep;

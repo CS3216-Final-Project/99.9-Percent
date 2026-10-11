@@ -93,3 +93,22 @@ export const missionReports = pgTable(
     check('mission_reports_xp_non_negative', sql`${t.xpEarned} >= 0`),
   ],
 );
+
+// Campaign accounts are independent of the retained language-learning tables.
+export const gameAccounts = pgTable('game_accounts', {
+  id: uuid().primaryKey().defaultRandom(), issuer: text().notNull(), subject: text().notNull(),
+  displayName: text().notNull(), createdAt: createdAt(),
+}, t => [unique('game_accounts_identity_key').on(t.issuer, t.subject)]);
+export const gameSessions = pgTable('game_sessions', {
+  tokenHash: text().primaryKey(), accountId: uuid().notNull().references(() => gameAccounts.id, {onDelete:'cascade'}),
+  csrfToken: text().notNull(), expiresAt: timestamp({withTimezone:true}).notNull(), createdAt: createdAt(),
+}, t => [index('game_sessions_account_idx').on(t.accountId)]);
+export const gameAuthAttempts = pgTable('game_auth_attempts', {
+  stateHash: text().primaryKey(), bindingHash: text().notNull(), nonce: text().notNull(), verifier: text().notNull(),
+  expiresAt: timestamp({withTimezone:true}).notNull(),
+});
+export const gameRuns = pgTable('game_runs', {
+  runId: text().primaryKey(), accountId: uuid().notNull().references(() => gameAccounts.id, {onDelete:'cascade'}),
+  revision: integer().notNull(), envelope: jsonb().$type<import('../../../shared/campaign.ts').CampaignEnvelope>().notNull(),
+  updatedAt: timestamp({withTimezone:true}).notNull().defaultNow(),
+}, t => [check('game_runs_positive_revision', sql`${t.revision} > 0`), index('game_runs_owner_updated_idx').on(t.accountId, t.updatedAt)]);

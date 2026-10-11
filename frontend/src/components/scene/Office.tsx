@@ -1,25 +1,38 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { deskSlot, POS, ROOM } from "./layout";
-import { look, Person, Walker, type Activity } from "./people";
-import { ModelBatch, preloadModels, type ModelId, type Placement } from "./models";
-import { ball, bx, cy, place, PrimBatch, type Prim, type V3 } from "./prims";
+import { creature, standsAtDesk, type Activity, type Species } from "./cast";
+import { Creature, Walker, Wanderer } from "./creatures";
+import { preloadCreatures } from "./creatureCatalog";
+import { Conversation } from "./chatter";
+import { GROUPS } from "./conversations";
+import { ARCADE_Z, ARCADES, CHAIR_OFFSET, deskSeat, FIXTURES, GLASS, GLASS_H, MEETING_CHAIRS, SPOTS } from "./floorplan";
+import { planLoop, type WaypointId } from "./routes";
+import { BALL_RADIUS, ballAt, RALLY, RALLY_PERIOD, TABLE } from "./rally";
+import { preloadModels, type ModelId } from "./modelCatalog";
+import { ModelBatch, type Placement } from "./models";
+import { PrimBatch } from "./prims";
+import { ball, bx, cy, place, type Prim, type V3 } from "./shapes";
+import { ARCADE_SCREEN, MAC, MAC_COLOUR_NAMES, type PropItem } from "./propModels";
+import { DetailedProps } from "./props";
+import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
 import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, whiteboard, woodFloor, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
 
 /*
- * Everything human in the building. The equipment sits on a glass-walled
- * server floor in the middle; around it are the engineering pods, the release
- * and growth desks, a monitoring room, a network and power room, townhall
- * steps, a library, a meeting room, reception, a kitchen, a dining table, a
- * lounge with games, and the people who use them.
+ * Everything around the equipment. It sits on a glass-walled server floor in
+ * the middle; around it are the engineering pods, the release and growth
+ * desks, a monitoring room, a network and power room, townhall steps, a
+ * library, a meeting room, reception, a kitchen, a dining table, a lounge with
+ * games, and the monster crew who use them (see creatures.tsx).
  *
- * Furniture comes from two CC0 model packs (see models.tsx); fittings with no
- * matching model are boxes and cylinders (see prims.tsx). Both are drawn as
- * instanced meshes. Only screens, glass, signs and moving things are separate.
+ * Furniture comes from CC0 model packs, with photo-scanned stand-ins at HD
+ * detail (see models.tsx); fittings with no matching model are boxes and
+ * cylinders (see prims.tsx). Both are batched. Only screens, glass, signs and
+ * moving things are separate.
  */
 
 const INK = "#1d1834";
@@ -89,31 +102,18 @@ function shelf(w: number, h: number, seed: number): Prim[] {
   return out;
 }
 
-/** Arcade cabinet facing +z. Its screen is drawn separately. */
-function arcade(color: string): Prim[] {
-  return [
-    bx([0, 0.9, 0], [0.72, 1.8, 0.75], color),
-    bx([0, 1.25, 0.39], [0.6, 0.5, 0.04], INK, [-0.2, 0, 0]),
-    bx([0, 0.93, 0.42], [0.66, 0.08, 0.3], INK),
-    cy([-0.15, 0.99, 0.45], 0.04, 0.08, "#ff4d5e"),
-    cy([0.1, 0.98, 0.45], 0.05, 0.03, "#ffd84a"),
-    cy([0.22, 0.98, 0.45], 0.05, 0.03, "#4cb8ff"),
-    bx([0, 1.68, 0.3], [0.66, 0.2, 0.22], "#ffd84a"),
-  ];
-}
-
 function pingPong(): Prim[] {
+  const { length: l, width: w, top, netTop } = TABLE;
+  const line = top + 0.005;
   return [
-    bx([0, 0.76, 0], [2.74, 0.06, 1.52], "#1f7a5c"),
-    bx([0, 0.795, 0.745], [2.74, 0.012, 0.03], "#fff7e8"),
-    bx([0, 0.795, -0.745], [2.74, 0.012, 0.03], "#fff7e8"),
-    bx([1.355, 0.795, 0], [0.03, 0.012, 1.52], "#fff7e8"),
-    bx([-1.355, 0.795, 0], [0.03, 0.012, 1.52], "#fff7e8"),
-    bx([0, 0.795, 0], [2.74, 0.012, 0.015], "#fff7e8"),
-    bx([0, 0.87, 0], [0.02, 0.15, 1.64], LILAC),
+    bx([0, top - 0.03, 0], [l, 0.06, w], "#1f7a5c"),
+    bx([0, line, w / 2 - 0.015], [l, 0.012, 0.03], "#fff7e8"),
+    bx([0, line, -w / 2 + 0.015], [l, 0.012, 0.03], "#fff7e8"),
+    bx([l / 2 - 0.015, line, 0], [0.03, 0.012, w], "#fff7e8"),
+    bx([-l / 2 + 0.015, line, 0], [0.03, 0.012, w], "#fff7e8"),
+    bx([0, line, 0], [l, 0.012, 0.015], "#fff7e8"),
+    bx([0, (top + netTop) / 2, 0], [0.02, netTop - top, w + 0.12], LILAC),
     ...[-1.1, 1.1].flatMap((dx) => [-0.6, 0.6].map((dz) => bx([dx, 0.37, dz], [0.07, 0.74, 0.07], TRIM))),
-    cy([-0.9, 0.8, 0.45], 0.18, 0.02, "#ff4d5e"),
-    cy([0.95, 0.8, -0.4], 0.18, 0.02, INK),
   ];
 }
 
@@ -134,31 +134,6 @@ function booth(color: string): Prim[] {
 /* The whole floor plan                                                */
 /* ------------------------------------------------------------------ */
 
-/** Glass partition runs as [x1, z1, x2, z2]. Gaps for doors are already left out. */
-const GLASS: [number, number, number, number][] = [
-  // Server floor
-  [-13, 5, -2.0, 5],
-  [-0.8, 5, 9, 5],
-  [9, -4.6, 9, -0.2],
-  [9, 1.0, 9, 5],
-  [-13, -9.5, -13, -0.6],
-  [-13, 0.6, -13, 5],
-  // Monitoring room
-  [5.5, -9.5, 5.5, -4.6],
-  [5.5, -4.6, 9.6, -4.6],
-  [10.6, -4.6, 11.5, -4.6],
-  [11.5, -9.5, 11.5, -4.6],
-  // Network and power room
-  [-22, -1, -15.2, -1],
-  [-14.0, -1, -13, -1],
-  // Meeting room
-  [-13, 10.2, -6.8, 10.2],
-  [-5.9, 10.2, -5.5, 10.2],
-  [-5.5, 10.2, -5.5, 14.5],
-  [-13, 10.2, -13, 14.5],
-];
-
-const GLASS_H = 2.6;
 
 function glassFrames(): Prim[] {
   const out: Prim[] = [];
@@ -210,8 +185,10 @@ function placeModels(items: Placement[], x: number, z: number, rot = 0): Placeme
 }
 
 const DESK_TOP = 0.74;
-/** The lit panel of a desk monitor relative to its desk: centre height, front face and size. */
-const PANEL = { y: 1.02, z: -0.168, w: 0.6, h: 0.36 };
+/** The picture on a desk's Mac relative to its desk: centre height, front face and size. */
+const PANEL = { y: DESK_TOP + MAC.displayY, z: -0.168, w: MAC.screenW, h: MAC.screenH };
+/** The smaller Mac at reception: the centre and width of its picture. */
+const RECEPTION_SCREEN = { y: 1.0, z: 11.771, w: 0.52 };
 const DESK_PLANTS: [ModelId, number][] = [
   ["plantSmall1", 1],
   ["cactusSmallA", 0.7],
@@ -219,20 +196,62 @@ const DESK_PLANTS: [ModelId, number][] = [
   ["cactusSmallB", 0.7],
 ];
 
-/** A desk facing -z with its chair on the +z side. The monitors' screens are drawn by `People`. */
-function deskModels(w: number, i: number, monitors = 1): Placement[] {
-  const xs = monitors === 1 ? [0] : [-0.45, 0.45];
-  const out = [
-    mdl("desk", 0, 0, 0, [w, DESK_TOP, 0.78]),
-    ...xs.map((x) => mdl("screen", x, -0.2, 0, 0.85, DESK_TOP)),
-    mdl("keyboard", 0, 0.14, 0, 0.85, DESK_TOP),
-    mdl("mouse", 0.36, 0.16, 0, 1.1, DESK_TOP),
-    mdl("chairDesk", 0, 0.72, Math.PI),
-  ];
+/** The on-call SRE and the receptionist, who each have a desk of their own. */
+const ON_CALL = creature(12, "sre");
+const RECEPTIONIST = creature(18, "frontdesk");
+
+/**
+ * A desk facing -z with its chair on the +z side, unless whoever works there is too big for a chair. Its Macs come
+ * from `deskGear`; their pictures are drawn by `Staff`.
+ */
+function deskModels(w: number, i: number, chair = true): Placement[] {
+  const out = [mdl("desk", 0, 0, 0, [w, DESK_TOP, 0.78]), ...(chair ? [mdl("chairDesk", 0, CHAIR_OFFSET, Math.PI)] : [])];
   if (i % 2 === 1) {
     const [id, s] = DESK_PLANTS[(i >> 1) % DESK_PLANTS.length];
     out.push(mdl(id, -w / 2 + 0.2, -0.18, i, s, DESK_TOP));
   }
+  return out;
+}
+
+/** The Macs, keyboard and mouse on a desk, in the desk's frame. Each desk gets its own colour. */
+function deskGear(i: number, monitors = 1): PropItem[] {
+  const variant = MAC_COLOUR_NAMES[(i * 3) % MAC_COLOUR_NAMES.length];
+  const xs = monitors === 1 ? [0] : [-0.45, 0.45];
+  return [
+    // Each Mac stands just behind where its picture is drawn.
+    ...xs.map((x): PropItem => ({ kind: "imac", variant, p: [x, DESK_TOP, PANEL.z - MAC.gap] })),
+    { kind: "keyboard", variant, p: [0, DESK_TOP, 0.14] },
+    { kind: "mouse", variant, p: [0.36, DESK_TOP, 0.16] },
+  ];
+}
+
+/** Props built around the origin, placed at (x, z) and turned by rot. */
+function placeProps(items: PropItem[], x: number, z: number, rot = 0): PropItem[] {
+  return items.map((it) => ({ ...it, p: at(x, z, rot, it.p), rot: (it.rot ?? 0) + rot }));
+}
+
+/** The detailed machines: Macs on every desk, cooling units, vending machines, kitchen appliances and arcade cabinets. */
+function buildProps(): PropItem[] {
+  const out: PropItem[] = [];
+  const add = (items: PropItem[], x: number, z: number, rot = 0) => out.push(...placeProps(items, x, z, rot));
+  for (let i = 0; i < 8; i++) {
+    const s = deskSlot(i);
+    add(deskGear(i), s.x, s.z, s.rot);
+  }
+  add(deskGear(9, 2), POS.growth.x - 0.4, POS.growth.z + 0.2);
+  add(deskGear(12, 2), 8.2, -6.9);
+  // Reception: a smaller Mac on the lower work surface, facing the receptionist.
+  const rs = RECEPTION_SCREEN.w / MAC.screenW;
+  out.push(
+    { kind: "imac", variant: "orange", p: [3.2, RECEPTION_SCREEN.y - MAC.displayY * rs, RECEPTION_SCREEN.z + MAC.gap * rs], rot: Math.PI, s: rs },
+    { kind: "keyboard", variant: "orange", p: [3.2, 0.76, 11.65], rot: Math.PI },
+    { kind: "mouse", variant: "orange", p: [2.95, 0.76, 11.66], rot: Math.PI },
+  );
+  for (const z of [-2.6, 2.2]) out.push({ kind: "crac", p: [-12.45, 0, z], rot: Math.PI / 2 });
+  out.push({ kind: "vending", variant: "red", p: [12.6, 0, -9.0] }, { kind: "vending", variant: "blue", p: [13.7, 0, -9.0] });
+  out.push({ kind: "cooler", p: [15.0, 0, -4.0], rot: Math.PI / 2 });
+  out.push({ kind: "fridge", p: [15.35, 0, -9.1] }, { kind: "espresso", p: [17.23, 0.87, -9.15] });
+  for (const [variant, x] of ARCADES) out.push({ kind: "arcade", variant, p: [x, 0, ARCADE_Z] });
   return out;
 }
 
@@ -252,19 +271,7 @@ function buildStatic(): Prim[] {
   add([bx([0, 0.5, 0], [1.5, 1, 0.8], STEEL), bx([0, 1.28, -0.12], [1.17, 0.69, 0.05], INK, [-0.35, 0, 0]), bx([0.95, 0.6, 0.05], [0.3, 1.2, 0.6], TRIM)], POS.deploy.x, POS.deploy.z);
   add([cy([0, 0.55, 0], 0.08, 1.1, INK), bx([0, 1.5, 0], [1.27, 0.82, 0.05], INK)], POS.growth.x + 1.15, POS.growth.z - 0.55);
 
-  // Server floor: cooling units, an extinguisher, a crash cart, floor vents
-  for (const z of [-2.6, 2.2]) {
-    add(
-      [
-        bx([0, 1.0, 0], [0.9, 2.0, 1.4], "#cbc4ea"),
-        ...Array.from({ length: 7 }, (_, i) => bx([0.46, 0.45 + i * 0.18, 0], [0.02, 0.06, 1.1], "#5d5399")),
-        bx([0.47, 1.75, -0.35], [0.02, 0.18, 0.3], INK),
-        bx([0.48, 1.75, -0.35], [0.01, 0.06, 0.1], "#3ddc84"),
-      ],
-      -12.45,
-      z,
-    );
-  }
+  // Server floor: an extinguisher, a crash cart and floor vents (the cooling units are detailed props)
   add([cy([0, 0.3, 0], 0.2, 0.55, "#ff4d5e"), cy([0, 0.62, 0], 0.08, 0.1, INK)], -12.6, 4.4);
   add(
     [
@@ -324,14 +331,11 @@ function buildStatic(): Prim[] {
   out.push(bx([-2.1, 0.41, 12.6], [0.3, 0.02, 0.4], "#ffc53d", [0, 0.3, 0]));
   out.push(bx([3.2, 0.006, 13.95], [1.8, 0.012, 1.0], TRIM));
 
-  // Corridor: a low bookshelf and vending machines
+  // Corridor: a low bookshelf
   add(shelf(2.4, 1.1, 37), 11.6, 5.45);
-  add([bx([0, 0.95, 0], [0.9, 1.9, 0.8], "#ff4d5e"), bx([0, 1.25, 0.41], [0.6, 0.9, 0.02], "#a8d8ff"), bx([0, 0.35, 0.41], [0.6, 0.12, 0.02], INK)], 12.6, -9.0);
-  add([bx([0, 0.95, 0], [0.9, 1.9, 0.8], "#4cb8ff"), bx([0, 1.25, 0.41], [0.6, 0.9, 0.02], "#a8d8ff"), bx([0, 0.35, 0.41], [0.6, 0.12, 0.02], INK)], 13.7, -9.0);
 
-  // Fruit on the kitchen island and a water cooler
+  // Fruit on the kitchen island
   out.push(ball([18.4, 0.86, -6.2], [0.36, 0.12, 0.36], WHITE), ball([18.35, 0.93, -6.15], [0.1, 0.1, 0.1], "#ff4d5e"), ball([18.48, 0.93, -6.25], [0.1, 0.1, 0.1], "#ffc53d"));
-  add([bx([0, 0.5, 0], [0.38, 1.0, 0.38], LILAC), cy([0, 1.22, 0], 0.32, 0.42, "#4cb8ff")], 15.0, -4.0);
 
   // The remains of pizza night
   add(pizza(), 17.8, -0.1, 0, 0.76);
@@ -341,9 +345,7 @@ function buildStatic(): Prim[] {
   add(rug(5.0, 4.6, "#6b4aa0", "#7d5bb8"), 18.4, 6.5);
   out.push(cy([-19.2, 0.007, 11.7], 2.8, 0.012, "#6b4aa0"), cy([-19.2, 0.009, 11.7], 2.4, 0.013, "#7d5bb8"));
   out.push(ball([16.9, 0.26, 4.4], [0.96, 0.58, 0.96], "#2dd4bf"), ball([16.6, 0.26, 8.6], [0.96, 0.58, 0.96], "#ff7ad9"));
-  add(pingPong(), 18.2, 12.6);
-  add(arcade("#a985ff"), 20.4, 10.5);
-  add(arcade("#ff4d5e"), 21.3, 10.5);
+  add(pingPong(), RALLY.x, RALLY.z);
   return out;
 }
 
@@ -372,11 +374,12 @@ function buildModels(): Placement[] {
   // Engineering pods, the growth desk and the on-call desk
   for (let i = 0; i < 8; i++) {
     const s = deskSlot(i);
-    add(deskModels(1.5, i), s.x, s.z, s.rot);
+    // A desk whose engineer is too big for a chair is a standing desk.
+    add(deskModels(1.5, i, !standsAtDesk(creature(i))), s.x, s.z, s.rot);
   }
-  add(deskModels(2.2, 9, 2), POS.growth.x - 0.4, POS.growth.z + 0.2);
-  add(deskModels(1.8, 12, 2), 8.2, -6.9);
-  out.push(mdl("pottedPlant", -12.4, 5.6), mdl("pottedPlant", -12.4, 9.5), mdl("coatRack", -3.0, 5.6), mdl("trashcan", -3.0, 9.0, 0, 0.8));
+  add(deskModels(2.2, 9), POS.growth.x - 0.4, POS.growth.z + 0.2);
+  add(deskModels(1.8, 12, !standsAtDesk(ON_CALL)), 8.2, -6.9);
+  out.push(mdl("pottedPlant", -12.4, 5.6), mdl("pottedPlant", FIXTURES.plantByWhiteboard.x, FIXTURES.plantByWhiteboard.z), mdl("coatRack", -3.0, 5.6), mdl("trashcan", -3.0, 9.0, 0, 0.8));
   out.push(mdl("pottedPlant", 2.2, 8.9), mdl("cactusMedium", 8.9, 5.6, 0, 1.5));
 
   // Hardware waiting to be installed
@@ -392,15 +395,16 @@ function buildModels(): Placement[] {
 
   // Library corner
   out.push(mdl("armchair", -19.6, 10.8, Math.PI / 2, 0.95), mdl("armchair", -18.4, 12.6, Math.PI, 0.95));
-  out.push(mdl("sideTable", -19.1, 11.9, Math.PI / 4, 0.7), mdl("lampTable", -19.1, 11.9, 0, 0.9, 0.52), mdl("lampRoundFloor", -20.9, 13.7), mdl("pottedPlant", -14.0, 9.5, 0, 1.1));
+  out.push(mdl("sideTable", -19.1, 11.9, Math.PI / 4, 0.7), mdl("lampTable", -19.1, 11.9, 0, 0.9, 0.52), mdl("lampRoundFloor", -20.9, 13.7), mdl("pottedPlant", FIXTURES.plantByLibrary.x, FIXTURES.plantByLibrary.z, 0, 1.1));
 
   // Meeting room
   out.push(mdl("tableLong", -9.2, 12.35, 0, [3.4, 0.74, 1.3]));
-  for (const x of [-10.4, -9.2, -8.0]) out.push(mdl("chairModern", x, 11.42, 0, 1.2), mdl("chairModern", x, 13.28, Math.PI, 1.2));
+  for (const x of MEETING_CHAIRS.xs) out.push(mdl("chairModern", x, MEETING_CHAIRS.near, 0, 1.2), mdl("chairModern", x, MEETING_CHAIRS.far, Math.PI, 1.2));
   out.push(mdl("tvCabinet", MEETING_TV.x, MEETING_TV.z, Math.PI / 2, 0.9), mdl("tv", MEETING_TV.x, MEETING_TV.z, Math.PI / 2, MEETING_TV.s, MEETING_TV.y), mdl("pottedPlant", -6.0, 14.0));
 
   // Reception and the waiting area
-  out.push(mdl("screen", 3.2, 11.8, Math.PI, 0.75, 0.76), mdl("chairDesk", 3.2, 11.3), mdl("pottedPlant", 6.4, 13.9), mdl("coatRack", 5.6, 13.9));
+  if (!standsAtDesk(RECEPTIONIST)) out.push(mdl("chairDesk", SPOTS.receptionist.x, SPOTS.receptionist.z));
+  out.push(mdl("pottedPlant", 6.4, 13.9), mdl("coatRack", 5.6, 13.9));
   out.push(mdl("armchair", -3.2, 12.6, Math.PI / 2, 0.85), mdl("armchair", -1.2, 12.6, -Math.PI / 2, 0.85), mdl("tableCoffee", -2.2, 12.6, Math.PI / 2, 0.9), mdl("cactusMedium", -4.4, 13.9, 0, 1.6));
 
   // Corridor
@@ -410,11 +414,11 @@ function buildModels(): Placement[] {
   const run: ModelId[] = ["cabinetDrawer", "cabinet", "sink", "cabinet", "stove", "cabinetDrawer", "cabinet"];
   run.forEach((id, i) => out.push(mdl(id, 16.4 + i * 0.83, -9.06)));
   for (const z of [-8.2, -7.37, -6.54]) out.push(mdl("cabinet", 21.565, z, -Math.PI / 2));
-  out.push(mdl("fridge", 15.35, -9.1), mdl("coffeeMachine", 17.23, -9.15, 0, 1, 0.87), mdl("microwave", 20.55, -9.15, 0, 1, 0.87), mdl("blender", 16.4, -9.2, 0, 1, 0.87), mdl("toaster", 21.5, -7.37, -Math.PI / 2, 1, 0.87));
+  out.push(mdl("microwave", 20.55, -9.15, 0, 1, 0.87), mdl("blender", 16.4, -9.2, 0, 1, 0.87), mdl("toaster", 21.5, -7.37, -Math.PI / 2, 1, 0.87));
   for (const x of [17.57, 18.4, 19.23]) out.push(mdl("bar", x, -6.0), mdl("bar", x, -6.4, Math.PI));
   for (const x of [17.06, 19.74]) out.push(mdl("barEnd", x, -6.0), mdl("barEnd", x, -6.4, Math.PI));
   for (const x of [18.0, 18.9]) out.push(mdl("stoolBar", x, -5.35, Math.PI));
-  out.push(mdl("trashcan", 15.1, -7.6, 0, 0.8));
+  out.push(mdl("trashcan", FIXTURES.kitchenBin.x, FIXTURES.kitchenBin.z, -Math.PI / 2, 0.8));
 
   // Dining table and chairs
   out.push(mdl("tableLong", 18.5, 0, 0, [4.0, 0.75, 1.1]));
@@ -532,6 +536,15 @@ const ZONES: [FloorKey, number, number, number, number, number][] = [
   ["kitchen", 18.25, -6.25, 7.5, 6.5, 0.8],
 ];
 
+/** Each finish at HD detail: a photo surface in the colours of the basic one, and how rough it is. */
+const HD_FLOORS: Record<FloorKey, { id: SurfaceId; tint?: string; roughness?: number }> = {
+  server: { id: "serverTiles", tint: "#4f4987" },
+  wood: { id: "parquet", tint: "#c39470", roughness: 1.6 },
+  noc: { id: "carpet", tint: "#2f3f73" },
+  meeting: { id: "carpet", tint: "#7652ae" },
+  kitchen: { id: "kitchenTiles", tint: "#e6e0ff", roughness: 0.9 },
+};
+
 function Floors() {
   const textures = useMemo(() => {
     const base: Record<FloorKey, THREE.CanvasTexture> = {
@@ -548,31 +561,54 @@ function Floors() {
       return t;
     });
   }, []);
+  // At HD detail, photo surfaces in world metres: one material per finish, shared by its zones.
+  const surfaces = useSurfaces();
+  const hd = useMemo(() => {
+    if (!surfaces) return null;
+    const materials = new Map<FloorKey, THREE.Material>();
+    for (const [key, f] of Object.entries(HD_FLOORS) as [FloorKey, (typeof HD_FLOORS)[FloorKey]][]) materials.set(key, surfaceMaterial(surfaces[f.id], f.tint, f.roughness));
+    const geometries = ZONES.map(([key, x, z, w, d]) => projectUV(new THREE.PlaneGeometry(w, d), surfaces[HD_FLOORS[key].id].size, [x, -z, 0]));
+    return { materials, geometries };
+  }, [surfaces]);
+  useEffect(
+    () => () => {
+      hd?.geometries.forEach((g) => g.dispose());
+      hd?.materials.forEach((m) => m.dispose());
+    },
+    [hd],
+  );
   return (
     <group>
-      {ZONES.map(([, x, z, w, d], i) => (
-        <mesh key={i} position={[x, 0.004, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[w, d]} />
-          <meshLambertMaterial map={textures[i]} />
-        </mesh>
-      ))}
+      {ZONES.map(([key, x, z, w, d], i) =>
+        hd ? (
+          <mesh key={`hd${i}`} position={[x, 0.004, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow geometry={hd.geometries[i]} material={hd.materials.get(key)} />
+        ) : (
+          <mesh key={i} position={[x, 0.004, z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <planeGeometry args={[w, d]} />
+            <meshLambertMaterial map={textures[i]} />
+          </mesh>
+        ),
+      )}
     </group>
   );
 }
 
+/** Seconds into a swing at which the paddle meets the ball. */
+const SWING_CONTACT = 0.35;
+
+/** The -x player hits as the ball starts out, the +x player half a rally later. */
+const PING = { period: RALLY_PERIOD, at: -SWING_CONTACT };
+const PONG = { period: RALLY_PERIOD, at: RALLY_PERIOD / 2 - SWING_CONTACT };
+
 function PingPongBall() {
   const ball = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
-    if (!ball.current) return;
-    // A rally that never ends: the ball crosses the net and bounces on each side.
-    const t = clock.elapsedTime * 0.9;
-    const f = t % 2;
-    const x = f < 1 ? -1.1 + f * 2.2 : 1.1 - (f - 1) * 2.2;
-    ball.current.position.set(18.2 + x, 0.82 + Math.abs(Math.sin(t * Math.PI * 2)) * 0.3, 12.6 + Math.sin(t * 1.3) * 0.35);
+    // A rally that never ends.
+    ball.current?.position.set(...ballAt(clock.elapsedTime));
   });
   return (
     <mesh ref={ball}>
-      <sphereGeometry args={[0.035, 8, 6]} />
+      <sphereGeometry args={[BALL_RADIUS, 8, 6]} />
       <meshBasicMaterial color="#fff7e8" />
     </mesh>
   );
@@ -630,7 +666,7 @@ function WallClock({ position }: { position: V3 }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* People                                                              */
+/* The crew                                                            */
 /* ------------------------------------------------------------------ */
 
 export interface Crew {
@@ -642,6 +678,17 @@ export interface Crew {
 }
 
 type Seat = "type" | "relax" | "mug" | "kitchen" | "lounge";
+
+/** Crew who wander the office: where each loop starts, its seed, walking speed, and how far into it they begin. */
+const WANDERERS: { species: Species; start: WaypointId; seed: number; speed: number; offset: number }[] = [
+  { species: creature(24, "designer"), start: "spineCooler", seed: 3, speed: 0.5, offset: 0 },
+  { species: creature(16, "dev"), start: "frontDeploy", seed: 11, speed: 0.5, offset: 17 },
+  { species: creature(9, "pm"), start: "gamesLane", seed: 23, speed: 0.65, offset: 34 },
+  { species: creature(30, "intern"), start: "kitchenMid", seed: 31, speed: 0.45, offset: 51 },
+  { species: creature(43, "marketer"), start: "frontGap", seed: 47, speed: 0.7, offset: 68 },
+  { species: creature(45, "security"), start: "libraryLane", seed: 59, speed: 0.55, offset: 85 },
+];
+const WANDERER_PLANS = WANDERERS.map((w) => planLoop(w.start, w.seed, { legs: 30, speed: w.speed }));
 
 /**
  * Where engineer i is. Assigned engineers code at their desks. The first free
@@ -656,7 +703,7 @@ function seatFor(i: number, crew: Crew): Seat {
   return free % 2 ? "mug" : "relax";
 }
 
-function People({ crew }: { crew: Crew }) {
+function Staff({ crew }: { crew: Crew }) {
   const meetingTv = tvPicture(MEETING_TV);
   const loungeTv = tvPicture(LOUNGE_TV);
   return (
@@ -670,51 +717,61 @@ function People({ crew }: { crew: Crew }) {
           <group key={i}>
             <ScreenPlane kind={screen} w={PANEL.w} h={PANEL.h} position={at(slot.x, slot.z, slot.rot, [0, PANEL.y, PANEL.z])} rot={slot.rot} />
             {seat && seat !== "kitchen" && seat !== "lounge" && (
-              <Person pose="sit" activity={seat as Activity} look={look(i)} position={at(slot.x, slot.z, slot.rot, [0, 0, 0.72])} rotation={slot.rot} phase={i * 1.7} />
+              <Creature pose="sit" activity={crew.incident ? "panic" : (seat as Activity)} species={creature(i)} position={[deskSeat(i).x, 0, deskSeat(i).z]} rotation={slot.rot} phase={i * 1.7} />
             )}
-            {seat === "kitchen" && <Person pose="stand" activity="mug" look={look(i)} position={[16.6, 0, -5.7]} rotation={-2.4} phase={i} />}
-            {seat === "lounge" && <Person pose="sit" activity="laptop" look={look(i)} position={[19.9, 0, 5.9]} rotation={Math.PI / 2} phase={i} />}
+            {seat === "kitchen" && <Creature pose="stand" activity="mug" species={creature(i)} position={[SPOTS.kitchenBreak.x, 0, SPOTS.kitchenBreak.z]} rotation={SPOTS.kitchenBreak.rot} phase={i} />}
+            {seat === "lounge" &&
+              (standsAtDesk(creature(i)) ? (
+                <Creature pose="stand" activity="chat" species={creature(i)} position={[SPOTS.loungeStand.x, 0, SPOTS.loungeStand.z]} rotation={SPOTS.loungeStand.rot} phase={i} />
+              ) : (
+                <Creature pose="sit" activity="laptop" species={creature(i)} position={[SPOTS.sofa.x, 0, SPOTS.sofa.z]} rotation={SPOTS.sofa.rot} phase={i} />
+              ))}
           </group>
         );
       })}
 
-      {/* Release engineer, marketer, on-call engineer and receptionist */}
+      {/* Release engineer, marketer, on-call SRE and receptionist */}
       <ScreenPlane kind={crew.releases > 0 ? "deploy-busy" : "deploy"} w={1.1} h={0.62} position={[POS.deploy.x, 1.28, POS.deploy.z - 0.09]} tilt={-0.35} />
-      <Person pose="stand" activity={crew.releases > 0 || crew.incident ? "type" : "chat"} look={look(11)} position={[POS.deploy.x, 0, POS.deploy.z + 0.78]} phase={3} />
+      <Creature pose="stand" activity={crew.releases > 0 || crew.incident ? "type" : "chat"} species={creature(11, "dev")} position={[SPOTS.releaseEngineer.x, 0, SPOTS.releaseEngineer.z]} phase={3} />
       {[-0.45, 0.45].map((dx) => (
         <ScreenPlane key={dx} kind={crew.promos > 0 ? "chart" : "idle"} w={PANEL.w} h={PANEL.h} position={[POS.growth.x - 0.4 + dx, PANEL.y, POS.growth.z + 0.2 + PANEL.z]} />
       ))}
       <ScreenPlane kind="chart" w={1.2} h={0.75} position={[POS.growth.x + 1.15, 1.5, POS.growth.z - 0.52]} />
-      <Person pose="sit" activity={crew.promos > 0 ? "type" : "mug"} look={look(14)} position={[POS.growth.x - 0.4, 0, POS.growth.z + 0.92]} phase={5} />
+      <Creature pose="sit" activity={crew.promos > 0 ? "type" : "mug"} species={creature(14, "marketer")} position={[SPOTS.marketer.x, 0, SPOTS.marketer.z]} phase={5} />
       {[-0.45, 0.45].map((dx) => (
         <ScreenPlane key={dx} kind={crew.incident ? "alert" : "dash"} w={PANEL.w} h={PANEL.h} position={[8.2 + dx, PANEL.y, -6.9 + PANEL.z]} />
       ))}
-      <Person pose="sit" activity={crew.incident ? "type" : "mug"} look={look(12)} position={[8.2, 0, -6.18]} phase={7} />
-      <ScreenPlane kind="idle" w={0.52} h={0.31} position={[3.2, 1.0, 11.771]} rot={Math.PI} />
-      <Person pose="sit" activity="type" look={look(18)} position={[3.2, 0, 11.3]} rotation={Math.PI} phase={2} />
+      <Creature pose="sit" activity={crew.incident ? "type" : "mug"} species={ON_CALL} position={[SPOTS.onCall.x, 0, SPOTS.onCall.z]} phase={7} />
+      <ScreenPlane kind="idle" w={RECEPTION_SCREEN.w} h={(RECEPTION_SCREEN.w * MAC.screenH) / MAC.screenW} position={[3.2, RECEPTION_SCREEN.y, RECEPTION_SCREEN.z]} rot={Math.PI} />
+      <Creature pose="sit" activity="type" species={RECEPTIONIST} position={[SPOTS.receptionist.x, 0, SPOTS.receptionist.z]} rotation={SPOTS.receptionist.rot} phase={2} />
 
       {/* A meeting in progress */}
       <ScreenPlane kind="slides" w={meetingTv.w} h={meetingTv.h} position={meetingTv.position} rot={Math.PI / 2} />
-      <Person pose="stand" activity="present" look={look(36)} position={[-12.1, 0, 12.0]} rotation={-Math.PI / 2} phase={1} />
-      <Person pose="sit" activity="listen" look={look(33)} position={[-10.4, 0, 11.42]} rotation={Math.PI} phase={2} />
-      <Person pose="sit" activity="listen" look={look(34)} position={[-8.0, 0, 13.28]} phase={4} />
-      <Person pose="sit" activity="listen" look={look(35)} position={[-9.2, 0, 13.28]} phase={6} />
+      <Creature pose="stand" activity="present" species={creature(36, "pm")} position={[SPOTS.presenter.x, 0, SPOTS.presenter.z]} rotation={SPOTS.presenter.rot} phase={1} />
+      <Creature pose="sit" activity="listen" species={creature(33, "founder")} position={[SPOTS.founder.x, 0, SPOTS.founder.z]} rotation={SPOTS.founder.rot} phase={2} />
+      <Creature pose="sit" activity="listen" species={creature(34, "designer")} position={[SPOTS.designerInMeeting.x, 0, SPOTS.designerInMeeting.z]} phase={4} />
+      <Creature pose="sit" activity="listen" species={creature(35, "data")} position={[SPOTS.analystInMeeting.x, 0, SPOTS.analystInMeeting.z]} phase={6} />
 
       {/* Kitchen chat, the lounge, a phone call and the townhall */}
-      <Person pose="stand" activity="chat" look={look(31)} position={[17.5, 0, -4.85]} rotation={0.81} phase={8} />
-      <Person pose="sit" activity="listen" look={look(27)} position={[19.9, 0, 7.1]} rotation={Math.PI / 2} phase={9} />
-      <Person pose="stand" activity="chat" look={look(38)} position={[-14.8, 0, 13.7]} rotation={Math.PI} phase={10} />
-      <Person pose="sit" activity="laptop" look={look(40)} position={[-18.6, 0, 3.6]} rotation={-Math.PI / 2} phase={11} seat={0.87} />
+      <Creature pose="stand" activity="chat" species={creature(31, "intern")} position={[SPOTS.kitchenChat.x, 0, SPOTS.kitchenChat.z]} rotation={SPOTS.kitchenChat.rot} phase={8} />
+      <Creature pose="sit" activity="listen" species={creature(27, "dev")} position={[SPOTS.sofaListener.x, 0, SPOTS.sofaListener.z]} rotation={SPOTS.sofaListener.rot} phase={9} />
+      <Creature pose="stand" activity="chat" species={creature(38, "marketer")} position={[SPOTS.phoneBooth.x, 0, SPOTS.phoneBooth.z]} rotation={SPOTS.phoneBooth.rot} phase={10} />
+      <Creature pose="sit" activity="laptop" species={creature(40, "data")} position={[SPOTS.townhallReader.x, 0, SPOTS.townhallReader.z]} rotation={SPOTS.townhallReader.rot} phase={11} seat={0.8} />
       <ScreenPlane kind="slides" w={2.1} h={1.12} position={[-14.35, 1.5, 4.5]} rot={-Math.PI / 2} />
       <ScreenPlane kind="game" w={loungeTv.w} h={loungeTv.h} position={loungeTv.position} rot={Math.PI / 2} />
-      {[20.4, 21.3].map((x) => (
-        <ScreenPlane key={x} kind="game" w={0.54} h={0.44} position={[x, 1.25, 10.92]} tilt={-0.2} />
+      {ARCADES.map(([, x]) => (
+        <ScreenPlane key={x} kind="game" w={ARCADE_SCREEN.w} h={ARCADE_SCREEN.h} position={[x, ARCADE_SCREEN.y, ARCADE_Z + ARCADE_SCREEN.z]} tilt={ARCADE_SCREEN.tilt} />
       ))}
 
-      {/* People walking the corridors */}
-      <Walker from={[13.2, -3.6]} to={[13.2, 12.8]} speed={0.6} look={look(21)} />
-      <Walker from={[-4.4, 9.7]} to={[12.4, 9.7]} speed={0.55} look={look(16)} phase={4} />
-      <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} look={look(23)} phase={2} />
+      {/* Small groups chatting, and crew wandering the office on loops of their own */}
+      {GROUPS.map((g) => (
+        <Conversation key={g.name} group={g} incident={crew.incident} />
+      ))}
+      {WANDERERS.map((w, i) => (
+        <Wanderer key={i} plan={WANDERER_PLANS[i]} species={w.species} offset={w.offset} />
+      ))}
+      {/* A technician on the server floor */}
+      <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} species={creature(23, "tech")} phase={2} />
     </group>
   );
 }
@@ -724,20 +781,26 @@ function People({ crew }: { crew: Crew }) {
 /* ------------------------------------------------------------------ */
 
 preloadModels();
+preloadCreatures();
 
 export function Office({ crew }: { crew: Crew }) {
   const prims = useMemo(() => buildStatic(), []);
   const models = useMemo(() => buildModels(), []);
   const wall = useMemo(() => buildWallMounted(), []);
+  const props = useMemo(() => buildProps(), []);
   return (
     <group>
       <Floors />
       <PrimBatch prims={prims} />
       <ModelBatch placements={models} />
+      <DetailedProps items={props} />
       <Glass />
       <WhiteboardFace position={[-12.27, 1.45, 7.4]} rot={Math.PI / 2} />
-      <People crew={crew} />
+      <Staff crew={crew} />
       <PingPongBall />
+      {/* Two players at the ends of the table, each swinging as the ball reaches them. */}
+      <Creature species="frog" activity="play" holding="paddle" position={[SPOTS.pingPlayer.x, 0, SPOTS.pingPlayer.z]} rotation={SPOTS.pingPlayer.rot} beat={PING} />
+      <Creature species="bunny" activity="play" holding="paddle" position={[SPOTS.pongPlayer.x, 0, SPOTS.pongPlayer.z]} rotation={SPOTS.pongPlayer.rot} beat={PONG} />
 
       <OnWall wall="left">
         <PrimBatch prims={wall.leftPrims} shadows={false} />

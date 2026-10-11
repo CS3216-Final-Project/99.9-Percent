@@ -1,0 +1,10 @@
+Ultimate Monsters, by Quaternius (quaternius.com)
+
+License: (Creative Commons Zero, CC0)
+http://creativecommons.org/publicdomain/zero/1.0/
+
+Free to use in personal, educational and commercial projects; credit is not
+required. The models were downloaded as GLB from Poly Pizza (poly.pizza),
+which lists them as CC0 by Quaternius, and compressed with gltf-transform
+(meshopt). Models: Armabee, Birb, Bunny, Cat, Chicken, Frog, GreenBlob,
+Monkroose, Mushnub, MushnubEvolved, Ninja, Pigeon, PinkSlime, Yeti.

@@ -1,6 +1,6 @@
 # 🔑 Authentication — Google OAuth
 
-**Decision:** Google OAuth 2.0 + OpenID Connect. **Status:** planned MVP work. **Owner:** Di Heng.
+**Decision:** Google OAuth 2.0 + OpenID Connect. **Status:** implemented locally in the Phase 3 follow-up; Google/deployment configuration and live acceptance remain outstanding. **Owner:** Di Heng.
 
 React/Vite → Express → Google sign-in → app session in Neon. Guest play remains available.
 
@@ -39,7 +39,7 @@ sequenceDiagram
 
 ## ☁️ Deployment contract
 
-**Planned:** keep both Vercel projects. Forward frontend `/api/*` to the existing backend `/api/*`; use a Vite dev proxy locally. This gives browser requests a same-origin cookie path. Vercel supports [external rewrites](https://vercel.com/docs/routing/rewrites#rewrites-to-external-origins).
+Both Vercel projects are retained. `frontend/api/[...path].ts` forwards only the documented account/session/run paths to the HTTPS origin configured by the server-only `API_PROXY_TARGET`. There is no hard-coded production destination. Configure and verify destination ownership before enabling it. The proxy forwards separate Set-Cookie headers, redirects, cookies, Origin and CSRF, and disables caching. Local Vite `/api` requests forward to localhost:3001. Browser account requests always use `/api`; `VITE_API_URL` remains the independent health-client setting.
 
 | | Setup / verification |
 |---|---|
@@ -85,3 +85,17 @@ Use verified issuer + subject for account identity. Never trust a client-supplie
 The Phase 2 analytics bridge already supplies eventId, runId, sessionId, buildId, scenarioId/version, physicalStep, occurredAt and payload. Review batch size, retention and consent before remote ingestion. Server acknowledgements must not erase local unexported records prematurely.
 
 Phase 3 acceptance: new/returning sign-in, cancellation, session restoration/sign-out/expiry, replayed callback rejection, CSRF/origin checks, atomic revision conflict, two-owner isolation, guest attachment, offline/local preservation, and deployed cookie/cache/proxy verification. Use Supertest/PGlite locally and isolated test credentials for external checks. Keep the current VITE_API_URL and two Vercel projects until that integration is implemented and tested.
+
+## Phase 3 implementation and deployment checklist
+
+See [the integration report](phases/PHASE_3_AUTH_CLOUD_REPORT.md) for validation and compatibility boundaries.
+
+Implemented routes: GET `/api/auth/google`, GET `/api/auth/google/callback`, GET `/api/session`, POST `/api/auth/logout`, GET `/api/runs`, GET/PUT `/api/runs/:runId`. Remote analytics ingestion is still a separate Phase 4/backend deliverable. Accounts identify verified Google issuer/subject; the database stores hashes of app session tokens. State/nonce/PKCE attempts are durable, browser-bound and atomically consumed. OIDC uses openid-client with signature/non-repudiation checks enabled. Writes require the configured exact Origin and session CSRF token.
+
+Cloud saves accept schema-3 and schema-4 compact replay envelopes; local Campaign now writes schema 4, including the optional historical foundation boundary. The frontend applies full simulation validation before loading. Deployed schema-1/2/3 local replay saves convert with exact source backups; Classic stays local. The API is not an anti-cheat engine. Uploads are limited to 1 MiB; oversized or incompatible saves remain local and exportable. No leaderboard/server-authoritative gameplay was added.
+
+Configure the backend's GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI and APP_ORIGIN for the same browser-facing origin; retain existing DATABASE_URL / DATABASE_URL_UNPOOLED and CORS_ORIGINS. Configure the frontend Vercel function's API_PROXY_TARGET to a verified HTTPS backend origin. Register the exact callback with Google and configure its consent/test audience. Unregistered previews must remain guest-only. Local HTTP cookies are permitted only for localhost/127.0.0.1; hosted cookies require HTTPS.
+
+Before deployment acceptance: review/apply the additive migration through the authorized release process; verify two real Google accounts, cancellation, returning-user login, expiry/logout, callback replay rejection, cookie forwarding, private cache headers, fresh-browser resume, guest attachment, account switching and concurrent revision conflict. These live checks are not established by mocked provider/browser tests.
+
+Sign-in never uploads a guest run automatically. Account bindings live under nn.campaign.cloud.v1 and survive sign-out. Pending owner snapshots remain local during errors/expiry; use Save company to cloud to retry. Conflicts require an explicit choice and retain both versions. Replacing an active company retains the original bytes/current snapshot; Export account copies includes preserved snapshots and conflict copies. Local storage quota failures are surfaced and cannot promise reload durability.

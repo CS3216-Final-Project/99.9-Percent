@@ -1,3 +1,5 @@
+import { DATA_STRATEGY as D } from "./scenarios/dataStrategy";
+import { APPLICATION_SCALING as P } from "./scenarios/applicationScaling";
 import type { Branch, GameState, TechDef, TechId, TechStatus } from "./types";
 import { BALANCE } from "./balance";
 
@@ -299,7 +301,7 @@ export function has(state: Pick<GameState, "techDone" | "campaign">, tech: TechI
 export function techStatus(state: GameState, id: TechId): TechStatus {
   if(state.campaign) {
     if(![...(state.campaign.spikeStage?["autoscaling"]:[]),"larger_database","larger_servers","load_balancing",...(state.campaign.dataStage?["caching","cache_tuning"]:[])].includes(id))return "locked";
-    if(id==="larger_database")return state.campaign.dbCapacity>=(state.campaign.dataStage?3000:2000)?"done":"available";
+    if(id==="larger_database")return state.campaign.dbCapacity>=(state.campaign.dataStage?D.dbCapacity:P.dbCapacity)?"done":"available";
     if(id==="cache_tuning"&&!state.campaign.readCache)return "locked";
     return has(state,id)?"done":state.campaign.openingMilestone?.acknowledged?"available":"locked";
   }

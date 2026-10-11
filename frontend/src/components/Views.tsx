@@ -5,6 +5,8 @@ import { BALANCE, metrics, type EventKind, type GameState, type Postmortem } fro
 import { compact, money, moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { tipProps } from "./tips";
+import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow, type ConceptKind } from "./ui";
 
 /* ------------------------------------------------------------------ */
@@ -30,7 +32,7 @@ export function EngineersView() {
         </h3>
         <div className="seats" aria-label={`${assigned} of ${game.engineers} engineers assigned`}>
           {Array.from({ length: game.engineers }, (_, i) => (
-            <span key={i} className={`seat${i < assigned ? " is-busy" : ""}`} title={i < assigned ? "Assigned" : "Free"}>
+            <span key={i} className={`seat${i < assigned ? " is-busy" : ""}`} {...tipProps(i < assigned ? "Assigned" : "Free")}>
               <Icon name="team" />
             </span>
           ))}
@@ -60,7 +62,7 @@ export function EngineersView() {
           price={game.engineers >= BALANCE.engineer.max ? undefined : BALANCE.engineer.hireCost}
           disabled={locked || game.engineers >= BALANCE.engineer.max}
           onClick={() => act({ type: "hire_engineer" })}
-          title={`Then ${moneyFull(BALANCE.engineer.salary)} a week.`}
+          tip={`Then ${moneyFull(BALANCE.engineer.salary)} a week.`}
         />
       </section>
 
@@ -125,6 +127,7 @@ export function LineChart({
   targetLabel,
   max,
   min,
+  axisLabel = "Week",
 }: {
   title: string;
   series: Series[];
@@ -134,6 +137,7 @@ export function LineChart({
   targetLabel?: string;
   max?: number;
   min?: number;
+  axisLabel?: "Week" | "Step";
 }) {
   const W = 340;
   const H = 170;
@@ -148,6 +152,7 @@ export function LineChart({
   const x = (i: number) => L + ((W - L - R) * i) / n;
   const y = (v: number) => T + (H - T - B) * (1 - (v - lo) / (hi - lo || 1));
   const ticks = [lo, lo + (hi - lo) / 2, hi];
+  const hit = Math.max(3, Math.min(8, (W - L - R) / n / 2));
 
   return (
     <figure className="chart">
@@ -164,9 +169,9 @@ export function LineChart({
         </span>
       </figcaption>
       {turns.length < 2 ? (
-        <p className="empty">Play two weeks to see a trend.</p>
+        <p className="empty">Advance two {axisLabel === "Step" ? "steps" : "weeks"} to see a trend.</p>
       ) : (
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title} by week`}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title} by ${axisLabel.toLowerCase()}`}>
           {ticks.map((t) => (
             <g key={t}>
               <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} className="chart-grid" />
@@ -187,19 +192,19 @@ export function LineChart({
             <g key={s.name}>
               <polyline fill="none" stroke={s.color} strokeWidth={2.5} strokeLinejoin="round" points={s.values.map((v, i) => `${x(i)},${y(v)}`).join(" ")} />
               {s.values.map((v, i) => (
-                <circle key={i} cx={x(i)} cy={y(v)} r={i === s.values.length - 1 ? 3 : 1.6} fill={s.color}>
-                  <title>
-                    Week {turns[i]}: {s.name} {format(v)}
-                  </title>
-                </circle>
+                <g key={i}>
+                  <circle cx={x(i)} cy={y(v)} r={i === s.values.length - 1 ? 3 : 1.6} fill={s.color} />
+                  {/* A wider invisible target, so a point is easy to hover. */}
+                  <circle cx={x(i)} cy={y(v)} r={hit} fill="transparent" {...tipProps(`${axisLabel} ${turns[i]}: ${s.name} ${format(v)}`)} />
+                </g>
               ))}
             </g>
           ))}
           <text x={L} y={H - 5} className="chart-tick">
-            Week {turns[0]}
+            {axisLabel} {turns[0]}
           </text>
           <text x={W - R} y={H - 5} textAnchor="end" className="chart-tick">
-            Week {turns[turns.length - 1]}
+            {axisLabel} {turns[turns.length - 1]}
           </text>
         </svg>
       )}
@@ -269,24 +274,6 @@ export function RunCharts({ game, compactSet = false }: { game: GameState; compa
 /* ------------------------------------------------------------------ */
 /* Postmortems                                                         */
 /* ------------------------------------------------------------------ */
-
-export const OUTCOME_LABEL: Record<Postmortem["outcome"], string> = {
-  resolved: "Fixed",
-  mitigated: "Contained",
-  failed: "Not fixed in time",
-  auto_mitigated: "Handled automatically",
-};
-
-export const OUTCOME_ICON: Record<Postmortem["outcome"], IconName> = {
-  resolved: "check",
-  mitigated: "alert",
-  failed: "close",
-  auto_mitigated: "robot",
-};
-
-export function outcomeTone(pm: Postmortem): "ok" | "warn" | "critical" {
-  return pm.outcome === "failed" ? "critical" : pm.outcome === "mitigated" ? "warn" : "ok";
-}
 
 /**
  * A postmortem is a one-screen summary first: what failed, what fixed it and

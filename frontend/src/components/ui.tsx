@@ -5,6 +5,7 @@ import { BALANCE, releaseRisk, taskEta, testEffort, type GameState, type Release
 import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { tipProps, type TipSide } from "./tips";
 
 export type ConceptKind = "cash" | "users" | "revenue" | "health" | "tech" | "team" | "growth" | "ok" | "warn" | "critical" | "muted" | "go";
 
@@ -35,7 +36,7 @@ export function Callout({
   onClick,
   compact = false,
   className,
-  title,
+  tip,
   live,
 }: {
   tone: CalloutTone;
@@ -48,7 +49,8 @@ export function Callout({
   onClick?: () => void;
   compact?: boolean;
   className?: string;
-  title?: string;
+  /** Longer explanation, shown in the tooltip. */
+  tip?: string;
   /** Announce the text (not the category label) to screen readers. */
   live?: "alert" | "status";
 }) {
@@ -69,22 +71,39 @@ export function Callout({
     </>
   );
   return onClick ? (
-    <button type="button" className={cls} onClick={onClick} title={title}>
+    <button type="button" className={cls} onClick={onClick} {...tipProps(tip)}>
       {body}
     </button>
   ) : (
-    <div className={cls} title={title}>
+    <div className={cls} {...tipProps(tip)}>
       {body}
     </div>
   );
 }
 
 /** Plain-language explanation shown on hover, keyboard focus or tap. Detail lives here, not on screen. */
-export function Tip({ text, children, side = "below" }: { text: string; children: ReactNode; side?: "below" | "above" | "left" }) {
+export function Tip({ text, children, side }: { text: string; children: ReactNode; side?: TipSide }) {
   return (
-    <span className={`tip tip-${side}`} tabIndex={0} data-tip={text}>
+    <span className="tip" tabIndex={0} {...tipProps(text, side)}>
       {children}
     </span>
+  );
+}
+
+/** Shared headline tile for both gameplay modes. */
+export function Stat({ icon, kind, label, tip, children }: { icon: IconName; kind: ConceptKind; label: string; tip: string; children: ReactNode }) {
+  return (
+    <div className={`stat stat-${kind}`}>
+      <span className="stat-icon">
+        <Concept kind={kind} icon={icon} />
+      </span>
+      <div className="stat-body">
+        <Tip text={tip}>
+          {label}
+        </Tip>
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -97,10 +116,6 @@ export function Meter({ value, tone = "accent", label }: { value: number; tone?:
       <div className="meter-fill" style={{ width: `${v * 100}%` }} />
     </div>
   );
-}
-
-export function utilTone(util: number): "ok" | "warn" | "critical" {
-  return util >= 1 ? "critical" : util >= 0.85 ? "warn" : "ok";
 }
 
 /** A labelled bar: the main way the game shows how something is doing. */
@@ -119,7 +134,7 @@ export function Gauge({ label, value, text, tone, tip, icon }: { label: string; 
 
 export function Chip({ icon, children, tip }: { icon?: IconName; children: ReactNode; tip?: string }) {
   return (
-    <span className="stat-chip" title={tip}>
+    <span className="stat-chip" {...tipProps(tip)}>
       {icon && <Icon name={icon} size={16} />}
       {children}
     </span>
@@ -136,7 +151,7 @@ export function Act({
   disabled,
   primary,
   tour,
-  title,
+  tip,
 }: {
   icon?: IconName;
   label: string;
@@ -146,10 +161,11 @@ export function Act({
   disabled?: boolean;
   primary?: boolean;
   tour?: string;
-  title?: string;
+  /** What it does, and why it may be unavailable. Shown in the tooltip, also while disabled. */
+  tip?: string;
 }) {
   return (
-    <button type="button" className={`act${primary ? " act-primary" : ""}`} onClick={onClick} disabled={disabled} data-tour={tour} title={title}>
+    <button type="button" className={`act${primary ? " act-primary" : ""}`} onClick={onClick} disabled={disabled} data-tour={tour} {...tipProps(tip)}>
       {icon && <Icon name={icon} />}
       <span className="act-label">{label}</span>
       {price !== undefined && (
@@ -197,7 +213,7 @@ export function TaskRow({ game, task }: { game: GameState; task: Task }) {
             disabled={locked}
             onClick={() => act({ type: "cancel_task", taskId: task.id })}
             aria-label={`Cancel ${task.title}`}
-            title={task.costPaid > 0 ? "Cancel (50% refund)" : "Cancel"}
+            {...tipProps(task.costPaid > 0 ? "Cancel (50% refund)" : "Cancel")}
           >
             <Icon name="close" size={12} />
           </button>
@@ -209,7 +225,7 @@ export function TaskRow({ game, task }: { game: GameState; task: Task }) {
           <Icon name={eta === null ? "alert" : "latency"} size={12} />
           {eta === null ? "No engineers" : `${eta} wk left`}
         </span>
-        <div className="stepper" role="group" aria-label={`Engineers on ${task.title}`} title={`Up to ${BALANCE.engineer.maxPerTask} engineers. More finish sooner.`}>
+        <div className="stepper" role="group" aria-label={`Engineers on ${task.title}`} {...tipProps(`Up to ${BALANCE.engineer.maxPerTask} engineers. More finish sooner.`)}>
           <button type="button" disabled={locked || task.assigned <= 0} onClick={() => act({ type: "assign_engineers", taskId: task.id, count: task.assigned - 1 })} aria-label="Remove an engineer">
             −
           </button>
@@ -276,14 +292,14 @@ export function ReleaseRow({ game, release }: { game: GameState; release: Releas
             data-tour="primary"
             disabled={locked}
             onClick={() => act({ type: "deploy_release", releaseId: release.id })}
-            title="Risk is the chance this deploy breaks production. It rises with tech debt. Testing first cuts it by 85%."
+            {...tipProps("Risk is the chance this deploy breaks production. It rises with tech debt. Testing first cuts it by 85%.")}
           >
             <Icon name="ship" />
             <span className="act-label">Deploy</span>
             <span className={`price risk-${tone}`}>{pct(risk)} risk</span>
           </button>
           {!release.tested && (
-            <button type="button" className="act" disabled={locked} onClick={() => act({ type: "test_release", releaseId: release.id })} title="Engineers test it before it ships.">
+            <button type="button" className="act" disabled={locked} onClick={() => act({ type: "test_release", releaseId: release.id })} {...tipProps("Engineers test it before it ships.")}>
               <Icon name="test" />
               <span className="act-label">Test first</span>
               <span className="price">
@@ -305,12 +321,15 @@ export function Modal({
   wide = false,
   tone,
   icon,
+  className,
 }: {
   title: string;
   children: ReactNode;
   onClose?: () => void;
   wide?: boolean;
   tone?: "alert";
+  /** A layout of its own, such as the two-column menu. */
+  className?: string;
   /** The idea this dialog is about, shown beside the title. */
   icon?: { kind: ConceptKind; name: IconName };
 }) {
@@ -323,7 +342,7 @@ export function Modal({
   },[title]);
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className={`modal${wide ? " modal-wide" : ""}${tone ? ` modal-${tone}` : ""}`} ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={e=>{
+      <div className={`modal${wide ? " modal-wide" : ""}${tone ? ` modal-${tone}` : ""}${className ? ` ${className}` : ""}`} ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={e=>{
         if(e.key==="Escape"){e.stopPropagation();onClose?.();}
         if(e.key==="Tab"){
           const nodes=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,select,textarea,[tabindex="0"]')??[]);

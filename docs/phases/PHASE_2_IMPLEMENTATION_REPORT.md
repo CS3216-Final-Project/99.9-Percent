@@ -1,4 +1,35 @@
-﻿# Phase 2 implementation report
+# Phase 2 implementation report
+
+## 10 October: compatibility corrections for PR #11
+
+This revision supersedes the implementation and validation details in the historical 9 October report below. The PR integrates main through `69f193dcb1501e49ffa7bf0b7ace608e27abb250`, including Classic mode, save import/export, music, the current office/city scene, and the UI patterns in `docs/UI_DESIGN.md`.
+
+Three review issues are corrected:
+
+1. **Main's saves load and continue.** Main uses schema-1 replay envelopes (`seed`, `step`, ordered `inputs`, fractional clock credit), not full game snapshots. `saveEnvelope.ts` now replays that format and normalizes it to schema 2 with measurement metadata. The obsolete snapshot migration module is removed. Before writing schema 2, `persist.ts` preserves the exact original bytes under a versioned backup key. Backup and active-slot write failures preserve the source, including during explicit reset. Unknown or invalid saves remain protected and exportable.
+2. **Responses precede detailed evidence.** CampaignUI retains main's icon-led header, stability meter, symptom tiles, equipment controls, selected observation and response rows. Full evidence and finances remain disclosures below the responses. A compact dependency cue reuses the existing equipment controls and selection. Desktop checks cover all three responses both before and after selecting equipment; mobile checks cover scrolling, touch selection, each response and detailed evidence.
+3. **Postmortems use recorded drainage.** Main's causal report implementation is retained. Limiting at step 6 followed by an upgrade request at step 10 or 11 is compared with limiting alone. When the backlog was already zero before upgrade activation, the report explicitly declines to credit the upgrade with clearing it. A separate overloaded-upgrade case still credits its observed drainage.
+
+The Phase 2 onboarding, milestone, session measurement, export and failure context remain integrated into the existing store and UI. Historical Phase 1 acknowledgements are normalized into replayable inputs and backfilled as acknowledged milestones; they do not produce newly measured PR1 completions. Physical/economic tuning and `opening-db` scenario version 1 remain unchanged. Classic mode and its separate save slot remain covered.
+
+Validation uses Node **v22.20.0** and locked installs in each package. A path without a percent sign is used for the validation copy because this Windows runner cannot reliably load Vitest workers from the repository path. Tests require normal local worker access; the sandbox's temporary-file error was environmental. The final browser run uses the same configuration on local port 4186 because port 4175 already has a preview server; the existing server is left running.
+
+| Final local check | Result |
+| --- | --- |
+| Frontend lint / typecheck | PASS, no lint warnings |
+| Frontend test coverage | PASS: 281 passed, 1 optional diagnostic skipped |
+| Frontend balance | PASS: 5 tests |
+| Frontend production build | PASS |
+| Chromium and mobile WebGL browser journeys | PASS across runs: 10 Classic checks, 15 campaign/mobile checks |
+| Backend lint / typecheck / test coverage | PASS: 18 tests |
+
+The earlier browser run passed all 25 journeys before main's new city update. After that update, two combined Windows runs hit severe rendering/teardown timeouts and were interrupted. The clean rerun passed all 10 Classic checks before a later campaign timeout; a fresh campaign-only run then passed all 15 campaign/mobile checks without retries. The isolated HD scene check also passed. A balance check timed out while the overloaded browser was running and passed all five tests when rerun alone. Test assertions, time limits and CI configuration were not weakened. Full combined CI on the pushed head remains the release gate. The landing screenshot was refreshed from the current healthy campaign. Coverage is supporting evidence, not proof of correctness. No backend/schema/shared-contract changes are introduced relative to main; no production migration or PR merge is performed.
+
+Release limitations remain unchanged: a real `VITE_PLAYTEST_URL`, recorded deployment/build verification and actual human sessions are still outstanding. The disabled Join Playtest button reports the missing registration destination honestly. The protocol is preparation, not participant evidence. No Phase 3 mechanics are enabled.
+
+The first pushed CI run identified a timing-dependent assertion in the Classic reset test: it compared raw campaign bytes before a legitimate mode-switch save, so a one-millisecond `savedAt` difference failed it. The test now captures the departing campaign after that save and deliberately changes `Date.now()` before the Classic reset. It still requires byte-for-byte preservation during the reset and no longer depends on operations completing in the same millisecond.
+
+## Original 9 October report (historical record)
 
 Date: 9 October 2026. Branch: `ai/phase-2-pr1`. Starting checkpoint: `69e3a918edd88d94d73fe64faa5a3a689be7b710`.
 

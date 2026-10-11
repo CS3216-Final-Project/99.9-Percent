@@ -191,7 +191,7 @@ Milestone copy must not imply unfinished mechanics are currently usable. State t
 
 # 6. Persistence and migration
 
-Extend `persist.ts` and `saveMigrations.ts`; do not add a second save system or local-save adapter.
+Extend `persist.ts` and the current main branch's `saveEnvelope.ts` replay-envelope validator; do not add a second save system or local-save adapter. Main stores a seed, step and ordered inputs rather than a full game snapshot.
 
 Keep active namespaces:
 
@@ -203,7 +203,7 @@ nn.campaign.analytics.v1
 
 Keep all legacy keys, including nn.save.v1, nn.meta.v1 and nn.analytics.v1, byte-for-byte unchanged. Preserve legacy export, corrupt/unsupported payload protection, explicit reset, storage-failure reporting and paused resume.
 
-For required saved-state additions, use envelope schemaVersion 2 while retaining the current campaign storage key and scenario version. Register and test the version-1-to-2 migration in the existing registry. Update validator/version dispatch together; do not merely add required fields to initialization. Back up the original payload under a versioned backup key before replacement; validate migrated state. Backup/validation/write failure must not destroy the source. Unknown future versions remain unsupported and exportable.
+For required saved-state additions, use envelope schemaVersion 2 while retaining the current campaign storage key and scenario version. Dispatch and test version-1-to-2 migration through the existing replay-envelope validator. Replay version-1 inputs, normalize any historical milestone acknowledgement into the input log, and retain that replay format for schema 2. Update validator/version dispatch together; do not merely add required fields to initialization. Back up the original payload under a versioned backup key before replacement; validate migrated state. Backup/validation/write failure must not destroy the source. Unknown future versions remain unsupported and exportable.
 
 Migration policy:
 

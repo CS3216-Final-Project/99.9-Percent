@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import type { V3 } from "./prims";
+import { useDetail, type Detail } from "./detail";
+import { toFloatAttributes } from "./gltf";
+import { HD_MODELS, HD_SWAPS, loadModel, MODELS, packScale, type HdId, type ModelId, type Swap } from "./modelCatalog";
+import type { V3 } from "./shapes";
 
 /*
  * Furniture models from two CC0 packs, Kenney's Furniture Kit (kenney.nl) and
@@ -15,71 +17,12 @@ import type { V3 } from "./prims";
  * Models are placed by their bounding box: `p` is where the bottom centre of
  * the box goes, so it does not matter where each artist put the origin. Both
  * packs face +z.
+ *
+ * At HD detail the most visible pieces (plants, sofas, armchairs, tables,
+ * boxes, a lamp) are swapped for photo-scanned CC0 models from Poly Haven.
+ * Each stand-in is scaled to fit inside the box of the model it replaces, so
+ * the layout is the same at both levels of detail.
  */
-
-const KENNEY = "/models/kenney/";
-const KAYKIT = "/models/kaykit/";
-
-const kenney = (name: string) => `${KENNEY}${name}.glb`;
-const kaykit = (name: string) => `${KAYKIT}${name}.gltf`;
-
-const MODELS = {
-  desk: kenney("desk"),
-  chairDesk: kenney("chairDesk"),
-  screen: kenney("computerScreen"),
-  keyboard: kenney("computerKeyboard"),
-  mouse: kenney("computerMouse"),
-  cabinet: kenney("kitchenCabinet"),
-  cabinetDrawer: kenney("kitchenCabinetDrawer"),
-  sink: kenney("kitchenSink"),
-  stove: kenney("kitchenStove"),
-  fridge: kenney("kitchenFridgeLarge"),
-  coffeeMachine: kenney("kitchenCoffeeMachine"),
-  microwave: kenney("kitchenMicrowave"),
-  blender: kenney("kitchenBlender"),
-  toaster: kenney("toaster"),
-  cabinetUpper: kenney("kitchenCabinetUpper"),
-  bar: kenney("kitchenBar"),
-  barEnd: kenney("kitchenBarEnd"),
-  stoolBar: kenney("stoolBar"),
-  trashcan: kenney("trashcan"),
-  tableCoffee: kenney("tableCoffee"),
-  tableCoffeeGlass: kenney("tableCoffeeGlass"),
-  chairModern: kenney("chairModernCushion"),
-  chairCushion: kenney("chairCushion"),
-  bench: kenney("benchCushion"),
-  loungeChair: kenney("loungeChairRelax"),
-  tvCabinet: kenney("cabinetTelevision"),
-  tv: kenney("televisionModern"),
-  speaker: kenney("speaker"),
-  lampRoundFloor: kenney("lampRoundFloor"),
-  lampSquareFloor: kenney("lampSquareFloor"),
-  lampTable: kenney("lampRoundTable"),
-  pottedPlant: kenney("pottedPlant"),
-  plantSmall1: kenney("plantSmall1"),
-  plantSmall3: kenney("plantSmall3"),
-  boxClosed: kenney("cardboardBoxClosed"),
-  boxOpen: kenney("cardboardBoxOpen"),
-  coatRack: kenney("coatRackStanding"),
-  sideTable: kenney("sideTable"),
-  couch: kaykit("couch_pillows"),
-  armchair: kaykit("armchair_pillows"),
-  cactusSmallA: kaykit("cactus_small_A"),
-  cactusSmallB: kaykit("cactus_small_B"),
-  cactusMedium: kaykit("cactus_medium_A"),
-  frameLargeA: kaykit("pictureframe_large_A"),
-  frameMedium: kaykit("pictureframe_medium"),
-  pillowA: kaykit("pillow_A"),
-  pillowB: kaykit("pillow_B"),
-  tableLong: kaykit("table_medium_long"),
-} as const;
-
-export type ModelId = keyof typeof MODELS;
-
-/** How many metres one model unit is: Kenney models are about half size, KayKit about one and a half. */
-function packScale(id: ModelId): number {
-  return MODELS[id].startsWith(KAYKIT) ? 0.62 : 1.93;
-}
 
 export interface Placement {
   id: ModelId;
@@ -104,28 +47,34 @@ interface Prepared {
 }
 
 /**
- * Matte Lambert versions of the packs' materials, which cost far less per pixel
- * than physically based shading. Materials that look the same are shared across
- * models so they can be drawn together. Every KayKit model brings its own copy
- * of the same texture atlas, so a texture is known by its name and size.
+ * The packs' materials, shared across models when they look the same so they
+ * can be drawn together. Basic detail turns them matte Lambert, which costs far
+ * less per pixel; HD keeps them physically based, at least satin-rough so the
+ * low-poly furniture does not look like wet plastic. Every KayKit model brings
+ * its own copy of the same texture atlas, so a texture is known by its name and size.
  */
-const matte = new Map<string, THREE.Material>();
-function toMatte(source: THREE.Material): THREE.Material {
+const shared = new Map<string, THREE.Material>();
+function toShared(source: THREE.Material, detail: Detail): THREE.Material {
   const s = source as THREE.MeshStandardMaterial;
   const image = s.map?.image as { width?: number; height?: number } | undefined;
   const map = s.map ? `${s.map.name}:${image?.width}x${image?.height}` : "";
-  const key = [s.color.getHexString(), map, s.vertexColors, s.transparent, s.opacity, s.side].join("|");
-  let m = matte.get(key);
+  const key = [detail, s.color.getHexString(), map, s.vertexColors, s.transparent, s.opacity, s.side, s.roughness, s.metalness].join("|");
+  let m = shared.get(key);
   if (!m) {
-    m = new THREE.MeshLambertMaterial({ color: s.color, map: s.map, vertexColors: s.vertexColors, transparent: s.transparent, opacity: s.opacity, side: s.side });
-    matte.set(key, m);
+    const common = { color: s.color, map: s.map, vertexColors: s.vertexColors, transparent: s.transparent, opacity: s.opacity, side: s.side };
+    m =
+      detail === "hd"
+        ? new THREE.MeshStandardMaterial({ ...common, roughness: Math.max(0.5, s.roughness ?? 1), metalness: Math.min(0.3, s.metalness ?? 0) })
+        : new THREE.MeshLambertMaterial(common);
+    shared.set(key, m);
   }
   return m;
 }
 
 const prepared = new Map<string, Prepared>();
-function prepare(url: string, scene: THREE.Object3D): Prepared {
-  const hit = prepared.get(url);
+/** A model's parts in its own frame. Photo-scanned models keep their own materials: their maps are what makes them look real. */
+function prepare(url: string, scene: THREE.Object3D, detail: Detail, keepMaterials = false): Prepared {
+  const hit = prepared.get(`${detail}|${url}`);
   if (hit) return hit;
   scene.updateMatrixWorld(true);
   const parts: Part[] = [];
@@ -133,14 +82,14 @@ function prepare(url: string, scene: THREE.Object3D): Prepared {
   scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
-    const geometry = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+    const geometry = toFloatAttributes(mesh.geometry.clone()).applyMatrix4(mesh.matrixWorld);
     geometry.computeBoundingBox();
     box.union(geometry.boundingBox!);
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    parts.push({ geometry, material: toMatte(materials[0]) });
+    parts.push({ geometry, material: keepMaterials ? materials[0] : toShared(materials[0], detail) });
   });
   const out = { parts, size: box.getSize(new THREE.Vector3()), base: new THREE.Vector3((box.min.x + box.max.x) / 2, box.min.y, (box.min.z + box.max.z) / 2) };
-  prepared.set(url, out);
+  prepared.set(`${detail}|${url}`, out);
   return out;
 }
 
@@ -155,19 +104,17 @@ function matrixFor(pl: Placement, prep: Prepared): THREE.Matrix4 {
   return m.multiply(new THREE.Matrix4().makeTranslation(-prep.base.x, -prep.base.y, -prep.base.z));
 }
 
-// Neither pack is compressed, so three's plain loader is enough.
-const loader = new GLTFLoader();
-const loads = new Map<string, Promise<THREE.Object3D>>();
-
-/** Fetch a model once however often it is asked for. A failed fetch is forgotten, so a later mount tries again. */
-function loadModel(url: string): Promise<THREE.Object3D> {
-  let load = loads.get(url);
-  if (!load) {
-    load = loader.loadAsync(url).then((gltf) => gltf.scene);
-    load.catch(() => loads.delete(url));
-    loads.set(url, load);
-  }
-  return load;
+/** Where a stand-in goes: inside the box the original would fill, turned the same way. */
+function standInMatrix(pl: Placement, original: Prepared, standIn: Prepared, swap: Swap): THREE.Matrix4 {
+  const k = packScale(pl.id);
+  const want = Array.isArray(pl.s) ? new THREE.Vector3(...pl.s) : original.size.clone().multiplyScalar(k * (pl.s ?? 1));
+  const turn = swap.turn ?? 0;
+  // A quarter turn swaps which side of the stand-in lines up with the original's width.
+  const quarter = Math.abs(Math.round(turn / (Math.PI / 2))) % 2 === 1;
+  const have = quarter ? new THREE.Vector3(standIn.size.z, standIn.size.y, standIn.size.x) : standIn.size;
+  const f = swap.fit === "height" ? want.y / have.y : Math.min(want.x / have.x, want.y / have.y, want.z / have.z);
+  const m = new THREE.Matrix4().compose(new THREE.Vector3(...pl.p), new THREE.Quaternion().setFromAxisAngle(UP, (pl.rot ?? 0) + turn), new THREE.Vector3(f, f, f));
+  return m.multiply(new THREE.Matrix4().makeTranslation(-standIn.base.x, -standIn.base.y, -standIn.base.z));
 }
 
 interface Batch {
@@ -175,12 +122,15 @@ interface Batch {
   material: THREE.Material;
 }
 
-/** Every placed model baked into one mesh per material. */
-function bake(placements: Placement[], scenes: Map<ModelId, THREE.Object3D>): Batch[] {
+/** Every placed model baked into one mesh per material, with photo-scanned stand-ins where they have loaded. */
+function bake(placements: Placement[], scenes: Map<ModelId, THREE.Object3D>, standIns: Map<HdId, THREE.Object3D> | null, detail: Detail): Batch[] {
   const byMaterial = new Map<THREE.Material, THREE.BufferGeometry[]>();
   for (const pl of placements) {
-    const prep = prepare(MODELS[pl.id], scenes.get(pl.id)!);
-    const m = matrixFor(pl, prep);
+    const original = prepare(MODELS[pl.id], scenes.get(pl.id)!, detail);
+    const swap = HD_SWAPS[pl.id];
+    const standIn = swap && standIns?.get(swap.id);
+    const prep = swap && standIn ? prepare(HD_MODELS[swap.id], standIn, detail, true) : original;
+    const m = swap && standIn ? standInMatrix(pl, original, prep, swap) : matrixFor(pl, original);
     for (const part of prep.parts) byMaterial.set(part.material, [...(byMaterial.get(part.material) ?? []), part.geometry.clone().applyMatrix4(m)]);
   }
   return [...byMaterial].map(([material, list]) => {
@@ -213,7 +163,10 @@ export function ModelBatch({ placements, shadows = true }: { placements: Placeme
       live = false;
     };
   }, [placements]);
-  const batches = useMemo(() => (scenes ? bake(placements, scenes) : []), [placements, scenes]);
+  const detail = useDetail();
+  const standIns = useStandIns(placements, detail);
+  const batches = useMemo(() => (scenes ? bake(placements, scenes, standIns, detail) : []), [placements, scenes, standIns, detail]);
+  useEffect(() => () => batches.forEach((b) => b.geometry.dispose()), [batches]);
   return (
     <group>
       {batches.map((b, i) => (
@@ -223,7 +176,27 @@ export function ModelBatch({ placements, shadows = true }: { placements: Placeme
   );
 }
 
-/** Start fetching every model as soon as the 3D scene's code loads. */
-export function preloadModels(): void {
-  for (const url of Object.values(MODELS)) void loadModel(url);
+/**
+ * The photo-scanned stand-ins these placements need, at HD detail only. Until
+ * they load, or if they cannot be downloaded, the stylised models stay.
+ */
+function useStandIns(placements: Placement[], detail: Detail): Map<HdId, THREE.Object3D> | null {
+  const [loaded, setLoaded] = useState<Map<HdId, THREE.Object3D> | null>(null);
+  const ids = useMemo(() => [...new Set(placements.flatMap((p) => HD_SWAPS[p.id]?.id ?? []))], [placements]);
+  useEffect(() => {
+    if (detail !== "hd" || ids.length === 0) return;
+    let live = true;
+    Promise.all(ids.map((id) => loadModel(HD_MODELS[id]))).then(
+      (list) => {
+        if (live) setLoaded(new Map(ids.map((id, i) => [id, list[i]])));
+      },
+      (error: unknown) => {
+        if (live) console.warn("HD furniture failed to load; keeping the stylised models.", error);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [ids, detail]);
+  return detail === "hd" ? loaded : null;
 }

@@ -589,55 +589,98 @@ button:disabled {
 }
 
 /* ---------------------------------------------------------------- */
-/* Tooltip: where the explanations live                              */
+/* Tooltip: one shared bubble, never the browser's title box          */
+/* (components/Tooltip.tsx places it; any element with data-tip uses it) */
 /* ---------------------------------------------------------------- */
 
+/* A term that explains itself: dotted, and the bubble opens on hover, focus or tap. */
 .tip {
-  position: relative;
   border-bottom: 2px dotted currentColor;
   cursor: help;
 }
 
-.tip::after {
-  content: attr(data-tip);
-  position: absolute;
+.tooltip {
+  position: fixed;
   left: 0;
-  top: calc(100% + 10px);
-  width: 250px;
-  padding: 10px 12px;
-  background: var(--paper);
-  color: var(--ink);
-  border: 2px solid var(--ink);
+  top: 0;
+  z-index: 300;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: max-content;
+  max-width: min(272px, calc(100vw - 16px));
+  padding: 8px 12px 9px;
+  background: var(--night);
+  color: var(--on-night);
+  border: 2px solid var(--night-line);
   border-radius: var(--radius);
+  box-shadow:
+    0 3px 0 0 rgb(8 6 22 / 0.55),
+    0 14px 28px rgb(8 6 22 / 0.45);
   font-family: var(--font-body);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 400;
   line-height: 1.45;
-  text-transform: none;
   letter-spacing: 0;
-  box-shadow: var(--lift);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  z-index: 80;
-  white-space: normal;
   text-align: left;
+  text-transform: none;
+  white-space: normal;
+  pointer-events: none;
+  animation: tooltip-in 0.12s ease-out;
 }
 
-.tip-above::after {
-  top: auto;
-  bottom: calc(100% + 10px);
+.tooltip[data-side="above"] {
+  --tip-shift: 3px;
 }
 
-.tip-left::after {
-  left: auto;
-  right: 0;
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    translate: 0 var(--tip-shift, -3px);
+  }
 }
 
-.tip:hover::after,
-.tip:focus::after {
-  opacity: 1;
-  visibility: visible;
+.tooltip-text {
+  min-width: 0;
+}
+
+/* A shortcut such as "(Q)" shows as a key. */
+.tooltip-key {
+  flex: none;
+  min-width: 1.6em;
+  padding: 0 5px;
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 0 var(--paper-3);
+  font-family: var(--font-num);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  left: var(--tip-arrow, 50%);
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--night);
+  border: 2px solid var(--night-line);
+  transform: rotate(45deg);
+}
+
+.tooltip[data-side="below"] .tooltip-arrow {
+  top: -7px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.tooltip[data-side="above"] .tooltip-arrow {
+  bottom: -7px;
+  border-top: 0;
+  border-left: 0;
 }
 
 /* ---------------------------------------------------------------- */
@@ -3189,14 +3232,264 @@ button:disabled {
   background: #ffedf0;
 }
 
+.menu-grid + .callout {
+  margin-top: 10px;
+}
+
+/* The menu: run card, Resume and the run tiles across the top, then two columns of sections. */
+.modal-menu {
+  width: min(860px, 100%);
+}
+
+.modal-menu > .modal-body > .callout + .callout {
+  margin-top: 10px;
+}
+
+.menu-columns {
+  display: grid;
+  column-gap: 28px;
+}
+
+@media (min-width: 760px) {
+  .menu-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
 .menu-section {
-  margin-top: 16px;
+  margin-top: 18px;
   padding-top: 4px;
   border-top: 2px dashed var(--paper-3);
 }
 
+.menu-section > h4,
+.menu-section-head h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 8px;
+  font-size: 1.05rem;
+}
+
+.menu-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.menu-section > p,
+.menu-note {
+  margin: 0 0 10px;
+  font-size: 0.92rem;
+  color: var(--text-soft);
+}
+
 .menu-section .callout {
-  margin-top: 4px;
+  margin-top: 8px;
+}
+
+/* Stacked, equal-width actions: labels line up and nothing wraps unevenly. */
+.menu-actions {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+
+.menu-actions .btn {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.menu-actions .btn .icon {
+  flex: none;
+}
+
+/* A full-width row of actions that wraps into equal columns. */
+.menu-actions-row {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+
+/* A choice waiting for confirmation, beside the control that asked for it. */
+.menu-confirm {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 2px solid var(--paper-3);
+  border-radius: 6px;
+}
+
+.menu-confirm p {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.menu-confirm .btn-row {
+  margin: 10px 0 0;
+}
+
+/* A related group inside a section, such as the pre-update save. */
+.menu-sub {
+  margin-top: 14px;
+  padding: 10px 12px 12px;
+  background: var(--paper-2);
+  border-radius: 6px;
+}
+
+.menu-sub h5 {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+
+/* Starting over replaces the run: set apart, in the colours of a warning. */
+.menu-danger {
+  padding: 4px 12px 12px;
+  background: #ffedf0;
+  border: 2px solid var(--critical);
+  border-radius: 6px;
+}
+
+.menu-danger > h4 {
+  color: var(--critical-ink);
+}
+
+.menu-danger .field {
+  margin-bottom: 0;
+}
+
+/* Sound: a label, a slider and its percentage on one line. */
+.menu-toggle.is-on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.volume {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr) 3.2rem;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.volume label {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.volume output {
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.volume input[type="range"] {
+  --fill: 0%;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+
+.volume input[type="range"]::-webkit-slider-runnable-track {
+  height: 10px;
+  background: linear-gradient(to right, var(--go) var(--fill), var(--paper-2) var(--fill));
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+}
+
+.volume input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: var(--paper-2);
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+}
+
+.volume input[type="range"]::-moz-range-progress {
+  height: 6px;
+  background: var(--go);
+}
+
+.volume input[type="range"]::-webkit-slider-thumb {
+  width: 18px;
+  height: 22px;
+  margin-top: -8px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 0 var(--ink);
+  appearance: none;
+}
+
+.volume input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 18px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 0 var(--ink);
+}
+
+.volume input[type="range"]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.menu-sound.is-muted .volume input[type="range"],
+.menu-sound.is-muted .volume output {
+  opacity: 0.5;
+}
+
+@media (max-width: 480px) {
+  /* Phone: the run card's numbers get the full width of their tiles, and the run tiles become one list. */
+  .menu-run-stats {
+    gap: 6px;
+  }
+
+  .menu-run-stats > div {
+    column-gap: 6px;
+    padding: 6px;
+  }
+
+  .menu-run-stats .concept {
+    grid-row: auto;
+    width: 20px;
+    height: 20px;
+  }
+
+  .menu-run-stats .concept .icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .menu-run-stats dd {
+    grid-column: 1 / -1;
+    font-size: 1rem;
+  }
+
+  .menu-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .menu-tile {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
+  .volume {
+    grid-template-columns: minmax(0, 1fr) 3.2rem;
+    row-gap: 0;
+  }
+
+  .volume label {
+    grid-column: 1 / -1;
+  }
 }
 
 .field {
@@ -3713,122 +4006,31 @@ button:disabled {
   }
 }
 
-/* Opening campaign evidence uses the existing panel, buttons and theme. */
-.campaign-panel { padding: 14px; overflow-y: auto; }
-.campaign-panel p { margin: 12px 0; line-height: 1.5; }
-.campaign-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.campaign-table caption { text-align: left; padding: 8px 0; }
-.campaign-table th, .campaign-table td { padding: 6px; text-align: left; border-bottom: 1px solid #ffffff22; }
-.campaign-actions { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-.campaign-panel .btn { white-space: normal; }
+/* Campaign uses the shared HUD, incident workspace and disclosure styles.
+   Only physical-step evidence needs additional layout. See docs/UI_DESIGN.md. */
+.campaign-stability strong { font-family: var(--font-num); font-size: 1.1rem; }
+.campaign-stability .clock-row { margin-bottom: 6px; }
+.campaign-inspect { margin-top: 10px; }
+.chip.is-selected { background: var(--go); border-color: var(--ink); }
+.campaign-evidence, .campaign-working { margin-top: 10px; }
+.campaign-panel .act { margin-top: 0; }
+.campaign-panel .act-label { white-space: normal; }
+.campaign-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.campaign-table caption { text-align: left; padding: 8px 0; color: var(--text-soft); }
+.campaign-table th, .campaign-table td { padding: 6px; text-align: left; border-bottom: 1px solid var(--paper-3); }
+.campaign-details { overflow-x: auto; }
 
-.campaign-header .stat { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; padding: 6px; }
-.campaign-header .stat > span { font-size: 11px; }
-.campaign-header .stat > strong { font-size: 1rem; white-space: normal; overflow-wrap: anywhere; }
-@media (max-width: 900px) {
-  .campaign-header .stat > strong { font-size: 12px; }
-}
-
-.dependency-strip{display:grid;grid-template-columns:1fr 12px 1.5fr 12px 1.5fr;align-items:center;gap:4px;font-size:11px}.dependency-strip .btn{min-width:0;font-size:11px;padding:6px}.dependency-strip [aria-pressed="true"],.selected-evidence{background:#e5f2ff;outline:2px solid #426788;outline-offset:-2px} .campaign-panel :focus-visible{outline:3px solid #426788;outline-offset:3px}
-
+.campaign-panel .step-head { margin-top: 10px; }
+.request-path { margin: 0 0 4px; font-size: 12px; }
 .campaign-entry{max-height:94vh;overflow:auto;max-width:720px}.gameplay-preview{width:100%;max-height:240px;object-fit:cover;border-radius:8px}.campaign-entry h1{font-size:clamp(24px,4vw,42px)}.modal select,.modal textarea{display:block;width:100%;padding:8px;margin:8px 0}.modal :focus-visible{outline:3px solid #426788;outline-offset:2px}
 
-/* Four dependency nodes must not fall into the old strip's arrow column. */
-.dependency-strip.data-dependencies { grid-template-columns: minmax(0, 1fr); text-align: center; gap: 2px; }
-.data-dependencies > span[aria-hidden="true"] { transform: rotate(90deg); line-height: 14px; width: 14px; justify-self: center; pointer-events: none; }
-.data-dependencies > .btn { width: 100%; }
+.campaign-entry { max-height: calc(100dvh - 2rem); overflow-y: auto; }
+.instance-choices { display: grid; gap: 6px; margin-top: 8px; }
+.instance-choices .chip { display: block; width: 100%; white-space: normal; text-align: left; }
+.instance-choices .chip span { display: block; font-family: var(--font-num); font-size: 0.8rem; margin-top: 4px; }
+.scaling-controls fieldset { display: grid; gap: 6px; min-width: 0; border: 1px solid var(--paper-3); padding: 8px; }
+.scaling-controls legend { font-size: 0.85rem; }
+.scaling-controls .btn { white-space: normal; }
 
-/* Campaign goals stay separate from diagnostic evidence and interventions. */
-.campaign-guidance { border-bottom: 2px solid #42678855; padding-bottom: 12px; margin-bottom: 14px; }
-.campaign-guidance h2, .campaign-panel [aria-label="Actions"] h2 { font-size: 16px; }
-.campaign-guidance h3 { font-size: 14px; margin: 12px 0 4px; }
-.campaign-progression { position: sticky; top: -14px; z-index: 2; background: var(--paper); padding: 4px 0; border-bottom: 1px solid #42678855; }
-.campaign-stages { list-style: none; padding: 0; margin: 8px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; font-size: 11px; }
-.campaign-stages li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px; padding: 5px 8px; border: 1px solid #42678844; border-radius: 4px; }
-.campaign-stages [aria-current="step"] { border: 2px solid #426788; }
-.traffic-limit-notice, .idle-app-notice { border-left: 3px solid #8b5c20; padding: 8px 10px; background: #e7bf6b22; }
-.campaign-panel .traffic-limit-notice p, .campaign-panel .idle-app-notice p { margin: 6px 0; }
-
-/* Campaign comprehension: the office remains the world view; guidance leads. */
-.campaign-app:not(.is-title) { grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); grid-template-areas: "top top" "workflow stage" "bottom bottom"; }
-.campaign-app:not(.is-title) .campaign-panel { grid-area: workflow; width: auto; justify-self: stretch; align-self: stretch; min-height: 0; max-height: none; margin: 8px; padding: 12px; }
-.campaign-app .campaign-stages { grid-template-columns: repeat(5, minmax(0,1fr)); font-size: 12px; }
-.campaign-stages li { flex-direction: column; justify-content: start; }
-.campaign-stages small { font-size: 10px; opacity: .75; }
-.campaign-stages [aria-current="step"] { background: #e5f2ff; box-shadow: inset 0 3px #426788; }
-.campaign-panel .campaign-guidance { margin-bottom: 8px; padding-bottom: 8px; }
-.campaign-panel .campaign-guidance p { margin: 6px 0; }
-.campaign-panel .current-objective { font-size: 19px; font-weight: 600; }
-.campaign-panel h2 { font-size: 17px; margin: 0 0 6px; }
-.stage-context summary,.detailed-evidence summary,.financial-evidence summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
-.company-status { border: 2px solid #426788; background: #e5f2ff; border-radius: 6px; padding: 10px 12px; }
-.company-status p { margin: 4px 0; }
-.company-status.has-incident { border-color: #c54444; background: #ffe6df; }
-.company-status [role="alert"] { border-top: 1px solid #c5444488; margin-top: 6px; padding-top: 8px; }
-.campaign-panel .panel-section { padding: 10px 0; }
-.campaign-panel .dependency-strip { font-size: 13px; }
-.campaign-panel .dependency-strip .btn { font-size: 13px; min-height: 65px; }
-.campaign-panel .data-dependencies { grid-template-columns: 1fr 12px 1.3fr 12px 1.1fr 12px 1.3fr; }
-.campaign-panel .data-dependencies > span[aria-hidden="true"] { transform: none; }
-.campaign-panel .campaign-actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: start; }
-.action-card { border: 1px solid #42678855; border-radius: 6px; padding: 8px; }
-.action-card .btn { width: 100%; min-height: 46px; }
-.campaign-panel .action-card p { font-size: 12px; margin: 6px 0 0; }
-.campaign-panel .idle-app-notice { padding: 6px; }
-.campaign-panel .idle-app-notice p { font-size: 12px; margin: 4px 0; }
-.campaign-app .bottombar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
-.clock-explanation { display: flex; gap: 12px; width: 100%; font-family: var(--font-body); font-size: 12px; }
-.clock-explanation strong { white-space: nowrap; color: var(--go); }
-.recovery-banner,.completion-banner { padding: 12px; border: 2px solid #426788; background: #e5f2ff; color: var(--ink); border-radius: 6px; }
-.postmortem-summary h3 { margin: 16px 0 6px; }
-@media (max-width:900px) {
- .campaign-app:not(.is-title) { display: flex; flex-direction: column; overflow-y: auto; padding-bottom: 130px; }
- .campaign-app:not(.is-title) .campaign-panel { order: 1; flex: none; margin: 8px; overflow: visible; width: auto; position: static; }
- .campaign-app:not(.is-title) .stage { order: 2; flex: 0 0 300px; height: 300px; margin: 8px; }
- .campaign-app .campaign-stages { grid-template-columns: repeat(3,minmax(0,1fr)); font-size: 11px; }
- .campaign-app .campaign-progression { position: static; padding: 0; }
- .campaign-app .campaign-stages li { padding: 4px; }
- .campaign-app .campaign-stages small { display: none; }
- .campaign-app .campaign-stages li:last-child { grid-column: auto; }
- .campaign-app .bottombar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; }
- .campaign-app .time-controls { flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
- .campaign-app .speed { display: flex; }
- .campaign-app .speed button { font-size: 10px; }
- .clock-explanation { flex-direction: column; gap: 2px; font-size: 11px; }
- .campaign-panel .current-objective { font-size: 17px; }
- .campaign-panel .campaign-actions { grid-template-columns: repeat(2,minmax(0,1fr)); }
- .campaign-panel .data-dependencies { grid-template-columns: 1fr; }
- .campaign-panel .data-dependencies > span[aria-hidden="true"] { transform: rotate(90deg); }
-}
-
-/* Keep the initial decision surface compact; detailed evidence remains disclosed below. */
-.campaign-panel .campaign-guidance h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.campaign-panel .campaign-guidance { border-bottom: 0; }
-.campaign-panel .architecture-overview > p { margin: 6px 0; font-size: 12px; }
-.clock-explanation summary { cursor: pointer; }
-@media (max-width:900px) {
- .campaign-header .stat:last-child { display: none; }
- .campaign-header .stats-strip { grid-template-columns: repeat(3,minmax(0,1fr)); }
- .campaign-panel .current-stage small { display: none; }
- .campaign-panel .campaign-guidance h3 { margin: 4px 0; }
- .campaign-panel .campaign-guidance .current-objective { margin: 4px 0; }
- .campaign-panel .stage-context summary { font-size: 11px; padding: 4px 0; }
- .campaign-panel .dependency-strip .btn { min-height: 55px; font-size: 11px; padding: 4px; }
- .campaign-panel .dependency-strip { font-size: 11px; }
- .campaign-panel .architecture-overview > p { display: inline-block; margin-right: 6px; }
- .campaign-panel .architecture-overview > .btn { font-size: 11px; padding: 5px; }
- .campaign-panel .company-status { padding: 6px 8px; }
- .campaign-panel .company-status p { font-size: 12px; }
- .campaign-panel .action-card { padding: 5px; }
- .campaign-panel .action-card .btn { font-size: 11px; padding: 5px; }
- .campaign-panel .action-card p { font-size: 11px; }
- .campaign-app .bottombar { display: grid; grid-template-columns: 70px minmax(0,1fr); gap: 4px; padding: 6px; }
- .campaign-app .time-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
- .campaign-app .time-controls > .speed { grid-column: 1 / -1; grid-row: 2; }
- .campaign-app .time-controls > .btn { font-size: 11px; padding: 6px; }
- .campaign-app .clock-explanation { grid-column: 1 / -1; }
- .campaign-app .clock-explanation details { font-size: 10px; }
- .campaign-app .clock-explanation p { margin: 3px 0; }
-}
-
-@media (max-width:900px) { .campaign-app .campaign-progression { position: sticky; top: 0; z-index: 29; } }
+/* Campaign progress uses the existing HUD typography and stays visible while evidence scrolls. */
+.campaign-stage { color: var(--on-night-soft); font-family: var(--font-num); font-size: .75rem; font-weight: 600; }

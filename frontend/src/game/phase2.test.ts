@@ -2,7 +2,7 @@ import {beforeEach,afterEach,it,expect,vi} from "vitest";
 import {newGame,applyAction,type GameState} from "../sim";
 import {advanceSteps} from "../sim/step";
 import {useGame,inspectOrSelect} from "./store";
-import {makeEnvelope,CAMPAIGN_SAVE_KEY} from "./saveMigrations";
+import {makeEnvelope,decodeSave,CAMPAIGN_SAVE_KEY} from "./saveEnvelope";
 import {loadGame,saveGame,readAnalytics,archiveEvents,exportPlaytest,DEFAULT_META,saveMeta} from "./persist";
 import {emptyMeasurement,beginSession,projectEvents} from "./telemetry";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});
@@ -12,12 +12,21 @@ function recovered() {let g=advanceSteps(newGame(1,"phase2-test"),6).state;g=act
 function enter(){useGame.getState().boot();useGame.getState().play();useGame.getState().onboardingMove("skip");}
 function v1(g:GameState) {
  const e=JSON.parse(JSON.stringify(makeEnvelope(g)));e.schemaVersion=1;
- delete e.game.campaign.openingPrevention;delete e.game.campaign.openingMilestone;delete e.runtime.measurement;
+ delete e.runtime.measurement;
+ e.inputs=e.inputs.filter((i:{action:{type:string}})=>i.action.type!=="acknowledge_milestone");
  return JSON.stringify(e);
 }
+function backup(raw:string) {const e=JSON.parse(raw);return CAMPAIGN_SAVE_KEY+".backup.v1."+e.runId+"."+e.savedAt;}
+function aggregate(snapshot:NonNullable<GameState["campaign"]>["snapshot"]) {
+ const {version: _version,instances: _instances,effectiveAppCapacity: _effective,appBusyBudget: _budget,routing: _routing,...recorded}=snapshot;
+ return recorded;
+}
+
 it("landing boot creates neither durable company nor run event; explicit entry is idempotent",()=>{
  useGame.getState().boot();useGame.getState().boot();
  expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBeNull();expect(readAnalytics()).toEqual([]);
+ useGame.getState().setRunning(false);useGame.getState().saveNow(true);
+ expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBeNull();
  useGame.getState().advance();useGame.getState().setRunning(true);useGame.getState().tick(60);
  expect(useGame.getState().game.campaign!.step).toBe(0);
  useGame.getState().play();useGame.getState().play();
@@ -60,18 +69,62 @@ it.each(["healthy","review","acknowledged"] as const)("migrates Phase 1 %s witho
  if(kind==="acknowledged")g=act(g,{type:"acknowledge_review"});
  const raw=v1(g);localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);localStorage.setItem("nn.save.v1","legacy");
  const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("load");
- expect(loaded.game.campaign!.snapshot).toEqual(g.campaign!.snapshot);
+ expect(loaded.game.campaign!.snapshot).toEqual(aggregate(g.campaign!.snapshot));
+ expect(loaded.game.campaign!.recent.every(m=>m.instances===undefined)).toBe(true);
  expect(loaded.game.campaign!.ledger).toEqual(g.campaign!.ledger);
- expect(loaded.game.campaign!.trace).toEqual(g.campaign!.trace);
+
  expect(loaded.game.campaign!.openingMilestone?.acknowledged??null).toBe(kind==="acknowledged"?true:null);
  expect(loaded.measurement).toMatchObject({origin:"phase1",openingStartedAt:null});
- expect(localStorage.getItem(CAMPAIGN_SAVE_KEY+".backup.v1")).toBe(raw);
+ expect(saveGame(loaded.game,loaded.remainderMs,false,loaded.measurement)).toBe(true);
+ expect(localStorage.getItem(backup(raw))).toBe(raw);
  expect(localStorage.getItem("nn.save.v1")).toBe("legacy");expect(readAnalytics()).toEqual([]);
 });
-it("failed Phase 1 migration backup preserves the original",()=>{
+it.each([
+ {failure:"backup",reset:false},{failure:"active",reset:false},
+ {failure:"backup",reset:true},{failure:"active",reset:true}
+])("preserves Phase 1 bytes after $failure write failure (explicit reset: $reset)",({failure,reset})=>{
  const raw=v1(recovered());localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);
- vi.spyOn(Storage.prototype,"setItem").mockImplementation(()=>{throw Error("quota");});
- expect(loadGame().status).not.toBe("ok");expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBe(raw);
+ const original=Storage.prototype.setItem;
+ vi.spyOn(Storage.prototype,"setItem").mockImplementation(function(this:Storage,key,value){
+  if(key===(failure==="backup"?backup(raw):CAMPAIGN_SAVE_KEY))throw Error("quota");
+  original.call(this,key,value);
+ });
+ const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("load");
+ expect(saveGame(loaded.game,0,reset,loaded.measurement)).toBe(false);expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBe(raw);
+ if(failure==="active")expect(localStorage.getItem(backup(raw))).toBe(raw);
+});
+it("loads main's input-log envelope with queued work, fractional clock credit and no snapshot",()=>{
+ const raw=JSON.stringify({schemaVersion:1,scenarioId:"opening-db",scenarioVersion:1,
+  runId:"main-save",seed:1,step:7,inputs:[{step:6,action:{type:"start_db_upgrade"}}],
+  runtime:{remainderMs:350},savedAt:123});
+ localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);
+ const expected=advanceSteps(act(advanceSteps(newGame(1,"main-save"),6).state,{type:"start_db_upgrade"}),1).state;
+ const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("load");
+ expect(loaded.game.campaign).toMatchObject({runId:"main-save",step:7,cashCents:expected.campaign!.cashCents,
+  dbCapacity:600,dbBacklog:expected.campaign!.dbBacklog,pending:expected.campaign!.pending,
+  ledger:expected.campaign!.ledger,cumulative:expected.campaign!.cumulative,scaling:null});
+ expect(loaded.game.campaign!.snapshot).toEqual(aggregate(expected.campaign!.snapshot));
+ expect(loaded.game.campaign!.trace.find(e=>e.type==="action-requested")!.data).toEqual({actionId:expected.campaign!.actions[0].id,type:"upgrade-db",costCents:300000,activationStep:9});
+ expect(loaded.remainderMs).toBe(350);
+ expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBe(raw);
+ enter();expect(useGame.getState().running).toBe(false);
+ expect(localStorage.getItem(backup(raw))).toBe(raw);
+ useGame.getState().setRunning(true);useGame.getState().tick(1.65);
+ expect(useGame.getState().game.campaign!.step).toBe(9);
+ expect(useGame.getState().game.campaign!.dbCapacity).toBe(1000);
+ expect(loadGame()).toMatchObject({status:"ok",game:useGame.getState().game,remainderMs:0});
+});
+it("normalizes a historical acknowledgement into a current replay save without re-awarding completion",()=>{
+ let game=act(recovered(),{type:"acknowledge_review"});
+ game=act(game,{type:"acknowledge_milestone"});game=advanceSteps(game,4).state;
+ localStorage.setItem(CAMPAIGN_SAVE_KEY,v1(game));
+ const loaded=loadGame();if(loaded.status!=="ok")throw Error("load");
+ const upgraded=makeEnvelope(loaded.game,0,123,loaded.measurement);
+ const roundtrip=decodeSave(JSON.stringify(upgraded));
+ expect(roundtrip).toMatchObject({status:"ok",game:loaded.game});
+ enter();useGame.getState().advance();
+ expect(readAnalytics().filter(e=>e.name==="run_completed_opening")).toEqual([]);
+ expect(useGame.getState().game.campaign!.openingMilestone?.acknowledged).toBe(true);
 });
 it("trace projection deduplicates retries and distinguishes request/activation steps",()=>{
  let g=advanceSteps(newGame(1,"events"),6).state;
@@ -116,7 +169,8 @@ it("active timing includes paused thinking but excludes hidden/offline intervals
 });
 it("bankruptcy telemetry survives explicit restart",()=>{
  let g=advanceSteps(newGame(),6).state;
- g=advanceSteps(g,53).state;g.campaign!.cashCents=1;g.cash=.01;saveGame(g);
+ const ending=advanceSteps(g,100000).state;
+ g=advanceSteps(g,ending.campaign!.step-g.campaign!.step-1).state;saveGame(g);
  saveMeta({...DEFAULT_META,openingOnboarding:{version:1,step:2,status:"completed"}});
  enter();useGame.getState().setRunning(true);useGame.getState().tick(1);
  expect(useGame.getState().game.phase).toBe("ended");
@@ -139,19 +193,6 @@ it("later incident recovery cannot re-award the opening milestone",()=>{
  g=act(g,{type:"acknowledge_review"});
  expect(g.campaign!.openingMilestone).toEqual(milestone);
  expect(g.campaign!.trace.filter(t=>t.type==="milestone-awarded")).toHaveLength(1);
-});
-it.each(["ambiguous","write-failure"])("migration preserves source on %s",kind=>{
- const g=recovered();if(kind==="ambiguous")g.phase="management";
- const raw=v1(g);localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);
- if(kind==="write-failure") {
-  const original=Storage.prototype.setItem;
-  vi.spyOn(Storage.prototype,"setItem").mockImplementation(function(this:Storage,k,v){
-   if(k===CAMPAIGN_SAVE_KEY)throw Error("quota");original.call(this,k,v);
-  });
- }
- expect(loadGame().status).not.toBe("ok");
- expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBe(raw);
- expect(localStorage.getItem(CAMPAIGN_SAVE_KEY+".backup.v1")).toBe(raw);
 });
 it("successful archive write followed by reload does not duplicate the staged occurrence",()=>{
  enter();inspectOrSelect("app");
