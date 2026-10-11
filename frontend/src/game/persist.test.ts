@@ -4,7 +4,7 @@ import { step, advanceSteps } from "../sim/step";
 import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics, saveClassicGame, loadClassicGame } from "./persist";
 import { CAMPAIGN_SAVE_KEY as KEY, makeEnvelope } from "./saveEnvelope";
 import { decodeClassicSave, rawLegacySave, exportGame } from "./persist";
-import { DEFAULT_AUDIO, DEFAULT_GRAPHICS, legacyMusicOff, loadAudio, loadGraphics, saveAudio, saveGraphics, saveMode } from "./persist";
+import { DEFAULT_AUDIO, DEFAULT_GRAPHICS, isSilent, legacyMusicOff, loadAudio, loadGraphics, saveAudio, saveGraphics, saveMode } from "./persist";
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 describe("campaign data preservation", () => {
@@ -124,6 +124,15 @@ describe("sound settings", () => {
     expect(loadAudio()).toEqual({ music: 35, effects: 0, muted: true });
     saveMode("classic");
     expect(loadAudio()).toEqual({ music: 35, effects: 0, muted: true });
+  });
+
+  it("count as silent when muted or when both volumes are at 0, and not otherwise", () => {
+    expect(isSilent(DEFAULT_AUDIO)).toBe(false);
+    expect(isSilent({ ...DEFAULT_AUDIO, muted: true })).toBe(true);
+    expect(isSilent({ music: 0, effects: 0, muted: false })).toBe(true);
+    // One audible channel is enough to be heard.
+    expect(isSilent({ music: 0, effects: 5, muted: false })).toBe(false);
+    expect(isSilent({ music: 5, effects: 0, muted: false })).toBe(false);
   });
 
   it("keep a player who turned the music off muted, at the default volumes", () => {

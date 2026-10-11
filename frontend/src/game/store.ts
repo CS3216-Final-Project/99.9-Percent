@@ -32,6 +32,7 @@ import {
   DEFAULT_AUDIO,
   DEFAULT_GRAPHICS,
   DEFAULT_META,
+  isSilent,
   loadClassicGame,
   loadGame,
   loadMeta,
@@ -183,7 +184,7 @@ interface Store {
   rate: (rating: number) => void;
   /** Change the sound settings, remembered for next time. Volumes are clamped to 0–100. */
   setAudio: (patch: Partial<AudioSettings>) => void;
-  /** Silence music and effects, or bring them back at their volumes. */
+  /** Silence music and effects, or bring them back at their volumes. With both volumes at 0 there is nothing to bring back, so they return to the defaults. */
   toggleMute: () => void;
   /** Change the graphics settings, remembered for next time. An unknown quality is ignored. */
   setGraphics: (patch: Partial<GraphicsSettings>) => void;
@@ -784,7 +785,12 @@ export const useGame = create<Store>()((set, get) => {
       // Unsaved settings still apply for this visit.
       saveAudio(audio);
     },
-    toggleMute: () => get().setAudio({ muted: !get().audio.muted }),
+    toggleMute: () => {
+      const { audio } = get();
+      if (!isSilent(audio)) return get().setAudio({ muted: true });
+      // A mute only unmutes; volumes dragged to 0 are brought back too, or the click would change nothing you can hear.
+      get().setAudio(audio.music === 0 && audio.effects === 0 ? DEFAULT_AUDIO : { muted: false });
+    },
 
     setGraphics: (patch) => {
       const quality = GRAPHICS_QUALITIES.find((q) => q === patch.quality) ?? get().graphics.quality;
