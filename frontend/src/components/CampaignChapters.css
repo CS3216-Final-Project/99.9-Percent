@@ -1,0 +1,58 @@
+.app.has-chapters {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "top" "chapters" "stage" "bottom";
+}
+
+.chapter-bar {
+  grid-area: chapters;
+  display: grid;
+  grid-template-columns: minmax(200px, 1.1fr) minmax(0, 2.4fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 16px;
+  background: var(--night);
+  color: var(--on-night);
+  border-bottom: 3px solid var(--ink);
+  z-index: 29;
+}
+
+.chapter-current p {
+  margin: 0 0 4px;
+  color: var(--go);
+  font-family: var(--font-num);
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.chapter-current h2 { font-family: var(--font-display); font-size: 1.4rem; line-height: 1.15; }
+.chapter-trail, .chapter-overview { list-style: none; padding: 0; margin: 0; }
+.chapter-trail { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.chapter-trail li { display: flex; align-items: center; gap: 7px; padding: 8px 6px; border: 2px solid transparent; border-radius: var(--radius); color: var(--on-night-soft); font-size: .8rem; font-weight: 600; line-height: 1.2; }
+.chapter-trail small { display: block; margin-top: 4px; font-size: .68rem; font-weight: 400; }
+.chapter-number { flex: none; display: grid; place-content: center; width: 26px; height: 26px; border: 2px solid currentColor; border-radius: 50%; font-family: var(--font-num); font-size: .85rem; font-weight: 700; }
+.chapter-trail .is-complete .chapter-number { color: var(--ok); }
+.chapter-trail li[aria-current] { background: var(--paper); color: var(--ink); border-color: var(--go); }
+.chapter-trail li[aria-current] .chapter-number { background: var(--go); color: var(--ink); }
+.chapter-bar > .btn { white-space: nowrap; }
+
+.chapter-overview { display: grid; gap: 10px; margin-block: 18px; }
+.chapter-overview li { display: flex; gap: 12px; padding: 12px; border: 2px solid var(--paper-3); border-radius: var(--radius); }
+.chapter-overview li[aria-current] { border-color: var(--ink); background: var(--go); }
+.chapter-overview h3 { font-family: var(--font-display); font-size: 1.25rem; line-height: 1.2; }
+.chapter-overview p { margin: 6px 0 0; }
+.chapter-status { display: block; margin-top: 4px; font-size: .85rem; font-weight: 600; }
+
+@media (max-width: 1100px) {
+  .chapter-bar { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .chapter-trail { display: none; }
+}
+
+@media (max-width: 640px) {
+  .chapter-bar { padding: 10px 8px; gap: 8px; }
+  .chapter-current h2 { font-size: 1.2rem; }
+  .chapter-current p { font-size: .7rem; }
+  .chapter-bar > .btn { padding: 8px; font-size: .9rem; }
+  .chapter-bar > .btn .icon { display: none; }
+}

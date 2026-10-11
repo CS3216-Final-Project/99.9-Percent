@@ -6,8 +6,11 @@ import { canEnterReliability, pendingReliability, effectiveTargets, researchBala
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
+import { campaignChapters } from "@/game/campaignChapters";
 import TechTree from "./TechTree";
 import { AccountPanel } from "./AccountPanel";
+import { ModeChoice } from "./ModeChoice";
+import { CampaignChapters } from "./CampaignChapters";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest } from "@/game/persist";
 import { nextMove } from "@/game/advisor";
@@ -76,15 +79,10 @@ function CampaignGuidance() {
 function CampaignProgression() {
   const {game}=useGame(),c=game.campaign!;
   const model=campaignGuidance(game);
-  const status=(current:boolean,done:boolean,available=false)=>done?"Completed":current?"Current":available?"Available next":"Locked";
   return <section aria-label="Campaign requirements">
     <details className="more"><summary>Campaign progression</summary>
       <nav aria-label="Campaign progression"><ol className="campaign-stages">
-        <li aria-current={!model.openingDone?"step":undefined}>Opening <strong>{status(!model.openingDone,model.openingDone)}</strong></li>
-        <li aria-current={model.openingDone&&!c.dataStage?"step":undefined}>Scaling &amp; Routing <strong>{status(model.openingDone,!!c.dataStage)}</strong></li>
-        <li aria-current={c.dataStage&&!c.spikeStage?"step":undefined}>Data Strategy <strong>{status(!!c.dataStage,!!c.spikeStage,model.dataAvailable)}</strong></li>
-        <li aria-current={c.spikeStage&&!c.reliabilityStage?"step":undefined}>Traffic Spikes &amp; Autoscaling <strong>{status(!!c.spikeStage,!!c.spikeStage?.acknowledged,model.spikesAvailable)}</strong></li>
-        <li aria-current={c.reliabilityStage?"step":undefined}>Stay Online <strong>{status(!!c.reliabilityStage,!!c.reliabilityStage?.acknowledged,canEnterReliability(game))}</strong></li>
+        {campaignChapters(game).map(chapter=><li key={chapter.id} aria-current={chapter.current?"step":undefined}>{chapter.name} <strong>{chapter.status}</strong></li>)}
       </ol></nav>
       <RequirementList items={model.requirements} />
       {model.waiting&&<p role="status">{model.waiting}</p>}
@@ -96,14 +94,13 @@ function CampaignProgression() {
 }
 
 export function CampaignHeader() {
-  const { game, openView } = useGame(), c = game.campaign!;
+  const { game, openView, started } = useGame(), c = game.campaign!;
   const incident = game.phase === "incident";
   const atRisk = c.snapshot.latencyMs >= Q.latencyThresholdMs;
   const word = incident ? "Incident" : game.phase === "ended" ? "Bankrupt" : game.phase === "review" ? "Recovered" : atRisk ? "At risk" : c.limit!==null ? "Traffic limited" : "Healthy";
   const tone = incident || game.phase === "ended" ? "critical" : atRisk ? "warn" : "health";
-  return <header className={`topbar${incident ? " is-incident" : ""}`}>
+  return <><header className={`topbar${incident ? " is-incident" : ""}`}>
     <div className="brand"><span className="brand-mark">99.99%</span>
-      <span className="campaign-stage" aria-label="Current campaign stage">{stageName(game)}</span>
     </div>
     <div className="stats-strip">
       <Stat icon="cash" kind="cash" label="Cash" tip={`Available cash: ${dollars(c.cashCents)}. Revenue and running costs settle every ${Q.periodSteps} steps. Setup costs are paid immediately.`}>
@@ -122,7 +119,7 @@ export function CampaignHeader() {
     <button type="button" className="icon-btn" aria-label="Technology tree" {...tipProps("Technology tree")} onClick={() => openView("tech")}><Icon name="tree" /></button>
     <SoundButton />
     <button type="button" className="icon-btn menu-btn" aria-label="Menu" {...tipProps("Menu")} onClick={() => openView("menu")}><Icon name="menu" /></button>
-  </header>;
+  </header>{started && <CampaignChapters />}</>;
 }
 
 export function CampaignPanel() {
@@ -363,6 +360,7 @@ export function CampaignOverlays() {
   const {hasRun}=useGame();
   const configured=import.meta.env.VITE_PLAYTEST_URL as string|undefined;
   const playtestUrl=configured&&/^https?:\/\//.test(configured)?configured:null;
+  if (!started && !hasRun) return <ModeChoice />;
   if (!started) return <div className="title-screen campaign-title"><div className="title-card campaign-entry">
     <div className="title-copy">
       <span className="title-kicker"><Icon name="server" size={16} />A system design tycoon</span>
@@ -373,7 +371,7 @@ export function CampaignOverlays() {
     </div>
     <div className="title-start">
       <img className="gameplay-preview" src="/opening-gameplay.png" alt="The furnished office and component evidence in the playable campaign" />
-      <div className="title-cta"><div className="title-actions"><button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}><Icon name="play" />{hasRun ? "Continue company" : "Try Prototype"}</button>
+      <div className="title-cta"><div className="title-actions"><button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}><Icon name="play" />{hasRun ? "Continue company" : "Play Campaign"}</button>
         {playtestUrl?<a className="btn" href={playtestUrl} target="_blank" rel="noopener noreferrer">Join Playtest</a>:<button className="btn" disabled>Join Playtest</button>}</div>
         {!playtestUrl&&<p className="muted">Playtest registration is not open yet.</p>}</div>
       <p className="muted">Play immediately as a guest. Progress stays in this browser until you explicitly attach it to an account.</p><AccountPanel />
@@ -457,6 +455,7 @@ function PreventionOutcome({campaign}:{campaign:Campaign}) {
   const prepared=campaign.actions.filter(a=>requested.has(a.id)&&PREPARATION_NAMES[a.type]);
   return <div>
     <Callout tone="success" icon="health" kicker="First growth prevented">Traffic increased from {num(Q.startingTraffic)} to {num(Q.grownTraffic)} req/s and the Application and Database handled full demand with empty queues and healthy service for {Q.stableSteps} consecutive steps.</Callout>
+    <p>Prevention is recorded separately. Scaling unlocks only after a real Opening incident is recovered and its postmortem and milestone are acknowledged. No incident is forced.</p>
     {prepared.length?<ul>{prepared.map(a=><li key={a.id}>{PREPARATION_NAMES[a.type]}: {a.activatedStep!==null&&a.activatedStep<=o.qualifiedStep?"active before completion":"still pending at completion"}{a.costCents>0?` · setup ${dollars(a.costCents)}`:" · no setup cost"}.</li>)}</ul>:<p>No infrastructure or admission changes were recorded before completion.</p>}
     <dl className="rows">
       <Row label="Application demand / capacity" value={`${num(m.app.demand)} / ${num(m.app.capacity)} req/s`} />
