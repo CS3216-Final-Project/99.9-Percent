@@ -7,6 +7,7 @@ Request and response types live in [`shared/`](../shared). Change a type there o
 |---|---|---|---|---|
 | GET | `/api/health` | Di Heng | `HealthResponse` (`shared/common.ts`) | Done |
 | GET | `/api/health/db` | Di Heng | `HealthResponse`, or 503 if the database is unreachable | Done |
+| GET | `/api/stats` | Di Heng | `PublicStats` (`backend/src/routes/stats.ts`): public sign-up and cloud-save counts for the landing page, cached for 60 s; 503 with `no-store` when the database is unavailable | Done |
 | POST | `/api/dialogue` | Zi Yao | `DialogueRequest` → `DialogueResponse` (`shared/dialogue.ts`) | Stub |
 | POST | `/api/missions/:id/report` | Zi Yao | → `MissionReport` (`shared/scores.ts`) | Planned |
 | GET | `/api/progress` | Di Heng | TBD | Planned |

@@ -6,6 +6,7 @@ import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
 import { runsRouter } from './routes/runs.js';
 import { feedbackRouter } from './routes/feedback.js';
+import { statsRouter } from './routes/stats.js';
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use('/api', authRouter);
 app.use('/api/runs', runsRouter);
 app.use('/api/feedback', feedbackRouter);
+app.use('/api/stats', statsRouter);
 app.use('/api/health', healthRouter);
 app.use('/api/dialogue', dialogueRouter);
 
