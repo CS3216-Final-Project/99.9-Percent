@@ -15,6 +15,13 @@ test("reliability: inspection and effective recipients remain clear on narrow to
  await expect(panel).toContainText("detected unhealthy");
  await expect(page.getByRole("button",{name:"Restore App 2 · free · 3 steps",exact:true})).toBeEnabled();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.getByRole("button",{name:"Technology tree",exact:true}).tap();
+ const tree=page.getByRole("dialog",{name:"Technology tree"});
+ await expect(tree.locator("[data-tech]")).toHaveCount(9);
+ await tree.getByRole("button",{name:"Automatic Failover: Owned",exact:true}).tap();
+ await expect(tree.getByRole("heading",{name:"Automatic Failover",exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await tree.getByRole("button",{name:"Close",exact:true}).tap();
  await page.getByRole("button",{name:"Menu",exact:true}).tap();
  await expect(page.getByRole("dialog",{name:"Menu"}).getByRole("tab",{name:/Graphics/})).toBeVisible();
 });

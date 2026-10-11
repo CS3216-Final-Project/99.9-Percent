@@ -379,7 +379,7 @@ export function CampaignOverlays() {
       <button className="btn btn-primary" onClick={()=>onboardingMove("next")}>{meta.openingOnboarding.step===2?"Finish introduction":"Next"}</button></div>
     </Modal>;
   }
-  if (view === "tech") return <Modal title="Technology tree" wide icon={{ kind: "tech", name: "tree" }} onClose={() => openView(null)}><TechTree /></Modal>;
+  if (view === "tech") return <Modal title="Technology tree" wide className="modal-tech" icon={{ kind: "tech", name: "tree" }} onClose={() => openView(null)}><TechTree /></Modal>;
   if (pendingReliability(c)) return <Modal title="Reliability outcome" icon={{ kind: "ok", name: "health" }}>
     <ReliabilityOutcome campaign={c} />
     <button className="btn btn-primary" onClick={()=>act({type:"acknowledge_reliability"})}>Continue operating<Icon name="next" /></button>

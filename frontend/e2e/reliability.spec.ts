@@ -5,9 +5,43 @@ async function boot(page:Page,g:ReturnType<typeof readyReliability>){await page.
 async function advance(page:Page,n:number){for(let i=0;i<n;i++)await page.getByRole("button",{name:"Advance step",exact:true}).click();}
 test("reliability: same-company entry, nine-node ownership and explicit research",async({page})=>{
  await boot(page,readyReliability());const before=(await savedGame(page)).campaign!;await page.getByRole("button",{name:"Continue to reliability",exact:true}).click();await expect(page.getByLabel("Current campaign stage")).toHaveText("Stay Online");await page.getByRole("banner").getByRole("button",{name:"Technology tree",exact:true}).click();const dialog=page.getByRole("dialog",{name:"Technology tree"});await expect(dialog.locator("[data-tech]")).toHaveCount(9);await expect(dialog.getByRole("button",{name:"Larger Database: Owned",exact:true})).toBeVisible();await dialog.getByRole("button",{name:"Health Checks: Available",exact:true}).click();await dialog.getByRole("button",{name:"Unlock Health Checks · 1 research point",exact:true}).click();await expect(dialog.getByRole("button",{name:"Health Checks: Owned",exact:true})).toBeVisible();const after=(await savedGame(page)).campaign!;expect(after.runId).toBe(before.runId);expect(after.cashCents).toBe(before.cashCents);expect(after.step).toBe(before.step);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign!.reliabilityStage!.owned).toContain("health_checks");
+ const tree=page.getByRole("dialog",{name:"Technology tree"});
+ await page.getByRole("button",{name:"Technology tree",exact:true}).click();
+ expect(await tree.locator("[data-tech]").evaluateAll(nodes=>nodes.every(node=>{
+  const box=node.getBoundingClientRect(),viewport=node.closest(".tree-scroll")!.getBoundingClientRect();
+  return box.left>=viewport.left&&box.right<=viewport.right;
+ })),"All nine technologies fit beside the detail panel on desktop").toBe(true);
 });
 test("reliability: manual restoration, measured report, outcome and paused reload without API",async({page})=>{
- test.setTimeout(120000);await boot(page,act(readyReliability(),{type:"enter_reliability"}));await page.clock.install();await page.getByRole("button",{name:"Start reliability test",exact:true}).click();await advance(page,8);await expect(page.getByRole("region",{name:"Stay Online"})).toContainText("failed");const f=(await savedGame(page)).campaign!.reliabilityStage!.fault!;await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign!.reliabilityStage!.fault).toEqual(f);await page.getByRole("button",{name:"Run",exact:true}).click();await page.clock.runFor(2000);await page.getByRole("button",{name:"Pause",exact:true}).click();await page.getByRole("button",{name:`Restore App ${f.targetId.slice(4)} · free · 3 steps`,exact:true}).click();await page.getByRole("button",{name:"Run",exact:true}).click();await page.clock.runFor(12000);await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible();await page.getByRole("button",{name:"Continue company",exact:true}).click();await advance(page,5);await expect(page.getByRole("dialog",{name:"Reliability outcome"})).toBeVisible();await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(page.getByRole("dialog",{name:"Reliability outcome"})).toBeVisible();await page.getByRole("button",{name:"Continue operating",exact:true}).click();expect((await savedGame(page)).campaign!.reliabilityStage!.acknowledged).toBe(true);
+ test.setTimeout(120000);
+ await boot(page,act(readyReliability(),{type:"enter_reliability"}));
+ await page.getByRole("button",{name:"Start reliability test",exact:true}).click();
+ await advance(page,8);
+ await expect(page.getByRole("region",{name:"Stay Online"})).toContainText("failed");
+ const f=(await savedGame(page)).campaign!.reliabilityStage!.fault!;
+ await page.reload();
+ await page.getByRole("button",{name:"Continue company",exact:true}).click();
+ expect((await savedGame(page)).campaign!.reliabilityStage!.fault).toEqual(f);
+ // Keep the actual WebGL room. Waiting for physical outcomes avoids rendering
+ // every virtual animation frame during a long fake-clock jump on CI.
+ const resumedStep=(await savedGame(page)).campaign!.step;
+ await page.getByRole("button",{name:"Run",exact:true}).click();
+ await expect.poll(async()=>(await savedGame(page)).campaign!.step).toBeGreaterThan(resumedStep);
+ await page.getByRole("button",{name:"Pause",exact:true}).click();
+ await page.getByRole("button",{name:`Restore App ${f.targetId.slice(4)} · free · 3 steps`,exact:true}).click();
+ const restoring=(await savedGame(page)).campaign!;
+ expect(restoring.apps.find(app=>app.id===f.targetId)!.health).toBe("failed");
+ expect(restoring.pending.find(action=>action.type==="restore-app")!.activationStep).toBe(restoring.step+3);
+ await page.getByRole("button",{name:"Run",exact:true}).click();
+ await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});
+ await page.getByRole("button",{name:"Continue company",exact:true}).click();
+ await advance(page,5);
+ await expect(page.getByRole("dialog",{name:"Reliability outcome"})).toBeVisible();
+ await page.reload();
+ await page.getByRole("button",{name:"Continue company",exact:true}).click();
+ await expect(page.getByRole("dialog",{name:"Reliability outcome"})).toBeVisible();
+ await page.getByRole("button",{name:"Continue operating",exact:true}).click();
+ expect((await savedGame(page)).campaign!.reliabilityStage!.acknowledged).toBe(true);
 });
 test("reliability: one-step detection and delayed real spare promotion",async({page})=>{
  await boot(page,preparedReliability());await page.getByRole("button",{name:"Start reliability test",exact:true}).click();await advance(page,8);let c=(await savedGame(page)).campaign!;expect(c.apps[1].health).toBe("failed");expect(c.apps[1].detectedHealth).toBe("healthy");await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.apps[1].detectedHealth).toBe("unhealthy");expect(c.pending.some(a=>a.type==="promote-spare")).toBe(true);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.routing.targets).toEqual(["app-1","app-3"]);expect(c.apps).toHaveLength(3);await expect(page.getByRole("region",{name:"Stay Online"})).toContainText("3,200 /");

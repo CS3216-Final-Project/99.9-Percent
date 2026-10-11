@@ -3051,6 +3051,10 @@ button:disabled {
   width: min(580px, 100%);
 }
 
+.modal-tech {
+  width: min(1400px, 100%);
+}
+
 .modal-head {
   display: flex;
   justify-content: space-between;

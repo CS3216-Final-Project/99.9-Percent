@@ -71,6 +71,8 @@ Authority: [original scaling plan](PHASE_3_SCALING.md), reconciled by the accept
 
 No server dependency is added to ordinary campaign gameplay. No production database migration or provider configuration is performed by this review.
 
+There is also a documented Scaling affordability limitation, retained by the adapted Phase 6 contract: an inherited company can lack the mandatory $3,000 database headroom purchase while installed costs exceed its obtainable revenue. For example, an unupgraded 600-capacity database yields at most $7,200 per 60-step period at $0.20 per completion, below the base $7,600 application/database/four-engineer cost. A company that has already spent down its cash cannot necessarily earn its way out. The representative balance paths do not prove universal financial recoverability. Earlier prices are preserved; the contract assigns a separate economy/progression decision to Phase 7.
+
 ## Phase 4: data strategy
 
 Authority: approved [bounded Phase 4 contract](PHASE_4_DATA_STRATEGY.md). It explicitly defers the wider roadmap's full research progression and central ingestion; those deferrals are not silently treated as implemented.
