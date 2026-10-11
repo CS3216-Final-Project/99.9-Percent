@@ -109,6 +109,7 @@ To change the schema: edit `schema.ts`, run `npm run db:generate`, and commit th
 |---|---|---|---|
 | CI `frontend` | Every PR | GitHub Actions | lint, typecheck, coverage, build, desktop/touch browser tests |
 | CI `backend` | Every PR | GitHub Actions | lint, typecheck, coverage (incl. migrations on in-memory Postgres), migrations match schema |
+| Dependabot | Weekly | GitHub | npm and Actions updates after a 7-day cooldown; security fixes immediately |
 | Preview deploy | Every PR | Vercel | Preview URL for each project, linked on the PR |
 | Production deploy | Push to `main` | Vercel | Both projects |
 | Migrate database | Push to `main` | GitHub Actions (`cd.yml`) | `db:migrate` on the production Neon database |

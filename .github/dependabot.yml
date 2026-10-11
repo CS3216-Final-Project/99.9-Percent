@@ -1,0 +1,26 @@
+# Weekly version updates. A new release waits out a cooldown before Dependabot
+# proposes it: hijacked npm releases are usually caught and pulled within days.
+# Security updates for known advisories skip the cooldown.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories: [/frontend, /backend]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      # One PR for every minor and patch bump; majors stay separate for review.
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Keeps the SHA-pinned actions in .github/workflows current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
