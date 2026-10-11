@@ -6,6 +6,23 @@
 > **Status:** Reconciled implementation contract; implementation, baseline and validation outstanding
 > **Repository checkpoint inspected:** `ai/phase-5-progression`, `8be77e220b9b130cdcc6812a5975bd2127ca851a`, 10 October 2026
 
+# 0. Recorded deviations in the merged implementation
+
+This contract was written against the PR #28 branch, before main merged Phases 1-5 separately (#10, #11, #17, #18, #20).
+The implementation was rebased onto main, and these sections no longer describe the shipped code:
+
+- **Persistence (section 10, file plan in section 12, acceptance in sections 13.1 and 15).** There is no `saveMigrations.ts`, migration registry or snapshot validator.
+  Main's saves hold the seed and recorded player inputs, and loading replays them on the deterministic engine (`frontend/src/game/saveEnvelope.ts`, `frontend/src/sim/replay.ts`).
+  Schema 6 is still used, so a build without reliability cannot load these saves; schemas 1-5 load through the same replay and are rejected if they contain prevention or reliability decisions.
+  Replay cannot be forged into an inconsistent state, so the per-field validators and migration failure cases in section 10 are not needed.
+  Before an older save is replaced, its exact bytes are still backed up.
+- **Opening prevention on old saves.** A run recorded before prevention existed can qualify for it when replayed today, although that run never paused for the review.
+  Replay records the prevention acknowledgement on its behalf instead of refusing the save; the resulting milestone stays pending for the player.
+- **Shared contract.** `shared/campaign.ts` and `backend/src/routes/runs.ts` accept schema 6 for cloud copies, contrary to the "no backend change" note in section 10.
+- **Presentation (sections 4.3 and 9).** Main's campaign layout and components are kept.
+  Reliability controls, the prevention and reliability outcome modals, the technology tree view and the requirement checklist are presented in that layout, not in the separate PR UI rewrite.
+- **Browser coverage (section 13.3).** The mobile browser cases for spikes, prevention and reliability were not carried over, so Phase 6 has no mobile browser coverage yet.
+
 # 1. Authority and repository reconciliation
 
 Read this with `docs/PROJECT_PROPOSAL.md`, `docs/DEVELOPMENT_ROADMAP.md`, the approved Phase 1–5 contracts, `docs/CURRENT_GAME_LOGIC_AND_FLOW.md`, `docs/phases/PHASE_5_IMPLEMENTATION_REPORT.md` and the Opening/UX/guardrail reports. Current campaign implementation and subsequent user-approved scope take precedence over stale roadmap assumptions. This document specifies future work; it does not claim Phase 6 is implemented.
@@ -285,6 +302,8 @@ Every supported gate must have a factual visible reason and valid next observati
 This is not a guarantee that every inherited company remains solvent. The existing Scaling affordability trap is preserved and disclosed: mandatory $3,000 headroom can be unaffordable while installed costs exceed full-demand revenue. Phase 6 must not add an unrelated bailout, refund or retroactive gate change. Inconsistent/corrupt save evidence remains protected/exportable, not automatically repaired or marked complete. Phase 7 owns the separate economy/progression decision.
 
 # 10. Persistence: schema 6 is required for this model
+
+> Superseded by replay saves; see section 0.
 
 This is not a schema bump merely for tree presentation. Tree-only derived states would fit schema 5. Physical failure/standby requires incompatible routing/snapshot invariants: even if installed `state="active"` is retained, schema 5 requires snapshot `routed` to match configured membership, checks processing budgets against nominal tiers, has fixed action/source kinds and lacks fault/detection/promotion/restoration references. Optional fields alone would either violate current validation or leave older readers treating unhealthy configured capacity as useful. New health-aware snapshots must not masquerade as version 5.
 
