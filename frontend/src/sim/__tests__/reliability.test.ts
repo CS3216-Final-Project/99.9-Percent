@@ -40,9 +40,10 @@ it("conserves failed deliveries and charges existing installed infrastructure",(
 it("new spare is a real paid unrouted instance and keeps research ownership after release",()=>{
  let s=act(reliabilityCompany(),{type:"unlock_reliability",tech:"standby"});const cash=s.campaign!.cashCents;s=act(s,{type:"install_spare"});expect(s.campaign!.cashCents).toBe(cash-100000);s=tick(s,2);expect(s.campaign!.apps[3]).toMatchObject({role:"spare",routed:false,capacity:1000});s=tick(act(s,{type:"release_spare"}),1);expect(has(s,"standby")).toBe(true);expect(s.campaign!.reliabilityStage!.spareId).toBeNull();
 });
-it("schema 6 validates and deterministic serialization preserves every fault/probe/promotion boundary",()=>{
+it("replays and serializes deterministically across every fault/probe/promotion boundary",()=>{
  let s=act(preparedReliability(),{type:"arm_reliability"});for(let i=0;i<40&&!pendingReliability(s.campaign);i++){expect(replay(s),`step ${s.campaign!.step}`).toEqual(JSON.parse(JSON.stringify(s)));expect(tick(JSON.parse(JSON.stringify(s)))).toEqual(tick(s));if(s.phase==="review")s=act(s,{type:"acknowledge_review"});s=tick(s);}
-});
+ // This bounded case reconstructs up to 40 complete saves on CI, rather than advancing one state.
+},15_000);
 
 it("freezes retained failed queues and cannot recover by discarding unfinished work",()=>{
  let s=tick(act(reliabilityCompany(),{type:"arm_reliability"}),7);s.campaign!.apps[2].backlog=35;s.campaign!.cumulative.admitted+=35;s=tick(s,3);expect(s.campaign!.apps[2].backlog).toBe(35);expect(s.campaign!.snapshot.instances![2].processed).toBe(0);expect(s.campaign!.cumulative.admitted).toBe(s.campaign!.cumulative.successful+s.campaign!.cumulative.failed+s.campaign!.apps.reduce((n,a)=>n+a.backlog,0)+s.campaign!.dbBacklog);
