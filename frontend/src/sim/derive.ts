@@ -1,3 +1,4 @@
+import { DATA_STRATEGY as D } from "./scenarios/dataStrategy";
 import { APPLICATION_SCALING as S } from "./scenarios/applicationScaling";
 import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
 import { BALANCE, PROMOS } from "./balance";
@@ -110,7 +111,7 @@ export interface CostBreakdown {
 }
 
 export function costs(s: GameState, tempServers = 0): CostBreakdown {
-  if(s.campaign){const c=s.campaign,servers=c.apps.reduce((sum,a)=>sum+(a.tier==="large"?S.appWeeklyCents:Q.appWeeklyCents),0)/100,database=(c.dbCapacity===2000?S.dbWeeklyCents:c.upgraded?Q.upgradedDbWeeklyCents:Q.dbWeeklyCents)/100,redundancy=c.loadBalancer?S.lbWeeklyCents/100:0,salaries=Q.engineers*Q.salaryWeeklyCents/100;return {servers,database,salaries,redundancy,tooling:0,autoscale:0,total:servers+database+salaries+redundancy};}
+  if(s.campaign){const c=s.campaign,servers=c.apps.reduce((sum,a)=>sum+(a.tier==="large"?S.appWeeklyCents:Q.appWeeklyCents),0)/100,database=(c.dbCapacity===D.dbCapacity?D.dbWeeklyCents:c.dbCapacity===S.dbCapacity?S.dbWeeklyCents:c.upgraded?Q.upgradedDbWeeklyCents:Q.dbWeeklyCents)/100,redundancy=c.loadBalancer?S.lbWeeklyCents/100:0,salaries=Q.engineers*Q.salaryWeeklyCents/100;return {servers,database,salaries,redundancy,tooling:c.readCache?D.cacheWeeklyCents/100:0,autoscale:0,total:servers+database+salaries+redundancy+(c.readCache?D.cacheWeeklyCents/100:0)};}
   const salaries = s.engineers * BALANCE.engineer.salary;
   const servers = s.infra.appHosts.length * serverUpkeep(s);
   const dbUpkeep = BALANCE.db.tiers[s.infra.dbTier].upkeep;
@@ -526,6 +527,9 @@ export const EQUIPMENT_ORDER: EquipmentId[] = [
 export function equipmentInfo(s: GameState, id: EquipmentId): EquipmentInfo {
   if(s.campaign) {
     const m=s.campaign.snapshot, names:Partial<Record<EquipmentId,string>>={app:"Servers",db:"Database",gateway:"Network",monitoring:"Monitoring",team:"Team",deploy:"Deploy",growth:"Growth"};
+    if(id==="cache") return {id,name:"Read Cache",built:!!s.campaign.readCache,state:s.campaign.readCache?"ok":"absent",
+      summary:m.data?`${m.data.hits} hits; ${m.data.eligibleMisses} eligible misses; used hit rate ${m.data.effectiveHitRateUsed/100}%`:"No cache observation yet",
+      about:"Only eligible reads can hit. Writes and old database backlog still require the database."};
     const built=["app","db","gateway","monitoring","team","deploy","growth"].includes(id);
     const component=id==="app"?m.app:id==="db"?m.db:null;
     return {id,name:names[id]??id,built,state:built?(component?utilState(component.demandRatio):"ok"):"absent",

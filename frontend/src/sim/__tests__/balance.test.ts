@@ -72,3 +72,21 @@ describe("opening-db financial trade-offs", () => {
     }
   });
 });
+
+describe("data-strategy financial alternatives",()=>{
+ it("preserves approved prices and measures cache versus DB upkeep and rejection",async()=>{
+  const {dataCompany}=await import("./dataFixture");const {applyAction}=await import("../index");const {step,advanceSteps}=await import("../step");
+  const nets:number[]=[];
+  for(const choice of ["cache","database","limit"] as const){
+   let g=advanceSteps(dataCompany(),6).state;const cash=g.campaign!.cashCents;
+   const r=applyAction(g,choice==="cache"?{type:"deploy_cache"}:choice==="database"?{type:"start_db_upgrade"}:{type:"set_traffic_limit",enabled:true});
+   if(!r.ok)throw Error(r.message);g=r.state;
+   expect(cash-g.campaign!.cashCents).toBe(choice==="cache"?150000:choice==="database"?400000:0);
+   while(g.campaign!.step<180){if(g.phase==="review"){const a=applyAction(g,{type:"acknowledge_review"});if(!a.ok)throw Error(a.message);g=a.state;}g=step(g).state;}
+   const period=g.campaign!.settlements.at(-1)!;nets.push(period.netCents);
+   expect(period.cacheCents).toBe(choice==="cache"?40000:0);expect(period.dbCents).toBe(choice==="database"?350000:250000);
+   expect(g.campaign!.snapshot.rejected>0).toBe(choice==="limit");
+  }
+  expect(nets[0]).toBeGreaterThan(nets[1]);expect(nets[1]).toBeGreaterThan(nets[2]);
+ });
+});

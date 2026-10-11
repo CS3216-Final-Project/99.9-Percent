@@ -56,6 +56,21 @@ it('does not replace progress with unsupported cloud envelopes',async()=>{
   await useGame.getState().restoreAccount();const before=rawSave(),e=current();vi.mocked(api.getRun).mockResolvedValue({runId:e.runId,revision:1,envelope:{...e,schemaVersion:99 as 3},updatedAt:'now'});
   await useGame.getState().resumeCloud(e.runId);expect(rawSave()).toBe(before);expect(useGame.getState().cloudStatus).toContain('compatible');
 });
+it('loads schema 3 cloud replay saves paused and archives the original response without uploading',async()=>{
+  await useGame.getState().restoreAccount();const e={...makeEnvelope(newGame(8,'phase3-remote'),321),schemaVersion:3 as const};
+  const remote={runId:e.runId,revision:2,envelope:e,updatedAt:'now'};vi.mocked(api.getRun).mockResolvedValue(remote);
+  await useGame.getState().resumeCloud(e.runId);
+  expect(useGame.getState()).toMatchObject({started:false,running:false,remainderMs:321});
+  expect(useGame.getState().game.campaign!.dataStage).toBeNull();expect(api.putRun).not.toHaveBeenCalled();
+  expect(JSON.parse(localStorage.getItem(`nn.campaign.before-cloud.${e.runId}.cloud.2`)!)).toEqual(remote);
+  expect(localCloudCopy(e.runId)?.local.schemaVersion).toBe(4);
+});
+it('reports corrupt schema 3 cloud inputs as incompatible while preserving local progress',async()=>{
+  await useGame.getState().restoreAccount();const before=rawSave(),game=useGame.getState().game;
+  const e={...current(),schemaVersion:3 as const,step:-1};vi.mocked(api.getRun).mockResolvedValue({runId:e.runId,revision:1,envelope:e,updatedAt:'now'});
+  await useGame.getState().resumeCloud(e.runId);expect(rawSave()).toBe(before);expect(useGame.getState().game).toBe(game);
+  expect(useGame.getState().cloudStatus).toBe('This cloud save needs a compatible game version. Local progress is retained.');
+});
 it('blocks replacement/attachment when account records are corrupt or storage fails',async()=>{
   await useGame.getState().restoreAccount();localStorage.setItem('nn.campaign.cloud.v1','{');await useGame.getState().saveCloud(true);
   expect(api.putRun).not.toHaveBeenCalled();expect(localStorage.getItem('nn.campaign.cloud.v1')).toBe('{');

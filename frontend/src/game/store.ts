@@ -410,6 +410,7 @@ export const useGame = create<Store>()((set, get) => {
         const previous=localCloudCopy(runId);
         if(previous&&previous.ownerId!==session.account.id)throw Error('This run is bound to another local owner.');
         if(previous)localStorage.setItem(`nn.campaign.before-cloud.${runId}.owner-copy`,JSON.stringify(previous));
+        localStorage.setItem(`nn.campaign.before-cloud.${runId}.cloud.${run.revision}`,JSON.stringify(run));
         rememberCloud({ownerId:session.account.id,revision:run.revision,local:e});
         if(!saveGame(game,e.runtime.remainderMs,true,e.runtime.measurement))throw Error('Storage could not retain the cloud copy. Local progress is retained.');
         saveMode("campaign");
@@ -501,6 +502,7 @@ export const useGame = create<Store>()((set, get) => {
       if (get().game.campaign) {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
+        if (result.ok && action.type === "enter_data") set({running:false});
         commit(state);
         if (!result.ok) get().notify(result.message, "error");
         return result.ok;
@@ -742,10 +744,10 @@ export const useGame = create<Store>()((set, get) => {
  */
 export function inspectOrSelect(id: EquipmentId, appId?: string): void {
   const { game, select, act } = useGame.getState();
-  if(game.campaign && !["app","db","monitoring","gateway"].includes(id))return;
+  if(game.campaign && !["app","db","monitoring","gateway",...(game.campaign?.dataStage?["cache"]:[])].includes(id))return;
   select(id);
   if (appId) useGame.getState().selectApp(appId);
-  if(game.campaign) { if(["app","db","monitoring","gateway"].includes(id))act({type:"incident_inspect",equipment:id,...(id==="app"?{appId:useGame.getState().selectedAppId??"app-1"}:{})}); return; }
+  if(game.campaign) { if(["app","db","monitoring","gateway",...(game.campaign?.dataStage?["cache"]:[])].includes(id))act({type:"incident_inspect",equipment:id,...(id==="app"?{appId:useGame.getState().selectedAppId??"app-1"}:{})}); return; }
   const inc = game.incident;
   if (game.phase !== "incident" || !inc || inc.status !== "active") return;
   if (!inspectable(game).includes(id)) return;
