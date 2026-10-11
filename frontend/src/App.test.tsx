@@ -6,10 +6,43 @@ import { useGame } from "./game/store";
 vi.mock("./components/scene/Facility", () => ({ default: () => <div data-testid="facility" /> }));
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
+it("lets new players compare both modes without starting a run for them", () => {
+  vi.useFakeTimers();
+  render(<StrictMode><App /></StrictMode>);
+  const choices = screen.getByRole("region", { name: "Choose how you want to play" });
+  expect(within(choices).getByRole("region", { name: "Campaign" }).textContent).toContain("Continuous play");
+  expect(within(choices).getByRole("region", { name: "Classic" }).textContent).toContain("50,000 users in 26 weeks");
+  expect(within(choices).getByRole("button", { name: "Play Campaign" })).toBeTruthy();
+  expect(within(choices).getByRole("button", { name: "Play Classic" })).toBeTruthy();
+  fireEvent.keyDown(window, { key: "p" });
+  act(() => vi.advanceTimersByTime(5000));
+  expect(useGame.getState().started).toBe(false);
+  expect(useGame.getState().game.campaign!.step).toBe(0);
+  expect(localStorage.getItem("nn.campaign.save.v1")).toBeNull();
+  expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
+  fireEvent.click(within(choices).getByRole("button", { name: "Play Classic" }));
+  expect(useGame.getState().mode).toBe("classic");
+  expect(useGame.getState().started).toBe(true);
+  expect(useGame.getState().running).toBe(false);
+  expect(useGame.getState().tour?.track).toBe("basics");
+  expect(localStorage.getItem("nn.campaign.save.v1")).toBeNull();
+  expect(localStorage.getItem("nn.mode.v1")).toBe("classic");
+});
+
+it("keeps the mode choice open when switching cannot preserve the stored save", () => {
+  localStorage.setItem("nn.campaign.save.v1", "{");
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Play Classic" }));
+  expect(useGame.getState().started).toBe(false);
+  expect(screen.getByRole("button", { name: "Switch and lose this run" })).toBeTruthy();
+  expect(localStorage.getItem("nn.campaign.save.v1")).toBe("{");
+  expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
+});
+
 describe("opening UI", () => {
   it("starts paused with immediate evidence and no later progression controls", async () => {
     render(<StrictMode><App /></StrictMode>); expect(await screen.findByTestId("facility")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+    fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
     expect(screen.getByRole("complementary", { name: "System metrics" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Tech" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
@@ -18,7 +51,7 @@ describe("opening UI", () => {
   });
   it("advances once and cleans up the shared clock on pause/unmount", () => {
     vi.useFakeTimers(); const view = render(<StrictMode><App /></StrictMode>);
-    fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+    fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(1000)); expect(useGame.getState().game.campaign!.step).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
@@ -26,7 +59,7 @@ describe("opening UI", () => {
     view.unmount(); act(() => vi.advanceTimersByTime(5000)); expect(useGame.getState().game.campaign!.step).toBe(1);
   });
   it("visible interventions lead to review and the same company", () => {
-    vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+    vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
     for (let i = 0; i < 6; i++)fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
     const id = useGame.getState().game.campaign!.runId;
     expect(screen.getByText(/Stable steps: 0\/5/)).toBeTruthy();
@@ -46,7 +79,7 @@ describe("opening UI", () => {
 
   });
   it("hidden-page pause does not resume or catch up", () => {
-    render(<App />); fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" })); fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    render(<App />); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" })); fireEvent.click(screen.getByRole("button", { name: "Run" }));
     Object.defineProperty(document, "hidden", { configurable: true, value: true }); fireEvent(document, new Event("visibilitychange"));
     expect(useGame.getState().running).toBe(false);
     Object.defineProperty(document, "hidden", { configurable: true, value: false }); fireEvent(document, new Event("visibilitychange"));
@@ -55,7 +88,7 @@ describe("opening UI", () => {
 });
 
 it("offers the same mute control beside the menu in both modes", () => {
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
   const mute = screen.getByRole("button", { name: "Mute sound" });
   expect(mute.getAttribute("aria-pressed")).toBe("false");
   fireEvent.click(mute); expect(mute.getAttribute("aria-pressed")).toBe("true");
@@ -78,7 +111,7 @@ const openTab = (menu: HTMLElement, name: string) => fireEvent.click(within(menu
 const expectButtons = (menu: HTMLElement, names: string[]) => { for (const name of names) expect(within(menu).getByRole("button", { name })).toBeTruthy(); };
 
 it("splits both menus into the same tabs and keeps every earlier control on one of them", () => {
-  render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
   const campaignMenu = openMenu();
   const labels = (menu: HTMLElement) => within(within(menu).getByRole("tablist", { name: "Menu sections" })).getAllByRole("tab").map((t) => t.textContent);
   expect(labels(campaignMenu)).toEqual(["Run", "Sound", "Graphics", "Saves", "Playtest"]);
@@ -126,7 +159,7 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
 });
 
 it("lands the bankrupt company's menu on Saves, where Export and New company are", () => {
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
   act(() => useGame.setState((s) => ({ game: { ...s.game, phase: "ended" } })));
   fireEvent.click(screen.getByRole("button", { name: "Export or start a new company" }));
   const menu = screen.getByRole("dialog", { name: "Menu" });
@@ -135,7 +168,7 @@ it("lands the bankrupt company's menu on Saves, where Export and New company are
 });
 
 it("forgets a pending Start over confirmation when the player leaves its tab", () => {
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Try Prototype" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
   fireEvent.click(within(openMenu()).getByRole("button", { name: "Switch to Classic" }));
   act(() => useGame.getState().advance());
   expect(useGame.getState().game.totals.weeks).toBeGreaterThan(0);

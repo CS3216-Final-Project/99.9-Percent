@@ -445,7 +445,7 @@ export default function Game() {
   }
 
   return (
-    <div className={`app phase-${phase}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}`}>
+    <div className={`app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}`}>
       {campaign ? <CampaignHeader /> : <TopBar />}
       <main className="stage">
         <Suspense fallback={<div className="stage-loading">Loading…</div>}>

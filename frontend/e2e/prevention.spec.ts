@@ -1,8 +1,8 @@
 import {test,expect,expectRoom,savedGame} from "./fixtures";
 
-test("Opening prevention: fresh player, new observations, reloads and same-company Scaling without API",async({page})=>{
+test("Opening prevention: fresh player, new observations and reloads keep Scaling locked without API",async({page})=>{
  test.setTimeout(90000);await page.route("**/api/**",r=>r.abort());await page.goto("/");
- await page.getByRole("button",{name:"Try Prototype",exact:true}).click();await page.getByRole("button",{name:"Skip introduction"}).click();await expectRoom(page);
+ await page.getByRole("button",{name:"Play Campaign",exact:true}).click();await page.getByRole("button",{name:"Skip introduction"}).click();await expectRoom(page);
  const id=(await savedGame(page)).campaign!.runId;
  await page.getByRole("button",{name:/Limit to 500 requests\/s/}).click();
  await page.getByRole("button",{name:/Upgrade database/}).click();
@@ -20,9 +20,10 @@ test("Opening prevention: fresh player, new observations, reloads and same-compa
  c=(await savedGame(page)).campaign!;expect(c.openingRecovered).toBe(false);expect(c.reports).toEqual([]);expect(c.openingMilestone).toBeNull();
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(outcome).toBeVisible();expect((await savedGame(page)).campaign).toEqual(c);
  await outcome.getByRole("button",{name:"Continue company",exact:true}).click();
- const milestone=page.getByRole("dialog",{name:"First growth challenge handled"});await expect(milestone).toContainText("without an incident");
- await milestone.getByRole("button",{name:"Continue operating",exact:true}).click();
- await expect(page.getByLabel("Current campaign stage")).toHaveText("Scaling & Routing");
- c=(await savedGame(page)).campaign!;expect(c.runId).toBe(id);expect(c.step).toBe(9);expect(c.openingRecovered).toBe(false);expect(c.scaling?.id).toBe("application-scaling");
+ await expect(page.getByRole("dialog",{name:"First growth challenge handled"})).toHaveCount(0);
+ await expect(page.getByLabel("Current campaign stage")).toHaveText("Opening");
+ await expect(guidance).toContainText("prevention does not unlock Scaling");
+ await expect(page.getByRole("region",{name:"Scaling controls"})).toHaveCount(0);
+ c=(await savedGame(page)).campaign!;expect(c.runId).toBe(id);expect(c.step).toBe(9);expect(c.openingRecovered).toBe(false);expect(c.scaling).toBeNull();expect(c.openingMilestone).toBeNull();expect(c.openingPrevention!.outcome!.acknowledged).toBe(true);
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);
 });
