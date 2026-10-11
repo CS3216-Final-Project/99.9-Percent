@@ -1,5 +1,5 @@
 import type {IncomingMessage,ServerResponse} from 'node:http';
-import {accountPathAllowed,proxyTarget} from '../src/lib/accountProxy.js';
+import {accountPathAllowed,proxyTarget} from './accountProxy.js';
 /** Vercel function: API_PROXY_TARGET is a server-only origin configured per deployment. */
 export default async function handler(req:IncomingMessage & {body?:unknown},res:ServerResponse) {
   res.setHeader('Cache-Control','private, no-store');res.setHeader('CDN-Cache-Control','no-store');res.setHeader('Vercel-CDN-Cache-Control','no-store');
