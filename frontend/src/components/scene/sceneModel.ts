@@ -54,6 +54,8 @@ export function buildModel(s: GameState): SceneModel {
   const hosts: Led[] = s.infra.appHosts.map((h, i) => {
     if(s.campaign) {
       const a=s.campaign.apps[i], x=s.campaign.snapshot.instances?.find(x=>x.id===a.id);
+      if(a.health==="failed")return "critical";
+      if(a.role==="spare")return "standby";
       if(!a.routed&&a.backlog===0)return "off";
       return x&&x.demandRatio>1?"critical":a.backlog>0?"warn":"ok";
     }
@@ -95,7 +97,8 @@ export function buildModel(s: GameState): SceneModel {
     hosts,
     temp: Math.min(inc ? (s.pendingTurn?.autoscaled ?? 0) : s.live.tempServers, MAX_TEMP_SHOWN),
     lb: has(s, "load_balancing"),
-    standby: has(s, "standby"),
+    // Campaign spares are actual fleet members, already drawn once in hosts.
+    standby: !s.campaign && has(s, "standby"),
     cache: has(s, "caching"),
     dbCabinets: s.infra.dbTier + 1,
     dbLed,

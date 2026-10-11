@@ -1,8 +1,8 @@
 # Phase 6 — Reliability
 
-> **Project:** 99.99% — System Design Tycoon  
-> **Target:** 23–28 October 2026, overlapping PR2 integration  
-> **Primary learning outcomes:** LO3 Improve reliability; LO4 Weigh design trade-offs; reinforces LO1 Diagnose bottlenecks  
+> **Project:** 99.99% — System Design Tycoon
+> **Target:** 23–28 October 2026, overlapping PR2 integration
+> **Primary learning outcomes:** LO3 Improve reliability; LO4 Weigh design trade-offs; reinforces LO1 Diagnose bottlenecks
 > **Status:** Detailed implementation plan for Phase 6 only
 
 ---

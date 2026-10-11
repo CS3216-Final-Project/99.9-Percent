@@ -112,3 +112,14 @@ export const gameRuns = pgTable('game_runs', {
   revision: integer().notNull(), envelope: jsonb().$type<import('../../../shared/campaign.ts').CampaignEnvelope>().notNull(),
   updatedAt: timestamp({withTimezone:true}).notNull().defaultNow(),
 }, t => [check('game_runs_positive_revision', sql`${t.revision} > 0`), index('game_runs_owner_updated_idx').on(t.accountId, t.updatedAt)]);
+
+/** Anonymous player feedback, independent of accounts and browser saves. */
+export const gameFeedback = pgTable('game_feedback', {
+  id: uuid().primaryKey().defaultRandom(),
+  message: text().notNull(),
+  mode: text().$type<'campaign' | 'classic'>().notNull(),
+  createdAt: createdAt(),
+}, t => [
+  check('game_feedback_message_length', sql`char_length(btrim(${t.message})) between 1 and 2000`),
+  check('game_feedback_mode', sql`${t.mode} in ('campaign', 'classic')`),
+]);

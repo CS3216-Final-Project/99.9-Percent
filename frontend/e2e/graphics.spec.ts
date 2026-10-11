@@ -8,7 +8,7 @@ const pixelRatio = (page: Page) =>
 // The room is drawn for real here: the point is that the menu's choice reaches the renderer.
 test("changes the graphics quality from the menu, redraws the room and remembers the choice", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Try Prototype", exact: true }).click();
+  await page.getByRole("button", { name: "Play Campaign", exact: true }).click();
   await page.getByRole("button", { name: "Skip introduction" }).click();
   await expectRoom(page);
   // The test browser draws in software, so Auto means half the pixels.

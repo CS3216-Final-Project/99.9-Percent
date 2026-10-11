@@ -1,0 +1,35 @@
+.feedback-form {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  text-align: left;
+}
+.feedback-form p,
+.feedback-form .field {
+  margin: 0;
+}
+.feedback-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-height: 132px;
+  margin: 0;
+  padding: 12px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  resize: vertical;
+}
+.feedback-form textarea:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.feedback-form .btn-row {
+  flex-wrap: wrap;
+}
+.feedback-inline {
+  margin-top: 16px;
+}

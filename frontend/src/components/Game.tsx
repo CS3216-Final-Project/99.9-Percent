@@ -374,7 +374,7 @@ export default function Game() {
   }
 
   return (
-    <div className={`app phase-${phase}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`}>
+    <div className={`app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`}>
       {campaign ? <CampaignHeader /> : <TopBar />}
       {started && !campaign && <OperationsRail />}
       <main className="stage">

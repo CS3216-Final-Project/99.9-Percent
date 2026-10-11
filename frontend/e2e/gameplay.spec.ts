@@ -7,7 +7,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     // Only the upgrade path inspects a machine by clicking it in the room.
     const room = path === "upgrade";
     if (!room) await withoutRoom();
-    await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
+    await page.goto("/"); await page.getByRole("button", { name: "Play Campaign", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
     if (room) await expectRoom(page);
     for (let i = 0; i < 6; i++)await page.getByRole("button", { name: "Advance step", exact: true }).click();
     if (path === "upgrade") {
@@ -18,7 +18,12 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
         const panelBox = el.closest("aside")!.getBoundingClientRect();
         return [...el.querySelectorAll("button")].every(button => {
           const box = button.getBoundingClientRect();
-          return box.top >= panelBox.top + 3 && box.bottom <= panelBox.bottom - 3;
+          return box.top >= panelBox.top + 3 && box.bottom <= panelBox.bottom - 3 &&
+            box.left >= panelBox.left && box.right <= panelBox.right &&
+            [...button.querySelectorAll(".price, .act-label")].every(label=>{
+              const labelBox=label.getBoundingClientRect();
+              return labelBox.left>=box.left&&labelBox.right<=box.right;
+            });
         });
       });
       expect(await responsesFit()).toBe(true);
@@ -66,7 +71,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
 test("preserves a corrupt campaign save until explicit reset", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await page.addInitScript(() => { localStorage.setItem("nn.campaign.save.v1", "{"); });
-  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Play Campaign", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await page.getByRole("button", { name: "Advance step" }).click();
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBe("{");
   await page.getByRole("button", { name: "Menu", exact: true }).click();
@@ -87,7 +92,7 @@ test("resumes an incident paused", async ({ page, withoutRoom }) => {
 });
 test("keeps the room playable without downloaded furniture", async ({ page }) => {
   await page.route("**/models/**", route => route.abort());
-  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Play Campaign", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await expectRoom(page); await page.getByRole("button", { name: "Advance step" }).click();
   expect((await savedGame(page)).campaign!.step).toBe(1);
 });

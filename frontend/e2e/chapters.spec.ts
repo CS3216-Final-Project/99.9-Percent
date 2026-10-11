@@ -1,0 +1,32 @@
+import { test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
+import { dataCompany } from "../src/sim/__tests__/dataFixture";
+
+test("chapter bar stays visible and follows the same company into Data Strategy", async ({ page }) => {
+  await page.route("**/api/**", route => route.abort());
+  await seedSave(page, dataCompany("read-heavy", false));
+  await page.goto("/");
+  await expect(page.getByRole("region", { name: "Campaign chapters" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expectRoom(page);
+  const bar = page.getByRole("region", { name: "Campaign chapters" });
+  await expect(bar).toContainText("Chapter 2 of 5");
+  await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Scaling & Routing");
+  await expect(bar.getByLabel("Chapter progress")).toBeVisible();
+  const before = await savedGame(page);
+  await bar.getByRole("button", { name: "View chapters" }).click();
+  const dialog = page.getByRole("dialog", { name: "Campaign chapters" });
+  await expect(dialog.getByRole("listitem")).toHaveCount(5);
+  await expect(dialog.getByRole("listitem").filter({ hasText: "Data Strategy" })).toContainText("Available next");
+  await expect(dialog.getByRole("listitem").filter({ hasText: "Stay Online" })).toContainText("Locked");
+  expect(await savedGame(page)).toEqual(before);
+  await page.screenshot({ path: "test-results/campaign-chapters-overview.png" });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await page.getByRole("button", { name: "Continue to data strategy", exact: true }).click();
+  await expect(bar).toContainText("Chapter 3 of 5");
+  await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Data Strategy");
+  expect((await savedGame(page)).campaign!.runId).toBe(before.campaign!.runId);
+  await page.getByRole("complementary", { name: "System metrics" }).evaluate(el => { el.scrollTop = el.scrollHeight; });
+  await expect(bar).toBeInViewport();
+  await page.screenshot({ path: "test-results/campaign-chapters-desktop.png" });
+});

@@ -15,6 +15,13 @@
       "when": 1791621335726,
       "tag": "0001_abandoned_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791705140441,
+      "tag": "0002_fearless_exodus",
+      "breakpoints": true
     }
   ]
 }

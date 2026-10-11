@@ -9,7 +9,7 @@ test("keyboard introduction stays paused, contains focus and remembers completio
   await expect(preview).toBeVisible();
   await expect.poll(() => preview.evaluate(el => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await page.screenshot({ path: "test-results/phase2-title.png" });
-  await page.getByRole("button", { name: "Try Prototype" }).press("Enter");
+  await page.getByRole("button", { name: "Play Campaign" }).press("Enter");
   const intro = page.getByRole("dialog", { name: "Company introduction" });
   await expect(intro).toContainText("Prompt 1 of 3");
   await page.keyboard.press("p");

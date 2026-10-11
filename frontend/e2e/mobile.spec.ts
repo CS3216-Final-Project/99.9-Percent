@@ -1,9 +1,95 @@
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
+import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
+import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
+
+
+test("Opening prevention recognition keeps Scaling locked after touch review and reload",async({page})=>{
+ let g=newGame(0,"touch-prevention");
+ g=act(g,{type:"set_traffic_limit",enabled:true});g=act(g,{type:"start_db_upgrade"});g=advanceSteps(g,4).state;
+ g=act(g,{type:"incident_inspect",equipment:"app"});g=act(g,{type:"incident_inspect",equipment:"db"});
+ g=act(g,{type:"set_traffic_limit",enabled:false});g=advanceSteps(g,5).state;
+ await page.route("**/api/**",r=>r.abort());await page.setViewportSize({width:390,height:844});
+ await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ const review=page.getByRole("dialog",{name:"Prevention review"});
+ await expect(review).toContainText("Scaling unlocks only after a real Opening incident");
+ await review.getByRole("button",{name:"Continue company",exact:true}).tap();
+ await expect(page.getByRole("dialog",{name:"First growth challenge handled"})).toHaveCount(0);
+ await expect(page.getByLabel("Current campaign stage")).toHaveText("Opening");
+ await expect(page.getByRole("region",{name:"Scaling controls"})).toHaveCount(0);
+ const before=(await savedGame(page)).campaign!;expect(before.openingMilestone).toBeNull();expect(before.scaling).toBeNull();
+ await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
+ expect((await savedGame(page)).campaign).toEqual(before);await expect(page.getByLabel("Current campaign stage")).toHaveText("Opening");
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+test("current chapter is prominent and the full journey opens on touch", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/api/**", route => route.abort());
+  await seedSave(page, spikeCompany(false));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).tap();
+  await expectRoom(page);
+  const bar = page.getByRole("region", { name: "Campaign chapters" });
+  await expect(bar).toContainText("Chapter 4 of 5");
+  await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Traffic Spikes & Autoscaling");
+  await expect(bar.getByRole("button", { name: "View chapters" })).toBeInViewport();
+  expect(await bar.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/campaign-chapters-mobile.png" });
+  const before = await savedGame(page);
+  await bar.getByRole("button", { name: "View chapters" }).tap();
+  const dialog = page.getByRole("dialog", { name: "Campaign chapters" });
+  await expect(dialog.getByRole("listitem")).toHaveCount(5);
+  await expect(dialog.getByRole("heading", { name: "Stay Online" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Back to company" }).tap();
+  await expect(dialog).toBeHidden();
+  expect(await savedGame(page)).toEqual(before);
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+});
+
+test("new players can compare both modes and start Classic on touch", async ({ page }) => {
+  await page.goto("/");
+  const choices = page.getByRole("region", { name: "Choose how you want to play" });
+  await expect(choices.getByRole("button", { name: "Play Campaign" })).toBeInViewport();
+  await expect(choices.getByRole("button", { name: "Play Classic" })).toBeInViewport();
+  await expect(choices.getByRole("region", { name: "Classic" })).toContainText("50,000 users in 26 weeks");
+  expect(await page.locator(".mode-entry").evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/mode-choice-mobile.png" });
+  await choices.getByRole("button", { name: "Play Classic" }).tap();
+  await page.getByRole("button", { name: "Skip", exact: true }).tap();
+  await expectRoom(page);
+  await page.getByRole("button", { name: /Next week/ }).tap();
+  await page.reload();
+  await page.getByRole("button", { name: "Continue week 2" }).tap();
+  await expect(page.getByRole("button", { name: /Next week/ })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBeNull();
+});
+
+test("reliability: inspection and effective recipients remain clear on narrow touch screens",async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.route("**/api/**",route=>route.abort());
+ await seedSave(page,tick(act(preparedReliability(),{type:"arm_reliability"}),9));
+ await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ const panel=page.getByRole("region",{name:"Stay Online"});
+ await panel.getByRole("button",{name:"Inspect App 2 health · free",exact:true}).tap();
+ const instances=page.getByRole("region",{name:"Application instances"});
+ await expect(instances.getByRole("button",{name:/App 2: Installed - not receiving traffic/})).toHaveAttribute("aria-pressed","true");
+ await expect(panel).toContainText("detected unhealthy");
+ await expect(page.getByRole("button",{name:"Restore App 2 · free · 3 steps",exact:true})).toBeEnabled();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.getByRole("button",{name:"Technology tree",exact:true}).tap();
+ const tree=page.getByRole("dialog",{name:"Technology tree"});
+ await expect(tree.locator("[data-tech]")).toHaveCount(9);
+ await tree.getByRole("button",{name:"Automatic Failover: Owned",exact:true}).tap();
+ await expect(tree.getByRole("heading",{name:"Automatic Failover",exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await tree.getByRole("button",{name:"Close",exact:true}).tap();
+ await page.getByRole("button",{name:"Menu",exact:true}).tap();
+ await expect(page.getByRole("dialog",{name:"Menu"}).getByRole("tab",{name:/Graphics/})).toBeVisible();
+});
 
 test("inspects evidence and advances a physical step on touch", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap();
+  await page.goto("/"); await page.getByRole("button", { name: "Play Campaign", exact: true }).tap();
   await page.getByRole("button", { name: "Skip introduction" }).tap();
   await expectRoom(page);
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
@@ -48,7 +134,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
 });
 
 test("a tap explains a term, and tapping a button does not leave a tooltip over it", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap(); await page.getByRole("button", { name: "Skip introduction" }).tap();
+  await page.goto("/"); await page.getByRole("button", { name: "Play Campaign", exact: true }).tap(); await page.getByRole("button", { name: "Skip introduction" }).tap();
   await expectRoom(page);
   const tip = page.getByRole("tooltip");
   await page.getByRole("complementary", { name: "System metrics" }).getByText("Inspect the evidence", { exact: true }).tap();
@@ -88,7 +174,7 @@ test('account controls remain usable on touch while accounts are offline',async(
   await expect(page.getByRole('button',{name:'Retry account connection'})).toBeEnabled();
   await page.getByRole('button',{name:'Retry account connection'}).scrollIntoViewIfNeeded();
   await page.screenshot({path:'test-results/phase3-account-mobile.png'});
-  await page.getByRole('button',{name:'Try Prototype',exact:true}).tap();
+  await page.getByRole('button',{name:'Play Campaign',exact:true}).tap();
   await expect(page.getByRole('dialog',{name:'Company introduction'})).toBeVisible();
 });
 

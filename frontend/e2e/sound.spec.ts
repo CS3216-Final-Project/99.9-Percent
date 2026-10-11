@@ -26,7 +26,7 @@ test("sounds the company starting, each introduction prompt and the alarm, and n
   // The title screen is silent; starting the company powers it up: a fan sweep, two bells and a soft chord.
   await page.waitForTimeout(300);
   expect(await voices()).toBe(0);
-  await page.getByRole("button", { name: "Try Prototype", exact: true }).click();
+  await page.getByRole("button", { name: "Play Campaign", exact: true }).click();
   await expect.poll(voices).toBeGreaterThanOrEqual(5);
   const launch = await voices();
   // Each prompt of the introduction ticks.
@@ -59,7 +59,7 @@ test("sounds the company starting, each introduction prompt and the alarm, and n
 
 test("the header sound button follows the menu sliders and turns sound back on from silence", async ({ page, withoutRoom }) => {
   await withoutRoom();
-  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Play Campaign", exact: true }).click();
   await page.getByRole("button", { name: "Skip introduction" }).click();
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await page.getByRole("button", { name: "Menu", exact: true }).click();
@@ -82,7 +82,7 @@ test("starts a new company with the same sound, and lets a saved one continue qu
   await withoutRoom();
   const voices = await countEffects(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Try Prototype", exact: true }).click();
+  await page.getByRole("button", { name: "Play Campaign", exact: true }).click();
   await expect.poll(voices).toBeGreaterThanOrEqual(5);
   await page.getByRole("button", { name: "Skip introduction" }).click();
   await expect(page.getByRole("dialog", { name: "Company introduction" })).toBeHidden();

@@ -26,11 +26,28 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
     const primary = inc.primaryComponent ?? "db";
     const constraint = primary === "db" ? opening.db : opening.instances!.find(a=>a.id===primary)!;
     const explanations = [
-        !opening.instances ? `At step ${inc.openedStep}, database demand was ${opening.db.demand} ops/s against ${opening.db.capacity} ops/s capacity. Three consecutive overloaded steps opened the incident.` :
+        inc.kind==="application-failure"?`At step ${inc.openedStep}, three consecutive steps of failure-attributed request losses opened an application-failure incident. Detection and promotion are separate delayed effects.`:!opening.instances ? `At step ${inc.openedStep}, database demand was ${opening.db.demand} ops/s against ${opening.db.capacity} ops/s capacity. Three consecutive overloaded steps opened the incident.` :
             `At step ${inc.openedStep}, ${primary === "db" ? "database" : primary.replace("app-","App ")} demand was ${constraint.demand} ${primary==="db"?"ops/s":"requests/s"} against ${constraint.capacity} capacity. Three consecutive overloaded steps on this component opened the incident.`,
-        opening.spikes?.activePulse&&spikeEvent?`Temporary demand pulse ${spikeEvent.data.pulse} began at step ${spikeEvent.step}, changing incoming traffic to ${spikeEvent.data.to} req/s; compare admitted demand and each dependency.`:opening.data&&workloadEvent?`Workload changed to ${workloadEvent.data.profile} at step ${workloadEvent.step}; compare logical work and uncached DB demand with capacity.`:events.some(e => e.type === "traffic-change") ? "The recorded traffic increase initiated the overload." :
+        inc.kind==="application-failure"?"The recorded application failure reduced useful capacity without increasing incoming traffic. Compare actual health, detection and configured/effective recipients.":opening.spikes?.activePulse&&spikeEvent?`Temporary demand pulse ${spikeEvent.data.pulse} began at step ${spikeEvent.step}, changing incoming traffic to ${spikeEvent.data.to} req/s; compare admitted demand and each dependency.`:opening.data&&workloadEvent?`Workload changed to ${workloadEvent.data.profile} at step ${workloadEvent.step}; compare logical work and uncached DB demand with capacity.`:events.some(e => e.type === "traffic-change") ? "The recorded traffic increase initiated the overload." :
             `The incident followed an admission or capacity change at step ${demandEvent?.step ?? start?.step}; compare its recorded effect with the opening metrics.`,
     ];
+    const fault=c.reliabilityStage?.fault;
+    if(fault?.startedStep!==null&&fault&&fault.startedStep<=c.step) {
+        const name=(id:string)=>`App ${id.slice(4)}`;
+        explanations.push(`${name(fault.targetId)} failed at step ${fault.startedStep}. Failed recipients process no work; retained queues remain until restoration. Health checking detects failure but creates no capacity. A spare helps only when routed.`);
+        for(const e of events.filter(e=>e.step>=fault.startedStep!)) {
+            if(e.type==="health-change-detected")explanations.push(`At step ${e.step}, ${name(String(e.data.appId))} was detected ${e.data.detectedHealth} by ${e.data.source==="probe"?"Health Checks":"manual inspection"}. Detection delay: ${e.data.delay} step(s).`);
+            if(e.type==="failover-activated")explanations.push(`At step ${e.step}, Automatic Failover promoted ${name(String(e.data.appId))} into the route using existing installed capacity.`);
+            if(e.type==="failover-cancelled")explanations.push(`At step ${e.step}, spare promotion was cancelled because restoration, the spare or the configured route changed.`);
+            if(e.type==="instance-restored")explanations.push(`At step ${e.step}, ${name(String(e.data.appId))} was restored ${e.data.source==="manual"?"by the requested restore action":"when the temporary fault expired"}. Routing and health detection still determine whether it receives traffic.`);
+        }
+        const bypass=snapshots.find(m=>m.reliability&&m.step>=fault.startedStep!&&!m.reliability.effective.includes(fault.targetId)&&m.instances?.some(a=>a.id===fault.targetId&&a.health==="failed"));
+        if(bypass) {
+            const capacity=bypass.reliability!.healthyRoutedCapacity;
+            explanations.push(`At step ${bypass.step}, the failed instance was bypassed. Surviving routed capacity was ${capacity} req/s against ${bypass.admitted} req/s admitted traffic. ${bypass.admitted>capacity?"Traffic exceeded surviving capacity, so correct rerouting still left the applications overloaded.":"Surviving capacity could handle admitted traffic; retained queues and database pressure still determine recovery."}`);
+        }
+        explanations.push(`At recovery, healthy routed capacity was ${c.snapshot.reliability?.healthyRoutedCapacity??0} req/s. Autoscaling was suspended during the test; installed spare and failed apps still incurred upkeep.`);
+    }
     if(c.spikeStage) {
       for(const e of events.filter(x=>["traffic-spike-started","traffic-spike-ended","autoscale-scale-out-decided","autoscaler-blocked","autoscale-instance-retired"].includes(x.type)))
         explanations.push(`Step ${e.step}: ${e.type}. ${e.data.reason??""} ${e.data.to?`Incoming demand ${e.data.to} req/s.`:""}`);
@@ -57,7 +74,11 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
             : before?.db.backlog === 0
                 ? "Database backlog was already zero before activation; this change is not credited with clearing it."
                 : "No database backlog drainage was observed at activation; this change is not credited with clearing it.";
-        if (Number(d.dbAfter) > Number(d.dbBefore))
+        if (["health-checks","create-spare","reserve-spare","release-spare","failover","promote-spare","restore-app"].includes(action.type)) {
+            const names: Record<string,string>={"health-checks":"Health Checks deployment","create-spare":"Spare application installation","reserve-spare":"Spare reservation","release-spare":"Spare release",failover:"Automatic Failover deployment","promote-spare":"Spare promotion","restore-app":"Application restoration"};
+            explanations.push(`${names[action.type]} activated at step ${effect.step}. Compare the recorded health, routing and surviving capacity; activation alone does not establish recovery.`);
+        }
+        else if (Number(d.dbAfter) > Number(d.dbBefore))
             explanations.push(`Database capacity increased from ${d.dbBefore} to ${d.dbAfter} ops/s. ${drainage}`);
         else if (Number(d.admittedAfter) < Number(d.admittedBefore))
             explanations.push(`Admitted demand fell from ${d.admittedBefore} to ${d.admittedAfter} requests/s, rejecting demand. ${drainage}`);
