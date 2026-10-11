@@ -54,6 +54,7 @@ export function buildModel(s: GameState): SceneModel {
   const hosts: Led[] = s.infra.appHosts.map((h, i) => {
     if(s.campaign) {
       const a=s.campaign.apps[i], x=s.campaign.snapshot.instances?.find(x=>x.id===a.id);
+      if(a.health==="failed")return "critical";
       if(!a.routed&&a.backlog===0)return "off";
       return x&&x.demandRatio>1?"critical":a.backlog>0?"warn":"ok";
     }

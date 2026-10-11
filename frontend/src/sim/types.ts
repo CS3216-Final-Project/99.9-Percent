@@ -429,6 +429,17 @@ export interface GameState {
 /* ------------------------------------------------------------------ */
 
 export type Action =
+  | { type: "enter_reliability" }
+  | { type: "unlock_reliability"; tech: "health_checks" | "standby" | "auto_failover" }
+  | { type: "deploy_health_checks" }
+  | { type: "install_spare" }
+  | { type: "reserve_spare"; appId: string }
+  | { type: "release_spare" }
+  | { type: "deploy_failover" }
+  | { type: "set_failover"; enabled: boolean }
+  | { type: "restore_app"; appId: string }
+  | { type: "arm_reliability" }
+  | { type: "acknowledge_reliability" }
   | { type: "enter_spikes" }
   | { type: "unlock_autoscaling" }
   | { type: "deploy_autoscaler" }
@@ -459,7 +470,8 @@ export type Action =
   | { type: "incident_action"; recovery: RecoveryId }
   | { type: "incident_hint" }
   | { type: "acknowledge_review" }
-  | { type: "acknowledge_milestone"; enterScaling?: boolean };
+  | { type: "acknowledge_milestone"; enterScaling?: boolean }
+  | { type: "acknowledge_prevention_review" };
 
 export type FailureReason =
   | "wrong_phase"

@@ -47,7 +47,9 @@ export function projectEvents(previous:Measurement,g:GameState,now:string):Measu
     const inData=!!dataEntry&&t.id>=dataEntry.id;
     const spikeEntry=c.trace.find(x=>x.type==="spike-stage-entered");
     const inSpikes=!!spikeEntry&&t.id>=spikeEntry.id;
-    const emit=(name:string,payload:Payload=t.data,suffix="")=>{event(m,g,name,{...payload,...(inSpikes?{stageId:"traffic-spikes",stageVersion:1}:{}),...(c.dataStage&&inData?{dataStageId:c.dataStage.id,dataStageVersion:c.dataStage.version,profile:t.data.profile??c.trace.filter(x=>x.id<=t.id&&(x.type==="workload-changed"||x.type==="data-stage-entered")).at(-1)?.data.profile??c.dataStage.profile}:{}),...(c.scaling&&t.step>=c.scaling.enteredStep?{continuationId:c.scaling.id,continuationVersion:c.scaling.version}:{})},now,id+suffix);m.pending[m.pending.length-1].physicalStep=t.step;};
+    const reliabilityEntry=c.trace.find(x=>x.type==="reliability-stage-entered");
+    const inReliability=!!reliabilityEntry&&t.id>=reliabilityEntry.id;
+    const emit=(name:string,payload:Payload=t.data,suffix="")=>{event(m,g,name,{...payload,...(inSpikes?{stageId:"traffic-spikes",stageVersion:1}:{}),...(inReliability?{stageId:"application-reliability",stageVersion:1}:{}),...(c.dataStage&&inData?{dataStageId:c.dataStage.id,dataStageVersion:c.dataStage.version,profile:t.data.profile??c.trace.filter(x=>x.id<=t.id&&(x.type==="workload-changed"||x.type==="data-stage-entered")).at(-1)?.data.profile??c.dataStage.profile}:{}),...(c.scaling&&t.step>=c.scaling.enteredStep?{continuationId:c.scaling.id,continuationVersion:c.scaling.version}:{})},now,id+suffix);m.pending[m.pending.length-1].physicalStep=t.step;};
     const spikeNames:Record<string,string>={
       "spike-stage-entered":"traffic_spike_stage_entered","progression-awarded":"progression_awarded","autoscaling-unlocked":"autoscaling_unlocked",
       "traffic-spikes-announced":"traffic_spikes_announced","traffic-spike-started":"traffic_spike_started","traffic-spike-ended":"traffic_spike_ended",
@@ -56,6 +58,14 @@ export function projectEvents(previous:Measurement,g:GameState,now:string):Measu
       "autoscale-retirement-cancelled":"autoscale_retirement_cancelled","autoscale-instance-retired":"autoscale_instance_retired",
       "traffic-spike-stage-completed":"traffic_spike_stage_completed","spike-stage-acknowledged":"traffic_spike_stage_acknowledged"};
     if(spikeNames[t.type])emit(spikeNames[t.type],{...t.data,...(t.type==="traffic-spike-stage-completed"?timing():{})});
+    const preventionNames:Record<string,string>={
+      "opening-prevention-eligible":"opening_prevention_eligible",
+      "opening-prevention-application-inspected":"opening_prevention_application_inspected",
+      "opening-prevention-database-inspected":"opening_prevention_database_inspected",
+      "opening-prevention-qualified":"opening_prevention_qualified",
+      "opening-prevention-review-acknowledged":"opening_prevention_review_acknowledged"};
+    if(preventionNames[t.type])emit(preventionNames[t.type]);
+    if(["reliability-stage-entered","reliability-research-awarded","reliability-tech-unlocked","reliability-failure-armed","reliability-failure-started","health-change-detected","spare-reserved","failover-activated","failover-cancelled","instance-restored","reliability-stage-completed","reliability-stage-acknowledged"].includes(t.type))emit(t.type.replaceAll("-","_"),{...t.data,...(t.type==="reliability-stage-completed"?timing():{}),stageId:"application-reliability",stageVersion:1});
     switch(t.type) {
       case "inspection": emit("component_inspected",{...t.data,snapshotStep:t.step});break;
       case "data-stage-entered":emit("data_stage_entered");break;
@@ -67,14 +77,14 @@ export function projectEvents(previous:Measurement,g:GameState,now:string):Measu
       case "bankruptcy":emit("run_failed",{...t.data,...timing()});break;
       case "action-requested": {
         const a=c.actions.find(a=>a.id===t.data.actionId)!;
-        const names:Record<typeof a.type,string>={"add-app":"app_instance_requested","upgrade-db":"database_upgrade_requested",limit:"traffic_limit_requested",unlimit:"traffic_limit_requested","scale-up":"vertical_scale_requested","deploy-lb":"load_balancer_requested",routing:"routing_requested",cache:"cache_requested","cache-tuning":"cache_tuning_requested","deploy-autoscaler":"autoscaler_requested","retire-app":"autoscale_retirement_requested"};
+        const names:Record<typeof a.type,string>={"health-checks":"health_checks_requested","create-spare":"create_spare_requested","reserve-spare":"reserve_spare_requested","release-spare":"release_spare_requested","failover":"failover_requested","promote-spare":"promote_spare_requested","restore-app":"restore_app_requested","add-app":"app_instance_requested","upgrade-db":"database_upgrade_requested",limit:"traffic_limit_requested",unlimit:"traffic_limit_requested","scale-up":"vertical_scale_requested","deploy-lb":"load_balancer_requested",routing:"routing_requested",cache:"cache_requested","cache-tuning":"cache_tuning_requested","deploy-autoscaler":"autoscaler_requested","retire-app":"autoscale_retirement_requested"};
         emit(a.source==="autoscaler"&&a.type==="add-app"?"autoscale_provisioning_started":names[a.type],
           {...t.data,actionSource:a.source??"player",action_requested_step:a.requestedStep});
-        if(a.source!=="autoscaler")emit("gameplay_decision",{actionId:a.id,replayOf:m.replayOf},":decision");break;
+        if(!a.source||a.source==="player")emit("gameplay_decision",{actionId:a.id,replayOf:m.replayOf},":decision");break;
       }
       case "action-activated": {
         const a=c.actions.find(a=>a.id===t.data.actionId)!;
-        const names:Record<typeof a.type,string>={"add-app":"app_instance_activated","upgrade-db":c.dataStage&&inData?"database_upgrade_activated":"action_activated",limit:"traffic_limit_applied",unlimit:"traffic_limit_removed","scale-up":"vertical_scale_activated","deploy-lb":"load_balancer_deployed",cache:"cache_activated","cache-tuning":"cache_tuning_activated","deploy-autoscaler":"autoscaler_activated","retire-app":"autoscale_retirement_activated",routing:t.data.routingFirstEnabled?"routing_enabled":"routing_changed"};
+        const names:Record<typeof a.type,string>={"health-checks":"health_checks_activated","create-spare":"create_spare_activated","reserve-spare":"reserve_spare_activated","release-spare":"release_spare_activated","failover":"failover_activated","promote-spare":"promote_spare_activated","restore-app":"restore_app_activated","add-app":"app_instance_activated","upgrade-db":c.dataStage&&inData?"database_upgrade_activated":"action_activated",limit:"traffic_limit_applied",unlimit:"traffic_limit_removed","scale-up":"vertical_scale_activated","deploy-lb":"load_balancer_deployed",cache:"cache_activated","cache-tuning":"cache_tuning_activated","deploy-autoscaler":"autoscaler_activated","retire-app":"autoscale_retirement_activated",routing:t.data.routingFirstEnabled?"routing_enabled":"routing_changed"};
         emit(a.source==="autoscaler"&&a.type==="add-app"?"autoscale_instance_activated":a.source==="autoscaler"&&a.type==="routing"?"autoscale_routing_completed":names[a.type],
           {...t.data,actionSource:a.source??"player",action_requested_step:a.requestedStep,action_activated_step:a.activatedStep});
         break;
