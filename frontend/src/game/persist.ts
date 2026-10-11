@@ -14,6 +14,8 @@ const ANALYTICS_KEY = "nn.campaign.analytics.v1";
 const CLASSIC_SAVE_KEY = "nn.classic.save.v1";
 const CLASSIC_META_KEY = "nn.classic.meta.v1";
 const MODE_KEY = "nn.mode.v1";
+const AUDIO_KEY = "nn.audio.v1";
+/** Music on or off, from before the volume settings. Still written, so an older build keeps the player's choice. */
 const MUSIC_KEY = "nn.music.v1";
 const LEGACY_SAVE_KEY = "nn.save.v1";
 const LEGACY_META_KEY = "nn.meta.v1";
@@ -35,8 +37,6 @@ export interface Meta {
   tutorialDone: boolean;
   /** The short guide shown on the first incident has been seen. */
   incidentGuideDone: boolean;
-  /** Background music plays. */
-  music: boolean;
 }
 
 export const DEFAULT_META: Meta = {
@@ -48,8 +48,17 @@ export const DEFAULT_META: Meta = {
   firstIncidentCompleted: false,
   tutorialDone: false,
   incidentGuideDone: false,
-  music: true,
 };
+
+/** Sound settings, shared by both modes. Volumes are whole percents. */
+export interface AudioSettings {
+  music: number;
+  effects: number;
+  /** Silences music and effects without losing either volume. */
+  muted: boolean;
+}
+
+export const DEFAULT_AUDIO: AudioSettings = { music: 80, effects: 80, muted: false };
 
 function read(key: string): string | null {
   try {
@@ -203,33 +212,77 @@ export function saveClassicGame(game: GameState): boolean {
   return write(CLASSIC_SAVE_KEY, exportGame(game));
 }
 
-function decodeMeta(raw: string | null): Meta {
-  if (!raw) return { ...DEFAULT_META };
+/** Older metadata also held the music switch, which now lives in the sound settings. */
+type StoredMeta = Partial<Meta> & { music?: unknown };
+
+function parseMeta(raw: string | null): StoredMeta | null {
+  if (!raw) return null;
   try {
-    const meta = { ...DEFAULT_META, ...(JSON.parse(raw) as Partial<Meta>) };
-    const o=meta.openingOnboarding;
-    if(!o || o.version!==1 || !Number.isInteger(o.step) || o.step<0 || o.step>2 || !["not-started","in-progress","completed","skipped"].includes(o.status)) meta.openingOnboarding=structuredClone(DEFAULT_META.openingOnboarding);
-    if (typeof meta.music !== "boolean") meta.music = DEFAULT_META.music;
-    return meta;
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as StoredMeta) : null;
   } catch {
-    return { ...DEFAULT_META };
+    return null;
   }
 }
 
-/** Each mode keeps its own tutorial/counters; music is a shared player preference. */
-export function loadMeta(mode: GameMode = "campaign"): Meta {
-  const meta = decodeMeta(read(mode === "classic" ? CLASSIC_META_KEY : META_KEY));
-  const music = read(MUSIC_KEY);
-  if (music === "true" || music === "false") meta.music = music === "true";
+function decodeMeta(raw: string | null): Meta {
+  const { music: _music, ...stored } = parseMeta(raw) ?? {};
+  const meta: Meta = { ...DEFAULT_META, ...stored };
+  const o=meta.openingOnboarding;
+  if(!o || o.version!==1 || !Number.isInteger(o.step) || o.step<0 || o.step>2 || !["not-started","in-progress","completed","skipped"].includes(o.status)) meta.openingOnboarding=structuredClone(DEFAULT_META.openingOnboarding);
   return meta;
+}
+
+/** Each mode keeps its own tutorial/counters; sound is a shared player preference (see loadAudio). */
+export function loadMeta(mode: GameMode = "campaign"): Meta {
+  return decodeMeta(read(mode === "classic" ? CLASSIC_META_KEY : META_KEY));
 }
 export function loadLegacyMeta(): Meta {
-  const meta = decodeMeta(read(LEGACY_META_KEY));
-  const music = read(MUSIC_KEY);
-  if (music === "true" || music === "false") meta.music = music === "true";
-  return meta;
+  return decodeMeta(read(LEGACY_META_KEY));
 }
-export function saveMusic(enabled: boolean): void { write(MUSIC_KEY, String(enabled)); }
+
+/** The old music switch: the shared key wins, then the switch in that metadata, then on. */
+function musicWasOn(metaKey: string): boolean {
+  const music = read(MUSIC_KEY);
+  if (music === "true" || music === "false") return music === "true";
+  return parseMeta(read(metaKey))?.music !== false;
+}
+
+/** True when the pre-update profile had music off and the player has not chosen sound settings since. */
+export function legacyMusicOff(): boolean {
+  return read(AUDIO_KEY) === null && !musicWasOn(LEGACY_META_KEY);
+}
+
+const percent = (value: unknown, fallback: number): number =>
+  typeof value === "number" && Number.isFinite(value) ? Math.round(Math.min(100, Math.max(0, value))) : fallback;
+
+/**
+ * The sound settings. A browser from before the volume sliders keeps its music
+ * choice: music turned off there becomes muted here. Missing or corrupt fields
+ * fall back to the defaults.
+ */
+export function loadAudio(): AudioSettings {
+  const stored = read(AUDIO_KEY);
+  if (stored !== null) {
+    try {
+      const s = JSON.parse(stored) as Partial<Record<keyof AudioSettings, unknown>> | null;
+      if (s && typeof s === "object")
+        return {
+          music: percent(s.music, DEFAULT_AUDIO.music),
+          effects: percent(s.effects, DEFAULT_AUDIO.effects),
+          muted: typeof s.muted === "boolean" ? s.muted : DEFAULT_AUDIO.muted,
+        };
+    } catch {
+      /* unreadable: fall back to the older setting */
+    }
+  }
+  return { ...DEFAULT_AUDIO, muted: !musicWasOn(loadMode() === "classic" ? CLASSIC_META_KEY : META_KEY) };
+}
+
+export function saveAudio(settings: AudioSettings): boolean {
+  write(MUSIC_KEY, String(!settings.muted && settings.music > 0));
+  return write(AUDIO_KEY, JSON.stringify(settings));
+}
 
 export function saveMeta(meta: Meta, mode: GameMode = "campaign"): boolean {
   return write(mode === "classic" ? CLASSIC_META_KEY : META_KEY, JSON.stringify(meta));

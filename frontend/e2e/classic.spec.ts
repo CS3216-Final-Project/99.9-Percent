@@ -169,21 +169,32 @@ test('resumes an incident paused, investigates, fixes it and acknowledges the po
   expect((await savedGame(page)).turn).toBe(2);
 });
 
-test('plays music from the first click and remembers when it is turned off', async ({ page, withoutRoom }) => {
+test('plays sound from the first click, follows the menu sliders and remembers a mute', async ({ page, withoutRoom }) => {
   await withoutRoom();
   const problems: string[] = [];
-  page.on('console', message => { if (message.text().includes('music could not be prepared')) problems.push(message.text()); });
+  page.on('console', message => { if (/could not be (prepared|played)/.test(message.text())) problems.push(message.text()); });
   await page.goto('/');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
-  const music = page.getByRole('button', { name: 'Music' });
-  await expect(music).toHaveAttribute('aria-pressed', 'true');
+  const mute = page.getByRole('button', { name: 'Mute sound' });
+  await expect(mute).toHaveAttribute('aria-pressed', 'false');
   // Give the loops time to be synthesised; a failure would be reported on the console.
   await page.waitForTimeout(3000);
   expect(problems).toEqual([]);
-  await music.click();
-  await expect(music).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  const menu = page.getByRole('dialog', { name: 'Menu' });
+  const effects = menu.getByRole('slider', { name: 'Sound effects' });
+  await effects.fill('40');
+  await expect(effects).toHaveAttribute('aria-valuetext', '40%');
+  await effects.press('ArrowRight');
+  await expect(effects).toHaveAttribute('aria-valuetext', '45%');
+  await expect(menu).toBeVisible();
+  await menu.getByRole('button', { name: 'Resume', exact: true }).click();
+  await mute.click();
+  await expect(mute).toHaveAttribute('aria-pressed', 'true');
+  expect(problems).toEqual([]);
   await page.reload();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Music' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('button', { name: 'Mute sound' })).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('nn.audio.v1')!))).toEqual({ music: 80, effects: 45, muted: true });
 });

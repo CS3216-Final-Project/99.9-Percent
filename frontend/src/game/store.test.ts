@@ -189,13 +189,22 @@ describe("old saves and imports across modes", () => {
     enter(); useGame.getState().advance();
     const campaign = useGame.getState().game;
     expect(useGame.getState().resumeLegacySave()).toBe(true);
-    expect(useGame.getState()).toMatchObject({ mode: "classic", game, running: false, meta: { tutorialDone: true, music: false } });
+    expect(useGame.getState()).toMatchObject({ mode: "classic", game, running: false, meta: { tutorialDone: true }, audio: { muted: true } });
     useGame.getState().advance();
     const classic = useGame.getState().game;
     useGame.getState().switchMode("campaign"); expect(useGame.getState().game).toEqual(campaign);
-    expect(useGame.getState().meta.music).toBe(false);
+    expect(useGame.getState().audio.muted).toBe(true);
     useGame.getState().switchMode("classic"); expect(useGame.getState().game).toEqual(classic);
     for (const [key, value] of Object.entries(originals)) expect(localStorage.getItem(key)).toBe(value);
+  });
+  it("keeps sound settings chosen since the update when resuming the pre-update save", () => {
+    const game = JSON.parse(JSON.stringify(advanceTurn(newLegacyGame(777)))) as ReturnType<typeof newGame>;
+    localStorage.setItem("nn.save.v1", JSON.stringify({ game, savedAt: 1 }));
+    localStorage.setItem("nn.meta.v1", JSON.stringify({ tutorialDone: true, music: false }));
+    useGame.getState().boot();
+    useGame.getState().setAudio({ music: 0, muted: false });
+    expect(useGame.getState().resumeLegacySave()).toBe(true);
+    expect(useGame.getState().audio).toEqual({ music: 0, effects: 80, muted: false });
   });
   it("leaves a malformed legacy save available for export without replacing either run", () => {
     localStorage.setItem("nn.save.v1", "{"); useGame.getState().boot();
@@ -230,12 +239,30 @@ describe("old saves and imports across modes", () => {
     expect(useGame.getState()).toMatchObject({ mode: "campaign", game: before });
     expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
   });
-  it("keeps music muted across mode switches and reloads", () => {
-    useGame.getState().boot(); useGame.getState().toggleMusic();
-    useGame.getState().switchMode("classic"); expect(useGame.getState().meta.music).toBe(false);
-    useGame.getState().switchMode("campaign"); expect(useGame.getState().meta.music).toBe(false);
+  it("keeps the sound settings across mode switches and reloads", () => {
+    useGame.getState().boot();
+    useGame.getState().setAudio({ music: 35, effects: 60 }); useGame.getState().toggleMute();
+    const settings = { music: 35, effects: 60, muted: true };
+    useGame.getState().switchMode("classic"); expect(useGame.getState().audio).toEqual(settings);
+    useGame.getState().switchMode("campaign"); expect(useGame.getState().audio).toEqual(settings);
     useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
-    expect(useGame.getState().meta.music).toBe(false);
+    expect(useGame.getState().audio).toEqual(settings);
+    useGame.getState().toggleMute(); expect(useGame.getState().audio).toEqual({ ...settings, muted: false });
+  });
+  it("keeps sound settings in memory when storage fails, through a mode switch", () => {
+    useGame.getState().boot();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
+    useGame.getState().setAudio({ effects: 20, muted: true });
+    useGame.getState().switchMode("classic", { discard: true });
+    expect(useGame.getState().audio).toMatchObject({ effects: 20, muted: true });
+  });
+  it("clamps volumes to whole percents and ignores a change that changes nothing", () => {
+    useGame.getState().boot();
+    useGame.getState().setAudio({ music: 140, effects: -3 });
+    expect(useGame.getState().audio).toMatchObject({ music: 100, effects: 0 });
+    const before = useGame.getState().audio;
+    useGame.getState().setAudio({ music: Number.NaN, effects: 0 });
+    expect(useGame.getState().audio).toBe(before);
   });
 });
 

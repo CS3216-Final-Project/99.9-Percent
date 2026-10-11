@@ -8,7 +8,8 @@ import { money, num } from "@/game/format";
 import { useState } from "react";
 import { inspectOrSelect, useGame, type Speed } from "@/game/store";
 import { SaveFiles } from "./SaveFiles";
-import { MusicButton } from "./MusicButton";
+import { SoundButton } from "./SoundButton";
+import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { CampaignPostmortem, Intervention } from "@/sim/campaignTypes";
 import type { GameState } from "@/sim";
@@ -96,7 +97,7 @@ export function CampaignHeader() {
         <strong>{word}</strong>
       </Stat>
     </div>
-    <MusicButton />
+    <SoundButton />
     <button type="button" className="icon-btn menu-btn" aria-label="Menu" {...tipProps("Menu")} onClick={() => openView("menu")}><Icon name="menu" /></button>
   </header>;
 }
@@ -299,17 +300,35 @@ export function CampaignOverlays() {
     <p>Upfront investment: {dollars(c.investedCents)}. Rejected demand: {c.cumulative.rejected} requests (not an extra cash charge).</p>
     <div className="btn-row"><button className="btn" onClick={() => openView("history")}>View history</button><button className="btn" onClick={() => openView("menu")}>Export or start a new company</button></div>
   </Modal>;
-  if (view === "menu") return <Modal title="Menu" icon={{ kind: "muted", name: "menu" }} onClose={closeMenu}>
+  if (view === "menu") return <Modal title="Menu" icon={{ kind: "muted", name: "menu" }} onClose={closeMenu} className="modal-menu">
     <Callout tone="info" icon="pause" kicker="Time is paused">One step models one second of requests. Every 60 steps settles an operating week. Pausing freezes everything.</Callout>
-    <section className="menu-section"><h4>How to play</h4><p>{nextMove(game).text} Click equipment in the room or the investigation controls to inspect it for free. Choose a response, then Run to observe the change. P pauses and Esc closes a view.</p></section>
     {saveBlocked && <Callout tone="warn" icon="save" kicker="Save preserved" live="alert">Your stored save is unreadable or unsupported and has been preserved. This run stays in memory until you explicitly reset.</Callout>}
-    <section className="menu-section"><h4>Company</h4><div className="btn-row"><button className="btn" onClick={()=>saveNow()}><Icon name="save" />Save now</button><button className="btn" onClick={() => setConfirmReset(true)}>New company</button></div>
-      {confirmReset && <><p>This replaces only the current campaign save. Export it first if you want to keep it.</p><button className="btn" onClick={() => { newRun(); setConfirmReset(false); }}>Confirm new company</button></>}
+    <section className="menu-section" aria-label="How to play"><h4><Icon name="info" size={16} />How to play</h4>
+      <p>{nextMove(game).text} Click equipment in the room or the investigation controls to inspect it for free. Choose a response, then Run to observe the change. P pauses and Esc closes a view.</p>
     </section>
-    <section className="menu-section"><h4>Introduction and playtest records</h4>
-      <div className="btn-row"><button className="btn" onClick={()=>useGame.getState().showOnboarding()}>Replay introduction</button>
-      <button className="btn" onClick={()=>{useGame.getState().measureTime();const s=useGame.getState();download("playtest-session.json",exportPlaytest(s.game,s.measurement));}}>Export playtest record</button>
-      <button className="btn" onClick={()=>useGame.getState().endSession()}>Save and exit to title</button></div>
+    <div className="menu-columns">
+      <div className="menu-col">
+        <section className="menu-section" aria-label="Company"><h4><Icon name="save" size={16} />Company</h4>
+          <div className="menu-actions"><button type="button" className="btn" onClick={() => saveNow()}><Icon name="save" size={16} />Save now</button></div>
+        </section>
+        <SoundSettings />
+        {/* The account panel names itself; the wrapper only gives it the menu's section spacing. */}
+        <div className="menu-section menu-account"><AccountPanel /></div>
+        <SaveFiles />
+      </div>
+      <div className="menu-col"><ModeSwitch to="classic" />
+        <section className="menu-section menu-danger" aria-label="Start over"><h4><Icon name="refresh" size={16} />Start over</h4>
+          <div className="menu-actions"><button type="button" className={`btn${confirmReset ? " btn-quiet" : ""}`} aria-expanded={confirmReset} onClick={() => setConfirmReset(true)}><Icon name="refresh" size={16} />New company</button></div>
+          {confirmReset && <div className="menu-confirm"><p>This replaces only the current campaign save. Export it first if you want to keep it.</p>
+            <div className="btn-row"><button type="button" className="btn btn-danger" onClick={() => { newRun(); setConfirmReset(false); }}>Confirm new company</button>
+              <button type="button" className="btn btn-quiet" onClick={() => setConfirmReset(false)}>Cancel</button></div></div>}
+        </section>
+      </div>
+    </div>
+    <section className="menu-section" aria-label="Introduction and playtest records"><h4><Icon name="analytics" size={16} />Introduction and playtest records</h4>
+      <div className="menu-actions menu-actions-row"><button type="button" className="btn" onClick={()=>useGame.getState().showOnboarding()}><Icon name="info" size={16} />Replay introduction</button>
+      <button type="button" className="btn" onClick={()=>{useGame.getState().measureTime();const s=useGame.getState();download("playtest-session.json",exportPlaytest(s.game,s.measurement));}}><Icon name="download" size={16} />Export playtest record</button>
+      <button type="button" className="btn" onClick={()=>useGame.getState().endSession()}><Icon name="pause" size={16} />Save and exit to title</button></div>
       <details className="more"><summary>Playtest observer notes</summary>
         <p>Session: {measurement.session?.id??"Not started"} · Build: {import.meta.env.VITE_BUILD_ID||"dev/unrecorded"}</p>
         <label>Participant source <select value={measurement.session?.source??"unspecified"} onChange={e=>useGame.getState().observer(e.target.value as "organic"|"recruited"|"unspecified")}><option value="unspecified">Unspecified</option><option value="recruited">Recruited</option><option value="organic">Organic</option></select></label>
@@ -317,7 +336,6 @@ export function CampaignOverlays() {
         <button className="btn" disabled={!intervention.trim()} onClick={()=>{useGame.getState().observer(measurement.session?.source??"unspecified",intervention);setIntervention("");}}>Record intervention</button>
       </details>
     </section>
-    <AccountPanel /><SaveFiles /><ModeSwitch to="classic" />
   </Modal>;
   if (view === "history") return <Modal title="Campaign history" wide icon={{ kind: "users", name: "history" }} onClose={() => openView(null)}>
     <LineChart title="Latency" axisLabel="Step" series={[{ name: "Latency", color: "var(--c-health)", values: c.recent.map(m => m.latencyMs) }]} turns={c.recent.map(m => m.step)} format={v => `${v.toFixed(0)} ms`} />

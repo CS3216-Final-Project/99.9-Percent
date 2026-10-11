@@ -47,7 +47,7 @@ test("recovers a pre-update run and exports/imports Classic files from either mo
     }
   }, original);
   await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
-  await page.getByRole("button", { name: "Music", exact: true }).click();
+  await page.getByRole("button", { name: "Mute sound", exact: true }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const legacyDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export pre-update save" }).click();
@@ -55,7 +55,7 @@ test("recovers a pre-update run and exports/imports Classic files from either mo
   await page.getByRole("button", { name: "Resume pre-update save" }).click();
   await page.getByRole("button", { name: "Confirm resume", exact: true }).click();
   await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Music", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Mute sound", exact: true })).toHaveAttribute("aria-pressed", "true");
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("nn.classic.save.v1")!).game)).toEqual(JSON.parse(JSON.stringify(game)));
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const classicDownload = page.waitForEvent("download");
@@ -67,6 +67,6 @@ test("recovers a pre-update run and exports/imports Classic files from either mo
   await page.getByRole("button", { name: "Confirm import" }).click();
   await expect(page.getByRole("button", { name: "Next week" })).toBeVisible();
   await page.reload(); await page.getByRole("button", { name: /Continue week/ }).click();
-  await expect(page.getByRole("button", { name: "Music", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Mute sound", exact: true })).toHaveAttribute("aria-pressed", "true");
   expect(await page.evaluate(() => localStorage.getItem("nn.save.v1"))).toBe(original);
 });

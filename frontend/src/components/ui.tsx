@@ -325,12 +325,15 @@ export function Modal({
   wide = false,
   tone,
   icon,
+  className,
 }: {
   title: string;
   children: ReactNode;
   onClose?: () => void;
   wide?: boolean;
   tone?: "alert";
+  /** A layout of its own, such as the two-column menu. */
+  className?: string;
   /** The idea this dialog is about, shown beside the title. */
   icon?: { kind: ConceptKind; name: IconName };
 }) {
@@ -343,7 +346,7 @@ export function Modal({
   },[title]);
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
-      <div className={`modal${wide ? " modal-wide" : ""}${tone ? ` modal-${tone}` : ""}`} ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={e=>{
+      <div className={`modal${wide ? " modal-wide" : ""}${tone ? ` modal-${tone}` : ""}${className ? ` ${className}` : ""}`} ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={e=>{
         if(e.key==="Escape"){e.stopPropagation();onClose?.();}
         if(e.key==="Tab"){
           const nodes=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,select,textarea,[tabindex="0"]')??[]);
