@@ -2,7 +2,7 @@ import { pendingSpikeAcknowledgement, spikeInput } from "@/sim/autoscaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
 import { canEnterData, databaseUpgrade, pendingStop } from "@/sim/step";
-import { canEnterReliability, pendingReliability } from "@/sim/reliability";
+import { canEnterReliability, pendingReliability, effectiveTargets, researchBalance } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
@@ -126,6 +126,7 @@ export function CampaignPanel() {
   const unlocked = !!c.openingMilestone?.acknowledged;
   const dbUpgrade=databaseUpgrade(c);
   const selectedApp = c.apps.find(a=>a.id===selectedAppId)??c.apps[0];
+  const recipients = c.reliabilityStage ? effectiveTargets(c) : c.routing.targets;
   const disabled = useGame(s=>s.onboarding) || pendingStop(c) !== null || !!(c.openingMilestone && !c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
   const admissionPending = c.pending.some(a => a.type === "limit" || a.type === "unlimit");
   const place = PLACES.find(id => id === selected && (id!=="cache"||c.dataStage));
@@ -162,8 +163,8 @@ export function CampaignPanel() {
           {component ? <>Demand {num(component.demand)}/s · capacity {num(component.capacity)}/s · backlog {num(component.backlog)}.</> : place === "cache" ? <>Cache {c.readCache?"deployed":"not deployed"} · effective rate used {m.data?`${m.data.effectiveHitRateUsed/100}%`:"not yet observed"} · hits {m.data?.hits??"not yet observed"}. Misses and writes reach the database.</> : place === "gateway" ? <>Incoming {num(m.incoming)}/s · admitted {num(m.admitted)}/s · rejected {num(m.rejected)}/s.</> : <>Latency {m.latencyMs.toFixed(0)} ms · errors {percent(m.serviceErrorRate)} · backlog {num(m.app.backlog + m.db.backlog)}.</>}
         </Callout></div>}
         {unlocked && <details className="more" open={selected==="app"}><summary>Application instances · {c.routing.mode} routing</summary>
-          <section aria-label="Application instances"><p className="muted">Load balancer: {c.loadBalancer?"Deployed":"Not deployed"}. Receiving new traffic: {c.routing.targets.map(appName).join(", ")}.</p>
-            <div className="instance-choices">{c.apps.map(a=>{const x=m.instances?.find(x=>x.id===a.id);return <button key={a.id} className={`chip${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} {...tipProps(`Capacity ${a.capacity} req/s; backlog ${a.backlog}. ${a.routed?"Receiving traffic":"Installed - not receiving traffic"}`)} onClick={()=>inspectOrSelect("app",a.id)}>{appName(a.id)}: {a.routed?"Receiving traffic":"Installed - not receiving traffic"}{x&&<span>{x.demand}/{x.capacity} req/s · processed {x.processed} · backlog {x.backlog}</span>}</button>;})}</div>
+          <section aria-label="Application instances"><p className="muted">Load balancer: {c.loadBalancer?"Deployed":"Not deployed"}. Receiving new traffic: {recipients.map(appName).join(", ") || "None"}.</p>
+            <div className="instance-choices">{c.apps.map(a=>{const x=m.instances?.find(x=>x.id===a.id),receiving=recipients.includes(a.id);return <button key={a.id} className={`chip${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} {...tipProps(`Capacity ${a.capacity} req/s; backlog ${a.backlog}. ${receiving?"Receiving traffic":"Installed - not receiving traffic"}`)} onClick={()=>inspectOrSelect("app",a.id)}>{appName(a.id)}: {receiving?"Receiving traffic":"Installed - not receiving traffic"}{x&&<span>{x.demand}/{x.capacity} req/s · processed {x.processed} · backlog {x.backlog}</span>}</button>;})}</div>
             {c.apps.filter(a=>!a.routed).map(a=><p role="note" aria-label={`${appName(a.id)} routing status`} key={a.id}>Installed capacity does not receive traffic until routing includes this app.</p>)}
           </section></details>}
       </div>
@@ -173,6 +174,7 @@ export function CampaignPanel() {
         <li><Act label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbUpgrade?`${dbUpgrade.delay} steps · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next campaign stage."} onClick={() => act({ type: "start_db_upgrade" })} /></li>
         <li><Act label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} step`} disabled={disabled || admissionPending} tip="Changes admitted traffic at the next physical step. Rejected requests earn no revenue." onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
       </ul>
+      {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type))} />}
       {unlocked && <section aria-label="Scaling controls" className="scaling-controls">
         <h4 className="step-head">Scale and route</h4>
         <ul className="actions">
@@ -209,7 +211,6 @@ export function CampaignPanel() {
           <button className="btn" disabled={disabled||!c.dataStage.consumed||c.dataStage.contrastConsumed||!!c.spikeStage||!canEnterData(game)} onClick={()=>act({type:"contrast_workload"})}>Observe contrasting workload</button>
         </details>
       </section>}
-      {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type))} />}
       {c.pending.map(a => <div className="working campaign-working" role="status" key={a.id}>
         <span>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} step(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
@@ -251,7 +252,7 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
    {a&&<li><button className="btn" disabled={disabled} aria-pressed={a.enabled} onClick={()=>act({type:"set_autoscaling",enabled:!a.enabled})}>{a.enabled?"Disable autoscaling":"Enable autoscaling"}</button></li>}
   </ul>
   <details className="more"><summary>Controller evidence and costs</summary>
-   <p>Research: {d.researchEarned-d.researchSpent} point available. Autoscaling {d.researchSpent?"unlocked":"locked"}. Normal demand {T.baseline}; spike demand {T.peak} req/s.</p>
+   <p>Research: {researchBalance(c)} point(s) available. Autoscaling {d.researchSpent?"unlocked":"locked"}. Normal demand {T.baseline}; spike demand {T.peak} req/s.</p>
    <p>Installed {c.apps.length} / maximum {T.maximum}; routed {c.routing.targets.length}. Automatic apps cost $1,000 setup and $700/week after installation. Controller upkeep: $100/week, including while disabled.</p>
    <p>Observed routed busy utilisation: {o?`${(o.routedBusyBasisPoints/100).toFixed(2)}%`:"No controller observation yet"}. High-utilization observations: {a?.highSteps??0} / 3; low-utilization observations: {a?.lowSteps??0} / 6.</p>
    <p>Scale out above 80% for 3 steps. Empty controller apps may retire below 60% for 6 safe steps; minimum 2. Cooldown remaining: {Math.max(0,(a?.cooldownUntil??0)-c.step)} steps.</p>
@@ -379,9 +380,7 @@ export function CampaignOverlays() {
   }
   if (view === "tech") return <Modal title="Technology tree" wide icon={{ kind: "tech", name: "tree" }} onClose={() => openView(null)}><TechTree /></Modal>;
   if (pendingReliability(c)) return <Modal title="Reliability outcome" icon={{ kind: "ok", name: "health" }}>
-    <p>The application test has ended. Service met five stable management observations after restoration.</p>
-    <p>Installed capacity did not guarantee healthy routed capacity. Health Checks detect; spares and routing provide surviving capacity. Failover creates no capacity.</p>
-    <p>{c.limit!==null?"Traffic limit active":"Full demand admitted"}. Rejected requests: {num(c.cumulative.rejected)}. Setup spending: {dollars(c.investedCents)}.</p>
+    <ReliabilityOutcome campaign={c} />
     <button className="btn btn-primary" onClick={()=>act({type:"acknowledge_reliability"})}>Continue operating<Icon name="next" /></button>
   </Modal>;
   if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_prevention_review"})}>Continue company<Icon name="next" /></button></Modal>;
@@ -403,6 +402,7 @@ export function CampaignOverlays() {
     <LineChart title="Latency" axisLabel="Step" series={[{ name: "Latency", color: "var(--c-health)", values: c.recent.map(m => m.latencyMs) }]} turns={c.recent.map(m => m.step)} format={v => `${v.toFixed(0)} ms`} />
     {c.spikeStage&&<details className="more"><summary>Traffic spike and controller history</summary>{c.recent.filter(m=>m.spikes).map(m=><p key={m.step}>Step {m.step}: incoming {m.incoming}; {m.spikes!.activePulse?`pulse ${m.spikes!.activePulse}`:"baseline"}; routed busy {m.spikes!.routedBusyBasisPoints/100}%; installed/routed {m.spikes!.installed}/{m.spikes!.routed}; {m.spikes!.blockedReason??"observing"}.</p>)}</details>}
     {c.openingPrevention?.outcome&&<section aria-label="Historical Opening prevention outcome"><PreventionOutcome campaign={c} /></section>}
+    {c.reliabilityStage?.completedStep!=null&&<section aria-label="Historical reliability outcome"><ReliabilityOutcome campaign={c} /></section>}
     {c.reports.map(p => <Report key={p.id} report={p} />)}
     <details className="more"><summary>Financial settlements</summary>{c.settlements.map(p => <p key={p.period}>Week {p.period}: revenue {dollars(p.revenueCents)}, net {dollars(p.netCents)}</p>)}</details>
     <details className="more"><summary>Action and event history</summary>{c.trace.filter(e => e.type !== "metrics").map(e => <p key={e.id}>Step {e.step}: {e.type.replaceAll("-", " ")} {e.data.reason ? String(e.data.reason) : e.data.type ? ACTION_NAMES[e.data.type as Intervention] ?? String(e.data.type).replaceAll("-", " ") : ""}</p>)}</details>
@@ -412,6 +412,26 @@ export function CampaignOverlays() {
 
 type Settlement = Campaign["settlements"][number];
 const infrastructureCents = (p: Settlement | undefined) => p ? p.appCents + p.dbCents + (p.lbCents??0) + (p.cacheCents??0) + (p.controllerCents??0) + (p.checksCents??0) + (p.failoverCents??0) : 0;
+
+function ReliabilityOutcome({campaign:c}:{campaign:Campaign}) {
+  const d=c.reliabilityStage!,f=d.fault!;
+  const completion=c.trace.find(e=>e.type==="reliability-stage-completed");
+  const detection=c.trace.find(e=>e.type==="health-change-detected"&&e.data.appId===f.targetId&&e.data.detectedHealth==="unhealthy"&&e.step>=f.startStep);
+  const promotion=c.trace.find(e=>e.type==="failover-activated"&&e.data.eventId===f.id);
+  return <div>
+    <Callout compact tone="success" icon="health" kicker={completion?.data.limited?"Stable — traffic limited":"Stable service"}>
+      {completion?.data.incidentOccurred?"A production incident occurred during the test and its measured recovery was reviewed.":"The test completed without opening a production incident."} Five stable management observations followed restoration.
+    </Callout>
+    <dl className="rows"><Row label="Application failure" value={`${appName(f.targetId)} · step ${f.startedStep}`} />
+      <Row label="Failure detected" value={detection?`Step ${detection.step} · ${detection.data.source==="probe"?"Health Checks":"manual inspection"}`:"Not detected before restoration"} />
+      <Row label="Spare promotion" value={promotion?`${appName(String(promotion.data.appId))} · step ${promotion.step}`:"No automatic promotion"} />
+      <Row label="Restoration" value={`Step ${f.restoredStep} · ${f.restoreSource==="manual"?"requested restore":"fault expired"}`} />
+      <Row label="Outcome recorded" value={`Step ${d.completedStep}`} />
+      <Row label="Company rejected requests at completion" value={num(Number(completion?.data.rejected??0))} />
+      <Row label="Company setup spending at completion" value={dollars(Number(completion?.data.setupCents??0))} /></dl>
+    <p>Health Checks detect; spares and routing provide surviving capacity. Failover creates no capacity. Compare per-instance demand and capacity in recorded incident evidence.</p>
+  </div>;
+}
 
 const PREPARATION_NAMES: Partial<Record<ScheduledAction["type"], string>> = {"upgrade-db":"Database upgrade","add-app":"Additional application",limit:"Traffic limit",unlimit:"Traffic limit removal"};
 function PreventionOutcome({campaign}:{campaign:Campaign}) {
@@ -433,20 +453,24 @@ function PreventionOutcome({campaign}:{campaign:Campaign}) {
 
 function ReliabilityControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
   const {game,act}=useGame(),c=game.campaign!,d=c.reliabilityStage!,f=d.fault,r=c.snapshot.reliability;
+  const recipients=effectiveTargets(c),spare=c.apps.find(a=>a.id===d.spareId);
+  const checksUnavailable=disabled||busy||d.checksStep!==null||!d.owned.includes("health_checks")||c.cashCents<=R.checksCostCents;
+  const spareUnavailable=disabled||busy||!!d.spareId||c.apps.length>=T.maximum||!d.owned.includes("standby")||c.cashCents<=R.spareCostCents;
+  const failoverUnavailable=disabled||busy||!!d.failover||!d.owned.includes("auto_failover")||d.checksStep===null||!c.loadBalancer||!spare||spare.health==="failed"||c.cashCents<=R.failoverCostCents;
   return <section aria-label="Stay Online" className="scaling-controls">
     <h4 className="step-head"><Icon name="health" size={16} />Stay online</h4>
     <p role="status">{!f?"Prepare, then explicitly start the reliability test.":f.startedStep===null?"Reliability test scheduled. Run to observe it.":f.restoredStep===null?`${appName(f.targetId)} failed. Inspect health, surviving capacity and routing.`:"Application restored. Observe stable service."} Stable after restoration: {d.stableSteps} / {Q.stableSteps}.</p>
     {c.spikeStage?.controller&&f&&!d.acknowledged&&<p className="muted">Autoscaling waits while the reliability test runs; its enabled state and upkeep are preserved.</p>}
     <ul className="actions">
-      <li><Act label="Deploy Health Checks" price={R.checksCostCents/100} note="2 steps" disabled={disabled||busy||d.checksStep!==null||!d.owned.includes("health_checks")} tip="Unlock in the technology tree. Detects health changes; load balancing is required for routing exclusion." onClick={()=>act({type:"deploy_health_checks"})} /></li>
-      <li><Act label="Install spare" price={R.spareCostCents/100} note="2 steps" disabled={disabled||busy||!!d.spareId||c.apps.length>=T.maximum||!d.owned.includes("standby")} tip="Unlock Spare Application in the technology tree. A spare receives no traffic until promoted." onClick={()=>act({type:"install_spare"})} /></li>
-      <li><Act label="Deploy Automatic Failover" price={R.failoverCostCents/100} note="2 steps" disabled={disabled||busy||!!d.failover||!d.owned.includes("auto_failover")} tip="Promotes a real spare after detection. Creates no capacity." onClick={()=>act({type:"deploy_failover"})} /></li>
+      <li><Act label="Deploy Health Checks" price={R.checksCostCents/100} note="2 steps" disabled={checksUnavailable} tip="Requires its research unlock and available cash. Detects health changes; load balancing is required for routing exclusion." onClick={()=>act({type:"deploy_health_checks"})} /></li>
+      <li><Act label="Install spare" price={R.spareCostCents/100} note="2 steps" disabled={spareUnavailable} tip="Requires Spare Application research, available cash and a free instance slot. A spare receives no traffic until promoted." onClick={()=>act({type:"install_spare"})} /></li>
+      <li><Act label="Deploy Automatic Failover" price={R.failoverCostCents/100} note="2 steps" disabled={failoverUnavailable} tip="Requires its research unlock, deployed Health Checks and Load Balancing, a healthy reserved spare and available cash. Creates no capacity." onClick={()=>act({type:"deploy_failover"})} /></li>
       {d.failover&&<li><Act label={d.failover.enabled?"Disable failover":"Enable failover"} price={0} disabled={disabled} onClick={()=>act({type:"set_failover",enabled:!d.failover!.enabled})} /></li>}
     </ul>
     <div className="instance-choices">{c.apps.map(a=><div key={a.id} className="chip">
-      <span>{appName(a.id)} · {a.health??"healthy"} · detected {a.detectedHealth??"unknown"} · {a.role??"serving"} · {r?.effective.includes(a.id)?"receiving traffic":"not receiving traffic"}</span>
-      <button className="btn btn-small" disabled={disabled} onClick={()=>act({type:"incident_inspect",equipment:"app",appId:a.id})}>Inspect {appName(a.id)} health · free</button>
-      {a.health==="failed"&&<button className="btn btn-small" disabled={disabled} onClick={()=>act({type:"restore_app",appId:a.id})}>Restore {appName(a.id)} · free · 3 steps</button>}
+      <span>{appName(a.id)} · {a.health??"healthy"} · detected {a.detectedHealth??"unknown"} · {a.role??"serving"} · {recipients.includes(a.id)?"receiving traffic":"not receiving traffic"}</span>
+      <button className="btn btn-small" disabled={disabled} onClick={()=>inspectOrSelect("app",a.id)}>Inspect {appName(a.id)} health · free</button>
+      {a.health==="failed"&&<button className="btn btn-small" disabled={disabled||busy} onClick={()=>act({type:"restore_app",appId:a.id})}>Restore {appName(a.id)} · free · 3 steps</button>}
       {!a.routed&&a.role!=="spare"&&<button className="btn btn-small" disabled={disabled||busy||!d.owned.includes("standby")||!!d.spareId} onClick={()=>act({type:"reserve_spare",appId:a.id})}>Reserve {appName(a.id)} as spare · 1 step</button>}
       {a.role==="spare"&&<button className="btn btn-small" disabled={disabled||busy} onClick={()=>act({type:"release_spare"})}>Release spare · 1 step</button>}
     </div>)}</div>

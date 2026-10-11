@@ -47,3 +47,24 @@ test("sounds the alarm when the opening incident starts, and nothing while muted
   await expect.poll(voices).toBeGreaterThan(unmuted);
   expect(problems).toEqual([]);
 });
+
+test("the header sound button follows the menu sliders and turns sound back on from silence", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click();
+  await page.getByRole("button", { name: "Skip introduction" }).click();
+  const mute = page.getByRole("button", { name: "Mute sound", exact: true });
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menu" });
+  await menu.getByRole("tab", { name: "Sound" }).click();
+  // The menu covers the header button, which still shows what the sliders say.
+  await menu.getByRole("slider", { name: "Music" }).fill("0");
+  await expect(mute).toHaveAttribute("aria-pressed", "false");
+  await menu.getByRole("slider", { name: "Sound effects" }).fill("0");
+  await expect(mute).toHaveAttribute("aria-pressed", "true");
+  await expect(menu.getByRole("button", { name: "Mute all" })).toHaveAttribute("aria-pressed", "true");
+  await menu.getByRole("button", { name: "Close" }).click();
+  // A real click on the button: silent at 0 and 0 means turning sound on, not muting again.
+  await mute.click();
+  await expect(mute).toHaveAttribute("aria-pressed", "false");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("nn.audio.v1")!))).toEqual({ music: 80, effects: 80, muted: false });
+});

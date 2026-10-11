@@ -5,6 +5,7 @@ import { advanceSteps, step } from "@/sim/step";
 import { buildModel } from "./sceneModel";
 import {dataCompany} from "@/sim/__tests__/dataFixture";
 import {footprint,dbSlot,DB_CABINET} from "./layout";
+import {reliabilityCompany,preparedReliability} from "@/sim/__tests__/reliabilityFixture";
 
 function must(s: GameState, action: Action): GameState {
   const r = applyAction(s, action);
@@ -14,6 +15,13 @@ function must(s: GameState, action: Action): GameState {
 
 // E2E skips drawing the room in most journeys, so the incident rules of the scene are pinned here.
 describe("scene model", () => {
+  it("draws only installed spare capacity, once, rather than creating a rack from research ownership",()=>{
+    const owned=must(reliabilityCompany(),{type:"unlock_reliability",tech:"standby"});
+    expect(buildModel(owned).standby).toBe(false);
+    expect(buildModel(owned).hosts).toHaveLength(owned.campaign!.apps.length);
+    const prepared=preparedReliability(),model=buildModel(prepared);
+    expect(model.standby).toBe(false);expect(model.hosts).toEqual(["ok","ok","standby"]);
+  });
   it("renders the fourth campaign DB cabinet in the same footprint as the activated tier",()=>{
     let s=dataCompany();s=must(s,{type:"start_db_upgrade"});s=advanceSteps(s,4).state;
     expect(s.campaign!.dbCapacity).toBe(3000);const m=buildModel(s),pad=footprint(s,"db");

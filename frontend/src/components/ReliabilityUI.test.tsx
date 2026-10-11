@@ -18,3 +18,17 @@ it("exposes actual and detected health and surviving capacity",()=>{
  expect(panel.textContent).toContain("failed");expect(panel.textContent).toContain("detected healthy");expect(panel.textContent).toContain("1,600 /");
  expect(within(panel).getByRole("button",{name:"Restore App 2 · free · 3 steps"})).toBeTruthy();
 });
+it("uses effective routing for labels and selects an inspected application",()=>{
+ show(tick(act(preparedReliability(),{type:"arm_reliability"}),9));
+ const instances=screen.getByRole("region",{name:"Application instances"});
+ expect(within(instances).getByRole("button",{name:/App 2: Installed - not receiving traffic/})).toBeTruthy();
+ fireEvent.click(screen.getByRole("button",{name:"Inspect App 2 health · free"}));
+ expect(useGame.getState().selectedAppId).toBe("app-2");expect(useGame.getState().selected).toBe("app");
+});
+it("disables failover deployment without a reserved spare and purchases that exhaust cash",()=>{
+ let g=preparedReliability();g=act(g,{type:"release_spare"});g=tick(g);
+ g.campaign!.reliabilityStage!.failover=null;g.campaign!.reliabilityStage!.checksStep=null;g.campaign!.cashCents=50000;
+ show(g);const panel=screen.getByRole("region",{name:"Stay Online"});
+ for(const name of ["Deploy Automatic Failover","Deploy Health Checks","Install spare"])
+  expect((within(panel).getByRole("button",{name:new RegExp(name)}) as HTMLButtonElement).disabled).toBe(true);
+});

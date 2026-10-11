@@ -32,6 +32,7 @@ import {
   DEFAULT_AUDIO,
   DEFAULT_GRAPHICS,
   DEFAULT_META,
+  isSilent,
   loadClassicGame,
   loadGame,
   loadMeta,
@@ -804,7 +805,12 @@ export const useGame = create<Store>()((set, get) => {
       // Unsaved settings still apply for this visit.
       saveAudio(audio);
     },
-    toggleMute: () => get().setAudio({ muted: !get().audio.muted }),
+    toggleMute: () => {
+      const { audio } = get();
+      if (!isSilent(audio)) return get().setAudio({ muted: true });
+      // A mute only unmutes; volumes dragged to 0 are brought back too, or the click would change nothing you can hear.
+      get().setAudio(audio.music === 0 && audio.effects === 0 ? DEFAULT_AUDIO : { muted: false });
+    },
 
     setGraphics: (patch) => {
       const quality = GRAPHICS_QUALITIES.find((q) => q === patch.quality) ?? get().graphics.quality;

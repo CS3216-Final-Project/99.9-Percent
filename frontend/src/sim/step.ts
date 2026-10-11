@@ -147,7 +147,7 @@ export function stepInPlace(s: GameState): StopReason {
         const dbBefore = c.dbCapacity, appBefore = c.apps.reduce((n,a)=>n+a.capacity,0);
         const targetCapacityBefore = action.targetId ? c.apps.find(a=>a.id===action.targetId)?.capacity ?? 0 : null;
         const routingBefore = JSON.stringify(c.routing);
-        const effectiveBefore = c.apps.filter(a=>c.routing.targets.includes(a.id)).reduce((n,a)=>n+a.capacity,0);
+        const effectiveBefore = c.apps.filter(a=>(c.reliabilityStage?effectiveTargets(c):c.routing.targets).includes(a.id)&&a.health!=="failed").reduce((n,a)=>n+a.capacity,0);
         const admittedBefore = Math.min(c.incomingRate, c.limit ?? c.incomingRate);
         if(["health-checks","create-spare","reserve-spare","release-spare","failover","promote-spare","restore-app"].includes(action.type)&&!activateReliability(c,action))continue;
         if(action.type==="retire-app"&&!activateRetirement(c,action))continue;
@@ -188,7 +188,7 @@ export function stepInPlace(s: GameState): StopReason {
             actionId: action.id, ...(c.spikeStage?{source:action.source??"player"}:{}), costCents:action.costCents, dbBefore, dbAfter: c.dbCapacity, appBefore,
             appAfter: c.apps.reduce((n,a)=>n+a.capacity,0), admittedBefore, admittedAfter: Math.min(c.incomingRate, c.limit ?? c.incomingRate),
             targetId: action.targetId ?? null, capacityBefore:targetCapacityBefore, capacityAfter:action.targetId?c.apps.find(a=>a.id===action.targetId)?.capacity??null:action.capacityAfter??null, routingBefore, routingAfter: JSON.stringify(c.routing),
-            effectiveBefore, effectiveAfter: c.apps.filter(a=>c.routing.targets.includes(a.id)).reduce((n,a)=>n+a.capacity,0),
+            effectiveBefore, effectiveAfter: c.apps.filter(a=>(c.reliabilityStage?effectiveTargets(c):c.routing.targets).includes(a.id)&&a.health!=="failed").reduce((n,a)=>n+a.capacity,0),
             ...(c.dataStage?{cacheTarget:c.readCache?.target??0, cacheWarmth:c.readCache?.warmth??0}:{}),
             routingFirstEnabled: action.type === "routing" && c.routing.mode === "balanced" && !c.routingEnabledOnce
         });
@@ -490,6 +490,8 @@ function actInPlace(s: GameState, action: Action): Rejection | null {
     if (type === "scale-up" && (!target || target.state !== "active" || target.tier !== "base"))return fail("Select an active base application to scale up.");
     if (type === "deploy-lb" && c.loadBalancer)return fail("Load balancing is already deployed.");
     const routing = action.type === "set_routing" ? {mode:action.mode,targets:[...action.targets].sort((a,b)=>Number(a.split("-")[1])-Number(b.split("-")[1]))} : null;
+    if(routing&&c.pending.some(a=>a.type==="reserve-spare"&&routing.targets.includes(a.targetId!)))
+        return fail("An application being reserved as spare cannot receive a pending route.");
     if (routing && (!c.loadBalancer || !routingValid(c,routing) || c.pending.some(a=>a.type==="routing"||a.type==="retire-app") || JSON.stringify(routing)===JSON.stringify(c.routing)))return fail("Routing requires deployed load balancing, valid active targets and a changed configuration.");
     if (["limit","unlimit"].includes(type) && (c.pending.some(a => a.type === "limit" || a.type === "unlimit") || ((c.limit !== null) === (type === "limit"))))
         return fail("Admission setting is already active or a change is pending.");

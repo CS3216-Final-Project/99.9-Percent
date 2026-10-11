@@ -14,7 +14,7 @@ export const MAX_REPLAY_INPUTS = 100_000;
  * deterministic, so the result equals the state the inputs were recorded from.
  * Throws when the inputs could not have been recorded by a real run.
  */
-export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number, legacyMilestones = false, foundation?: {step:number;inputs:number}): GameState {
+export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number, legacyMilestones = false, foundation?: {step:number;inputs:number}, legacyPrevention = false): GameState {
     if (!Number.isSafeInteger(finalStep) || finalStep < 0 || finalStep > MAX_REPLAY_STEPS)
         throw new Error("Replay step is out of range");
     if (inputs.length > MAX_REPLAY_INPUTS)
@@ -25,8 +25,8 @@ export function replayCampaign(seed: number, runId: string, inputs: readonly Cam
     for (const input of inputs) {
         if (!Number.isSafeInteger(input.step) || input.step > finalStep)
             throw new Error("Input step is out of range");
-        advanceTo(s, input.step);
-        if (input.action.type !== "acknowledge_prevention_review") acknowledgeUnseenPrevention(s);
+        advanceTo(s, input.step, legacyPrevention);
+        if (legacyPrevention && input.action.type !== "acknowledge_prevention_review") acknowledgeUnseenPrevention(s);
         applyCampaignInputInPlace(s, input.action);
         // Phase 1 acknowledgement already returned to management: preserve that state.
         // Record the added acknowledgement so subsequent saves replay exactly.
@@ -35,15 +35,15 @@ export function replayCampaign(seed: number, runId: string, inputs: readonly Cam
             applyCampaignInputInPlace(s, {type:"acknowledge_milestone", enterScaling:false});
         }
     }
-    advanceTo(s, finalStep);
+    advanceTo(s, finalStep, legacyPrevention);
     return projectCampaign(s);
 }
 
-function advanceTo(s: GameState, target: number): void {
+function advanceTo(s: GameState, target: number, legacyPrevention: boolean): void {
     if (s.campaign!.step > target)
         throw new Error("Inputs are out of order");
     while (s.campaign!.step < target) {
-        acknowledgeUnseenPrevention(s);
+        if (legacyPrevention) acknowledgeUnseenPrevention(s);
         if (s.phase === "review" || s.phase === "ended" || pendingStop(s.campaign))
             throw new Error("The run cannot advance past a review, recognition or bankruptcy");
         stepInPlace(s);

@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { newGame, newLegacyGame, advanceTurn } from "../sim";
 import { advanceSteps } from "../sim/step";
-import { loadClassicGame, loadGame, saveGame, readAnalytics } from "./persist";
+import { DEFAULT_AUDIO, isSilent, loadAudio, loadClassicGame, loadGame, saveGame, readAnalytics } from "./persist";
 import { makeEnvelope } from "./saveEnvelope";
 import { useGame } from "./store";
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
@@ -275,6 +275,27 @@ describe("old saves and imports across modes", () => {
     useGame.getState().setGraphics({});
     useGame.getState().setGraphics({ quality: "medium" });
     expect(useGame.getState().graphics).toBe(before);
+  });
+  it("toggles mute at the saved volumes, and only unmutes a channel that has volume", () => {
+    useGame.getState().boot();
+    useGame.getState().setAudio({ music: 0, effects: 60 });
+    useGame.getState().toggleMute();
+    expect(useGame.getState().audio).toEqual({ music: 0, effects: 60, muted: true });
+    // Coming back leaves the music at the 0 the player chose.
+    useGame.getState().toggleMute();
+    expect(useGame.getState().audio).toEqual({ music: 0, effects: 60, muted: false });
+  });
+  it("brings the default volumes back when sound is turned on with both at 0, muted or not", () => {
+    useGame.getState().boot();
+    useGame.getState().setAudio({ music: 0, effects: 0 });
+    expect(isSilent(useGame.getState().audio)).toBe(true);
+    // Silent without the mute flag: one click must make sound, not just flip a flag nothing reads.
+    useGame.getState().toggleMute();
+    expect(useGame.getState().audio).toEqual(DEFAULT_AUDIO);
+    expect(loadAudio()).toEqual(DEFAULT_AUDIO);
+    useGame.getState().setAudio({ music: 0, effects: 0, muted: true });
+    useGame.getState().toggleMute();
+    expect(useGame.getState().audio).toEqual(DEFAULT_AUDIO);
   });
   it("clamps volumes to whole percents and ignores a change that changes nothing", () => {
     useGame.getState().boot();

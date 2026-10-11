@@ -44,12 +44,25 @@ it("leaves a replayed prevention milestone for the player in a legacy save inste
  const c=loaded.game.campaign!;
  expect(c.openingMilestone).toMatchObject({outcomeId:"opening-prevention",acknowledged:false});
  expect(c.dbCapacity).toBe(1000);expect(c.trace.filter(t=>t.type==="action-rejected"&&t.data.action==="start_db_upgrade")).toHaveLength(1);
+ expect(decodeSave(JSON.stringify(makeEnvelope(loaded.game))).status).toBe("ok");
 });
 it("preserves a partial streak, inspections and a pending review through reload",()=>{
  let g=inspecting(deadEnd());g=act(g,{type:"set_traffic_limit",enabled:false});g=advanceSteps(g,2).state;
  expect(saveGame(g)).toBe(true);let loaded=loadGame();if(loaded.status!=="ok")throw Error("load");expect(loaded.game.campaign).toEqual(g.campaign);
  g=advanceSteps(loaded.game,3).state;expect(saveGame(g)).toBe(true);loaded=loadGame();if(loaded.status!=="ok")throw Error("load");expect(loaded.game.campaign).toEqual(g.campaign);
  expect(advanceSteps(loaded.game,20).stepsConsumed).toBe(0);
+});
+it("rejects a current save that skips a required prevention review",()=>{
+ let g=inspecting(deadEnd());g=act(g,{type:"set_traffic_limit",enabled:false});g=advanceSteps(g,5).state;
+ const envelope=makeEnvelope(g);
+ expect(decodeSave(JSON.stringify(envelope)).status).toBe("ok");
+ expect(decodeSave(JSON.stringify({...envelope,step:envelope.step+1})).status).toBe("corrupt");
+ // A same-step action that was rejected during review must stay rejected when replayed.
+ g=act(g,{type:"acknowledge_prevention_review"});g=act(g,{type:"acknowledge_milestone"});
+ const acknowledged=makeEnvelope(g);
+ expect(decodeSave(JSON.stringify({...acknowledged,inputs:acknowledged.inputs.filter(i=>i.action.type!=="acknowledge_prevention_review")})).status).toBe("ok");
+ const skipped=decodeSave(JSON.stringify({...acknowledged,inputs:acknowledged.inputs.filter(i=>i.action.type!=="acknowledge_prevention_review")}));
+ if(skipped.status==="ok")expect(skipped.game.campaign!.openingPrevention!.outcome!.acknowledged).toBe(false);
 });
 it("does not count paused ticks, review reading or repeated acknowledgement",()=>{
  let g=inspecting(deadEnd());g=act(g,{type:"set_traffic_limit",enabled:false});g=advanceSteps(g,2).state;

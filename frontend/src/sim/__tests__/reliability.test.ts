@@ -40,6 +40,14 @@ it("conserves failed deliveries and charges existing installed infrastructure",(
 it("new spare is a real paid unrouted instance and keeps research ownership after release",()=>{
  let s=act(reliabilityCompany(),{type:"unlock_reliability",tech:"standby"});const cash=s.campaign!.cashCents;s=act(s,{type:"install_spare"});expect(s.campaign!.cashCents).toBe(cash-100000);s=tick(s,2);expect(s.campaign!.apps[3]).toMatchObject({role:"spare",routed:false,capacity:1000});s=tick(act(s,{type:"release_spare"}),1);expect(has(s,"standby")).toBe(true);expect(s.campaign!.reliabilityStage!.spareId).toBeNull();
 });
+it("rejects routing into an accepted spare reservation instead of crashing on activation",()=>{
+ let g=reliabilityCompany();g=act(g,{type:"unlock_reliability",tech:"standby"});
+ g=tick(act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2"]}));
+ g=act(g,{type:"reserve_spare",appId:"app-3"});const before=structuredClone(g);
+ expect(applyAction(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}).ok).toBe(false);
+ expect(g).toEqual(before);g=tick(g);expect(g.campaign!.apps[2].role).toBe("spare");
+ expect(g.campaign!.routing.targets).toEqual(["app-1","app-2"]);expect(replay(g)).toEqual(JSON.parse(JSON.stringify(g)));
+});
 it("replays and serializes deterministically across every fault/probe/promotion boundary",()=>{
  let s=act(preparedReliability(),{type:"arm_reliability"});for(let i=0;i<40&&!pendingReliability(s.campaign);i++){expect(replay(s),`step ${s.campaign!.step}`).toEqual(JSON.parse(JSON.stringify(s)));expect(tick(JSON.parse(JSON.stringify(s)))).toEqual(tick(s));if(s.phase==="review")s=act(s,{type:"acknowledge_review"});s=tick(s);}
  // This bounded case reconstructs up to 40 complete saves on CI, rather than advancing one state.
@@ -90,4 +98,38 @@ it("settles exact partial checks/failover exposure including disabled failover w
  const failover=Math.floor(((c.ledger.failoverNumerator??0)+(c.remainders.failover??0)+remaining*10000)/60);
  g=tick(g,remaining);const settlement=g.campaign!.settlements.at(-1)!;expect(settlement.checksCents).toBe(checks);expect(settlement.failoverCents).toBe(failover);
  const count=g.campaign!.settlements.length;g=tick(g);expect(g.campaign!.settlements).toHaveLength(count);
+});
+
+it.each([500,900])("evaluates %s req/s against 600 surviving capacity after detection",traffic=>{
+ // Isolate the plan's 2 × 600 example without retuning the inherited campaign economy.
+ let g=reliabilityCompany();g.campaign!.apps=g.campaign!.apps.slice(0,2);
+ g.campaign!.apps.forEach(a=>{a.capacity=600;a.tier="base";});
+ g.campaign!.routing.targets=["app-1","app-2"];g.campaign!.incomingRate=traffic;
+ g=act(g,{type:"unlock_reliability",tech:"health_checks"});g=tick(act(g,{type:"deploy_health_checks"}),2);
+ const original=structuredClone(g);g=tick(act(g,{type:"arm_reliability"}),9);
+ expect(original.campaign!.apps.every(a=>a.health==="healthy")).toBe(true);
+ expect(g.campaign!.snapshot.reliability!.effective).toEqual(["app-1"]);
+ expect(g.campaign!.snapshot.reliability!.healthyRoutedCapacity).toBe(600);
+ expect(g.campaign!.snapshot.instances![0]).toMatchObject({demand:traffic,capacity:600});
+ expect(g.campaign!.snapshot.app.backlog>0).toBe(traffic>600);
+ if(traffic===500){g=tick(g,5);expect(g.phase).toBe("management");expect(g.campaign!.incident).toBeNull();}
+ else {
+  g=tick(g,4);expect(g.phase).toBe("incident");expect(g.campaign!.incident!.stableSteps).toBe(0);
+  g=tick(act(g,{type:"set_traffic_limit",enabled:true}),25);
+  expect(g.phase).toBe("review");const report=g.campaign!.reports.at(-1)!;
+  expect(report.explanations.join(" ")).toContain("600 req/s against 900 req/s");
+  expect(report.explanations.join(" ")).toContain("correct rerouting still left the applications overloaded");
+  expect(report.explanations.join(" ")).not.toContain('"appId":');
+ }
+});
+
+it("real spare promotion cannot recover a service with insufficient surviving capacity",()=>{
+ // Three 600-capacity apps: two serving, one reserved. After promotion only 1,200 remains for 2,400 demand.
+ let g=preparedReliability();g.campaign!.apps.forEach(a=>{a.capacity=600;});
+ // Use a healthy lower-demand setup snapshot to arm before applying the load boundary.
+ g=act(g,{type:"arm_reliability"});g=tick(g,12);
+ expect(g.campaign!.routing.targets).toEqual(["app-1","app-3"]);
+ expect(g.campaign!.snapshot.reliability!.healthyRoutedCapacity).toBe(1200);
+ expect(g.campaign!.apps).toHaveLength(3);expect(g.phase).toBe("incident");
+ expect(g.campaign!.incident!.stableSteps).toBe(0);expect(g.campaign!.snapshot.app.backlog).toBeGreaterThan(0);
 });

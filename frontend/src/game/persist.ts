@@ -61,6 +61,9 @@ export interface AudioSettings {
 
 export const DEFAULT_AUDIO: AudioSettings = { music: 80, effects: 80, muted: false };
 
+/** Nothing would be heard: muted, or both volumes at 0. What the header button and the menu's Mute all show. */
+export const isSilent = (audio: AudioSettings): boolean => audio.muted || (audio.music === 0 && audio.effects === 0);
+
 /** How much the room is drawn with. Auto picks by what draws the canvas; the others are the player's choice. */
 export const GRAPHICS_QUALITIES = ["auto", "high", "medium", "low"] as const;
 export type GraphicsQuality = (typeof GRAPHICS_QUALITIES)[number];

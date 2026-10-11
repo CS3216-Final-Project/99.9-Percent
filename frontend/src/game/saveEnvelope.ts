@@ -65,10 +65,13 @@ export function validateEnvelope(value: unknown): Validation {
         const inputs = legacy || phase2 ? e.inputs.map(input => input.action.type === "acknowledge_milestone"
             ? {...input, action: {...input.action, enterScaling: false}} : input) : e.inputs;
         const foundation = legacy || phase2 ? {step:e.step, inputs:inputs.length} : e.foundation;
+        // Legacy replay may insert this review acknowledgement inside the retained foundation.
+        // It must remain replayable when that migrated run is saved under the current schema.
+        const foundationReliabilityActions = reliabilityActions.filter(type=>type!=="acknowledge_prevention_review");
         if(foundation && (!integer(foundation.step) || foundation.step>e.step || !integer(foundation.inputs) || foundation.inputs>inputs.length ||
-            inputs.slice(0,foundation.inputs).some(input=>input.step>foundation.step || ["enter_scaling","scale_up","deploy_load_balancer","set_routing",...dataActions,...spikeActions,...reliabilityActions].includes(input.action.type) ||
+            inputs.slice(0,foundation.inputs).some(input=>input.step>foundation.step || ["enter_scaling","scale_up","deploy_load_balancer","set_routing",...dataActions,...spikeActions,...foundationReliabilityActions].includes(input.action.type) ||
                 (input.action.type==="acknowledge_milestone" && input.action.enterScaling!==false)))) return {status:"corrupt"};
-        const game = replayCampaign(e.seed, e.runId, inputs, e.step, legacy, foundation);
+        const game = replayCampaign(e.seed, e.runId, inputs, e.step, legacy, foundation, e.schemaVersion !== SCHEMA_VERSION);
         if(legacy && game.campaign!.foundation)game.campaign!.foundation.inputs=game.campaign!.inputs.length;
         const measurement: Measurement = legacy
             ? {...emptyMeasurement(), origin:"phase1", runStarted:true, cursor:game.campaign!.trace.length}
