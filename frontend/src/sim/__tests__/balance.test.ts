@@ -90,3 +90,31 @@ describe("data-strategy financial alternatives",()=>{
   expect(nets[0]).toBeGreaterThan(nets[1]);expect(nets[1]).toBeGreaterThan(nets[2]);
  });
 });
+
+describe("traffic-spikes financial alternatives",()=>{
+ it("compares manual, automatic, limiting and hybrid choices on identical pulses",async()=>{
+  const {dataCompany,act,tick}=await import("./spikeFixtures");
+  const {pendingSpikeAcknowledgement}=await import("../autoscaling");
+  const rows=[];
+  const foundation=dataCompany();
+  for(const strategy of ["manual","automatic","limit","hybrid"] as const){
+   let g=act(foundation,{type:"enter_spikes"});const c=g.campaign!,start=c.cashCents,invested=c.investedCents,rejected=c.cumulative.rejected;
+   if(strategy==="manual"){g=tick(act(g,{type:"add_server"}),2);g=tick(act(g,{type:"scale_up",appId:"app-3"}),3);g=tick(act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}));}
+   if(strategy==="automatic"||strategy==="hybrid"){g=act(g,{type:"unlock_autoscaling"});g=tick(act(g,{type:"deploy_autoscaler"}),2);}
+   if(strategy==="limit"||strategy==="hybrid")g=tick(act(g,{type:"set_traffic_limit",enabled:true}));
+   while(!pendingSpikeAcknowledgement(g.campaign!)){if(g.phase==="review")g=act(g,{type:"acknowledge_review"});expect(g.phase).not.toBe("ended");expect(g.campaign!.step-c.spikeStage!.enteredStep).toBeLessThan(200);g=tick(g);expect(g.campaign!.apps.length).toBeLessThanOrEqual(4);}
+   expect(g.campaign!.spikeStage!.consumed).toHaveLength(4);expect(g.campaign!.cashCents).toBeGreaterThan(0);
+   rows.push({strategy,setup:g.campaign!.investedCents-invested,cashChange:g.campaign!.cashCents-start,rejected:g.campaign!.cumulative.rejected-rejected,controllerCost:g.campaign!.settlements.reduce((n,p)=>n+(p.controllerCents??0),0),completion:g.campaign!.step-c.spikeStage!.enteredStep});
+  }
+  console.log("Phase 5 matched pulses",rows);
+  expect(rows.find(r=>r.strategy==="manual")!.rejected).toBe(0);expect(rows.find(r=>r.strategy==="automatic")!.rejected).toBe(0);
+  expect(rows.find(r=>r.strategy==="limit")!.rejected).toBeGreaterThan(0);expect(rows.find(r=>r.strategy==="hybrid")!.setup).toBe(100000);
+  expect(rows.find(r=>r.strategy==="automatic")!.controllerCost).toBeGreaterThan(0);
+ }, 15_000);
+ it("write-heavy pressure survives automatic capacity and limiting still permits measured recovery",async()=>{
+  const {spikeCompany,untilOffset,act,tick}=await import("./spikeFixtures");const {pendingSpikeAcknowledgement}=await import("../autoscaling");
+  let g=untilOffset(spikeCompany(true,"write-heavy"),24);expect(g.campaign!.snapshot.db.demand).toBeGreaterThan(g.campaign!.dbCapacity);
+  g=act(g,{type:"set_traffic_limit",enabled:true});while(!pendingSpikeAcknowledgement(g.campaign!)){if(g.phase==="review")g=act(g,{type:"acknowledge_review"});expect(g.phase).not.toBe("ended");g=tick(g);}
+  expect(g.campaign!.cashCents).toBeGreaterThan(0);expect(g.campaign!.dbCapacity).toBe(3000);expect(g.campaign!.readCache!.target).toBe(6000);expect(g.campaign!.reports.at(-1)!.limited).toBe(true);
+ });
+});

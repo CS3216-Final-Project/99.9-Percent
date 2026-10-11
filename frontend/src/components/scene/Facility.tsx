@@ -26,7 +26,8 @@ import {
   tempSlot,
   type Footprint,
 } from "./layout";
-import { chooseDetail, DetailContext, detailOverride, useDetail, type Renderer } from "./detail";
+import { DetailContext, detailOverride, useDetail, type Renderer } from "./detail";
+import { resolveQuality, type QualityProfile } from "./quality";
 import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { Icon } from "../icons";
@@ -456,9 +457,12 @@ const INTERNET = "internet";
 const labelAt = new THREE.Vector2();
 /** A campaign run is on screen, which lays its labels out differently. */
 let inCampaign = false;
+let inSpikes = false;
+let campaignAppIds: string[] = [];
 
 function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprint> }) {
   const apps = useGame((s) => s.game.campaign?.apps);
+  const spikes = useGame((s) => !!s.game.campaign?.spikeStage);
 
   useEffect(() => {
     for (const id of EQUIPMENT_ORDER) {
@@ -466,7 +470,7 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
       anchors.set(id, new THREE.Vector3(f.x, f.h + 0.3, f.z));
     }
     anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, 1.35, AISLE_Z));
-    for (const id of ["app-1", "app-2"]) anchors.delete(id);
+    for (const id of anchors.keys()) if (/^app-/.test(id)) anchors.delete(id);
     if (apps) {
       apps.forEach((a, i) => {
         const p = appSlot(i);
@@ -474,7 +478,9 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
       });
     }
     inCampaign = !!apps;
-  }, [footprints, apps]);
+    inSpikes = spikes;
+    campaignAppIds = apps?.map(a => a.id) ?? [];
+  }, [footprints, apps, spikes]);
   return null;
 }
 
@@ -489,7 +495,14 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
     screenPoint(pos, camera, size.width, size.height, labelAt);
     let { x, y } = labelAt;
     // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
-    y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : key === "app-1" ? -10 : key === "app-2" ? 12 : 0;
+    const slot = campaignAppIds.indexOf(key);
+    y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : slot >= 0 ? slot * 22 - 10 : 0;
+    // The mobile bottom panel occupies at most 56% of the room. Spread the
+    // growing pool above it by slot order, even when permanent IDs have gaps.
+    if (inSpikes && slot >= 0 && size.width <= 900) {
+      y = Math.min(y, size.height * 0.40 - (campaignAppIds.length - 1 - slot) * 26);
+      x = Math.max(size.width * 0.78, Math.min(size.width - 65, x));
+    }
     if (key === "cache" && inCampaign && size.width <= 900) {
       y = Math.min(y, size.height * 0.32);
       x = Math.max(65, Math.min(size.width - 65, x));
@@ -550,7 +563,7 @@ function Labels() {
       {EQUIPMENT_ORDER.filter((id) => m.opening ? ["gateway","app","db","monitoring",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={a.id==="app-1"?"App 1":"App 2"} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{a.id==="app-1"?"App 1":"App 2"}<span className="eq-note">{a.routed?"routed":"unrouted"}</span></button>)}
+      {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.routed?"routed":"unrouted"}</span></button>)}
     </div>
   );
 }
@@ -668,7 +681,8 @@ function Effects() {
   );
 }
 
-function Scene({ effects }: { effects: boolean }) {
+function Scene({ quality }: { quality: QualityProfile }) {
+  const effects = quality.effects;
   const m = useSceneModel();
   const campaign = useGame(s => s.game.campaign);
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
@@ -696,10 +710,10 @@ function Scene({ effects }: { effects: boolean }) {
         position={[11, 17, 7]}
         intensity={2.3}
         color="#fff1de"
-        castShadow
-        // HD gets a sharper map with softened edges.
-        shadow-mapSize={hd ? [4096, 4096] : [2048, 2048]}
-        shadow-radius={hd ? 3 : 1}
+        castShadow={quality.shadows}
+        // The shadow map's sharpness and edge softness come from the quality setting.
+        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
+        shadow-radius={quality.shadowRadius}
         shadow-bias={-0.0005}
         shadow-camera-left={-30}
         shadow-camera-right={30}
@@ -722,7 +736,7 @@ function Scene({ effects }: { effects: boolean }) {
       {/* App servers */}
       {m.hosts.slice(0, 12).map((led, i) => {
         const p = appSlot(i);
-        return <group key={i} onClick={e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",`app-${i+1}`);}}}><Rack x={p.x} z={p.z} led={led} /></group>;
+        return <group key={i} onClick={e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",campaign?.apps[i]?.id??`app-${i+1}`);}}}><Rack x={p.x} z={p.z} led={led} /></group>;
       })}
       {Array.from({ length: m.temp }, (_, i) => {
         const p = tempSlot(i);
@@ -838,42 +852,41 @@ function isSoftwareRenderer(gl: THREE.WebGLRenderer): boolean {
   return /swiftshader|llvmpipe|software|softpipe|basic render/i.test(name);
 }
 
-/** Software rendering cannot keep up with 60 frames a second, so it draws 20. */
-const SOFTWARE_FPS = 20;
-
-/** In on-demand mode, ask for a new frame 20 times a second. */
-function SoftwareFrames() {
+/** In on-demand mode, ask for a new frame `fps` times a second. */
+function FrameLimiter({ fps }: { fps: number }) {
   const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
-    const id = window.setInterval(() => invalidate(), 1000 / SOFTWARE_FPS);
+    const id = window.setInterval(() => invalidate(), 1000 / fps);
     return () => window.clearInterval(id);
-  }, [invalidate]);
+  }, [invalidate, fps]);
   return null;
 }
 
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
   const [renderer, setRenderer] = useState<Renderer>("unknown");
-  /** Drawing in software, without a GPU: no shadows, half the pixels, 20 frames a second. */
-  const soft = renderer === "software";
   const [override] = useState(() => detailOverride(window.location.search));
-  const detail = chooseDetail(renderer, override);
+  const chosen = useGame((s) => s.graphics.quality);
+  // Without a graphics card the browser draws on the CPU. Auto keeps that playable: no shadows, half the pixels
+  // (labels and the interface are HTML and stay sharp) and 20 frames a second. A GPU gets HD detail: photo
+  // textures, physically based shading and reflections. The player can pick a quality instead (see the menu).
+  const quality = resolveQuality(chosen, renderer, override);
+  const capped = quality.fps !== null;
   return (
     <div className="stage-canvas" ref={container}>
+      {/* Shadow maps cannot be resized or switched on and off once materials are compiled, so a new quality starts a new canvas. */}
       <Canvas
+        key={chosen}
         orthographic
-        shadows={soft ? false : "percentage"}
-        dpr={soft ? 0.5 : [1, 1.75]}
-        frameloop={soft ? "demand" : "always"}
+        shadows={quality.shadows ? "percentage" : false}
+        dpr={quality.dpr}
+        frameloop={capped ? "demand" : "always"}
         // How strongly the HD environment lights materials; without one it has no effect.
         scene={{ environmentIntensity: HD_REFLECTIONS }}
         onCreated={({ gl }) => {
-          // Without a graphics card the browser draws on the CPU. Keep it playable: no shadows, half the pixels
-          // (labels and the interface are HTML and stay sharp) and 20 frames a second. A GPU keeps full quality.
-          // A GPU also gets HD detail: photo textures, physically based shading and reflections.
           const software = isSoftwareRenderer(gl);
-          // Before the first frame, so no material is ever compiled with shadows.
-          if (software) gl.shadowMap.enabled = false;
+          // Before the first frame, so no material is ever compiled with shadows that are not wanted.
+          if (!resolveQuality(chosen, software ? "software" : "gpu", override).shadows) gl.shadowMap.enabled = false;
           setRenderer(software ? "software" : "gpu");
         }}
         camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: CAMERA_NEAR, far: CAMERA_FAR }}
@@ -884,11 +897,11 @@ export default function Facility() {
       >
         {/* The room waits until the renderer is known, so a GPU never compiles the basic materials only to replace them. */}
         {renderer !== "unknown" && (
-          <DetailContext.Provider value={detail}>
-            <Scene effects={detail === "hd" && !soft} />
+          <DetailContext.Provider value={quality.detail}>
+            <Scene quality={quality} />
           </DetailContext.Provider>
         )}
-        {soft && <SoftwareFrames />}
+        {quality.fps !== null && <FrameLimiter fps={quality.fps} />}
       </Canvas>
       <Labels />
       <HoverTip container={container} />

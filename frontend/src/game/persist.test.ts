@@ -4,7 +4,7 @@ import { step, advanceSteps } from "../sim/step";
 import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics, saveClassicGame, loadClassicGame } from "./persist";
 import { CAMPAIGN_SAVE_KEY as KEY, makeEnvelope } from "./saveEnvelope";
 import { decodeClassicSave, rawLegacySave, exportGame } from "./persist";
-import { DEFAULT_AUDIO, legacyMusicOff, loadAudio, saveAudio, saveMode } from "./persist";
+import { DEFAULT_AUDIO, DEFAULT_GRAPHICS, isSilent, legacyMusicOff, loadAudio, loadGraphics, saveAudio, saveGraphics, saveMode } from "./persist";
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 describe("campaign data preservation", () => {
@@ -126,6 +126,15 @@ describe("sound settings", () => {
     expect(loadAudio()).toEqual({ music: 35, effects: 0, muted: true });
   });
 
+  it("count as silent when muted or when both volumes are at 0, and not otherwise", () => {
+    expect(isSilent(DEFAULT_AUDIO)).toBe(false);
+    expect(isSilent({ ...DEFAULT_AUDIO, muted: true })).toBe(true);
+    expect(isSilent({ music: 0, effects: 0, muted: false })).toBe(true);
+    // One audible channel is enough to be heard.
+    expect(isSilent({ music: 0, effects: 5, muted: false })).toBe(false);
+    expect(isSilent({ music: 5, effects: 0, muted: false })).toBe(false);
+  });
+
   it("keep a player who turned the music off muted, at the default volumes", () => {
     localStorage.setItem("nn.music.v1", "false");
     expect(loadAudio()).toEqual({ ...DEFAULT_AUDIO, muted: true });
@@ -184,5 +193,28 @@ describe("sound settings", () => {
     // Music at zero mirrors the old switch as off, but that is the player's new choice, not the old one.
     saveAudio({ music: 0, effects: 80, muted: false });
     expect(legacyMusicOff()).toBe(false);
+  });
+});
+
+describe("graphics settings", () => {
+  it("start at Auto and round trip, shared by both modes", () => {
+    expect(DEFAULT_GRAPHICS).toEqual({ quality: "auto" });
+    expect(loadGraphics()).toEqual(DEFAULT_GRAPHICS);
+    expect(saveGraphics({ quality: "low" })).toBe(true);
+    expect(loadGraphics()).toEqual({ quality: "low" });
+    saveMode("classic");
+    expect(loadGraphics()).toEqual({ quality: "low" });
+  });
+
+  it.each(["{", "null", "42", JSON.stringify({}), JSON.stringify({ quality: "ultra" }), JSON.stringify({ quality: 3 })])("fall back to Auto for a corrupt value %s", (raw) => {
+    localStorage.setItem("nn.graphics.v1", raw);
+    expect(loadGraphics()).toEqual(DEFAULT_GRAPHICS);
+  });
+
+  it("fall back to Auto when storage is unavailable, and report a save that did not stick", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("blocked"); });
+    expect(loadGraphics()).toEqual(DEFAULT_GRAPHICS);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
+    expect(saveGraphics({ quality: "medium" })).toBe(false);
   });
 });

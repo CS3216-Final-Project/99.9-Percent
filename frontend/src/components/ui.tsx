@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { BALANCE, releaseRisk, taskEta, testEffort, type GameState, type Release, type Task } from "@/sim";
 import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
@@ -314,6 +314,93 @@ export function ReleaseRow({ game, release }: { game: GameState; release: Releas
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+export interface TabItem<Id extends string> {
+  id: Id;
+  label: string;
+  icon: IconName;
+}
+
+/**
+ * A row of tabs with the panel of the selected one beneath it. The caller passes only the selected tab's
+ * content as `children`, so a section that is not on screen is not mounted and forgets any half-finished
+ * choice (a pending confirmation, a chosen file). Arrow keys, Home and End move between tabs, and the
+ * selected tab is the only one in the Tab order.
+ */
+export function Tabs<Id extends string>({
+  label,
+  tabs,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  tabs: TabItem<Id>[];
+  value: Id;
+  onChange: (id: Id) => void;
+  children: ReactNode;
+}) {
+  const base = useId();
+  const buttons = useRef(new Map<Id, HTMLButtonElement>());
+  const select = (index: number) => {
+    const tab = tabs[(index + tabs.length) % tabs.length];
+    onChange(tab.id);
+    buttons.current.get(tab.id)?.focus();
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const at = tabs.findIndex((t) => t.id === value);
+    let target: number;
+    switch (e.key) {
+      case "ArrowRight":
+        target = at + 1;
+        break;
+      case "ArrowLeft":
+        target = at - 1;
+        break;
+      case "Home":
+        target = 0;
+        break;
+      case "End":
+        target = tabs.length - 1;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    select(target);
+  };
+  return (
+    <div className="tabset">
+      <div className="tab-strip" role="tablist" aria-label={label} onKeyDown={onKeyDown}>
+        {tabs.map((t) => (
+          <button
+            type="button"
+            key={t.id}
+            ref={(el) => {
+              if (el) buttons.current.set(t.id, el);
+              else buttons.current.delete(t.id);
+            }}
+            role="tab"
+            id={`${base}-tab-${t.id}`}
+            aria-selected={t.id === value}
+            // Only the selected tab's panel is in the page.
+            aria-controls={t.id === value ? `${base}-panel-${t.id}` : undefined}
+            tabIndex={t.id === value ? 0 : -1}
+            className={t.id === value ? "is-active" : ""}
+            onClick={() => onChange(t.id)}
+          >
+            <Icon name={t.icon} size={20} />
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="tab-panel" role="tabpanel" id={`${base}-panel-${value}`} aria-labelledby={`${base}-tab-${value}`}>
+        {children}
+      </div>
     </div>
   );
 }

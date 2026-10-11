@@ -27,14 +27,14 @@ export function SaveFiles() {
     if (fileInput.current) fileInput.current.value = "";
   };
   return <section className="menu-section" aria-label="Save files">
-    <h4><Icon name="save" size={16} />Save files</h4>
+    <h4><Icon name="save" size={20} />Save files</h4>
     <p className="menu-note">Export a file to keep a backup or continue on another browser. Campaign and Classic files open in their matching mode.</p>
     <div className="menu-actions">
       <button type="button" className="btn" onClick={() => download(`${mode}.json`, exportGame(game, remainderMs, measurement))}>
-        <Icon name="download" size={16} />{mode === "campaign" ? "Export current company" : "Export current run"}</button>
+        <Icon name="download" size={20} />{mode === "campaign" ? "Export current company" : "Export current run"}</button>
       <button type="button" className="btn" disabled={rawSave(mode) === null} onClick={() => download(`stored-${mode}.json`, rawSave(mode) ?? "null")}>
-        <Icon name="copy" size={16} />Export original stored save</button>
-      <button type="button" className="btn" onClick={() => fileInput.current?.click()}><Icon name="upload" size={16} />Import save</button>
+        <Icon name="copy" size={20} />Export original stored save</button>
+      <button type="button" className="btn" onClick={() => fileInput.current?.click()}><Icon name="upload" size={20} />Import save</button>
     </div>
     <input ref={fileInput} type="file" accept=".json,application/json" hidden aria-label="Save file to import"
       onChange={e => void pickImport(e.target.files?.[0])} />
@@ -46,8 +46,8 @@ export function SaveFiles() {
       <h5 id={legacyTitle}>Pre-update save</h5>
       <p className="menu-note">Your original save is preserved. Resume a copy in Classic or export the original file.</p>
       <div className="menu-actions">
-        <button type="button" className="btn" onClick={() => download("pre-update-save.json", legacy)}><Icon name="download" size={16} />Export pre-update save</button>
-        <button type="button" className="btn" onClick={() => { setConfirmLegacy(true); setPending(null); }}><Icon name="play" size={16} />Resume pre-update save</button>
+        <button type="button" className="btn" onClick={() => download("pre-update-save.json", legacy)}><Icon name="download" size={20} />Export pre-update save</button>
+        <button type="button" className="btn" onClick={() => { setConfirmLegacy(true); setPending(null); }}><Icon name="play" size={20} />Resume pre-update save</button>
       </div>
       {confirmLegacy && <div className="menu-confirm">
         <p>This replaces the saved Classic run with a copy of your pre-update save. Export your Classic run first if you want to keep it. Your original pre-update save remains unchanged.</p>

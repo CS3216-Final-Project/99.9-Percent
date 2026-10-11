@@ -3121,7 +3121,7 @@ button:disabled {
 .menu-run-title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: 1.35rem;
 }
 
 .menu-run-stats {
@@ -3156,7 +3156,7 @@ button:disabled {
 
 .menu-run-stats dt {
   font-family: var(--font-num);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -3167,13 +3167,14 @@ button:disabled {
   margin: 0;
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   white-space: nowrap;
 }
 
 .menu-seed {
   margin: 10px 0 0;
-  font-size: 0.84rem;
+  font-size: 1rem;
+  line-height: 1.4;
   color: var(--on-night-soft);
 }
 
@@ -3231,12 +3232,12 @@ button:disabled {
 
 .menu-tile-body strong {
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: 1.25rem;
 }
 
 .menu-tile-body span {
-  font-size: 0.84rem;
-  line-height: 1.3;
+  font-size: 1rem;
+  line-height: 1.35;
   color: var(--text-soft);
 }
 
@@ -3250,7 +3251,7 @@ button:disabled {
 
 /* The menu: run card, Resume and the run tiles across the top, then two columns of sections. */
 .modal-menu {
-  width: min(860px, 100%);
+  width: min(920px, 100%);
 }
 
 .modal-menu > .modal-body > .callout + .callout {
@@ -3281,7 +3282,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   margin: 12px 0 8px;
-  font-size: 1.05rem;
+  font-size: 1.3rem;
 }
 
 .menu-section-head {
@@ -3294,7 +3295,8 @@ button:disabled {
 .menu-section > p,
 .menu-note {
   margin: 0 0 10px;
-  font-size: 0.92rem;
+  font-size: 1.05rem;
+  line-height: 1.45;
   color: var(--text-soft);
 }
 
@@ -3335,7 +3337,8 @@ button:disabled {
 
 .menu-confirm p {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 1.05rem;
+  line-height: 1.45;
 }
 
 .menu-confirm .btn-row {
@@ -3353,7 +3356,7 @@ button:disabled {
 .menu-sub h5 {
   margin: 0 0 6px;
   font-family: var(--font-display);
-  font-size: 0.95rem;
+  font-size: 1.15rem;
 }
 
 /* Starting over replaces the run: set apart, in the colours of a warning. */
@@ -3380,19 +3383,21 @@ button:disabled {
 
 .volume {
   display: grid;
-  grid-template-columns: 7.5rem minmax(0, 1fr) 3.2rem;
+  grid-template-columns: 9.5rem minmax(0, 1fr) 3.6rem;
   align-items: center;
   gap: 12px;
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .volume label {
   font-family: var(--font-display);
   font-weight: 600;
+  font-size: 1.15rem;
 }
 
 .volume output {
   font-family: var(--font-num);
+  font-size: 1.1rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -3481,7 +3486,7 @@ button:disabled {
 
   .menu-run-stats dd {
     grid-column: 1 / -1;
-    font-size: 1rem;
+    font-size: 1.15rem;
   }
 
   .menu-grid {
@@ -3495,12 +3500,254 @@ button:disabled {
   }
 
   .volume {
-    grid-template-columns: minmax(0, 1fr) 3.2rem;
+    grid-template-columns: minmax(0, 1fr) 3.6rem;
     row-gap: 0;
   }
 
   .volume label {
     grid-column: 1 / -1;
+  }
+}
+
+/*
+ * The menu is read at arm's length, not at a glance, so its text is larger than the rest of the interface.
+ * The big Resume button keeps its own size.
+ */
+.modal-menu .btn:not(.btn-big) {
+  padding: 10px 16px;
+  font-size: 1.15rem;
+}
+
+.modal-menu .btn-small:not(.btn-big) {
+  padding: 7px 12px;
+  font-size: 1.05rem;
+}
+
+.modal-menu .field {
+  font-size: 1.05rem;
+}
+
+.modal-menu .field input {
+  padding: 11px 13px;
+  font-size: 1.05rem;
+}
+
+.modal-menu .callout-text,
+.modal-menu .callout-compact .callout-text {
+  font-size: 1.05rem;
+}
+
+.modal-menu .callout-kicker {
+  font-size: 0.85rem;
+}
+
+.modal-menu .tag {
+  font-size: 1rem;
+}
+
+.modal-menu .more > summary {
+  font-size: 1.1rem;
+}
+
+.modal-menu .row {
+  font-size: 1.05rem;
+}
+
+/* Tabs: a strip of chunky buttons, the selected one dark. Only the selected tab's panel is in the page. */
+.tabset {
+  margin-top: 14px;
+}
+
+/* Tabs change the menu's height, so it hangs from the top: the tab strip stays where the pointer left it. */
+.modal-backdrop:has(> .modal-menu) {
+  align-items: start;
+  padding-top: clamp(18px, 5vh, 56px);
+}
+
+.modal-menu {
+  max-height: calc(100dvh - clamp(18px, 5vh, 56px) - 18px);
+}
+
+.tab-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding-bottom: 14px;
+  border-bottom: 3px solid var(--ink);
+}
+
+.tab-strip button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 6px;
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--press);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  transition:
+    transform 0.05s,
+    box-shadow 0.05s;
+}
+
+.tab-strip button .icon {
+  flex: none;
+}
+
+.tab-strip button:hover:not(.is-active) {
+  background: #fff;
+}
+
+.tab-strip button.is-active {
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 0 0 0 0 var(--ink);
+  transform: translateY(3px);
+}
+
+.tab-strip button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tab-panel {
+  padding-top: 4px;
+}
+
+/* The first section of a tab starts the panel, so it needs no divider above it. */
+.tab-panel .menu-section:first-child {
+  margin-top: 0;
+}
+
+.tab-panel .menu-section:first-child:not(.menu-danger) {
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Graphics: one card per quality, picked like radio buttons. */
+.quality-options {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 12px;
+}
+
+@media (min-width: 640px) {
+  .quality-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.quality-option {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+
+.quality-option input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.quality-body {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  height: 100%;
+  padding: 12px 14px 12px 50px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: var(--press);
+}
+
+/* The round marker: empty, or filled when chosen, so the choice does not rely on colour. */
+.quality-body::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 24px;
+  height: 24px;
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+}
+
+.quality-option:hover .quality-body {
+  background: #fff;
+}
+
+.quality-option input:checked + .quality-body {
+  background: #fff3b8;
+  border-width: 3px;
+  padding: 11px 13px 11px 49px;
+}
+
+.quality-option input:checked + .quality-body::before {
+  left: 13px;
+  top: 13px;
+  background: var(--ink);
+  box-shadow: inset 0 0 0 4px #fff;
+}
+
+.quality-option input:focus-visible + .quality-body {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.quality-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 10px;
+}
+
+.quality-head strong {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+
+.quality-hint {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.quality-text {
+  font-size: 1.02rem;
+  line-height: 1.4;
+  color: var(--text-soft);
+}
+
+@media (max-width: 759px) {
+  /* Narrow screens: five tabs in two rows, icon above its label, so every label stays full size. */
+  .tab-strip {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .tab-strip button {
+    flex-direction: column;
+    gap: 2px;
+    min-height: 56px;
+    padding: 6px 2px;
+    font-size: 1.1rem;
   }
 }
 

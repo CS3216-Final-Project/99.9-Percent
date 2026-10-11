@@ -1,4 +1,5 @@
 import { useId, type CSSProperties } from "react";
+import { isSilent } from "@/game/persist";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 
@@ -31,22 +32,24 @@ export function SoundSettings() {
   const audio = useGame((s) => s.audio);
   const setAudio = useGame((s) => s.setAudio);
   const toggleMute = useGame((s) => s.toggleMute);
+  // The same reading as the header button, so the two never disagree.
+  const silent = isSilent(audio);
   return (
     <section className={`menu-section menu-sound${audio.muted ? " is-muted" : ""}`} aria-label="Sound">
       <div className="menu-section-head">
         <h4>
-          <Icon name={audio.muted ? "muted" : "music"} size={16} />
+          <Icon name={silent ? "muted" : "music"} size={20} />
           Sound
         </h4>
-        <button type="button" className={`btn btn-small menu-toggle${audio.muted ? " is-on" : ""}`} aria-pressed={audio.muted} onClick={toggleMute}>
-          <Icon name="muted" size={16} />
+        <button type="button" className={`btn btn-small menu-toggle${silent ? " is-on" : ""}`} aria-pressed={silent} onClick={toggleMute}>
+          <Icon name="muted" size={20} />
           Mute all
         </button>
       </div>
       {/* Moving a slider means the player wants to hear it, so it also unmutes. */}
       <Volume label="Music" value={audio.music} onChange={(music) => setAudio({ music, muted: false })} />
       <Volume label="Sound effects" value={audio.effects} onChange={(effects) => setAudio({ effects, muted: false })} />
-      <p className="menu-note muted">{audio.muted ? "Muted. Moving a slider turns sound back on." : "Effects play a sample as you set them."}</p>
+      <p className="menu-note muted">{audio.muted ? "Muted. Moving a slider turns sound back on." : silent ? "Both volumes are at 0. Raise one to hear sound." : "Effects play a sample as you set them."}</p>
     </section>
   );
 }

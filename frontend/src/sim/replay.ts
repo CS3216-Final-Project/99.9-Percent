@@ -1,3 +1,4 @@
+import { pendingSpikeAcknowledgement } from "./autoscaling";
 import type { GameState } from "./types";
 import type { CampaignInput } from "./campaignTypes";
 import { newGame } from "./state";
@@ -41,7 +42,7 @@ function advanceTo(s: GameState, target: number): void {
     if (s.campaign!.step > target)
         throw new Error("Inputs are out of order");
     while (s.campaign!.step < target) {
-        if (s.phase === "review" || s.phase === "ended")
+        if (s.phase === "review" || s.phase === "ended" || pendingSpikeAcknowledgement(s.campaign))
             throw new Error("The run cannot advance past a review or bankruptcy");
         stepInPlace(s);
     }

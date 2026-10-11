@@ -6,6 +6,8 @@ import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { GraphicsSettings } from "./GraphicsSettings";
+import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { ModeSwitch } from "./ModeSwitch";
 import { SaveFiles } from "./SaveFiles";
 import { SoundSettings } from "./SoundSettings";
@@ -281,7 +283,7 @@ export function EndReport() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Menu: the run, sound, save files, mode, starting over, playtest data */
+/* Menu: the run above tabs for the run, sound, graphics, saves and playtest data */
 /* ------------------------------------------------------------------ */
 
 function summarise(events: AnalyticsEvent[]) {
@@ -321,6 +323,7 @@ export function Menu() {
   const showOnboarding = useGame((s) => s.showOnboarding);
   const startTutorialRun = useGame((s) => s.startTutorialRun);
   const notify = useGame((s) => s.notify);
+  const [tab, setTab] = useState<MenuTab>("run");
   const [seed, setSeed] = useState("");
   const [confirm, setConfirm] = useState<"new" | "reset" | "tutorial" | null>(null);
   const [events, setEvents] = useState<AnalyticsEvent[]>(readAnalytics);
@@ -358,6 +361,12 @@ export function Menu() {
       This replaces your week {week} run. Press the red button again to confirm.
     </Callout>
   );
+
+  // A confirmation belongs to the control that asked for it, so it does not wait on another tab.
+  const goTo = (next: MenuTab) => {
+    setConfirm(null);
+    setTab(next);
+  };
 
   return (
     <Modal title="Menu" onClose={close} icon={{ kind: "go", name: "menu" }} className="modal-menu">
@@ -398,72 +407,88 @@ export function Menu() {
         Resume
       </button>
 
-      <div className="menu-grid" role="group" aria-label="Run">
-        <MenuTile icon="save" kind="ok" title="Save now" text="Write this run to the browser." onClick={saveNow} />
-        <MenuTile icon="info" kind="users" title="How to play" text="The rules on one card." onClick={showOnboarding} />
-        <MenuTile icon="robot" kind="go" title={label("tutorial", "Tutorial")} text="Replay the guided first week." danger={confirm === "tutorial"} onClick={() => start("tutorial")} />
-      </div>
-      {confirm === "tutorial" && warning}
+      <MenuTabs value={tab} onChange={goTo}>
+        {tab === "run" && (
+          <>
+            <div className="menu-grid" role="group" aria-label="Run">
+              <MenuTile icon="save" kind="ok" title="Save now" text="Write this run to the browser." onClick={saveNow} />
+              <MenuTile icon="info" kind="users" title="How to play" text="The rules on one card." onClick={showOnboarding} />
+              <MenuTile icon="robot" kind="go" title={label("tutorial", "Tutorial")} text="Replay the guided first week." danger={confirm === "tutorial"} onClick={() => start("tutorial")} />
+            </div>
+            {confirm === "tutorial" && warning}
+            <ModeSwitch to="campaign" />
+          </>
+        )}
 
-      <div className="menu-columns">
-        <div className="menu-col">
-          <SoundSettings />
-          <SaveFiles />
-        </div>
-        <div className="menu-col">
-          <ModeSwitch to="campaign" />
-          <section className="menu-section menu-danger" aria-label="Start over">
+        {tab === "sound" && <SoundSettings />}
+
+        {tab === "graphics" && <GraphicsSettings />}
+
+        {tab === "saves" && (
+          <div className="menu-columns">
+            <div className="menu-col">
+              <SaveFiles />
+            </div>
+            <div className="menu-col">
+              <section className="menu-section menu-danger" aria-label="Start over">
+                <h4>
+                  <Icon name="refresh" size={20} />
+                  Start over
+                </h4>
+                <label className="field">
+                  <span>Seed (optional): leave empty for a random run.</span>
+                  <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
+                </label>
+                <div className="menu-actions">
+                  <button type="button" className={`btn${confirm === "new" ? " btn-danger" : ""}`} onClick={() => start("new")}>
+                    <Icon name="play" size={20} />
+                    {label("new", "New game")}
+                  </button>
+                  <button type="button" className={`btn${confirm === "reset" ? " btn-danger" : ""}`} onClick={() => start("reset")}>
+                    <Icon name="refresh" size={20} />
+                    {label("reset", "Reset to first run")}
+                  </button>
+                </div>
+                {(confirm === "new" || confirm === "reset") && warning}
+              </section>
+            </div>
+          </div>
+        )}
+
+        {tab === "playtest" && (
+          <section className="menu-section" aria-label="Playtest data">
             <h4>
-              <Icon name="refresh" size={16} />
-              Start over
+              <Icon name="analytics" size={20} />
+              Playtest data ({events.length} events)
             </h4>
-            <label className="field">
-              <span>Seed (optional): leave empty for a random run.</span>
-              <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
-            </label>
-            <div className="menu-actions">
-              <button type="button" className={`btn${confirm === "new" ? " btn-danger" : ""}`} onClick={() => start("new")}>
-                <Icon name="play" size={16} />
-                {label("new", "New game")}
+            <p className="menu-note">Kept in this browser only.</p>
+            <dl className="rows">
+              {summarise(events).map(([k, v]) => (
+                <div className="row" key={k}>
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="btn-row">
+              <button type="button" className="btn" onClick={copy} disabled={events.length === 0}>
+                Copy as JSON
               </button>
-              <button type="button" className={`btn${confirm === "reset" ? " btn-danger" : ""}`} onClick={() => start("reset")}>
-                <Icon name="refresh" size={16} />
-                {label("reset", "Reset to first run")}
+              <button
+                type="button"
+                className="btn btn-quiet"
+                disabled={events.length === 0}
+                onClick={() => {
+                  clearAnalytics();
+                  setEvents([]);
+                }}
+              >
+                Clear
               </button>
             </div>
-            {(confirm === "new" || confirm === "reset") && warning}
           </section>
-        </div>
-      </div>
-
-      <details className="more">
-        <summary>Playtest data ({events.length} events)</summary>
-        <p className="muted">Kept in this browser only.</p>
-        <dl className="rows">
-          {summarise(events).map(([k, v]) => (
-            <div className="row" key={k}>
-              <dt>{k}</dt>
-              <dd>{v}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="btn-row">
-          <button type="button" className="btn" onClick={copy} disabled={events.length === 0}>
-            Copy as JSON
-          </button>
-          <button
-            type="button"
-            className="btn btn-quiet"
-            disabled={events.length === 0}
-            onClick={() => {
-              clearAnalytics();
-              setEvents([]);
-            }}
-          >
-            Clear
-          </button>
-        </div>
-      </details>
+        )}
+      </MenuTabs>
     </Modal>
   );
 }

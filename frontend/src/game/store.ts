@@ -1,4 +1,5 @@
 "use client";
+import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
 import { advanceSteps, applyCampaignInput } from "@/sim/step";
@@ -24,10 +25,14 @@ import {
   rawLegacySave,
   legacyMusicOff,
   loadAudio,
+  loadGraphics,
   loadLegacyMeta,
   saveAudio,
+  saveGraphics,
   DEFAULT_AUDIO,
+  DEFAULT_GRAPHICS,
   DEFAULT_META,
+  isSilent,
   loadClassicGame,
   loadGame,
   loadMeta,
@@ -37,8 +42,10 @@ import {
   saveMeta,
   saveMode,
   track,
+  GRAPHICS_QUALITIES,
   type AudioSettings,
   type GameMode,
+  type GraphicsSettings,
   type Meta,
 } from "./persist";
 import { decodeSave } from "./saveEnvelope";
@@ -127,6 +134,8 @@ interface Store {
   meta: Meta;
   /** Sound settings, shared by both modes and kept across mode switches. */
   audio: AudioSettings;
+  /** Graphics settings, shared by both modes and kept across mode switches. */
+  graphics: GraphicsSettings;
   selected: EquipmentId | null;
   selectedAppId: string | null;
   selectApp: (id: string) => void;
@@ -175,8 +184,10 @@ interface Store {
   rate: (rating: number) => void;
   /** Change the sound settings, remembered for next time. Volumes are clamped to 0–100. */
   setAudio: (patch: Partial<AudioSettings>) => void;
-  /** Silence music and effects, or bring them back at their volumes. */
+  /** Silence music and effects, or bring them back at their volumes. With both volumes at 0 there is nothing to bring back, so they return to the defaults. */
   toggleMute: () => void;
+  /** Change the graphics settings, remembered for next time. An unknown quality is ignored. */
+  setGraphics: (patch: Partial<GraphicsSettings>) => void;
   notify: (text: string, kind?: Toast["kind"]) => void;
   dismissToast: () => void;
 }
@@ -214,7 +225,8 @@ export const useGame = create<Store>()((set, get) => {
       const was=prev.campaign, c=next.campaign;
       const patch:Partial<Store>={game:next};
       if(!was?.firstPauseConsumed && c.firstPauseConsumed)patch.running=false;
-      if(next.phase==="review"||next.phase==="ended"||(c.openingMilestone&&!c.openingMilestone.acknowledged))patch.running=false;
+      if(get().selectedAppId&&!c.apps.some(a=>a.id===get().selectedAppId))patch.selectedAppId=c.apps[0].id;
+      if(pendingSpikeAcknowledgement(c)||next.phase==="review"||next.phase==="ended"||(c.openingMilestone&&!c.openingMilestone.acknowledged))patch.running=false;
       get().measureTime();
       patch.measurement=projectEvents(get().measurement,next,new Date().toISOString());
       set(patch);
@@ -453,6 +465,7 @@ export const useGame = create<Store>()((set, get) => {
     lastAction: null,
     meta: loadMetaSafe(),
     audio: loadAudioSafe(),
+    graphics: loadGraphicsSafe(),
     selected: null,
     selectedAppId: null,
     selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({selected:"app",selectedAppId:id}); },
@@ -469,7 +482,7 @@ export const useGame = create<Store>()((set, get) => {
     boot: () => {
       if (get().ready) return;
       // Read once here, not on every mode switch: if storage fails, the in-memory settings are the ones to keep.
-      set({ audio: loadAudio() });
+      set({ audio: loadAudio(), graphics: loadGraphics() });
       enter(loadMode(), false);
     },
 
@@ -529,12 +542,13 @@ export const useGame = create<Store>()((set, get) => {
 
 
     act: (action) => {
+      if(pendingSpikeAcknowledgement(get().game.campaign) && action.type!=="acknowledge_spikes")return false;
       if(get().game.campaign && (!get().started || get().onboarding || (get().game.campaign!.openingMilestone && !get().game.campaign!.openingMilestone!.acknowledged && action.type !== "acknowledge_milestone"))) return false;
       const record = (ok: boolean) => set({ lastAction: { id: actionId++, type: action.type, ok } });
       if (get().game.campaign) {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
-        if (result.ok && action.type === "enter_data") set({running:false});
+        if (result.ok && ["enter_data", "enter_spikes", "acknowledge_spikes"].includes(action.type)) set({running:false});
         record(result.ok);
         commit(state);
         if (!result.ok) get().notify(result.message, "error");
@@ -552,7 +566,7 @@ export const useGame = create<Store>()((set, get) => {
 
     advance: () => {
       const { game } = get();
-      if (game.phase !== "management" || (game.campaign && (!get().started || get().onboarding || (game.campaign.openingMilestone && !game.campaign.openingMilestone.acknowledged)))) return;
+      if (pendingSpikeAcknowledgement(game.campaign) || game.phase !== "management" || (game.campaign && (!get().started || get().onboarding || (game.campaign.openingMilestone && !game.campaign.openingMilestone.acknowledged)))) return;
       const next = advanceTurn(game);
       commit(next);
       const r = next.lastReport;
@@ -568,7 +582,7 @@ export const useGame = create<Store>()((set, get) => {
     tick: (dt) => {
       const { game, running, speed } = get();
       if(game.campaign) {
-        if(!get().started || get().onboarding || (game.campaign.openingMilestone && !game.campaign.openingMilestone.acknowledged) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
+        if(pendingSpikeAcknowledgement(game.campaign) || !get().started || get().onboarding || (game.campaign.openingMilestone && !game.campaign.openingMilestone.acknowledged) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
         const credit=get().remainderMs+Math.round(dt*1000*speed);
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
@@ -598,7 +612,7 @@ export const useGame = create<Store>()((set, get) => {
     },
     focusTech: (id) => set({ techFocus: id, view: id ? "tech" : get().view }),
     setRunning: (running) => {
-      set({ running: running && (!get().game.campaign || (get().started && !get().onboarding && !(get().game.campaign!.openingMilestone && !get().game.campaign!.openingMilestone!.acknowledged))) && get().view!=="menu" && !document.hidden && !["review","ended"].includes(get().game.phase) });
+      set({ running: running && !pendingSpikeAcknowledgement(get().game.campaign) && (!get().game.campaign || (get().started && !get().onboarding && !(get().game.campaign!.openingMilestone && !get().game.campaign!.openingMilestone!.acknowledged))) && get().view!=="menu" && !document.hidden && !["review","ended"].includes(get().game.phase) });
       if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
     setSpeed: (speed) => set({ speed }),
@@ -771,7 +785,21 @@ export const useGame = create<Store>()((set, get) => {
       // Unsaved settings still apply for this visit.
       saveAudio(audio);
     },
-    toggleMute: () => get().setAudio({ muted: !get().audio.muted }),
+    toggleMute: () => {
+      const { audio } = get();
+      if (!isSilent(audio)) return get().setAudio({ muted: true });
+      // A mute only unmutes; volumes dragged to 0 are brought back too, or the click would change nothing you can hear.
+      get().setAudio(audio.music === 0 && audio.effects === 0 ? DEFAULT_AUDIO : { muted: false });
+    },
+
+    setGraphics: (patch) => {
+      const quality = GRAPHICS_QUALITIES.find((q) => q === patch.quality) ?? get().graphics.quality;
+      if (quality === get().graphics.quality) return;
+      const graphics: GraphicsSettings = { quality };
+      set({ graphics });
+      // Unsaved settings still apply for this visit.
+      saveGraphics(graphics);
+    },
 
     rate: (rating) => {
       const { game } = get();
@@ -810,6 +838,10 @@ function loadMetaSafe(): Meta {
 
 function loadAudioSafe(): AudioSettings {
   return typeof window === "undefined" ? { ...DEFAULT_AUDIO } : loadAudio();
+}
+
+function loadGraphicsSafe(): GraphicsSettings {
+  return typeof window === "undefined" ? { ...DEFAULT_GRAPHICS } : loadGraphics();
 }
 
 export { clearSave };
