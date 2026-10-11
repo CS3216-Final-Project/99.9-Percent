@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { Router } from 'express';
-import { FEEDBACK_MAX_LENGTH, type FeedbackRequest, type FeedbackResponse } from '../../../shared/feedback.ts';
+import { FEEDBACK_MAX_LENGTH, type FeedbackRequest, type FeedbackResponse } from '../../../shared/feedback.js';
 import { getDb, isDbConfigured } from '../db/client.js';
 import { gameFeedback } from '../db/schema.js';
 
