@@ -1274,8 +1274,9 @@ button:disabled {
 .act {
   width: 100%;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
   min-height: 44px;
   padding: 8px 12px 8px 10px;
   margin: 10px 0 0;
@@ -1293,8 +1294,19 @@ button:disabled {
     box-shadow 0.05s;
 }
 
+/* The label keeps its line; the badges move under it when a narrow panel cannot fit both. */
 .act-label {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+}
+
+.act-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
 }
 
 .act:hover:not(:disabled) {
@@ -3760,11 +3772,30 @@ button:disabled {
    Only physical-step evidence needs additional layout. See docs/UI_DESIGN.md. */
 .campaign-stability strong { font-family: var(--font-num); font-size: 1.1rem; }
 .campaign-stability .clock-row { margin-bottom: 6px; }
-.campaign-inspect { margin-top: 10px; }
 .chip.is-selected { background: var(--go); border-color: var(--ink); }
 .campaign-evidence, .campaign-working { margin-top: 10px; }
 .campaign-panel .act { margin-top: 0; }
-.campaign-panel .act-label { white-space: normal; }
+/* The panel is narrow: every response shows its name, then its cost and delay, so the rows line up. */
+.campaign-panel .act-label { flex-basis: 100%; }
+.campaign-panel .act-meta { margin-left: 0; justify-content: flex-start; }
+/* A one-line header keeps the responses and the stage guidance in view without scrolling. */
+.campaign-panel .panel-head { gap: 10px; padding-block: 8px; }
+.campaign-panel .panel-icon { width: 40px; height: 40px; }
+.campaign-panel .panel-head > div { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.campaign-panel .panel-head h2 { margin: 0; }
+.campaign-guidance { display: grid; justify-items: start; gap: 8px; }
+.incident .campaign-guidance { margin-top: 10px; }
+/* Tighter rhythm than the shared defaults so the whole overview fits a laptop-height panel. */
+.campaign-panel .panel-head { margin-bottom: 10px; }
+.campaign-panel .incident-symptoms { margin-top: 10px; }
+.campaign-panel .impact { margin: 8px 0; }
+.campaign-panel .step-head { margin-bottom: 6px; }
+.campaign-panel .chips { gap: 6px; }
+.campaign-panel .chip { padding-block: 2px; }
+.campaign-panel .act { row-gap: 4px; padding-block: 5px; min-height: 0; }
+.campaign-panel .actions { gap: 6px; }
+.campaign-panel .more { margin-top: 8px; padding-top: 8px; }
+.campaign-panel .panel-section { padding-bottom: 12px; }
 .campaign-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .campaign-table caption { text-align: left; padding: 8px 0; color: var(--text-soft); }
 .campaign-table th, .campaign-table td { padding: 6px; text-align: left; border-bottom: 1px solid var(--paper-3); }
@@ -3772,9 +3803,48 @@ button:disabled {
 
 .campaign-panel .step-head { margin-top: 10px; }
 .request-path { margin: 0 0 4px; font-size: 12px; }
-.campaign-entry{max-height:94vh;overflow:auto;max-width:720px}.gameplay-preview{width:100%;max-height:240px;object-fit:cover;border-radius:8px}.campaign-entry h1{font-size:clamp(24px,4vw,42px)}.modal select,.modal textarea{display:block;width:100%;padding:8px;margin:8px 0}.modal :focus-visible{outline:3px solid #426788;outline-offset:2px}
+.modal select, .modal textarea { display: block; width: 100%; padding: 8px; margin: 8px 0; }
+.modal :focus-visible { outline: 3px solid #426788; outline-offset: 2px; }
 
-.campaign-entry { max-height: calc(100dvh - 2rem); overflow-y: auto; }
+/* Campaign title: the pitch on the left, the preview and the way in on the right, so a
+   laptop screen shows everything at once. Short screens scroll the card without a scrollbar. */
+.campaign-title {
+  justify-items: center;
+  background: linear-gradient(90deg, rgb(20 17 40 / 0.97) 0%, rgb(20 17 40 / 0.92) 50%, rgb(20 17 40 / 0.78) 100%);
+}
+.campaign-entry {
+  width: 100%;
+  max-width: 1180px;
+  max-height: 100dvh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  /* Keeps focus rings and pressed shadows clear of the scroll container's clipping edge. */
+  padding: 16px 12px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  column-gap: clamp(28px, 4vw, 64px);
+  align-items: center;
+}
+.campaign-entry::-webkit-scrollbar { display: none; }
+.title-copy, .title-start { display: grid; justify-items: start; gap: 6px; min-width: 0; }
+.campaign-entry h1 { font-size: clamp(2.6rem, 5vw, 4.4rem); }
+.campaign-entry .title-goal { max-width: 42ch; }
+.campaign-entry .title-loop li { font-size: 0.95rem; }
+.campaign-entry .title-actions { align-items: center; margin: 14px 0 4px; }
+/* --text-soft is tuned for paper; on the night backdrop it needs the HUD's soft tone. */
+.campaign-entry .muted { color: var(--on-night-soft); margin: 6px 0 0; }
+.gameplay-preview { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border: 3px solid var(--ink); border-radius: 6px; box-shadow: var(--lift); }
+@media (max-width: 1000px) {
+  .campaign-entry { max-width: 620px; grid-template-columns: minmax(0, 1fr); }
+  .gameplay-preview { aspect-ratio: auto; max-height: 240px; }
+  /* One column: the way in comes before the preview, so it shows without scrolling. */
+  .title-cta { order: -1; }
+  .campaign-entry .title-actions { margin-top: 8px; }
+}
+@media (max-width: 900px) {
+  .campaign-title { align-items: end; background: linear-gradient(0deg, rgb(20 17 40 / 0.98) 0%, rgb(20 17 40 / 0.9) 60%, rgb(20 17 40 / 0.4) 100%); }
+  .campaign-title { padding-block: 0; }
+  .campaign-entry { padding: 12px 4px; }
+}
 .instance-choices { display: grid; gap: 6px; margin-top: 8px; }
 .instance-choices .chip { display: block; width: 100%; white-space: normal; text-align: left; }
 .instance-choices .chip span { display: block; font-family: var(--font-num); font-size: 0.8rem; margin-top: 4px; }

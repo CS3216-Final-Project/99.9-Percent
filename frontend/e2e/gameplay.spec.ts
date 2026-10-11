@@ -37,7 +37,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     }
     const opening = (await savedGame(page)).campaign!;
     expect(opening.step).toBe(6);
-    await page.getByRole("button", { name: "Inspect metrics · free" }).click();
+    await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).click();
     if (path === "app-then-upgrade") {
       await page.getByRole("button", { name: /Add server/ }).click();
       await page.getByRole("button", { name: "Run", exact: true }).click();
