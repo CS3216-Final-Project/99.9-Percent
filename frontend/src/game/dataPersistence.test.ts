@@ -16,7 +16,7 @@ it("loads schema 3 without data entry, preserves history and backs up exact byte
  expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBe(raw);
  expect(saveGame(loaded.game,loaded.remainderMs,false,loaded.measurement)).toBe(true);
  expect(localStorage.getItem(`${CAMPAIGN_SAVE_KEY}.backup.v3.${source.runId}.1`)).toBe(raw);
- expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(5);
+ expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(6);
 });
 it.each(["backup","replacement","conflicting backup"])("preserves schema 3 source on %s failure",boundary=>{
  const g=dataCompany("read-heavy",false),raw=JSON.stringify({...makeEnvelope(g,0,1),schemaVersion:3});

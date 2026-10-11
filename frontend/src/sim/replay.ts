@@ -30,7 +30,7 @@ export function replayCampaign(seed: number, runId: string, inputs: readonly Cam
         applyCampaignInputInPlace(s, input.action);
         // Phase 1 acknowledgement already returned to management: preserve that state.
         // Record the added acknowledgement so subsequent saves replay exactly.
-        if(legacyMilestones && s.campaign!.openingMilestone && !s.campaign!.openingMilestone.acknowledged) {
+        if(legacyMilestones && s.campaign!.openingMilestone?.incidentId && !s.campaign!.openingMilestone.acknowledged) {
             if(s.campaign!.foundation)s.campaign!.foundation.inputs++;
             applyCampaignInputInPlace(s, {type:"acknowledge_milestone", enterScaling:false});
         }

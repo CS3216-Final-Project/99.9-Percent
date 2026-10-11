@@ -63,7 +63,7 @@ it('loads schema 3 cloud replay saves paused and archives the original response 
   expect(useGame.getState()).toMatchObject({started:false,running:false,remainderMs:321});
   expect(useGame.getState().game.campaign!.dataStage).toBeNull();expect(api.putRun).not.toHaveBeenCalled();
   expect(JSON.parse(localStorage.getItem(`nn.campaign.before-cloud.${e.runId}.cloud.2`)!)).toEqual(remote);
-  expect(localCloudCopy(e.runId)?.local.schemaVersion).toBe(5);
+  expect(localCloudCopy(e.runId)?.local.schemaVersion).toBe(6);
 });
 it('reports corrupt schema 3 cloud inputs as incompatible while preserving local progress',async()=>{
   await useGame.getState().restoreAccount();const before=rawSave(),game=useGame.getState().game;

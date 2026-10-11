@@ -234,7 +234,7 @@ function CampaignDetail({game,id}:{game:GameState;id:TechId}) {
  {TECH[id].requires.length>0&&<p>Requires: {TECH[id].requires.map(t=>TECH[t].name).join(", ")}</p>}
  {status==="locked"&&<p>{reliability&&!c.reliabilityStage?"Enter Stay Online to unlock this capability.":"Meet the displayed prerequisite or campaign stage first."}</p>}
  {reliability&&status==="available"&&<button className="btn" disabled={researchBalance(c)<1} onClick={()=>act({type:"unlock_reliability",tech:id as "health_checks"|"standby"|"auto_failover"})}>Unlock {TECH[id].name} · 1 research point</button>}
- {id==="autoscaling"&&status==="available"&&<button className="btn" onClick={()=>act({type:"unlock_autoscaling"})}>Unlock autoscaling · 1 research point</button>}
+ {id==="autoscaling"&&status==="available"&&<button className="btn" disabled={researchBalance(c)<1} onClick={()=>act({type:"unlock_autoscaling"})}>Unlock autoscaling · 1 research point</button>}
  {!reliability&&<button className="btn" onClick={choose}>View existing actions</button>}
  <p>{id==="health_checks"?c.reliabilityStage?.checksStep!==null&&c.reliabilityStage?.checksStep!==undefined?"Deployed":"Not deployed":id==="standby"?c.reliabilityStage?.spareId?`Standing by: ${c.reliabilityStage.spareId}`:"No reserved spare":id==="auto_failover"?c.reliabilityStage?.failover?c.reliabilityStage.failover.enabled?"Deployed and enabled":"Deployed and disabled":"Not deployed":id==="autoscaling"?c.spikeStage?.controller?c.spikeStage.controller.enabled?"Deployed and enabled":"Deployed and disabled":"Not deployed":""}</p>
  </div>;
