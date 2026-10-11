@@ -1,6 +1,6 @@
 # Phases 1–5 requirements audit
 
-Reviewed on 11 October 2026 as part of PR #28, against `main` at `c126b2ed4dadfd8df1629be713334f411ee3f685`. This audit checks the current physical campaign implementation and its tests against each phase's requirements. Earlier implementation reports provide context, but their PASS labels are not used as independent proof.
+Reviewed on 11 October 2026 as part of PR #28, against `main` at `76f0c31` (including the latest title/overview layout, #33). This audit checks the current physical campaign implementation and its tests against each phase's requirements. Earlier implementation reports provide context, but their PASS labels are not used as independent proof.
 
 ## Verdict
 
@@ -23,7 +23,7 @@ Authority: [final Phase 1 plan](PHASE_1_SIMULATION_FINAL.md), including its conf
 | Requirement group | Code and observable evidence | Assessment |
 | --- | --- | --- |
 | Deterministic physical steps | `frontend/src/sim/scenarios/openingDatabaseIncident.ts` and `step.ts` retain 300 req/s healthy demand, step-4 growth to 800, application capacity 1,000, database capacity 600, bounded queues and initial $20,000 / 2,000 users / four engineers. `openingDatabaseIncident.test.ts` checks the exact early steps, backlog progression, overflow and conservation | Met |
-| Costs, delays and settlement | Add application costs $1,000 / two steps; database upgrade $3,000 / three steps; admission limit $500 / one step. `settlement.ts`, `settlement.test.ts` and opening tests cover activation exposure, 60-step settlement, retained fractional cents, installed idle upkeep and revenue only from completed work | Met |
+| Costs, delays and settlement | Add application costs $1,000 / two steps; database upgrade $3,000 / three steps; enabling/removing the 500 req/s admission limit is free and takes one step. `settlement.ts`, `settlement.test.ts` and opening tests cover activation exposure, 60-step settlement, retained fractional cents, installed idle upkeep and revenue only from completed work | Met |
 | Incident and recovery rules | Three overloaded observations open an incident; five consecutive qualifying observations recover it. Strict latency/error boundaries, positive admitted work/outcomes, no forced timeout and bankruptcy taking precedence over same-step recovery are tested in `openingDatabaseIncident.test.ts` | Met |
 | Three distinct response paths | Opening engine tests and `e2e/gameplay.spec.ts` cover direct database upgrade, an admission limit with rejected demand, and application-first followed by the database correction. Installed but unrouted capacity does not repair the database constraint | Met in code; browser execution status in integration report |
 | Honest causal reports | `traceCampaign.test.ts` covers delayed/unactivated actions, the actual backlog-draining intervention, mixed responses and retained evidence beyond the normal rolling window. Reports use physical snapshots rather than requested actions as proof | Met |

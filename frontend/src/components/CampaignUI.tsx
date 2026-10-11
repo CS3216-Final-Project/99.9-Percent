@@ -60,8 +60,8 @@ function CampaignGuidance() {
     :model.openingDone?"Prepare the system for the next growth wave."
     :model.prevention?"Handle the traffic increase without an incident: inspect the Application and Database, then keep service healthy at full demand."
     :"Observe demand and compare component evidence.";
-  const status=(current:boolean,done:boolean,available=false)=>done?"Completed":current?"Current":available?"Available next":"Locked";
-  return <section className="panel-section campaign-guidance" aria-label="Campaign guidance">
+
+  return <section className="campaign-guidance" aria-label="Campaign guidance">
     <Callout compact tone="info" icon="monitor" kicker={`Current stage: ${stageName(game)}`}>{objective}</Callout>
     {action?.action&&<button className="btn btn-primary" disabled={onboarding||game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
     {!c.reliabilityStage&&c.spikeStage?.acknowledged&&<button className="btn btn-primary" disabled={onboarding||!canEnterReliability(game)} onClick={()=>act({type:"enter_reliability"})}>Continue to reliability<Icon name="next" /></button>}
@@ -69,7 +69,16 @@ function CampaignGuidance() {
       <p role="status">Stable service: {c.openingPrevention?.stableSteps??0} / {Q.stableSteps} steps. Pausing adds no time; unhealthy service restarts the counter.</p>
       <div className="btn-row"><button className="btn btn-small" disabled={onboarding} onClick={()=>inspectOrSelect("app","app-1")}>Inspect Application</button><button className="btn btn-small" disabled={onboarding} onClick={()=>inspectOrSelect("db")}>Inspect Database</button></div>
     </section>}
-    <details className="more"><summary>Campaign progression and next requirements</summary>
+
+  </section>;
+}
+
+function CampaignProgression() {
+  const {game}=useGame(),c=game.campaign!;
+  const model=campaignGuidance(game);
+  const status=(current:boolean,done:boolean,available=false)=>done?"Completed":current?"Current":available?"Available next":"Locked";
+  return <section aria-label="Campaign requirements">
+    <details className="more"><summary>Campaign progression</summary>
       <nav aria-label="Campaign progression"><ol className="campaign-stages">
         <li aria-current={!model.openingDone?"step":undefined}>Opening <strong>{status(!model.openingDone,model.openingDone)}</strong></li>
         <li aria-current={model.openingDone&&!c.dataStage?"step":undefined}>Scaling &amp; Routing <strong>{status(model.openingDone,!!c.dataStage)}</strong></li>
@@ -133,9 +142,10 @@ export function CampaignPanel() {
       <header className="panel-head">
         <span className={`panel-icon${incident ? " state-critical" : ""}`}><Icon name={incident ? "incident" : "monitor"} /></span>
         <div><h2>{incident ? "Service slowdown" : "System overview"}</h2>
-          <span className={`state${incident ? " state-critical" : ""}`}><Icon name={incident ? "alert" : "health"} size={12} />{incident ? "Incident" : "Live metrics"}</span>
+          {incident && <span className="state state-critical"><Icon name="alert" size={12} />Incident</span>}
         </div>
       </header>
+      {!incident && <CampaignGuidance />}
       {c.incident && <div className="incident-clock campaign-stability">
         <div className="clock-row"><Icon name="health" /><Tip text="Recovery requires five consecutive physical steps below 500 ms and 1% service errors, with traffic and completed requests. A failing step resets this counter.">
           <strong>Stable steps: {c.incident.stableSteps}/{Q.stableSteps}</strong>
@@ -155,7 +165,6 @@ export function CampaignPanel() {
         <div className="chips">{PLACES.filter(id=>id!=="cache"||c.dataStage).map(id => <button type="button" key={id} className={`chip${place === id ? " is-selected" : ""}`} aria-pressed={place === id} disabled={disabled} onClick={() => inspectOrSelect(id)}>
           <span className="chip-icon" aria-hidden="true"><Icon name={EQUIPMENT_ICON[id]} size={16} /></span>{PLACE_NAMES[id]}
         </button>)}</div>
-        <button type="button" className="btn btn-small campaign-inspect" disabled={disabled} onClick={() => inspectOrSelect(place ?? "monitoring")}><Icon name="search" size={16} />Inspect metrics · free</button>
         {place && <div className="campaign-evidence" role="status"><Callout compact tone="info" icon={EQUIPMENT_ICON[place]} kicker={`${PLACE_NAMES[place]} · step ${m.step}`}>
           {component ? <>Demand {num(component.demand)}/s · capacity {num(component.capacity)}/s · backlog {num(component.backlog)}.</> : place === "cache" ? <>Cache {c.readCache?"deployed":"not deployed"} · effective rate used {m.data?`${m.data.effectiveHitRateUsed/100}%`:"not yet observed"} · hits {m.data?.hits??"not yet observed"}. Misses and writes reach the database.</> : place === "gateway" ? <>Incoming {num(m.incoming)}/s · admitted {num(m.admitted)}/s · rejected {num(m.rejected)}/s.</> : <>Latency {m.latencyMs.toFixed(0)} ms · errors {percent(m.serviceErrorRate)} · backlog {num(m.app.backlog + m.db.backlog)}.</>}
         </Callout></div>}
@@ -212,6 +221,7 @@ export function CampaignPanel() {
         <span>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} step(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
       </div>)}
+      {incident && <CampaignGuidance />}
       {c.apps.some(a=>!a.routed) && <p className="muted">{c.apps.filter(a=>!a.routed).map(a=>appName(a.id)).join(", ")}: Installed, not receiving traffic</p>}
       <details className="more campaign-details"><summary>Full system evidence</summary>
         <p>Incoming <b>{m.incoming}</b> / admitted <b>{m.admitted}</b> / rejected <b>{m.rejected}</b> requests/s</p>
@@ -228,9 +238,9 @@ export function CampaignPanel() {
         <Row label="Rejected this period" value={num(c.ledger.rejected)} />
         <Row label="Opportunity value" value={dollars(c.ledger.rejected * Q.revenueCents)} tip="Revenue forgone from rejected demand, not an extra cash charge." />
       </dl></details>
+      <CampaignProgression />
     </section>
     {c.spikeStage&&<SpikeControls disabled={disabled} busy={busy}/>}
-    <CampaignGuidance />
   </aside>;
 }
 
@@ -353,16 +363,21 @@ export function CampaignOverlays() {
   const {hasRun}=useGame();
   const configured=import.meta.env.VITE_PLAYTEST_URL as string|undefined;
   const playtestUrl=configured&&/^https?:\/\//.test(configured)?configured:null;
-  if (!started) return <div className="title-screen"><div className="title-card campaign-entry">
-    <span className="title-kicker"><Icon name="server" size={16} />A system design tycoon</span>
-    <h1>99.99%</h1><p className="title-tag">Grow a startup. Keep it online.</p>
-    <p className="title-goal">Keep your company online as traffic grows, without running out of cash.</p>
-    <ul className="title-loop" aria-label="How a run works"><li><Concept kind="users" icon="search" />Inspect evidence</li><li><Concept kind="tech" icon="server" />Choose a response</li><li><Concept kind="critical" icon="incident" />Run and observe</li></ul>
-    <p className="title-goal">Click room equipment to inspect it for free. One step models one second of traffic; 60 steps settle an operating week. Run advances time, and P pauses. The first incident pauses for your response.</p>
-    <img className="gameplay-preview" src="/opening-gameplay.png" alt="The furnished office and component evidence in the playable campaign" />
-    <div className="title-actions"><button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}><Icon name="play" />{hasRun ? "Continue company" : "Try Prototype"}</button></div>
-    {playtestUrl?<a className="btn" href={playtestUrl} target="_blank" rel="noopener noreferrer">Join Playtest</a>:<><button className="btn" disabled>Join Playtest</button><p className="muted">Playtest registration is not open yet.</p></>}
-    <p className="muted">Play immediately as a guest. Progress stays in this browser until you explicitly attach it to an account.</p><AccountPanel />
+  if (!started) return <div className="title-screen campaign-title"><div className="title-card campaign-entry">
+    <div className="title-copy">
+      <span className="title-kicker"><Icon name="server" size={16} />A system design tycoon</span>
+      <h1>99.99%</h1><p className="title-tag">Grow a startup. Keep it online.</p>
+      <p className="title-goal">Keep your company online as traffic grows, without running out of cash.</p>
+      <ul className="title-loop" aria-label="How a run works"><li><Concept kind="users" icon="search" />Inspect evidence</li><li><Concept kind="tech" icon="server" />Choose a response</li><li><Concept kind="critical" icon="incident" />Run and observe</li></ul>
+      <p className="title-goal">Click room equipment to inspect it for free. One step models one second of traffic; 60 steps settle an operating week. Run advances time, and P pauses. The first incident pauses for your response.</p>
+    </div>
+    <div className="title-start">
+      <img className="gameplay-preview" src="/opening-gameplay.png" alt="The furnished office and component evidence in the playable campaign" />
+      <div className="title-cta"><div className="title-actions"><button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}><Icon name="play" />{hasRun ? "Continue company" : "Try Prototype"}</button>
+        {playtestUrl?<a className="btn" href={playtestUrl} target="_blank" rel="noopener noreferrer">Join Playtest</a>:<button className="btn" disabled>Join Playtest</button>}</div>
+        {!playtestUrl&&<p className="muted">Playtest registration is not open yet.</p>}</div>
+      <p className="muted">Play immediately as a guest. Progress stays in this browser until you explicitly attach it to an account.</p><AccountPanel />
+    </div>
   </div></div>;
   if(useGame.getState().onboarding) {
     const {meta,onboardingMove}=useGame.getState();

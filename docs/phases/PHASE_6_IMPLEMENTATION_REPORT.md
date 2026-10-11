@@ -1,6 +1,6 @@
 # Phase 6 review and integration report
 
-Reviewed on 11 October 2026 against PR #28, the original [Phase 6 plan](PHASE_6_RELIABILITY.md), [UI design](../UI_DESIGN.md), and `main` at `c126b2ed4dadfd8df1629be713334f411ee3f685`. The later PR documentation commit `ad7ac41` is included. The original plan is preserved; the PR's adapted contract and its earlier rebase notes are in [PHASE_6_IMPLEMENTATION_CONTRACT.md](PHASE_6_IMPLEMENTATION_CONTRACT.md).
+Reviewed on 11 October 2026 against PR #28, the original [Phase 6 plan](PHASE_6_RELIABILITY.md), [UI design](../UI_DESIGN.md), and `main` at `76f0c31` (including the latest title/overview layout, #33). The later PR documentation commit `ad7ac41` is included. The original plan is preserved; the PR's adapted contract and its earlier rebase notes are in [PHASE_6_IMPLEMENTATION_CONTRACT.md](PHASE_6_IMPLEMENTATION_CONTRACT.md).
 
 The additional [Phases 1–5 requirements audit](PHASE_1_TO_5_REQUIREMENTS_AUDIT.md) maps the earlier plans to physical campaign code and observable tests. Their bounded gameplay is implemented, but full acceptance is not established: human sessions, a verified playtest signup destination and live Google/cloud/deployment checks remain outstanding. PR #28 deliberately extends the earlier recovered-incident-only progression rule with acknowledged opening prevention; the audit records that deviation explicitly.
 
@@ -11,10 +11,11 @@ The additional [Phases 1–5 requirements audit](PHASE_1_TO_5_REQUIREMENTS_AUDIT
 - Show effective traffic recipients in application controls, independently of configured membership. Per-app health inspection now selects through the same dispatcher as room inspection. Disable unaffordable reliability deployments and failover without its real deployed prerequisites/spare.
 - Draw installed campaign spares once in the fleet, with a standby indicator. Research ownership no longer draws a fictitious additional spare rack.
 - Replace raw reliability event JSON in postmortems with failure/detection/promotion/restoration explanations and the measured surviving-capacity/admitted-demand comparison. Action evidence excludes failed capacity. Preserve exact snapshots and trace data in saves/exports.
-- Record the reliability outcome in History after acknowledgement, including whether an incident opened, detection/promotion/restoration steps and company-wide spending/rejected demand at completion.
+- Record the reliability outcome in History after acknowledgement, including whether an incident opened, detection/promotion/restoration steps and company-wide setup spending/rejected demand at completion.
 - Use the shared research balance in both the tree and controller evidence. Campaign node tooltips use campaign effects rather than legacy weekly research descriptions; unlock controls respect required reviews.
 - Keep reliability responses ahead of older scaling/data controls. Campaign response buttons stack cost/delay badges beside wrapping labels inside their panel, and tree branch labels use ink on the paper modal. Widen the tree-specific desktop dialog so all nine nodes fit beside the detail panel, retaining the touch layout. Browser assertions check opening response containment, desktop node visibility and touch node selection.
 - Resolve the latest-main header conflict by retaining its bottom Week/Step readout and the reliability stage label. Preserve main's synchronized sound controls, company startup/introduction cues, tests, five menu tabs, graphics settings, Classic behavior, deployment configuration and migrations. Integrate the remote branch's later rebase/test commit `7e11a78`; address its rendering-cost concern by waiting for real physical outcomes in the manual-restoration journey while retaining live WebGL assertions.
+- Integrate main's later title/overview update #33: preserve the two-column title, updated gameplay preview, compact healthy stage guidance, incident response order and shared action metadata. Keep Phase 6 requirements in the progression disclosure after the responses; retain 44px campaign action targets and contained cost/delay stacks.
 
 ## Validation
 
@@ -27,7 +28,7 @@ Node 22.20.0. Dependencies installed separately using `npm ci` in frontend and b
 | Frontend balance | All 14 tests passed, including six solvent reliability alternatives |
 | Frontend production build | Passed |
 | Backend lint / typecheck / coverage | 37 passed; 81.35% statements, 83.62% lines |
-| Complete desktop / touch browser suite | 51 passed with retries enabled and flaky tests forbidden; no failures or retries. After the final tree dialog fix and reliability test optimization, all 11 affected desktop/touch journeys plus two screenshot-capture cases passed again without retries |
+| Complete desktop / touch browser suite | Final run against main #33: all 51 committed desktop/touch journeys plus two temporary screenshot-capture cases passed (53 total). Retries were enabled and flaky tests forbidden; no failures, retries or skipped browser cases |
 | Desktop and narrow touch visual inspection | Title, management, opening incident, selected equipment, pending response, report, outcome, history, menu and tree captured at 1440 × 900 and 390 × 844. Inspection found and corrected action badge overflow, tree label contrast and the cramped desktop tree dialog. Generated screenshots remain outside Git |
 
 Existing diagnostics include Three.js's CommonJS deprecation and Playwright's colour-environment warning. Guest journeys can log `/api/session` proxy `ECONNREFUSED` when no backend runs; the API-unavailable campaign journeys pass and unhandled page errors are checked. No failing required check is accepted as a baseline exception.

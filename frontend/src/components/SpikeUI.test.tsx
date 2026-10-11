@@ -7,7 +7,7 @@ beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),
 function show(g:ReturnType<typeof dataCompany>){useGame.setState({game:g,started:true,ready:true,onboarding:false});render(<><CampaignPanel/><CampaignControls/><CampaignOverlays/></>);}
 it("extends the current strip with factual available continuation and no new store",()=>{
  show(dataCompany());const nav=screen.getByRole("navigation",{name:"Campaign progression"});expect(nav.textContent).toContain("Traffic Spikes & Autoscaling Available next");
- fireEvent.click(screen.getByRole("button",{name:"Continue to traffic spikes"}));expect(nav.textContent).toContain("Data Strategy Completed");expect(nav.textContent).toContain("Traffic Spikes & Autoscaling Current");expect(useGame.getState().running).toBe(false);expect(screen.getByRole("region",{name:"Campaign guidance"}).textContent).not.toContain("before continuing to traffic spikes");
+ fireEvent.click(screen.getByRole("button",{name:"Continue to traffic spikes"}));expect(nav.textContent).toContain("Data Strategy Completed");expect(nav.textContent).toContain("Traffic Spikes & Autoscaling Current");expect(useGame.getState().running).toBe(false);expect(screen.getByRole("region",{name:"Campaign requirements"}).textContent).not.toContain("before continuing to traffic spikes");
 });
 it("shows live provisioning, counters, delayed routing and per-instance shared selection",()=>{
  show(untilOffset(spikeCompany(),13));const control=screen.getByRole("region",{name:"Traffic spikes and autoscaling"});expect(control.textContent).toContain("TRAFFIC SPIKE ACTIVE");expect(control.textContent).toContain("3 steps, followed by 1 routing step");

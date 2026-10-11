@@ -8,7 +8,7 @@ test("Opening prevention: fresh player, new observations, reloads and same-compa
  await page.getByRole("button",{name:/Upgrade database/}).click();
  for(let i=0;i<4;i++)await page.getByRole("button",{name:"Advance step",exact:true}).click();
  let c=(await savedGame(page)).campaign!;expect(c.consumedEvents).toContain("opening-growth");expect(c.incident).toBeNull();expect(c.reports).toEqual([]);
- const guidance=page.getByRole("region",{name:"Campaign guidance"}),progress=page.getByRole("region",{name:"Opening prevention progress"});
+ const guidance=page.getByRole("region",{name:"Campaign requirements"}),progress=page.getByRole("region",{name:"Opening prevention progress"});
  await expect(progress).toContainText("Stable service: 0 / 5");await expect(guidance.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","false");
  await page.getByRole("button",{name:/Remove traffic limit/}).click();
  await progress.getByRole("button",{name:"Inspect Application"}).click();await progress.getByRole("button",{name:"Inspect Database"}).click();

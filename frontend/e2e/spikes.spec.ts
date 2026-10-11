@@ -3,7 +3,7 @@ import {dataCompany,spikeCompany,untilOffset} from "../src/sim/__tests__/spikeFi
 import type {Page} from "@playwright/test";
 async function blockedGuest(page:Page,g:ReturnType<typeof dataCompany>){
  const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
- await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);await page.getByRole("region",{name:"Campaign guidance"}).locator("summary").click();return api;
+ await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);await page.locator("summary").filter({hasText:"Campaign progression"}).click();return api;
 }
 async function runTo(page:Page,step:number){
  await page.getByRole("button",{name:"Run",exact:true}).click();

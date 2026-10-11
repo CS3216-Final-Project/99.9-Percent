@@ -11,7 +11,7 @@ function inspected(){let g=prevented();g=act(g,{type:"incident_inspect",equipmen
 const qualified=()=>advanceSteps(inspected(),5).state;
 const ui=()=><><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/></>;
 function show(g:GameState){useGame.setState({game:g,ready:true,started:true,onboarding:false});return render(ui());}
-const guidance=()=>screen.getByRole("region",{name:"Campaign guidance"});
+const guidance=()=>screen.getByRole("region",{name:"Campaign requirements"});
 const requirement=(id:string)=>guidance().querySelector(`[data-requirement="${id}"]`)!;
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});afterEach(cleanup);
 it("lists outstanding prevention requirements and inspects components without advancing time",()=>{

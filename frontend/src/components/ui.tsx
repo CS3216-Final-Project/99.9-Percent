@@ -168,16 +168,20 @@ export function Act({
     <button type="button" className={`act${primary ? " act-primary" : ""}`} onClick={onClick} disabled={disabled} data-tour={tour} {...tipProps(tip)}>
       {icon && <Icon name={icon} />}
       <span className="act-label">{label}</span>
-      {price !== undefined && (
-        <span className="price">
-          <Icon name="cash" size={12} />
-          {moneyFull(price)}
-        </span>
-      )}
-      {note && (
-        <span className="price">
-          <Icon name="latency" size={12} />
-          {note}
+      {(price !== undefined || note) && (
+        <span className="act-meta">
+          {price !== undefined && (
+            <span className="price">
+              <Icon name="cash" size={12} />
+              {moneyFull(price)}
+            </span>
+          )}
+          {note && (
+            <span className="price">
+              <Icon name="latency" size={12} />
+              {note}
+            </span>
+          )}
         </span>
       )}
     </button>
