@@ -73,12 +73,9 @@ export function CampaignHeader() {
   const word = incident ? "Incident" : game.phase === "ended" ? "Bankrupt" : game.phase === "review" ? "Recovered" : atRisk ? "At risk" : c.limit!==null ? "Traffic limited" : "Healthy";
   const tone = incident || game.phase === "ended" ? "critical" : atRisk ? "warn" : "health";
   return <header className={`topbar${incident ? " is-incident" : ""}`}>
-    <div className="brand"><span className="brand-mark">99.99%</span><div className="week">
-      <span className="brand-week"><Icon name={incident ? "incident" : "week"} size={16} />
-        Week <strong>{game.turn}</strong> · Step <strong data-testid="physical-step">{c.step}</strong>
-      </span>
+    <div className="brand"><span className="brand-mark">99.99%</span>
       <span className="campaign-stage" aria-label="Current campaign stage">{c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":c.openingMilestone?.acknowledged?"Scaling & Routing":"Opening"}</span>
-    </div></div>
+    </div>
     <div className="stats-strip">
       <Stat icon="cash" kind="cash" label="Cash" tip={`Available cash: ${dollars(c.cashCents)}. Revenue and running costs settle every ${Q.periodSteps} steps. Setup costs are paid immediately.`}>
         <strong className={c.cashCents <= 0 ? "text-critical" : ""}>{money(c.cashCents / 100)}</strong>
@@ -247,7 +244,11 @@ export function CampaignControls() {
     <nav className="view-tabs" aria-label="Views"><button type="button" className={view === "history" ? "is-active" : ""} aria-pressed={view === "history"} aria-label="History" {...tipProps("History")} onClick={() => openView(view === "history" ? null : "history")}>
       <span className="tab-icon" aria-hidden="true"><Icon name="history" /></span><span className="tab-label">History</span>
     </button></nav>
-    <div className="time-controls"><button type="button" className={`icon-btn${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps("Run or pause physical steps (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /></button>
+    <div className="time-controls">
+      <div className={`week${game.phase === "incident" ? " is-incident" : ""}`}><span className="brand-week"><Icon name={game.phase === "incident" ? "incident" : "week"} size={16} />
+        Week <strong>{game.turn}</strong> · Step <strong data-testid="physical-step">{game.campaign!.step}</strong>
+      </span></div>
+      <button type="button" className={`icon-btn${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps("Run or pause physical steps (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /></button>
       <div className="speed" role="group" aria-label="Game speed">{([.5, 1, 2] as Speed[]).map(v => <button type="button" key={v} className={speed === v ? "is-active" : ""} aria-pressed={speed === v} onClick={() => setSpeed(v)} {...tipProps(`${v}× speed`)}>{v}×</button>)}</div>
       <button type="button" className="btn btn-primary advance" disabled={!active || game.phase !== "management"} onClick={advance} {...tipProps("Advance one physical step. One step models one second of requests; 60 steps settle an operating week.")}><span className="advance-label">{game.phase === "incident" ? "Incident" : game.phase === "ended" ? "Company closed" : game.phase === "review" ? "Review" : "Advance step"}</span><Icon name="next" /></button>
     </div>

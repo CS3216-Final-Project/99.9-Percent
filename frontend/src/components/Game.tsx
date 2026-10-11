@@ -46,31 +46,11 @@ function TopBar() {
   const m = metrics(game);
   const health = healthOf(game);
   const inc = game.phase === "incident" ? game.incident : null;
-  const week = Math.min(game.turn, BALANCE.maxTurns);
 
   return (
     <header className={`topbar${inc ? " is-incident" : ""}`}>
       <div className="brand">
         <span className="brand-mark">99.99%</span>
-        <div className="week">
-          <span className="brand-week">
-            <Icon name={inc ? "incident" : "week"} size={16} />
-            {inc ? (
-              <>
-                Incident <strong>{clock(inc.elapsed)}</strong>
-              </>
-            ) : (
-              <>
-                Week <strong>{week}</strong>/{BALANCE.maxTurns}
-              </>
-            )}
-          </span>
-          <span className="week-track" aria-hidden="true">
-            {Array.from({ length: BALANCE.maxTurns }, (_, i) => (
-              <i key={i} className={i + 1 < week ? "is-past" : i + 1 === week ? "is-now" : ""} />
-            ))}
-          </span>
-        </div>
       </div>
 
       <div className="stats-strip">
@@ -186,6 +166,34 @@ function StageHud() {
 
 const SPEEDS: Speed[] = [0.5, 1, 2];
 
+/** Which week it is, or how long the incident has run: kept beside the controls that move it on. */
+function WeekClock() {
+  const game = useGame((s) => s.game);
+  const inc = game.phase === "incident" ? game.incident : null;
+  const week = Math.min(game.turn, BALANCE.maxTurns);
+  return (
+    <div className={`week${inc ? " is-incident" : ""}`}>
+      <span className="brand-week">
+        <Icon name={inc ? "incident" : "week"} size={16} />
+        {inc ? (
+          <>
+            Incident <strong>{clock(inc.elapsed)}</strong>
+          </>
+        ) : (
+          <>
+            Week <strong>{week}</strong>/{BALANCE.maxTurns}
+          </>
+        )}
+      </span>
+      <span className="week-track" aria-hidden="true">
+        {Array.from({ length: BALANCE.maxTurns }, (_, i) => (
+          <i key={i} className={i + 1 < week ? "is-past" : i + 1 === week ? "is-now" : ""} />
+        ))}
+      </span>
+    </div>
+  );
+}
+
 function BottomBar() {
   const game = useGame((s) => s.game);
   const view = useGame((s) => s.view);
@@ -228,6 +236,7 @@ function BottomBar() {
       </nav>
 
       <div className="time-controls">
+        <WeekClock />
         {showTime && (
           <>
             <button
