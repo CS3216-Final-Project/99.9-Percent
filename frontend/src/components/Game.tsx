@@ -12,7 +12,8 @@ import { useGame, type Speed, type View } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { SoundButton } from "./SoundButton";
 import { tipProps } from "./tips";
-import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Modals";
+import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
+import { HomeScreen } from "./HomeScreen";
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
 import Tutorial from "./Tutorial";
@@ -384,7 +385,7 @@ export default function Game() {
       </main>
       {campaign ? <>{started && <CampaignPanel />}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ViewSheet /><BottomBar /></>}
       <ToastHost />
-      {!campaign && !started && <TitleScreen />}
+      {!campaign && !started && <HomeScreen />}
       {!campaign && started && view === "menu" && <Menu />}
       {!campaign && started && onboarding && <HowToPlay />}
       {!campaign && started && <Tutorial />}

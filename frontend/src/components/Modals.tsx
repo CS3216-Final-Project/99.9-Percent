@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { BALANCE, buildReport } from "@/sim";
 import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
-import { isFreshRun, useGame } from "@/game/store";
+import { useGame } from "@/game/store";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon, type IconName } from "./icons";
 import { GraphicsSettings } from "./GraphicsSettings";
@@ -15,76 +15,6 @@ import { SoundSettings } from "./SoundSettings";
 import { Callout, Concept, Modal, type ConceptKind } from "./ui";
 import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { PostmortemBody, RunCharts } from "./Views";
-
-/* ------------------------------------------------------------------ */
-/* Title screen                                                        */
-/* ------------------------------------------------------------------ */
-
-/** The first thing anyone sees: the room, the name, the goal and one button. */
-export function TitleScreen() {
-  const game = useGame((s) => s.game);
-  const meta = useGame((s) => s.meta);
-  const play = useGame((s) => s.play);
-  const newRun = useGame((s) => s.newRun);
-  const startTutorialRun = useGame((s) => s.startTutorialRun);
-  const resumable = !isFreshRun(game) && game.phase !== "ended";
-
-  const fresh = () => (meta.tutorialDone ? newRun({}) : startTutorialRun());
-
-  return (
-    <div className="title-screen">
-      <div className="title-card">
-        <span className="title-kicker">
-          <Icon name="server" size={16} />
-          A system design tycoon
-        </span>
-        <h1>99.99%</h1>
-        <p className="title-tag">Grow a startup. Keep it online.</p>
-        <p className="title-goal">
-          Reach <strong>{num(BALANCE.targetUsers)} users</strong> in <strong>{BALANCE.maxTurns} weeks</strong> without running out of cash.
-        </p>
-        <ul className="title-loop" aria-label="How a run works">
-          <li>
-            <Concept kind="users" icon="users" />
-            Grow users
-          </li>
-          <li>
-            <Concept kind="tech" icon="server" />
-            Scale your stack
-          </li>
-          <li>
-            <Concept kind="critical" icon="incident" />
-            Survive incidents
-          </li>
-        </ul>
-        <div className="title-actions">
-          {resumable ? (
-            <>
-              <button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}>
-                <Icon name="play" />
-                Continue week {game.turn}
-              </button>
-              <button type="button" className="btn btn-big" onClick={fresh}>
-                New game
-              </button>
-            </>
-          ) : (
-            <button type="button" className="btn btn-primary btn-big" autoFocus onClick={game.phase === "ended" ? fresh : play}>
-              <Icon name="play" />
-              Play
-            </button>
-          )}
-        </div>
-        <div className="title-actions"><FeedbackButton /></div>
-        {meta.tutorialDone && (
-          <button type="button" className="link-btn" onClick={startTutorialRun}>
-            Replay the tutorial
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /* How to play (reference card, opened from the menu)                  */

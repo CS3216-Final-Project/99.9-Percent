@@ -50,7 +50,7 @@ import {
 } from "./persist";
 import { decodeSave } from "./saveEnvelope";
 import { makeEnvelope, validateEnvelope, type SaveEnvelope } from "./saveEnvelope";
-import { AccountApiError, getSession, logout, listRuns, putRun, getRun } from "@/lib/api";
+import { AccountApiError, getSession, logout, listRuns, putRun, getRun, emailLogin, emailRegister } from "@/lib/api";
 import type { AppSession, CloudRun, RunSummary } from "../../../shared/campaign.ts";
 import { checkpointCloud, localCloudCopy, rememberCloud } from "./cloud";
 
@@ -115,10 +115,15 @@ interface Store {
   cloudRuns: RunSummary[];
   cloudConflict: CloudRun | null;
   restoreAccount: () => Promise<void>;
+  /** Resolve to an error to show beside the form, or null once signed in. */
+  signInWithEmail: (email:string, password:string) => Promise<string|null>;
+  registerWithEmail: (name:string, email:string, password:string) => Promise<string|null>;
   signOut: () => Promise<void>;
-  refreshCloudRuns: () => Promise<void>;
+  /** Resolves true once the list reflects the account. */
+  refreshCloudRuns: () => Promise<boolean>;
   saveCloud: (attach?:boolean) => Promise<void>;
-  resumeCloud: (runId:string) => Promise<void>;
+  /** Resolves true once the cloud save is the local Campaign save. */
+  resumeCloud: (runId:string) => Promise<boolean>;
   keepLocalConflict: () => Promise<void>;
 
   hasRun: boolean;
@@ -224,6 +229,11 @@ function requiredAcknowledgement(c: Campaign): Action["type"] | null {
   return c.openingMilestone && !c.openingMilestone.acknowledged ? "acknowledge_milestone" : null;
 }
 const awaitingAcknowledgement = (c: Campaign) => requiredAcknowledgement(c) !== null;
+/** The run in a stored Campaign save, for naming its backup when that save is not the active game. */
+function storedRunId(raw: string): string {
+  try { const runId = (JSON.parse(raw) as { runId?: unknown }).runId; return typeof runId === "string" ? runId : "unreadable"; }
+  catch { return "unreadable"; }
+}
 
 export const useGame = create<Store>()((set, get) => {
   let accountRequest = 0;
@@ -234,7 +244,7 @@ export const useGame = create<Store>()((set, get) => {
     if(!s.hasRun)return true;
     const saved=saveGame(s.game,s.remainderMs,explicitReset,s.measurement);
     try { if (saved) checkpointCloud(makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement)); }
-    catch { s.notify("Local progress is saved, but its account backup could not be retained. Export account copies before replacing this company.","error"); return false; }
+    catch { s.notify("Saved in this browser, but its cloud copy could not be kept. Download a backup from Menu, Saves before replacing this company.","error"); return false; }
     if(saved && archiveEvents(s.measurement.pending)) {
       set({measurement:{...s.measurement,pending:[]}});
       return true;
@@ -392,12 +402,23 @@ export const useGame = create<Store>()((set, get) => {
     if (started) get().play();
   }
 
+  const SIGNED_IN='Signed in. Nothing is uploaded until you choose Save to cloud.';
   function accountFailure(error:unknown) {
     if(error instanceof AccountApiError && error.status===401)set({accountSession:null,accountStatus:'guest'});
-    set({cloudStatus:error instanceof Error?error.message:'Cloud service unavailable. Local progress is retained.'});
+    // fetch failures (TypeError) and unreadable responses (SyntaxError) carry browser wording, not ours.
+    const ours=error instanceof Error&&!(error instanceof TypeError)&&!(error instanceof SyntaxError);
+    set({cloudStatus:ours?error.message:'Cloud saves are unavailable right now. Your local save is unchanged.'});
   }
-  function currentEnvelope() { const s=get();if (!s.game.campaign) throw Error("Cloud saves are available for Campaign companies. Classic progress stays local.");return makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement); }
-  function ownSession() {const session=get().accountSession;if(!session)throw Error('Sign in first. Local progress is retained.');return session;}
+  /** Email sign-in answers in place, so the session is set here instead of after a page reload. */
+  async function emailSession(request:()=>Promise<AppSession>):Promise<string|null> {
+    if(get().cloudBusy)return 'Wait for the current cloud action to finish.';
+    ++accountRequest;set({cloudBusy:true});
+    try {const session=await request();set({accountSession:session,accountStatus:'signed-in',cloudRuns:[],cloudConflict:null,cloudStatus:SIGNED_IN});return null;}
+    catch(error){return error instanceof AccountApiError?error.message:'Accounts are unavailable right now. You can keep playing; progress saves in this browser.';}
+    finally{set({cloudBusy:false});}
+  }
+  function currentEnvelope() { const s=get();if (!s.game.campaign) throw Error("Cloud saves are for Campaign. Classic progress stays in this browser.");return makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement); }
+  function ownSession() {const session=get().accountSession;if(!session)throw Error('Sign in first. Your local save is unchanged.');return session;}
   return {
     prepareSignIn:()=>{set({running:false});return !get().hasRun||persist();},
     accountSession:null, accountStatus:'unchecked', cloudStatus:'Local progress stays in this browser.', cloudBusy:false, cloudRuns:[], cloudConflict:null,
@@ -405,47 +426,50 @@ export const useGame = create<Store>()((set, get) => {
         if(get().accountStatus==='checking'||get().cloudBusy)return;
         const request=++accountRequest;
         set({accountStatus:'checking'});
-        try {const session=await getSession();if(request!==accountRequest)return;set({accountSession:session,accountStatus:'signed-in',cloudRuns:[],cloudStatus:'Signed in. Guest runs are attached only when you choose.'});}
-        catch(error){if(request!==accountRequest)return;const outcome=new URLSearchParams(window.location.search).get('auth');set({accountSession:null,accountStatus:error instanceof AccountApiError&&error.status===401?'guest':'unavailable',cloudStatus:outcome==='cancelled'?'Google sign-in cancelled. Your local company is retained.':outcome==='failed'?'Google sign-in failed. Your local company is retained.':'Local play is available. Sign in or retry when accounts are available.'});}
+        try {const session=await getSession();if(request!==accountRequest)return;set({accountSession:session,accountStatus:'signed-in',cloudRuns:[],cloudStatus:SIGNED_IN});}
+        catch(error){if(request!==accountRequest)return;const outcome=new URLSearchParams(window.location.search).get('auth'),guest=error instanceof AccountApiError&&error.status===401;
+          set({accountSession:null,accountStatus:guest?'guest':'unavailable',cloudStatus:outcome==='cancelled'?'Google sign-in was cancelled. Your local save is unchanged.':outcome==='failed'?'Google sign-in failed. Your local save is unchanged.':guest?'Playing as a guest. Progress saves in this browser.':'Accounts are unavailable right now. You can keep playing; progress saves in this browser.'});}
     },
+    signInWithEmail:(email,password)=>emailSession(()=>emailLogin(email,password)),
+    registerWithEmail:(name,email,password)=>emailSession(()=>emailRegister(email,password,name)),
     signOut: async()=>{
         if(get().cloudBusy)return;
         ++accountRequest;
       set({cloudBusy:true,accountStatus:get().accountSession?'signed-in':get().accountStatus});
-      try {const session=ownSession();await logout(session.csrfToken);set({accountSession:null,accountStatus:'guest',cloudRuns:[],cloudConflict:null,cloudStatus:'Signed out. Local progress and owner bindings are retained.'});}
+      try {const session=ownSession();await logout(session.csrfToken);set({accountSession:null,accountStatus:'guest',cloudRuns:[],cloudConflict:null,cloudStatus:'Signed out. Your local save stays in this browser.'});}
       catch(error){accountFailure(error);}
       finally{set({cloudBusy:false});}
     },
     refreshCloudRuns: async()=>{
-      if(get().cloudBusy)return;set({cloudBusy:true});
-      try {const session=ownSession();const runs=await listRuns();if(get().accountSession===session)set({cloudRuns:runs,cloudStatus:runs.length?'Choose a cloud company to resume. Your current local company will be retained.':'No cloud companies yet.'});}
-      catch(error){accountFailure(error);}finally{set({cloudBusy:false});}
+      if(get().cloudBusy)return false;set({cloudBusy:true});
+      try {const session=ownSession();const runs=await listRuns();if(get().accountSession!==session)return false;set({cloudRuns:runs});return true;}
+      catch(error){accountFailure(error);return false;}finally{set({cloudBusy:false});}
     },
     saveCloud: async(attach=false)=>{
       if(get().cloudBusy)return;set({cloudBusy:true});
       let envelope:SaveEnvelope|undefined;
       try {
-        const session=ownSession();if(!get().hasRun||get().saveBlocked)throw Error('Start or load a valid company before attaching it.');
+        const session=ownSession();if(!get().hasRun||get().saveBlocked)throw Error('Start a Campaign game before saving it to the cloud.');
         get().measureTime();envelope=currentEnvelope();
-        if(validateEnvelope(envelope).status!=='ok')throw Error('This campaign snapshot is invalid. Export it before replacing it.');
+        if(validateEnvelope(envelope).status!=='ok')throw Error('This save could not be checked. Download a backup before replacing it.');
         const copy=localCloudCopy(envelope.runId);
-        if(copy&&copy.ownerId!==session.account.id)throw Error('This local company belongs to another account. Its pending progress is retained.');
-        if(!copy&&!attach)throw Error('Choose Attach current guest company first.');
-        if(copy?.remote)throw Error('Resolve the cloud conflict before retrying. Both copies are retained.');
+        if(copy&&copy.ownerId!==session.account.id)throw Error('This local save belongs to another account. It stays in this browser.');
+        if(!copy&&!attach)throw Error('Save this game to the cloud first.');
+        if(copy?.remote)throw Error('Choose which version to keep first. Both are kept.');
         rememberCloud({ownerId:session.account.id,revision:copy?.revision??0,local:envelope});
         const game=get().game;
         const saved=await putRun(envelope,copy?.revision??0,session.csrfToken);
         if(get().accountSession!==session)return;
-        if(saved.runId!==envelope.runId || !Number.isSafeInteger(saved.revision) || saved.revision<1)throw Error('Invalid cloud acknowledgement. Local progress is retained.');
+        if(saved.runId!==envelope.runId || !Number.isSafeInteger(saved.revision) || saved.revision<1)throw Error('The cloud did not confirm the save. Your local save is unchanged.');
         rememberCloud({ownerId:session.account.id,revision:saved.revision,local:currentEnvelope()});
-        set({cloudConflict:null,cloudStatus:get().game===game?'Cloud save complete.':'Cloud snapshot saved. Newer local changes are pending.'});
+        set({cloudConflict:null,cloudStatus:get().game===game?'Saved to the cloud.':'Saved to the cloud. Progress made since then is only in this browser.'});
       } catch(error) {
         if(error instanceof AccountApiError&&error.status===409&&error.detail.current&&envelope) {
           set({cloudConflict:error.detail.current});
           try {
             const copy=localCloudCopy(envelope.runId)!;rememberCloud({...copy,local:currentEnvelope(),remote:error.detail.current});
-            set({cloudStatus:'Cloud conflict: both copies are retained. Choose which to continue.'});
-          } catch {set({cloudStatus:'Conflict copies could not be stored. Keep this tab open and export account copies before continuing.'});}
+            set({cloudStatus:'The cloud has a different version of this save. Both are kept: choose which to continue.'});
+          } catch {set({cloudStatus:'Both versions could not be stored. Keep this tab open and download a backup before continuing.'});}
         } else accountFailure(error);
       } finally{set({cloudBusy:false});}
     },
@@ -453,7 +477,7 @@ export const useGame = create<Store>()((set, get) => {
       if(get().cloudBusy)return;
       try {
         const session=ownSession(),e=currentEnvelope(),copy=localCloudCopy(e.runId);
-        if(!copy||copy.ownerId!==session.account.id||!copy.remote)throw Error('No conflict for this company.');
+        if(!copy||copy.ownerId!==session.account.id||!copy.remote)throw Error('There is no conflict for this save.');
         const remote=copy.remote as CloudRun;
         // Preserve both exact versions before an explicit revision-conditional overwrite.
         localStorage.setItem(`nn.campaign.conflict.${e.runId}.${remote.revision}`,JSON.stringify({local:e,remote}));
@@ -462,28 +486,31 @@ export const useGame = create<Store>()((set, get) => {
       }catch(error){accountFailure(error);}
     },
     resumeCloud: async(runId)=>{
-      if(get().cloudBusy)return;set({cloudBusy:true,running:false});
+      if(get().cloudBusy)return false;set({cloudBusy:true,running:false});
       try {
         const session=ownSession(),before=get().game,run=await getRun(runId);
-        if(get().accountSession!==session||get().game!==before)throw Error('Local company changed while loading. Retry when paused.');
+        if(get().accountSession!==session||get().game!==before)throw Error('Your local game changed while loading. Pause and try again.');
         const validated=validateEnvelope(run.envelope);
-        if(validated.status!=='ok')throw Error('This cloud save needs a compatible game version. Local progress is retained.');
+        if(validated.status!=='ok')throw Error('This cloud save is from a different version of the game. Your local save is unchanged.');
         const s=get(),e=validated.envelope,game=validated.game;
-        if(e.runId!==runId)throw Error('Cloud run identity does not match.');
+        if(e.runId!==runId)throw Error('This cloud save does not match the one requested.');
+        // The home screen can load a cloud save while Classic is active: keep that run before leaving it.
+        if(s.mode==='classic'&&!saveClassicGame(s.game))throw Error('Your Classic game could not be saved first. Your local saves are unchanged.');
         // Refuse replacement unless current bytes and all account copies are durably retained.
         const original=localStorage.getItem('nn.campaign.save.v1');
-        if(original!==null)localStorage.setItem(`nn.campaign.before-cloud.${s.game.campaign!.runId}`,original);
-        if(s.hasRun)localStorage.setItem(`nn.campaign.before-cloud.${s.game.campaign!.runId}.pending`,JSON.stringify(currentEnvelope()));
+        if(original!==null)localStorage.setItem(`nn.campaign.before-cloud.${s.game.campaign?.runId??storedRunId(original)}`,original);
+        if(s.mode==='campaign'&&s.hasRun)localStorage.setItem(`nn.campaign.before-cloud.${s.game.campaign!.runId}.pending`,JSON.stringify(currentEnvelope()));
         const previous=localCloudCopy(runId);
-        if(previous&&previous.ownerId!==session.account.id)throw Error('This run is bound to another local owner.');
+        if(previous&&previous.ownerId!==session.account.id)throw Error('This save belongs to another account in this browser.');
         if(previous)localStorage.setItem(`nn.campaign.before-cloud.${runId}.owner-copy`,JSON.stringify(previous));
         localStorage.setItem(`nn.campaign.before-cloud.${runId}.cloud.${run.revision}`,JSON.stringify(run));
         rememberCloud({ownerId:session.account.id,revision:run.revision,local:e});
-        if(!saveGame(game,e.runtime.remainderMs,true,e.runtime.measurement))throw Error('Storage could not retain the cloud copy. Local progress is retained.');
+        if(!saveGame(game,e.runtime.remainderMs,true,e.runtime.measurement))throw Error('This browser could not store the cloud save. Your local save is unchanged.');
         saveMode("campaign");
-        set({mode:"campaign",game,generation:get().generation+1,lastAction:null,lastIntro:null,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
-          running:false,started:false,onboarding:false,view:null,selected:null,selectedAppId:null,activeMark:null,cloudConflict:null,cloudStatus:'Cloud company loaded and paused. Continue when ready.'});
-      }catch(error){accountFailure(error);}finally{set({cloudBusy:false});}
+        set({mode:"campaign",...(s.mode==='classic'?{meta:loadMeta("campaign"),tour:null}:{}),game,generation:get().generation+1,lastAction:null,lastIntro:null,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
+          running:false,started:false,onboarding:false,view:null,selected:null,selectedAppId:null,activeMark:null,cloudConflict:null,cloudStatus:'Cloud save loaded. Continue when ready.'});
+        return true;
+      }catch(error){accountFailure(error);return false;}finally{set({cloudBusy:false});}
     },
     hasRun: false, measurement: emptyMeasurement(), activeMark: null,
     mode: "campaign",
@@ -660,7 +687,7 @@ export const useGame = create<Store>()((set, get) => {
     newRun: (opts = {}) => {
       if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return;}
       try {if(get().hasRun && get().game.campaign)checkpointCloud(currentEnvelope());}
-      catch {get().notify("Export account copies before replacing this company: its pending backup could not be saved.","error");return;}
+      catch {get().notify("Download a backup from Menu, Saves before replacing this company: its cloud copy could not be kept.","error");return;}
       if (get().mode === "campaign") {
       const replacementRunId=crypto.randomUUID();
       const old=get();

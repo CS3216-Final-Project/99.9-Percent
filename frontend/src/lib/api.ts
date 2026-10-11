@@ -26,3 +26,5 @@ export const getRun=(id:string)=>accountRequest<CloudRun>(`/runs/${encodeURIComp
 export const putRun=(envelope:CampaignEnvelope,expectedRevision:number,csrfToken:string)=>accountRequest<CloudRun>(`/runs/${encodeURIComponent(envelope.runId)}`,{
   method:'PUT',headers:{'X-CSRF-Token':csrfToken},body:JSON.stringify({envelope,expectedRevision})});
 export const logout=(csrfToken:string)=>accountRequest<void>('/auth/logout',{method:'POST',headers:{'X-CSRF-Token':csrfToken}});
+export const emailLogin=(email:string,password:string)=>accountRequest<AppSession>('/auth/email/login',{method:'POST',body:JSON.stringify({email,password})});
+export const emailRegister=(email:string,password:string,name:string)=>accountRequest<AppSession>('/auth/email/register',{method:'POST',body:JSON.stringify({email,password,name})});

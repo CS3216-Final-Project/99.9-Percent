@@ -13,16 +13,20 @@ Request and response types live in [`shared/`](../shared). Change a type there o
 | GET | `/api/progress` | Di Heng | TBD | Planned |
 | GET | `/api/areas/:id/layout` | Di Heng | → `CityLayout` (`shared/cityLayout.ts`) | Planned |
 
-## 🔑 Planned MVP authentication
+## 🔑 Accounts and cloud saves
 
-**Selected:** Google OAuth + OpenID Connect, with Express-managed app sessions in Neon. These routes are planned, not implemented. Owner: Di Heng. Browser-facing paths use the planned same-origin `/api` proxy; the current base URL above remains the existing setup.
+Google OAuth + OpenID Connect, or an email and password, with Express-managed app sessions in Neon. Owner: Di Heng. The browser always calls these through the same-origin `/api` proxy, never through `VITE_API_URL`.
 
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/auth/google` | Start Google sign-in |
 | GET | `/api/auth/google/callback` | Validate callback, create/resolve account, issue app session |
-| GET | `/api/auth/session` | Restore account state; return signed-out state when no valid session exists |
-| POST | `/api/auth/logout` | Revoke app session and clear cookie |
+| POST | `/api/auth/email/register` | `{email, password, name?}` → `AppSession` (201) and session cookie; 409 if the email has an account |
+| POST | `/api/auth/email/login` | `{email, password}` → `AppSession` and session cookie; 401 for a wrong email or password, 429 while locked |
+| GET | `/api/session` | Restore account state (`AppSession`), or 401 when signed out |
+| POST | `/api/auth/logout` | Revoke app session and clear cookie (CSRF token required) |
+| GET | `/api/runs` | List the account's Campaign cloud saves (`RunSummary[]`) |
+| GET / PUT | `/api/runs/:runId` | Load, or save with an expected revision (`CloudRun`, 409 `SaveConflict`) |
 
 Private save routes validate the app session and enforce owner/revision checks. Guest play stays local. [🔑 Flow, security and deployment](AUTHENTICATION.md)
 

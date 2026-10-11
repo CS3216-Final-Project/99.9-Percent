@@ -2,10 +2,10 @@ import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import {useGame} from './store';
 import {localCloudCopy,rememberCloud} from './cloud';
 import {makeEnvelope,validateEnvelope} from './saveEnvelope';
-import {loadGame,rawSave} from './persist';
-import {newGame} from '../sim';
+import {loadClassicGame,loadGame,rawSave,saveMode} from './persist';
+import {newGame,newLegacyGame} from '../sim';
 import * as api from '../lib/api';
-vi.mock('../lib/api',async original=>{const actual=await original<typeof import('../lib/api')>();return {...actual,getSession:vi.fn(),listRuns:vi.fn(),getRun:vi.fn(),putRun:vi.fn(),logout:vi.fn()};});
+vi.mock('../lib/api',async original=>{const actual=await original<typeof import('../lib/api')>();return {...actual,getSession:vi.fn(),listRuns:vi.fn(),getRun:vi.fn(),putRun:vi.fn(),logout:vi.fn(),emailLogin:vi.fn(),emailRegister:vi.fn()};});
 const a={account:{id:'owner-a',displayName:'A'},csrfToken:'csrf-a'},b={account:{id:'owner-b',displayName:'B'},csrfToken:'csrf-b'};
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);vi.clearAllMocks();vi.mocked(api.getSession).mockResolvedValue(a);vi.mocked(api.logout).mockResolvedValue();useGame.getState().boot();useGame.getState().play();useGame.getState().onboardingMove('skip');});
 afterEach(()=>vi.restoreAllMocks());
@@ -54,7 +54,7 @@ it('resumes a validated cloud run paused while preserving the current local comp
 });
 it('does not replace progress with unsupported cloud envelopes',async()=>{
   await useGame.getState().restoreAccount();const before=rawSave(),e=current();vi.mocked(api.getRun).mockResolvedValue({runId:e.runId,revision:1,envelope:{...e,schemaVersion:99 as 3},updatedAt:'now'});
-  await useGame.getState().resumeCloud(e.runId);expect(rawSave()).toBe(before);expect(useGame.getState().cloudStatus).toContain('compatible');
+  await useGame.getState().resumeCloud(e.runId);expect(rawSave()).toBe(before);expect(useGame.getState().cloudStatus).toContain('different version');
 });
 it('loads schema 3 cloud replay saves paused and archives the original response without uploading',async()=>{
   await useGame.getState().restoreAccount();const e={...makeEnvelope(newGame(8,'phase3-remote'),321),schemaVersion:3 as const};
@@ -69,7 +69,7 @@ it('reports corrupt schema 3 cloud inputs as incompatible while preserving local
   await useGame.getState().restoreAccount();const before=rawSave(),game=useGame.getState().game;
   const e={...current(),schemaVersion:3 as const,step:-1};vi.mocked(api.getRun).mockResolvedValue({runId:e.runId,revision:1,envelope:e,updatedAt:'now'});
   await useGame.getState().resumeCloud(e.runId);expect(rawSave()).toBe(before);expect(useGame.getState().game).toBe(game);
-  expect(useGame.getState().cloudStatus).toBe('This cloud save needs a compatible game version. Local progress is retained.');
+  expect(useGame.getState().cloudStatus).toBe('This cloud save is from a different version of the game. Your local save is unchanged.');
 });
 it('blocks replacement/attachment when account records are corrupt or storage fails',async()=>{
   await useGame.getState().restoreAccount();localStorage.setItem('nn.campaign.cloud.v1','{');await useGame.getState().saveCloud(true);
@@ -119,4 +119,36 @@ it('keeps a quota-failed conflict in memory without an unhandled rejection',asyn
   await useGame.getState().restoreAccount();const e=current(),remote={runId:e.runId,revision:2,envelope:e,updatedAt:'now'};
   vi.mocked(api.putRun).mockImplementation(async()=>{vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw Error('quota');});throw new api.AccountApiError(409,{error:'conflict',current:remote});});
   await expect(useGame.getState().saveCloud(true)).resolves.toBeUndefined();expect(useGame.getState().cloudConflict).toEqual(remote);expect(useGame.getState().cloudStatus).toContain('Keep this tab open');
+});
+
+it('signs in with email in place, without uploading the guest company',async()=>{
+  vi.mocked(api.getSession).mockRejectedValue(new api.AccountApiError(401,{error:'guest'}));await useGame.getState().restoreAccount();
+  vi.mocked(api.emailLogin).mockResolvedValue(b);
+  expect(await useGame.getState().signInWithEmail('b@example.com','password-b')).toBeNull();
+  expect(api.emailLogin).toHaveBeenCalledWith('b@example.com','password-b');
+  expect(useGame.getState()).toMatchObject({accountSession:b,accountStatus:'signed-in',cloudBusy:false});
+  expect(api.putRun).not.toHaveBeenCalled();expect(localCloudCopy(current().runId)).toBeUndefined();
+});
+it('returns email sign-in errors to the form and stays a guest',async()=>{
+  vi.mocked(api.getSession).mockRejectedValue(new api.AccountApiError(401,{error:'guest'}));await useGame.getState().restoreAccount();
+  vi.mocked(api.emailLogin).mockRejectedValue(new api.AccountApiError(401,{error:'Email or password is incorrect.'}));
+  expect(await useGame.getState().signInWithEmail('b@example.com','wrong-password')).toBe('Email or password is incorrect.');
+  vi.mocked(api.emailRegister).mockRejectedValue(SyntaxError('Unexpected end of JSON input'));
+  expect(await useGame.getState().registerWithEmail('B','b@example.com','password-b')).toMatch(/Accounts are unavailable/);
+  expect(useGame.getState()).toMatchObject({accountSession:null,accountStatus:'guest',cloudBusy:false});
+  vi.mocked(api.emailRegister).mockResolvedValue(b);
+  expect(await useGame.getState().registerWithEmail('B','b@example.com','password-b')).toBeNull();
+  expect(api.emailRegister).toHaveBeenLastCalledWith('b@example.com','password-b','B');expect(useGame.getState().accountSession).toBe(b);
+});
+it('loads a cloud save from the home screen while Classic is active, keeping the Classic game',async()=>{
+  await useGame.getState().restoreAccount();const local=current();
+  saveMode('classic');useGame.setState(useGame.getInitialState(),true);useGame.getState().boot();
+  const classic={...newLegacyGame(3),turn:6};useGame.setState({game:classic});
+  vi.mocked(api.getSession).mockResolvedValue(a);await useGame.getState().restoreAccount();
+  const e=makeEnvelope(newGame(8,'remote-from-classic'),120);vi.mocked(api.getRun).mockResolvedValue({runId:e.runId,revision:4,envelope:e,updatedAt:'now'});
+  expect(await useGame.getState().resumeCloud(e.runId)).toBe(true);
+  expect(useGame.getState()).toMatchObject({mode:'campaign',hasRun:true,started:false,remainderMs:120});
+  expect(useGame.getState().game.campaign!.runId).toBe('remote-from-classic');
+  const kept=loadClassicGame();expect(kept.status==='ok'&&kept.game.turn).toBe(6);
+  expect(JSON.parse(localStorage.getItem(`nn.campaign.before-cloud.${local.runId}`)!).runId).toBe(local.runId);
 });
