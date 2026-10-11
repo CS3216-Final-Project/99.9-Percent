@@ -32,6 +32,16 @@ export async function readSession(req:Request):Promise<AppSession|null> {
     .where(and(eq(gameSessions.tokenHash,hash(token)),gt(gameSessions.expiresAt,new Date())));
   return row?{account:{id:row.id,displayName:row.displayName},csrfToken:row.csrfToken}:null;
 }
+const SESSION_MS=30*86400_000;
+/** Issue a fresh app session for this browser, revoking the one it held, and return what the client needs. */
+export async function startSession(req:Request,res:Response,account:{id:string;displayName:string}):Promise<AppSession> {
+  const db=getDb(),token=randomToken(),csrfToken=randomToken();
+  await db.insert(gameSessions).values({tokenHash:hash(token),accountId:account.id,csrfToken,expiresAt:new Date(Date.now()+SESSION_MS)});
+  const previous=cookie(req,'nn_session');
+  if(previous)await db.delete(gameSessions).where(eq(gameSessions.tokenHash,hash(previous)));
+  setCookie(res,'nn_session',token,SESSION_MS);
+  return {account:{id:account.id,displayName:account.displayName},csrfToken};
+}
 export async function requireSession(req:Request,res:Response,next:NextFunction) {
   const session=await readSession(req); if(!session){res.status(401).json({error:'Sign in to access cloud saves.'});return;}
   res.locals.session=session;

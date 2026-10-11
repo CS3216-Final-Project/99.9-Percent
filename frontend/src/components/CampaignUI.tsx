@@ -8,8 +8,8 @@ import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliabi
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
 import { campaignChapters } from "@/game/campaignChapters";
 import TechTree from "./TechTree";
-import { AccountPanel } from "./AccountPanel";
-import { ModeChoice } from "./ModeChoice";
+import { AccountSection } from "./Account";
+import { HomeScreen } from "./HomeScreen";
 import { CampaignChapters } from "./CampaignChapters";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest } from "@/game/persist";
@@ -333,8 +333,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
       {tab === "saves" && <div className="menu-columns">
         <div className="menu-col"><SaveFiles /></div>
         <div className="menu-col">
-          {/* The account panel names itself; the wrapper only gives it the menu's section spacing. */}
-          <div className="menu-section menu-account"><AccountPanel /></div>
+          <AccountSection />
           <section className="menu-section menu-danger" aria-label="Start over"><h4><Icon name="refresh" size={20} />Start over</h4>
             <div className="menu-actions"><button type="button" className={`btn${confirmReset ? " btn-quiet" : ""}`} aria-expanded={confirmReset} onClick={() => setConfirmReset(true)}><Icon name="refresh" size={20} />New company</button></div>
             {confirmReset && <div className="menu-confirm"><p>This replaces only the current campaign save. Export it first if you want to keep it.</p>
@@ -357,25 +356,9 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
   </Modal>;
 }
 export function CampaignOverlays() {
-  const { game, started, play, view, openView, act } = useGame();
+  const { game, started, view, openView, act } = useGame();
   const c = game.campaign!;
-  const {hasRun}=useGame();
-  if (!started && !hasRun) return <ModeChoice />;
-  if (!started) return <div className="title-screen campaign-title"><div className="title-card campaign-entry">
-    <div className="title-copy">
-      <span className="title-kicker"><Icon name="server" size={16} />A system design tycoon</span>
-      <h1>99.99%</h1><p className="title-tag">Grow a startup. Keep it online.</p>
-      <p className="title-goal">Keep your company online as traffic grows, without running out of cash.</p>
-      <ul className="title-loop" aria-label="How a run works"><li><Concept kind="users" icon="search" />Inspect evidence</li><li><Concept kind="tech" icon="server" />Choose a response</li><li><Concept kind="critical" icon="incident" />Run and observe</li></ul>
-      <p className="title-goal">Click room equipment to inspect it for free. One step models one second of traffic; 60 steps settle an operating week. Run advances time, and P pauses. The first incident pauses for your response.</p>
-    </div>
-    <div className="title-start">
-      <img className="gameplay-preview" src="/opening-gameplay.png" alt="The furnished office and component evidence in the playable campaign" />
-      <div className="title-cta"><div className="title-actions"><button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}><Icon name="play" />{hasRun ? "Continue company" : "Play Campaign"}</button>
-        <FeedbackButton /></div></div>
-      <p className="muted">Play immediately as a guest. Progress stays in this browser until you explicitly attach it to an account.</p><AccountPanel />
-    </div>
-  </div></div>;
+  if (!started) return <HomeScreen />;
   if(useGame.getState().onboarding) {
     const {meta,onboardingMove}=useGame.getState();
     const prompts=[

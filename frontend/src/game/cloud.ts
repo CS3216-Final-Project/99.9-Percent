@@ -15,7 +15,7 @@ function read():Copies {
 export function localCloudCopy(runId:string):LocalCloudCopy|undefined {const all=read();return Object.hasOwn(all,runId)?all[runId]:undefined;}
 export function rememberCloud(copy:LocalCloudCopy) {
   const all=read(),previous=Object.hasOwn(all,copy.local.runId)?all[copy.local.runId]:undefined;
-  if(previous&&previous.ownerId!==copy.ownerId)throw Error('This local run belongs to another account. Start a new guest company to attach a different run.');
+  if(previous&&previous.ownerId!==copy.ownerId)throw Error('This local save belongs to another account. Start a new game to save a different one to the cloud.');
   localStorage.setItem(KEY,JSON.stringify({...all,[copy.local.runId]:copy}));
 }
 export function checkpointCloud(envelope:SaveEnvelope) {

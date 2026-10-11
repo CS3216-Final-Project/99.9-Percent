@@ -10,10 +10,13 @@ import { ChartLine } from "pixelarticons/react/ChartLine.js";
 import { Check } from "pixelarticons/react/Check.js";
 import { CheckboxOn } from "pixelarticons/react/CheckboxOn.js";
 import { Close } from "pixelarticons/react/Close.js";
+import { Cloud } from "pixelarticons/react/Cloud.js";
 import { Coins } from "pixelarticons/react/Coins.js";
 import { Copy } from "pixelarticons/react/Copy.js";
 import { Database } from "pixelarticons/react/Database.js";
 import { Download } from "pixelarticons/react/Download.js";
+import { Eye } from "pixelarticons/react/Eye.js";
+import { EyeOff } from "pixelarticons/react/EyeOff.js";
 import { Fire } from "pixelarticons/react/Fire.js";
 import { Flag } from "pixelarticons/react/Flag.js";
 import { Frown } from "pixelarticons/react/Frown.js";
@@ -25,6 +28,9 @@ import { InfoBox } from "pixelarticons/react/InfoBox.js";
 import { Laptop } from "pixelarticons/react/Laptop.js";
 import { Lightbulb } from "pixelarticons/react/Lightbulb.js";
 import { Lock } from "pixelarticons/react/Lock.js";
+import { Login } from "pixelarticons/react/Login.js";
+import { Logout } from "pixelarticons/react/Logout.js";
+import { Mail } from "pixelarticons/react/Mail.js";
 import { Megaphone } from "pixelarticons/react/Megaphone.js";
 import { Meh } from "pixelarticons/react/Meh.js";
 import { Menu } from "pixelarticons/react/Menu.js";
@@ -57,6 +63,7 @@ import { TrendingUp } from "pixelarticons/react/TrendingUp.js";
 import { Trophy } from "pixelarticons/react/Trophy.js";
 import { Undo } from "pixelarticons/react/Undo.js";
 import { Upload } from "pixelarticons/react/Upload.js";
+import { User } from "pixelarticons/react/User.js";
 import { UserPlus } from "pixelarticons/react/UserPlus.js";
 import { Users } from "pixelarticons/react/Users.js";
 import { Volume3 } from "pixelarticons/react/Volume3.js";
@@ -138,6 +145,13 @@ const ICONS = {
   flag: Flag,
   party: PartyPopper,
   robot: RobotFaceHappy,
+  user: User,
+  cloud: Cloud,
+  mail: Mail,
+  login: Login,
+  logout: Logout,
+  eye: Eye,
+  eyeOff: EyeOff,
 } satisfies Record<string, ComponentType<SVGProps<SVGSVGElement>>>;
 
 export type IconName = keyof typeof ICONS;

@@ -53,7 +53,7 @@ test("new players can compare both modes and start Classic on touch", async ({ p
   await expect(choices.getByRole("button", { name: "Play Campaign" })).toBeInViewport();
   await expect(choices.getByRole("button", { name: "Play Classic" })).toBeInViewport();
   await expect(choices.getByRole("region", { name: "Classic" })).toContainText("50,000 users in 26 weeks");
-  expect(await page.locator(".mode-entry").evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await page.locator(".home-card").evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.screenshot({ path: "test-results/mode-choice-mobile.png" });
   await choices.getByRole("button", { name: "Play Classic" }).tap();
   await page.getByRole("button", { name: "Skip", exact: true }).tap();
@@ -169,11 +169,14 @@ test("selects scaling instances through room and evidence on touch",async({page}
 
 test('account controls remain usable on touch while accounts are offline',async({page})=>{
   await page.route('**/api/session',route=>route.fulfill({status:503,json:{error:'offline'}}));
-  await page.goto('/');await page.getByText('Account and cloud saves',{exact:true}).tap();
-  await expect(page.getByRole('link',{name:'Sign in with Google'})).toBeVisible();
-  await expect(page.getByRole('button',{name:'Retry account connection'})).toBeEnabled();
-  await page.getByRole('button',{name:'Retry account connection'}).scrollIntoViewIfNeeded();
+  await page.goto('/');await page.getByRole('button',{name:/Sign in/}).tap();
+  const dialog=page.getByRole('dialog',{name:'Account'});
+  await expect(dialog.getByRole('link',{name:'Continue with Google'})).toBeVisible();
+  await expect(dialog.getByRole('button',{name:'Try again'})).toBeEnabled();
+  await expect(dialog.getByLabel('Email',{exact:true})).toBeVisible();
+  expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
   await page.screenshot({path:'test-results/phase3-account-mobile.png'});
+  await dialog.getByRole('button',{name:'Close'}).tap();
   await page.getByRole('button',{name:'Play Campaign',exact:true}).tap();
   await expect(page.getByRole('dialog',{name:'Company introduction'})).toBeVisible();
 });

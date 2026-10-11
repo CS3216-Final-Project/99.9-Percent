@@ -1,8 +1,8 @@
-# 🔑 Authentication — Google OAuth
+# 🔑 Authentication — Google OAuth and email
 
-**Decision:** Google OAuth 2.0 + OpenID Connect. **Status:** implemented locally in the Phase 3 follow-up; Google/deployment configuration and live acceptance remain outstanding. **Owner:** Di Heng.
+**Decision:** Google OAuth 2.0 + OpenID Connect, plus email and password accounts. **Status:** implemented locally in the Phase 3 follow-up; Google/deployment configuration and live acceptance remain outstanding. **Owner:** Di Heng.
 
-React/Vite → Express → Google sign-in → app session in Neon. Guest play remains available.
+React/Vite → Express → Google sign-in, or an email and password → app session in Neon. Guest play remains available.
 
 ## 🔄 Sign-in flow
 
@@ -98,4 +98,17 @@ Configure the backend's GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_
 
 Before deployment acceptance: review/apply the additive migration through the authorized release process; verify two real Google accounts, cancellation, returning-user login, expiry/logout, callback replay rejection, cookie forwarding, private cache headers, fresh-browser resume, guest attachment, account switching and concurrent revision conflict. These live checks are not established by mocked provider/browser tests.
 
-Sign-in never uploads a guest run automatically. Account bindings live under nn.campaign.cloud.v1 and survive sign-out. Pending owner snapshots remain local during errors/expiry; use Save company to cloud to retry. Conflicts require an explicit choice and retain both versions. Replacing an active company retains the original bytes/current snapshot; Export account copies includes preserved snapshots and conflict copies. Local storage quota failures are surfaced and cannot promise reload durability.
+Sign-in never uploads a guest run automatically. Account bindings live under nn.campaign.cloud.v1 and survive sign-out. Pending owner snapshots remain local during errors/expiry; use Save to cloud to retry. Conflicts require an explicit choice and retain both versions. Replacing an active company retains the original bytes/current snapshot; Download backup (Account, Backup) includes preserved snapshots and conflict copies. Local storage quota failures are surfaced and cannot promise reload durability.
+
+## Email and password accounts
+
+Players who do not want to use Google can create an account with an email and password from the same Account dialog. The routes are `POST /api/auth/email/register` and `POST /api/auth/email/login`, each with its own Vercel function file under `frontend/api/auth/email/` and an entry in the proxy allowlist. Both answer with the same `AppSession` body as `GET /api/session` and set the same `nn_session` cookie through the shared `startSession` helper, which also revokes the browser's previous session. Sign-in happens in place, without a page reload, and never uploads the guest run.
+
+| | Contract |
+|---|---|
+| 👤 Identity | Issuer `email` with the trimmed, lowercased address as subject in `game_accounts`. An email account never merges with a Google account that has the same address, so knowing someone's email cannot take over their Google-backed saves. |
+| 🔒 Password | scrypt (N=16384, r=8, p=1, 16-byte salt, 64-byte key) from `node:crypto`, stored as `scrypt$N$r$p$salt$key` in `game_email_credentials`; compared with `timingSafeEqual`. 8 to 200 characters. Unknown emails still pay for one hash so response time does not reveal which addresses have accounts. |
+| 🛡️ Abuse | Requests must carry the exact `APP_ORIGIN` as Origin, which blocks login CSRF. A wrong email and a wrong password give the same 401. Ten wrong passwords lock the account for 15 minutes (429); a correct password after the lock resets the count. |
+| 🐘 Storage | One additive migration (`0003`) adds `game_email_credentials`, keyed by account ID and deleted with its account. |
+
+Not yet built: email verification, password reset and per-IP rate limits. Registration therefore says when an address already has an account, and someone could register an address they do not own. That gives them no access to anyone else's saves, but it would stop the real owner registering that address. Add verification and reset, which need an email provider and its server-side key, before relying on email accounts for anything beyond game saves.

@@ -103,6 +103,11 @@ export const gameSessions = pgTable('game_sessions', {
   tokenHash: text().primaryKey(), accountId: uuid().notNull().references(() => gameAccounts.id, {onDelete:'cascade'}),
   csrfToken: text().notNull(), expiresAt: timestamp({withTimezone:true}).notNull(), createdAt: createdAt(),
 }, t => [index('game_sessions_account_idx').on(t.accountId)]);
+/** Password sign-in for accounts whose identity is issuer `email` with the normalised email as subject. */
+export const gameEmailCredentials = pgTable('game_email_credentials', {
+  accountId: uuid().primaryKey().references(() => gameAccounts.id, {onDelete:'cascade'}), passwordHash: text().notNull(),
+  failedAttempts: integer().notNull().default(0), lockedUntil: timestamp({withTimezone:true}), createdAt: createdAt(),
+}, t => [check('game_email_credentials_failed_attempts', sql`${t.failedAttempts} >= 0`)]);
 export const gameAuthAttempts = pgTable('game_auth_attempts', {
   stateHash: text().primaryKey(), bindingHash: text().notNull(), nonce: text().notNull(), verifier: text().notNull(),
   expiresAt: timestamp({withTimezone:true}).notNull(),

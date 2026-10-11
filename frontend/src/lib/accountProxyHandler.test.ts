@@ -5,6 +5,8 @@ import session from '../../api/session';
 import google from '../../api/auth/google';
 import callback from '../../api/auth/google/callback';
 import logout from '../../api/auth/logout';
+import emailLogin from '../../api/auth/email/login';
+import emailRegister from '../../api/auth/email/register';
 import runs from '../../api/runs/index';
 import run from '../../api/runs/[runId]';
 type Req=Parameters<typeof handler>[0];type Res=Parameters<typeof handler>[1];
@@ -15,6 +17,8 @@ it.each([
   ['/api/auth/google','GET',google],
   ['/api/auth/google/callback?code=a&state=b','GET',callback],
   ['/api/auth/logout','POST',logout],
+  ['/api/auth/email/login','POST',emailLogin],
+  ['/api/auth/email/register','POST',emailRegister],
   ['/api/runs','GET',runs],
   ['/api/runs/company-1','GET',run],
   ['/api/runs/company-1','PUT',run],

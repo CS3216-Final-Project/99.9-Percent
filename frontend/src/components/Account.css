@@ -1,0 +1,362 @@
+/* Account: a chip on the home screen, and the same content in its dialog and in Menu, Saves. */
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  max-width: 100%;
+  padding: 6px 14px 6px 8px;
+  background: var(--night-3);
+  color: var(--on-night);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--press);
+  text-align: left;
+  transition:
+    transform 0.05s,
+    box-shadow 0.05s;
+}
+
+.account-chip:hover {
+  background: var(--night-line);
+}
+
+.account-chip:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 0 var(--ink);
+}
+
+.account-chip > .icon {
+  flex: none;
+  color: var(--go);
+}
+
+.account-chip-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.account-chip-name {
+  overflow: hidden;
+  max-width: 22ch;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-chip-sub {
+  color: var(--on-night-soft);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.account-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  background: var(--c-tech);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.account-avatar-big {
+  width: 48px;
+  height: 48px;
+  font-size: 1.2rem;
+}
+
+.modal-account {
+  width: min(520px, 100%);
+}
+
+.account-lede,
+.account-status,
+.cloud-note {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.account-status:empty {
+  display: none;
+}
+
+.account-signin {
+  display: grid;
+  gap: 12px;
+}
+
+.btn-google {
+  width: 100%;
+  min-height: 48px;
+  background: #fff;
+  text-decoration: none;
+}
+
+.google-mark {
+  flex: none;
+}
+
+.account-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-soft);
+  font-size: 0.95rem;
+}
+
+.account-divider::before,
+.account-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 2px dashed var(--paper-3);
+}
+
+.account-form {
+  display: grid;
+  gap: 4px;
+}
+
+.account-form-title {
+  margin: 0 0 2px;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+
+.account-form .field {
+  margin: 4px 0;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.field-optional {
+  color: var(--text-soft);
+  font-weight: 400;
+}
+
+.account-form .field input {
+  box-sizing: border-box;
+  width: 100%;
+  font-size: 1rem;
+}
+
+.account-form .field input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.password-field {
+  position: relative;
+  display: block;
+}
+
+.password-field input {
+  padding-right: 48px;
+}
+
+/* Sits inside the input's border, so it drops the button frame and keeps only its hover tint. */
+.icon-btn.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.icon-btn.password-toggle:hover:not(:disabled),
+.icon-btn.password-toggle[aria-pressed="true"] {
+  background: var(--paper-2);
+}
+
+.icon-btn.password-toggle:active:not(:disabled) {
+  transform: translateY(-50%);
+  box-shadow: none;
+}
+
+.field-hint {
+  margin: 0 0 4px;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.form-error {
+  margin: 4px 0;
+  padding: 8px 10px;
+  background: #ffedf0;
+  border: 2px solid var(--critical);
+  border-radius: var(--radius);
+  color: var(--critical-ink);
+  font-weight: 500;
+}
+
+.account-form .btn-primary {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 6px;
+}
+
+.account-switch {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+/* A link-weight action on paper, for choices that sit beside a main button. */
+.text-btn {
+  padding: 2px 0;
+  background: none;
+  border: 0;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.text-btn:hover:not(:disabled) {
+  color: #1d6fb8;
+}
+
+.text-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.account-profile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--paper-2);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+}
+
+.account-profile-text {
+  display: grid;
+  flex: 1;
+  min-width: 10ch;
+}
+
+.account-profile-text strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+}
+
+.account-profile-text span {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.cloud-saves {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cloud-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+
+.cloud-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.cloud-heading-row .cloud-heading {
+  margin: 0;
+}
+
+.cloud-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cloud-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+}
+
+.cloud-row-text {
+  display: grid;
+  min-width: 0;
+}
+
+.cloud-row-text strong {
+  font-weight: 600;
+}
+
+.cloud-row-text span {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.cloud-row .btn {
+  flex: none;
+}
+
+.cloud-conflict-actions {
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.cloud-backup .cloud-note {
+  margin: 8px 0;
+}
+
+/* Menu, Saves: the menu's own type sizes apply to the same content. */
+.modal-menu .account-form .field,
+.modal-menu .account-lede,
+.modal-menu .account-status,
+.modal-menu .cloud-note {
+  font-size: 1.05rem;
+}
+
+@media (max-width: 640px) {
+  .account-chip {
+    min-height: 44px;
+    padding: 4px 10px 4px 6px;
+  }
+  .account-chip-sub {
+    display: none;
+  }
+  .account-chip-name {
+    max-width: 12ch;
+  }
+  .account-avatar {
+    width: 30px;
+    height: 30px;
+  }
+}

@@ -46,13 +46,14 @@ Coverage is a baseline report, with no arbitrary global percentage gate. Fronten
 
 Still needed as the product grows: Firefox/WebKit and real-device checks, broader keyboard/screen-reader accessibility review, performance budgets, and integration tests for any new server-backed gameplay. Add these when their features or support commitments exist; do not label the current suite comprehensive.
 
-## Google authentication and cloud save coverage
+## Account and cloud save coverage
 
-Google OIDC and optional account-owned snapshots are implemented and tested against mocked provider exchange and isolated PGlite. Follow the [authentication contract](AUTHENTICATION.md) for deployment acceptance. The automated suite covers:
+Google OIDC, email and password accounts and optional account-owned snapshots are implemented and tested against mocked provider exchange and isolated PGlite. Follow the [authentication contract](AUTHENTICATION.md) for deployment acceptance. The automated suite covers:
 
-- **API:** mock Google code exchange/token validation; reject invalid/replayed callbacks, expired/revoked sessions and CSRF; verify two-account save isolation and revision conflicts.
+- **API:** mock Google code exchange/token validation; reject invalid/replayed callbacks, expired/revoked sessions and CSRF; verify two-account save isolation and revision conflicts. Email accounts: salted scrypt hashes, normalised addresses, duplicate registration refused without changing the password, the same answer for a wrong password and an unknown email, session rotation, the 15-minute lock after ten wrong passwords, other origins refused and no Google merge.
 - **Database:** additive account/session/attempt/run migrations and constraints with PGlite. Actual Neon HTTP connectivity remains an isolated deployment acceptance check.
-- **Browser:** Google cancellation, session restoration/sign-out, explicit guest-run attachment, offline changes and preserved legacy keys. Stub provider responses for repeatable CI.
+- **Browser:** Google cancellation, email sign-in after a wrong password and a refused duplicate account, session restoration/sign-out, explicit Save to cloud, conflict choice in Menu, Saves, another account's save left alone, loading a cloud save in a fresh browser, the offline Account dialog on touch, and preserved legacy keys. Stub provider responses for repeatable CI.
+- **Home screen:** both mode cards on every visit, each showing its saved game, so a Campaign in progress can switch to Classic and back without losing either save (React tests and a browser journey).
 - **Remaining deployment acceptance:** real Google sign-in with two test accounts on registered production/auth-test origins, exact callbacks, proxy cookies and private-response cache headers. These checks require configured test credentials and are not established by mocked CI.
 
 ## Agent guidance
