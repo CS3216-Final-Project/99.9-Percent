@@ -22,8 +22,11 @@ import {
   clearSave,
   decodeClassicSave,
   rawLegacySave,
+  legacyMusicOff,
+  loadAudio,
   loadLegacyMeta,
-  saveMusic,
+  saveAudio,
+  DEFAULT_AUDIO,
   DEFAULT_META,
   loadClassicGame,
   loadGame,
@@ -34,6 +37,7 @@ import {
   saveMeta,
   saveMode,
   track,
+  type AudioSettings,
   type GameMode,
   type Meta,
 } from "./persist";
@@ -76,6 +80,13 @@ export interface Toast {
   kind: "info" | "error" | "success";
 }
 
+/** The player's latest decision and whether the game accepted it. */
+export interface LastAction {
+  id: number;
+  type: Action["type"];
+  ok: boolean;
+}
+
 interface Store {
   prepareSignIn: () => boolean;
   accountSession: AppSession | null;
@@ -107,7 +118,15 @@ interface Store {
   /** False while the title screen is showing. */
   started: boolean;
   game: GameState;
+  /**
+   * Counts the times the game was replaced wholesale (boot, new run, import,
+   * mode switch), so a watcher can tell a loaded game from one being played.
+   */
+  generation: number;
+  lastAction: LastAction | null;
   meta: Meta;
+  /** Sound settings, shared by both modes and kept across mode switches. */
+  audio: AudioSettings;
   selected: EquipmentId | null;
   selectedAppId: string | null;
   selectApp: (id: string) => void;
@@ -154,13 +173,16 @@ interface Store {
   /** Begin the walkthrough, restarting the intro run first if this one is already under way. */
   startTutorialRun: () => void;
   rate: (rating: number) => void;
-  /** Turn the background music on or off, remembered for next time. */
-  toggleMusic: () => void;
+  /** Change the sound settings, remembered for next time. Volumes are clamped to 0–100. */
+  setAudio: (patch: Partial<AudioSettings>) => void;
+  /** Silence music and effects, or bring them back at their volumes. */
+  toggleMute: () => void;
   notify: (text: string, kind?: Toast["kind"]) => void;
   dismissToast: () => void;
 }
 
 let toastId = 1;
+let actionId = 1;
 let lastIncidentSave = 0;
 
 export const useGame = create<Store>()((set, get) => {
@@ -280,6 +302,8 @@ export const useGame = create<Store>()((set, get) => {
       ready: true,
       mode,
       started,
+      generation: get().generation + 1,
+      lastAction: null,
       meta,
       running: false,
       remainderMs: 0,
@@ -414,7 +438,7 @@ export const useGame = create<Store>()((set, get) => {
         rememberCloud({ownerId:session.account.id,revision:run.revision,local:e});
         if(!saveGame(game,e.runtime.remainderMs,true,e.runtime.measurement))throw Error('Storage could not retain the cloud copy. Local progress is retained.');
         saveMode("campaign");
-        set({mode:"campaign",game,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
+        set({mode:"campaign",game,generation:get().generation+1,lastAction:null,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
           running:false,started:false,onboarding:false,view:null,selected:null,selectedAppId:null,activeMark:null,cloudConflict:null,cloudStatus:'Cloud company loaded and paused. Continue when ready.'});
       }catch(error){accountFailure(error);}finally{set({cloudBusy:false});}
     },
@@ -425,7 +449,10 @@ export const useGame = create<Store>()((set, get) => {
     ready: false,
     started: false,
     game: newGame(BALANCE.introSeed),
+    generation: 0,
+    lastAction: null,
     meta: loadMetaSafe(),
+    audio: loadAudioSafe(),
     selected: null,
     selectedAppId: null,
     selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({selected:"app",selectedAppId:id}); },
@@ -441,6 +468,8 @@ export const useGame = create<Store>()((set, get) => {
 
     boot: () => {
       if (get().ready) return;
+      // Read once here, not on every mode switch: if storage fails, the in-memory settings are the ones to keep.
+      set({ audio: loadAudio() });
       enter(loadMode(), false);
     },
 
@@ -454,6 +483,8 @@ export const useGame = create<Store>()((set, get) => {
       const status=meta.openingOnboarding.status;
       const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
       set({game,hasRun:true,meta,measurement,started:true,running:false,
+        // Starting a fresh company replaces the game, like a new run.
+        ...(state.hasRun?{}:{generation:state.generation+1,lastAction:null}),
         onboarding:status==="not-started"||status==="in-progress",activeMark:document.hidden?null:performance.now()});
       if(!saveMeta(meta))get().notify("Onboarding preferences could not be saved.","error");
       persist();
@@ -499,15 +530,18 @@ export const useGame = create<Store>()((set, get) => {
 
     act: (action) => {
       if(get().game.campaign && (!get().started || get().onboarding || (get().game.campaign!.openingMilestone && !get().game.campaign!.openingMilestone!.acknowledged && action.type !== "acknowledge_milestone"))) return false;
+      const record = (ok: boolean) => set({ lastAction: { id: actionId++, type: action.type, ok } });
       if (get().game.campaign) {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
         if (result.ok && action.type === "enter_data") set({running:false});
+        record(result.ok);
         commit(state);
         if (!result.ok) get().notify(result.message, "error");
         return result.ok;
       }
       const result = applyAction(get().game, action);
+      record(result.ok);
       if (!result.ok) {
         get().notify(result.message, "error");
         return false;
@@ -590,7 +624,7 @@ export const useGame = create<Store>()((set, get) => {
       }
       const nextMeta={...old.meta,runsStarted:old.meta.runsStarted+1};
       const measurement=beginSession(m,game,crypto.randomUUID(),new Date().toISOString());
-      set({game,measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
+      set({game,generation:get().generation+1,lastAction:null,measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
         selected:null,hovered:null,view:null,techFocus:null,running:false,rating:null,
         onboarding:["not-started","in-progress"].includes(nextMeta.openingOnboarding.status),tour:null,
         started:true,toast:null,activeMark:document.hidden?null:performance.now()});
@@ -608,6 +642,8 @@ export const useGame = create<Store>()((set, get) => {
       track("run_started", { mode, seed: game.seed, run: nextMeta.runsStarted });
       set({
         game,
+        generation: get().generation + 1,
+        lastAction: null,
         remainderMs:0,
         saveBlocked:false,
         meta: nextMeta,
@@ -660,7 +696,7 @@ export const useGame = create<Store>()((set, get) => {
       const measurement = campaign.status === "ok" ? beginSession(campaign.envelope.runtime.measurement, game, crypto.randomUUID(), new Date().toISOString()) : emptyMeasurement();
       const saved = mode === "campaign" ? saveGame(game, remainderMs, true, measurement) && archiveEvents(measurement.pending) : saveClassicGame(game);
       saveMode(mode);
-      set({ mode, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, remainderMs, saveBlocked: false, running: false, view: null,
+      set({ mode, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, remainderMs, saveBlocked: false, running: false, view: null,
         selected: null, hovered: null, started: true, tour: null, onboarding: false, techFocus: null, rating: null });
       track("save_imported", { mode, step: game.campaign?.step ?? game.turn });
       get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
@@ -673,11 +709,13 @@ export const useGame = create<Store>()((set, get) => {
         get().notify("The pre-update save cannot be resumed. Export the original file to keep a copy.", "error");
         return false;
       }
+      const musicOff = legacyMusicOff();
       if (!get().importSave(raw)) return false;
       const meta = loadLegacyMeta();
-      saveMusic(meta.music);
       saveMeta(meta, "classic");
       set({ meta });
+      // The pre-update profile's music switch carries over; the volumes stay as they are.
+      if (musicOff) get().setAudio({ muted: true });
       return true;
     },
 
@@ -720,12 +758,20 @@ export const useGame = create<Store>()((set, get) => {
       get().startTour("basics");
     },
 
-    toggleMusic: () => {
-      const meta = { ...get().meta, music: !get().meta.music };
-      saveMusic(meta.music);
-      saveMeta(meta, get().mode);
-      set({ meta });
+    setAudio: (patch) => {
+      const now = get().audio;
+      const level = (v: number | undefined, was: number) => (v === undefined || !Number.isFinite(v) ? was : Math.round(Math.min(100, Math.max(0, v))));
+      const audio: AudioSettings = {
+        music: level(patch.music, now.music),
+        effects: level(patch.effects, now.effects),
+        muted: patch.muted ?? now.muted,
+      };
+      if (audio.music === now.music && audio.effects === now.effects && audio.muted === now.muted) return;
+      set({ audio });
+      // Unsaved settings still apply for this visit.
+      saveAudio(audio);
     },
+    toggleMute: () => get().setAudio({ muted: !get().audio.muted }),
 
     rate: (rating) => {
       const { game } = get();
@@ -760,6 +806,10 @@ function loadMetaSafe(): Meta {
     return { ...DEFAULT_META };
   }
   return loadMeta();
+}
+
+function loadAudioSafe(): AudioSettings {
+  return typeof window === "undefined" ? { ...DEFAULT_AUDIO } : loadAudio();
 }
 
 export { clearSave };

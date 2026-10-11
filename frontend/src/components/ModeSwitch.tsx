@@ -23,18 +23,21 @@ export function ModeSwitch({ to }: { to: GameMode }) {
         <Icon name="switch" size={16} />
         Game mode
       </h4>
-      <p className="muted">
+      <p className="menu-note">
         You are playing {NAME[from]}. {ABOUT[to]} Each mode keeps its own saved run.
       </p>
-      <button
-        type="button"
-        className={`btn ${unsaved ? "btn-danger" : ""}`}
-        onClick={() => {
-          if (!switchMode(to, { discard: unsaved })) setUnsaved(true);
-        }}
-      >
-        {unsaved ? "Switch and lose this run" : `Switch to ${NAME[to]}`}
-      </button>
+      <div className="menu-actions">
+        <button
+          type="button"
+          className={`btn ${unsaved ? "btn-danger" : ""}`}
+          onClick={() => {
+            if (!switchMode(to, { discard: unsaved })) setUnsaved(true);
+          }}
+        >
+          <Icon name="switch" size={16} />
+          {unsaved ? "Switch and lose this run" : `Switch to ${NAME[to]}`}
+        </button>
+      </div>
       {unsaved && (
         <Callout compact tone="warn" icon="alert" kicker="Not saved">
           This run could not be saved, so switching now loses it. Press the red button again to switch anyway.

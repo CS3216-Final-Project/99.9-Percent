@@ -19,19 +19,20 @@ The isometric room is the main canvas. A dark purple HUD frames cream paper pane
 | Trends | Shared `LineChart`, labelled units, ticks and time axis | `Views.tsx` |
 | Menu / report | Shared `Modal` with concept icon, body and footer actions | `components/ui.tsx`, `Modals.tsx` |
 | Explanation on demand | Dark HUD tooltip with an arrow and a key for shortcuts. `Tip` wraps a term; `tipProps(text)` (or the `tip` prop on `Act`, `Callout`, `Chip`) marks a control. One `TooltipLayer` draws it. Never use the native `title` attribute | `components/ui.tsx`, `tips.ts`, `Tooltip.tsx` |
+| Sound | Header mute beside Menu; the menu's Sound section with labelled Music and Sound effects sliders (percent shown) and Mute all, the same setting as the header | `SoundButton.tsx`, `SoundSettings.tsx` |
 
 Paths in this table are under `frontend/src/`. Shared vocabulary lives in `presentation.ts`: the same equipment gets the same name and icon in the room, investigation controls and inspector. Prefer extracting a shared primitive when extending an existing pattern to copying its markup or overriding its styles for one mode.
 
 ## Screen structure
 
 - **Title:** room remains behind the overlay; show the title kicker, game name, short goal, three icon-led steps and a prominent Play/Continue button. Explain the current mode's loop and time units briefly. Do not carry Classic's 26-week target into Campaign.
-- **Top bar:** brand and time at the left, four familiar metric tiles, then music and Menu. Health changes to the incident icon and the whole header gets the red striped treatment during an incident. Campaign pending revenue must be clearly distinguished from available cash and settled revenue.
+- **Top bar:** brand and time at the left, four familiar metric tiles, then the sound mute and Menu. Health changes to the incident icon and the whole header gets the red striped treatment during an incident. Campaign pending revenue must be clearly distinguished from available cash and settled revenue.
 - **Management:** room equipment is clickable. Selecting it gives immediate visible feedback with its name, icon and authoritative metrics. Campaign can keep a compact system overview visible because only a few opening actions exist.
 - **Incident:** retain the red banner and symptom-focused title, a compact progress area, three impact tiles, then the numbered jobs **1. Inspect the evidence** and **2. Choose a response**. Equipment controls mirror the room. Selected equipment is highlighted and its latest observation is shown. Keep the permitted responses equally prominent; no full metrics table before the response list.
 - **Bottom bar:** view tabs on the left; play/pause icon, selected speed and primary advance action on the right. Keep accessible names for icon-only buttons. Use labels that match the mode's actual time model.
 - **Review:** report in a shared modal with outcome tag, time range, spending and evidence-based explanations. Raw snapshots belong in a disclosure. Continue returns to the same company.
 - **History:** use shared charts with physical steps or weeks labelled accurately. Financial settlements and event details can use disclosures.
-- **Menu:** group how-to-play, company/run controls and save-file controls into sections. Confirm replacement of saved progress and keep raw export available when a save cannot be read. Music stays next to Menu in all modes.
+- **Menu:** the same layout in both modes. Across the top: Classic's run card, Resume and the Save now / How to play / Tutorial tiles; Campaign's paused notice, how to play and Save now. Below, from 760 px wide, two columns: Sound and Save files (the pre-update save as a group inside it) on the left, Game mode and Start over on the right; narrower screens stack them in that order. Start over sits in a red-bordered box because it replaces the run. Each section has an icon heading and stacked full-width actions; a confirmation appears beside the control that asked for it. Playtest records come last: Classic's collapsed playtest data, and Campaign's introduction replay, playtest export, save-and-exit and observer notes. Confirm replacement of saved progress and keep raw export available when a save cannot be read. The sound mute stays next to Menu in all modes and is the same setting as Mute all.
 
 ## Phase 1 adaptations
 

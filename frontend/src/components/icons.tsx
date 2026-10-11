@@ -13,6 +13,7 @@ import { Close } from "pixelarticons/react/Close.js";
 import { Coins } from "pixelarticons/react/Coins.js";
 import { Copy } from "pixelarticons/react/Copy.js";
 import { Database } from "pixelarticons/react/Database.js";
+import { Download } from "pixelarticons/react/Download.js";
 import { Fire } from "pixelarticons/react/Fire.js";
 import { Flag } from "pixelarticons/react/Flag.js";
 import { Frown } from "pixelarticons/react/Frown.js";
@@ -55,6 +56,7 @@ import { Tools } from "pixelarticons/react/Tools.js";
 import { TrendingUp } from "pixelarticons/react/TrendingUp.js";
 import { Trophy } from "pixelarticons/react/Trophy.js";
 import { Undo } from "pixelarticons/react/Undo.js";
+import { Upload } from "pixelarticons/react/Upload.js";
 import { UserPlus } from "pixelarticons/react/UserPlus.js";
 import { Users } from "pixelarticons/react/Users.js";
 import { Volume3 } from "pixelarticons/react/Volume3.js";
@@ -82,6 +84,8 @@ const ICONS = {
   bolt: Zap,
   copy: Copy,
   save: Save,
+  download: Download,
+  upload: Upload,
   monitor: Monitor,
   plug: Plug,
   ship: Ship,

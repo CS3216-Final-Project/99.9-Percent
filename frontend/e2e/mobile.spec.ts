@@ -6,8 +6,8 @@ test("inspects evidence and advances a physical step on touch", async ({ page })
   await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap();
   await page.getByRole("button", { name: "Skip introduction" }).tap();
   await expectRoom(page);
-  const music = page.getByRole("button", { name: "Music", exact: true });
-  await music.tap(); await expect(music).toHaveAttribute("aria-pressed", "false");
+  const mute = page.getByRole("button", { name: "Mute sound", exact: true });
+  await mute.tap(); await expect(mute).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: "test-results/phase1-mobile.png" });
   await page.getByRole("button", { name: "Inspect metrics · free" }).tap();
   await page.getByRole("button", { name: "Advance step" }).tap();
@@ -58,10 +58,10 @@ test("a tap explains a term, and tapping a button does not leave a tooltip over 
   expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(view.width);
   await page.screenshot({ path: "test-results/tooltip-mobile.png" });
 
-  const music = page.getByRole("button", { name: "Music", exact: true });
-  await music.tap();
+  const mute = page.getByRole("button", { name: "Mute sound", exact: true });
+  await mute.tap();
   await expect(tip).toBeHidden();
-  await expect(music).toHaveAttribute("aria-pressed", "false");
+  await expect(mute).toHaveAttribute("aria-pressed", "true");
 });
 
 test("selects scaling instances through room and evidence on touch",async({page})=>{

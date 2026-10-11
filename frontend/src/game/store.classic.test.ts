@@ -19,17 +19,17 @@ function resumeIncident() {
   return game;
 }
 
-describe('music setting', () => {
-  it('turns the music off and on, and remembers it for the next visit', () => {
+describe('sound settings', () => {
+  it('mutes and unmutes, and remembers it for the next visit', () => {
     useGame.getState().boot();
-    expect(useGame.getState().meta.music).toBe(true);
-    useGame.getState().toggleMusic();
-    expect(useGame.getState().meta.music).toBe(false);
+    expect(useGame.getState().audio.muted).toBe(false);
+    useGame.getState().toggleMute();
+    expect(useGame.getState().audio.muted).toBe(true);
     useGame.setState(useGame.getInitialState(), true);
     useGame.getState().boot();
-    expect(useGame.getState().meta.music).toBe(false);
-    useGame.getState().toggleMusic();
-    expect(useGame.getState().meta.music).toBe(true);
+    expect(useGame.getState().audio.muted).toBe(true);
+    useGame.getState().toggleMute();
+    expect(useGame.getState().audio.muted).toBe(false);
   });
 });
 

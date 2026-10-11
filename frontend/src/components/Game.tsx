@@ -5,11 +5,14 @@ import { lazy, Suspense, useEffect, useRef } from "react";
 import { BALANCE, completedTechIds, currentWarnings, metrics, TECH_ORDER, type GameState } from "@/sim";
 import { nextMove } from "@/game/advisor";
 import { clock, compact, money, moneyFull, num, signedMoney, uptimePct } from "@/game/format";
+import { watchCues } from "@/game/cues";
 import { createMusic, type Music } from "@/game/music";
+import type { AudioSettings } from "@/game/persist";
+import { createSfx } from "@/game/sfx";
 import { useGame, type Speed, type View } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { SoundButton } from "./SoundButton";
 import { tipProps } from "./tips";
-import { MusicButton } from "./MusicButton";
 import { EndReport, HowToPlay, Menu, PostmortemModal, TitleScreen } from "./Modals";
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
@@ -98,7 +101,7 @@ function TopBar() {
         </Stat>
       </div>
 
-      <MusicButton />
+      <SoundButton />
       <button type="button" className="icon-btn menu-btn" onClick={() => openView("menu")} aria-label="Menu" {...tipProps("Menu")}>
         <Icon name="menu" />
       </button>
@@ -317,22 +320,47 @@ function ToastHost() {
 /* Shell                                                               */
 /* ------------------------------------------------------------------ */
 
+const musicLevel = (a: AudioSettings) => (a.muted ? 0 : a.music);
+const effectsLevel = (a: AudioSettings) => (a.muted ? 0 : a.effects);
+
 /** Background music once a run is on screen: calm while building, tense during an incident. */
 function useMusic(): void {
-  const on = useGame((s) => s.meta.music);
+  const level = useGame((s) => musicLevel(s.audio));
   const started = useGame((s) => s.started);
   const incident = useGame((s) => s.game.phase === "incident");
   const music = useRef<Music | null>(null);
   useEffect(() => {
-    const m = createMusic(() => useGame.getState().meta.music);
+    const m = createMusic(() => musicLevel(useGame.getState().audio) > 0);
     music.current = m;
     return () => {
       m.dispose();
       music.current = null;
     };
   }, []);
-  useEffect(() => music.current?.setEnabled(on && started), [on, started]);
+  useEffect(() => music.current?.setVolume(level), [level]);
+  useEffect(() => music.current?.setEnabled(started), [started]);
   useEffect(() => music.current?.setMood(incident ? "tense" : "calm"), [incident]);
+}
+
+/**
+ * Sound effects for what just happened in the game. Driven by a store
+ * subscription rather than renders, so the volume is already set when a cue
+ * plays and nothing is heard twice under StrictMode.
+ */
+function useSoundEffects(): void {
+  useEffect(() => {
+    const sfx = createSfx(() => effectsLevel(useGame.getState().audio) > 0);
+    sfx.setVolume(effectsLevel(useGame.getState().audio));
+    const stopVolume = useGame.subscribe((s, prev) => {
+      if (s.audio !== prev.audio) sfx.setVolume(effectsLevel(s.audio));
+    });
+    const stopCues = watchCues(useGame.subscribe, (cue) => sfx.play(cue));
+    return () => {
+      stopCues();
+      stopVolume();
+      sfx.dispose();
+    };
+  }, []);
 }
 
 export default function Game() {
@@ -347,6 +375,7 @@ export default function Game() {
   const onboarding = useGame((s) => s.onboarding);
   const touring = useGame((s) => s.tour?.track ?? null);
   useMusic();
+  useSoundEffects();
 
   useEffect(() => {
     useGame.getState().boot();
