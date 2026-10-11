@@ -19,7 +19,7 @@ The isometric room is the main canvas. A dark purple HUD frames cream paper pane
 | Trends | Shared `LineChart`, labelled units, ticks and time axis | `Views.tsx` |
 | Menu / report | Shared `Modal` with concept icon, body and footer actions | `components/ui.tsx`, `Modals.tsx` |
 | Explanation on demand | Dark HUD tooltip with an arrow and a key for shortcuts. `Tip` wraps a term; `tipProps(text)` (or the `tip` prop on `Act`, `Callout`, `Chip`) marks a control. One `TooltipLayer` draws it. Never use the native `title` attribute | `components/ui.tsx`, `tips.ts`, `Tooltip.tsx` |
-| Sound | Header mute beside Menu; the menu's Sound section with labelled Music and Sound effects sliders (percent shown) and Mute all, the same setting as the header | `SoundButton.tsx`, `SoundSettings.tsx` |
+| Sound | Header mute beside Menu; the menu's Sound section with labelled Music and Sound effects sliders (percent shown) and Mute all, the same setting as the header. Both read as muted when the mute is on or when both volumes are at 0, since nothing would be heard, and either then brings the default volumes back | `SoundButton.tsx`, `SoundSettings.tsx` |
 | Graphics | The menu's Graphics section: one radio card per quality (Auto, High, Medium, Low), each with a one-line account of what it changes. A chosen card is filled and outlined, not only coloured. The choice applies at once and is remembered in the browser | `GraphicsSettings.tsx`, `scene/quality.ts` |
 | Tabs | A strip of buttons, the selected one dark, above a panel that holds only the selected tab's sections. `Tabs` supplies the tab roles, `aria-selected`, a single Tab stop and Arrow, Home and End keys. Tab names are one or two words with an icon | `components/ui.tsx`, `MenuTabs.tsx` |
 
