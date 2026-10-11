@@ -26,7 +26,8 @@ import {
   tempSlot,
   type Footprint,
 } from "./layout";
-import { chooseDetail, DetailContext, detailOverride, useDetail, type Renderer } from "./detail";
+import { DetailContext, detailOverride, useDetail, type Renderer } from "./detail";
+import { resolveQuality, type QualityProfile } from "./quality";
 import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { Icon } from "../icons";
@@ -680,7 +681,8 @@ function Effects() {
   );
 }
 
-function Scene({ effects }: { effects: boolean }) {
+function Scene({ quality }: { quality: QualityProfile }) {
+  const effects = quality.effects;
   const m = useSceneModel();
   const campaign = useGame(s => s.game.campaign);
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
@@ -708,10 +710,10 @@ function Scene({ effects }: { effects: boolean }) {
         position={[11, 17, 7]}
         intensity={2.3}
         color="#fff1de"
-        castShadow
-        // HD gets a sharper map with softened edges.
-        shadow-mapSize={hd ? [4096, 4096] : [2048, 2048]}
-        shadow-radius={hd ? 3 : 1}
+        castShadow={quality.shadows}
+        // The shadow map's sharpness and edge softness come from the quality setting.
+        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
+        shadow-radius={quality.shadowRadius}
         shadow-bias={-0.0005}
         shadow-camera-left={-30}
         shadow-camera-right={30}
@@ -850,42 +852,41 @@ function isSoftwareRenderer(gl: THREE.WebGLRenderer): boolean {
   return /swiftshader|llvmpipe|software|softpipe|basic render/i.test(name);
 }
 
-/** Software rendering cannot keep up with 60 frames a second, so it draws 20. */
-const SOFTWARE_FPS = 20;
-
-/** In on-demand mode, ask for a new frame 20 times a second. */
-function SoftwareFrames() {
+/** In on-demand mode, ask for a new frame `fps` times a second. */
+function FrameLimiter({ fps }: { fps: number }) {
   const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
-    const id = window.setInterval(() => invalidate(), 1000 / SOFTWARE_FPS);
+    const id = window.setInterval(() => invalidate(), 1000 / fps);
     return () => window.clearInterval(id);
-  }, [invalidate]);
+  }, [invalidate, fps]);
   return null;
 }
 
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
   const [renderer, setRenderer] = useState<Renderer>("unknown");
-  /** Drawing in software, without a GPU: no shadows, half the pixels, 20 frames a second. */
-  const soft = renderer === "software";
   const [override] = useState(() => detailOverride(window.location.search));
-  const detail = chooseDetail(renderer, override);
+  const chosen = useGame((s) => s.graphics.quality);
+  // Without a graphics card the browser draws on the CPU. Auto keeps that playable: no shadows, half the pixels
+  // (labels and the interface are HTML and stay sharp) and 20 frames a second. A GPU gets HD detail: photo
+  // textures, physically based shading and reflections. The player can pick a quality instead (see the menu).
+  const quality = resolveQuality(chosen, renderer, override);
+  const capped = quality.fps !== null;
   return (
     <div className="stage-canvas" ref={container}>
+      {/* Shadow maps cannot be resized or switched on and off once materials are compiled, so a new quality starts a new canvas. */}
       <Canvas
+        key={chosen}
         orthographic
-        shadows={soft ? false : "percentage"}
-        dpr={soft ? 0.5 : [1, 1.75]}
-        frameloop={soft ? "demand" : "always"}
+        shadows={quality.shadows ? "percentage" : false}
+        dpr={quality.dpr}
+        frameloop={capped ? "demand" : "always"}
         // How strongly the HD environment lights materials; without one it has no effect.
         scene={{ environmentIntensity: HD_REFLECTIONS }}
         onCreated={({ gl }) => {
-          // Without a graphics card the browser draws on the CPU. Keep it playable: no shadows, half the pixels
-          // (labels and the interface are HTML and stay sharp) and 20 frames a second. A GPU keeps full quality.
-          // A GPU also gets HD detail: photo textures, physically based shading and reflections.
           const software = isSoftwareRenderer(gl);
-          // Before the first frame, so no material is ever compiled with shadows.
-          if (software) gl.shadowMap.enabled = false;
+          // Before the first frame, so no material is ever compiled with shadows that are not wanted.
+          if (!resolveQuality(chosen, software ? "software" : "gpu", override).shadows) gl.shadowMap.enabled = false;
           setRenderer(software ? "software" : "gpu");
         }}
         camera={{ position: [TARGET.x + CAMERA_OFFSET.x, CAMERA_OFFSET.y, TARGET.z + CAMERA_OFFSET.z], zoom: 30, near: CAMERA_NEAR, far: CAMERA_FAR }}
@@ -896,11 +897,11 @@ export default function Facility() {
       >
         {/* The room waits until the renderer is known, so a GPU never compiles the basic materials only to replace them. */}
         {renderer !== "unknown" && (
-          <DetailContext.Provider value={detail}>
-            <Scene effects={detail === "hd" && !soft} />
+          <DetailContext.Provider value={quality.detail}>
+            <Scene quality={quality} />
           </DetailContext.Provider>
         )}
-        {soft && <SoftwareFrames />}
+        {quality.fps !== null && <FrameLimiter fps={quality.fps} />}
       </Canvas>
       <Labels />
       <HoverTip container={container} />

@@ -256,6 +256,26 @@ describe("old saves and imports across modes", () => {
     useGame.getState().switchMode("classic", { discard: true });
     expect(useGame.getState().audio).toMatchObject({ effects: 20, muted: true });
   });
+  it("keeps the graphics quality across mode switches and reloads", () => {
+    useGame.getState().boot();
+    expect(useGame.getState().graphics).toEqual({ quality: "auto" });
+    useGame.getState().setGraphics({ quality: "low" });
+    useGame.getState().switchMode("classic"); expect(useGame.getState().graphics).toEqual({ quality: "low" });
+    useGame.getState().switchMode("campaign"); expect(useGame.getState().graphics).toEqual({ quality: "low" });
+    useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+    expect(useGame.getState().graphics).toEqual({ quality: "low" });
+  });
+  it("applies a graphics quality for this visit even when storage fails, and ignores an unknown one", () => {
+    useGame.getState().boot();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
+    useGame.getState().setGraphics({ quality: "medium" });
+    expect(useGame.getState().graphics).toEqual({ quality: "medium" });
+    const before = useGame.getState().graphics;
+    useGame.getState().setGraphics({ quality: "ultra" as never });
+    useGame.getState().setGraphics({});
+    useGame.getState().setGraphics({ quality: "medium" });
+    expect(useGame.getState().graphics).toBe(before);
+  });
   it("clamps volumes to whole percents and ignores a change that changes nothing", () => {
     useGame.getState().boot();
     useGame.getState().setAudio({ music: 140, effects: -3 });

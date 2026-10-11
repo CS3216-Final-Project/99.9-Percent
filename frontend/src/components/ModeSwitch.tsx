@@ -20,7 +20,7 @@ export function ModeSwitch({ to }: { to: GameMode }) {
   return (
     <section className="menu-section" aria-label="Game mode">
       <h4>
-        <Icon name="switch" size={16} />
+        <Icon name="switch" size={20} />
         Game mode
       </h4>
       <p className="menu-note">
@@ -34,7 +34,7 @@ export function ModeSwitch({ to }: { to: GameMode }) {
             if (!switchMode(to, { discard: unsaved })) setUnsaved(true);
           }}
         >
-          <Icon name="switch" size={16} />
+          <Icon name="switch" size={20} />
           {unsaved ? "Switch and lose this run" : `Switch to ${NAME[to]}`}
         </button>
       </div>

@@ -121,6 +121,7 @@ test('confirms replacing a run and starts the supplied replay seed', async ({ pa
   await page.getByRole('button', { name: 'Continue week 2' }).click();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   const menu = page.getByRole('dialog', { name: 'Menu' });
+  await menu.getByRole('tab', { name: 'Saves' }).click();
   await menu.getByRole('textbox').fill('e2e-repeatable');
   await menu.getByRole('button', { name: 'New game', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
@@ -183,6 +184,7 @@ test('plays sound from the first click, follows the menu sliders and remembers a
   expect(problems).toEqual([]);
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   const menu = page.getByRole('dialog', { name: 'Menu' });
+  await menu.getByRole('tab', { name: 'Sound' }).click();
   const effects = menu.getByRole('slider', { name: 'Sound effects' });
   await effects.fill('40');
   await expect(effects).toHaveAttribute('aria-valuetext', '40%');
