@@ -1,16 +1,17 @@
 import type { Action, GameState } from "@/sim";
 import type { Cue } from "./sfx";
-import type { useGame } from "./store";
+import type { IntroKind, useGame } from "./store";
 
 /*
  * Which sound effect, if any, a change in the game deserves. Read from the
  * store before and after each update, so the simulation never knows about
- * sound. Loading, importing or starting a game is not news: nothing plays for
- * the state it arrives in.
+ * sound. Loading or importing a game is not news: nothing plays for the state
+ * it arrives in. Starting a company is: the store says so with `lastIntro`,
+ * which only the player's own starts and introduction steps set.
  */
 
 type StoreState = ReturnType<typeof useGame.getState>;
-export type CueState = Pick<StoreState, "game" | "generation" | "lastAction" | "toast" | "started" | "audio">;
+export type CueState = Pick<StoreState, "game" | "generation" | "lastAction" | "lastIntro" | "toast" | "started" | "audio">;
 
 /** The sound for each accepted decision; decisions that open or close a screen make none. */
 const ACTION_CUE: Partial<Record<Action["type"], Cue>> = {
@@ -37,10 +38,18 @@ const ACTION_CUE: Partial<Record<Action["type"], Cue>> = {
   incident_hint: "blip",
 };
 
+/** The sound for each point in a run's introduction: a company starting, the prompts moving on, the introduction done. */
+const INTRO_CUE: Record<IntroKind, Cue> = {
+  begin: "launch",
+  step: "blip",
+  finish: "unlock",
+};
+
 /** When several cues land at once, only the most important plays. */
 export const CUE_PRIORITY: readonly Cue[] = [
   "won",
   "lost",
+  "launch",
   "alarm",
   "relief",
   "review",
@@ -63,6 +72,8 @@ export function cuesBetween(prev: CueState, next: CueState): Cue[] {
   const cues: Cue[] = [];
   // The effects slider plays a sample at its new volume, as does turning sound back on.
   if (next.audio.effects !== prev.audio.effects || (prev.audio.muted && !next.audio.muted)) cues.push("preview");
+  // A new company replaces the game and may leave the title screen, so this comes before the checks that silence both.
+  if (next.lastIntro && next.lastIntro !== prev.lastIntro) cues.push(INTRO_CUE[next.lastIntro.kind]);
   if (next.generation !== prev.generation || !prev.started || !next.started) return cues;
 
   const decided = next.lastAction;
@@ -128,11 +139,15 @@ export function topCue(cues: readonly Cue[]): Cue | null {
 
 type Subscribe = (listener: (state: CueState, prev: CueState) => void) => () => void;
 
+/** What still sounds when the game was replaced in the same burst: a slider sample, and the start of the run that did the replacing. */
+const SURVIVES_REPLACEMENT: readonly Cue[] = ["preview", "launch"];
+
 /**
  * Watch the store and play one cue per burst of updates. A single decision can
  * update the store several times in a row (a new state, then a notice), so
  * cues gather until the current task is done. If the game was replaced during
- * the burst, as by loading or importing, the whole burst is dropped.
+ * the burst, as by loading or importing, the burst is dropped, except for the
+ * sounds in SURVIVES_REPLACEMENT.
  */
 export function watchCues(subscribe: Subscribe, play: (cue: Cue) => void): () => void {
   let pending: Cue[] = [];
@@ -141,12 +156,10 @@ export function watchCues(subscribe: Subscribe, play: (cue: Cue) => void): () =>
   let stopped = false;
   const flush = () => {
     queued = false;
-    const cue = topCue(pending);
-    // A slider sample still plays after a load; nothing else does.
-    const keep = replaced ? (pending.includes("preview") ? "preview" : null) : cue;
+    const cue = topCue(replaced ? pending.filter((c) => SURVIVES_REPLACEMENT.includes(c)) : pending);
     pending = [];
     replaced = false;
-    if (keep && !stopped) play(keep);
+    if (cue && !stopped) play(cue);
   };
   const unsubscribe = subscribe((state, prev) => {
     if (state.generation !== prev.generation) replaced = true;
