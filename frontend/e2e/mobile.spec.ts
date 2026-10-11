@@ -1,6 +1,23 @@
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
+import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
+
+test("reliability: inspection and effective recipients remain clear on narrow touch screens",async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.route("**/api/**",route=>route.abort());
+ await seedSave(page,tick(act(preparedReliability(),{type:"arm_reliability"}),9));
+ await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ const panel=page.getByRole("region",{name:"Stay Online"});
+ await panel.getByRole("button",{name:"Inspect App 2 health · free",exact:true}).tap();
+ const instances=page.getByRole("region",{name:"Application instances"});
+ await expect(instances.getByRole("button",{name:/App 2: Installed - not receiving traffic/})).toHaveAttribute("aria-pressed","true");
+ await expect(panel).toContainText("detected unhealthy");
+ await expect(page.getByRole("button",{name:"Restore App 2 · free · 3 steps",exact:true})).toBeEnabled();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.getByRole("button",{name:"Menu",exact:true}).tap();
+ await expect(page.getByRole("dialog",{name:"Menu"}).getByRole("tab",{name:/Graphics/})).toBeVisible();
+});
 
 test("inspects evidence and advances a physical step on touch", async ({ page }) => {
   await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).tap();

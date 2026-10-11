@@ -18,7 +18,12 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
         const panelBox = el.closest("aside")!.getBoundingClientRect();
         return [...el.querySelectorAll("button")].every(button => {
           const box = button.getBoundingClientRect();
-          return box.top >= panelBox.top + 3 && box.bottom <= panelBox.bottom - 3;
+          return box.top >= panelBox.top + 3 && box.bottom <= panelBox.bottom - 3 &&
+            box.left >= panelBox.left && box.right <= panelBox.right &&
+            [...button.querySelectorAll(".price, .act-label")].every(label=>{
+              const labelBox=label.getBoundingClientRect();
+              return labelBox.left>=box.left&&labelBox.right<=box.right;
+            });
         });
       });
       expect(await responsesFit()).toBe(true);

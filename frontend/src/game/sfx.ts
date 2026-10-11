@@ -102,6 +102,21 @@ const VOICES = {
     });
     bell(ctx, out, at + 0.14, 84, 0.06, 0.3);
   },
+  /** A company starts: a rack powering up, a sweep that rises and settles into two bell notes. */
+  launch: (ctx, out, at, hiss) => {
+    const lp = filter(ctx, "lowpass", 300);
+    lp.frequency.setValueAtTime(300, at);
+    lp.frequency.exponentialRampToValueAtTime(2600, at + 0.34);
+    const fan = osc(ctx, "sawtooth", note(36), at, at + 0.42);
+    fan.frequency.setValueAtTime(note(36), at);
+    fan.frequency.exponentialRampToValueAtTime(note(48), at + 0.34);
+    fan.connect(lp).connect(envelope(ctx, at, 0.42, 0.1, 0.1, 0.12)).connect(out);
+    noise(ctx, at, at + 0.36, hiss).connect(filter(ctx, "bandpass", 1800)).connect(envelope(ctx, at, 0.36, 0.05, 0.12, 0.16)).connect(out);
+    // Online: a rising fifth over a soft open chord.
+    bell(ctx, out, at + 0.34, 84, 0.2, 0.8);
+    bell(ctx, out, at + 0.46, 91, 0.2, 0.9);
+    for (const m of [60, 67]) osc(ctx, "triangle", note(m), at + 0.34, at + 1.2).connect(envelope(ctx, at + 0.34, 0.86, 0.07, 0.03, 0.5)).connect(out);
+  },
   /** A server goes in or out of the rack: a heavy thump and a latch. */
   clunk: (ctx, out, at, hiss) => {
     const o = osc(ctx, "sine", 120, at, at + 0.2);
@@ -163,6 +178,7 @@ const GAP: Record<Cue, number> = {
   review: 1500,
   won: 3000,
   lost: 3000,
+  launch: 3000,
   unlock: 600,
   weekUp: 300,
   weekDown: 300,

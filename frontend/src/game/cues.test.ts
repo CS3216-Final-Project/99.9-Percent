@@ -6,12 +6,13 @@ import { cuesBetween, CUE_PRIORITY, topCue, watchCues, type CueState } from "./c
 import { DEFAULT_AUDIO, saveClassicGame, saveGame, saveMeta, saveMode, DEFAULT_META } from "./persist";
 import { makeEnvelope } from "./saveEnvelope";
 import { CUE_NAMES, type Cue } from "./sfx";
-import { useGame } from "./store";
+import { useGame, type IntroKind } from "./store";
 
 const state = (game: GameState, over: Partial<CueState> = {}): CueState => ({
   game,
   generation: 1,
   lastAction: null,
+  lastIntro: null,
   toast: null,
   started: true,
   audio: { ...DEFAULT_AUDIO },
@@ -207,7 +208,32 @@ describe("cues from the player and the settings", () => {
     expect([...CUE_PRIORITY].sort()).toEqual([...CUE_NAMES].sort());
     expect(topCue(["blip", "weekUp", "alarm", "clunk"])).toBe("alarm");
     expect(topCue(["relief", "won"])).toBe("won");
+    // A company starting is heard over the notice that its save failed.
+    expect(topCue(["buzz", "launch", "blip"])).toBe("launch");
+    expect(topCue(["alarm", "launch"])).toBe("launch");
     expect(topCue([])).toBeNull();
+  });
+});
+
+describe("cues from a run's introduction", () => {
+  const game = newLegacyGame(1);
+  const intro = (kind: IntroKind, id = 1): CueState["lastIntro"] => ({ id, kind });
+  it("sound a company starting, though it replaces the game or leaves the title screen", () => {
+    expect(cuesBetween(state(game), state(game, { lastIntro: intro("begin"), generation: 2 }))).toEqual(["launch"]);
+    expect(cuesBetween(state(game, { started: false }), state(game, { lastIntro: intro("begin") }))).toEqual(["launch"]);
+    // The next start is a different signal, even of the same kind.
+    expect(cuesBetween(state(game, { lastIntro: intro("begin", 1) }), state(game, { lastIntro: intro("begin", 2) }))).toEqual(["launch"]);
+  });
+
+  it("tick for each prompt and mark the introduction's end", () => {
+    expect(cuesBetween(state(game), state(game, { lastIntro: intro("step") }))).toEqual(["blip"]);
+    expect(cuesBetween(state(game), state(game, { lastIntro: intro("finish") }))).toEqual(["unlock"]);
+  });
+
+  it("stay quiet while the signal is unchanged", () => {
+    const same = intro("begin");
+    expect(cuesBetween(state(game, { lastIntro: same }), state(game, { lastIntro: same, generation: 2 }))).toEqual([]);
+    expect(cuesBetween(state(game, { lastIntro: same }), state(game, { lastIntro: null }))).toEqual([]);
   });
 });
 
@@ -226,7 +252,7 @@ describe("watching the store", () => {
     vi.restoreAllMocks();
   });
 
-  it("stays quiet through boot, loading, importing, new runs and mode switches", async () => {
+  it("stays quiet through boot, loading, importing, resuming and switching between saved runs", async () => {
     // A saved campaign that is mid-incident, a classic run mid-incident and a pre-update save with music off.
     saveGame(advanceSteps(newGame(1, "saved"), 6).state);
     saveMeta({ ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true }, "classic");
@@ -240,20 +266,14 @@ describe("watching the store", () => {
     await settle();
     expect(s().game.phase).toBe("incident");
     // Each load below lands on a state that would sound if it had been played into.
-    s().newRun({ seed: 3 });
-    await settle();
     s().switchMode("classic");
     await settle();
     expect(s().game.phase).toBe("incident");
     s().switchMode("campaign");
     await settle();
-    s().newRun({ seed: 4 });
-    await settle();
     expect(s().importSave(JSON.stringify(makeEnvelope(advanceSteps(newGame(2, "imported"), 6).state)))).toBe(true);
     await settle();
     expect(s().importSave(JSON.stringify({ savedAt: 1, game: classic }))).toBe(true);
-    await settle();
-    s().newRun({ seed: 5 });
     await settle();
     expect(s().resumeLegacySave()).toBe(true);
     await settle();
@@ -267,6 +287,8 @@ describe("watching the store", () => {
     s().play();
     // In the game a click starts play, well after boot: anything in the same task as a load is dropped.
     await settle();
+    expect(heard).toEqual(["launch"]);
+    heard.length = 0;
     s().onboardingMove("skip");
     s().setRunning(true);
     s().tick(30);
@@ -287,6 +309,8 @@ describe("watching the store", () => {
     s().play();
     await settle();
     s().onboardingMove("skip");
+    await settle();
+    heard.length = 0;
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
     s().setRunning(true);
     for (let i = 0; i < 3; i++) {
@@ -305,6 +329,8 @@ describe("watching the store", () => {
     s().boot();
     s().play();
     await settle();
+    expect(heard).toEqual(["launch"]);
+    heard.length = 0;
     expect(s().act({ type: "hire_engineer" })).toBe(true);
     await settle();
     s().setAudio({ effects: 40 });
@@ -314,5 +340,170 @@ describe("watching the store", () => {
     s().act({ type: "add_server" });
     await settle();
     expect(heard).toEqual(["hire", "preview"]);
+  });
+
+  it("launches a first company and a new one, but lets a saved one continue quietly", async () => {
+    const s = () => useGame.getState();
+    s().boot();
+    await settle();
+    // The title screen is silent.
+    expect(heard).toEqual([]);
+    s().play();
+    await settle();
+    expect(heard).toEqual(["launch"]);
+    s().onboardingMove("skip");
+    await settle();
+    // Leaving to the title and reloading the page brings the same company back: Continue company.
+    s().endSession();
+    await settle();
+    heard.length = 0;
+    useGame.setState(useGame.getInitialState(), true);
+    s().boot();
+    await settle();
+    s().play();
+    await settle();
+    expect(s().hasRun).toBe(true);
+    expect(heard).toEqual([]);
+    // New company, and the reset to the first run: each starts once.
+    s().onboardingMove("skip");
+    await settle();
+    heard.length = 0;
+    s().newRun();
+    await settle();
+    expect(heard).toEqual(["launch"]);
+    s().newRun({ seed: 9999 });
+    await settle();
+    expect(heard).toEqual(["launch", "launch"]);
+  });
+
+  it("stays quiet for a new company the game refuses to start", async () => {
+    const s = () => useGame.getState();
+    s().boot();
+    s().play();
+    await settle();
+    s().onboardingMove("skip");
+    await settle();
+    heard.length = 0;
+    const before = s().game;
+    // Without room to keep the old company's backup, the game will not replace it.
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw Error("quota");
+    });
+    s().newRun();
+    await settle();
+    expect(s().game).toBe(before);
+    expect(s().toast?.kind).toBe("error");
+    expect(heard).toEqual(["buzz"]);
+  });
+
+  it("launches a classic run on Play and a restarted tutorial once, but not a resumed week", async () => {
+    saveMode("classic");
+    const s = () => useGame.getState();
+    s().boot();
+    await settle();
+    expect(heard).toEqual([]);
+    s().play();
+    await settle();
+    expect(heard).toEqual(["launch"]);
+    expect(s().tour).toEqual({ track: "basics", step: 0 });
+    s().endTour(false);
+    expect(s().act({ type: "add_server" })).toBe(true);
+    await settle();
+    heard.length = 0;
+    // Reloading the page shows "Continue week 1" once something was decided; Play there carries on without a launch.
+    useGame.setState(useGame.getInitialState(), true);
+    s().boot();
+    s().play();
+    await settle();
+    expect(s().game.infra.appHosts).toHaveLength(2);
+    expect(heard).toEqual([]);
+    // The tutorial restarts the company and its walkthrough in one go: one launch.
+    s().startTutorialRun();
+    await settle();
+    expect(s().tour).toEqual({ track: "basics", step: 0 });
+    expect(heard).toEqual(["launch"]);
+  });
+
+  it("launches when switching into a mode with no company yet, in either mode", async () => {
+    saveMode("classic");
+    const s = () => useGame.getState();
+    s().boot();
+    s().play();
+    await settle();
+    heard.length = 0;
+    expect(s().switchMode("campaign")).toBe(true);
+    await settle();
+    expect(s().game.campaign).toBeTruthy();
+    expect(heard).toEqual(["launch"]);
+    s().onboardingMove("skip");
+    await settle();
+    heard.length = 0;
+    // The classic run is saved, so going back resumes it.
+    expect(s().switchMode("classic")).toBe(true);
+    await settle();
+    expect(heard).toEqual([]);
+    // With no saved run in the mode being entered, the switch starts a company.
+    localStorage.clear();
+    saveMode("classic");
+    expect(s().switchMode("campaign", { discard: true })).toBe(true);
+    await settle();
+    expect(heard).toEqual(["launch"]);
+  });
+
+  it("ticks through the campaign introduction and marks its end", async () => {
+    const s = () => useGame.getState();
+    s().boot();
+    s().play();
+    await settle();
+    heard.length = 0;
+    const move = async (direction: "next" | "back" | "skip") => {
+      s().onboardingMove(direction);
+      await settle();
+    };
+    await move("next");
+    await move("next");
+    await move("back");
+    expect(heard).toEqual(["blip", "blip", "blip"]);
+    expect(s().onboarding).toBe(true);
+    heard.length = 0;
+    await move("next");
+    await move("next");
+    expect(s().onboarding).toBe(false);
+    expect(s().meta.openingOnboarding.status).toBe("completed");
+    // The last prompt is the end of the introduction; skipping is only another tick.
+    expect(heard).toEqual(["blip", "unlock"]);
+    heard.length = 0;
+    s().showOnboarding();
+    await settle();
+    await move("skip");
+    expect(heard).toEqual(["blip", "blip"]);
+  });
+
+  it("marks the end of the classic walkthrough, but not its steps or a skip", async () => {
+    saveMode("classic");
+    const s = () => useGame.getState();
+    s().boot();
+    s().play();
+    await settle();
+    heard.length = 0;
+    // A step may already sound for what the player just did; moving on adds nothing.
+    s().tourNext();
+    await settle();
+    s().endTour(false);
+    await settle();
+    expect(heard).toEqual([]);
+    s().startTour("basics");
+    await settle();
+    expect(heard).toEqual(["launch"]);
+    s().endTour(true);
+    await settle();
+    expect(heard).toEqual(["launch", "unlock"]);
+    // The first-incident guide ending is not the introduction.
+    s().startTour("incident");
+    await settle();
+    heard.length = 0;
+    s().endTour(true);
+    await settle();
+    expect(heard).toEqual([]);
   });
 });

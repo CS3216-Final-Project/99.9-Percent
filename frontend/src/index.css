@@ -2078,6 +2078,11 @@ button:disabled {
 }
 
 /* Tech tree */
+.modal .tree {
+  --on-night: var(--ink);
+  --on-night-soft: var(--text-soft);
+}
+
 .tree {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(320px, 22vw, 420px);
@@ -4290,8 +4295,16 @@ button:disabled {
 .campaign-inspect { margin-top: 10px; }
 .chip.is-selected { background: var(--go); border-color: var(--ink); }
 .campaign-evidence, .campaign-working { margin-top: 10px; }
-.campaign-panel .act { margin-top: 0; }
-.campaign-panel .act-label { white-space: normal; }
+.campaign-panel .act {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  line-height: 1.2;
+  margin-top: 0;
+}
+.campaign-panel .actions { grid-template-columns: minmax(0, 1fr); }
+.campaign-panel .act-label { min-width: 0; grid-column: 1; grid-row: 1 / span 2; white-space: normal; }
+.campaign-panel .act .price { grid-column: 2; justify-self: end; }
 .campaign-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .campaign-table caption { text-align: left; padding: 8px 0; color: var(--text-soft); }
 .campaign-table th, .campaign-table td { padding: 6px; text-align: left; border-bottom: 1px solid var(--paper-3); }

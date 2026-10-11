@@ -32,3 +32,10 @@ it("disables failover deployment without a reserved spare and purchases that exh
  for(const name of ["Deploy Automatic Failover","Deploy Health Checks","Install spare"])
   expect((within(panel).getByRole("button",{name:new RegExp(name)}) as HTMLButtonElement).disabled).toBe(true);
 });
+it("keeps the recorded reliability outcome available after acknowledgement",()=>{
+ const completed=tick(act(preparedReliability(),{type:"arm_reliability"}),35);
+ show(completed);expect(screen.getByRole("dialog",{name:"Reliability outcome"}).textContent).toContain("Spare promotion");
+ fireEvent.click(screen.getByRole("button",{name:"Continue operating"}));
+ cleanup();const acknowledged=useGame.getState().game;useGame.setState({view:"history"});show(acknowledged);
+ expect(screen.getByRole("region",{name:"Historical reliability outcome"}).textContent).toContain("App 3");
+});

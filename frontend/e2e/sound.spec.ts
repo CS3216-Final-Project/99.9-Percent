@@ -15,23 +15,32 @@ async function countEffects(page: Page) {
   return () => page.evaluate(() => (window as unknown as { effectVoices: number }).effectVoices);
 }
 
-test("sounds the alarm when the opening incident starts, and nothing while muted", async ({ page, withoutRoom }) => {
+test("sounds the company starting, each introduction prompt and the alarm, and nothing while muted", async ({ page, withoutRoom }) => {
   // The effects need no room; skipping its software WebGL keeps this journey fast.
   await withoutRoom();
   const problems: string[] = [];
   // Audio failures only: without a backend, the account panel's requests fail on every page.
   page.on("console", message => { if (/could not be (prepared|played)/.test(message.text())) problems.push(message.text()); });
   const voices = await countEffects(page);
-  await page.goto("/"); await page.getByRole("button", { name: "Try Prototype", exact: true }).click();
+  await page.goto("/");
+  // The title screen is silent; starting the company powers it up: a fan sweep, two bells and a soft chord.
+  await page.waitForTimeout(300);
+  expect(await voices()).toBe(0);
+  await page.getByRole("button", { name: "Try Prototype", exact: true }).click();
+  await expect.poll(voices).toBeGreaterThanOrEqual(5);
+  const launch = await voices();
+  // Each prompt of the introduction ticks.
   await page.getByRole("button", { name: "Skip introduction" }).click();
+  await expect.poll(voices).toBeGreaterThan(launch);
+  const introduced = await voices();
   const advance = page.getByRole("button", { name: "Advance step", exact: true });
   for (let i = 0; i < 5; i++) await advance.click();
   // Quiet steps make no sound.
-  expect(await voices()).toBe(0);
+  expect(await voices()).toBe(introduced);
   await advance.click();
   await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
   // The alarm: two siren whoops over a low hit.
-  await expect.poll(voices).toBeGreaterThanOrEqual(3);
+  await expect.poll(voices).toBeGreaterThanOrEqual(introduced + 3);
   const alarm = await voices();
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   const inspect = page.getByRole("button", { name: "Inspect metrics · free" });
@@ -67,4 +76,25 @@ test("the header sound button follows the menu sliders and turns sound back on f
   await mute.click();
   await expect(mute).toHaveAttribute("aria-pressed", "false");
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("nn.audio.v1")!))).toEqual({ music: 80, effects: 80, muted: false });
+});
+
+test("starts a new company with the same sound, and lets a saved one continue quietly", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  const voices = await countEffects(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Try Prototype", exact: true }).click();
+  await expect.poll(voices).toBeGreaterThanOrEqual(5);
+  await page.getByRole("button", { name: "Skip introduction" }).click();
+  await expect(page.getByRole("dialog", { name: "Company introduction" })).toBeHidden();
+  // Reloading counts from zero again: the saved company continues without its start-up sound.
+  await page.reload();
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await page.waitForTimeout(500);
+  expect(await voices()).toBe(0);
+  const menu = page.getByRole("dialog", { name: "Menu" });
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await menu.getByRole("tab", { name: "Saves" }).click();
+  await menu.getByRole("button", { name: "New company", exact: true }).click();
+  await menu.getByRole("button", { name: "Confirm new company" }).click();
+  await expect.poll(voices).toBeGreaterThanOrEqual(5);
 });

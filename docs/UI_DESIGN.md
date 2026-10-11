@@ -54,6 +54,16 @@ Reveal the Read Cache inspection chip and room label only after data entry. They
 
 Until actual workload growth, show “Waiting for workload growth.” Once applied, show the observed profile/mix, rate used, hits, misses and DB pressure in a compact callout. Keep logical operations, warmth used/after, read/write demand and historical details in disclosures. History with no data observations says the detail was not recorded. Cache/tuning use the same action rows and cost/delay badges as other investments; unavailable database tiers do not advertise a locked purchase.
 
+## Phase 6 reliability
+
+Keep the same incident workspace and action rows. Reliability responses follow the three shared capacity/admission responses, before older scaling and data controls. Cost and delay badges wrap inside the button; all three Opening responses must remain inside the initial desktop panel, including their labels and badges.
+
+Show actual health, detected health, configured routing and effective traffic recipients separately. A detected failed app can remain configured while receiving no traffic; labels must follow the effective recipients. Free per-app health inspection uses the same selection dispatcher as the room and inspector. Research ownership does not create equipment: a reserved spare is one existing installed rack, shown once with its standby state.
+
+The technology tree uses the shared modal and the existing nine-node layout. Use ink-coloured branch labels and secondary text when the tree is on the modal's paper surface. Campaign tooltips explain physical-step costs and effects; legacy engineer-week descriptions do not describe Campaign rules. Unlocking, deploying and receiving traffic remain distinct states.
+
+Reliability reports explain failure, detection, rerouting, surviving capacity, admitted demand and restoration in player-facing language. Detailed snapshots retain exact evidence. The completion outcome distinguishes an actual incident from a test that opened none, records the admission/cost trade-offs at completion, and remains available in History after acknowledgement.
+
 ## Responsive and accessible behaviour
 
 Use the existing desktop side panel and mobile bottom panel. At 900 px and below, the header wraps, metric tiles reduce to icon/headline pairs, view tabs become icons and the speed selector hides. The room stays usable above the mobile panel. Evidence tables may scroll inside their disclosure; the page must not overflow horizontally. Do not make tables or explanatory paragraphs push every decision far below the initial viewport.

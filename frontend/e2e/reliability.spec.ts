@@ -1,5 +1,5 @@
 import {test,expect,seedSave,savedGame,expectRoom} from "./fixtures";
-import {readyReliability,preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
+import {readyReliability,preparedReliability,act} from "../src/sim/__tests__/reliabilityFixture";
 import type {Page} from "@playwright/test";
 async function boot(page:Page,g:ReturnType<typeof readyReliability>){await page.route("**/api/**",r=>r.abort());await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);}
 async function advance(page:Page,n:number){for(let i=0;i<n;i++)await page.getByRole("button",{name:"Advance step",exact:true}).click();}
@@ -11,18 +11,4 @@ test("reliability: manual restoration, measured report, outcome and paused reloa
 });
 test("reliability: one-step detection and delayed real spare promotion",async({page})=>{
  await boot(page,preparedReliability());await page.getByRole("button",{name:"Start reliability test",exact:true}).click();await advance(page,8);let c=(await savedGame(page)).campaign!;expect(c.apps[1].health).toBe("failed");expect(c.apps[1].detectedHealth).toBe("healthy");await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.apps[1].detectedHealth).toBe("unhealthy");expect(c.pending.some(a=>a.type==="promote-spare")).toBe(true);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.routing.targets).toEqual(["app-1","app-3"]);expect(c.apps).toHaveLength(3);await expect(page.getByRole("region",{name:"Stay Online"})).toContainText("3,200 /");
-});
-
-test("reliability: inspection and effective recipients remain clear on narrow touch screens",async({page})=>{
- await page.setViewportSize({width:390,height:844});
- await boot(page,tick(act(preparedReliability(),{type:"arm_reliability"}),9));
- const panel=page.getByRole("region",{name:"Stay Online"});
- await panel.getByRole("button",{name:"Inspect App 2 health · free",exact:true}).click();
- const instances=page.getByRole("region",{name:"Application instances"});
- await expect(instances.getByRole("button",{name:/App 2: Installed - not receiving traffic/})).toHaveAttribute("aria-pressed","true");
- await expect(panel).toContainText("detected unhealthy");
- await expect(page.getByRole("button",{name:"Restore App 2 · free · 3 steps",exact:true})).toBeEnabled();
- expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
- await page.getByRole("button",{name:"Menu",exact:true}).click();
- await expect(page.getByRole("dialog",{name:"Menu"}).getByRole("tab",{name:/Graphics/})).toBeVisible();
 });
