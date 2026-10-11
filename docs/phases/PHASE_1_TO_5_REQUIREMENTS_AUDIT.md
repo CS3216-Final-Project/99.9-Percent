@@ -1,5 +1,7 @@
 # Phases 1–5 requirements audit
 
+Follow-up product decision, 11 October 2026: the user replaced playtest registration with anonymous database-backed player feedback. See [the feedback change](../PLAYER_FEEDBACK.md). This supersedes the signup CTA requirement for the new UI; it does not establish historical signups, deployed feedback acceptance or human playtests.
+
 Reviewed on 11 October 2026 as part of PR #28, against `main` at `76f0c31` (including the latest title/overview layout, #33). This audit checks the current physical campaign implementation and its tests against each phase's requirements. Earlier implementation reports provide context, but their PASS labels are not used as independent proof.
 
 ## Verdict

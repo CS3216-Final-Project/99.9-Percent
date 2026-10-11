@@ -25,6 +25,7 @@ import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { Campaign, CampaignPostmortem, Intervention, ScheduledAction } from "@/sim/campaignTypes";
 import type { GameState } from "@/sim";
+import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
 import { EQUIPMENT_ICON } from "./presentation";
@@ -343,6 +344,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
         </div>
       </div>}
       {tab === "playtest" && <section className="menu-section" aria-label="Playtest records"><h4><Icon name="analytics" size={20} />Playtest records</h4>
+        <FeedbackButton inline />
         <div className="menu-actions"><button type="button" className="btn" onClick={()=>{useGame.getState().measureTime();const s=useGame.getState();download("playtest-session.json",exportPlaytest(s.game,s.measurement));}}><Icon name="download" size={20} />Export playtest record</button></div>
         <details className="more"><summary>Playtest observer notes</summary>
           <p>Session: {measurement.session?.id??"Not started"} · Build: {import.meta.env.VITE_BUILD_ID||"dev/unrecorded"}</p>
@@ -358,8 +360,6 @@ export function CampaignOverlays() {
   const { game, started, play, view, openView, act } = useGame();
   const c = game.campaign!;
   const {hasRun}=useGame();
-  const configured=import.meta.env.VITE_PLAYTEST_URL as string|undefined;
-  const playtestUrl=configured&&/^https?:\/\//.test(configured)?configured:null;
   if (!started && !hasRun) return <ModeChoice />;
   if (!started) return <div className="title-screen campaign-title"><div className="title-card campaign-entry">
     <div className="title-copy">
@@ -372,8 +372,7 @@ export function CampaignOverlays() {
     <div className="title-start">
       <img className="gameplay-preview" src="/opening-gameplay.png" alt="The furnished office and component evidence in the playable campaign" />
       <div className="title-cta"><div className="title-actions"><button type="button" className="btn btn-primary btn-big" autoFocus onClick={play}><Icon name="play" />{hasRun ? "Continue company" : "Play Campaign"}</button>
-        {playtestUrl?<a className="btn" href={playtestUrl} target="_blank" rel="noopener noreferrer">Join Playtest</a>:<button className="btn" disabled>Join Playtest</button>}</div>
-        {!playtestUrl&&<p className="muted">Playtest registration is not open yet.</p>}</div>
+        <FeedbackButton /></div></div>
       <p className="muted">Play immediately as a guest. Progress stays in this browser until you explicitly attach it to an account.</p><AccountPanel />
     </div>
   </div></div>;

@@ -5,6 +5,7 @@ import { dialogueRouter } from './routes/dialogue.js';
 import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
 import { runsRouter } from './routes/runs.js';
+import { feedbackRouter } from './routes/feedback.js';
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use(express.json({ limit: '1mb' }));
 
 app.use('/api', authRouter);
 app.use('/api/runs', runsRouter);
+app.use('/api/feedback', feedbackRouter);
 app.use('/api/health', healthRouter);
 app.use('/api/dialogue', dialogueRouter);
 

@@ -5,6 +5,7 @@ import { BALANCE, buildReport } from "@/sim";
 import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
+import { FeedbackButton } from "./FeedbackButton";
 import { Icon, type IconName } from "./icons";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
@@ -74,6 +75,7 @@ export function TitleScreen() {
             </button>
           )}
         </div>
+        <div className="title-actions"><FeedbackButton /></div>
         {meta.tutorialDone && (
           <button type="button" className="link-btn" onClick={startTutorialRun}>
             Replay the tutorial
@@ -461,7 +463,8 @@ export function Menu() {
               <Icon name="analytics" size={20} />
               Playtest data ({events.length} events)
             </h4>
-            <p className="menu-note">Kept in this browser only.</p>
+            <FeedbackButton inline />
+            <p className="menu-note">Playtest events below are kept in this browser only.</p>
             <dl className="rows">
               {summarise(events).map(([k, v]) => (
                 <div className="row" key={k}>

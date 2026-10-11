@@ -147,3 +147,11 @@ GitHub Actions (Settings > Secrets and variables > Actions):
 | `API_URL` | Variable (optional) | Production API URL for the smoke test. Defaults to `https://99-99-percent-backend.vercel.app`. If set explicitly, it must use this new URL too. |
 
 Merges to `main` deploy to production. Pull requests get preview links.
+
+### Player feedback
+
+**Give feedback** on either mode's title screen, or under Menu → Playtest, submits a message without requiring sign-in. The browser uses the existing public `VITE_API_URL` backend origin and its configured `CORS_ORIGINS` policy. Local development expects the backend on port 3001. Account proxy configuration is not required for feedback.
+
+`POST /api/feedback` accepts `{ id, message, mode }`: a random UUID v4 submission ID, 1–2000 trimmed characters, and `campaign` or `classic`. It returns `{ id }` only after persistence in `game_feedback`; replaying the same submission is idempotent. No public feedback-list endpoint is exposed. No saves, email addresses or account tokens are uploaded.
+
+Migration `0002_fearless_exodus.sql` adds the table without changing existing tables. The existing CD job runs `npm run db:migrate` on pushes to `main` after merge. Until the database/migration is available, the form reports a send failure and retains the draft in the open component. Drafts are not persisted across reloads.
