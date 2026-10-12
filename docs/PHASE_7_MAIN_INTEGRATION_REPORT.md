@@ -61,14 +61,28 @@ separately with `npm ci` in the integration worktree.
 - Balance: passed, 25 cases.
 - Frontend lint and typecheck: passed.
 - Final frontend coverage: passed, 759 tests and one optional TRACE skip.
-- Full browser results: pending at the time this report was first written;
-  updated before PR creation.
+- Final UI recheck after preserving main's introduction wording: 33 tests passed.
+- Full production-build browser suite: all 74 journeys passed in one final run,
+  with retries disabled (13.8 minutes), including Classic, Campaign, accounts,
+  desktop and mobile.
+- GitHub CI on code integration commit `0f4643e`: both required gates,
+  `frontend` and `backend`, passed, including all three browser shards. See
+  [PR #51](https://github.com/CS3216-Final-Project/99.9-Percent/pull/51) for checks
+  on the final documentation commit and the current review state.
+- Whitespace checks: passed. Integration worktree is clean after committing.
 
 The first frontend coverage run passed 757 tests and failed two home-screen
 assertions expecting five chapters. Those assertions were updated to six without
-changing the home-screen implementation. Browser retries are disabled for local
-integration verification. Generated logs, coverage, screenshots and browser
-artifacts are ignored and excluded from the PR.
+changing the home-screen implementation. The first full browser run passed 68
+journeys and failed six checks using outdated copy/selectors: reset confirmation,
+cache-evidence disclosure, home-screen chapter count, introduction prompt text,
+collapsed precision controls and the mobile evidence term. These were corrected
+without removing assertions or increasing timeouts; main's prompt wording was
+retained in the interactive introduction. The rebuilt final run passed all 74.
+Initial failure screenshots/traces are preserved in the recovery backup.
+Generated logs, coverage, screenshots and browser artifacts are ignored and
+excluded from the PR. Desktop introduction/overview and mobile controls were
+also inspected visually.
 
 ## Review boundaries
 
