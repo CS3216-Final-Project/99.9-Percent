@@ -1,136 +1,216 @@
 {
-    "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.4.50",
-        "version" : "2.0"
+  "asset": {
+    "generator": "glTF-Transform v4.5.1",
+    "version": "2.0"
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 1344,
+      "normalized": false,
+      "byteOffset": 0,
+      "bufferView": 0
     },
-    "scene" : 0,
-    "scenes" : [
-        {
-            "name" : "Scene",
-            "nodes" : [
-                0
-            ]
+    {
+      "type": "VEC3",
+      "componentType": 5122,
+      "count": 464,
+      "max": [
+        32767,
+        30807,
+        31163
+      ],
+      "min": [
+        -32767,
+        -30807,
+        -31163
+      ],
+      "normalized": true,
+      "byteOffset": 0,
+      "bufferView": 1
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5123,
+      "count": 464,
+      "normalized": true,
+      "byteOffset": 0,
+      "bufferView": 2
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5122,
+      "count": 464,
+      "normalized": true,
+      "byteOffset": 0,
+      "bufferView": 3
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 1,
+      "byteOffset": 0,
+      "byteLength": 2688,
+      "target": 34963,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 0,
+          "byteLength": 517,
+          "mode": "TRIANGLES",
+          "byteStride": 2,
+          "count": 1344
         }
-    ],
-    "nodes" : [
-        {
-            "mesh" : 0,
-            "name" : "cactus_medium_A"
+      }
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 2688,
+      "byteLength": 3712,
+      "target": 34962,
+      "byteStride": 8,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 520,
+          "byteLength": 2724,
+          "mode": "ATTRIBUTES",
+          "byteStride": 8,
+          "count": 464
         }
-    ],
-    "materials" : [
-        {
-            "name" : "furniture_texture",
-            "pbrMetallicRoughness" : {
-                "baseColorTexture" : {
-                    "index" : 0
-                },
-                "metallicFactor" : 0,
-                "roughnessFactor" : 0.5
-            }
+      }
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 6400,
+      "byteLength": 1856,
+      "target": 34962,
+      "byteStride": 4,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 3244,
+          "byteLength": 1510,
+          "mode": "ATTRIBUTES",
+          "byteStride": 4,
+          "count": 464
         }
-    ],
-    "meshes" : [
-        {
-            "name" : "Cylinder.004",
-            "primitives" : [
-                {
-                    "attributes" : {
-                        "POSITION" : 0,
-                        "TEXCOORD_0" : 1,
-                        "NORMAL" : 2
-                    },
-                    "indices" : 3,
-                    "material" : 0
-                }
-            ]
+      }
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 8256,
+      "byteLength": 3712,
+      "target": 34962,
+      "byteStride": 8,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 4756,
+          "byteLength": 2558,
+          "mode": "ATTRIBUTES",
+          "byteStride": 8,
+          "count": 464
         }
-    ],
-    "textures" : [
-        {
-            "sampler" : 0,
-            "source" : 0
+      }
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 0,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "furniturebits_texture",
+      "mimeType": "image/png",
+      "uri": "furniturebits_texture.png"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "cactus_medium_A.bin",
+      "byteLength": 7316
+    },
+    {
+      "byteLength": 11968,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "fallback": true
         }
-    ],
-    "images" : [
-        {
-            "mimeType" : "image/png",
-            "name" : "furniturebits_texture",
-            "uri" : "furniturebits_texture.png"
+      }
+    }
+  ],
+  "materials": [
+    {
+      "name": "furniture_texture",
+      "pbrMetallicRoughness": {
+        "roughnessFactor": 0.5,
+        "metallicFactor": 0,
+        "baseColorTexture": {
+          "index": 0
         }
-    ],
-    "accessors" : [
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Cylinder.004",
+      "primitives": [
         {
-            "bufferView" : 0,
-            "componentType" : 5126,
-            "count" : 464,
-            "max" : [
-                0.43994686007499695,
-                0.8272479176521301,
-                0.4184219241142273
-            ],
-            "min" : [
-                -0.4399626851081848,
-                1.8132850527763367e-06,
-                -0.4184218943119049
-            ],
-            "type" : "VEC3"
-        },
-        {
-            "bufferView" : 1,
-            "componentType" : 5126,
-            "count" : 464,
-            "type" : "VEC2"
-        },
-        {
-            "bufferView" : 2,
-            "componentType" : 5126,
-            "count" : 464,
-            "type" : "VEC3"
-        },
-        {
-            "bufferView" : 3,
-            "componentType" : 5123,
-            "count" : 1344,
-            "type" : "SCALAR"
+          "attributes": {
+            "POSITION": 1,
+            "TEXCOORD_0": 2,
+            "NORMAL": 3
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
         }
-    ],
-    "bufferViews" : [
-        {
-            "buffer" : 0,
-            "byteLength" : 5568,
-            "byteOffset" : 0,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 3712,
-            "byteOffset" : 5568,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 5568,
-            "byteOffset" : 9280,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 2688,
-            "byteOffset" : 14848,
-            "target" : 34963
-        }
-    ],
-    "samplers" : [
-        {
-            "magFilter" : 9729,
-            "minFilter" : 9987
-        }
-    ],
-    "buffers" : [
-        {
-            "byteLength" : 17536,
-            "uri" : "cactus_medium_A.bin"
-        }
-    ]
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "cactus_medium_A",
+      "translation": [
+        -0.000007912516593933105,
+        0.41362486546859145,
+        1.4901161193847656e-8
+      ],
+      "scale": [
+        0.4399547725915909,
+        0.4399547725915909,
+        0.4399547725915909
+      ],
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0,
+  "extensionsUsed": [
+    "EXT_meshopt_compression",
+    "KHR_mesh_quantization"
+  ],
+  "extensionsRequired": [
+    "EXT_meshopt_compression",
+    "KHR_mesh_quantization"
+  ]
 }
