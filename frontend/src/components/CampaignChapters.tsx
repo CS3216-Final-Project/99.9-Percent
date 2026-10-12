@@ -7,6 +7,7 @@ import "./CampaignChapters.css";
 
 export function CampaignChapters() {
   const game = useGame((s) => s.game);
+  const introduction = useGame(s => s.meta.openingOnboarding.status);
   const [open, setOpen] = useState(false);
   const chapters = campaignChapters(game);
   const current = chapters.find((chapter) => chapter.current)!;
@@ -16,6 +17,7 @@ export function CampaignChapters() {
       <div className="chapter-current">
         <p>Campaign · Chapter {current.number} of {chapters.length}</p>
         <h2 aria-label="Current chapter"><span aria-label="Current campaign stage">{current.name}</span></h2>
+        {introduction === "completed" && <span className="campaign-intro-badge">Getting started ✓</span>}
       </div>
       <ol className="chapter-trail" aria-label="Chapter progress">
         {chapters.map((chapter) => <li key={chapter.id} aria-current={chapter.current ? "step" : undefined} className={chapter.completed ? "is-complete" : ""}>
@@ -29,7 +31,7 @@ export function CampaignChapters() {
       }}><Icon name="goal" size={18} />View chapters</button>
     </section>
     {open && <Modal title="Campaign chapters" icon={{ kind: "tech", name: "goal" }} onClose={() => setOpen(false)}>
-      <p>One company, five chapters. Your servers, investments and progress carry forward.</p>
+      <p>One company, six chapters. Your servers, investments and progress carry forward.</p>
       <ol className="chapter-overview">
         {chapters.map((chapter) => <li key={chapter.id} aria-current={chapter.current ? "step" : undefined}>
           <span className="chapter-number" aria-hidden="true">{chapter.completed ? <Icon name="check" size={18} /> : chapter.number}</span>

@@ -1,3 +1,4 @@
+import { advanceCampaignStep } from "./fixtures";
 import {test,expect,seedSave,savedGame,expectRoom} from "./fixtures";
 import {newGame,applyAction,type GameState,type Action} from "../src/sim";
 import {advanceSteps} from "../src/sim/step";
@@ -10,7 +11,7 @@ for(const path of ["vertical","horizontal"] as const)test(`scaling continuation:
  await seedSave(page,company());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
  const id=(await savedGame(page)).campaign!.runId;
  await page.getByRole("button",{name:/Upgrade database/}).click();
- for(let i=0;i<8;i++)await page.getByRole("button",{name:"Advance step",exact:true}).click();
+ for(let i=0;i<8;i++)await advanceCampaignStep(page);
  await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect.poll(async()=>!!(await savedGame(page)).campaign!.incident).toBe(true);
  await page.getByRole("button",{name:"Pause",exact:true}).click();

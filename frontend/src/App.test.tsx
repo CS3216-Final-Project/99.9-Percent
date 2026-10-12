@@ -62,6 +62,7 @@ describe("opening UI", () => {
   });
   it("visible interventions lead to review and the same company", () => {
     vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+    fireEvent.click(screen.getByText("More controls"));
     for (let i = 0; i < 6; i++)fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
     const id = useGame.getState().game.campaign!.runId;
     expect(screen.getByText(/Stable steps: 0\/5/)).toBeTruthy();
@@ -195,6 +196,7 @@ it("forgets a pending Start over confirmation when the player leaves its tab", (
 
 it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  fireEvent.click(screen.getByText("More controls"));
   fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
   const views = screen.getByRole("navigation", { name: "Views" });
   fireEvent.click(within(views).getByRole("button", { name: "History" }));
@@ -214,6 +216,7 @@ it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", (
 
 it("asks once before New company replaces the campaign, as Classic's Start over does", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  fireEvent.click(screen.getByText("More controls"));
   fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
   const runId = useGame.getState().game.campaign!.runId;
   const menu = openMenu();

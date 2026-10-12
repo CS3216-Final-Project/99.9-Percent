@@ -1,4 +1,6 @@
 import type { GameState } from "./types";
+import { emptyServiceMeasurement } from "./campaignScorecard";
+import type { ServiceMeasurement } from "./campaignTypes";
 import type { CampaignInput } from "./campaignTypes";
 import { newGame } from "./state";
 import { applyCampaignInputInPlace, pendingStop, projectCampaign, stepInPlace } from "./step";
@@ -14,13 +16,14 @@ export const MAX_REPLAY_INPUTS = 100_000;
  * deterministic, so the result equals the state the inputs were recorded from.
  * Throws when the inputs could not have been recorded by a real run.
  */
-export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number, legacyMilestones = false, foundation?: {step:number;inputs:number}, legacyPrevention = false, legacyPreventionInputs = 0): GameState {
+export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number, legacyMilestones = false, foundation?: {step:number;inputs:number}, legacyPrevention = false, legacyPreventionInputs = 0, serviceMeasurementStart?: Pick<ServiceMeasurement,"fromStep"|"scope">): GameState {
     if (!Number.isSafeInteger(finalStep) || finalStep < 0 || finalStep > MAX_REPLAY_STEPS)
         throw new Error("Replay step is out of range");
     if (inputs.length > MAX_REPLAY_INPUTS)
         throw new Error("Replay has too many inputs");
     // The fresh state is private to this replay, so every step and input can mutate it.
     const s = newGame(seed, runId);
+    if (serviceMeasurementStart) s.campaign!.serviceMeasurement = emptyServiceMeasurement(serviceMeasurementStart.fromStep, serviceMeasurementStart.scope);
     if (!Number.isSafeInteger(legacyPreventionInputs) || legacyPreventionInputs<0 || legacyPreventionInputs>inputs.length)
         throw new Error("Legacy prevention input prefix is out of range");
     if(legacyPreventionInputs)s.campaign!.legacyPreventionInputs=legacyPreventionInputs;

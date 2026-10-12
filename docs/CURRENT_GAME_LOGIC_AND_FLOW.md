@@ -1,8 +1,14 @@
-ï»¿# Current game logic and player flow
+# Current game logic and player flow
 
-Reviewed: 10 October 2026. Repository: `C:/Users/user/99.9-Percent`. Branch: `ai/phase-5-progression`. HEAD: `1322ebcdbade2fe4d1ec9fc34fb8bea652b6077a`.
+Reviewed: 11 October 2026. Repository: `C:/Users/user/99.9-Percent`. Branch: `ai/phase-7-combined-campaign`. HEAD: `ae35ca52c4c08e0092ab539409dbc9023bc14bc6`.
 
-This report describes the **current working-tree implementation**, including the uncommitted Phase 5 implementation, both Opening completion routes, progression guidance and prevention UX polish. It is not a description of HEAD alone, a production deployment, or a replacement phase contract. No production code was changed for this report.
+This document originally described the Phase 7 branch before integration. The cherry-pick onto main is currently under review on `ai/phase-7-ux-integration`, based on `993a0240213789cfa7808e942a130a5c677324b0`. Historical Phase 7 validation below is not validation of this integrated working tree. This is not a production deployment or a replacement phase contract.
+
+**Opening progression integration discrepancy:** main acknowledges a new company's prevention outcome without awarding an Opening milestone. New prevention-only companies therefore remain in Opening and cannot enter Scaling. The prevention-to-milestone path described below is the original Phase 7 design, not the currently integrated rule. Existing already-entered historical prevention companies are preserved by input-log replay; old pending prevention milestones do not grant a new entry. The current rule conflicts with the intended successful-prevention design and remains unchanged pending the user's decision. No incident is fabricated to resolve this discrepancy.
+
+Compatibility boundary: older main input-log saves are replayed and preserved. The original Phase 7 branch used snapshot envelopes containing `game` rather than `inputs`; those exports are not automatically converted by main's validator, even when their schema number is 7. Their bytes remain protected, but resuming them requires a separate verified conversion.
+
+Main's current menu, audio, chapter layout, account features and compact input-log persistence are preserved during integration. The save implementation is `saveEnvelope.ts` plus `sim/replay.ts`; deleted `saveMigrations.ts` is not restored. The Phase 7 implementation report remains the original branch's historical evidence until integration validation is completed.
 
 ## 1. What the game currently is
 
@@ -16,7 +22,8 @@ It is **not only a database-overload game anymore**. The active campaign impleme
 | Scaling & Routing | Does installed capacity actually receive traffic? | Per-instance processing, larger apps, additional apps, load balancing and explicit routing |
 | Data Strategy | How does workload change the value of a cache? | Read/write profiles, cold-cache warm-up, tuning and a larger database |
 | Traffic Spikes & Autoscaling | Can delayed automation handle changing demand at an acceptable cost? | Two demand pulses, an optional controller, automatic installation/routing and safe retirement |
-| Later stages | Not available in the active campaign | Reliability and combined-campaign/evaluation work remain later scope |
+| Stay Online | Does detection provide surviving capacity? | Temporary app failure, Health Checks, real spares, delayed failover and explicit outcome review |
+| Grow the Company | Can this company handle combined growth and remain solvent? | Three saved workload/failure rounds, optional promotion, final target, explicit completion, scorecard and replay |
 
 Opening can complete through recovered-incident acknowledgement or the new evidence-backed prevention outcome described in section 3. Both require explicit milestone acknowledgement.
 
@@ -33,7 +40,7 @@ flowchart TD
     C --> D[Actual incident: respond and reach measured recovery]
     C --> R[Prevent incident: full demand, both inspections, five stable steps]
     R --> S[Review prevention outcome; Continue company]
-    S --> F
+    S --> X[Current main: remain in Opening; progression rule under review]
     D --> E[Review postmortem; Continue company]
     E --> F[Opening milestone; Continue operating]
     F --> G[Scaling & Routing]
@@ -46,7 +53,10 @@ flowchart TD
     M --> N[Manual capacity, optional automation, or admission relief]
     N --> O[Both pulses end; five stable baseline management steps]
     O --> P[Spike recognition; Continue operating]
-    P --> Q[Same company continues; later stages locked]
+    P --> Q[Stay Online: prepare, start temporary app test and review]
+    Q --> U[Grow the Company: three explicit growth waves and outcome reviews]
+    U --> V[Full-demand final proof; review scorecard and complete campaign]
+    V --> W[Inspect the same company; optionally confirm a new run]
 ```
 
 This is a typical path, not a scripted sequence of guaranteed incidents. Preparatory investments or an admission limit can prevent later incidents. Reports are created only for actual recovered incidents.
@@ -163,7 +173,7 @@ Manual installations retain their two-step delay. Only eligible controller-creat
 
 Disabling the controller stops new decisions; already accepted work is not rolled back. Installed controller upkeep continues while disabled. Automation cannot expand the database, improve cache effectiveness or remove an admission limit.
 
-After both pulses end, five qualifying baseline management steps with empty queues and acknowledged reports record stage completion. The recognition then requires **Continue operating**. It grants no further resources, preserves the company and generates no additional pulses. The strip labels the stage Completed after acknowledgement, while guidance remains in the Traffic Spikes & Autoscaling context; Reliability stays locked.
+After both pulses end, five qualifying baseline management steps with empty queues and acknowledged reports record stage completion. The recognition then requires **Continue operating**. It grants no further resources, preserves the company and generates no additional pulses. The strip labels the stage Completed after acknowledgement, and Continue to reliability becomes available when its actual baseline prerequisites hold.
 
 ## 7. Shared simulation and incident rules
 
@@ -214,26 +224,19 @@ Thus **Stable â€” traffic limited** can be technically successful and finan
 
 ## 9. Persistence, measurement and boundaries
 
-The optional prevention extension stays in schema 5; old saves are not rewritten merely to initialize it. Updated validation accepts both absent extensions and evidence-backed prevention milestones. Builds predating this feature do not support the new prevention milestone format; export the company before any rollback.
+The prevention extension was introduced within schema 5. Current schema 7 retains its evidence and explicit acknowledgements through migration; migration does not invent a prevention outcome. Updated validation accepts both absent extensions and evidence-backed prevention milestones. Builds predating this feature do not support the new prevention milestone format; export the company before any rollback.
 
-Campaign saves use envelope schema 6 at `nn.campaign.save.v1`, with separately stored onboarding metadata and local analytics.
-A save holds the seed and the recorded player inputs; loading replays them on the deterministic engine, so older schemas 1-5 load through the same replay.
-An older schema cannot contain decisions introduced after it, and before replacing an older save its exact bytes are backed up.
-Legacy `nn.save.v1`, `nn.meta.v1` and `nn.analytics.v1` remain separate.
+Campaign saves use compact input-log schema 7 at `nn.campaign.save.v1`, with separately stored onboarding metadata and local analytics. Main's `saveEnvelope.ts` validates and replays older schemas 1-6 and backs up exact source bytes before replacement. Phase 7 decisions replay through the same engine. Service measurement has an explicit saved start boundary; older campaigns have prospective coverage and unknown historical whole-run uptime. Loading does not enter a stage or grant research. Legacy `nn.save.v1`, `nn.meta.v1` and `nn.analytics.v1` remain separate.
 
 Autosave runs through existing transitions and a ten-second foreground timer, with page lifecycle saves. Resume is paused and preserves pending action deadlines, queues, progression, acknowledgements and measurement. Corrupt/unsupported saves are protected and exportable; unavailable storage cannot guarantee durable reload recovery.
 
 Local telemetry attributes run/session/build/scenario, physical step, timestamps and active time. Stable trace IDs distinguish requests from activations and player actions from controller actions. Continuing the same run is not replay. Menu offers session/campaign/legacy exports and manually recorded observer context. The gameplay flow does not require the API, Google sign-in or cloud saves. Deferred auth/cloud drafts remain outside this active flow.
 
-Nine technology identities are retained, but the full legacy research UI is not the active progression mechanism. Active reliability actions such as injected app failures, health checks, spare promotion and failover are not implemented in this campaign.
+The full nine-node technology tree is active inside CampaignUI. Actual DB tier derives Larger Database ownership without rewriting saves or charging the player. Reliability owns the existing Health Checks, Spare Application and Automatic Failover identities. Phase 7 grants no additional research or technology.
 
 ## 10. What is verified and what is not
 
-Fresh final validation under Node 22.23.3 passed 340 unit tests with one optional TRACE skip, eight balance tests and all 23 CI desktop/mobile E2E journeys in one run without retries. Lint passed with 23 unchanged warnings; typecheck, coverage, production build and whitespace checks passed. Backend lint/typecheck/coverage passed with 18 tests and no lint warnings.
-
-Frontend coverage: 83.89% statements, 80.42% branches, 88.44% functions and 86.47% lines; visual components are outside its configured scope. Both Opening routes and paused reload at inspection/streak/review/milestone/completed states passed. Full Phase 1–5 regressions passed, including guest play with the API unavailable. See the final-validation section of the [Phase 5 implementation report](phases/PHASE_5_IMPLEMENTATION_REPORT.md) for exact commands and boundaries.
-
-Deployment and human sessions remain NOT TESTED. These checks do not prove enjoyment, learning, session duration, real-device accessibility or profitability for every inherited company. The known solvent Scaling affordability trap remains; section 12 explains why visible guidance is not a universal financial rescue. The working changes remain uncommitted and deferred auth/cloud remains unapplied. No gameplay was changed during this final validation/documentation pass; Phase 6 was not started.
+The accepted Phase 6 baseline was 396 passing unit tests, one optional TRACE skip, 14 balance tests, 27 CI E2E journeys and 18 backend tests. These are historical baseline results. See the [Phase 7 implementation report](phases/PHASE_7_IMPLEMENTATION_REPORT.md) for final commands/counts and failures resolved during implementation. Automated results do not establish human understanding, enjoyment, duration or a tested live deployment. Human sessions, release verification and real-device/screen-reader acceptance remain NOT TESTED.
 
 ## 11. Source map
 
@@ -256,9 +259,9 @@ Deployment and human sessions remain NOT TESTED. These checks do not prove enjoy
 
 ## 12. Campaign-wide progression guidance update
 
-The existing Campaign guidance now uses one unsaved, read-only `campaignGuidance` model to show completed/incomplete requirements, waiting states and pending explicit actions. It preserves both Opening routes and every existing Scaling/Data/Spike gate. Required reviews, milestones and continuations remain outside History; pending spike recognition can also be dismissed and reopened without acknowledgement. Growth waiting text does not disclose future scheduled steps. Workload contrast and autoscaling are explicitly optional. Reliability is explicitly unimplemented.
+The existing Campaign guidance now uses one unsaved, read-only `campaignGuidance` model to show completed/incomplete requirements, waiting states and pending explicit actions. It preserves both Opening routes and every existing Scaling/Data/Spike gate. Required reviews, milestones and continuations remain outside History; pending spike recognition can also be dismissed and reopened without acknowledgement. Growth waiting text does not disclose future scheduled steps. Workload contrast and autoscaling are explicitly optional. Reliability is implemented; its progression item derives Completed/Current/Available/Locked from the existing stage state. Grow the Company follows its acknowledged outcome.
 
-Traffic limiting explains why Opening prevention cannot qualify at full demand. Scaling also explains unaffordable mandatory headroom without promising a financial rescue. A reproduced supported purchase sequence can remain solvent but unable to fund headroom and earn positive net revenue; resolving that economic dead end would require a separately approved balance/progression change. This guidance pass makes the cause visible without changing mechanics or repairing saved state.
+Traffic limiting explains why Opening prevention cannot qualify at full demand. Scaling explains unaffordable paid headroom without promising a bailout. The original guidance pass only exposed the economic trap. Phase 7 now adds the separately approved, explicit risk-consent policy below; it waives only the headroom gate, preserving costs, physics and the need to earn real revenue.
 
 See [Campaign progression guardrail report](CAMPAIGN_PROGRESSION_GUARDRAIL_REPORT.md) for the changed-file list, exact gates, the historical guardrail run and the fresh final validation: 340 passing unit tests/one optional skip, eight balance tests and 23 full-suite browser journeys. These are local automated results, not deployment or human acceptance.
 
@@ -271,4 +274,22 @@ Previously, preventing every Opening incident left a healthy company unable to p
 
 Campaign guidance exposes real stage-blocking conditions and pending reviews/recognitions outside History. It explains waiting without exposing future event deadlines and leaves optional strategies and valid interventions available. The prevention checklist uses player-facing service/inspection labels, a live five-second simulated-service counter and an explicit traffic-limit consequence. Review sections describe actual preparation, recorded capacity evidence, spending and rejected demand; they do not claim optimal spending or zero trade-offs.
 
-No simulation equations, balance constants, prices, settlement rules, incident/recovery thresholds or Phase 2–5 stage gates changed for the guardrail or UX polish. The earlier authorized prevention implementation adds a completion route and an optional schema-5 state extension; the presentation pass adds no progression/store/save semantics. The financial affordability trap described in final validation remains a separate known limitation.
+No simulation equations, balance constants, prices, settlement rules, incident/recovery thresholds or Phase 2–5 stage gates changed for the guardrail or UX polish. The earlier authorized prevention implementation adds a completion route and an optional schema-5 state extension; the presentation pass adds no progression/store/save semantics. Phase 7 adds the separately approved explicit Scaling risk-consent exception described below; the original unconsented gate remains unchanged.
+
+## Phase 6–7 continuation and campaign completion
+
+After acknowledged Spike recognition, Continue to reliability enters Stay Online in the same company. The player explicitly starts its temporary app test; the target fails eight physical steps later and restores naturally after twenty failed steps, unless the existing free three-step manual restoration activates sooner. Health Checks detect on a later step; real spare promotion is delayed and creates no capacity. Actual reports and five stable post-restoration observations precede explicit reliability acknowledgement.
+
+**Continue to Grow the Company** enters `combined-campaign` v1 only after acknowledged Reliability, stable 2,400 req/s management, empty queues, healthy apps, positive cash and finished actions/reports. It grants no resources. Registered users start at 2,000 and grow to 20,000, 35,000 and 50,000 at the three announced waves. Normal baseline request demand is `2400 + floor((users − 2000) × 600 / (target − 2000))`: 2,400 → 2,625 → 2,812 → 3,000 req/s for the default target. Earlier stages retain their original traffic values.
+
+The saved seeded pool contains exactly one read-heavy pulse (3,800/4,000 req/s), one write-heavy pressure (3,000 req/s) and one failure under load (3,400/3,600 req/s), in bounded 12/16-step intervals. Five new stable full-demand readiness observations make Start next growth wave available. Scheduling announces pressure with the existing eight-step warning; UI guidance does not reveal hidden deadlines. Only one primary pressure runs at a time; failure under load permits one temporary app fault as the secondary pressure. Existing workload processing, routing, controller and failover handle the actual inputs.
+
+After pressure and any fault end, queues must drain, all applications must be healthy and reports acknowledged, followed by five stable full-demand observations. Review growth outcome and Continue company explicitly acknowledge each round. Reaching the user target alone does not win. After all three reviews, five additional full-demand baseline steps qualify a final review; Complete campaign explicitly ends the run once, freezes the shared clock and preserves the inspectable company.
+
+Promotion is optional: $500 setup, next-step activation, +400 req/s for twelve steps and thirty-step cooldown after it ends. It is available only between waves and grants no registered users or research. At a fully loaded 3,000 ops/s DB without cache, its backlog may require a real intervention to drain after pressure ends; matching capacity to new arrivals alone does not remove retained work. Temporary limiting or other valid existing actions remain player decisions, never automatic completion.
+
+The scorecard separates settled/pending revenue, infrastructure setup/operations, salaries and promotion spending. It reports rejection/opportunity value separately from service errors, actual architecture/technologies, incident count, eligible service-health uptime and longest contiguous degraded span. Fresh-run counters retain observations beyond the recent-600 display. Migrated runs explicitly report partial/unknown historical coverage. Confirmed replay archives old company/scorecard evidence before replacing the active slot and chooses a distinct run ID and seed at the application boundary.
+
+**Scaling financial exit:** the original paid 2,000 ops/s headroom gate remains. A separate confirmation lets the player accept the 1,400 req/s growth wave with current DB capacity. Consent grants no cash, capacity, discount or recovery and consumes no step; overload and insolvency remain possible. The exact historical $1,593.34 trapped company can earn actual successful-request settlement revenue and later buy headroom, without a bailout.
+
+Phase 7 adds no maintenance, risky deployment, new fault family, auth/cloud or Phase 8 evaluation mechanics. Deferred auth/cloud stashes remain unapplied.

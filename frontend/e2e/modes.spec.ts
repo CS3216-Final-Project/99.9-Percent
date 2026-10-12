@@ -1,4 +1,4 @@
-import { test, expect, expectRoom, savedGame, savedClassicGame, seedSave } from "./fixtures";
+import { advanceCampaignStep, test, expect, expectRoom, savedGame, savedClassicGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 
 for (const mode of ["Campaign", "Classic"] as const) {
@@ -30,7 +30,7 @@ for (const mode of ["Campaign", "Classic"] as const) {
 test("switches between campaign and classic from the menu, keeping each run", async ({ page }) => {
   await page.goto("/"); await page.getByRole("button", { name: "Play Campaign", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await expectRoom(page);
-  await page.getByRole("button", { name: "Advance step", exact: true }).click();
+  await advanceCampaignStep(page);
   const campaign = await savedGame(page);
   expect(campaign.campaign!.step).toBe(1);
 
@@ -73,7 +73,7 @@ test("the home screen is the same in both modes and can continue or switch eithe
   const choices = page.getByRole("region", { name: "Choose how you want to play" });
   const campaign = choices.getByRole("region", { name: "Campaign" }), classic = choices.getByRole("region", { name: "Classic" });
   await expect(campaign).toContainText("Last played");
-  await expect(campaign).toContainText("Chapter 1 of 5: Opening");
+  await expect(campaign).toContainText("Chapter 1 of 6: Opening");
   await expect(classic).toContainText("No saved game");
   await page.screenshot({ path: "test-results/home-campaign-in-progress.png" });
   // Halfway through a Campaign, Classic is one click away from the home screen.
@@ -84,7 +84,7 @@ test("the home screen is the same in both modes and can continue or switch eithe
   await expect(classic).toContainText("Last played");
   await expect(classic).toContainText("Week 2 of 26");
   await expect(classic.getByRole("button", { name: "New game" })).toBeVisible();
-  await expect(campaign).toContainText("Chapter 1 of 5: Opening");
+  await expect(campaign).toContainText("Chapter 1 of 6: Opening");
   await page.screenshot({ path: "test-results/home-classic-in-progress.png" });
   // And the Campaign is one click away from a Classic home screen.
   await campaign.getByRole("button", { name: "Continue company" }).click();

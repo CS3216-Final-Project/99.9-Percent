@@ -189,7 +189,7 @@ function BottomBar() {
 
 function ClassicViewSheet() {
   const view = useGame((s) => s.view);
-  if (!view || view === "menu") return null;
+  if (!view || view === "menu" || view === "guidance" || view === "scorecard") return null;
   return (
     <ViewSheet view={view}>
       {view === "tech" && <TechTree />}

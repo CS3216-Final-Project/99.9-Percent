@@ -1,3 +1,4 @@
+import { advanceCampaignStep } from "./fixtures";
 import {test,expect,expectRoom,seedSave,savedGame} from "./fixtures";
 import {dataCompany,spikeCompany,untilOffset} from "../src/sim/__tests__/spikeFixtures";
 import type {Page} from "@playwright/test";
@@ -29,7 +30,7 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  const before=(await savedGame(page)).campaign!;await page.getByRole("button",{name:"Continue to traffic spikes"}).click();
  const unlock=page.getByRole("button",{name:/Unlock autoscaling/});await unlock.focus();await expect(unlock).toBeFocused();await page.keyboard.press("Enter");await page.getByRole("button",{name:/Deploy autoscaling/}).click();
  const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
- for(let i=0;i<9;i++)await page.getByRole("button",{name:"Advance step",exact:true}).click();
+ for(let i=0;i<9;i++)await advanceCampaignStep(page);
  expect((await savedGame(page)).campaign!.spikeStage!.controller!.highSteps).toBe(2);
  await clockTo(page,n+10);await expect(page.getByRole("status").filter({hasText:"Add server (App 3)"})).toContainText("activates in 3 step(s)");
  await clockTo(page,n+13);let c=(await savedGame(page)).campaign!;expect(c.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(c.snapshot.app.capacity).toBe(3200);
@@ -53,9 +54,9 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
 });
 test("spikes: manual planning prevents overload without an autoscaler",async({page})=>{
  test.setTimeout(90000);const api=await blockedGuest(page,spikeCompany(false));const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
- await page.getByRole("button",{name:/Add server/}).click();for(let i=0;i<2;i++)await page.getByRole("button",{name:"Advance step",exact:true}).click();
- await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await page.getByRole("button",{name:/Scale up App 3/}).click();for(let i=0;i<3;i++)await page.getByRole("button",{name:"Advance step",exact:true}).click();
- await page.getByText("Configure routing",{exact:false}).click();await page.getByRole("button",{name:"Balance across installed apps"}).click();await page.getByRole("button",{name:"Advance step",exact:true}).click();
+ await page.getByRole("button",{name:/Add server/}).click();for(let i=0;i<2;i++)await advanceCampaignStep(page);
+ await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await page.getByRole("button",{name:/Scale up App 3/}).click();for(let i=0;i<3;i++)await advanceCampaignStep(page);
+ await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"Balance across installed apps"}).click();await advanceCampaignStep(page);
  await page.getByRole("button",{name:"2×",exact:true}).click();await runTo(page,n+28);const c=(await savedGame(page)).campaign!;
  expect(c.apps).toHaveLength(3);expect(c.spikeStage!.controller).toBeNull();expect(c.incident).toBeNull();expect(c.snapshot.app.capacity).toBe(4800);expect(c.investedCents).toBeGreaterThan(0);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
@@ -74,6 +75,6 @@ test("spikes: disabling keeps paid installation and allows an explicit manual ro
  await runTo(page,before.step+3);
  const idle=(await savedGame(page)).campaign!;expect(idle.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(idle.cashCents).toBe(before.cashCents);expect(idle.pending.some(a=>a.type==="routing")).toBe(false);
  await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await expect(page.getByRole("note",{name:"App 3 routing status"})).toBeVisible();
- await page.getByText("Configure routing",{exact:false}).click();await page.getByRole("button",{name:"Balance across installed apps"}).click();await runTo(page,(await savedGame(page)).campaign!.step+1);
+ await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"Balance across installed apps"}).click();await runTo(page,(await savedGame(page)).campaign!.step+1);
  const routed=(await savedGame(page)).campaign!;expect(routed.apps.find(a=>a.id==="app-3")!.routed).toBe(true);expect(routed.spikeStage!.controller!.enabled).toBe(false);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });

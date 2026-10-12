@@ -170,6 +170,7 @@ describe("game interface", () => {
     fireEvent.click(screen.getByRole("button", { name: "Play Campaign" }));
     fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
+    fireEvent.click(screen.getByText("More controls"));
     for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
     expect(screen.getByText(/Stable steps: 0\/5/)).toBeTruthy();
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
@@ -185,6 +186,7 @@ describe("game interface", () => {
     expect(tooltip()?.textContent).toMatch(/Available cash: \$20,000/);
     out(screen.getByText("Cash"));
 
+    fireEvent.click(screen.getByText("More controls"));
     for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
     const advance = screen.getByRole("button", { name: "Incident" });
     expect(advance.hasAttribute("disabled")).toBe(true);

@@ -1,0 +1,62 @@
+/* Campaign-only selectors: shared Classic typography, controls and modals are untouched. */
+.campaign-panel .campaign-guidance { margin-bottom: 12px; }
+.campaign-panel .campaign-investigation-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.campaign-panel .campaign-investigation-head .step-head { margin: 8px 0; }
+.campaign-panel .campaign-action-card { border-bottom: 1px solid var(--paper-3); padding-bottom: 8px; }
+.campaign-panel .campaign-action-effect { margin: 4px 0; font-size: 12px; line-height: 1.4; }
+.campaign-panel .campaign-action-reason { margin: 4px 0; font-size: 12px; color: var(--warn-ink); }
+.campaign-panel .campaign-action-detail { font-size: 12px; line-height: 1.45; }
+.campaign-panel .campaign-action-detail summary { cursor: pointer; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; }
+.campaign-panel .campaign-action-detail p { margin: 6px 0; }
+.campaign-clock .campaign-play { gap: 6px; min-height: 44px; }
+.campaign-clock .campaign-clock-state { font-size: 12px; font-weight: 700; }
+.campaign-clock.is-paused { border-top: 3px solid var(--focus); }
+.campaign-clock .campaign-step { font-size: 12px; opacity: .85; }
+.campaign-introduction { max-width: 620px; }
+.campaign-introduction .campaign-intro-meta { font-size: 12px; font-weight: 700; }
+.campaign-introduction h3 { margin: 12px 0 8px; }
+.campaign-introduction .campaign-intro-flow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 20px 0; flex-wrap: wrap; }
+.campaign-introduction .campaign-intro-flow > span:first-child { display: grid; justify-items: center; gap: 4px; }
+.campaign-introduction .campaign-intro-example { border-left: 4px solid var(--focus); background: var(--paper-2); padding: 12px; margin: 12px 0; min-height: 90px; }
+.campaign-introduction .campaign-intro-example p { margin: 6px 0; }
+.campaign-introduction .btn[aria-pressed="true"] { outline: 3px solid var(--focus); outline-offset: 2px; }
+.campaign-introduction .campaign-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.campaign-tech-intro { font-size: 13px; line-height: 1.5; max-width: 75ch; }
+@media (max-width: 600px) {
+  .campaign-clock .campaign-play span { font-size: 12px; }
+  .campaign-clock .campaign-clock-state { display: none; }
+  .campaign-clock .campaign-step { padding: 8px; }
+  .campaign-introduction .campaign-intro-flow { gap: 6px; }
+  .campaign-introduction .btn { min-height: 44px; }
+}
+
+.campaign-clock .campaign-advanced { position: relative; font-size: 12px; }
+.campaign-clock .campaign-advanced > summary { cursor: pointer; padding: 10px 6px; }
+.campaign-clock .campaign-advanced > div { position: absolute; bottom: calc(100% + 12px); right: 0; padding: 12px; width: 230px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--paper); color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.campaign-clock .campaign-advanced p { margin: 4px 0 10px; }
+.chapter-current .campaign-intro-badge { display: inline-block; color: var(--on-night-soft); font-size: 11px; margin-top: 4px; }
+
+.campaign-panel .campaign-action-card { padding-bottom: 4px; }
+.campaign-panel .campaign-action-effect { margin: 2px 0; }
+.campaign-panel .campaign-action-detail summary { padding: 2px 0; }
+
+@media (min-width: 901px) {
+  .app.has-chapters .campaign-panel { width: 420px; }
+  .campaign-panel .campaign-investigation-head { flex-wrap: nowrap; }
+  .campaign-panel .campaign-investigation-head .step-head { font-size: .95rem; min-width: 0; order: -1; }
+}
+
+@media (min-width: 901px) {
+  .campaign-panel .incident-investigate .chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); }
+  .campaign-panel .incident-investigate .chip { justify-content: center; padding-inline: 6px; }
+  .campaign-panel .incident-investigate .chip-icon { display: none; }
+  .campaign-panel .campaign-action-card .act-meta { display: flex; flex-wrap: wrap; max-width: 225px; gap: 4px; justify-content: flex-end; }
+  .campaign-panel .campaign-action-card { padding-bottom: 2px; }
+  .campaign-panel .campaign-action-effect { margin: 0; }
+  .campaign-panel .campaign-action-detail summary { padding: 0; }
+}
+
+@media (min-width: 901px) {
+  .campaign-panel .incident-investigate .chip { font-size: .85rem; min-height: 36px; padding-inline: 4px; white-space: nowrap; }
+  .app.has-chapters .campaign-panel .step-head { margin-top: 6px; margin-bottom: 4px; }
+}

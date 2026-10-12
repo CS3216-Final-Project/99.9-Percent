@@ -1,3 +1,4 @@
+import { advanceCampaignStep } from "./fixtures";
 import {test,expect,seedSave,expectRoom,savedGame} from './fixtures';
 import {newGame} from '../src/sim';
 import type {AppSession,CloudRun} from '../../shared/campaign';
@@ -30,7 +31,7 @@ test('saves to the cloud only when asked, resolves conflicts, keeps owners apart
   await page.screenshot({path:'test-results/account-signed-in.png'});
   await dialog.getByRole('button',{name:'Close'}).click();
   await page.getByRole('button',{name:'Continue company',exact:true}).click();await expectRoom(page);
-  await page.getByRole('button',{name:'Advance step',exact:true}).click();await page.getByRole('button',{name:'Menu',exact:true}).click();
+  await advanceCampaignStep(page);await page.getByRole('button',{name:'Menu',exact:true}).click();
   await page.getByRole('tab',{name:'Saves'}).click();
   const account=page.getByRole('region',{name:'Account and cloud saves'});
   // Another browser has saved revision 2 since this tab saved revision 1.

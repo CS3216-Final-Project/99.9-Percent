@@ -28,7 +28,7 @@ it("shows a Campaign in progress beside Classic, and switches to Classic without
   const choices = boot("campaign");
   const campaign = card(choices, "Campaign"), classic = card(choices, "Classic");
   expect(campaign.textContent).toContain("Last played");
-  expect(campaign.textContent).toMatch(/Saved game\s*Chapter 1 of 5: Opening/);
+  expect(campaign.textContent).toMatch(/Saved game\s*Chapter 1 of 6: Opening/);
   expect(within(campaign).getByRole("button", { name: "Continue company" })).toBeTruthy();
   expect(classic.textContent).toContain("No saved game");
   // Reading the other mode for its card must not write a Classic save.
@@ -48,7 +48,7 @@ it("shows a Classic in progress beside Campaign, with the same card layout, and 
   expect(classic.textContent).toContain("Week 2 of 26");
   expect(within(classic).getByRole("button", { name: "Continue week 2" })).toBeTruthy();
   expect(within(classic).getByRole("button", { name: "New game" })).toBeTruthy();
-  expect(campaign.textContent).toContain("Chapter 1 of 5");
+  expect(campaign.textContent).toContain("Chapter 1 of 6");
   expect(campaign.textContent).not.toContain("Last played");
   fireEvent.click(within(campaign).getByRole("button", { name: "Continue company" }));
   expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, hasRun: true });
