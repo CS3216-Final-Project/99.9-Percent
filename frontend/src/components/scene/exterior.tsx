@@ -114,7 +114,7 @@ const M = {
 /* Facades                                                             */
 /* ------------------------------------------------------------------ */
 
-const STYLE = { glass: 0, ribbon: 1, stone: 2 } as const;
+const STYLE = { glass: 0, ribbon: 1, stone: 2, fins: 3, grid: 4 } as const;
 
 /** Office lights: warm, cool and the shops at street level. */
 const LIGHTS = { warm: new THREE.Color("#ffd49a"), cool: new THREE.Color("#d6e6ff"), shop: new THREE.Color("#fff0cf") };
@@ -146,14 +146,19 @@ vec3 facade(vec3 wall) {
   float seed = vLook.x;
   float style = vLook.y;
   float share = vLook.z;
-  float bay = style < 0.5 ? 1.5 : (style < 1.5 ? 3.0 : 2.2);
+  float bay = style < 0.5 ? 1.5 : style < 1.5 ? 3.0 : style < 2.5 ? 2.2 : style < 3.5 ? 1.2 : 2.4;
   vec2 g = vec2(vWall.x / bay, vWall.y / ${STOREY.toFixed(1)});
   vec2 cell = floor(g);
   vec2 f = fract(g);
   vec2 e = fwidth(g) * 0.75 + 1e-4;
   bool street = cell.y < 0.5 && vLook.w > 0.5;
-  // The opening in each bay: left, right, sill and head, as fractions of the bay and the storey.
-  vec4 frame = style < 0.5 ? vec4(0.05, 0.95, 0.21, 0.97) : (style < 1.5 ? vec4(0.02, 0.98, 0.34, 0.9) : vec4(0.24, 0.76, 0.26, 0.8));
+  // The opening in each bay: left, right, sill and head, as fractions of the bay and the storey. Fins leave a slot
+  // nearly floor to ceiling; the grid punches a small square.
+  vec4 frame = style < 0.5 ? vec4(0.05, 0.95, 0.21, 0.97)
+    : style < 1.5 ? vec4(0.02, 0.98, 0.34, 0.9)
+    : style < 2.5 ? vec4(0.24, 0.76, 0.26, 0.8)
+    : style < 3.5 ? vec4(0.3, 0.7, 0.04, 0.98)
+    : vec4(0.3, 0.7, 0.32, 0.72);
   if (street) frame = vec4(0.04, 0.96, 0.04, 0.82);
   float open = band(f.x, frame.x, frame.y, e.x) * band(f.y, frame.z, frame.w, e.y);
   // An office is a run of bays on one floor sharing its lights. Some floors have gone home, some are working late.
@@ -483,7 +488,54 @@ function plantGeometry(p: Plant): THREE.BufferGeometry[] {
       tint(new THREE.CylinderGeometry(p.w * 0.4, p.w * 0.4, 0.1, 14).translate(p.x, p.y1 - 0.05, p.z), "#1c1d22", 0.8),
     ];
   }
+  if (p.kind === "panel") {
+    // Tilted up toward +z on a low frame.
+    return [tint(box(p.w, 0.08, p.d, 0, 0, 0).rotateX(0.32).translate(p.x, p.y0 + 0.55, p.z), "#2a4377", 0.7), tint(box(p.w - 0.4, 0.4, 0.12, p.x, p.y0 + 0.2, p.z), "#4a4b52", 0.5)];
+  }
+  if (p.kind === "pool") {
+    // The coping round the water; the water itself glows (see roofLights).
+    const c = 0.5;
+    return [
+      tint(box(p.w + 2 * c, h, c, p.x, p.y0 + h / 2, p.z - p.d / 2 - c / 2), "#9d978c", 0.6),
+      tint(box(p.w + 2 * c, h, c, p.x, p.y0 + h / 2, p.z + p.d / 2 + c / 2), "#9d978c", 0.6),
+      tint(box(c, h, p.d, p.x - p.w / 2 - c / 2, p.y0 + h / 2, p.z), "#9d978c", 0.6),
+      tint(box(c, h, p.d, p.x + p.w / 2 + c / 2, p.y0 + h / 2, p.z), "#9d978c", 0.6),
+    ];
+  }
+  if (p.kind === "helipad") {
+    // A dark pad, a yellow ring and a white H across it.
+    const r = p.w / 2;
+    const y = p.y0 + 0.02;
+    const paint = (g: THREE.BufferGeometry, colour: string, lift: number) => tint(g.rotateX(-Math.PI / 2).translate(p.x, y + lift, p.z), colour, 1);
+    return [
+      tint(new THREE.CylinderGeometry(r, r, h, 32).translate(p.x, p.y0 + h / 2, p.z), "#2a2a31", 0.85),
+      paint(new THREE.RingGeometry(r * 0.72, r * 0.8, 40), "#c9a630", h),
+      paint(new THREE.PlaneGeometry(r * 0.16, r * 0.8).translate(-r * 0.24, 0, 0), "#d8d3c8", h + 0.01),
+      paint(new THREE.PlaneGeometry(r * 0.16, r * 0.8).translate(r * 0.24, 0, 0), "#d8d3c8", h + 0.01),
+      paint(new THREE.PlaneGeometry(r * 0.4, r * 0.14), "#d8d3c8", h + 0.01),
+    ];
+  }
+  if (p.kind === "shrub") {
+    return [tint(new THREE.IcosahedronGeometry(0.5, 0).scale(p.w, h * 1.6, p.d).translate(p.x, p.y0 + h * 0.45, p.z), "#2f5a36", 0.5)];
+  }
   return [tint(box(p.w, h, p.d, p.x, p.y0 + h / 2, p.z), "#5d5f68", 0.5)];
+}
+
+/** Water in the rooftop pools and the lights round the helipads, which glow. */
+function roofLights(list: Building[]): THREE.BufferGeometry | null {
+  const parts: THREE.BufferGeometry[] = [];
+  for (const b of list) {
+    for (const p of roofPlant(b)) {
+      if (p.kind === "pool") parts.push(tint(flat(p.w, p.d).translate(p.x, p.y1 - 0.08, p.z), "#2fb4cc", 1));
+      if (p.kind !== "helipad") continue;
+      const r = p.w / 2 - 0.25;
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2;
+        parts.push(tint(box(0.3, 0.2, 0.3, p.x + r * Math.cos(a), p.y1 + 0.1, p.z + r * Math.sin(a)), "#9dffb4", 1));
+      }
+    }
+  }
+  return parts.length ? merge(parts) : null;
 }
 
 /** Roofs and the terraces on setbacks, their parapets, and the plant on top. */
@@ -548,12 +600,14 @@ function Buildings({ lite }: { lite: boolean }) {
   const walls = useMemo(() => facades([...list, TOWER]), [list]);
   const tops = useMemo(() => roofs(list, lite), [list, lite]);
   const bands = useMemo(() => crowns(list), [list]);
+  const lights = useMemo(() => (lite ? null : roofLights(list)), [list, lite]);
   useEffect(() => () => material.dispose(), [material]);
   return (
     <group>
       <Merged geometry={walls} material={material} />
       <Merged geometry={tops} material={M.shaded} />
       {bands && <Merged geometry={bands} material={M.glow} />}
+      {lights && <Merged geometry={lights} material={M.glow} />}
       <Beacons list={list} />
     </group>
   );

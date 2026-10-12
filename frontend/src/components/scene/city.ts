@@ -74,7 +74,13 @@ export function clearOfOffice(r: Rect, top: number): boolean {
   return top <= gap(r, BUILDING) / CLEAR;
 }
 
-export type Facade = "glass" | "ribbon" | "stone";
+export type Facade = "glass" | "ribbon" | "stone" | "fins" | "grid";
+
+/**
+ * What covers the top roof: bare membrane or gravel, a planted roof, rows of solar panels, a terrace round a pool,
+ * or a helipad on the tallest.
+ */
+export type Finish = "membrane" | "gravel" | "green" | "solar" | "pool" | "helipad";
 
 /** One box of a building: a podium, a shaft or a crown, each standing on the one before. */
 export interface Mass {
@@ -85,13 +91,17 @@ export interface Mass {
 
 export interface Building {
   masses: Mass[];
-  /** Floor-to-ceiling glass, bands of windows, or stone with a window in each bay. */
+  /**
+   * Floor-to-ceiling glass, bands of windows, stone with a window in each bay, tall slots between concrete fins, or a
+   * concrete grid of small punched windows.
+   */
   facade: Facade;
   /** Frames and spandrels, or the stone or brick of the walls. */
   wall: string;
   /** Glass with the lights off behind it. */
   glass: string;
   roof: string;
+  finish: Finish;
   /** Share of offices with the lights still on. */
   lit: number;
   seed: number;
@@ -117,6 +127,7 @@ export const TOWER: Building = {
   wall: "#56607a",
   glass: "#1b2a3d",
   roof: "#302f3a",
+  finish: "membrane",
   lit: 0.42,
   seed: 9,
   crown: null,
@@ -225,13 +236,38 @@ export const parkBlock = (): Block => blocks().find(isPark) as Block;
 /* Buildings                                                           */
 /* ------------------------------------------------------------------ */
 
-const GLASS_TINTS = ["#1c2b3a", "#18302f", "#23262f", "#1d2433", "#2b2620", "#202a36", "#1a2a2a"];
-const FRAMES = ["#59606e", "#4b5260", "#646a75", "#3f4450", "#5b5a60"];
-const CONCRETE = ["#6a6b70", "#5f625f", "#77726a", "#55575e", "#6d675e"];
-const STONE = ["#7d6f5e", "#6c4b3c", "#6b6b68", "#836e57", "#5e4a3f", "#74685c"];
+// Dark frames and stone alongside pale aluminium, bronze, limestone, white concrete, brick and terracotta, so
+// neighbours stand apart at night.
+const GLASS_TINTS = ["#1c2b3a", "#18302f", "#23262f", "#1d2433", "#2b2620", "#202a36", "#1a2a2a", "#1f3a4a", "#263a52"];
+const FRAMES = ["#59606e", "#4b5260", "#646a75", "#3f4450", "#5b5a60", "#858d9b", "#8b7b63", "#2c3039"];
+const CONCRETE = ["#6a6b70", "#5f625f", "#77726a", "#55575e", "#6d675e", "#9c988e", "#8e9096", "#a2998a"];
+const STONE = ["#7d6f5e", "#6c4b3c", "#6b6b68", "#836e57", "#5e4a3f", "#74685c", "#aa9d84", "#b28a63", "#8c4a37", "#9b5a3e"];
 const DARK_GLASS = ["#151a24", "#171b20", "#1a1d26"];
-const ROOFS = ["#2f2e36", "#38373f", "#36332f", "#2a332d", "#2d313a", "#3b3834"];
-const CROWNS = ["#9fd8ff", "#f4f1ea", "#ffd27a", "#c49bff"];
+const ROOFS: Record<Finish, readonly string[]> = {
+  membrane: ["#2f2e36", "#38373f", "#36332f", "#2a332d", "#2d313a", "#3b3834"],
+  gravel: ["#5b5961", "#66625f", "#55585f", "#6c6870"],
+  green: ["#2d4a31", "#35522f", "#2a4636"],
+  solar: ["#4d4c54", "#57565c"],
+  pool: ["#77716a", "#837b6f"],
+  helipad: ["#3c3b44", "#45434c"],
+};
+const CROWNS = ["#9fd8ff", "#f4f1ea", "#ffd27a", "#c49bff", "#7de8d3"];
+
+/** A roof finish that suits a building of this many storeys with a top roof this size. */
+function finishFor(top: Rect, storeys: number, rng: RngHolder): Finish {
+  const side = Math.min(top[2] - top[0], top[3] - top[1]);
+  const options: [Finish, number][] = [
+    ["membrane", 3],
+    ["gravel", 3],
+  ];
+  if (side >= 15) options.push(["solar", 2]);
+  if (storeys <= 24) options.push(["green", 2]);
+  if (storeys >= 6 && storeys <= 26 && side >= 16) options.push(["pool", 1]);
+  if (storeys >= 28 && side >= 20) options.push(["helipad", 2]);
+  let r = rand(rng) * options.reduce((sum, [, w]) => sum + w, 0);
+  for (const [kind, w] of options) if ((r -= w) < 0) return kind;
+  return "membrane";
+}
 
 /** Whole storeys a box on `r` may rise to, roof plant included, without ever hiding the office. */
 function storeysAllowed(r: Rect): number {
@@ -239,8 +275,18 @@ function storeysAllowed(r: Rect): number {
 }
 
 const level = (storeys: number) => GROUND_Y + storeys * STOREY;
+const narrow = (r: Rect) => Math.min(r[2] - r[0], r[3] - r[1]);
 
-/** Cut a block into two or three lots each way, with a narrow gap between neighbours. */
+/**
+ * Pull each side of a rectangle in by `lo` to `hi` metres, each side its own amount. With chance `flush` a side
+ * stays nearly in line with the one below, just clear of its parapet.
+ */
+function setback(r: Rect, rng: RngHolder, lo: number, hi: number, flush = 0.3): Rect {
+  const by = () => (rand(rng) < flush ? PARAPET / 2 : randRange(rng, lo, hi));
+  return [r[0] + by(), r[1] + by(), r[2] - by(), r[3] - by()];
+}
+
+/** Cut a block into two or three lots each way, each set back from the street and its neighbours by its own amount. */
 function lots(r: Rect, rng: RngHolder): Rect[] {
   const cuts = (a: number, b: number, n: number) => {
     const out = [a];
@@ -251,44 +297,91 @@ function lots(r: Rect, rng: RngHolder): Rect[] {
   const xs = cuts(r[0], r[2], r[2] - r[0] > 90 ? pick(rng, [2, 3, 3]) : 2);
   const zs = cuts(r[1], r[3], r[3] - r[1] > 70 ? pick(rng, [2, 2, 3]) : 2);
   const out: Rect[] = [];
-  for (let a = 0; a + 1 < xs.length; a++) for (let b = 0; b + 1 < zs.length; b++) out.push(inset([xs[a], zs[b], xs[a + 1], zs[b + 1]], randRange(rng, 0.8, 2.4)));
+  for (let a = 0; a + 1 < xs.length; a++) for (let b = 0; b + 1 < zs.length; b++) out.push(setback([xs[a], zs[b], xs[a + 1], zs[b + 1]], rng, 0.8, 3.2, 0));
   return out;
 }
 
-function building(lot: Rect, rng: RngHolder): Building | null {
+/** Now and then a long lot holds two buildings: a low one beside a taller neighbour. `true` marks the low one. */
+function pair(lot: Rect, rng: RngHolder): [Rect, boolean][] {
+  const alongX = lot[2] - lot[0] >= lot[3] - lot[1];
+  const [a, b] = alongX ? [lot[0], lot[2]] : [lot[1], lot[3]];
+  if (b - a < 34 || rand(rng) > 0.3) return [[lot, false]];
+  const lowFirst = rand(rng) < 0.5;
+  const cut = a + (b - a) * (lowFirst ? randRange(rng, 0.3, 0.42) : randRange(rng, 0.58, 0.7));
+  const half = randRange(rng, 1.2, 2.5) / 2;
+  const first: Rect = alongX ? [lot[0], lot[1], cut - half, lot[3]] : [lot[0], lot[1], lot[2], cut - half];
+  const second: Rect = alongX ? [cut + half, lot[1], lot[2], lot[3]] : [lot[0], cut + half, lot[2], lot[3]];
+  return [
+    [first, lowFirst],
+    [second, !lowFirst],
+  ];
+}
+
+function building(lot: Rect, rng: RngHolder, low = false): Building | null {
   const seed = Math.floor(rand(rng) * 10000);
   const roll = rand(rng);
-  const want = Math.round(roll < 0.3 ? randRange(rng, 3, 7) : roll < 0.62 ? randRange(rng, 8, 20) : randRange(rng, 21, 58));
+  const want = Math.round(low ? randRange(rng, 2, 6) : roll < 0.3 ? randRange(rng, 3, 7) : roll < 0.62 ? randRange(rng, 8, 20) : randRange(rng, 21, 58));
   const masses: Mass[] = [];
-  // Tall buildings stand on a podium as wide as the lot, and the tallest end in a narrower crown.
-  if (want > 14 && Math.min(lot[2] - lot[0], lot[3] - lot[1]) > 24) {
+  const stack = (rect: Rect, storeys: number) => masses.push({ rect, y0: masses.length ? masses[masses.length - 1].y1 : GROUND_Y, y1: level(storeys) });
+  // Tall buildings stand on a podium as wide as the lot, their shafts set back from it, often more on one side than
+  // another. Some step back again once or twice as they rise, and the tallest end in a narrower crown.
+  if (want > 14 && narrow(lot) > 24) {
     const podium = Math.min(Math.round(randRange(rng, 2, 5)), storeysAllowed(lot));
-    const shaftRect = inset(lot, randRange(rng, 2.5, 6));
+    const shaftRect = setback(lot, rng, 2.5, 7);
     const shaft = Math.min(want, storeysAllowed(shaftRect));
-    if (podium >= 1 && shaft >= podium + 4) {
-      masses.push({ rect: lot, y0: GROUND_Y, y1: level(podium) }, { rect: shaftRect, y0: level(podium), y1: level(shaft) });
-      if (shaft > 26 && rand(rng) < 0.6) {
-        const crownRect = inset(shaftRect, randRange(rng, 2, 4));
-        const top = Math.min(shaft + Math.round(randRange(rng, 2, 5)), storeysAllowed(crownRect));
-        if (top > shaft) masses.push({ rect: crownRect, y0: level(shaft), y1: level(top) });
+    if (podium >= 1 && shaft >= podium + 4 && narrow(shaftRect) >= 10) {
+      stack(lot, podium);
+      const steps = [shaft];
+      if (shaft - podium >= 16) {
+        const tiers = pick(rng, [1, 2, 2, 3]);
+        if (tiers >= 2) steps.unshift(Math.round(podium + (shaft - podium) * randRange(rng, 0.5, 0.68)));
+        if (tiers === 3) steps.splice(1, 0, Math.round(podium + (shaft - podium) * randRange(rng, 0.76, 0.88)));
+      }
+      let rect = shaftRect;
+      for (const top of steps) {
+        stack(rect, top);
+        const next = setback(rect, rng, 1.5, 4.5, 0.35);
+        if (narrow(next) < 8) break;
+        rect = next;
+      }
+      const reached = (masses[masses.length - 1].y1 - GROUND_Y) / STOREY;
+      if (steps.length === 1 && reached > 26 && rand(rng) < 0.6) {
+        const crownRect = setback(masses[masses.length - 1].rect, rng, 2, 4, 0);
+        const top = Math.min(reached + Math.round(randRange(rng, 2, 5)), storeysAllowed(crownRect));
+        if (top > reached) stack(crownRect, top);
       }
     }
   }
   if (masses.length === 0) {
     const n = Math.min(want, storeysAllowed(lot));
     if (n < 2) return null;
-    masses.push({ rect: lot, y0: GROUND_Y, y1: level(n) });
+    // Some step back for their top floor or few.
+    const top = n >= 6 && rand(rng) < 0.4 ? setback(lot, rng, 2, 5, 0.4) : null;
+    if (top && narrow(top) >= 8) {
+      const k = Math.min(n - 3, Math.round(randRange(rng, 1, 4)));
+      stack(lot, n - k);
+      stack(top, n);
+    } else stack(lot, n);
   }
   const storeys = (masses[masses.length - 1].y1 - GROUND_Y) / STOREY;
-  const facade: Facade = storeys > 20 ? (rand(rng) < 0.72 ? "glass" : "ribbon") : storeys > 7 ? pick(rng, ["glass", "ribbon", "stone"] as const) : rand(rng) < 0.55 ? "stone" : pick(rng, ["ribbon", "glass"] as const);
-  const wall = facade === "glass" ? pick(rng, FRAMES) : facade === "ribbon" ? pick(rng, CONCRETE) : pick(rng, STONE);
+  const facade: Facade =
+    storeys > 20
+      ? pick(rng, ["glass", "glass", "glass", "ribbon", "fins", "fins"] as const)
+      : storeys > 7
+        ? pick(rng, ["glass", "ribbon", "stone", "fins", "grid"] as const)
+        : rand(rng) < 0.5
+          ? "stone"
+          : pick(rng, ["ribbon", "glass", "grid"] as const);
+  const wall = facade === "glass" ? pick(rng, FRAMES) : facade === "stone" ? pick(rng, STONE) : pick(rng, CONCRETE);
   const glass = facade === "glass" ? pick(rng, GLASS_TINTS) : pick(rng, DARK_GLASS);
+  const finish = finishFor(masses[masses.length - 1].rect, storeys, rng);
   return {
     masses,
     facade,
     wall,
     glass,
-    roof: pick(rng, ROOFS),
+    roof: pick(rng, ROOFS[finish]),
+    finish,
     lit: randRange(rng, 0.1, 0.42),
     seed,
     crown: storeys >= 30 && rand(rng) < 0.45 ? pick(rng, CROWNS) : null,
@@ -302,15 +395,17 @@ export function buildings(seed = 31): Building[] {
   for (const b of blocks()) {
     if (isTowerBlock(b) || isPark(b)) continue;
     for (const lot of lots(b.rect, rng)) {
-      const made = building(lot, rng);
-      if (made) out.push(made);
+      for (const [part, low] of pair(lot, rng)) {
+        const made = building(part, rng, low);
+        if (made) out.push(made);
+      }
     }
   }
   return out;
 }
 
 export interface Plant {
-  kind: "box" | "tank" | "fan";
+  kind: "box" | "tank" | "fan" | "panel" | "pool" | "helipad" | "shrub";
   x: number;
   z: number;
   w: number;
@@ -320,38 +415,75 @@ export interface Plant {
   y1: number;
 }
 
-/** Lift overruns, air handlers, cooling fans and water tanks on a building's roof. */
+/** Solar panels: one module, and the rows they stand in. */
+const PANEL = { w: 3.2, d: 1.6, gap: 0.4, row: 2.8 };
+
+/**
+ * Lift overruns, air handlers, cooling fans and water tanks on a building's roof, and whatever its finish brings: a
+ * helipad in the middle, a pool on the terrace, planting, or rows of solar panels over the roof that is left.
+ */
 export function roofPlant(b: Building): Plant[] {
   const top = b.masses[b.masses.length - 1];
   const rng: RngHolder = { rngState: b.seed };
   const [x0, z0, x1, z1] = inset(top.rect, PARAPET + 0.6);
   const out: Plant[] = [];
+  const free = (r: Rect, margin: number) => r[0] >= x0 && r[2] <= x1 && r[1] >= z0 && r[3] <= z1 && !out.some((p) => overlaps(r, rect(p.x, p.z, p.w, p.d), margin));
   const room = (w: number, d: number) => {
     for (let tries = 0; tries < 12; tries++) {
       const x = randRange(rng, x0 + w / 2, x1 - w / 2);
       const z = randRange(rng, z0 + d / 2, z1 - d / 2);
-      const r = rect(x, z, w, d);
-      if (r[0] >= x0 && r[2] <= x1 && r[1] >= z0 && r[3] <= z1 && !out.some((p) => overlaps(r, rect(p.x, p.z, p.w, p.d), 0.8))) return { x, z };
+      if (free(rect(x, z, w, d), 0.8)) return { x, z };
     }
     return null;
   };
+  const put = (kind: Plant["kind"], x: number, z: number, w: number, d: number, h: number) => out.push({ kind, x, z, w, d, y0: top.y1, y1: top.y1 + h });
   const add = (kind: Plant["kind"], w: number, d: number, h: number) => {
     const at = room(w, d);
-    if (at) out.push({ kind, ...at, w, d, y0: top.y1, y1: top.y1 + h });
+    if (at) put(kind, at.x, at.z, w, d, h);
   };
+  if (b.finish === "helipad") {
+    const s = Math.min(17, x1 - x0, z1 - z0);
+    put("helipad", (x0 + x1) / 2, (z0 + z1) / 2, s, s, 0.15);
+  }
+  if (b.finish === "pool") add("pool", randRange(rng, 7, Math.min(13, x1 - x0 - 4)), randRange(rng, 3.2, 4.6), 0.35);
   add("box", randRange(rng, 4, 6), randRange(rng, 4, 7), randRange(rng, 2.4, 3.4));
+  if (b.finish === "solar") {
+    // A grid of modules centred on the roof, leaving out any that would sit on the lift overrun. Smaller plant
+    // finds room between the rows afterwards, or goes without.
+    const cols = Math.floor((x1 - x0 + PANEL.gap) / (PANEL.w + PANEL.gap));
+    const rows = Math.floor((z1 - z0 - PANEL.d) / PANEL.row) + 1;
+    const left = (x0 + x1) / 2 - (cols * (PANEL.w + PANEL.gap) - PANEL.gap) / 2;
+    const back = (z0 + z1) / 2 - ((rows - 1) * PANEL.row + PANEL.d) / 2;
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const x = left + i * (PANEL.w + PANEL.gap) + PANEL.w / 2;
+        const z = back + j * PANEL.row + PANEL.d / 2;
+        if (free(rect(x, z, PANEL.w, PANEL.d), 0.5)) put("panel", x, z, PANEL.w, PANEL.d, 0.9);
+      }
+    }
+  }
   const units = Math.floor(randRange(rng, 1, 4));
   for (let k = 0; k < units; k++) add("box", randRange(rng, 2, 4.5), randRange(rng, 1.6, 3), randRange(rng, 1.2, 2));
   const fans = Math.floor(randRange(rng, 0, 3));
   for (let k = 0; k < fans; k++) add("fan", 2.4, 2.4, randRange(rng, 1.4, 2));
   if (b.facade === "stone" && rand(rng) < 0.7) add("tank", 3, 3, randRange(rng, 3, 3.8));
+  if (b.finish === "green") {
+    const shrubs = Math.floor(randRange(rng, 4, 10));
+    for (let k = 0; k < shrubs; k++) {
+      const s = randRange(rng, 1.2, 2.6);
+      add("shrub", s, s, s * 0.75);
+    }
+  }
   return out;
 }
+
+/** Below this many storeys, a building has no aviation lights. Only the skyline's tallest carry them. */
+export const BEACON_STOREYS = 40;
 
 /** Red lights on the corners of anything tall enough to trouble a helicopter. */
 export function beacons(b: Building): { x: number; y: number; z: number }[] {
   const top = b.masses[b.masses.length - 1];
-  if (top.y1 - GROUND_Y < 22 * STOREY) return [];
+  if (top.y1 - GROUND_Y < BEACON_STOREYS * STOREY) return [];
   const [x0, z0, x1, z1] = inset(top.rect, 0.3);
   return [
     [x0, z0],

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BEACON_STOREYS,
   beacons,
   blocks,
   BUILDING,
@@ -40,6 +41,7 @@ import {
   TURN,
   vehicleAt,
   vehicleRect,
+  type Building,
   type Rect,
   type Vehicle,
 } from './city';
@@ -116,6 +118,52 @@ describe('the buildings round the tower', () => {
   it('is the same town on every visit', () => {
     expect(buildings()).toEqual(town);
     expect(buildings(32)).not.toEqual(town);
+  });
+});
+
+describe('the variety of buildings', () => {
+  const storeys = (b: Building) => (b.masses[b.masses.length - 1].y1 - GROUND_Y) / STOREY;
+  const centre = (r: Rect) => [(r[0] + r[2]) / 2, (r[1] + r[3]) / 2];
+
+  it('dresses every facade style and roof finish somewhere in town', () => {
+    expect(new Set(town.map((b) => b.facade))).toEqual(new Set(['glass', 'ribbon', 'stone', 'fins', 'grid']));
+    expect(new Set(town.map((b) => b.finish))).toEqual(new Set(['membrane', 'gravel', 'green', 'solar', 'pool', 'helipad']));
+    expect(new Set(town.map((b) => b.wall)).size).toBeGreaterThan(20);
+  });
+
+  it('fits each roof with what its finish promises', () => {
+    for (const b of town) {
+      const kinds = roofPlant(b).map((p) => p.kind);
+      expect(kinds.filter((k) => k === 'helipad').length, `building ${town.indexOf(b)}`).toBe(b.finish === 'helipad' ? 1 : 0);
+      if (b.finish === 'helipad') expect(storeys(b)).toBeGreaterThanOrEqual(28);
+      if (b.finish === 'pool') expect(kinds).toContain('pool');
+      // A solar roof is mostly panels, not a lone module squeezed between the plant.
+      if (b.finish === 'solar') expect(kinds.filter((k) => k === 'panel').length, `building ${town.indexOf(b)}`).toBeGreaterThanOrEqual(6);
+      if (b.finish !== 'solar') expect(kinds).not.toContain('panel');
+    }
+  });
+
+  it('keeps plant, panels and pools on the roof clear of each other', () => {
+    for (const b of town) {
+      const plant = roofPlant(b);
+      const pads = plant.map((p): Rect => [p.x - p.w / 2, p.z - p.d / 2, p.x + p.w / 2, p.z + p.d / 2]);
+      for (let i = 0; i < pads.length; i++) for (let j = i + 1; j < pads.length; j++) expect(overlaps(pads[i], pads[j]), `${plant[i].kind} and ${plant[j].kind}`).toBe(false);
+    }
+  });
+
+  it('steps some towers back as they rise, off centre, and pairs some low buildings with taller neighbours', () => {
+    expect(town.filter((b) => b.masses.length >= 4).length).toBeGreaterThan(5);
+    const offCentre = town.filter((b) => b.masses.slice(1).some((m, k) => Math.hypot(centre(m.rect)[0] - centre(b.masses[k].rect)[0], centre(m.rect)[1] - centre(b.masses[k].rect)[1]) > 1));
+    expect(offCentre.length).toBeGreaterThan(30);
+    const pairs = town.filter((a) => storeys(a) <= 6 && town.some((b) => b !== a && storeys(b) > storeys(a) + 4 && gap(a.masses[0].rect, b.masses[0].rect) < 2.6));
+    expect(pairs.length).toBeGreaterThan(5);
+  });
+
+  it('lights aviation beacons only on the tallest towers', () => {
+    const lit = town.filter((b) => beacons(b).length > 0);
+    expect(lit.length).toBeGreaterThan(0);
+    for (const b of lit) expect(storeys(b)).toBeGreaterThanOrEqual(BEACON_STOREYS);
+    expect(lit.length).toBeLessThan(town.filter((b) => storeys(b) >= 22).length / 2);
   });
 });
 
