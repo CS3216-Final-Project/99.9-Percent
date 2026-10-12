@@ -52,8 +52,8 @@ interface Stop {
 
 /** The day, stop by stop. The first and last are the same midnight, so the cycle wraps without a seam. */
 const STOPS: Stop[] = [
-  { t: 0, horizon: "#1a1633", sky: [0.26, 0.29, 0.44], ground: [0.14, 0.13, 0.2], key: [0.28, 0.34, 0.52], dark: 1 },
-  { t: 0.2, horizon: "#2a2552", sky: [0.27, 0.3, 0.45], ground: [0.15, 0.14, 0.2], key: [0.29, 0.35, 0.53], dark: 0.96 },
+  { t: 0, horizon: "#1a1633", sky: [0.12, 0.14, 0.25], ground: [0.06, 0.06, 0.1], key: [0.13, 0.17, 0.29], dark: 1 },
+  { t: 0.2, horizon: "#2a2552", sky: [0.13, 0.15, 0.26], ground: [0.07, 0.06, 0.11], key: [0.14, 0.18, 0.3], dark: 0.96 },
   { t: 0.25, horizon: "#f0a77e", sky: [0.42, 0.38, 0.48], ground: [0.25, 0.2, 0.22], key: [0.82, 0.5, 0.32], dark: 0.45 },
   { t: 0.3, horizon: "#e9dccb", sky: [0.5, 0.54, 0.64], ground: [0.29, 0.27, 0.25], key: [0.98, 0.84, 0.66], dark: 0.08 },
   { t: 0.4, horizon: "#c6dcef", sky: [0.54, 0.61, 0.71], ground: [0.32, 0.3, 0.27], key: [1.0, 0.95, 0.86], dark: 0 },
@@ -61,8 +61,8 @@ const STOPS: Stop[] = [
   { t: 0.62, horizon: "#c6dcef", sky: [0.54, 0.61, 0.71], ground: [0.32, 0.3, 0.27], key: [1.0, 0.94, 0.84], dark: 0 },
   { t: 0.7, horizon: "#f1c792", sky: [0.5, 0.52, 0.6], ground: [0.3, 0.27, 0.24], key: [0.98, 0.76, 0.52], dark: 0.06 },
   { t: 0.75, horizon: "#ec8a64", sky: [0.4, 0.36, 0.48], ground: [0.24, 0.18, 0.22], key: [0.85, 0.5, 0.33], dark: 0.45 },
-  { t: 0.8, horizon: "#4a3a6e", sky: [0.32, 0.32, 0.48], ground: [0.17, 0.15, 0.22], key: [0.36, 0.4, 0.58], dark: 0.9 },
-  { t: 1, horizon: "#1a1633", sky: [0.26, 0.29, 0.44], ground: [0.14, 0.13, 0.2], key: [0.28, 0.34, 0.52], dark: 1 },
+  { t: 0.8, horizon: "#4a3a6e", sky: [0.2, 0.2, 0.34], ground: [0.1, 0.09, 0.15], key: [0.22, 0.24, 0.4], dark: 0.9 },
+  { t: 1, horizon: "#1a1633", sky: [0.12, 0.14, 0.25], ground: [0.06, 0.06, 0.1], key: [0.13, 0.17, 0.29], dark: 1 },
 ];
 
 /** The moon hangs in the north-west all night, where the city's light used to come from. */

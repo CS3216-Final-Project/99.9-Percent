@@ -21,3 +21,19 @@ plaster        Poly Haven, "Plastered Wall 04"         Rob Tuytel
                https://polyhaven.com/a/plastered_wall_04
 carpet         ambientCG, "Carpet 016"                 ambientCG
                https://ambientcg.com/a/Carpet016
+
+The city's ground and roofs use five more Poly Haven sets, also CC0. Their colour
+maps were turned grey and downscaled to 768 px, their normal maps to 512 px, and
+they hold only color.jpg and normal.jpg; the city has no use for an arm map.
+
+Folder         Source                                  Authors
+asphalt        Poly Haven, "Aerial Asphalt 01"         Rob Tuytel
+               https://polyhaven.com/a/aerial_asphalt_01
+lawn           Poly Haven, "Leafy Grass"               Charlotte Baglioni
+               https://polyhaven.com/a/leafy_grass
+pavement       Poly Haven, "Concrete Pavement 02"      Charlotte Baglioni
+               https://polyhaven.com/a/concrete_pavement_02
+gravel         Poly Haven, "Gravel"                    Dimitrios Savva
+               https://polyhaven.com/a/gravel
+roof-tiles     Poly Haven, "Clay Roof Tiles 02"        Amal Kumar
+               https://polyhaven.com/a/clay_roof_tiles_02

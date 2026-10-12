@@ -56,6 +56,7 @@ import {
 } from "./city";
 import { useDetail } from "./detail";
 import { world } from "./cityLight";
+import { useCitySurfaces, type CitySurface } from "./cityTextures";
 import { logoSign } from "./textures";
 
 /*
@@ -91,13 +92,15 @@ vec3 cityLight(vec3 n) {
 `;
 
 /**
- * How a material takes the light: shaded by the sun, moon and sky; glowing, and brighter at night; seen only at
- * night, like the pools of lamplight; or shaded by its own shader, like the facades.
+ * How a material takes the light: shaded by the sun, moon and sky; the same over a photo-scanned surface; glowing,
+ * and brighter at night; seen only at night, like the pools of lamplight; or shaded by its own shader, like the
+ * facades.
  */
-type Lighting = "lit" | "glow" | "night" | "own";
+type Lighting = "lit" | "textured" | "glow" | "night" | "own";
 
 const LIGHTING: Record<Lighting, string> = {
   lit: "diffuseColor.rgb *= cityLight(normalize(vCityNormal));",
+  textured: "diffuseColor.rgb *= cityDetail(normalize(vCityNormal)) * cityLight(cityBumped(normalize(vCityNormal)));",
   glow: "diffuseColor.rgb *= mix(0.6, 1.0, uDark);",
   night: "diffuseColor.rgb *= uDark;",
   own: "",
@@ -139,6 +142,88 @@ function faded<P extends THREE.MeshBasicMaterialParameters>(params: P, key: stri
   m.customProgramCacheKey = () => key;
   return m;
 }
+
+/** The grey photo sets average about this much in linear light (see cityTextures.ts). */
+const GREY_MEAN = 0.58;
+
+/**
+ * A photo-scanned surface laid on the ground and roofs by world position, so it needs no texture coordinates. Two
+ * samples, the second larger and turned, break up the repeat. Steep faces, like a parapet's, are left plain.
+ */
+const DETAIL_GLSL = `
+uniform sampler2D uDetail;
+uniform sampler2D uDetailNormal;
+uniform float uTile;
+uniform float uContrast;
+uniform float uMottle;
+
+vec2 detailUvA() { return vFadeWorld.xz / uTile; }
+vec2 detailUvB() { return mat2(0.8, -0.6, 0.6, 0.8) * vFadeWorld.xz / (uTile * 2.71) + 0.37; }
+float detailFlat(vec3 n) { return smoothstep(0.35, 0.8, abs(n.y)); }
+
+/** How much lighter or darker the photo is here than on average, with broad patches across the whole surface. */
+float cityDetail(vec3 n) {
+  float d = mix(texture2D(uDetail, detailUvA()).r, texture2D(uDetail, detailUvB()).r, 0.4) / ${GREY_MEAN.toFixed(2)};
+  float broad = texture2D(uDetail, vFadeWorld.xz / (uTile * 31.0) + 0.61).r / ${GREY_MEAN.toFixed(2)};
+  d = (1.0 + (d - 1.0) * uContrast) * (1.0 + (broad - 1.0) * uMottle);
+  return mix(1.0, d, detailFlat(n));
+}
+
+/** The normal, tipped by the photo's bumps. */
+vec3 cityBumped(vec3 n) {
+  vec2 t = mix(texture2D(uDetailNormal, detailUvA()).xy, texture2D(uDetailNormal, detailUvB()).xy, 0.4) * 2.0 - 1.0;
+  return normalize(n + vec3(t.x, 0.0, -t.y) * 0.8 * detailFlat(n));
+}
+`;
+
+/** A plain-coloured material laid with a photo-scanned surface. */
+function texturedMaterial(surface: CitySurface): THREE.MeshBasicMaterial {
+  return faded({ vertexColors: true }, "city-textured", "textured", (shader) => {
+    shader.uniforms.uDetail = { value: surface.map };
+    shader.uniforms.uDetailNormal = { value: surface.normalMap };
+    shader.uniforms.uTile = { value: surface.tile };
+    shader.uniforms.uContrast = { value: surface.contrast };
+    shader.uniforms.uMottle = { value: surface.mottle };
+    shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${DETAIL_GLSL}`);
+  });
+}
+
+/** What each part of the ground and the roofs is made of, for its photo at HD detail. */
+type Fabric = "pavement" | "lawn" | "gravel" | "asphalt" | "roofTiles" | "plain";
+const FABRICS: Fabric[] = ["pavement", "lawn", "gravel", "asphalt", "roofTiles", "plain"];
+
+/** Each surface's material: photo-scanned at HD once the photos have loaded, plain colour otherwise. */
+type Looks = Record<Fabric, THREE.Material>;
+
+function useLooks(): Looks {
+  const surfaces = useCitySurfaces();
+  const looks = useMemo(() => {
+    const plain: Looks = { pavement: M.shaded, lawn: M.shaded, gravel: M.shaded, asphalt: M.shaded, roofTiles: M.shaded, plain: M.shaded };
+    if (!surfaces) return plain;
+    return { ...plain, pavement: texturedMaterial(surfaces.pavement), lawn: texturedMaterial(surfaces.lawn), gravel: texturedMaterial(surfaces.gravel), asphalt: texturedMaterial(surfaces.asphalt), roofTiles: texturedMaterial(surfaces.roofTiles) };
+  }, [surfaces]);
+  useEffect(
+    () => () => {
+      for (const m of Object.values(looks)) if (m !== M.shaded) m.dispose();
+    },
+    [looks],
+  );
+  return looks;
+}
+
+/** Parts of the ground or the roofs, merged by what they are made of and drawn in their materials. */
+function Surfaces({ parts, looks }: { parts: Record<Fabric, THREE.BufferGeometry[]>; looks: Looks }) {
+  const merged = useMemo(() => FABRICS.filter((g) => parts[g].length > 0).map((g) => ({ g, geometry: merge(parts[g]) })), [parts]);
+  return (
+    <group>
+      {merged.map(({ g, geometry }) => (
+        <Merged key={g} geometry={geometry} material={looks[g]} />
+      ))}
+    </group>
+  );
+}
+
+const noParts = (): Record<Fabric, THREE.BufferGeometry[]> => Object.fromEntries(FABRICS.map((g) => [g, []])) as unknown as Record<Fabric, THREE.BufferGeometry[]>;
 
 /** Shared materials: plain vertex colours, tinted per instance where needed, and the bright ones that glow. */
 const M = {
@@ -527,32 +612,32 @@ const GROUND = { pavement: "#a9a59c", lawn: "#6c9150", park: "#5f8a48", path: "#
 
 const rectFlat = ([x0, z0, x1, z1]: Rect, y: number) => flat(x1 - x0, z1 - z0).translate((x0 + x1) / 2, y, (z0 + z1) / 2);
 
-function Ground() {
-  const geometry = useMemo(() => {
-    const out: THREE.BufferGeometry[] = [];
-    const add = (g: THREE.BufferGeometry, colour: string) => out.push(tint(g, colour));
+function Ground({ looks }: { looks: Looks }) {
+  const parts = useMemo(() => {
+    const out = noParts();
+    const add = (on: Fabric, g: THREE.BufferGeometry, colour: string) => out[on].push(tint(g, colour));
     const span = 2 * REACH + 80;
-    add(flat(span, span).translate(FADE.x, LAYER.ground, FADE.z), GROUND.pavement);
+    add("pavement", flat(span, span).translate(FADE.x, LAYER.ground, FADE.z), GROUND.pavement);
     // Every block is lawn under whatever stands on it; the park's is greener, and the car parks are asphalt.
-    for (const b of blocks()) add(rectFlat(b.rect, LAYER.block), GROUND.lawn);
-    add(rectFlat(parkBlock().rect, LAYER.tarmac), GROUND.park);
-    for (const p of parkPaths()) add(rectFlat(p, LAYER.paint), GROUND.path);
-    for (const cp of town().carParks) if (fadeAt((cp.rect[0] + cp.rect[2]) / 2, (cp.rect[1] + cp.rect[3]) / 2) < 1) add(rectFlat(cp.rect, LAYER.tarmac), GROUND.lot);
+    for (const b of blocks()) add("lawn", rectFlat(b.rect, LAYER.block), GROUND.lawn);
+    add("lawn", rectFlat(parkBlock().rect, LAYER.tarmac), GROUND.park);
+    for (const p of parkPaths()) add("gravel", rectFlat(p, LAYER.paint), GROUND.path);
+    for (const cp of town().carParks) if (fadeAt((cp.rect[0] + cp.rect[2]) / 2, (cp.rect[1] + cp.rect[3]) / 2) < 1) add("asphalt", rectFlat(cp.rect, LAYER.tarmac), GROUND.lot);
     // Carriageways, the kerbs either side of them, and the planted medians down the middle.
     for (const r of ROADS) {
-      add(rectFlat(roadRect(r), LAYER.tarmac), GROUND.road);
+      add("asphalt", rectFlat(roadRect(r), LAYER.tarmac), GROUND.road);
       for (const [a, b] of between(r)) {
         if (Math.min(fadeAt(...roadPoint(r, a)), fadeAt(...roadPoint(r, b))) >= 1) continue;
-        for (const side of [-1, 1]) add(onRoad(r, (a + b) / 2, side * (CARRIAGEWAY / 2 + 0.15), b - a, 0.3, LAYER.paint), GROUND.kerb);
+        for (const side of [-1, 1]) add("plain", onRoad(r, (a + b) / 2, side * (CARRIAGEWAY / 2 + 0.15), b - a, 0.3, LAYER.paint), GROUND.kerb);
         const from = a + STREET.pavement;
         const to = b - STREET.pavement;
-        add(onRoad(r, (from + to) / 2, 0, to - from, STREET.median - 0.6, LAYER.paint), GROUND.median);
-        for (const side of [-1, 1]) add(onRoad(r, (from + to) / 2, side * (STREET.median / 2 - 0.15), to - from, 0.3, LAYER.paint), GROUND.kerb);
+        add("lawn", onRoad(r, (from + to) / 2, 0, to - from, STREET.median - 0.6, LAYER.paint), GROUND.median);
+        for (const side of [-1, 1]) add("plain", onRoad(r, (from + to) / 2, side * (STREET.median / 2 - 0.15), to - from, 0.3, LAYER.paint), GROUND.kerb);
       }
     }
-    return merge(out);
+    return out;
   }, []);
-  return <Merged geometry={geometry} material={M.shaded} />;
+  return <Surfaces parts={parts} looks={looks} />;
 }
 
 /** The cars in the car parks, standing in their bays. */
@@ -765,12 +850,15 @@ function pitchedRoof(r: Rect, y: number, pitch: Pitch): THREE.BufferGeometry {
 }
 
 /** Roofs and the terraces on setbacks, their parapets, and the plant on top. */
-function roofs(list: Building[], lite: boolean): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
+function roofs(list: Building[], lite: boolean): Record<Fabric, THREE.BufferGeometry[]> {
+  const out = noParts();
+  const parts = out.plain;
+  // Roofs of gravel, of grass, of tiles or shingles, and of everything else, each laid with its photo at HD.
+  const deck = (b: Building): Fabric => (b.finish === "gravel" ? "gravel" : b.finish === "green" ? "lawn" : "pavement");
   for (const b of list) {
     for (const m of b.masses) {
       if (b.pitch !== "flat") {
-        parts.push(tint(pitchedRoof(m.rect, m.y1, b.pitch), b.roof));
+        out.roofTiles.push(tint(pitchedRoof(m.rect, m.y1, b.pitch), b.roof));
         continue;
       }
       const [x0, z0, x1, z1] = m.rect;
@@ -779,8 +867,8 @@ function roofs(list: Building[], lite: boolean): THREE.BufferGeometry {
       const cx = (x0 + x1) / 2;
       const cz = (z0 + z1) / 2;
       const t = 0.35;
+      out[deck(b)].push(tint(flat(w, d).translate(cx, m.y1, cz), b.roof));
       parts.push(
-        tint(flat(w, d).translate(cx, m.y1, cz), b.roof),
         tint(box(w, PARAPET, t, cx, m.y1 + PARAPET / 2, z0 + t / 2), b.wall),
         tint(box(w, PARAPET, t, cx, m.y1 + PARAPET / 2, z1 - t / 2), b.wall),
         tint(box(t, PARAPET, d - 2 * t, x0 + t / 2, m.y1 + PARAPET / 2, cz), b.wall),
@@ -789,7 +877,7 @@ function roofs(list: Building[], lite: boolean): THREE.BufferGeometry {
     }
     if (!lite) for (const p of roofPlant(b)) parts.push(...plantGeometry(p));
   }
-  return merge(parts);
+  return out;
 }
 
 /** Strips of light round the tops of some towers. */
@@ -824,7 +912,7 @@ function Beacons({ list }: { list: Building[] }) {
   return geometry ? <mesh ref={ref} geometry={geometry} material={M.glow} frustumCulled={false} /> : null;
 }
 
-function Buildings({ lite }: { lite: boolean }) {
+function Buildings({ lite, looks }: { lite: boolean; looks: Looks }) {
   const list = useMemo(() => buildings(), []);
   const material = useMemo(() => facadeMaterial(), []);
   const walls = useMemo(() => facades([...list, TOWER]), [list]);
@@ -835,7 +923,7 @@ function Buildings({ lite }: { lite: boolean }) {
   return (
     <group>
       <Merged geometry={walls} material={material} />
-      <Merged geometry={tops} material={M.shaded} />
+      <Surfaces parts={tops} looks={looks} />
       {bands && <Merged geometry={bands} material={M.glow} />}
       {lights && <Merged geometry={lights} material={M.glow} />}
       <Beacons list={list} />
@@ -1166,13 +1254,14 @@ function Crowd({ share, lite }: { share: number; lite: boolean }) {
 /** The world outside the office, lit for the time of day by applyDaylight. */
 export function Exterior() {
   const basic = useDetail() === "basic";
+  const looks = useLooks();
   return (
     <group>
-      <Ground />
+      <Ground looks={looks} />
       <Markings />
       <Yards />
       <Parked lite={basic} />
-      <Buildings lite={basic} />
+      <Buildings lite={basic} looks={looks} />
       <Tower />
       <Trees basic={basic} />
       <Park basic={basic} />
