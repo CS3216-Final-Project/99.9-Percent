@@ -226,18 +226,62 @@ export default function TechTree() {
   );
 }
 
+const CAMPAIGN_ACTION: Partial<Record<TechId, string>> = { larger_servers: "scale-up", larger_database: "upgrade-db", load_balancing: "deploy-lb", caching: "cache", cache_tuning: "cache-tuning", autoscaling: "deploy-autoscaler", health_checks: "health-checks", standby: "create-spare", auto_failover: "failover" };
+
+/** What is installed for this node right now, where the campaign tracks it separately from ownership. */
+function deployment(c: NonNullable<GameState["campaign"]>, id: TechId): string | null {
+  const r = c.reliabilityStage;
+  if (id === "health_checks") return r?.checksStep !== null && r?.checksStep !== undefined ? "Deployed" : "Not deployed";
+  if (id === "standby") return r?.spareId ? `Standing by: App ${r.spareId.slice(4)}` : "No reserved spare";
+  if (id === "auto_failover") return r?.failover ? (r.failover.enabled ? "Deployed and enabled" : "Deployed and disabled") : "Not deployed";
+  if (id === "autoscaling") return c.spikeStage?.controller ? (c.spikeStage.controller.enabled ? "Deployed and enabled" : "Deployed and disabled") : "Not deployed";
+  return null;
+}
+
+/** The Classic detail panel's layout, with the campaign's research points and physical-step costs. */
 function CampaignDetail({game,id}:{game:GameState;id:TechId}) {
- const {act,select,openView}=useGame(),c=game.campaign!,status=techStatus(game,id);
- const reliability=["health_checks","standby","auto_failover"].includes(id);
- const choose=()=>{select(id==="larger_database"?"db":id==="caching"||id==="cache_tuning"?"cache":"app");openView(null);};
- return <div className="tree-detail"><h3>{TECH[id].name}</h3><strong>{status==="done"?"Owned":status==="locked"?"Locked":"Available"}</strong><p>{campaignTechText(game,id)}</p><p>Research available: {researchBalance(c)}</p><p>{c.pending.filter(a=>({larger_servers:"scale-up",larger_database:"upgrade-db",load_balancing:"deploy-lb",caching:"cache",cache_tuning:"cache-tuning",autoscaling:"deploy-autoscaler",health_checks:"health-checks",standby:"create-spare",auto_failover:"failover"} as Record<string,string>)[id]===a.type).map(a=>`Pending activation: ${a.activationStep-c.step} steps`).join("; ")}</p>
- {TECH[id].requires.length>0&&<p>Requires: {TECH[id].requires.map(t=>TECH[t].name).join(", ")}</p>}
- {status==="locked"&&<p>{reliability&&!c.reliabilityStage?"Enter Stay Online to unlock this capability.":"Meet the displayed prerequisite or campaign stage first."}</p>}
- {reliability&&status==="available"&&<button className="btn" disabled={researchBalance(c)<1||pendingStop(c)!==null||game.phase==="review"||game.phase==="ended"} onClick={()=>act({type:"unlock_reliability",tech:id as "health_checks"|"standby"|"auto_failover"})}>Unlock {TECH[id].name} · 1 research point</button>}
- {id==="autoscaling"&&status==="available"&&<button className="btn" disabled={researchBalance(c)<1||pendingStop(c)!==null||game.phase==="review"||game.phase==="ended"} onClick={()=>act({type:"unlock_autoscaling"})}>Unlock autoscaling · 1 research point</button>}
- {!reliability&&<button className="btn" onClick={choose}>View existing actions</button>}
- <p>{id==="health_checks"?c.reliabilityStage?.checksStep!==null&&c.reliabilityStage?.checksStep!==undefined?"Deployed":"Not deployed":id==="standby"?c.reliabilityStage?.spareId?`Standing by: App ${c.reliabilityStage.spareId.slice(4)}`:"No reserved spare":id==="auto_failover"?c.reliabilityStage?.failover?c.reliabilityStage.failover.enabled?"Deployed and enabled":"Deployed and disabled":"Not deployed":id==="autoscaling"?c.spikeStage?.controller?c.spikeStage.controller.enabled?"Deployed and enabled":"Deployed and disabled":"Not deployed":""}</p>
- </div>;
+  const { act, select, openView, focusTech } = useGame();
+  const c = game.campaign!, status = techStatus(game, id);
+  const reliability = ["health_checks", "standby", "auto_failover"].includes(id);
+  const blocked = researchBalance(c) < 1 || pendingStop(c) !== null || game.phase === "review" || game.phase === "ended";
+  const choose = () => { select(id === "larger_database" ? "db" : id === "caching" || id === "cache_tuning" ? "cache" : "app"); openView(null); };
+  const pending = c.pending.filter((a) => CAMPAIGN_ACTION[id] === a.type);
+  const installed = deployment(c, id);
+  return (
+    <div className="tree-detail">
+      <span className={`tag tag-${status === "done" ? "ok" : status === "locked" ? "plain" : "accent"}`}>
+        <Icon name={STATUS_ICON[status]} size={12} />
+        {status === "done" ? "Owned" : STATUS_WORD[status]}
+      </span>
+      <div className="tree-detail-head">
+        <Concept kind={status === "locked" ? "muted" : "tech"} icon={TECH_ICON[id] ?? "tree"} />
+        <h3>{TECH[id].name}</h3>
+      </div>
+      <p>{campaignTechText(game, id)}</p>
+      <div className="chips">
+        <Chip icon="bulb" tip="Research points unlock reliability and autoscaling capabilities. Deploying them is a separate purchase.">Research available: {researchBalance(c)}</Chip>
+        {installed && <Chip icon={installed.startsWith("Not") || installed.startsWith("No ") ? "minus" : "check"}>{installed}</Chip>}
+        {pending.map((a) => <Chip key={a.id} icon="latency">Pending activation: {a.activationStep - c.step} steps</Chip>)}
+      </div>
+      {TECH[id].requires.length > 0 && (
+        <div className="chips">
+          {TECH[id].requires.map((r) => {
+            const met = techStatus(game, r) === "done";
+            return (
+              <button type="button" key={r} className={`tech-chip tech-${met ? "done" : "locked"}`} onClick={() => focusTech(r)}>
+                <Icon name={met ? "check" : "lock"} size={16} />
+                Needs {TECH[r].name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {status === "locked" && <p className="muted">{reliability && !c.reliabilityStage ? "Enter Stay Online to unlock this capability." : "Meet the displayed prerequisite or campaign stage first."}</p>}
+      {reliability && status === "available" && <Act primary icon="plus" label={`Unlock ${TECH[id].name}`} note="1 research point" noteIcon="bulb" disabled={blocked} onClick={() => act({ type: "unlock_reliability", tech: id as "health_checks" | "standby" | "auto_failover" })} />}
+      {id === "autoscaling" && status === "available" && <Act primary icon="plus" label="Unlock autoscaling" note="1 research point" noteIcon="bulb" disabled={blocked} onClick={() => act({ type: "unlock_autoscaling" })} />}
+      {!reliability && <Act icon="next" label="View existing actions" tip="Close the tree and select the equipment this capability acts on." onClick={choose} />}
+    </div>
+  );
 }
 
 function campaignTechText(game:GameState,id:TechId):string {

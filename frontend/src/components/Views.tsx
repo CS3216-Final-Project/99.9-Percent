@@ -4,10 +4,10 @@ import { useState } from "react";
 import { BALANCE, metrics, type EventKind, type GameState, type Postmortem } from "@/sim";
 import { compact, money, moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
-import { Icon, type IconName } from "./icons";
+import { Icon } from "./icons";
 import { tipProps } from "./tips";
-import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
-import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow, type ConceptKind } from "./ui";
+import { CHART_COLORS, EVENT_STYLE, OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
+import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow } from "./ui";
 
 /* ------------------------------------------------------------------ */
 /* Engineer allocation                                                 */
@@ -212,7 +212,6 @@ export function LineChart({
   );
 }
 
-const C = { users: "#1f8fe0", cash: "#d18f00", revenue: "#0f9f8f", costs: "#e46a00", db: "#7b4fe0", health: "#e0386a", mood: "#1aa35a", debt: "#c41d33" };
 
 export function RunCharts({ game, compactSet = false }: { game: GameState; compactSet?: boolean }) {
   const h = game.history;
@@ -220,15 +219,15 @@ export function RunCharts({ game, compactSet = false }: { game: GameState; compa
   const monitored = game.techDone.includes("monitoring");
   return (
     <div className="charts">
-      <LineChart title="Users" series={[{ name: "Users", color: C.users, values: h.map((r) => r.users) }]} turns={turns} format={compact} target={BALANCE.targetUsers} targetLabel="Goal" />
-      <LineChart title="Cash" series={[{ name: "Cash", color: C.cash, values: h.map((r) => r.cash) }]} turns={turns} format={money} />
+      <LineChart title="Users" series={[{ name: "Users", color: CHART_COLORS.users, values: h.map((r) => r.users) }]} turns={turns} format={compact} target={BALANCE.targetUsers} targetLabel="Goal" />
+      <LineChart title="Cash" series={[{ name: "Cash", color: CHART_COLORS.cash, values: h.map((r) => r.cash) }]} turns={turns} format={money} />
       {!compactSet && (
         <>
           <LineChart
             title="Revenue and costs"
             series={[
-              { name: "Revenue", color: C.revenue, values: h.map((r) => r.revenue) },
-              { name: "Costs", color: C.costs, values: h.map((r) => r.costs) },
+              { name: "Revenue", color: CHART_COLORS.revenue, values: h.map((r) => r.revenue) },
+              { name: "Costs", color: CHART_COLORS.costs, values: h.map((r) => r.costs) },
             ]}
             turns={turns}
             format={money}
@@ -237,8 +236,8 @@ export function RunCharts({ game, compactSet = false }: { game: GameState; compa
             <LineChart
               title="Peak load"
               series={[
-                { name: "Servers", color: C.users, values: h.map((r) => Math.min(1.5, r.appUtil)) },
-                { name: "Database", color: C.db, values: h.map((r) => Math.min(1.5, r.dbUtil)) },
+                { name: "Servers", color: CHART_COLORS.users, values: h.map((r) => Math.min(1.5, r.appUtil)) },
+                { name: "Database", color: CHART_COLORS.db, values: h.map((r) => Math.min(1.5, r.dbUtil)) },
               ]}
               turns={turns}
               format={(v) => pct(v)}
@@ -254,12 +253,12 @@ export function RunCharts({ game, compactSet = false }: { game: GameState; compa
               <p className="empty">Needs Monitoring.</p>
             </figure>
           )}
-          <LineChart title="Uptime" series={[{ name: "Uptime", color: C.health, values: h.map((r) => Math.max(0.9, r.availability)) }]} turns={turns} format={(v) => pct(v, 1)} max={1} min={0.9} />
+          <LineChart title="Uptime" series={[{ name: "Uptime", color: CHART_COLORS.health, values: h.map((r) => Math.max(0.9, r.availability)) }]} turns={turns} format={(v) => pct(v, 1)} max={1} min={0.9} />
           <LineChart
             title="Satisfaction and tech debt"
             series={[
-              { name: "Satisfaction", color: C.mood, values: h.map((r) => r.satisfaction) },
-              { name: "Debt", color: C.debt, values: h.map((r) => r.techDebt) },
+              { name: "Satisfaction", color: CHART_COLORS.mood, values: h.map((r) => r.satisfaction) },
+              { name: "Debt", color: CHART_COLORS.debt, values: h.map((r) => r.techDebt) },
             ]}
             turns={turns}
             format={(v) => String(Math.round(v))}
@@ -345,55 +344,66 @@ export function PostmortemBody({ pm }: { pm: Postmortem }) {
 /* History: charts, event feed, postmortems                            */
 /* ------------------------------------------------------------------ */
 
-type Tab = "charts" | "events" | "postmortems";
+export type HistoryTab = "charts" | "events" | "postmortems";
 
-const EVENT_STYLE: Record<EventKind, [ConceptKind, IconName]> = {
-  info: ["muted", "info"],
-  decision: ["users", "check"],
-  warning: ["warn", "alert"],
-  incident: ["critical", "incident"],
-  success: ["ok", "party"],
-  finance: ["cash", "cash"],
-  milestone: ["go", "goal"],
-};
+/** History's three tabs, the same in both modes. */
+export function HistoryTabs({ tab, onChange, incidents }: { tab: HistoryTab; onChange: (tab: HistoryTab) => void; incidents: number }) {
+  return (
+    <div className="tabs" role="tablist">
+      {(
+        [
+          ["charts", "Charts"],
+          ["events", "Events"],
+          ["postmortems", `Incidents (${incidents})`],
+        ] as [HistoryTab, string][]
+      ).map(([id, label]) => (
+        <button type="button" key={id} role="tab" aria-selected={tab === id} className={tab === id ? "is-active" : ""} onClick={() => onChange(id)}>
+          <Icon name={id === "charts" ? "history" : id === "events" ? "week" : "incident"} size={16} />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export interface FeedEntry {
+  id: string | number;
+  kind: EventKind;
+  /** When it happened, in the mode's own time unit: "Week 3" or "Step 120". */
+  when: string;
+  text: string;
+}
+
+/** The event log, newest first. */
+export function EventFeed({ entries, className }: { entries: FeedEntry[]; className?: string }) {
+  if (entries.length === 0) return <p className="empty">Nothing has happened yet.</p>;
+  return (
+    <ol className={`feed${className ? ` ${className}` : ""}`}>
+      {entries.map((e) => (
+        <li key={e.id} className={`feed-item feed-${e.kind}`}>
+          <Concept kind={EVENT_STYLE[e.kind][0]} icon={EVENT_STYLE[e.kind][1]} />
+          <span className="feed-week">{e.when}</span>
+          <span>{e.text}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 export function HistoryView() {
   const game = useGame((s) => s.game);
-  const [tab, setTab] = useState<Tab>("charts");
+  const [tab, setTab] = useState<HistoryTab>("charts");
   const [open, setOpen] = useState<string | null>(null);
   const events = [...game.log].reverse();
   const pms = [...game.postmortems].reverse();
 
   return (
     <div className="history">
-      <div className="tabs" role="tablist">
-        {(
-          [
-            ["charts", "Charts"],
-            ["events", "Events"],
-            ["postmortems", `Incidents (${game.postmortems.length})`],
-          ] as [Tab, string][]
-        ).map(([id, label]) => (
-          <button type="button" key={id} role="tab" aria-selected={tab === id} className={tab === id ? "is-active" : ""} onClick={() => setTab(id)}>
-            <Icon name={id === "charts" ? "history" : id === "events" ? "week" : "incident"} size={16} />
-            {label}
-          </button>
-        ))}
-      </div>
+      <HistoryTabs tab={tab} onChange={setTab} incidents={game.postmortems.length} />
 
       {tab === "charts" && <RunCharts game={game} />}
 
-      {tab === "events" && (
-        <ol className="feed">
-          {events.map((e) => (
-            <li key={e.id} className={`feed-item feed-${e.kind}`}>
-              <Concept kind={EVENT_STYLE[e.kind][0]} icon={EVENT_STYLE[e.kind][1]} />
-              <span className="feed-week">Week {e.turn}</span>
-              <span>{e.text}</span>
-            </li>
-          ))}
-        </ol>
-      )}
+      {tab === "events" && <EventFeed entries={events.map((e) => ({ id: e.id, kind: e.kind, when: `Week ${e.turn}`, text: e.text }))} />}
 
       {tab === "postmortems" &&
         (pms.length === 0 ? (

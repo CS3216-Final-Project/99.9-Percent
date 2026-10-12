@@ -1,5 +1,6 @@
-import type { EquipmentId, EquipmentState, Postmortem, TechId } from "@/sim";
+import type { EquipmentId, EquipmentState, EventKind, Postmortem, TechId } from "@/sim";
 import type { IconName } from "./icons";
+import type { ConceptKind } from "./ui";
 
 /*
  * Display vocabulary shared across the interface: which icon, word and tone
@@ -74,3 +75,17 @@ export const OUTCOME_ICON: Record<Postmortem["outcome"], IconName> = {
 export function outcomeTone(pm: Postmortem): "ok" | "warn" | "critical" {
   return pm.outcome === "failed" ? "critical" : pm.outcome === "mitigated" ? "warn" : "ok";
 }
+
+/** Series colours, shared by both modes' history charts. */
+export const CHART_COLORS = { users: "#1f8fe0", cash: "#d18f00", revenue: "#0f9f8f", costs: "#e46a00", db: "#7b4fe0", health: "#e0386a", mood: "#1aa35a", debt: "#c41d33" };
+
+/** The icon tile for each kind of entry in the history feed. */
+export const EVENT_STYLE: Record<EventKind, [ConceptKind, IconName]> = {
+  info: ["muted", "info"],
+  decision: ["users", "check"],
+  warning: ["warn", "alert"],
+  incident: ["critical", "incident"],
+  success: ["ok", "party"],
+  finance: ["cash", "cash"],
+  milestone: ["go", "goal"],
+};

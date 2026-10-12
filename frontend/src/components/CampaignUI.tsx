@@ -13,24 +13,25 @@ import { HomeScreen } from "./HomeScreen";
 import { CampaignChapters } from "./CampaignChapters";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest } from "@/game/persist";
-import { nextMove } from "@/game/advisor";
 import { money, num } from "@/game/format";
 import { useState } from "react";
 import { inspectOrSelect, useGame, type Speed } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
+import { MenuRun, MenuTile } from "./MenuRun";
 import { SaveFiles } from "./SaveFiles";
 import { SoundButton } from "./SoundButton";
 import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { Campaign, CampaignPostmortem, Intervention, ScheduledAction } from "@/sim/campaignTypes";
-import type { GameState } from "@/sim";
+import { completedTechIds, TECH_ORDER, type EventKind, type GameState } from "@/sim";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
-import { EQUIPMENT_ICON } from "./presentation";
+import { CHART_COLORS, EQUIPMENT_ICON } from "./presentation";
 import { ModeSwitch } from "./ModeSwitch";
-import { LineChart } from "./Views";
+import { EventFeed, HistoryTabs, LineChart, type HistoryTab } from "./Views";
+import { ViewSheet, ViewTabs } from "./ViewSheet";
 import { Act, Callout, Concept, Meter, Modal, Row, Stat, Tip } from "./ui";
 
 const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(c / 100);
@@ -117,7 +118,6 @@ export function CampaignHeader() {
         <strong>{word}</strong>
       </Stat>
     </div>
-    <button type="button" className="icon-btn" aria-label="Technology tree" {...tipProps("Technology tree")} onClick={() => openView("tech")}><Icon name="tree" /></button>
     <SoundButton />
     <button type="button" className="icon-btn menu-btn" aria-label="Menu" {...tipProps("Menu")} onClick={() => openView("menu")}><Icon name="menu" /></button>
   </header>{started && <CampaignChapters />}</>;
@@ -252,7 +252,7 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
   </Callout>
   <p role="status">Controller: {a?(a.enabled?"Enabled":"Disabled"):"Not deployed"}. {a?.blockedReason??""}</p>
   <ul className="actions">
-   <li><Act label="Unlock autoscaling" note="1 research point" disabled={disabled||!!d.researchSpent} tip="Spend the data-readiness point to unlock this capability. Deployment is a separate purchase." onClick={()=>act({type:"unlock_autoscaling"})}/></li>
+   <li><Act label="Unlock autoscaling" note="1 research point" noteIcon="bulb" disabled={disabled||!!d.researchSpent} tip="Spend the data-readiness point to unlock this capability. Deployment is a separate purchase." onClick={()=>act({type:"unlock_autoscaling"})}/></li>
    <li><Act label="Deploy autoscaling" price={T.controllerCostCents/100} note={`${T.controllerDelay} steps`} disabled={disabled||busy||!d.researchSpent||!!a||!c.loadBalancer||c.routing.mode!=="balanced"||c.routing.targets.length<2||c.cashCents<=T.controllerCostCents} tip="Requires balanced routing to at least two apps. Controller upkeep is $100 per operating week, including while disabled." onClick={()=>act({type:"deploy_autoscaler"})}/></li>
    {a&&<li><button className="btn" disabled={disabled} aria-pressed={a.enabled} onClick={()=>act({type:"set_autoscaling",enabled:!a.enabled})}>{a.enabled?"Disable autoscaling":"Enable autoscaling"}</button></li>}
   </ul>
@@ -268,12 +268,13 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
 }
 
 export function CampaignControls() {
-  const { game, view, running, setRunning, speed, setSpeed, advance, openView } = useGame();
+  const { game, running, setRunning, speed, setSpeed, advance } = useGame();
   const active = useGame(s=>s.started && !s.onboarding) && pendingStop(game.campaign) === null && !(game.campaign!.openingMilestone && !game.campaign!.openingMilestone.acknowledged) && (game.phase === "management" || game.phase === "incident");
   return <footer className="bottombar">
-    <nav className="view-tabs" aria-label="Views"><button type="button" className={view === "history" ? "is-active" : ""} aria-pressed={view === "history"} aria-label="History" {...tipProps("History")} onClick={() => openView(view === "history" ? null : "history")}>
-      <span className="tab-icon" aria-hidden="true"><Icon name="history" /></span><span className="tab-label">History</span>
-    </button></nav>
+    <ViewTabs tabs={[
+      { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}` },
+      { id: "history", label: "History", icon: "history", badge: game.campaign!.reports.length > 0 ? String(game.campaign!.reports.length) : null },
+    ]} />
     <div className="time-controls">
       <div className={`week${game.phase === "incident" ? " is-incident" : ""}`}><span className="brand-week"><Icon name={game.phase === "incident" ? "incident" : "week"} size={16} />
         Week <strong>{game.turn}</strong> · Step <strong data-testid="physical-step">{game.campaign!.step}</strong>
@@ -285,9 +286,9 @@ export function CampaignControls() {
   </footer>;
 }
 
-function Report({ report }: { report: CampaignPostmortem }) {
+function Report({ report, meta = true }: { report: CampaignPostmortem; meta?: boolean }) {
   return <div>
-    <p className="pm-meta"><span className="tag tag-ok"><Icon name="check" size={12} />Recovered{report.limited ? " under traffic limit" : " at full demand"}</span><span className="muted">Steps {report.openedStep}–{report.recoveredStep}</span></p>
+    {meta && <p className="pm-meta"><span className="tag tag-ok"><Icon name="check" size={12} />Recovered{report.limited ? " under traffic limit" : " at full demand"}</span><span className="muted">Steps {report.openedStep}–{report.recoveredStep}</span></p>}
     <dl className="rows"><Row label="Setup spending" value={dollars(report.setupCents)} /></dl>
     <div className="pm-lines">{report.explanations.map((text, i) => <Callout compact key={i} tone="info" icon="search" kicker="Recorded evidence">
       {text.replace(/\b\d+\.\d{3,}\b/g, value => Number(value).toFixed(2))}
@@ -301,9 +302,10 @@ function download(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
   const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
 }
-/** The campaign menu: what stays above the tabs is the paused notice and any unreadable-save warning. */
+/** The campaign menu: the same run card, Resume, tabs and tiles as Classic's, with the company's own actions. */
 function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
   const { game, openView, newRun, saveNow, saveBlocked, measurement } = useGame();
+  const c = game.campaign!;
   const [tab, setTab] = useState<MenuTab>(initialTab);
   const [confirmReset, setConfirmReset] = useState(false);
   const [intervention, setIntervention] = useState("");
@@ -313,19 +315,27 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
     setConfirmReset(false);
     setTab(next);
   };
-  return <Modal title="Menu" icon={{ kind: "muted", name: "menu" }} onClose={close} className="modal-menu">
-    <Callout tone="info" icon="pause" kicker="Time is paused">One step models one second of requests. Every 60 steps settles an operating week. Pausing freezes everything.</Callout>
+  // As in Classic, the first press only asks and the second, on the now red button, replaces the company.
+  const reset = () => {
+    if (!confirmReset) { setConfirmReset(true); return; }
+    newRun(); setConfirmReset(false);
+  };
+  return <Modal title="Menu" icon={{ kind: "go", name: "menu" }} onClose={close} className="modal-menu">
+    <MenuRun title="This company" saved={!saveBlocked} onResume={close}
+      stats={[
+        { icon: "week", kind: "go", label: "Week · step", value: `${game.turn} · ${c.step}` },
+        { icon: "users", kind: "users", label: "Users", value: num(game.users) },
+        { icon: "cash", kind: "cash", label: "Cash", value: money(c.cashCents / 100) },
+      ]}
+      note={<><strong>Time is paused.</strong> One step models one second of requests; every 60 steps settles an operating week.</>} />
     {saveBlocked && <Callout tone="warn" icon="save" kicker="Save preserved" live="alert">Your stored save is unreadable or unsupported and has been preserved. This run stays in memory until you explicitly reset.</Callout>}
     <MenuTabs value={tab} onChange={goTo}>
       {tab === "run" && <>
-        <section className="menu-section" aria-label="How to play"><h4><Icon name="info" size={20} />How to play</h4>
-          <p>{nextMove(game).text} Click equipment in the room or the investigation controls to inspect it for free. Choose a response, then Run to observe the change. P pauses and Esc closes a view.</p>
-        </section>
-        <section className="menu-section" aria-label="Company"><h4><Icon name="save" size={20} />Company</h4>
-          <div className="menu-actions menu-actions-row"><button type="button" className="btn" onClick={() => saveNow()}><Icon name="save" size={20} />Save now</button>
-            <button type="button" className="btn" onClick={()=>useGame.getState().showOnboarding()}><Icon name="info" size={20} />Replay introduction</button>
-            <button type="button" className="btn" onClick={()=>useGame.getState().endSession()}><Icon name="pause" size={20} />Save and exit to title</button></div>
-        </section>
+        <div className="menu-grid" role="group" aria-label="Run">
+          <MenuTile icon="save" kind="ok" title="Save now" text="Write this company to the browser." onClick={() => saveNow()} />
+          <MenuTile icon="info" kind="users" title="How to play" text="Replay the three-prompt introduction." onClick={() => useGame.getState().showOnboarding()} />
+          <MenuTile icon="pause" kind="go" title="Save and exit" text="Stop here and return to the title screen." onClick={() => useGame.getState().endSession()} />
+        </div>
         <ModeSwitch to="classic" />
       </>}
       {tab === "sound" && <SoundSettings />}
@@ -335,10 +345,8 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
         <div className="menu-col">
           <AccountSection />
           <section className="menu-section menu-danger" aria-label="Start over"><h4><Icon name="refresh" size={20} />Start over</h4>
-            <div className="menu-actions"><button type="button" className={`btn${confirmReset ? " btn-quiet" : ""}`} aria-expanded={confirmReset} onClick={() => setConfirmReset(true)}><Icon name="refresh" size={20} />New company</button></div>
-            {confirmReset && <div className="menu-confirm"><p>This replaces only the current campaign save. Export it first if you want to keep it.</p>
-              <div className="btn-row"><button type="button" className="btn btn-danger" onClick={() => { newRun(); setConfirmReset(false); }}>Confirm new company</button>
-                <button type="button" className="btn btn-quiet" onClick={() => setConfirmReset(false)}>Cancel</button></div></div>}
+            <div className="menu-actions"><button type="button" className={`btn${confirmReset ? " btn-danger" : ""}`} onClick={reset}><Icon name="refresh" size={20} />{confirmReset ? "Lose this company? Press again" : "New company"}</button></div>
+            {confirmReset && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces only the current campaign save. Export it first if you want to keep it. Press the red button again to confirm.</Callout>}
           </section>
         </div>
       </div>}
@@ -356,54 +364,109 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
   </Modal>;
 }
 export function CampaignOverlays() {
-  const { game, started, view, openView, act } = useGame();
-  const c = game.campaign!;
+  const { started, view } = useGame();
   if (!started) return <HomeScreen />;
-  if(useGame.getState().onboarding) {
-    const {meta,onboardingMove}=useGame.getState();
-    const prompts=[
-      ["Your architecture","Requests travel from Users through the Application to the Database. Select equipment in the office or dependency strip to inspect the same component."],
-      ["Your evidence","Compare demand with capacity and unfinished work (backlog). Latency describes response time; service errors count failed completed requests. Deliberate rejections are shown separately."],
-      ["Your controls","Inspection is free. Run or Advance step to observe traffic changes, and Pause to think. Investments cost money and take time to activate. Watch what changes after a decision."]
-    ];
-    return <Modal title="Company introduction" onClose={()=>onboardingMove("skip")}>
-      <p>Prompt {meta.openingOnboarding.step+1} of 3 - Simulation paused</p>
-      <h3>{prompts[meta.openingOnboarding.step][0]}</h3><p>{prompts[meta.openingOnboarding.step][1]}</p>
-      <div className="campaign-actions"><button className="btn" onClick={()=>onboardingMove("skip")}>Skip introduction</button>
-      <button className="btn" disabled={meta.openingOnboarding.step===0} onClick={()=>onboardingMove("back")}>Back</button>
-      <button className="btn btn-primary" onClick={()=>onboardingMove("next")}>{meta.openingOnboarding.step===2?"Finish introduction":"Next"}</button></div>
+  // Tech and History open over the room from the bottom bar, as in Classic; dialogs that need an answer sit above them.
+  return <>
+    {view === "tech" && <ViewSheet view="tech"><TechTree /></ViewSheet>}
+    {view === "history" && <ViewSheet view="history"><CampaignHistory /></ViewSheet>}
+    <CampaignDialog />
+  </>;
+}
+
+const INTRODUCTION = [
+  ["Your architecture","Requests travel from Users through the Application to the Database. Select equipment in the office or dependency strip to inspect the same component."],
+  ["Your evidence","Compare demand with capacity and unfinished work (backlog). Latency describes response time; service errors count failed completed requests. Deliberate rejections are shown separately."],
+  ["Your controls","Inspection is free. Run or Advance step to observe traffic changes, and Pause to think. Investments cost money and take time to activate. Watch what changes after a decision. P pauses and Esc closes a view."]
+] as const;
+
+/** The one dialog that currently needs the player, if any. */
+function CampaignDialog() {
+  const { game, view, openView, act, onboarding, meta, onboardingMove } = useGame();
+  const c = game.campaign!;
+  if (onboarding) {
+    const step = meta.openingOnboarding.step;
+    return <Modal title="Company introduction" icon={{ kind: "go", name: "info" }} onClose={()=>onboardingMove("skip")}>
+      <div className="tour-dots" aria-hidden="true">{INTRODUCTION.map((_, i) => <i key={i} className={i < step ? "is-done" : i === step ? "is-now" : ""} />)}</div>
+      <p className="muted">Prompt {step+1} of {INTRODUCTION.length} - Simulation paused</p>
+      <h3>{INTRODUCTION[step][0]}</h3><p>{INTRODUCTION[step][1]}</p>
+      <div className="modal-foot"><button className="btn btn-quiet" onClick={()=>onboardingMove("skip")}>Skip introduction</button>
+        <div className="btn-row"><button className="btn" disabled={step===0} onClick={()=>onboardingMove("back")}>Back</button>
+        <button className="btn btn-primary" onClick={()=>onboardingMove("next")}>{step===INTRODUCTION.length-1?"Finish introduction":"Next"}</button></div></div>
     </Modal>;
   }
-  if (view === "tech") return <Modal title="Technology tree" wide className="modal-tech" icon={{ kind: "tech", name: "tree" }} onClose={() => openView(null)}><TechTree /></Modal>;
   if (pendingReliability(c)) return <Modal title="Reliability outcome" icon={{ kind: "ok", name: "health" }}>
     <ReliabilityOutcome campaign={c} />
-    <button className="btn btn-primary" onClick={()=>act({type:"acknowledge_reliability"})}>Continue operating<Icon name="next" /></button>
+    <ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_reliability"})} />
   </Modal>;
-  if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_prevention_review"})}>Continue company<Icon name="next" /></button></Modal>;
-  if (game.phase === "review") return <Modal title="Incident postmortem" wide icon={{ kind: "ok", name: "incident" }}><Report report={c.reports[c.reports.length - 1]} /><div className="modal-foot"><span className="muted">The same company continues.</span><button className="btn btn-primary" onClick={() => act({ type: "acknowledge_review" })}>Continue company<Icon name="next" /></button></div></Modal>;
-  if(c.openingMilestone&&!c.openingMilestone.acknowledged)return <Modal title="First growth challenge handled">
+  if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_prevention_review"})} /></Modal>;
+  if (game.phase === "review") return <Modal title="Incident postmortem" wide icon={{ kind: "ok", name: "incident" }}><Report report={c.reports[c.reports.length - 1]} /><ContinueFoot label="Continue company" onClick={() => act({ type: "acknowledge_review" })} /></Modal>;
+  if(c.openingMilestone&&!c.openingMilestone.acknowledged)return <Modal title="First growth challenge handled" icon={{ kind: "go", name: "goal" }}>
     <p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
     <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p>
-    <button className="btn btn-primary" onClick={()=>act({type:"acknowledge_milestone"})}>Continue operating</button>
+    <ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_milestone"})} />
   </Modal>;
-  if(pendingSpikeAcknowledgement(c) && view!=="menu" && view!=="history") return <Modal title="Spike response handled" onClose={()=>openView("history")}><p>Both demand pulses ended and five baseline steps qualified for stable service. The same company continues with its investments and operating costs.</p><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_spikes"})}>Continue operating</button></Modal>;
+  if(pendingSpikeAcknowledgement(c) && view!=="menu" && view!=="history") return <Modal title="Spike response handled" icon={{ kind: "go", name: "goal" }} onClose={()=>openView("history")}><p>Both demand pulses ended and five baseline steps qualified for stable service. The same company continues with its investments and operating costs.</p><ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_spikes"})} /></Modal>;
   if (game.phase === "ended" && view === null) return <Modal title="Company bankrupt" tone="alert" icon={{ kind: "critical", name: "cash" }} onClose={() => openView("menu")}>
     <Callout tone="critical" icon="cash" kicker="Company closed">Cash reached {dollars(c.cashCents)} after settlement at step {c.step}. Final metrics and history remain available.</Callout>
     <p>Last period revenue: {dollars(c.settlements.at(-1)?.revenueCents??0)}. Infrastructure: {dollars(infrastructureCents(c.settlements.at(-1)))}. Salaries: {dollars(c.settlements.at(-1)?.salaryCents??0)}.</p>
     <p>Upfront investment: {dollars(c.investedCents)}. Rejected demand: {c.cumulative.rejected} requests (not an extra cash charge).</p>
-    <div className="btn-row"><button className="btn" onClick={() => openView("history")}>View history</button><button className="btn" onClick={() => openView("menu")}>Export or start a new company</button></div>
+    <div className="modal-foot"><button className="btn btn-quiet" onClick={() => openView("history")}><Icon name="history" size={16} />View history</button><button className="btn btn-primary" onClick={() => openView("menu")}><Icon name="refresh" size={16} />Export or start a new company</button></div>
   </Modal>;
   if (view === "menu") return <CampaignMenu initialTab={game.phase === "ended" ? "saves" : "run"} />;
-  if (view === "history") return <Modal title="Campaign history" wide icon={{ kind: "users", name: "history" }} onClose={() => openView(null)}>
-    <LineChart title="Latency" axisLabel="Step" series={[{ name: "Latency", color: "var(--c-health)", values: c.recent.map(m => m.latencyMs) }]} turns={c.recent.map(m => m.step)} format={v => `${v.toFixed(0)} ms`} />
-    {c.spikeStage&&<details className="more"><summary>Traffic spike and controller history</summary>{c.recent.filter(m=>m.spikes).map(m=><p key={m.step}>Step {m.step}: incoming {m.incoming}; {m.spikes!.activePulse?`pulse ${m.spikes!.activePulse}`:"baseline"}; routed busy {m.spikes!.routedBusyBasisPoints/100}%; installed/routed {m.spikes!.installed}/{m.spikes!.routed}; {m.spikes!.blockedReason??"observing"}.</p>)}</details>}
-    {c.openingPrevention?.outcome&&<section aria-label="Historical Opening prevention outcome"><PreventionOutcome campaign={c} /></section>}
-    {c.reliabilityStage?.completedStep!=null&&<section aria-label="Historical reliability outcome"><ReliabilityOutcome campaign={c} /></section>}
-    {c.reports.map(p => <Report key={p.id} report={p} />)}
-    <details className="more"><summary>Financial settlements</summary>{c.settlements.map(p => <p key={p.period}>Week {p.period}: revenue {dollars(p.revenueCents)}, net {dollars(p.netCents)}</p>)}</details>
-    <details className="more"><summary>Action and event history</summary>{c.trace.filter(e => e.type !== "metrics").map(e => <p key={e.id}>Step {e.step}: {e.type.replaceAll("-", " ")} {e.data.reason ? String(e.data.reason) : e.data.type ? ACTION_NAMES[e.data.type as Intervention] ?? String(e.data.type).replaceAll("-", " ") : ""}</p>)}</details>
-  </Modal>;
   return null;
+}
+
+/** Every acknowledgement ends the same way: the company carries on, and one button says so. */
+function ContinueFoot({ label, onClick }: { label: string; onClick: () => void }) {
+  return <div className="modal-foot"><span className="muted">The same company continues.</span><button className="btn btn-primary" onClick={onClick}>{label}<Icon name="next" /></button></div>;
+}
+
+const eventKind = (type: string): EventKind =>
+  type === "settlement" ? "finance"
+  : /incident-opened|failure-started|bankruptcy/.test(type) ? "incident"
+  : /rejected|blocked|cancelled|superseded/.test(type) ? "warning"
+  : /recovered|restored|qualified|completed/.test(type) ? "success"
+  : /milestone|awarded|stage-entered|unlocked/.test(type) ? "milestone"
+  : /action-|acknowledged|enabled|reserved|decided/.test(type) ? "decision"
+  : "info";
+const eventText = (e: Campaign["trace"][number]) => {
+  const text = `${e.type.replaceAll("-", " ")} ${e.data.reason ? String(e.data.reason) : e.data.type ? ACTION_NAMES[e.data.type as Intervention] ?? String(e.data.type).replaceAll("-", " ") : ""}`.trim();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
+/** History uses Classic's tabs: charts, the event log and the incident reports, with the step as the time unit. */
+function CampaignHistory() {
+  const c = useGame(s => s.game.campaign!);
+  const [tab, setTab] = useState<HistoryTab>("charts");
+  const [open, setOpen] = useState<string | null>(null);
+  const steps = c.recent.map(m => m.step);
+  return <div className="history">
+    <HistoryTabs tab={tab} onChange={setTab} incidents={c.reports.length} />
+    {tab === "charts" && <>
+      <div className="charts">
+        <LineChart title="Latency" axisLabel="Step" series={[{ name: "Latency", color: CHART_COLORS.health, values: c.recent.map(m => m.latencyMs) }]} turns={steps} format={v => `${v.toFixed(0)} ms`} />
+        <LineChart title="Traffic" axisLabel="Step" series={[{ name: "Incoming", color: CHART_COLORS.users, values: c.recent.map(m => m.incoming) }, { name: "Admitted", color: CHART_COLORS.revenue, values: c.recent.map(m => m.admitted) }]} turns={steps} format={v => `${num(v)}/s`} />
+        <LineChart title="Revenue and costs" series={[{ name: "Revenue", color: CHART_COLORS.revenue, values: c.settlements.map(p => p.revenueCents / 100) }, { name: "Costs", color: CHART_COLORS.costs, values: c.settlements.map(p => (p.revenueCents - p.netCents) / 100) }]} turns={c.settlements.map(p => p.period)} format={money} />
+      </div>
+      <div className="history-notes">
+        {c.spikeStage&&<details className="more"><summary>Traffic spike and controller history</summary>{c.recent.filter(m=>m.spikes).map(m=><p key={m.step}>Step {m.step}: incoming {m.incoming}; {m.spikes!.activePulse?`pulse ${m.spikes!.activePulse}`:"baseline"}; routed busy {m.spikes!.routedBusyBasisPoints/100}%; installed/routed {m.spikes!.installed}/{m.spikes!.routed}; {m.spikes!.blockedReason??"observing"}.</p>)}</details>}
+        <details className="more"><summary>Financial settlements</summary>{c.settlements.length ? c.settlements.map(p => <p key={p.period}>Week {p.period}: revenue {dollars(p.revenueCents)}, net {dollars(p.netCents)}</p>) : <p>No operating week has settled yet.</p>}</details>
+      </div>
+    </>}
+    {tab === "events" && <EventFeed className="campaign-feed" entries={c.trace.filter(e => e.type !== "metrics").reverse().map(e => ({ id: e.id, kind: eventKind(e.type), when: `Step ${e.step}`, text: eventText(e) }))} />}
+    {tab === "postmortems" && <div className="history-incidents">
+      {c.openingPrevention?.outcome&&<section className="history-card" aria-label="Historical Opening prevention outcome"><PreventionOutcome campaign={c} /></section>}
+      {c.reliabilityStage?.completedStep!=null&&<section className="history-card" aria-label="Historical reliability outcome"><ReliabilityOutcome campaign={c} /></section>}
+      {c.reports.length === 0 ? <p className="empty">No incidents yet.</p> : <ul className="pm-list">{[...c.reports].reverse().map(report => <li key={report.id}>
+        <button type="button" className="pm-toggle" aria-expanded={open === report.id} onClick={() => setOpen(open === report.id ? null : report.id)}>
+          <span><Icon name="incident" size={16} />Steps {report.openedStep}–{report.recoveredStep}: Service slowdown</span>
+          <span className="tag tag-ok"><Icon name="check" size={12} />Recovered{report.limited ? " under traffic limit" : ""}</span>
+        </button>
+        {open === report.id && <div className="pm"><Report report={report} meta={false} /></div>}
+      </li>)}</ul>}
+    </div>}
+  </div>;
 }
 
 type Settlement = Campaign["settlements"][number];

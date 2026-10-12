@@ -8,7 +8,7 @@ import { watchCues } from "@/game/cues";
 import { createMusic, type Music } from "@/game/music";
 import type { AudioSettings } from "@/game/persist";
 import { createSfx } from "@/game/sfx";
-import { useGame, type Speed, type View } from "@/game/store";
+import { useGame, type Speed } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { SoundButton } from "./SoundButton";
 import { tipProps } from "./tips";
@@ -17,9 +17,10 @@ import { HomeScreen } from "./HomeScreen";
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
 import Tutorial from "./Tutorial";
-import { Callout, Concept, Meter, Stat, type ConceptKind } from "./ui";
+import { Callout, Meter, Stat } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
 import OperationsRail from "./OperationsRail";
+import { ViewSheet, ViewTabs, type ViewTab } from "./ViewSheet";
 
 // Keep the WebGL scene in its own chunk; Vite renders this app in the browser.
 const Facility = lazy(() => import("./scene/Facility"));
@@ -126,10 +127,8 @@ function WeekClock() {
 
 function BottomBar() {
   const game = useGame((s) => s.game);
-  const view = useGame((s) => s.view);
   const running = useGame((s) => s.running);
   const speed = useGame((s) => s.speed);
-  const openView = useGame((s) => s.openView);
   const setRunning = useGame((s) => s.setRunning);
   const setSpeed = useGame((s) => s.setSpeed);
   const advance = useGame((s) => s.advance);
@@ -142,28 +141,15 @@ function BottomBar() {
   const hasPast = game.history.length > 0;
   const showTime = incident || game.turn > 1;
 
-  const toggle = (v: Exclude<View, null>) => openView(view === v ? null : v);
-  const tabs: [Exclude<View, null>, string, IconName, string | null, boolean][] = [
-    ["tech", "Tech", "tree", `${completedTechIds(game).length}/${TECH_ORDER.length}`, true],
-    ["engineers", "Team", "team", `${m.freeEngineers} free`, hasWork],
-    ["history", "History", "history", game.postmortems.length > 0 ? String(game.postmortems.length) : null, hasPast],
-  ];
-
   return (
     <footer className="bottombar">
-      <nav className="view-tabs" aria-label="Views">
-        {tabs
-          .filter((t) => t[4])
-          .map(([id, label, icon, badge]) => (
-            <button type="button" key={id} data-view={id} className={view === id ? "is-active" : ""} aria-pressed={view === id} aria-label={label} {...tipProps(label)} disabled={incident && id !== "history"} onClick={() => toggle(id)}>
-              <span className="tab-icon" aria-hidden="true">
-                <Icon name={icon} />
-              </span>
-              <span className="tab-label">{label}</span>
-              {badge && <span className="badge">{badge}</span>}
-            </button>
-          ))}
-      </nav>
+      <ViewTabs
+        tabs={[
+          { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}`, disabled: incident },
+          ...(hasWork ? [{ id: "engineers", label: "Team", icon: "team", badge: `${m.freeEngineers} free`, disabled: incident } satisfies ViewTab] : []),
+          ...(hasPast ? [{ id: "history", label: "History", icon: "history", badge: game.postmortems.length > 0 ? String(game.postmortems.length) : null } satisfies ViewTab] : []),
+        ]}
+      />
 
       <div className="time-controls">
         <WeekClock />
@@ -201,34 +187,15 @@ function BottomBar() {
 /* Overlay views                                                       */
 /* ------------------------------------------------------------------ */
 
-const VIEW_TITLES: Record<Exclude<View, null | "menu">, string> = { tech: "Tech tree", engineers: "Team", history: "History" };
-const VIEW_ICONS: Record<Exclude<View, null | "menu">, [ConceptKind, IconName]> = {
-  tech: ["tech", "tree"],
-  engineers: ["team", "team"],
-  history: ["users", "history"],
-};
-
-function ViewSheet() {
+function ClassicViewSheet() {
   const view = useGame((s) => s.view);
-  const openView = useGame((s) => s.openView);
   if (!view || view === "menu") return null;
   return (
-    <section className={`sheet sheet-${view}`} aria-label={VIEW_TITLES[view]}>
-      <header className="sheet-head">
-        <h2>
-          <Concept kind={VIEW_ICONS[view][0]} icon={VIEW_ICONS[view][1]} />
-          {VIEW_TITLES[view]}
-        </h2>
-        <button type="button" className="icon-btn" onClick={() => openView(null)} aria-label="Close">
-          <Icon name="close" />
-        </button>
-      </header>
-      <div className="sheet-body">
-        {view === "tech" && <TechTree />}
-        {view === "engineers" && <EngineersView />}
-        {view === "history" && <HistoryView />}
-      </div>
-    </section>
+    <ViewSheet view={view}>
+      {view === "tech" && <TechTree />}
+      {view === "engineers" && <EngineersView />}
+      {view === "history" && <HistoryView />}
+    </ViewSheet>
   );
 }
 
@@ -383,7 +350,7 @@ export default function Game() {
           <Facility />
         </Suspense>
       </main>
-      {campaign ? <>{started && <CampaignPanel />}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ViewSheet /><BottomBar /></>}
+      {campaign ? <>{started && <CampaignPanel />}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ClassicViewSheet /><BottomBar /></>}
       <ToastHost />
       {!campaign && !started && <HomeScreen />}
       {!campaign && started && view === "menu" && <Menu />}

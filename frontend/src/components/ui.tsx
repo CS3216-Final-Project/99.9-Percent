@@ -147,6 +147,7 @@ export function Act({
   label,
   price,
   note,
+  noteIcon = "latency",
   onClick,
   disabled,
   primary,
@@ -157,6 +158,8 @@ export function Act({
   label: string;
   price?: number;
   note?: string;
+  /** The note's badge icon: a clock for an activation delay unless the note says otherwise. */
+  noteIcon?: IconName;
   onClick: () => void;
   disabled?: boolean;
   primary?: boolean;
@@ -178,7 +181,7 @@ export function Act({
           )}
           {note && (
             <span className="price">
-              <Icon name="latency" size={12} />
+              <Icon name={noteIcon} size={12} />
               {note}
             </span>
           )}

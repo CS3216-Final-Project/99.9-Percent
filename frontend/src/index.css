@@ -2014,11 +2014,6 @@ button:disabled {
 }
 
 /* Tech tree */
-.modal .tree {
-  --on-night: var(--ink);
-  --on-night-soft: var(--text-soft);
-}
-
 .tree {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(320px, 22vw, 420px);
@@ -2035,7 +2030,8 @@ button:disabled {
 .tree-map {
   flex: none;
   width: 100%;
-  min-width: 960px;
+  /* Narrow enough that all nine nodes fit beside the detail panel next to Classic's Operations rail. */
+  min-width: 760px;
   max-width: 2200px;
   margin: auto;
 }
@@ -2987,10 +2983,6 @@ button:disabled {
   width: min(580px, 100%);
 }
 
-.modal-tech {
-  width: min(1400px, 100%);
-}
-
 .modal-head {
   display: flex;
   justify-content: space-between;
@@ -3261,10 +3253,6 @@ button:disabled {
 }
 
 /* A full-width row of actions that wraps into equal columns. */
-.menu-actions-row {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
-}
-
 /* A choice waiting for confirmation, beside the control that asked for it. */
 .menu-confirm {
   margin-top: 10px;
@@ -4257,6 +4245,15 @@ button:disabled {
 .campaign-details { overflow-x: auto; }
 
 .campaign-panel .step-head { margin-top: 10px; }
+/* Campaign history shares Classic's sheet, tabs, chart cards and feed. Its disclosures and
+   stage outcomes sit on the same paper cards so they read on the night background. */
+.history-notes, .history-card { max-width: 880px; padding: 0 14px 12px; background: var(--paper); color: var(--ink); border: 3px solid var(--ink); border-radius: 6px; box-shadow: var(--press); }
+.history-notes { margin-top: 14px; }
+.history-notes > .more:first-child { margin-top: 0; border-top: 0; }
+.history-notes > .more { padding-top: 12px; }
+.history-card { padding-top: 12px; }
+.history-incidents { display: grid; gap: 10px; }
+.campaign-feed .feed-item { grid-template-columns: 28px 76px 1fr; }
 .request-path { margin: 0 0 4px; font-size: 12px; }
 .modal select, .modal textarea { display: block; width: 100%; padding: 8px; margin: 8px 0; }
 .modal :focus-visible { outline: 3px solid #426788; outline-offset: 2px; }
