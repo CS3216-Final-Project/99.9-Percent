@@ -21,6 +21,7 @@ import {
   gap,
   GROUND_Y,
   inside,
+  isLong,
   LAG,
   LANE,
   LANES,
@@ -284,6 +285,14 @@ describe('traffic', () => {
 
   it('would collide if the crossing traffic came out of turn', () => {
     expect(collisions(vehicles, TURN.z[0], 20).length).toBeGreaterThan(0);
+  });
+
+  it('mixes cars, taxis, vans, trucks and buses, the long ones a few in each lane', () => {
+    const kinds = new Map<string, number>();
+    for (const v of vehicles) kinds.set(v.kind, (kinds.get(v.kind) ?? 0) + 1);
+    expect(new Set(kinds.keys())).toEqual(new Set(['sedan', 'hatch', 'suv', 'taxi', 'van', 'truck', 'bus']));
+    expect(vehicles.filter((v) => isLong(v.kind)).length).toBeLessThan(vehicles.length * 0.15);
+    expect(isLong('bus') && isLong('truck') && !isLong('van')).toBe(true);
   });
 
   it('is the same traffic on every visit', () => {

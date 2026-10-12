@@ -44,6 +44,7 @@ import {
   type Road,
   type Tree,
   type Vehicle,
+  type VehicleKind,
 } from "./city";
 import { useDetail } from "./detail";
 import { logoSign } from "./textures";
@@ -315,6 +316,36 @@ function truckBody(): THREE.BufferGeometry {
     tint(box(2.1, 0.7, 0.1, 0, 1.85, -4.2), "#2b3140", 0.7),
     ...[-1.05, 1.05].flatMap((x) => [-3.0, 0.4, 3.4].map((z) => tint(wheel(x, z), "#18171c"))),
   ]);
+}
+
+/** Wheels either side, `x` out from the middle, at each of `zs` along. */
+const wheels = (x: number, zs: number[], r = 0.34, w = 0.24) =>
+  [-x, x].flatMap((side) => zs.map((z) => tint(new THREE.CylinderGeometry(r, r, w, 10).rotateZ(Math.PI / 2).translate(side, r, z), "#18171c")));
+
+/**
+ * Each kind of vehicle facing -z, its wheels on the ground: a white body that the vehicle's own colour tints, and
+ * dark glass. A lite one leaves the wheels to the imagination. Taxis share the saloon's body.
+ */
+function vehicleBody(kind: VehicleKind, lite = false): THREE.BufferGeometry {
+  const glass = "#8d93a3";
+  const dark = "#2b3140";
+  if (kind === "hatch") return merge([tint(box(1.75, 0.68, 3.9, 0, 0.62, 0), "#ffffff", 0.55), tint(box(1.55, 0.58, 2.1, 0, 1.25, 0.45), glass, 0.6), ...(lite ? [] : wheels(0.8, [-1.2, 1.25]))]);
+  if (kind === "suv") return merge([tint(box(1.85, 0.95, 4.4, 0, 0.8, 0), "#ffffff", 0.55), tint(box(1.7, 0.6, 2.7, 0, 1.57, 0.35), glass, 0.6), ...(lite ? [] : wheels(0.84, [-1.4, 1.4], 0.4))]);
+  if (kind === "van") return merge([tint(box(1.8, 1.75, 4.4, 0, 1.2, 0), "#ffffff", 0.55), tint(box(1.6, 0.55, 0.06, 0, 1.6, -2.21), dark, 0.8), ...(lite ? [] : wheels(0.82, [-1.4, 1.45], 0.36))]);
+  if (kind === "truck") return truckBody();
+  if (kind === "bus") return merge([tint(box(2.4, 2.6, 8.8, 0, 1.7, 0), "#ffffff", 0.55), tint(box(2.2, 0.9, 0.06, 0, 2.0, -4.41), dark, 0.8), ...(lite ? [] : wheels(1.05, [-3.0, 2.8], 0.45, 0.3))]);
+  return carBody(lite);
+}
+
+/** Head and tail lights for each kind, the lit sign on a taxi's roof, and a bus's lit windows and route sign. */
+function vehicleLights(kind: VehicleKind): THREE.BufferGeometry {
+  if (kind === "hatch") return carLights(3.9, 0.7, 1.75);
+  if (kind === "suv") return carLights(4.4, 0.95, 1.85);
+  if (kind === "van") return carLights(4.4, 0.75, 1.8);
+  if (kind === "truck") return carLights(8.6, 1.0, 2.3);
+  if (kind === "bus") return merge([carLights(8.8, 0.8, 2.4), ...[-1, 1].map((s) => tint(box(0.04, 0.75, 7.0, s * 1.215, 2.25, 0.3), "#ffd99a", 1)), tint(box(1.4, 0.3, 0.05, 0, 2.75, -4.43), "#ffb347", 1)]);
+  if (kind === "taxi") return merge([carLights(), tint(box(0.62, 0.2, 0.28, 0, 1.63, 0.2), "#fff1b0", 1)]);
+  return carLights();
 }
 
 function treeTrunk(): THREE.BufferGeometry {
@@ -847,17 +878,21 @@ function Fleet({ vehicles, body, lights }: { vehicles: Vehicle[]; body: THREE.Bu
   );
 }
 
-/** Cars and trucks on every road. `share` thins the traffic for a computer without a GPU. */
+const KINDS: VehicleKind[] = ["sedan", "hatch", "suv", "taxi", "van", "truck", "bus"];
+
+/** Cars, taxis, vans, trucks and buses on every road. `share` thins the traffic for a computer without a GPU. */
 function Traffic({ share, lite }: { share: number; lite: boolean }) {
-  const { cars, trucks } = useMemo(() => {
+  const fleets = useMemo(() => {
     const all = traffic().filter((_, i) => (i * share) % 1 < share);
-    return { cars: all.filter((v) => !v.truck), trucks: all.filter((v) => v.truck) };
+    return KINDS.map((kind) => ({ kind, vehicles: all.filter((v) => v.kind === kind) }));
   }, [share]);
-  const geo = useMemo(() => ({ car: carBody(lite), carLights: carLights(), truck: truckBody(), truckLights: carLights(8.6, 1.0, 2.3) }), [lite]);
+  const geo = useMemo(() => new Map(KINDS.map((k) => [k, { body: vehicleBody(k, lite), lights: vehicleLights(k) }])), [lite]);
   return (
     <group>
-      <Fleet vehicles={cars} body={geo.car} lights={geo.carLights} />
-      <Fleet vehicles={trucks} body={geo.truck} lights={geo.truckLights} />
+      {fleets.map(({ kind, vehicles }) => {
+        const g = geo.get(kind) as { body: THREE.BufferGeometry; lights: THREE.BufferGeometry };
+        return <Fleet key={kind} vehicles={vehicles} body={g.body} lights={g.lights} />;
+      })}
     </group>
   );
 }

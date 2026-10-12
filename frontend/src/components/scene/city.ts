@@ -733,23 +733,37 @@ export function vehicleAt(lane: Lane, slot: number, t: number): { x: number; z: 
   return lane.axis === "x" ? { x: FADE.x + along, z: lane.at } : { x: lane.at, z: FADE.z + along };
 }
 
+/**
+ * Saloons, hatchbacks, SUVs, taxis and vans all fit within a car's length; trucks and buses within a truck's. The
+ * junctions' timing is worked out from those two lengths, so no vehicle may be longer.
+ */
+export type VehicleKind = "sedan" | "hatch" | "suv" | "taxi" | "van" | "truck" | "bus";
+
+export const isLong = (kind: VehicleKind): boolean => kind === "truck" || kind === "bus";
+
 export interface Vehicle {
   lane: number;
   slot: number;
-  truck: boolean;
+  kind: VehicleKind;
   colour: string;
 }
 
-export const CAR_COLOURS = ["#d9d9de", "#26262e", "#8a8f99", "#2f4c8f", "#9c1f2b", "#e8e4d8", "#3d5c47", "#5a5f6b", "#e0b32e", "#1d3557"];
+export const CAR_COLOURS = ["#d9d9de", "#26262e", "#8a8f99", "#2f4c8f", "#9c1f2b", "#e8e4d8", "#3d5c47", "#5a5f6b", "#b5562a", "#1d3557"];
+const TAXI_COLOURS = ["#e8b31f", "#e8b31f", "#3e9a5f"];
+const BUS_COLOURS = ["#c8323c", "#2f7d4f", "#e8e4d8", "#2f5fa0"];
+const SHORT: readonly VehicleKind[] = ["sedan", "sedan", "sedan", "sedan", "hatch", "hatch", "suv", "suv", "taxi", "van"];
 
-/** About three places in five filled, a few with trucks; the same traffic every visit. */
+/** About four places in five filled, a few with trucks and buses; the same traffic every visit. */
 export function traffic(seed = 21): Vehicle[] {
   const rng: RngHolder = { rngState: seed };
   const out: Vehicle[] = [];
   LANES.forEach((lane, l) => {
     for (let slot = 0; slot < lane.slots; slot++) {
-      if (rand(rng) > 0.6) continue;
-      out.push({ lane: l, slot, truck: rand(rng) < (lane.axis === "x" ? 0.12 : 0.07), colour: pick(rng, CAR_COLOURS) });
+      if (rand(rng) > 0.8) continue;
+      const long = rand(rng) < (lane.axis === "x" ? 0.12 : 0.07);
+      const kind: VehicleKind = long ? (rand(rng) < 0.5 ? "bus" : "truck") : pick(rng, SHORT);
+      const colour = kind === "taxi" ? pick(rng, TAXI_COLOURS) : kind === "bus" ? pick(rng, BUS_COLOURS) : pick(rng, CAR_COLOURS);
+      out.push({ lane: l, slot, kind, colour });
     }
   });
   return out;
@@ -759,7 +773,7 @@ export function traffic(seed = 21): Vehicle[] {
 export function vehicleRect(v: Vehicle, t: number): Rect {
   const lane = LANES[v.lane];
   const { x, z } = vehicleAt(lane, v.slot, t);
-  const length = v.truck ? VEHICLE.truck : VEHICLE.car;
-  const width = v.truck ? VEHICLE.width : 1.8;
+  const length = isLong(v.kind) ? VEHICLE.truck : VEHICLE.car;
+  const width = isLong(v.kind) ? VEHICLE.width : 1.8;
   return lane.axis === "x" ? rect(x, z, length, width) : rect(x, z, width, length);
 }
