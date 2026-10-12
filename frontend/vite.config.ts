@@ -6,6 +6,10 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'import.meta.env.VITE_DEPLOY_ENV': JSON.stringify(process.env.VERCEL_ENV ?? 'local'),
+    'import.meta.env.VITE_COMMIT_SHA': JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA ?? ''),
+  },
   server: {proxy: {'/api': {target:'http://localhost:3001',changeOrigin:false}}},
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
