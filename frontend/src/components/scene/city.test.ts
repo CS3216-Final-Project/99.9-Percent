@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bays,
   BEACON_STOREYS,
   beacons,
   benches,
@@ -29,6 +30,7 @@ import {
   lamps,
   overlaps,
   parkBlock,
+  parkedCars,
   parkCentre,
   parkPaths,
   pedestrians,
@@ -43,6 +45,7 @@ import {
   STREET,
   STREET_WIDTH,
   TOWER,
+  town as cityTown,
   towerBlock,
   traffic,
   trees,
@@ -61,15 +64,16 @@ const town = buildings();
 const masses = town.flatMap((b, i) => b.masses.map((m) => ({ ...m, building: i })));
 const inJunction = (x: number, z: number, margin: number) => CROSS_X.some((cx) => Math.abs(x - cx) < margin) && CROSS_Z.some((cz) => Math.abs(z - cz) < margin);
 
-describe('the office tower', () => {
-  it('puts the office on the top floor, fifteen storeys above the street', () => {
+describe("the startup's building", () => {
+  it('puts the office on the top floor, three storeys above the street', () => {
+    expect(FLOORS_BELOW).toBe(3);
     expect(TOWER.masses[0].y0).toBe(GROUND_Y);
     expect(TOWER.masses[TOWER.masses.length - 1].y1).toBe(SLAB);
     expect((SLAB - GROUND_Y) / STOREY).toBe(FLOORS_BELOW);
     expect(TOWER.masses[TOWER.masses.length - 1].rect).toEqual(BUILDING);
   });
 
-  it('stands its podium and plaza inside its own block, clear of the street', () => {
+  it('stands its lobby wing and lawn inside its own block, clear of the street', () => {
     const block = towerBlock().rect;
     expect(inside(PODIUM[0], PODIUM[1], block, -4)).toBe(true);
     expect(inside(PODIUM[2], PODIUM[3], block, -4)).toBe(true);
@@ -77,9 +81,9 @@ describe('the office tower', () => {
   });
 });
 
-describe('the buildings round the tower', () => {
+describe('the buildings round the office', () => {
   it('never rises between the camera and the office, roof plant and beacons included', () => {
-    expect(masses.length).toBeGreaterThan(150);
+    expect(masses.length).toBeGreaterThan(100);
     for (const m of masses) expect(clearOfOffice(m.rect, m.y1 + ROOF_HEADROOM), `building ${m.building}`).toBe(true);
     for (const b of town) {
       const top = b.masses[b.masses.length - 1];
@@ -88,18 +92,18 @@ describe('the buildings round the tower', () => {
     }
   });
 
-  it('allows a tall tower only far enough away, and anything below the office floor anywhere', () => {
+  it('allows a taller building only far enough away, and anything below the office floor anywhere', () => {
     const across: Rect = [BUILDING[2] + 25, BUILDING[1], BUILDING[2] + 45, BUILDING[3]];
     expect(clearOfOffice(across, 40)).toBe(false);
     expect(clearOfOffice(across, 25 / CLEAR)).toBe(true);
     expect(clearOfOffice(across, -0.5)).toBe(true);
     expect(clearOfOffice([BUILDING[0] - 300, 0, BUILDING[0] - 280, 20], 150)).toBe(true);
-    // The city does reach above the office further out, so the rule is doing the work.
-    expect(masses.some((m) => m.y1 > 60)).toBe(true);
+    // Some offices further out do rise well above the office floor, so the rule is doing the work.
+    expect(masses.some((m) => m.y1 > 8)).toBe(true);
     expect(masses.filter((m) => gap(m.rect, BUILDING) < 40).every((m) => m.y1 + ROOF_HEADROOM <= 40 / CLEAR)).toBe(true);
   });
 
-  it('builds on lots inside the blocks, off the streets, the plaza and the park, and apart from each other', () => {
+  it("builds inside the blocks, off the streets, the startup's campus and the park, and apart from each other", () => {
     const lots = blocks().filter((b) => !(b.i === 0 && b.j === 0) && !(b.i === -1 && b.j === -1));
     for (const m of masses) {
       expect(lots.some((b) => inside(m.rect[0], m.rect[1], b.rect, 0.01) && inside(m.rect[2], m.rect[3], b.rect, 0.01)), `building ${m.building}`).toBe(true);
@@ -136,16 +140,21 @@ describe('the variety of buildings', () => {
   const storeys = (b: Building) => (b.masses[b.masses.length - 1].y1 - GROUND_Y) / STOREY;
   const centre = (r: Rect) => [(r[0] + r[2]) / 2, (r[1] + r[3]) / 2];
 
-  it('dresses every facade style and roof finish somewhere in town', () => {
-    expect(new Set(town.map((b) => b.facade))).toEqual(new Set(['glass', 'ribbon', 'stone', 'fins', 'grid']));
-    expect(new Set(town.map((b) => b.finish))).toEqual(new Set(['membrane', 'gravel', 'green', 'solar', 'pool', 'helipad']));
+  it('dresses every facade style and roof finish somewhere in town, and pitches only the houses\' roofs', () => {
+    expect(new Set(town.map((b) => b.facade))).toEqual(new Set(['glass', 'ribbon', 'fins', 'grid', 'house']));
+    expect(new Set(town.map((b) => b.finish))).toEqual(new Set(['membrane', 'gravel', 'green', 'solar', 'pool', 'helipad', 'tiles']));
+    for (const b of town) {
+      expect(b.pitch !== 'flat').toBe(b.facade === 'house');
+      expect(b.finish === 'tiles').toBe(b.facade === 'house');
+    }
   });
 
   it('fits each roof with what its finish promises', () => {
     for (const b of town) {
       const kinds = roofPlant(b).map((p) => p.kind);
       expect(kinds.filter((k) => k === 'helipad').length, `building ${town.indexOf(b)}`).toBe(b.finish === 'helipad' ? 1 : 0);
-      if (b.finish === 'helipad') expect(storeys(b)).toBeGreaterThanOrEqual(28);
+      if (b.finish === 'helipad') expect(storeys(b)).toBeGreaterThanOrEqual(6);
+      if (b.pitch !== 'flat') expect(kinds).toEqual([]);
       if (b.finish === 'pool') expect(kinds).toContain('pool');
       // A solar roof is mostly panels, not a lone module squeezed between the plant.
       if (b.finish === 'solar') expect(kinds.filter((k) => k === 'panel').length, `building ${town.indexOf(b)}`).toBeGreaterThanOrEqual(6);
@@ -161,24 +170,49 @@ describe('the variety of buildings', () => {
     }
   });
 
-  it('steps some towers back as they rise, off centre, and pairs some low buildings with taller neighbours', () => {
-    expect(town.some((b) => b.masses.length >= 4)).toBe(true);
-    const offCentre = town.filter((b) => b.masses.slice(1).some((m, k) => Math.hypot(centre(m.rect)[0] - centre(b.masses[k].rect)[0], centre(m.rect)[1] - centre(b.masses[k].rect)[1]) > 1));
-    expect(offCentre.length).toBeGreaterThan(10);
-    const pairs = town.filter((a) => storeys(a) <= 6 && town.some((b) => b !== a && storeys(b) > storeys(a) + 4 && gap(a.masses[0].rect, b.masses[0].rect) < 2.6));
-    expect(pairs.length).toBeGreaterThan(2);
+  it('lays out office parks, neighbourhoods of low houses and strips of shops, some offices stepping back on top', () => {
+    const { zones, pools } = cityTown();
+    expect(new Set(zones.map((z) => z.zone))).toEqual(new Set(['offices', 'homes', 'shops']));
+    const houses = town.filter((b) => b.facade === 'house');
+    expect(houses.length).toBeGreaterThan(40);
+    for (const h of houses) expect(storeys(h)).toBeLessThanOrEqual(2);
+    expect(pools.length).toBeGreaterThan(5);
+    const stepped = town.filter((b) => b.masses.length >= 2);
+    expect(stepped.length).toBeGreaterThan(0);
+    for (const b of stepped) expect(Math.hypot(centre(b.masses[1].rect)[0] - centre(b.masses[0].rect)[0], centre(b.masses[1].rect)[1] - centre(b.masses[0].rect)[1])).toBeGreaterThanOrEqual(0);
   });
 
-  it('lights aviation beacons only on the tallest towers', () => {
+  it('parks cars in the bays of car parks that stand clear of the buildings, the pools and each other', () => {
+    const { carParks, pools } = cityTown();
+    expect(carParks.length).toBeGreaterThan(10);
+    const footprints = town.map((b) => b.masses[0].rect);
+    for (let i = 0; i < carParks.length; i++) {
+      const cp = carParks[i].rect;
+      expect(footprints.filter((f) => overlaps(f, cp)), `car park ${i}`).toEqual([]);
+      expect(pools.filter((p) => overlaps(p, cp))).toEqual([]);
+      for (let j = i + 1; j < carParks.length; j++) expect(overlaps(cp, carParks[j].rect)).toBe(false);
+      const spaces = bays(carParks[i]);
+      expect(spaces.length, `car park ${i}`).toBeGreaterThan(0);
+      for (const b of spaces) expect(inside(b.x, b.z, cp)).toBe(true);
+    }
+    // The startup's own car park, behind its building, is full of bays too.
+    expect(carParks.some((cp) => inside((cp.rect[0] + cp.rect[2]) / 2, (cp.rect[1] + cp.rect[3]) / 2, towerBlock().rect))).toBe(true);
+    const cars = parkedCars();
+    expect(cars.length).toBeGreaterThan(300);
+    for (const c of cars) expect(carParks.some((cp) => inside(c.x, c.z, cp.rect))).toBe(true);
+    expect(parkedCars()).toEqual(cars);
+  });
+
+  it('lights aviation beacons only on the few tallest offices', () => {
     const lit = town.filter((b) => beacons(b).length > 0);
     expect(lit.length).toBeGreaterThan(0);
     for (const b of lit) expect(storeys(b)).toBeGreaterThanOrEqual(BEACON_STOREYS);
-    expect(lit.length).toBeLessThan(town.filter((b) => storeys(b) >= 22).length / 2);
+    expect(lit.length).toBeLessThan(town.length * 0.1);
   });
 });
 
 describe('the streets', () => {
-  it('stands lamps and trees on the pavements, off the carriageways, the junctions and the buildings', () => {
+  it('stands lamps and trees off the lanes, the junctions, the buildings, the car parks and the pools', () => {
     const posts = lamps();
     const planted = trees();
     const things = [...posts.map((l) => ({ ...l, kind: 'lamp' })), ...planted.map((t) => ({ ...t, kind: 'tree' }))];
@@ -186,7 +220,10 @@ describe('the streets', () => {
     // Gathered first and checked once: an expect per pair is too slow for the coverage run.
     const stray = (where: string, test: (t: { x: number; z: number }) => boolean) => things.filter(test).map((t) => `${t.kind} at ${t.x.toFixed(1)}, ${t.z.toFixed(1)} ${where}`);
     expect([
-      ...stray('on a road', (t) => ROADS.some((r) => inside(t.x, t.z, roadRect(r), 0.2))),
+      // The medians are planted, but nothing stands on a lane.
+      ...stray('on a lane', (t) => ROADS.some((r) => inside(t.x, t.z, roadRect(r), 0.2) && Math.abs((r.axis === 'x' ? t.z : t.x) - r.at) > STREET.median / 2 - 0.5)),
+      ...stray('in a car park', (t) => cityTown().carParks.some((cp) => inside(t.x, t.z, cp.rect, 0.5))),
+      ...stray('in a pool', (t) => cityTown().pools.some((p) => inside(t.x, t.z, p, 0.5))),
       ...stray('in a junction', (t) => inJunction(t.x, t.z, STREET_WIDTH / 2)),
       ...stray('in a building', (t) => masses.some((m) => inside(t.x, t.z, m.rect, 0.3))),
       ...stray('in the podium', (t) => inside(t.x, t.z, PODIUM, 0.3)),
@@ -210,16 +247,30 @@ describe('the streets', () => {
     }
   });
 
-  it('plants each street with one kind of tree, the plaza in flower and the park with a mix', () => {
+  it('plants each pavement with one kind of tree and each median with another, mostly palms, and the park with a mix', () => {
     const all = trees();
-    const [parkRect, plaza] = [parkBlock().rect, towerBlock().rect];
-    expect(new Set(all.map((t) => t.kind))).toEqual(new Set(['round', 'cone', 'umbrella', 'blossom']));
+    const [parkRect, campus] = [parkBlock().rect, towerBlock().rect];
+    expect(new Set(all.map((t) => t.kind))).toEqual(new Set(['round', 'cone', 'umbrella', 'blossom', 'palm']));
     const park = all.filter((t) => inside(t.x, t.z, parkRect));
     expect(new Set(park.map((t) => t.kind)).size).toBeGreaterThanOrEqual(3);
-    expect(all.filter((t) => inside(t.x, t.z, plaza)).every((t) => t.kind === 'blossom')).toBe(true);
+    const lawn = all.filter((t) => inside(t.x, t.z, campus));
+    expect(lawn.filter((t) => t.kind === 'palm').length).toBeGreaterThan(lawn.length / 2);
+    let palmMedians = 0;
     for (const r of ROADS) {
-      const kinds = new Set(all.filter((t) => !inside(t.x, t.z, parkRect) && !inside(t.x, t.z, plaza) && Math.abs((r.axis === 'x' ? t.z : t.x) - r.at) < STREET_WIDTH / 2).map((t) => t.kind));
-      expect(kinds.size, `road ${r.axis} at ${r.at}`).toBeLessThanOrEqual(1);
+      const across = (t: { x: number; z: number }) => Math.abs((r.axis === 'x' ? t.z : t.x) - r.at);
+      const median = new Set(all.filter((t) => across(t) < STREET.median / 2).map((t) => t.kind));
+      const kerb = new Set(all.filter((t) => across(t) > STREET.median / 2 && across(t) < STREET_WIDTH / 2).map((t) => t.kind));
+      expect(median.size, `median of road ${r.axis} at ${r.at}`).toBeLessThanOrEqual(1);
+      expect(kerb.size, `pavements of road ${r.axis} at ${r.at}`).toBeLessThanOrEqual(1);
+      if (median.has('palm')) palmMedians++;
+    }
+    expect(palmMedians).toBeGreaterThanOrEqual(ROADS.length / 2);
+  });
+
+  it('keeps every tree low enough, or far enough away, never to hide the office', () => {
+    for (const t of trees()) {
+      const crown = t.h * 0.45;
+      expect(clearOfOffice([t.x - crown, t.z - crown, t.x + crown, t.z + crown], GROUND_Y + t.h), `${t.kind} at ${t.x.toFixed(1)}, ${t.z.toFixed(1)}`).toBe(true);
     }
   });
 

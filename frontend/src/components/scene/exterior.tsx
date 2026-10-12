@@ -5,6 +5,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
+  BAY,
+  bays,
   beacons,
   benches,
   blocks,
@@ -25,6 +27,7 @@ import {
   PARAPET,
   parkBlock,
   parkCentre,
+  parkedCars,
   parkPaths,
   pedestrians,
   PODIUM,
@@ -36,13 +39,16 @@ import {
   STOREY,
   STREET,
   TOWER,
+  town,
   traffic,
   trees,
   vehicleAt,
   walkerAt,
   type Building,
   type LampStyle,
+  type Pitch,
   type Plant,
+  type Rect,
   type Road,
   type Tree,
   type Vehicle,
@@ -138,15 +144,15 @@ function faded<P extends THREE.MeshBasicMaterialParameters>(params: P, key: stri
 const M = {
   shaded: faded({ vertexColors: true }, "city-lit", "lit"),
   glow: faded({ vertexColors: true, toneMapped: false }, "city-glow", "glow"),
-  white: faded({ color: "#a9a6a0" }, "city-lit", "lit"),
-  yellow: faded({ color: "#a8892e" }, "city-lit", "lit"),
+  white: faded({ color: "#e3e1da" }, "city-lit", "lit"),
+  yellow: faded({ color: "#e0b53a" }, "city-lit", "lit"),
 };
 
 /* ------------------------------------------------------------------ */
 /* Facades                                                             */
 /* ------------------------------------------------------------------ */
 
-const STYLE = { glass: 0, ribbon: 1, stone: 2, fins: 3, grid: 4 } as const;
+const STYLE = { glass: 0, ribbon: 1, stone: 2, fins: 3, grid: 4, house: 5 } as const;
 
 /** Office lights: warm, cool and the shops at street level. */
 const LIGHTS = { warm: new THREE.Color("#ffd49a"), cool: new THREE.Color("#d6e6ff"), shop: new THREE.Color("#fff0cf") };
@@ -180,19 +186,20 @@ vec3 facade(vec3 paint, vec3 n) {
   float seed = vLook.x;
   float style = vLook.y;
   float share = vLook.z;
-  float bay = style < 0.5 ? 1.5 : style < 1.5 ? 3.0 : style < 2.5 ? 2.2 : style < 3.5 ? 1.2 : 2.4;
+  float bay = style < 0.5 ? 1.5 : style < 1.5 ? 3.0 : style < 2.5 ? 2.2 : style < 3.5 ? 1.2 : style < 4.5 ? 2.4 : 3.4;
   vec2 g = vec2(vWall.x / bay, vWall.y / ${STOREY.toFixed(1)});
   vec2 cell = floor(g);
   vec2 f = fract(g);
   vec2 e = fwidth(g) * 0.75 + 1e-4;
   bool street = cell.y < 0.5 && vLook.w > 0.5;
   // The opening in each bay: left, right, sill and head, as fractions of the bay and the storey. Fins leave a slot
-  // nearly floor to ceiling; the grid punches a small square.
+  // nearly floor to ceiling; the grid punches a small square, and a house has a window here and there.
   vec4 frame = style < 0.5 ? vec4(0.05, 0.95, 0.21, 0.97)
     : style < 1.5 ? vec4(0.02, 0.98, 0.34, 0.9)
     : style < 2.5 ? vec4(0.24, 0.76, 0.26, 0.8)
     : style < 3.5 ? vec4(0.3, 0.7, 0.04, 0.98)
-    : vec4(0.3, 0.7, 0.32, 0.72);
+    : style < 4.5 ? vec4(0.3, 0.7, 0.32, 0.72)
+    : vec4(0.3, 0.7, 0.3, 0.7);
   if (street) frame = vec4(0.04, 0.96, 0.04, 0.82);
   float open = band(f.x, frame.x, frame.y, e.x) * band(f.y, frame.z, frame.w, e.y);
   // An office is a run of bays on one floor sharing its lights. Some floors have gone home, some are working late.
@@ -274,7 +281,8 @@ function facades(list: Building[]): THREE.BufferGeometry {
           wall.push(w.r, w.g, w.b);
           glass.push(g.r, g.g, g.b);
           at.push(u, y - GROUND_Y);
-          look.push(b.seed % 997, STYLE[b.facade], b.lit, m.y0 === GROUND_Y ? 1 : 0);
+          // Offices and shops have shop windows at street level; houses do not.
+          look.push(b.seed % 997, STYLE[b.facade], b.lit, m.y0 === GROUND_Y && b.facade !== "house" ? 1 : 0);
         }
         index.push(first, first + 1, first + 2, first, first + 2, first + 3);
       }
@@ -380,13 +388,28 @@ function treeTrunk(): THREE.BufferGeometry {
  * Unit-scale canopies, coarser when lite, in pale greys: each tree's own colour tints them. A rounded crown of a few
  * lumps, a conifer of two stacked cones, and a rain tree's flat, spreading umbrella.
  */
-function treeCanopy(kind: "round" | "cone" | "umbrella", lite = false): THREE.BufferGeometry {
+function treeCanopy(kind: "round" | "cone" | "umbrella" | "palm", lite = false): THREE.BufferGeometry {
   const detail = lite ? 0 : 1;
   const lump = (r: number, x: number, y: number, z: number, shade: string) => tint(new THREE.IcosahedronGeometry(r, detail).translate(x, y, z), shade);
   if (kind === "cone") {
     return merge([
       tint(new THREE.ConeGeometry(1, 1.25, lite ? 6 : 9).translate(0, -0.2, 0), "#ffffff"),
       tint(new THREE.ConeGeometry(0.72, 1.0, lite ? 6 : 9).translate(0, 0.45, 0), "#e8e8e8"),
+    ]);
+  }
+  if (kind === "palm") {
+    // Fronds fanning out and drooping from the top of the trunk, round a knot where they meet.
+    const fronds = lite ? 7 : 11;
+    return merge([
+      lump(0.2, 0, 0, 0, "#c9c2a8"),
+      ...Array.from({ length: fronds }, (_, k) =>
+        tint(
+          box(0.26, 0.04, 1.05, 0, 0, -0.55)
+            .rotateX(-(0.35 + 0.35 * ((k * 5) % 3) / 2))
+            .rotateY((k / fronds) * Math.PI * 2 + 0.3 * (k % 2)),
+          k % 2 ? "#ffffff" : "#e0e0e0",
+        ),
+      ),
     ]);
   }
   if (kind === "umbrella") {
@@ -499,33 +522,77 @@ function between(r: Road): [number, number][] {
 
 const roadPoint = (r: Road, along: number): [number, number] => (r.axis === "x" ? [along, r.at] : [r.at, along]);
 
+/** The colours of the ground by day: concrete pavements, lawns, gravel paths, asphalt and kerbs. */
+const GROUND = { pavement: "#a9a59c", lawn: "#6c9150", park: "#5f8a48", path: "#cbc2ab", road: "#3d3e44", lot: "#4a4b50", kerb: "#d2cec5", median: "#678c49" };
+
+const rectFlat = ([x0, z0, x1, z1]: Rect, y: number) => flat(x1 - x0, z1 - z0).translate((x0 + x1) / 2, y, (z0 + z1) / 2);
+
 function Ground() {
   const geometry = useMemo(() => {
     const out: THREE.BufferGeometry[] = [];
     const add = (g: THREE.BufferGeometry, colour: string) => out.push(tint(g, colour));
     const span = 2 * REACH + 80;
-    add(flat(span, span).translate(FADE.x, LAYER.ground, FADE.z), "#33313b");
-    for (const b of blocks()) {
-      const [x0, z0, x1, z1] = b.rect;
-      const tower = b.i === 0 && b.j === 0;
-      add(flat(x1 - x0, z1 - z0).translate((x0 + x1) / 2, LAYER.block, (z0 + z1) / 2), tower ? "#45424f" : "#2b2a32");
-    }
-    // The park: lawn and paths.
-    const [px0, pz0, px1, pz1] = parkBlock().rect;
-    add(flat(px1 - px0, pz1 - pz0).translate((px0 + px1) / 2, LAYER.tarmac, (pz0 + pz1) / 2), "#1d2d22");
-    for (const [x0, z0, x1, z1] of parkPaths()) add(flat(x1 - x0, z1 - z0).translate((x0 + x1) / 2, LAYER.paint, (z0 + z1) / 2), "#4b4755");
-    // Carriageways, and the kerbs either side of them.
+    add(flat(span, span).translate(FADE.x, LAYER.ground, FADE.z), GROUND.pavement);
+    // Every block is lawn under whatever stands on it; the park's is greener, and the car parks are asphalt.
+    for (const b of blocks()) add(rectFlat(b.rect, LAYER.block), GROUND.lawn);
+    add(rectFlat(parkBlock().rect, LAYER.tarmac), GROUND.park);
+    for (const p of parkPaths()) add(rectFlat(p, LAYER.paint), GROUND.path);
+    for (const cp of town().carParks) if (fadeAt((cp.rect[0] + cp.rect[2]) / 2, (cp.rect[1] + cp.rect[3]) / 2) < 1) add(rectFlat(cp.rect, LAYER.tarmac), GROUND.lot);
+    // Carriageways, the kerbs either side of them, and the planted medians down the middle.
     for (const r of ROADS) {
-      const [x0, z0, x1, z1] = roadRect(r);
-      add(flat(x1 - x0, z1 - z0).translate((x0 + x1) / 2, LAYER.tarmac, (z0 + z1) / 2), "#1e1d24");
+      add(rectFlat(roadRect(r), LAYER.tarmac), GROUND.road);
       for (const [a, b] of between(r)) {
         if (Math.min(fadeAt(...roadPoint(r, a)), fadeAt(...roadPoint(r, b))) >= 1) continue;
-        for (const side of [-1, 1]) add(onRoad(r, (a + b) / 2, side * (CARRIAGEWAY / 2 + 0.15), b - a, 0.3, LAYER.paint), "#5a5763");
+        for (const side of [-1, 1]) add(onRoad(r, (a + b) / 2, side * (CARRIAGEWAY / 2 + 0.15), b - a, 0.3, LAYER.paint), GROUND.kerb);
+        const from = a + STREET.pavement;
+        const to = b - STREET.pavement;
+        add(onRoad(r, (from + to) / 2, 0, to - from, STREET.median - 0.6, LAYER.paint), GROUND.median);
+        for (const side of [-1, 1]) add(onRoad(r, (from + to) / 2, side * (STREET.median / 2 - 0.15), to - from, 0.3, LAYER.paint), GROUND.kerb);
       }
     }
     return merge(out);
   }, []);
   return <Merged geometry={geometry} material={M.shaded} />;
+}
+
+/** The cars in the car parks, standing in their bays. */
+function Parked({ lite }: { lite: boolean }) {
+  const fleets = useMemo(() => {
+    const all = parkedCars().filter((c) => fadeAt(c.x, c.z) < 1);
+    return KINDS.map((kind) => {
+      const own = all.filter((c) => c.kind === kind);
+      return { kind, matrices: own.map((c) => compose(c.x, GROUND_Y + 0.01, c.z, c.rot)), colours: own.map((c) => c.colour) };
+    }).filter((f) => f.matrices.length > 0);
+  }, []);
+  const geo = useMemo(() => new Map(KINDS.map((k) => [k, vehicleBody(k, lite)])), [lite]);
+  return (
+    <group>
+      {fleets.map(({ kind, matrices, colours }) => (
+        <Instances key={kind} geometry={geo.get(kind) as THREE.BufferGeometry} material={M.shaded} matrices={matrices} colours={colours} />
+      ))}
+    </group>
+  );
+}
+
+/** Pools in the back yards: their coping, and the water, which glows a little at night. */
+function Yards() {
+  const { coping, water } = useMemo(() => {
+    const stone: THREE.BufferGeometry[] = [];
+    const wet: THREE.BufferGeometry[] = [];
+    for (const [x0, z0, x1, z1] of town().pools) {
+      if (fadeAt((x0 + x1) / 2, (z0 + z1) / 2) >= 1) continue;
+      const c = 0.45;
+      stone.push(tint(box(x1 - x0 + 2 * c, 0.12, z1 - z0 + 2 * c, (x0 + x1) / 2, GROUND_Y + 0.06, (z0 + z1) / 2), "#d8d2c4"));
+      wet.push(tint(rectFlat([x0, z0, x1, z1], GROUND_Y + 0.13), "#4cc9e8"));
+    }
+    return { coping: stone.length ? merge(stone) : null, water: wet.length ? merge(wet) : null };
+  }, []);
+  return (
+    <group>
+      {coping && <Merged geometry={coping} material={M.shaded} />}
+      {water && <Merged geometry={water} material={M.glow} />}
+    </group>
+  );
 }
 
 /** Lane lines, the median, zebra crossings and stop lines, as two batches of painted strips. */
@@ -551,8 +618,19 @@ function Markings() {
         }
         const from = a + zebra + 2;
         const to = b - zebra - 2;
-        for (const side of [-1, 1]) y.push(onRoad(r, (from + to) / 2, side * 0.18, to - from, 0.12, LAYER.paint));
+        for (const side of [-1, 1]) y.push(onRoad(r, (from + to) / 2, side * (STREET.median / 2 + 0.2), to - from, 0.12, LAYER.paint));
         for (let s = from + 2; s + 3 < to; s += 9) for (const side of [-1, 1]) w.push(onRoad(r, s + 1.5, side * lane, 3, 0.13, LAYER.paint));
+      }
+    }
+    // The lines either side of every bay in the car parks.
+    for (const cp of town().carParks) {
+      if (fadeAt((cp.rect[0] + cp.rect[2]) / 2, (cp.rect[1] + cp.rect[3]) / 2) >= 1) continue;
+      for (const bay of bays(cp)) {
+        const alongZ = Math.abs(Math.sin(bay.rot)) < 0.5;
+        for (const side of [-1, 1]) {
+          const line = alongZ ? flat(0.12, BAY.depth - 0.4).translate(bay.x + (side * BAY.width) / 2, LAYER.paint, bay.z) : flat(BAY.depth - 0.4, 0.12).translate(bay.x, LAYER.paint, bay.z + (side * BAY.width) / 2);
+          w.push(line);
+        }
       }
     }
     return [merge(w), merge(y)];
@@ -640,11 +718,61 @@ function roofLights(list: Building[]): THREE.BufferGeometry | null {
   return parts.length ? merge(parts) : null;
 }
 
+/**
+ * A pitched roof over `r`, its eaves at `y` and reaching a little past the walls: a ridge along its length with
+ * gable ends, or hipped on every side.
+ */
+function pitchedRoof(r: Rect, y: number, pitch: Pitch): THREE.BufferGeometry {
+  const eaves = 0.45;
+  const alongX = r[2] - r[0] >= r[3] - r[1];
+  const [l0, l1] = alongX ? [r[0] - eaves, r[2] + eaves] : [r[1] - eaves, r[3] + eaves];
+  const [c0, c1] = alongX ? [r[1] - eaves, r[3] + eaves] : [r[0] - eaves, r[2] + eaves];
+  const half = (c1 - c0) / 2;
+  const mid = (c0 + c1) / 2;
+  const rise = Math.min(3.2, half * 0.6);
+  const hip = pitch === "hip" ? Math.min(half, (l1 - l0) / 2 - 0.05) : 0;
+  const at = (along: number, acrossAt: number, up: number): THREE.Vector3 => (alongX ? new THREE.Vector3(along, y + up, acrossAt) : new THREE.Vector3(acrossAt, y + up, along));
+  const e00 = at(l0, c0, 0);
+  const e10 = at(l1, c0, 0);
+  const e11 = at(l1, c1, 0);
+  const e01 = at(l0, c1, 0);
+  const r0 = at(l0 + hip, mid, rise);
+  const r1 = at(l1 - hip, mid, rise);
+  const centre = at((l0 + l1) / 2, mid, 0);
+  const tris = [
+    [e00, e10, r1],
+    [e00, r1, r0],
+    [e11, e01, r0],
+    [e11, r0, r1],
+    [e01, e00, r0],
+    [e10, e11, r1],
+  ];
+  const pos: number[] = [];
+  const ab = new THREE.Vector3();
+  const ac = new THREE.Vector3();
+  const out = new THREE.Vector3();
+  for (const [a, b, c] of tris) {
+    // Wind each face to look outward and up, away from the middle of the roof.
+    ab.subVectors(b, a);
+    ac.subVectors(c, a);
+    out.set((a.x + b.x + c.x) / 3 - centre.x, 1, (a.z + b.z + c.z) / 3 - centre.z);
+    const flip = ab.clone().cross(ac).dot(out) < 0;
+    for (const v of flip ? [a, c, b] : [a, b, c]) pos.push(v.x, v.y, v.z);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  return geo;
+}
+
 /** Roofs and the terraces on setbacks, their parapets, and the plant on top. */
 function roofs(list: Building[], lite: boolean): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   for (const b of list) {
     for (const m of b.masses) {
+      if (b.pitch !== "flat") {
+        parts.push(tint(pitchedRoof(m.rect, m.y1, b.pitch), b.roof));
+        continue;
+      }
       const [x0, z0, x1, z1] = m.rect;
       const w = x1 - x0;
       const d = z1 - z0;
@@ -776,6 +904,7 @@ const CROWN = {
   blossom: { trunk: 0.45, at: 0.62, size: [0.36, 0.32, 0.36] },
   cone: { trunk: 0.28, at: 0.56, size: [0.2, 0.42, 0.2] },
   umbrella: { trunk: 0.72, at: 0.8, size: [0.44, 0.44, 0.44] },
+  palm: { trunk: 0.94, at: 0.95, size: [0.27, 0.27, 0.27] },
 } as const;
 
 function Trees({ basic }: { basic: boolean }) {
@@ -785,13 +914,13 @@ function Trees({ basic }: { basic: boolean }) {
       const c = CROWN[t.kind];
       return compose(t.x, GROUND_Y + t.h * c.at, t.z, t.turn, [t.h * c.size[0], t.h * c.size[1], t.h * c.size[2]]);
     };
-    const shape = (s: "round" | "cone" | "umbrella") => list.filter((t) => (t.kind === "blossom" ? "round" : t.kind) === s);
+    const shape = (s: "round" | "cone" | "umbrella" | "palm") => list.filter((t) => (t.kind === "blossom" ? "round" : t.kind) === s);
     return {
       trunks: list.map((t) => compose(t.x, GROUND_Y, t.z, t.turn, [1, t.h * CROWN[t.kind].trunk, 1])),
-      crowns: (["round", "cone", "umbrella"] as const).map((s) => ({ s, matrices: shape(s).map(crown), colours: shape(s).map((t) => t.leaf) })),
+      crowns: (["round", "cone", "umbrella", "palm"] as const).map((s) => ({ s, matrices: shape(s).map(crown), colours: shape(s).map((t) => t.leaf) })),
     };
   }, [basic]);
-  const geo = useMemo(() => ({ trunk: treeTrunk(), round: treeCanopy("round", basic), cone: treeCanopy("cone", basic), umbrella: treeCanopy("umbrella", basic) }), [basic]);
+  const geo = useMemo(() => ({ trunk: treeTrunk(), round: treeCanopy("round", basic), cone: treeCanopy("cone", basic), umbrella: treeCanopy("umbrella", basic), palm: treeCanopy("palm", basic) }), [basic]);
   return (
     <group>
       <Instances geometry={geo.trunk} material={M.shaded} matrices={trunks} />
@@ -1041,6 +1170,8 @@ export function Exterior() {
     <group>
       <Ground />
       <Markings />
+      <Yards />
+      <Parked lite={basic} />
       <Buildings lite={basic} />
       <Tower />
       <Trees basic={basic} />

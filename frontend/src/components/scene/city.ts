@@ -2,28 +2,27 @@ import { pick, rand, randRange, type RngHolder } from "@/sim/rng";
 import { ROOM } from "./layout";
 
 /*
- * The world outside the office, at night: downtown. The startup rents the top
- * floor of a glass office tower, fifteen storeys above the street. Round the
- * tower's foot is a plaza; beyond it a grid of four-lane streets with traffic,
- * lamps and trees, a park, and blocks of offices, older stone buildings and
- * towers that grow taller with distance, so none of them ever stands between
- * the camera and the crew.
+ * The world outside the office: a Silicon Valley suburb. The startup has the top floor of a low glass campus
+ * building, three storeys above the street, with a lobby wing and a roof terrace below it, a lawn round about and its
+ * own car park. Beyond it runs a grid of palm-lined boulevards with planted medians, traffic, lamps and people on the
+ * pavements, and the blocks between them hold office parks with their car parks, neighbourhoods of houses with
+ * pitched roofs and back-yard pools, strips of shops, and a park. Anything that would rise in front of the office
+ * and hide the crew is kept low or far enough away.
  *
- * Everything here is plain data and arithmetic, kept free of React and
- * three.js so the layout and the traffic can be tested; exterior.tsx draws it.
- * The world fades into the night with distance from the office, and into a
- * haze with depth below it, so it has no edge and the street looks far down.
+ * Everything here is plain data and arithmetic, kept free of React and three.js so the layout and the traffic can be
+ * tested; exterior.tsx draws it, under the light of the time of day (see sky.ts). The world fades into the sky with
+ * distance from the office, so it has no edge.
  */
 
 /** Height of a storey, slab to slab. */
 export const STOREY = 4;
-/** The office floor is y = 0; this many storeys of the tower stand below it. */
-export const FLOORS_BELOW = 15;
-/** The underside of the office's floor slab, where the tower's walls below it end. */
+/** The office floor is y = 0; this many storeys of its building stand below it. */
+export const FLOORS_BELOW = 3;
+/** The underside of the office's floor slab, where the building's walls below it end. */
 export const SLAB = -0.5;
 /** Street level. */
 export const GROUND_Y = SLAB - FLOORS_BELOW * STOREY;
-/** The night sky, which the world fades into. Matches the scene background. */
+/** The night sky, which the world fades into after dark, and before the time of day is first applied. */
 export const NIGHT = "#1a1633";
 /** The point the fade is measured from, and where it starts and is complete. */
 export const FADE = { x: ROOM.cx, z: ROOM.cz, from: 170, to: 330 };
@@ -57,10 +56,10 @@ export function gap(a: Rect, b: Rect): number {
 }
 
 /* ------------------------------------------------------------------ */
-/* The office and its tower                                            */
+/* The office and its building                                         */
 /* ------------------------------------------------------------------ */
 
-/** The office floor, and the tower's shaft below it. */
+/** The office floor, and the building's upper storeys below it. */
 export const BUILDING: Rect = [ROOM.x0 - 0.25, ROOM.z0 - 0.25, ROOM.x1 + 0.25, ROOM.z1 + 0.25];
 
 /**
@@ -74,13 +73,16 @@ export function clearOfOffice(r: Rect, top: number): boolean {
   return top <= gap(r, BUILDING) / CLEAR;
 }
 
-export type Facade = "glass" | "ribbon" | "stone" | "fins" | "grid";
+export type Facade = "glass" | "ribbon" | "stone" | "fins" | "grid" | "house";
 
 /**
  * What covers the top roof: bare membrane or gravel, a planted roof, rows of solar panels, a terrace round a pool,
- * or a helipad on the tallest.
+ * a helipad on the tallest, or the tiles or shingles of a pitched roof.
  */
-export type Finish = "membrane" | "gravel" | "green" | "solar" | "pool" | "helipad";
+export type Finish = "membrane" | "gravel" | "green" | "solar" | "pool" | "helipad" | "tiles";
+
+/** A flat roof, or a pitched one with a ridge along its length or hipped on every side. */
+export type Pitch = "flat" | "gable" | "hip";
 
 /** One box of a building: a podium, a shaft or a crown, each standing on the one before. */
 export interface Mass {
@@ -92,8 +94,8 @@ export interface Mass {
 export interface Building {
   masses: Mass[];
   /**
-   * Floor-to-ceiling glass, bands of windows, stone with a window in each bay, tall slots between concrete fins, or a
-   * concrete grid of small punched windows.
+   * Floor-to-ceiling glass, bands of windows, stone with a window in each bay, tall slots between concrete fins, a
+   * concrete grid of small punched windows, or a house's painted stucco.
    */
   facade: Facade;
   /** Frames and spandrels, or the stone or brick of the walls. */
@@ -102,6 +104,7 @@ export interface Building {
   glass: string;
   roof: string;
   finish: Finish;
+  pitch: Pitch;
   /** Share of offices with the lights still on. */
   lit: number;
   seed: number;
@@ -113,11 +116,11 @@ export interface Building {
 export const ROOF_HEADROOM = 4;
 export const PARAPET = 1.1;
 
-export const PODIUM_STOREYS = 3;
-/** The tower's lobby and shops, wider than the shaft above them. */
+export const PODIUM_STOREYS = 1;
+/** The building's lobby and café, a storey high and wider than the floors above, with a terrace on its roof. */
 export const PODIUM: Rect = [BUILDING[0] - 7, BUILDING[1] - 6, BUILDING[2] + 7, BUILDING[3] + 6];
 
-/** The startup's tower. Its last storey below the office carries the company's sign. */
+/** The startup's building. Its last storey below the office carries the company's sign. */
 export const TOWER: Building = {
   masses: [
     { rect: PODIUM, y0: GROUND_Y, y1: GROUND_Y + PODIUM_STOREYS * STOREY },
@@ -128,6 +131,7 @@ export const TOWER: Building = {
   glass: "#1b2a3d",
   roof: "#302f3a",
   finish: "membrane",
+  pitch: "flat",
   lit: 0.42,
   seed: 9,
   crown: null,
@@ -138,8 +142,8 @@ export const TOWER: Building = {
 /* ------------------------------------------------------------------ */
 
 export const LANE = 3.2;
-/** Two lanes each way either side of a painted median, and a pavement each side. */
-export const STREET = { lanes: 2, median: 0.6, pavement: 3.6 };
+/** Two lanes each way either side of a planted median, and a pavement each side. */
+export const STREET = { lanes: 2, median: 6, pavement: 3.6 };
 export const CARRIAGEWAY = 2 * STREET.lanes * LANE + STREET.median;
 export const STREET_WIDTH = CARRIAGEWAY + 2 * STREET.pavement;
 
@@ -149,7 +153,7 @@ export const VEHICLE = { car: 4.6, truck: 9, width: 2.4 };
  * Junctions have no lights; traffic takes turns by the clock instead. In each cycle the vehicles on roads running
  * along x cross every junction first, then those on roads running along z. Speeds are in metres a second.
  */
-export const CYCLE = 5;
+export const CYCLE = 6;
 export const SPEED = { x: 13, z: 11 };
 /** How far a vehicle's centre can be from a crossing road's centre line while some of it is over a crossing lane. */
 export const JUNCTION = STREET.median / 2 + (STREET.lanes - 0.5) * LANE + VEHICLE.width / 2 + VEHICLE.truck / 2;
@@ -233,37 +237,41 @@ export const towerBlock = (): Block => blocks().find(isTowerBlock) as Block;
 export const parkBlock = (): Block => blocks().find(isPark) as Block;
 
 /* ------------------------------------------------------------------ */
-/* Buildings                                                           */
+/* Blocks and what stands on them                                      */
 /* ------------------------------------------------------------------ */
 
-// Dark frames and stone alongside pale aluminium, bronze, limestone, white concrete, brick and terracotta, so
-// neighbours stand apart at night.
+// Office parks in glass, aluminium and concrete; houses in pale stucco under terracotta tiles or grey shingles; and
+// shops with bright fronts behind their car parks.
 const GLASS_TINTS = ["#1c2b3a", "#18302f", "#23262f", "#1d2433", "#2b2620", "#202a36", "#1a2a2a", "#1f3a4a", "#263a52"];
 const FRAMES = ["#59606e", "#4b5260", "#646a75", "#3f4450", "#5b5a60", "#858d9b", "#8b7b63", "#2c3039"];
-const CONCRETE = ["#6a6b70", "#5f625f", "#77726a", "#55575e", "#6d675e", "#9c988e", "#8e9096", "#a2998a"];
-const STONE = ["#7d6f5e", "#6c4b3c", "#6b6b68", "#836e57", "#5e4a3f", "#74685c", "#aa9d84", "#b28a63", "#8c4a37", "#9b5a3e"];
+const CONCRETE = ["#8e8c86", "#9c988e", "#8e9096", "#a2998a", "#b3ada2", "#c2bdb2", "#7c7a76"];
+const STUCCO = ["#e9dfcc", "#efe6d6", "#d9c7a7", "#f2ede3", "#cdb89a", "#e4d3c0", "#c9cfc8", "#e6d2b5", "#d8c3a5"];
+const SHOPFRONTS = ["#e8e2d6", "#d7cbb8", "#c8c4bd", "#ece6dc", "#b9b2a6"];
 const DARK_GLASS = ["#151a24", "#171b20", "#1a1d26"];
 const ROOFS: Record<Finish, readonly string[]> = {
-  membrane: ["#2f2e36", "#38373f", "#36332f", "#2a332d", "#2d313a", "#3b3834"],
-  gravel: ["#5b5961", "#66625f", "#55585f", "#6c6870"],
-  green: ["#2d4a31", "#35522f", "#2a4636"],
-  solar: ["#4d4c54", "#57565c"],
-  pool: ["#77716a", "#837b6f"],
-  helipad: ["#3c3b44", "#45434c"],
+  membrane: ["#c4c3be", "#b4b3ae", "#a5a4a0", "#76747a"],
+  gravel: ["#8a857c", "#958f86", "#7e7b78"],
+  green: ["#4f7a3f", "#5a8446", "#476f3d"],
+  solar: ["#9d9ca0", "#a8a7aa"],
+  pool: ["#b2aa9c", "#bfb6a6"],
+  helipad: ["#5a5960", "#64626a"],
+  tiles: ["#b5603c", "#a8553a", "#c06e45", "#9c4f35", "#6d6a66", "#5a5d63", "#7a5a48"],
 };
+/** Light strips round the tops of the taller offices, and the shops' signs. */
 const CROWNS = ["#9fd8ff", "#f4f1ea", "#ffd27a", "#c49bff", "#7de8d3"];
+const SIGNS = ["#ff5a5f", "#2ec4b6", "#ffbf00", "#7b61ff", "#ff7f3f", "#3fa7ff"];
 
 /** A roof finish that suits a building of this many storeys with a top roof this size. */
 function finishFor(top: Rect, storeys: number, rng: RngHolder): Finish {
   const side = Math.min(top[2] - top[0], top[3] - top[1]);
   const options: [Finish, number][] = [
     ["membrane", 3],
-    ["gravel", 3],
+    ["gravel", 2],
   ];
-  if (side >= 15) options.push(["solar", 2]);
-  if (storeys <= 24) options.push(["green", 2]);
-  if (storeys >= 6 && storeys <= 26 && side >= 16) options.push(["pool", 1]);
-  if (storeys >= 28 && side >= 20) options.push(["helipad", 2]);
+  if (side >= 15) options.push(["solar", 3]);
+  if (storeys <= 6) options.push(["green", 1]);
+  if (storeys >= 3 && storeys <= 8 && side >= 16) options.push(["pool", 2]);
+  if (storeys >= 6 && side >= 20) options.push(["helipad", 4]);
   let r = rand(rng) * options.reduce((sum, [, w]) => sum + w, 0);
   for (const [kind, w] of options) if ((r -= w) < 0) return kind;
   return "membrane";
@@ -286,123 +294,313 @@ function setback(r: Rect, rng: RngHolder, lo: number, hi: number, flush = 0.3): 
   return [r[0] + by(), r[1] + by(), r[2] - by(), r[3] - by()];
 }
 
-/** Cut a block into two or three lots each way, each set back from the street and its neighbours by its own amount. */
-function lots(r: Rect, rng: RngHolder): Rect[] {
-  const cuts = (a: number, b: number, n: number) => {
-    const out = [a];
-    for (let k = 1; k < n; k++) out.push(a + ((b - a) * k) / n + randRange(rng, -0.06, 0.06) * (b - a));
-    out.push(b);
-    return out;
-  };
-  const xs = cuts(r[0], r[2], r[2] - r[0] > 90 ? pick(rng, [2, 3, 3]) : 2);
-  const zs = cuts(r[1], r[3], r[3] - r[1] > 70 ? pick(rng, [2, 2, 3]) : 2);
-  const out: Rect[] = [];
-  for (let a = 0; a + 1 < xs.length; a++) for (let b = 0; b + 1 < zs.length; b++) out.push(setback([xs[a], zs[b], xs[a + 1], zs[b + 1]], rng, 0.8, 3.2, 0));
-  return out;
+/** A rectangle from a span along a block's length and one across it, whichever way the block lies. */
+const span = (alongX: boolean, a0: number, a1: number, c0: number, c1: number): Rect => (alongX ? [a0, c0, a1, c1] : [c0, a0, c1, a1]);
+
+/** A block's length and breadth, as spans, with the way it lies. */
+function lengthwise(r: Rect): { alongX: boolean; a0: number; a1: number; c0: number; c1: number } {
+  const alongX = r[2] - r[0] >= r[3] - r[1];
+  return alongX ? { alongX, a0: r[0], a1: r[2], c0: r[1], c1: r[3] } : { alongX, a0: r[1], a1: r[3], c0: r[0], c1: r[2] };
 }
 
-/** Now and then a long lot holds two buildings: a low one beside a taller neighbour. `true` marks the low one. */
-function pair(lot: Rect, rng: RngHolder): [Rect, boolean][] {
-  const alongX = lot[2] - lot[0] >= lot[3] - lot[1];
-  const [a, b] = alongX ? [lot[0], lot[2]] : [lot[1], lot[3]];
-  if (b - a < 34 || rand(rng) > 0.3) return [[lot, false]];
-  const lowFirst = rand(rng) < 0.5;
-  const cut = a + (b - a) * (lowFirst ? randRange(rng, 0.3, 0.42) : randRange(rng, 0.58, 0.7));
-  const half = randRange(rng, 1.2, 2.5) / 2;
-  const first: Rect = alongX ? [lot[0], lot[1], cut - half, lot[3]] : [lot[0], lot[1], lot[2], cut - half];
-  const second: Rect = alongX ? [cut + half, lot[1], lot[2], lot[3]] : [lot[0], cut + half, lot[2], lot[3]];
-  return [
-    [first, lowFirst],
-    [second, !lowFirst],
-  ];
+/** The span across a block, whichever way it lies. */
+const across = (r: Rect, alongX: boolean): [number, number] => (alongX ? [r[1], r[3]] : [r[0], r[2]]);
+
+/** What a block is used for. */
+export type Zone = "offices" | "homes" | "shops";
+
+/** A car park: rows of bays across a rectangle of asphalt (see bays). */
+export interface CarPark {
+  rect: Rect;
 }
 
-function building(lot: Rect, rng: RngHolder, low = false): Building | null {
+export interface LawnTree {
+  x: number;
+  z: number;
+  kind: TreeKind;
+}
+
+/** Everything that stands in the blocks: one pass over them, so the parts always agree with each other. */
+export interface Town {
+  buildings: Building[];
+  carParks: CarPark[];
+  /** Back-yard pools, at ground level. */
+  pools: Rect[];
+  /** Trees on the lawns of the campus, the office parks and the back yards. */
+  lawnTrees: LawnTree[];
+  zones: { i: number; j: number; zone: Zone }[];
+}
+
+function office(r: Rect, rng: RngHolder, far: boolean): Building | null {
   const seed = Math.floor(rand(rng) * 10000);
-  const roll = rand(rng);
-  const want = Math.round(low ? randRange(rng, 2, 6) : roll < 0.3 ? randRange(rng, 3, 7) : roll < 0.62 ? randRange(rng, 8, 20) : randRange(rng, 21, 58));
-  const masses: Mass[] = [];
-  const stack = (rect: Rect, storeys: number) => masses.push({ rect, y0: masses.length ? masses[masses.length - 1].y1 : GROUND_Y, y1: level(storeys) });
-  // Tall buildings stand on a podium as wide as the lot, their shafts set back from it, often more on one side than
-  // another. Some step back again once or twice as they rise, and the tallest end in a narrower crown.
-  if (want > 14 && narrow(lot) > 24) {
-    const podium = Math.min(Math.round(randRange(rng, 2, 5)), storeysAllowed(lot));
-    const shaftRect = setback(lot, rng, 2.5, 7);
-    const shaft = Math.min(want, storeysAllowed(shaftRect));
-    if (podium >= 1 && shaft >= podium + 4 && narrow(shaftRect) >= 10) {
-      stack(lot, podium);
-      const steps = [shaft];
-      if (shaft - podium >= 16) {
-        const tiers = pick(rng, [1, 2, 2, 3]);
-        if (tiers >= 2) steps.unshift(Math.round(podium + (shaft - podium) * randRange(rng, 0.5, 0.68)));
-        if (tiers === 3) steps.splice(1, 0, Math.round(podium + (shaft - podium) * randRange(rng, 0.76, 0.88)));
-      }
-      let rect = shaftRect;
-      for (const top of steps) {
-        stack(rect, top);
-        const next = setback(rect, rng, 1.5, 4.5, 0.35);
-        if (narrow(next) < 8) break;
-        rect = next;
-      }
-      const reached = (masses[masses.length - 1].y1 - GROUND_Y) / STOREY;
-      if (steps.length === 1 && reached > 26 && rand(rng) < 0.6) {
-        const crownRect = setback(masses[masses.length - 1].rect, rng, 2, 4, 0);
-        const top = Math.min(reached + Math.round(randRange(rng, 2, 5)), storeysAllowed(crownRect));
-        if (top > reached) stack(crownRect, top);
-      }
+  const want = Math.round(far && rand(rng) < 0.4 ? randRange(rng, 6, 11) : randRange(rng, 2, 5));
+  const n = Math.min(want, storeysAllowed(r));
+  if (n < 1) return null;
+  const masses: Mass[] = [{ rect: r, y0: GROUND_Y, y1: level(n) }];
+  // Some step back for their top floor or few.
+  if (n >= 4 && rand(rng) < 0.35) {
+    const top = setback(r, rng, 2, 6, 0.4);
+    if (narrow(top) >= 10) {
+      const k = n >= 7 ? Math.round(randRange(rng, 1, 3)) : 1;
+      masses[0].y1 = level(n - k);
+      masses.push({ rect: top, y0: level(n - k), y1: level(n) });
     }
   }
-  if (masses.length === 0) {
-    const n = Math.min(want, storeysAllowed(lot));
-    if (n < 2) return null;
-    // Some step back for their top floor or few.
-    const top = n >= 6 && rand(rng) < 0.4 ? setback(lot, rng, 2, 5, 0.4) : null;
-    if (top && narrow(top) >= 8) {
-      const k = Math.min(n - 3, Math.round(randRange(rng, 1, 4)));
-      stack(lot, n - k);
-      stack(top, n);
-    } else stack(lot, n);
-  }
-  const storeys = (masses[masses.length - 1].y1 - GROUND_Y) / STOREY;
-  const facade: Facade =
-    storeys > 20
-      ? pick(rng, ["glass", "glass", "glass", "ribbon", "fins", "fins"] as const)
-      : storeys > 7
-        ? pick(rng, ["glass", "ribbon", "stone", "fins", "grid"] as const)
-        : rand(rng) < 0.5
-          ? "stone"
-          : pick(rng, ["ribbon", "glass", "grid"] as const);
-  const wall = facade === "glass" ? pick(rng, FRAMES) : facade === "stone" ? pick(rng, STONE) : pick(rng, CONCRETE);
-  const glass = facade === "glass" ? pick(rng, GLASS_TINTS) : pick(rng, DARK_GLASS);
-  const finish = finishFor(masses[masses.length - 1].rect, storeys, rng);
+  const facade = pick(rng, ["glass", "glass", "glass", "ribbon", "ribbon", "fins", "grid"] as const);
+  const finish = finishFor(masses[masses.length - 1].rect, n, rng);
   return {
     masses,
     facade,
-    wall,
-    glass,
+    wall: facade === "glass" ? pick(rng, FRAMES) : pick(rng, CONCRETE),
+    glass: facade === "glass" ? pick(rng, GLASS_TINTS) : pick(rng, DARK_GLASS),
     roof: pick(rng, ROOFS[finish]),
     finish,
-    lit: randRange(rng, 0.1, 0.42),
+    pitch: "flat",
+    lit: randRange(rng, 0.15, 0.45),
     seed,
-    crown: storeys >= 30 && rand(rng) < 0.45 ? pick(rng, CROWNS) : null,
+    crown: n >= 6 && rand(rng) < 0.35 ? pick(rng, CROWNS) : null,
   };
 }
 
-/** Every building in town but the startup's own tower, the same ones every visit. */
-export function buildings(seed = 31): Building[] {
+function house(r: Rect, rng: RngHolder): Building {
+  const seed = Math.floor(rand(rng) * 10000);
+  const n = rand(rng) < 0.7 ? 1 : 2;
+  return {
+    masses: [{ rect: r, y0: GROUND_Y, y1: level(n) }],
+    facade: "house",
+    wall: pick(rng, STUCCO),
+    glass: pick(rng, DARK_GLASS),
+    roof: pick(rng, ROOFS.tiles),
+    finish: "tiles",
+    pitch: pick(rng, ["gable", "gable", "hip"] as const),
+    lit: randRange(rng, 0.3, 0.6),
+    seed,
+    crown: null,
+  };
+}
+
+function shop(r: Rect, rng: RngHolder): Building {
+  const seed = Math.floor(rand(rng) * 10000);
+  const finish = rand(rng) < 0.6 ? "membrane" : "gravel";
+  return {
+    masses: [{ rect: r, y0: GROUND_Y, y1: level(1) }],
+    facade: "glass",
+    wall: pick(rng, SHOPFRONTS),
+    glass: pick(rng, GLASS_TINTS),
+    roof: pick(rng, ROOFS[finish]),
+    finish,
+    pitch: "flat",
+    lit: 0.6,
+    seed,
+    crown: pick(rng, SIGNS),
+  };
+}
+
+/** Trees scattered over `area`, clear of everything in `avoid` and of each other. */
+function plant(area: Rect, avoid: Rect[], count: number, kinds: readonly TreeKind[], rng: RngHolder, out: LawnTree[]): void {
+  const mine: LawnTree[] = [];
+  for (let tries = 0; mine.length < count && tries < count * 30; tries++) {
+    const x = randRange(rng, area[0], area[2]);
+    const z = randRange(rng, area[1], area[3]);
+    if (avoid.some((a) => inside(x, z, a, 3)) || mine.some((t) => Math.hypot(t.x - x, t.z - z) < 7)) continue;
+    mine.push({ x, z, kind: pick(rng, kinds) });
+  }
+  out.push(...mine);
+}
+
+const area = (r: Rect) => Math.max(0, r[2] - r[0]) * Math.max(0, r[3] - r[1]);
+
+/** One or two office buildings, each on a lawn with its car park beside it. */
+function officePark(r: Rect, far: boolean, rng: RngHolder, town: Town): void {
+  const { alongX, a0, a1 } = lengthwise(r);
+  const parts: Rect[] = [];
+  if (a1 - a0 > 90 && rand(rng) < 0.6) {
+    const cut = a0 + (a1 - a0) * randRange(rng, 0.42, 0.58);
+    parts.push(span(alongX, a0, cut - 3, ...across(r, alongX)), span(alongX, cut + 3, a1, ...across(r, alongX)));
+  } else parts.push(r);
+  for (const p of parts) {
+    const { alongX: px, a0: p0, a1: p1, c0, c1 } = lengthwise(p);
+    const length = Math.min(70, (p1 - p0) * randRange(rng, 0.45, 0.6));
+    const depth = Math.min(42, c1 - c0 - 2 * randRange(rng, 7, 11));
+    if (depth < 14 || length < 18) continue;
+    const atStart = rand(rng) < 0.5;
+    const lawn = randRange(rng, 6, 10);
+    const b0 = atStart ? p0 + lawn : p1 - lawn - length;
+    const middle = (c0 + c1) / 2 + randRange(rng, -0.25, 0.25) * (c1 - c0 - depth - 14);
+    const foot = span(px, b0, b0 + length, middle - depth / 2, middle + depth / 2);
+    const made = office(foot, rng, far);
+    const avoid: Rect[] = [];
+    if (made) {
+      town.buildings.push(made);
+      avoid.push(foot);
+    }
+    const k0 = atStart ? b0 + length + 6 : p0 + 3;
+    const k1 = atStart ? p1 - 3 : b0 - 6;
+    if (k1 - k0 >= 16) {
+      const lot = span(px, k0, k1, c0 + 3, c1 - 3);
+      town.carParks.push({ rect: lot });
+      avoid.push(lot);
+    }
+    plant(p, avoid, Math.round(area(p) / 400), ["palm", "palm", "round", "round", "blossom", "cone"], rng, town.lawnTrees);
+  }
+}
+
+/** Two rows of houses back to back, each facing its street, with a front yard, a deep back yard and sometimes a pool. */
+function neighbourhood(r: Rect, rng: RngHolder, town: Town): void {
+  const { alongX, a0, a1, c0, c1 } = lengthwise(r);
+  const n = Math.max(2, Math.round((a1 - a0) / randRange(rng, 16, 20)));
+  const lot = (a1 - a0) / n;
+  const middle = (c0 + c1) / 2;
+  for (const side of [-1, 1] as const) {
+    const street = side < 0 ? c0 : c1;
+    for (let k = 0; k < n; k++) {
+      const width = lot - randRange(rng, 3.5, 5.5);
+      const depth = randRange(rng, 9, 13);
+      const front = randRange(rng, 5, 7.5);
+      const centre = a0 + (k + 0.5) * lot + randRange(rng, -0.8, 0.8);
+      const h0 = side < 0 ? street + front : street - front - depth;
+      const foot = span(alongX, centre - width / 2, centre + width / 2, h0, h0 + depth);
+      town.buildings.push(house(foot, rng));
+      // The back yard runs from the house to the middle of the block.
+      const y0 = side < 0 ? h0 + depth + 2 : middle + 1.5;
+      const y1 = side < 0 ? middle - 1.5 : h0 - 2;
+      const avoid: Rect[] = [foot];
+      if (y1 - y0 >= 9 && rand(rng) < 0.35) {
+        const pw = randRange(rng, 4, Math.min(8, width - 2));
+        const pd = randRange(rng, 2.6, 4);
+        const py = side < 0 ? y0 + 1.5 : y1 - 1.5 - pd;
+        const pool = span(alongX, centre - pw / 2, centre + pw / 2, py, py + pd);
+        town.pools.push(pool);
+        avoid.push(pool);
+      }
+      if (y1 - y0 >= 9) plant(span(alongX, centre - lot / 2 + 1.5, centre + lot / 2 - 1.5, y0, y1), avoid, rand(rng) < 0.6 ? 2 : 1, ["round", "round", "palm", "blossom", "cone"], rng, town.lawnTrees);
+    }
+  }
+}
+
+/** A strip of shops along the back of the block, its car park in front on the street, and a small shop on the corner. */
+function retail(r: Rect, rng: RngHolder, town: Town): void {
+  const { alongX, a0, a1, c0, c1 } = lengthwise(r);
+  const facing = rand(rng) < 0.5 ? 1 : -1;
+  const length = (a1 - a0) * randRange(rng, 0.7, 0.88);
+  const depth = randRange(rng, 18, 24);
+  const s0 = a0 + 3 + (a1 - a0 - length - 6) * rand(rng);
+  const back = facing > 0 ? c0 + 3 : c1 - 3 - depth;
+  const strip = span(alongX, s0, s0 + length, back, back + depth);
+  town.buildings.push(shop(strip, rng));
+  const f0 = facing > 0 ? back + depth + 6 : c0 + 3;
+  const f1 = facing > 0 ? c1 - 3 : back - 6;
+  const padLength = randRange(rng, 14, 18);
+  const padDepth = Math.min(randRange(rng, 12, 15), f1 - f0 - 2);
+  const padAtStart = rand(rng) < 0.5;
+  const pad0 = padAtStart ? a0 + 4 : a1 - 4 - padLength;
+  if (padDepth >= 10) {
+    const pad = span(alongX, pad0, pad0 + padLength, facing > 0 ? f1 - padDepth : f0, facing > 0 ? f1 : f0 + padDepth);
+    town.buildings.push(shop(pad, rng));
+  }
+  const k0 = padAtStart ? pad0 + padLength + 5 : a0 + 3;
+  const k1 = padAtStart ? a1 - 3 : pad0 - 5;
+  if (k1 - k0 >= 16 && f1 - f0 >= 16) town.carParks.push({ rect: span(alongX, k0, k1, f0, f1) });
+}
+
+/** The startup's own campus: its car park behind the building, and trees on the lawn round about. */
+function campus(rng: RngHolder, town: Town): void {
+  const t = towerBlock().rect;
+  const lot: Rect = [t[0] + 6, t[1] + 5, t[2] - 6, PODIUM[1] - 8];
+  if (lot[3] - lot[1] >= 16) town.carParks.push({ rect: lot });
+  plant(inset(t, 1.5), [inset(PODIUM, -2), lot], Math.round(area(t) / 500), ["palm", "palm", "palm", "blossom", "round"], rng, town.lawnTrees);
+}
+
+const towns = new Map<number, Town>();
+
+/** Everything in town but the startup's own building, the same every visit. */
+export function town(seed = 31): Town {
+  const known = towns.get(seed);
+  if (known) return known;
   const rng: RngHolder = { rngState: seed };
-  const out: Building[] = [];
+  const made: Town = { buildings: [], carParks: [], pools: [], lawnTrees: [], zones: [] };
+  campus(rng, made);
   for (const b of blocks()) {
     if (isTowerBlock(b) || isPark(b)) continue;
-    for (const lot of lots(b.rect, rng)) {
-      for (const [part, low] of pair(lot, rng)) {
-        const made = building(part, rng, low);
-        if (made) out.push(made);
+    const near = Math.max(Math.abs(b.i), Math.abs(b.j)) <= 1;
+    const roll = rand(rng);
+    const zone: Zone = near ? (roll < 0.55 ? "offices" : roll < 0.8 ? "shops" : "homes") : roll < 0.42 ? "offices" : roll < 0.82 ? "homes" : "shops";
+    made.zones.push({ i: b.i, j: b.j, zone });
+    const r = inset(b.rect, 1.5);
+    if (zone === "offices") officePark(r, !near, rng, made);
+    else if (zone === "homes") neighbourhood(r, rng, made);
+    else retail(r, rng, made);
+  }
+  // The tallest office with room for one always has a helipad on its roof.
+  const top = (b: Building) => b.masses[b.masses.length - 1];
+  const tallest = made.buildings.filter((b) => b.pitch === "flat" && narrow(top(b).rect) >= 20).sort((a, b) => top(b).y1 - top(a).y1)[0];
+  if (tallest && !made.buildings.some((b) => b.finish === "helipad")) {
+    tallest.finish = "helipad";
+    tallest.roof = ROOFS.helipad[0];
+  }
+  towns.set(seed, made);
+  return made;
+}
+
+/** Every building in town but the startup's own. */
+export const buildings = (seed = 31): Building[] => town(seed).buildings;
+
+/** A bay in a car park: where a car stands and which way it faces (a car faces -z at 0). */
+export interface Bay {
+  x: number;
+  z: number;
+  rot: number;
+}
+
+/** Bays, the lines between them, and the aisles: 2.6 metres wide and 5.4 deep, two rows to each 7-metre aisle. */
+export const BAY = { width: 2.6, depth: 5.4, aisle: 7 };
+
+/** The bays in a car park, in rows along its longer side: two rows facing each other across each aisle. */
+export function bays(cp: CarPark): Bay[] {
+  const { alongX, a0, a1, c0, c1 } = lengthwise(cp.rect);
+  const out: Bay[] = [];
+  const stride = 2 * BAY.depth + BAY.aisle;
+  const pairs = Math.floor((c1 - c0) / stride);
+  const start = c0 + (c1 - c0 - pairs * stride) / 2;
+  const count = Math.floor((a1 - a0 - 1) / BAY.width);
+  const first = a0 + (a1 - a0 - count * BAY.width) / 2 + BAY.width / 2;
+  for (let pair = 0; pair < pairs; pair++) {
+    for (const side of [0, 1]) {
+      const centre = start + pair * stride + BAY.depth / 2 + side * (BAY.depth + BAY.aisle);
+      // Each car faces the aisle it came in from: the first row looks across it, the second back.
+      const facing = side === 0 ? 1 : -1;
+      for (let k = 0; k < count; k++) {
+        const along = first + k * BAY.width;
+        const [x, z] = alongX ? [along, centre] : [centre, along];
+        const rot = alongX ? (facing > 0 ? Math.PI : 0) : facing > 0 ? -Math.PI / 2 : Math.PI / 2;
+        out.push({ x, z, rot });
       }
     }
   }
   return out;
 }
+
+export interface ParkedCar extends Bay {
+  kind: VehicleKind;
+  colour: string;
+}
+
+/** Cars in about two bays in three, the same every visit. */
+export function parkedCars(seed = 37): ParkedCar[] {
+  const rng: RngHolder = { rngState: seed };
+  const out: ParkedCar[] = [];
+  for (const cp of town().carParks) {
+    const share = randRange(rng, 0.45, 0.9);
+    for (const b of bays(cp)) {
+      if (rand(rng) > share) continue;
+      const kind = pick(rng, PARKED);
+      out.push({ ...b, kind, colour: kind === "taxi" ? pick(rng, TAXI_COLOURS) : pick(rng, CAR_COLOURS) });
+    }
+  }
+  return out;
+}
+
+const PARKED: readonly VehicleKind[] = ["sedan", "sedan", "sedan", "hatch", "suv", "suv", "van"];
 
 export interface Plant {
   kind: "box" | "tank" | "fan" | "panel" | "pool" | "helipad" | "shrub";
@@ -423,6 +621,8 @@ const PANEL = { w: 3.2, d: 1.6, gap: 0.4, row: 2.8 };
  * helipad in the middle, a pool on the terrace, planting, or rows of solar panels over the roof that is left.
  */
 export function roofPlant(b: Building): Plant[] {
+  // A pitched roof carries nothing.
+  if (b.pitch !== "flat") return [];
   const top = b.masses[b.masses.length - 1];
   const rng: RngHolder = { rngState: b.seed };
   const [x0, z0, x1, z1] = inset(top.rect, PARAPET + 0.6);
@@ -477,8 +677,8 @@ export function roofPlant(b: Building): Plant[] {
   return out;
 }
 
-/** Below this many storeys, a building has no aviation lights. Only the skyline's tallest carry them. */
-export const BEACON_STOREYS = 40;
+/** Below this many storeys, a building has no aviation lights. Only the few taller offices far out carry them. */
+export const BEACON_STOREYS = 9;
 
 /** Red lights on the corners of anything tall enough to trouble a helicopter. */
 export function beacons(b: Building): { x: number; y: number; z: number }[] {
@@ -505,10 +705,10 @@ export interface Spot {
 }
 
 /**
- * A rounded broadleaf, a narrow conifer, a rain tree's wide umbrella of a crown, or a broadleaf in flower. Each
- * street is planted with one kind; the plaza is in flower; the park is mixed, with rain trees the most of all.
+ * A rounded oak, a narrow cypress, a wide umbrella of a crown, a jacaranda in flower, or a palm. Each pavement is
+ * planted with one kind and each median with another, mostly palms; the campus is mostly palms, and the park mixed.
  */
-export type TreeKind = "round" | "cone" | "umbrella" | "blossom";
+export type TreeKind = "round" | "cone" | "umbrella" | "blossom" | "palm";
 
 export interface Tree {
   x: number;
@@ -526,7 +726,14 @@ const LEAVES: Record<TreeKind, readonly string[]> = {
   cone: ["#1f3a2c", "#1c3428", "#24402f", "#1a3a33"],
   umbrella: ["#2f4d2a", "#3a5630", "#29472e", "#40592f"],
   blossom: ["#ad5b84", "#bb739a", "#9461a3", "#c27f8f", "#c995ab", "#b39339"],
+  palm: ["#4f7d3a", "#5a8a3f", "#44713a", "#638f45"],
 };
+
+/** How tall each kind grows, in metres. */
+const TREE_HEIGHT: Record<TreeKind, [number, number]> = { round: [6, 9], cone: [7, 10.5], umbrella: [8, 11.5], blossom: [5, 7.5], palm: [9, 14] };
+
+/** Palms and oaks stand this far apart down the middle of the medians. */
+const MEDIAN_GAP = 13;
 
 const LAMP_GAP = 26;
 /** Kerb to lamp post, and kerb to tree pit. */
@@ -606,43 +813,44 @@ export const parkLoop = (): Rect => inset(parkBlock().rect, 6);
 /** The fountain where the paths cross: its basin's radius, and the round paved square it stands in. */
 export const FOUNTAIN = { r: 3.6, square: 7.5 };
 
-/** Street trees halfway between the lamps, round the tower's plaza and across the park. */
+/** Street trees halfway between the lamps and down the medians, on the lawns of the blocks, and across the park. */
 export function trees(seed = 13): Tree[] {
   const rng: RngHolder = { rngState: seed };
   const out: Tree[] = [];
-  const add = (x: number, z: number, kind: TreeKind, lo: number, hi: number) =>
-    out.push({ x, z, h: randRange(rng, lo, hi), turn: randRange(rng, 0, Math.PI * 2), kind, leaf: pick(rng, LEAVES[kind]) });
+  const add = (x: number, z: number, kind: TreeKind) =>
+    out.push({ x, z, h: randRange(rng, ...TREE_HEIGHT[kind]), turn: randRange(rng, 0, Math.PI * 2), kind, leaf: pick(rng, LEAVES[kind]) });
   ROADS.forEach((r, i) => {
-    // Not every street is planted, and each that is has one kind of tree.
-    if (i % 3 === 1) return;
-    const kind = pick(rng, ["round", "round", "round", "cone", "cone", "blossom"] as const);
+    // Every median is planted, mostly with palms. Not every pavement is, and each that is has one kind of tree.
+    const middle = rand(rng) < 0.75 ? "palm" : "round";
+    const kerb = i % 3 === 1 ? null : pick(rng, ["palm", "palm", "round", "round", "cone", "blossom"] as const);
     for (const [a, b] of stretches(r)) {
       const n = Math.max(1, Math.round((b - a) / LAMP_GAP));
-      for (let k = 0; k < n; k++) {
+      for (let k = 0; k < n && kerb; k++) {
         for (const side of [-1, 1] as const) {
           const [x, z] = kerbside(r, a + ((b - a) * (k + 0.5)) / n, side, TREE_IN);
-          if (fadeAt(x, z) < 0.9) add(x, z, kind, 5.5, 7.5);
+          if (fadeAt(x, z) < 0.9) add(x, z, kerb);
         }
+      }
+      const m = Math.max(1, Math.round((b - a) / MEDIAN_GAP));
+      for (let k = 0; k <= m; k++) {
+        const along = a + ((b - a) * k) / m;
+        const [x, z] = r.axis === "x" ? [along, r.at] : [r.at, along];
+        if (fadeAt(x, z) < 0.9) add(x, z, middle);
       }
     }
   });
-  // The plaza: a ring of trees in flower in from the pavement, leaving the way to the doors clear.
-  const plaza = inset(towerBlock().rect, 4);
-  const ring: [number, number][] = [];
-  for (let x = plaza[0]; x <= plaza[2] + 0.01; x += (plaza[2] - plaza[0]) / 10) ring.push([x, plaza[1]], [x, plaza[3]]);
-  for (let z = plaza[1] + 8; z <= plaza[3] - 8; z += (plaza[3] - plaza[1]) / 8) ring.push([plaza[0], z], [plaza[2], z]);
-  for (const [x, z] of ring) if (Math.abs(x - FADE.x) > 6 && !inside(x, z, PODIUM, 4)) add(x, z, "blossom", 5, 7);
+  for (const t of town().lawnTrees) if (fadeAt(t.x, t.z) < 0.92) add(t.x, t.z, t.kind);
   // The park: scattered, off the paths, the fountain's square and the flower beds.
   const park = parkBlock().rect;
   const paths = parkPaths();
   const [cx, cz] = parkCentre();
-  for (let tries = 0, planted = 0; planted < 46 && tries < 1500; tries++) {
+  const planted: Tree[] = [];
+  for (let tries = 0; planted.length < 46 && tries < 1500; tries++) {
     const x = randRange(rng, park[0] + 4, park[2] - 4);
     const z = randRange(rng, park[1] + 4, park[3] - 4);
-    if (paths.some((p) => inside(x, z, p, 2.5)) || Math.hypot(x - cx, z - cz) < FOUNTAIN.square + 3 || out.some((t) => Math.hypot(t.x - x, t.z - z) < 7.5)) continue;
-    const kind = pick(rng, ["umbrella", "umbrella", "umbrella", "round", "round", "cone", "blossom"] as const);
-    add(x, z, kind, kind === "umbrella" ? 8 : 6, kind === "umbrella" ? 11.5 : 10.5);
-    planted++;
+    if (paths.some((p) => inside(x, z, p, 3)) || Math.hypot(x - cx, z - cz) < FOUNTAIN.square + 3 || planted.some((t) => Math.hypot(t.x - x, t.z - z) < 7.5)) continue;
+    add(x, z, pick(rng, ["umbrella", "umbrella", "round", "round", "palm", "cone", "blossom"] as const));
+    planted.push(out[out.length - 1]);
   }
   return out;
 }
