@@ -230,8 +230,8 @@ export function blocks(): Block[] {
 }
 
 const isTowerBlock = (b: Block) => b.i === 0 && b.j === 0;
-/** The park is the block diagonally behind the tower from the starting view, where it fills the sky above the office. */
-const isPark = (b: Block) => b.i === -1 && b.j === -1;
+/** The park is the block to the upper left of the office from the starting view. */
+const isPark = (b: Block) => b.i === -1 && b.j === 0;
 
 export const towerBlock = (): Block => blocks().find(isTowerBlock) as Block;
 export const parkBlock = (): Block => blocks().find(isPark) as Block;
@@ -307,7 +307,39 @@ function lengthwise(r: Rect): { alongX: boolean; a0: number; a1: number; c0: num
 const across = (r: Rect, alongX: boolean): [number, number] => (alongX ? [r[1], r[3]] : [r[0], r[2]]);
 
 /** What a block is used for. */
-export type Zone = "offices" | "homes" | "shops";
+export type Zone = "offices" | "homes" | "shops" | "hq";
+
+/** The ring-shaped headquarters of the valley's biggest company, round a wooded courtyard. */
+export interface Ring {
+  x: number;
+  z: number;
+  /** Radii of its outer and inner walls. */
+  outer: number;
+  inner: number;
+  storeys: number;
+}
+
+/** The block the ring stands on: beside the startup's, to the upper right of it from the starting view. */
+export const HQ_BLOCK = { i: 0, j: -1 };
+
+/**
+ * A billboard on a roof: its middle, which way its face looks (it faces -z at 0), its size, how high its bottom
+ * edge stands, and which of the advertisements it carries.
+ */
+export interface Billboard {
+  x: number;
+  z: number;
+  rot: number;
+  w: number;
+  h: number;
+  y0: number;
+  ad: number;
+}
+
+/** How many different advertisements there are (see textures.ts). */
+export const ADS = 8;
+/** A billboard's legs lift it this far above its roof. */
+export const BILLBOARD_LEGS = 0.7;
 
 /** A car park: rows of bays across a rectangle of asphalt (see bays). */
 export interface CarPark {
@@ -329,6 +361,8 @@ export interface Town {
   /** Trees on the lawns of the campus, the office parks and the back yards. */
   lawnTrees: LawnTree[];
   zones: { i: number; j: number; zone: Zone }[];
+  ring: Ring | null;
+  billboards: Billboard[];
 }
 
 function office(r: Rect, rng: RngHolder, far: boolean): Building | null {
@@ -488,6 +522,15 @@ function retail(r: Rect, rng: RngHolder, town: Town): void {
   const back = facing > 0 ? c0 + 3 : c1 - 3 - depth;
   const strip = span(alongX, s0, s0 + length, back, back + depth);
   town.buildings.push(shop(strip, rng));
+  // One or two billboards along the strip's front edge, facing its car park and the street beyond.
+  const boards = length > 60 ? 2 : 1;
+  const front = facing > 0 ? back + depth - 1 : back + 1;
+  const rot = alongX ? (facing > 0 ? Math.PI : 0) : facing > 0 ? -Math.PI / 2 : Math.PI / 2;
+  for (let k = 0; k < boards; k++) {
+    const along = s0 + (length * (k + 1)) / (boards + 1);
+    const [x, z] = alongX ? [along, front] : [front, along];
+    town.billboards.push({ x, z, rot, w: Math.min(10, length / 3), h: 3, y0: level(1) + BILLBOARD_LEGS, ad: Math.floor(rand(rng) * ADS) });
+  }
   const f0 = facing > 0 ? back + depth + 6 : c0 + 3;
   const f1 = facing > 0 ? c1 - 3 : back - 6;
   const padLength = randRange(rng, 14, 18);
@@ -501,6 +544,27 @@ function retail(r: Rect, rng: RngHolder, town: Town): void {
   const k0 = padAtStart ? pad0 + padLength + 5 : a0 + 3;
   const k1 = padAtStart ? a1 - 3 : pad0 - 5;
   if (k1 - k0 >= 16 && f1 - f0 >= 16) town.carParks.push({ rect: span(alongX, k0, k1, f0, f1) });
+}
+
+/** The ring: four storeys of curved glass round a wooded courtyard, with trees in the block's corners outside it. */
+function headquarters(r: Rect, rng: RngHolder, town: Town): void {
+  const x = (r[0] + r[2]) / 2;
+  const z = (r[1] + r[3]) / 2;
+  const outer = narrow(r) / 2 - 5;
+  const ring: Ring = { x, z, outer, inner: outer - 13, storeys: 4 };
+  town.ring = ring;
+  const trees: LawnTree[] = [];
+  const kinds = ["round", "round", "umbrella", "palm", "cone", "blossom"] as const;
+  for (let tries = 0; trees.length < 60 && tries < 3000; tries++) {
+    const px = randRange(rng, r[0] + 2, r[2] - 2);
+    const pz = randRange(rng, r[1] + 2, r[3] - 2);
+    const d = Math.hypot(px - x, pz - z);
+    // In the courtyard, clear of the walls, or out in the corners beyond them.
+    if (!(d < ring.inner - 5 || d > ring.outer + 6)) continue;
+    if (trees.some((t) => Math.hypot(t.x - px, t.z - pz) < 7)) continue;
+    trees.push({ x: px, z: pz, kind: pick(rng, kinds) });
+  }
+  town.lawnTrees.push(...trees);
 }
 
 /** The startup's own campus: its car park behind the building, and trees on the lawn round about. */
@@ -518,16 +582,18 @@ export function town(seed = 31): Town {
   const known = towns.get(seed);
   if (known) return known;
   const rng: RngHolder = { rngState: seed };
-  const made: Town = { buildings: [], carParks: [], pools: [], lawnTrees: [], zones: [] };
+  const made: Town = { buildings: [], carParks: [], pools: [], lawnTrees: [], zones: [], ring: null, billboards: [] };
   campus(rng, made);
   for (const b of blocks()) {
     if (isTowerBlock(b) || isPark(b)) continue;
     const near = Math.max(Math.abs(b.i), Math.abs(b.j)) <= 1;
     const roll = rand(rng);
-    const zone: Zone = near ? (roll < 0.55 ? "offices" : roll < 0.8 ? "shops" : "homes") : roll < 0.42 ? "offices" : roll < 0.82 ? "homes" : "shops";
+    const hq = b.i === HQ_BLOCK.i && b.j === HQ_BLOCK.j;
+    const zone: Zone = hq ? "hq" : near ? (roll < 0.55 ? "offices" : roll < 0.8 ? "shops" : "homes") : roll < 0.42 ? "offices" : roll < 0.82 ? "homes" : "shops";
     made.zones.push({ i: b.i, j: b.j, zone });
     const r = inset(b.rect, 1.5);
-    if (zone === "offices") officePark(r, !near, rng, made);
+    if (zone === "hq") headquarters(r, rng, made);
+    else if (zone === "offices") officePark(r, !near, rng, made);
     else if (zone === "homes") neighbourhood(r, rng, made);
     else retail(r, rng, made);
   }
@@ -594,13 +660,13 @@ export function parkedCars(seed = 37): ParkedCar[] {
     for (const b of bays(cp)) {
       if (rand(rng) > share) continue;
       const kind = pick(rng, PARKED);
-      out.push({ ...b, kind, colour: kind === "taxi" ? pick(rng, TAXI_COLOURS) : pick(rng, CAR_COLOURS) });
+      out.push({ ...b, kind, colour: kind === "taxi" ? pick(rng, TAXI_COLOURS) : kind === "robotaxi" ? ROBOTAXI : pick(rng, CAR_COLOURS) });
     }
   }
   return out;
 }
 
-const PARKED: readonly VehicleKind[] = ["sedan", "sedan", "sedan", "hatch", "suv", "suv", "van"];
+const PARKED: readonly VehicleKind[] = ["sedan", "sedan", "sedan", "hatch", "suv", "suv", "van", "robotaxi"];
 
 export interface Plant {
   kind: "box" | "tank" | "fan" | "panel" | "pool" | "helipad" | "shrub";
@@ -971,7 +1037,7 @@ export function vehicleAt(lane: Lane, slot: number, t: number): { x: number; z: 
  * Saloons, hatchbacks, SUVs, taxis and vans all fit within a car's length; trucks and buses within a truck's. The
  * junctions' timing is worked out from those two lengths, so no vehicle may be longer.
  */
-export type VehicleKind = "sedan" | "hatch" | "suv" | "taxi" | "van" | "truck" | "bus";
+export type VehicleKind = "sedan" | "hatch" | "suv" | "taxi" | "robotaxi" | "van" | "truck" | "bus";
 
 export const isLong = (kind: VehicleKind): boolean => kind === "truck" || kind === "bus";
 
@@ -984,8 +1050,10 @@ export interface Vehicle {
 
 export const CAR_COLOURS = ["#d9d9de", "#26262e", "#8a8f99", "#2f4c8f", "#9c1f2b", "#e8e4d8", "#3d5c47", "#5a5f6b", "#b5562a", "#1d3557"];
 const TAXI_COLOURS = ["#e8b31f", "#e8b31f", "#3e9a5f"];
+/** Self-driving taxis are all white, with a spinning sensor on the roof. */
+const ROBOTAXI = "#f1f1ee";
 const BUS_COLOURS = ["#c8323c", "#2f7d4f", "#e8e4d8", "#2f5fa0"];
-const SHORT: readonly VehicleKind[] = ["sedan", "sedan", "sedan", "sedan", "hatch", "hatch", "suv", "suv", "taxi", "van"];
+const SHORT: readonly VehicleKind[] = ["sedan", "sedan", "sedan", "sedan", "hatch", "hatch", "suv", "suv", "taxi", "robotaxi", "robotaxi", "van"];
 
 /** About four places in five filled, a few with trucks and buses; the same traffic every visit. */
 export function traffic(seed = 21): Vehicle[] {
@@ -996,7 +1064,7 @@ export function traffic(seed = 21): Vehicle[] {
       if (rand(rng) > 0.8) continue;
       const long = rand(rng) < (lane.axis === "x" ? 0.12 : 0.07);
       const kind: VehicleKind = long ? (rand(rng) < 0.5 ? "bus" : "truck") : pick(rng, SHORT);
-      const colour = kind === "taxi" ? pick(rng, TAXI_COLOURS) : kind === "bus" ? pick(rng, BUS_COLOURS) : pick(rng, CAR_COLOURS);
+      const colour = kind === "taxi" ? pick(rng, TAXI_COLOURS) : kind === "bus" ? pick(rng, BUS_COLOURS) : kind === "robotaxi" ? ROBOTAXI : pick(rng, CAR_COLOURS);
       out.push({ lane: l, slot, kind, colour });
     }
   });

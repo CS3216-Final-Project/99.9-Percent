@@ -460,6 +460,49 @@ export function logoSign(): THREE.CanvasTexture {
   return t;
 }
 
+/** One billboard advertisement's cell in the sheet of them: two across, four down. */
+export const AD_CELL: [number, number] = [512, 160];
+
+/** Advertisements for the valley's made-up startups: a headline, a line under it, and their colours. */
+const ADS: { head: string; line: string; paper: string; ink: string; accent: string }[] = [
+  { head: "SHIP IT FRIDAY", line: "DeployDuck · zero-downtime deploys", paper: "#ffd84a", ink: "#1d1834", accent: "#ff7a3d" },
+  { head: "YOUR AI WROTE THIS", line: "Promptly · billboards that write themselves", paper: "#6f4cff", ink: "#ffffff", accent: "#ffd84a" },
+  { head: "SERVERLESS*", line: "*servers sold separately · Nimbus Cloud", paper: "#bfe6ff", ink: "#12304d", accent: "#2f7de1" },
+  { head: "99.99%", line: "keep it online · now hiring", paper: "#1d1834", ink: "#ffe680", accent: "#ff9be3" },
+  { head: "HIRING 10x ENGINEERS", line: "1x welcome too · Gigaflow", paper: "#2ec4b6", ink: "#0f2b2a", accent: "#ffffff" },
+  { head: "PIVOT PARTNERS", line: "we have changed direction", paper: "#ff7f3f", ink: "#2b1205", accent: "#fff3d6" },
+  { head: "BYTE BURRITO", line: "fuel for late-night deploys", paper: "#d7263d", ink: "#fff3d6", accent: "#ffd84a" },
+  { head: "DEBUG IN PROD?", line: "Tracewise sees everything", paper: "#0f2b2a", ink: "#7de8d3", accent: "#ff5a5f" },
+];
+
+/** Every billboard advertisement on one sheet, in the pixel font. */
+export function adsTexture(): THREE.CanvasTexture {
+  const [cw, ch] = AD_CELL;
+  return letteredTexture("ads", cw * 2, ch * 4, (g) => {
+    ADS.forEach((ad, k) => {
+      const x = (k % 2) * cw;
+      const y = Math.floor(k / 2) * ch;
+      g.fillStyle = ad.paper;
+      g.fillRect(x, y, cw, ch);
+      g.fillStyle = ad.accent;
+      g.fillRect(x, y + ch - 18, cw, 18);
+      g.fillRect(x + 22, y + 22, 14, ch - 62);
+      g.textAlign = "left";
+      g.textBaseline = "middle";
+      g.fillStyle = ad.ink;
+      // Each line shrinks, if it must, to fit the board.
+      const fit = (text: string, size: number, at: number) => {
+        g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
+        const width = g.measureText(text).width;
+        if (width > cw - 70) g.font = `700 ${Math.floor((size * (cw - 70)) / width)}px "Pixelify Sans", sans-serif`;
+        g.fillText(text, x + 50, y + at);
+      };
+      fit(ad.head, 58, 60);
+      fit(ad.line, 24, 112);
+    });
+  });
+}
+
 /** Today's architecture sketch, with the next idea scribbled in red. */
 export function whiteboard(): THREE.CanvasTexture {
   const W = 320;

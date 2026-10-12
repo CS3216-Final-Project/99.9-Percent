@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
+  BILLBOARD_LEGS,
   BAY,
   bays,
   beacons,
@@ -47,6 +48,7 @@ import {
   type Building,
   type LampStyle,
   type Pitch,
+  type Ring,
   type Plant,
   type Rect,
   type Road,
@@ -57,7 +59,7 @@ import {
 import { useDetail } from "./detail";
 import { world } from "./cityLight";
 import { useCitySurfaces, type CitySurface } from "./cityTextures";
-import { logoSign } from "./textures";
+import { adsTexture, logoSign } from "./textures";
 
 /*
  * Draws the city round the office (see city.ts) at whatever time of day it is (see sky.ts). Nothing out here takes
@@ -96,11 +98,13 @@ vec3 cityLight(vec3 n) {
  * and brighter at night; seen only at night, like the pools of lamplight; or shaded by its own shader, like the
  * facades.
  */
-type Lighting = "lit" | "textured" | "glow" | "night" | "own";
+type Lighting = "lit" | "textured" | "sign" | "glow" | "night" | "own";
 
 const LIGHTING: Record<Lighting, string> = {
   lit: "diffuseColor.rgb *= cityLight(normalize(vCityNormal));",
   textured: "diffuseColor.rgb *= cityDetail(normalize(vCityNormal)) * cityLight(cityBumped(normalize(vCityNormal)));",
+  // Sunlit by day like any surface, floodlit at night.
+  sign: "diffuseColor.rgb *= mix(cityLight(normalize(vCityNormal)), vec3(1.0), uDark * 0.85);",
   glow: "diffuseColor.rgb *= mix(0.6, 1.0, uDark);",
   night: "diffuseColor.rgb *= uDark;",
   own: "",
@@ -329,8 +333,8 @@ function facadeMaterial(): THREE.MeshBasicMaterial {
   });
 }
 
-/** The walls of every box of every building, as one mesh for the facade shader. */
-function facades(list: Building[]): THREE.BufferGeometry {
+/** The walls of every box of every building, and of the ring, as one mesh for the facade shader. */
+function facades(list: Building[], ring: Ring | null): THREE.BufferGeometry {
   const pos: number[] = [];
   const normal: number[] = [];
   const wall: number[] = [];
@@ -368,6 +372,39 @@ function facades(list: Building[]): THREE.BufferGeometry {
           at.push(u, y - GROUND_Y);
           // Offices and shops have shop windows at street level; houses do not.
           look.push(b.seed % 997, STYLE[b.facade], b.lit, m.y0 === GROUND_Y && b.facade !== "house" ? 1 : 0);
+        }
+        index.push(first, first + 1, first + 2, first, first + 2, first + 3);
+      }
+    }
+  }
+  if (ring) {
+    // Curved glass in narrow panels round the outside and the courtyard, each wall read from its left as seen
+    // from in front of it: clockwise round the outside, the other way round the courtyard.
+    w.set("#c9ccd1");
+    g.set("#203a52");
+    const top = GROUND_Y + ring.storeys * STOREY;
+    const panels = 160;
+    for (const [radius, out] of [
+      [ring.outer, 1],
+      [ring.inner, -1],
+    ] as const) {
+      for (let k = 0; k < panels; k++) {
+        const a0 = (k / panels) * Math.PI * 2;
+        const a1 = ((k + 1) / panels) * Math.PI * 2;
+        const ends = out > 0 ? [a1, a0] : [a0, a1];
+        const first = pos.length / 3;
+        for (const [a, y] of [
+          [ends[0], GROUND_Y],
+          [ends[1], GROUND_Y],
+          [ends[1], top],
+          [ends[0], top],
+        ]) {
+          pos.push(ring.x + radius * Math.cos(a), y, ring.z + radius * Math.sin(a));
+          normal.push(out * Math.cos(a), 0, out * Math.sin(a));
+          wall.push(w.r, w.g, w.b);
+          glass.push(g.r, g.g, g.b);
+          at.push(radius * (out > 0 ? Math.PI * 2 - a : a), y - GROUND_Y);
+          look.push(77, STYLE.glass, 0.5, 1);
         }
         index.push(first, first + 1, first + 2, first, first + 2, first + 3);
       }
@@ -449,6 +486,11 @@ function vehicleBody(kind: VehicleKind, lite = false): THREE.BufferGeometry {
   if (kind === "hatch") return merge([tint(box(1.75, 0.68, 3.9, 0, 0.62, 0), "#ffffff"), tint(box(1.55, 0.58, 2.1, 0, 1.25, 0.45), glass), ...(lite ? [] : wheels(0.8, [-1.2, 1.25]))]);
   if (kind === "suv") return merge([tint(box(1.85, 0.95, 4.4, 0, 0.8, 0), "#ffffff"), tint(box(1.7, 0.6, 2.7, 0, 1.57, 0.35), glass), ...(lite ? [] : wheels(0.84, [-1.4, 1.4], 0.4))]);
   if (kind === "van") return merge([tint(box(1.8, 1.75, 4.4, 0, 1.2, 0), "#ffffff"), tint(box(1.6, 0.55, 0.06, 0, 1.6, -2.21), dark), ...(lite ? [] : wheels(0.82, [-1.4, 1.45], 0.36))]);
+  if (kind === "robotaxi") {
+    // A saloon with a spinning sensor on its roof and a camera pod on each wing.
+    const sensor = "#2b2d33";
+    return merge([carBody(lite), tint(new THREE.CylinderGeometry(0.3, 0.36, 0.28, 14).translate(0, 1.66, 0.25), sensor), ...(lite ? [] : [-0.88, 0.88].map((x) => tint(box(0.12, 0.2, 0.26, x, 1.02, -1.25), sensor)))]);
+  }
   if (kind === "truck") return truckBody();
   if (kind === "bus") return merge([tint(box(2.4, 2.6, 8.8, 0, 1.7, 0), "#ffffff"), tint(box(2.2, 0.9, 0.06, 0, 2.0, -4.41), dark), ...(lite ? [] : wheels(1.05, [-3.0, 2.8], 0.45, 0.3))]);
   return carBody(lite);
@@ -462,6 +504,7 @@ function vehicleLights(kind: VehicleKind): THREE.BufferGeometry {
   if (kind === "truck") return carLights(8.6, 1.0, 2.3);
   if (kind === "bus") return merge([carLights(8.8, 0.8, 2.4), ...[-1, 1].map((s) => tint(box(0.04, 0.75, 7.0, s * 1.215, 2.25, 0.3), "#ffd99a")), tint(box(1.4, 0.3, 0.05, 0, 2.75, -4.43), "#ffb347")]);
   if (kind === "taxi") return merge([carLights(), tint(box(0.62, 0.2, 0.28, 0, 1.63, 0.2), "#fff1b0")]);
+  if (kind === "robotaxi") return merge([carLights(), tint(new THREE.CylinderGeometry(0.31, 0.31, 0.05, 14).translate(0, 1.82, 0.25), "#5fe3d6")]);
   return carLights();
 }
 
@@ -880,6 +923,45 @@ function roofs(list: Building[], lite: boolean): Record<Fabric, THREE.BufferGeom
   return out;
 }
 
+/** The ring's roof: a band of solar panels between pale rims. */
+function ringRoof(ring: Ring): THREE.BufferGeometry[] {
+  const top = GROUND_Y + ring.storeys * STOREY;
+  const band = (r0: number, r1: number, lift: number, colour: string) => tint(new THREE.RingGeometry(r0, r1, 160).rotateX(-Math.PI / 2).translate(ring.x, top + lift, ring.z), colour);
+  return [band(ring.inner + 0.8, ring.outer - 0.8, 0.02, "#2f4166"), band(ring.outer - 0.8, ring.outer, 0.03, "#d9dbde"), band(ring.inner, ring.inner + 0.8, 0.03, "#d9dbde")];
+}
+
+/** Billboards on the shops' roofs: their legs and frames, and their faces cut from the sheet of advertisements. */
+function Billboards() {
+  const { frames, faces } = useMemo(() => {
+    const solid: THREE.BufferGeometry[] = [];
+    const shown: THREE.BufferGeometry[] = [];
+    for (const b of town().billboards) {
+      if (fadeAt(b.x, b.z) >= 1) continue;
+      const place = (g: THREE.BufferGeometry) => g.rotateY(b.rot).translate(b.x, 0, b.z);
+      const legs = BILLBOARD_LEGS + b.h / 2;
+      for (const side of [-1, 1]) solid.push(tint(place(box(0.18, legs, 0.18, side * b.w * 0.32, b.y0 - BILLBOARD_LEGS + legs / 2, 0.2)), "#4a4c55"));
+      solid.push(tint(place(box(b.w + 0.3, b.h + 0.3, 0.2, 0, b.y0 + b.h / 2, 0.12)), "#3b3d45"));
+      // The face looks the way the billboard does, -z before it is turned; its picture is one cell of the sheet.
+      const face = new THREE.PlaneGeometry(b.w, b.h).rotateY(Math.PI).translate(0, b.y0 + b.h / 2, -0.005);
+      const col = b.ad % 2;
+      const row = Math.floor(b.ad / 2);
+      const uv = face.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, (col + uv.getX(i)) / 2, 1 - (row + 1 - uv.getY(i)) / 4);
+      shown.push(place(face));
+    }
+    return { frames: solid.length ? merge(solid) : null, faces: shown.length ? merge(shown) : null };
+  }, []);
+  const ads = useMemo(() => adsTexture(), []);
+  const paper = useMemo(() => faded({ map: ads, toneMapped: false }, "city-ads", "sign"), [ads]);
+  useEffect(() => () => paper.dispose(), [paper]);
+  return (
+    <group>
+      {frames && <Merged geometry={frames} material={M.shaded} />}
+      {faces && <Merged geometry={faces} material={paper} />}
+    </group>
+  );
+}
+
 /** Strips of light round the tops of some towers. */
 function crowns(list: Building[]): THREE.BufferGeometry | null {
   const parts: THREE.BufferGeometry[] = [];
@@ -915,8 +997,13 @@ function Beacons({ list }: { list: Building[] }) {
 function Buildings({ lite, looks }: { lite: boolean; looks: Looks }) {
   const list = useMemo(() => buildings(), []);
   const material = useMemo(() => facadeMaterial(), []);
-  const walls = useMemo(() => facades([...list, TOWER]), [list]);
-  const tops = useMemo(() => roofs(list, lite), [list, lite]);
+  const ring = town().ring;
+  const walls = useMemo(() => facades([...list, TOWER], ring), [list, ring]);
+  const tops = useMemo(() => {
+    const parts = roofs(list, lite);
+    if (ring) parts.plain.push(...ringRoof(ring));
+    return parts;
+  }, [list, lite, ring]);
   const bands = useMemo(() => crowns(list), [list]);
   const lights = useMemo(() => (lite ? null : roofLights(list)), [list, lite]);
   useEffect(() => () => material.dispose(), [material]);
@@ -1153,7 +1240,7 @@ function Fleet({ vehicles, body, lights }: { vehicles: Vehicle[]; body: THREE.Bu
   );
 }
 
-const KINDS: VehicleKind[] = ["sedan", "hatch", "suv", "taxi", "van", "truck", "bus"];
+const KINDS: VehicleKind[] = ["sedan", "hatch", "suv", "taxi", "robotaxi", "van", "truck", "bus"];
 
 /** Cars, taxis, vans, trucks and buses on every road. `share` thins the traffic for a computer without a GPU. */
 function Traffic({ share, lite }: { share: number; lite: boolean }) {
@@ -1260,6 +1347,7 @@ export function Exterior() {
       <Ground looks={looks} />
       <Markings />
       <Yards />
+      <Billboards />
       <Parked lite={basic} />
       <Buildings lite={basic} looks={looks} />
       <Tower />

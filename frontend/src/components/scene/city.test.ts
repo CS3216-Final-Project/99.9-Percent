@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ADS,
   bays,
   BEACON_STOREYS,
+  BILLBOARD_LEGS,
   beacons,
   benches,
   blocks,
@@ -22,6 +24,7 @@ import {
   FOUNTAIN,
   gap,
   GROUND_Y,
+  HQ_BLOCK,
   inside,
   isLong,
   LAG,
@@ -104,7 +107,8 @@ describe('the buildings round the office', () => {
   });
 
   it("builds inside the blocks, off the streets, the startup's campus and the park, and apart from each other", () => {
-    const lots = blocks().filter((b) => !(b.i === 0 && b.j === 0) && !(b.i === -1 && b.j === -1));
+    const park = parkBlock();
+    const lots = blocks().filter((b) => !(b.i === 0 && b.j === 0) && !(b.i === park.i && b.j === park.j));
     for (const m of masses) {
       expect(lots.some((b) => inside(m.rect[0], m.rect[1], b.rect, 0.01) && inside(m.rect[2], m.rect[3], b.rect, 0.01)), `building ${m.building}`).toBe(true);
       for (const r of ROADS) expect(overlaps(m.rect, roadRect(r, STREET_WIDTH))).toBe(false);
@@ -172,7 +176,7 @@ describe('the variety of buildings', () => {
 
   it('lays out office parks, neighbourhoods of low houses and strips of shops, some offices stepping back on top', () => {
     const { zones, pools } = cityTown();
-    expect(new Set(zones.map((z) => z.zone))).toEqual(new Set(['offices', 'homes', 'shops']));
+    expect(new Set(zones.map((z) => z.zone))).toEqual(new Set(['offices', 'homes', 'shops', 'hq']));
     const houses = town.filter((b) => b.facade === 'house');
     expect(houses.length).toBeGreaterThan(40);
     for (const h of houses) expect(storeys(h)).toBeLessThanOrEqual(2);
@@ -201,6 +205,45 @@ describe('the variety of buildings', () => {
     expect(cars.length).toBeGreaterThan(300);
     for (const c of cars) expect(carParks.some((cp) => inside(c.x, c.z, cp.rect))).toBe(true);
     expect(parkedCars()).toEqual(cars);
+  });
+
+  it('raises the ring headquarters alone on its block, clear of the office, with trees only clear of its walls', () => {
+    const { ring, zones, carParks } = cityTown();
+    expect(ring).not.toBeNull();
+    const r = ring!;
+    const block = blocks().find((b) => b.i === HQ_BLOCK.i && b.j === HQ_BLOCK.j)!;
+    expect(zones.find((z) => z.i === HQ_BLOCK.i && z.j === HQ_BLOCK.j)!.zone).toBe('hq');
+    const bounds: Rect = [r.x - r.outer, r.z - r.outer, r.x + r.outer, r.z + r.outer];
+    expect(inside(bounds[0], bounds[1], block.rect) && inside(bounds[2], bounds[3], block.rect)).toBe(true);
+    expect(r.inner).toBeGreaterThan(20);
+    expect(r.outer - r.inner).toBeGreaterThan(8);
+    expect(clearOfOffice(bounds, GROUND_Y + r.storeys * STOREY)).toBe(true);
+    expect(town.filter((b) => overlaps(b.masses[0].rect, block.rect))).toEqual([]);
+    expect(carParks.filter((cp) => overlaps(cp.rect, block.rect))).toEqual([]);
+    const crowded = trees().filter((t) => {
+      const d = Math.hypot(t.x - r.x, t.z - r.z);
+      return d > r.inner - 4 && d < r.outer + 4;
+    });
+    expect(crowded).toEqual([]);
+    expect(trees().filter((t) => Math.hypot(t.x - r.x, t.z - r.z) < r.inner).length).toBeGreaterThan(5);
+  });
+
+  it('stands billboards on the shops\' roofs, facing out over their car parks', () => {
+    const { billboards } = cityTown();
+    expect(billboards.length).toBeGreaterThan(2);
+    const shops = town.filter((b) => b.masses.length === 1 && b.crown && b.facade === 'glass' && storeys(b) === 1);
+    for (const bb of billboards) {
+      const roof = shops.find((b) => inside(bb.x, bb.z, b.masses[0].rect));
+      expect(roof, `billboard at ${bb.x.toFixed(1)}, ${bb.z.toFixed(1)}`).toBeDefined();
+      const top = roof!.masses[0].y1;
+      expect(bb.y0 - BILLBOARD_LEGS).toBeCloseTo(top, 9);
+      expect(bb.y0 + bb.h).toBeLessThanOrEqual(top + ROOF_HEADROOM);
+      expect(bb.ad).toBeGreaterThanOrEqual(0);
+      expect(bb.ad).toBeLessThan(ADS);
+      // It faces away from the middle of its roof, out over the front.
+      const [cx, cz] = centre(roof!.masses[0].rect);
+      expect(-Math.sin(bb.rot) * (bb.x - cx) - Math.cos(bb.rot) * (bb.z - cz)).toBeGreaterThan(0);
+    }
   });
 
   it('lights aviation beacons only on the few tallest offices', () => {
@@ -419,7 +462,7 @@ describe('traffic', () => {
   it('mixes cars, taxis, vans, trucks and buses, the long ones a few in each lane', () => {
     const kinds = new Map<string, number>();
     for (const v of vehicles) kinds.set(v.kind, (kinds.get(v.kind) ?? 0) + 1);
-    expect(new Set(kinds.keys())).toEqual(new Set(['sedan', 'hatch', 'suv', 'taxi', 'van', 'truck', 'bus']));
+    expect(new Set(kinds.keys())).toEqual(new Set(['sedan', 'hatch', 'suv', 'taxi', 'robotaxi', 'van', 'truck', 'bus']));
     expect(vehicles.filter((v) => isLong(v.kind)).length).toBeLessThan(vehicles.length * 0.15);
     expect(isLong('bus') && isLong('truck') && !isLong('van')).toBe(true);
   });
