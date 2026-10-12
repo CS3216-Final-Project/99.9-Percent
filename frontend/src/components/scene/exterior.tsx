@@ -213,10 +213,13 @@ function texturedMaterial(surface: CitySurface): THREE.MeshBasicMaterial {
   });
 }
 
-/** Leaves and bark, lit through; at HD, the leaves carry a photo of foliage laid round them from three sides. */
-function foliageMaterial(surface: CitySurface | null): THREE.MeshBasicMaterial {
-  if (!surface) return faded({ vertexColors: true, side: THREE.DoubleSide }, "city-foliage", "foliage");
-  return faded({ vertexColors: true, side: THREE.DoubleSide }, "city-foliage-textured", "foliageTextured", (shader) => {
+/**
+ * Leaves and bark, lit through; at HD, the leaves carry a photo of foliage laid round them from three sides. Thin
+ * fronds and bark are seen from both sides; closed clumps of leaves only from outside, which halves their cost.
+ */
+function foliageMaterial(surface: CitySurface | null, side: THREE.Side): THREE.MeshBasicMaterial {
+  if (!surface) return faded({ vertexColors: true, side }, "city-foliage", "foliage");
+  return faded({ vertexColors: true, side }, "city-foliage-textured", "foliageTextured", (shader) => {
     shader.uniforms.uDetail = { value: surface.map };
     shader.uniforms.uDetailNormal = { value: surface.normalMap };
     shader.uniforms.uTile = { value: 1.3 };
@@ -1114,7 +1117,7 @@ const shapeOf = (t: Tree): TreeShape => (t.kind === "blossom" ? "round" : t.kind
 
 /**
  * Every tree, by shape and by model: its bark and its leaves share each tree's place, turn and size, a little wider
- * or narrower than the model, and the leaves take the tree's own colour. A shadow lies under each.
+ * or narrower than the model, and the leaves take the tree's own colour. A shadow lies under each, except at Low quality.
  */
 function Trees({ basic }: { basic: boolean }) {
   const surfaces = useCitySurfaces();
@@ -1134,6 +1137,7 @@ function Trees({ basic }: { basic: boolean }) {
     );
   }, [basic]);
   const models = useMemo(() => new Map(groups.map((g) => [`${g.shape}${g.variant}`, treeModel(g.shape, g.variant, basic)])), [groups, basic]);
+  // Low quality draws no shadows, the trees' included.
   const shadows = useMemo(
     () =>
       trees()
@@ -1144,7 +1148,10 @@ function Trees({ basic }: { basic: boolean }) {
         }),
     [basic],
   );
-  const looks = useMemo(() => ({ bark: foliageMaterial(null), leaves: foliageMaterial(surfaces?.lawn ?? null) }), [surfaces]);
+  const looks = useMemo(
+    () => ({ bark: foliageMaterial(null, THREE.DoubleSide), fronds: foliageMaterial(surfaces?.lawn ?? null, THREE.DoubleSide), clumps: foliageMaterial(surfaces?.lawn ?? null, THREE.FrontSide) }),
+    [surfaces],
+  );
   const shade = useMemo(() => {
     const map = shadowTexture();
     return { map, material: treeShadowMaterial(map) };
@@ -1152,7 +1159,8 @@ function Trees({ basic }: { basic: boolean }) {
   useEffect(
     () => () => {
       looks.bark.dispose();
-      looks.leaves.dispose();
+      looks.fronds.dispose();
+      looks.clumps.dispose();
     },
     [looks],
   );
@@ -1166,13 +1174,13 @@ function Trees({ basic }: { basic: boolean }) {
   const disc = useMemo(() => flat(1, 1), []);
   return (
     <group>
-      <Instances geometry={disc} material={shade.material} matrices={shadows} />
+      {!basic && <Instances geometry={disc} material={shade.material} matrices={shadows} />}
       {groups.map(({ shape, variant, matrices, colours }) => {
         const m = models.get(`${shape}${variant}`) as TreeModel;
         return (
           <group key={`${shape}${variant}`}>
             <Instances geometry={m.bark} material={looks.bark} matrices={matrices} />
-            <Instances geometry={m.leaves} material={looks.leaves} matrices={matrices} colours={colours} />
+            <Instances geometry={m.leaves} material={shape === "palm" ? looks.fronds : looks.clumps} matrices={matrices} colours={colours} />
           </group>
         );
       })}
