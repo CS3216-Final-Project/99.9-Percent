@@ -1,6 +1,6 @@
 "use client";
 
-import { Line, MapControls } from "@react-three/drei";
+import { Line, MapControls, PerformanceMonitor } from "@react-three/drei";
 import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
@@ -14,6 +14,7 @@ import {
   symptomaticEquipment,
   type EquipmentId,
 } from "@/sim";
+import type { GraphicsQuality } from "@/game/persist";
 import { inspectOrSelect, useGame } from "@/game/store";
 import {
   AISLE_Z,
@@ -27,7 +28,7 @@ import {
   type Footprint,
 } from "./layout";
 import { DetailContext, detailOverride, useDetail, type Renderer } from "./detail";
-import { resolveQuality, type QualityProfile } from "./quality";
+import { adapt, adapts, resolveQuality, type QualityProfile } from "./quality";
 import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { Icon } from "../icons";
@@ -870,8 +871,15 @@ export default function Facility() {
   // Without a graphics card the browser draws on the CPU. Auto keeps that playable: no shadows, half the pixels
   // (labels and the interface are HTML and stay sharp) and 20 frames a second. A GPU gets HD detail: photo
   // textures, physically based shading and reflections. The player can pick a quality instead (see the menu).
-  const quality = resolveQuality(chosen, renderer, override);
-  const capped = quality.fps !== null;
+  const profile = resolveQuality(chosen, renderer, override);
+  const capped = profile.fps !== null;
+  // Auto on a graphics card watches the frame rate and, if it falls, draws fewer pixels and then drops the effects
+  // pass (see adapt in quality.ts). A quality the player chose is left exactly as chosen.
+  const [load, setLoad] = useState<{ quality: GraphicsQuality; factor: number; settled: boolean }>({ quality: chosen, factor: 1, settled: false });
+  const current = load.quality === chosen ? load : { quality: chosen, factor: 1, settled: false };
+  const adaptive = adapts(chosen, renderer, profile);
+  const tuned = adaptive ? adapt(profile, current.factor, current.settled, window.devicePixelRatio || 1) : null;
+  const quality: QualityProfile = tuned ? { ...profile, dpr: tuned.dpr, effects: tuned.effects } : profile;
   return (
     <div className="stage-canvas" ref={container}>
       {/* Shadow maps cannot be resized or switched on and off once materials are compiled, so a new quality starts a new canvas. */}
@@ -902,6 +910,14 @@ export default function Facility() {
           </DetailContext.Provider>
         )}
         {quality.fps !== null && <FrameLimiter fps={quality.fps} />}
+        {adaptive && (
+          <PerformanceMonitor
+            factor={1}
+            flipflops={3}
+            onChange={({ factor }) => setLoad((l) => ({ quality: chosen, factor, settled: l.quality === chosen && l.settled }))}
+            onFallback={({ factor }) => setLoad({ quality: chosen, factor, settled: true })}
+          />
+        )}
       </Canvas>
       <Labels />
       <HoverTip container={container} />

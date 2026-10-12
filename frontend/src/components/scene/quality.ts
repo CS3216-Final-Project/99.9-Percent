@@ -44,7 +44,7 @@ export const QUALITY_OPTIONS: { id: GraphicsQuality; label: string; summary: str
   {
     id: "auto",
     label: "Auto",
-    summary: "Recommended. Picks High on a graphics card and the lightest look when the browser draws on the CPU.",
+    summary: "Recommended. Picks High on a graphics card, easing off sharpness and glow if the frame rate drops, and the lightest look when the browser draws on the CPU.",
     details: "Matches your machine",
   },
   {
@@ -66,3 +66,27 @@ export const QUALITY_OPTIONS: { id: GraphicsQuality; label: string; summary: str
     details: "For older or low-powered machines",
   },
 ];
+
+/** Auto never draws with fewer pixels than this per CSS pixel, however slow the machine. */
+export const ADAPT_MIN_DPR = 0.75;
+/** Below this share of its full quality, Auto drops the glow and ambient-shading pass. */
+export const ADAPT_EFFECTS_FROM = 0.4;
+
+/** Whether Auto should watch the frame rate: only on a graphics card with the frame rate uncapped. */
+export function adapts(quality: GraphicsQuality, renderer: Renderer, profile: QualityProfile): boolean {
+  return quality === "auto" && renderer === "gpu" && profile.fps === null;
+}
+
+/**
+ * What Auto draws with when the frame rate has fallen, as a share of its full quality from 1 down to 0: first fewer
+ * pixels, down to ADAPT_MIN_DPR, then without the effects pass. Neither needs a new canvas, so the camera stays put;
+ * shadows and detail would, so they never change on their own. Once the monitor gives up flipping between two
+ * levels, it settles on the lower and the effects stay off. `deviceRatio` is the display's pixel density.
+ */
+export function adapt(profile: QualityProfile, factor: number, settled: boolean, deviceRatio: number): { dpr: number; effects: boolean } {
+  // The profile's own pixels: a range is clamped to the display's density, as the canvas does with it.
+  const top = Array.isArray(profile.dpr) ? Math.min(profile.dpr[1], Math.max(profile.dpr[0], deviceRatio)) : profile.dpr;
+  const share = Math.min(1, Math.max(0, factor));
+  const bottom = Math.min(ADAPT_MIN_DPR, top);
+  return { dpr: bottom + (top - bottom) * share, effects: profile.effects && !settled && share >= ADAPT_EFFECTS_FROM };
+}
