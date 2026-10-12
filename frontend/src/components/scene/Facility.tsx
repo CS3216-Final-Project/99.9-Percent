@@ -43,6 +43,7 @@ import { updateWalls } from "./wallState";
 import { buildModel, type SceneModel } from "./sceneModel";
 import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
 import { screenPoint } from "./labels";
+import { ROOM_PALETTE } from "./palette";
 
 function useSceneModel(): SceneModel {
   const key = useGame((s) => JSON.stringify(buildModel(s.game)));
@@ -396,7 +397,7 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
     fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4.2)) : base;
   });
 
-  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered ? ACCENT : built ? "#8f87c9" : "#6e67a3";
+  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered ? ACCENT : built ? ROOM_PALETTE.footprint.built : ROOM_PALETTE.footprint.empty;
   const hw = f.w / 2;
   const hd = f.d / 2;
   const outline: [number, number, number][] = [
@@ -576,7 +577,7 @@ function Labels() {
 /* ------------------------------------------------------------------ */
 
 /** Tint of the polished concrete under the corridors in HD. */
-const CONCRETE_TINT = "#4c4679";
+const CONCRETE_TINT = ROOM_PALETTE.floor.concrete;
 
 function Room() {
   const tiles = useMemo(() => {
@@ -609,20 +610,20 @@ function Room() {
       )}
       <mesh position={[ROOM.cx, -0.26, ROOM.cz]}>
         <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
-        <meshStandardMaterial color="#2a2450" roughness={0.9} />
+        <meshStandardMaterial color={ROOM_PALETTE.slab} roughness={0.9} />
       </mesh>
       {/* Four walls; the ones between the camera and the room drop to a low rim. */}
-      <Wall wall="back" x={ROOM.cx} z={ROOM.z0 - 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
-      <Wall wall="front" x={ROOM.cx} z={ROOM.z1 + 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
-      <Wall wall="left" x={ROOM.x0 - 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
-      <Wall wall="right" x={ROOM.x1 + 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
+      <Wall wall="back" x={ROOM.cx} z={ROOM.z0 - 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color={ROOM_PALETTE.wall} />
+      <Wall wall="front" x={ROOM.cx} z={ROOM.z1 + 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color={ROOM_PALETTE.wall} />
+      <Wall wall="left" x={ROOM.x0 - 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color={ROOM_PALETTE.wallSide} />
+      <Wall wall="right" x={ROOM.x1 + 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color={ROOM_PALETTE.wallSide} />
       <mesh position={[ROOM.cx, 0.12, ROOM.z0 + 0.02]}>
         <boxGeometry args={[ROOM.w, 0.24, 0.04]} />
-        <meshStandardMaterial color={TRIM} roughness={0.85} />
+        <meshStandardMaterial color={ROOM_PALETTE.skirting} roughness={0.85} />
       </mesh>
       <mesh position={[ROOM.x0 + 0.02, 0.12, ROOM.cz]}>
         <boxGeometry args={[0.04, 0.24, ROOM.d]} />
-        <meshStandardMaterial color={TRIM} roughness={0.85} />
+        <meshStandardMaterial color={ROOM_PALETTE.skirting} roughness={0.85} />
       </mesh>
       {/* Overhead cable tray along the back wall. */}
       <OnWall wall="back">
@@ -677,7 +678,7 @@ function Daylight({ quality, hd }: { quality: QualityProfile; hd: boolean }) {
   return (
     <>
       <color ref={background} attach="background" args={["#1a1633"]} />
-      <hemisphereLight ref={sky} args={["#fff0dd", "#3b3366", skyStrength]} />
+      <hemisphereLight ref={sky} args={["#fff0dd", ROOM_PALETTE.bounce, skyStrength]} />
       <directionalLight
         ref={sun}
         position={[11, 17, 7]}

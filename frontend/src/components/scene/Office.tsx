@@ -18,6 +18,7 @@ import { PrimBatch } from "./prims";
 import { ball, bx, cy, place, type Prim, type V3 } from "./shapes";
 import { ARCADE_SCREEN, MAC, MAC_COLOUR_NAMES, type PropItem } from "./propModels";
 import { DetailedProps } from "./props";
+import { PIXEL_FLOORS, ROOM_PALETTE } from "./palette";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
 import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, whiteboard, woodFloor, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
@@ -294,8 +295,8 @@ function buildStatic(): Prim[] {
     [6.4, -1.0],
     [0.9, 0.6],
   ]) {
-    out.push(bx([x, 0.006, z], [0.86, 0.012, 0.86], "#8f87c9"));
-    for (let i = 0; i < 16; i++) out.push(bx([x - 0.3 + (i % 4) * 0.2, 0.013, z - 0.3 + Math.floor(i / 4) * 0.2], [0.07, 0.004, 0.07], TRIM));
+    out.push(bx([x, 0.006, z], [0.86, 0.012, 0.86], ROOM_PALETTE.vent));
+    for (let i = 0; i < 16; i++) out.push(bx([x - 0.3 + (i % 4) * 0.2, 0.013, z - 0.3 + Math.floor(i / 4) * 0.2], [0.07, 0.004, 0.07], ROOM_PALETTE.ventHoles));
   }
 
   // Network and power room: batteries, UPS cabinets, fire suppression and a patch panel
@@ -538,11 +539,11 @@ const ZONES: [FloorKey, number, number, number, number, number][] = [
 
 /** Each finish at HD detail: a photo surface in the colours of the basic one, and how rough it is. */
 const HD_FLOORS: Record<FloorKey, { id: SurfaceId; tint?: string; roughness?: number }> = {
-  server: { id: "serverTiles", tint: "#4f4987" },
-  wood: { id: "parquet", tint: "#c39470", roughness: 1.6 },
-  noc: { id: "carpet", tint: "#2f3f73" },
-  meeting: { id: "carpet", tint: "#7652ae" },
-  kitchen: { id: "kitchenTiles", tint: "#e6e0ff", roughness: 0.9 },
+  server: { id: "serverTiles", tint: ROOM_PALETTE.floor.server },
+  wood: { id: "parquet", tint: ROOM_PALETTE.floor.wood, roughness: 1.6 },
+  noc: { id: "carpet", tint: ROOM_PALETTE.floor.monitoring },
+  meeting: { id: "carpet", tint: ROOM_PALETTE.floor.meeting },
+  kitchen: { id: "kitchenTiles", tint: ROOM_PALETTE.floor.kitchen, roughness: 0.9 },
 };
 
 function Floors() {
@@ -550,8 +551,8 @@ function Floors() {
     const base: Record<FloorKey, THREE.CanvasTexture> = {
       server: floorTiles(),
       wood: woodFloor(),
-      noc: carpet("#2f3f73", "#26335e"),
-      meeting: carpet("#7d5bb8", "#6b4aa0"),
+      noc: carpet(PIXEL_FLOORS.monitoring.base, PIXEL_FLOORS.monitoring.fleck),
+      meeting: carpet(PIXEL_FLOORS.meeting.base, PIXEL_FLOORS.meeting.fleck),
       kitchen: kitchenTiles(),
     };
     return ZONES.map(([key, , , w, d, tile]) => {

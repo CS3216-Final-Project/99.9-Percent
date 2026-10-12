@@ -2,9 +2,9 @@ import { pick, rand, randRange, type RngHolder } from "@/sim/rng";
 import { ROOM } from "./layout";
 
 /*
- * The world outside the office: a Silicon Valley suburb. The startup has the top floor of a low glass campus
- * building, three storeys above the street, with a lobby wing and a roof terrace below it, a lawn round about and its
- * own car park. Beyond it runs a grid of palm-lined boulevards with planted medians, traffic, lamps and people on the
+ * The world outside the office: a Silicon Valley suburb. The startup has the top floor of a glass campus building,
+ * six storeys above the street, with a lobby wing and a roof terrace below it, a lawn round about and its own car
+ * park. Beyond it runs a grid of palm-lined boulevards with planted medians, traffic, lamps and people on the
  * pavements, and the blocks between them hold office parks with their car parks, neighbourhoods of houses with
  * pitched roofs and back-yard pools, strips of shops, and a park. Anything that would rise in front of the office
  * and hide the crew is kept low or far enough away.
@@ -17,7 +17,7 @@ import { ROOM } from "./layout";
 /** Height of a storey, slab to slab. */
 export const STOREY = 4;
 /** The office floor is y = 0; this many storeys of its building stand below it. */
-export const FLOORS_BELOW = 3;
+export const FLOORS_BELOW = 6;
 /** The underside of the office's floor slab, where the building's walls below it end. */
 export const SLAB = -0.5;
 /** Street level. */
@@ -26,8 +26,8 @@ export const GROUND_Y = SLAB - FLOORS_BELOW * STOREY;
 export const NIGHT = "#1a1633";
 /** The point the fade is measured from, and where it starts and is complete. */
 export const FADE = { x: ROOM.cx, z: ROOM.cz, from: 170, to: 330 };
-/** The haze: how far below the office it is thickest, and how much of the night it adds there. */
-export const HAZE = { depth: 160, most: 0.5 };
+/** The haze: how far below the office it is thickest, and the most of the sky's colour it adds there. */
+export const HAZE = { depth: 30, most: 0.4 };
 
 /** How far into the fade a point is: 0 is clear, 1 is lost in the night. */
 export function fadeAt(x: number, z: number): number {

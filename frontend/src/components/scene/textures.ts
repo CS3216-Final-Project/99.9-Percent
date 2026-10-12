@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { PIXEL_FLOORS } from "./palette";
 
 /**
  * Small procedural textures drawn on canvases. They give the racks and screens
@@ -276,16 +277,17 @@ export function floorTiles(): THREE.CanvasTexture {
   // A 16-pixel tile drawn pixel by pixel: base, a lit top-left edge and a dark grout line.
   const S = 16;
   const [c, g] = canvas(S, S);
-  g.fillStyle = "#544e8c";
+  const p = PIXEL_FLOORS.server;
+  g.fillStyle = p.base;
   g.fillRect(0, 0, S, S);
   for (let i = 0; i < 10; i++) {
-    g.fillStyle = noise(i) > 0.5 ? "#5a5494" : "#4f4985";
+    g.fillStyle = noise(i) > 0.5 ? p.light : p.dark;
     g.fillRect(Math.floor(noise(i + 500) * 13) + 1, Math.floor(noise(i + 900) * 13) + 1, 1, 1);
   }
-  g.fillStyle = "#615ba0";
+  g.fillStyle = p.edge;
   g.fillRect(1, 1, S - 2, 1);
   g.fillRect(1, 1, 1, S - 2);
-  g.fillStyle = "#3a3468";
+  g.fillStyle = p.grout;
   g.fillRect(0, S - 1, S, 1);
   g.fillRect(S - 1, 0, 1, S);
   const t = finish(c);
@@ -309,15 +311,15 @@ function repeating(t: THREE.CanvasTexture): THREE.CanvasTexture {
 export function woodFloor(): THREE.CanvasTexture {
   const S = 32;
   const [c, g] = canvas(S, S);
-  const tones = ["#8a5a3c", "#93623f", "#7f5236", "#8d5d3a"];
+  const { tones, seam, grain } = PIXEL_FLOORS.wood;
   for (let row = 0; row < 4; row++) {
     const y = row * 8;
     g.fillStyle = tones[row];
     g.fillRect(0, y, S, 8);
-    g.fillStyle = "#6a4129";
+    g.fillStyle = seam;
     g.fillRect(0, y + 7, S, 1);
     g.fillRect((row * 11 + 5) % S, y, 1, 7);
-    g.fillStyle = "#a06d47";
+    g.fillStyle = grain;
     for (let i = 0; i < 4; i++) g.fillRect(Math.floor(noise(row * 9 + i) * S), y + 2 + Math.floor(noise(row * 5 + i + 30) * 4), 2, 1);
   }
   return repeating(finish(c));
@@ -577,13 +579,14 @@ export function whiteboard(): THREE.CanvasTexture {
 export function concreteFloor(): THREE.CanvasTexture {
   const S = 32;
   const [c, g] = canvas(S, S);
-  g.fillStyle = "#4a4475";
+  const p = PIXEL_FLOORS.concrete;
+  g.fillStyle = p.base;
   g.fillRect(0, 0, S, S);
   for (let i = 0; i < 40; i++) {
-    g.fillStyle = noise(i) > 0.5 ? "#504a7d" : "#443e6c";
+    g.fillStyle = noise(i) > 0.5 ? p.light : p.dark;
     g.fillRect(Math.floor(noise(i + 300) * S), Math.floor(noise(i + 600) * S), 2, 1);
   }
-  g.fillStyle = "#3d3764";
+  g.fillStyle = p.seam;
   g.fillRect(0, S - 1, S, 1);
   g.fillRect(S - 1, 0, 1, S);
   return repeating(finish(c));
@@ -604,12 +607,13 @@ export function carpet(base: string, fleck: string): THREE.CanvasTexture {
 export function kitchenTiles(): THREE.CanvasTexture {
   const S = 16;
   const [c, g] = canvas(S, S);
-  g.fillStyle = "#d9d4f0";
+  const p = PIXEL_FLOORS.kitchen;
+  g.fillStyle = p.base;
   g.fillRect(0, 0, S, S);
-  g.fillStyle = "#c9c2e6";
+  g.fillStyle = p.alternate;
   g.fillRect(0, 0, S / 2, S / 2);
   g.fillRect(S / 2, S / 2, S / 2, S / 2);
-  g.fillStyle = "#8f87c9";
+  g.fillStyle = p.grout;
   g.fillRect(0, 0, S, 1);
   g.fillRect(0, 0, 1, S);
   g.fillRect(0, S / 2, S, 1);

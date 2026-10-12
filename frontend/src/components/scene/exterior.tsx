@@ -164,8 +164,9 @@ function faded<P extends THREE.MeshBasicMaterialParameters>(params: P, key: stri
         "#include <fog_fragment>",
         `#include <fog_fragment>
       float far = smoothstep(uFade.z, uFade.w, distance(vFadeWorld.xz, uFade.xy));
-      // The haze below is thickest at night; by day the air is clear enough to see the street.
-      float deep = uHaze.y * mix(0.25, 1.0, uDark) * smoothstep(0.0, uHaze.x, -vFadeWorld.y);
+      // A light haze lifts the street toward the sky's colour by day, so it reads as far below the office; it is
+      // thicker at night.
+      float deep = uHaze.y * mix(0.45, 0.8, uDark) * smoothstep(0.0, uHaze.x, -vFadeWorld.y);
       gl_FragColor.rgb = mix(gl_FragColor.rgb, uHorizon, 1.0 - (1.0 - far) * (1.0 - deep));`,
       );
   };

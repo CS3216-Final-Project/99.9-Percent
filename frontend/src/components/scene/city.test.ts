@@ -69,8 +69,8 @@ const masses = town.flatMap((b, i) => b.masses.map((m) => ({ ...m, building: i }
 const inJunction = (x: number, z: number, margin: number) => CROSS_X.some((cx) => Math.abs(x - cx) < margin) && CROSS_Z.some((cz) => Math.abs(z - cz) < margin);
 
 describe("the startup's building", () => {
-  it('puts the office on the top floor, three storeys above the street', () => {
-    expect(FLOORS_BELOW).toBe(3);
+  it('puts the office on the top floor, six storeys above the street', () => {
+    expect(FLOORS_BELOW).toBe(6);
     expect(TOWER.masses[0].y0).toBe(GROUND_Y);
     expect(TOWER.masses[TOWER.masses.length - 1].y1).toBe(SLAB);
     expect((SLAB - GROUND_Y) / STOREY).toBe(FLOORS_BELOW);
