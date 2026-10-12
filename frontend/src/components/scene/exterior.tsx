@@ -20,6 +20,7 @@ import {
   GROUND_Y,
   HAZE,
   LANE,
+  LAMP_REACH,
   LANES,
   lamps,
   NIGHT,
@@ -42,6 +43,7 @@ import {
   vehicleAt,
   walkerAt,
   type Building,
+  type LampStyle,
   type Plant,
   type Road,
   type Tree,
@@ -382,14 +384,30 @@ function benchBody(): THREE.BufferGeometry {
   ]);
 }
 
-/** A street lamp's pole and arm, the head reaching out along -z. */
-function lampPost(): THREE.BufferGeometry {
-  return merge([tint(new THREE.CylinderGeometry(0.07, 0.11, 7, 6).translate(0, 3.5, 0), "#4e4c5c"), tint(box(0.08, 0.08, 1.6, 0, 6.95, -0.8), "#4e4c5c")]);
+/** Each style of street lamp's pole and arm, the head reaching out along -z (see LAMP_REACH). */
+function lampPost(style: LampStyle): THREE.BufferGeometry {
+  const metal = "#4e4c5c";
+  if (style === "blade") return merge([tint(new THREE.CylinderGeometry(0.06, 0.09, 8, 6).translate(0, 4, 0), "#5b5e6a"), tint(box(0.06, 0.06, 1.6, 0, 7.97, -0.8), "#5b5e6a")]);
+  if (style === "lantern") {
+    return merge([
+      tint(box(0.3, 0.5, 0.3, 0, 0.25, 0), "#2f2d36"),
+      tint(new THREE.CylinderGeometry(0.06, 0.09, 4.2, 6).translate(0, 2.35, 0), "#2f2d36"),
+      tint(new THREE.ConeGeometry(0.32, 0.3, 4).rotateY(Math.PI / 4).translate(0, 4.95, 0), "#2f2d36"),
+    ]);
+  }
+  return merge([tint(new THREE.CylinderGeometry(0.07, 0.11, 7, 6).translate(0, 3.5, 0), metal), tint(box(0.08, 0.08, 1.6, 0, 6.95, -0.8), metal)]);
 }
 
-function lampHead(): THREE.BufferGeometry {
-  return tint(box(0.32, 0.12, 0.62, 0, 6.88, -1.45), "#ffe2a8", 1);
+/** The glowing head of each style, in white for the lamp's own colour of light to tint. */
+function lampHead(style: LampStyle): THREE.BufferGeometry {
+  if (style === "blade") return tint(box(0.24, 0.07, 1.0, 0, 7.92, -LAMP_REACH.blade), "#ffffff", 1);
+  if (style === "lantern") return tint(box(0.34, 0.48, 0.34, 0, 4.55, 0), "#ffffff", 1);
+  return tint(box(0.32, 0.12, 0.62, 0, 6.88, -LAMP_REACH.arm), "#ffffff", 1);
 }
+
+/** Colours of lamplight, and how wide a pool each style casts. */
+const LAMPLIGHT = { warm: "#ffe2a8", cool: "#dbe8ff" };
+const POOL: Record<LampStyle, number> = { arm: 11, blade: 13, lantern: 9 };
 
 /* ------------------------------------------------------------------ */
 /* Instancing                                                          */
@@ -429,9 +447,10 @@ function poolTexture(): THREE.CanvasTexture {
   c.width = c.height = 128;
   const g = c.getContext("2d") as CanvasRenderingContext2D;
   const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-  grad.addColorStop(0, "rgba(255,214,150,0.5)");
-  grad.addColorStop(0.5, "rgba(255,200,130,0.16)");
-  grad.addColorStop(1, "rgba(255,200,130,0)");
+  // White, for each lamp's own colour of light to tint.
+  grad.addColorStop(0, "rgba(255,255,255,0.5)");
+  grad.addColorStop(0.5, "rgba(255,255,255,0.16)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
   g.fillStyle = grad;
   g.fillRect(0, 0, 128, 128);
   const t = new THREE.CanvasTexture(c);
@@ -795,18 +814,29 @@ function Park({ basic }: { basic: boolean }) {
   );
 }
 
+const LAMP_STYLES: LampStyle[] = ["arm", "blade", "lantern"];
+
 function Lamps({ pools }: { pools: boolean }) {
   const spots = useMemo(() => lamps(), []);
-  const matrices = useMemo(() => spots.map((l) => compose(l.x, GROUND_Y, l.z, l.rot)), [spots]);
-  const poolMatrices = useMemo(
+  const styles = useMemo(
     () =>
-      spots.map((l) => {
-        const reach = new THREE.Vector3(0, 0, -1.45).applyAxisAngle(new THREE.Vector3(0, 1, 0), l.rot);
-        return compose(l.x + reach.x, LAYER.glow, l.z + reach.z);
+      LAMP_STYLES.map((style) => {
+        const own = spots.filter((l) => l.style === style);
+        return { style, matrices: own.map((l) => compose(l.x, GROUND_Y, l.z, l.rot)), colours: own.map((l) => (l.warm ? LAMPLIGHT.warm : LAMPLIGHT.cool)) };
       }),
     [spots],
   );
-  const geo = useMemo(() => ({ post: lampPost(), head: lampHead(), pool: flat(11, 11) }), []);
+  const poolMatrices = useMemo(
+    () =>
+      spots.map((l) => {
+        const reach = new THREE.Vector3(0, 0, -LAMP_REACH[l.style]).applyAxisAngle(new THREE.Vector3(0, 1, 0), l.rot);
+        const s = POOL[l.style];
+        return compose(l.x + reach.x, LAYER.glow, l.z + reach.z, 0, [s, 1, s]);
+      }),
+    [spots],
+  );
+  const poolColours = useMemo(() => spots.map((l) => (l.warm ? LAMPLIGHT.warm : LAMPLIGHT.cool)), [spots]);
+  const geo = useMemo(() => ({ posts: new Map(LAMP_STYLES.map((s) => [s, lampPost(s)])), heads: new Map(LAMP_STYLES.map((s) => [s, lampHead(s)])), pool: flat(1, 1) }), []);
   const pool = useMemo(() => faded({ map: poolTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }, "city-pool"), []);
   useEffect(
     () => () => {
@@ -817,9 +847,15 @@ function Lamps({ pools }: { pools: boolean }) {
   );
   return (
     <group>
-      <Instances geometry={geo.post} material={M.shaded} matrices={matrices} />
-      <Instances geometry={geo.head} material={M.glow} matrices={matrices} />
-      {pools && <Instances geometry={geo.pool} material={pool} matrices={poolMatrices} />}
+      {styles.map(({ style, matrices, colours }) =>
+        matrices.length ? (
+          <group key={style}>
+            <Instances geometry={geo.posts.get(style) as THREE.BufferGeometry} material={M.shaded} matrices={matrices} />
+            <Instances geometry={geo.heads.get(style) as THREE.BufferGeometry} material={M.glow} matrices={matrices} colours={colours} />
+          </group>
+        ) : null,
+      )}
+      {pools && <Instances geometry={geo.pool} material={pool} matrices={poolMatrices} colours={poolColours} />}
     </group>
   );
 }

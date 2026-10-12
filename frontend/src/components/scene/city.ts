@@ -547,17 +547,42 @@ function kerbside(r: Road, along: number, side: -1 | 1, out: number): [number, n
   return r.axis === "x" ? [along, across] : [across, along];
 }
 
-/** Street lamps along both kerbs of every road, evenly spaced between the junctions. */
-export function lamps(): Spot[] {
-  const out: Spot[] = [];
+/**
+ * A street lamp: the usual arm reaching over the road, a tall slim blade reaching further, or a short lantern on a
+ * post. Its light is warm or cool.
+ */
+export type LampStyle = "arm" | "blade" | "lantern";
+
+export interface Lamp extends Spot {
+  style: LampStyle;
+  warm: boolean;
+}
+
+/** How far each style's head reaches out over the road from its post. */
+export const LAMP_REACH: Record<LampStyle, number> = { arm: 1.45, blade: 2.0, lantern: 0 };
+
+/** Whether a lamp stands on the pavement along the park's railings. */
+export const byThePark = (l: Spot): boolean => inside(l.x, l.z, parkBlock().rect, STREET.pavement);
+
+/**
+ * Street lamps along both kerbs of every road, evenly spaced between the junctions. Each road has one style and one
+ * colour of light, arms or blades, except for warm lanterns along the park's railings.
+ */
+export function lamps(seed = 29): Lamp[] {
+  const rng: RngHolder = { rngState: seed };
+  const out: Lamp[] = [];
   for (const r of ROADS) {
+    const style = pick(rng, ["arm", "arm", "blade"] as const);
+    const warm = style === "blade" ? rand(rng) < 0.25 : rand(rng) < 0.8;
     for (const [a, b] of stretches(r)) {
       const n = Math.max(1, Math.round((b - a) / LAMP_GAP));
       for (let k = 0; k <= n; k++) {
         for (const side of [-1, 1] as const) {
           const [x, z] = kerbside(r, a + ((b - a) * k) / n, side, LAMP_IN);
           const rot = r.axis === "x" ? (side === 1 ? 0 : Math.PI) : side === 1 ? Math.PI / 2 : -Math.PI / 2;
-          if (fadeAt(x, z) < 0.95) out.push({ x, z, rot });
+          if (fadeAt(x, z) >= 0.95) continue;
+          const spot = { x, z, rot };
+          out.push(byThePark(spot) ? { ...spot, style: "lantern", warm: true } : { ...spot, style, warm });
         }
       }
     }

@@ -4,6 +4,7 @@ import {
   beacons,
   benches,
   blocks,
+  byThePark,
   BUILDING,
   buildings,
   CARRIAGEWAY,
@@ -189,6 +190,18 @@ describe('the streets', () => {
     for (const t of trees()) for (const l of lamps()) expect(Math.hypot(t.x - l.x, t.z - l.z)).toBeGreaterThan(3);
     for (const t of trees()) for (const p of parkPaths()) expect(inside(t.x, t.z, p, 1)).toBe(false);
     expect(trees().filter((t) => inside(t.x, t.z, parkBlock().rect)).length).toBeGreaterThan(25);
+  });
+
+  it('lights each road with one style and colour of lamp, and the park railings with lanterns', () => {
+    const all = lamps();
+    expect(new Set(all.map((l) => l.style))).toEqual(new Set(['arm', 'blade', 'lantern']));
+    expect(new Set(all.map((l) => l.warm))).toEqual(new Set([true, false]));
+    for (const l of all) expect(l.style === 'lantern').toBe(byThePark(l));
+    expect(all.filter((l) => l.style === 'lantern').length).toBeGreaterThan(10);
+    for (const r of ROADS) {
+      const own = all.filter((l) => !byThePark(l) && Math.abs((r.axis === 'x' ? l.z : l.x) - r.at) < STREET_WIDTH / 2);
+      expect(new Set(own.map((l) => `${l.style} ${l.warm}`)).size, `road ${r.axis} at ${r.at}`).toBeLessThanOrEqual(1);
+    }
   });
 
   it('plants each street with one kind of tree, the plaza in flower and the park with a mix', () => {
