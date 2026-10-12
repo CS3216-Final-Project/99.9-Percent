@@ -562,7 +562,7 @@ export interface Lamp extends Spot {
 export const LAMP_REACH: Record<LampStyle, number> = { arm: 1.45, blade: 2.0, lantern: 0 };
 
 /** Whether a lamp stands on the pavement along the park's railings. */
-export const byThePark = (l: Spot): boolean => inside(l.x, l.z, parkBlock().rect, STREET.pavement);
+export const byThePark = (l: Spot, park = parkBlock().rect): boolean => inside(l.x, l.z, park, STREET.pavement);
 
 /**
  * Street lamps along both kerbs of every road, evenly spaced between the junctions. Each road has one style and one
@@ -571,6 +571,7 @@ export const byThePark = (l: Spot): boolean => inside(l.x, l.z, parkBlock().rect
 export function lamps(seed = 29): Lamp[] {
   const rng: RngHolder = { rngState: seed };
   const out: Lamp[] = [];
+  const park = parkBlock().rect;
   for (const r of ROADS) {
     const style = pick(rng, ["arm", "arm", "blade"] as const);
     const warm = style === "blade" ? rand(rng) < 0.25 : rand(rng) < 0.8;
@@ -582,7 +583,7 @@ export function lamps(seed = 29): Lamp[] {
           const rot = r.axis === "x" ? (side === 1 ? 0 : Math.PI) : side === 1 ? Math.PI / 2 : -Math.PI / 2;
           if (fadeAt(x, z) >= 0.95) continue;
           const spot = { x, z, rot };
-          out.push(byThePark(spot) ? { ...spot, style: "lantern", warm: true } : { ...spot, style, warm });
+          out.push(byThePark(spot, park) ? { ...spot, style: "lantern", warm: true } : { ...spot, style, warm });
         }
       }
     }

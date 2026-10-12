@@ -179,39 +179,46 @@ describe('the variety of buildings', () => {
 
 describe('the streets', () => {
   it('stands lamps and trees on the pavements, off the carriageways, the junctions and the buildings', () => {
-    const things = [...lamps().map((l) => ({ ...l, kind: 'lamp' })), ...trees().map((t) => ({ ...t, kind: 'tree' }))];
-    expect(lamps().length).toBeGreaterThan(200);
-    for (const t of things) {
-      for (const r of ROADS) expect(inside(t.x, t.z, roadRect(r), 0.2), `${t.kind} at ${t.x.toFixed(1)}, ${t.z.toFixed(1)}`).toBe(false);
-      expect(inJunction(t.x, t.z, STREET_WIDTH / 2), `${t.kind} in a junction`).toBe(false);
-      for (const m of masses) expect(inside(t.x, t.z, m.rect, 0.3), `${t.kind} in building ${m.building}`).toBe(false);
-      expect(inside(t.x, t.z, PODIUM, 0.3)).toBe(false);
-    }
-    for (const t of trees()) for (const l of lamps()) expect(Math.hypot(t.x - l.x, t.z - l.z)).toBeGreaterThan(3);
-    for (const t of trees()) for (const p of parkPaths()) expect(inside(t.x, t.z, p, 1)).toBe(false);
-    expect(trees().filter((t) => inside(t.x, t.z, parkBlock().rect)).length).toBeGreaterThan(25);
+    const posts = lamps();
+    const planted = trees();
+    const things = [...posts.map((l) => ({ ...l, kind: 'lamp' })), ...planted.map((t) => ({ ...t, kind: 'tree' }))];
+    expect(posts.length).toBeGreaterThan(200);
+    // Gathered first and checked once: an expect per pair is too slow for the coverage run.
+    const stray = (where: string, test: (t: { x: number; z: number }) => boolean) => things.filter(test).map((t) => `${t.kind} at ${t.x.toFixed(1)}, ${t.z.toFixed(1)} ${where}`);
+    expect([
+      ...stray('on a road', (t) => ROADS.some((r) => inside(t.x, t.z, roadRect(r), 0.2))),
+      ...stray('in a junction', (t) => inJunction(t.x, t.z, STREET_WIDTH / 2)),
+      ...stray('in a building', (t) => masses.some((m) => inside(t.x, t.z, m.rect, 0.3))),
+      ...stray('in the podium', (t) => inside(t.x, t.z, PODIUM, 0.3)),
+    ]).toEqual([]);
+    const paths = parkPaths();
+    expect(planted.filter((t) => posts.some((l) => Math.hypot(t.x - l.x, t.z - l.z) <= 3))).toEqual([]);
+    expect(planted.filter((t) => paths.some((p) => inside(t.x, t.z, p, 1)))).toEqual([]);
+    expect(planted.filter((t) => inside(t.x, t.z, parkBlock().rect)).length).toBeGreaterThan(25);
   });
 
   it('lights each road with one style and colour of lamp, and the park railings with lanterns', () => {
     const all = lamps();
     expect(new Set(all.map((l) => l.style))).toEqual(new Set(['arm', 'blade', 'lantern']));
     expect(new Set(all.map((l) => l.warm))).toEqual(new Set([true, false]));
-    for (const l of all) expect(l.style === 'lantern').toBe(byThePark(l));
+    const park = parkBlock().rect;
+    for (const l of all) expect(l.style === 'lantern').toBe(byThePark(l, park));
     expect(all.filter((l) => l.style === 'lantern').length).toBeGreaterThan(10);
     for (const r of ROADS) {
-      const own = all.filter((l) => !byThePark(l) && Math.abs((r.axis === 'x' ? l.z : l.x) - r.at) < STREET_WIDTH / 2);
+      const own = all.filter((l) => !byThePark(l, park) && Math.abs((r.axis === 'x' ? l.z : l.x) - r.at) < STREET_WIDTH / 2);
       expect(new Set(own.map((l) => `${l.style} ${l.warm}`)).size, `road ${r.axis} at ${r.at}`).toBeLessThanOrEqual(1);
     }
   });
 
   it('plants each street with one kind of tree, the plaza in flower and the park with a mix', () => {
     const all = trees();
+    const [parkRect, plaza] = [parkBlock().rect, towerBlock().rect];
     expect(new Set(all.map((t) => t.kind))).toEqual(new Set(['round', 'cone', 'umbrella', 'blossom']));
-    const park = all.filter((t) => inside(t.x, t.z, parkBlock().rect));
+    const park = all.filter((t) => inside(t.x, t.z, parkRect));
     expect(new Set(park.map((t) => t.kind)).size).toBeGreaterThanOrEqual(3);
-    expect(all.filter((t) => inside(t.x, t.z, towerBlock().rect)).every((t) => t.kind === 'blossom')).toBe(true);
+    expect(all.filter((t) => inside(t.x, t.z, plaza)).every((t) => t.kind === 'blossom')).toBe(true);
     for (const r of ROADS) {
-      const kinds = new Set(all.filter((t) => !inside(t.x, t.z, parkBlock().rect) && !inside(t.x, t.z, towerBlock().rect) && Math.abs((r.axis === 'x' ? t.z : t.x) - r.at) < STREET_WIDTH / 2).map((t) => t.kind));
+      const kinds = new Set(all.filter((t) => !inside(t.x, t.z, parkRect) && !inside(t.x, t.z, plaza) && Math.abs((r.axis === 'x' ? t.z : t.x) - r.at) < STREET_WIDTH / 2).map((t) => t.kind));
       expect(kinds.size, `road ${r.axis} at ${r.at}`).toBeLessThanOrEqual(1);
     }
   });
@@ -222,15 +229,16 @@ describe('the streets', () => {
     const beds = flowerBeds();
     // A bench is 1.7 m long and 0.6 m deep, turned to face its path.
     const seats = benches().map((b): Rect => (Math.abs(Math.sin(b.rot)) < 0.5 ? [b.x - 0.85, b.z - 0.3, b.x + 0.85, b.z + 0.3] : [b.x - 0.3, b.z - 0.85, b.x + 0.3, b.z + 0.85]));
+    const planted = trees();
     expect(beds.length).toBe(8);
     expect(seats.length).toBeGreaterThan(10);
     for (const r of [...beds, ...seats]) {
       expect(inside(r[0], r[1], park) && inside(r[2], r[3], park)).toBe(true);
       for (const p of parkPaths()) expect(overlaps(r, p)).toBe(false);
       expect(gap(r, [cx, cz, cx, cz])).toBeGreaterThan(FOUNTAIN.square);
-      for (const t of trees()) expect(inside(t.x, t.z, r, 0.5), `tree at ${t.x.toFixed(1)}, ${t.z.toFixed(1)}`).toBe(false);
+      for (const t of planted) expect(inside(t.x, t.z, r, 0.5), `tree at ${t.x.toFixed(1)}, ${t.z.toFixed(1)}`).toBe(false);
     }
-    for (const t of trees()) expect(Math.hypot(t.x - cx, t.z - cz)).toBeGreaterThan(FOUNTAIN.square);
+    for (const t of planted) expect(Math.hypot(t.x - cx, t.z - cz)).toBeGreaterThan(FOUNTAIN.square);
     for (const f of flowers()) expect(beds.some((b) => inside(f.x, f.z, b))).toBe(true);
     for (let i = 0; i < seats.length; i++) for (let j = i + 1; j < seats.length; j++) expect(overlaps(seats[i], seats[j])).toBe(false);
   });
@@ -259,14 +267,15 @@ describe('pedestrians', () => {
   it('walks round loops that never cross a road, a building, the podium, a lamp post or a tree', () => {
     expect(people.length).toBeGreaterThan(200);
     const posts = [...lamps(), ...trees()].map((p): Rect => [p.x - 0.25, p.z - 0.25, p.x + 0.25, p.z + 0.25]);
-    WALKS.forEach((loop, i) => {
-      for (const s of sides(loop)) {
-        for (const r of ROADS) expect(overlaps(s, roadRect(r)), `loop ${i} on a road`).toBe(false);
-        for (const m of masses) expect(overlaps(s, m.rect), `loop ${i} through building ${m.building}`).toBe(false);
-        expect(overlaps(s, PODIUM), `loop ${i} through the podium`).toBe(false);
-        for (const p of posts) expect(overlaps(s, p), `loop ${i} into a post at ${p[0].toFixed(1)}, ${p[1].toFixed(1)}`).toBe(false);
-      }
-    });
+    const crossed = WALKS.flatMap((loop, i) =>
+      sides(loop).flatMap((s) => [
+        ...ROADS.filter((r) => overlaps(s, roadRect(r))).map(() => `loop ${i} on a road`),
+        ...masses.filter((m) => overlaps(s, m.rect)).map((m) => `loop ${i} through building ${m.building}`),
+        ...(overlaps(s, PODIUM) ? [`loop ${i} through the podium`] : []),
+        ...posts.filter((p) => overlaps(s, p)).map((p) => `loop ${i} into a post at ${p[0].toFixed(1)}, ${p[1].toFixed(1)}`),
+      ]),
+    );
+    expect(crossed).toEqual([]);
   });
 
   it('keeps walkers in the park on its loop path', () => {
