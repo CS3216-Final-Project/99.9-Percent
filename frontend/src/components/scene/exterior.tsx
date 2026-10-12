@@ -62,6 +62,7 @@ import { world } from "./cityLight";
 import { useCitySurfaces, type CitySurface } from "./cityTextures";
 import { useSurfaces, type Surface } from "./surfaces";
 import { TREE_VARIANTS, treeModel, type TreeModel, type TreeShape } from "./treeModels";
+import { vehicleBody, vehicleLights } from "./vehicleModels";
 import { adsTexture, logoSign } from "./textures";
 
 /*
@@ -98,6 +99,16 @@ vec3 cityLight(vec3 n) {
 /** The same through leaves: the sun reaches a little round the far side of a crown. */
 vec3 foliageLight(vec3 n) {
   return mix(uGroundLight, uSkyLight, 0.5 + 0.5 * n.y) + uKeyLight * 0.95 * max((dot(n, uKeyDir) + 0.45) / 1.45, 0.0);
+}
+
+/** The sky so far up from the horizon, for what glass and paint reflect: pale and sunlit low down, deeper blue overhead. */
+vec3 skyAt(float up) {
+  return mix(uSkyLight * 1.15 + uKeyLight * 0.12, uSkyLight * vec3(0.55, 0.72, 1.08), sqrt(clamp(up, 0.0, 1.0)));
+}
+
+/** Which way the eye looks at this fragment. */
+vec3 lineOfSight() {
+  return isOrthographic ? normalize(vec3(-viewMatrix[0][2], -viewMatrix[1][2], -viewMatrix[2][2])) : normalize(vFadeWorld - cameraPosition);
 }
 `;
 
@@ -306,12 +317,62 @@ function Surfaces({ parts, looks }: { parts: Record<Fabric, THREE.BufferGeometry
 
 const noParts = (): Record<Fabric, THREE.BufferGeometry[]> => Object.fromEntries(FABRICS.map((g) => [g, []])) as unknown as Record<Fabric, THREE.BufferGeometry[]>;
 
-/** Shared materials: plain vertex colours, tinted per instance where needed, and the bright ones that glow. */
+/**
+ * Vehicles at HD (see vehicleModels.ts): only their paint takes each vehicle's own colour. Paint has a clear coat that
+ * mirrors the sky on the bonnet and roof and shines where it catches the sun; glass is dark, reflecting the sky more
+ * the flatter it lies; trim and tyres are matte.
+ */
+const VEHICLE_GLSL = `
+varying float vFinish;
+
+vec3 vehicle(vec3 base, vec3 n) {
+  vec3 V = lineOfSight();
+  vec3 r = reflect(V, n);
+  vec3 env = r.y > 0.0 ? skyAt(r.y) : mix(vec3(0.12, 0.13, 0.11) * cityLight(vec3(0.0, 1.0, 0.0)), skyAt(0.0), smoothstep(-0.35, 0.0, r.y));
+  float fresnel = pow(1.0 - max(-dot(V, n), 0.0), 5.0);
+  vec3 shine = uKeyLight * pow(max(dot(n, normalize(uKeyDir - V)), 0.0), 90.0) * (1.0 - uDark);
+  vec3 lit = base * cityLight(n);
+  vec3 paint = lit + env * mix(0.05, 1.0, fresnel) + shine * 0.9;
+  vec3 glass = lit * 0.6 + env * mix(0.18, 1.0, fresnel) + shine * 1.2;
+  return vFinish < 0.5 ? lit : vFinish < 1.5 ? paint : glass;
+}
+`;
+
+function vehicleMaterial(): THREE.MeshBasicMaterial {
+  return faded({ vertexColors: true }, "city-vehicle", "own", (shader) => {
+    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nattribute float aFinish;\nvarying float vFinish;").replace(
+      "#include <color_vertex>",
+      `vColor = vec4(1.0);
+      vColor.rgb *= color;
+      #ifdef USE_INSTANCING_COLOR
+        vColor.rgb *= mix(vec3(1.0), instanceColor.rgb, 1.0 - step(0.5, abs(aFinish - 1.0)));
+      #endif
+      vFinish = aFinish;`,
+    );
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\n${VEHICLE_GLSL}`)
+      .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = vehicle(diffuseColor.rgb, normalize(vCityNormal));");
+  });
+}
+
+/** Vehicles' lamps glow day and night; their lit windows, finished as glass, only once it gets dark. */
+function lampMaterial(): THREE.MeshBasicMaterial {
+  return faded({ vertexColors: true, toneMapped: false }, "city-lamps", "own", (shader) => {
+    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nattribute float aFinish;\nvarying float vFinish;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvFinish = aFinish;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying float vFinish;")
+      .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = vFinish > 1.5 ? mix(vec3(0.035, 0.045, 0.06), diffuseColor.rgb, uDark) : diffuseColor.rgb * mix(0.6, 1.0, uDark);");
+  });
+}
+
+/** Shared materials: plain vertex colours, tinted per instance where needed, the bright ones that glow, and vehicles. */
 const M = {
   shaded: faded({ vertexColors: true }, "city-lit", "lit"),
   glow: faded({ vertexColors: true, toneMapped: false }, "city-glow", "glow"),
   white: faded({ color: "#e3e1da" }, "city-lit", "lit"),
   yellow: faded({ color: "#e0b53a" }, "city-lit", "lit"),
+  vehicle: vehicleMaterial(),
+  lamps: lampMaterial(),
 };
 
 /* ------------------------------------------------------------------ */
@@ -365,12 +426,10 @@ float band(float f, float a, float b, float e) {
  * faded into haze; so upper floors show more of the haze than lower ones. The haze is brighter toward the sun.
  */
 vec3 reflected(vec3 r, float height) {
-  vec3 haze = uSkyLight * 1.15 + uKeyLight * 0.12;
-  vec3 zenith = uSkyLight * vec3(0.55, 0.72, 1.08);
   float reach = height * length(r.xz) / max(-r.y, 1e-3);
   float far = r.y > 0.0 ? 1.0 : smoothstep(2.0, 32.0, reach);
   vec3 near = vec3(0.12, 0.13, 0.11) * cityLight(vec3(0.0, 1.0, 0.0));
-  vec3 env = r.y > 0.0 ? mix(haze, zenith, sqrt(r.y)) : mix(near, haze, far);
+  vec3 env = r.y > 0.0 ? skyAt(r.y) : mix(near, skyAt(0.0), far);
   vec3 toward = normalize(vec3(r.x, 0.08, r.z));
   return env + uKeyLight * 0.45 * pow(max(dot(toward, uKeyDir), 0.0), 6.0) * far;
 }
@@ -456,7 +515,7 @@ vec3 facade(vec3 paint, vec3 n) {
 #endif
   wall = paint * detail * shade * cityLight(wallN);
   // The line of sight, and how squarely it meets the wall.
-  vec3 V = isOrthographic ? normalize(vec3(-viewMatrix[0][2], -viewMatrix[1][2], -viewMatrix[2][2])) : normalize(vFadeWorld - cameraPosition);
+  vec3 V = lineOfSight();
   float square = max(-dot(V, n), 0.05);
   // The glass stands back in its opening, so from above the sill shows below it and a jamb beside it: q is where
   // the line of sight meets the glass. Traced back toward the sun, a point on the glass is lit if it clears the
@@ -649,69 +708,6 @@ const merge = (parts: THREE.BufferGeometry[]) => mergeGeometries(parts) as THREE
 /** A flat quad lying on the ground, centred at the origin. */
 const flat = (w: number, d: number) => new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2);
 
-/** A car facing -z, its wheels on the ground. A lite car, for drawing without a GPU, leaves the wheels to the imagination. */
-function carBody(lite = false): THREE.BufferGeometry {
-  const wheel = (x: number, z: number) => new THREE.CylinderGeometry(0.34, 0.34, 0.24, 10).rotateZ(Math.PI / 2).translate(x, 0.34, z);
-  return merge([
-    tint(box(1.8, 0.7, 4.4, 0, 0.62, 0), "#ffffff"),
-    tint(box(1.6, 0.55, 2.3, 0, 1.24, 0.3), "#8d93a3"),
-    ...(lite ? [] : [-0.82, 0.82].flatMap((x) => [-1.35, 1.4].map((z) => tint(wheel(x, z), "#18171c")))),
-  ]);
-}
-
-/** Headlights at the front, tail lights at the back. */
-function carLights(length = 4.4, height = 0.72, width = 1.8): THREE.BufferGeometry {
-  const lamp = (x: number, z: number, colour: string) => tint(box(0.36, 0.14, 0.06, x, height, z), colour);
-  return merge([lamp(-width / 2 + 0.3, -length / 2 - 0.02, "#fff4d6"), lamp(width / 2 - 0.3, -length / 2 - 0.02, "#fff4d6"), lamp(-width / 2 + 0.3, length / 2 + 0.02, "#ff2a3a"), lamp(width / 2 - 0.3, length / 2 + 0.02, "#ff2a3a")]);
-}
-
-/** A box truck facing -z. */
-function truckBody(): THREE.BufferGeometry {
-  const wheel = (x: number, z: number) => new THREE.CylinderGeometry(0.45, 0.45, 0.3, 10).rotateZ(Math.PI / 2).translate(x, 0.45, z);
-  return merge([
-    tint(box(2.4, 2.6, 6.2, 0, 2.05, 1.2), "#ffffff"),
-    tint(box(2.3, 1.9, 2.2, 0, 1.4, -3.1), "#c9ccd6"),
-    tint(box(2.1, 0.7, 0.1, 0, 1.85, -4.2), "#2b3140"),
-    ...[-1.05, 1.05].flatMap((x) => [-3.0, 0.4, 3.4].map((z) => tint(wheel(x, z), "#18171c"))),
-  ]);
-}
-
-/** Wheels either side, `x` out from the middle, at each of `zs` along. */
-const wheels = (x: number, zs: number[], r = 0.34, w = 0.24) =>
-  [-x, x].flatMap((side) => zs.map((z) => tint(new THREE.CylinderGeometry(r, r, w, 10).rotateZ(Math.PI / 2).translate(side, r, z), "#18171c")));
-
-/**
- * Each kind of vehicle facing -z, its wheels on the ground: a white body that the vehicle's own colour tints, and
- * dark glass. A lite one leaves the wheels to the imagination. Taxis share the saloon's body.
- */
-function vehicleBody(kind: VehicleKind, lite = false): THREE.BufferGeometry {
-  const glass = "#8d93a3";
-  const dark = "#2b3140";
-  if (kind === "hatch") return merge([tint(box(1.75, 0.68, 3.9, 0, 0.62, 0), "#ffffff"), tint(box(1.55, 0.58, 2.1, 0, 1.25, 0.45), glass), ...(lite ? [] : wheels(0.8, [-1.2, 1.25]))]);
-  if (kind === "suv") return merge([tint(box(1.85, 0.95, 4.4, 0, 0.8, 0), "#ffffff"), tint(box(1.7, 0.6, 2.7, 0, 1.57, 0.35), glass), ...(lite ? [] : wheels(0.84, [-1.4, 1.4], 0.4))]);
-  if (kind === "van") return merge([tint(box(1.8, 1.75, 4.4, 0, 1.2, 0), "#ffffff"), tint(box(1.6, 0.55, 0.06, 0, 1.6, -2.21), dark), ...(lite ? [] : wheels(0.82, [-1.4, 1.45], 0.36))]);
-  if (kind === "robotaxi") {
-    // A saloon with a spinning sensor on its roof and a camera pod on each wing.
-    const sensor = "#2b2d33";
-    return merge([carBody(lite), tint(new THREE.CylinderGeometry(0.3, 0.36, 0.28, 14).translate(0, 1.66, 0.25), sensor), ...(lite ? [] : [-0.88, 0.88].map((x) => tint(box(0.12, 0.2, 0.26, x, 1.02, -1.25), sensor)))]);
-  }
-  if (kind === "truck") return truckBody();
-  if (kind === "bus") return merge([tint(box(2.4, 2.6, 8.8, 0, 1.7, 0), "#ffffff"), tint(box(2.2, 0.9, 0.06, 0, 2.0, -4.41), dark), ...(lite ? [] : wheels(1.05, [-3.0, 2.8], 0.45, 0.3))]);
-  return carBody(lite);
-}
-
-/** Head and tail lights for each kind, the lit sign on a taxi's roof, and a bus's lit windows and route sign. */
-function vehicleLights(kind: VehicleKind): THREE.BufferGeometry {
-  if (kind === "hatch") return carLights(3.9, 0.7, 1.75);
-  if (kind === "suv") return carLights(4.4, 0.95, 1.85);
-  if (kind === "van") return carLights(4.4, 0.75, 1.8);
-  if (kind === "truck") return carLights(8.6, 1.0, 2.3);
-  if (kind === "bus") return merge([carLights(8.8, 0.8, 2.4), ...[-1, 1].map((s) => tint(box(0.04, 0.75, 7.0, s * 1.215, 2.25, 0.3), "#ffd99a")), tint(box(1.4, 0.3, 0.05, 0, 2.75, -4.43), "#ffb347")]);
-  if (kind === "taxi") return merge([carLights(), tint(box(0.62, 0.2, 0.28, 0, 1.63, 0.2), "#fff1b0")]);
-  if (kind === "robotaxi") return merge([carLights(), tint(new THREE.CylinderGeometry(0.31, 0.31, 0.05, 14).translate(0, 1.82, 0.25), "#5fe3d6")]);
-  return carLights();
-}
-
 /** A park bench facing -z: slats on two legs, and a back. */
 function benchBody(): THREE.BufferGeometry {
   return merge([
@@ -863,7 +859,7 @@ function Parked({ lite }: { lite: boolean }) {
   return (
     <group>
       {fleets.map(({ kind, matrices, colours }) => (
-        <Instances key={kind} geometry={geo.get(kind) as THREE.BufferGeometry} material={M.shaded} matrices={matrices} colours={colours} />
+        <Instances key={kind} geometry={geo.get(kind) as THREE.BufferGeometry} material={lite ? M.shaded : M.vehicle} matrices={matrices} colours={colours} />
       ))}
     </group>
   );
@@ -1410,7 +1406,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 const heading = (axis: "x" | "z", dir: 1 | -1) => (axis === "x" ? -dir * (Math.PI / 2) : dir === 1 ? Math.PI : 0);
 
 /** One kind of vehicle on the move: bodies and their lights. */
-function Fleet({ vehicles, body, lights }: { vehicles: Vehicle[]; body: THREE.BufferGeometry; lights: THREE.BufferGeometry }) {
+function Fleet({ vehicles, body, lights, material }: { vehicles: Vehicle[]; body: THREE.BufferGeometry; lights: THREE.BufferGeometry; material: THREE.Material }) {
   const bodies = useRef<THREE.InstancedMesh>(null);
   const lamps = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
@@ -1419,7 +1415,8 @@ function Fleet({ vehicles, body, lights }: { vehicles: Vehicle[]; body: THREE.Bu
     const c = new THREE.Color();
     vehicles.forEach((v, i) => mesh.setColorAt(i, c.set(v.colour)));
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [vehicles]);
+    // A new body or material makes a new mesh, which needs its colours again.
+  }, [vehicles, body, material]);
   useFrame(({ clock }) => {
     const b = bodies.current;
     const l = lamps.current;
@@ -1446,8 +1443,8 @@ function Fleet({ vehicles, body, lights }: { vehicles: Vehicle[]; body: THREE.Bu
   if (vehicles.length === 0) return null;
   return (
     <group>
-      <instancedMesh key={`b${vehicles.length}`} ref={bodies} args={[body, M.shaded, vehicles.length]} frustumCulled={false} />
-      <instancedMesh key={`l${vehicles.length}`} ref={lamps} args={[lights, M.glow, vehicles.length]} frustumCulled={false} />
+      <instancedMesh key={`b${vehicles.length}`} ref={bodies} args={[body, material, vehicles.length]} frustumCulled={false} />
+      <instancedMesh key={`l${vehicles.length}`} ref={lamps} args={[lights, M.lamps, vehicles.length]} frustumCulled={false} />
     </group>
   );
 }
@@ -1465,7 +1462,7 @@ function Traffic({ share, lite }: { share: number; lite: boolean }) {
     <group>
       {fleets.map(({ kind, vehicles }) => {
         const g = geo.get(kind) as { body: THREE.BufferGeometry; lights: THREE.BufferGeometry };
-        return <Fleet key={kind} vehicles={vehicles} body={g.body} lights={g.lights} />;
+        return <Fleet key={kind} vehicles={vehicles} body={g.body} lights={g.lights} material={lite ? M.shaded : M.vehicle} />;
       })}
     </group>
   );
@@ -1509,7 +1506,8 @@ function Crowd({ share, lite }: { share: number; lite: boolean }) {
     const c = new THREE.Color();
     people.forEach((p, i) => mesh.setColorAt(i, c.set(p.colour)));
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [people]);
+    // A new body makes a new mesh, which needs its colours again.
+  }, [people, geo]);
   useFrame(({ clock }) => {
     const b = bodies.current;
     const e = eyes.current;

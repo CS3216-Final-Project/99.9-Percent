@@ -1074,12 +1074,16 @@ export function traffic(seed = 21): Vehicle[] {
   return out;
 }
 
+/** The most ground a vehicle of a kind may cover, front to back and side to side; vehicleModels.ts keeps within it. */
+export function vehicleSize(kind: VehicleKind): { length: number; width: number } {
+  return isLong(kind) ? { length: VEHICLE.truck, width: VEHICLE.width } : { length: VEHICLE.car, width: 1.8 };
+}
+
 /** The ground a vehicle covers at time t. */
 export function vehicleRect(v: Vehicle, t: number): Rect {
   const lane = LANES[v.lane];
   const { x, z } = vehicleAt(lane, v.slot, t);
-  const length = isLong(v.kind) ? VEHICLE.truck : VEHICLE.car;
-  const width = isLong(v.kind) ? VEHICLE.width : 1.8;
+  const { length, width } = vehicleSize(v.kind);
   return lane.axis === "x" ? rect(x, z, length, width) : rect(x, z, width, length);
 }
 
