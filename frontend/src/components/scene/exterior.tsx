@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
@@ -57,6 +57,7 @@ import {
   type Vehicle,
   type VehicleKind,
 } from "./city";
+import { zoomedOut } from "./camera";
 import { useDetail } from "./detail";
 import { world } from "./cityLight";
 import { useCitySurfaces, type CitySurface } from "./cityTextures";
@@ -1246,7 +1247,7 @@ const shapeOf = (t: Tree): TreeShape => (t.kind === "blossom" ? "round" : t.kind
  * Every tree, by shape and by model: its bark and its leaves share each tree's place, turn and size, a little wider
  * or narrower than the model, and the leaves take the tree's own colour. A shadow lies under each, except at Low quality.
  */
-function Trees({ basic }: { basic: boolean }) {
+function Trees({ basic, lite }: { basic: boolean; lite: boolean }) {
   const surfaces = useCitySurfaces();
   const groups = useMemo(() => {
     const list = trees().filter((_, i) => !basic || i % 2 === 0);
@@ -1263,7 +1264,7 @@ function Trees({ basic }: { basic: boolean }) {
       }).filter((g) => g.matrices.length > 0),
     );
   }, [basic]);
-  const models = useMemo(() => new Map(groups.map((g) => [`${g.shape}${g.variant}`, treeModel(g.shape, g.variant, basic)])), [groups, basic]);
+  const models = useMemo(() => new Map(groups.map((g) => [`${g.shape}${g.variant}`, treeModel(g.shape, g.variant, lite)])), [groups, lite]);
   // Low quality draws no shadows, the trees' included.
   const shadows = useMemo(
     () =>
@@ -1584,9 +1585,21 @@ function Crowd({ share, lite }: { share: number; lite: boolean }) {
 /* Downtown                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Whether the camera is zoomed out far enough for the city's lighter models (see zoomedOut in camera.ts). */
+function useZoomedOut(): boolean {
+  const [far, setFar] = useState(false);
+  useFrame(({ camera }) => {
+    const next = zoomedOut((camera as THREE.OrthographicCamera).zoom, far);
+    if (next !== far) setFar(next);
+  });
+  return far;
+}
+
 /** The world outside the office, lit for the time of day by applyDaylight. */
 export function Exterior() {
   const basic = useDetail() === "basic";
+  // Far out, the trees, cars and people draw their lighter models, as they always do at basic detail.
+  const lite = useZoomedOut() || basic;
   const looks = useLooks();
   return (
     <group>
@@ -1594,14 +1607,14 @@ export function Exterior() {
       <Markings />
       <Yards />
       <Billboards />
-      <Parked lite={basic} />
+      <Parked lite={lite} />
       <Buildings lite={basic} looks={looks} />
       <Tower />
-      <Trees basic={basic} />
+      <Trees basic={basic} lite={lite} />
       <Park basic={basic} />
       <Lamps pools={!basic} />
-      <Traffic share={basic ? 0.4 : 1} lite={basic} />
-      <Crowd share={basic ? 0.4 : 1} lite={basic} />
+      <Traffic share={basic ? 0.4 : 1} lite={lite} />
+      <Crowd share={basic ? 0.4 : 1} lite={lite} />
     </group>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
+import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, DETAIL_ZOOM, MIN_TILT, MAX_TILT, turnAbout, zoomedOut } from "./camera";
 import { buildings, FADE, GROUND_Y, REACH, ROOF_HEADROOM, TOWER } from "./city";
 import { ROOM } from "./layout";
 
@@ -108,5 +108,19 @@ describe("turning the camera", () => {
     expect(Math.abs(anchor.clone().project(orbit).x)).toBeGreaterThan(0.01);
     const turned = turnAbout(target.clone(), anchor, towards(before, target), towards(orbit, target));
     expect(anchor.clone().project(cameraAt(turned, Math.PI / 4, Math.PI / 2)).x).toBeCloseTo(0, 10);
+  });
+});
+
+describe("detail by zoom", () => {
+  it("draws lighter models only well zoomed out, and does not flicker at the line", () => {
+    expect(zoomedOut(30, false)).toBe(false);
+    expect(zoomedOut(10, false)).toBe(true);
+    expect(zoomedOut(DETAIL_ZOOM.into, false)).toBe(false);
+    // Between the two thresholds, it stays as it was.
+    const between = (DETAIL_ZOOM.into + DETAIL_ZOOM.outOf) / 2;
+    expect(zoomedOut(between, false)).toBe(false);
+    expect(zoomedOut(between, true)).toBe(true);
+    expect(zoomedOut(DETAIL_ZOOM.outOf + 0.1, true)).toBe(false);
+    expect(DETAIL_ZOOM.outOf).toBeGreaterThan(DETAIL_ZOOM.into);
   });
 });
