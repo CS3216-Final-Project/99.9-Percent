@@ -36,7 +36,7 @@ import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
 import { applyDaylight } from "./cityLight";
 import { Exterior } from "./exterior";
-import { daylight, timeOfDay, timeOverride } from "./sky";
+import { daylightNow } from "./dayClock";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
 import { buildModel, type SceneModel } from "./sceneModel";
@@ -647,8 +647,6 @@ function Room() {
 const HD_SKY = 1.45;
 const HD_REFLECTIONS = 0.3;
 
-/** When the day began: on the first load, so a new canvas after a change of graphics carries on where it was. */
-const DAY_START = performance.now();
 /** How far the office's sun stands from the room, along the direction its light comes from. */
 const SUN_DISTANCE = 21.4;
 
@@ -658,14 +656,13 @@ const SUN_DISTANCE = 21.4;
  * drop low or dim far, so the room reads the same at noon and at three in the morning.
  */
 function Daylight({ quality, hd }: { quality: QualityProfile; hd: boolean }) {
-  const [fixed] = useState(() => timeOverride(window.location.search));
   const sky = useRef<THREE.HemisphereLight>(null);
   const sun = useRef<THREE.DirectionalLight>(null);
   const background = useRef<THREE.Color>(null);
   // Reflections light the HD materials too, so the sky light is turned down to keep the same brightness.
   const skyStrength = hd ? HD_SKY : 1.7;
   useFrame(() => {
-    const d = daylight(timeOfDay((performance.now() - DAY_START) / 1000, fixed));
+    const d = daylightNow();
     applyDaylight(d, quality.effects);
     background.current?.setRGB(d.horizon[0], d.horizon[1], d.horizon[2], THREE.SRGBColorSpace);
     if (sky.current) sky.current.intensity = skyStrength * d.office.sky;

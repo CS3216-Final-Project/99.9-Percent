@@ -5,11 +5,13 @@ import { lazy, Suspense, useEffect, useRef } from "react";
 import { BALANCE, completedTechIds, metrics, TECH_ORDER, type GameState } from "@/sim";
 import { clock, compact, money, num, signedMoney, uptimePct } from "@/game/format";
 import { watchCues } from "@/game/cues";
+import { createAmbience } from "@/game/ambience";
 import { createMusic, type Music } from "@/game/music";
 import type { AudioSettings } from "@/game/persist";
 import { createSfx } from "@/game/sfx";
 import { useGame, type Speed } from "@/game/store";
 import { Icon, type IconName } from "./icons";
+import { daylightNow } from "./scene/dayClock";
 import { SoundButton } from "./SoundButton";
 import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
@@ -248,6 +250,32 @@ function useMusic(): void {
   useEffect(() => music.current?.setMood(incident ? "tense" : "calm"), [incident]);
 }
 
+/** How often the city's sound checks how dark it has got outside. */
+const DUSK_CHECK_MS = 2000;
+
+/**
+ * The city outside, heard under the game while a run is on screen: birds by day, crickets at night, following the
+ * same clock as the light (see scene/dayClock.ts). It goes with the sound-effects volume and mute.
+ */
+function useAmbience(): void {
+  useEffect(() => {
+    const a = createAmbience(() => effectsLevel(useGame.getState().audio) > 0);
+    a.setVolume(effectsLevel(useGame.getState().audio));
+    a.setDark(daylightNow().dark);
+    const stopFollowing = useGame.subscribe((s, prev) => {
+      if (s.audio !== prev.audio) a.setVolume(effectsLevel(s.audio));
+      if (s.started !== prev.started) a.setEnabled(s.started);
+    });
+    a.setEnabled(useGame.getState().started);
+    const id = window.setInterval(() => a.setDark(daylightNow().dark), DUSK_CHECK_MS);
+    return () => {
+      window.clearInterval(id);
+      stopFollowing();
+      a.dispose();
+    };
+  }, []);
+}
+
 /**
  * Sound effects for what just happened in the game. Driven by a store
  * subscription rather than renders, so the volume is already set when a cue
@@ -282,6 +310,7 @@ export default function Game() {
   const touring = useGame((s) => s.tour?.track ?? null);
   useMusic();
   useSoundEffects();
+  useAmbience();
 
   useEffect(() => {
     useGame.getState().boot();
