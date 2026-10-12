@@ -60,6 +60,7 @@ import {
 import { useDetail } from "./detail";
 import { world } from "./cityLight";
 import { useCitySurfaces, type CitySurface } from "./cityTextures";
+import { useSurfaces, type Surface } from "./surfaces";
 import { TREE_VARIANTS, treeModel, type TreeModel, type TreeShape } from "./treeModels";
 import { adsTexture, logoSign } from "./textures";
 
@@ -326,6 +327,12 @@ const LIGHTS = { warm: new THREE.Color("#ffd49a"), cool: new THREE.Color("#d6e6f
  * Each facade knows, per vertex, its wall colour (frames, spandrels or stone), its glass, where it is on the wall in
  * metres, and the building's seed, style, share of lit offices and whether it reaches the street. The shader cuts the
  * wall into bays and storeys, opens a window in each, and lights runs of windows as offices with the lights on.
+ *
+ * At HD detail (FACADE_FINE) the glass is set back in its opening, so a sill and a jamb show round it and the sun
+ * casts the head's and a jamb's shadow into it, and the glass reflects what a pane would: seen from above, the street
+ * and lawns low down and the hazy distance higher up, brighter toward the sun. Sills catch the sun along their noses.
+ * Once the photo sets have loaded (FACADE_WALLS), houses are stucco and offices concrete, laid by world position and
+ * weathered at the foot and under the sills. Low quality keeps the flat windows.
  */
 const FACADE_GLSL = `
 varying vec2 vWall;
@@ -334,6 +341,12 @@ varying vec3 vGlass;
 uniform vec3 uWarm;
 uniform vec3 uCool;
 uniform vec3 uShop;
+#ifdef FACADE_WALLS
+uniform sampler2D uPlaster;
+uniform sampler2D uPlasterNormal;
+uniform sampler2D uConcrete;
+uniform sampler2D uConcreteNormal;
+#endif
 
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -344,6 +357,24 @@ float hash12(vec2 p) {
 float band(float f, float a, float b, float e) {
   return smoothstep(a - e, a + e, f) - smoothstep(b - e, b + e, f);
 }
+
+#ifdef FACADE_FINE
+/**
+ * What glass \`height\` metres up sees along \`r\`. Above the horizon, the sky: pale low down, deeper blue overhead.
+ * Below it, the street and lawns across the way, until the ray would meet the ground so far off that the city has
+ * faded into haze; so upper floors show more of the haze than lower ones. The haze is brighter toward the sun.
+ */
+vec3 reflected(vec3 r, float height) {
+  vec3 haze = uSkyLight * 1.15 + uKeyLight * 0.12;
+  vec3 zenith = uSkyLight * vec3(0.55, 0.72, 1.08);
+  float reach = height * length(r.xz) / max(-r.y, 1e-3);
+  float far = r.y > 0.0 ? 1.0 : smoothstep(2.0, 32.0, reach);
+  vec3 near = vec3(0.12, 0.13, 0.11) * cityLight(vec3(0.0, 1.0, 0.0));
+  vec3 env = r.y > 0.0 ? mix(haze, zenith, sqrt(r.y)) : mix(near, haze, far);
+  vec3 toward = normalize(vec3(r.x, 0.08, r.z));
+  return env + uKeyLight * 0.45 * pow(max(dot(toward, uKeyDir), 0.0), 6.0) * far;
+}
+#endif
 
 vec3 facade(vec3 paint, vec3 n) {
   vec3 lit = cityLight(n);
@@ -382,29 +413,126 @@ vec3 facade(vec3 paint, vec3 n) {
   float blind = step(0.72, hash12(vec2(cell.x + seed, cell.y + 5.0)));
   float drop = mix(frame.z + 0.25, frame.w, hash12(vec2(cell.x, cell.y + seed)));
   light *= mix(1.0, 0.35, blind * step(drop, f.y));
+  float pane = 0.75 + 0.5 * hash12(cell + seed * 0.37);
+  // Far off, the windows are finer than a pixel: show their average instead of a shimmer.
+  float coverage = (frame.y - frame.x) * (frame.w - frame.z);
+  float distant = smoothstep(0.3, 0.7, max(fwidth(g.x), fwidth(g.y)));
+#ifndef FACADE_FINE
   // The glass is tinted and lit like the wall; by day it also shows the sky, more toward the top of each pane and a
   // little differently in each, and at night it catches a little of the city's glow.
-  float pane = 0.75 + 0.5 * hash12(cell + seed * 0.37);
   vec3 sky = uSkyLight * mix(vec3(1.0), normalize(vGlass + 0.02) * 1.7, 0.5) * (0.12 + 0.14 * f.y) * (0.7 + 0.6 * hash12(cell * 0.7 + seed)) * (1.0 - uDark);
   vec3 dark = vGlass * lit * pane * (0.8 + 0.4 * f.y) + sky;
   vec3 colour = mix(wall, mix(dark, light, on), open);
-  // Far off, the windows are finer than a pixel: show their average instead of a shimmer.
-  float coverage = (frame.y - frame.x) * (frame.w - frame.z);
   vec3 average = mix(wall, mix(vGlass * lit + uSkyLight * 0.19 * (1.0 - uDark), uWarm * 0.6, share * evening), coverage);
-  return mix(colour, average, smoothstep(0.3, 0.7, max(fwidth(g.x), fwidth(g.y))));
+  return mix(colour, average, distant);
+#else
+  // Along the wall, left to right as seen from outside, and up it, in metres within this bay and storey.
+  vec3 T = vec3(n.z, 0.0, -n.x);
+  vec2 size = vec2(bay, ${STOREY.toFixed(1)});
+  vec2 m = f * size;
+  vec2 em = e * size;
+  vec4 edge = frame * size.xxyy;
+  float shade = 1.0;
+  vec3 wallN = n;
+  float detail = 1.0;
+#ifdef FACADE_WALLS
+  {
+    // Stucco on houses, concrete on offices; curtain walls keep their plain frames.
+    vec2 uv = vec2(dot(vFadeWorld, T), vFadeWorld.y);
+    float plaster = step(4.5, style);
+    float rough = step(0.5, style);
+    vec2 uvP = uv / 2.6;
+    vec2 uvC = uv / 3.4;
+    float grey = mix(texture2D(uConcrete, uvC).r, texture2D(uPlaster, uvP).r, plaster) / ${GREY_MEAN.toFixed(2)};
+    vec2 bump = mix(texture2D(uConcreteNormal, uvC).xy, texture2D(uPlasterNormal, uvP).xy, plaster) * 2.0 - 1.0;
+    float broad = texture2D(uConcrete, uv / 41.0 + fract(seed * 0.013)).r / ${GREY_MEAN.toFixed(2)};
+    detail = mix(1.0, (1.0 + (grey - 1.0) * mix(1.8, 1.6, plaster)) * (1.0 + (broad - 1.0) * mix(0.9, 0.5, plaster)), rough);
+    wallN = normalize(n + (T * bump.x + vec3(0.0, bump.y, 0.0)) * 0.6 * rough);
+    // Rain darkens the foot of a wall, and runs down from under each sill in streaks.
+    float below = edge.z - m.y;
+    float streak = band(f.x, frame.x + 0.05, frame.y - 0.05, e.x) * step(0.0, below) * (1.0 - smoothstep(0.0, 1.2, below)) * clamp(0.6 + (grey - 1.0) * 2.5, 0.0, 1.0);
+    shade = 1.0 - rough * (0.16 * (1.0 - smoothstep(0.0, 0.8, vWall.y)) + 0.12 * streak);
+  }
+#endif
+  wall = paint * detail * shade * cityLight(wallN);
+  // The line of sight, and how squarely it meets the wall.
+  vec3 V = isOrthographic ? normalize(vec3(-viewMatrix[0][2], -viewMatrix[1][2], -viewMatrix[2][2])) : normalize(vFadeWorld - cameraPosition);
+  float square = max(-dot(V, n), 0.05);
+  // The glass stands back in its opening, so from above the sill shows below it and a jamb beside it: q is where
+  // the line of sight meets the glass. Traced back toward the sun, a point on the glass is lit if it clears the
+  // opening, so the head and a jamb cast their shadows on it.
+  float depth = street ? 0.08 : style < 0.5 ? 0.1 : style < 1.5 ? 0.12 : style < 2.5 ? 0.22 : style < 3.5 ? 0.35 : style < 4.5 ? 0.2 : 0.12;
+  vec2 q = m + depth * vec2(dot(V, T), V.y) / square;
+  float sill = 1.0 - smoothstep(edge.z - em.y, edge.z + em.y, q.y);
+  float head = smoothstep(edge.w - em.y, edge.w + em.y, q.y);
+  float jambL = 1.0 - smoothstep(edge.x - em.x, edge.x + em.x, q.x);
+  float jambR = smoothstep(edge.y - em.x, edge.y + em.x, q.x);
+  float sunIn = dot(uKeyDir, n);
+  vec2 back = q + depth * vec2(dot(uKeyDir, T), uKeyDir.y) / max(sunIn, 0.05);
+  float sunlit = step(0.0, sunIn) * band(back.x, edge.x, edge.y, em.x) * band(back.y, edge.z, edge.w, em.y);
+  // Through the glass, the office, with a patch of sun on it where the sun comes in; shops keep their lights on all day.
+  vec3 inside = vGlass * lit * pane * 0.8 + uKeyLight * max(sunIn, 0.0) * sunlit * (vGlass * 2.5 + 0.015) + (street ? uShop * 0.09 * pane : vec3(0.0));
+  // Each pane sits a little out of true, so neighbouring panes reflect a little differently; coated office glass
+  // reflects more than a house's, and more still when seen edge on.
+  vec2 tip = vec2(hash12(cell * 1.31 + seed), hash12(cell * 0.77 + seed * 1.9)) - 0.5;
+  vec3 pn = normalize(n + T * tip.x * 0.08 + vec3(0.0, tip.y * 0.08, 0.0));
+  float f0 = street ? 0.12 : style < 0.5 ? 0.3 : style < 1.5 ? 0.26 : 0.16;
+  float fresnel = f0 + (1.0 - f0) * pow(1.0 - max(-dot(V, pn), 0.0), 5.0);
+  // The coating tints what the glass reflects.
+  vec3 coat = mix(vec3(1.0), normalize(vGlass + 0.02) * 1.73, 0.55);
+  vec3 env = reflected(reflect(V, pn), max(vWall.y, 0.3)) * coat * (0.92 + 0.16 * smoothstep(frame.z, frame.w, f.y));
+  vec3 glass = mix(inside, env, fresnel);
+  vec3 inner = mix(glass, light, on);
+  // A house's windows have white frames and glazing bars in a cross.
+  float house = step(4.5, style);
+  float sash = 1.0 - band(m.x, edge.x + 0.07, edge.y - 0.07, em.x) * band(m.y, edge.z + 0.07, edge.w - 0.07, em.y);
+  sash = max(sash, band(m.x, (edge.x + edge.y) * 0.5 - 0.025, (edge.x + edge.y) * 0.5 + 0.025, em.x));
+  sash = max(sash, band(m.y, mix(edge.z, edge.w, 0.55) - 0.025, mix(edge.z, edge.w, 0.55) + 0.025, em.y));
+  inner = mix(inner, vec3(0.86, 0.85, 0.82) * cityLight(n), house * sash);
+  inner = mix(inner, paint * shade * cityLight(T), jambL);
+  inner = mix(inner, paint * shade * cityLight(-T), jambR);
+  inner = mix(inner, paint * shade * cityLight(vec3(0.0, -1.0, 0.0)), head);
+  inner = mix(inner, paint * shade * cityLight(vec3(0.0, 1.0, 0.0)), sill);
+  // The rounded nose of each sill catches the sun when the sun, the sill and the eye line up across the wall.
+  vec3 H = normalize(uKeyDir - V);
+  float across = dot(H, T);
+  vec3 cap = normalize(H - across * T + 1e-4);
+  float glint = pow(max(1.0 - across * across, 0.0), 24.0) * max(dot(uKeyDir, cap), 0.0) * step(0.0, dot(cap, n)) * (1.0 - uDark);
+  float nose = band(m.y, edge.z - 0.035, edge.z, em.y) * band(f.x, frame.x, frame.y, e.x);
+  vec3 colour = mix(wall, inner, open) + uKeyLight * glint * nose * 0.9;
+  float fresnelFlat = f0 + (1.0 - f0) * pow(1.0 - square, 5.0);
+  vec3 glassAverage = mix(vGlass * lit * 0.8, reflected(reflect(V, n), max(vWall.y, 0.3)) * coat, fresnelFlat);
+  vec3 average = mix(wall, mix(glassAverage, uWarm * 0.6, share * evening), coverage);
+  return mix(colour, average, distant);
+#endif
 }
 `;
 
-function facadeMaterial(): THREE.MeshBasicMaterial {
-  return faded({ vertexColors: true }, "city-facade", "own", (shader) => {
+/** Photo-scanned stucco for houses and concrete for offices, from the office's own HD sets (see surfaces.ts). */
+interface FacadeWalls {
+  plaster: Surface;
+  concrete: Surface;
+}
+
+/** The facades' material: flat windows at Low quality; set-back, reflecting glass at HD, on photo walls once loaded. */
+function facadeMaterial(fine: boolean, walls: FacadeWalls | null): THREE.MeshBasicMaterial {
+  const key = !fine ? "city-facade" : walls ? "city-facade-walls" : "city-facade-fine";
+  return faded({ vertexColors: true }, key, "own", (shader) => {
     shader.uniforms.uWarm = { value: LIGHTS.warm };
     shader.uniforms.uCool = { value: LIGHTS.cool };
     shader.uniforms.uShop = { value: LIGHTS.shop };
+    if (walls) {
+      shader.uniforms.uPlaster = { value: walls.plaster.map };
+      shader.uniforms.uPlasterNormal = { value: walls.plaster.normalMap };
+      shader.uniforms.uConcrete = { value: walls.concrete.map };
+      shader.uniforms.uConcreteNormal = { value: walls.concrete.normalMap };
+    }
+    const defines = `${fine ? "#define FACADE_FINE\n" : ""}${fine && walls ? "#define FACADE_WALLS\n" : ""}`;
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nattribute vec2 aWall;\nattribute vec4 aLook;\nattribute vec3 aGlass;\nvarying vec2 vWall;\nvarying vec4 vLook;\nvarying vec3 vGlass;")
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWall = aWall;\nvLook = aLook;\nvGlass = aGlass;");
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", `#include <common>\n${FACADE_GLSL}`)
+      .replace("#include <common>", `#include <common>\n${defines}${FACADE_GLSL}`)
       .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = facade(diffuseColor.rgb, normalize(vCityNormal));");
   });
 }
@@ -1035,7 +1163,9 @@ function Beacons({ list }: { list: Building[] }) {
 
 function Buildings({ lite, looks }: { lite: boolean; looks: Looks }) {
   const list = useMemo(() => buildings(), []);
-  const material = useMemo(() => facadeMaterial(), []);
+  // The office's own photo sets, already loaded for its floors and walls at HD.
+  const surfaces = useSurfaces();
+  const material = useMemo(() => facadeMaterial(!lite, surfaces && { plaster: surfaces.plaster, concrete: surfaces.concrete }), [lite, surfaces]);
   const ring = town().ring;
   const walls = useMemo(() => facades([...list, TOWER], ring), [list, ring]);
   const tops = useMemo(() => {
