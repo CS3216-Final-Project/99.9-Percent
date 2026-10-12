@@ -504,13 +504,29 @@ export interface Spot {
   rot: number;
 }
 
+/**
+ * A rounded broadleaf, a narrow conifer, a rain tree's wide umbrella of a crown, or a broadleaf in flower. Each
+ * street is planted with one kind; the plaza is in flower; the park is mixed, with rain trees the most of all.
+ */
+export type TreeKind = "round" | "cone" | "umbrella" | "blossom";
+
 export interface Tree {
   x: number;
   z: number;
   /** Height in metres. */
   h: number;
   turn: number;
+  kind: TreeKind;
+  /** The colour of its leaves, or of its flowers. */
+  leaf: string;
 }
+
+const LEAVES: Record<TreeKind, readonly string[]> = {
+  round: ["#26432f", "#2b4a33", "#30502c", "#22402f", "#36532f", "#2c4626"],
+  cone: ["#1f3a2c", "#1c3428", "#24402f", "#1a3a33"],
+  umbrella: ["#2f4d2a", "#3a5630", "#29472e", "#40592f"],
+  blossom: ["#ad5b84", "#bb739a", "#9461a3", "#c27f8f", "#c995ab", "#b39339"],
+};
 
 const LAMP_GAP = 26;
 /** Kerb to lamp post, and kerb to tree pit. */
@@ -549,38 +565,57 @@ export function lamps(): Spot[] {
   return out;
 }
 
+/** Width of the park's footpaths. */
+const PARK_PATH = 3;
+
+/** Where the park's paths cross. */
+export function parkCentre(): [number, number] {
+  const [x0, z0, x1, z1] = parkBlock().rect;
+  return [(x0 + x1) / 2, (z0 + z1) / 2];
+}
+
+/** The outer edge of the loop path inside the railings. */
+export const parkLoop = (): Rect => inset(parkBlock().rect, 6);
+
+/** The fountain where the paths cross: its basin's radius, and the round paved square it stands in. */
+export const FOUNTAIN = { r: 3.6, square: 7.5 };
+
 /** Street trees halfway between the lamps, round the tower's plaza and across the park. */
 export function trees(seed = 13): Tree[] {
   const rng: RngHolder = { rngState: seed };
   const out: Tree[] = [];
-  const add = (x: number, z: number, lo: number, hi: number) => out.push({ x, z, h: randRange(rng, lo, hi), turn: randRange(rng, 0, Math.PI * 2) });
+  const add = (x: number, z: number, kind: TreeKind, lo: number, hi: number) =>
+    out.push({ x, z, h: randRange(rng, lo, hi), turn: randRange(rng, 0, Math.PI * 2), kind, leaf: pick(rng, LEAVES[kind]) });
   ROADS.forEach((r, i) => {
-    // Not every street is planted.
+    // Not every street is planted, and each that is has one kind of tree.
     if (i % 3 === 1) return;
+    const kind = pick(rng, ["round", "round", "round", "cone", "cone", "blossom"] as const);
     for (const [a, b] of stretches(r)) {
       const n = Math.max(1, Math.round((b - a) / LAMP_GAP));
       for (let k = 0; k < n; k++) {
         for (const side of [-1, 1] as const) {
           const [x, z] = kerbside(r, a + ((b - a) * (k + 0.5)) / n, side, TREE_IN);
-          if (fadeAt(x, z) < 0.9) add(x, z, 5.5, 7.5);
+          if (fadeAt(x, z) < 0.9) add(x, z, kind, 5.5, 7.5);
         }
       }
     }
   });
-  // The plaza: a ring of trees in from the pavement, leaving the way to the doors clear.
+  // The plaza: a ring of trees in flower in from the pavement, leaving the way to the doors clear.
   const plaza = inset(towerBlock().rect, 4);
   const ring: [number, number][] = [];
   for (let x = plaza[0]; x <= plaza[2] + 0.01; x += (plaza[2] - plaza[0]) / 10) ring.push([x, plaza[1]], [x, plaza[3]]);
   for (let z = plaza[1] + 8; z <= plaza[3] - 8; z += (plaza[3] - plaza[1]) / 8) ring.push([plaza[0], z], [plaza[2], z]);
-  for (const [x, z] of ring) if (Math.abs(x - FADE.x) > 6 && !inside(x, z, PODIUM, 4)) add(x, z, 5, 7);
-  // The park: scattered, off the paths.
+  for (const [x, z] of ring) if (Math.abs(x - FADE.x) > 6 && !inside(x, z, PODIUM, 4)) add(x, z, "blossom", 5, 7);
+  // The park: scattered, off the paths, the fountain's square and the flower beds.
   const park = parkBlock().rect;
   const paths = parkPaths();
+  const [cx, cz] = parkCentre();
   for (let tries = 0, planted = 0; planted < 46 && tries < 1500; tries++) {
     const x = randRange(rng, park[0] + 4, park[2] - 4);
     const z = randRange(rng, park[1] + 4, park[3] - 4);
-    if (paths.some((p) => inside(x, z, p, 2.5)) || out.some((t) => Math.hypot(t.x - x, t.z - z) < 7.5)) continue;
-    add(x, z, 6, 10.5);
+    if (paths.some((p) => inside(x, z, p, 2.5)) || Math.hypot(x - cx, z - cz) < FOUNTAIN.square + 3 || out.some((t) => Math.hypot(t.x - x, t.z - z) < 7.5)) continue;
+    const kind = pick(rng, ["umbrella", "umbrella", "umbrella", "round", "round", "cone", "blossom"] as const);
+    add(x, z, kind, kind === "umbrella" ? 8 : 6, kind === "umbrella" ? 11.5 : 10.5);
     planted++;
   }
   return out;
@@ -589,10 +624,9 @@ export function trees(seed = 13): Tree[] {
 /** Footpaths across the park: one each way through the middle and a loop inside the railings. */
 export function parkPaths(): Rect[] {
   const [x0, z0, x1, z1] = parkBlock().rect;
-  const cx = (x0 + x1) / 2;
-  const cz = (z0 + z1) / 2;
-  const w = 3;
-  const loop = inset([x0, z0, x1, z1], 6);
+  const [cx, cz] = parkCentre();
+  const w = PARK_PATH;
+  const loop = parkLoop();
   return [
     [x0, cz - w / 2, x1, cz + w / 2],
     [cx - w / 2, z0, cx + w / 2, z1],
@@ -601,6 +635,52 @@ export function parkPaths(): Rect[] {
     [loop[0], loop[1], loop[0] + w, loop[3]],
     [loop[2] - w, loop[1], loop[2], loop[3]],
   ];
+}
+
+/** Beds of flowers along both sides of each arm of the paths, from the fountain's square out toward the loop. */
+export function flowerBeds(): Rect[] {
+  const [cx, cz] = parkCentre();
+  const loop = parkLoop();
+  const out: Rect[] = [];
+  const near = PARK_PATH / 2 + 0.6;
+  const far = near + 1.6;
+  for (const dir of [-1, 1]) {
+    // Along x, then along z, each bed stopping short of the loop.
+    const ax = [cx + dir * (FOUNTAIN.square + 2), dir > 0 ? Math.min(cx + dir * (FOUNTAIN.square + 16), loop[2] - PARK_PATH - 3) : Math.max(cx + dir * (FOUNTAIN.square + 16), loop[0] + PARK_PATH + 3)];
+    const az = [cz + dir * (FOUNTAIN.square + 2), dir > 0 ? Math.min(cz + dir * (FOUNTAIN.square + 14), loop[3] - PARK_PATH - 3) : Math.max(cz + dir * (FOUNTAIN.square + 14), loop[1] + PARK_PATH + 3)];
+    for (const side of [-1, 1]) {
+      out.push([Math.min(...ax), Math.min(cz + side * near, cz + side * far), Math.max(...ax), Math.max(cz + side * near, cz + side * far)]);
+      out.push([Math.min(cx + side * near, cx + side * far), Math.min(...az), Math.max(cx + side * near, cx + side * far), Math.max(...az)]);
+    }
+  }
+  return out;
+}
+
+/** Flowers in the beds: where each stands and its colour. */
+export function flowers(seed = 17): { x: number; z: number; colour: string }[] {
+  const rng: RngHolder = { rngState: seed };
+  const colours = ["#e0567a", "#f2c14e", "#f4f1ea", "#b06ad8", "#ff8a5c", "#e86aa6", "#7fb4ff"];
+  return flowerBeds().flatMap(([x0, z0, x1, z1]) => {
+    const n = Math.round(((x1 - x0) * (z1 - z0)) / 0.7);
+    return Array.from({ length: n }, () => ({ x: randRange(rng, x0 + 0.25, x1 - 0.25), z: randRange(rng, z0 + 0.25, z1 - 0.25), colour: pick(rng, colours) }));
+  });
+}
+
+/** Benches on the inner side of the loop path, facing it, clear of where the cross paths meet it. A bench faces -z at 0. */
+export function benches(): Spot[] {
+  const [cx, cz] = parkCentre();
+  const loop = parkLoop();
+  const out: Spot[] = [];
+  const back = PARK_PATH + 0.7;
+  for (let x = loop[0] + 14; x <= loop[2] - 14; x += 12) {
+    if (Math.abs(x - cx) < 6) continue;
+    out.push({ x, z: loop[1] + back, rot: 0 }, { x, z: loop[3] - back, rot: Math.PI });
+  }
+  for (let z = loop[1] + 14; z <= loop[3] - 14; z += 12) {
+    if (Math.abs(z - cz) < 6) continue;
+    out.push({ x: loop[0] + back, z, rot: Math.PI / 2 }, { x: loop[2] - back, z, rot: -Math.PI / 2 });
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------------ */

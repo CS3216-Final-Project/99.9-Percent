@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BEACON_STOREYS,
   beacons,
+  benches,
   blocks,
   BUILDING,
   buildings,
@@ -14,6 +15,9 @@ import {
   FADE,
   fadeAt,
   FLOORS_BELOW,
+  flowerBeds,
+  flowers,
+  FOUNTAIN,
   gap,
   GROUND_Y,
   inside,
@@ -23,6 +27,7 @@ import {
   lamps,
   overlaps,
   parkBlock,
+  parkCentre,
   parkPaths,
   PODIUM,
   REACH,
@@ -179,6 +184,37 @@ describe('the streets', () => {
     for (const t of trees()) for (const l of lamps()) expect(Math.hypot(t.x - l.x, t.z - l.z)).toBeGreaterThan(3);
     for (const t of trees()) for (const p of parkPaths()) expect(inside(t.x, t.z, p, 1)).toBe(false);
     expect(trees().filter((t) => inside(t.x, t.z, parkBlock().rect)).length).toBeGreaterThan(25);
+  });
+
+  it('plants each street with one kind of tree, the plaza in flower and the park with a mix', () => {
+    const all = trees();
+    expect(new Set(all.map((t) => t.kind))).toEqual(new Set(['round', 'cone', 'umbrella', 'blossom']));
+    const park = all.filter((t) => inside(t.x, t.z, parkBlock().rect));
+    expect(new Set(park.map((t) => t.kind)).size).toBeGreaterThanOrEqual(3);
+    expect(all.filter((t) => inside(t.x, t.z, towerBlock().rect)).every((t) => t.kind === 'blossom')).toBe(true);
+    for (const r of ROADS) {
+      const kinds = new Set(all.filter((t) => !inside(t.x, t.z, parkBlock().rect) && !inside(t.x, t.z, towerBlock().rect) && Math.abs((r.axis === 'x' ? t.z : t.x) - r.at) < STREET_WIDTH / 2).map((t) => t.kind));
+      expect(kinds.size, `road ${r.axis} at ${r.at}`).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('keeps the fountain, flower beds and benches on the lawn, clear of the paths, the trees and each other', () => {
+    const [cx, cz] = parkCentre();
+    const park = parkBlock().rect;
+    const beds = flowerBeds();
+    // A bench is 1.7 m long and 0.6 m deep, turned to face its path.
+    const seats = benches().map((b): Rect => (Math.abs(Math.sin(b.rot)) < 0.5 ? [b.x - 0.85, b.z - 0.3, b.x + 0.85, b.z + 0.3] : [b.x - 0.3, b.z - 0.85, b.x + 0.3, b.z + 0.85]));
+    expect(beds.length).toBe(8);
+    expect(seats.length).toBeGreaterThan(10);
+    for (const r of [...beds, ...seats]) {
+      expect(inside(r[0], r[1], park) && inside(r[2], r[3], park)).toBe(true);
+      for (const p of parkPaths()) expect(overlaps(r, p)).toBe(false);
+      expect(gap(r, [cx, cz, cx, cz])).toBeGreaterThan(FOUNTAIN.square);
+      for (const t of trees()) expect(inside(t.x, t.z, r, 0.5), `tree at ${t.x.toFixed(1)}, ${t.z.toFixed(1)}`).toBe(false);
+    }
+    for (const t of trees()) expect(Math.hypot(t.x - cx, t.z - cz)).toBeGreaterThan(FOUNTAIN.square);
+    for (const f of flowers()) expect(beds.some((b) => inside(f.x, f.z, b))).toBe(true);
+    for (let i = 0; i < seats.length; i++) for (let j = i + 1; j < seats.length; j++) expect(overlaps(seats[i], seats[j])).toBe(false);
   });
 
   it('runs every road out into the night, so its ends are never seen', () => {

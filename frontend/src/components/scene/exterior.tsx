@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
   beacons,
+  benches,
   blocks,
   BUILDING,
   buildings,
@@ -13,6 +14,9 @@ import {
   crossings,
   FADE,
   fadeAt,
+  flowerBeds,
+  flowers,
+  FOUNTAIN,
   GROUND_Y,
   HAZE,
   LANE,
@@ -21,6 +25,7 @@ import {
   NIGHT,
   PARAPET,
   parkBlock,
+  parkCentre,
   parkPaths,
   PODIUM,
   REACH,
@@ -37,6 +42,7 @@ import {
   type Building,
   type Plant,
   type Road,
+  type Tree,
   type Vehicle,
 } from "./city";
 import { useDetail } from "./detail";
@@ -315,13 +321,31 @@ function treeTrunk(): THREE.BufferGeometry {
   return tint(new THREE.CylinderGeometry(0.16, 0.24, 1, 7).translate(0, 0.5, 0), "#4a3a2e", 0.55);
 }
 
-/** A unit-scale canopy: a few lumps of leaves, coarser when lite. */
-function treeCanopy(lite = false): THREE.BufferGeometry {
+/**
+ * Unit-scale canopies, coarser when lite, in pale greys: each tree's own colour tints them. A rounded crown of a few
+ * lumps, a conifer of two stacked cones, and a rain tree's flat, spreading umbrella.
+ */
+function treeCanopy(kind: "round" | "cone" | "umbrella", lite = false): THREE.BufferGeometry {
   const detail = lite ? 0 : 1;
+  const lump = (r: number, x: number, y: number, z: number, shade: string) => tint(new THREE.IcosahedronGeometry(r, detail).translate(x, y, z), shade, 0.45);
+  if (kind === "cone") {
+    return merge([
+      tint(new THREE.ConeGeometry(1, 1.25, lite ? 6 : 9).translate(0, -0.2, 0), "#ffffff", 0.45),
+      tint(new THREE.ConeGeometry(0.72, 1.0, lite ? 6 : 9).translate(0, 0.45, 0), "#e8e8e8", 0.45),
+    ]);
+  }
+  if (kind === "umbrella") {
+    return merge([lump(1.0, 0, 0, 0, "#ffffff"), lump(0.8, 0.95, -0.05, 0.3, "#e4e4e4"), lump(0.8, -0.85, 0.05, -0.35, "#d6d6d6"), lump(0.7, 0.15, 0.1, -0.95, "#ececec"), lump(0.7, -0.2, -0.05, 0.95, "#dcdcdc")].map((g) => g.scale(1, 0.42, 1)));
+  }
+  return merge([lump(1.0, 0, 0, 0, "#ffffff"), lump(0.75, 0.7, 0.25, 0.3, "#e6e6e6"), lump(0.7, -0.6, 0.15, -0.4, "#d2d2d2")]);
+}
+
+/** A park bench facing -z: slats on two legs, and a back. */
+function benchBody(): THREE.BufferGeometry {
   return merge([
-    tint(new THREE.IcosahedronGeometry(1.0, detail), "#26432f", 0.45),
-    tint(new THREE.IcosahedronGeometry(0.75, detail).translate(0.7, 0.25, 0.3), "#2b4a33", 0.45),
-    tint(new THREE.IcosahedronGeometry(0.7, detail).translate(-0.6, 0.15, -0.4), "#223d2b", 0.45),
+    tint(box(1.7, 0.08, 0.5, 0, 0.45, 0), "#6b5038", 0.6),
+    tint(box(1.7, 0.42, 0.07, 0, 0.72, 0.24), "#6b5038", 0.6),
+    ...[-0.7, 0.7].map((x) => tint(box(0.08, 0.45, 0.5, x, 0.225, 0.02), "#2e2d33", 0.6)),
   ]);
 }
 
@@ -341,15 +365,21 @@ function lampHead(): THREE.BufferGeometry {
 const compose = (x: number, y: number, z: number, yaw = 0, s: THREE.Vector3Tuple = [1, 1, 1]) =>
   new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)), new THREE.Vector3(...s));
 
-function Instances({ geometry, material, matrices }: { geometry: THREE.BufferGeometry; material: THREE.Material; matrices: THREE.Matrix4[] }) {
+/** Copies of one geometry; `colours`, one per copy, tint each copy's vertex colours. */
+function Instances({ geometry, material, matrices, colours }: { geometry: THREE.BufferGeometry; material: THREE.Material; matrices: THREE.Matrix4[]; colours?: string[] }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;
     matrices.forEach((m, i) => mesh.setMatrixAt(i, m));
     mesh.instanceMatrix.needsUpdate = true;
+    if (colours) {
+      const c = new THREE.Color();
+      colours.forEach((hex, i) => mesh.setColorAt(i, c.set(hex)));
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
     mesh.computeBoundingSphere();
-  }, [matrices]);
+  }, [matrices, colours]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   return <instancedMesh key={matrices.length} ref={ref} args={[geometry, material, matrices.length]} frustumCulled={false} />;
 }
@@ -668,19 +698,66 @@ function Tower() {
 /* Trees and lamps                                                     */
 /* ------------------------------------------------------------------ */
 
+/** Where each kind of crown sits on its trunk, as shares of the tree's height, and how big it is. */
+const CROWN = {
+  round: { trunk: 0.45, at: 0.62, size: [0.36, 0.32, 0.36] },
+  blossom: { trunk: 0.45, at: 0.62, size: [0.36, 0.32, 0.36] },
+  cone: { trunk: 0.28, at: 0.56, size: [0.2, 0.42, 0.2] },
+  umbrella: { trunk: 0.72, at: 0.8, size: [0.44, 0.44, 0.44] },
+} as const;
+
 function Trees({ basic }: { basic: boolean }) {
-  const { trunks, canopies } = useMemo(() => {
+  const { trunks, crowns } = useMemo(() => {
     const list = trees().filter((_, i) => !basic || i % 2 === 0);
+    const crown = (t: Tree) => {
+      const c = CROWN[t.kind];
+      return compose(t.x, GROUND_Y + t.h * c.at, t.z, t.turn, [t.h * c.size[0], t.h * c.size[1], t.h * c.size[2]]);
+    };
+    const shape = (s: "round" | "cone" | "umbrella") => list.filter((t) => (t.kind === "blossom" ? "round" : t.kind) === s);
     return {
-      trunks: list.map((t) => compose(t.x, GROUND_Y, t.z, t.turn, [1, t.h * 0.45, 1])),
-      canopies: list.map((t) => compose(t.x, GROUND_Y + t.h * 0.62, t.z, t.turn, [t.h * 0.36, t.h * 0.32, t.h * 0.36])),
+      trunks: list.map((t) => compose(t.x, GROUND_Y, t.z, t.turn, [1, t.h * CROWN[t.kind].trunk, 1])),
+      crowns: (["round", "cone", "umbrella"] as const).map((s) => ({ s, matrices: shape(s).map(crown), colours: shape(s).map((t) => t.leaf) })),
     };
   }, [basic]);
-  const geo = useMemo(() => ({ trunk: treeTrunk(), canopy: treeCanopy(basic) }), [basic]);
+  const geo = useMemo(() => ({ trunk: treeTrunk(), round: treeCanopy("round", basic), cone: treeCanopy("cone", basic), umbrella: treeCanopy("umbrella", basic) }), [basic]);
   return (
     <group>
       <Instances geometry={geo.trunk} material={M.shaded} matrices={trunks} />
-      <Instances geometry={geo.canopy} material={M.shaded} matrices={canopies} />
+      {crowns.map(({ s, matrices, colours }) => (
+        <Instances key={s} geometry={geo[s]} material={M.shaded} matrices={matrices} colours={colours} />
+      ))}
+    </group>
+  );
+}
+
+/** The park's fountain and its square, the flower beds along the paths, and the benches round the loop. */
+function Park({ basic }: { basic: boolean }) {
+  const { stone, water } = useMemo(() => {
+    const [cx, cz] = parkCentre();
+    const r = FOUNTAIN.r;
+    const at = (g: THREE.BufferGeometry, y: number) => g.translate(cx, GROUND_Y + y, cz);
+    const disc = (radius: number, y: number, colour: string, ambient = 1) => tint(at(new THREE.CircleGeometry(radius, 40).rotateX(-Math.PI / 2), y), colour, ambient);
+    const solid: THREE.BufferGeometry[] = [
+      disc(FOUNTAIN.square, 0.025, "#4b4755"),
+      tint(at(new THREE.CylinderGeometry(r, r + 0.15, 0.6, 40), 0.3), "#8b8578", 0.6),
+      tint(at(new THREE.RingGeometry(r - 0.35, r, 40).rotateX(-Math.PI / 2), 0.63), "#a29b8d", 1),
+      tint(at(new THREE.CylinderGeometry(0.35, 0.5, 1.5, 12), 1.35), "#8b8578", 0.6),
+      tint(at(new THREE.CylinderGeometry(1.3, 0.6, 0.3, 24), 2.2), "#8b8578", 0.6),
+      tint(at(new THREE.CylinderGeometry(0.18, 0.25, 0.8, 10), 2.7), "#8b8578", 0.6),
+    ];
+    for (const [x0, z0, x1, z1] of flowerBeds()) solid.push(tint(box(x1 - x0, 0.3, z1 - z0, (x0 + x1) / 2, GROUND_Y + 0.15, (z0 + z1) / 2), "#3a2a22", 0.6));
+    if (!basic) for (const f of flowers()) solid.push(tint(new THREE.IcosahedronGeometry(0.2, 0).translate(f.x, GROUND_Y + 0.42, f.z), f.colour, 0.75));
+    // Water in the basin and the bowl, and the jet above it, glow.
+    const glow = [disc(r - 0.35, 0.61, "#2fa9c9"), disc(1.15, 2.36, "#2fa9c9"), tint(at(new THREE.CylinderGeometry(0.06, 0.12, 1.1, 8), 3.6), "#bdefff", 1)];
+    return { stone: merge(solid), water: merge(glow) };
+  }, [basic]);
+  const seats = useMemo(() => benches().map((b) => compose(b.x, GROUND_Y, b.z, b.rot)), []);
+  const bench = useMemo(() => benchBody(), []);
+  return (
+    <group>
+      <Merged geometry={stone} material={M.shaded} />
+      <Merged geometry={water} material={M.glow} />
+      <Instances geometry={bench} material={M.shaded} matrices={seats} />
     </group>
   );
 }
@@ -803,6 +880,7 @@ export function Exterior({ linear }: { linear: boolean }) {
       <Buildings lite={basic} />
       <Tower />
       <Trees basic={basic} />
+      <Park basic={basic} />
       <Lamps pools={!basic} />
       <Traffic share={basic ? 0.4 : 1} lite={basic} />
     </group>
