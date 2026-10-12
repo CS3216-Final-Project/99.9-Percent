@@ -8,7 +8,7 @@ See the [Development Roadmap](docs/DEVELOPMENT_ROADMAP.md) for planned work and 
 
 The [System Architecture](docs/SYSTEM_ARCHITECTURE.md) diagrams show the target MVP's frontend, simulation, Google OAuth, saves, API and Neon database, plus the infrastructure simulated inside the game. [🔑 Authentication](docs/AUTHENTICATION.md) describes the optional Google sign-in, durable app sessions and account-owned cloud saves. Real-provider deployment acceptance remains outstanding.
 
-The [UI design guide](docs/UI_DESIGN.md) defines the shared visual language, incident and inspector layouts, responsive behaviour and review checks used by both gameplay modes.
+The [UI design guide](docs/UI_DESIGN.md) defines the shared visual language, incident and inspector layouts, responsive behaviour and review checks used by both gameplay modes. The [asset pipeline](docs/ASSET_PIPELINE.md) covers where models and textures come from, exporting from Blender, compressing models with `npm run models:compress` and recording licences.
 
 ## Structure
 
