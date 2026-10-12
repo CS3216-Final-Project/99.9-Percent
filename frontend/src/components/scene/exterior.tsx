@@ -27,6 +27,7 @@ import {
   parkBlock,
   parkCentre,
   parkPaths,
+  pedestrians,
   PODIUM,
   REACH,
   roadRect,
@@ -39,6 +40,7 @@ import {
   traffic,
   trees,
   vehicleAt,
+  walkerAt,
   type Building,
   type Plant,
   type Road,
@@ -898,6 +900,81 @@ function Traffic({ share, lite }: { share: number; lite: boolean }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Pedestrians                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A passer-by facing -z: a round monster like the crew upstairs, on two small feet, in a white body that its own
+ * colour tints. Its eyes are drawn apart, so they stay white.
+ */
+function walkerBody(lite: boolean): THREE.BufferGeometry {
+  return merge([
+    tint(new THREE.IcosahedronGeometry(0.5, lite ? 0 : 1).scale(0.72, 1.15, 0.72).translate(0, 0.78, 0), "#ffffff", 0.62),
+    ...[-0.16, 0.16].map((x) => tint(box(0.17, 0.2, 0.26, x, 0.1, -0.02), "#4a4652", 0.7)),
+  ]);
+}
+
+function walkerEyes(): THREE.BufferGeometry {
+  return merge(
+    [-0.13, 0.13].flatMap((x) => [
+      tint(new THREE.IcosahedronGeometry(0.085, 0).translate(x, 1.0, -0.27), "#f6f4ef", 1),
+      tint(new THREE.IcosahedronGeometry(0.045, 0).translate(x, 1.0, -0.34), "#1b1b22", 1),
+    ]),
+  );
+}
+
+const stretch = new THREE.Vector3();
+
+/** People walking the pavements, the park and the plaza, hopping as they go. `share` thins the crowd without a GPU. */
+function Crowd({ share, lite }: { share: number; lite: boolean }) {
+  const people = useMemo(() => pedestrians().filter((_, i) => (i * share) % 1 < share), [share]);
+  const geo = useMemo(() => ({ body: walkerBody(lite), eyes: walkerEyes() }), [lite]);
+  const bodies = useRef<THREE.InstancedMesh>(null);
+  const eyes = useRef<THREE.InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const mesh = bodies.current;
+    if (!mesh) return;
+    const c = new THREE.Color();
+    people.forEach((p, i) => mesh.setColorAt(i, c.set(p.colour)));
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [people]);
+  useFrame(({ clock }) => {
+    const b = bodies.current;
+    const e = eyes.current;
+    if (!b || !e) return;
+    const t = clock.elapsedTime;
+    for (let k = 0; k < people.length; k++) {
+      const p = people[k];
+      const at = walkerAt(p, t);
+      const phase = t * p.speed * 2.8 + k * 1.7;
+      const squash = 1 + 0.06 * Math.cos(2 * phase);
+      place.set(at.x, GROUND_Y + 0.02 + Math.abs(Math.sin(phase)) * 0.12 * p.size, at.z);
+      spin.setFromAxisAngle(UP, at.heading);
+      stretch.set(p.size / Math.sqrt(squash), p.size * squash, p.size / Math.sqrt(squash));
+      turned.compose(place, spin, stretch);
+      b.setMatrixAt(k, turned);
+      e.setMatrixAt(k, turned);
+    }
+    b.instanceMatrix.needsUpdate = true;
+    e.instanceMatrix.needsUpdate = true;
+  });
+  useEffect(
+    () => () => {
+      geo.body.dispose();
+      geo.eyes.dispose();
+    },
+    [geo],
+  );
+  if (people.length === 0) return null;
+  return (
+    <group>
+      <instancedMesh key={`b${people.length}`} ref={bodies} args={[geo.body, M.shaded, people.length]} frustumCulled={false} />
+      <instancedMesh key={`e${people.length}`} ref={eyes} args={[geo.eyes, M.shaded, people.length]} frustumCulled={false} />
+    </group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Downtown                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -918,6 +995,7 @@ export function Exterior({ linear }: { linear: boolean }) {
       <Park basic={basic} />
       <Lamps pools={!basic} />
       <Traffic share={basic ? 0.4 : 1} lite={basic} />
+      <Crowd share={basic ? 0.4 : 1} lite={basic} />
     </group>
   );
 }

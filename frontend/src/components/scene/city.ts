@@ -777,3 +777,79 @@ export function vehicleRect(v: Vehicle, t: number): Rect {
   const width = isLong(v.kind) ? VEHICLE.width : 1.8;
   return lane.axis === "x" ? rect(x, z, length, width) : rect(x, z, width, length);
 }
+
+/* ------------------------------------------------------------------ */
+/* Pedestrians                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Where people walk: round and round a rectangle, never across a road, since the junctions leave traffic no gap for
+ * them. Each block has two loops on its pavement, between the building line and the tree pits, one each way; the
+ * park has two on its loop path, and the tower's plaza one round the podium.
+ */
+/** Building line to each loop, and the most room a passer-by takes either side of it. */
+export const WALK = { near: 0.65, far: 1.3, radius: 0.45 };
+
+function walkLoops(): Rect[] {
+  const out: Rect[] = [];
+  const grow = (r: Rect, by: number): Rect => inset(r, -by);
+  for (const b of blocks()) {
+    const nx = Math.min(Math.max(FADE.x, b.rect[0]), b.rect[2]);
+    const nz = Math.min(Math.max(FADE.z, b.rect[1]), b.rect[3]);
+    if (fadeAt(nx, nz) > 0.6) continue;
+    out.push(grow(b.rect, WALK.near), grow(b.rect, WALK.far));
+  }
+  const loop = parkLoop();
+  out.push(inset(loop, PARK_PATH / 2 - 0.6), inset(loop, PARK_PATH / 2 + 0.6));
+  out.push(grow(PODIUM, 2));
+  return out;
+}
+
+/** Every walking loop, the same on every visit. */
+export const WALKS: Rect[] = walkLoops();
+
+export interface Pedestrian {
+  walk: number;
+  /** Where round the loop they start, in metres, and which way they go. */
+  at: number;
+  dir: 1 | -1;
+  /** Metres a second. */
+  speed: number;
+  /** Height relative to an average passer-by. */
+  size: number;
+  colour: string;
+}
+
+export const PEOPLE_COLOURS = ["#ff8fab", "#7fd6ff", "#9be38b", "#ffd166", "#c39bff", "#ff9f68", "#6ee7c8", "#f4f1ea", "#ff6b6b", "#8fb3ff"];
+
+const perimeter = (r: Rect) => 2 * (r[2] - r[0] + r[3] - r[1]);
+
+/** About one person every 22 metres of loop, each loop one way round; the same crowd every visit. */
+export function pedestrians(seed = 23): Pedestrian[] {
+  const rng: RngHolder = { rngState: seed };
+  const out: Pedestrian[] = [];
+  WALKS.forEach((r, walk) => {
+    const n = Math.round(perimeter(r) / 22);
+    const dir: 1 | -1 = walk % 2 === 0 ? 1 : -1;
+    for (let k = 0; k < n; k++) {
+      out.push({ walk, at: ((k + randRange(rng, -0.3, 0.3)) * perimeter(r)) / n, dir, speed: randRange(rng, 1.0, 1.5), size: randRange(rng, 0.75, 1.2), colour: pick(rng, PEOPLE_COLOURS) });
+    }
+  });
+  return out;
+}
+
+/** Where a pedestrian is at time t, and which way they face (they face -z at 0). */
+export function walkerAt(p: Pedestrian, t: number): { x: number; z: number; heading: number } {
+  const [x0, z0, x1, z1] = WALKS[p.walk];
+  const w = x1 - x0;
+  const d = z1 - z0;
+  const all = 2 * (w + d);
+  const s = (((p.at + p.dir * p.speed * t) % all) + all) % all;
+  // Round the loop: along the back edge, down the right, along the front backwards, up the left.
+  let x: number, z: number, dx: number, dz: number;
+  if (s < w) [x, z, dx, dz] = [x0 + s, z0, 1, 0];
+  else if (s < w + d) [x, z, dx, dz] = [x1, z0 + s - w, 0, 1];
+  else if (s < 2 * w + d) [x, z, dx, dz] = [x1 - (s - w - d), z1, -1, 0];
+  else [x, z, dx, dz] = [x0, z1 - (s - 2 * w - d), 0, -1];
+  return { x, z, heading: Math.atan2(-dx * p.dir, -dz * p.dir) };
+}

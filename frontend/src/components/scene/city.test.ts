@@ -30,6 +30,7 @@ import {
   parkBlock,
   parkCentre,
   parkPaths,
+  pedestrians,
   PODIUM,
   REACH,
   roadRect,
@@ -47,6 +48,9 @@ import {
   TURN,
   vehicleAt,
   vehicleRect,
+  walkerAt,
+  WALK,
+  WALKS,
   type Building,
   type Rect,
   type Vehicle,
@@ -226,6 +230,58 @@ describe('the streets', () => {
     }
     expect(REACH).toBeGreaterThan(FADE.to);
     expect(fadeAt(FADE.x, FADE.z)).toBe(0);
+  });
+});
+
+describe('pedestrians', () => {
+  const people = pedestrians();
+  /** The four sides of a walking loop, each widened by the room a passer-by takes. */
+  const sides = ([x0, z0, x1, z1]: Rect, by = WALK.radius): Rect[] => [
+    [x0 - by, z0 - by, x1 + by, z0 + by],
+    [x0 - by, z1 - by, x1 + by, z1 + by],
+    [x0 - by, z0 - by, x0 + by, z1 + by],
+    [x1 - by, z0 - by, x1 + by, z1 + by],
+  ];
+
+  it('walks round loops that never cross a road, a building, the podium, a lamp post or a tree', () => {
+    expect(people.length).toBeGreaterThan(200);
+    const posts = [...lamps(), ...trees()].map((p): Rect => [p.x - 0.25, p.z - 0.25, p.x + 0.25, p.z + 0.25]);
+    WALKS.forEach((loop, i) => {
+      for (const s of sides(loop)) {
+        for (const r of ROADS) expect(overlaps(s, roadRect(r)), `loop ${i} on a road`).toBe(false);
+        for (const m of masses) expect(overlaps(s, m.rect), `loop ${i} through building ${m.building}`).toBe(false);
+        expect(overlaps(s, PODIUM), `loop ${i} through the podium`).toBe(false);
+        for (const p of posts) expect(overlaps(s, p), `loop ${i} into a post at ${p[0].toFixed(1)}, ${p[1].toFixed(1)}`).toBe(false);
+      }
+    });
+  });
+
+  it('keeps walkers in the park on its loop path', () => {
+    const park = WALKS.filter((loop) => inside(loop[0], loop[1], parkBlock().rect));
+    expect(park.length).toBe(2);
+    for (const loop of park) for (const s of sides(loop)) expect(parkPaths().some((p) => inside(s[0], s[1], p, 0.01) && inside(s[2], s[3], p, 0.01))).toBe(true);
+  });
+
+  it('moves each walker along its loop at walking pace, facing the way it goes', () => {
+    for (const p of people.slice(0, 60)) {
+      const [x0, z0, x1, z1] = WALKS[p.walk];
+      for (let t = 0; t < 30; t += 1.3) {
+        const a = walkerAt(p, t);
+        const onEdge = Math.abs(a.x - x0) < 1e-6 || Math.abs(a.x - x1) < 1e-6 || Math.abs(a.z - z0) < 1e-6 || Math.abs(a.z - z1) < 1e-6;
+        expect(onEdge && inside(a.x, a.z, WALKS[p.walk], 1e-6)).toBe(true);
+        const b = walkerAt(p, t + 0.05);
+        const step = Math.hypot(b.x - a.x, b.z - a.z);
+        expect(step).toBeLessThanOrEqual(p.speed * 0.05 + 1e-6);
+        // Away from the corners, the step is along the way the walker faces.
+        if (step > p.speed * 0.049) {
+          expect(-Math.sin(a.heading) * (b.x - a.x) - Math.cos(a.heading) * (b.z - a.z)).toBeCloseTo(step, 6);
+        }
+      }
+    }
+  });
+
+  it('is the same crowd on every visit', () => {
+    expect(pedestrians()).toEqual(people);
   });
 });
 
