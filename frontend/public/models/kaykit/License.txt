@@ -32,3 +32,5 @@
 
 	Follow on Twitter for updates:
 	http://twitter.com/KayLousberg
+
+The models were compressed with meshopt (gltf-transform 4.5.0, `npm run models:compress`); the texture is unchanged. See docs/ASSET_PIPELINE.md.
