@@ -14,6 +14,32 @@ function useAccountRestore() {
   }, []);
 }
 
+/** The landing page's account links open the game at `/?signin=1`. */
+const SIGN_IN_PARAM = "signin";
+
+/**
+ * When the page was opened with `?signin`, wait for the account check, then open the account dialog for a
+ * player who is not signed in. A signed-in player sees nothing. The flag leaves the address once handled,
+ * so a reload does not ask again.
+ */
+function useSignInRequest(setOpen: (open: boolean) => void) {
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has(SIGN_IN_PARAM)) return;
+    const settle = ({ accountStatus, accountSession }: ReturnType<typeof useGame.getState>) => {
+      if (accountStatus === "unchecked" || accountStatus === "checking") return false;
+      const url = new URL(window.location.href);
+      url.searchParams.delete(SIGN_IN_PARAM);
+      window.history.replaceState(window.history.state, "", url);
+      if (!accountSession) setOpen(true);
+      return true;
+    };
+    if (settle(useGame.getState())) return;
+    // StrictMode runs this twice; only the subscription that survives handles the request.
+    const stop = useGame.subscribe((s) => { if (settle(s)) stop(); });
+    return stop;
+  }, [setOpen]);
+}
+
 const initials = (name: string) =>
   name.trim().split(/\s+/).slice(0, 2).map((word) => word[0]?.toUpperCase() ?? "").join("") || "?";
 
@@ -28,6 +54,7 @@ export function AccountButton() {
   const session = useGame((s) => s.accountSession);
   const status = useGame((s) => s.accountStatus);
   const [open, setOpen] = useState(false);
+  useSignInRequest(setOpen);
   const checking = status === "unchecked" || status === "checking";
   return <>
     <button type="button" className={`account-chip${session ? " is-signed-in" : ""}`} aria-haspopup="dialog" onClick={() => setOpen(true)}>
