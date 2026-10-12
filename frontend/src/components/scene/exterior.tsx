@@ -42,6 +42,7 @@ import {
   TOWER,
   town,
   traffic,
+  TREE_SPREAD,
   trees,
   vehicleAt,
   walkerAt,
@@ -59,6 +60,7 @@ import {
 import { useDetail } from "./detail";
 import { world } from "./cityLight";
 import { useCitySurfaces, type CitySurface } from "./cityTextures";
+import { TREE_VARIANTS, treeModel, type TreeModel, type TreeShape } from "./treeModels";
 import { adsTexture, logoSign } from "./textures";
 
 /*
@@ -91,6 +93,11 @@ uniform float uDark;
 vec3 cityLight(vec3 n) {
   return mix(uGroundLight, uSkyLight, 0.5 + 0.5 * n.y) + uKeyLight * max(dot(n, uKeyDir), 0.0);
 }
+
+/** The same through leaves: the sun reaches a little round the far side of a crown. */
+vec3 foliageLight(vec3 n) {
+  return mix(uGroundLight, uSkyLight, 0.5 + 0.5 * n.y) + uKeyLight * 0.95 * max((dot(n, uKeyDir) + 0.45) / 1.45, 0.0);
+}
 `;
 
 /**
@@ -98,13 +105,19 @@ vec3 cityLight(vec3 n) {
  * and brighter at night; seen only at night, like the pools of lamplight; or shaded by its own shader, like the
  * facades.
  */
-type Lighting = "lit" | "textured" | "sign" | "glow" | "night" | "own";
+type Lighting = "lit" | "textured" | "foliage" | "foliageTextured" | "shadow" | "sign" | "glow" | "night" | "own";
 
 const LIGHTING: Record<Lighting, string> = {
   lit: "diffuseColor.rgb *= cityLight(normalize(vCityNormal));",
   textured: "diffuseColor.rgb *= cityDetail(normalize(vCityNormal)) * cityLight(cityBumped(normalize(vCityNormal)));",
   // Sunlit by day like any surface, floodlit at night.
   sign: "diffuseColor.rgb *= mix(cityLight(normalize(vCityNormal)), vec3(1.0), uDark * 0.85);",
+  // Leaves and fronds are thin, so each side is lit as if it faced the viewer, and light wraps round them a little.
+  foliage: "diffuseColor.rgb *= foliageLight(normalize(vCityNormal) * (gl_FrontFacing ? 1.0 : -1.0));",
+  foliageTextured:
+    "vec3 leafN = normalize(vCityNormal) * (gl_FrontFacing ? 1.0 : -1.0); diffuseColor.rgb *= leafDetail(leafN) * foliageLight(leafN);",
+  // A soft shadow on the ground: darker by day, faint under the moon.
+  shadow: "diffuseColor.a *= mix(0.72, 0.2, uDark);",
   glow: "diffuseColor.rgb *= mix(0.6, 1.0, uDark);",
   night: "diffuseColor.rgb *= uDark;",
   own: "",
@@ -173,6 +186,14 @@ float cityDetail(vec3 n) {
   return mix(1.0, d, detailFlat(n));
 }
 
+/** A photo's light and dark laid round a crown from three sides at once, so leaves read on every face of it. */
+float leafDetail(vec3 n) {
+  vec3 w = abs(n);
+  w /= w.x + w.y + w.z;
+  float t = texture2D(uDetail, vFadeWorld.zy / uTile).r * w.x + texture2D(uDetail, vFadeWorld.xz / uTile).r * w.y + texture2D(uDetail, vFadeWorld.xy / uTile).r * w.z;
+  return 1.0 + (t / ${GREY_MEAN.toFixed(2)} - 1.0) * uContrast;
+}
+
 /** The normal, tipped by the photo's bumps. */
 vec3 cityBumped(vec3 n) {
   vec2 t = mix(texture2D(uDetailNormal, detailUvA()).xy, texture2D(uDetailNormal, detailUvB()).xy, 0.4) * 2.0 - 1.0;
@@ -189,6 +210,58 @@ function texturedMaterial(surface: CitySurface): THREE.MeshBasicMaterial {
     shader.uniforms.uContrast = { value: surface.contrast };
     shader.uniforms.uMottle = { value: surface.mottle };
     shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${DETAIL_GLSL}`);
+  });
+}
+
+/** Leaves and bark, lit through; at HD, the leaves carry a photo of foliage laid round them from three sides. */
+function foliageMaterial(surface: CitySurface | null): THREE.MeshBasicMaterial {
+  if (!surface) return faded({ vertexColors: true, side: THREE.DoubleSide }, "city-foliage", "foliage");
+  return faded({ vertexColors: true, side: THREE.DoubleSide }, "city-foliage-textured", "foliageTextured", (shader) => {
+    shader.uniforms.uDetail = { value: surface.map };
+    shader.uniforms.uDetailNormal = { value: surface.normalMap };
+    shader.uniforms.uTile = { value: 1.3 };
+    shader.uniforms.uContrast = { value: 0.9 };
+    shader.uniforms.uMottle = { value: 0 };
+    shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${DETAIL_GLSL}`);
+  });
+}
+
+/** A soft round shadow, dark in the middle and gone at the edge. */
+function shadowTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d") as CanvasRenderingContext2D;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.5, "rgba(255,255,255,0.85)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+/**
+ * Shadows of the trees on the ground, cast away from the sun: right under each tree at noon, long and thrown far
+ * when the sun is low. Each copy is scaled to its crown's width across and its tree's height up, which the shader
+ * reads back to work out how far the crown's shadow falls.
+ */
+function treeShadowMaterial(map: THREE.Texture): THREE.MeshBasicMaterial {
+  // Darken what is under the shadow but leave the canvas's own alpha alone, or the page would show through it.
+  const blend = { blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor };
+  return faded({ color: "#000000", map, transparent: true, depthWrite: false, ...blend }, "city-tree-shadow", "shadow", (shader) => {
+    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nuniform vec3 uKeyDir;").replace(
+      "#include <begin_vertex>",
+      `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+        float treeHeight = length(instanceMatrix[1].xyz);
+        float shadowWidth = length(instanceMatrix[0].xyz);
+        vec2 sunward = uKeyDir.xz / max(uKeyDir.y, 0.3);
+        float lean = length(sunward);
+        vec2 along = lean > 1e-3 ? sunward / lean : vec2(0.0);
+        transformed.xz += along * dot(transformed.xz, along) * min(lean, 2.0) * 0.6;
+        transformed.xz -= sunward * treeHeight * 0.5 / shadowWidth;
+      #endif`,
+    );
   });
 }
 
@@ -508,44 +581,6 @@ function vehicleLights(kind: VehicleKind): THREE.BufferGeometry {
   return carLights();
 }
 
-function treeTrunk(): THREE.BufferGeometry {
-  return tint(new THREE.CylinderGeometry(0.16, 0.24, 1, 7).translate(0, 0.5, 0), "#4a3a2e");
-}
-
-/**
- * Unit-scale canopies, coarser when lite, in pale greys: each tree's own colour tints them. A rounded crown of a few
- * lumps, a conifer of two stacked cones, and a rain tree's flat, spreading umbrella.
- */
-function treeCanopy(kind: "round" | "cone" | "umbrella" | "palm", lite = false): THREE.BufferGeometry {
-  const detail = lite ? 0 : 1;
-  const lump = (r: number, x: number, y: number, z: number, shade: string) => tint(new THREE.IcosahedronGeometry(r, detail).translate(x, y, z), shade);
-  if (kind === "cone") {
-    return merge([
-      tint(new THREE.ConeGeometry(1, 1.25, lite ? 6 : 9).translate(0, -0.2, 0), "#ffffff"),
-      tint(new THREE.ConeGeometry(0.72, 1.0, lite ? 6 : 9).translate(0, 0.45, 0), "#e8e8e8"),
-    ]);
-  }
-  if (kind === "palm") {
-    // Fronds fanning out and drooping from the top of the trunk, round a knot where they meet.
-    const fronds = lite ? 7 : 11;
-    return merge([
-      lump(0.2, 0, 0, 0, "#c9c2a8"),
-      ...Array.from({ length: fronds }, (_, k) =>
-        tint(
-          box(0.26, 0.04, 1.05, 0, 0, -0.55)
-            .rotateX(-(0.35 + 0.35 * ((k * 5) % 3) / 2))
-            .rotateY((k / fronds) * Math.PI * 2 + 0.3 * (k % 2)),
-          k % 2 ? "#ffffff" : "#e0e0e0",
-        ),
-      ),
-    ]);
-  }
-  if (kind === "umbrella") {
-    return merge([lump(1.0, 0, 0, 0, "#ffffff"), lump(0.8, 0.95, -0.05, 0.3, "#e4e4e4"), lump(0.8, -0.85, 0.05, -0.35, "#d6d6d6"), lump(0.7, 0.15, 0.1, -0.95, "#ececec"), lump(0.7, -0.2, -0.05, 0.95, "#dcdcdc")].map((g) => g.scale(1, 0.42, 1)));
-  }
-  return merge([lump(1.0, 0, 0, 0, "#ffffff"), lump(0.75, 0.7, 0.25, 0.3, "#e6e6e6"), lump(0.7, -0.6, 0.15, -0.4, "#d2d2d2")]);
-}
-
 /** A park bench facing -z: slats on two legs, and a back. */
 function benchBody(): THREE.BufferGeometry {
   return merge([
@@ -601,7 +636,8 @@ function Instances({ geometry, material, matrices, colours }: { geometry: THREE.
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
     mesh.computeBoundingSphere();
-  }, [matrices, colours]);
+    // A new geometry or material makes a new mesh, which needs its copies placed again.
+  }, [matrices, colours, geometry, material]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   return <instancedMesh key={matrices.length} ref={ref} args={[geometry, material, matrices.length]} frustumCulled={false} />;
 }
@@ -633,7 +669,7 @@ function poolTexture(): THREE.CanvasTexture {
 /* The ground: pavements, roads, the plaza and the park                */
 /* ------------------------------------------------------------------ */
 
-const LAYER = { ground: GROUND_Y, block: GROUND_Y + 0.005, tarmac: GROUND_Y + 0.01, paint: GROUND_Y + 0.02, glow: GROUND_Y + 0.03 };
+const LAYER = { ground: GROUND_Y, block: GROUND_Y + 0.005, tarmac: GROUND_Y + 0.01, paint: GROUND_Y + 0.02, shade: GROUND_Y + 0.025, glow: GROUND_Y + 0.03 };
 
 /** A strip on a road: `along` it, `across` from its centre line, so long and so wide. */
 function onRoad(r: Road, along: number, across: number, length: number, width: number, y: number): THREE.BufferGeometry {
@@ -1073,35 +1109,73 @@ function Tower() {
 /* Trees and lamps                                                     */
 /* ------------------------------------------------------------------ */
 
-/** Where each kind of crown sits on its trunk, as shares of the tree's height, and how big it is. */
-const CROWN = {
-  round: { trunk: 0.45, at: 0.62, size: [0.36, 0.32, 0.36] },
-  blossom: { trunk: 0.45, at: 0.62, size: [0.36, 0.32, 0.36] },
-  cone: { trunk: 0.28, at: 0.56, size: [0.2, 0.42, 0.2] },
-  umbrella: { trunk: 0.72, at: 0.8, size: [0.44, 0.44, 0.44] },
-  palm: { trunk: 0.94, at: 0.95, size: [0.27, 0.27, 0.27] },
-} as const;
+const SHAPES: TreeShape[] = ["round", "cone", "umbrella", "palm"];
+const shapeOf = (t: Tree): TreeShape => (t.kind === "blossom" ? "round" : t.kind);
 
+/**
+ * Every tree, by shape and by model: its bark and its leaves share each tree's place, turn and size, a little wider
+ * or narrower than the model, and the leaves take the tree's own colour. A shadow lies under each.
+ */
 function Trees({ basic }: { basic: boolean }) {
-  const { trunks, crowns } = useMemo(() => {
+  const surfaces = useCitySurfaces();
+  const groups = useMemo(() => {
     const list = trees().filter((_, i) => !basic || i % 2 === 0);
-    const crown = (t: Tree) => {
-      const c = CROWN[t.kind];
-      return compose(t.x, GROUND_Y + t.h * c.at, t.z, t.turn, [t.h * c.size[0], t.h * c.size[1], t.h * c.size[2]]);
-    };
-    const shape = (s: "round" | "cone" | "umbrella" | "palm") => list.filter((t) => (t.kind === "blossom" ? "round" : t.kind) === s);
-    return {
-      trunks: list.map((t) => compose(t.x, GROUND_Y, t.z, t.turn, [1, t.h * CROWN[t.kind].trunk, 1])),
-      crowns: (["round", "cone", "umbrella", "palm"] as const).map((s) => ({ s, matrices: shape(s).map(crown), colours: shape(s).map((t) => t.leaf) })),
-    };
+    const placed = list.map((t, i) => {
+      // Each tree a little wider or narrower than its model, the same way every visit.
+      const sx = 0.92 + 0.16 * ((i * 0.618) % 1);
+      const sz = 0.92 + 0.16 * ((i * 0.382 + 0.5) % 1);
+      return { t, i, matrix: compose(t.x, GROUND_Y, t.z, t.turn, [t.h * sx, t.h, t.h * sz]) };
+    });
+    return SHAPES.flatMap((shape) =>
+      Array.from({ length: TREE_VARIANTS[shape] }, (_, variant) => {
+        const own = placed.filter((p) => shapeOf(p.t) === shape && p.i % TREE_VARIANTS[shape] === variant);
+        return { shape, variant, matrices: own.map((p) => p.matrix), colours: own.map((p) => p.t.leaf) };
+      }).filter((g) => g.matrices.length > 0),
+    );
   }, [basic]);
-  const geo = useMemo(() => ({ trunk: treeTrunk(), round: treeCanopy("round", basic), cone: treeCanopy("cone", basic), umbrella: treeCanopy("umbrella", basic), palm: treeCanopy("palm", basic) }), [basic]);
+  const models = useMemo(() => new Map(groups.map((g) => [`${g.shape}${g.variant}`, treeModel(g.shape, g.variant, basic)])), [groups, basic]);
+  const shadows = useMemo(
+    () =>
+      trees()
+        .filter((_, i) => !basic || i % 2 === 0)
+        .map((t) => {
+          const across = 2.2 * TREE_SPREAD[t.kind] * t.h;
+          return compose(t.x, LAYER.shade, t.z, 0, [across, t.h, across]);
+        }),
+    [basic],
+  );
+  const looks = useMemo(() => ({ bark: foliageMaterial(null), leaves: foliageMaterial(surfaces?.lawn ?? null) }), [surfaces]);
+  const shade = useMemo(() => {
+    const map = shadowTexture();
+    return { map, material: treeShadowMaterial(map) };
+  }, []);
+  useEffect(
+    () => () => {
+      looks.bark.dispose();
+      looks.leaves.dispose();
+    },
+    [looks],
+  );
+  useEffect(
+    () => () => {
+      shade.map.dispose();
+      shade.material.dispose();
+    },
+    [shade],
+  );
+  const disc = useMemo(() => flat(1, 1), []);
   return (
     <group>
-      <Instances geometry={geo.trunk} material={M.shaded} matrices={trunks} />
-      {crowns.map(({ s, matrices, colours }) => (
-        <Instances key={s} geometry={geo[s]} material={M.shaded} matrices={matrices} colours={colours} />
-      ))}
+      <Instances geometry={disc} material={shade.material} matrices={shadows} />
+      {groups.map(({ shape, variant, matrices, colours }) => {
+        const m = models.get(`${shape}${variant}`) as TreeModel;
+        return (
+          <group key={`${shape}${variant}`}>
+            <Instances geometry={m.bark} material={looks.bark} matrices={matrices} />
+            <Instances geometry={m.leaves} material={looks.leaves} matrices={matrices} colours={colours} />
+          </group>
+        );
+      })}
     </group>
   );
 }

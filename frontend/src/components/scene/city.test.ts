@@ -49,6 +49,7 @@ import {
   STREET_WIDTH,
   TOWER,
   town as cityTown,
+  TREE_SPREAD,
   towerBlock,
   traffic,
   trees,
@@ -312,7 +313,7 @@ describe('the streets', () => {
 
   it('keeps every tree low enough, or far enough away, never to hide the office', () => {
     for (const t of trees()) {
-      const crown = t.h * 0.45;
+      const crown = t.h * TREE_SPREAD[t.kind];
       expect(clearOfOffice([t.x - crown, t.z - crown, t.x + crown, t.z + crown], GROUND_Y + t.h), `${t.kind} at ${t.x.toFixed(1)}, ${t.z.toFixed(1)}`).toBe(true);
     }
   });

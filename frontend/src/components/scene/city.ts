@@ -798,6 +798,9 @@ const LEAVES: Record<TreeKind, readonly string[]> = {
 /** How tall each kind grows, in metres. */
 const TREE_HEIGHT: Record<TreeKind, [number, number]> = { round: [6, 9], cone: [7, 10.5], umbrella: [8, 11.5], blossom: [5, 7.5], palm: [9, 14] };
 
+/** How far each kind's crown reaches out from its trunk, as a share of its height (see treeModels.ts). */
+export const TREE_SPREAD: Record<TreeKind, number> = { round: 0.52, blossom: 0.52, cone: 0.2, umbrella: 0.85, palm: 0.46 };
+
 /** Palms and oaks stand this far apart down the middle of the medians. */
 const MEDIAN_GAP = 13;
 
