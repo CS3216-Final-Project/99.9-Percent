@@ -25,6 +25,11 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   await expect(page.getByRole('dialog', { name: /Tutorial, step 2/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tech', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Tech tree' }).locator('.node')).toHaveCount(9);
+  // Beside the Operations rail, the sheet is narrower than Campaign's; all nine still fit next to the detail panel.
+  expect(await page.getByRole('region', { name: 'Tech tree' }).locator('[data-tech]').evaluateAll(nodes => nodes.every(node => {
+    const box = node.getBoundingClientRect(), viewport = node.closest('.tree-scroll')!.getBoundingClientRect();
+    return box.left >= viewport.left && box.right <= viewport.right;
+  })), 'All nine technologies fit beside the detail panel on desktop').toBe(true);
   await page.getByRole('button', { name: 'Scale Up: Available' }).click();
   await page.getByRole('button', { name: /^Start/ }).click();
   await expect(page.getByRole('dialog', { name: /Tutorial, step 3/ })).toBeVisible();

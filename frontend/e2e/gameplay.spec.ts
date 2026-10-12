@@ -80,7 +80,7 @@ test("preserves a corrupt campaign save until explicit reset", async ({ page, wi
   await menu.getByRole("tab", { name: "Saves" }).click();
   const download = page.waitForEvent("download"); await menu.getByRole("button", { name: "Export original stored save" }).click(); await download;
   await menu.getByRole("button", { name: "New company", exact: true }).click();
-  await menu.getByRole("button", { name: "Confirm new company" }).click();
+  await menu.getByRole("button", { name: "Lose this company? Press again" }).click();
   expect((await savedGame(page)).campaign!.step).toBe(0);
 });
 test("resumes an incident paused", async ({ page, withoutRoom }) => {
@@ -107,7 +107,7 @@ test("keeps history reachable after bankruptcy", async ({ page, withoutRoom }) =
   const bankrupt = page.getByRole("dialog", { name: "Company bankrupt" });
   await expect(bankrupt).toBeVisible();
   await bankrupt.getByRole("button", { name: "View history" }).click();
-  const history = page.getByRole("dialog", { name: "Campaign history" });
+  const history = page.getByRole("region", { name: "History" });
   await expect(history).toContainText("Financial settlements");
   await expect(bankrupt).toBeHidden();
   await history.getByRole("button", { name: "Close" }).click();

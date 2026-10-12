@@ -6,13 +6,14 @@ import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { useGame } from "@/game/store";
 import { FeedbackButton } from "./FeedbackButton";
-import { Icon, type IconName } from "./icons";
+import { Icon } from "./icons";
 import { GraphicsSettings } from "./GraphicsSettings";
+import { MenuRun, MenuTile } from "./MenuRun";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { ModeSwitch } from "./ModeSwitch";
 import { SaveFiles } from "./SaveFiles";
 import { SoundSettings } from "./SoundSettings";
-import { Callout, Concept, Modal, type ConceptKind } from "./ui";
+import { Callout, Concept, Modal } from "./ui";
 import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { PostmortemBody, RunCharts } from "./Views";
 
@@ -234,19 +235,6 @@ function summarise(events: AnalyticsEvent[]) {
   ] as [string, string | number][];
 }
 
-/** A big, labelled menu choice: what it is, and one line on what it does. */
-function MenuTile({ icon, kind, title, text, onClick, danger = false }: { icon: IconName; kind: ConceptKind; title: string; text: string; onClick: () => void; danger?: boolean }) {
-  return (
-    <button type="button" className={`menu-tile${danger ? " is-danger" : ""}`} onClick={onClick} aria-label={title}>
-      <Concept kind={danger ? "critical" : kind} icon={danger ? "alert" : icon} />
-      <span className="menu-tile-body">
-        <strong>{title}</strong>
-        <span>{danger ? "Your current run will be replaced." : text}</span>
-      </span>
-    </button>
-  );
-}
-
 export function Menu() {
   const game = useGame((s) => s.game);
   const openView = useGame((s) => s.openView);
@@ -302,42 +290,21 @@ export function Menu() {
 
   return (
     <Modal title="Menu" onClose={close} icon={{ kind: "go", name: "menu" }} className="modal-menu">
-      <section className="menu-run" aria-label="This run">
-        <div className="menu-run-head">
-          <span className="menu-run-title">This run</span>
-          <span className="tag tag-ok">
-            <Icon name="save" size={12} />
-            Autosaved
-          </span>
-        </div>
-        <dl className="menu-run-stats">
-          <div>
-            <Concept kind="go" icon="week" />
-            <dt>Week</dt>
-            <dd>
-              {week} / {BALANCE.maxTurns}
-            </dd>
-          </div>
-          <div>
-            <Concept kind="users" icon="users" />
-            <dt>Users</dt>
-            <dd>{num(game.users)}</dd>
-          </div>
-          <div>
-            <Concept kind="cash" icon="cash" />
-            <dt>Cash</dt>
-            <dd>{money(game.cash)}</dd>
-          </div>
-        </dl>
-        <p className="menu-seed">
-          Seed <code>{game.seed}</code> Playing the same seed again gives the same run.
-        </p>
-      </section>
-
-      <button type="button" className="btn btn-primary btn-big menu-resume" autoFocus onClick={close}>
-        <Icon name="play" />
-        Resume
-      </button>
+      <MenuRun
+        title="This run"
+        saved
+        stats={[
+          { icon: "week", kind: "go", label: "Week", value: `${week} / ${BALANCE.maxTurns}` },
+          { icon: "users", kind: "users", label: "Users", value: num(game.users) },
+          { icon: "cash", kind: "cash", label: "Cash", value: money(game.cash) },
+        ]}
+        note={
+          <>
+            Seed <code>{game.seed}</code> Playing the same seed again gives the same run.
+          </>
+        }
+        onResume={close}
+      />
 
       <MenuTabs value={tab} onChange={goTo}>
         {tab === "run" && (

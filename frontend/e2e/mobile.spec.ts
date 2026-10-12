@@ -77,8 +77,8 @@ test("reliability: inspection and effective recipients remain clear on narrow to
  await expect(panel).toContainText("detected unhealthy");
  await expect(page.getByRole("button",{name:"Restore App 2 · free · 3 steps",exact:true})).toBeEnabled();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
- await page.getByRole("button",{name:"Technology tree",exact:true}).tap();
- const tree=page.getByRole("dialog",{name:"Technology tree"});
+ await page.getByRole("button",{name:"Tech",exact:true}).tap();
+ const tree=page.getByRole("region",{name:"Tech tree"});
  await expect(tree.locator("[data-tech]")).toHaveCount(9);
  await tree.getByRole("button",{name:"Automatic Failover: Owned",exact:true}).tap();
  await expect(tree.getByRole("heading",{name:"Automatic Failover",exact:true})).toBeVisible();
@@ -99,7 +99,7 @@ test("inspects evidence and advances a physical step on touch", async ({ page })
   await page.getByRole("button", { name: "Advance step" }).tap();
   expect((await savedGame(page)).campaign!.step).toBe(1);
   await page.getByRole("button", { name: "History", exact: true }).tap();
-  await expect(page.getByRole("dialog", { name: "Campaign history" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "History" })).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).tap();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
 });

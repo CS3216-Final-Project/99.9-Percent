@@ -95,6 +95,6 @@ test("starts a new company with the same sound, and lets a saved one continue qu
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await menu.getByRole("tab", { name: "Saves" }).click();
   await menu.getByRole("button", { name: "New company", exact: true }).click();
-  await menu.getByRole("button", { name: "Confirm new company" }).click();
+  await menu.getByRole("button", { name: "Lose this company? Press again" }).click();
   await expect.poll(voices).toBeGreaterThanOrEqual(5);
 });

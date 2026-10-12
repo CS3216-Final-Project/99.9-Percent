@@ -44,7 +44,9 @@ describe("opening UI", () => {
     render(<StrictMode><App /></StrictMode>); expect(await screen.findByTestId("facility")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
     expect(screen.getByRole("complementary", { name: "System metrics" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Tech" })).toBeNull();
+    // Tech and History wait in the bottom bar's view tabs, where Classic keeps them; later stage controls do not appear yet.
+    expect(within(screen.getByRole("navigation", { name: "Views" })).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Tech", "History"]);
+    expect(screen.queryByRole("region", { name: "Scaling controls" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
     expect(useGame.getState().game.campaign!.step).toBe(0);
     expect(useGame.getState().meta.runsStarted).toBe(1);
@@ -115,10 +117,15 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   const campaignMenu = openMenu();
   const labels = (menu: HTMLElement) => within(within(menu).getByRole("tablist", { name: "Menu sections" })).getAllByRole("tab").map((t) => t.textContent);
   expect(labels(campaignMenu)).toEqual(["Run", "Sound", "Graphics", "Saves", "Playtest"]);
-  // The paused notice stays above the tabs; the Run tab opens first and shows only its own sections.
-  expect(within(campaignMenu).getByText("Time is paused")).toBeTruthy();
+  // As in Classic, the run card (with the paused notice) and Resume stay above the tabs; the Run tab opens first.
   expect(within(campaignMenu).getByRole("tab", { name: "Run" }).getAttribute("aria-selected")).toBe("true");
-  expectButtons(campaignMenu, ["Save now", "Replay introduction", "Save and exit to title", "Switch to Classic"]);
+  for (const tab of ["Run", "Sound", "Graphics", "Saves", "Playtest"]) {
+    openTab(campaignMenu, tab);
+    expect(within(campaignMenu).getByRole("region", { name: "This company" }).textContent).toContain("Time is paused");
+    expect(within(campaignMenu).getByRole("button", { name: "Resume" })).toBeTruthy();
+  }
+  openTab(campaignMenu, "Run");
+  expectButtons(campaignMenu, ["Save now", "How to play", "Save and exit", "Switch to Classic"]);
   expect(within(campaignMenu).queryByRole("button", { name: "Import save" })).toBeNull();
   openTab(campaignMenu, "Sound");
   fireEvent.change(within(campaignMenu).getByRole("slider", { name: "Music" }), { target: { value: "25" } });
@@ -184,4 +191,38 @@ it("forgets a pending Start over confirmation when the player leaves its tab", (
   expect(within(menu).queryByText("Are you sure?")).toBeNull();
   expect(within(menu).getByRole("button", { name: "New game" })).toBeTruthy();
   expect(useGame.getState().game.seed).toBe(seed);
+});
+
+it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", () => {
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
+  const views = screen.getByRole("navigation", { name: "Views" });
+  fireEvent.click(within(views).getByRole("button", { name: "History" }));
+  const history = screen.getByRole("region", { name: "History" });
+  expect(within(history).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Charts", "Events", "Incidents (0)"]);
+  fireEvent.click(within(history).getByRole("tab", { name: "Events" }));
+  expect(history.textContent).toMatch(/Step \d+/);
+  // Esc closes the sheet back to the room, as in Classic.
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(screen.queryByRole("region", { name: "History" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Run" }));
+  fireEvent.click(within(views).getByRole("button", { name: "Tech" }));
+  expect(screen.getByRole("region", { name: "Tech tree" }).querySelectorAll("[data-tech]")).toHaveLength(9);
+  expect(within(views).getByRole("button", { name: "Tech" }).getAttribute("aria-pressed")).toBe("true");
+  expect(useGame.getState().running).toBe(false);
+});
+
+it("asks once before New company replaces the campaign, as Classic's Start over does", () => {
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Play Campaign" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
+  const runId = useGame.getState().game.campaign!.runId;
+  const menu = openMenu();
+  openTab(menu, "Saves");
+  fireEvent.click(within(menu).getByRole("button", { name: "New company" }));
+  // The first press only asks.
+  expect(useGame.getState().game.campaign!.step).toBe(1);
+  expect(within(menu).getByText("Are you sure?")).toBeTruthy();
+  fireEvent.click(within(menu).getByRole("button", { name: "Lose this company? Press again" }));
+  expect(useGame.getState().game.campaign!.step).toBe(0);
+  expect(useGame.getState().game.campaign!.runId).not.toBe(runId);
 });

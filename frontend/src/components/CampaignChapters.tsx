@@ -37,7 +37,10 @@ export function CampaignChapters() {
         </li>)}
       </ol>
       <p className="muted">Complete each chapter’s requirements and choose Continue when it becomes available. Time is paused while you look around.</p>
-      <button className="btn btn-primary" onClick={() => setOpen(false)}>Back to company</button>
+      <div className="modal-foot">
+        <span />
+        <button className="btn btn-primary" onClick={() => setOpen(false)}>Back to company</button>
+      </div>
     </Modal>}
   </>;
 }
