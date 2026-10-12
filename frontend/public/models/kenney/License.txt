@@ -21,3 +21,5 @@
 
 	Follow on Twitter for updates:
 	http://twitter.com/KenneyNL
+
+The models were compressed with meshopt (gltf-transform 4.5.0, `npm run models:compress`); see docs/ASSET_PIPELINE.md.
