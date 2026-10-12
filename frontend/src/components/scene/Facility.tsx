@@ -34,7 +34,9 @@ import { Icon } from "../icons";
 import { tipProps } from "../tips";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
+import { applyDaylight } from "./cityLight";
 import { Exterior } from "./exterior";
+import { daylight, timeOfDay, timeOverride } from "./sky";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
 import { buildModel, type SceneModel } from "./sceneModel";
@@ -645,6 +647,60 @@ function Room() {
 const HD_SKY = 1.45;
 const HD_REFLECTIONS = 0.3;
 
+/** When the day began: on the first load, so a new canvas after a change of graphics carries on where it was. */
+const DAY_START = performance.now();
+/** How far the office's sun stands from the room, along the direction its light comes from. */
+const SUN_DISTANCE = 21.4;
+
+/**
+ * The time of day (see sky.ts), moved on every frame: the sky behind the city, the city's own light, and the
+ * office's sun and sky light. The office's lights follow the day's colour and the sun across the sky, but never
+ * drop low or dim far, so the room reads the same at noon and at three in the morning.
+ */
+function Daylight({ quality, hd }: { quality: QualityProfile; hd: boolean }) {
+  const [fixed] = useState(() => timeOverride(window.location.search));
+  const sky = useRef<THREE.HemisphereLight>(null);
+  const sun = useRef<THREE.DirectionalLight>(null);
+  const background = useRef<THREE.Color>(null);
+  // Reflections light the HD materials too, so the sky light is turned down to keep the same brightness.
+  const skyStrength = hd ? HD_SKY : 1.7;
+  useFrame(() => {
+    const d = daylight(timeOfDay((performance.now() - DAY_START) / 1000, fixed));
+    applyDaylight(d, quality.effects);
+    background.current?.setRGB(d.horizon[0], d.horizon[1], d.horizon[2], THREE.SRGBColorSpace);
+    if (sky.current) sky.current.intensity = skyStrength * d.office.sky;
+    const light = sun.current;
+    if (light) {
+      light.intensity = d.office.sun;
+      light.color.setRGB(d.office.colour[0], d.office.colour[1], d.office.colour[2], THREE.SRGBColorSpace);
+      light.position.set(d.office.dir[0] * SUN_DISTANCE, d.office.dir[1] * SUN_DISTANCE, d.office.dir[2] * SUN_DISTANCE);
+    }
+  });
+  return (
+    <>
+      <color ref={background} attach="background" args={["#1a1633"]} />
+      <hemisphereLight ref={sky} args={["#fff0dd", "#3b3366", skyStrength]} />
+      <directionalLight
+        ref={sun}
+        position={[11, 17, 7]}
+        intensity={2.3}
+        color="#fff1de"
+        castShadow={quality.shadows}
+        // The shadow map's sharpness and edge softness come from the quality setting.
+        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
+        shadow-radius={quality.shadowRadius}
+        shadow-bias={-0.0005}
+        shadow-camera-left={-30}
+        shadow-camera-right={30}
+        shadow-camera-top={30}
+        shadow-camera-bottom={-30}
+        shadow-camera-near={1}
+        shadow-camera-far={60}
+      />
+    </>
+  );
+}
+
 /**
  * Soft reflections of a generic bright room for the HD materials. It is built
  * on the graphics card from three's procedural room, so nothing is downloaded.
@@ -702,31 +758,13 @@ function Scene({ quality }: { quality: QualityProfile }) {
 
   return (
     <>
-      <color attach="background" args={["#1a1633"]} />
       {hd && <Reflections />}
-      {/* Reflections light the HD materials too, so the sky light is turned down to keep the same brightness. */}
-      <hemisphereLight args={["#fff0dd", "#3b3366", hd ? HD_SKY : 1.7]} />
-      <directionalLight
-        position={[11, 17, 7]}
-        intensity={2.3}
-        color="#fff1de"
-        castShadow={quality.shadows}
-        // The shadow map's sharpness and edge softness come from the quality setting.
-        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
-        shadow-radius={quality.shadowRadius}
-        shadow-bias={-0.0005}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
-        shadow-camera-near={1}
-        shadow-camera-far={60}
-      />
+      <Daylight quality={quality} hd={hd} />
       <pointLight position={[-3, 3.4, -3.5]} intensity={24} distance={13} color="#8fc3ff" />
       <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
       <Room />
-      <Exterior linear={effects} />
+      <Exterior />
       <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
 
       {/* Network edge */}

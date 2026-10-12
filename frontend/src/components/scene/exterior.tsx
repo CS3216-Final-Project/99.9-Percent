@@ -18,12 +18,10 @@ import {
   flowers,
   FOUNTAIN,
   GROUND_Y,
-  HAZE,
   LANE,
   LAMP_REACH,
   LANES,
   lamps,
-  NIGHT,
   PARAPET,
   parkBlock,
   parkCentre,
@@ -51,74 +49,97 @@ import {
   type VehicleKind,
 } from "./city";
 import { useDetail } from "./detail";
+import { world } from "./cityLight";
 import { logoSign } from "./textures";
 
 /*
- * Draws downtown round the office tower (see city.ts) at night. Everything
- * outside is unlit: shading is baked into vertex colours under a moon from
- * the north-west, and windows, lamps and headlights are simply bright, so the
- * office's own lights do not turn the night into day. Facades are drawn by a
- * shader that lays out each building's windows, floor by floor, and lights a
- * share of the offices behind them. Every material fades to the night sky with
- * distance from the office, and into a haze with depth below it. Things that
- * repeat are instanced or merged; the whole city costs a few dozen draw calls.
+ * Draws the city round the office (see city.ts) at whatever time of day it is (see sky.ts). Nothing out here takes
+ * part in three.js's lighting: every material shades itself from its normal under the sun or the moon and the sky,
+ * all set once a frame by applyDaylight, so the whole city costs the same on a phone as on a graphics card. Windows,
+ * lamps and headlights are simply bright, and brighter as it gets dark. Facades are drawn by a shader that lays out
+ * each building's windows, floor by floor, shows the sky in the glass by day and lights a share of the offices
+ * behind them by night. Every material fades to the sky at the horizon with distance from the office, and into a
+ * haze with depth below it. Things that repeat are instanced or merged; the whole city costs a few dozen draw calls.
  */
 
 /* ------------------------------------------------------------------ */
-/* Materials that fade into the night                                  */
+/* Materials lit by the time of day                                    */
 /* ------------------------------------------------------------------ */
 
-const fade = {
-  uFade: { value: new THREE.Vector4(FADE.x, FADE.z, FADE.from, FADE.to) },
-  uHaze: { value: new THREE.Vector2(HAZE.depth, HAZE.most) },
-  uNight: { value: new THREE.Color(NIGHT) },
-};
+const WORLD_GLSL = `
+varying vec3 vFadeWorld;
+varying vec3 vCityNormal;
+uniform vec4 uFade;
+uniform vec2 uHaze;
+uniform vec3 uHorizon;
+uniform vec3 uKeyDir;
+uniform vec3 uKeyLight;
+uniform vec3 uSkyLight;
+uniform vec3 uGroundLight;
+uniform float uDark;
 
-/** The night colour as the shader needs it: linear when effects render off-screen first, display colour otherwise. */
-function setNight(linear: boolean): void {
-  fade.uNight.value.set(NIGHT);
-  if (!linear) fade.uNight.value.convertLinearToSRGB();
+/** Light from the sky above and the ground below, and from the sun or the moon. */
+vec3 cityLight(vec3 n) {
+  return mix(uGroundLight, uSkyLight, 0.5 + 0.5 * n.y) + uKeyLight * max(dot(n, uKeyDir), 0.0);
 }
+`;
+
+/**
+ * How a material takes the light: shaded by the sun, moon and sky; glowing, and brighter at night; seen only at
+ * night, like the pools of lamplight; or shaded by its own shader, like the facades.
+ */
+type Lighting = "lit" | "glow" | "night" | "own";
+
+const LIGHTING: Record<Lighting, string> = {
+  lit: "diffuseColor.rgb *= cityLight(normalize(vCityNormal));",
+  glow: "diffuseColor.rgb *= mix(0.6, 1.0, uDark);",
+  night: "diffuseColor.rgb *= uDark;",
+  own: "",
+};
 
 type Shader = THREE.WebGLProgramParametersWithUniforms;
 
-/** Fade a material into the night with distance and depth; `more` adds to its shader first. */
-function faded<P extends THREE.MeshBasicMaterialParameters>(params: P, key = "city-fade", more?: (shader: Shader) => void): THREE.MeshBasicMaterial {
+/** Light a material by the time of day and fade it into the sky with distance and depth; `more` adds to its shader first. */
+function faded<P extends THREE.MeshBasicMaterialParameters>(params: P, key: string, lighting: Lighting, more?: (shader: Shader) => void): THREE.MeshBasicMaterial {
   const m = new THREE.MeshBasicMaterial(params);
   m.onBeforeCompile = (shader) => {
     more?.(shader);
-    shader.uniforms.uFade = fade.uFade;
-    shader.uniforms.uHaze = fade.uHaze;
-    shader.uniforms.uNight = fade.uNight;
-    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vFadeWorld;").replace(
+    Object.assign(shader.uniforms, world);
+    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vFadeWorld;\nvarying vec3 vCityNormal;").replace(
       "#include <project_vertex>",
       `#include <project_vertex>
       vec4 fadeWorld = vec4(transformed, 1.0);
+      vec3 cityNormal = normal;
       #ifdef USE_INSTANCING
         fadeWorld = instanceMatrix * fadeWorld;
+        cityNormal = mat3(instanceMatrix) * cityNormal;
       #endif
-      vFadeWorld = (modelMatrix * fadeWorld).xyz;`,
+      vFadeWorld = (modelMatrix * fadeWorld).xyz;
+      vCityNormal = normalize(mat3(modelMatrix) * cityNormal);`,
     );
     shader.fragmentShader = shader.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 vFadeWorld;\nuniform vec4 uFade;\nuniform vec2 uHaze;\nuniform vec3 uNight;")
+      .replace("#include <common>", `#include <common>\n${WORLD_GLSL}`)
+      .replace("#include <color_fragment>", `#include <color_fragment>\n${LIGHTING[lighting]}`)
       .replace(
         "#include <fog_fragment>",
         `#include <fog_fragment>
       float far = smoothstep(uFade.z, uFade.w, distance(vFadeWorld.xz, uFade.xy));
-      float deep = uHaze.y * smoothstep(0.0, uHaze.x, -vFadeWorld.y);
-      gl_FragColor.rgb = mix(gl_FragColor.rgb, uNight, 1.0 - (1.0 - far) * (1.0 - deep));`,
+      // The haze below is thickest at night; by day the air is clear enough to see the street.
+      float deep = uHaze.y * mix(0.25, 1.0, uDark) * smoothstep(0.0, uHaze.x, -vFadeWorld.y);
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, uHorizon, 1.0 - (1.0 - far) * (1.0 - deep));`,
       );
   };
+  // Each way of taking the light compiles its own program.
   m.customProgramCacheKey = () => key;
   return m;
 }
 
 /** Shared materials: plain vertex colours, tinted per instance where needed, and the bright ones that glow. */
 const M = {
-  shaded: faded({ vertexColors: true }),
-  glow: faded({ vertexColors: true, toneMapped: false }),
-  white: faded({ color: "#a9a6a0" }),
-  yellow: faded({ color: "#a8892e" }),
+  shaded: faded({ vertexColors: true }, "city-lit", "lit"),
+  glow: faded({ vertexColors: true, toneMapped: false }, "city-glow", "glow"),
+  white: faded({ color: "#a9a6a0" }, "city-lit", "lit"),
+  yellow: faded({ color: "#a8892e" }, "city-lit", "lit"),
 };
 
 /* ------------------------------------------------------------------ */
@@ -153,7 +174,9 @@ float band(float f, float a, float b, float e) {
   return smoothstep(a - e, a + e, f) - smoothstep(b - e, b + e, f);
 }
 
-vec3 facade(vec3 wall) {
+vec3 facade(vec3 paint, vec3 n) {
+  vec3 lit = cityLight(n);
+  vec3 wall = paint * lit;
   float seed = vLook.x;
   float style = vLook.y;
   float share = vLook.z;
@@ -176,7 +199,9 @@ vec3 facade(vec3 wall) {
   float run = 2.0 + floor(hash12(vec2(cell.y, seed)) * 5.0);
   float office = floor(cell.x / run);
   float busy = share * (0.25 + 1.5 * hash12(vec2(cell.y * 0.71, seed + 3.0)));
-  float on = step(hash12(vec2(office * 1.37 + seed, cell.y * 2.11 + seed * 0.7)), street ? 0.75 : busy);
+  // Offices switch their lights on one by one as it gets dark, and the shops along the street with them.
+  float evening = smoothstep(0.15, 0.85, uDark);
+  float on = step(hash12(vec2(office * 1.37 + seed, cell.y * 2.11 + seed * 0.7)), (street ? 0.75 : busy) * evening);
   float tone = hash12(vec2(office + 19.0, cell.y + seed));
   vec3 light = street ? uShop : (tone > 0.72 ? uCool : uWarm);
   light *= 0.5 + 0.5 * hash12(vec2(office + 7.0, cell.y * 3.0 + seed));
@@ -185,18 +210,21 @@ vec3 facade(vec3 wall) {
   float blind = step(0.72, hash12(vec2(cell.x + seed, cell.y + 5.0)));
   float drop = mix(frame.z + 0.25, frame.w, hash12(vec2(cell.x, cell.y + seed)));
   light *= mix(1.0, 0.35, blind * step(drop, f.y));
-  // Dark glass catches a little of the city's glow, more toward the top of each pane.
-  vec3 dark = vGlass * (0.75 + 0.5 * hash12(cell + seed * 0.37)) * (0.8 + 0.4 * f.y);
+  // The glass is tinted and lit like the wall; by day it also shows the sky, more toward the top of each pane and a
+  // little differently in each, and at night it catches a little of the city's glow.
+  float pane = 0.75 + 0.5 * hash12(cell + seed * 0.37);
+  vec3 sky = uSkyLight * mix(vec3(1.0), normalize(vGlass + 0.02) * 1.7, 0.5) * (0.12 + 0.14 * f.y) * (0.7 + 0.6 * hash12(cell * 0.7 + seed)) * (1.0 - uDark);
+  vec3 dark = vGlass * lit * pane * (0.8 + 0.4 * f.y) + sky;
   vec3 colour = mix(wall, mix(dark, light, on), open);
   // Far off, the windows are finer than a pixel: show their average instead of a shimmer.
   float coverage = (frame.y - frame.x) * (frame.w - frame.z);
-  vec3 average = mix(wall, mix(vGlass, uWarm * 0.6, share), coverage);
+  vec3 average = mix(wall, mix(vGlass * lit + uSkyLight * 0.19 * (1.0 - uDark), uWarm * 0.6, share * evening), coverage);
   return mix(colour, average, smoothstep(0.3, 0.7, max(fwidth(g.x), fwidth(g.y))));
 }
 `;
 
 function facadeMaterial(): THREE.MeshBasicMaterial {
-  return faded({ vertexColors: true }, "city-facade", (shader) => {
+  return faded({ vertexColors: true }, "city-facade", "own", (shader) => {
     shader.uniforms.uWarm = { value: LIGHTS.warm };
     shader.uniforms.uCool = { value: LIGHTS.cool };
     shader.uniforms.uShop = { value: LIGHTS.shop };
@@ -205,18 +233,14 @@ function facadeMaterial(): THREE.MeshBasicMaterial {
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWall = aWall;\nvLook = aLook;\nvGlass = aGlass;");
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>\n${FACADE_GLSL}`)
-      .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = facade(diffuseColor.rgb);");
+      .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = facade(diffuseColor.rgb, normalize(vCityNormal));");
   });
 }
-
-const MOON = new THREE.Vector3(-0.45, 1, -0.3).normalize();
-
-/** Moonlight on a wall facing (nx, nz). */
-const moonlit = (nx: number, nz: number, ambient = 0.55) => ambient + (1 - ambient) * Math.max(0, nx * MOON.x + nz * MOON.z);
 
 /** The walls of every box of every building, as one mesh for the facade shader. */
 function facades(list: Building[]): THREE.BufferGeometry {
   const pos: number[] = [];
+  const normal: number[] = [];
   const wall: number[] = [];
   const glass: number[] = [];
   const at: number[] = [];
@@ -238,7 +262,6 @@ function facades(list: Building[]): THREE.BufferGeometry {
       ];
       for (const [ax, az, bx, bz, nx, nz] of sides) {
         const len = Math.hypot(bx - ax, bz - az);
-        const k = moonlit(nx, nz);
         const first = pos.length / 3;
         for (const [x, y, z, u] of [
           [ax, m.y0, az, 0],
@@ -247,8 +270,9 @@ function facades(list: Building[]): THREE.BufferGeometry {
           [ax, m.y1, az, 0],
         ]) {
           pos.push(x, y, z);
-          wall.push(w.r * k, w.g * k, w.b * k);
-          glass.push(g.r * k, g.g * k, g.b * k);
+          normal.push(nx, 0, nz);
+          wall.push(w.r, w.g, w.b);
+          glass.push(g.r, g.g, g.b);
           at.push(u, y - GROUND_Y);
           look.push(b.seed % 997, STYLE[b.facade], b.lit, m.y0 === GROUND_Y ? 1 : 0);
         }
@@ -258,6 +282,7 @@ function facades(list: Building[]): THREE.BufferGeometry {
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normal, 3));
   geo.setAttribute("color", new THREE.Float32BufferAttribute(wall, 3));
   geo.setAttribute("aGlass", new THREE.Float32BufferAttribute(glass, 3));
   geo.setAttribute("aWall", new THREE.Float32BufferAttribute(at, 2));
@@ -271,19 +296,14 @@ function facades(list: Building[]): THREE.BufferGeometry {
 /* Geometry helpers                                                    */
 /* ------------------------------------------------------------------ */
 
-/** Paint a geometry one colour, darker on the sides away from the moon. */
-function tint(g: THREE.BufferGeometry, colour: string, ambient = 0.5): THREE.BufferGeometry {
+/** Paint a geometry one colour, with normals for the sun, moon and sky to shade it by (see faded). */
+function tint(g: THREE.BufferGeometry, colour: string): THREE.BufferGeometry {
   const geo = g.index ? g.toNonIndexed() : g;
   geo.computeVertexNormals();
-  const n = geo.attributes.normal;
   const c = new THREE.Color(colour);
-  const cols = new Float32Array(n.count * 3);
-  const v = new THREE.Vector3();
-  for (let i = 0; i < n.count; i++) {
-    v.fromBufferAttribute(n, i);
-    const k = ambient + (1 - ambient) * Math.max(0, v.dot(MOON));
-    cols.set([c.r * k, c.g * k, c.b * k], i * 3);
-  }
+  const n = geo.attributes.position.count;
+  const cols = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) cols.set([c.r, c.g, c.b], i * 3);
   geo.setAttribute("color", new THREE.BufferAttribute(cols, 3));
   geo.deleteAttribute("uv");
   return geo;
@@ -299,15 +319,15 @@ const flat = (w: number, d: number) => new THREE.PlaneGeometry(w, d).rotateX(-Ma
 function carBody(lite = false): THREE.BufferGeometry {
   const wheel = (x: number, z: number) => new THREE.CylinderGeometry(0.34, 0.34, 0.24, 10).rotateZ(Math.PI / 2).translate(x, 0.34, z);
   return merge([
-    tint(box(1.8, 0.7, 4.4, 0, 0.62, 0), "#ffffff", 0.55),
-    tint(box(1.6, 0.55, 2.3, 0, 1.24, 0.3), "#8d93a3", 0.6),
+    tint(box(1.8, 0.7, 4.4, 0, 0.62, 0), "#ffffff"),
+    tint(box(1.6, 0.55, 2.3, 0, 1.24, 0.3), "#8d93a3"),
     ...(lite ? [] : [-0.82, 0.82].flatMap((x) => [-1.35, 1.4].map((z) => tint(wheel(x, z), "#18171c")))),
   ]);
 }
 
 /** Headlights at the front, tail lights at the back. */
 function carLights(length = 4.4, height = 0.72, width = 1.8): THREE.BufferGeometry {
-  const lamp = (x: number, z: number, colour: string) => tint(box(0.36, 0.14, 0.06, x, height, z), colour, 1);
+  const lamp = (x: number, z: number, colour: string) => tint(box(0.36, 0.14, 0.06, x, height, z), colour);
   return merge([lamp(-width / 2 + 0.3, -length / 2 - 0.02, "#fff4d6"), lamp(width / 2 - 0.3, -length / 2 - 0.02, "#fff4d6"), lamp(-width / 2 + 0.3, length / 2 + 0.02, "#ff2a3a"), lamp(width / 2 - 0.3, length / 2 + 0.02, "#ff2a3a")]);
 }
 
@@ -315,9 +335,9 @@ function carLights(length = 4.4, height = 0.72, width = 1.8): THREE.BufferGeomet
 function truckBody(): THREE.BufferGeometry {
   const wheel = (x: number, z: number) => new THREE.CylinderGeometry(0.45, 0.45, 0.3, 10).rotateZ(Math.PI / 2).translate(x, 0.45, z);
   return merge([
-    tint(box(2.4, 2.6, 6.2, 0, 2.05, 1.2), "#ffffff", 0.55),
-    tint(box(2.3, 1.9, 2.2, 0, 1.4, -3.1), "#c9ccd6", 0.55),
-    tint(box(2.1, 0.7, 0.1, 0, 1.85, -4.2), "#2b3140", 0.7),
+    tint(box(2.4, 2.6, 6.2, 0, 2.05, 1.2), "#ffffff"),
+    tint(box(2.3, 1.9, 2.2, 0, 1.4, -3.1), "#c9ccd6"),
+    tint(box(2.1, 0.7, 0.1, 0, 1.85, -4.2), "#2b3140"),
     ...[-1.05, 1.05].flatMap((x) => [-3.0, 0.4, 3.4].map((z) => tint(wheel(x, z), "#18171c"))),
   ]);
 }
@@ -333,11 +353,11 @@ const wheels = (x: number, zs: number[], r = 0.34, w = 0.24) =>
 function vehicleBody(kind: VehicleKind, lite = false): THREE.BufferGeometry {
   const glass = "#8d93a3";
   const dark = "#2b3140";
-  if (kind === "hatch") return merge([tint(box(1.75, 0.68, 3.9, 0, 0.62, 0), "#ffffff", 0.55), tint(box(1.55, 0.58, 2.1, 0, 1.25, 0.45), glass, 0.6), ...(lite ? [] : wheels(0.8, [-1.2, 1.25]))]);
-  if (kind === "suv") return merge([tint(box(1.85, 0.95, 4.4, 0, 0.8, 0), "#ffffff", 0.55), tint(box(1.7, 0.6, 2.7, 0, 1.57, 0.35), glass, 0.6), ...(lite ? [] : wheels(0.84, [-1.4, 1.4], 0.4))]);
-  if (kind === "van") return merge([tint(box(1.8, 1.75, 4.4, 0, 1.2, 0), "#ffffff", 0.55), tint(box(1.6, 0.55, 0.06, 0, 1.6, -2.21), dark, 0.8), ...(lite ? [] : wheels(0.82, [-1.4, 1.45], 0.36))]);
+  if (kind === "hatch") return merge([tint(box(1.75, 0.68, 3.9, 0, 0.62, 0), "#ffffff"), tint(box(1.55, 0.58, 2.1, 0, 1.25, 0.45), glass), ...(lite ? [] : wheels(0.8, [-1.2, 1.25]))]);
+  if (kind === "suv") return merge([tint(box(1.85, 0.95, 4.4, 0, 0.8, 0), "#ffffff"), tint(box(1.7, 0.6, 2.7, 0, 1.57, 0.35), glass), ...(lite ? [] : wheels(0.84, [-1.4, 1.4], 0.4))]);
+  if (kind === "van") return merge([tint(box(1.8, 1.75, 4.4, 0, 1.2, 0), "#ffffff"), tint(box(1.6, 0.55, 0.06, 0, 1.6, -2.21), dark), ...(lite ? [] : wheels(0.82, [-1.4, 1.45], 0.36))]);
   if (kind === "truck") return truckBody();
-  if (kind === "bus") return merge([tint(box(2.4, 2.6, 8.8, 0, 1.7, 0), "#ffffff", 0.55), tint(box(2.2, 0.9, 0.06, 0, 2.0, -4.41), dark, 0.8), ...(lite ? [] : wheels(1.05, [-3.0, 2.8], 0.45, 0.3))]);
+  if (kind === "bus") return merge([tint(box(2.4, 2.6, 8.8, 0, 1.7, 0), "#ffffff"), tint(box(2.2, 0.9, 0.06, 0, 2.0, -4.41), dark), ...(lite ? [] : wheels(1.05, [-3.0, 2.8], 0.45, 0.3))]);
   return carBody(lite);
 }
 
@@ -347,13 +367,13 @@ function vehicleLights(kind: VehicleKind): THREE.BufferGeometry {
   if (kind === "suv") return carLights(4.4, 0.95, 1.85);
   if (kind === "van") return carLights(4.4, 0.75, 1.8);
   if (kind === "truck") return carLights(8.6, 1.0, 2.3);
-  if (kind === "bus") return merge([carLights(8.8, 0.8, 2.4), ...[-1, 1].map((s) => tint(box(0.04, 0.75, 7.0, s * 1.215, 2.25, 0.3), "#ffd99a", 1)), tint(box(1.4, 0.3, 0.05, 0, 2.75, -4.43), "#ffb347", 1)]);
-  if (kind === "taxi") return merge([carLights(), tint(box(0.62, 0.2, 0.28, 0, 1.63, 0.2), "#fff1b0", 1)]);
+  if (kind === "bus") return merge([carLights(8.8, 0.8, 2.4), ...[-1, 1].map((s) => tint(box(0.04, 0.75, 7.0, s * 1.215, 2.25, 0.3), "#ffd99a")), tint(box(1.4, 0.3, 0.05, 0, 2.75, -4.43), "#ffb347")]);
+  if (kind === "taxi") return merge([carLights(), tint(box(0.62, 0.2, 0.28, 0, 1.63, 0.2), "#fff1b0")]);
   return carLights();
 }
 
 function treeTrunk(): THREE.BufferGeometry {
-  return tint(new THREE.CylinderGeometry(0.16, 0.24, 1, 7).translate(0, 0.5, 0), "#4a3a2e", 0.55);
+  return tint(new THREE.CylinderGeometry(0.16, 0.24, 1, 7).translate(0, 0.5, 0), "#4a3a2e");
 }
 
 /**
@@ -362,11 +382,11 @@ function treeTrunk(): THREE.BufferGeometry {
  */
 function treeCanopy(kind: "round" | "cone" | "umbrella", lite = false): THREE.BufferGeometry {
   const detail = lite ? 0 : 1;
-  const lump = (r: number, x: number, y: number, z: number, shade: string) => tint(new THREE.IcosahedronGeometry(r, detail).translate(x, y, z), shade, 0.45);
+  const lump = (r: number, x: number, y: number, z: number, shade: string) => tint(new THREE.IcosahedronGeometry(r, detail).translate(x, y, z), shade);
   if (kind === "cone") {
     return merge([
-      tint(new THREE.ConeGeometry(1, 1.25, lite ? 6 : 9).translate(0, -0.2, 0), "#ffffff", 0.45),
-      tint(new THREE.ConeGeometry(0.72, 1.0, lite ? 6 : 9).translate(0, 0.45, 0), "#e8e8e8", 0.45),
+      tint(new THREE.ConeGeometry(1, 1.25, lite ? 6 : 9).translate(0, -0.2, 0), "#ffffff"),
+      tint(new THREE.ConeGeometry(0.72, 1.0, lite ? 6 : 9).translate(0, 0.45, 0), "#e8e8e8"),
     ]);
   }
   if (kind === "umbrella") {
@@ -378,9 +398,9 @@ function treeCanopy(kind: "round" | "cone" | "umbrella", lite = false): THREE.Bu
 /** A park bench facing -z: slats on two legs, and a back. */
 function benchBody(): THREE.BufferGeometry {
   return merge([
-    tint(box(1.7, 0.08, 0.5, 0, 0.45, 0), "#6b5038", 0.6),
-    tint(box(1.7, 0.42, 0.07, 0, 0.72, 0.24), "#6b5038", 0.6),
-    ...[-0.7, 0.7].map((x) => tint(box(0.08, 0.45, 0.5, x, 0.225, 0.02), "#2e2d33", 0.6)),
+    tint(box(1.7, 0.08, 0.5, 0, 0.45, 0), "#6b5038"),
+    tint(box(1.7, 0.42, 0.07, 0, 0.72, 0.24), "#6b5038"),
+    ...[-0.7, 0.7].map((x) => tint(box(0.08, 0.45, 0.5, x, 0.225, 0.02), "#2e2d33")),
   ]);
 }
 
@@ -400,9 +420,9 @@ function lampPost(style: LampStyle): THREE.BufferGeometry {
 
 /** The glowing head of each style, in white for the lamp's own colour of light to tint. */
 function lampHead(style: LampStyle): THREE.BufferGeometry {
-  if (style === "blade") return tint(box(0.24, 0.07, 1.0, 0, 7.92, -LAMP_REACH.blade), "#ffffff", 1);
-  if (style === "lantern") return tint(box(0.34, 0.48, 0.34, 0, 4.55, 0), "#ffffff", 1);
-  return tint(box(0.32, 0.12, 0.62, 0, 6.88, -LAMP_REACH.arm), "#ffffff", 1);
+  if (style === "blade") return tint(box(0.24, 0.07, 1.0, 0, 7.92, -LAMP_REACH.blade), "#ffffff");
+  if (style === "lantern") return tint(box(0.34, 0.48, 0.34, 0, 4.55, 0), "#ffffff");
+  return tint(box(0.32, 0.12, 0.62, 0, 6.88, -LAMP_REACH.arm), "#ffffff");
 }
 
 /** Colours of lamplight, and how wide a pool each style casts. */
@@ -482,7 +502,7 @@ const roadPoint = (r: Road, along: number): [number, number] => (r.axis === "x" 
 function Ground() {
   const geometry = useMemo(() => {
     const out: THREE.BufferGeometry[] = [];
-    const add = (g: THREE.BufferGeometry, colour: string) => out.push(tint(g, colour, 1));
+    const add = (g: THREE.BufferGeometry, colour: string) => out.push(tint(g, colour));
     const span = 2 * REACH + 80;
     add(flat(span, span).translate(FADE.x, LAYER.ground, FADE.z), "#33313b");
     for (const b of blocks()) {
@@ -560,37 +580,37 @@ function plantGeometry(p: Plant): THREE.BufferGeometry[] {
   const h = p.y1 - p.y0;
   if (p.kind === "tank") {
     return [
-      tint(new THREE.CylinderGeometry(p.w / 2, p.w / 2, h * 0.8, 12).translate(p.x, p.y0 + h * 0.4, p.z), "#6b5f55", 0.5),
-      tint(new THREE.ConeGeometry(p.w / 2 + 0.1, h * 0.2, 12).translate(p.x, p.y0 + h * 0.9, p.z), "#4f4640", 0.5),
+      tint(new THREE.CylinderGeometry(p.w / 2, p.w / 2, h * 0.8, 12).translate(p.x, p.y0 + h * 0.4, p.z), "#6b5f55"),
+      tint(new THREE.ConeGeometry(p.w / 2 + 0.1, h * 0.2, 12).translate(p.x, p.y0 + h * 0.9, p.z), "#4f4640"),
     ];
   }
   if (p.kind === "fan") {
     return [
-      tint(box(p.w, h - 0.1, p.d, p.x, p.y0 + (h - 0.1) / 2, p.z), "#6a6c75", 0.5),
-      tint(new THREE.CylinderGeometry(p.w * 0.4, p.w * 0.4, 0.1, 14).translate(p.x, p.y1 - 0.05, p.z), "#1c1d22", 0.8),
+      tint(box(p.w, h - 0.1, p.d, p.x, p.y0 + (h - 0.1) / 2, p.z), "#6a6c75"),
+      tint(new THREE.CylinderGeometry(p.w * 0.4, p.w * 0.4, 0.1, 14).translate(p.x, p.y1 - 0.05, p.z), "#1c1d22"),
     ];
   }
   if (p.kind === "panel") {
     // Tilted up toward +z on a low frame.
-    return [tint(box(p.w, 0.08, p.d, 0, 0, 0).rotateX(0.32).translate(p.x, p.y0 + 0.55, p.z), "#2a4377", 0.7), tint(box(p.w - 0.4, 0.4, 0.12, p.x, p.y0 + 0.2, p.z), "#4a4b52", 0.5)];
+    return [tint(box(p.w, 0.08, p.d, 0, 0, 0).rotateX(0.32).translate(p.x, p.y0 + 0.55, p.z), "#2a4377"), tint(box(p.w - 0.4, 0.4, 0.12, p.x, p.y0 + 0.2, p.z), "#4a4b52")];
   }
   if (p.kind === "pool") {
     // The coping round the water; the water itself glows (see roofLights).
     const c = 0.5;
     return [
-      tint(box(p.w + 2 * c, h, c, p.x, p.y0 + h / 2, p.z - p.d / 2 - c / 2), "#9d978c", 0.6),
-      tint(box(p.w + 2 * c, h, c, p.x, p.y0 + h / 2, p.z + p.d / 2 + c / 2), "#9d978c", 0.6),
-      tint(box(c, h, p.d, p.x - p.w / 2 - c / 2, p.y0 + h / 2, p.z), "#9d978c", 0.6),
-      tint(box(c, h, p.d, p.x + p.w / 2 + c / 2, p.y0 + h / 2, p.z), "#9d978c", 0.6),
+      tint(box(p.w + 2 * c, h, c, p.x, p.y0 + h / 2, p.z - p.d / 2 - c / 2), "#9d978c"),
+      tint(box(p.w + 2 * c, h, c, p.x, p.y0 + h / 2, p.z + p.d / 2 + c / 2), "#9d978c"),
+      tint(box(c, h, p.d, p.x - p.w / 2 - c / 2, p.y0 + h / 2, p.z), "#9d978c"),
+      tint(box(c, h, p.d, p.x + p.w / 2 + c / 2, p.y0 + h / 2, p.z), "#9d978c"),
     ];
   }
   if (p.kind === "helipad") {
     // A dark pad, a yellow ring and a white H across it.
     const r = p.w / 2;
     const y = p.y0 + 0.02;
-    const paint = (g: THREE.BufferGeometry, colour: string, lift: number) => tint(g.rotateX(-Math.PI / 2).translate(p.x, y + lift, p.z), colour, 1);
+    const paint = (g: THREE.BufferGeometry, colour: string, lift: number) => tint(g.rotateX(-Math.PI / 2).translate(p.x, y + lift, p.z), colour);
     return [
-      tint(new THREE.CylinderGeometry(r, r, h, 32).translate(p.x, p.y0 + h / 2, p.z), "#2a2a31", 0.85),
+      tint(new THREE.CylinderGeometry(r, r, h, 32).translate(p.x, p.y0 + h / 2, p.z), "#2a2a31"),
       paint(new THREE.RingGeometry(r * 0.72, r * 0.8, 40), "#c9a630", h),
       paint(new THREE.PlaneGeometry(r * 0.16, r * 0.8).translate(-r * 0.24, 0, 0), "#d8d3c8", h + 0.01),
       paint(new THREE.PlaneGeometry(r * 0.16, r * 0.8).translate(r * 0.24, 0, 0), "#d8d3c8", h + 0.01),
@@ -598,9 +618,9 @@ function plantGeometry(p: Plant): THREE.BufferGeometry[] {
     ];
   }
   if (p.kind === "shrub") {
-    return [tint(new THREE.IcosahedronGeometry(0.5, 0).scale(p.w, h * 1.6, p.d).translate(p.x, p.y0 + h * 0.45, p.z), "#2f5a36", 0.5)];
+    return [tint(new THREE.IcosahedronGeometry(0.5, 0).scale(p.w, h * 1.6, p.d).translate(p.x, p.y0 + h * 0.45, p.z), "#2f5a36")];
   }
-  return [tint(box(p.w, h, p.d, p.x, p.y0 + h / 2, p.z), "#5d5f68", 0.5)];
+  return [tint(box(p.w, h, p.d, p.x, p.y0 + h / 2, p.z), "#5d5f68")];
 }
 
 /** Water in the rooftop pools and the lights round the helipads, which glow. */
@@ -608,12 +628,12 @@ function roofLights(list: Building[]): THREE.BufferGeometry | null {
   const parts: THREE.BufferGeometry[] = [];
   for (const b of list) {
     for (const p of roofPlant(b)) {
-      if (p.kind === "pool") parts.push(tint(flat(p.w, p.d).translate(p.x, p.y1 - 0.08, p.z), "#2fb4cc", 1));
+      if (p.kind === "pool") parts.push(tint(flat(p.w, p.d).translate(p.x, p.y1 - 0.08, p.z), "#2fb4cc"));
       if (p.kind !== "helipad") continue;
       const r = p.w / 2 - 0.25;
       for (let k = 0; k < 8; k++) {
         const a = (k / 8) * Math.PI * 2;
-        parts.push(tint(box(0.3, 0.2, 0.3, p.x + r * Math.cos(a), p.y1 + 0.1, p.z + r * Math.sin(a)), "#9dffb4", 1));
+        parts.push(tint(box(0.3, 0.2, 0.3, p.x + r * Math.cos(a), p.y1 + 0.1, p.z + r * Math.sin(a)), "#9dffb4"));
       }
     }
   }
@@ -632,11 +652,11 @@ function roofs(list: Building[], lite: boolean): THREE.BufferGeometry {
       const cz = (z0 + z1) / 2;
       const t = 0.35;
       parts.push(
-        tint(flat(w, d).translate(cx, m.y1, cz), b.roof, 0.6),
-        tint(box(w, PARAPET, t, cx, m.y1 + PARAPET / 2, z0 + t / 2), b.wall, 0.55),
-        tint(box(w, PARAPET, t, cx, m.y1 + PARAPET / 2, z1 - t / 2), b.wall, 0.55),
-        tint(box(t, PARAPET, d - 2 * t, x0 + t / 2, m.y1 + PARAPET / 2, cz), b.wall, 0.55),
-        tint(box(t, PARAPET, d - 2 * t, x1 - t / 2, m.y1 + PARAPET / 2, cz), b.wall, 0.55),
+        tint(flat(w, d).translate(cx, m.y1, cz), b.roof),
+        tint(box(w, PARAPET, t, cx, m.y1 + PARAPET / 2, z0 + t / 2), b.wall),
+        tint(box(w, PARAPET, t, cx, m.y1 + PARAPET / 2, z1 - t / 2), b.wall),
+        tint(box(t, PARAPET, d - 2 * t, x0 + t / 2, m.y1 + PARAPET / 2, cz), b.wall),
+        tint(box(t, PARAPET, d - 2 * t, x1 - t / 2, m.y1 + PARAPET / 2, cz), b.wall),
       );
     }
     if (!lite) for (const p of roofPlant(b)) parts.push(...plantGeometry(p));
@@ -653,10 +673,10 @@ function crowns(list: Building[]): THREE.BufferGeometry | null {
     const y = b.masses[b.masses.length - 1].y1 - 0.5;
     const o = 0.06;
     parts.push(
-      tint(box(x1 - x0 + 2 * o, 0.35, 0.05, (x0 + x1) / 2, y, z0 - o), b.crown, 1),
-      tint(box(x1 - x0 + 2 * o, 0.35, 0.05, (x0 + x1) / 2, y, z1 + o), b.crown, 1),
-      tint(box(0.05, 0.35, z1 - z0, x0 - o, y, (z0 + z1) / 2), b.crown, 1),
-      tint(box(0.05, 0.35, z1 - z0, x1 + o, y, (z0 + z1) / 2), b.crown, 1),
+      tint(box(x1 - x0 + 2 * o, 0.35, 0.05, (x0 + x1) / 2, y, z0 - o), b.crown),
+      tint(box(x1 - x0 + 2 * o, 0.35, 0.05, (x0 + x1) / 2, y, z1 + o), b.crown),
+      tint(box(0.05, 0.35, z1 - z0, x0 - o, y, (z0 + z1) / 2), b.crown),
+      tint(box(0.05, 0.35, z1 - z0, x1 + o, y, (z0 + z1) / 2), b.crown),
     );
   }
   return parts.length ? merge(parts) : null;
@@ -665,7 +685,7 @@ function crowns(list: Building[]): THREE.BufferGeometry | null {
 /** The red lights on the tallest towers blink together, a second apart. */
 function Beacons({ list }: { list: Building[] }) {
   const geometry = useMemo(() => {
-    const parts = list.flatMap((b) => beacons(b)).map((p) => tint(box(0.5, 0.5, 0.5, p.x, p.y, p.z), "#ff3030", 1));
+    const parts = list.flatMap((b) => beacons(b)).map((p) => tint(box(0.5, 0.5, 0.5, p.x, p.y, p.z), "#ff3030"));
     return parts.length ? merge(parts) : null;
   }, [list]);
   const ref = useRef<THREE.Mesh>(null);
@@ -701,13 +721,13 @@ function Tower() {
     const top = TOWER.masses[0].y1;
     const [x0, z0, x1, z1] = PODIUM;
     const [bx0, bz0, bx1, bz1] = BUILDING;
-    const planter = (x: number, z: number, w: number, d: number) => tint(box(w, 0.6, d, x, top + 0.3, z), "#2f4a33", 0.55);
+    const planter = (x: number, z: number, w: number, d: number) => tint(box(w, 0.6, d, x, top + 0.3, z), "#2f4a33");
     return merge([
-      tint(flat(x1 - x0, z1 - z0).translate((x0 + x1) / 2, top, (z0 + z1) / 2), TOWER.roof, 0.6),
-      tint(box(x1 - x0, PARAPET, 0.35, (x0 + x1) / 2, top + PARAPET / 2, z0 + 0.17), TOWER.wall, 0.55),
-      tint(box(x1 - x0, PARAPET, 0.35, (x0 + x1) / 2, top + PARAPET / 2, z1 - 0.17), TOWER.wall, 0.55),
-      tint(box(0.35, PARAPET, z1 - z0, x0 + 0.17, top + PARAPET / 2, (z0 + z1) / 2), TOWER.wall, 0.55),
-      tint(box(0.35, PARAPET, z1 - z0, x1 - 0.17, top + PARAPET / 2, (z0 + z1) / 2), TOWER.wall, 0.55),
+      tint(flat(x1 - x0, z1 - z0).translate((x0 + x1) / 2, top, (z0 + z1) / 2), TOWER.roof),
+      tint(box(x1 - x0, PARAPET, 0.35, (x0 + x1) / 2, top + PARAPET / 2, z0 + 0.17), TOWER.wall),
+      tint(box(x1 - x0, PARAPET, 0.35, (x0 + x1) / 2, top + PARAPET / 2, z1 - 0.17), TOWER.wall),
+      tint(box(0.35, PARAPET, z1 - z0, x0 + 0.17, top + PARAPET / 2, (z0 + z1) / 2), TOWER.wall),
+      tint(box(0.35, PARAPET, z1 - z0, x1 - 0.17, top + PARAPET / 2, (z0 + z1) / 2), TOWER.wall),
       // Planters along the terrace either side of the shaft.
       planter((x0 + bx0) / 2, (z0 + z1) / 2, 2, z1 - z0 - 6),
       planter((x1 + bx1) / 2, (z0 + z1) / 2, 2, z1 - z0 - 6),
@@ -716,7 +736,7 @@ function Tower() {
     ]);
   }, []);
   const sign = useMemo(() => logoSign(), []);
-  const letters = useMemo(() => faded({ map: sign, transparent: true, depthWrite: false, toneMapped: false }, "city-sign"), [sign]);
+  const letters = useMemo(() => faded({ map: sign, transparent: true, depthWrite: false, toneMapped: false }, "city-sign", "glow"), [sign]);
   useEffect(
     () => () => {
       letters.dispose();
@@ -788,19 +808,19 @@ function Park({ basic }: { basic: boolean }) {
     const [cx, cz] = parkCentre();
     const r = FOUNTAIN.r;
     const at = (g: THREE.BufferGeometry, y: number) => g.translate(cx, GROUND_Y + y, cz);
-    const disc = (radius: number, y: number, colour: string, ambient = 1) => tint(at(new THREE.CircleGeometry(radius, 40).rotateX(-Math.PI / 2), y), colour, ambient);
+    const disc = (radius: number, y: number, colour: string) => tint(at(new THREE.CircleGeometry(radius, 40).rotateX(-Math.PI / 2), y), colour);
     const solid: THREE.BufferGeometry[] = [
       disc(FOUNTAIN.square, 0.025, "#4b4755"),
-      tint(at(new THREE.CylinderGeometry(r, r + 0.15, 0.6, 40), 0.3), "#8b8578", 0.6),
-      tint(at(new THREE.RingGeometry(r - 0.35, r, 40).rotateX(-Math.PI / 2), 0.63), "#a29b8d", 1),
-      tint(at(new THREE.CylinderGeometry(0.35, 0.5, 1.5, 12), 1.35), "#8b8578", 0.6),
-      tint(at(new THREE.CylinderGeometry(1.3, 0.6, 0.3, 24), 2.2), "#8b8578", 0.6),
-      tint(at(new THREE.CylinderGeometry(0.18, 0.25, 0.8, 10), 2.7), "#8b8578", 0.6),
+      tint(at(new THREE.CylinderGeometry(r, r + 0.15, 0.6, 40), 0.3), "#8b8578"),
+      tint(at(new THREE.RingGeometry(r - 0.35, r, 40).rotateX(-Math.PI / 2), 0.63), "#a29b8d"),
+      tint(at(new THREE.CylinderGeometry(0.35, 0.5, 1.5, 12), 1.35), "#8b8578"),
+      tint(at(new THREE.CylinderGeometry(1.3, 0.6, 0.3, 24), 2.2), "#8b8578"),
+      tint(at(new THREE.CylinderGeometry(0.18, 0.25, 0.8, 10), 2.7), "#8b8578"),
     ];
-    for (const [x0, z0, x1, z1] of flowerBeds()) solid.push(tint(box(x1 - x0, 0.3, z1 - z0, (x0 + x1) / 2, GROUND_Y + 0.15, (z0 + z1) / 2), "#3a2a22", 0.6));
-    if (!basic) for (const f of flowers()) solid.push(tint(new THREE.IcosahedronGeometry(0.2, 0).translate(f.x, GROUND_Y + 0.42, f.z), f.colour, 0.75));
+    for (const [x0, z0, x1, z1] of flowerBeds()) solid.push(tint(box(x1 - x0, 0.3, z1 - z0, (x0 + x1) / 2, GROUND_Y + 0.15, (z0 + z1) / 2), "#3a2a22"));
+    if (!basic) for (const f of flowers()) solid.push(tint(new THREE.IcosahedronGeometry(0.2, 0).translate(f.x, GROUND_Y + 0.42, f.z), f.colour));
     // Water in the basin and the bowl, and the jet above it, glow.
-    const glow = [disc(r - 0.35, 0.61, "#2fa9c9"), disc(1.15, 2.36, "#2fa9c9"), tint(at(new THREE.CylinderGeometry(0.06, 0.12, 1.1, 8), 3.6), "#bdefff", 1)];
+    const glow = [disc(r - 0.35, 0.61, "#2fa9c9"), disc(1.15, 2.36, "#2fa9c9"), tint(at(new THREE.CylinderGeometry(0.06, 0.12, 1.1, 8), 3.6), "#bdefff")];
     return { stone: merge(solid), water: merge(glow) };
   }, [basic]);
   const seats = useMemo(() => benches().map((b) => compose(b.x, GROUND_Y, b.z, b.rot)), []);
@@ -837,7 +857,7 @@ function Lamps({ pools }: { pools: boolean }) {
   );
   const poolColours = useMemo(() => spots.map((l) => (l.warm ? LAMPLIGHT.warm : LAMPLIGHT.cool)), [spots]);
   const geo = useMemo(() => ({ posts: new Map(LAMP_STYLES.map((s) => [s, lampPost(s)])), heads: new Map(LAMP_STYLES.map((s) => [s, lampHead(s)])), pool: flat(1, 1) }), []);
-  const pool = useMemo(() => faded({ map: poolTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }, "city-pool"), []);
+  const pool = useMemo(() => faded({ map: poolTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }, "city-pool", "night"), []);
   useEffect(
     () => () => {
       pool.map?.dispose();
@@ -945,16 +965,16 @@ function Traffic({ share, lite }: { share: number; lite: boolean }) {
  */
 function walkerBody(lite: boolean): THREE.BufferGeometry {
   return merge([
-    tint(new THREE.IcosahedronGeometry(0.5, lite ? 0 : 1).scale(0.72, 1.15, 0.72).translate(0, 0.78, 0), "#ffffff", 0.62),
-    ...[-0.16, 0.16].map((x) => tint(box(0.17, 0.2, 0.26, x, 0.1, -0.02), "#4a4652", 0.7)),
+    tint(new THREE.IcosahedronGeometry(0.5, lite ? 0 : 1).scale(0.72, 1.15, 0.72).translate(0, 0.78, 0), "#ffffff"),
+    ...[-0.16, 0.16].map((x) => tint(box(0.17, 0.2, 0.26, x, 0.1, -0.02), "#4a4652")),
   ]);
 }
 
 function walkerEyes(): THREE.BufferGeometry {
   return merge(
     [-0.13, 0.13].flatMap((x) => [
-      tint(new THREE.IcosahedronGeometry(0.085, 0).translate(x, 1.0, -0.27), "#f6f4ef", 1),
-      tint(new THREE.IcosahedronGeometry(0.045, 0).translate(x, 1.0, -0.34), "#1b1b22", 1),
+      tint(new THREE.IcosahedronGeometry(0.085, 0).translate(x, 1.0, -0.27), "#f6f4ef"),
+      tint(new THREE.IcosahedronGeometry(0.045, 0).translate(x, 1.0, -0.34), "#1b1b22"),
     ]),
   );
 }
@@ -1014,13 +1034,9 @@ function Crowd({ share, lite }: { share: number; lite: boolean }) {
 /* Downtown                                                            */
 /* ------------------------------------------------------------------ */
 
-/**
- * The world outside. `linear` says whether the scene renders through the
- * effects chain, which needs the night colour in linear light.
- */
-export function Exterior({ linear }: { linear: boolean }) {
+/** The world outside the office, lit for the time of day by applyDaylight. */
+export function Exterior() {
   const basic = useDetail() === "basic";
-  setNight(linear);
   return (
     <group>
       <Ground />
