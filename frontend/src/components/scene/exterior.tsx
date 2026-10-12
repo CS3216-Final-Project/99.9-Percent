@@ -63,6 +63,7 @@ import { useCitySurfaces, type CitySurface } from "./cityTextures";
 import { useSurfaces, type Surface } from "./surfaces";
 import { TREE_VARIANTS, treeModel, type TreeModel, type TreeShape } from "./treeModels";
 import { vehicleBody, vehicleLights } from "./vehicleModels";
+import { HIP, HAIR, SHOULDER, SKIN, STATURE, stature, TROUSERS, walkerModel } from "./walkerModels";
 import { adsTexture, logoSign } from "./textures";
 
 /*
@@ -1472,76 +1473,111 @@ function Traffic({ share, lite }: { share: number; lite: boolean }) {
 /* Pedestrians                                                         */
 /* ------------------------------------------------------------------ */
 
+/** A palette as a GLSL array of linear colours. */
+const palette = (name: string, hexes: string[]) => {
+  const c = new THREE.Color();
+  return `const vec3 ${name}[${hexes.length}] = vec3[${hexes.length}](${hexes.map((h) => (c.set(h), `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`)).join(", ")});`;
+};
+
+/** The walkers' clock: their arms and legs swing in the vertex shader, so only their places change each frame. */
+const walkClock = { value: 0 };
+
 /**
- * A passer-by facing -z: a round monster like the crew upstairs, on two small feet, in a white body that its own
- * colour tints. Its eyes are drawn apart, so they stay white.
+ * Passers-by (see walkerModels.ts). Each walker's stride (aStride: strides a second, where in its stride it starts,
+ * and a seed for its looks) swings each leg from the hip against the arm on the same side, and lowers the body as
+ * the legs spread, so the feet stay on the ground. The shirt takes the walker's own colour, a little muted; skin,
+ * hair and trousers are picked from their palettes by the seed.
  */
-function walkerBody(lite: boolean): THREE.BufferGeometry {
-  return merge([
-    tint(new THREE.IcosahedronGeometry(0.5, lite ? 0 : 1).scale(0.72, 1.15, 0.72).translate(0, 0.78, 0), "#ffffff"),
-    ...[-0.16, 0.16].map((x) => tint(box(0.17, 0.2, 0.26, x, 0.1, -0.02), "#4a4652")),
-  ]);
+const WALKER_GLSL = `
+attribute vec2 aWho;
+attribute vec3 aStride;
+uniform float uWalkTime;
+${palette("SKIN", SKIN)}
+${palette("HAIR", HAIR)}
+${palette("TROUSERS", TROUSERS)}
+`;
+
+const WALKER_STRIDE = `
+float stride = uWalkTime * aStride.x + aStride.y;
+float spread = 0.45 * sin(stride);
+if (aWho.y > 0.5) {
+  float side = mod(aWho.y, 2.0) > 0.5 ? 1.0 : -1.0;
+  float leg = step(aWho.y, 2.5);
+  float angle = spread * side * mix(-0.8, 1.0, leg);
+  float pivot = mix(${SHOULDER.toFixed(2)}, ${HIP.toFixed(2)}, leg);
+  vec2 yz = vec2(transformed.y - pivot, transformed.z);
+  transformed.y = pivot + yz.x * cos(angle) - yz.y * sin(angle);
+  transformed.z = yz.x * sin(angle) + yz.y * cos(angle);
+}
+transformed.y -= ${HIP.toFixed(2)} * (1.0 - cos(spread));
+`;
+
+const WALKER_COLOUR = `
+vec3 dress = color;
+float seed = aStride.z;
+if (aWho.x < 0.5) {
+  #ifdef USE_INSTANCING_COLOR
+    dress = mix(instanceColor.rgb, vec3(dot(instanceColor.rgb, vec3(0.3, 0.59, 0.11))), 0.3);
+  #endif
+} else if (aWho.x < 1.5) dress = SKIN[int(fract(seed * 7.31) * ${SKIN.length}.0)];
+else if (aWho.x < 2.5) dress = HAIR[int(fract(seed * 3.17) * ${HAIR.length}.0)];
+else if (aWho.x < 3.5) dress = TROUSERS[int(fract(seed * 5.53) * ${TROUSERS.length}.0)];
+vColor = vec4(dress, 1.0);
+`;
+
+function walkerMaterial(): THREE.MeshBasicMaterial {
+  return faded({ vertexColors: true }, "city-walker", "lit", (shader) => {
+    shader.uniforms.uWalkTime = walkClock;
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", `#include <common>\n${WALKER_GLSL}`)
+      .replace("#include <color_vertex>", WALKER_COLOUR)
+      .replace("#include <begin_vertex>", `#include <begin_vertex>\n${WALKER_STRIDE}`);
+  });
 }
 
-function walkerEyes(): THREE.BufferGeometry {
-  return merge(
-    [-0.13, 0.13].flatMap((x) => [
-      tint(new THREE.IcosahedronGeometry(0.085, 0).translate(x, 1.0, -0.27), "#f6f4ef"),
-      tint(new THREE.IcosahedronGeometry(0.045, 0).translate(x, 1.0, -0.34), "#1b1b22"),
-    ]),
-  );
-}
+const walkerLook = walkerMaterial();
 
 const stretch = new THREE.Vector3();
 
-/** People walking the pavements, the park and the plaza, hopping as they go. `share` thins the crowd without a GPU. */
+/** People walking the pavements, the park and the plaza, each at their own height and pace. `share` thins the crowd without a GPU. */
 function Crowd({ share, lite }: { share: number; lite: boolean }) {
   const people = useMemo(() => pedestrians().filter((_, i) => (i * share) % 1 < share), [share]);
-  const geo = useMemo(() => ({ body: walkerBody(lite), eyes: walkerEyes() }), [lite]);
-  const bodies = useRef<THREE.InstancedMesh>(null);
-  const eyes = useRef<THREE.InstancedMesh>(null);
+  const body = useMemo(() => {
+    const g = walkerModel(lite);
+    // A stride is about 0.8 of a person's height, two steps; each walker starts somewhere in theirs.
+    const strides = new Float32Array(people.length * 3);
+    people.forEach((p, i) => strides.set([(2 * Math.PI * p.speed) / (0.8 * stature(p.size)), (p.at * 1.37) % (2 * Math.PI), (p.at * 0.618 + p.walk * 0.29) % 1], i * 3));
+    g.setAttribute("aStride", new THREE.InstancedBufferAttribute(strides, 3));
+    return g;
+  }, [lite, people]);
+  const mesh = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
-    const mesh = bodies.current;
-    if (!mesh) return;
+    const m = mesh.current;
+    if (!m) return;
     const c = new THREE.Color();
-    people.forEach((p, i) => mesh.setColorAt(i, c.set(p.colour)));
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    people.forEach((p, i) => m.setColorAt(i, c.set(p.colour)));
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
     // A new body makes a new mesh, which needs its colours again.
-  }, [people, geo]);
+  }, [people, body]);
   useFrame(({ clock }) => {
-    const b = bodies.current;
-    const e = eyes.current;
-    if (!b || !e) return;
+    const m = mesh.current;
+    if (!m) return;
     const t = clock.elapsedTime;
+    walkClock.value = t;
     for (let k = 0; k < people.length; k++) {
       const p = people[k];
       const at = walkerAt(p, t);
-      const phase = t * p.speed * 2.8 + k * 1.7;
-      const squash = 1 + 0.06 * Math.cos(2 * phase);
-      place.set(at.x, GROUND_Y + 0.02 + Math.abs(Math.sin(phase)) * 0.12 * p.size, at.z);
+      place.set(at.x, GROUND_Y + 0.01, at.z);
       spin.setFromAxisAngle(UP, at.heading);
-      stretch.set(p.size / Math.sqrt(squash), p.size * squash, p.size / Math.sqrt(squash));
-      turned.compose(place, spin, stretch);
-      b.setMatrixAt(k, turned);
-      e.setMatrixAt(k, turned);
+      const s = stature(p.size) / STATURE;
+      turned.compose(place, spin, stretch.set(s, s, s));
+      m.setMatrixAt(k, turned);
     }
-    b.instanceMatrix.needsUpdate = true;
-    e.instanceMatrix.needsUpdate = true;
+    m.instanceMatrix.needsUpdate = true;
   });
-  useEffect(
-    () => () => {
-      geo.body.dispose();
-      geo.eyes.dispose();
-    },
-    [geo],
-  );
+  useEffect(() => () => body.dispose(), [body]);
   if (people.length === 0) return null;
-  return (
-    <group>
-      <instancedMesh key={`b${people.length}`} ref={bodies} args={[geo.body, M.shaded, people.length]} frustumCulled={false} />
-      <instancedMesh key={`e${people.length}`} ref={eyes} args={[geo.eyes, M.shaded, people.length]} frustumCulled={false} />
-    </group>
-  );
+  return <instancedMesh key={`b${people.length}`} ref={mesh} args={[body, walkerLook, people.length]} frustumCulled={false} />;
 }
 
 /* ------------------------------------------------------------------ */
