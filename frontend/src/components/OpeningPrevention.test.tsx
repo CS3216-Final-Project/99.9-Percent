@@ -11,7 +11,7 @@ function inspected(){let g=prevented();g=act(g,{type:"incident_inspect",equipmen
 const qualified=()=>advanceSteps(inspected(),5).state;
 const ui=()=><><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/></>;
 function show(g:GameState){useGame.setState({game:g,ready:true,started:true,onboarding:false});return render(ui());}
-const guidance=()=>screen.getByRole("region",{name:"Campaign requirements"});
+const guidance=()=>screen.getByRole("region",{name:"Guided Mode requirements"});
 const requirement=(id:string)=>guidance().querySelector(`[data-requirement="${id}"]`)!;
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});afterEach(cleanup);
 it("lists outstanding prevention requirements and inspects components without advancing time",()=>{
@@ -32,7 +32,7 @@ it("records prevention and explains why Scaling remains locked",()=>{
  expect(screen.queryByRole("dialog",{name:"First growth challenge handled"})).toBeNull();
  expect(useGame.getState().game.campaign!.scaling).toBeNull();
  expect(requirement("recovery").getAttribute("data-met")).toBe("false");
- expect(screen.getByLabelText("Current campaign stage").textContent).toBe("Opening");
+ expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe("Opening");
  expect(useGame.getState().game.campaign!.cashCents).toBe(cash);expect(useGame.getState().game.campaign!.step).toBe(step);
 });
 it.each(["streak","outcome","acknowledged"])("reload preserves prevention %s with paused time",kind=>{
@@ -42,7 +42,7 @@ it.each(["streak","outcome","acknowledged"])("reload preserves prevention %s wit
  render(ui());expect(useGame.getState().running).toBe(false);
  if(kind==="streak")expect(screen.getByRole("region",{name:"Opening prevention progress"}).textContent).toContain("Stable service: 2 / 5");
  if(kind==="outcome")expect(screen.getByRole("dialog",{name:"Prevention review"})).toBeTruthy();
- if(kind==="acknowledged"){expect(screen.queryByRole("dialog")).toBeNull();expect(screen.getByLabelText("Current campaign stage").textContent).toBe("Opening");}
+ if(kind==="acknowledged"){expect(screen.queryByRole("dialog")).toBeNull();expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe("Opening");}
  expect(useGame.getState().game.campaign).toEqual(g.campaign);
 });
 it("history excludes purchases made after qualification",()=>{

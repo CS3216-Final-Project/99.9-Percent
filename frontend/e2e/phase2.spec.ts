@@ -8,7 +8,7 @@ test("keyboard introduction stays paused, contains focus and remembers completio
   const preview = page.getByRole("img", { name: /furnished office/ });
   await expect(preview).toHaveCount(0);
   await page.screenshot({ path: "test-results/phase2-title.png" });
-  await page.getByRole("button", { name: "Play Campaign" }).press("Enter");
+  await page.getByRole("button", { name: "Start Guided Mode" }).press("Enter");
   const intro = page.getByRole("dialog", { name: "Company introduction" });
   await expect(intro).toContainText("Prompt 1 of 3");
   await page.keyboard.press("p");

@@ -1,6 +1,6 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PostHogConfig } from "posthog-js/dist/module.no-external";
-import { configuredAnalytics, createAnalyticsSink, POSTHOG_OPTIONS, startProductAnalytics, type AnalyticsConfig } from "./analytics";
+import { ANALYTICS_CONSENT_KEY, configuredAnalytics, createAnalyticsSink, loadAnalyticsConsent, POSTHOG_OPTIONS, saveAnalyticsConsent, startConsentedProductAnalytics, startProductAnalytics, type AnalyticsConfig } from "./analytics";
 import { useGame } from "@/game/store";
 
 const config: AnalyticsConfig = { enabled: true, token: "phc_test_public_token", host: "https://us.i.posthog.com", buildId: "test" };
@@ -86,4 +86,108 @@ it("installs no observers, timers or storage writes when unconfigured", () => {
   stop();
   expect(subscribe).not.toHaveBeenCalled();
   expect(listener).not.toHaveBeenCalled();
+});
+
+describe("analytics consent", () => {
+  afterEach(() => { localStorage.clear(); });
+
+  it("treats a missing, corrupt or unreadable decision as undecided and round-trips each choice", () => {
+    expect(loadAnalyticsConsent()).toBeNull();
+    localStorage.setItem(ANALYTICS_CONSENT_KEY, "{");
+    expect(loadAnalyticsConsent()).toBeNull();
+    localStorage.setItem(ANALYTICS_CONSENT_KEY, '"accepted"');
+    expect(loadAnalyticsConsent()).toBeNull();
+    expect(saveAnalyticsConsent("accepted")).toBe(true);
+    expect(loadAnalyticsConsent()).toBe("accepted");
+    expect(saveAnalyticsConsent("declined")).toBe(true);
+    expect(loadAnalyticsConsent()).toBe("declined");
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("blocked"); });
+    expect(loadAnalyticsConsent()).toBeNull();
+  });
+
+  it("announces the decision even when it cannot be persisted", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
+    const heard: unknown[] = [];
+    const listener = (event: Event) => heard.push((event as CustomEvent).detail);
+    window.addEventListener("nn:analytics-consent", listener);
+    try {
+      expect(saveAnalyticsConsent("accepted")).toBe(false);
+      expect(heard).toEqual(["accepted"]);
+    } finally {
+      window.removeEventListener("nn:analytics-consent", listener);
+    }
+  });
+
+  it("starts nothing while undecided or declined, and exactly once on acceptance", () => {
+    const subscribe = vi.spyOn(useGame, "subscribe");
+    const stop = startConsentedProductAnalytics(useGame, config);
+    try {
+      expect(subscribe).not.toHaveBeenCalled();
+      saveAnalyticsConsent("declined");
+      expect(subscribe).not.toHaveBeenCalled();
+      saveAnalyticsConsent("accepted");
+      expect(subscribe).toHaveBeenCalledTimes(1);
+      // A second decision, or the same acceptance repeated, does not add an observer.
+      saveAnalyticsConsent("accepted");
+      expect(subscribe).toHaveBeenCalledTimes(1);
+    } finally {
+      stop();
+    }
+  });
+
+  it("stops the active observer on a later decline and restarts once on re-acceptance", () => {
+    const unsubscribers: ReturnType<typeof vi.fn>[] = [];
+    const subscribe = vi.spyOn(useGame, "subscribe").mockImplementation(() => {
+      const unsubscribe = vi.fn();
+      unsubscribers.push(unsubscribe);
+      return unsubscribe;
+    });
+    const stop = startConsentedProductAnalytics(useGame, config);
+    try {
+      saveAnalyticsConsent("accepted");
+      expect(subscribe).toHaveBeenCalledTimes(1);
+      expect(unsubscribers).toHaveLength(1);
+      // Opting out unsubscribes the observer it started.
+      saveAnalyticsConsent("declined");
+      expect(unsubscribers[0]).toHaveBeenCalledTimes(1);
+      // Declining again does nothing further.
+      saveAnalyticsConsent("declined");
+      expect(subscribe).toHaveBeenCalledTimes(1);
+      // Re-acceptance starts exactly one new observer, not duplicates.
+      saveAnalyticsConsent("accepted");
+      expect(subscribe).toHaveBeenCalledTimes(2);
+      expect(unsubscribers).toHaveLength(2);
+      saveAnalyticsConsent("accepted");
+      expect(subscribe).toHaveBeenCalledTimes(2);
+    } finally {
+      stop();
+    }
+    // Final cleanup unsubscribes the still-active second observer.
+    expect(unsubscribers[1]).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts on boot from a persisted acceptance and cleans up its listener and observer", () => {
+    localStorage.setItem(ANALYTICS_CONSENT_KEY, "accepted");
+    const subscribe = vi.spyOn(useGame, "subscribe");
+    const remove = vi.spyOn(window, "removeEventListener");
+    const stop = startConsentedProductAnalytics(useGame, config);
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    stop();
+    expect(remove).toHaveBeenCalledWith("nn:analytics-consent", expect.any(Function));
+    // Cleanup also stops the analytics run it started: a later acceptance stays stopped.
+    saveAnalyticsConsent("accepted");
+    expect(subscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies an acceptance for this visit even when storage fails", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
+    const subscribe = vi.spyOn(useGame, "subscribe");
+    const stop = startConsentedProductAnalytics(useGame, config);
+    try {
+      saveAnalyticsConsent("accepted");
+      expect(subscribe).toHaveBeenCalledTimes(1);
+    } finally {
+      stop();
+    }
+  });
 });

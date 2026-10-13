@@ -7,7 +7,7 @@ import {advanceSteps} from "../sim/step";
 import {dataCompany,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
 function decision(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 function show(g:GameState){useGame.setState({game:g,started:true,ready:true,onboarding:false});render(<><CampaignPanel/><CampaignOverlays/></>);}
-const guidance=()=>screen.getByRole("region",{name:"Campaign requirements"});
+const guidance=()=>screen.getByRole("region",{name:"Guided Mode requirements"});
 const met=(id:string)=>guidance().querySelector(`[data-requirement="${id}"]`)!.getAttribute("data-met");
 const recovered=()=>advanceSteps(decision(advanceSteps(newGame(),6).state,{type:"start_db_upgrade"}),30).state;
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});afterEach(cleanup);

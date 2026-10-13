@@ -4,7 +4,9 @@ import { step, advanceSteps } from "../sim/step";
 import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics, saveClassicGame, loadClassicGame } from "./persist";
 import { CAMPAIGN_SAVE_KEY as KEY, makeEnvelope } from "./saveEnvelope";
 import { decodeClassicSave, rawLegacySave, exportGame } from "./persist";
-import { DEFAULT_AUDIO, DEFAULT_GRAPHICS, isSilent, legacyMusicOff, loadAudio, loadGraphics, saveAudio, saveGraphics, saveMode } from "./persist";
+import { DEFAULT_AUDIO, DEFAULT_GRAPHICS, challengeUnlocked, isSilent, legacyMusicOff, loadAudio, loadGraphics, loadMode, saveAudio, saveGraphics, saveMode } from "./persist";
+import { preparedReliability, act, tick } from "../sim/__tests__/reliabilityFixture";
+import { pendingReliability } from "../sim/reliability";
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 describe("campaign data preservation", () => {
@@ -116,6 +118,39 @@ describe("validated replacement and legacy files", () => {
   });
 });
 
+describe("challenge mode unlock", () => {
+  it("stays locked for a new or unreadable profile and unlocks only through campaign metadata", () => {
+    expect(challengeUnlocked()).toBe(false);
+    localStorage.setItem("nn.campaign.meta.v1", "{");
+    expect(challengeUnlocked()).toBe(false);
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true }, "classic");
+    expect(challengeUnlocked()).toBe(false);
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+    expect(challengeUnlocked()).toBe(true);
+  });
+  it("counts an older completed campaign save even when its metadata predates the field", () => {
+    let game = act(preparedReliability(), { type: "arm_reliability" });
+    for (let i = 0; i < 60 && !pendingReliability(game.campaign); i++) {
+      if (game.phase === "review") game = act(game, { type: "acknowledge_review" });
+      game = tick(game);
+    }
+    game = act(game, { type: "acknowledge_reliability" });
+    expect(game.campaign!.reliabilityStage?.acknowledged).toBe(true);
+    saveGame(game);
+    expect(loadMeta().challengeUnlocked).toBe(false);
+    expect(challengeUnlocked()).toBe(true);
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+    clearSave();
+    expect(challengeUnlocked()).toBe(true);
+  });
+  it("refuses a stale classic last-mode while locked and honours it once unlocked", () => {
+    saveMode("classic");
+    expect(loadMode()).toBe("campaign");
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+    expect(loadMode()).toBe("classic");
+  });
+});
+
 describe("sound settings", () => {
   it("start at the defaults and round trip, shared by both modes", () => {
     expect(loadAudio()).toEqual(DEFAULT_AUDIO);
@@ -145,6 +180,7 @@ describe("sound settings", () => {
   it("read the music switch from older metadata when the shared key is missing", () => {
     localStorage.setItem("nn.classic.meta.v1", JSON.stringify({ music: false }));
     expect(loadAudio().muted).toBe(false);
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
     saveMode("classic");
     expect(loadAudio().muted).toBe(true);
     // The shared key wins over metadata, as it did before.

@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect, expectRoom, seedClassicSave } from "./fixtures";
+import { test, expect, expectRoom, seedClassicSave, unlockChallenge } from "./fixtures";
 import { advanceTurn, newLegacyGame } from "../src/sim";
 
 type Point = { x: number; y: number };
@@ -41,6 +41,7 @@ const spread = (points: Point[], from: Point) => Math.max(...points.map(p => Mat
 test("turning the room with Q and E keeps the company in place", async ({ page }) => {
   // The opening framing and the turns ease a share of the way each frame, so software rendering takes tens of seconds.
   test.slow();
+  await unlockChallenge(page);
   await page.addInitScript(() => localStorage.setItem("nn.mode.v1", "classic"));
   await seedClassicSave(page, advanceTurn(newLegacyGame(1)));
   await page.goto("/");

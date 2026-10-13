@@ -9,7 +9,7 @@ beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),
 afterEach(cleanup);
 function show(game:GameState){useGame.setState({game,ready:true,started:true,onboarding:false});render(<CampaignPanel/>);}
 it("keeps the selected workload hidden until actual growth and enters through the paused store",()=>{
- show(dataCompany("read-heavy",false));const guide=screen.getByRole("region",{name:"Campaign guidance"});
+ show(dataCompany("read-heavy",false));const guide=screen.getByRole("region",{name:"Guided Mode guidance"});
  fireEvent.click(within(guide).getByRole("button",{name:/Continue to data strategy/}));
  const data=screen.getByRole("region",{name:"Data strategy"});expect(data.textContent).toContain("Waiting for workload growth");
  expect(data.textContent).not.toMatch(/read-heavy|write-heavy|80%|20%/);expect(useGame.getState().running).toBe(false);

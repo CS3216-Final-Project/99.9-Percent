@@ -1,4 +1,4 @@
-import { test, expect, expectRoom, seedClassicSave } from "./fixtures";
+import { test, expect, expectRoom, seedClassicSave, unlockChallenge } from "./fixtures";
 import { applyAction, newLegacyGame } from "../src/sim";
 
 test.use({ hasTouch: true });
@@ -10,6 +10,7 @@ for (const width of [1440, 390]) {
     if (!upgrade.ok) throw new Error(upgrade.message);
     const debt = applyAction(upgrade.state, { type: "start_debt_paydown" });
     if (!debt.ok) throw new Error(debt.message);
+    await unlockChallenge(page);
     await seedClassicSave(page, debt.state);
     await page.addInitScript(() => localStorage.setItem("nn.mode.v1", "classic"));
     await page.goto("/");

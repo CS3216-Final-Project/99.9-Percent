@@ -12,10 +12,10 @@ export function CampaignChapters() {
   const current = chapters.find((chapter) => chapter.current)!;
 
   return <>
-    <section className="chapter-bar" aria-label="Campaign chapters">
+    <section className="chapter-bar" aria-label="Guided Mode chapters">
       <div className="chapter-current">
-        <p>Campaign · Chapter {current.number} of {chapters.length}</p>
-        <h2 aria-label="Current chapter"><span aria-label="Current campaign stage">{current.name}</span></h2>
+        <p>Guided Mode · Chapter {current.number} of {chapters.length}</p>
+        <h2 aria-label="Current chapter"><span aria-label="Current Guided Mode stage">{current.name}</span></h2>
       </div>
       <ol className="chapter-trail" aria-label="Chapter progress">
         {chapters.map((chapter) => <li key={chapter.id} aria-current={chapter.current ? "step" : undefined} className={chapter.completed ? "is-complete" : ""}>
@@ -28,7 +28,7 @@ export function CampaignChapters() {
         setOpen(true);
       }}><Icon name="goal" size={18} />View chapters</button>
     </section>
-    {open && <Modal title="Campaign chapters" icon={{ kind: "tech", name: "goal" }} onClose={() => setOpen(false)}>
+    {open && <Modal title="Guided Mode chapters" icon={{ kind: "tech", name: "goal" }} onClose={() => setOpen(false)}>
       <p>One company, five chapters. Your servers, investments and progress carry forward.</p>
       <ol className="chapter-overview">
         {chapters.map((chapter) => <li key={chapter.id} aria-current={chapter.current ? "step" : undefined}>
