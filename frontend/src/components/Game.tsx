@@ -13,6 +13,9 @@ import { useGame, type Speed } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { daylightNow } from "./scene/dayClock";
 import { nextGap, viewFocus, ZONE_SOUNDS, zoneLevel, type ZoneSound } from "./scene/zoneSounds";
+import { DOORS, FLOOR_Y, RIDE_SECONDS } from "./scene/levels";
+import { onRide, ride } from "./scene/ride";
+import { buildModel } from "./scene/sceneModel";
 import { SoundButton } from "./SoundButton";
 import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
@@ -257,20 +260,37 @@ const DUSK_CHECK_MS = 2000;
 const ZONE_TICK_MS = 200;
 
 /**
+ * How loud the server hall's fans and hum are, 0 to 1: silent with the office in view, and on the server floor from
+ * a steady hum when the servers idle to the full whir under load.
+ */
+function hallLevel(s: ReturnType<typeof useGame.getState>): number {
+  if (s.floor !== "servers") return 0;
+  const load = Math.min(1, Math.max(0, (buildModel(s.game).flow - 0.25) / 0.75));
+  return 0.55 + 0.45 * load;
+}
+
+/**
  * The city outside, heard under the game while a run is on screen: birds by day, crickets at night, following the
- * same clock as the light (see scene/dayClock.ts). It goes with the sound-effects volume and mute.
+ * same clock as the light (see scene/dayClock.ts). On the server floor the hall's fans take over. It goes with the
+ * sound-effects volume and mute.
  */
 function useAmbience(): void {
   useEffect(() => {
     const a = createAmbience(() => effectsLevel(useGame.getState().audio) > 0);
     a.setVolume(effectsLevel(useGame.getState().audio));
     a.setDark(daylightNow().dark);
+    a.setHall(hallLevel(useGame.getState()), 0);
     const stopFollowing = useGame.subscribe((s, prev) => {
       if (s.audio !== prev.audio) a.setVolume(effectsLevel(s.audio));
       if (s.started !== prev.started) a.setEnabled(s.started);
+      // Crossfade over the elevator's ride.
+      if (s.floor !== prev.floor) a.setHall(hallLevel(s), RIDE_SECONDS);
     });
     a.setEnabled(useGame.getState().started);
-    const id = window.setInterval(() => a.setDark(daylightNow().dark), DUSK_CHECK_MS);
+    const id = window.setInterval(() => {
+      a.setDark(daylightNow().dark);
+      a.setHall(hallLevel(useGame.getState()), 2);
+    }, DUSK_CHECK_MS);
     return () => {
       window.clearInterval(id);
       stopFollowing();
@@ -292,6 +312,12 @@ function useSoundEffects(): void {
       if (s.audio !== prev.audio) sfx.setVolume(effectsLevel(s.audio));
     });
     const stopCues = watchCues(useGame.subscribe, (cue) => sfx.play(cue));
+    // The elevator: a click and the car's hum as it sets off, then the chime and the doors as it arrives.
+    const stopRide = onRide((event) => {
+      const up = FLOOR_Y[ride.to] > FLOOR_Y[ride.from];
+      if (event === "depart") sfx.liftDepart(up);
+      else sfx.liftArrive(up, { close: DOORS.move + DOORS.hold, shut: 2 * DOORS.move + DOORS.hold });
+    });
     // The zones' own sounds, near where the camera looks, while a run is on screen and nothing covers the room.
     const due = new Map<ZoneSound, number>();
     const zones = window.setInterval(() => {
@@ -317,6 +343,7 @@ function useSoundEffects(): void {
     }, ZONE_TICK_MS);
     return () => {
       window.clearInterval(zones);
+      stopRide();
       stopCues();
       stopVolume();
       sfx.dispose();

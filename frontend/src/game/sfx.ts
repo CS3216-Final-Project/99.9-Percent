@@ -203,6 +203,49 @@ const ZONE_VOICES = {
 export type ZoneCue = keyof typeof ZONE_VOICES;
 export const ZONE_CUES = Object.keys(ZONE_VOICES) as ZoneCue[];
 
+/** The car's hum as it rides: a low tone sliding up or down under a soft rush of air, for about the length of a ride. */
+function hum(ctx: Ctx, out: AudioNode, at: number, hiss: AudioBuffer, rising: boolean): void {
+  const length = 1.25;
+  const [from, to] = rising ? [62, 98] : [98, 62];
+  const o = osc(ctx, "sawtooth", from, at, at + length);
+  o.frequency.setValueAtTime(from, at);
+  o.frequency.linearRampToValueAtTime(to, at + length);
+  o.connect(filter(ctx, "lowpass", 240)).connect(envelope(ctx, at, length, 0.11, 0.25, 0.35)).connect(out);
+  noise(ctx, at, at + length, hiss).connect(filter(ctx, "bandpass", rising ? 700 : 520)).connect(envelope(ctx, at, length, 0.05, 0.3, 0.4)).connect(out);
+}
+
+/**
+ * The elevator: the call button's click, the car's hum, the chime as it arrives (higher going up than going down),
+ * and the doors sliding and meeting. They answer the player switching floors.
+ */
+const LIFT_VOICES = {
+  call: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 2800, 0.03, hit(ctx, at, 0.3, 0.03)),
+  humUp: (ctx, out, at, hiss) => hum(ctx, out, at, hiss, true),
+  humDown: (ctx, out, at, hiss) => hum(ctx, out, at, hiss, false),
+  chimeUp: (ctx, out, at) => {
+    bell(ctx, out, at, 79, 0.15, 1.0);
+    bell(ctx, out, at + 0.24, 84, 0.15, 1.3);
+  },
+  chimeDown: (ctx, out, at) => {
+    bell(ctx, out, at, 76, 0.15, 1.0);
+    bell(ctx, out, at + 0.24, 72, 0.15, 1.3);
+  },
+  doors: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 900, 0.45, envelope(ctx, at, 0.45, 0.3, 0.12, 0.25)),
+  thud: (ctx, out, at, hiss) => {
+    osc(ctx, "triangle", 68, at, at + 0.2).connect(hit(ctx, at, 0.22, 0.16)).connect(out);
+    burst(ctx, out, at, hiss, 300, 0.08, hit(ctx, at, 0.12, 0.07));
+  },
+} satisfies Record<string, Voice>;
+
+export type LiftCue = keyof typeof LIFT_VOICES;
+export const LIFT_CUES = Object.keys(LIFT_VOICES) as LiftCue[];
+
+/** When the elevator's doors move after the car arrives, in seconds: they open at once, start closing at `close` and meet at `shut`. */
+export interface LiftDoors {
+  close: number;
+  shut: number;
+}
+
 /** Shortest gap between two plays of the same zone sound, in milliseconds. */
 const ZONE_GAP: Record<ZoneCue, number> = { foosball: 250, arcade: 1200, espresso: 6000, snore: 3000 };
 
@@ -245,6 +288,10 @@ const SLEEP_MS = 10_000;
 const SLIDE = 0.05;
 
 export interface Sfx {
+  /** The elevator sets off, up or down: the call button's click and the car's hum. Doors still to close from the last ride fall silent. */
+  liftDepart(up: boolean): void;
+  /** The car arrives: its hum stops, the chime sounds and the doors open, wait and close. */
+  liftArrive(up: boolean, doors: LiftDoors): void;
   /**
    * Play a zone's sound at `level` (0 to 1) of the effects volume, unless the sound is off, the audio is asleep or
    * the same sound has only just played. Zone sounds never wake the audio: they are only scenery.
@@ -258,7 +305,7 @@ export interface Sfx {
   dispose(): void;
 }
 
-const SILENT: Sfx = { play() {}, playZone() {}, setVolume() {}, dispose() {} };
+const SILENT: Sfx = { play() {}, playZone() {}, liftDepart() {}, liftArrive() {}, setVolume() {}, dispose() {} };
 
 /**
  * `wanted` says whether the player has effects on, so a click can start the
@@ -316,7 +363,70 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
 
   const lastZone = new Map<ZoneCue, number>();
 
+  /** Run `voices` on the audio now, waking it if it wakes promptly, as a cue would. */
+  function whenAwake(voices: (c: AudioContext) => void): void {
+    if (disposed || percent <= 0) return;
+    const t = now();
+    const c = start();
+    const run = () => {
+      try {
+        voices(c);
+      } catch (error) {
+        if (!warned) console.warn("A sound effect could not be played; the game carries on without it.", error);
+        warned = true;
+      }
+    };
+    if (c.state === "running") {
+      run();
+      return;
+    }
+    c.resume()
+      .then(() => {
+        if (ctx === c && !disposed && percent > 0 && now() - t < FRESH_MS) run();
+      })
+      .catch(() => {});
+  }
+
+  /** Each ride's sounds go through a gain of their own, so the next ride can silence what is left of them; the hum has one inside it. */
+  let ride: GainNode | null = null;
+  let humming: GainNode | null = null;
+  const fade = (g: GainNode, c: BaseAudioContext, seconds: number) => {
+    const at = c.currentTime;
+    g.gain.cancelScheduledValues(at);
+    g.gain.setValueAtTime(g.gain.value, at);
+    g.gain.linearRampToValueAtTime(0, at + seconds);
+  };
+  const lane = (c: AudioContext, into: AudioNode) => {
+    const g = c.createGain();
+    g.gain.value = 1;
+    g.connect(into);
+    return g;
+  };
+
   return {
+    liftDepart(up) {
+      whenAwake((c) => {
+        if (!bus || !hiss) return;
+        if (ride) fade(ride, c, 0.08);
+        ride = lane(c, bus);
+        humming = lane(c, ride);
+        const at = c.currentTime + 0.005;
+        LIFT_VOICES.call(c, ride, at, hiss);
+        LIFT_VOICES[up ? "humUp" : "humDown"](c, humming, at + 0.05, hiss);
+      });
+    },
+    liftArrive(up, doors) {
+      whenAwake((c) => {
+        if (!bus || !hiss) return;
+        if (humming) fade(humming, c, 0.15);
+        ride ??= lane(c, bus);
+        const at = c.currentTime + 0.005;
+        LIFT_VOICES[up ? "chimeUp" : "chimeDown"](c, ride, at);
+        LIFT_VOICES.doors(c, ride, at + 0.05, hiss);
+        LIFT_VOICES.doors(c, ride, at + doors.close, hiss);
+        LIFT_VOICES.thud(c, ride, at + doors.shut, hiss);
+      });
+    },
     playZone(cue, level) {
       if (disposed || percent <= 0 || level <= 0 || !ctx || !bus || !hiss || ctx.state !== "running") return;
       const t = now();
@@ -377,9 +487,9 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
 }
 
 /** Render one cue offline at full volume, for checking levels in a browser. */
-export async function renderCue(cue: Cue | ZoneCue, rate = 44100): Promise<AudioBuffer> {
+export async function renderCue(cue: Cue | ZoneCue | LiftCue, rate = 44100): Promise<AudioBuffer> {
   const ctx = new OfflineAudioContext(1, Math.round(rate * 2), rate);
-  const voice: Voice = cue in ZONE_VOICES ? ZONE_VOICES[cue as ZoneCue] : VOICES[cue as Cue];
+  const voice: Voice = cue in ZONE_VOICES ? ZONE_VOICES[cue as ZoneCue] : cue in LIFT_VOICES ? LIFT_VOICES[cue as LiftCue] : VOICES[cue as Cue];
   voice(ctx, ctx.destination, 0.01, hissBuffer(ctx));
   return ctx.startRendering();
 }

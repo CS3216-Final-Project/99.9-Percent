@@ -17,6 +17,8 @@ describe("sound effects without Web Audio", () => {
       sfx.setVolume(0);
       sfx.dispose();
       sfx.play("alarm");
+      sfx.liftDepart(true);
+      sfx.liftArrive(true, { close: 2.8, shut: 3.2 });
     }).not.toThrow();
   });
 });
@@ -97,6 +99,34 @@ describe("sound effects", () => {
     ctx.state = "running";
     sfx.setVolume(0);
     sfx.playZone("espresso", 0.3);
+    expect(ctx.voices).toBe(quiet);
+    sfx.dispose();
+  });
+
+  it("ride the elevator: a click and a hum setting off, a chime and the doors arriving, and nothing while muted", () => {
+    const sfx = createSfx(() => true);
+    sfx.liftDepart(false);
+    expect(FakeAudioContext.made).toHaveLength(0);
+    sfx.setVolume(80);
+    sfx.liftDepart(false);
+    const ctx = FakeAudioContext.made[0];
+    const set = ctx.voices;
+    expect(set).toBeGreaterThan(0);
+    // The ride has a gain of its own, and the hum one inside it.
+    const ride = ctx.gains[1];
+    const hum = ctx.gains[2];
+    sfx.liftArrive(false, { close: 2.8, shut: 3.2 });
+    expect(ctx.voices).toBeGreaterThan(set);
+    // Arriving stops the hum but not the ride's own sounds, the chime and the doors.
+    expect(hum.gain.ramps.at(-1)).toBe(0);
+    expect(ride.gain.ramps).toEqual([]);
+    // Setting off again silences what is left of the last ride: its doors closing.
+    sfx.liftDepart(true);
+    expect(ride.gain.ramps.at(-1)).toBe(0);
+    sfx.setVolume(0);
+    const quiet = ctx.voices;
+    sfx.liftDepart(false);
+    sfx.liftArrive(true, { close: 2.8, shut: 3.2 });
     expect(ctx.voices).toBe(quiet);
     sfx.dispose();
   });
