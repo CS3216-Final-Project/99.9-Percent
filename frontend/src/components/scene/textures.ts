@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { EQUIPMENT, PIXEL_FLOORS } from "./palette";
+import { EQUIPMENT, PIXEL_FLOORS, type TileColours } from "./palette";
 
 /**
  * Small procedural textures drawn on canvases. They give the racks and screens
@@ -619,11 +619,10 @@ export function carpet(base: string, fleck: string): THREE.CanvasTexture {
   return repeating(finish(c));
 }
 
-/** Kitchen floor: big pale tiles with dark grout. */
-export function kitchenTiles(): THREE.CanvasTexture {
+/** Big tiles with dark grout: the kitchen's pale ones unless other colours are given. */
+export function kitchenTiles(p: TileColours = PIXEL_FLOORS.kitchen): THREE.CanvasTexture {
   const S = 16;
   const [c, g] = canvas(S, S);
-  const p = PIXEL_FLOORS.kitchen;
   g.fillStyle = p.base;
   g.fillRect(0, 0, S, S);
   g.fillStyle = p.alternate;

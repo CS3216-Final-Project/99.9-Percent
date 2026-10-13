@@ -539,38 +539,67 @@ function WhiteboardFace({ position, rot }: { position: V3; rot: number }) {
   );
 }
 
-type FloorKey = "server" | "work" | "noc" | "meeting" | "kitchen";
+type FloorKey = "server" | "work" | "noc" | "meeting" | "kitchen" | "events" | "library" | "reception" | "dining" | "lounge" | "games" | "nap";
 
-/** Floor finishes by zone, as [finish, centre x, centre z, width, depth, tile size]. */
+/**
+ * Floor finishes by zone, as [finish, centre x, centre z, width, depth, tile size]. Each zone of the office has a
+ * floor of its own, so the zones read apart from the default view; what is left over is the bare concrete of the
+ * corridors and the network room.
+ */
 const ZONES: [FloorKey, number, number, number, number, number][] = [
   ["server", -3.75, -2.25, 18.5, 14.5, 0.9],
   ["server", 7.25, 0.2, 3.5, 9.6, 0.9],
   ["noc", 8.5, -7.05, 6, 4.9, 1.2],
-  ["work", 0.75, 7.6, 27.5, 5.2, 1.2],
-  ["work", 4.5, 12.35, 20, 4.3, 1.2],
-  ["work", -17.5, 6.75, 9, 15.5, 1.2],
-  ["work", 18.25, 5.75, 7.5, 17.5, 1.2],
+  // Engineering: the pods, the release console and the growth desk.
+  ["work", -2.2, 7.6, 21.6, 5.2, 1.2],
   ["meeting", -9.25, 12.35, 7.5, 4.3, 1.2],
+  ["reception", 1.25, 12.35, 13.5, 4.3, 0.8],
+  // The foosball corner beside reception, carpeted like the games room across the corridor.
+  ["games", 10.3, 12.35, 4.6, 4.3, 1.2],
+  ["nap", 10.5, 7.4, 3.8, 3.2, 1.2],
+  ["events", -17.5, 4.3, 9, 10.6, 1.2],
+  ["library", -17.5, 12.05, 9, 4.9, 1.2],
   ["kitchen", 18.25, -6.25, 7.5, 6.5, 0.8],
+  ["dining", 18.25, 0, 7.5, 6, 0.8],
+  ["lounge", 18.25, 6.15, 7.5, 6.3, 1.2],
+  ["games", 18.25, 11.9, 7.5, 5.2, 1.2],
 ];
 
-/** Each finish at HD detail: a photo surface in the colours of the basic one, and how rough it is. */
+/**
+ * Each finish at HD detail: a photo surface in the colours of the basic one, and how rough it is. Every zone reuses
+ * one of the photo sets the room already loads, so the zones add no downloads.
+ */
 const HD_FLOORS: Record<FloorKey, { id: SurfaceId; tint?: string; roughness?: number }> = {
   server: { id: "serverTiles", tint: ROOM_PALETTE.floor.server },
   work: { id: "carpet", tint: ROOM_PALETTE.floor.work },
   noc: { id: "carpet", tint: ROOM_PALETTE.floor.monitoring },
   meeting: { id: "carpet", tint: ROOM_PALETTE.floor.meeting },
   kitchen: { id: "kitchenTiles", tint: ROOM_PALETTE.floor.kitchen, roughness: 0.9 },
+  events: { id: "carpet", tint: ROOM_PALETTE.floor.events },
+  library: { id: "carpet", tint: ROOM_PALETTE.floor.library },
+  reception: { id: "concrete", tint: ROOM_PALETTE.floor.reception, roughness: 0.8 },
+  dining: { id: "concrete", tint: ROOM_PALETTE.floor.dining, roughness: 0.85 },
+  lounge: { id: "carpet", tint: ROOM_PALETTE.floor.lounge },
+  games: { id: "carpet", tint: ROOM_PALETTE.floor.games },
+  nap: { id: "carpet", tint: ROOM_PALETTE.floor.nap },
 };
 
 function Floors() {
   const textures = useMemo(() => {
+    const rug = (c: { base: string; fleck: string }) => carpet(c.base, c.fleck);
     const base: Record<FloorKey, THREE.CanvasTexture> = {
       server: floorTiles(),
-      work: carpet(PIXEL_FLOORS.work.base, PIXEL_FLOORS.work.fleck),
-      noc: carpet(PIXEL_FLOORS.monitoring.base, PIXEL_FLOORS.monitoring.fleck),
-      meeting: carpet(PIXEL_FLOORS.meeting.base, PIXEL_FLOORS.meeting.fleck),
+      work: rug(PIXEL_FLOORS.work),
+      noc: rug(PIXEL_FLOORS.monitoring),
+      meeting: rug(PIXEL_FLOORS.meeting),
       kitchen: kitchenTiles(),
+      events: rug(PIXEL_FLOORS.events),
+      library: rug(PIXEL_FLOORS.library),
+      reception: kitchenTiles(PIXEL_FLOORS.reception),
+      dining: kitchenTiles(PIXEL_FLOORS.dining),
+      lounge: rug(PIXEL_FLOORS.lounge),
+      games: rug(PIXEL_FLOORS.games),
+      nap: rug(PIXEL_FLOORS.nap),
     };
     return ZONES.map(([key, , , w, d, tile]) => {
       const t = base[key].clone();

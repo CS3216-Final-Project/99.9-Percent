@@ -41,6 +41,12 @@ export const CLOSED_ROOMS: [number, number, number, number][] = [
   [-13, 10.2, -5.5, 14.5],
 ];
 
+/**
+ * Floor kept empty, as [x0, z0, x1, z1]: the east corridor's square where the elevator to the server floor will
+ * stand. Nothing may be placed in it and no walk may cross it, so it is free when the elevator arrives.
+ */
+export const ELEVATOR_SPOT: [number, number, number, number] = [9, -3.5, 11.5, -1];
+
 /** The arcade cabinets, side by side in the games corner. */
 export const ARCADES: [string, number][] = [
   ["purple", 20.4],
