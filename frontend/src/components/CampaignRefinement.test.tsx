@@ -80,7 +80,7 @@ it("system evidence records a real free inspection without advancing the clock",
 it("shows paid-now cash, delayed upkeep and routing limitation before adding an App Server", () => {
   start(); renderCompany(); skip();
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
-  expect(card.textContent).toContain("Another App Server"); expect(card.textContent).toContain("needs routing");
+  expect(card.textContent).not.toContain("Another App Server");
   fireEvent.click(within(card as HTMLElement).getByText("Effect & costs"));
   expect(card.textContent).toContain("$19,000"); expect(card.textContent).toContain("$700 / 60s");
   expect(card.textContent).toContain("No refund or undo");
@@ -120,7 +120,7 @@ it("traffic-limit warning explains rejection without inventing extra charges or 
 it("Scale Up describes the selected server rather than implying another installed instance", () => {
   useGame.setState({game:dataCompany(),ready:true,started:true,onboarding:false,selectedAppId:"app-1"});
   render(<CampaignAction label="Scale up App 1" price={2000} note="3 steps" onClick={()=>{}}/>);
-  expect(screen.getByText(/Makes this App Server larger/)).toBeTruthy();
+  expect(screen.queryByText(/Makes this App Server larger/)).toBeNull();
   expect(screen.getByText("Total upkeep").closest(".row")!.textContent).toContain("$1,100 / 60s (+$400)");
 });
 it("postmortem keeps all actual causes and observations reachable while leading with a compact summary", () => {
@@ -130,4 +130,20 @@ it("postmortem keeps all actual causes and observations reachable while leading 
   for(const explanation of game.campaign!.reports[0].explanations) expect(report.textContent).toContain(explanation.replace(/\b\d+\.\d{3,}\b/g,v=>Number(v).toFixed(2)));
   fireEvent.click(within(report).getByText("Causes, actions and trade-offs"));
   expect(within(report).getByRole("button",{name:"Continue company"})).toBeTruthy();
+});
+it.each([
+  [/Add server/, ["app"]], [/Upgrade database/, ["db"]], [/Limit to 500/, ["gateway"]],
+] as const)("pointing at %s lights up the machine it changes, and leaving clears it", (name, ids) => {
+  start(); renderCompany(); skip();
+  const card=screen.getByRole("button",{name}).closest(".campaign-action-card")!;
+  fireEvent.pointerEnter(card); expect(useGame.getState().affected).toEqual(ids);
+  fireEvent.pointerLeave(card); expect(useGame.getState().affected).toEqual([]);
+});
+it("keeps the affected machine lit while its confirmation is open, and clears it after Confirm", () => {
+  start(); renderCompany(); skip();
+  const button=screen.getByRole("button",{name:/Upgrade database/}), card=button.closest(".campaign-action-card")!;
+  fireEvent.pointerEnter(card); fireEvent.click(button); fireEvent.pointerLeave(card);
+  expect(useGame.getState().affected).toEqual(["db"]);
+  fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
+  expect(useGame.getState().affected).toEqual([]);
 });

@@ -8,7 +8,6 @@
 .campaign-panel .progression-requirements li[data-met="true"] svg { color: var(--ok-ink); }
 .campaign-panel .campaign-requirements p { margin: 6px 0 0; font-size: 13px; line-height: 1.45; }
 .campaign-panel .campaign-action-card { border-bottom: 1px solid var(--paper-3); padding-bottom: 8px; }
-.campaign-panel .campaign-action-effect { margin: 4px 0; font-size: 12px; line-height: 1.4; }
 .campaign-panel .campaign-action-reason { margin: 4px 0; font-size: 12px; color: var(--warn-ink); }
 .campaign-panel .campaign-action-detail { font-size: 12px; line-height: 1.45; margin-top: 2px; }
 .campaign-panel .campaign-action-detail summary { cursor: pointer; padding: 4px 0; width: fit-content; font-weight: 700; color: var(--text-soft); }
@@ -52,7 +51,6 @@
 .chapter-current .campaign-intro-badge { display: inline-block; color: var(--on-night-soft); font-size: 11px; margin-top: 4px; }
 
 .campaign-panel .campaign-action-card { padding-bottom: 4px; }
-.campaign-panel .campaign-action-effect { margin: 2px 0; }
 .campaign-panel .campaign-action-detail summary { padding: 2px 0; }
 
 @media (min-width: 901px) {
@@ -65,7 +63,6 @@
   .campaign-panel .incident-investigate .chip-icon { display: none; }
   .campaign-panel .campaign-action-card .act-meta { display: flex; flex-wrap: wrap; max-width: 225px; gap: 4px; justify-content: flex-end; }
   .campaign-panel .campaign-action-card { padding-bottom: 2px; }
-  .campaign-panel .campaign-action-effect { margin: 0; }
 }
 
 @media (min-width: 901px) {

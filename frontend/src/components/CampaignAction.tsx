@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useSyncExternalStore, type ComponentProps } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ComponentProps } from "react";
+import type { EquipmentId } from "@/sim";
 import { useGame } from "@/game/store";
 import { moneyFull as money } from "@/game/format";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
@@ -21,6 +22,7 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
   const { game, onboarding, selectedAppId } = useGame();
   const c = game.campaign!, id = useId(), card = useRef<HTMLDivElement>(null);
   const open = useSyncExternalStore(subscribe, () => confirming === props.label);
+  const [pointing, setPointing] = useState(false);
   useEffect(() => () => { if (confirming === props.label) setConfirming(null); }, [props.label]);
   const app = c.apps.find(a => a.id === selectedAppId) ?? c.apps[0];
   const busy = c.pending.some(a => !["limit", "unlimit", "routing"].includes(a.type));
@@ -34,15 +36,12 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
     : label === "Deploy Health Checks" ? R.checksWeeklyCents
     : label === "Deploy Automatic Failover" ? R.failoverWeeklyCents
     : label === "Deploy autoscaling" ? T.controllerWeeklyCents : null;
-  const effect = isAdd ? "Another App Server · needs routing."
-    : isScale ? "Makes this App Server larger."
-    : label === "Upgrade database" ? "More Database capacity."
-    : label === "Deploy load balancing" ? "Shares traffic after routing is configured."
-    : label === "Deploy Read Cache" ? "Reuses read results · starts cold."
-    : label.startsWith("Tune cache") ? "Higher hit-rate ceiling · warming still needed."
-    : label.startsWith("Limit to") ? "Rejects above 500 req/s · same upkeep."
-    : label === "Remove traffic limit" ? "Full demand returns · check capacity."
-    : null;
+  // The machines this action changes, lit up in the room while the player points at or confirms it.
+  const affected: EquipmentId[] = label === "Upgrade database" ? ["db"]
+    : label.startsWith("Limit to") || label === "Remove traffic limit" || label === "Deploy load balancing" ? ["gateway"]
+    : label === "Deploy Read Cache" || label.startsWith("Tune cache") ? ["cache"]
+    : label === "Deploy Health Checks" ? ["monitoring"]
+    : ["app"];
   const currentDbUpkeep = c.dbCapacity === Q.dbCapacity ? Q.dbWeeklyCents : c.dbCapacity === Q.upgradedDbCapacity ? Q.upgradedDbWeeklyCents : c.dbCapacity === P.dbCapacity ? P.dbWeeklyCents : D.dbWeeklyCents;
   const increase = upkeep === null ? null : isScale ? upkeep - Q.appWeeklyCents : label === "Upgrade database" ? upkeep - currentDbUpkeep : upkeep;
   let reason = "See this action's requirements for details.";
@@ -73,6 +72,12 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
   else if (label === "Deploy Automatic Failover" && !c.loadBalancer) reason = "Deploy load balancing first.";
   else if (label === "Deploy Automatic Failover" && !c.apps.some(a => a.id === c.reliabilityStage?.spareId && a.health !== "failed")) reason = "Reserve a healthy spare first.";
   else if (busy) reason = "An infrastructure deployment is pending. Wait for activation.";
+  const highlight = pointing || open, affectedKey = affected.join();
+  useEffect(() => {
+    if (!highlight) return;
+    useGame.getState().setAffected(affectedKey.split(",") as EquipmentId[]);
+    return () => useGame.getState().setAffected([]);
+  }, [highlight, affectedKey]);
   const cancel = () => { setConfirming(null); card.current?.querySelector<HTMLButtonElement>("button.act")?.focus(); };
   const costs = <>
     {props.tip && <p>{props.tip}</p>}
@@ -84,9 +89,10 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
     </dl>
     {props.price !== undefined && props.price > 0 && <p className="muted">No refund or undo. Upkeep starts at activation.</p>}
   </>;
-  return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card}>
+  return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey}
+    onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)}
+    onFocus={() => setPointing(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPointing(false); }}>
     <Act {...props} onClick={() => setConfirming(open ? null : label)} />
-    {effect && <p className="campaign-action-effect">{effect}</p>}
     {props.disabled && <p className="campaign-action-reason" id={id}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
     {open ? <section className="campaign-action-box campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); cancel(); } }}>
       <p className="campaign-action-confirm-title">{label}?</p>

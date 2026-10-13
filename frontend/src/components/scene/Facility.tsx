@@ -433,16 +433,19 @@ const AMBER = "#ff9f1a";
 function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Footprint; built: boolean; symptomatic: boolean; inspecting: boolean }) {
   const selected = useGame((s) => s.selected === id);
   const hovered = useGame((s) => s.hovered === id);
+  const affected = useGame((s) => s.affected.includes(id));
   const fill = useRef<THREE.MeshBasicMaterial>(null);
   const alerting = symptomatic || inspecting;
 
   useFrame(({ clock }) => {
     if (!fill.current) return;
-    const base = alerting ? 0.16 : selected ? 0.13 : hovered ? 0.07 : 0;
-    fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4.2)) : base;
+    const base = alerting ? 0.16 : affected ? 0.14 : selected ? 0.13 : hovered ? 0.07 : 0;
+    // The machine an action would change breathes gently; an alert pulses faster.
+    fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4.2))
+      : affected ? base + 0.12 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 3)) : base;
   });
 
-  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered ? ACCENT : built ? ROOM_PALETTE.footprint.built : ROOM_PALETTE.footprint.empty;
+  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered || affected ? ACCENT : built ? ROOM_PALETTE.footprint.built : ROOM_PALETTE.footprint.empty;
   const hw = f.w / 2;
   const hd = f.d / 2;
   const outline: [number, number, number][] = [
@@ -478,12 +481,12 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
         <Line
           points={outline}
           color={color}
-          lineWidth={selected || alerting ? 2.6 : hovered ? 2.2 : 1.3}
+          lineWidth={selected || alerting || affected ? 2.6 : hovered ? 2.2 : 1.3}
           dashed={!built}
           dashSize={0.32}
           gapSize={0.22}
           transparent
-          opacity={built || hovered || selected ? 0.95 : 0.7}
+          opacity={built || hovered || selected || affected ? 0.95 : 0.7}
         />
       </group>
       {/* Invisible volume that catches hover and click for the whole group. */}
@@ -571,6 +574,7 @@ function bindLabel(key: string) {
 function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
   const selected = useGame((s) => s.selected === id);
   const hovered = useGame((s) => s.hovered === id);
+  const affected = useGame((s) => s.affected.includes(id));
   const built = m.built[id];
   const inspecting = m.inspecting === id;
   const inspected = m.inspected.includes(id);
@@ -580,7 +584,7 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       type="button"
       ref={bindLabel(id)}
       data-eq={id}
-      className={`eq-label tone-${tone}${selected ? " is-selected" : ""}${!built && !selected && !hovered ? " is-quiet" : ""}`}
+      className={`eq-label tone-${tone}${selected ? " is-selected" : ""}${affected ? " is-affected" : ""}${!built && !selected && !hovered && !affected ? " is-quiet" : ""}`}
       onClick={() => inspectOrSelect(id)}
       onFocus={() => useGame.getState().hover(id)}
       onBlur={() => useGame.getState().hover(null)}
@@ -607,6 +611,7 @@ function Labels({ landed }: { landed: Floor | null }) {
   const c=useGame(s=>s.game.campaign);
   const selectedAppId=useGame(s=>s.selectedAppId);
   const selected=useGame(s=>s.selected);
+  const appsAffected=useGame(s=>s.affected.includes("app"));
   const servers = landed === "servers";
   return (
     <div className="eq-labels">
@@ -619,7 +624,7 @@ function Labels({ landed }: { landed: Floor | null }) {
       {EQUIPMENT_ORDER.filter((id) => floorOf(id) === landed && (m.opening ? ["gateway","app","db","monitoring",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id])).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span></button>)}
+      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span></button>)}
     </div>
   );
 }
@@ -1043,6 +1048,7 @@ function pressFloor(floor: Floor, how: "menu" | "key"): void {
  */
 function FloorMenu() {
   const floor = useGame((s) => s.floor);
+  const affected = useGame((s) => s.affected);
   const m = useSceneModel();
   return (
     <div className="floor-menu" role="group" aria-label="Floors">
@@ -1053,7 +1059,7 @@ function FloorMenu() {
             key={f}
             type="button"
             data-floor={f}
-            className={`floor-button${f === floor ? " is-here" : ""}`}
+            className={`floor-button${f === floor ? " is-here" : ""}${f !== floor && affected.some((id) => floorOf(id) === f) ? " is-affected" : ""}`}
             aria-pressed={f === floor}
             onClick={() => pressFloor(f, "menu")}
             {...tipProps(`${FLOOR_NAME[f]} (${f === "office" ? "Page Up" : "Page Down"})`)}

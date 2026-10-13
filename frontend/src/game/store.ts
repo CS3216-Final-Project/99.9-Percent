@@ -169,6 +169,8 @@ interface Store {
   /** Take the view to a floor; `how` says what asked, for the analytics. */
   goToFloor: (floor: Floor, how: FloorSwitch) => void;
   hovered: EquipmentId | null;
+  /** The machines a campaign action the player is considering would change, lit up in the room. Never saved. */
+  affected: EquipmentId[];
   view: View;
   techFocus: TechId | null;
   /** Management: auto-advance is on. Incident: the crisis clock is running. */
@@ -187,6 +189,7 @@ interface Store {
   tick: (dt: number) => void;
   select: (id: EquipmentId | null) => void;
   hover: (id: EquipmentId | null) => void;
+  setAffected: (ids: EquipmentId[]) => void;
   openView: (view: View) => void;
   focusTech: (id: TechId | null) => void;
   setRunning: (running: boolean) => void;
@@ -394,6 +397,7 @@ export const useGame = create<Store>()((set, get) => {
       selected: null,
       selectedAppId: null,
       hovered: null,
+      affected: [],
       view: null,
       techFocus: null,
       onboarding: false,
@@ -563,6 +567,7 @@ export const useGame = create<Store>()((set, get) => {
     floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
     goToFloor: (floor, how) => set(floorPatch(floor, how)),
     hovered: null,
+    affected: [],
     view: null,
     techFocus: null,
     running: false,
@@ -700,6 +705,10 @@ export const useGame = create<Store>()((set, get) => {
     hover: (id) => {
       if (get().hovered !== id) set({ hovered: id });
     },
+    setAffected: (ids) => {
+      const was = get().affected;
+      if (was.length !== ids.length || was.some((id, i) => id !== ids[i])) set({ affected: ids });
+    },
     openView: (view) => {
       const campaign = !!get().game.campaign;
       if (campaign && view === "tech" && get().view !== "tech") uiEvent("technology_tree_opened");
@@ -745,7 +754,7 @@ export const useGame = create<Store>()((set, get) => {
       const measurement=beginSession(m,game,crypto.randomUUID(),new Date().toISOString());
       if(m.replayOf)event(measurement,game,"replay_started",{previousRunId:m.replayOf,seed:game.seed});
       set({game,generation:get().generation+1,lastAction:null,lastIntro:intro("begin"),measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
-        selected:null,selectedAppId:null,hovered:null,view:null,techFocus:null,running:false,rating:null,
+        selected:null,selectedAppId:null,hovered:null,affected:[],view:null,techFocus:null,running:false,rating:null,
         onboarding:["not-started","in-progress"].includes(nextMeta.openingOnboarding.status),tour:null,
         started:true,toast:null,activeMark:document.hidden?null:performance.now()});
       saveMeta(nextMeta);persist(true);
@@ -770,6 +779,7 @@ export const useGame = create<Store>()((set, get) => {
         meta: nextMeta,
         selected: null,
         hovered: null,
+        affected: [],
         view: null,
         techFocus: null,
         running: false,
@@ -820,7 +830,7 @@ export const useGame = create<Store>()((set, get) => {
       const saved = mode === "campaign" ? saveGame(game, remainderMs, true, measurement) && archiveEvents(measurement.pending) : saveClassicGame(game);
       saveMode(mode);
       set({ mode, importGeneration: get().importGeneration + 1, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, view: null,
-        selected: null, hovered: null, started: true, tour: null, onboarding: false, techFocus: null, rating: null });
+        selected: null, hovered: null, affected: [], started: true, tour: null, onboarding: false, techFocus: null, rating: null });
       track("save_imported", { mode, step: game.campaign?.step ?? game.turn });
       get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
       return true;
