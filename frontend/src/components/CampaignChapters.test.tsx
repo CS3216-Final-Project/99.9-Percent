@@ -19,7 +19,7 @@ it.each([
 ] as const)("shows %s prominently at chapter %i", (name, number, company) => {
   useGame.setState({ game: company(), started: true, ready: true });
   render(<CampaignChapters />);
-  const bar = screen.getByRole("region", { name: "Campaign chapters" });
+  const bar = screen.getByRole("region", { name: "Guided Mode chapters" });
   expect(within(bar).getByLabelText("Current chapter").textContent).toBe(name);
   expect(bar.textContent).toContain(`Chapter ${number} of 5`);
   expect(bar.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
@@ -32,7 +32,7 @@ it("opens all five chapters without advancing the company and stays paused on cl
   fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
   expect(useGame.getState().running).toBe(false);
   expect(useGame.getState().game).toBe(game);
-  const dialog = screen.getByRole("dialog", { name: "Campaign chapters" });
+  const dialog = screen.getByRole("dialog", { name: "Guided Mode chapters" });
   expect(within(dialog).getAllByRole("listitem")).toHaveLength(5);
   expect(dialog.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
   expect(within(dialog).getByRole("heading", { name: "Stay Online" }).closest("li")!.textContent).toContain("Locked");

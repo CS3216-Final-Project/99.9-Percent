@@ -38,6 +38,8 @@ export interface Meta {
   tutorialDone: boolean;
   /** The short guide shown on the first incident has been seen. */
   incidentGuideDone: boolean;
+  /** Challenge Mode stays unlocked once earned; completing Guided Mode cannot be taken back. */
+  challengeUnlocked: boolean;
 }
 
 export const DEFAULT_META: Meta = {
@@ -49,6 +51,7 @@ export const DEFAULT_META: Meta = {
   firstIncidentCompleted: false,
   tutorialDone: false,
   incidentGuideDone: false,
+  challengeUnlocked: false,
 };
 
 /** Sound settings, shared by both modes. Volumes are whole percents. */
@@ -144,9 +147,20 @@ export function clearSave(): void {
   remove(SAVE_KEY);
 }
 
+/**
+ * Challenge Mode is locked until the Guided Mode company acknowledges its final
+ * reliability chapter. The unlock is permanent: once the metadata records it, or
+ * an older completed save already has it, it cannot be lost.
+ */
+export function challengeUnlocked(): boolean {
+  if (loadMeta("campaign").challengeUnlocked) return true;
+  const loaded = loadGame();
+  return loaded.status === "ok" && loaded.game.campaign?.reliabilityStage?.acknowledged === true;
+}
+
 /** The mode last played. Anything else, including no choice yet, means campaign. */
 export function loadMode(): GameMode {
-  return read(MODE_KEY) === "classic" ? "classic" : "campaign";
+  return read(MODE_KEY) === "classic" && challengeUnlocked() ? "classic" : "campaign";
 }
 
 export function saveMode(mode: GameMode): void {

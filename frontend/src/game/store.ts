@@ -37,6 +37,7 @@ import {
   loadGame,
   loadMeta,
   loadMode,
+  challengeUnlocked,
   saveClassicGame,
   saveGame,
   saveMeta,
@@ -227,6 +228,8 @@ let introId = 1;
 const intro = (kind: IntroKind): LastIntro => ({ id: introId++, kind });
 let lastIncidentSave = 0;
 
+const CHALLENGE_LOCKED = "Complete all five Guided Mode chapters to unlock Challenge Mode.";
+
 const ACKNOWLEDGEMENTS = {
   "reliability-review": "acknowledge_reliability",
   "prevention-review": "acknowledge_prevention_review",
@@ -274,6 +277,11 @@ export const useGame = create<Store>()((set, get) => {
     else track("floor_switched", { to: floor, how, mode: get().mode });
     return { floor };
   }
+  /** The unlock already earned in memory, or the one durable in the campaign profile/save. */
+  function challengeUnlockedNow():boolean {
+    return get().mode === "classic" || get().meta.challengeUnlocked ||
+      get().game.campaign?.reliabilityStage?.acknowledged === true || challengeUnlocked();
+  }
   /** Apply a new game state, record analytics for phase changes and save. */
   function commit(next: GameState, opts: { save?: boolean } = {}): void {
     const prev = get().game;
@@ -283,6 +291,12 @@ export const useGame = create<Store>()((set, get) => {
       if(!was?.firstPauseConsumed && c.firstPauseConsumed)patch.running=false;
       if(get().selectedAppId&&!c.apps.some(a=>a.id===get().selectedAppId))patch.selectedAppId=c.apps[0].id;
       if(awaitingAcknowledgement(c)||next.phase==="review"||next.phase==="ended")patch.running=false;
+      // The first acknowledged reliability outcome permanently unlocks Challenge Mode.
+      if(!was?.reliabilityStage?.acknowledged && c.reliabilityStage?.acknowledged && !get().meta.challengeUnlocked) {
+        const meta={...get().meta,challengeUnlocked:true};
+        saveMeta(meta);
+        patch.meta=meta;
+      }
       get().measureTime();
       patch.measurement=projectEvents(get().measurement,next,new Date().toISOString());
       set(patch);
@@ -406,7 +420,7 @@ export const useGame = create<Store>()((set, get) => {
       // Switching into an empty classic mode starts a company; boot, which only shows the title, does not.
       set({ ...fresh, game, meta: nextMeta, tour: meta.tutorialDone ? null : { track: "basics", step: 0 }, lastIntro: started ? intro("begin") : null });
       if (!saved) get().notify("Could not save. Play continues in memory.", "error");
-      else if (loaded.status === "corrupt") get().notify("Saved classic run was unreadable. Started a new one.", "error");
+      else if (loaded.status === "corrupt") get().notify("Saved Challenge Mode run was unreadable. Started a new one.", "error");
       return;
     }
     const loaded = loadGame();
@@ -434,7 +448,7 @@ export const useGame = create<Store>()((set, get) => {
     catch(error){return error instanceof AccountApiError?error.message:'Accounts are unavailable right now. You can keep playing; progress saves in this browser.';}
     finally{set({cloudBusy:false});}
   }
-  function currentEnvelope() { const s=get();if (!s.game.campaign) throw Error("Cloud saves are for Campaign. Classic progress stays in this browser.");return makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement); }
+  function currentEnvelope() { const s=get();if (!s.game.campaign) throw Error("Cloud saves are for Guided Mode. Challenge Mode progress stays in this browser.");return makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement); }
   function ownSession() {const session=get().accountSession;if(!session)throw Error('Sign in first. Your local save is unchanged.');return session;}
   return {
     prepareSignIn:()=>{set({running:false});return !get().hasRun||persist();},
@@ -466,7 +480,7 @@ export const useGame = create<Store>()((set, get) => {
       if(get().cloudBusy)return;set({cloudBusy:true});
       let envelope:SaveEnvelope|undefined;
       try {
-        const session=ownSession();if(!get().hasRun||get().saveBlocked)throw Error('Start a Campaign game before saving it to the cloud.');
+        const session=ownSession();if(!get().hasRun||get().saveBlocked)throw Error('Start a Guided Mode game before saving it to the cloud.');
         get().measureTime();envelope=currentEnvelope();
         if(validateEnvelope(envelope).status!=='ok')throw Error('This save could not be checked. Download a backup before replacing it.');
         const copy=localCloudCopy(envelope.runId);
@@ -512,7 +526,7 @@ export const useGame = create<Store>()((set, get) => {
         const s=get(),e=validated.envelope,game=validated.game;
         if(e.runId!==runId)throw Error('This cloud save does not match the one requested.');
         // The home screen can load a cloud save while Classic is active: keep that run before leaving it.
-        if(s.mode==='classic'&&!saveClassicGame(s.game))throw Error('Your Classic game could not be saved first. Your local saves are unchanged.');
+        if(s.mode==='classic'&&!saveClassicGame(s.game))throw Error('Your Challenge Mode game could not be saved first. Your local saves are unchanged.');
         // Refuse replacement unless current bytes and all account copies are durably retained.
         const original=localStorage.getItem('nn.campaign.save.v1');
         if(original!==null)localStorage.setItem(`nn.campaign.before-cloud.${s.game.campaign?.runId??storedRunId(original)}`,original);
@@ -766,6 +780,7 @@ export const useGame = create<Store>()((set, get) => {
     switchMode: (mode, opts = {}) => {
       if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return false;}
       if (mode === get().mode) return true;
+      if (mode === "classic" && !challengeUnlockedNow()) { get().notify(CHALLENGE_LOCKED, "info"); return false; }
       if (!persist() && !opts.discard) return false;
       saveMode(mode);
       track("mode_switched", { to: mode });
@@ -789,6 +804,7 @@ export const useGame = create<Store>()((set, get) => {
       }
       const game = campaign.status === "ok" ? campaign.game : (classic as Extract<ReturnType<typeof decodeClassicSave>, { status: "ok" }>).game;
       const mode: GameMode = game.campaign ? "campaign" : "classic";
+      if (mode === "classic" && !challengeUnlockedNow()) { get().notify(CHALLENGE_LOCKED, "info"); return false; }
         // Preserve current progress and any owner-bound pending copy before replacement.
         if ((mode !== get().mode || get().hasRun) && !persist()) {
           get().notify("Could not save the current run. Export it before importing a replacement.", "error");

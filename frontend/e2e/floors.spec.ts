@@ -1,9 +1,10 @@
 import type { Page } from "@playwright/test";
-import { test, expect, expectRoom, seedClassicSave } from "./fixtures";
+import { test, expect, expectRoom, seedClassicSave, unlockChallenge } from "./fixtures";
 import { advanceTurn, newLegacyGame, type GameState } from "../src/sim";
 import { DEFAULT_META } from "../src/game/persist";
 
 test.beforeEach(async ({ page }) => {
+  await unlockChallenge(page);
   await page.addInitScript(() => localStorage.setItem("nn.mode.v1", "classic"));
 });
 
@@ -78,7 +79,7 @@ test("an incident downstairs badges the server floor from the office, and the in
 
 test("the tutorial takes the view to its step's floor once, and never pulls the player back", async ({ page }) => {
   await page.goto("/?floor=office");
-  await page.getByRole("button", { name: "Play Classic", exact: true }).click();
+  await page.getByRole("button", { name: "Start Challenge Mode", exact: true }).click();
   // The first step points at the servers, so the view rides down to them.
   await expect(page.getByRole("dialog", { name: /Tutorial, step 1/ })).toBeVisible();
   await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");
@@ -93,7 +94,7 @@ test("the tutorial takes the view to its step's floor once, and never pulls the 
 test("the first incident's guide takes a player on the office floor down to the machines", async ({ page }) => {
   await seedBeforeIncident(page, { ...newLegacyGame(1), users: 4500 });
   await page.goto("/?floor=office");
-  await page.getByRole("button", { name: /^(Play Classic|Continue week)/ }).click();
+  await page.getByRole("button", { name: /^(Start Challenge Mode|Continue week)/ }).click();
   await expect(label(page, "Growth")).toBeVisible();
   await page.getByRole("button", { name: "Next week", exact: true }).click();
   await expect(page.getByRole("dialog", { name: /Incident guide, step 1/ })).toBeVisible();

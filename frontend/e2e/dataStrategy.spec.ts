@@ -14,9 +14,9 @@ function prepared(){
 for(const strategy of ["cache","database"] as const)test(`data strategy: ${strategy}, continuity and reload`,async({page})=>{
  test.setTimeout(150000);const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
  await seedSave(page,prepared());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
- const guidance=page.getByRole("region",{name:"Campaign guidance"});
- await page.locator("summary").filter({hasText:"Campaign progression"}).click();
- await expect(page.getByRole("navigation",{name:"Campaign progression"})).toContainText("Data Strategy Available next");
+ const guidance=page.getByRole("region",{name:"Guided Mode guidance"});
+ await page.locator("summary").filter({hasText:"Guided Mode progression"}).click();
+ await expect(page.getByRole("navigation",{name:"Guided Mode progression"})).toContainText("Data Strategy Available next");
  await page.getByRole("button",{name:"Continue to data strategy",exact:true}).click();
  await expect(guidance).toContainText("Current stage: Data Strategy");
  await expect(page.getByRole("region",{name:"Data strategy"})).toContainText("Waiting for workload growth");

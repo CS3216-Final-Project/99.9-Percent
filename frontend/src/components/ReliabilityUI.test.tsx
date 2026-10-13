@@ -11,7 +11,7 @@ it("shows nine technology nodes with derived database ownership and locked futur
  const g=newGame();g.campaign!.dbCapacity=1000;g.campaign!.upgraded=true;show(g);fireEvent.click(within(screen.getByRole("navigation",{name:"Views"})).getByRole("button",{name:"Tech"}));const dialog=screen.getByRole("region",{name:"Tech tree"});expect(dialog.querySelectorAll("[data-tech]")).toHaveLength(9);expect(within(dialog).getByRole("button",{name:"Larger Database: Owned"})).toBeTruthy();expect(within(dialog).getByRole("button",{name:"Health Checks: Locked"})).toBeTruthy();expect(within(dialog).queryByText(/engineer-weeks/)).toBeNull();
 });
 it("shows the stage and a legal way to start the test",()=>{
- show(reliabilityCompany());expect(screen.getByLabelText("Current campaign stage").textContent).toBe("Stay Online");expect(screen.getByRole("button",{name:/Start reliability test/})).toBeTruthy();
+ show(reliabilityCompany());expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe("Stay Online");expect(screen.getByRole("button",{name:/Start reliability test/})).toBeTruthy();
 });
 it("exposes actual and detected health and surviving capacity",()=>{
  show(tick(act(preparedReliability(),{type:"arm_reliability"}),8));const panel=screen.getByRole("region",{name:"Stay Online"});

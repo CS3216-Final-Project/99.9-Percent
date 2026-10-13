@@ -85,3 +85,67 @@ export function startProductAnalytics(store: typeof useGame, config = configured
   const sink = createAnalyticsSink(config);
   return sink ? watchProductAnalytics(store, sink, config.buildId) : () => {};
 }
+
+/* ------------------------------------------------------------------ */
+/* Explicit opt-in: PostHog is not loaded until the player says yes.    */
+/* ------------------------------------------------------------------ */
+
+export type AnalyticsConsent = "accepted" | "declined" | null;
+export const ANALYTICS_CONSENT_KEY = "nn.analytics-consent.v1";
+export const ANALYTICS_CONSENT_EVENT = "nn:analytics-consent";
+
+/** The saved decision; a missing, corrupt or unreadable record means undecided. */
+export function loadAnalyticsConsent(): AnalyticsConsent {
+  try {
+    const stored = window.localStorage.getItem(ANALYTICS_CONSENT_KEY);
+    return stored === "accepted" || stored === "declined" ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remembers the decision, then announces it even when storage failed, so an
+ * acceptance still applies for this visit. Returns whether it was persisted.
+ */
+export function saveAnalyticsConsent(value: Exclude<AnalyticsConsent, null>): boolean {
+  let saved = false;
+  try {
+    window.localStorage.setItem(ANALYTICS_CONSENT_KEY, value);
+    saved = true;
+  } catch {
+    /* best effort: the event below still applies the decision for this visit */
+  }
+  window.dispatchEvent(new CustomEvent(ANALYTICS_CONSENT_EVENT, { detail: value }));
+  return saved;
+}
+
+/**
+ * Starts product analytics only after an explicit acceptance: no SDK load,
+ * observer, timer, listener or storage write happens while consent is missing
+ * or declined. A later decline stops everything immediately; a renewed
+ * acceptance may start it once again. The returned cleanup stops everything
+ * it started.
+ */
+export function startConsentedProductAnalytics(store: typeof useGame, config = configuredAnalytics()): () => void {
+  let consent = loadAnalyticsConsent();
+  let stop: (() => void) | null = null;
+  const begin = () => {
+    if (consent === "accepted" && !stop) stop = startProductAnalytics(store, config);
+  };
+  const end = () => {
+    stop?.();
+    stop = null;
+  };
+  begin();
+  const onConsent = (event: Event) => {
+    const decision = (event as CustomEvent<AnalyticsConsent>).detail;
+    consent = decision === "accepted" || decision === "declined" ? decision : loadAnalyticsConsent();
+    if (consent === "accepted") begin(); else end();
+  };
+  window.addEventListener(ANALYTICS_CONSENT_EVENT, onConsent);
+  return () => {
+    window.removeEventListener(ANALYTICS_CONSENT_EVENT, onConsent);
+    end();
+  };
+}

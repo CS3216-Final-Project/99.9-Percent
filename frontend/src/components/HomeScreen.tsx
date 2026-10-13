@@ -3,6 +3,7 @@ import { BALANCE, type GameState } from "@/sim";
 import { num } from "@/game/format";
 import { campaignChapters } from "@/game/campaignChapters";
 import { loadClassicGame, loadGame, loadMeta, type GameMode } from "@/game/persist";
+import { loadAnalyticsConsent, saveAnalyticsConsent, type AnalyticsConsent } from "@/lib/analytics";
 import { isFreshRun, useGame } from "@/game/store";
 import { AccountButton } from "./Account";
 import { FeedbackButton } from "./FeedbackButton";
@@ -14,32 +15,50 @@ import "./HomeScreen.css";
 interface Summary { progress: string | null; resumable: boolean; ended: boolean; tutorialDone: boolean; continueLabel: string }
 
 function campaignSummary(game: GameState | null): Summary {
-  if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone: false, continueLabel: "Play Campaign" };
+  if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone: false, continueLabel: "Start Guided Mode" };
   const chapters = campaignChapters(game);
   const chapter = chapters.find((c) => c.current) ?? chapters.filter((c) => c.completed).at(-1) ?? chapters[0];
   const ended = game.phase === "ended";
   return { progress: ended ? "Company closed" : `Chapter ${chapter.number} of ${chapters.length}: ${chapter.name}`, resumable: true, ended, tutorialDone: false, continueLabel: "Continue company" };
 }
 function classicSummary(game: GameState | null, tutorialDone: boolean): Summary {
-  if (!game || game.campaign || isFreshRun(game)) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Play Classic" };
+  if (!game || game.campaign || isFreshRun(game)) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Challenge Mode" };
   const ended = game.phase === "ended";
   return { progress: ended ? "Last game finished" : `Week ${game.turn} of ${BALANCE.maxTurns}`, resumable: !ended, ended, tutorialDone,
-    continueLabel: ended ? "Play Classic" : `Continue week ${game.turn}` };
+    continueLabel: ended ? "Start Challenge Mode" : `Continue week ${game.turn}` };
 }
 
 const MODES: Record<GameMode, { name: string; icon: IconName; pace: string; about: string }> = {
   campaign: {
-    name: "Campaign", icon: "server", pace: "Continuous play · Guided challenges",
-    about: "Grow one company through guided infrastructure challenges. Inspect problems, upgrade servers and watch your changes take effect. Pause whenever you need.",
+    name: "Guided Mode", icon: "server", pace: "Continuous play · Five guided chapters",
+    about: "Learn infrastructure concepts through guided challenges. Inspect problems, upgrade servers and watch your changes take effect. Pause whenever you need.",
   },
   classic: {
-    name: "Classic", icon: "week", pace: `Week by week · ${BALANCE.maxTurns}-week challenge`,
-    about: `Manage money, engineers and research. Grow to ${num(BALANCE.targetUsers)} users in ${BALANCE.maxTurns} weeks while handling outages and keeping the business afloat.`,
+    name: "Challenge Mode", icon: "week", pace: `Week by week · ${BALANCE.maxTurns}-week challenge`,
+    about: `Apply what you learned on your own. Grow to ${num(BALANCE.targetUsers)} users in ${BALANCE.maxTurns} weeks while handling outages and keeping the business afloat.`,
   },
 };
 
+/** The analytics opt-in, shown only until the player decides either way. */
+function AnalyticsConsentPanel() {
+  const [consent, setConsent] = useState<AnalyticsConsent>(() => loadAnalyticsConsent());
+  if (consent !== null) return null;
+  const decide = (value: Exclude<AnalyticsConsent, null>) => {
+    saveAnalyticsConsent(value);
+    setConsent(value);
+  };
+  return <section className="consent-panel" aria-labelledby="analytics-consent-heading">
+    <h2 id="analytics-consent-heading">Help improve 99.99%</h2>
+    <p>Share anonymous gameplay events and timing so we can improve the learning experience. We never send account details, URLs, or saved games.</p>
+    <div className="consent-actions">
+      <button type="button" className="btn btn-primary" onClick={() => decide("accepted")}><Icon name="check" />Allow anonymous analytics</button>
+      <button type="button" className="btn" onClick={() => decide("declined")}>No thanks</button>
+    </div>
+  </section>;
+}
+
 /**
- * The one home screen for every visit: first time, a Campaign in progress or a Classic in progress.
+ * The one home screen for every visit: first time, a Guided Mode run or a Challenge Mode run in progress.
  * Both modes always have a card, so the player can continue either one or switch from here.
  */
 export function HomeScreen() {
@@ -50,6 +69,8 @@ export function HomeScreen() {
   const busy = useGame((s) => s.cloudBusy);
   const generation = useGame((s) => s.generation);
   const [unsaved, setUnsaved] = useState<GameMode | null>(null);
+  // Challenge Mode unlocks when the Guided Mode company acknowledges its final chapter.
+  const unlocked = useGame((s) => s.mode === "classic" || s.meta.challengeUnlocked || s.game.campaign?.reliabilityStage?.acknowledged === true);
 
   // The mode that is not loaded is read straight from storage, without loading or writing it.
   const other = useMemo(() => {
@@ -100,14 +121,16 @@ export function HomeScreen() {
         <h2 id="mode-heading">Choose how you want to play</h2>
         <div className="mode-options">
           {(["campaign", "classic"] as const).map((m) => <ModeCard key={m} mode={m} summary={summary(m)} lastPlayed={m === mode && !!active.progress}
+            locked={m === "classic" && !unlocked}
             unsaved={unsaved === m} busy={busy} autoFocus={m === mode && !!active.progress}
             onPlay={() => playMode(m)} onNew={() => inMode(m, fresh)} onTutorial={() => inMode(m, () => useGame.getState().startTutorialRun())} />)}
         </div>
         {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved">
           This run could not be saved, so switching now loses it. Press the red button again to switch anyway.
         </Callout>}
-        <p className="mode-note">Each mode keeps its own save, so you can switch between them at any time.</p>
+        <p className="mode-note">Guided Mode comes first: finish all five chapters to unlock Challenge Mode. Each mode keeps its own save.</p>
       </section>
+      <AnalyticsConsentPanel />
       <footer className="home-foot">
         <FeedbackButton />
       </footer>
@@ -115,30 +138,40 @@ export function HomeScreen() {
   </div>;
 }
 
-function ModeCard({ mode, summary, lastPlayed, unsaved, busy, autoFocus, onPlay, onNew, onTutorial }: {
-  mode: GameMode; summary: Summary; lastPlayed: boolean; unsaved: boolean; busy: boolean; autoFocus: boolean;
+function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, autoFocus, onPlay, onNew, onTutorial }: {
+  mode: GameMode; summary: Summary; lastPlayed: boolean; locked: boolean; unsaved: boolean; busy: boolean; autoFocus: boolean;
   onPlay: () => void; onNew: () => void; onTutorial: () => void;
 }) {
   const info = MODES[mode];
   const heading = `${mode}-heading`;
   const label = unsaved ? "Switch and lose this run" : summary.continueLabel;
-  return <section className={`mode-option${lastPlayed ? " is-last-played" : ""}`} aria-labelledby={heading}>
+  return <section className={`mode-option${lastPlayed ? " is-last-played" : ""}${locked ? " is-locked" : ""}`} aria-labelledby={heading}>
     <div className="mode-option-head">
       <h3 id={heading}><Icon name={info.icon} />{info.name}</h3>
       {lastPlayed && <span className="mode-badge">Last played</span>}
     </div>
     <p className="mode-pace">{info.pace}</p>
     <p>{info.about}</p>
-    <div className={`mode-progress${summary.progress ? "" : " is-empty"}`}>
-      <Icon name={summary.progress ? "save" : "plus"} size={20} />
-      <span><span className="mode-progress-label">{summary.progress ? "Saved game" : "No saved game"}</span>{summary.progress ?? "Starts from the beginning"}</span>
-    </div>
-    <div className="mode-actions">
-      <button type="button" className={`btn ${unsaved ? "btn-danger" : "btn-primary"}`} disabled={busy} autoFocus={autoFocus} onClick={onPlay}>
-        <Icon name="play" />{label}
-      </button>
-      {mode === "classic" && summary.resumable && <button type="button" className="btn" disabled={busy} onClick={onNew}>New game</button>}
-    </div>
-    {mode === "classic" && summary.tutorialDone && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>Replay the tutorial</button>}
+    {locked ? <>
+      <div className="mode-progress is-empty">
+        <Icon name="lock" size={20} />
+        <span><span className="mode-progress-label">Locked</span>Complete all five Guided Mode chapters to unlock.</span>
+      </div>
+      <div className="mode-actions">
+        <button type="button" className="btn" disabled><Icon name="lock" />Complete Guided Mode to unlock</button>
+      </div>
+    </> : <>
+      <div className={`mode-progress${summary.progress ? "" : " is-empty"}`}>
+        <Icon name={summary.progress ? "save" : "plus"} size={20} />
+        <span><span className="mode-progress-label">{summary.progress ? "Saved game" : "No saved game"}</span>{summary.progress ?? "Starts from the beginning"}</span>
+      </div>
+      <div className="mode-actions">
+        <button type="button" className={`btn ${unsaved ? "btn-danger" : "btn-primary"}`} disabled={busy} autoFocus={autoFocus} onClick={onPlay}>
+          <Icon name="play" />{label}
+        </button>
+        {mode === "classic" && summary.resumable && <button type="button" className="btn" disabled={busy} onClick={onNew}>New game</button>}
+      </div>
+      {mode === "classic" && summary.tutorialDone && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>Replay the tutorial</button>}
+    </>}
   </section>;
 }
