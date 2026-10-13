@@ -16,8 +16,8 @@ it("lets new players compare both modes without starting a run for them", () => 
   expect(guided.textContent).toContain("Continuous play");
   expect(challenge.textContent).toContain("50,000 users in 26 weeks");
   expect(within(choices).getByRole("button", { name: "Start Guided Mode" })).toBeTruthy();
-  // Challenge Mode is locked until all five Guided Mode chapters are complete.
-  expect(challenge.textContent).toContain("Complete all five Guided Mode chapters to unlock.");
+  // Challenge Mode is locked until the first five Guided Mode chapters are complete.
+  expect(challenge.textContent).toContain("Complete the first five Guided Mode chapters to unlock.");
   const lockedButton = within(challenge).getByRole("button", { name: "Complete Guided Mode to unlock" });
   expect(lockedButton).toHaveProperty("disabled", true);
   fireEvent.keyDown(window, { key: "p" });
@@ -59,7 +59,7 @@ it("shows the locked unlock prompt in the menu instead of a switch control", () 
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
   const menu = openMenu();
   const modeSection = within(menu).getByRole("region", { name: "Game mode" });
-  expect(modeSection.textContent).toContain("Complete all five Guided Mode chapters to unlock Challenge Mode.");
+  expect(modeSection.textContent).toContain("Complete the first five Guided Mode chapters to unlock Challenge Mode.");
   const lockedButton = within(modeSection).getByRole("button", { name: "Complete Guided Mode to unlock" });
   expect(lockedButton).toHaveProperty("disabled", true);
   fireEvent.click(lockedButton);
@@ -103,10 +103,12 @@ describe("opening UI", () => {
   });
   it("visible interventions lead to review and the same company", () => {
     vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+    fireEvent.click(screen.getByText("More controls"));
     for (let i = 0; i < 6; i++)fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
     const id = useGame.getState().game.campaign!.runId;
     expect(screen.getByText(/Stable steps: 0\/5/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(8000));
     expect(screen.getByRole("dialog", { name: "Incident postmortem" })).toBeTruthy();
@@ -239,6 +241,7 @@ it("forgets a pending Start over confirmation when the player leaves its tab", (
 
 it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  fireEvent.click(screen.getByText("More controls"));
   fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
   const views = screen.getByRole("navigation", { name: "Views" });
   fireEvent.click(within(views).getByRole("button", { name: "History" }));
@@ -258,6 +261,7 @@ it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", (
 
 it("asks once before New company replaces the campaign, as Classic's Start over does", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+  fireEvent.click(screen.getByText("More controls"));
   fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
   const runId = useGame.getState().game.campaign!.runId;
   const menu = openMenu();

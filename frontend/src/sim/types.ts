@@ -429,6 +429,12 @@ export interface GameState {
 /* ------------------------------------------------------------------ */
 
 export type Action =
+  | { type:"enter_combined"; finalUserTarget?:number; sequence?:import("./scenarios/combinedCampaign").CombinedScenario[] }
+  | { type:"start_growth_wave" }
+  | { type:"acknowledge_growth" }
+  | { type:"complete_campaign" }
+  | { type:"accept_scaling_risk" }
+  | { type:"run_promotion" }
   | { type: "enter_reliability" }
   | { type: "unlock_reliability"; tech: "health_checks" | "standby" | "auto_failover" }
   | { type: "deploy_health_checks" }

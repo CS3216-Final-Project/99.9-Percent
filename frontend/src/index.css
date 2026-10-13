@@ -897,6 +897,39 @@ button:disabled {
   outline-offset: 1px;
 }
 
+/* The machine a campaign action would change, while the player points at or confirms the action. */
+.eq-label.is-affected {
+  background: #fff;
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+  animation: affected-glow 1.2s ease-in-out infinite;
+}
+
+/* The floor holding that machine, when it is out of view. */
+.floor-button.is-affected {
+  background: #e3f4ff;
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+  animation: affected-glow 1.2s ease-in-out infinite;
+}
+
+@keyframes affected-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(76 184 255 / 0.9), var(--press);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgb(76 184 255 / 0), var(--press);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eq-label.is-affected,
+  .floor-button.is-affected {
+    animation: none;
+  }
+}
+
 .eq-dot {
   display: none;
 }

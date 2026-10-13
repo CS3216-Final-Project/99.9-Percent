@@ -36,6 +36,7 @@ test("explains a locked control, which is where the reason for being locked is s
   await page.goto("/"); await page.getByRole("button", { name: "Continue company" }).click();
   await expectRoom(page);
 
+  await page.locator(".campaign-advanced > summary").click();
   const advance = page.getByRole("button", { name: "Incident", exact: true });
   await expect(advance).toBeDisabled();
   await advance.hover();

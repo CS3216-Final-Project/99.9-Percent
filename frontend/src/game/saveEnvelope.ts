@@ -21,6 +21,8 @@ export interface SaveEnvelope {
     inputs: CampaignInput[];
     foundation?: { step: number; inputs: number };
     legacyPreventionInputs?: number;
+    /** Prospective service coverage, distinct from replayable physical history. */
+    serviceMeasurementStart?: {fromStep:number;scope:"full-run"|"since-upgrade"};
     runtime: {
         remainderMs: number;
         measurement: Measurement;
@@ -65,6 +67,11 @@ export function validateEnvelope(value: unknown): Validation {
     const legacyPreventionInputs=phase6?e.inputs.length:e.legacyPreventionInputs??0;
     if(!integer(legacyPreventionInputs) || legacyPreventionInputs>e.inputs.length ||
         (!phase6 && e.schemaVersion!==SCHEMA_VERSION && legacyPreventionInputs!==0))return {status:"corrupt"};
+    const combinedActions = ["enter_combined", "start_growth_wave", "acknowledge_growth", "complete_campaign", "accept_scaling_risk", "run_promotion"];
+    if (e.schemaVersion !== SCHEMA_VERSION && e.inputs.some(i => combinedActions.includes(i.action.type))) return {status:"corrupt"};
+    const serviceStart = e.serviceMeasurementStart ?? {fromStep:e.step+1,scope:"since-upgrade" as const};
+    if (!integer(serviceStart.fromStep) || serviceStart.fromStep < 1 || serviceStart.fromStep > e.step+1 ||
+        !["full-run","since-upgrade"].includes(serviceStart.scope) || (serviceStart.scope === "full-run" && serviceStart.fromStep !== 1)) return {status:"corrupt"};
     try {
         // Old milestone acknowledgements predate scaling. Loading them must not enter the new stage.
         const inputs = legacy || phase2 ? e.inputs.map(input => input.action.type === "acknowledge_milestone"
@@ -76,7 +83,7 @@ export function validateEnvelope(value: unknown): Validation {
         if(foundation && (!integer(foundation.step) || foundation.step>e.step || !integer(foundation.inputs) || foundation.inputs>inputs.length ||
             inputs.slice(0,foundation.inputs).some(input=>input.step>foundation.step || ["enter_scaling","scale_up","deploy_load_balancer","set_routing",...dataActions,...spikeActions,...foundationReliabilityActions].includes(input.action.type) ||
                 (input.action.type==="acknowledge_milestone" && input.action.enterScaling!==false)))) return {status:"corrupt"};
-        const game = replayCampaign(e.seed, e.runId, inputs, e.step, legacy, foundation, !phase6 && e.schemaVersion !== SCHEMA_VERSION, legacyPreventionInputs);
+        const game = replayCampaign(e.seed, e.runId, inputs, e.step, legacy, foundation, !phase6 && e.schemaVersion !== SCHEMA_VERSION, legacyPreventionInputs, serviceStart);
         if(legacy && game.campaign!.foundation)game.campaign!.foundation.inputs=game.campaign!.inputs.length;
         const measurement: Measurement = legacy
             ? {...emptyMeasurement(), origin:"phase1", runStarted:true, cursor:game.campaign!.trace.length}
@@ -102,7 +109,7 @@ export function decodeSave(raw: string): Validation {
 }
 export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.now(), measurement: Measurement = emptyMeasurement()): SaveEnvelope {
     const c = game.campaign!;
-    return { schemaVersion: SCHEMA_VERSION, scenarioId: c.scenarioId, scenarioVersion: c.scenarioVersion, runId: c.runId, seed: game.seed, step: c.step, inputs: c.inputs, ...(c.foundation?{foundation:c.foundation}:{}), ...(c.legacyPreventionInputs?{legacyPreventionInputs:c.legacyPreventionInputs}:{}), runtime: { remainderMs, measurement }, savedAt };
+    return { schemaVersion: SCHEMA_VERSION, scenarioId: c.scenarioId, scenarioVersion: c.scenarioVersion, runId: c.runId, seed: game.seed, step: c.step, inputs: c.inputs, serviceMeasurementStart: {fromStep:c.serviceMeasurement?.fromStep??c.step+1,scope:c.serviceMeasurement?.scope==="full-run"?"full-run":"since-upgrade"}, ...(c.foundation?{foundation:c.foundation}:{}), ...(c.legacyPreventionInputs?{legacyPreventionInputs:c.legacyPreventionInputs}:{}), runtime: { remainderMs, measurement }, savedAt };
 }
 /** Never replace an existing save unless its payload can actually be replayed. */
 export function replaceable(raw: string | null): boolean {

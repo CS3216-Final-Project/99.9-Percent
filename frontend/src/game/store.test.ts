@@ -329,7 +329,7 @@ it("imports a pre-update incident paused and preserves its recovery state", () =
 });
 
 describe("challenge mode lock", () => {
-  const LOCKED = "Complete all five Guided Mode chapters to unlock Challenge Mode.";
+  const LOCKED = "Complete the first five Guided Mode chapters to unlock Challenge Mode.";
   it("forces a stale classic last-mode back to campaign while locked", () => {
     saveMode("classic");
     expect(loadMode()).toBe("campaign");
@@ -340,7 +340,7 @@ describe("challenge mode lock", () => {
     useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
     expect(useGame.getState().mode).toBe("classic");
   });
-  it("refuses switching to Challenge Mode before the five chapters are complete", () => {
+  it("refuses switching to Challenge Mode before the first five chapters are complete", () => {
     enter(); useGame.getState().advance();
     const campaign = useGame.getState().game;
     expect(useGame.getState().switchMode("classic")).toBe(false);

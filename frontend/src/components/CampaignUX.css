@@ -1,0 +1,80 @@
+/* Campaign-only selectors: shared Classic typography, controls and modals are untouched. */
+.campaign-panel .campaign-guidance { margin-bottom: 12px; }
+.campaign-panel .campaign-requirements { justify-self: stretch; }
+.campaign-panel .progression-requirements { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; font-size: 13px; line-height: 1.4; }
+.campaign-panel .progression-requirements li { display: flex; align-items: flex-start; gap: 6px; color: var(--text-soft); }
+.campaign-panel .progression-requirements li svg { flex: none; margin-top: 3px; color: var(--critical-ink); }
+.campaign-panel .progression-requirements li[data-met="true"] { color: var(--ink); }
+.campaign-panel .progression-requirements li[data-met="true"] svg { color: var(--ok-ink); }
+.campaign-panel .campaign-requirements p { margin: 6px 0 0; font-size: 13px; line-height: 1.45; }
+.campaign-panel .campaign-action-card { border-bottom: 1px solid var(--paper-3); padding-bottom: 8px; }
+.campaign-panel .campaign-action-reason { margin: 4px 0; font-size: 12px; color: var(--warn-ink); }
+/* An action's confirmation floats over the room beside the machine it changes (see ActionPopover). It wears the
+   night of the header and room overlays, so it reads as part of the room rather than a second panel. */
+.campaign-action-popover { position: absolute; left: 0; top: 0; z-index: 6; width: min(320px, calc(100% - 24px)); border: 2px solid var(--night-line); border-left: 4px solid var(--focus); border-radius: var(--radius); background: var(--night-2); color: var(--on-night); box-shadow: var(--lift); font-size: 12px; line-height: 1.45; opacity: 0; transition: opacity .12s ease-out; }
+.campaign-action-popover.is-placed { opacity: 1; }
+.campaign-action-popover-body { overflow-y: auto; padding: 12px 14px; }
+.campaign-action-popover p { margin: 0 0 6px; }
+.campaign-action-popover .muted { color: var(--on-night-soft); }
+.campaign-action-popover .campaign-action-machine { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--night-4); color: var(--on-night-soft); }
+.campaign-action-popover .campaign-action-machine b { display: block; margin-bottom: 2px; color: var(--focus); font-family: var(--font-display); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.campaign-action-popover .campaign-action-confirm-title { font-family: var(--font-display); font-size: 15px; margin-bottom: 4px; color: var(--go); }
+.campaign-action-popover .rows { margin: 0 0 6px; }
+.campaign-action-popover .row { padding: 4px 0; font-size: 12px; border-bottom-color: var(--night-4); }
+.campaign-action-popover .row dt { color: var(--on-night-soft); }
+.campaign-action-popover .row:last-child { border-bottom: 0; }
+/* On a short room the details scroll while the decision stays in reach. */
+.campaign-action-popover .btn-row { position: sticky; bottom: -12px; margin: 8px 0 -12px; padding: 8px 0 12px; border-top: 1px solid var(--night-4); background: var(--night-2); }
+/* The notch points at the machine's marker on whichever side it sits. */
+.campaign-action-popover[data-side="left"]::before,
+.campaign-action-popover[data-side="right"]::before { content: ""; position: absolute; top: calc(var(--notch, 50%) - 8px); width: 10px; height: 16px; }
+.campaign-action-popover[data-side="left"]::before { left: -14px; background: var(--focus); clip-path: polygon(100% 0, 0 50%, 100% 100%); }
+.campaign-action-popover[data-side="right"]::before { right: -12px; background: var(--night-line); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+@media (prefers-reduced-motion: reduce) { .campaign-action-popover { transition: none; } }
+.campaign-panel .campaign-action-card.is-confirming .act { outline: 3px solid var(--focus); outline-offset: 1px; }
+.campaign-clock .campaign-play { gap: 6px; min-height: 44px; }
+.campaign-clock .campaign-clock-state { font-size: 12px; font-weight: 700; }
+.campaign-clock.is-paused { border-top: 3px solid var(--focus); }
+.campaign-clock .campaign-step { font-size: 12px; opacity: .85; }
+.campaign-introduction { max-width: 620px; }
+.campaign-introduction .campaign-intro-meta { font-size: 12px; font-weight: 700; }
+.campaign-introduction h3 { margin: 12px 0 8px; }
+.campaign-introduction .campaign-intro-flow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 20px 0; flex-wrap: wrap; }
+.campaign-introduction .campaign-intro-flow > span:first-child { display: grid; justify-items: center; gap: 4px; }
+.campaign-introduction .campaign-intro-example { border-left: 4px solid var(--focus); background: var(--paper-2); padding: 12px; margin: 12px 0; min-height: 90px; }
+.campaign-introduction .campaign-intro-example p { margin: 6px 0; }
+.campaign-introduction .btn[aria-pressed="true"] { outline: 3px solid var(--focus); outline-offset: 2px; }
+.campaign-introduction .campaign-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.campaign-tech-intro { font-size: 13px; line-height: 1.5; max-width: 75ch; }
+@media (max-width: 600px) {
+  .campaign-clock .campaign-play span { font-size: 12px; }
+  .campaign-clock .campaign-clock-state { display: none; }
+  .campaign-clock .campaign-step { padding: 8px; }
+  .campaign-introduction .campaign-intro-flow { gap: 6px; }
+  .campaign-introduction .btn { min-height: 44px; }
+}
+
+.campaign-clock .campaign-advanced { position: relative; font-size: 12px; }
+.campaign-clock .campaign-advanced > summary { cursor: pointer; padding: 10px 6px; }
+.campaign-clock .campaign-advanced > div { position: absolute; bottom: calc(100% + 12px); right: 0; padding: 12px; width: 230px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--paper); color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.campaign-clock .campaign-advanced p { margin: 4px 0 10px; }
+.chapter-current .campaign-intro-badge { display: inline-block; color: var(--on-night-soft); font-size: 11px; margin-top: 4px; }
+
+.campaign-panel .campaign-action-card { padding-bottom: 4px; }
+
+@media (min-width: 901px) {
+  .app.has-chapters .campaign-panel { width: 420px; }
+}
+
+@media (min-width: 901px) {
+  .campaign-panel .incident-investigate .chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); }
+  .campaign-panel .incident-investigate .chip { justify-content: center; padding-inline: 6px; }
+  .campaign-panel .incident-investigate .chip-icon { display: none; }
+  .campaign-panel .campaign-action-card .act-meta { display: flex; flex-wrap: wrap; max-width: 225px; gap: 4px; justify-content: flex-end; }
+  .campaign-panel .campaign-action-card { padding-bottom: 2px; }
+}
+
+@media (min-width: 901px) {
+  .campaign-panel .incident-investigate .chip { font-size: .85rem; min-height: 36px; padding-inline: 4px; white-space: nowrap; }
+  .app.has-chapters .campaign-panel .step-head { margin-top: 6px; margin-bottom: 4px; }
+}

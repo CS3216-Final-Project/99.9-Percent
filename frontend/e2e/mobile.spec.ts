@@ -1,3 +1,4 @@
+import { advanceCampaignStep } from "./fixtures";
 import { test, expect, expectRoom, savedGame, seedSave, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -31,7 +32,7 @@ test("current chapter is prominent and the full journey opens on touch", async (
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
   await expectRoom(page);
   const bar = page.getByRole("region", { name: "Guided Mode chapters" });
-  await expect(bar).toContainText("Chapter 4 of 5");
+  await expect(bar).toContainText("Chapter 4 of 6");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Traffic Spikes & Autoscaling");
   await expect(bar.getByRole("button", { name: "View chapters" })).toBeInViewport();
   expect(await bar.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
@@ -39,7 +40,7 @@ test("current chapter is prominent and the full journey opens on touch", async (
   const before = await savedGame(page);
   await bar.getByRole("button", { name: "View chapters" }).tap();
   const dialog = page.getByRole("dialog", { name: "Guided Mode chapters" });
-  await expect(dialog.getByRole("listitem")).toHaveCount(5);
+  await expect(dialog.getByRole("listitem")).toHaveCount(6);
   await expect(dialog.getByRole("heading", { name: "Stay Online" })).toBeVisible();
   await dialog.getByRole("button", { name: "Back to company" }).tap();
   await expect(dialog).toBeHidden();
@@ -97,7 +98,7 @@ test("inspects evidence and advances a physical step on touch", async ({ page })
   await mute.tap(); await expect(mute).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: "test-results/phase1-mobile.png" });
   await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).tap();
-  await page.getByRole("button", { name: "Advance step" }).tap();
+  await advanceCampaignStep(page);
   expect((await savedGame(page)).campaign!.step).toBe(1);
   await page.getByRole("button", { name: "History", exact: true }).tap();
   await expect(page.getByRole("region", { name: "History" })).toBeVisible();
@@ -122,7 +123,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   await panel.locator("summary").filter({ hasText: "Full system evidence" }).tap();
   await expect(panel.getByRole("table")).toContainText("133.33%");
   await panel.locator("summary").filter({ hasText: "Full system evidence" }).tap();
-  await panel.getByRole("button", { name: /Upgrade database/ }).tap();
+  await panel.getByRole("button", { name: /Upgrade database/ }).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
   await expect(panel.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("3 step(s)");
   await expect(panel.getByRole("button", { name: /Add server/ })).toBeDisabled();
   await page.screenshot({ path: "test-results/phase1-mobile-incident.png" });
@@ -138,7 +139,7 @@ test("a tap explains a term, and tapping a button does not leave a tooltip over 
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap(); await page.getByRole("button", { name: "Skip introduction" }).tap();
   await expectRoom(page);
   const tip = page.getByRole("tooltip");
-  await page.getByRole("complementary", { name: "System metrics" }).getByText("Inspect the evidence", { exact: true }).tap();
+  await page.getByRole("complementary", { name: "System metrics" }).getByText("System evidence", { exact: true }).tap();
   await expect(tip).toContainText("Inspection is free");
   await expect(tip).toHaveCSS("opacity", "1");
   const box = (await tip.boundingBox())!, view = page.viewportSize()!;
@@ -188,13 +189,13 @@ test("cache selection, paid activation and warmth reload on touch",async({page})
  await page.route("**/api/**",route=>route.abort());await seedSave(page,dataCompany());
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
  const panel=page.getByRole("complementary",{name:"System metrics"}),data=page.getByRole("region",{name:"Data strategy"});
- await data.getByRole("button",{name:/Deploy Read Cache/}).tap();
- for(let i=0;i<2;i++)await page.getByRole("button",{name:"Advance step",exact:true}).tap();
+ await data.getByRole("button",{name:/Deploy Read Cache/}).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
+ for(let i=0;i<2;i++)await advanceCampaignStep(page);
  const roomCache=page.getByRole("main").getByRole("button",{name:/Read Cache/});
  await roomCache.tap();await expect(roomCache).toHaveAttribute("aria-pressed","true");await expect(panel.getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");
- await page.getByRole("button",{name:"Advance step",exact:true}).tap();
+ await advanceCampaignStep(page);
  const before=(await savedGame(page)).campaign!;expect(before.readCache).not.toBeNull();expect(before.readCache!.warmth).toBe(0);
- await page.getByRole("button",{name:"Advance step",exact:true}).tap();
+ await advanceCampaignStep(page);
  expect((await savedGame(page)).campaign!.readCache!.warmth).toBe(1200);
  await data.scrollIntoViewIfNeeded();await page.screenshot({path:"test-results/phase4-mobile-cache.png"});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
@@ -214,4 +215,18 @@ test("traffic spikes: touch selects an instance after retirement leaves an ID ga
  await page.screenshot({path:"test-results/phase5-mobile.png"});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
  await page.getByRole("button",{name:"Menu",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Menu",exact:true})).toBeVisible();
+});
+
+test("combined: touch scorecard, completed guidance, technology inspection and paused reload",async({page})=>{const {finishedCompany}=await import("../src/sim/__tests__/combinedFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,finishedCompany());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Grow the Company");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Grow the Company"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("50,000");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
+
+test("Campaign UX: touch introduction, comparison and secondary controls fit the mobile viewport",async({page,withoutRoom})=>{
+ await withoutRoom();await page.setViewportSize({width:390,height:844});await page.goto("/");await page.getByRole("button",{name:"Start Guided Mode",exact:true}).tap();
+ const intro=page.getByRole("dialog",{name:"Company introduction"});await intro.getByRole("button",{name:"App Server",exact:true}).tap();await expect(intro).toContainText("capacity 1,000 req/s");
+ await intro.getByRole("button",{name:"Next",exact:true}).tap();await intro.getByRole("button",{name:"Rejected request",exact:true}).tap();await expect(intro).toContainText("$0 earned");
+ await intro.getByRole("button",{name:"Next",exact:true}).tap();await intro.getByRole("button",{name:"Finish introduction",exact:true}).tap();
+ await expect(page.getByRole("button",{name:"Run",exact:true})).toBeInViewport();await expect(page.getByRole("button",{name:"Advance step",exact:true})).toBeHidden();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+ await page.locator(".campaign-advanced > summary").tap();await expect(page.getByRole("button",{name:"Advance step",exact:true})).toBeInViewport();
+ await page.getByRole("button",{name:"Advance step",exact:true}).tap();expect((await savedGame(page)).campaign!.step).toBe(1);
+ await page.screenshot({path:"test-results/campaign-ux-mobile.png"});
 });

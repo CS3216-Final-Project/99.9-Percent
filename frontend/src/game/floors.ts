@@ -34,7 +34,7 @@ export function floorFromSearch(search: string): Floor | null {
 }
 
 /** What took the player to another floor, for the analytics. */
-export type FloorSwitch = "menu" | "key" | "elevator" | "select" | "tour" | "incident";
+export type FloorSwitch = "menu" | "key" | "elevator" | "select" | "tour" | "incident" | "action";
 
 /** What a floor out of view asks of the player: nothing, a warning, or an alert. */
 export type Attention = "none" | "warn" | "alert";
