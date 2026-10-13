@@ -847,7 +847,7 @@ function Scene({ quality, landed }: { quality: QualityProfile; landed: Floor | n
       {/* The server floor, a storey below */}
       <group ref={servers} position={[0, FLOOR_Y.servers, 0]}>
         <Room servers />
-        <ServerFloor incident={m.incident} />
+        <ServerFloor incident={m.incident} engineers={m.engineers} />
         <Landing floor="servers" interactive={landed === "servers"} />
 
         {/* Network edge */}

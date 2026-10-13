@@ -1,11 +1,12 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { creature, standsAtDesk } from "./cast";
 import { Creature, Walker } from "./creatures";
-import { SERVER_GLASS, SERVER_ZONE_NAMES, SPOTS } from "./floorplan";
+import { RESPONDERS, SERVER_GLASS, SERVER_ZONE_NAMES, SPOTS } from "./floorplan";
+import { heading } from "./routes";
 import { ModelBatch, type Placement } from "./models";
 import { deskGear, deskModels, glassFrames, ignoreRay, mdl, PANEL, placeModels, placeProps, rand } from "./furniture";
 import { Beacon, Floors, GlassPanes, ScreenPlane, ZoneNames, type Zone } from "./Office";
@@ -321,7 +322,60 @@ function ColdAir() {
   );
 }
 
-export function ServerFloor({ incident }: { incident: boolean }) {
+/** A path cut into its straight legs, each with how far along the path it begins. */
+function walkLegs(path: [number, number][]) {
+  const legs: { a: [number, number]; b: [number, number]; len: number; from: number }[] = [];
+  for (let i = 1, from = 0; i < path.length; i++) {
+    const a = path[i - 1];
+    const b = path[i];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    legs.push({ a, b, len, from });
+    from += len;
+  }
+  return legs;
+}
+
+/** Metres a second the engineers called down walk, a little hurried, and seconds between them leaving the car. */
+const RESPONSE = { speed: 1.1, stagger: 0.9 };
+
+/**
+ * An engineer called down by an incident: steps out of the elevator, walks the path to the racks and starts work
+ * there. Mounted when the incident starts, so the walk begins then, on the clock.
+ */
+function Responder({ index }: { index: number }) {
+  const { path, face } = RESPONDERS[index];
+  const group = useRef<THREE.Group>(null);
+  const start = useRef(-1);
+  const [there, setThere] = useState(false);
+  const legs = useMemo(() => walkLegs(path), [path]);
+  useFrame(() => {
+    const g = group.current;
+    if (!g) return;
+    const now = performance.now() / 1000;
+    if (start.current < 0) start.current = now;
+    const t = now - start.current - index * RESPONSE.stagger;
+    g.visible = t >= 0;
+    const d = Math.max(0, t) * RESPONSE.speed;
+    const leg = legs.find((l) => d < l.from + l.len);
+    if (!leg) {
+      const [x, z] = path[path.length - 1];
+      g.position.set(x, 0, z);
+      g.rotation.y = heading(face[0] - x, face[1] - z);
+      if (!there) setThere(true);
+      return;
+    }
+    const f = (d - leg.from) / leg.len;
+    g.position.set(leg.a[0] + (leg.b[0] - leg.a[0]) * f, 0, leg.a[1] + (leg.b[1] - leg.a[1]) * f);
+    g.rotation.y = heading(leg.b[0] - leg.a[0], leg.b[1] - leg.a[1]);
+  });
+  return (
+    <group ref={group} visible={false}>
+      <Creature species={creature(index)} activity={there ? "type" : "walk"} pace={RESPONSE.speed} position={[0, 0, 0]} phase={index * 1.7} />
+    </group>
+  );
+}
+
+export function ServerFloor({ incident, engineers }: { incident: boolean; engineers: number }) {
   const prims = useMemo(() => buildStatic(), []);
   const models = useMemo(() => buildModels(), []);
   const props = useMemo(() => buildProps(), []);
@@ -344,6 +398,8 @@ export function ServerFloor({ incident }: { incident: boolean }) {
       <Creature pose="sit" activity={incident ? "type" : "mug"} species={ON_CALL} position={[SPOTS.onCall.x, 0, SPOTS.onCall.z]} phase={7} />
       <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} species={creature(23, "tech")} phase={2} />
       <Walker from={[17.5, -7.0]} to={[17.5, 7.5]} speed={0.4} species={creature(26, "tech")} phase={5} />
+      {/* During an incident, the first engineers come down from their desks */}
+      {incident && RESPONDERS.slice(0, engineers).map((_, i) => <Responder key={i} index={i} />)}
 
       <OnWall wall="left">
         <PrimBatch prims={panel} shadows={false} />

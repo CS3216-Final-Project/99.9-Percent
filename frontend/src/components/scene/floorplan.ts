@@ -79,6 +79,16 @@ export const GLASS: [number, number, number, number][] = [
 
 export const GLASS_H = 2.6;
 
+/**
+ * When an incident starts, the first engineers leave their desks and ride down to the servers: out of the elevator,
+ * round the shaft and through the hall's east door to the racks, where they stand facing the point given. Purely for
+ * show; the incident is handled in the panels.
+ */
+export const RESPONDERS: { path: [number, number][]; face: [number, number] }[] = [
+  { path: [[12.0, -2.25], [12.0, 0.4], [3.2, 0.4], [1.2, -2.0]], face: [0.1, -3.6] },
+  { path: [[12.0, -2.25], [12.0, 0.4], [-1.0, 0.4], [-1.0, 1.7]], face: [-1.0, 3.1] },
+];
+
 /** The office floor's rooms behind glass, as [x0, z0, x1, z1]. Nobody wanders into them. */
 export const CLOSED_ROOMS: [number, number, number, number][] = [QUIET_ROOM, HUDDLE_ROOM, [-13, 10.2, -5.5, 14.5], NAP_ROOM];
 

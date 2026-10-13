@@ -27,6 +27,7 @@ import {
   openDeskSlot,
   QUIET_DESKS,
   QUIET_ROOM,
+  RESPONDERS,
   SHARED_TABLE,
   SPOTS,
   STAGE,
@@ -1008,7 +1009,9 @@ function Staff({ crew }: { crew: Crew }) {
       {Array.from({ length: 8 }, (_, i) => {
         const slot = deskSlot(i);
         const hired = i < crew.engineers;
-        const seat = hired ? seatFor(i, crew) : null;
+        // During an incident the first engineers are down on the server floor (see ServerFloor.tsx).
+        const away = crew.incident && i < RESPONDERS.length;
+        const seat = hired && !away ? seatFor(i, crew) : null;
         const screen: ScreenKind = !hired ? "off" : seat === "type" ? "code" : "idle";
         return (
           <group key={i}>

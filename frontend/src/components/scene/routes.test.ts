@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GROUPS } from './conversations';
-import { CLOSED_ROOMS, deskSeat, ELEVATOR_SPOT, GLASS, OBSTACLES, SPOTS, type Obstacle } from './floorplan';
+import { CLOSED_ROOMS, deskSeat, ELEVATOR_SPOT, GLASS, OBSTACLES, RESPONDERS, SERVER_GLASS, SPOTS, type Obstacle } from './floorplan';
 import { ROOM } from './layout';
 import { heading, neighbours, PATHS, planLoop, poseAt, TURN_RATE, WAYPOINTS, wrapAngle, type WaypointId } from './routes';
 
@@ -137,6 +137,36 @@ describe('office walking routes', () => {
 
   it('only stops at dead ends, so walkers passing through never pause in a corridor', () => {
     for (const id of ids) if (WAYPOINTS[id].stop) expect(neighbours(id), id).toHaveLength(1);
+  });
+});
+
+describe('the engineers called down to the server floor', () => {
+  const legs = RESPONDERS.flatMap((r, n) => r.path.slice(1).map((b, i) => ({ name: `responder ${n}, leg ${i}`, a: r.path[i], b })));
+  const shaft: Obstacle = { name: 'elevator shaft', box: ELEVATOR_SPOT };
+
+  it('step out of the elevator in front of its doors, which face the corridor', () => {
+    for (const r of RESPONDERS) {
+      expect(r.path[0][0]).toBeGreaterThan(ELEVATOR_SPOT[2]);
+      expect(r.path[0][1]).toBeGreaterThan(ELEVATOR_SPOT[1]);
+      expect(r.path[0][1]).toBeLessThan(ELEVATOR_SPOT[3]);
+    }
+  });
+
+  it("walk round the shaft and through the server hall's doors, never through its glass", () => {
+    const blocked = [
+      ...legs.flatMap((l) => SERVER_GLASS.filter(([x1, z1, x2, z2]) => segmentToSegment(l.a, l.b, [x1, z1], [x2, z2]) < GLASS_CLEARANCE).map((g) => `${l.name} by glass ${g.join(',')}`)),
+      ...legs.filter((l) => segmentToObstacle(l.a, l.b, shaft) < WALKER_RADIUS).map((l) => `${l.name} through the shaft`),
+    ];
+    expect(blocked).toEqual([]);
+    // The check itself must catch a walk straight through the hall's east glass.
+    expect(SERVER_GLASS.some(([x1, z1, x2, z2]) => segmentToSegment([12, -3], [6, -3], [x1, z1], [x2, z2]) < GLASS_CLEARANCE)).toBe(true);
+  });
+
+  it('end up in the server hall, among the racks', () => {
+    for (const r of RESPONDERS) {
+      const [x, z] = r.path[r.path.length - 1];
+      expect(inBox([x, z], [-13, -9.5, 9, 5])).toBe(true);
+    }
   });
 });
 
