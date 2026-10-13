@@ -171,6 +171,8 @@ interface Store {
   hovered: EquipmentId | null;
   /** The machines a campaign action the player is considering would change, lit up in the room. Never saved. */
   affected: EquipmentId[];
+  /** The latest request to centre the camera on a machine's marker (an equipment or App Server id). Never saved. */
+  cameraFocus: { anchor: string; seq: number } | null;
   view: View;
   techFocus: TechId | null;
   /** Management: auto-advance is on. Incident: the crisis clock is running. */
@@ -190,6 +192,7 @@ interface Store {
   select: (id: EquipmentId | null) => void;
   hover: (id: EquipmentId | null) => void;
   setAffected: (ids: EquipmentId[]) => void;
+  focusCamera: (anchor: string) => void;
   openView: (view: View) => void;
   focusTech: (id: TechId | null) => void;
   setRunning: (running: boolean) => void;
@@ -398,6 +401,7 @@ export const useGame = create<Store>()((set, get) => {
       selectedAppId: null,
       hovered: null,
       affected: [],
+      cameraFocus: null,
       view: null,
       techFocus: null,
       onboarding: false,
@@ -568,6 +572,7 @@ export const useGame = create<Store>()((set, get) => {
     goToFloor: (floor, how) => set(floorPatch(floor, how)),
     hovered: null,
     affected: [],
+    cameraFocus: null,
     view: null,
     techFocus: null,
     running: false,
@@ -709,6 +714,7 @@ export const useGame = create<Store>()((set, get) => {
       const was = get().affected;
       if (was.length !== ids.length || was.some((id, i) => id !== ids[i])) set({ affected: ids });
     },
+    focusCamera: (anchor) => set({ cameraFocus: { anchor, seq: (get().cameraFocus?.seq ?? 0) + 1 } }),
     openView: (view) => {
       const campaign = !!get().game.campaign;
       if (campaign && view === "tech" && get().view !== "tech") uiEvent("technology_tree_opened");

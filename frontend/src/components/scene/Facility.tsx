@@ -34,6 +34,7 @@ import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { Icon } from "../icons";
 import { tipProps } from "../tips";
+import { openRoomArea } from "../roomArea";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
 import { ServerFloor } from "./ServerFloor";
@@ -105,6 +106,21 @@ function frameBox(box: THREE.Box3, dir: THREE.Vector3, width: number, height: nu
   return { zoom, target: center.add(dir.clone().multiplyScalar((floorY - center.y) / dir.y)) };
 }
 
+/**
+ * The point on the floor at height `floorY` to look at so that `p` shows at the centre of the room the panel leaves
+ * open, at `zoom`, when looking along `dir`. The view is orthographic, so a pixel spans 1 / zoom world units.
+ */
+function centreOn(p: THREE.Vector3, dir: THREE.Vector3, zoom: number, width: number, height: number, floorY: number): THREE.Vector3 {
+  const stage = document.querySelector("main.stage")?.getBoundingClientRect();
+  const open = stage ? openRoomArea(stage) : { right: width, bottom: height };
+  const ox = open.right / 2 - width / 2;
+  const oy = open.bottom / 2 - height / 2;
+  const right = new THREE.Vector3().crossVectors(dir, UP).normalize();
+  const up = new THREE.Vector3().crossVectors(right, dir).normalize();
+  const c = p.clone().addScaledVector(right, -ox / zoom).addScaledVector(up, oy / zoom);
+  return c.addScaledVector(dir, (floorY - c.y) / dir.y);
+}
+
 /** The darkening laid over the room as the elevator passes between floors, moved by the camera each frame. */
 let dipEl: HTMLDivElement | null = null;
 
@@ -117,6 +133,8 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
   const homing = useRef(false);
   /** Turn still to apply from Q, E or the rotate buttons. */
   const spin = useRef(0);
+  /** The marker a campaign action asked the view to centre on, until the camera arrives or the player takes it. */
+  const focusing = useRef<string | null>(null);
   const box = useRef<THREE.Box3 | null>(null);
   const v = useMemo(
     () => ({ offset: new THREE.Vector3(), dir: new THREE.Vector3(), before: new THREE.Vector3(), from: new THREE.Vector3(), centre: new THREE.Vector3() }),
@@ -144,12 +162,14 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
   useEffect(() => {
     cameraApi.zoomBy = (factor) => {
       touched.current = true;
+      focusing.current = null;
       camera.zoom = THREE.MathUtils.clamp(camera.zoom * factor, 10, 140);
       camera.updateProjectionMatrix();
       controls.current?.update();
     };
     cameraApi.reset = () => {
       touched.current = false;
+      focusing.current = null;
       homing.current = true;
       spin.current = 0;
     };
@@ -158,6 +178,18 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
       spin.current += radians;
     };
   }, [camera]);
+
+  // A campaign action centres its machine at the default zoom, then leaves the camera where the player can take it.
+  useEffect(
+    () =>
+      useGame.subscribe((s, prev) => {
+        if (!s.cameraFocus || s.cameraFocus === prev.cameraFocus) return;
+        focusing.current = s.cameraFocus.anchor;
+        touched.current = true;
+        homing.current = false;
+      }),
+    [],
+  );
 
   // Q and E turn the room. Ignored while typing and before a run starts.
   useEffect(() => {
@@ -234,6 +266,20 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
       camera.position.add(c.target).sub(before);
       camera.updateProjectionMatrix();
     }
+    const aim = focusing.current ? anchors.get(focusing.current) : undefined;
+    if (aim) {
+      dir.copy(camera.position).sub(c.target).normalize().negate();
+      const zoom = box.current ? frameBox(box.current, dir, size.width, size.height, FLOOR_Y[floor]).zoom : camera.zoom;
+      const goal = centreOn(aim, dir, zoom, size.width, size.height, FLOOR_Y[floor]);
+      const k = reducedMotion() ? 1 : 0.12;
+      camera.zoom += (zoom - camera.zoom) * k;
+      before.copy(c.target);
+      c.target.x += (goal.x - c.target.x) * k;
+      c.target.z += (goal.z - c.target.z) * k;
+      camera.position.add(c.target).sub(before);
+      camera.updateProjectionMatrix();
+      if (Math.abs(zoom - camera.zoom) < 0.05 && Math.hypot(goal.x - c.target.x, goal.z - c.target.z) < 0.01) focusing.current = null;
+    }
     // Ride with the elevator: the view's height follows the car on the clock, however few frames are drawn.
     const y = viewHeight();
     camera.position.y += y - c.target.y;
@@ -280,6 +326,7 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
       onStart={() => {
         touched.current = true;
         homing.current = false;
+        focusing.current = null;
       }}
     />
   );

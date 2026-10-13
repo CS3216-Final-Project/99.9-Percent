@@ -62,6 +62,8 @@ Show latency, service errors and total backlog as the compact symptom summary. F
 Each campaign action shows what it changes in the room instead of in words: while the player points at or focuses an action, or its confirmation is open, the affected machine's marker and floor pad glow blue (Database for a database upgrade, Network for traffic limits and load balancing, Read Cache for cache work, Monitoring for Health Checks, the App Servers otherwise), and when that machine is on the other floor its floor button glows instead.
 The panel lists each action only by name, price and activation; its effect and costs are not repeated there.
 Pressing an action never buys it straight away. The view rides to the affected machine's floor and a confirmation opens over the room beside that machine's marker, with a notch pointing at it; a Scale up action points at its own App Server.
+The camera eases to centre that marker in the part of the room the panel leaves open, at the default zoom whether the player had zoomed in or out; panning, zooming or dragging stops it.
+The confirmation wears the night colours of the header and the room's overlays, with a blue edge, the machine name in blue and the action title in yellow.
 The confirmation names the machine and says in one sentence what it does, then gives the action as its title, the action's effect, Setup, Cash after, upkeep and Activation as label/value rows, the no-refund note, and Confirm (focused) and Cancel.
 It follows the marker as the camera moves, sits on the marker's left, away from the panel, unless that runs off the room, when it takes the right, and on a short room scrolls its details while Confirm and Cancel stay pinned at its foot.
 Without a drawn room it settles in the open part of the stage.

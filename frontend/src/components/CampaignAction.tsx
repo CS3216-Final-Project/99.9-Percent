@@ -11,6 +11,7 @@ import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { pendingStop } from "@/sim/step";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { Act, Row } from "./ui";
+import { EDGE, openRoomArea } from "./roomArea";
 
 // One action confirmation is open at a time across the panel, keyed by the action label.
 let confirming: string | null = null;
@@ -108,6 +109,7 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
     setConfirming(label);
     const s = useGame.getState(), floor = floorOf(affected[0]);
     if (s.floor !== floor) s.goToFloor(floor, "action");
+    s.focusCamera(anchor);
   };
   return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey}
     onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)}
@@ -128,7 +130,7 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
   </div>;
 }
 
-const GAP = 14, EDGE = 12;
+const GAP = 14;
 
 /**
  * Floats its content over the room beside the marker of the machine an action changes, on its left where it fits,
@@ -146,13 +148,7 @@ function ActionPopover({ anchor, children }: { anchor: string; children: ReactNo
     const place = () => {
       frame = requestAnimationFrame(place);
       const s = stage.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
-      let right = s.width - EDGE, bottom = s.height - EDGE;
-      // The campaign panel floats over the room: beside it on a wide screen, below it on a narrow one.
-      const panel = document.querySelector(".campaign-panel")?.getBoundingClientRect();
-      if (panel && panel.width > 0) {
-        if (panel.left - s.left > s.width * 0.4) right = Math.min(right, panel.left - s.left - EDGE);
-        else if (panel.top - s.top > s.height * 0.2) bottom = Math.min(bottom, panel.top - s.top - EDGE);
-      }
+      const { right, bottom } = openRoomArea(s);
       (el.firstElementChild as HTMLElement).style.maxHeight = `${Math.max(160, bottom - EDGE)}px`;
       const marker = document.querySelector<HTMLElement>(`.eq-label[data-eq="${anchor}"]`);
       const a = marker && marker.style.visibility === "visible" ? marker.getBoundingClientRect() : null;
