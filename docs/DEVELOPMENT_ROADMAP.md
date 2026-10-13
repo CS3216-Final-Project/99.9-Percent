@@ -407,7 +407,7 @@ Dates below use the supplied course schedule and Singapore time. Phases overlap;
 
 **Dependencies:** Complete LO1–LO4 mechanics before formal testing.
 
-**Scope guard:** No new mechanics. If a critical fix changes evaluated behaviour, version and report the affected sessions separately rather than silently pooling results.
+**Scope guard:** No new game mechanics: the simulation, balance and rules stay as frozen. The office add-on below is the one planned change to the evaluated interface, and only the stages reviewed and green by 31 October enter the evaluation build. If a critical fix changes evaluated behaviour, version and report the affected sessions separately rather than silently pooling results.
 
 #### Add-on track: a zoned two-floor office, walk mode and views
 
@@ -416,12 +416,14 @@ Dates below use the supplied course schedule and Singapore time. Phases overlap;
 **Stages** (one PR each, each playable on its own):
 1. **Zoned office.** Rebuild the top floor as named zones: work area, meeting rooms, events space, focus booths, dining, nap pods, lounge, games room and reception, with partitions, floors, signs, crew stops and zone sounds. Visual only.
 2. **Server floor and elevator.** Move the servers, database, cache, backup, network and monitoring one storey down, on the spots they use today. Add an always-available floor menu (and Page Up/Page Down), an animated elevator, and badges for incidents on the floor out of view. The server hall holds the existing cap of 12 app servers plus 6 temporary ones; when it is full, no more servers can be added.
-3. **Walk mode and avatars.** An optional creature avatar, picked when a company starts and changeable at any time, steered with W A S D, the arrow keys or click-to-walk. Doors open as it nears, prompts do what clicking does, and it rides the elevator. Clicking, the panels and the floor menu still do everything.
+3. **Walk mode and avatars.** An optional avatar, one of a set of creatures made for the player and distinct from the crew, picked when a company starts and changeable at any time, steered with W A S D, the arrow keys or click-to-walk. Doors open as it nears, prompts do what clicking does, and it rides the elevator. Clicking, the panels and the floor menu still do everything.
 4. **Views and the map.** Overview, follow and first-person views, and a map showing which floor and zone the avatar is in.
 
 **Finish:** Every stage ships with its animations and sounds (elevator doors, ride and chime, footsteps, zone props) synthesised in the browser, following the existing volume, mute and reduced-motion settings.
 
-**Scope guard:** No stage changes the simulation, balance or save format. Stage 1 enters the frozen build only if it is reviewed and green by 31 October. Stages 2–4 change how players reach equipment, so they stay behind a setting that is off in the evaluation build and turned on for the Phase 9 showcase.
+**Scope guard:** No stage changes the simulation, balance or save format, and walking and zones never change the game. All four stages aim for the evaluation build and must be reviewed and green by 31 October; a stage that is not stays behind a setting that is off for the evaluation and on for the Phase 9 showcase.
+
+**Evaluation:** The floor menu, walk mode and views change how players reach equipment. Analytics record floor switches, walk-mode sessions and view changes, and each session records its build, so their effect on first-incident completion is reported separately.
 
 ---
 
