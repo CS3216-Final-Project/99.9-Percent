@@ -83,8 +83,8 @@ test("the tutorial takes the view to its step's floor once, and never pulls the 
   await expect(page.getByRole("dialog", { name: /Tutorial, step 1/ })).toBeVisible();
   await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");
   await expect(label(page, "Servers")).toBeVisible();
-  // Riding up mid-step stays up.
-  await page.keyboard.press("PageUp");
+  // Riding up mid-step stays up. The step's card has the keyboard, as a dialog, so the player uses the floor menu.
+  await floor(page, "Office floor").click();
   await expect(label(page, "Growth")).toBeVisible();
   await page.waitForTimeout(1500);
   await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
