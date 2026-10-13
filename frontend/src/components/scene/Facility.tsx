@@ -554,6 +554,8 @@ const anchors = new Map<string, THREE.Vector3>();
 const labelEls = new Map<string, HTMLElement>();
 const INTERNET = "internet";
 const labelAt = new THREE.Vector2();
+/** Where each label goes this frame, kept until overlapping ones are moved apart. */
+const placed = new Map<string, { x: number; y: number }>();
 /** A campaign run is on screen, which lays its labels out differently. */
 let inCampaign = false;
 let inSpikes = false;
@@ -606,9 +608,20 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
       y = Math.min(y, size.height * 0.32);
       x = Math.max(65, Math.min(size.width - 65, x));
     }
+    placed.set(key, { x, y });
+  });
+  // The Read Cache stands beside the database, so from some views their markers meet: stack the cache's above.
+  const cache = placed.get("cache"), db = placed.get("db"), cacheEl = labelEls.get("cache"), dbEl = labelEls.get("db");
+  if (cache && db && cacheEl && dbEl) {
+    const h = Math.max(cacheEl.offsetHeight, dbEl.offsetHeight) + 12;
+    if (Math.abs(cache.x - db.x) < (cacheEl.offsetWidth + dbEl.offsetWidth) / 2 && Math.abs(cache.y - db.y) < h) cache.y = Math.min(cache.y, db.y - h);
+  }
+  placed.forEach(({ x, y }, key) => {
+    const el = labelEls.get(key)!;
     el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
     el.style.visibility = "visible";
   });
+  placed.clear();
 }
 
 function bindLabel(key: string) {
