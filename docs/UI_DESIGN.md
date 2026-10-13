@@ -8,6 +8,8 @@ The isometric room is the main canvas. A dark purple HUD frames cream paper pane
 
 The room itself is a realistic office, apart from the HUD's purple: warm off-white walls, concrete, grey carpet tiles where the crew work and coloured carpets in the rooms, charcoal and grey metal racks, white and light grey furniture, with a few colour accents. Its colours live in `frontend/src/components/scene/palette.ts` (`ROOM_PALETTE`, `FURNITURE`, `EQUIPMENT`, `PIXEL_FLOORS`); take new room colours from there rather than writing hex values into the scene. The HUD tokens in `index.css` are for the interface only.
 
+Each zone of the office has a floor of its own and its name floating over it (`ZONE_NAMES` in `scene/floorplan.ts`): a small dark sign drawn in the 3D scene, always facing the camera and 20 px tall at any zoom, smaller than the equipment's labels and fading out when the camera pulls back too far to read it. Zone names are scenery, not interface: they carry no actions, ignore clicks and stay out of the accessibility tree. Machine rooms keep their equipment labels and get no zone name.
+
 | Meaning / purpose | Existing pattern | Source |
 | --- | --- | --- |
 | Cash, users, revenue, health | `Stat` with a coloured `Concept` tile, label, headline and explanatory `Tip` | `components/ui.tsx`, `Game.tsx` |

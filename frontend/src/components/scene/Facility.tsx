@@ -36,6 +36,7 @@ import { tipProps } from "../tips";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
 import { applyDaylight } from "./cityLight";
+import { viewFocus } from "./zoneSounds";
 import { Exterior } from "./exterior";
 import { daylightNow } from "./dayClock";
 import { OnWall, Wall } from "./walls";
@@ -156,6 +157,22 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Tell the office's sounds where the camera looks, and that a room is on screen.
+  useFrame((state) => {
+    const c = controls.current;
+    if (!c) return;
+    viewFocus.x = c.target.x;
+    viewFocus.z = c.target.z;
+    viewFocus.zoom = (state.camera as THREE.OrthographicCamera).zoom;
+    viewFocus.live = true;
+  });
+  useEffect(
+    () => () => {
+      viewFocus.live = false;
+    },
+    [],
+  );
 
   // Read the camera from the frame state: R3F expects per-frame mutation here, not on the hook's render value.
   useFrame((state) => {

@@ -24,6 +24,20 @@ export const ROOM_PALETTE = {
     meeting: "#5f7a70",
     /** The kitchen's tiles. */
     kitchen: "#ebe8e2",
+    /** The events space's deep blue carpet, under the townhall steps and the stage. */
+    events: "#3c4a68",
+    /** The library's warm carpet. */
+    library: "#7d6b58",
+    /** Reception's light stone, in big tiles. */
+    reception: "#c4beb3",
+    /** Warm stone where the crew eat. */
+    dining: "#d8c2a2",
+    /** The lounge's sand-coloured carpet. */
+    lounge: "#8f8676",
+    /** The teal carpet of the games room and the foosball corner. */
+    games: "#3f6e72",
+    /** The nap room's dark carpet. */
+    nap: "#2e3344",
   },
   /** The server floor's perforated vent tiles, and the holes in them. */
   vent: "#8d9299",
@@ -83,4 +97,18 @@ export const PIXEL_FLOORS = {
   monitoring: { base: "#3d4756", fleck: "#343d4a" },
   meeting: { base: "#5f7a70", fleck: "#536b62" },
   kitchen: { base: "#ebe8e2", alternate: "#dfdbd3", grout: "#a8a49c" },
+  events: { base: "#3c4a68", fleck: "#344059" },
+  library: { base: "#7d6b58", fleck: "#6f5e4d" },
+  reception: { base: "#c4beb3", alternate: "#bab4a9", grout: "#9a958c" },
+  dining: { base: "#d8c2a2", alternate: "#cdb695", grout: "#a8957a" },
+  lounge: { base: "#8f8676", fleck: "#817869" },
+  games: { base: "#3f6e72", fleck: "#376064" },
+  nap: { base: "#2e3344", fleck: "#282c3b" },
 } as const;
+
+/** A tiled floor's colours at the low-quality look: two alternating tiles and the grout between them. */
+export interface TileColours {
+  base: string;
+  alternate: string;
+  grout: string;
+}

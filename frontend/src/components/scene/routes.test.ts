@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GROUPS } from './conversations';
-import { CLOSED_ROOMS, deskSeat, GLASS, OBSTACLES, SPOTS, type Obstacle } from './floorplan';
+import { CLOSED_ROOMS, deskSeat, ELEVATOR_SPOT, GLASS, OBSTACLES, SPOTS, type Obstacle } from './floorplan';
 import { ROOM } from './layout';
 import { heading, neighbours, PATHS, planLoop, poseAt, TURN_RATE, WAYPOINTS, wrapAngle, type WaypointId } from './routes';
 
@@ -49,6 +49,16 @@ function segmentToObstacle(a: P, b: P, o: Obstacle): number {
     [x0, z1],
   ];
   return Math.min(...corners.map((c, i) => segmentToSegment(a, b, c, corners[(i + 1) % 4])));
+}
+
+/** Whether a piece of furniture reaches into a box on the floor. */
+function overlaps(o: Obstacle, [x0, z0, x1, z1]: [number, number, number, number]): boolean {
+  if ('disc' in o) {
+    const [x, z, r] = o.disc;
+    return Math.hypot(x - Math.max(x0, Math.min(x, x1)), z - Math.max(z0, Math.min(z, z1))) < r;
+  }
+  const [a0, b0, a1, b1] = o.box;
+  return a0 < x1 && a1 > x0 && b0 < z1 && b1 > z0;
 }
 
 const point = (id: WaypointId): P => [WAYPOINTS[id].x, WAYPOINTS[id].z];
@@ -109,6 +119,20 @@ describe('office walking routes', () => {
       }
     }
     expect([...seen].sort()).toEqual([...ids].sort());
+  });
+
+  it("keeps the elevator's square empty: no furniture, crew, waypoint or walk in it", () => {
+    const spot: Obstacle = { name: 'elevator', box: ELEVATOR_SPOT };
+    const crowding = [
+      ...OBSTACLES.filter((o) => overlaps(o, ELEVATOR_SPOT)).map((o) => o.name),
+      ...stillCrew.filter((c) => inBox(c.p, ELEVATOR_SPOT)).map((c) => c.name),
+      ...ids.filter((id) => inBox(point(id), ELEVATOR_SPOT)),
+      ...paths.filter((path) => segmentToObstacle(path.a, path.b, spot) < WALKER_RADIUS).map((path) => path.name),
+    ];
+    expect(crowding).toEqual([]);
+    // The check itself must catch something placed there.
+    expect(overlaps({ name: 'crate', disc: [10, -2, 0.3] }, ELEVATOR_SPOT)).toBe(true);
+    expect(overlaps({ name: 'crate', box: [11.4, -1.2, 12, -0.5] }, ELEVATOR_SPOT)).toBe(true);
   });
 
   it('only stops at dead ends, so walkers passing through never pause in a corridor', () => {

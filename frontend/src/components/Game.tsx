@@ -12,6 +12,7 @@ import { createSfx } from "@/game/sfx";
 import { useGame, type Speed } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { daylightNow } from "./scene/dayClock";
+import { nextGap, viewFocus, ZONE_SOUNDS, zoneLevel, type ZoneSound } from "./scene/zoneSounds";
 import { SoundButton } from "./SoundButton";
 import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
@@ -252,6 +253,8 @@ function useMusic(): void {
 
 /** How often the city's sound checks how dark it has got outside. */
 const DUSK_CHECK_MS = 2000;
+/** How often the zones' sounds check whether they are due, in milliseconds. */
+const ZONE_TICK_MS = 200;
 
 /**
  * The city outside, heard under the game while a run is on screen: birds by day, crickets at night, following the
@@ -289,7 +292,31 @@ function useSoundEffects(): void {
       if (s.audio !== prev.audio) sfx.setVolume(effectsLevel(s.audio));
     });
     const stopCues = watchCues(useGame.subscribe, (cue) => sfx.play(cue));
+    // The zones' own sounds, near where the camera looks, while a run is on screen and nothing covers the room.
+    const due = new Map<ZoneSound, number>();
+    const zones = window.setInterval(() => {
+      const s = useGame.getState();
+      if (!s.started || s.view || document.hidden || !viewFocus.live || viewFocus.hush) {
+        due.clear();
+        return;
+      }
+      const now = performance.now() / 1000;
+      for (const zone of ZONE_SOUNDS) {
+        const level = zoneLevel(zone, viewFocus);
+        if (level < 0.01) {
+          due.delete(zone);
+          continue;
+        }
+        // A zone coming into earshot waits a gap before its first sound, so a pan never sets off a burst.
+        const at = due.get(zone) ?? now + nextGap(zone, Math.random());
+        if (now >= at) {
+          sfx.playZone(zone.cue, level);
+          due.set(zone, now + nextGap(zone, Math.random()));
+        } else due.set(zone, at);
+      }
+    }, ZONE_TICK_MS);
     return () => {
+      window.clearInterval(zones);
       stopCues();
       stopVolume();
       sfx.dispose();

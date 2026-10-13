@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ALL_ROLES, ALL_SPECIES, CLIPS, creature, motionFor, SPECIES, standsAtDesk, type Activity, type Kind } from './cast';
 
-const ACTIVITIES: Activity[] = ['type', 'relax', 'mug', 'laptop', 'idle', 'chat', 'walk', 'listen', 'present', 'panic', 'play'];
+const ACTIVITIES: Activity[] = ['type', 'relax', 'mug', 'laptop', 'idle', 'chat', 'walk', 'listen', 'present', 'panic', 'play', 'doze'];
 
 /** The animation names inside a GLB file, without the armature prefix. */
 function clipsInFile(file: string): string[] {
@@ -44,6 +44,14 @@ describe('animations', () => {
     const { file, kind } = SPECIES[species];
     const inFile = clipsInFile(file);
     for (const activity of ACTIVITIES) expect(inFile).toContain(motionFor(kind, activity).clip);
+  });
+
+  it('dozes on the slowed idle, never on the death clip', () => {
+    for (const kind of Object.keys(CLIPS) as Kind[]) {
+      const m = motionFor(kind, 'doze');
+      expect(m.clip).not.toBe('Death');
+      expect(m.speed).toBeLessThan(motionFor(kind, 'idle').speed);
+    }
   });
 
   it('walks walkers and keeps flyers in the air', () => {

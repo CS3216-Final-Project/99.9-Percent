@@ -168,6 +168,44 @@ const VOICES = {
 export type Cue = keyof typeof VOICES;
 export const CUE_NAMES = Object.keys(VOICES) as Cue[];
 
+/** A short burst of hiss through a band of `hz`, for knocks, clacks and steam. */
+function burst(ctx: Ctx, out: AudioNode, at: number, hiss: AudioBuffer, hz: number, length: number, gain: AudioNode): void {
+  const band = filter(ctx, "bandpass", hz);
+  noise(ctx, at, at + length, hiss).connect(band).connect(gain).connect(out);
+}
+
+/**
+ * The sounds of the office's zones, heard quietly when the camera is near them (see scene/zoneSounds.ts). They are
+ * not game events, so they have no place among the cues above and never compete with them.
+ */
+const ZONE_VOICES = {
+  /** A foosball shot: the rod's clack, then the ball off the side wall. */
+  foosball: (ctx, out, at, hiss) => {
+    burst(ctx, out, at, hiss, 2100, 0.05, hit(ctx, at, 0.5, 0.045));
+    burst(ctx, out, at + 0.11, hiss, 1400, 0.05, hit(ctx, at + 0.11, 0.28, 0.05));
+  },
+  /** Three quick chiptune notes from an arcade cabinet. */
+  arcade: (ctx, out, at) => run(ctx, out, at, [76, 83, 88], 0.07, 0.11, 0.06, 2600),
+  /** The espresso machine: a hiss of steam over a low gurgle. */
+  espresso: (ctx, out, at, hiss) => {
+    burst(ctx, out, at, hiss, 3600, 1.4, envelope(ctx, at, 1.4, 0.16, 0.15, 0.6));
+    const low = filter(ctx, "lowpass", 380);
+    noise(ctx, at + 0.2, at + 1.2, hiss).connect(low).connect(envelope(ctx, at + 0.2, 1.0, 0.3, 0.1, 0.4)).connect(out);
+  },
+  /** A sleeper breathing out, slow and soft. */
+  snore: (ctx, out, at, hiss) => {
+    const low = filter(ctx, "lowpass", 520);
+    noise(ctx, at, at + 1.6, hiss).connect(low).connect(envelope(ctx, at, 1.6, 0.14, 0.7, 0.8)).connect(out);
+    osc(ctx, "sine", 92, at + 0.3, at + 1.3).connect(envelope(ctx, at + 0.3, 1.0, 0.05, 0.4, 0.5)).connect(out);
+  },
+} satisfies Record<string, Voice>;
+
+export type ZoneCue = keyof typeof ZONE_VOICES;
+export const ZONE_CUES = Object.keys(ZONE_VOICES) as ZoneCue[];
+
+/** Shortest gap between two plays of the same zone sound, in milliseconds. */
+const ZONE_GAP: Record<ZoneCue, number> = { foosball: 250, arcade: 1200, espresso: 6000, snore: 3000 };
+
 /**
  * Shortest gap between two plays of the same cue, in milliseconds. Stings
  * never stack; small blips may repeat quickly but not into a drone.
@@ -207,6 +245,11 @@ const SLEEP_MS = 10_000;
 const SLIDE = 0.05;
 
 export interface Sfx {
+  /**
+   * Play a zone's sound at `level` (0 to 1) of the effects volume, unless the sound is off, the audio is asleep or
+   * the same sound has only just played. Zone sounds never wake the audio: they are only scenery.
+   */
+  playZone(cue: ZoneCue, level: number): void;
   /** Play a cue now, unless the sound is off or the same cue has only just played. */
   play(cue: Cue): void;
   /** The player's effects volume, 0 to 100; 0 when muted. At 0 the audio is suspended. */
@@ -215,7 +258,7 @@ export interface Sfx {
   dispose(): void;
 }
 
-const SILENT: Sfx = { play() {}, setVolume() {}, dispose() {} };
+const SILENT: Sfx = { play() {}, playZone() {}, setVolume() {}, dispose() {} };
 
 /**
  * `wanted` says whether the player has effects on, so a click can start the
@@ -271,7 +314,24 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
     }
   }
 
+  const lastZone = new Map<ZoneCue, number>();
+
   return {
+    playZone(cue, level) {
+      if (disposed || percent <= 0 || level <= 0 || !ctx || !bus || !hiss || ctx.state !== "running") return;
+      const t = now();
+      if (t - (lastZone.get(cue) ?? -Infinity) < ZONE_GAP[cue]) return;
+      lastZone.set(cue, t);
+      try {
+        const g = ctx.createGain();
+        g.gain.value = Math.min(1, level);
+        g.connect(bus);
+        ZONE_VOICES[cue](ctx, g, ctx.currentTime + 0.005, hiss);
+      } catch (error) {
+        if (!warned) console.warn("A sound effect could not be played; the game carries on without it.", error);
+        warned = true;
+      }
+    },
     play(cue) {
       if (disposed || percent <= 0) return;
       const t = now();
@@ -317,8 +377,9 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
 }
 
 /** Render one cue offline at full volume, for checking levels in a browser. */
-export async function renderCue(cue: Cue, rate = 44100): Promise<AudioBuffer> {
+export async function renderCue(cue: Cue | ZoneCue, rate = 44100): Promise<AudioBuffer> {
   const ctx = new OfflineAudioContext(1, Math.round(rate * 2), rate);
-  VOICES[cue](ctx, ctx.destination, 0.01, hissBuffer(ctx));
+  const voice: Voice = cue in ZONE_VOICES ? ZONE_VOICES[cue as ZoneCue] : VOICES[cue as Cue];
+  voice(ctx, ctx.destination, 0.01, hissBuffer(ctx));
   return ctx.startRendering();
 }
