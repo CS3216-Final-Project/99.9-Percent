@@ -1,7 +1,9 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { newGame, newLegacyGame, advanceTurn } from "../sim";
 import { advanceSteps } from "../sim/step";
-import { DEFAULT_AUDIO, isSilent, loadAudio, loadClassicGame, loadGame, saveGame, readAnalytics } from "./persist";
+import { preparedReliability, act, tick } from "../sim/__tests__/reliabilityFixture";
+import { pendingReliability } from "../sim/reliability";
+import { DEFAULT_AUDIO, DEFAULT_META, isSilent, loadAudio, loadClassicGame, loadGame, loadMeta, loadMode, saveGame, saveMeta, saveMode, readAnalytics } from "./persist";
 import { makeEnvelope } from "./saveEnvelope";
 import { useGame } from "./store";
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
@@ -103,6 +105,8 @@ it("saves every decision so a reload replays to the same company", () => {
 });
 
 describe("game modes", () => {
+  // These journeys play Challenge Mode, which an already-unlocked profile allows.
+  beforeEach(() => saveMeta({ ...DEFAULT_META, challengeUnlocked: true }));
   it("defaults to campaign and remembers the last mode played", () => {
     useGame.getState().boot();
     expect(useGame.getState().mode).toBe("campaign");
@@ -142,7 +146,7 @@ describe("game modes", () => {
   it("replaces an unreadable classic save with a new run", () => {
     localStorage.setItem("nn.classic.save.v1", "{");
     useGame.getState().boot(); useGame.getState().switchMode("classic");
-    expect(useGame.getState().toast).toMatchObject({ kind: "error", text: "Saved classic run was unreadable. Started a new one." });
+    expect(useGame.getState().toast).toMatchObject({ kind: "error", text: "Saved Challenge Mode run was unreadable. Started a new one." });
     expect(loadClassicGame().status).toBe("ok");
   });
   it("refuses to switch away from a run it cannot save unless told to discard it", () => {
@@ -182,6 +186,8 @@ it("persists fractional credit when the menu pauses, then resumes identically af
 });
 
 describe("old saves and imports across modes", () => {
+  // These journeys import or resume Challenge Mode saves, which an already-unlocked profile allows.
+  beforeEach(() => saveMeta({ ...DEFAULT_META, challengeUnlocked: true }));
   it("resumes a copy of an existing run and metadata, leaving every legacy key intact", () => {
     const game = JSON.parse(JSON.stringify(advanceTurn(newLegacyGame(777)))) as ReturnType<typeof newGame>;
     const originals = { "nn.save.v1": JSON.stringify({ game, savedAt: 1 }), "nn.meta.v1": JSON.stringify({ tutorialDone: true, music: false }), "nn.analytics.v1": "[legacy]" };
@@ -309,6 +315,7 @@ describe("old saves and imports across modes", () => {
 
 
 it("imports a pre-update incident paused and preserves its recovery state", () => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
   const game = JSON.parse(JSON.stringify(advanceTurn({ ...newLegacyGame(1), users: 4500 }))) as ReturnType<typeof newGame>;
   expect(game.phase).toBe("incident");
   const raw = JSON.stringify({ savedAt: 1, game });
@@ -319,4 +326,70 @@ it("imports a pre-update incident paused and preserves its recovery state", () =
   useGame.getState().setRunning(true); useGame.getState().tick(.2);
   expect(useGame.getState().game.incident!.elapsed).toBeCloseTo(game.incident!.elapsed + .2);
   expect(localStorage.getItem("nn.save.v1")).toBe(raw);
+});
+
+describe("challenge mode lock", () => {
+  const LOCKED = "Complete the first five Guided Mode chapters to unlock Challenge Mode.";
+  it("forces a stale classic last-mode back to campaign while locked", () => {
+    saveMode("classic");
+    expect(loadMode()).toBe("campaign");
+    useGame.getState().boot();
+    expect(useGame.getState().mode).toBe("campaign");
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+    expect(loadMode()).toBe("classic");
+    useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+    expect(useGame.getState().mode).toBe("classic");
+  });
+  it("refuses switching to Challenge Mode before the first five chapters are complete", () => {
+    enter(); useGame.getState().advance();
+    const campaign = useGame.getState().game;
+    expect(useGame.getState().switchMode("classic")).toBe(false);
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", game: campaign, started: true });
+    expect(useGame.getState().toast?.text).toBe(LOCKED);
+    expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
+  });
+  it("refuses a Classic import while locked, keeping both modes untouched", () => {
+    enter(); const before = useGame.getState().game;
+    expect(useGame.getState().importSave(JSON.stringify({ savedAt: 1, game: advanceTurn(newLegacyGame(5)) }))).toBe(false);
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", game: before });
+    expect(useGame.getState().toast?.text).toBe(LOCKED);
+    expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
+  });
+  it("unlocks Challenge Mode permanently when the reliability chapter is acknowledged", () => {
+    let game = act(preparedReliability(), { type: "arm_reliability" });
+    for (let i = 0; i < 60 && !pendingReliability(game.campaign); i++) {
+      if (game.phase === "review") game = act(game, { type: "acknowledge_review" });
+      game = tick(game);
+    }
+    expect(pendingReliability(game.campaign)).toBe(true);
+    useGame.setState({ game, started: true, ready: true, hasRun: true, onboarding: false });
+    expect(useGame.getState().act({ type: "acknowledge_reliability" })).toBe(true);
+    expect(useGame.getState().meta.challengeUnlocked).toBe(true);
+    expect(loadMeta().challengeUnlocked).toBe(true);
+    // The unlock is durable: a later visit can play Challenge Mode right away.
+    useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+    expect(useGame.getState().switchMode("classic")).toBe(true);
+    expect(useGame.getState().mode).toBe("classic");
+    useGame.getState().advance();
+    const classic = useGame.getState().game;
+    useGame.getState().switchMode("campaign");
+    expect(useGame.getState().game.campaign!.reliabilityStage?.acknowledged).toBe(true);
+    useGame.getState().switchMode("classic");
+    expect(useGame.getState().game).toEqual(classic);
+  });
+  it("treats an older completed campaign save as unlocked even without the new metadata", () => {
+    let game = act(preparedReliability(), { type: "arm_reliability" });
+    for (let i = 0; i < 60 && !pendingReliability(game.campaign); i++) {
+      if (game.phase === "review") game = act(game, { type: "acknowledge_review" });
+      game = tick(game);
+    }
+    game = act(game, { type: "acknowledge_reliability" });
+    expect(game.campaign!.reliabilityStage?.acknowledged).toBe(true);
+    saveGame(game);
+    saveMode("classic");
+    expect(loadMeta().challengeUnlocked).toBe(false);
+    expect(loadMode()).toBe("classic");
+    useGame.getState().boot();
+    expect(useGame.getState().mode).toBe("classic");
+  });
 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMusic } from "./music";
-import { createSfx, CUE_NAMES } from "./sfx";
+import { createSfx, CUE_NAMES, ZONE_CUES } from "./sfx";
 import { loudness } from "./synth";
 import { FakeAudioContext, FakeOfflineAudioContext } from "./testing/fakeAudio";
 
@@ -17,6 +17,8 @@ describe("sound effects without Web Audio", () => {
       sfx.setVolume(0);
       sfx.dispose();
       sfx.play("alarm");
+      sfx.liftDepart(true);
+      sfx.liftArrive(true, { close: 2.8, shut: 3.2 });
     }).not.toThrow();
   });
 });
@@ -66,6 +68,66 @@ describe("sound effects", () => {
     sfx.play("buzz");
     expect(ctx.voices).toBe(silent);
     expect(ctx.gains[0].gain.ramps.at(-1)).toBe(0);
+    sfx.dispose();
+  });
+
+  it("play the zones' sounds at their level, but never wake sleeping audio or sound while muted", () => {
+    let t = 0;
+    const sfx = createSfx(() => true, () => t);
+    sfx.setVolume(80);
+    // Before anything has started the audio, a zone sound is dropped rather than starting it.
+    sfx.playZone("foosball", 0.4);
+    expect(FakeAudioContext.made).toHaveLength(0);
+    sfx.play("blip");
+    const ctx = FakeAudioContext.made[0];
+    for (const cue of ZONE_CUES) {
+      t += 10_000;
+      const before = ctx.voices;
+      const gains = ctx.gains.length;
+      sfx.playZone(cue, 0.3);
+      expect(ctx.voices, cue).toBeGreaterThan(before);
+      // The first node a zone sound makes holds it at its level.
+      expect(ctx.gains[gains].gain.value, cue).toBeCloseTo(0.3);
+    }
+    t += 10_000;
+    const quiet = ctx.voices;
+    sfx.playZone("snore", 0);
+    ctx.state = "suspended";
+    sfx.playZone("arcade", 0.3);
+    expect(ctx.voices).toBe(quiet);
+    expect(ctx.state).toBe("suspended");
+    ctx.state = "running";
+    sfx.setVolume(0);
+    sfx.playZone("espresso", 0.3);
+    expect(ctx.voices).toBe(quiet);
+    sfx.dispose();
+  });
+
+  it("ride the elevator: a click and a hum setting off, a chime and the doors arriving, and nothing while muted", () => {
+    const sfx = createSfx(() => true);
+    sfx.liftDepart(false);
+    expect(FakeAudioContext.made).toHaveLength(0);
+    sfx.setVolume(80);
+    sfx.liftDepart(false);
+    const ctx = FakeAudioContext.made[0];
+    const set = ctx.voices;
+    expect(set).toBeGreaterThan(0);
+    // The ride has a gain of its own, and the hum one inside it.
+    const ride = ctx.gains[1];
+    const hum = ctx.gains[2];
+    sfx.liftArrive(false, { close: 2.8, shut: 3.2 });
+    expect(ctx.voices).toBeGreaterThan(set);
+    // Arriving stops the hum but not the ride's own sounds, the chime and the doors.
+    expect(hum.gain.ramps.at(-1)).toBe(0);
+    expect(ride.gain.ramps).toEqual([]);
+    // Setting off again silences what is left of the last ride: its doors closing.
+    sfx.liftDepart(true);
+    expect(ride.gain.ramps.at(-1)).toBe(0);
+    sfx.setVolume(0);
+    const quiet = ctx.voices;
+    sfx.liftDepart(false);
+    sfx.liftArrive(true, { close: 2.8, shut: 3.2 });
+    expect(ctx.voices).toBe(quiet);
     sfx.dispose();
   });
 

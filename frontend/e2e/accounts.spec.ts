@@ -27,7 +27,7 @@ test('saves to the cloud only when asked, resolves conflicts, keeps owners apart
   expect(putCount).toBe(0);
   await dialog.getByRole('button',{name:'Save to cloud',exact:true}).click();await expect(dialog.getByText('Saved to the cloud.',{exact:true})).toBeVisible();
   expect(putCount).toBe(1);await expect(dialog.getByText('In the cloud as version 1')).toBeVisible();
-  await expect(dialog.getByRole('listitem')).toContainText('Campaign save (this game)');
+  await expect(dialog.getByRole('listitem')).toContainText('Guided Mode save (this game)');
   await page.screenshot({path:'test-results/account-signed-in.png'});
   await dialog.getByRole('button',{name:'Close'}).click();
   await page.getByRole('button',{name:'Continue company',exact:true}).click();await expectRoom(page);
@@ -48,12 +48,18 @@ test('saves to the cloud only when asked, resolves conflicts, keeps owners apart
   expect(putCount).toBe(3);
   // A fresh isolated context has no local save, but the same provider-backed app account.
   session={account:{id:'owner-a',displayName:'Player A'},csrfToken:'csrf-a'};
-  await page.evaluate(()=>{for(const key of ['nn.campaign.save.v1','nn.campaign.cloud.v1'])localStorage.removeItem(key);});
-  const fresh=await context.newPage();await fresh.goto('/');await fresh.getByRole('button',{name:/Player A/}).click();
+  // A fresh browser has no other tab drawing the room. Left open, this one keeps rendering it behind the home screen
+  // in the same software renderer, which can stall the fresh tab for longer than an assertion waits. Its errors are
+  // still checked when the test ends.
+  await page.close();
+  // The tabs share storage, so the fresh one drops the save before the game reads it.
+  const fresh=await context.newPage();
+  await fresh.addInitScript(()=>{for(const key of ['nn.campaign.save.v1','nn.campaign.cloud.v1'])localStorage.removeItem(key);});
+  await fresh.goto('/');await fresh.getByRole('button',{name:/Player A/}).click();
   const freshDialog=fresh.getByRole('dialog',{name:'Account'});
-  await expect(freshDialog.getByText(/No Campaign game in this browser yet/)).toBeVisible();
+  await expect(freshDialog.getByText(/No Guided Mode game in this browser yet/)).toBeVisible();
   await freshDialog.getByRole('button',{name:/^Load cloud save from/}).click();await expect(freshDialog).toBeHidden();
-  await expect(fresh.getByRole('region',{name:'Campaign'})).toContainText('Last played');
+  await expect(fresh.getByRole('region',{name:'Guided Mode'})).toContainText('Last played');
   await fresh.getByRole('button',{name:'Continue company',exact:true}).click();await expectRoom(fresh);
   expect((await savedGame(fresh)).campaign!.step).toBe(1);await fresh.close();
 });

@@ -167,7 +167,7 @@ describe("game interface", () => {
   it("uses no native title tooltips on the title screen, in play or in an incident", () => {
     render(<App />);
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Play Campaign" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
     fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
     fireEvent.click(screen.getByText("More controls"));
@@ -178,7 +178,7 @@ describe("game interface", () => {
 
   it("explains a header metric and a locked time control in the shared bubble", () => {
     render(<App />);
-    fireEvent.click(screen.getByRole("button", { name: "Play Campaign" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
     fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
 
     over(screen.getByText("Cash"));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
+import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, DETAIL_ZOOM, MIN_TILT, MAX_TILT, turnAbout, zoomedOut } from "./camera";
 import { buildings, FADE, GROUND_Y, REACH, ROOF_HEADROOM, TOWER } from "./city";
 import { ROOM } from "./layout";
 
@@ -108,5 +108,38 @@ describe("turning the camera", () => {
     expect(Math.abs(anchor.clone().project(orbit).x)).toBeGreaterThan(0.01);
     const turned = turnAbout(target.clone(), anchor, towards(before, target), towards(orbit, target));
     expect(anchor.clone().project(cameraAt(turned, Math.PI / 4, Math.PI / 2)).x).toBeCloseTo(0, 10);
+  });
+
+  it("on the server floor keeps the equipment in place on screen and the view on that floor, a storey below the office", () => {
+    const floorY = -4;
+    const anchor = new THREE.Vector3(-1, floorY + 1.5, 0.6);
+    const view = new THREE.Vector3().setFromSphericalCoords(1, Math.PI / 4, Math.PI / 4).negate();
+    const target = anchor.clone().addScaledVector(view, (floorY - anchor.y) / view.y);
+    const before = cameraAt(target, Math.PI / 4, Math.PI / 4);
+    const after = towards(cameraAt(target, Math.PI / 4, Math.PI / 2), target);
+    const turned = turnAbout(target.clone(), anchor, towards(before, target), after, floorY);
+    expect(turned.y).toBeCloseTo(floorY, 10);
+    const onScreen = anchor.clone().project(cameraAt(turned, Math.PI / 4, Math.PI / 2));
+    expect(Math.hypot(onScreen.x, onScreen.y)).toBeCloseTo(0, 10);
+    // Sliding back onto the office's floor instead leaves the view at the wrong height, and bringing it straight down
+    // to the server floor afterwards carries the equipment across the screen.
+    const wrong = turnAbout(target.clone(), anchor, towards(before, target), after);
+    expect(wrong.y).toBeCloseTo(0, 10);
+    const dropped = anchor.clone().project(cameraAt(wrong.setY(floorY), Math.PI / 4, Math.PI / 2));
+    expect(Math.hypot(dropped.x, dropped.y)).toBeGreaterThan(0.01);
+  });
+});
+
+describe("detail by zoom", () => {
+  it("draws lighter models only well zoomed out, and does not flicker at the line", () => {
+    expect(zoomedOut(30, false)).toBe(false);
+    expect(zoomedOut(10, false)).toBe(true);
+    expect(zoomedOut(DETAIL_ZOOM.into, false)).toBe(false);
+    // Between the two thresholds, it stays as it was.
+    const between = (DETAIL_ZOOM.into + DETAIL_ZOOM.outOf) / 2;
+    expect(zoomedOut(between, false)).toBe(false);
+    expect(zoomedOut(between, true)).toBe(true);
+    expect(zoomedOut(DETAIL_ZOOM.outOf + 0.1, true)).toBe(false);
+    expect(DETAIL_ZOOM.outOf).toBeGreaterThan(DETAIL_ZOOM.into);
   });
 });

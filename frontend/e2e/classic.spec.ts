@@ -1,7 +1,8 @@
-import { test, expect, expectRoom, savedClassicGame as savedGame, seedClassicSave as seedSave } from './fixtures';
+import { test, expect, expectRoom, savedClassicGame as savedGame, seedClassicSave as seedSave, unlockChallenge } from './fixtures';
 import { advanceTurn, newLegacyGame as newGame } from '../src/sim';
 
 test.beforeEach(async ({ page }) => {
+  await unlockChallenge(page);
   await page.addInitScript(() => localStorage.setItem('nn.mode.v1', 'classic'));
 });
 
@@ -15,7 +16,7 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   });
   page.on('response', response => { if (response.url().includes('/models/creatures/') && response.ok()) crew.add(response.url()); });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Play Classic', exact: true }).click();
+  await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await expectRoom(page);
   // The monster crew works at every level of detail.
   await expect.poll(() => crew.size).toBe(14);
@@ -57,7 +58,7 @@ test('keeps the game playable when the furniture and creature models cannot be d
   const skipped = page.waitForEvent('console', message => message.text().includes('Furniture models failed to load'));
   const crew = page.waitForEvent('console', message => message.text().includes('Creature models failed to load'));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Play Classic', exact: true }).click();
+  await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await skipped;
   await crew;
@@ -72,21 +73,27 @@ test('draws the photo-scanned surfaces and furniture when HD detail is forced', 
   // which took up to 30 seconds locally, so it gets the same headroom as other slow journeys.
   test.setTimeout(120_000);
   const textures = new Set<string>();
+  const city = new Set<string>();
   const furniture = new Set<string>();
+  // The city's ground and roofs have photo sets of their own, apart from the office's.
+  const outside = /\/textures\/(asphalt|lawn|pavement|gravel|roof-tiles)\//;
   page.on('response', response => {
     if (!response.ok()) return;
     const path = new URL(response.url()).pathname;
-    if (path.includes('/textures/')) textures.add(path);
+    if (outside.test(path)) city.add(path);
+    else if (path.includes('/textures/')) textures.add(path);
     if (path.includes('/models/polyhaven/')) furniture.add(path);
   });
   await page.goto('/?graphics=hd');
-  await page.getByRole('button', { name: 'Play Classic', exact: true }).click();
+  await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   // Compiling the HD shaders in software can block the page for longer than the default 10 seconds.
   await expectRoom(page, 30_000);
-  // Six surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
-  await expect.poll(() => textures.size).toBe(18);
+  // Five surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
+  await expect.poll(() => textures.size).toBe(15);
   await expect.poll(() => furniture.size).toBe(9);
+  // Five surfaces outside, each with a colour and a normal map.
+  await expect.poll(() => city.size).toBe(10);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
   await expectRoom(page);
@@ -98,7 +105,7 @@ test('keeps the game playable when the HD textures and furniture cannot be downl
   const surfaces = page.waitForEvent('console', message => message.text().includes('HD textures failed to load'));
   const furniture = page.waitForEvent('console', message => message.text().includes('HD furniture failed to load'));
   await page.goto('/?graphics=hd');
-  await page.getByRole('button', { name: 'Play Classic', exact: true }).click();
+  await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await surfaces;
   await furniture;
@@ -112,8 +119,8 @@ test('recovers from a corrupt save through the playable first-run flow', async (
   await withoutRoom();
   await page.addInitScript(() => localStorage.setItem('nn.classic.save.v1', '{'));
   await page.goto('/');
-  await expect(page.getByRole('alert')).toHaveText('Saved classic run was unreadable. Started a new one.');
-  await page.getByRole('button', { name: 'Play Classic', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText('Saved Challenge Mode run was unreadable. Started a new one.');
+  await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
@@ -180,7 +187,7 @@ test('plays sound from the first click, follows the menu sliders and remembers a
   const problems: string[] = [];
   page.on('console', message => { if (/could not be (prepared|played)/.test(message.text())) problems.push(message.text()); });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Play Classic', exact: true }).click();
+  await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   const mute = page.getByRole('button', { name: 'Mute sound' });
   await expect(mute).toHaveAttribute('aria-pressed', 'false');
@@ -201,7 +208,7 @@ test('plays sound from the first click, follows the menu sliders and remembers a
   await expect(mute).toHaveAttribute('aria-pressed', 'true');
   expect(problems).toEqual([]);
   await page.reload();
-  await page.getByRole('button', { name: 'Play Classic', exact: true }).click();
+  await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Mute sound' })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('nn.audio.v1')!))).toEqual({ music: 80, effects: 45, muted: true });
 });

@@ -45,12 +45,12 @@ describe('loading the HD surfaces', () => {
 
     load.mockImplementation(async () => new THREE.Texture());
     const surfaces = await loadSurfaces(4);
-    expect(Object.keys(surfaces).sort()).toEqual(['carpet', 'concrete', 'kitchenTiles', 'parquet', 'plaster', 'serverTiles']);
+    expect(Object.keys(surfaces).sort()).toEqual(['carpet', 'concrete', 'kitchenTiles', 'plaster', 'serverTiles']);
     // Colour maps are gamma-corrected; normal and roughness data must not be.
-    expect(surfaces.parquet.map.colorSpace).toBe(THREE.SRGBColorSpace);
-    expect(surfaces.parquet.normalMap.colorSpace).toBe(THREE.NoColorSpace);
-    expect(surfaces.parquet.arm.colorSpace).toBe(THREE.NoColorSpace);
-    expect(surfaces.parquet.map.wrapS).toBe(THREE.RepeatWrapping);
+    expect(surfaces.kitchenTiles.map.colorSpace).toBe(THREE.SRGBColorSpace);
+    expect(surfaces.kitchenTiles.normalMap.colorSpace).toBe(THREE.NoColorSpace);
+    expect(surfaces.kitchenTiles.arm.colorSpace).toBe(THREE.NoColorSpace);
+    expect(surfaces.kitchenTiles.map.wrapS).toBe(THREE.RepeatWrapping);
 
     const calls = load.mock.calls.length;
     expect(await loadSurfaces(4)).toBe(surfaces);

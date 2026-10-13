@@ -3,7 +3,7 @@ import { test, expect, savedGame } from "./fixtures";
 test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
 test("Campaign getting-started exploration, keyboard navigation and reload do not run the simulation", async ({page}) => {
   await page.route("**/api/**",r=>r.abort()); await page.goto("/");
-  await page.getByRole("button",{name:"Play Campaign",exact:true}).click();
+  await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();
   const intro=page.getByRole("dialog",{name:"Company introduction"});
   const before=await savedGame(page);
   await intro.getByRole("button",{name:"App Server",exact:true}).focus(); await page.keyboard.press("Enter");
@@ -20,13 +20,13 @@ test("Campaign getting-started exploration, keyboard navigation and reload do no
   await intro.getByRole("button",{name:"Finish introduction",exact:true}).click();
   await expect(intro).toBeHidden(); await expect(page.getByRole("button",{name:"Run",exact:true})).toContainText("Run company");
   await expect(page.getByRole("button",{name:"Advance step",exact:true})).toBeHidden();
-  await expect(page.getByRole("region",{name:"Campaign chapters"})).toContainText("Getting started");
+  await expect(page.getByRole("region",{name:"Guided Mode chapters"})).toContainText("Getting started");
   await page.screenshot({path:"test-results/campaign-ux-desktop.png"});
   expect((await savedGame(page)).campaign!.step).toBe(0);
   await page.reload(); await page.getByRole("button",{name:"Continue company",exact:true}).click(); await expect(intro).toBeHidden();
 });
 test("Campaign option comparison, precision control and pause-to-investigate use public controls", async ({page}) => {
-  await page.goto("/"); await page.getByRole("button",{name:"Play Campaign",exact:true}).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
+  await page.goto("/"); await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   const card=page.getByRole("button",{name:/Add server/}).locator("..");
   await card.locator("summary").click(); await expect(card).toContainText("$700"); await expect(card).toContainText("$19,000");
   await page.locator(".campaign-advanced > summary").click(); await page.getByRole("button",{name:"Advance step",exact:true}).click();

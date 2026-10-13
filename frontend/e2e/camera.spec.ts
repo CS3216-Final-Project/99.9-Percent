@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect, expectRoom, seedClassicSave } from "./fixtures";
+import { test, expect, expectRoom, seedClassicSave, unlockChallenge } from "./fixtures";
 import { advanceTurn, newLegacyGame } from "../src/sim";
 
 type Point = { x: number; y: number };
@@ -39,14 +39,18 @@ async function trackLabels(page: Page, key?: string): Promise<Point[]> {
 const spread = (points: Point[], from: Point) => Math.max(...points.map(p => Math.hypot(p.x - from.x, p.y - from.y)));
 
 test("turning the room with Q and E keeps the company in place", async ({ page }) => {
+  // The opening framing and the turns ease a share of the way each frame, so software rendering takes tens of seconds.
+  test.slow();
+  await unlockChallenge(page);
   await page.addInitScript(() => localStorage.setItem("nn.mode.v1", "classic"));
   await seedClassicSave(page, advanceTurn(newLegacyGame(1)));
   await page.goto("/");
   await page.getByRole("button", { name: "Continue week 2" }).click();
   await expectRoom(page);
 
-  // Wait for the opening framing to settle on the built equipment.
-  await expect.poll(async () => (await trackLabels(page)).length).toBe(1);
+  // Wait for the opening framing to settle on the built equipment. It eases per frame, not per second, so a runner
+  // drawing a few frames a second needs far longer than the default wait.
+  await expect.poll(async () => (await trackLabels(page)).length, { timeout: 45_000 }).toBe(1);
 
   for (const key of ["q", "e"]) {
     const samples = await trackLabels(page, key);

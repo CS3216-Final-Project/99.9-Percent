@@ -72,7 +72,7 @@ function CampaignGuidance() {
     :model.prevention?"Handle the traffic increase without an incident: inspect the Application and Database, then keep service healthy at full demand."
     :"Observe demand and compare component evidence.";
 
-  return <section className="campaign-guidance" aria-label="Campaign guidance">
+  return <section className="campaign-guidance" aria-label="Guided Mode guidance">
     <Callout compact tone="info" icon="monitor" kicker={`Current stage: ${stageName(game)}`}>{objective}</Callout>
     {c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
     {c.combinedStage&&model.incomplete.length>0&&<details className="more"><summary>Next growth requirements</summary><RequirementList items={model.incomplete}/></details>}
@@ -92,9 +92,9 @@ function CampaignGuidance() {
 function CampaignProgression() {
   const {game}=useGame(),c=game.campaign!;
   const model=campaignGuidance(game);
-  return <section aria-label="Campaign requirements">
-    <details className="more"><summary>Campaign progression</summary>
-      <nav aria-label="Campaign progression"><ol className="campaign-stages">
+  return <section aria-label="Guided Mode requirements">
+    <details className="more"><summary>Guided Mode progression</summary>
+      <nav aria-label="Guided Mode progression"><ol className="campaign-stages">
         {campaignChapters(game).map(chapter=><li key={chapter.id} aria-current={chapter.current?"step":undefined}>{chapter.name} <strong>{chapter.status}</strong></li>)}
       </ol></nav>
       <RequirementList items={model.requirements} />
@@ -186,7 +186,7 @@ export function CampaignPanel() {
       <h4 className="step-head"><span className="step-num" aria-hidden="true">2</span>Actions</h4>
       <ul className="actions">
         <li><Act label="Add server" price={Q.appCostCents / 100} note={`${Q.appDelay} steps`} disabled={disabled || busy || c.apps.length >= (c.spikeStage ? T.maximum : Q.maxApps) || c.cashCents <= Q.appCostCents} tip="Adds installed application capacity. Without routing, a new server does not receive traffic." onClick={() => act({ type: "add_server" })} /></li>
-        <li><Act label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbUpgrade?`${dbUpgrade.delay} steps · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next campaign stage."} onClick={() => act({ type: "start_db_upgrade" })} /></li>
+        <li><Act label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbUpgrade?`${dbUpgrade.delay} steps · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next Guided Mode stage."} onClick={() => act({ type: "start_db_upgrade" })} /></li>
         <li><Act label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} step`} disabled={disabled || admissionPending} tip="Changes admitted traffic at the next physical step. Rejected requests earn no revenue." onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
       </ul>
       {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type))} />}
@@ -361,7 +361,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
           <AccountSection />
           <section className="menu-section menu-danger" aria-label="Start over"><h4><Icon name="refresh" size={20} />Start over</h4>
             <div className="menu-actions"><button type="button" className={`btn${confirmReset ? " btn-danger" : ""}`} onClick={reset}><Icon name="refresh" size={20} />{confirmReset ? "Lose this company? Press again" : "New company"}</button></div>
-            {confirmReset && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces only the current campaign save. Export it first if you want to keep it. Press the red button again to confirm.</Callout>}
+            {confirmReset && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces only the current Guided Mode save. Export it first if you want to keep it. Press the red button again to confirm.</Callout>}
           </section>
         </div>
       </div>}

@@ -13,6 +13,7 @@ function download(name: string, text: string) {
 /** Shared file controls; importing validates first and asks before replacing a run. */
 export function SaveFiles() {
   const { game, mode, remainderMs, measurement, importSave, resumeLegacySave, notify } = useGame();
+  const challengeUnlocked = useGame((s) => s.mode === "classic" || s.meta.challengeUnlocked || s.game.campaign?.reliabilityStage?.acknowledged === true);
   const [pending, setPending] = useState<{ name: string; text: string } | null>(null);
   const [confirmLegacy, setConfirmLegacy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -28,7 +29,7 @@ export function SaveFiles() {
   };
   return <section className="menu-section" aria-label="Save files">
     <h4><Icon name="save" size={20} />Save files</h4>
-    <p className="menu-note">Export a file to keep a backup or continue on another browser. Campaign and Classic files open in their matching mode.</p>
+    <p className="menu-note">Export a file to keep a backup or continue on another browser. Guided Mode and Challenge Mode files open in their matching mode.</p>
     <div className="menu-actions">
       <button type="button" className="btn" onClick={() => download(`${mode}.json`, exportGame(game, remainderMs, measurement))}>
         <Icon name="download" size={20} />{mode === "campaign" ? "Export current company" : "Export current run"}</button>
@@ -44,13 +45,13 @@ export function SaveFiles() {
         <button type="button" className="btn btn-quiet" onClick={() => setPending(null)}>Cancel import</button></div></div>}
     {legacy !== null && <div className="menu-sub" role="group" aria-labelledby={legacyTitle}>
       <h5 id={legacyTitle}>Pre-update save</h5>
-      <p className="menu-note">Your original save is preserved. Resume a copy in Classic or export the original file.</p>
+      <p className="menu-note">Your original save is preserved. Resume a copy in Challenge Mode or export the original file.{!challengeUnlocked && " Complete Guided Mode to unlock Challenge Mode before resuming this save."}</p>
       <div className="menu-actions">
         <button type="button" className="btn" onClick={() => download("pre-update-save.json", legacy)}><Icon name="download" size={20} />Export pre-update save</button>
-        <button type="button" className="btn" onClick={() => { setConfirmLegacy(true); setPending(null); }}><Icon name="play" size={20} />Resume pre-update save</button>
+        <button type="button" className="btn" disabled={!challengeUnlocked} onClick={() => { setConfirmLegacy(true); setPending(null); }}><Icon name="play" size={20} />Resume pre-update save</button>
       </div>
       {confirmLegacy && <div className="menu-confirm">
-        <p>This replaces the saved Classic run with a copy of your pre-update save. Export your Classic run first if you want to keep it. Your original pre-update save remains unchanged.</p>
+        <p>This replaces the saved Challenge Mode run with a copy of your pre-update save. Export your Challenge Mode run first if you want to keep it. Your original pre-update save remains unchanged.</p>
         <div className="btn-row"><button type="button" className="btn btn-danger" onClick={() => { resumeLegacySave(); setConfirmLegacy(false); }}>Confirm resume</button>
           <button type="button" className="btn btn-quiet" onClick={() => setConfirmLegacy(false)}>Cancel resume</button></div></div>}
     </div>}

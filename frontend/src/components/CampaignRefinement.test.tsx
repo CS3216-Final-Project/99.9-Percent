@@ -39,7 +39,7 @@ it("lets players compare actual request revenue and introduces ownership separat
 it("completion records existing onboarding metadata, stays paused and does not reappear after reload", () => {
   start(); renderCompany(); move(); move(); fireEvent.click(screen.getByRole("button",{name:"Finish introduction"}));
   expect(useGame.getState().meta.openingOnboarding.status).toBe("completed");
-  expect(screen.getByRole("region",{name:"Campaign chapters"}).textContent).toContain("Getting started");
+  expect(screen.getByRole("region",{name:"Guided Mode chapters"}).textContent).toContain("Getting started");
   expect(useGame.getState().game.campaign!.step).toBe(0); expect(useGame.getState().running).toBe(false);
   cleanup(); useGame.setState(useGame.getInitialState(),true); start(); renderCompany();
   expect(screen.queryByRole("dialog",{name:"Company introduction"})).toBeNull();

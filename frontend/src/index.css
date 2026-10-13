@@ -290,6 +290,7 @@ button:disabled {
 
 .app.is-title .eq-labels,
 .app.is-title .camera-buttons,
+.app.is-title .floor-menu,
 .app.is-title .side {
   display: none;
 }
@@ -700,6 +701,121 @@ button:disabled {
   font-size: 0.74rem;
   font-weight: 700;
   text-align: center;
+}
+
+/*
+ * The floor menu, like an elevator's panel: the office above the server floor, each with its storey number, and the
+ * floor in view lit. It sits over the camera buttons.
+ */
+.floor-menu {
+  position: absolute;
+  left: 12px;
+  bottom: 58px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 25;
+}
+
+.floor-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px 0 5px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--press);
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.floor-button:hover {
+  background: #fff;
+}
+
+.floor-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 0 var(--ink);
+}
+
+.floor-number {
+  display: grid;
+  place-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper-3);
+  font-family: var(--font-num);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.floor-button.is-here {
+  background: var(--go);
+}
+
+.floor-button.is-here .floor-number {
+  color: var(--go);
+  box-shadow: 0 0 6px 1px rgb(255 216 74 / 0.8);
+}
+
+/* Something on a floor out of view needs the player: amber for a warning, red and pulsing for an incident. */
+.floor-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+.floor-badge.tone-alert {
+  background: var(--critical);
+  animation: floor-alert 1s ease-in-out infinite;
+}
+
+@keyframes floor-alert {
+  50% {
+    transform: scale(1.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floor-badge.tone-alert {
+    animation: none;
+  }
+}
+
+/* The view dips as the elevator passes between the floors, with a band of light sweeping past the car. */
+.ride-dip {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(180deg, #0a0816 0%, #0a0816 42%, #2b2648 50%, #0a0816 58%, #0a0816 100%);
+  background-size: 100% 300%;
+}
+
+/* Read by screen readers, not drawn. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Touch screens rotate with two fingers, so the keyboard hint is for mouse users only. */
