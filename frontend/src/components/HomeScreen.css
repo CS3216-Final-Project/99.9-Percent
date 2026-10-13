@@ -181,11 +181,15 @@
   color: var(--on-night-soft);
 }
 
-/* The analytics notice joins the home card, using the same paper surface as the mode cards. */
+/* The analytics notice joins the home card, using the same paper surface as the mode cards, but kept compact:
+   text on the left, OK and Opt out on the right. */
 .consent-panel {
   display: grid;
-  gap: 10px;
-  padding: 20px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "head actions" "text actions";
+  align-items: center;
+  gap: 4px 20px;
+  padding: 12px 16px;
   background: var(--paper);
   color: var(--ink);
   border: 3px solid var(--ink);
@@ -194,22 +198,26 @@
 }
 
 .consent-panel h2 {
+  grid-area: head;
   font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-size: 1.05rem;
+}
+
+/* The game's name in the same logo face as the title above. */
+.consent-logo {
+  font-family: var(--font-logo);
 }
 
 .consent-panel p {
+  grid-area: text;
   margin: 0;
+  font-size: 0.875rem;
 }
 
 .consent-actions {
+  grid-area: actions;
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.consent-actions .btn {
-  min-height: 48px;
+  gap: 8px;
 }
 
 .home-foot {
@@ -244,10 +252,13 @@
     gap: 10px;
   }
   .consent-panel {
-    padding: 16px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "head" "text" "actions";
+    gap: 8px;
   }
-  .consent-actions {
-    display: grid;
+  .consent-actions .btn {
+    flex: 1;
+    min-height: 44px;
   }
   /* A phone shows both Play buttons first; an empty save slot has nothing to say there. */
   .mode-progress.is-empty {

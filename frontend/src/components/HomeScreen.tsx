@@ -48,12 +48,11 @@ function AnalyticsConsentPanel() {
     setConsent(value);
   };
   return <section className="consent-panel" aria-labelledby="analytics-consent-heading">
-    <h2 id="analytics-consent-heading">Help improve 99.99%</h2>
-    <p>We track anonymous gameplay events, like which chapters you finish and how long they take, to help make the game better. We never send account details, URLs, or saved games.</p>
-    <p>If you would rather not share, press Opt out.</p>
+    <h2 id="analytics-consent-heading">Help improve <span className="consent-logo">99.99%</span></h2>
+    <p>We track anonymous gameplay events, like which chapters you finish and how long they take, to help make the game better. We never send account details, URLs, or saved games. If you would rather not share, press Opt out.</p>
     <div className="consent-actions">
-      <button type="button" className="btn" onClick={() => decide("accepted")}><Icon name="check" />OK</button>
-      <button type="button" className="btn" onClick={() => decide("declined")}>Opt out</button>
+      <button type="button" className="btn btn-small btn-primary" onClick={() => decide("accepted")}><Icon name="check" />OK</button>
+      <button type="button" className="btn btn-small btn-danger" onClick={() => decide("declined")}>Opt out</button>
     </div>
   </section>;
 }
