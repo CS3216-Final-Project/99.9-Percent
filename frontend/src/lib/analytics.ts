@@ -87,7 +87,7 @@ export function startProductAnalytics(store: typeof useGame, config = configured
 }
 
 /* ------------------------------------------------------------------ */
-/* Explicit opt-in: PostHog is not loaded until the player says yes.    */
+/* Opt-out: analytics runs unless the player has opted out.            */
 /* ------------------------------------------------------------------ */
 
 export type AnalyticsConsent = "accepted" | "declined" | null;
@@ -121,17 +121,17 @@ export function saveAnalyticsConsent(value: Exclude<AnalyticsConsent, null>): bo
 }
 
 /**
- * Starts product analytics only after an explicit acceptance: no SDK load,
- * observer, timer, listener or storage write happens while consent is missing
- * or declined. A later decline stops everything immediately; a renewed
- * acceptance may start it once again. The returned cleanup stops everything
- * it started.
+ * Starts product analytics unless the player has opted out: an undecided or
+ * accepted choice runs it, while a decline means no SDK load, observer, timer,
+ * listener or storage write. A later decline stops everything immediately; a
+ * renewed acceptance may start it once again. The returned cleanup stops
+ * everything it started.
  */
-export function startConsentedProductAnalytics(store: typeof useGame, config = configuredAnalytics()): () => void {
+export function startProductAnalyticsUnlessOptedOut(store: typeof useGame, config = configuredAnalytics()): () => void {
   let consent = loadAnalyticsConsent();
   let stop: (() => void) | null = null;
   const begin = () => {
-    if (consent === "accepted" && !stop) stop = startProductAnalytics(store, config);
+    if (consent !== "declined" && !stop) stop = startProductAnalytics(store, config);
   };
   const end = () => {
     stop?.();
@@ -141,7 +141,7 @@ export function startConsentedProductAnalytics(store: typeof useGame, config = c
   const onConsent = (event: Event) => {
     const decision = (event as CustomEvent<AnalyticsConsent>).detail;
     consent = decision === "accepted" || decision === "declined" ? decision : loadAnalyticsConsent();
-    if (consent === "accepted") begin(); else end();
+    if (consent === "declined") end(); else begin();
   };
   window.addEventListener(ANALYTICS_CONSENT_EVENT, onConsent);
   return () => {

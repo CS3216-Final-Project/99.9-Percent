@@ -181,7 +181,7 @@
   color: var(--on-night-soft);
 }
 
-/* The analytics opt-in joins the home card, using the same paper surface as the mode cards. */
+/* The analytics notice joins the home card, using the same paper surface as the mode cards. */
 .consent-panel {
   display: grid;
   gap: 10px;

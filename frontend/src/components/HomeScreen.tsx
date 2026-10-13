@@ -39,7 +39,7 @@ const MODES: Record<GameMode, { name: string; icon: IconName; pace: string; abou
   },
 };
 
-/** The analytics opt-in, shown only until the player decides either way. */
+/** The analytics notice, shown only until the player confirms it or opts out. */
 function AnalyticsConsentPanel() {
   const [consent, setConsent] = useState<AnalyticsConsent>(() => loadAnalyticsConsent());
   if (consent !== null) return null;
@@ -49,10 +49,11 @@ function AnalyticsConsentPanel() {
   };
   return <section className="consent-panel" aria-labelledby="analytics-consent-heading">
     <h2 id="analytics-consent-heading">Help improve 99.99%</h2>
-    <p>Share anonymous gameplay events and timing so we can improve the learning experience. We never send account details, URLs, or saved games.</p>
+    <p>We track anonymous gameplay events, like which chapters you finish and how long they take, to help make the game better. We never send account details, URLs, or saved games.</p>
+    <p>If you would rather not share, press Opt out.</p>
     <div className="consent-actions">
-      <button type="button" className="btn btn-primary" onClick={() => decide("accepted")}><Icon name="check" />Allow anonymous analytics</button>
-      <button type="button" className="btn" onClick={() => decide("declined")}>No thanks</button>
+      <button type="button" className="btn" onClick={() => decide("accepted")}><Icon name="check" />OK</button>
+      <button type="button" className="btn" onClick={() => decide("declined")}>Opt out</button>
     </div>
   </section>;
 }
