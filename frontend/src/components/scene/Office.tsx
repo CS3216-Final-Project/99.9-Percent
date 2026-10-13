@@ -23,6 +23,7 @@ import { FURNITURE, PIXEL_FLOORS, ROOM_PALETTE } from "./palette";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
 import { arcadeScreen, carpet, floorTiles, kitchenTiles, logoSign, poster, puffTexture, screenTexture, skyline, skylineDay, whiteboard, zoneName, zzzTexture, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
+import { viewFocus } from "./zoneSounds";
 
 /*
  * Everything around the equipment. It sits on a glass-walled server floor in
@@ -1114,6 +1115,10 @@ preloadModels();
 preloadCreatures();
 
 export function Office({ crew }: { crew: Crew }) {
+  // The zones keep their sounds to themselves during an incident.
+  useEffect(() => {
+    viewFocus.hush = crew.incident;
+  }, [crew.incident]);
   const prims = useMemo(() => buildStatic(), []);
   const models = useMemo(() => buildModels(), []);
   const wall = useMemo(() => buildWallMounted(), []);

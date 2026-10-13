@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMusic } from "./music";
-import { createSfx, CUE_NAMES } from "./sfx";
+import { createSfx, CUE_NAMES, ZONE_CUES } from "./sfx";
 import { loudness } from "./synth";
 import { FakeAudioContext, FakeOfflineAudioContext } from "./testing/fakeAudio";
 
@@ -66,6 +66,38 @@ describe("sound effects", () => {
     sfx.play("buzz");
     expect(ctx.voices).toBe(silent);
     expect(ctx.gains[0].gain.ramps.at(-1)).toBe(0);
+    sfx.dispose();
+  });
+
+  it("play the zones' sounds at their level, but never wake sleeping audio or sound while muted", () => {
+    let t = 0;
+    const sfx = createSfx(() => true, () => t);
+    sfx.setVolume(80);
+    // Before anything has started the audio, a zone sound is dropped rather than starting it.
+    sfx.playZone("foosball", 0.4);
+    expect(FakeAudioContext.made).toHaveLength(0);
+    sfx.play("blip");
+    const ctx = FakeAudioContext.made[0];
+    for (const cue of ZONE_CUES) {
+      t += 10_000;
+      const before = ctx.voices;
+      const gains = ctx.gains.length;
+      sfx.playZone(cue, 0.3);
+      expect(ctx.voices, cue).toBeGreaterThan(before);
+      // The first node a zone sound makes holds it at its level.
+      expect(ctx.gains[gains].gain.value, cue).toBeCloseTo(0.3);
+    }
+    t += 10_000;
+    const quiet = ctx.voices;
+    sfx.playZone("snore", 0);
+    ctx.state = "suspended";
+    sfx.playZone("arcade", 0.3);
+    expect(ctx.voices).toBe(quiet);
+    expect(ctx.state).toBe("suspended");
+    ctx.state = "running";
+    sfx.setVolume(0);
+    sfx.playZone("espresso", 0.3);
+    expect(ctx.voices).toBe(quiet);
     sfx.dispose();
   });
 
