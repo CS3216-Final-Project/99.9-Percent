@@ -38,6 +38,8 @@ export const ROOM_PALETTE = {
     games: "#3f6e72",
     /** The nap room's dark carpet. */
     nap: "#2e3344",
+    /** The quiet room's slate carpet, upstairs from the network room. */
+    quiet: "#56606e",
   },
   /** The server floor's perforated vent tiles, and the holes in them. */
   vent: "#8d9299",
@@ -104,6 +106,7 @@ export const PIXEL_FLOORS = {
   lounge: { base: "#8f8676", fleck: "#817869" },
   games: { base: "#3f6e72", fleck: "#376064" },
   nap: { base: "#2e3344", fleck: "#282c3b" },
+  quiet: { base: "#56606e", fleck: "#4c5562" },
 } as const;
 
 /** A tiled floor's colours at the low-quality look: two alternating tiles and the grout between them. */

@@ -34,6 +34,38 @@ describe('sound settings', () => {
   });
 });
 
+describe('the floor in view', () => {
+  it('goes to the floor of whatever is chosen, records the switch, and stays put when nothing is', () => {
+    useGame.getState().boot();
+    expect(useGame.getState().floor).toBe('servers');
+    useGame.getState().select('growth');
+    expect(useGame.getState().floor).toBe('office');
+    useGame.getState().select(null);
+    expect(useGame.getState().floor).toBe('office');
+    useGame.getState().select('db');
+    expect(useGame.getState().floor).toBe('servers');
+    useGame.getState().goToFloor('servers', 'menu');
+    expect(readAnalytics().filter(e => e.name === 'floor_switched').map(e => e.data)).toEqual([
+      { to: 'office', how: 'select', mode: 'classic' },
+      { to: 'servers', how: 'select', mode: 'classic' },
+    ]);
+  });
+
+  it('is never moved by an incident starting, nor saved with the game', () => {
+    saveGame({ ...newGame(1), users: 4500 });
+    saveMeta({ ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 }, 'classic');
+    useGame.getState().boot();
+    useGame.getState().goToFloor('office', 'key');
+    useGame.getState().advance();
+    expect(useGame.getState().game.phase).toBe('incident');
+    expect(useGame.getState().floor).toBe('office');
+    expect(localStorage.getItem('nn.classic.save.v1')).not.toContain('"floor"');
+    // A new run keeps the floor the player last looked at.
+    useGame.getState().newRun();
+    expect(useGame.getState().floor).toBe('office');
+  });
+});
+
 describe('game lifecycle', () => {
   it('boots idempotently without duplicating runs or analytics', () => {
     useGame.getState().boot();

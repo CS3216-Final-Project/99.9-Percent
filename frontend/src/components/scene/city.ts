@@ -62,15 +62,21 @@ export function gap(a: Rect, b: Rect): number {
 /** The office floor, and the building's upper storeys below it. */
 export const BUILDING: Rect = [ROOM.x0 - 0.25, ROOM.z0 - 0.25, ROOM.x1 + 0.25, ROOM.z1 + 0.25];
 
+/** The company's lower floor, with the servers, a storey below the office: the lowest floor the camera looks into. */
+export const SERVER_FLOOR_Y = -STOREY;
+
 /**
- * Seen from the usual tilt, anything rising h metres above the office floor nearer than about 1.6h would stand in
- * front of the office and hide the crew. Anything below the floor never can.
+ * Seen from the usual tilt, anything rising h metres above the floor in view nearer than about 1.6h would stand in
+ * front of it and hide the crew. Anything below that floor never can.
  */
 export const CLEAR = 1.6;
 
-/** Whether a box standing on `r` and rising to `top` (the office floor is 0) can never hide the office. */
+/**
+ * Whether a box standing on `r` and rising to `top` (the office floor is 0) can never hide the office, nor the
+ * server floor a storey below it.
+ */
 export function clearOfOffice(r: Rect, top: number): boolean {
-  return top <= gap(r, BUILDING) / CLEAR;
+  return top - SERVER_FLOOR_Y <= gap(r, BUILDING) / CLEAR;
 }
 
 export type Facade = "glass" | "ribbon" | "stone" | "fins" | "grid" | "house";
@@ -120,11 +126,14 @@ export const PODIUM_STOREYS = 1;
 /** The building's lobby and café, a storey high and wider than the floors above, with a terrace on its roof. */
 export const PODIUM: Rect = [BUILDING[0] - 7, BUILDING[1] - 6, BUILDING[2] + 7, BUILDING[3] + 6];
 
-/** The startup's building. Its last storey below the office carries the company's sign. */
+/**
+ * The startup's building, up to the company's server floor. That last storey, which carries the company's sign, is
+ * TOP_STOREY: the room drawn in its place when the server floor is in view stands in for it.
+ */
 export const TOWER: Building = {
   masses: [
     { rect: PODIUM, y0: GROUND_Y, y1: GROUND_Y + PODIUM_STOREYS * STOREY },
-    { rect: BUILDING, y0: GROUND_Y + PODIUM_STOREYS * STOREY, y1: SLAB },
+    { rect: BUILDING, y0: GROUND_Y + PODIUM_STOREYS * STOREY, y1: SLAB - STOREY },
   ],
   // A curtain wall: light aluminium mullions and blue-green glass, apart from the darker offices round it.
   facade: "glass",
@@ -137,6 +146,9 @@ export const TOWER: Building = {
   seed: 9,
   crown: null,
 };
+
+/** The office building's top storey under the office, where the servers are, with its lights on behind the glass. */
+export const TOP_STOREY: Building = { ...TOWER, masses: [{ rect: BUILDING, y0: SLAB - STOREY, y1: SLAB }], lit: 0.9 };
 
 /* ------------------------------------------------------------------ */
 /* Roads                                                               */
@@ -278,9 +290,9 @@ function finishFor(top: Rect, storeys: number, rng: RngHolder): Finish {
   return "membrane";
 }
 
-/** Whole storeys a box on `r` may rise to, roof plant included, without ever hiding the office. */
+/** Whole storeys a box on `r` may rise to, roof plant included, without ever hiding the office or the server floor. */
 function storeysAllowed(r: Rect): number {
-  return Math.floor((gap(r, BUILDING) / CLEAR - ROOF_HEADROOM - GROUND_Y) / STOREY);
+  return Math.floor((gap(r, BUILDING) / CLEAR + SERVER_FLOOR_Y - ROOF_HEADROOM - GROUND_Y) / STOREY);
 }
 
 const level = (storeys: number) => GROUND_Y + storeys * STOREY;

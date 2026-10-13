@@ -403,6 +403,33 @@ export function letteredTexture(key: string, w: number, h: number, draw: (g: Can
   return t;
 }
 
+/**
+ * The elevator's floor indicator: the floor's number in amber on black, with an arrow while the car is moving up or
+ * down. Shared, so never disposed.
+ */
+export function liftDisplay(floor: number, arrow: "up" | "down" | null): THREE.CanvasTexture {
+  return letteredTexture(`lift|${floor}|${arrow}`, 128, 64, (g, w, h) => {
+    g.fillStyle = "#0d0e12";
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = "#ffb43d";
+    g.shadowColor = "#ffb43d";
+    g.shadowBlur = 8;
+    g.font = '700 44px "Pixelify Sans", monospace';
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(String(floor), w * 0.64, h / 2 + 3);
+    if (!arrow) return;
+    const x = w * 0.26;
+    const up = arrow === "up";
+    g.beginPath();
+    g.moveTo(x - 13, up ? h / 2 + 9 : h / 2 - 9);
+    g.lineTo(x + 13, up ? h / 2 + 9 : h / 2 - 9);
+    g.lineTo(x, up ? h / 2 - 12 : h / 2 + 12);
+    g.closePath();
+    g.fill();
+  });
+}
+
 /** The size of a speech bubble's canvas; the bubble itself shrinks to fit its line. */
 export const BUBBLE_CANVAS: [number, number] = [384, 108];
 

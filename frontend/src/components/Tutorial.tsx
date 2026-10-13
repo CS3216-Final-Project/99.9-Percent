@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useGame, type TourTrack } from "@/game/store";
+import { floorOf } from "@/game/floors";
+import type { EquipmentId } from "@/sim";
 
 /**
  * Guided walkthroughs. Each step is a goal ("Add a server") plus one short
@@ -79,6 +81,8 @@ const INCIDENT: Step[] = [
     title: "Customers are failing",
     hint: () => "The clock is paused for this guide.",
     target: () => ".incident-clock",
+    // The machines are on the server floor, so the guide starts by riding down to them.
+    enter: (s) => s.goToFloor("servers", "tour"),
   },
   {
     title: "Find the cause",
@@ -184,10 +188,19 @@ export default function Tutorial() {
     if (!step) return;
     let last = "";
     let scrolledFor = "";
+    let floorFor = "";
     const read = () => {
       setViewport((v) => (v.w === window.innerWidth && v.h === window.innerHeight ? v : { w: window.innerWidth, h: window.innerHeight }));
       const sel = step.target(useGame.getState());
       setSelector(sel);
+      // A step pointing at equipment on the other floor takes the view there first; its label appears as the car
+      // arrives. Once only: a player who then rides elsewhere is not pulled back.
+      const eq = /^\.eq-label\[data-eq="([a-zA-Z]+)"\]$/.exec(sel)?.[1] as EquipmentId | undefined;
+      if (eq && floorFor !== sel) {
+        floorFor = sel;
+        const s = useGame.getState();
+        if (floorOf(eq) !== s.floor) s.goToFloor(floorOf(eq), "tour");
+      }
       const el = document.querySelector(sel);
       if (!el) {
         if (last !== "none") {

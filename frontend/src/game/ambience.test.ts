@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createAmbience, dayEvents, LOOP_SECONDS, mix, nightEvents, type Event } from './ambience';
+import { blend, createAmbience, dayEvents, LOOP_SECONDS, mix, nightEvents, type Event } from './ambience';
 
 const kinds = (events: Event[]) => new Set(events.map((e) => e.kind));
 
@@ -58,6 +58,23 @@ describe('crossfading with the dark', () => {
   });
 });
 
+describe('the server floor', () => {
+  it('takes over from the city as the hall is heard, and leaves the city as it was with the office in view', () => {
+    for (const dark of [0, 0.4, 1]) {
+      expect(blend(dark, 0)).toEqual({ ...mix(dark), hall: 0 });
+      const indoors = blend(dark, 1);
+      expect(indoors.hall).toBe(1);
+      expect(indoors.day).toBeCloseTo(0, 9);
+      expect(indoors.night).toBeCloseTo(0, 9);
+    }
+    const half = blend(0, 0.5);
+    expect(half.day).toBeCloseTo(0.5, 9);
+    expect(half.hall).toBe(0.5);
+    expect(blend(0, 3)).toEqual(blend(0, 1));
+    expect(blend(0, -1)).toEqual(blend(0, 0));
+  });
+});
+
 describe('without Web Audio', () => {
   it('stays silent and never throws, as in tests', () => {
     const a = createAmbience(() => true);
@@ -65,6 +82,7 @@ describe('without Web Audio', () => {
       a.setEnabled(true);
       a.setVolume(80);
       a.setDark(0.5);
+      a.setHall(1);
       a.dispose();
     }).not.toThrow();
   });

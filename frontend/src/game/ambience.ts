@@ -3,7 +3,8 @@ import { filter, loudness, onUserGesture, realtimeAudio } from "./synth";
 
 /*
  * The sound of the city outside, under the game: by day birds in the trees, a breeze and the traffic's hum; at night
- * crickets, and quieter traffic with a car going by now and then. Like the music (music.ts), each is synthesised
+ * crickets, and quieter traffic with a car going by now and then. On the server floor the city gives way to the
+ * hall's fans and the hum of its power, louder as the servers work harder. Like the music (music.ts), each is synthesised
  * once, off the main audio thread, into a buffer that plays on repeat, and the two crossfade as it gets dark (see
  * scene/sky.ts). It follows the sound-effects volume, since it is the world's sound rather than the score's, and
  * plays only while a run is on screen. Where the Web Audio API is missing, as in tests, there is none.
@@ -18,6 +19,11 @@ export interface Ambience {
   setVolume(percent: number): void;
   /** How dark it is outside, 0 in broad day to 1 in deep night. */
   setDark(dark: number): void;
+  /**
+   * How much of the server hall is heard instead of the city, 0 with the office in view to 1 on the server floor
+   * under full load, reached over `seconds`.
+   */
+  setHall(level: number, seconds?: number): void;
   dispose(): void;
 }
 
@@ -81,6 +87,13 @@ export function mix(dark: number): { day: number; night: number } {
   const d = Math.min(1, Math.max(0, dark));
   const s = d * d * (3 - 2 * d);
   return { day: Math.cos((s * Math.PI) / 2), night: Math.sin((s * Math.PI) / 2) };
+}
+
+/** How loud the day, the night and the server hall play: the hall takes over from the city as it rises. */
+export function blend(dark: number, hall: number): { day: number; night: number; hall: number } {
+  const h = Math.min(1, Math.max(0, hall));
+  const city = mix(dark);
+  return { day: city.day * (1 - h), night: city.night * (1 - h), hall: h };
 }
 
 type Ctx = BaseAudioContext;
@@ -174,10 +187,11 @@ function play(ctx: Ctx, out: AudioNode, hiss: AudioBuffer, e: Event): void {
 }
 
 /**
- * Synthesise a loop: a bed of low traffic hum, by day a breeze, and the loop's events, brought to an even loudness
- * (`level`, root mean square) so the day and the night sit where they are meant to under the music.
+ * Synthesise a loop: beds of filtered noise (the traffic's hum, by day a breeze, the hall's fans), steady tones (the
+ * hall's mains hum) and the loop's events, brought to an even loudness (`level`, root mean square) so each sits where
+ * it is meant to under the music.
  */
-async function renderAmbience(events: Event[], hum: number, breeze: number, seed: number, level: number): Promise<AudioBuffer> {
+async function renderAmbience(events: Event[], beds: Bed[], tones: Tone[], seed: number, level: number): Promise<AudioBuffer> {
   const length = Math.round(LOOP_SECONDS * RATE);
   const ctx = new OfflineAudioContext(1, length, RATE);
   const rng: RngHolder = { rngState: seed };
@@ -190,8 +204,16 @@ async function renderAmbience(events: Event[], hum: number, breeze: number, seed
     g.gain.value = gain;
     source(ctx, hiss).connect(filter(ctx, type, hz)).connect(g).connect(bus);
   };
-  bed(hum, "lowpass", 220);
-  bed(breeze, "highpass", 2500);
+  for (const [type, hz, gain] of beds) bed(gain, type, hz);
+  for (const [hz, gain] of tones) {
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    const o = ctx.createOscillator();
+    o.frequency.value = hz;
+    o.connect(g).connect(bus);
+    o.start(0);
+    o.stop(LOOP_SECONDS);
+  }
   for (const e of events) play(ctx, bus, hiss, e);
   const out = await ctx.startRendering();
   const data = out.getChannelData(0);
@@ -209,19 +231,27 @@ async function renderAmbience(events: Event[], hum: number, breeze: number, seed
   return out;
 }
 
-/** Each loop's events, the loudness of its traffic hum and its breeze, the seed of its noise, and its overall level. */
-const LOOPS = {
-  day: { events: dayEvents, hum: 0.05, breeze: 0.012, seed: 71, level: 0.09 },
-  night: { events: nightEvents, hum: 0.03, breeze: 0, seed: 73, level: 0.06 },
-} as const;
+/** A bed of noise through a filter: its type, frequency and loudness. */
+type Bed = [BiquadFilterType, number, number];
+/** A steady tone: its frequency and loudness. */
+type Tone = [number, number];
 
-/** Synthesise the day's loop or the night's. */
+/** Each loop's events, beds and tones, the seed of its noise, and its overall level. */
+const LOOPS: Record<"day" | "night" | "hall", { events: () => Event[]; beds: Bed[]; tones: Tone[]; seed: number; level: number }> = {
+  // The traffic's low hum, and by day a breeze in the trees.
+  day: { events: dayEvents, beds: [["lowpass", 220, 0.05], ["highpass", 2500, 0.012]], tones: [], seed: 71, level: 0.09 },
+  night: { events: nightEvents, beds: [["lowpass", 220, 0.03]], tones: [], seed: 73, level: 0.06 },
+  // The racks' fans as a broad whir over the cooling units' rumble, and the mains hum with its harmonics.
+  hall: { events: () => [], beds: [["bandpass", 900, 0.07], ["lowpass", 260, 0.05]], tones: [[100, 0.02], [200, 0.008], [300, 0.004]], seed: 79, level: 0.08 },
+};
+
+/** Synthesise the day's loop, the night's or the server hall's. */
 export function renderAmbienceLoop(which: keyof typeof LOOPS): Promise<AudioBuffer> {
   const l = LOOPS[which];
-  return renderAmbience(l.events(), l.hum, l.breeze, l.seed, l.level);
+  return renderAmbience(l.events(), l.beds, l.tones, l.seed, l.level);
 }
 
-const SILENT: Ambience = { setEnabled() {}, setVolume() {}, setDark() {}, dispose() {} };
+const SILENT: Ambience = { setEnabled() {}, setVolume() {}, setDark() {}, setHall() {}, dispose() {} };
 
 /** `wanted` says whether the player has effects on, so a click can start the audio before the game asks for it. */
 export function createAmbience(wanted: () => boolean = () => false): Ambience {
@@ -233,10 +263,12 @@ export function createAmbience(wanted: () => boolean = () => false): Ambience {
   let master: GainNode | null = null;
   let day: GainNode | null = null;
   let night: GainNode | null = null;
+  let hall: GainNode | null = null;
   const sources: AudioBufferSourceNode[] = [];
   let enabled = false;
   let percent = 0;
   let dark = 0;
+  let indoors = 0;
   let disposed = false;
   let sleep = 0;
 
@@ -261,17 +293,21 @@ export function createAmbience(wanted: () => boolean = () => false): Ambience {
     master = c.createGain();
     master.gain.value = 0;
     master.connect(c.destination);
-    const lanes = mix(dark);
+    const lanes = blend(dark, indoors);
     day = c.createGain();
     day.gain.value = lanes.day;
     day.connect(master);
     night = c.createGain();
     night.gain.value = lanes.night;
     night.connect(master);
+    hall = c.createGain();
+    hall.gain.value = lanes.hall;
+    hall.connect(master);
     (async () => {
       for (const [lane, which] of [
         [day, "day"],
         [night, "night"],
+        [hall, "hall"],
       ] as const) {
         const buffer = await renderAmbienceLoop(which);
         if (disposed || ctx !== c) return;
@@ -315,9 +351,17 @@ export function createAmbience(wanted: () => boolean = () => false): Ambience {
     },
     setDark(next) {
       dark = next;
-      const lanes = mix(next);
+      const lanes = blend(next, indoors);
       if (day) ramp(day.gain, lanes.day, 2);
       if (night) ramp(night.gain, lanes.night, 2);
+    },
+    setHall(level, seconds = 1.2) {
+      if (Math.abs(level - indoors) < 1e-3) return;
+      indoors = level;
+      const lanes = blend(dark, level);
+      if (day) ramp(day.gain, lanes.day, seconds);
+      if (night) ramp(night.gain, lanes.night, seconds);
+      if (hall) ramp(hall.gain, lanes.hall, seconds);
     },
     dispose() {
       disposed = true;
@@ -333,7 +377,7 @@ export function createAmbience(wanted: () => boolean = () => false): Ambience {
       sources.length = 0;
       ctx?.close().catch(() => {});
       ctx = null;
-      master = day = night = null;
+      master = day = night = hall = null;
     },
   };
 }
