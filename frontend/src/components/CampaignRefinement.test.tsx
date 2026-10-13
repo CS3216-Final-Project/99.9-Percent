@@ -77,13 +77,15 @@ it("system evidence records a real free inspection without advancing the clock",
   expect(screen.getByRole("region",{name:"Tech tree"}).textContent).toContain("Owned does not mean deployed");
   fireEvent.click(screen.getByRole("button",{name:"Close"})); expect(useGame.getState().running).toBe(false);
 });
-it("shows paid-now cash, delayed upkeep and routing limitation before adding an App Server", () => {
+it("shows what the machine does, paid-now cash, delayed upkeep and routing limitation only when adding an App Server", () => {
   start(); renderCompany(); skip();
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
-  expect(card.textContent).not.toContain("Another App Server");
-  fireEvent.click(within(card as HTMLElement).getByText("Effect & costs"));
-  expect(card.textContent).toContain("$19,000"); expect(card.textContent).toContain("$700 / 60s");
-  expect(card.textContent).toContain("No refund or undo");
+  expect(card.textContent).not.toContain("$700 / 60s"); expect(screen.queryByText("Effect & costs")).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:/Add server/}));
+  const confirm=screen.getByRole("region",{name:"Confirm Add server"});
+  expect(confirm.textContent).toContain("App Servers run the product"); expect(confirm.textContent).toContain("does not receive traffic");
+  expect(confirm.textContent).toContain("$19,000"); expect(confirm.textContent).toContain("$700 / 60s");
+  expect(confirm.textContent).toContain("No refund or undo");
   expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
 });
 it("asks for confirmation before an action is dispatched, and Cancel or Escape leaves the company unchanged", () => {
@@ -120,6 +122,7 @@ it("traffic-limit warning explains rejection without inventing extra charges or 
 it("Scale Up describes the selected server rather than implying another installed instance", () => {
   useGame.setState({game:dataCompany(),ready:true,started:true,onboarding:false,selectedAppId:"app-1"});
   render(<CampaignAction label="Scale up App 1" price={2000} note="3 steps" onClick={()=>{}}/>);
+  fireEvent.click(screen.getByRole("button",{name:/Scale up App 1/}));
   expect(screen.queryByText(/Makes this App Server larger/)).toBeNull();
   expect(screen.getByText("Total upkeep").closest(".row")!.textContent).toContain("$1,100 / 60s (+$400)");
 });
@@ -146,4 +149,10 @@ it("keeps the affected machine lit while its confirmation is open, and clears it
   expect(useGame.getState().affected).toEqual(["db"]);
   fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
   expect(useGame.getState().affected).toEqual([]);
+});
+it("opening an action's confirmation from the office floor rides to the floor of the machine it changes", () => {
+  start(); renderCompany(); skip(); useGame.setState({floor:"office"});
+  fireEvent.click(screen.getByRole("button",{name:/Upgrade database/}));
+  expect(useGame.getState().floor).toBe("servers");
+  expect(screen.getByRole("region",{name:"Confirm Upgrade database"}).textContent).toContain("The database stores");
 });
