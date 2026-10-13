@@ -27,7 +27,7 @@ for(const path of ["vertical","horizontal"] as const)test(`scaling continuation:
   expect((await savedGame(page)).campaign!.routing.mode).toBe("single");
   await page.getByText("Configure routing · single",{exact:true}).click();
   await page.getByRole("button",{name:"Balance across installed apps"}).click();
- }else await page.getByRole("button",{name:/Scale up App 1/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
+ }else{await page.getByRole("button",{name:/Scale up App 1/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();}
  await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
  if(path==="horizontal")expect((await savedGame(page)).campaign!.snapshot.instances!.map(a=>a.demand)).toEqual([700,700]);
