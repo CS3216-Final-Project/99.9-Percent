@@ -256,6 +256,7 @@ describe("watching the store", () => {
     // A saved campaign that is mid-incident, a classic run mid-incident and a pre-update save with music off.
     saveGame(advanceSteps(newGame(1, "saved"), 6).state);
     saveMeta({ ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true }, "classic");
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
     const classic = copy(overload());
     saveClassicGame(classic);
     localStorage.setItem("nn.save.v1", JSON.stringify({ savedAt: 1, game: copy(advanceTurn(newLegacyGame(7))) }));
@@ -323,6 +324,7 @@ describe("watching the store", () => {
   });
 
   it("plays the classic decisions and the slider sample, and stops when asked", async () => {
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
     saveMode("classic");
     saveMeta({ ...DEFAULT_META, tutorialDone: true }, "classic");
     const s = () => useGame.getState();
@@ -397,6 +399,7 @@ describe("watching the store", () => {
   });
 
   it("launches a classic run on Play and a restarted tutorial once, but not a resumed week", async () => {
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
     saveMode("classic");
     const s = () => useGame.getState();
     s().boot();
@@ -425,6 +428,7 @@ describe("watching the store", () => {
   });
 
   it("launches when switching into a mode with no company yet, in either mode", async () => {
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
     saveMode("classic");
     const s = () => useGame.getState();
     s().boot();
@@ -444,6 +448,7 @@ describe("watching the store", () => {
     expect(heard).toEqual([]);
     // With no saved run in the mode being entered, the switch starts a company.
     localStorage.clear();
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
     saveMode("classic");
     expect(s().switchMode("campaign", { discard: true })).toBe(true);
     await settle();
@@ -480,6 +485,7 @@ describe("watching the store", () => {
   });
 
   it("marks the end of the classic walkthrough, but not its steps or a skip", async () => {
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
     saveMode("classic");
     const s = () => useGame.getState();
     s().boot();

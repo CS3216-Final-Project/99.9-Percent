@@ -26,10 +26,15 @@ test("optional product analytics observes Play and survives reload with no title
   });
   await page.clock.install();
   await page.goto("/?test_secret=not-for-analytics");
-  await expect(page.getByRole("button", { name: "Play Campaign" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start Guided Mode" })).toBeVisible();
+  // Nothing reaches PostHog before the player explicitly opts in.
+  expect(captured).toEqual([]);
+  expect(await page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith("ph_")))).toBe(false);
+  await page.getByRole("button", { name: "Allow anonymous analytics" }).click();
+  expect(await page.evaluate(() => localStorage.getItem("nn.analytics-consent.v1"))).toBe("accepted");
   expect(captured.filter(e => e.event === "gameplay_run_started")).toHaveLength(0);
   if (enabled) await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith("ph_phc_test")))).toBe(true);
-  await page.getByRole("button", { name: "Play Campaign" }).click();
+  await page.getByRole("button", { name: "Start Guided Mode" }).click();
   await page.getByRole("button", { name: "Skip introduction" }).click();
   await page.clock.runFor(20_000);
   if (enabled) {
@@ -51,4 +56,21 @@ test("optional product analytics observes Play and survives reload with no title
     expect(captured).toEqual([]);
     expect(await page.evaluate(() => localStorage.getItem("nn.product-analytics.v1"))).toBeNull();
   }
+});
+
+test("the analytics choice is asked once and remembered", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  const posthog: string[] = [];
+  await page.route("https://us.i.posthog.com/**", route => { posthog.push(route.request().url()); return route.abort(); });
+  await page.goto("/");
+  const panel = page.getByRole("region", { name: "Help improve 99.99%" });
+  await expect(panel).toContainText("We never send account details, URLs, or saved games.");
+  await page.getByRole("button", { name: "No thanks" }).click();
+  await expect(panel).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("nn.analytics-consent.v1"))).toBe("declined");
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Help improve 99.99%" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Start Guided Mode" }).click();
+  await page.getByRole("button", { name: "Skip introduction" }).click();
+  expect(posthog).toEqual([]);
 });

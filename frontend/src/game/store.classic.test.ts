@@ -5,6 +5,7 @@ import { useGame } from './store';
 
 beforeEach(() => {
   localStorage.clear();
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
   saveMode('classic');
   useGame.setState(useGame.getInitialState(), true);
 });

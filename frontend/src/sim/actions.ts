@@ -78,7 +78,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
   switch (action.type) {
     case "acknowledge_prevention_review":
     case "acknowledge_milestone":
-    case "set_traffic_limit": return fail("invalid", "Campaign action only.");
+    case "set_traffic_limit": return fail("invalid", "Guided Mode action only.");
     case "launch_promotion": {
       const def = PROMOS[action.promo];
       if (!def) return fail("invalid", "Unknown promotion.");
@@ -384,6 +384,6 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (prev.phase !== "review") return fail("wrong_phase", "There is nothing to review.");
       return ok(acknowledgeReview(prev));
     }
-    default: return fail("invalid", "This action requires the continuous campaign.");
+    default: return fail("invalid", "This action requires Guided Mode.");
   }
 }

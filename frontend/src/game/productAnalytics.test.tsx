@@ -32,7 +32,7 @@ it("counts actual Campaign play once under StrictMode, never the title screen", 
   render(<StrictMode><App /></StrictMode>);
   reactAct(() => vi.advanceTimersByTime(HEARTBEAT_MS));
   expect(events).toEqual([]);
-  fireEvent.click(screen.getByRole("button", { name: "Play Campaign" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   useGame.getState().play();
   expect(named("gameplay_run_started")).toHaveLength(1);
   expect(named("gameplay_session_started")).toHaveLength(1);
@@ -90,6 +90,7 @@ it("keeps the run ID and total across reload but starts a new gameplay session",
 });
 
 it("gives Classic stable run identity across reloads and distinct IDs for replays", () => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
   saveMode("classic"); watch(); play();
   const first = named("gameplay_run_started")[0].properties.run_id;
   stop(); useGame.setState(useGame.getInitialState(), true); watch(); play();
@@ -101,6 +102,7 @@ it("gives Classic stable run identity across reloads and distinct IDs for replay
 });
 
 it("tracks the end of Classic independently from Campaign chapters and marks a subsequent replay", () => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
   saveMode("classic"); watch(); play();
   const game = { ...useGame.getState().game, outcome: "won" as const, phase: "ended" as const };
   useGame.setState({ game });
@@ -169,6 +171,7 @@ it("restarts a session on back/forward cache restoration without starting anothe
 });
 
 it("handles switching modes and keeps Classic imports out of the new-run cohort", () => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
   watch(); play();
   useGame.getState().switchMode("classic");
   expect(named("gameplay_session_ended")[0].properties.mode).toBe("campaign");
@@ -206,6 +209,7 @@ it("ignores malformed analytics storage, storage failures and a throwing collect
 });
 
 it("does not treat opening a previously finished Classic save as a completion", () => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
   saveMode("classic");
   saveClassicGame({ ...newLegacyGame(2), outcome: "won", phase: "ended" });
   saveMeta({ ...DEFAULT_META, runsStarted: 1 }, "classic");

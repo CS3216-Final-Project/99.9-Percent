@@ -2,7 +2,7 @@ import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import {useGame} from './store';
 import {localCloudCopy,rememberCloud} from './cloud';
 import {makeEnvelope,validateEnvelope} from './saveEnvelope';
-import {loadClassicGame,loadGame,rawSave,saveMode} from './persist';
+import {loadClassicGame,loadGame,rawSave,saveMode,saveMeta,DEFAULT_META} from './persist';
 import {newGame,newLegacyGame} from '../sim';
 import * as api from '../lib/api';
 vi.mock('../lib/api',async original=>{const actual=await original<typeof import('../lib/api')>();return {...actual,getSession:vi.fn(),listRuns:vi.fn(),getRun:vi.fn(),putRun:vi.fn(),logout:vi.fn(),emailLogin:vi.fn(),emailRegister:vi.fn()};});
@@ -142,7 +142,7 @@ it('returns email sign-in errors to the form and stays a guest',async()=>{
 });
 it('loads a cloud save from the home screen while Classic is active, keeping the Classic game',async()=>{
   await useGame.getState().restoreAccount();const local=current();
-  saveMode('classic');useGame.setState(useGame.getInitialState(),true);useGame.getState().boot();
+  saveMeta({...DEFAULT_META,challengeUnlocked:true});saveMode('classic');useGame.setState(useGame.getInitialState(),true);useGame.getState().boot();
   const classic={...newLegacyGame(3),turn:6};useGame.setState({game:classic});
   vi.mocked(api.getSession).mockResolvedValue(a);await useGame.getState().restoreAccount();
   const e=makeEnvelope(newGame(8,'remote-from-classic'),120);vi.mocked(api.getRun).mockResolvedValue({runId:e.runId,revision:4,envelope:e,updatedAt:'now'});

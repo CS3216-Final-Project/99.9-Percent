@@ -108,7 +108,7 @@ function SignIn({ Heading }: { Heading: HeadingTag }) {
   const prepareSignIn = useGame((s) => s.prepareSignIn);
   const restoreAccount = useGame((s) => s.restoreAccount);
   return <div className="account-signin">
-    <p className="account-lede">Sign in to save your Campaign to the cloud and continue it on another device. Without an account, progress saves in this browser.</p>
+    <p className="account-lede">Sign in to save your Guided Mode company to the cloud and continue it on another device. Without an account, progress saves in this browser.</p>
     {status === "unavailable"
       ? <Callout compact tone="warn" icon="alert" kicker="Accounts offline" live="status"
           action={<button type="button" className="btn btn-small" onClick={() => void restoreAccount()}>Try again</button>}>
@@ -251,12 +251,12 @@ function CloudSaves({ onLoaded, Heading }: { onLoaded?: () => void; Heading: Hea
 
     <Heading className="cloud-heading"><Icon name="save" size={20} />This browser</Heading>
     {s.mode === "classic"
-      ? <p className="cloud-note">Cloud saves are for Campaign. Classic progress stays in this browser.</p>
+      ? <p className="cloud-note">Cloud saves are for Guided Mode. Challenge Mode progress stays in this browser.</p>
       : !local
-        ? <p className="cloud-note">No Campaign game in this browser yet. Start one, or load a cloud save below.</p>
+        ? <p className="cloud-note">No Guided Mode game in this browser yet. Start one, or load a cloud save below.</p>
         : <div className="cloud-row">
             <div className="cloud-row-text">
-              <strong>Campaign save</strong>
+              <strong>Guided Mode save</strong>
               <span>{owner && !mismatch ? `In the cloud as version ${revision}` : "Not saved to the cloud yet"}</span>
             </div>
             <button type="button" className="btn btn-primary btn-small" disabled={s.cloudBusy || mismatch || ownershipError || s.saveBlocked || hasConflict} onClick={() => void save()}>
@@ -286,11 +286,11 @@ function CloudSaves({ onLoaded, Heading }: { onLoaded?: () => void; Heading: Hea
           {s.cloudRuns.map((run) => <CloudRunRow key={run.runId} run={run} current={run.runId === local} busy={s.cloudBusy} onLoad={() => void load(run.runId)} />)}
         </ul>
       : <p className="cloud-note">{{ loading: "Looking for your cloud saves…", listed: "No cloud saves yet.", failed: "Your cloud saves could not be listed. Choose Refresh to try again." }[listing]}</p>}
-    {s.cloudRuns.length > 0 && <p className="cloud-note">Loading a cloud save replaces this browser’s Campaign save. A backup copy of it is kept first.</p>}
+    {s.cloudRuns.length > 0 && <p className="cloud-note">Loading a cloud save replaces this browser’s Guided Mode save. A backup copy of it is kept first.</p>}
 
     <details className="more cloud-backup">
       <summary>Backup</summary>
-      <p className="cloud-note">Download every Campaign copy this browser holds, including cloud copies and unresolved versions.</p>
+      <p className="cloud-note">Download every Guided Mode copy this browser holds, including cloud copies and unresolved versions.</p>
       <button type="button" className="btn btn-small" onClick={download}><Icon name="download" size={20} />Download backup</button>
     </details>
   </div>;
@@ -300,7 +300,7 @@ function CloudRunRow({ run, current, busy, onLoad }: { run: RunSummary; current:
   const when = savedAt(run.updatedAt);
   return <li className="cloud-row">
     <div className="cloud-row-text">
-      <strong>{current ? "Campaign save (this game)" : "Campaign save"}</strong>
+      <strong>{current ? "Guided Mode save (this game)" : "Guided Mode save"}</strong>
       <span>Saved {when} · version {run.revision}</span>
     </div>
     <button type="button" className="btn btn-small" disabled={busy} aria-label={`Load cloud save from ${when}`} onClick={onLoad}>

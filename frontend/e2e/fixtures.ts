@@ -36,9 +36,25 @@ export async function seedSave(page: Page, game: GameState) {
     // Only create the fixture once; a reload must exercise the real saved state.
     if (localStorage.getItem('nn.campaign.save.v1') === null) {
       localStorage.setItem('nn.campaign.save.v1', save);
-      localStorage.setItem('nn.campaign.meta.v1', JSON.stringify(meta));
+      // Keep fields a companion fixture (for example the Challenge Mode unlock) already wrote.
+      let earlier: Record<string, unknown> = {};
+      try { const parsed = JSON.parse(localStorage.getItem('nn.campaign.meta.v1') ?? '{}'); if (parsed && typeof parsed === 'object') earlier = parsed; } catch { /* defaults below */ }
+      localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ ...earlier, ...meta }));
     }
   }, { save: JSON.stringify(makeEnvelope(game)), meta: { ...DEFAULT_META, openingOnboarding:{version:1,step:2,status:"completed"}, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 } });
+}
+
+/**
+ * Marks Challenge Mode as unlocked in the campaign profile, the way a finished
+ * Guided Mode run leaves it. Apply before navigation in any journey that starts
+ * or switches to Challenge Mode; it merges, so seed order does not matter.
+ */
+export async function unlockChallenge(page: Page) {
+  await page.addInitScript(defaults => {
+    let meta: Record<string, unknown> = {};
+    try { const parsed = JSON.parse(localStorage.getItem('nn.campaign.meta.v1') ?? '{}'); if (parsed && typeof parsed === 'object') meta = parsed; } catch { /* defaults below */ }
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ ...defaults, ...meta, challengeUnlocked: true }));
+  }, DEFAULT_META);
 }
 
 /** The company the stored save replays to, decoded the same way the game loads it. */

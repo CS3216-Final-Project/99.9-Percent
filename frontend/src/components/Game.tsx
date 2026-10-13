@@ -79,7 +79,7 @@ function TopBar() {
           icon={health.icon}
           kind={health.tone === "ok" ? "health" : health.tone}
           label="Health"
-          tip="Uptime is the share of requests served across the whole run. 99.99% allows about 26 minutes of downtime in this campaign."
+          tip="Uptime is the share of requests served across the whole run. 99.99% allows about 26 minutes of downtime in this company."
         >
           <strong>{health.word}</strong>
           <span className="muted">{uptimePct(m.uptime)}</span>

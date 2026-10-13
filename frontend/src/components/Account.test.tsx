@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { newGame } from "@/sim";
 import { makeEnvelope } from "@/game/saveEnvelope";
+import { DEFAULT_META, saveMeta } from "@/game/persist";
 import { useGame } from "@/game/store";
 import * as api from "@/lib/api";
 import { AccountButton, AccountSection } from "./Account";
@@ -119,7 +120,7 @@ it("lists cloud saves once signed in, loads one and closes, and signs out", asyn
   render(<StrictMode><AccountButton /></StrictMode>);
   fireEvent.click(await screen.findByRole("button", { name: /Ada Lovelace/ }));
   const dialog = screen.getByRole("dialog", { name: "Account" });
-  expect(within(dialog).getByText(/No Campaign game in this browser yet/)).toBeTruthy();
+  expect(within(dialog).getByText(/No Guided Mode game in this browser yet/)).toBeTruthy();
   const row = (await within(dialog).findByText(/version 3/)).closest("li")!;
   expect(api.listRuns).toHaveBeenCalledTimes(1);
   fireEvent.click(within(row).getByRole("button", { name: /^Load cloud save from/ }));
@@ -129,7 +130,7 @@ it("lists cloud saves once signed in, loads one and closes, and signs out", asyn
 
   fireEvent.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
   const reopened = screen.getByRole("dialog", { name: "Account" });
-  expect(await within(reopened).findByText("Campaign save (this game)")).toBeTruthy();
+  expect(await within(reopened).findByText("Guided Mode save (this game)")).toBeTruthy();
   fireEvent.click(within(reopened).getByRole("button", { name: "Sign out" }));
   expect(await screen.findByRole("link", { name: "Continue with Google" })).toBeTruthy();
   expect(useGame.getState().game.campaign!.runId).toBe("cloud-company");
@@ -147,10 +148,11 @@ it("does not claim the account is empty when its cloud saves cannot be listed", 
   expect(await screen.findByText("No cloud saves yet.")).toBeTruthy();
 });
 
-it("explains in Menu, Saves that Classic progress stays in this browser", async () => {
+it("explains in Menu, Saves that Challenge Mode progress stays in this browser", async () => {
   vi.mocked(api.getSession).mockResolvedValue(ada);
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
   useGame.getState().switchMode("classic");
   render(<StrictMode><AccountSection /></StrictMode>);
-  expect(await screen.findByText("Cloud saves are for Campaign. Classic progress stays in this browser.")).toBeTruthy();
+  expect(await screen.findByText("Cloud saves are for Guided Mode. Challenge Mode progress stays in this browser.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Save to cloud" })).toBeNull();
 });

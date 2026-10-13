@@ -181,6 +181,37 @@
   color: var(--on-night-soft);
 }
 
+/* The analytics opt-in joins the home card, using the same paper surface as the mode cards. */
+.consent-panel {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--lift);
+}
+
+.consent-panel h2 {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+}
+
+.consent-panel p {
+  margin: 0;
+}
+
+.consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.consent-actions .btn {
+  min-height: 48px;
+}
+
 .home-foot {
   display: flex;
   flex-wrap: wrap;
@@ -211,6 +242,12 @@
   .mode-option {
     padding: 16px;
     gap: 10px;
+  }
+  .consent-panel {
+    padding: 16px;
+  }
+  .consent-actions {
+    display: grid;
   }
   /* A phone shows both Play buttons first; an empty save slot has nothing to say there. */
   .mode-progress.is-empty {
