@@ -21,7 +21,7 @@ import { ARCADE_SCREEN, MAC, MAC_COLOUR_NAMES, type PropItem } from "./propModel
 import { DetailedProps } from "./props";
 import { FURNITURE, PIXEL_FLOORS, ROOM_PALETTE } from "./palette";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
-import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, skylineDay, whiteboard, zoneName, type PosterKind, type ScreenKind } from "./textures";
+import { arcadeScreen, carpet, floorTiles, kitchenTiles, logoSign, poster, puffTexture, screenTexture, skyline, skylineDay, whiteboard, zoneName, zzzTexture, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
 
 /*
@@ -118,6 +118,9 @@ function pingPong(): Prim[] {
     ...[-1.1, 1.1].flatMap((dx) => [-0.6, 0.6].map((dz) => bx([dx, 0.37, dz], [0.07, 0.74, 0.07], TRIM))),
   ];
 }
+
+/** The top of the mug under the espresso machine, where its steam rises from. */
+const ESPRESSO_MUG: V3 = [17.31, 0.96, -8.91];
 
 /** How high a nap pod's mattress is, where its sleeper lies. */
 const NAP_MATTRESS = 0.56;
@@ -854,6 +857,93 @@ function ZoneNames() {
   );
 }
 
+/** Seconds a "z" takes to drift up from the sleeper and fade, and how many are in the air at once. */
+const ZZZ = { period: 3.6, count: 3 };
+
+/** A sleeper's "z"s, drifting up and away one after another from just above their head. */
+function Zzz({ position }: { position: V3 }) {
+  const materials = useMemo(() => Array.from({ length: ZZZ.count }, () => new THREE.SpriteMaterial({ map: zzzTexture(), transparent: true, depthWrite: false })), []);
+  useEffect(() => () => materials.forEach((m) => m.dispose()), [materials]);
+  const sprites = useRef<(THREE.Sprite | null)[]>([]);
+  useFrame(({ clock }) => {
+    sprites.current.forEach((sprite, i) => {
+      if (!sprite) return;
+      const phase = (clock.elapsedTime / ZZZ.period + i / ZZZ.count) % 1;
+      sprite.position.set(position[0] - phase * 0.25, position[1] + phase * 0.7, position[2]);
+      const size = 0.2 + phase * 0.22;
+      sprite.scale.set(size, size, 1);
+      sprite.material.opacity = Math.sin(phase * Math.PI);
+    });
+  });
+  return (
+    <group>
+      {materials.map((m, i) => (
+        <sprite
+          key={i}
+          ref={(el) => {
+            sprites.current[i] = el;
+          }}
+          material={m}
+          raycast={ignoreRay}
+        />
+      ))}
+    </group>
+  );
+}
+
+/** Wisps of steam rising from the mug under the espresso machine, each fading as it climbs. */
+function Steam({ position }: { position: V3 }) {
+  // Brighter than the lit room, so the wisps show against the pale kitchen wall behind them.
+  const materials = useMemo(() => Array.from({ length: 4 }, () => new THREE.SpriteMaterial({ map: puffTexture(), color: new THREE.Color(1.25, 1.3, 1.35), transparent: true, depthWrite: false, toneMapped: false })), []);
+  useEffect(() => () => materials.forEach((m) => m.dispose()), [materials]);
+  const sprites = useRef<(THREE.Sprite | null)[]>([]);
+  useFrame(({ clock }) => {
+    sprites.current.forEach((sprite, i) => {
+      if (!sprite) return;
+      // Each wisp climbs clear of the machine's top before it fades.
+      const phase = (clock.elapsedTime / 3 + i / 4) % 1;
+      sprite.position.set(position[0] + Math.sin(phase * 5 + i) * 0.04, position[1] + phase * 0.6, position[2]);
+      const size = 0.06 + phase * 0.2;
+      sprite.scale.set(size, size, 1);
+      sprite.material.opacity = 0.75 * Math.sin(phase * Math.PI);
+    });
+  });
+  return (
+    <group>
+      {materials.map((m, i) => (
+        <sprite
+          key={i}
+          ref={(el) => {
+            sprites.current[i] = el;
+          }}
+          material={m}
+          raycast={ignoreRay}
+        />
+      ))}
+    </group>
+  );
+}
+
+/** An arcade cabinet's screen playing its attract mode, eight frames a second. */
+function ArcadeScreen({ variant, x }: { variant: string; x: number }) {
+  const game = useMemo(() => arcadeScreen(variant), [variant]);
+  useEffect(() => () => game.texture.dispose(), [game]);
+  const shown = useRef(-1);
+  useFrame(({ clock }) => {
+    const frame = Math.floor(clock.elapsedTime * 8);
+    if (frame === shown.current) return;
+    shown.current = frame;
+    game.draw(frame);
+  });
+  const rotation = useMemo(() => new THREE.Euler(ARCADE_SCREEN.tilt, 0, 0, "YXZ"), []);
+  return (
+    <mesh position={[x, ARCADE_SCREEN.y, ARCADE_Z + ARCADE_SCREEN.z]} rotation={rotation}>
+      <planeGeometry args={[ARCADE_SCREEN.w, ARCADE_SCREEN.h]} />
+      <meshBasicMaterial map={game.texture} toneMapped={false} />
+    </mesh>
+  );
+}
+
 /** Red beacon above the monitoring wall that spins up during an incident. */
 function Beacon({ on }: { on: boolean }) {
   const lamp = useRef<THREE.MeshStandardMaterial>(null);
@@ -999,8 +1089,8 @@ function Staff({ crew }: { crew: Crew }) {
       <Creature pose="sit" activity="laptop" species={creature(40, "data")} position={[SPOTS.townhallReader.x, 0, SPOTS.townhallReader.z]} rotation={SPOTS.townhallReader.rot} phase={11} seat={0.8} />
       <ScreenPlane kind="slides" w={2.1} h={1.12} position={[-14.35, 1.5, 4.5]} rot={-Math.PI / 2} />
       <ScreenPlane kind="game" w={loungeTv.w} h={loungeTv.h} position={loungeTv.position} rot={Math.PI / 2} />
-      {ARCADES.map(([, x]) => (
-        <ScreenPlane key={x} kind="game" w={ARCADE_SCREEN.w} h={ARCADE_SCREEN.h} position={[x, ARCADE_SCREEN.y, ARCADE_Z + ARCADE_SCREEN.z]} tilt={ARCADE_SCREEN.tilt} />
+      {ARCADES.map(([variant, x]) => (
+        <ArcadeScreen key={x} variant={variant} x={x} />
       ))}
 
       {/* Small groups chatting, and crew wandering the office on loops of their own */}
@@ -1047,6 +1137,8 @@ export function Office({ crew }: { crew: Crew }) {
       <Creature species="ninja" activity="type" position={[SPOTS.foosballSouth.x, 0, SPOTS.foosballSouth.z]} rotation={SPOTS.foosballSouth.rot} phase={4} />
       <Creature species="cat" activity="type" position={[SPOTS.foosballNorth.x, 0, SPOTS.foosballNorth.z]} rotation={SPOTS.foosballNorth.rot} phase={9} />
       <Creature species="pinkSlime" pose="sit" activity="doze" position={[SPOTS.napper.x, 0, SPOTS.napper.z]} rotation={SPOTS.napper.rot} phase={3} seat={NAP_MATTRESS} />
+      <Zzz position={[SPOTS.napper.x, NAP_MATTRESS + 0.75, SPOTS.napper.z]} />
+      <Steam position={ESPRESSO_MUG} />
 
       <OnWall wall="left">
         <PrimBatch prims={wall.leftPrims} shadows={false} />

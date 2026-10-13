@@ -637,6 +637,99 @@ export function zoneName(name: string): THREE.CanvasTexture {
   return t;
 }
 
+let puff: THREE.CanvasTexture | null = null;
+
+/** A soft round puff, white in the middle and gone at the edge: a wisp of steam. Shared, so never disposed. */
+export function puffTexture(): THREE.CanvasTexture {
+  if (puff) return puff;
+  const [c, g] = canvas(64, 64);
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255, 255, 255, 0.9)");
+  grad.addColorStop(0.6, "rgba(255, 255, 255, 0.35)");
+  grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  puff = new THREE.CanvasTexture(c);
+  puff.colorSpace = THREE.SRGBColorSpace;
+  return puff;
+}
+
+let snore: THREE.CanvasTexture | null = null;
+
+/** A pale "z" with a dark outline, for someone asleep. Shared, so never disposed. */
+export function zzzTexture(): THREE.CanvasTexture {
+  if (snore) return snore;
+  const [c, g] = canvas(64, 64);
+  g.font = 'bold 52px "Pixelify Letters", Rubik, system-ui, sans-serif';
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.lineWidth = 7;
+  g.strokeStyle = "rgba(29, 32, 38, 0.9)";
+  g.strokeText("z", 32, 34);
+  g.fillStyle = "#f4f1ea";
+  g.fillText("z", 32, 34);
+  snore = new THREE.CanvasTexture(c);
+  snore.colorSpace = THREE.SRGBColorSpace;
+  return snore;
+}
+
+/** 0 to 1 and back to 0 as t runs from 0 to 2, and so on: a ball bouncing between two walls. */
+const triangle = (t: number) => 1 - Math.abs((((t % 2) + 2) % 2) - 1);
+
+/**
+ * An arcade cabinet's attract mode, redrawn a frame at a time: space invaders marching on the purple cabinet and a
+ * game of bricks on the other. Each cabinet gets its own small canvas, so the shared screen pictures stay still.
+ */
+export function arcadeScreen(variant: string): { texture: THREE.CanvasTexture; draw: (frame: number) => void } {
+  const W = 64;
+  const H = 52;
+  const [c, g] = canvas(W, H);
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.generateMipmaps = false;
+  const px = (x: number, y: number, w: number, h: number, colour: string) => {
+    g.fillStyle = colour;
+    g.fillRect(Math.round(x), Math.round(y), w, h);
+  };
+  const invaders = (f: number) => {
+    const march = triangle(f / 10) * 10 - 5;
+    const legs = f % 2;
+    for (let row = 0; row < 3; row++)
+      for (let col = 0; col < 5; col++) {
+        const x = 9 + col * 10 + march;
+        const y = 6 + row * 8;
+        const colour = row === 0 ? "#ff7ad9" : "#a985ff";
+        px(x + 1, y, 3, 1, colour);
+        px(x, y + 1, 5, 2, colour);
+        px(x + (legs ? 0 : 1), y + 3, 1, 1, colour);
+        px(x + (legs ? 4 : 3), y + 3, 1, 1, colour);
+      }
+    const ship = W / 2 + Math.sin(f * 0.25) * 22;
+    px(ship - 3, H - 6, 7, 2, "#4cb8ff");
+    px(ship - 1, H - 8, 3, 2, "#4cb8ff");
+    const shot = f % 12;
+    px(W / 2 + Math.sin((f - shot) * 0.25) * 22, H - 10 - shot * 3.2, 1, 3, "#ffd84a");
+  };
+  const bricks = (f: number) => {
+    const colours = ["#ff4d5e", "#ff9f43", "#ffc53d"];
+    for (let row = 0; row < 3; row++)
+      for (let col = 0; col < 6; col++) if ((col * 7 + row * 3 + Math.floor(f / 24)) % 5 !== 0) px(3 + col * 10, 5 + row * 5, 8, 3, colours[row]);
+    const ball = { x: 3 + triangle(f / 17) * (W - 8), y: 22 + triangle(f / 11) * (H - 30) };
+    px(ball.x, ball.y, 2, 2, "#f4f1ea");
+    px(Math.max(2, Math.min(W - 14, ball.x - 6)), H - 5, 12, 2, "#3ddc84");
+  };
+  const draw = (frame: number) => {
+    px(0, 0, W, H, "#0b0d1a");
+    if (variant === "purple") invaders(frame);
+    else bricks(frame);
+    texture.needsUpdate = true;
+  };
+  draw(0);
+  return { texture, draw };
+}
+
 /** Short-pile carpet in one colour with a darker fleck. */
 export function carpet(base: string, fleck: string): THREE.CanvasTexture {
   const S = 16;
