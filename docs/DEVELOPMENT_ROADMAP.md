@@ -413,7 +413,7 @@ Dates below use the supplied course schedule and Singapore time. Phases overlap;
 
 **Goal:** A more realistic office: named zones, the machines on their own floor reached by an elevator, an optional avatar to walk it, and several ways to look at it.
 
-**Stages** (each one or two PRs, each playable on its own):
+**Stages** (one PR each, each playable on its own):
 1. **Zoned office.** Rebuild the top floor as named zones: work area, meeting rooms, events space, focus booths, dining, nap pods, lounge, games room and reception, with partitions, floors, signs, crew stops and zone sounds. Visual only.
 2. **Server floor and elevator.** Move the servers, database, cache, backup, network and monitoring one storey down, on the spots they use today. Add an always-available floor menu (and Page Up/Page Down), an animated elevator, and badges for incidents on the floor out of view. The server hall holds the existing cap of 12 app servers plus 6 temporary ones; when it is full, no more servers can be added.
 3. **Walk mode and avatars.** An optional creature avatar, picked when a company starts and changeable at any time, steered with W A S D, the arrow keys or click-to-walk. Doors open as it nears, prompts do what clicking does, and it rides the elevator. Clicking, the panels and the floor menu still do everything.
