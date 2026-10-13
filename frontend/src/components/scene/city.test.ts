@@ -43,10 +43,12 @@ import {
   ROADS,
   ROOF_HEADROOM,
   roofPlant,
+  SERVER_FLOOR_Y,
   SLAB,
   STOREY,
   STREET,
   STREET_WIDTH,
+  TOP_STOREY,
   TOWER,
   town as cityTown,
   TREE_SPREAD,
@@ -69,12 +71,16 @@ const masses = town.flatMap((b, i) => b.masses.map((m) => ({ ...m, building: i }
 const inJunction = (x: number, z: number, margin: number) => CROSS_X.some((cx) => Math.abs(x - cx) < margin) && CROSS_Z.some((cz) => Math.abs(z - cz) < margin);
 
 describe("the startup's building", () => {
-  it('puts the office on the top floor, six storeys above the street', () => {
+  it('puts the office on the top floor, six storeys above the street, with the server floor its last storey below', () => {
     expect(FLOORS_BELOW).toBe(6);
     expect(TOWER.masses[0].y0).toBe(GROUND_Y);
-    expect(TOWER.masses[TOWER.masses.length - 1].y1).toBe(SLAB);
     expect((SLAB - GROUND_Y) / STOREY).toBe(FLOORS_BELOW);
-    expect(TOWER.masses[TOWER.masses.length - 1].rect).toEqual(BUILDING);
+    // The tower stops a storey short; its top storey, drawn only while the office is in view, reaches the office's slab.
+    const shaft = TOWER.masses[TOWER.masses.length - 1];
+    expect(shaft.rect).toEqual(BUILDING);
+    expect(shaft.y1).toBe(SLAB - STOREY);
+    expect(TOP_STOREY.masses).toEqual([{ rect: BUILDING, y0: shaft.y1, y1: SLAB }]);
+    expect(SERVER_FLOOR_Y).toBe(-STOREY);
   });
 
   it('stands its lobby wing and lawn inside its own block, clear of the street', () => {
@@ -99,7 +105,9 @@ describe('the buildings round the office', () => {
   it('allows a taller building only far enough away, and anything below the office floor anywhere', () => {
     const across: Rect = [BUILDING[2] + 25, BUILDING[1], BUILDING[2] + 45, BUILDING[3]];
     expect(clearOfOffice(across, 40)).toBe(false);
-    expect(clearOfOffice(across, 25 / CLEAR)).toBe(true);
+    // Measured from the server floor a storey below the office, so the camera sees over it into either floor.
+    expect(clearOfOffice(across, 25 / CLEAR - STOREY)).toBe(true);
+    expect(clearOfOffice(across, 25 / CLEAR)).toBe(false);
     expect(clearOfOffice(across, -0.5)).toBe(true);
     expect(clearOfOffice([BUILDING[0] - 300, 0, BUILDING[0] - 280, 20], 150)).toBe(true);
     // Some offices further out do rise well above the office floor, so the rule is doing the work.

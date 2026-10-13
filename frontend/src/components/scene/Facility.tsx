@@ -16,6 +16,7 @@ import {
 } from "@/sim";
 import type { GraphicsQuality } from "@/game/persist";
 import { inspectOrSelect, useGame } from "@/game/store";
+import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import {
   AISLE_Z,
   appSlot,
@@ -35,6 +36,10 @@ import { Icon } from "../icons";
 import { tipProps } from "../tips";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
+import { ServerFloor } from "./ServerFloor";
+import { ElevatorCar, Landing } from "./Elevator";
+import { FLOOR_NUMBER, FLOOR_Y, rideAt } from "./levels";
+import { arrive, depart, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
 import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
 import { Exterior } from "./exterior";
@@ -73,8 +78,8 @@ const cameraApi: { zoomBy: (factor: number) => void; reset: () => void; rotateBy
   rotateBy: () => {},
 };
 
-/** Zoom and floor point that fit the box on screen when looking along `dir`. */
-function frameBox(box: THREE.Box3, dir: THREE.Vector3, width: number, height: number): { zoom: number; target: THREE.Vector3 } {
+/** Zoom and the point on the floor at height `floorY` that fit the box on screen when looking along `dir`. */
+function frameBox(box: THREE.Box3, dir: THREE.Vector3, width: number, height: number, floorY: number): { zoom: number; target: THREE.Vector3 } {
   const right = new THREE.Vector3().crossVectors(dir, UP).normalize();
   const up = new THREE.Vector3().crossVectors(right, dir).normalize();
   const center = box.getCenter(new THREE.Vector3());
@@ -97,10 +102,13 @@ function frameBox(box: THREE.Box3, dir: THREE.Vector3, width: number, height: nu
   // Leave room around the edges for labels, the prompt and the controls.
   const zoom = THREE.MathUtils.clamp(Math.min(width / (maxX - minX + 7), height / (maxY - minY + 6.5)), 10, 64);
   // Slide the centre down the view direction onto the floor, which is the plane the controls pan across.
-  return { zoom, target: center.add(dir.clone().multiplyScalar(-center.y / dir.y)) };
+  return { zoom, target: center.add(dir.clone().multiplyScalar((floorY - center.y) / dir.y)) };
 }
 
-function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean> }) {
+/** The darkening laid over the room as the elevator passes between floors, moved by the camera each frame. */
+let dipEl: HTMLDivElement | null = null;
+
+function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean>; floor: Floor }) {
   const controls = useRef<MapControlsImpl>(null);
   const camera = useThree((s) => s.camera) as THREE.OrthographicCamera;
   /** The player has panned, zoomed or dragged the view, so it no longer follows the facility. */
@@ -115,17 +123,23 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     [],
   );
 
-  // Frame the equipment that is actually built, and widen the view as the facility grows.
+  // On the server floor, frame the equipment that is actually built, and widen the view as the facility grows. The
+  // office floor is framed whole.
   useEffect(() => {
     const b = new THREE.Box3();
+    const y = FLOOR_Y[floor];
+    if (floor === "office") {
+      b.expandByPoint(new THREE.Vector3(ROOM.x0 + 4, y, ROOM.z0 + 2));
+      b.expandByPoint(new THREE.Vector3(ROOM.x1 - 4, y + 1.2, ROOM.z1 - 2));
+    }
     for (const id of EQUIPMENT_ORDER) {
-      if (!built[id]) continue;
+      if (!built[id] || floorOf(id) !== floor || floor === "office") continue;
       const f = footprints[id];
-      b.expandByPoint(new THREE.Vector3(f.x - f.w / 2, 0, f.z - f.d / 2));
-      b.expandByPoint(new THREE.Vector3(f.x + f.w / 2, f.h, f.z + f.d / 2));
+      b.expandByPoint(new THREE.Vector3(f.x - f.w / 2, y, f.z - f.d / 2));
+      b.expandByPoint(new THREE.Vector3(f.x + f.w / 2, y + f.h, f.z + f.d / 2));
     }
     box.current = b.isEmpty() ? null : b;
-  }, [footprints, built]);
+  }, [footprints, built, floor]);
 
   useEffect(() => {
     cameraApi.zoomBy = (factor) => {
@@ -158,14 +172,14 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Tell the office's sounds where the camera looks, and that a room is on screen.
+  // Tell the office's sounds where the camera looks, and whether the office floor is on screen.
   useFrame((state) => {
     const c = controls.current;
     if (!c) return;
     viewFocus.x = c.target.x;
     viewFocus.z = c.target.z;
     viewFocus.zoom = (state.camera as THREE.OrthographicCamera).zoom;
-    viewFocus.live = true;
+    viewFocus.live = shownFloor() === "office";
   });
   useEffect(
     () => () => {
@@ -208,16 +222,30 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
       camera.lookAt(c.target);
     }
 
-    // Until the player takes the camera, ease toward a framing of the built equipment from the current angle.
+    // Until the player takes the camera, ease toward a framing of the floor's built equipment from the current angle.
     if (!touched.current && box.current) {
       dir.copy(offset).normalize().negate();
-      const want = frameBox(box.current, dir, size.width, size.height);
+      const want = frameBox(box.current, dir, size.width, size.height, FLOOR_Y[floor]);
       const k = 0.1;
       camera.zoom += (want.zoom - camera.zoom) * k;
       before.copy(c.target);
-      c.target.lerp(want.target, k);
+      c.target.x += (want.target.x - c.target.x) * k;
+      c.target.z += (want.target.z - c.target.z) * k;
       camera.position.add(c.target).sub(before);
       camera.updateProjectionMatrix();
+    }
+    // Ride with the elevator: the view's height follows the car on the clock, however few frames are drawn.
+    const y = viewHeight();
+    camera.position.y += y - c.target.y;
+    c.target.y = y;
+    ride.y = y;
+    if (dipEl) {
+      const moving = riding();
+      const f = rideAt(rideClock());
+      dipEl.style.opacity = moving ? f.dip.toFixed(3) : "0";
+      // Light from each floor sweeps past the car: up the view going down, down it going up.
+      const down = FLOOR_Y[ride.to] < FLOOR_Y[ride.from];
+      dipEl.style.backgroundPosition = `0 ${((down ? f.car : 1 - f.car) * 100).toFixed(1)}%`;
     }
     // Keep the view over the building while panning.
     const t = c.target;
@@ -488,14 +516,14 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
   useEffect(() => {
     for (const id of EQUIPMENT_ORDER) {
       const f = footprints[id];
-      anchors.set(id, new THREE.Vector3(f.x, f.h + 0.3, f.z));
+      anchors.set(id, new THREE.Vector3(f.x, FLOOR_Y[floorOf(id)] + f.h + 0.3, f.z));
     }
-    anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, 1.35, AISLE_Z));
+    anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, FLOOR_Y.servers + 1.35, AISLE_Z));
     for (const id of anchors.keys()) if (/^app-/.test(id)) anchors.delete(id);
     if (apps) {
       apps.forEach((a, i) => {
         const p = appSlot(i);
-        anchors.set(a.id, new THREE.Vector3(p.x, RACK.h + 0.6, p.z));
+        anchors.set(a.id, new THREE.Vector3(p.x, FLOOR_Y.servers + RACK.h + 0.6, p.z));
       });
     }
     inCampaign = !!apps;
@@ -570,21 +598,28 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
   );
 }
 
-function Labels() {
+/**
+ * The labels of the floor the elevator stands at. While it rides there are none, and the new floor's appear as it
+ * arrives, so nothing on screen points at a floor that is not drawn.
+ */
+function Labels({ landed }: { landed: Floor | null }) {
   const m = useSceneModel();
   const c=useGame(s=>s.game.campaign);
   const selectedAppId=useGame(s=>s.selectedAppId);
   const selected=useGame(s=>s.selected);
+  const servers = landed === "servers";
   return (
     <div className="eq-labels">
-      <span className="wall-tag" ref={bindLabel(INTERNET)}>
-        <Icon name="network" />
-        Internet
-      </span>
-      {EQUIPMENT_ORDER.filter((id) => m.opening ? ["gateway","app","db","monitoring",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id]).map((id) => (
+      {servers && (
+        <span className="wall-tag" ref={bindLabel(INTERNET)}>
+          <Icon name="network" />
+          Internet
+        </span>
+      )}
+      {EQUIPMENT_ORDER.filter((id) => floorOf(id) === landed && (m.opening ? ["gateway","app","db","monitoring",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id])).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span></button>)}
+      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span></button>)}
     </div>
   );
 }
@@ -596,7 +631,7 @@ function Labels() {
 /** Tint of the polished concrete under the corridors in HD. */
 const CONCRETE_TINT = ROOM_PALETTE.floor.concrete;
 
-function Room() {
+function Room({ servers = false }: { servers?: boolean }) {
   const tiles = useMemo(() => {
     const t = concreteFloor();
     t.repeat.set(ROOM.w / 1.6, ROOM.d / 1.6);
@@ -642,18 +677,22 @@ function Room() {
         <boxGeometry args={[0.04, 0.24, ROOM.d]} />
         <meshStandardMaterial color={ROOM_PALETTE.skirting} roughness={0.85} />
       </mesh>
-      {/* Overhead cable tray along the back wall. */}
-      <OnWall wall="back">
-        <mesh castShadow position={[-3, 2.75, ROOM.z0 + 0.35]}>
-          <boxGeometry args={[17, 0.1, 0.5]} />
-          <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
-        </mesh>
-      </OnWall>
-      {/* Where the internet uplink enters the building. */}
-      <mesh position={[ROOM.x0 + 0.1, 0.5, AISLE_Z]}>
-        <boxGeometry args={[0.2, 1, 0.7]} />
-        <meshStandardMaterial color={BEZEL} metalness={0.05} roughness={0.85} />
-      </mesh>
+      {servers && (
+        <>
+          {/* Overhead cable tray along the back wall. */}
+          <OnWall wall="back">
+            <mesh castShadow position={[-3, 2.75, ROOM.z0 + 0.35]}>
+              <boxGeometry args={[17, 0.1, 0.5]} />
+              <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
+            </mesh>
+          </OnWall>
+          {/* Where the internet uplink enters the building. */}
+          <mesh position={[ROOM.x0 + 0.1, 0.5, AISLE_Z]}>
+            <boxGeometry args={[0.2, 1, 0.7]} />
+            <meshStandardMaterial color={BEZEL} metalness={0.05} roughness={0.85} />
+          </mesh>
+        </>
+      )}
     </group>
   );
 }
@@ -753,10 +792,23 @@ function Effects() {
   );
 }
 
-function Scene({ quality }: { quality: QualityProfile }) {
+function Scene({ quality, landed }: { quality: QualityProfile; landed: Floor | null }) {
   const effects = quality.effects;
   const m = useSceneModel();
   const campaign = useGame(s => s.game.campaign);
+  const floor = useGame((s) => s.floor);
+  const office = useRef<THREE.Group>(null);
+  const servers = useRef<THREE.Group>(null);
+  const lights = useRef<(THREE.PointLight | null)[]>([]);
+  // Draw one floor at a time, and light whichever it is: the lights move rather than switch, so no material is rebuilt.
+  useFrame(() => {
+    const shown = shownFloor();
+    if (office.current) office.current.visible = shown === "office";
+    if (servers.current) servers.current.visible = shown === "servers";
+    const y = FLOOR_Y[shown] + 3.4;
+    for (const l of lights.current) if (l) l.position.y = y;
+  });
+  const onFloor = (f: Floor) => EQUIPMENT_ORDER.filter((id) => floorOf(id) === f && landed === f);
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
 
   const appCount = Math.min(m.hosts.length, 12);
@@ -776,71 +828,87 @@ function Scene({ quality }: { quality: QualityProfile }) {
     <>
       {hd && <Reflections />}
       <Daylight quality={quality} hd={hd} />
-      <pointLight position={[-3, 3.4, -3.5]} intensity={24} distance={13} color="#8fc3ff" />
-      <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
+      <pointLight ref={(l) => { lights.current[0] = l; }} position={[-3, 3.4, -3.5]} intensity={24} distance={13} color="#8fc3ff" />
+      <pointLight ref={(l) => { lights.current[1] = l; }} position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
-      <Room />
       <Exterior />
-      <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
+      <ElevatorCar />
 
-      {/* Network edge */}
-      <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
-      {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint={EQUIPMENT.loadBalancer} />}
-
-      {/* App servers */}
-      {m.hosts.slice(0, 12).map((led, i) => {
-        const p = appSlot(i);
-        return <group key={i} onClick={e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",campaign?.apps[i]?.id??`app-${i+1}`);}}}><Rack x={p.x} z={p.z} led={led} /></group>;
-      })}
-      {Array.from({ length: m.temp }, (_, i) => {
-        const p = tempSlot(i);
-        return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint={EQUIPMENT.temporary} />;
-      })}
-      {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint={EQUIPMENT.standby} />}
-
-      {/* Data tier */}
-      {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint={EQUIPMENT.cache} />}
-      {Array.from({ length: m.dbCabinets }, (_, i) => {
-        const p = dbSlot(i);
-        return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint={EQUIPMENT.database} />;
-      })}
-      {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint={EQUIPMENT.database} />}
-      {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint={EQUIPMENT.backup} />}
-
-      {/* Monitoring wall */}
-      {m.monitoring > 0 &&
-        [-1.6, 0, 1.6].map((dx, i) => (
-          <Screen
-            key={i}
-            kind={m.incident ? "alert" : i === 2 && m.monitoring === 2 ? "chart" : "dash"}
-            w={1.45}
-            h={0.9}
-            position={[POS.monitoring.x + dx, 2.05, ROOM.z0 + 0.05]}
-          />
+      {/* The office floor, on top */}
+      <group ref={office}>
+        <Room />
+        <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
+        <Landing floor="office" interactive={landed === "office"} />
+        {onFloor("office").map((id) => (
+          <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
         ))}
+      </group>
 
-      {/* Cabling: internet -> edge -> app servers -> (cache) -> database -> replica / backups */}
-      <Cable points={[[ROOM.x0 + 0.2, aisleZ], [POS.gateway.x, aisleZ]]} speed={flow} alert={edgeAlert} />
-      {campaign ? campaign.routing.targets.map(id=>{const p=appSlot(campaign.apps.findIndex(a=>a.id===id));return <Cable key={id} points={[[POS.gateway.x,aisleZ],[p.x,aisleZ],[p.x,p.z]]} speed={flow} alert={m.hosts[campaign.apps.findIndex(a=>a.id===id)]==="critical"} />;}) : <Cable points={[[POS.gateway.x, aisleZ], [Math.max(appMaxX, -6.6) + 0.4, aisleZ]]} speed={flow} alert={edgeAlert} />}
-      <Cable
-        points={[
-          [trunkX, aisleZ],
-          [trunkX, dataZ],
-          [dbLastX + 0.4, dataZ],
-        ]}
-        speed={flow * (campaign?Math.max(.1,(campaign.snapshot.data?.databaseNewDemand??campaign.snapshot.app.processed)/Math.max(1,campaign.snapshot.app.processed)):(m.cache ? 0.7 : 1))}
-        alert={dataAlert}
-      />
-      {campaign?.readCache&&<Cable points={[[trunkX,aisleZ],[POS.cache.x,aisleZ],[POS.cache.x,POS.cache.z],[POS.cache.x,dataZ],[dbLastX+.4,dataZ]]} speed={flow} alert={dataAlert} />}
-      {m.replica && <Cable points={[[dbLastX + 0.4, dataZ], [POS.replica.x + 0.3, dataZ]]} speed={0.35} alert={false} />}
-      {m.backup && <Cable points={[[m.replica ? POS.replica.x + 0.3 : dbLastX + 0.4, dataZ], [POS.backup.x + 0.4, dataZ]]} speed={0.15} alert={false} />}
+      {/* The server floor, a storey below */}
+      <group ref={servers} position={[0, FLOOR_Y.servers, 0]}>
+        <Room servers />
+        <ServerFloor incident={m.incident} />
+        <Landing floor="servers" interactive={landed === "servers"} />
 
-      {EQUIPMENT_ORDER.map((id) => (
-        <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
-      ))}
+        {/* Network edge */}
+        <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
+        {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint={EQUIPMENT.loadBalancer} />}
+
+        {/* App servers */}
+        {m.hosts.slice(0, 12).map((led, i) => {
+          const p = appSlot(i);
+          return <group key={i} onClick={landed==="servers"?e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",campaign?.apps[i]?.id??`app-${i+1}`);}}:undefined}><Rack x={p.x} z={p.z} led={led} /></group>;
+        })}
+        {Array.from({ length: m.temp }, (_, i) => {
+          const p = tempSlot(i);
+          return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint={EQUIPMENT.temporary} />;
+        })}
+        {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint={EQUIPMENT.standby} />}
+
+        {/* Data tier */}
+        {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint={EQUIPMENT.cache} />}
+        {Array.from({ length: m.dbCabinets }, (_, i) => {
+          const p = dbSlot(i);
+          return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint={EQUIPMENT.database} />;
+        })}
+        {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint={EQUIPMENT.database} />}
+        {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint={EQUIPMENT.backup} />}
+
+        {/* Monitoring wall */}
+        {m.monitoring > 0 &&
+          [-1.6, 0, 1.6].map((dx, i) => (
+            <Screen
+              key={i}
+              kind={m.incident ? "alert" : i === 2 && m.monitoring === 2 ? "chart" : "dash"}
+              w={1.45}
+              h={0.9}
+              position={[POS.monitoring.x + dx, 2.05, ROOM.z0 + 0.05]}
+            />
+          ))}
+
+        {/* Cabling: internet -> edge -> app servers -> (cache) -> database -> replica / backups */}
+        <Cable points={[[ROOM.x0 + 0.2, aisleZ], [POS.gateway.x, aisleZ]]} speed={flow} alert={edgeAlert} />
+        {campaign ? campaign.routing.targets.map(id=>{const p=appSlot(campaign.apps.findIndex(a=>a.id===id));return <Cable key={id} points={[[POS.gateway.x,aisleZ],[p.x,aisleZ],[p.x,p.z]]} speed={flow} alert={m.hosts[campaign.apps.findIndex(a=>a.id===id)]==="critical"} />;}) : <Cable points={[[POS.gateway.x, aisleZ], [Math.max(appMaxX, -6.6) + 0.4, aisleZ]]} speed={flow} alert={edgeAlert} />}
+        <Cable
+          points={[
+            [trunkX, aisleZ],
+            [trunkX, dataZ],
+            [dbLastX + 0.4, dataZ],
+          ]}
+          speed={flow * (campaign?Math.max(.1,(campaign.snapshot.data?.databaseNewDemand??campaign.snapshot.app.processed)/Math.max(1,campaign.snapshot.app.processed)):(m.cache ? 0.7 : 1))}
+          alert={dataAlert}
+        />
+        {campaign?.readCache&&<Cable points={[[trunkX,aisleZ],[POS.cache.x,aisleZ],[POS.cache.x,POS.cache.z],[POS.cache.x,dataZ],[dbLastX+.4,dataZ]]} speed={flow} alert={dataAlert} />}
+        {m.replica && <Cable points={[[dbLastX + 0.4, dataZ], [POS.replica.x + 0.3, dataZ]]} speed={0.35} alert={false} />}
+        {m.backup && <Cable points={[[m.replica ? POS.replica.x + 0.3 : dbLastX + 0.4, dataZ], [POS.backup.x + 0.4, dataZ]]} speed={0.15} alert={false} />}
+
+        {onFloor("servers").map((id) => (
+          <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
+        ))}
+      </group>
       <LabelAnchors footprints={m.footprints} />
 
-      <CameraRig footprints={m.footprints} built={m.built} />
+      <CameraRig footprints={m.footprints} built={m.built} floor={floor} />
       {effects && <Effects />}
     </>
   );
@@ -916,8 +984,89 @@ function FrameLimiter({ fps }: { fps: number }) {
   return null;
 }
 
+/** The player has asked their system for less motion: floors cut rather than ride. */
+const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
+/**
+ * The floor the elevator stands at, whose labels and equipment can be clicked: null while it rides. It follows the
+ * floor in the store, riding to each new one on the clock.
+ */
+function useLanded(): Floor | null {
+  const [landed, setLanded] = useState<Floor | null>(() => useGame.getState().floor);
+  useEffect(() => {
+    placeCar(useGame.getState().floor);
+    const stopRide = onRide((event) => setLanded(event === "arrive" ? ride.to : null));
+    const stopFloor = useGame.subscribe((s, prev) => {
+      if (s.floor !== prev.floor) depart(s.floor, reducedMotion());
+    });
+    return () => {
+      stopFloor();
+      stopRide();
+    };
+  }, []);
+  return landed;
+}
+
+/** Take the view to a floor, or, pressed again for the floor already on its way, arrive there at once. */
+function pressFloor(floor: Floor, how: "menu" | "key"): void {
+  const s = useGame.getState();
+  if (s.floor === floor) arrive();
+  else s.goToFloor(floor, how);
+}
+
+/**
+ * The floor menu, like an elevator's panel: the office on top, the servers below, the floor in view pressed. A floor
+ * out of view that needs the player shows a badge.
+ */
+function FloorMenu() {
+  const floor = useGame((s) => s.floor);
+  const m = useSceneModel();
+  return (
+    <div className="floor-menu" role="group" aria-label="Floors">
+      {FLOORS.map((f) => {
+        const need = f === floor ? "none" : attentionOn(f, m);
+        return (
+          <button
+            key={f}
+            type="button"
+            data-floor={f}
+            className={`floor-button${f === floor ? " is-here" : ""}`}
+            aria-pressed={f === floor}
+            onClick={() => pressFloor(f, "menu")}
+            {...tipProps(`${FLOOR_NAME[f]} (${f === "office" ? "Page Up" : "Page Down"})`)}
+          >
+            <span className="floor-number" aria-hidden="true">
+              {FLOOR_NUMBER[f]}
+            </span>
+            {FLOOR_NAME[f]}
+            {need !== "none" && (
+              <span className={`floor-badge tone-${need}`}>
+                <span className="visually-hidden">{need === "alert" ? ", incident here" : ", needs a look"}</span>
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
+  const landed = useLanded();
+  // Page Up and Page Down ride between the floors, unless the player is typing or in a dialog or a menu.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "PageUp" && e.key !== "PageDown") return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable || el.closest('[role="dialog"], [role="menu"], [role="listbox"]'))) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !useGame.getState().started) return;
+      e.preventDefault();
+      pressFloor(e.key === "PageUp" ? "office" : "servers", "key");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [renderer, setRenderer] = useState<Renderer>("unknown");
   const [override] = useState(() => detailOverride(window.location.search));
   const chosen = useGame((s) => s.graphics.quality);
@@ -959,7 +1108,7 @@ export default function Facility() {
         {/* The room waits until the renderer is known, so a GPU never compiles the basic materials only to replace them. */}
         {renderer !== "unknown" && (
           <DetailContext.Provider value={quality.detail}>
-            <Scene quality={quality} />
+            <Scene quality={quality} landed={landed} />
           </DetailContext.Provider>
         )}
         {quality.fps !== null && <FrameLimiter fps={quality.fps} />}
@@ -972,8 +1121,16 @@ export default function Facility() {
           />
         )}
       </Canvas>
-      <Labels />
+      <div
+        className="ride-dip"
+        aria-hidden="true"
+        ref={(el) => {
+          dipEl = el;
+        }}
+      />
+      <Labels landed={landed} />
       <HoverTip container={container} />
+      <FloorMenu />
       <div className="camera-buttons" role="group" aria-label="Camera">
         <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" {...tipProps("Zoom in")}>
           +
@@ -991,7 +1148,7 @@ export default function Facility() {
           ⌂
         </button>
         <span className="camera-hint" aria-hidden="true">
-          <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn
+          <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn · <kbd>PgUp</kbd> <kbd>PgDn</kbd> to change floor
         </span>
       </div>
     </div>

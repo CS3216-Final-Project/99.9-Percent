@@ -40,6 +40,7 @@ import {
   SLAB,
   STOREY,
   STREET,
+  TOP_STOREY,
   TOWER,
   town,
   traffic,
@@ -69,6 +70,7 @@ import { TREE_VARIANTS, treeModel, type TreeModel, type TreeShape } from "./tree
 import { vehicleBody, vehicleLights } from "./vehicleModels";
 import { HIP, HAIR, SHOULDER, SKIN, STATURE, stature, TROUSERS, walkerModel } from "./walkerModels";
 import { adsTexture, logoSign } from "./textures";
+import { shownFloor } from "./ride";
 
 /*
  * Draws the city round the office (see city.ts) at whatever time of day it is (see sky.ts). Nothing out here takes
@@ -1154,6 +1156,7 @@ function BuildingShadows() {
     };
     for (const b of list) add(b);
     add(TOWER);
+    add(TOP_STOREY);
     // The office's own storey stands on top of its building.
     out.push({ rect: BUILDING, from: SLAB - GROUND_Y, to: ROOM.wallH - GROUND_Y });
     const ring = town().ring;
@@ -1236,6 +1239,9 @@ function Buildings({ lite, looks }: { lite: boolean; looks: Looks }) {
   const material = useMemo(() => facadeMaterial(!lite, surfaces && { plaster: surfaces.plaster, concrete: surfaces.concrete }), [lite, surfaces]);
   const ring = town().ring;
   const walls = useMemo(() => facades([...list, TOWER], ring), [list, ring]);
+  // The tower's top storey, under the office, gives way to the server floor's own room while that floor is in view.
+  const storey = useMemo(() => facades([TOP_STOREY], null), []);
+  const top = useOfficeOnly();
   const tops = useMemo(() => {
     const parts = roofs(list, lite);
     if (ring) parts.plain.push(...ringRoof(ring));
@@ -1247,6 +1253,9 @@ function Buildings({ lite, looks }: { lite: boolean; looks: Looks }) {
   return (
     <group>
       <Merged geometry={walls} material={material} />
+      <group ref={top}>
+        <Merged geometry={storey} material={material} />
+      </group>
       <Surfaces parts={tops} looks={looks} />
       {bands && <Merged geometry={bands} material={M.glow} />}
       {lights && <Merged geometry={lights} material={M.glow} />}
@@ -1293,7 +1302,17 @@ function terraceParts(lite: boolean): Record<Fabric, THREE.BufferGeometry[]> {
   return out;
 }
 
+/** A group shown only while the office floor is in view: the tower's top storey and its sign stand round the server floor. */
+function useOfficeOnly() {
+  const group = useRef<THREE.Group>(null);
+  useFrame(() => {
+    if (group.current) group.current.visible = shownFloor() === "office";
+  });
+  return group;
+}
+
 function Tower({ looks, lite }: { looks: Looks; lite: boolean }) {
+  const signs = useOfficeOnly();
   const terrace = useMemo(() => terraceParts(lite), [lite]);
   const sign = useMemo(() => logoSign(), []);
   const letters = useMemo(() => faded({ map: sign, transparent: true, depthWrite: false, toneMapped: false }, "city-sign", "glow"), [sign]);
@@ -1317,11 +1336,13 @@ function Tower({ looks, lite }: { looks: Looks; lite: boolean }) {
   return (
     <group>
       <Surfaces parts={terrace} looks={looks} />
-      {faces.map(([x, z, rot], i) => (
-        <mesh key={i} material={letters} position={[x, y, z]} rotation={[0, rot, 0]}>
-          <planeGeometry args={[12, 12 / 3.2]} />
-        </mesh>
-      ))}
+      <group ref={signs}>
+        {faces.map(([x, z, rot], i) => (
+          <mesh key={i} material={letters} position={[x, y, z]} rotation={[0, rot, 0]}>
+            <planeGeometry args={[12, 12 / 3.2]} />
+          </mesh>
+        ))}
+      </group>
     </group>
   );
 }

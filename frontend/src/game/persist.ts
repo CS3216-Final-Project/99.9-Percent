@@ -343,7 +343,8 @@ export type AnalyticsName =
   | "rating_submitted"
   | "save_resumed"
   | "save_imported"
-  | "mode_switched";
+  | "mode_switched"
+  | "floor_switched";
 
 export interface AnalyticsEvent {
   t: string;

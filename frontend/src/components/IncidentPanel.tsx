@@ -25,6 +25,7 @@ export default function IncidentPanel() {
   const running = useGame((s) => s.running);
   const setRunning = useGame((s) => s.setRunning);
   const act = useGame((s) => s.act);
+  const floor = useGame((s) => s.floor);
   const inc = game.incident;
   if (!inc) return null;
 
@@ -104,6 +105,12 @@ export default function IncidentPanel() {
             Find the cause
           </Tip>
         </h4>
+        {floor !== "servers" && (
+          <button type="button" className="btn btn-small incident-go" onClick={() => useGame.getState().goToFloor("servers", "incident")}>
+            <Icon name="server" size={16} />
+            Go to the server floor
+          </button>
+        )}
         <div className="chips">
           {places.map((id) => {
             const checked = inc.evidence.some((e) => e.equipment === id);

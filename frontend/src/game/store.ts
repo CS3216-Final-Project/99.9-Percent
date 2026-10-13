@@ -53,6 +53,7 @@ import { makeEnvelope, validateEnvelope, type SaveEnvelope } from "./saveEnvelop
 import { AccountApiError, getSession, logout, listRuns, putRun, getRun, emailLogin, emailRegister } from "@/lib/api";
 import type { AppSession, CloudRun, RunSummary } from "../../../shared/campaign.ts";
 import { checkpointCloud, localCloudCopy, rememberCloud } from "./cloud";
+import { floorFromSearch, floorOf, type Floor, type FloorSwitch } from "./floors";
 
 
 export type View = "tech" | "engineers" | "history" | "menu" | null;
@@ -160,6 +161,13 @@ interface Store {
   selected: EquipmentId | null;
   selectedAppId: string | null;
   selectApp: (id: string) => void;
+  /**
+   * The floor of the building in view. Choosing a piece of equipment takes the view to its floor; an incident never
+   * moves it on its own. Kept across runs on this page, but never saved.
+   */
+  floor: Floor;
+  /** Take the view to a floor; `how` says what asked, for the analytics. */
+  goToFloor: (floor: Floor, how: FloorSwitch) => void;
   hovered: EquipmentId | null;
   view: View;
   techFocus: TechId | null;
@@ -258,6 +266,13 @@ export const useGame = create<Store>()((set, get) => {
     get().measureTime();
     const m=structuredClone(get().measurement);
     event(m,get().game,name,data);set({measurement:m});
+  }
+  /** The change that takes the view to `floor`, recorded for the analytics; nothing if it is there already. */
+  function floorPatch(floor: Floor, how: FloorSwitch): Partial<Store> {
+    if (get().floor === floor) return {};
+    if (get().game.campaign) uiEvent("floor_switched", { to: floor, how });
+    else track("floor_switched", { to: floor, how, mode: get().mode });
+    return { floor };
   }
   /** Apply a new game state, record analytics for phase changes and save. */
   function commit(next: GameState, opts: { save?: boolean } = {}): void {
@@ -529,7 +544,10 @@ export const useGame = create<Store>()((set, get) => {
     graphics: loadGraphicsSafe(),
     selected: null,
     selectedAppId: null,
-    selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({selected:"app",selectedAppId:id}); },
+    selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
+    // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
+    floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
+    goToFloor: (floor, how) => set(floorPatch(floor, how)),
     hovered: null,
     view: null,
     techFocus: null,
@@ -664,7 +682,7 @@ export const useGame = create<Store>()((set, get) => {
       commit(next, { save: ended || due });
     },
 
-    select: id => set({selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null}),
+    select: id => set({selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null,...(id?floorPatch(floorOf(id),"select"):{})}),
     hover: (id) => {
       if (get().hovered !== id) set({ hovered: id });
     },

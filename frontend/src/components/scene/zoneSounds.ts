@@ -16,7 +16,7 @@ export interface Focus {
 
 /**
  * What the camera looks at right now, written by the scene each frame and read by the sounds. `live` is false
- * while no room is on screen, and `hush` is true during an incident, when the office has other things to say.
+ * while the office floor is not on screen, and `hush` is true during an incident, when the office has other things to say.
  */
 export const viewFocus: Focus & { live: boolean; hush: boolean } = { x: 0, z: 0, zoom: 30, live: false, hush: false };
 
