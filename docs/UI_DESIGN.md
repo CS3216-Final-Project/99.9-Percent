@@ -63,7 +63,7 @@ Each campaign action shows what it changes in the room instead of in words: whil
 The panel lists each action only by name, price and activation; its effect and costs are not repeated there.
 Pressing an action never buys it straight away. The view rides to the affected machine's floor and a confirmation opens over the room beside that machine's marker, with a notch pointing at it; a Scale up action points at its own App Server.
 The confirmation names the machine and says in one sentence what it does, then gives the action as its title, the action's effect, Setup, Cash after, upkeep and Activation as label/value rows, the no-refund note, and Confirm (focused) and Cancel.
-It follows the marker as the camera moves, flips to the marker's other side rather than slide under the panel, and on a short room scrolls its details while Confirm and Cancel stay pinned at its foot.
+It follows the marker as the camera moves, sits on the marker's left, away from the panel, unless that runs off the room, when it takes the right, and on a short room scrolls its details while Confirm and Cancel stay pinned at its foot.
 Without a drawn room it settles in the open part of the stage.
 Escape or Cancel closes it and returns focus to the action. Only one confirmation is open at a time, and Confirm follows the action's own disabled rule.
 

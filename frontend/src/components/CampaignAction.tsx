@@ -131,9 +131,9 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
 const GAP = 14, EDGE = 12;
 
 /**
- * Floats its content over the room beside the marker of the machine an action changes, following the marker as the
- * camera moves and staying clear of the side panel. Without a room, or before the elevator lands, it waits briefly
- * and then settles in the open part of the room so the decision is never blocked.
+ * Floats its content over the room beside the marker of the machine an action changes, on its left where it fits,
+ * following the marker as the camera moves and staying clear of the side panel. Without a room, or before the
+ * elevator lands, it waits briefly and then settles in the open part of the room so the decision is never blocked.
  */
 function ActionPopover({ anchor, children }: { anchor: string; children: ReactNode }) {
   const pop = useRef<HTMLDivElement>(null);
@@ -160,10 +160,11 @@ function ActionPopover({ anchor, children }: { anchor: string; children: ReactNo
       let x: number, y: number, side = "none";
       if (a) {
         const mid = a.top + a.height / 2 - s.top;
-        x = a.right - s.left + GAP; side = "left";
-        if (x + w > right) { x = a.left - s.left - GAP - w; side = "right"; }
+        // Prefer the marker's left, away from the panel; take its right only when the left runs off the room.
+        x = a.left - s.left - GAP - w; side = "right";
+        if (x < EDGE) { x = a.right - s.left + GAP; side = "left"; }
         y = mid - h / 2;
-        if (x < EDGE) { x = a.left + a.width / 2 - s.left - w / 2; y = a.bottom - s.top + GAP; side = "none"; }
+        if (side === "left" && x + w > right) { x = a.left + a.width / 2 - s.left - w / 2; y = a.bottom - s.top + GAP; side = "none"; }
         y = Math.max(EDGE, Math.min(bottom - h, y));
         el.style.setProperty("--notch", `${Math.max(16, Math.min(h - 16, mid - y))}px`);
       } else {
