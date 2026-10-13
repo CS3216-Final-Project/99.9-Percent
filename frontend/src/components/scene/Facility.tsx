@@ -216,7 +216,7 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
     }
     if (turned) {
       // While the view follows the facility, turn about the built equipment so it holds its place on screen.
-      if (!touched.current && box.current) turnAbout(c.target, box.current.getCenter(centre), from, dir.copy(offset).normalize().negate());
+      if (!touched.current && box.current) turnAbout(c.target, box.current.getCenter(centre), from, dir.copy(offset).normalize().negate(), c.target.y);
       camera.position.copy(c.target).add(offset);
       // The controls aimed the camera earlier this frame, from where it stood before the turn.
       camera.lookAt(c.target);
@@ -701,6 +701,9 @@ function Room({ servers = false }: { servers?: boolean }) {
 /* Scene                                                               */
 /* ------------------------------------------------------------------ */
 
+/** How long after the room opens the floor out of view is prepared for its first ride, in milliseconds. */
+const WARM_MS = 4000;
+
 /** Sky light and reflection strength at HD detail. */
 const HD_SKY = 1.45;
 const HD_REFLECTIONS = 0.3;
@@ -809,6 +812,24 @@ function Scene({ quality, landed }: { quality: QualityProfile; landed: Floor | n
     for (const l of lights.current) if (l) l.position.y = y;
   });
   const onFloor = (f: Floor) => EQUIPMENT_ORDER.filter((id) => floorOf(id) === f && landed === f);
+  // Once the room has loaded, prepare the floor out of view as well, so the first ride does not stall on new shaders.
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      const groups = [office.current, servers.current];
+      const shown = groups.map((g) => g?.visible ?? false);
+      for (const g of groups) if (g) g.visible = true;
+      try {
+        gl.compile(scene, camera);
+      } catch {
+        // Only a head start: the floor compiles when first shown anyway.
+      }
+      groups.forEach((g, i) => {
+        if (g) g.visible = shown[i];
+      });
+    }, WARM_MS);
+    return () => window.clearTimeout(id);
+  }, [gl, scene, camera]);
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
 
   const appCount = Math.min(m.hosts.length, 12);

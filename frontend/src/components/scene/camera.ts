@@ -25,9 +25,10 @@ function screenAxes(dir: THREE.Vector3): void {
 
 /**
  * Moves the floor point the camera looks at so that `anchor` stays at the same place on screen when the view
- * direction turns from `from` to `to`. Both directions point from the camera into the scene.
+ * direction turns from `from` to `to`. Both directions point from the camera into the scene. The point stays on the
+ * floor at height `floorY`: the office's is 0, the server floor's a storey lower.
  */
-export function turnAbout(target: THREE.Vector3, anchor: THREE.Vector3, from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3 {
+export function turnAbout(target: THREE.Vector3, anchor: THREE.Vector3, from: THREE.Vector3, to: THREE.Vector3, floorY = 0): THREE.Vector3 {
   screenAxes(from);
   offset.copy(anchor).sub(target);
   const x = offset.dot(right);
@@ -35,7 +36,7 @@ export function turnAbout(target: THREE.Vector3, anchor: THREE.Vector3, from: TH
   screenAxes(to);
   target.copy(anchor).addScaledVector(right, -x).addScaledVector(up, -y);
   // Slide along the new view direction back onto the floor.
-  return target.addScaledVector(to, -target.y / to.y);
+  return target.addScaledVector(to, (floorY - target.y) / to.y);
 }
 
 /**
