@@ -70,6 +70,27 @@ export const CLOSED_ROOMS: [number, number, number, number][] = [
  */
 export const ELEVATOR_SPOT: [number, number, number, number] = [9, -3.5, 11.5, -1];
 
+/**
+ * Each zone's name and where it floats, as [name, x, z], over the zone and clear of the equipment's own labels. The
+ * rooms of machines are named by their equipment labels already.
+ */
+export const ZONE_NAMES: [string, number, number][] = [
+  ["Events", -17.5, 4.3],
+  ["Library", -17.5, 12.0],
+  ["Meeting room", -9.25, 12.35],
+  ["Engineering", -3.6, 9.6],
+  ["Reception", 3.2, 13.4],
+  ["Foosball", FOOSBALL.x, FOOSBALL.z + 1.3],
+  ["Nap pods", (NAP_ROOM[0] + NAP_ROOM[2]) / 2, (NAP_ROOM[1] + NAP_ROOM[3]) / 2],
+  ["Kitchen", 18.25, -6.0],
+  ["Dining", 18.25, 0],
+  ["Lounge", 18.25, 6.2],
+  ["Games room", 18.25, 11.9],
+];
+
+/** How high the zone names float: above the glass, below the walls' tops. */
+export const ZONE_NAME_HEIGHT = 2.95;
+
 /** The arcade cabinets, side by side in the games corner. */
 export const ARCADES: [string, number][] = [
   ["purple", 20.4],

@@ -608,6 +608,35 @@ export function concreteFloor(): THREE.CanvasTexture {
   return repeating(finish(c));
 }
 
+/**
+ * A zone's name as a small dark sign with light lettering, sized to the name. Unlike the pixel textures it is drawn
+ * at twice the size and filtered smoothly, so the letters stay crisp when the sign is small on screen.
+ */
+export function zoneName(name: string): THREE.CanvasTexture {
+  const H = 72;
+  const font = '600 40px Rubik, "Segoe UI", system-ui, sans-serif';
+  const probe = document.createElement("canvas").getContext("2d") as CanvasRenderingContext2D;
+  probe.font = font;
+  const W = Math.ceil(probe.measureText(name).width) + 52;
+  const [c, g] = canvas(W, H);
+  g.fillStyle = "rgba(29, 32, 38, 0.84)";
+  g.beginPath();
+  g.roundRect(2, 2, W - 4, H - 4, 18);
+  g.fill();
+  g.strokeStyle = "rgba(255, 255, 255, 0.18)";
+  g.lineWidth = 2;
+  g.stroke();
+  g.font = font;
+  g.fillStyle = "#f4f1ea";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(name, W / 2, H / 2 + 2);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
 /** Short-pile carpet in one colour with a darker fleck. */
 export function carpet(base: string, fleck: string): THREE.CanvasTexture {
   const S = 16;

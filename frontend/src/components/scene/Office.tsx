@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { deskSlot, POS, ROOM } from "./layout";
 import { creature, standsAtDesk, type Activity, type Species } from "./cast";
@@ -10,7 +10,7 @@ import { Creature, Walker, Wanderer } from "./creatures";
 import { preloadCreatures } from "./creatureCatalog";
 import { Conversation } from "./chatter";
 import { GROUPS } from "./conversations";
-import { ARCADE_Z, ARCADES, CHAIR_OFFSET, deskSeat, FIXTURES, FOOSBALL, GLASS, GLASS_H, MEETING_CHAIRS, NAP_PODS, NAP_ROOM, SPOTS, STAGE } from "./floorplan";
+import { ARCADE_Z, ARCADES, CHAIR_OFFSET, deskSeat, FIXTURES, FOOSBALL, GLASS, GLASS_H, MEETING_CHAIRS, NAP_PODS, NAP_ROOM, SPOTS, STAGE, ZONE_NAME_HEIGHT, ZONE_NAMES } from "./floorplan";
 import { planLoop, type WaypointId } from "./routes";
 import { BALL_RADIUS, ballAt, RALLY, RALLY_PERIOD, TABLE } from "./rally";
 import { preloadModels, type ModelId } from "./modelCatalog";
@@ -21,7 +21,7 @@ import { ARCADE_SCREEN, MAC, MAC_COLOUR_NAMES, type PropItem } from "./propModel
 import { DetailedProps } from "./props";
 import { FURNITURE, PIXEL_FLOORS, ROOM_PALETTE } from "./palette";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
-import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, skylineDay, whiteboard, type PosterKind, type ScreenKind } from "./textures";
+import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, skylineDay, whiteboard, zoneName, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
 
 /*
@@ -780,6 +780,80 @@ function FoosballRods() {
   );
 }
 
+/** How tall a zone's name sign is on screen, in CSS pixels, at any zoom: smaller than the equipment's labels. */
+const ZONE_NAME_PX = 20;
+/** Zoom, in pixels a metre, over which zone names fade out as the camera pulls back: they are too small to read. */
+const ZONE_NAME_FADE: [number, number] = [14, 20];
+const ignoreRay = () => {};
+
+/**
+ * Each zone's name floating over it, always facing the camera so it reads at any turn, the same size on screen at
+ * any zoom, and glowing a little after dusk. They are drawn in the room rather than on the page, so they stay out of the way of screen readers and of
+ * the equipment's own labels, and they fade out as the camera pulls back too far to read them.
+ */
+function ZoneNames() {
+  // The signs are lettered once the interface font has arrived, so they match the rest of the game.
+  const [fonts, setFonts] = useState(0);
+  useEffect(() => {
+    let live = true;
+    document.fonts?.load('600 40px Rubik').then(() => live && setFonts(1), () => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  const signs = useMemo(
+    () =>
+      ZONE_NAMES.map(([name, x, z]) => {
+        const map = zoneName(name);
+        const material = new THREE.SpriteMaterial({ map, transparent: true, depthWrite: false, toneMapped: false });
+        return { name, x, z, material, aspect: map.image.width / map.image.height, fonts };
+      }),
+    [fonts],
+  );
+  useEffect(
+    () => () => {
+      for (const s of signs) {
+        s.material.map?.dispose();
+        s.material.dispose();
+      }
+    },
+    [signs],
+  );
+  const sprites = useRef<(THREE.Sprite | null)[]>([]);
+  useFrame(({ camera }) => {
+    const zoom = (camera as THREE.OrthographicCamera).zoom;
+    const t = Math.min(1, Math.max(0, (zoom - ZONE_NAME_FADE[0]) / (ZONE_NAME_FADE[1] - ZONE_NAME_FADE[0])));
+    const fade = t * t * (3 - 2 * t);
+    // Past 1 the lettering outshines the room, so the glow pass picks it up at night.
+    const glow = 1 + 0.4 * daylightNow().dark;
+    // The orthographic camera shows `zoom` CSS pixels a metre, so this many metres is always ZONE_NAME_PX tall.
+    const tall = ZONE_NAME_PX / zoom;
+    sprites.current.forEach((sprite, i) => {
+      if (!sprite) return;
+      const material = sprite.material;
+      material.opacity = fade;
+      material.color.setScalar(glow);
+      sprite.visible = fade > 0.01;
+      sprite.scale.set(tall * signs[i].aspect, tall, 1);
+    });
+  });
+  return (
+    <group>
+      {signs.map((s, i) => (
+        <sprite
+          key={s.name}
+          ref={(el) => {
+            sprites.current[i] = el;
+          }}
+          material={s.material}
+          position={[s.x, ZONE_NAME_HEIGHT, s.z]}
+          raycast={ignoreRay}
+        />
+      ))}
+    </group>
+  );
+}
+
 /** Red beacon above the monitoring wall that spins up during an incident. */
 function Beacon({ on }: { on: boolean }) {
   const lamp = useRef<THREE.MeshStandardMaterial>(null);
@@ -961,6 +1035,7 @@ export function Office({ crew }: { crew: Crew }) {
       <ModelBatch placements={models} />
       <DetailedProps items={props} />
       <Glass />
+      <ZoneNames />
       <WhiteboardFace position={[-12.27, 1.45, 7.4]} rot={Math.PI / 2} />
       <Staff crew={crew} />
       <PingPongBall />
