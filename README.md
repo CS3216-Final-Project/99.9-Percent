@@ -157,3 +157,7 @@ Merges to `main` deploy to production. Pull requests get preview links.
 `POST /api/feedback` accepts `{ id, message, mode }`: a random UUID v4 submission ID, 1–2000 trimmed characters, and `campaign` or `classic`. It returns `{ id }` only after persistence in `game_feedback`; replaying the same submission is idempotent. No public feedback-list endpoint is exposed. No saves, email addresses or account tokens are uploaded.
 
 Migration `0002_fearless_exodus.sql` adds the table without changing existing tables. The existing CD job runs `npm run db:migrate` on pushes to `main` after merge. Until the database/migration is available, the form reports a send failure and retains the draft in the open component. Drafts are not persisted across reloads.
+
+### Product analytics
+
+Optional PostHog tracking measures active gameplay duration, chapter progression, all-chapter Campaign completion, failures and returning players. Tracking is off until configured in the frontend's Production environment. Development, tests and preview builds do not collect product analytics. See [analytics setup and dashboard metrics](docs/ANALYTICS.md) for public token configuration, event definitions, dashboard recipes and measurement limits. Existing local playtest records and saves retain their formats.

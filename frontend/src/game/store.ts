@@ -129,6 +129,8 @@ interface Store {
   hasRun: boolean;
   measurement: Measurement;
   activeMark: number | null;
+  /** Transient import marker: analytics distinguishes an imported Classic save from a mode switch. */
+  importGeneration: number;
   measureTime: () => void;
   endSession: () => void;
   observer: (source:"recruited"|"organic"|"unspecified", intervention?:string) => void;
@@ -512,7 +514,7 @@ export const useGame = create<Store>()((set, get) => {
         return true;
       }catch(error){accountFailure(error);return false;}finally{set({cloudBusy:false});}
     },
-    hasRun: false, measurement: emptyMeasurement(), activeMark: null,
+    hasRun: false, measurement: emptyMeasurement(), activeMark: null, importGeneration: 0,
     mode: "campaign",
     remainderMs: 0,
     saveBlocked: false,
@@ -778,7 +780,7 @@ export const useGame = create<Store>()((set, get) => {
       const measurement = campaign.status === "ok" ? beginSession(campaign.envelope.runtime.measurement, game, crypto.randomUUID(), new Date().toISOString()) : emptyMeasurement();
       const saved = mode === "campaign" ? saveGame(game, remainderMs, true, measurement) && archiveEvents(measurement.pending) : saveClassicGame(game);
       saveMode(mode);
-      set({ mode, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, view: null,
+      set({ mode, importGeneration: get().importGeneration + 1, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, view: null,
         selected: null, hovered: null, started: true, tour: null, onboarding: false, techFocus: null, rating: null });
       track("save_imported", { mode, step: game.campaign?.step ?? game.turn });
       get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
