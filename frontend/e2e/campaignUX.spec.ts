@@ -25,14 +25,18 @@ test("Campaign getting-started exploration, keyboard navigation and reload do no
   expect((await savedGame(page)).campaign!.step).toBe(0);
   await page.reload(); await page.getByRole("button",{name:"Continue company",exact:true}).click(); await expect(intro).toBeHidden();
 });
-test("Campaign option comparison, precision control and pause-to-investigate use public controls", async ({page}) => {
+test("Campaign option comparison, confirmation, precision control and pause-to-investigate use public controls", async ({page}) => {
   await page.goto("/"); await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   const card=page.getByRole("button",{name:/Add server/}).locator("..");
-  await card.locator("summary").click(); await expect(card).toContainText("$700"); await expect(card).toContainText("$19,000");
+  await card.locator("summary").click(); await expect(card).toContainText("$700 / 60s"); await expect(card).toContainText("$19,000");
+  await expect(page.getByText("Operating finances")).toHaveCount(0); await expect(page.getByLabel("Request dependencies")).toHaveCount(0);
+  await page.getByRole("button",{name:/Add server/}).click(); const confirm=page.getByRole("region",{name:"Confirm Add server"});
+  await expect(confirm).toContainText("Add server?"); await expect(confirm.getByRole("button",{name:"Confirm"})).toBeFocused();
+  await page.keyboard.press("Escape"); await expect(confirm).toBeHidden(); expect((await savedGame(page)).campaign!.apps).toHaveLength(1);
   await page.locator(".campaign-advanced > summary").click(); await page.getByRole("button",{name:"Advance step",exact:true}).click();
   expect((await savedGame(page)).campaign!.step).toBe(1);
   await page.clock.install(); await page.getByRole("button",{name:"Run",exact:true}).click(); await page.clock.runFor(1000);
-  await page.getByRole("button",{name:"Pause & inspect",exact:true}).click(); const stopped=(await savedGame(page)).campaign!.step;
+  await expect(page.getByRole("button",{name:"Pause & inspect"})).toHaveCount(0); await page.getByRole("button",{name:"Pause",exact:true}).click(); const stopped=(await savedGame(page)).campaign!.step;
   await page.clock.runFor(3000); expect((await savedGame(page)).campaign!.step).toBe(stopped);
   await expect(page.getByRole("button",{name:"Run",exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Tech",exact:true}).click(); await expect(page.getByRole("region",{name:"Tech tree"})).toContainText("Owned does not mean deployed");

@@ -4,7 +4,7 @@ import {dataCompany,spikeCompany,untilOffset} from "../src/sim/__tests__/spikeFi
 import type {Page} from "@playwright/test";
 async function blockedGuest(page:Page,g:ReturnType<typeof dataCompany>){
  const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
- await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);await page.locator("summary").filter({hasText:"Guided Mode progression"}).click();return api;
+ await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);return api;
 }
 async function runTo(page:Page,step:number){
  await page.getByRole("button",{name:"Run",exact:true}).click();
@@ -26,9 +26,9 @@ async function clockUntilDialog(page:Page,name:string){
 
 test("spikes: explicit continuation, delayed autoscaling, retirement and reload without API",async({page,withoutRoom})=>{
  test.setTimeout(150000);await page.clock.install({time:new Date("2026-10-10T00:00:00Z")});const api=await blockedGuest(page,dataCompany());await page.clock.pauseAt(new Date("2026-10-10T00:01:00Z"));
- await expect(page.getByRole("navigation",{name:"Guided Mode progression"})).toContainText("Traffic Spikes & Autoscaling Available next");
+ await expect(page.getByRole("list",{name:"Chapter progress"}).getByRole("listitem").filter({hasText:"Traffic Spikes"})).toContainText("Available next");
  const before=(await savedGame(page)).campaign!;await page.getByRole("button",{name:"Continue to traffic spikes"}).click();
- const unlock=page.getByRole("button",{name:/Unlock autoscaling/});await unlock.focus();await expect(unlock).toBeFocused();await page.keyboard.press("Enter");await page.getByRole("button",{name:/Deploy autoscaling/}).click();
+ const unlock=page.getByRole("button",{name:/Unlock autoscaling/});await unlock.focus();await expect(unlock).toBeFocused();await page.keyboard.press("Enter");await expect(page.getByRole("button",{name:"Confirm",exact:true})).toBeFocused();await page.keyboard.press("Enter");await page.getByRole("button",{name:/Deploy autoscaling/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
  for(let i=0;i<9;i++)await advanceCampaignStep(page);
  expect((await savedGame(page)).campaign!.spikeStage!.controller!.highSteps).toBe(2);
@@ -54,8 +54,8 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
 });
 test("spikes: manual planning prevents overload without an autoscaler",async({page})=>{
  test.setTimeout(90000);const api=await blockedGuest(page,spikeCompany(false));const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
- await page.getByRole("button",{name:/Add server/}).click();for(let i=0;i<2;i++)await advanceCampaignStep(page);
- await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await page.getByRole("button",{name:/Scale up App 3/}).click();for(let i=0;i<3;i++)await advanceCampaignStep(page);
+ await page.getByRole("button",{name:/Add server/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();for(let i=0;i<2;i++)await advanceCampaignStep(page);
+ await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await page.getByRole("button",{name:/Scale up App 3/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();for(let i=0;i<3;i++)await advanceCampaignStep(page);
  await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"Balance across installed apps"}).click();await advanceCampaignStep(page);
  await page.getByRole("button",{name:"2×",exact:true}).click();await runTo(page,n+28);const c=(await savedGame(page)).campaign!;
  expect(c.apps).toHaveLength(3);expect(c.spikeStage!.controller).toBeNull();expect(c.incident).toBeNull();expect(c.snapshot.app.capacity).toBe(4800);expect(c.investedCents).toBeGreaterThan(0);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
@@ -64,7 +64,7 @@ test("spikes: write-heavy DB constraint remains after automatic app routing",asy
  test.setTimeout(90000);const api=await blockedGuest(page,untilOffset(spikeCompany(true,"write-heavy"),24));
  const control=page.getByRole("region",{name:"Traffic spikes and autoscaling"});await expect(control).toContainText("cannot increase DB capacity");
  expect((await savedGame(page)).campaign!.snapshot.db.demand).toBeGreaterThan(3000);
- await page.getByRole("button",{name:"Limit to 500 requests/s"}).click();await page.getByRole("button",{name:"2×",exact:true}).click();await page.getByRole("button",{name:"Run",exact:true}).click();
+ await page.getByRole("button",{name:"Limit to 500 requests/s"}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await page.getByRole("button",{name:"2×",exact:true}).click();await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});await expect(page.getByRole("dialog")).toContainText("does not increase database capacity");
  const c=(await savedGame(page)).campaign!;expect(c.dbCapacity).toBe(3000);expect(c.readCache!.target).toBe(6000);expect(c.limit).toBe(500);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });

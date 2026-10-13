@@ -1,4 +1,4 @@
-import { useId, type ComponentProps } from "react";
+import { useEffect, useId, useRef, useSyncExternalStore, type ComponentProps } from "react";
 import { useGame } from "@/game/store";
 import { moneyFull as money } from "@/game/format";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
@@ -7,12 +7,21 @@ import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { pendingStop } from "@/sim/step";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
-import { Act } from "./ui";
+import { Act, Row } from "./ui";
 
-/** Information only: the parent's existing disabled predicate and dispatcher stay authoritative. */
+// One action confirmation is open at a time across the panel, keyed by the action label.
+let confirming: string | null = null;
+const listeners = new Set<() => void>();
+function setConfirming(label: string | null) { confirming = label; listeners.forEach(l => l()); }
+function subscribe(l: () => void) { listeners.add(l); return () => { listeners.delete(l); }; }
+
+
+/** Asks before dispatching; the parent's disabled predicate and dispatcher stay authoritative. */
 export function CampaignAction(props: ComponentProps<typeof Act>) {
   const { game, onboarding, selectedAppId } = useGame();
-  const c = game.campaign!, id = useId();
+  const c = game.campaign!, id = useId(), card = useRef<HTMLDivElement>(null);
+  const open = useSyncExternalStore(subscribe, () => confirming === props.label);
+  useEffect(() => () => { if (confirming === props.label) setConfirming(null); }, [props.label]);
   const app = c.apps.find(a => a.id === selectedAppId) ?? c.apps[0];
   const busy = c.pending.some(a => !["limit", "unlimit", "routing"].includes(a.type));
   const label = props.label;
@@ -64,16 +73,30 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
   else if (label === "Deploy Automatic Failover" && !c.loadBalancer) reason = "Deploy load balancing first.";
   else if (label === "Deploy Automatic Failover" && !c.apps.some(a => a.id === c.reliabilityStage?.spareId && a.health !== "failed")) reason = "Reserve a healthy spare first.";
   else if (busy) reason = "An infrastructure deployment is pending. Wait for activation.";
-  return <div className="campaign-action-card">
-    <Act {...props} />
+  const cancel = () => { setConfirming(null); card.current?.querySelector<HTMLButtonElement>("button.act")?.focus(); };
+  const costs = <>
+    {props.tip && <p>{props.tip}</p>}
+    <dl className="rows">
+      {props.price !== undefined && <Row label="Setup" value={`${money(props.price)} now`} />}
+      {props.price !== undefined && <Row label="Cash after" value={money((c.cashCents - props.price * 100) / 100)} />}
+      {upkeep !== null && <Row label={isScale || label === "Upgrade database" ? "Total upkeep" : "Added upkeep"} value={`${money(upkeep / 100)} / ${Q.periodSteps}s${increase !== null && increase !== upkeep ? ` (${increase >= 0 ? "+" : ""}${money(increase / 100)})` : ""}`} />}
+      {props.note && <Row label="Activation" value={props.note} />}
+    </dl>
+    {props.price !== undefined && props.price > 0 && <p className="muted">No refund or undo. Upkeep starts at activation.</p>}
+  </>;
+  return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card}>
+    <Act {...props} onClick={() => setConfirming(open ? null : label)} />
     {effect && <p className="campaign-action-effect">{effect}</p>}
     {props.disabled && <p className="campaign-action-reason" id={id}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
-    {(props.price !== undefined || props.tip) && <details className="campaign-action-detail"><summary>Effect &amp; costs</summary>
-      {props.tip && <p>{props.tip}</p>}
-      {props.price !== undefined && <p>Setup: {money(props.price)} paid on acceptance. Available cash after: {money((c.cashCents - props.price * 100)/100)}.</p>}
-      {upkeep !== null && <p>{isScale || label === "Upgrade database" ? "Total" : "Additional"} upkeep after activation: {money(upkeep/100)} per {Q.periodSteps} modeled seconds{increase !== null ? ` (${increase >= 0 ? "+" : ""}${money(increase/100)} change)` : ""}.</p>}
-      {props.note && <p>Activation: {props.note}. Run the company to advance pending work.</p>}
-      {props.price !== undefined && props.price > 0 && <p>Purchases have no refund or undo. Review the target and costs before buying.</p>}
+    {open ? <section className="campaign-action-box campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); cancel(); } }}>
+      <p className="campaign-action-confirm-title">{label}?</p>
+      {costs}
+      <div className="btn-row">
+        <button type="button" className="btn btn-primary btn-small" autoFocus disabled={props.disabled} onClick={() => { setConfirming(null); props.onClick(); }}>Confirm</button>
+        <button type="button" className="btn btn-small" onClick={cancel}>Cancel</button>
+      </div>
+    </section> : (props.price !== undefined || props.tip) && <details className="campaign-action-detail"><summary>Effect &amp; costs</summary>
+      <div className="campaign-action-box">{costs}</div>
     </details>}
   </div>;
 }

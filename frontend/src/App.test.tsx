@@ -108,6 +108,7 @@ describe("opening UI", () => {
     const id = useGame.getState().game.campaign!.runId;
     expect(screen.getByText(/Stable steps: 0\/5/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(8000));
     expect(screen.getByRole("dialog", { name: "Incident postmortem" })).toBeTruthy();

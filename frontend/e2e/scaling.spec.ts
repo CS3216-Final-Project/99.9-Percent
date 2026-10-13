@@ -10,24 +10,24 @@ for(const path of ["vertical","horizontal"] as const)test(`scaling continuation:
  await page.route("**/api/**",route=>route.abort());
  await seedSave(page,company());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
  const id=(await savedGame(page)).campaign!.runId;
- await page.getByRole("button",{name:/Upgrade database/}).click();
+ await page.getByRole("button",{name:/Upgrade database/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  for(let i=0;i<8;i++)await advanceCampaignStep(page);
  await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect.poll(async()=>!!(await savedGame(page)).campaign!.incident).toBe(true);
  await page.getByRole("button",{name:"Pause",exact:true}).click();
  expect((await savedGame(page)).campaign!.incident!.primaryComponent).toBe("app-1");
  if(path==="horizontal") {
-  await page.getByRole("button",{name:/Add server/}).click();await page.getByRole("button",{name:"Run",exact:true}).click();
+  await page.getByRole("button",{name:/Add server/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await page.getByRole("button",{name:"Run",exact:true}).click();
   await expect.poll(async()=>(await savedGame(page)).campaign!.apps.length).toBe(2);await page.getByRole("button",{name:"Pause",exact:true}).click();
   const c=(await savedGame(page)).campaign!;expect(c.snapshot.instances!.map(a=>a.demand)).toEqual([1400,0]);expect(c.incident).not.toBeNull();
   await page.getByRole("main").getByRole("button",{name:"App 2",exact:true}).click();
   await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 2:/})).toHaveAttribute("aria-pressed","true");
-  await page.getByRole("button",{name:/Deploy load balancing/}).click();await page.getByRole("button",{name:"Run",exact:true}).click();
+  await page.getByRole("button",{name:/Deploy load balancing/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await page.getByRole("button",{name:"Run",exact:true}).click();
   await expect.poll(async()=>(await savedGame(page)).campaign!.loadBalancer).toBe(true);await page.getByRole("button",{name:"Pause",exact:true}).click();
   expect((await savedGame(page)).campaign!.routing.mode).toBe("single");
   await page.getByText("Configure routing · single",{exact:true}).click();
   await page.getByRole("button",{name:"Balance across installed apps"}).click();
- }else await page.getByRole("button",{name:/Scale up App 1/}).click();
+ }else await page.getByRole("button",{name:/Scale up App 1/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
  if(path==="horizontal")expect((await savedGame(page)).campaign!.snapshot.instances!.map(a=>a.demand)).toEqual([700,700]);

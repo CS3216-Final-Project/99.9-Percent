@@ -45,13 +45,13 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     expect(opening.step).toBe(6);
     await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).click();
     if (path === "app-then-upgrade") {
-      await page.getByRole("button", { name: /Add server/ }).click();
+      await page.getByRole("button", { name: /Add server/ }).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
       await page.getByRole("button", { name: "Run", exact: true }).click();
       await expect.poll(async () => (await savedGame(page)).campaign!.apps.length).toBe(2);
       await page.getByRole("button", { name: "Pause", exact: true }).click();
       expect((await savedGame(page)).campaign!.dbCapacity).toBe(600);
     }
-    await page.getByRole("button", { name: path === "limit" ? /Limit to 500 requests\/s/ : /Upgrade database/ }).click();
+    await page.getByRole("button", { name: path === "limit" ? /Limit to 500 requests\/s/ : /Upgrade database/ }).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
     if (path === "upgrade") {
       await expect(page.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("activates in 3 step(s)");
       await expect(page.getByRole("button", { name: /Add server/ })).toBeDisabled();

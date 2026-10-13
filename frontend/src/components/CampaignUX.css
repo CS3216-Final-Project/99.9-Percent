@@ -1,13 +1,28 @@
 /* Campaign-only selectors: shared Classic typography, controls and modals are untouched. */
 .campaign-panel .campaign-guidance { margin-bottom: 12px; }
-.campaign-panel .campaign-investigation-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.campaign-panel .campaign-investigation-head .step-head { margin: 8px 0; }
+.campaign-panel .campaign-requirements { justify-self: stretch; }
+.campaign-panel .progression-requirements { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; font-size: 13px; line-height: 1.4; }
+.campaign-panel .progression-requirements li { display: flex; align-items: flex-start; gap: 6px; color: var(--text-soft); }
+.campaign-panel .progression-requirements li svg { flex: none; margin-top: 3px; color: var(--critical-ink); }
+.campaign-panel .progression-requirements li[data-met="true"] { color: var(--ink); }
+.campaign-panel .progression-requirements li[data-met="true"] svg { color: var(--ok-ink); }
+.campaign-panel .campaign-requirements p { margin: 6px 0 0; font-size: 13px; line-height: 1.45; }
 .campaign-panel .campaign-action-card { border-bottom: 1px solid var(--paper-3); padding-bottom: 8px; }
 .campaign-panel .campaign-action-effect { margin: 4px 0; font-size: 12px; line-height: 1.4; }
 .campaign-panel .campaign-action-reason { margin: 4px 0; font-size: 12px; color: var(--warn-ink); }
-.campaign-panel .campaign-action-detail { font-size: 12px; line-height: 1.45; }
-.campaign-panel .campaign-action-detail summary { cursor: pointer; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; }
-.campaign-panel .campaign-action-detail p { margin: 6px 0; }
+.campaign-panel .campaign-action-detail { font-size: 12px; line-height: 1.45; margin-top: 2px; }
+.campaign-panel .campaign-action-detail summary { cursor: pointer; padding: 4px 0; width: fit-content; font-weight: 700; color: var(--text-soft); }
+.campaign-panel .campaign-action-detail summary:hover { color: var(--ink); }
+/* Effect & costs and the purchase confirmation share one formatted container. */
+.campaign-panel .campaign-action-box { margin: 4px 0 6px; padding: 8px 10px; border: 2px solid var(--paper-3); border-radius: var(--radius); background: var(--paper-2); font-size: 12px; line-height: 1.45; }
+.campaign-panel .campaign-action-box p { margin: 0 0 6px; }
+.campaign-panel .campaign-action-box .rows { margin: 0 0 6px; }
+.campaign-panel .campaign-action-box .row { padding: 4px 0; font-size: 12px; }
+.campaign-panel .campaign-action-box .row:last-child { border-bottom: 0; }
+.campaign-panel .campaign-action-box > p:last-child { margin-bottom: 0; }
+.campaign-panel .campaign-action-confirm { border-color: var(--ink); border-left: 4px solid var(--focus); }
+.campaign-panel .campaign-action-confirm .campaign-action-confirm-title { font-family: var(--font-display); font-size: 14px; margin-bottom: 4px; }
+.campaign-panel .campaign-action-confirm .btn-row { margin: 8px 0 0; }
 .campaign-clock .campaign-play { gap: 6px; min-height: 44px; }
 .campaign-clock .campaign-clock-state { font-size: 12px; font-weight: 700; }
 .campaign-clock.is-paused { border-top: 3px solid var(--focus); }
@@ -42,8 +57,6 @@
 
 @media (min-width: 901px) {
   .app.has-chapters .campaign-panel { width: 420px; }
-  .campaign-panel .campaign-investigation-head { flex-wrap: nowrap; }
-  .campaign-panel .campaign-investigation-head .step-head { font-size: .95rem; min-width: 0; order: -1; }
 }
 
 @media (min-width: 901px) {
@@ -53,7 +66,6 @@
   .campaign-panel .campaign-action-card .act-meta { display: flex; flex-wrap: wrap; max-width: 225px; gap: 4px; justify-content: flex-end; }
   .campaign-panel .campaign-action-card { padding-bottom: 2px; }
   .campaign-panel .campaign-action-effect { margin: 0; }
-  .campaign-panel .campaign-action-detail summary { padding: 0; }
 }
 
 @media (min-width: 901px) {

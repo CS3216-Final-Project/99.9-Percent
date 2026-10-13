@@ -16,8 +16,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  test.setTimeout(150000);const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
  await seedSave(page,prepared());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
  const guidance=page.getByRole("region",{name:"Guided Mode guidance"});
- await page.locator("summary").filter({hasText:"Guided Mode progression"}).click();
- await expect(page.getByRole("navigation",{name:"Guided Mode progression"})).toContainText("Data Strategy Available next");
+ await expect(page.getByRole("list",{name:"Chapter progress"}).getByRole("listitem").filter({hasText:"Data Strategy"})).toContainText("Available next");
  await page.getByRole("button",{name:"Continue to data strategy",exact:true}).click();
  await expect(guidance).toContainText("Current stage: Data Strategy");
  await expect(page.getByRole("region",{name:"Data strategy"})).toContainText("Waiting for workload growth");
@@ -27,6 +26,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  const data=page.getByRole("region",{name:"Data strategy"});
  if(strategy==="cache")await data.getByRole("button",{name:/Deploy Read Cache/}).click();
  else await page.getByRole("button",{name:/Upgrade database/}).click();
+ await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await page.getByRole("button",{name:"Run",exact:true}).click();await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
  let c=(await savedGame(page)).campaign!;expect(c.runId).toBe("data-browser");
  if(strategy==="cache") {
@@ -42,7 +42,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
   await page.getByRole("button",{name:"Run",exact:true}).click();await expect.poll(async()=>(await savedGame(page)).campaign!.snapshot.db.demand).toBe(2112);
   await expect.poll(async()=>!!(await savedGame(page)).campaign!.incident).toBe(true);await page.getByRole("button",{name:"Pause",exact:true}).click();
   await expect(data).toContainText("write-heavy");expect((await savedGame(page)).campaign!.snapshot.data!.writes).toBe(1920);
-  await page.getByRole("button",{name:/Upgrade database/}).click();await page.getByRole("button",{name:"Run",exact:true}).click();
+  await page.getByRole("button",{name:/Upgrade database/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await page.getByRole("button",{name:"Run",exact:true}).click();
   await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
   expect((await savedGame(page)).campaign!.dbCapacity).toBe(3000);await page.getByRole("button",{name:"Continue company",exact:true}).click();
  }

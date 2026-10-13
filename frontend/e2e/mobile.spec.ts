@@ -123,7 +123,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   await panel.locator("summary").filter({ hasText: "Full system evidence" }).tap();
   await expect(panel.getByRole("table")).toContainText("133.33%");
   await panel.locator("summary").filter({ hasText: "Full system evidence" }).tap();
-  await panel.getByRole("button", { name: /Upgrade database/ }).tap();
+  await panel.getByRole("button", { name: /Upgrade database/ }).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
   await expect(panel.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("3 step(s)");
   await expect(panel.getByRole("button", { name: /Add server/ })).toBeDisabled();
   await page.screenshot({ path: "test-results/phase1-mobile-incident.png" });
@@ -189,7 +189,7 @@ test("cache selection, paid activation and warmth reload on touch",async({page})
  await page.route("**/api/**",route=>route.abort());await seedSave(page,dataCompany());
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
  const panel=page.getByRole("complementary",{name:"System metrics"}),data=page.getByRole("region",{name:"Data strategy"});
- await data.getByRole("button",{name:/Deploy Read Cache/}).tap();
+ await data.getByRole("button",{name:/Deploy Read Cache/}).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
  for(let i=0;i<2;i++)await advanceCampaignStep(page);
  const roomCache=page.getByRole("main").getByRole("button",{name:/Read Cache/});
  await roomCache.tap();await expect(roomCache).toHaveAttribute("aria-pressed","true");await expect(panel.getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");

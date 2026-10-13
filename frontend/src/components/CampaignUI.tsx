@@ -11,7 +11,6 @@ import { canEnterReliability, pendingReliability, effectiveTargets, researchBala
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
-import { campaignChapters } from "@/game/campaignChapters";
 import TechTree from "./TechTree";
 import { AccountSection } from "./Account";
 import { HomeScreen } from "./HomeScreen";
@@ -48,7 +47,6 @@ const ACTION_NAMES: Record<Intervention, string> = {
   "deploy-autoscaler":"Autoscaling controller deployment", "retire-app":"Safe application retirement", "health-checks":"Health Checks deployment", "create-spare":"Spare application install", "reserve-spare":"Reserve spare", "release-spare":"Release spare", failover:"Automatic Failover deployment", "promote-spare":"Promote spare", "restore-app":"Restore application", promotion:"Promotion",
 };
 const appName = (id: string) => `App ${id.slice(4)}`;
-const unsettledCents = (c: Campaign) => Math.floor((c.ledger.appNumerator + c.ledger.dbNumerator + c.ledger.salaryNumerator + (c.ledger.lbNumerator??0) + (c.ledger.cacheNumerator??0) + (c.ledger.controllerNumerator??0) + (c.ledger.checksNumerator??0) + (c.ledger.failoverNumerator??0)) / Q.periodSteps);
 function stageName(g: GameState) {
   const c=g.campaign!;
   return c.combinedStage?"Grow the Company":c.reliabilityStage?"Stay Online":c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":c.openingMilestone?.acknowledged?"Scaling & Routing":"Opening";
@@ -75,7 +73,12 @@ function CampaignGuidance() {
   return <section className="campaign-guidance" aria-label="Guided Mode guidance">
     <Callout compact tone="info" icon="monitor" kicker={`Current stage: ${stageName(game)}`}>{objective}</Callout>
     {c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
-    {c.combinedStage&&model.incomplete.length>0&&<details className="more"><summary>Next growth requirements</summary><RequirementList items={model.incomplete}/></details>}
+    {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><details className="more"><summary>{c.combinedStage?"Next growth requirements":"Chapter requirements"} · {model.completed.length}/{model.requirements.length}</summary>
+      <RequirementList items={c.combinedStage?model.incomplete:model.requirements}/>
+      {!c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
+      {model.notice&&<p role="note">{model.notice}</p>}
+      {model.optional&&<p className="muted">{model.optional}</p>}
+    </details></section>}
     {action?.action&&<button className="btn btn-primary" disabled={onboarding||game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
     {!c.reliabilityStage&&c.spikeStage?.acknowledged&&<button className="btn btn-primary" disabled={onboarding||!canEnterReliability(game)} onClick={()=>act({type:"enter_reliability"})}>Continue to reliability<Icon name="next" /></button>}
     {action&&!action.action&&<button className="btn btn-primary" disabled={onboarding} onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
@@ -86,23 +89,6 @@ function CampaignGuidance() {
       <div className="btn-row"><button className="btn btn-small" disabled={onboarding} onClick={()=>inspectOrSelect("app","app-1")}>Inspect Application</button><button className="btn btn-small" disabled={onboarding} onClick={()=>inspectOrSelect("db")}>Inspect Database</button></div>
     </section>}
 
-  </section>;
-}
-
-function CampaignProgression() {
-  const {game}=useGame(),c=game.campaign!;
-  const model=campaignGuidance(game);
-  return <section aria-label="Guided Mode requirements">
-    <details className="more"><summary>Guided Mode progression</summary>
-      <nav aria-label="Guided Mode progression"><ol className="campaign-stages">
-        {campaignChapters(game).map(chapter=><li key={chapter.id} aria-current={chapter.current?"step":undefined}>{chapter.name} <strong>{chapter.status}</strong></li>)}
-      </ol></nav>
-      <RequirementList items={model.requirements} />
-      {model.waiting&&<p role="status">{model.waiting}</p>}
-      {model.notice&&<p role="note">{model.notice}</p>}
-      {model.optional&&<p className="muted">{model.optional}</p>}
-      {c.limit!==null&&<Callout compact tone="warn" icon="network" kicker="Traffic limit active">Incoming {num(c.snapshot.incoming)} / admitted {num(c.snapshot.admitted)} / rejected {num(c.snapshot.rejected)} req/s. Rejected demand earns no revenue; its opportunity value is not an extra charge.</Callout>}
-    </details>
   </section>;
 }
 
@@ -169,8 +155,7 @@ export function CampaignPanel() {
         </dl>
       </div>
       <div className="incident-investigate">
-        <div className="campaign-investigation-head"><button className="btn btn-small" disabled={disabled} onClick={()=>{useGame.getState().setRunning(false);inspectOrSelect(selected??"monitoring",selectedAppId??undefined);}}>Pause &amp; inspect</button><h4 className="step-head"><span className="step-num" aria-hidden="true">1</span><Tip text="Click equipment in the room or here. Inspection is free, immediate and repeatable; it never advances time.">System evidence</Tip></h4></div>
-        <p className="request-path" aria-label="Request dependencies">{c.dataStage?"Users → App Server → optional Read Cache → Database":"Users → App Server → Database"}</p>
+        <h4 className="step-head"><span className="step-num" aria-hidden="true">1</span><Tip text="Click equipment in the room or here. Inspection is free, immediate and repeatable; it never advances time.">System evidence</Tip></h4>
         <div className="chips">{PLACES.filter(id=>id!=="cache"||c.dataStage).map(id => <button type="button" key={id} className={`chip${place === id ? " is-selected" : ""}`} aria-pressed={place === id} disabled={disabled} onClick={() => inspectOrSelect(id)}>
           <span className="chip-icon" aria-hidden="true"><Icon name={EQUIPMENT_ICON[id]} size={16} /></span>{PLACE_NAMES[id]}
         </button>)}</div>
@@ -241,15 +226,6 @@ export function CampaignPanel() {
         <p className="muted">Busy is the share of capacity doing work. Demand/capacity also shows demand above capacity. Installed servers only help when traffic is routed to them.</p>
       </details>
       {c.limit!==null&&<Callout compact tone="warn" icon="network" kicker="Traffic limit active">{num(m.admitted)} admitted / {num(m.rejected)} rejected req/s. Rejected requests earn no revenue. <strong>Infrastructure and salaries still cost the same.</strong></Callout>}
-      <details className="more"><summary>Operating finances</summary><p>Each successful request earns {dollars(Q.revenueCents)}. Failed and rejected requests earn nothing. Revenue and costs settle every {Q.periodSteps} modeled seconds; pending revenue cannot fund purchases.</p><dl className="rows">
-        <Row label="Available cash" value={dollars(c.cashCents)} />
-        <Row label="Pending revenue" value={dollars(c.ledger.successes * Q.revenueCents)} />
-        <Row label="Unsettled costs" value={dollars(unsettledCents(c))} />
-        <Row label="Next settlement" value={`Step ${(c.lastSettledPeriod + 1) * Q.periodSteps}`} />
-        <Row label="Rejected this period" value={num(c.ledger.rejected)} />
-        <Row label="Opportunity value" value={dollars(c.ledger.rejected * Q.revenueCents)} tip="Revenue forgone from rejected demand, not an extra cash charge." />
-      </dl></details>
-      <CampaignProgression />
     </section>
     {c.spikeStage&&<SpikeControls disabled={disabled} busy={busy}/>}
   </aside>;
@@ -390,7 +366,7 @@ export function CampaignOverlays() {
 }
 
 const INTRODUCTION = [
-  ["Your architecture","Requests travel from Users through the Application to the Database. Select equipment in the office or dependency strip to inspect the same component."],
+  ["Your architecture","Requests travel from Users through the Application to the Database. Select equipment in the office or its System evidence button to inspect the same component."],
   ["Your evidence","Compare demand with capacity and unfinished work (backlog). Latency describes response time; service errors count failed completed requests. Deliberate rejections are shown separately."],
   ["Your controls","Inspection is free. Run or Advance step to observe traffic changes, and Pause to think. Investments cost money and take time to activate. Watch what changes after a decision. P pauses and Esc closes a view."]
 ] as const;

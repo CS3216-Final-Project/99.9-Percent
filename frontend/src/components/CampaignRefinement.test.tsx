@@ -65,11 +65,13 @@ it("makes Run primary and keeps manual advancement behind optional controls", ()
   const step=screen.getByRole("button",{name:"Advance step"}); expect(step.className).not.toContain("btn-primary");
   fireEvent.click(step); expect(useGame.getState().game.campaign!.step).toBe(1);
 });
-it("Pause & inspect explicitly stops the current clock and records a real free inspection", () => {
-  start(); renderCompany(); skip(); fireEvent.click(screen.getByRole("button",{name:"Run"}));
+it("system evidence records a real free inspection without advancing the clock", () => {
+  start(); renderCompany(); skip();
+  expect(screen.queryByRole("button",{name:"Pause & inspect"})).toBeNull();
+  expect(screen.queryByLabelText("Request dependencies")).toBeNull();
   const step=useGame.getState().game.campaign!.step;
-  fireEvent.click(screen.getByRole("button",{name:"Pause & inspect"}));
-  expect(useGame.getState().running).toBe(false); expect(useGame.getState().game.campaign!.step).toBe(step);
+  fireEvent.click(screen.getByRole("button",{name:"Database"}));
+  expect(useGame.getState().game.campaign!.step).toBe(step);
   expect(useGame.getState().game.campaign!.trace.at(-1)?.type).toBe("inspection");
   fireEvent.click(screen.getByRole("button",{name:"Tech"}));
   expect(screen.getByRole("region",{name:"Tech tree"}).textContent).toContain("Owned does not mean deployed");
@@ -80,30 +82,46 @@ it("shows paid-now cash, delayed upkeep and routing limitation before adding an 
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
   expect(card.textContent).toContain("Another App Server"); expect(card.textContent).toContain("needs routing");
   fireEvent.click(within(card as HTMLElement).getByText("Effect & costs"));
-  expect(card.textContent).toContain("$19,000"); expect(card.textContent).toContain("$700");
-  expect(card.textContent).toContain("per 60 modeled seconds"); expect(card.textContent).toContain("no refund or undo");
+  expect(card.textContent).toContain("$19,000"); expect(card.textContent).toContain("$700 / 60s");
+  expect(card.textContent).toContain("No refund or undo");
   expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
 });
+it("asks for confirmation before an action is dispatched, and Cancel or Escape leaves the company unchanged", () => {
+  start(); renderCompany(); skip();
+  const add=screen.getByRole("button",{name:/Add server/}), before=useGame.getState().game;
+  fireEvent.click(add);
+  const confirm=screen.getByRole("region",{name:"Confirm Add server"});
+  expect(confirm.textContent).toContain("Add server?"); expect(confirm.textContent).toContain("$19,000");
+  expect(useGame.getState().game).toBe(before);
+  fireEvent.click(within(confirm).getByRole("button",{name:"Cancel"}));
+  expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull(); expect(document.activeElement).toBe(add);
+  fireEvent.click(add); fireEvent.keyDown(screen.getByRole("button",{name:"Confirm"}),{key:"Escape"});
+  expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull(); expect(useGame.getState().game).toBe(before);
+  // Only one confirmation is open at a time.
+  fireEvent.click(add); fireEvent.click(screen.getByRole("button",{name:/Upgrade database/}));
+  expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
+  expect(useGame.getState().game.campaign!.pending.map(a=>a.type)).toEqual(["upgrade-db"]);
+  expect(screen.queryByRole("button",{name:"Confirm"})).toBeNull();
+});
 it("visibly explains cash and pending-infrastructure reasons without altering accepted action rules", () => {
-  start(); renderCompany(); skip(); fireEvent.click(screen.getByRole("button",{name:/Upgrade database/}));
+  start(); renderCompany(); skip(); fireEvent.click(screen.getByRole("button",{name:/Upgrade database/})); fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
   expect(card.textContent).toContain("An infrastructure deployment is pending");
   cleanup(); const game=structuredClone(useGame.getState().game); game.campaign!.cashCents=100000; renderCompany(game);
   expect(screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!.textContent).toContain("Not enough available cash");
 });
-it("traffic-limit warning and financial details explain rejection without inventing extra charges or discounts", () => {
+it("traffic-limit warning explains rejection without inventing extra charges or discounts", () => {
   const game=advanceSteps(perform(newGame(1,"limit-info"),{type:"set_traffic_limit",enabled:true}),4).state;
   renderCompany(game); expect(screen.getByText(/Infrastructure and salaries still cost the same/)).toBeTruthy();
-  fireEvent.click(screen.getByText("Operating finances"));
-  expect(screen.getByText(/Each successful request earns/).textContent).toContain("$0.20");
-  expect(screen.getByText(/pending revenue cannot fund purchases/)).toBeTruthy();
+  expect(screen.queryByText("Operating finances")).toBeNull();
   expect(screen.getByText(/500 admitted \/ 300 rejected req\/s/)).toBeTruthy();
 });
 it("Scale Up describes the selected server rather than implying another installed instance", () => {
   useGame.setState({game:dataCompany(),ready:true,started:true,onboarding:false,selectedAppId:"app-1"});
   render(<CampaignAction label="Scale up App 1" price={2000} note="3 steps" onClick={()=>{}}/>);
   expect(screen.getByText(/Makes this App Server larger/)).toBeTruthy();
-  expect(screen.getByText(/Total upkeep after activation/).textContent).toContain("$1,100");
+  expect(screen.getByText("Total upkeep").closest(".row")!.textContent).toContain("$1,100 / 60s (+$400)");
 });
 it("postmortem keeps all actual causes and observations reachable while leading with a compact summary", () => {
   let game=advanceSteps(newGame(1,"report-info"),6).state;

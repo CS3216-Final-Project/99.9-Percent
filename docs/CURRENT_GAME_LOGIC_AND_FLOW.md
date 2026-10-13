@@ -66,8 +66,8 @@ This is a typical path, not a scripted sequence of guaranteed incidents. Prepara
 - **Campaign guidance:** current stage, desired outcome, factual prerequisites and continuation buttons.
 - **Progression strip:** completed, current, available-next and locked stages, derived from existing campaign state.
 - **System evidence:** incoming/admitted/rejected traffic; demand, capacity, busy utilisation, backlog, processed and failed work; latency and service errors.
-- **Actions:** available investments, admission changes, routing and stage-specific controls; pending activation countdowns.
-- **Office and dependency strip:** two views of the same infrastructure and selection. Selecting equipment does not create another simulation.
+- **Actions:** available investments, admission changes, routing and stage-specific controls; pending activation countdowns. Each action asks for confirmation, showing its setup, cash after, upkeep and activation, before it is dispatched.
+- **Office and System evidence buttons:** two views of the same infrastructure and selection. Selecting equipment does not create another simulation.
 - **History/Menu:** read-only reports and trends, exports, onboarding replay, save/exit and confirmed new-company reset.
 
 Try Prototype enters immediately as a guest. Continue company restores a saved company. The three-prompt introduction is skippable and separately persisted; it does not advance simulation time or reveal an incident solution.
