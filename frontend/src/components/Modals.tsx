@@ -5,6 +5,7 @@ import { BALANCE, buildReport } from "@/sim";
 import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { useGame } from "@/game/store";
+import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
 import { GraphicsSettings } from "./GraphicsSettings";
@@ -358,38 +359,41 @@ export function Menu() {
         )}
 
         {tab === "playtest" && (
-          <section className="menu-section" aria-label="Playtest data">
-            <h4>
-              <Icon name="analytics" size={20} />
-              Playtest data ({events.length} events)
-            </h4>
-            <FeedbackButton inline />
-            <p className="menu-note">Playtest events below are kept in this browser only.</p>
-            <dl className="rows">
-              {summarise(events).map(([k, v]) => (
-                <div className="row" key={k}>
-                  <dt>{k}</dt>
-                  <dd>{v}</dd>
-                </div>
-              ))}
-            </dl>
-            <div className="btn-row">
-              <button type="button" className="btn" onClick={copy} disabled={events.length === 0}>
-                Copy as JSON
-              </button>
-              <button
-                type="button"
-                className="btn btn-quiet"
-                disabled={events.length === 0}
-                onClick={() => {
-                  clearAnalytics();
-                  setEvents([]);
-                }}
-              >
-                Clear
-              </button>
-            </div>
-          </section>
+          <>
+            <AnalyticsSettings />
+            <section className="menu-section" aria-label="Playtest data">
+              <h4>
+                <Icon name="analytics" size={20} />
+                Playtest data ({events.length} events)
+              </h4>
+              <FeedbackButton inline />
+              <p className="menu-note">Playtest events below are kept in this browser only.</p>
+              <dl className="rows">
+                {summarise(events).map(([k, v]) => (
+                  <div className="row" key={k}>
+                    <dt>{k}</dt>
+                    <dd>{v}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="btn-row">
+                <button type="button" className="btn" onClick={copy} disabled={events.length === 0}>
+                  Copy as JSON
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-quiet"
+                  disabled={events.length === 0}
+                  onClick={() => {
+                    clearAnalytics();
+                    setEvents([]);
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </section>
+          </>
         )}
       </MenuTabs>
     </Modal>
