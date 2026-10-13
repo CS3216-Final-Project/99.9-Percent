@@ -10,7 +10,7 @@ import { Creature, Walker, Wanderer } from "./creatures";
 import { preloadCreatures } from "./creatureCatalog";
 import { Conversation } from "./chatter";
 import { GROUPS } from "./conversations";
-import { ARCADE_Z, ARCADES, CHAIR_OFFSET, deskSeat, FIXTURES, GLASS, GLASS_H, MEETING_CHAIRS, SPOTS } from "./floorplan";
+import { ARCADE_Z, ARCADES, CHAIR_OFFSET, deskSeat, FIXTURES, FOOSBALL, GLASS, GLASS_H, MEETING_CHAIRS, NAP_PODS, NAP_ROOM, SPOTS, STAGE } from "./floorplan";
 import { planLoop, type WaypointId } from "./routes";
 import { BALL_RADIUS, ballAt, RALLY, RALLY_PERIOD, TABLE } from "./rally";
 import { preloadModels, type ModelId } from "./modelCatalog";
@@ -116,6 +116,52 @@ function pingPong(): Prim[] {
     bx([0, line, 0], [l, 0.012, 0.015], "#fff7e8"),
     bx([0, (top + netTop) / 2, 0], [0.02, netTop - top, w + 0.12], LILAC),
     ...[-1.1, 1.1].flatMap((dx) => [-0.6, 0.6].map((dz) => bx([dx, 0.37, dz], [0.07, 0.74, 0.07], TRIM))),
+  ];
+}
+
+/** How high a nap pod's mattress is, where its sleeper lies. */
+const NAP_MATTRESS = 0.56;
+
+/** A nap pod 2 m long along x and 0.82 m wide, its hooded head at the +x end, with a mattress, a pillow and a reading light. */
+function napPod(accent: string): Prim[] {
+  const W = 0.82;
+  return [
+    bx([0, 0.22, 0], [2.0, 0.44, W], WHITE),
+    bx([0, 0.3, W / 2 + 0.003], [2.0, 0.06, 0.006], accent),
+    bx([0, 0.3, -W / 2 - 0.003], [2.0, 0.06, 0.006], accent),
+    bx([-0.05, NAP_MATTRESS - 0.06, 0], [1.8, 0.12, W - 0.14], accent),
+    bx([0.72, 0.6, 0], [0.32, 0.09, W - 0.32], WHITE),
+    // The hood over the head end: a roof, two sides and a back.
+    bx([0.45, 1.06, 0], [1.1, 0.06, W], PALE),
+    bx([0.45, 0.78, W / 2 - 0.025], [1.1, 0.56, 0.05], PALE),
+    bx([0.45, 0.78, -W / 2 + 0.025], [1.1, 0.56, 0.05], PALE),
+    bx([0.98, 0.78, 0], [0.05, 0.56, W], PALE),
+    bx([0.6, 1.02, 0], [0.12, 0.02, 0.12], "#ffd84a"),
+  ];
+}
+
+/** A foosball table's frame and pitch, 1.2 m along x; its rods turn in `FoosballRods`. */
+function foosballTable(): Prim[] {
+  return [
+    ...[-0.5, 0.5].flatMap((dx) => [-0.28, 0.28].map((dz) => bx([dx, 0.35, dz], [0.08, 0.7, 0.08], TRIM))),
+    bx([0, 0.69, 0], [1.16, 0.02, 0.71], "#3d8b5a"),
+    bx([0, 0.702, 0], [0.02, 0.004, 0.68], WHITE),
+    bx([0, 0.78, 0.37], [1.2, 0.2, 0.03], WOOD),
+    bx([0, 0.78, -0.37], [1.2, 0.2, 0.03], WOOD),
+    bx([0.59, 0.78, 0], [0.03, 0.2, 0.75], WOOD),
+    bx([-0.59, 0.78, 0], [0.03, 0.2, 0.75], WOOD),
+  ];
+}
+
+/** The events stage in front of the townhall screen, with a lectern facing the steps. */
+function stage(): Prim[] {
+  return [
+    bx([0, STAGE.h / 2, 0], [STAGE.w, STAGE.h, STAGE.d], WOOD_DARK),
+    bx([0, STAGE.h + 0.005, 0], [STAGE.w - 0.1, 0.01, STAGE.d - 0.1], WOOD),
+    // The lectern near the stage's north end, its sloped top towards the screen.
+    bx([-0.35, STAGE.h + 0.55, 1.4], [0.45, 1.1, 0.42], WOOD),
+    bx([-0.35, STAGE.h + 1.12, 1.4], [0.5, 0.04, 0.48], WOOD_DARK, [0, 0, 0.3]),
+    cy([-0.48, STAGE.h + 1.3, 1.4], 0.03, 0.3, INK),
   ];
 }
 
@@ -318,9 +364,14 @@ function buildStatic(): Prim[] {
   add([bx([0, 1.0, 0], [0.62, 2.0, 0.62], INK), ...Array.from({ length: 8 }, (_, i) => bx([0, 0.4 + i * 0.18, 0.32], [0.5, 0.06, 0.01], i % 3 ? "#3ddc84" : "#ffd84a"))], -14.3, -6.6);
   out.push(bx([-21.0, 0.008, -7.6], [0.06, 0.012, 3.6], "#ffc53d"), bx([-20.0, 0.008, -5.8], [2.0, 0.012, 0.06], "#ffc53d"));
 
-  // Townhall steps facing a screen
+  // Townhall steps facing a screen, and the stage in front of it
   TIERS.forEach(([x, h], tier) => out.push(bx([x, h / 2, 4.5], [1.2, h, 6.6], tier % 2 ? WOOD : WOOD_DARK)));
   add([bx([0, 0.45, 0], [0.4, 0.9, 1.4], TRIM), bx([0, 1.5, 0], [0.08, 1.22, 2.3], INK)], -14.3, 4.5);
+  add(stage(), STAGE.x, STAGE.z);
+
+  // The nap room's pods and the foosball table
+  NAP_PODS.forEach(([x, z], i) => add(napPod(FURNITURE.booths[i % FURNITURE.booths.length]), x, z));
+  add(foosballTable(), FOOSBALL.x, FOOSBALL.z);
 
   // Library shelves and phone booths
   add(shelf(1.9, 2.0, 11), -21.75, 10.6, Math.PI / 2);
@@ -398,6 +449,10 @@ function buildModels(): Placement[] {
   // Library corner
   out.push(mdl("armchair", -19.6, 10.8, Math.PI / 2, 0.95), mdl("armchair", -18.4, 12.6, Math.PI, 0.95));
   out.push(mdl("sideTable", -19.1, 11.9, Math.PI / 4, 0.7), mdl("lampTable", -19.1, 11.9, 0, 0.9, 0.52), mdl("lampRoundFloor", -20.9, 13.7), mdl("pottedPlant", FIXTURES.plantByLibrary.x, FIXTURES.plantByLibrary.z, 0, 1.1));
+
+  // The nap room: a side table with a lamp by the door, and a plant
+  out.push(mdl("sideTable", NAP_ROOM[0] + 0.5, NAP_ROOM[3] - 0.5, 0, 0.6), mdl("lampTable", NAP_ROOM[0] + 0.5, NAP_ROOM[3] - 0.5, 0, 0.8, 0.45));
+  out.push(mdl("pottedPlant", NAP_ROOM[0] + 0.45, NAP_ROOM[1] + 0.45, 0, 0.9));
 
   // Meeting room
   out.push(mdl("tableLong", -9.2, 12.35, 0, [3.4, 0.74, 1.3]));
@@ -551,12 +606,12 @@ const ZONES: [FloorKey, number, number, number, number, number][] = [
   ["server", 7.25, 0.2, 3.5, 9.6, 0.9],
   ["noc", 8.5, -7.05, 6, 4.9, 1.2],
   // Engineering: the pods, the release console and the growth desk.
-  ["work", -2.2, 7.6, 21.6, 5.2, 1.2],
+  ["work", -2.05, 7.6, 21.9, 5.2, 1.2],
   ["meeting", -9.25, 12.35, 7.5, 4.3, 1.2],
   ["reception", 1.25, 12.35, 13.5, 4.3, 0.8],
   // The foosball corner beside reception, carpeted like the games room across the corridor.
   ["games", 10.3, 12.35, 4.6, 4.3, 1.2],
-  ["nap", 10.5, 7.4, 3.8, 3.2, 1.2],
+  ["nap", (NAP_ROOM[0] + NAP_ROOM[2]) / 2, (NAP_ROOM[1] + NAP_ROOM[3]) / 2, NAP_ROOM[2] - NAP_ROOM[0], NAP_ROOM[3] - NAP_ROOM[1], 1.2],
   ["events", -17.5, 4.3, 9, 10.6, 1.2],
   ["library", -17.5, 12.05, 9, 4.9, 1.2],
   ["kitchen", 18.25, -6.25, 7.5, 6.5, 0.8],
@@ -658,6 +713,70 @@ function PingPongBall() {
       <sphereGeometry args={[BALL_RADIUS, 8, 6]} />
       <meshBasicMaterial color="#fff7e8" />
     </mesh>
+  );
+}
+
+/** Figures on each of the foosball table's eight rods, from one goal to the other, and whose side each rod is on. */
+const FOOS_FIGURES = [1, 2, 3, 4, 4, 3, 2, 1];
+const FOOS_SIDE = [0, 0, 1, 0, 1, 0, 1, 1];
+const FOOS_COLOURS = ["#ff4d5e", "#4cb8ff"];
+
+/**
+ * The foosball table's rods, handles and little players, twisting and sliding as the two crew members play. All
+ * three are instanced, so the table costs three draws however many figures it has.
+ */
+function FoosballRods() {
+  const rods = useRef<THREE.InstancedMesh>(null);
+  const handles = useRef<THREE.InstancedMesh>(null);
+  const figures = useRef<THREE.InstancedMesh>(null);
+  const parts = useMemo(() => {
+    const figureCount = FOOS_FIGURES.reduce((a, b) => a + b, 0);
+    return {
+      rod: new THREE.CylinderGeometry(0.01, 0.01, 1.15, 6).rotateX(Math.PI / 2),
+      handle: new THREE.CylinderGeometry(0.022, 0.022, 0.12, 8).rotateX(Math.PI / 2),
+      // Each figure hangs from its rod, its feet just above the pitch.
+      figure: new THREE.BoxGeometry(0.035, 0.12, 0.05).translate(0, -0.05, 0),
+      metal: new THREE.MeshStandardMaterial({ color: ALU, metalness: 0.6, roughness: 0.35 }),
+      grip: new THREE.MeshStandardMaterial({ color: INK }),
+      paint: new THREE.MeshStandardMaterial({ color: "#ffffff" }),
+      figureCount,
+    };
+  }, []);
+  useEffect(() => {
+    const colour = new THREE.Color();
+    let k = 0;
+    FOOS_FIGURES.forEach((n, i) => {
+      for (let j = 0; j < n; j++) figures.current?.setColorAt(k++, colour.set(FOOS_COLOURS[FOOS_SIDE[i]]));
+    });
+    if (figures.current?.instanceColor) figures.current.instanceColor.needsUpdate = true;
+    return () => {
+      for (const g of [parts.rod, parts.handle, parts.figure]) g.dispose();
+      for (const m of [parts.metal, parts.grip, parts.paint]) m.dispose();
+    };
+  }, [parts]);
+  const base = useMemo(() => new THREE.Matrix4(), []);
+  const step = useMemo(() => new THREE.Matrix4(), []);
+  const out = useMemo(() => new THREE.Matrix4(), []);
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    let k = 0;
+    FOOS_FIGURES.forEach((n, i) => {
+      // Each rod twists back and forth at its own pace and slides a little, as hands work the handles.
+      const twist = Math.sin(t * (3 + (i % 3)) + i * 1.3) * 0.9;
+      const slide = Math.sin(t * 1.6 + i) * 0.035;
+      base.makeRotationZ(twist).setPosition(-0.49 + i * 0.14, 0.82, slide);
+      rods.current?.setMatrixAt(i, base);
+      for (const side of [0, 1]) handles.current?.setMatrixAt(i * 2 + side, out.copy(base).multiply(step.makeTranslation(0, 0, side ? 0.6 : -0.6)));
+      for (let j = 0; j < n; j++) figures.current?.setMatrixAt(k++, out.copy(base).multiply(step.makeTranslation(0, 0, ((j + 0.5) / n - 0.5) * 0.62)));
+    });
+    for (const m of [rods.current, handles.current, figures.current]) if (m) m.instanceMatrix.needsUpdate = true;
+  });
+  return (
+    <group position={[FOOSBALL.x, 0, FOOSBALL.z]}>
+      <instancedMesh ref={rods} args={[parts.rod, parts.metal, FOOS_FIGURES.length]} frustumCulled={false} />
+      <instancedMesh ref={handles} args={[parts.handle, parts.grip, FOOS_FIGURES.length * 2]} frustumCulled={false} />
+      <instancedMesh ref={figures} args={[parts.figure, parts.paint, parts.figureCount]} frustumCulled={false} />
+    </group>
   );
 }
 
@@ -848,6 +967,11 @@ export function Office({ crew }: { crew: Crew }) {
       {/* Two players at the ends of the table, each swinging as the ball reaches them. */}
       <Creature species="frog" activity="play" holding="paddle" position={[SPOTS.pingPlayer.x, 0, SPOTS.pingPlayer.z]} rotation={SPOTS.pingPlayer.rot} beat={PING} />
       <Creature species="bunny" activity="play" holding="paddle" position={[SPOTS.pongPlayer.x, 0, SPOTS.pongPlayer.z]} rotation={SPOTS.pongPlayer.rot} beat={PONG} />
+      {/* A foosball match beside reception, and someone asleep in a nap pod. */}
+      <FoosballRods />
+      <Creature species="ninja" activity="type" position={[SPOTS.foosballSouth.x, 0, SPOTS.foosballSouth.z]} rotation={SPOTS.foosballSouth.rot} phase={4} />
+      <Creature species="cat" activity="type" position={[SPOTS.foosballNorth.x, 0, SPOTS.foosballNorth.z]} rotation={SPOTS.foosballNorth.rot} phase={9} />
+      <Creature species="pinkSlime" pose="sit" activity="doze" position={[SPOTS.napper.x, 0, SPOTS.napper.z]} rotation={SPOTS.napper.rot} phase={3} seat={NAP_MATTRESS} />
 
       <OnWall wall="left">
         <PrimBatch prims={wall.leftPrims} shadows={false} />

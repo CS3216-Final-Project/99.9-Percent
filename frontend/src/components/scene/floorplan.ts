@@ -7,6 +7,22 @@ import { RALLY, TABLE } from "./rally";
  * clear of. Kept free of React and three.js so the routes can be tested.
  */
 
+/** The nap room, as [x0, z0, x1, z1]: between the engineering pods and the east corridor. */
+export const NAP_ROOM: [number, number, number, number] = [8.9, 6.05, 12.5, 9.05];
+
+/** The three nap pods' centres, head to the east wall, lying along x. */
+export const NAP_PODS: [number, number][] = [
+  [11.45, 6.6],
+  [11.45, 7.55],
+  [11.45, 8.5],
+];
+
+/** The foosball table's centre, its length along x, in the corner beside reception. */
+export const FOOSBALL = { x: 10.3, z: 12.4 };
+
+/** The low stage in the events space, in front of the townhall screen, as its centre and size. */
+export const STAGE = { x: -15.45, z: 4.5, w: 1.7, d: 4.0, h: 0.18 };
+
 /** Glass partition runs as [x1, z1, x2, z2]. Gaps for doors are already left out. */
 export const GLASS: [number, number, number, number][] = [
   // Server floor
@@ -29,6 +45,12 @@ export const GLASS: [number, number, number, number][] = [
   [-5.9, 10.2, -5.5, 10.2],
   [-5.5, 10.2, -5.5, 14.5],
   [-13, 10.2, -13, 14.5],
+  // Nap room, its door on the west side
+  [NAP_ROOM[0], NAP_ROOM[1], NAP_ROOM[2], NAP_ROOM[1]],
+  [NAP_ROOM[2], NAP_ROOM[1], NAP_ROOM[2], NAP_ROOM[3]],
+  [NAP_ROOM[0], NAP_ROOM[3], NAP_ROOM[2], NAP_ROOM[3]],
+  [NAP_ROOM[0], NAP_ROOM[1], NAP_ROOM[0], 7.05],
+  [NAP_ROOM[0], 8.05, NAP_ROOM[0], NAP_ROOM[3]],
 ];
 
 export const GLASS_H = 2.6;
@@ -39,6 +61,7 @@ export const CLOSED_ROOMS: [number, number, number, number][] = [
   [5.5, -9.5, 11.5, -4.6],
   [-22, -9.5, -13, -1],
   [-13, 10.2, -5.5, 14.5],
+  NAP_ROOM,
 ];
 
 /**
@@ -103,6 +126,11 @@ export const SPOTS = {
   loungeStand: { x: 16.9, z: 6.5, rot: -Math.PI / 2 },
   phoneBooth: { x: -14.8, z: 13.7, rot: Math.PI },
   townhallReader: { x: -18.6, z: 3.6, rot: -Math.PI / 2 },
+  /** The two foosball players, either side of the table's length. */
+  foosballSouth: { x: FOOSBALL.x, z: FOOSBALL.z - 0.85, rot: Math.PI },
+  foosballNorth: { x: FOOSBALL.x, z: FOOSBALL.z + 0.85, rot: 0 },
+  /** Dozing at the open end of the middle pod, out from under its hood, facing the room. */
+  napper: { x: NAP_PODS[1][0] - 0.45, z: NAP_PODS[1][1], rot: Math.PI / 2 },
   pingPlayer: { x: RALLY.x - RALLY.stand, z: RALLY.z, rot: -Math.PI / 2 },
   pongPlayer: { x: RALLY.x + RALLY.stand, z: RALLY.z, rot: Math.PI / 2 },
 } satisfies Record<string, Spot>;
@@ -146,10 +174,12 @@ export const OBSTACLES: Obstacle[] = [
   disc("reception plant", 6.4, 13.9, PLANT_R),
   box("waiting armchairs", -2.2, 12.6, 2.95, 0.95),
   disc("waiting cactus", -4.4, 13.9, 0.44),
+  box("foosball table and handles", FOOSBALL.x, FOOSBALL.z, 1.3, 1.25),
 
   // Townhall and library
   box("townhall steps", -19.5, 4.5, 4.8, 6.6),
   box("townhall screen", -14.3, 4.5, 0.4, 2.3),
+  box("events stage", STAGE.x, STAGE.z, STAGE.w, STAGE.d),
   box("library shelves", -21.75, 11.65, 0.4, 4.0),
   box("library armchair", -19.6, 10.8, 0.94, 1.06),
   box("library armchair facing", -18.4, 12.6, 1.06, 0.94),
