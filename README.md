@@ -10,6 +10,8 @@ The [System Architecture](docs/SYSTEM_ARCHITECTURE.md) diagrams show the target 
 
 The [UI design guide](docs/UI_DESIGN.md) defines the shared visual language, incident and inspector layouts, responsive behaviour and review checks used by both gameplay modes. The [asset pipeline](docs/ASSET_PIPELINE.md) covers where models and textures come from, exporting from Blender, compressing models with `npm run models:compress` and recording licences.
 
+The [PostHog gameplay dashboard](https://us.posthog.com/shared/BAtLorlW6hhWp10C-ZxWuLR-itnjtQ) shows player activity, active gameplay duration, Campaign completion, chapter progression, retention and failed runs once production analytics is enabled.
+
 ## Structure
 
 ```
