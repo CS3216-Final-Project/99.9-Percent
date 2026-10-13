@@ -76,6 +76,20 @@ test("an incident downstairs badges the server floor from the office, and the in
   await expect(label(page, "Database")).toBeVisible();
 });
 
+test("the tutorial takes the view to its step's floor once, and never pulls the player back", async ({ page }) => {
+  await page.goto("/?floor=office");
+  await page.getByRole("button", { name: "Play Classic", exact: true }).click();
+  // The first step points at the servers, so the view rides down to them.
+  await expect(page.getByRole("dialog", { name: /Tutorial, step 1/ })).toBeVisible();
+  await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");
+  await expect(label(page, "Servers")).toBeVisible();
+  // Riding up mid-step stays up.
+  await page.keyboard.press("PageUp");
+  await expect(label(page, "Growth")).toBeVisible();
+  await page.waitForTimeout(1500);
+  await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
+});
+
 test("the first incident's guide takes a player on the office floor down to the machines", async ({ page }) => {
   await seedBeforeIncident(page, { ...newLegacyGame(1), users: 4500 });
   await page.goto("/?floor=office");

@@ -795,7 +795,7 @@ function Effects() {
   );
 }
 
-function Scene({ quality, landed }: { quality: QualityProfile; landed: Floor | null }) {
+function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Floor | null; warm: boolean }) {
   const effects = quality.effects;
   const m = useSceneModel();
   const campaign = useGame(s => s.game.campaign);
@@ -813,8 +813,10 @@ function Scene({ quality, landed }: { quality: QualityProfile; landed: Floor | n
   });
   const onFloor = (f: Floor) => EQUIPMENT_ORDER.filter((id) => floorOf(id) === f && landed === f);
   // Once the room has loaded, prepare the floor out of view as well, so the first ride does not stall on new shaders.
+  // Only on a graphics card: drawing on the CPU, compiling everything at once would stall the page for longer.
   const { gl, scene, camera } = useThree();
   useEffect(() => {
+    if (!warm) return;
     const id = window.setTimeout(() => {
       const groups = [office.current, servers.current];
       const shown = groups.map((g) => g?.visible ?? false);
@@ -829,7 +831,7 @@ function Scene({ quality, landed }: { quality: QualityProfile; landed: Floor | n
       });
     }, WARM_MS);
     return () => window.clearTimeout(id);
-  }, [gl, scene, camera]);
+  }, [gl, scene, camera, warm]);
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
 
   const appCount = Math.min(m.hosts.length, 12);
@@ -1129,7 +1131,7 @@ export default function Facility() {
         {/* The room waits until the renderer is known, so a GPU never compiles the basic materials only to replace them. */}
         {renderer !== "unknown" && (
           <DetailContext.Provider value={quality.detail}>
-            <Scene quality={quality} landed={landed} />
+            <Scene quality={quality} landed={landed} warm={renderer === "gpu"} />
           </DetailContext.Provider>
         )}
         {quality.fps !== null && <FrameLimiter fps={quality.fps} />}

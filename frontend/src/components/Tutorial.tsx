@@ -188,14 +188,19 @@ export default function Tutorial() {
     if (!step) return;
     let last = "";
     let scrolledFor = "";
+    let floorFor = "";
     const read = () => {
       setViewport((v) => (v.w === window.innerWidth && v.h === window.innerHeight ? v : { w: window.innerWidth, h: window.innerHeight }));
       const sel = step.target(useGame.getState());
       setSelector(sel);
-      // A step pointing at equipment on the other floor takes the view there first; its label appears as the car arrives.
+      // A step pointing at equipment on the other floor takes the view there first; its label appears as the car
+      // arrives. Once only: a player who then rides elsewhere is not pulled back.
       const eq = /^\.eq-label\[data-eq="([a-zA-Z]+)"\]$/.exec(sel)?.[1] as EquipmentId | undefined;
-      const s = useGame.getState();
-      if (eq && floorOf(eq) !== s.floor) s.goToFloor(floorOf(eq), "tour");
+      if (eq && floorFor !== sel) {
+        floorFor = sel;
+        const s = useGame.getState();
+        if (floorOf(eq) !== s.floor) s.goToFloor(floorOf(eq), "tour");
+      }
       const el = document.querySelector(sel);
       if (!el) {
         if (last !== "none") {
