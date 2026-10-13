@@ -9,8 +9,6 @@ Sets the game tints were turned grey. Every folder holds color.jpg, normal.jpg
 (OpenGL) and arm.jpg (R = ambient occlusion, G = roughness, B = metalness).
 
 Folder         Source                                  Authors
-parquet        Poly Haven, "Herringbone Parquet"       Sergej Majboroda, Jenelle van Heerden
-               https://polyhaven.com/a/herringbone_parquet
 concrete       Poly Haven, "Concrete Floor Worn 001"   Dimitrios Savva, Rico Cilliers
                https://polyhaven.com/a/concrete_floor_worn_001
 kitchen-tiles  Poly Haven, "Floor Tiles 06"            Rob Tuytel

@@ -21,7 +21,7 @@ import { ARCADE_SCREEN, MAC, MAC_COLOUR_NAMES, type PropItem } from "./propModel
 import { DetailedProps } from "./props";
 import { FURNITURE, PIXEL_FLOORS, ROOM_PALETTE } from "./palette";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
-import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, skylineDay, whiteboard, woodFloor, type PosterKind, type ScreenKind } from "./textures";
+import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, skylineDay, whiteboard, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
 
 /*
@@ -539,17 +539,17 @@ function WhiteboardFace({ position, rot }: { position: V3; rot: number }) {
   );
 }
 
-type FloorKey = "server" | "wood" | "noc" | "meeting" | "kitchen";
+type FloorKey = "server" | "work" | "noc" | "meeting" | "kitchen";
 
 /** Floor finishes by zone, as [finish, centre x, centre z, width, depth, tile size]. */
 const ZONES: [FloorKey, number, number, number, number, number][] = [
   ["server", -3.75, -2.25, 18.5, 14.5, 0.9],
   ["server", 7.25, 0.2, 3.5, 9.6, 0.9],
   ["noc", 8.5, -7.05, 6, 4.9, 1.2],
-  ["wood", 0.75, 7.6, 27.5, 5.2, 1.6],
-  ["wood", 4.5, 12.35, 20, 4.3, 1.6],
-  ["wood", -17.5, 6.75, 9, 15.5, 1.6],
-  ["wood", 18.25, 5.75, 7.5, 17.5, 1.6],
+  ["work", 0.75, 7.6, 27.5, 5.2, 1.2],
+  ["work", 4.5, 12.35, 20, 4.3, 1.2],
+  ["work", -17.5, 6.75, 9, 15.5, 1.2],
+  ["work", 18.25, 5.75, 7.5, 17.5, 1.2],
   ["meeting", -9.25, 12.35, 7.5, 4.3, 1.2],
   ["kitchen", 18.25, -6.25, 7.5, 6.5, 0.8],
 ];
@@ -557,7 +557,7 @@ const ZONES: [FloorKey, number, number, number, number, number][] = [
 /** Each finish at HD detail: a photo surface in the colours of the basic one, and how rough it is. */
 const HD_FLOORS: Record<FloorKey, { id: SurfaceId; tint?: string; roughness?: number }> = {
   server: { id: "serverTiles", tint: ROOM_PALETTE.floor.server },
-  wood: { id: "parquet", tint: ROOM_PALETTE.floor.wood, roughness: 1.6 },
+  work: { id: "carpet", tint: ROOM_PALETTE.floor.work },
   noc: { id: "carpet", tint: ROOM_PALETTE.floor.monitoring },
   meeting: { id: "carpet", tint: ROOM_PALETTE.floor.meeting },
   kitchen: { id: "kitchenTiles", tint: ROOM_PALETTE.floor.kitchen, roughness: 0.9 },
@@ -567,7 +567,7 @@ function Floors() {
   const textures = useMemo(() => {
     const base: Record<FloorKey, THREE.CanvasTexture> = {
       server: floorTiles(),
-      wood: woodFloor(),
+      work: carpet(PIXEL_FLOORS.work.base, PIXEL_FLOORS.work.fleck),
       noc: carpet(PIXEL_FLOORS.monitoring.base, PIXEL_FLOORS.monitoring.fleck),
       meeting: carpet(PIXEL_FLOORS.meeting.base, PIXEL_FLOORS.meeting.fleck),
       kitchen: kitchenTiles(),

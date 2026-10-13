@@ -13,14 +13,13 @@ import { useDetail } from "./detail";
  * and the pattern runs on across neighbouring floors.
  */
 
-export type SurfaceId = "parquet" | "concrete" | "kitchenTiles" | "serverTiles" | "plaster" | "carpet";
+export type SurfaceId = "concrete" | "kitchenTiles" | "serverTiles" | "plaster" | "carpet";
 
 /**
  * Folder under /textures, the width in metres one copy of the texture covers,
  * and whether the set was turned grey so the game can colour it.
  */
 const SURFACES: Record<SurfaceId, { dir: string; size: number; grey: boolean }> = {
-  parquet: { dir: "parquet", size: 3.4, grey: false },
   concrete: { dir: "concrete", size: 3, grey: true },
   kitchenTiles: { dir: "kitchen-tiles", size: 3, grey: false },
   // Three by three tiles, so each is 0.9 m like the raised floor it replaces.

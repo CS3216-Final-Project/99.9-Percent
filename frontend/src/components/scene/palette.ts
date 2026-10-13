@@ -1,6 +1,6 @@
 /*
  * The office's colours, in one place: a bright modern office of off-white walls, light concrete and raised-floor
- * tiles, oak, and muted carpets, so the room sits in the daylit city round it. Surfaces are mid tones rather than
+ * tiles, grey carpet tiles and muted carpets, so the room sits in the daylit city round it. Surfaces are mid tones rather than
  * pure white, so the office's lights and the glow pass do not blow them out. The equipment's state colours (see
  * Facility.tsx) and the neon sign are the only strong colours; everything here leaves room for them.
  */
@@ -17,8 +17,8 @@ export const ROOM_PALETTE = {
     concrete: "#9c988f",
     /** The server floor's raised tiles. */
     server: "#a9adb4",
-    /** Oak where the crew work. */
-    wood: "#c9a37d",
+    /** Grey carpet tiles where the crew work, a shade cooler and darker than the concrete so the two read apart. */
+    work: "#686c73",
     /** Carpet in the monitoring room and the meeting room. */
     monitoring: "#3d4756",
     meeting: "#5f7a70",
@@ -79,7 +79,7 @@ export const EQUIPMENT = {
 export const PIXEL_FLOORS = {
   concrete: { base: "#9a968d", light: "#a29e95", dark: "#928e86", seam: "#86827a" },
   server: { base: "#a6aab1", light: "#aeb2b9", dark: "#9fa3aa", edge: "#b8bcc3", grout: "#7f838a" },
-  wood: { tones: ["#b8875c", "#c08f63", "#ad7f55", "#bb8a5f"], seam: "#8f6542", grain: "#cf9f73" },
+  work: { base: "#757980", fleck: "#6b6f77" },
   monitoring: { base: "#3d4756", fleck: "#343d4a" },
   meeting: { base: "#5f7a70", fleck: "#536b62" },
   kitchen: { base: "#ebe8e2", alternate: "#dfdbd3", grout: "#a8a49c" },

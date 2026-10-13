@@ -308,24 +308,6 @@ function repeating(t: THREE.CanvasTexture): THREE.CanvasTexture {
   return t;
 }
 
-/** Warm wooden planks for the part of the floor where people work. */
-export function woodFloor(): THREE.CanvasTexture {
-  const S = 32;
-  const [c, g] = canvas(S, S);
-  const { tones, seam, grain } = PIXEL_FLOORS.wood;
-  for (let row = 0; row < 4; row++) {
-    const y = row * 8;
-    g.fillStyle = tones[row];
-    g.fillRect(0, y, S, 8);
-    g.fillStyle = seam;
-    g.fillRect(0, y + 7, S, 1);
-    g.fillRect((row * 11 + 5) % S, y, 1, 7);
-    g.fillStyle = grain;
-    for (let i = 0; i < 4; i++) g.fillRect(Math.floor(noise(row * 9 + i) * S), y + 2 + Math.floor(noise(row * 5 + i + 30) * 4), 2, 1);
-  }
-  return repeating(finish(c));
-}
-
 /** The city at night, seen through the office windows. */
 export function skyline(): THREE.CanvasTexture {
   const W = 96;

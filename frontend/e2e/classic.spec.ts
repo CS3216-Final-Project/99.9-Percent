@@ -88,8 +88,8 @@ test('draws the photo-scanned surfaces and furniture when HD detail is forced', 
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   // Compiling the HD shaders in software can block the page for longer than the default 10 seconds.
   await expectRoom(page, 30_000);
-  // Six surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
-  await expect.poll(() => textures.size).toBe(18);
+  // Five surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
+  await expect.poll(() => textures.size).toBe(15);
   await expect.poll(() => furniture.size).toBe(9);
   // Five surfaces outside, each with a colour and a normal map.
   await expect.poll(() => city.size).toBe(10);
