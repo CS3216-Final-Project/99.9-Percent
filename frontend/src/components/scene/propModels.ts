@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { FURNITURE } from "./palette";
 import type { V3 } from "./shapes";
 
 /*
@@ -407,23 +408,22 @@ function arcade(variant: string): Kit {
 
 function crac(): Kit {
   const k = new Kit();
-  const shell = "#d6d3e8";
-  const door = "#cbc7e2";
-  k.box([1.36, 0.04, 0.86], "#2a2840", "matte", [0, 0.02, 0]);
+  const { shell, door, base, louvre, display, button, label, top } = FURNITURE.crac;
+  k.box([1.36, 0.04, 0.86], base, "matte", [0, 0.02, 0]);
   k.round([1.4, 1.96, 0.9], 0.015, shell, "metal", [0, 1.0, 0]);
   for (const side of [-1, 1]) {
     // Two doors, louvred across the lower two thirds, with chrome handles by the seam.
     k.box([0.68, 1.9, 0.012], door, "metal", [side * 0.348, 1.0, 0.456]);
-    for (let i = 0; i < 19; i++) k.box([0.6, 0.012, 0.03], "#8a86b5", "metal", [side * 0.348, 0.14 + i * 0.058, 0.468], [0.6, 0, 0]);
+    for (let i = 0; i < 19; i++) k.box([0.6, 0.012, 0.03], louvre, "metal", [side * 0.348, 0.14 + i * 0.058, 0.468], [0.6, 0, 0]);
     k.box([0.02, 0.18, 0.02], "#e2e5ec", "chrome", [side * 0.05, 1.3, 0.472]);
   }
   // The controller: a lit display, status lights and buttons.
-  k.box([0.3, 0.2, 0.01], "#1c1b2e", "gloss", [-0.35, 1.62, 0.467]);
+  k.box([0.3, 0.2, 0.01], display, "gloss", [-0.35, 1.62, 0.467]);
   k.box([0.22, 0.09, 0.004], "#5ee7ff", "glow", [-0.35, 1.65, 0.473]);
   ["#3ddc84", "#3ddc84", "#ffc53d"].forEach((c, i) => k.box([0.014, 0.014, 0.004], c, "glow", [-0.44 + i * 0.03, 1.56, 0.473]));
-  for (let i = 0; i < 4; i++) k.box([0.03, 0.02, 0.008], "#9a97b8", "gloss", [-0.3 + i * 0.04, 1.555, 0.474]);
-  k.box([0.3, 0.06, 0.004], "#5d5399", "gloss", [0.35, 1.7, 0.464]);
-  k.box([1.3, 0.01, 0.8], "#3a3854", "matte", [0, 1.985, 0]);
+  for (let i = 0; i < 4; i++) k.box([0.03, 0.02, 0.008], button, "gloss", [-0.3 + i * 0.04, 1.555, 0.474]);
+  k.box([0.3, 0.06, 0.004], label, "gloss", [0.35, 1.7, 0.464]);
+  k.box([1.3, 0.01, 0.8], top, "matte", [0, 1.985, 0]);
   return k;
 }
 

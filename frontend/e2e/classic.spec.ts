@@ -72,11 +72,15 @@ test('draws the photo-scanned surfaces and furniture when HD detail is forced', 
   // which took up to 30 seconds locally, so it gets the same headroom as other slow journeys.
   test.setTimeout(120_000);
   const textures = new Set<string>();
+  const city = new Set<string>();
   const furniture = new Set<string>();
+  // The city's ground and roofs have photo sets of their own, apart from the office's.
+  const outside = /\/textures\/(asphalt|lawn|pavement|gravel|roof-tiles)\//;
   page.on('response', response => {
     if (!response.ok()) return;
     const path = new URL(response.url()).pathname;
-    if (path.includes('/textures/')) textures.add(path);
+    if (outside.test(path)) city.add(path);
+    else if (path.includes('/textures/')) textures.add(path);
     if (path.includes('/models/polyhaven/')) furniture.add(path);
   });
   await page.goto('/?graphics=hd');
@@ -84,9 +88,11 @@ test('draws the photo-scanned surfaces and furniture when HD detail is forced', 
   await page.getByRole('button', { name: 'Skip', exact: true }).click();
   // Compiling the HD shaders in software can block the page for longer than the default 10 seconds.
   await expectRoom(page, 30_000);
-  // Six surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
-  await expect.poll(() => textures.size).toBe(18);
+  // Five surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
+  await expect.poll(() => textures.size).toBe(15);
   await expect.poll(() => furniture.size).toBe(9);
+  // Five surfaces outside, each with a colour and a normal map.
+  await expect.poll(() => city.size).toBe(10);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
   await expectRoom(page);

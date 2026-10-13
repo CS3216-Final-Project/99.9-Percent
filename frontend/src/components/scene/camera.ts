@@ -37,3 +37,15 @@ export function turnAbout(target: THREE.Vector3, anchor: THREE.Vector3, from: TH
   // Slide along the new view direction back onto the floor.
   return target.addScaledVector(to, -target.y / to.y);
 }
+
+/**
+ * Zoom, in pixels a metre, below which the city outside draws its lighter trees, cars and people, and above which it
+ * goes back. Far enough out, their detail is finer than a pixel; the gap between the two keeps a zoom resting on
+ * the line from flickering between them.
+ */
+export const DETAIL_ZOOM = { into: 16, outOf: 19 };
+
+/** Whether the city should draw its lighter models at this zoom, given whether it already was. */
+export function zoomedOut(zoom: number, was: boolean): boolean {
+  return was ? zoom <= DETAIL_ZOOM.outOf : zoom < DETAIL_ZOOM.into;
+}

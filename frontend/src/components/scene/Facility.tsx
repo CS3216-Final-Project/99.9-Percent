@@ -35,12 +35,15 @@ import { Icon } from "../icons";
 import { tipProps } from "../tips";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
+import { applyDaylight } from "./cityLight";
 import { Exterior } from "./exterior";
+import { daylightNow } from "./dayClock";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
 import { buildModel, type SceneModel } from "./sceneModel";
 import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
 import { screenPoint } from "./labels";
+import { EQUIPMENT, ROOM_PALETTE } from "./palette";
 
 function useSceneModel(): SceneModel {
   const key = useGame((s) => JSON.stringify(buildModel(s.game)));
@@ -242,9 +245,9 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
 /* ------------------------------------------------------------------ */
 
 /* A toy server room at night: flat indigo cabinets, warm desks and bright status lights. */
-const STEEL = "#34305c";
-const TRIM = "#2a2450";
-const BEZEL = "#1d1834";
+const STEEL = EQUIPMENT.rack;
+const TRIM = EQUIPMENT.trim;
+const BEZEL = EQUIPMENT.bezel;
 
 function Rack({
   x,
@@ -394,7 +397,7 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
     fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4.2)) : base;
   });
 
-  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered ? ACCENT : built ? "#8f87c9" : "#6e67a3";
+  const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered ? ACCENT : built ? ROOM_PALETTE.footprint.built : ROOM_PALETTE.footprint.empty;
   const hw = f.w / 2;
   const hd = f.d / 2;
   const outline: [number, number, number][] = [
@@ -574,7 +577,7 @@ function Labels() {
 /* ------------------------------------------------------------------ */
 
 /** Tint of the polished concrete under the corridors in HD. */
-const CONCRETE_TINT = "#4c4679";
+const CONCRETE_TINT = ROOM_PALETTE.floor.concrete;
 
 function Room() {
   const tiles = useMemo(() => {
@@ -607,20 +610,20 @@ function Room() {
       )}
       <mesh position={[ROOM.cx, -0.26, ROOM.cz]}>
         <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
-        <meshStandardMaterial color="#2a2450" roughness={0.9} />
+        <meshStandardMaterial color={ROOM_PALETTE.slab} roughness={0.9} />
       </mesh>
       {/* Four walls; the ones between the camera and the room drop to a low rim. */}
-      <Wall wall="back" x={ROOM.cx} z={ROOM.z0 - 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
-      <Wall wall="front" x={ROOM.cx} z={ROOM.z1 + 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color="#5d5399" />
-      <Wall wall="left" x={ROOM.x0 - 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
-      <Wall wall="right" x={ROOM.x1 + 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color="#4f4688" />
+      <Wall wall="back" x={ROOM.cx} z={ROOM.z0 - 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color={ROOM_PALETTE.wall} />
+      <Wall wall="front" x={ROOM.cx} z={ROOM.z1 + 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color={ROOM_PALETTE.wall} />
+      <Wall wall="left" x={ROOM.x0 - 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color={ROOM_PALETTE.wallSide} />
+      <Wall wall="right" x={ROOM.x1 + 0.12} z={ROOM.cz} size={[0.24, ROOM.wallH, ROOM.d]} color={ROOM_PALETTE.wallSide} />
       <mesh position={[ROOM.cx, 0.12, ROOM.z0 + 0.02]}>
         <boxGeometry args={[ROOM.w, 0.24, 0.04]} />
-        <meshStandardMaterial color={TRIM} roughness={0.85} />
+        <meshStandardMaterial color={ROOM_PALETTE.skirting} roughness={0.85} />
       </mesh>
       <mesh position={[ROOM.x0 + 0.02, 0.12, ROOM.cz]}>
         <boxGeometry args={[0.04, 0.24, ROOM.d]} />
-        <meshStandardMaterial color={TRIM} roughness={0.85} />
+        <meshStandardMaterial color={ROOM_PALETTE.skirting} roughness={0.85} />
       </mesh>
       {/* Overhead cable tray along the back wall. */}
       <OnWall wall="back">
@@ -645,6 +648,57 @@ function Room() {
 /** Sky light and reflection strength at HD detail. */
 const HD_SKY = 1.45;
 const HD_REFLECTIONS = 0.3;
+
+/** How far the office's sun stands from the room, along the direction its light comes from. */
+const SUN_DISTANCE = 21.4;
+
+/**
+ * The time of day (see sky.ts), moved on every frame: the sky behind the city, the city's own light, and the
+ * office's sun and sky light. The office's lights follow the day's colour and the sun across the sky, but never
+ * drop low or dim far, so the room reads the same at noon and at three in the morning.
+ */
+function Daylight({ quality, hd }: { quality: QualityProfile; hd: boolean }) {
+  const sky = useRef<THREE.HemisphereLight>(null);
+  const sun = useRef<THREE.DirectionalLight>(null);
+  const background = useRef<THREE.Color>(null);
+  // Reflections light the HD materials too, so the sky light is turned down to keep the same brightness.
+  const skyStrength = hd ? HD_SKY : 1.7;
+  useFrame(() => {
+    const d = daylightNow();
+    applyDaylight(d, quality.effects);
+    background.current?.setRGB(d.horizon[0], d.horizon[1], d.horizon[2], THREE.SRGBColorSpace);
+    if (sky.current) sky.current.intensity = skyStrength * d.office.sky;
+    const light = sun.current;
+    if (light) {
+      light.intensity = d.office.sun;
+      light.color.setRGB(d.office.colour[0], d.office.colour[1], d.office.colour[2], THREE.SRGBColorSpace);
+      light.position.set(d.office.dir[0] * SUN_DISTANCE, d.office.dir[1] * SUN_DISTANCE, d.office.dir[2] * SUN_DISTANCE);
+    }
+  });
+  return (
+    <>
+      <color ref={background} attach="background" args={["#1a1633"]} />
+      <hemisphereLight ref={sky} args={["#fff0dd", ROOM_PALETTE.bounce, skyStrength]} />
+      <directionalLight
+        ref={sun}
+        position={[11, 17, 7]}
+        intensity={2.3}
+        color="#fff1de"
+        castShadow={quality.shadows}
+        // The shadow map's sharpness and edge softness come from the quality setting.
+        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
+        shadow-radius={quality.shadowRadius}
+        shadow-bias={-0.0005}
+        shadow-camera-left={-30}
+        shadow-camera-right={30}
+        shadow-camera-top={30}
+        shadow-camera-bottom={-30}
+        shadow-camera-near={1}
+        shadow-camera-far={60}
+      />
+    </>
+  );
+}
 
 /**
  * Soft reflections of a generic bright room for the HD materials. It is built
@@ -703,36 +757,18 @@ function Scene({ quality }: { quality: QualityProfile }) {
 
   return (
     <>
-      <color attach="background" args={["#1a1633"]} />
       {hd && <Reflections />}
-      {/* Reflections light the HD materials too, so the sky light is turned down to keep the same brightness. */}
-      <hemisphereLight args={["#fff0dd", "#3b3366", hd ? HD_SKY : 1.7]} />
-      <directionalLight
-        position={[11, 17, 7]}
-        intensity={2.3}
-        color="#fff1de"
-        castShadow={quality.shadows}
-        // The shadow map's sharpness and edge softness come from the quality setting.
-        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
-        shadow-radius={quality.shadowRadius}
-        shadow-bias={-0.0005}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
-        shadow-camera-near={1}
-        shadow-camera-far={60}
-      />
+      <Daylight quality={quality} hd={hd} />
       <pointLight position={[-3, 3.4, -3.5]} intensity={24} distance={13} color="#8fc3ff" />
       <pointLight position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
       <Room />
-      <Exterior linear={effects} />
+      <Exterior />
       <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
 
       {/* Network edge */}
       <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
-      {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint="#3a3566" />}
+      {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint={EQUIPMENT.loadBalancer} />}
 
       {/* App servers */}
       {m.hosts.slice(0, 12).map((led, i) => {
@@ -741,18 +777,18 @@ function Scene({ quality }: { quality: QualityProfile }) {
       })}
       {Array.from({ length: m.temp }, (_, i) => {
         const p = tempSlot(i);
-        return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint="#2f4a7a" />;
+        return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint={EQUIPMENT.temporary} />;
       })}
-      {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint="#4d3f63" />}
+      {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint={EQUIPMENT.standby} />}
 
       {/* Data tier */}
-      {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint="#2f3f73" />}
+      {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint={EQUIPMENT.cache} />}
       {Array.from({ length: m.dbCabinets }, (_, i) => {
         const p = dbSlot(i);
-        return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint="#3f3170" />;
+        return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint={EQUIPMENT.database} />;
       })}
-      {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint="#3f3170" />}
-      {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint="#3b3560" />}
+      {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint={EQUIPMENT.database} />}
+      {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint={EQUIPMENT.backup} />}
 
       {/* Monitoring wall */}
       {m.monitoring > 0 &&

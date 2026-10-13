@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { EQUIPMENT, PIXEL_FLOORS } from "./palette";
 
 /**
  * Small procedural textures drawn on canvases. They give the racks and screens
@@ -12,7 +13,7 @@ export const LED_COLORS: Record<Led, string> = {
   ok: "#3ddc84",
   warn: "#ff9f1a",
   critical: "#ff4d5e",
-  off: "#2a2547",
+  off: EQUIPMENT.face.ledOff,
   standby: "#ffc53d",
   temp: "#4cb8ff",
 };
@@ -60,7 +61,8 @@ export function panelTextures(variant: PanelVariant, led: Led): PanelTextures {
   const color = LED_COLORS[led];
   const lit = led !== "off";
 
-  m.fillStyle = "#1b1736";
+  const f = EQUIPMENT.face;
+  m.fillStyle = f.back;
   m.fillRect(0, 0, W, H);
   e.fillStyle = "#000";
   e.fillRect(0, 0, W, H);
@@ -83,14 +85,14 @@ export function panelTextures(variant: PanelVariant, led: Led): PanelTextures {
     const uh = (H - 12) / units;
     for (let i = 0; i < units; i++) {
       const y = 6 + i * uh;
-      m.fillStyle = "#2f2a55";
+      m.fillStyle = f.unit;
       m.fillRect(6, y + 1, W - 12, uh - 3);
-      m.fillStyle = "#221e42";
+      m.fillStyle = f.vent;
       for (let v = 0; v < 14; v++) m.fillRect(12 + v * 5, y + 5, 2.5, uh - 11);
-      m.fillStyle = "#3e3870";
+      m.fillStyle = f.edge;
       m.fillRect(6, y + 1, W - 12, 1.5);
       dot(W - 18, y + uh / 2, 2.6, color);
-      if (noise(i) > 0.35) dot(W - 28, y + uh / 2, 1.8, lit ? "#4cb8ff" : "#2a2547");
+      if (noise(i) > 0.35) dot(W - 28, y + uh / 2, 1.8, lit ? "#4cb8ff" : f.ledOff);
     }
   } else if (variant === "db" || variant === "storage") {
     const cols = variant === "db" ? 3 : 4;
@@ -101,11 +103,11 @@ export function panelTextures(variant: PanelVariant, led: Led): PanelTextures {
       for (let c2 = 0; c2 < cols; c2++) {
         const x = 7 + c2 * cw;
         const y = 7 + r * rh;
-        m.fillStyle = "#322c5c";
+        m.fillStyle = f.bay;
         m.fillRect(x + 1.5, y + 1.5, cw - 3, rh - 3);
-        m.fillStyle = "#211c40";
+        m.fillStyle = f.slot;
         m.fillRect(x + 5, y + rh * 0.3, cw - 10, rh * 0.42);
-        m.fillStyle = "#463f7a";
+        m.fillStyle = f.bayEdge;
         m.fillRect(x + 1.5, y + 1.5, cw - 3, 1.5);
         dot(x + cw - 8, y + rh - 8, 2.2, color);
       }
@@ -115,11 +117,11 @@ export function panelTextures(variant: PanelVariant, led: Led): PanelTextures {
     const rh = (H - 12) / rows;
     for (let r = 0; r < rows; r++) {
       const y = 6 + r * rh;
-      m.fillStyle = "#2c2752";
+      m.fillStyle = f.panel;
       m.fillRect(6, y + 1, W - 12, rh - 3);
       for (let p = 0; p < 12; p++) {
         const x = 11 + p * 9;
-        m.fillStyle = "#14112a";
+        m.fillStyle = f.port;
         m.fillRect(x, y + rh * 0.42, 6, rh * 0.34);
         const n = noise(r * 31 + p);
         if (n > 0.3) dot(x + 3, y + rh * 0.26, 1.5, n > 0.9 ? LED_COLORS.warn : color);
@@ -130,11 +132,11 @@ export function panelTextures(variant: PanelVariant, led: Led): PanelTextures {
     const uh = (H - 12) / units;
     for (let i = 0; i < units; i++) {
       const y = 6 + i * uh;
-      m.fillStyle = "#2f2a55";
+      m.fillStyle = f.unit;
       m.fillRect(6, y + 1, W - 12, uh - 3);
       for (let b = 0; b < 8; b++) {
         const x = 12 + b * 10;
-        m.fillStyle = "#221e42";
+        m.fillStyle = f.vent;
         m.fillRect(x, y + 8, 6, uh - 18);
         if (lit && noise(i * 17 + b) > 0.25) {
           m.fillStyle = "#4cb8ff";
@@ -162,15 +164,15 @@ export function screenTexture(kind: ScreenKind): THREE.CanvasTexture {
   const [c, g] = canvas(W, H);
 
   const bg: Record<ScreenKind, string> = {
-    code: "#16133a",
-    idle: "#100e26",
-    dash: "#14123a",
+    code: EQUIPMENT.screen.code,
+    idle: EQUIPMENT.screen.idle,
+    dash: EQUIPMENT.screen.dash,
     alert: "#3a0f1e",
-    chart: "#14123a",
+    chart: EQUIPMENT.screen.chart,
     deploy: "#10261e",
     "deploy-busy": "#2e1d0a",
-    off: "#0a0918",
-    game: "#0d0b22",
+    off: EQUIPMENT.screen.off,
+    game: EQUIPMENT.screen.game,
     slides: "#f4f1ea",
   };
   g.fillStyle = bg[kind];
@@ -184,7 +186,7 @@ export function screenTexture(kind: ScreenKind): THREE.CanvasTexture {
       g.fillRect(12 + indent, 12 + i * 11, 30 + noise(i + 9) * 130, 4);
     }
   } else if (kind === "idle") {
-    g.fillStyle = "#2a2547";
+    g.fillStyle = EQUIPMENT.screen.idleBar;
     g.fillRect(W / 2 - 40, H / 2 - 3, 80, 6);
   } else if (kind === "dash" || kind === "alert") {
     const line = kind === "alert" ? "#ff4d5e" : "#3ddc84";
@@ -192,7 +194,7 @@ export function screenTexture(kind: ScreenKind): THREE.CanvasTexture {
       for (let col = 0; col < 3; col++) {
         const x = 10 + col * 82;
         const y = 10 + r * 74;
-        g.fillStyle = kind === "alert" ? "#4a1630" : "#221e4a";
+        g.fillStyle = kind === "alert" ? "#4a1630" : EQUIPMENT.screen.tile;
         g.fillRect(x, y, 72, 64);
         g.strokeStyle = col === 1 && r === 0 ? "#4cb8ff" : line;
         g.lineWidth = 2;
@@ -208,7 +210,7 @@ export function screenTexture(kind: ScreenKind): THREE.CanvasTexture {
       }
     }
   } else if (kind === "chart") {
-    g.strokeStyle = "#2f2a55";
+    g.strokeStyle = EQUIPMENT.screen.grid;
     g.lineWidth = 1;
     for (let i = 1; i < 5; i++) {
       g.beginPath();
@@ -276,16 +278,17 @@ export function floorTiles(): THREE.CanvasTexture {
   // A 16-pixel tile drawn pixel by pixel: base, a lit top-left edge and a dark grout line.
   const S = 16;
   const [c, g] = canvas(S, S);
-  g.fillStyle = "#544e8c";
+  const p = PIXEL_FLOORS.server;
+  g.fillStyle = p.base;
   g.fillRect(0, 0, S, S);
   for (let i = 0; i < 10; i++) {
-    g.fillStyle = noise(i) > 0.5 ? "#5a5494" : "#4f4985";
+    g.fillStyle = noise(i) > 0.5 ? p.light : p.dark;
     g.fillRect(Math.floor(noise(i + 500) * 13) + 1, Math.floor(noise(i + 900) * 13) + 1, 1, 1);
   }
-  g.fillStyle = "#615ba0";
+  g.fillStyle = p.edge;
   g.fillRect(1, 1, S - 2, 1);
   g.fillRect(1, 1, 1, S - 2);
-  g.fillStyle = "#3a3468";
+  g.fillStyle = p.grout;
   g.fillRect(0, S - 1, S, 1);
   g.fillRect(S - 1, 0, 1, S);
   const t = finish(c);
@@ -303,24 +306,6 @@ function repeating(t: THREE.CanvasTexture): THREE.CanvasTexture {
   t.wrapS = THREE.RepeatWrapping;
   t.wrapT = THREE.RepeatWrapping;
   return t;
-}
-
-/** Warm wooden planks for the part of the floor where people work. */
-export function woodFloor(): THREE.CanvasTexture {
-  const S = 32;
-  const [c, g] = canvas(S, S);
-  const tones = ["#8a5a3c", "#93623f", "#7f5236", "#8d5d3a"];
-  for (let row = 0; row < 4; row++) {
-    const y = row * 8;
-    g.fillStyle = tones[row];
-    g.fillRect(0, y, S, 8);
-    g.fillStyle = "#6a4129";
-    g.fillRect(0, y + 7, S, 1);
-    g.fillRect((row * 11 + 5) % S, y, 1, 7);
-    g.fillStyle = "#a06d47";
-    for (let i = 0; i < 4; i++) g.fillRect(Math.floor(noise(row * 9 + i) * S), y + 2 + Math.floor(noise(row * 5 + i + 30) * 4), 2, 1);
-  }
-  return repeating(finish(c));
 }
 
 /** The city at night, seen through the office windows. */
@@ -355,6 +340,39 @@ export function skyline(): THREE.CanvasTexture {
     }
     x += bw + 1;
     i++;
+  }
+  return finish(c);
+}
+
+/** The same view by day: a pale sky over grey-blue towers and the glint of their glass, with treetops in front. */
+export function skylineDay(): THREE.CanvasTexture {
+  const W = 96;
+  const H = 64;
+  const [c, g] = canvas(W, H);
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, "#8fb6dc");
+  sky.addColorStop(1, "#dce8f1");
+  g.fillStyle = sky;
+  g.fillRect(0, 0, W, H);
+  let x = 0;
+  let i = 0;
+  while (x < W) {
+    const bw = 8 + Math.floor(noise(i * 3 + 1) * 12);
+    const bh = 18 + Math.floor(noise(i * 3 + 2) * 34);
+    g.fillStyle = i % 2 ? "#8d9cad" : "#a3b1c0";
+    g.fillRect(x, H - bh, bw, bh);
+    g.fillStyle = i % 2 ? "#7c8b9c" : "#91a0b0";
+    for (let wy = H - bh + 3; wy < H - 2; wy += 4) g.fillRect(x + 1, wy, bw - 2, 1);
+    g.fillStyle = "#e9f2f8";
+    g.fillRect(x + 1, H - bh + 1, 1, bh - 2);
+    x += bw + 1;
+    i++;
+  }
+  g.fillStyle = "#4f7a45";
+  for (let t = 0; t < 14; t++) {
+    const tx = Math.floor(noise(t + 200) * W);
+    const r = 2 + Math.floor(noise(t + 230) * 3);
+    g.fillRect(tx - r, H - r * 2, r * 2, r * 2);
   }
   return finish(c);
 }
@@ -460,6 +478,49 @@ export function logoSign(): THREE.CanvasTexture {
   return t;
 }
 
+/** One billboard advertisement's cell in the sheet of them: two across, four down. */
+export const AD_CELL: [number, number] = [512, 160];
+
+/** Advertisements for the valley's made-up startups: a headline, a line under it, and their colours. */
+const ADS: { head: string; line: string; paper: string; ink: string; accent: string }[] = [
+  { head: "SHIP IT FRIDAY", line: "DeployDuck · zero-downtime deploys", paper: "#ffd84a", ink: "#1d1834", accent: "#ff7a3d" },
+  { head: "YOUR AI WROTE THIS", line: "Promptly · billboards that write themselves", paper: "#6f4cff", ink: "#ffffff", accent: "#ffd84a" },
+  { head: "SERVERLESS*", line: "*servers sold separately · Nimbus Cloud", paper: "#bfe6ff", ink: "#12304d", accent: "#2f7de1" },
+  { head: "99.99%", line: "keep it online · now hiring", paper: "#1d1834", ink: "#ffe680", accent: "#ff9be3" },
+  { head: "HIRING 10x ENGINEERS", line: "1x welcome too · Gigaflow", paper: "#2ec4b6", ink: "#0f2b2a", accent: "#ffffff" },
+  { head: "PIVOT PARTNERS", line: "we have changed direction", paper: "#ff7f3f", ink: "#2b1205", accent: "#fff3d6" },
+  { head: "BYTE BURRITO", line: "fuel for late-night deploys", paper: "#d7263d", ink: "#fff3d6", accent: "#ffd84a" },
+  { head: "DEBUG IN PROD?", line: "Tracewise sees everything", paper: "#0f2b2a", ink: "#7de8d3", accent: "#ff5a5f" },
+];
+
+/** Every billboard advertisement on one sheet, in the pixel font. */
+export function adsTexture(): THREE.CanvasTexture {
+  const [cw, ch] = AD_CELL;
+  return letteredTexture("ads", cw * 2, ch * 4, (g) => {
+    ADS.forEach((ad, k) => {
+      const x = (k % 2) * cw;
+      const y = Math.floor(k / 2) * ch;
+      g.fillStyle = ad.paper;
+      g.fillRect(x, y, cw, ch);
+      g.fillStyle = ad.accent;
+      g.fillRect(x, y + ch - 18, cw, 18);
+      g.fillRect(x + 22, y + 22, 14, ch - 62);
+      g.textAlign = "left";
+      g.textBaseline = "middle";
+      g.fillStyle = ad.ink;
+      // Each line shrinks, if it must, to fit the board.
+      const fit = (text: string, size: number, at: number) => {
+        g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
+        const width = g.measureText(text).width;
+        if (width > cw - 70) g.font = `700 ${Math.floor((size * (cw - 70)) / width)}px "Pixelify Sans", sans-serif`;
+        g.fillText(text, x + 50, y + at);
+      };
+      fit(ad.head, 58, 60);
+      fit(ad.line, 24, 112);
+    });
+  });
+}
+
 /** Today's architecture sketch, with the next idea scribbled in red. */
 export function whiteboard(): THREE.CanvasTexture {
   const W = 320;
@@ -534,13 +595,14 @@ export function whiteboard(): THREE.CanvasTexture {
 export function concreteFloor(): THREE.CanvasTexture {
   const S = 32;
   const [c, g] = canvas(S, S);
-  g.fillStyle = "#4a4475";
+  const p = PIXEL_FLOORS.concrete;
+  g.fillStyle = p.base;
   g.fillRect(0, 0, S, S);
   for (let i = 0; i < 40; i++) {
-    g.fillStyle = noise(i) > 0.5 ? "#504a7d" : "#443e6c";
+    g.fillStyle = noise(i) > 0.5 ? p.light : p.dark;
     g.fillRect(Math.floor(noise(i + 300) * S), Math.floor(noise(i + 600) * S), 2, 1);
   }
-  g.fillStyle = "#3d3764";
+  g.fillStyle = p.seam;
   g.fillRect(0, S - 1, S, 1);
   g.fillRect(S - 1, 0, 1, S);
   return repeating(finish(c));
@@ -561,12 +623,13 @@ export function carpet(base: string, fleck: string): THREE.CanvasTexture {
 export function kitchenTiles(): THREE.CanvasTexture {
   const S = 16;
   const [c, g] = canvas(S, S);
-  g.fillStyle = "#d9d4f0";
+  const p = PIXEL_FLOORS.kitchen;
+  g.fillStyle = p.base;
   g.fillRect(0, 0, S, S);
-  g.fillStyle = "#c9c2e6";
+  g.fillStyle = p.alternate;
   g.fillRect(0, 0, S / 2, S / 2);
   g.fillRect(S / 2, S / 2, S / 2, S / 2);
-  g.fillStyle = "#8f87c9";
+  g.fillStyle = p.grout;
   g.fillRect(0, 0, S, 1);
   g.fillRect(0, 0, 1, S);
   g.fillRect(0, S / 2, S, 1);

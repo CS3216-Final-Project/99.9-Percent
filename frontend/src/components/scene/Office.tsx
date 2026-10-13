@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { deskSlot, POS, ROOM } from "./layout";
 import { creature, standsAtDesk, type Activity, type Species } from "./cast";
+import { daylightNow } from "./dayClock";
 import { Creature, Walker, Wanderer } from "./creatures";
 import { preloadCreatures } from "./creatureCatalog";
 import { Conversation } from "./chatter";
@@ -18,8 +19,9 @@ import { PrimBatch } from "./prims";
 import { ball, bx, cy, place, type Prim, type V3 } from "./shapes";
 import { ARCADE_SCREEN, MAC, MAC_COLOUR_NAMES, type PropItem } from "./propModels";
 import { DetailedProps } from "./props";
+import { FURNITURE, PIXEL_FLOORS, ROOM_PALETTE } from "./palette";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
-import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, whiteboard, woodFloor, type PosterKind, type ScreenKind } from "./textures";
+import { carpet, floorTiles, kitchenTiles, logoSign, poster, screenTexture, skyline, skylineDay, whiteboard, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
 
 /*
@@ -35,16 +37,16 @@ import { OnWall } from "./walls";
  * moving things are separate.
  */
 
-const INK = "#1d1834";
-const TRIM = "#2a2450";
-const STEEL = "#34305c";
+const INK = FURNITURE.ink;
+const TRIM = FURNITURE.trim;
+const STEEL = FURNITURE.steel;
 const WOOD = "#c98b55";
-const WOOD_DARK = "#8a5a3c";
+const WOOD_DARK = FURNITURE.woodDark;
 const CHAIR = "#ff9f43";
-const LILAC = "#e8e4ff";
-const PALE = "#d9d4f0";
+const LILAC = FURNITURE.light;
+const PALE = FURNITURE.pale;
 const WHITE = "#f4f1ea";
-const ALU = "#b9b2d9";
+const ALU = FURNITURE.alu;
 const MUGS = ["#4cb8ff", "#ff7ad9", "#3ddc84", "#ffc53d", "#a985ff", "#ff9f43"];
 const BOOKS = ["#ff4d5e", "#4cb8ff", "#ffc53d", "#3ddc84", "#a985ff", "#ff9f43", "#f4f1ea", "#2dd4bf", "#ff7ad9"];
 
@@ -277,7 +279,7 @@ function buildStatic(): Prim[] {
     [
       bx([0, 0.27, 0], [0.8, 0.04, 0.55], ALU),
       bx([0, 0.77, 0], [0.8, 0.04, 0.55], ALU),
-      ...[-0.37, 0.37].flatMap((dx) => [-0.24, 0.24].map((dz) => bx([dx, 0.42, dz], [0.04, 0.7, 0.04], "#5d5399"))),
+      ...[-0.37, 0.37].flatMap((dx) => [-0.24, 0.24].map((dz) => bx([dx, 0.42, dz], [0.04, 0.7, 0.04], FURNITURE.frame))),
       ...[-0.33, 0.33].flatMap((dx) => [-0.2, 0.2].map((dz) => cy([dx, 0.06, dz], 0.12, 0.05, INK))),
       bx([0, 0.8, 0.02], [0.4, 0.02, 0.28], PALE),
       bx([0, 0.93, -0.12], [0.4, 0.24, 0.02], PALE, [-0.3, 0, 0]),
@@ -294,8 +296,8 @@ function buildStatic(): Prim[] {
     [6.4, -1.0],
     [0.9, 0.6],
   ]) {
-    out.push(bx([x, 0.006, z], [0.86, 0.012, 0.86], "#8f87c9"));
-    for (let i = 0; i < 16; i++) out.push(bx([x - 0.3 + (i % 4) * 0.2, 0.013, z - 0.3 + Math.floor(i / 4) * 0.2], [0.07, 0.004, 0.07], TRIM));
+    out.push(bx([x, 0.006, z], [0.86, 0.012, 0.86], ROOM_PALETTE.vent));
+    for (let i = 0; i < 16; i++) out.push(bx([x - 0.3 + (i % 4) * 0.2, 0.013, z - 0.3 + Math.floor(i / 4) * 0.2], [0.07, 0.004, 0.07], ROOM_PALETTE.ventHoles));
   }
 
   // Network and power room: batteries, UPS cabinets, fire suppression and a patch panel
@@ -305,7 +307,7 @@ function buildStatic(): Prim[] {
   for (const x of [-19.0, -17.0]) {
     out.push(bx([x, 0.8, -9.1], [1.7, 1.6, 0.04], ALU));
     for (let r = 0; r < 3; r++) {
-      out.push(bx([x, 0.1 + r * 0.55, -8.95], [1.7, 0.04, 0.55], "#5d5399"));
+      out.push(bx([x, 0.1 + r * 0.55, -8.95], [1.7, 0.04, 0.55], FURNITURE.frame));
       for (let c = 0; c < 6; c++) {
         out.push(bx([x - 0.68 + c * 0.27, 0.32 + r * 0.55, -8.95], [0.22, 0.36, 0.42], INK));
         out.push(bx([x - 0.72 + c * 0.27, 0.51 + r * 0.55, -9.05], [0.04, 0.03, 0.04], c % 2 ? "#ff4d5e" : INK));
@@ -323,8 +325,8 @@ function buildStatic(): Prim[] {
   // Library shelves and phone booths
   add(shelf(1.9, 2.0, 11), -21.75, 10.6, Math.PI / 2);
   add(shelf(1.9, 2.0, 23), -21.75, 12.7, Math.PI / 2);
-  add(booth("#3e3570"), -16.2, 13.6);
-  add(booth("#a985ff"), -14.8, 13.6);
+  add(booth(FURNITURE.booths[0]), -16.2, 13.6);
+  add(booth(FURNITURE.booths[1]), -14.8, 13.6);
 
   // Reception desk, a magazine in the waiting area and the doormat
   add([bx([0, 0.525, 0], [3.2, 1.05, 0.7], WHITE), bx([0, 1.075, 0.02], [3.3, 0.05, 0.8], WOOD), bx([0, 0.74, -0.52], [3.0, 0.04, 0.36], WOOD), bx([0.9, 1.12, 0.1], [0.3, 0.06, 0.2], "#ff7ad9")], 3.2, 12.3);
@@ -342,8 +344,8 @@ function buildStatic(): Prim[] {
   add(pizza(), 19.4, 0.15, 1.2, 0.76);
 
   // Rugs in the lounge and the library, beanbags and the games corner
-  add(rug(5.0, 4.6, "#6b4aa0", "#7d5bb8"), 18.4, 6.5);
-  out.push(cy([-19.2, 0.007, 11.7], 2.8, 0.012, "#6b4aa0"), cy([-19.2, 0.009, 11.7], 2.4, 0.013, "#7d5bb8"));
+  add(rug(5.0, 4.6, FURNITURE.rug[0], FURNITURE.rug[1]), 18.4, 6.5);
+  out.push(cy([-19.2, 0.007, 11.7], 2.8, 0.012, FURNITURE.rug[0]), cy([-19.2, 0.009, 11.7], 2.4, 0.013, FURNITURE.rug[1]));
   out.push(ball([16.9, 0.26, 4.4], [0.96, 0.58, 0.96], "#2dd4bf"), ball([16.6, 0.26, 8.6], [0.96, 0.58, 0.96], "#ff7ad9"));
   add(pingPong(), RALLY.x, RALLY.z);
   return out;
@@ -463,9 +465,21 @@ function ScreenPlane({ kind, w, h, position, rot = 0, tilt = 0 }: { kind: Screen
   );
 }
 
-/** A window onto the city at night. Faces +z before rotation. */
+/** A window onto the city: the view by day fades into the view by night with the time of day. Faces +z before rotation. */
 function CityWindow({ position, rot = 0, w, h }: { position: V3; rot?: number; w: number; h: number }) {
   const tex = useMemo(() => skyline(), []);
+  const dayTex = useMemo(() => skylineDay(), []);
+  const day = useRef<THREE.MeshBasicMaterial>(null);
+  useFrame(() => {
+    if (day.current) day.current.opacity = 1 - daylightNow().dark;
+  });
+  useEffect(
+    () => () => {
+      tex.dispose();
+      dayTex.dispose();
+    },
+    [tex, dayTex],
+  );
   return (
     <group position={position} rotation={[0, rot, 0]}>
       <mesh>
@@ -475,6 +489,10 @@ function CityWindow({ position, rot = 0, w, h }: { position: V3; rot?: number; w
       <mesh position={[0, 0, 0.035]}>
         <planeGeometry args={[w, h]} />
         <meshBasicMaterial map={tex} toneMapped={false} />
+      </mesh>
+      <mesh position={[0, 0, 0.04]}>
+        <planeGeometry args={[w, h]} />
+        <meshBasicMaterial ref={day} map={dayTex} transparent depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh position={[0, 0, 0.05]}>
         <boxGeometry args={[0.06, h, 0.03]} />
@@ -521,37 +539,37 @@ function WhiteboardFace({ position, rot }: { position: V3; rot: number }) {
   );
 }
 
-type FloorKey = "server" | "wood" | "noc" | "meeting" | "kitchen";
+type FloorKey = "server" | "work" | "noc" | "meeting" | "kitchen";
 
 /** Floor finishes by zone, as [finish, centre x, centre z, width, depth, tile size]. */
 const ZONES: [FloorKey, number, number, number, number, number][] = [
   ["server", -3.75, -2.25, 18.5, 14.5, 0.9],
   ["server", 7.25, 0.2, 3.5, 9.6, 0.9],
   ["noc", 8.5, -7.05, 6, 4.9, 1.2],
-  ["wood", 0.75, 7.6, 27.5, 5.2, 1.6],
-  ["wood", 4.5, 12.35, 20, 4.3, 1.6],
-  ["wood", -17.5, 6.75, 9, 15.5, 1.6],
-  ["wood", 18.25, 5.75, 7.5, 17.5, 1.6],
+  ["work", 0.75, 7.6, 27.5, 5.2, 1.2],
+  ["work", 4.5, 12.35, 20, 4.3, 1.2],
+  ["work", -17.5, 6.75, 9, 15.5, 1.2],
+  ["work", 18.25, 5.75, 7.5, 17.5, 1.2],
   ["meeting", -9.25, 12.35, 7.5, 4.3, 1.2],
   ["kitchen", 18.25, -6.25, 7.5, 6.5, 0.8],
 ];
 
 /** Each finish at HD detail: a photo surface in the colours of the basic one, and how rough it is. */
 const HD_FLOORS: Record<FloorKey, { id: SurfaceId; tint?: string; roughness?: number }> = {
-  server: { id: "serverTiles", tint: "#4f4987" },
-  wood: { id: "parquet", tint: "#c39470", roughness: 1.6 },
-  noc: { id: "carpet", tint: "#2f3f73" },
-  meeting: { id: "carpet", tint: "#7652ae" },
-  kitchen: { id: "kitchenTiles", tint: "#e6e0ff", roughness: 0.9 },
+  server: { id: "serverTiles", tint: ROOM_PALETTE.floor.server },
+  work: { id: "carpet", tint: ROOM_PALETTE.floor.work },
+  noc: { id: "carpet", tint: ROOM_PALETTE.floor.monitoring },
+  meeting: { id: "carpet", tint: ROOM_PALETTE.floor.meeting },
+  kitchen: { id: "kitchenTiles", tint: ROOM_PALETTE.floor.kitchen, roughness: 0.9 },
 };
 
 function Floors() {
   const textures = useMemo(() => {
     const base: Record<FloorKey, THREE.CanvasTexture> = {
       server: floorTiles(),
-      wood: woodFloor(),
-      noc: carpet("#2f3f73", "#26335e"),
-      meeting: carpet("#7d5bb8", "#6b4aa0"),
+      work: carpet(PIXEL_FLOORS.work.base, PIXEL_FLOORS.work.fleck),
+      noc: carpet(PIXEL_FLOORS.monitoring.base, PIXEL_FLOORS.monitoring.fleck),
+      meeting: carpet(PIXEL_FLOORS.meeting.base, PIXEL_FLOORS.meeting.fleck),
       kitchen: kitchenTiles(),
     };
     return ZONES.map(([key, , , w, d, tile]) => {
