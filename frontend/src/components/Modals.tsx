@@ -100,6 +100,15 @@ export function PostmortemModal() {
 /* End of run                                                          */
 /* ------------------------------------------------------------------ */
 
+/** The reply under "Enjoyed it?"; a low rating also opens the feedback form below it. */
+const RATING_REPLY: Record<number, string> = {
+  1: "Sorry it wasn't fun. Tell us why?",
+  2: "Thanks. What would make it better?",
+  3: "Thanks, noted.",
+  4: "Glad you liked it!",
+  5: "Thanks, glad you loved it!",
+};
+
 export function EndReport() {
   const game = useGame((s) => s.game);
   const newRun = useGame((s) => s.newRun);
@@ -107,6 +116,7 @@ export function EndReport() {
   const rating = useGame((s) => s.rating);
   const openView = useGame((s) => s.openView);
   const view = useGame((s) => s.view);
+  const [askedWhy, setAskedWhy] = useState(false);
   const r = useMemo(() => buildReport(game), [game]);
   if (view === "history") return null;
 
@@ -154,13 +164,32 @@ export function EndReport() {
         <p id="rating-label">Enjoyed it?</p>
         <div className="rating-buttons" role="radiogroup" aria-labelledby="rating-label">
           {[1, 2, 3, 4, 5].map((n) => (
-            <button type="button" key={n} role="radio" aria-checked={rating === n} aria-label={`${n} out of 5`} className={rating === n ? "is-on" : ""} onClick={() => rate(n)}>
+            <button
+              type="button"
+              key={n}
+              role="radio"
+              aria-checked={rating === n}
+              aria-label={`${n} out of 5`}
+              className={rating === n ? "is-on" : ""}
+              onClick={() => {
+                rate(n);
+                if (n <= 2) setAskedWhy(true);
+              }}
+            >
               {n}
             </button>
           ))}
         </div>
-        <span className="muted">{rating ? "Thanks!" : "1 no, 5 loved it"}</span>
+        <span className={rating ? undefined : "muted"} role="status">
+          {rating ? RATING_REPLY[rating] : "1 no, 5 loved it"}
+        </span>
       </div>
+      {/* Kept mounted once shown, so moving to 3-5 and back does not lose a typed draft. */}
+      {askedWhy && (
+        <div className="rating-feedback" hidden={!rating || rating > 2}>
+          <FeedbackButton embedded />
+        </div>
+      )}
 
       <details className="more">
         <summary>Details</summary>

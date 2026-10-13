@@ -3961,6 +3961,23 @@ button:disabled {
   background: var(--go);
 }
 
+/* A low rating asks why right under the rating, on the same paper. */
+.rating-feedback {
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--paper-2);
+  border: 2px solid var(--paper-3);
+  border-radius: var(--radius);
+}
+
+.rating-feedback .feedback-inline {
+  margin-top: 0;
+}
+
+.rating-feedback h4 {
+  margin: 0 0 8px;
+}
+
 /* ---------------------------------------------------------------- */
 /* Guided tutorial                                                   */
 /* ---------------------------------------------------------------- */

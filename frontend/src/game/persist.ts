@@ -384,6 +384,15 @@ export function track(name: AnalyticsName, data?: AnalyticsEvent["data"]): void 
   write(ANALYTICS_KEY, JSON.stringify(events));
 }
 
+/** Replaces the data of the most recent `name` event, or tracks a new one when there is none. */
+export function retrack(name: AnalyticsName, data?: AnalyticsEvent["data"]): void {
+  const events = readAnalytics();
+  const index = events.findLastIndex((e) => e.name === name);
+  if (index === -1) return track(name, data);
+  events[index] = { ...events[index], t: new Date().toISOString(), data };
+  write(ANALYTICS_KEY, JSON.stringify(events));
+}
+
 export function clearAnalytics(): void {
   remove(ANALYTICS_KEY);
 }

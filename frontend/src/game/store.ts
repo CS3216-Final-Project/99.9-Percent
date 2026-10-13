@@ -42,6 +42,7 @@ import {
   saveGame,
   saveMeta,
   saveMode,
+  retrack,
   track,
   GRAPHICS_QUALITIES,
   type AudioSettings,
@@ -928,8 +929,9 @@ export const useGame = create<Store>()((set, get) => {
     },
 
     rate: (rating) => {
-      const { game } = get();
-      track("rating_submitted", { rating, outcome: game.outcome, weeks: game.totals.weeks, seed: game.seed });
+      const { game, rating: previous } = get();
+      // A run has one rating: changing it replaces the earlier choice rather than counting again.
+      (previous === null ? track : retrack)("rating_submitted", { rating, outcome: game.outcome, weeks: game.totals.weeks, seed: game.seed });
       set({ rating });
     },
 
