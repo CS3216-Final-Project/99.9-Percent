@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { rand, type RngHolder } from "@/sim/rng";
 import {
   BILLBOARD_LEGS,
   BAY,
@@ -60,6 +61,8 @@ import {
 import { zoomedOut } from "./camera";
 import { useDetail } from "./detail";
 import { world } from "./cityLight";
+import { ROOM } from "./layout";
+import { boxShadow, courtyardLight, drumShadow, shadowStep } from "./shadows";
 import { useCitySurfaces, type CitySurface } from "./cityTextures";
 import { useSurfaces, type Surface } from "./surfaces";
 import { TREE_VARIANTS, treeModel, type TreeModel, type TreeShape } from "./treeModels";
@@ -92,6 +95,7 @@ uniform vec3 uKeyLight;
 uniform vec3 uSkyLight;
 uniform vec3 uGroundLight;
 uniform float uDark;
+uniform float uLinear;
 
 /** Light from the sky above and the ground below, and from the sun or the moon. */
 vec3 cityLight(vec3 n) {
@@ -130,8 +134,9 @@ const LIGHTING: Record<Lighting, string> = {
   foliage: "diffuseColor.rgb *= foliageLight(normalize(vCityNormal) * (gl_FrontFacing ? 1.0 : -1.0));",
   foliageTextured:
     "vec3 leafN = normalize(vCityNormal) * (gl_FrontFacing ? 1.0 : -1.0); diffuseColor.rgb *= leafDetail(leafN) * foliageLight(leafN);",
-  // A soft shadow on the ground: darker by day, faint under the moon.
-  shadow: "diffuseColor.a *= mix(0.72, 0.2, uDark);",
+  // A soft shadow on the ground: darker by day, faint under the moon. Blended in linear light, the same alpha would
+  // darken the ground much less than blended for display, so it is raised to look the same either way.
+  shadow: "diffuseColor.a *= mix(0.72, 0.2, uDark); diffuseColor.a = mix(diffuseColor.a, 1.0 - pow(1.0 - diffuseColor.a, 2.2), uLinear);",
   glow: "diffuseColor.rgb *= mix(0.6, 1.0, uDark);",
   night: "diffuseColor.rgb *= uDark;",
   own: "",
@@ -244,6 +249,9 @@ function foliageMaterial(surface: CitySurface | null, side: THREE.Side): THREE.M
   });
 }
 
+/** Darken what is under a shadow but leave the canvas's own alpha alone, or the page would show through it. */
+const KEEP_ALPHA = { blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor };
+
 /** A soft round shadow, dark in the middle and gone at the edge. */
 function shadowTexture(): THREE.CanvasTexture {
   const c = document.createElement("canvas");
@@ -264,9 +272,7 @@ function shadowTexture(): THREE.CanvasTexture {
  * reads back to work out how far the crown's shadow falls.
  */
 function treeShadowMaterial(map: THREE.Texture): THREE.MeshBasicMaterial {
-  // Darken what is under the shadow but leave the canvas's own alpha alone, or the page would show through it.
-  const blend = { blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor };
-  return faded({ color: "#000000", map, transparent: true, depthWrite: false, ...blend }, "city-tree-shadow", "shadow", (shader) => {
+  return faded({ color: "#000000", map, transparent: true, depthWrite: false, ...KEEP_ALPHA }, "city-tree-shadow", "shadow", (shader) => {
     shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nuniform vec3 uKeyDir;").replace(
       "#include <begin_vertex>",
       `#include <begin_vertex>
@@ -1128,6 +1134,69 @@ function Billboards() {
   );
 }
 
+/** A box or a drum that casts a shadow, its heights above the ground; a drum may stand round an open courtyard. */
+type Caster = { rect: Rect; from: number; to: number } | { drum: [number, number, number]; court?: number; from: number; to: number };
+
+/** Turn the light this many degrees before the shadows are worked out again. */
+const SHADOW_TURN = Math.cos(THREE.MathUtils.degToRad(0.75));
+
+/**
+ * The shadows every building casts on the ground, away from the sun or the moon (see shadows.ts), worked out again
+ * as the light turns. They are drawn with depth, and a shadow's later pixels at the same depth are turned away, so
+ * where two overlap the ground is no darker than under one. Low quality draws none.
+ */
+function BuildingShadows() {
+  const casters = useMemo(() => {
+    const list = buildings();
+    const out: Caster[] = [];
+    const add = (b: Building) => {
+      for (const m of b.masses) out.push({ rect: m.rect, from: m.y0 - GROUND_Y, to: m.y1 - GROUND_Y + (b.pitch === "flat" ? PARAPET : 2.5) });
+    };
+    for (const b of list) add(b);
+    add(TOWER);
+    // The office's own storey stands on top of its building.
+    out.push({ rect: BUILDING, from: SLAB - GROUND_Y, to: ROOM.wallH - GROUND_Y });
+    const ring = town().ring;
+    if (ring) out.push({ drum: [ring.x, ring.z, ring.outer], court: ring.inner, from: 0, to: ring.storeys * STOREY + PARAPET });
+    return out;
+  }, []);
+  const geometry = useMemo(() => new THREE.BufferGeometry(), []);
+  const material = useMemo(
+    () => faded({ color: "#000000", opacity: 0.7, transparent: true, depthWrite: true, depthFunc: THREE.LessDepth, ...KEEP_ALPHA }, "city-building-shadow", "shadow"),
+    [],
+  );
+  const light = useMemo(() => new THREE.Vector3(0, -1, 0), []);
+  useFrame(() => {
+    const key = world.uKeyDir.value;
+    if (key.dot(light) > SHADOW_TURN) return;
+    light.copy(key);
+    const step = shadowStep([key.x, key.y, key.z]);
+    const pos: number[] = [];
+    const y = LAYER.shade;
+    for (const c of casters) {
+      const outline = "rect" in c ? boxShadow(c.rect, c.from, c.to, step) : drumShadow(c.drum[0], c.drum[1], c.drum[2], c.from, c.to, step);
+      const lit = "drum" in c && c.court ? courtyardLight(c.drum[0], c.drum[1], c.court, c.to, step) : [];
+      const points = [...outline, ...lit].map(([x, z]) => new THREE.Vector2(x, z));
+      for (const [a, b, d] of THREE.ShapeUtils.triangulateShape(points.slice(0, outline.length), lit.length ? [points.slice(outline.length)] : [])) {
+        // Each triangle wound to face up.
+        const [p, q, r] = [points[a], points[b], points[d]];
+        const up = (q.y - p.y) * (r.x - p.x) - (q.x - p.x) * (r.y - p.y) > 0;
+        for (const v of up ? [p, q, r] : [p, r, q]) pos.push(v.x, y, v.y);
+      }
+    }
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(new Float32Array(pos.length).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+  });
+  useEffect(
+    () => () => {
+      geometry.dispose();
+      material.dispose();
+    },
+    [geometry, material],
+  );
+  return <mesh geometry={geometry} material={material} frustumCulled={false} />;
+}
+
 /** Strips of light round the tops of some towers. */
 function crowns(list: Building[]): THREE.BufferGeometry | null {
   const parts: THREE.BufferGeometry[] = [];
@@ -1187,25 +1256,45 @@ function Buildings({ lite, looks }: { lite: boolean; looks: Looks }) {
 }
 
 /** The podium's roof garden round the foot of the shaft, and the company's sign on the tower's top storey. */
-function Tower() {
-  const terrace = useMemo(() => {
-    const top = TOWER.masses[0].y1;
-    const [x0, z0, x1, z1] = PODIUM;
-    const [bx0, bz0, bx1, bz1] = BUILDING;
-    const planter = (x: number, z: number, w: number, d: number) => tint(box(w, 0.6, d, x, top + 0.3, z), "#2f4a33");
-    return merge([
-      tint(flat(x1 - x0, z1 - z0).translate((x0 + x1) / 2, top, (z0 + z1) / 2), TOWER.roof),
-      tint(box(x1 - x0, PARAPET, 0.35, (x0 + x1) / 2, top + PARAPET / 2, z0 + 0.17), TOWER.wall),
-      tint(box(x1 - x0, PARAPET, 0.35, (x0 + x1) / 2, top + PARAPET / 2, z1 - 0.17), TOWER.wall),
-      tint(box(0.35, PARAPET, z1 - z0, x0 + 0.17, top + PARAPET / 2, (z0 + z1) / 2), TOWER.wall),
-      tint(box(0.35, PARAPET, z1 - z0, x1 - 0.17, top + PARAPET / 2, (z0 + z1) / 2), TOWER.wall),
-      // Planters along the terrace either side of the shaft.
-      planter((x0 + bx0) / 2, (z0 + z1) / 2, 2, z1 - z0 - 6),
-      planter((x1 + bx1) / 2, (z0 + z1) / 2, 2, z1 - z0 - 6),
-      planter((bx0 + bx1) / 2, (z0 + bz0) / 2, bx1 - bx0 - 4, 1.6),
-      planter((bx0 + bx1) / 2, (z1 + bz1) / 2, bx1 - bx0 - 4, 1.6),
-    ]);
-  }, []);
+/**
+ * The lobby wing's roof: a paved roof garden round the foot of the building, with an oak planter of lawn and shrubs
+ * along each side. Low quality leaves out the shrubs.
+ */
+function terraceParts(lite: boolean): Record<Fabric, THREE.BufferGeometry[]> {
+  const out = noParts();
+  const top = TOWER.masses[0].y1;
+  const [x0, z0, x1, z1] = PODIUM;
+  const [bx0, bz0, bx1, bz1] = BUILDING;
+  out.pavement.push(tint(flat(x1 - x0, z1 - z0).translate((x0 + x1) / 2, top, (z0 + z1) / 2), TOWER.roof));
+  out.plain.push(
+    tint(box(x1 - x0, PARAPET, 0.35, (x0 + x1) / 2, top + PARAPET / 2, z0 + 0.17), TOWER.wall),
+    tint(box(x1 - x0, PARAPET, 0.35, (x0 + x1) / 2, top + PARAPET / 2, z1 - 0.17), TOWER.wall),
+    tint(box(0.35, PARAPET, z1 - z0, x0 + 0.17, top + PARAPET / 2, (z0 + z1) / 2), TOWER.wall),
+    tint(box(0.35, PARAPET, z1 - z0, x1 - 0.17, top + PARAPET / 2, (z0 + z1) / 2), TOWER.wall),
+  );
+  // A planter: an oak box with lawn on top and a row of shrubs along it, the same every visit.
+  const rng: RngHolder = { rngState: 83 };
+  const planter = (x: number, z: number, w: number, d: number) => {
+    out.plain.push(tint(box(w, 0.55, d, x, top + 0.275, z), "#8a6a4c"));
+    out.lawn.push(tint(flat(w - 0.2, d - 0.2).translate(x, top + 0.56, z), "#5d7f45"));
+    if (lite) return;
+    const along = w > d;
+    const length = along ? w : d;
+    for (let s = -length / 2 + 0.9; s < length / 2 - 0.6; s += 1.6 + rand(rng) * 0.8) {
+      const r = 0.45 + rand(rng) * 0.3;
+      const [sx, sz] = along ? [x + s, z] : [x, z + s];
+      out.plain.push(tint(new THREE.IcosahedronGeometry(r, 1).scale(1, 0.85, 1).translate(sx, top + 0.55 + r * 0.7, sz), rand(rng) < 0.3 ? "#6f9a4a" : "#4f7a3f"));
+    }
+  };
+  planter((x0 + bx0) / 2, (z0 + z1) / 2, 2, z1 - z0 - 6);
+  planter((x1 + bx1) / 2, (z0 + z1) / 2, 2, z1 - z0 - 6);
+  planter((bx0 + bx1) / 2, (z0 + bz0) / 2, bx1 - bx0 - 4, 1.6);
+  planter((bx0 + bx1) / 2, (z1 + bz1) / 2, bx1 - bx0 - 4, 1.6);
+  return out;
+}
+
+function Tower({ looks, lite }: { looks: Looks; lite: boolean }) {
+  const terrace = useMemo(() => terraceParts(lite), [lite]);
   const sign = useMemo(() => logoSign(), []);
   const letters = useMemo(() => faded({ map: sign, transparent: true, depthWrite: false, toneMapped: false }, "city-sign", "glow"), [sign]);
   useEffect(
@@ -1227,7 +1316,7 @@ function Tower() {
   ];
   return (
     <group>
-      <Merged geometry={terrace} material={M.shaded} />
+      <Surfaces parts={terrace} looks={looks} />
       {faces.map(([x, z, rot], i) => (
         <mesh key={i} material={letters} position={[x, y, z]} rotation={[0, rot, 0]}>
           <planeGeometry args={[12, 12 / 3.2]} />
@@ -1610,7 +1699,8 @@ export function Exterior() {
       <Billboards />
       <Parked lite={lite} />
       <Buildings lite={basic} looks={looks} />
-      <Tower />
+      {!basic && <BuildingShadows />}
+      <Tower looks={looks} lite={basic} />
       <Trees basic={basic} lite={lite} />
       <Park basic={basic} />
       <Lamps pools={!basic} />

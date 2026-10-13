@@ -34,6 +34,47 @@ export const ROOM_PALETTE = {
   bounce: "#55524d",
 } as const;
 
+/**
+ * Furniture and fittings: charcoal and grey metal, white and light grey panels, oak, and a few colour accents (the
+ * phone booths, the beanbags, mugs and books) kept from the old office.
+ */
+export const FURNITURE = {
+  ink: "#23262b",
+  trim: "#3a3d43",
+  steel: "#5a5f68",
+  light: "#e5e6e9",
+  pale: "#d5d7db",
+  alu: "#bcc1c8",
+  woodDark: "#7a5a40",
+  /** Shelf boards and the legs of stands. */
+  frame: "#6b7078",
+  /** The two phone booths. */
+  booths: ["#3d4a5c", "#6f8f86"],
+  /** The lounge's rug and the townhall's round one: outer and inner. */
+  rug: ["#8a8276", "#978f83"],
+  /** The server room's cooling units: shell, door, base, louvres, display, buttons, label and top. */
+  crac: { shell: "#d9dbde", door: "#cdd0d4", base: "#2c2f34", louvre: "#8c9198", display: "#1b1d21", button: "#9da2a9", label: "#5a5f68", top: "#3a3d43" },
+} as const;
+
+/**
+ * The equipment: racks in charcoal, each kind a shade of its own so they stay apart, and their faces. The blue of a
+ * temporary server is kept, since it says the server is temporary.
+ */
+export const EQUIPMENT = {
+  rack: "#3f434b",
+  trim: "#2e3136",
+  bezel: "#1d1f23",
+  loadBalancer: "#3b4352",
+  standby: "#4a4d55",
+  cache: "#2f4856",
+  database: "#383c48",
+  backup: "#42454c",
+  temporary: "#2f4a7a",
+  face: { back: "#1a1c20", unit: "#2d3036", vent: "#22252a", edge: "#3c4048", bay: "#30343a", slot: "#212328", bayEdge: "#454a52", panel: "#2b2e34", port: "#131417", ledOff: "#2a2c31" },
+  /** What screens show when idle or switched off, and the panels of a dashboard. */
+  screen: { code: "#151b26", idle: "#0f121a", dash: "#131a26", chart: "#131a26", off: "#0a0b0f", game: "#0d0f17", idleBar: "#2a2e36", tile: "#1f2430", grid: "#2f343d" },
+} as const;
+
 /** The low-quality look's pixel floors: each a base, a lighter and a darker speck, and its grout or seams. */
 export const PIXEL_FLOORS = {
   concrete: { base: "#9a968d", light: "#a29e95", dark: "#928e86", seam: "#86827a" },

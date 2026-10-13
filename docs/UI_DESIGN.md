@@ -6,6 +6,8 @@ This guide records the current playable game's design. It applies to Campaign an
 
 The isometric room is the main canvas. A dark purple HUD frames cream paper panels, outlined pixel icons and yellow primary actions. Use the tokens in `frontend/src/index.css` for colours, fonts, borders, radii, spacing and shadows. Pixelify Sans is the display face; Rubik is the body and numeric face. Numbers use tabular figures. Do not introduce a separate theme or a compressed text-only HUD for a new mode.
 
+The room itself is a realistic office, apart from the HUD's purple: warm off-white walls, concrete, oak and coloured carpet floors, charcoal and grey metal racks, white and light grey furniture, with a few colour accents. Its colours live in `frontend/src/components/scene/palette.ts` (`ROOM_PALETTE`, `FURNITURE`, `EQUIPMENT`, `PIXEL_FLOORS`); take new room colours from there rather than writing hex values into the scene. The HUD tokens in `index.css` are for the interface only.
+
 | Meaning / purpose | Existing pattern | Source |
 | --- | --- | --- |
 | Cash, users, revenue, health | `Stat` with a coloured `Concept` tile, label, headline and explanatory `Tip` | `components/ui.tsx`, `Game.tsx` |

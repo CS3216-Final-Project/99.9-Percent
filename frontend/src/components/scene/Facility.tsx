@@ -43,7 +43,7 @@ import { updateWalls } from "./wallState";
 import { buildModel, type SceneModel } from "./sceneModel";
 import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
 import { screenPoint } from "./labels";
-import { ROOM_PALETTE } from "./palette";
+import { EQUIPMENT, ROOM_PALETTE } from "./palette";
 
 function useSceneModel(): SceneModel {
   const key = useGame((s) => JSON.stringify(buildModel(s.game)));
@@ -245,9 +245,9 @@ function CameraRig({ footprints, built }: { footprints: Record<EquipmentId, Foot
 /* ------------------------------------------------------------------ */
 
 /* A toy server room at night: flat indigo cabinets, warm desks and bright status lights. */
-const STEEL = "#34305c";
-const TRIM = "#2a2450";
-const BEZEL = "#1d1834";
+const STEEL = EQUIPMENT.rack;
+const TRIM = EQUIPMENT.trim;
+const BEZEL = EQUIPMENT.bezel;
 
 function Rack({
   x,
@@ -768,7 +768,7 @@ function Scene({ quality }: { quality: QualityProfile }) {
 
       {/* Network edge */}
       <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
-      {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint="#3a3566" />}
+      {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint={EQUIPMENT.loadBalancer} />}
 
       {/* App servers */}
       {m.hosts.slice(0, 12).map((led, i) => {
@@ -777,18 +777,18 @@ function Scene({ quality }: { quality: QualityProfile }) {
       })}
       {Array.from({ length: m.temp }, (_, i) => {
         const p = tempSlot(i);
-        return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint="#2f4a7a" />;
+        return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint={EQUIPMENT.temporary} />;
       })}
-      {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint="#4d3f63" />}
+      {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint={EQUIPMENT.standby} />}
 
       {/* Data tier */}
-      {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint="#2f3f73" />}
+      {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint={EQUIPMENT.cache} />}
       {Array.from({ length: m.dbCabinets }, (_, i) => {
         const p = dbSlot(i);
-        return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint="#3f3170" />;
+        return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint={EQUIPMENT.database} />;
       })}
-      {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint="#3f3170" />}
-      {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint="#3b3560" />}
+      {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint={EQUIPMENT.database} />}
+      {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint={EQUIPMENT.backup} />}
 
       {/* Monitoring wall */}
       {m.monitoring > 0 &&

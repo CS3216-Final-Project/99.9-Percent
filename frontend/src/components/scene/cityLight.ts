@@ -15,11 +15,13 @@ export const world = {
   uSkyLight: { value: new THREE.Color(0.27, 0.3, 0.45) },
   uGroundLight: { value: new THREE.Color(0.15, 0.14, 0.2) },
   uDark: { value: 1 },
+  /** 1 when effects render off-screen first, so colours are blended in linear light; 0 when blended for display. */
+  uLinear: { value: 0 },
 };
 
 /**
  * Light the city for a time of day. The horizon colour is mixed in after the colour-space conversion, so it is
- * linear when effects render off-screen first and a display colour otherwise.
+ * linear when effects render off-screen first and a display colour otherwise; shadows are blended the same way.
  */
 export function applyDaylight(d: Daylight, linear: boolean): void {
   world.uHorizon.value.setRGB(d.horizon[0], d.horizon[1], d.horizon[2], THREE.SRGBColorSpace);
@@ -29,4 +31,5 @@ export function applyDaylight(d: Daylight, linear: boolean): void {
   world.uSkyLight.value.setRGB(d.skyLight[0], d.skyLight[1], d.skyLight[2], THREE.LinearSRGBColorSpace);
   world.uGroundLight.value.setRGB(d.groundLight[0], d.groundLight[1], d.groundLight[2], THREE.LinearSRGBColorSpace);
   world.uDark.value = d.dark;
+  world.uLinear.value = linear ? 1 : 0;
 }
