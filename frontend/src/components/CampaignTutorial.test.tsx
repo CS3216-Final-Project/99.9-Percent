@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useGame, WALKTHROUGH_STEPS } from "@/game/store";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 import Tutorial, { BASICS_STEPS, CAMPAIGN_STEPS } from "./Tutorial";
+import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -84,6 +85,29 @@ it("waits through an incident and its review, then resumes where the player left
   expect(useGame.getState().game.phase).toBe("incident");
   expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
   expect(useGame.getState().tour).toEqual({ track: "campaign", step: 1 });
+});
+
+it("walks Stay Online through unlocking Health Checks in Tech and deploying it", () => {
+  useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 0 } });
+  renderCompany();
+  const guide = (step: number) => screen.getByRole("dialog", { name: `Chapter guide, step ${step} of 3` });
+  fireEvent.click(within(guide(1)).getByRole("button", { name: "Got it" }));
+  expect(guide(2).textContent).toContain("Unlock Health Checks");
+  expect(guide(2).textContent).toContain("Open Tech.");
+  // Interactive: it moves on only once the capability is actually unlocked.
+  expect(within(guide(2)).queryByRole("button", { name: "Next" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Tech" }));
+  expect(guide(2).textContent).toContain("Click Health Checks.");
+  fireEvent.click(screen.getByRole("button", { name: /^Health Checks:/ }));
+  expect(guide(2).textContent).toContain("Press Unlock Health Checks.");
+  fireEvent.click(screen.getByRole("button", { name: /Unlock Health Checks/ }));
+  expect(useGame.getState().game.campaign!.reliabilityStage!.owned).toContain("health_checks");
+  expect(guide(3).textContent).toContain("Close Tech.");
+  fireEvent.click(screen.getByRole("button", { name: "Tech" }));
+  expect(guide(3).textContent).toContain("Press Deploy Health Checks, then Confirm.");
+  fireEvent.click(screen.getByRole("button", { name: /^Deploy Health Checks/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+  expect(useGame.getState().tour).toBeNull();
 });
 
 it("shows a chapter's guide on the controls the chapter adds", () => {
