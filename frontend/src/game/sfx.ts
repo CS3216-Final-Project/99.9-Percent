@@ -198,6 +198,71 @@ const ZONE_VOICES = {
     noise(ctx, at, at + 1.6, hiss).connect(low).connect(envelope(ctx, at, 1.6, 0.14, 0.7, 0.8)).connect(out);
     osc(ctx, "sine", 92, at + 0.3, at + 1.3).connect(envelope(ctx, at + 0.3, 1.0, 0.05, 0.4, 0.5)).connect(out);
   },
+  /** Table tennis: the hollow knock of a paddle, then the ball's quieter bounce on the table. */
+  pingPong: (ctx, out, at, hiss) => {
+    osc(ctx, "sine", 420, at, at + 0.07).connect(hit(ctx, at, 0.14, 0.05)).connect(out);
+    burst(ctx, out, at, hiss, 1600, 0.03, hit(ctx, at, 0.1, 0.025));
+    osc(ctx, "sine", 640, at + 0.1, at + 0.14).connect(hit(ctx, at + 0.1, 0.06, 0.03)).connect(out);
+  },
+  /** Nearby voices: two or three low, indistinct tones overlapping, no words. */
+  murmur: (ctx, out, at) => {
+    const lp = filter(ctx, "lowpass", 900);
+    lp.connect(out);
+    [
+      [0, 52, 0.34, 0.05],
+      [0.07, 55, 0.26, 0.04],
+      [0.16, 48, 0.3, 0.03],
+    ].forEach(([t, m, len, peak]) => {
+      osc(ctx, "triangle", note(m), at + t, at + t + len).connect(envelope(ctx, at + t, len, peak, 0.06, 0.12)).connect(lp);
+    });
+  },
+  /** Typing at a desk: a few tiny high clicks at an uneven pace. */
+  keyboard: (ctx, out, at, hiss) => {
+    for (const t of [0, 0.07, 0.19, 0.26, 0.38, 0.47]) {
+      burst(ctx, out, at + t, hiss, 5200, 0.015, hit(ctx, at + t, 0.07, 0.012));
+    }
+  },
+  /** Someone in the phone booth: two short, muffled syllables, not a ring. */
+  phone: (ctx, out, at) => {
+    const bp = filter(ctx, "bandpass", 1100);
+    bp.Q.value = 1.4;
+    bp.connect(out);
+    [
+      [0, 57, 0.14],
+      [0.2, 60, 0.12],
+    ].forEach(([t, m, len]) => {
+      const o = osc(ctx, "sawtooth", note(m), at + t, at + t + len);
+      o.frequency.setValueAtTime(note(m), at + t);
+      o.frequency.linearRampToValueAtTime(note(m + 1), at + t + len);
+      o.connect(envelope(ctx, at + t, len, 0.07, 0.02, 0.05)).connect(bp);
+    });
+  },
+  /** A talk in the meeting room: one low phrase that moves through three pitches. */
+  presentation: (ctx, out, at) => {
+    const lp = filter(ctx, "lowpass", 750);
+    lp.connect(out);
+    [
+      [0, 50, 0.22],
+      [0.22, 55, 0.2],
+      [0.42, 52, 0.26],
+    ].forEach(([t, m, len]) => {
+      osc(ctx, "triangle", note(m), at + t, at + t + len).connect(envelope(ctx, at + t, len, 0.06, 0.04, 0.08)).connect(lp);
+    });
+  },
+  /** The kitchen counter: two light clinks of crockery. */
+  kitchen: (ctx, out, at, hiss) => {
+    burst(ctx, out, at, hiss, 4300, 0.04, hit(ctx, at, 0.11, 0.035));
+    osc(ctx, "sine", 2400, at, at + 0.09).connect(hit(ctx, at, 0.04, 0.08)).connect(out);
+    burst(ctx, out, at + 0.13, hiss, 3600, 0.04, hit(ctx, at + 0.13, 0.08, 0.03));
+    osc(ctx, "sine", 1900, at + 0.13, at + 0.2).connect(hit(ctx, at + 0.13, 0.03, 0.06)).connect(out);
+  },
+  /** The television murmuring in the corner: a low wash of noise and two quiet blips. */
+  television: (ctx, out, at, hiss) => {
+    const lp = filter(ctx, "lowpass", 800);
+    noise(ctx, at, at + 0.5, hiss).connect(lp).connect(envelope(ctx, at, 0.5, 0.07, 0.08, 0.2)).connect(out);
+    osc(ctx, "sine", note(69), at + 0.1, at + 0.16).connect(hit(ctx, at + 0.1, 0.04, 0.05)).connect(out);
+    osc(ctx, "sine", note(74), at + 0.28, at + 0.34).connect(hit(ctx, at + 0.28, 0.04, 0.05)).connect(out);
+  },
 } satisfies Record<string, Voice>;
 
 export type ZoneCue = keyof typeof ZONE_VOICES;
@@ -294,7 +359,19 @@ export interface LiftDoors {
 }
 
 /** Shortest gap between two plays of the same zone sound, in milliseconds. */
-const ZONE_GAP: Record<ZoneCue, number> = { foosball: 250, arcade: 1200, espresso: 6000, snore: 3000 };
+const ZONE_GAP: Record<ZoneCue, number> = {
+  foosball: 250,
+  pingPong: 300,
+  arcade: 1200,
+  espresso: 6000,
+  kitchen: 2500,
+  television: 1800,
+  keyboard: 700,
+  phone: 2200,
+  presentation: 2500,
+  murmur: 1800,
+  snore: 3000,
+};
 
 /**
  * Shortest gap between two plays of the same cue, in milliseconds. Stings
