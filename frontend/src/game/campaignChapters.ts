@@ -36,3 +36,12 @@ export function chapterAdvance(game: GameState): { label: string; action: Action
   if (!c.reliabilityStage && c.spikeStage?.acknowledged) return { label: "Continue to reliability", action: { type: "enter_reliability" }, ready: canEnterReliability(game) };
   return null;
 }
+
+/** Chapters that end without a recognition of their own, so the company stops to say so. */
+export type ChapterCompletion = "scaling" | "data";
+
+/** The chapter whose requirements are met while the company waits for the player to continue past it. */
+export function finishedChapter(game: GameState): ChapterCompletion | null {
+  const next = campaignGuidance(game).pendingAction?.action?.type;
+  return next === "enter_data" ? "scaling" : next === "enter_spikes" ? "data" : null;
+}

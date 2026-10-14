@@ -1,6 +1,7 @@
 "use client";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
+import { finishedChapter, type ChapterCompletion } from "./campaignChapters";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
 import type { Campaign } from "@/sim/campaignTypes";
 
@@ -228,6 +229,8 @@ interface Store {
   toast: Toast | null;
   onboarding: boolean;
   tour: Tour | null;
+  /** A chapter the company has just finished, announced once until the player continues or stays. */
+  chapterComplete: ChapterCompletion | null;
   /** The latest walkthrough start or end, for product analytics. */
   lastTour: TourEvent | null;
   rating: number | null;
@@ -263,6 +266,7 @@ interface Store {
   startTour: (track: TourTrack, from?: TourStart) => void;
   tourNext: () => void;
   endTour: (completed: boolean) => void;
+  dismissChapterComplete: () => void;
   /** Begin the walkthrough, restarting the intro run first if this one is already under way. */
   startTutorialRun: (from?: TourStart) => void;
   rate: (rating: number) => void;
@@ -393,6 +397,10 @@ export const useGame = create<Store>()((set, get) => {
       if(!was?.firstPauseConsumed && c.firstPauseConsumed)patch.running=false;
       if(get().selectedAppId&&!c.apps.some(a=>a.id===get().selectedAppId))patch.selectedAppId=c.apps[0].id;
       if(awaitingAcknowledgement(c)||next.phase==="review"||next.phase==="ended")patch.running=false;
+      // Finishing Scaling & Routing or Data Strategy pauses once to say so; the chapter bar keeps the way forward.
+      const finished=finishedChapter(next);
+      if(finished&&was?.runId===c.runId&&finishedChapter(prev)!==finished)Object.assign(patch,{chapterComplete:finished,running:false});
+      else if(!finished&&get().chapterComplete)patch.chapterComplete=null;
       // The first acknowledged reliability outcome permanently unlocks Challenge Mode.
       if(!was?.reliabilityStage?.acknowledged && c.reliabilityStage?.acknowledged && !get().meta.challengeUnlocked) {
         const meta={...get().meta,challengeUnlocked:true};
@@ -528,6 +536,7 @@ export const useGame = create<Store>()((set, get) => {
       techFocus: null,
       onboarding: false,
       tour: null,
+      chapterComplete: null,
       lastTour: null,
       rating: null,
       toast: null,
@@ -670,7 +679,7 @@ export const useGame = create<Store>()((set, get) => {
         rememberCloud({ownerId:session.account.id,revision:run.revision,local:e});
         if(!saveGame(game,e.runtime.remainderMs,true,e.runtime.measurement))throw Error('This browser could not store the cloud save. Your local save is unchanged.');
         saveMode("campaign");
-        set({mode:"campaign",...(s.mode==='classic'?{meta:loadMeta("campaign"),tour:null}:{}),game,generation:get().generation+1,lastAction:null,lastIntro:null,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
+        set({mode:"campaign",...(s.mode==='classic'?{meta:loadMeta("campaign"),tour:null}:{}),chapterComplete:null,game,generation:get().generation+1,lastAction:null,lastIntro:null,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
           running:false,started:false,onboarding:false,view:null,selected:null,selectedAppId:null,activeMark:null,cloudConflict:null,cloudStatus:'Cloud save loaded. Continue when ready.'});
         return true;
       }catch(error){accountFailure(error);return false;}finally{set({cloudBusy:false});}
@@ -725,6 +734,7 @@ export const useGame = create<Store>()((set, get) => {
     toast: null,
     onboarding: false,
     tour: null,
+    chapterComplete: null,
     lastTour: null,
     rating: null,
 
@@ -932,6 +942,7 @@ export const useGame = create<Store>()((set, get) => {
         rating: null,
         onboarding: false,
         tour: null,
+        chapterComplete: null,
         started: true,
         toast: null,
       });
@@ -976,7 +987,7 @@ export const useGame = create<Store>()((set, get) => {
       const saved = mode === "campaign" ? saveGame(game, remainderMs, true, measurement) && archiveEvents(measurement.pending) : saveClassicGame(game);
       saveMode(mode);
       set({ mode, importGeneration: get().importGeneration + 1, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, view: null,
-        selected: null, hovered: null, affected: [], started: true, tour: null, onboarding: false, techFocus: null, rating: null });
+        selected: null, hovered: null, affected: [], started: true, tour: null, chapterComplete: null, onboarding: false, techFocus: null, rating: null });
       track("save_imported", { mode, step: game.campaign?.step ?? game.turn });
       get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
       return true;
@@ -1035,6 +1046,7 @@ export const useGame = create<Store>()((set, get) => {
       } else if (tour.track === "campaign" && !get().meta.tutorialDone) set({ meta: walkthroughAt(get().meta, next.step) });
       if (get().game.campaign) persist();
     },
+    dismissChapterComplete: () => set({ chapterComplete: null }),
     endTour: (completed) => {
       const { tour, meta, game } = get();
       if (!tour) return;

@@ -1,5 +1,5 @@
-import { test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
-import { dataCompany } from "../src/sim/__tests__/dataFixture";
+import { test, expect, expectRoom, seedSave, savedGame, chapterComplete, advanceCampaignStep } from "./fixtures";
+import { dataCompany, finishingScaling } from "../src/sim/__tests__/dataFixture";
 import { completedReliability } from "../src/sim/__tests__/combinedFixture";
 
 test("chapter bar stays visible and follows the same company into Data Strategy", async ({ page }) => {
@@ -52,4 +52,23 @@ test("chapter trail labels stay inside their steps beside the Next button", asyn
   }
   await page.setViewportSize({ width: 1101, height: 900 });
   await bar.screenshot({ path: "test-results/campaign-chapters-next-1101.png" });
+});
+
+test("finishing Scaling & Routing stops once to announce it and continues from the dialog", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await page.removeLocatorHandler(chapterComplete(page));
+  await page.route("**/api/**", route => route.abort());
+  await seedSave(page, finishingScaling());
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expect(chapterComplete(page)).toHaveCount(0);
+  await advanceCampaignStep(page);
+  const dialog = chapterComplete(page);
+  await expect(dialog).toHaveAccessibleName("Scaling & Routing complete");
+  await expect(dialog).toContainText("Next: Data Strategy.");
+  await page.screenshot({ path: "test-results/chapter-complete-scaling.png" });
+  await dialog.getByRole("button", { name: "Continue to data strategy", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Data Strategy");
+  expect((await savedGame(page)).campaign!.dataStage).toBeTruthy();
 });
