@@ -212,7 +212,8 @@ export function WalkDriver({ walking, footprints, names }: { walking: boolean; f
     camera.getWorldDirection(forward);
     const x = avatar.x;
     const z = avatar.z;
-    stepAvatar(Math.min(dt, 0.1), [forward.x, forward.z], footprints, names, now());
+    // Movement is checked in small steps whatever the frame's length, so a slow renderer only walks it in bigger strides.
+    stepAvatar(Math.min(dt, 0.25), [forward.x, forward.z], footprints, names, now());
     // A footstep every stride, sounding of what is underfoot.
     stride.current += Math.hypot(avatar.x - x, avatar.z - z);
     if (!avatar.moving) stride.current = 0;

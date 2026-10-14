@@ -42,7 +42,7 @@ import { FLOOR_NUMBER, FLOOR_Y, rideAt } from "./levels";
 import { arrive, depart, now, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
 import { Avatar, WalkDriver, WalkFloor } from "./Avatar";
 import { GlassDoors } from "./Doors";
-import { avatar, clearPrompt, held, movesAvatar, onPrompt, play } from "./walk";
+import { avatar, clearPrompt, held, movesAvatar, onPrompt, play, walkTo } from "./walk";
 import type { Prompt } from "./player";
 import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
@@ -483,6 +483,7 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
     if (e.delta > 6) return;
     e.stopPropagation();
     inspectOrSelect(id);
+    approach(id, f);
   };
 
   return (
@@ -585,6 +586,12 @@ function bindLabel(key: string) {
   };
 }
 
+/** In walk mode, choosing equipment on the avatar's floor also sends the avatar over to it. */
+function approach(id: EquipmentId, f: Footprint): void {
+  if (!useGame.getState().walking || riding() || floorOf(id) !== avatar.floor) return;
+  walkTo(f.x, f.z);
+}
+
 function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
   const selected = useGame((s) => s.selected === id);
   const hovered = useGame((s) => s.hovered === id);
@@ -598,7 +605,10 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       ref={bindLabel(id)}
       data-eq={id}
       className={`eq-label tone-${tone}${selected ? " is-selected" : ""}${!built && !selected && !hovered ? " is-quiet" : ""}`}
-      onClick={() => inspectOrSelect(id)}
+      onClick={() => {
+        inspectOrSelect(id);
+        approach(id, m.footprints[id]);
+      }}
       onFocus={() => useGame.getState().hover(id)}
       onBlur={() => useGame.getState().hover(null)}
       aria-pressed={selected}
