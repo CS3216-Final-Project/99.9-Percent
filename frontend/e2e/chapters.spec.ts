@@ -22,7 +22,7 @@ test("chapter bar stays visible and follows the same company into Data Strategy"
   await page.screenshot({ path: "test-results/campaign-chapters-overview.png" });
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
-  await page.getByRole("button", { name: "Continue to data strategy", exact: true }).click();
+  await bar.getByRole("button", { name: "Continue to data strategy", exact: true }).click();
   await expect(bar).toContainText("Chapter 3 of 6");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Data Strategy");
   expect((await savedGame(page)).campaign!.runId).toBe(before.campaign!.runId);

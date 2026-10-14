@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { campaignChapters } from "@/game/campaignChapters";
+import { campaignChapters, chapterAdvance } from "@/game/campaignChapters";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { Modal } from "./ui";
@@ -11,6 +11,7 @@ export function CampaignChapters() {
   const [open, setOpen] = useState(false);
   const chapters = campaignChapters(game);
   const current = chapters.find((chapter) => chapter.current)!;
+  const advance = chapterAdvance(game);
 
   return <>
     <section className="chapter-bar" aria-label="Guided Mode chapters">
@@ -25,10 +26,13 @@ export function CampaignChapters() {
           <span>{chapter.shortName}<small>{chapter.status}</small></span>
         </li>)}
       </ol>
-      <button type="button" className="btn" aria-haspopup="dialog" onClick={() => {
-        useGame.getState().setRunning(false);
-        setOpen(true);
-      }}><Icon name="goal" size={18} />View chapters</button>
+      <div className="chapter-actions">
+        {advance && <button type="button" className="btn btn-primary chapter-advance" disabled={!advance.ready} onClick={() => useGame.getState().act(advance.action)}>{advance.label}<Icon name="next" /></button>}
+        <button type="button" className="btn" aria-haspopup="dialog" onClick={() => {
+          useGame.getState().setRunning(false);
+          setOpen(true);
+        }}><Icon name="goal" size={18} />View chapters</button>
+      </div>
     </section>
     {open && <Modal title="Guided Mode chapters" icon={{ kind: "tech", name: "goal" }} onClose={() => setOpen(false)}>
       <p>One company, six chapters. Your servers, investments and progress carry forward.</p>
