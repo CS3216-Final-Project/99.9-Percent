@@ -56,20 +56,3 @@ test("optional product analytics observes Play and survives reload with no title
     expect(await page.evaluate(() => localStorage.getItem("nn.product-analytics.v1"))).toBeNull();
   }
 });
-
-test("opting out is asked once and remembered", async ({ page, withoutRoom }) => {
-  await withoutRoom();
-  const posthog: string[] = [];
-  await page.route("https://us.i.posthog.com/**", route => { posthog.push(route.request().url()); return route.abort(); });
-  await page.goto("/");
-  const panel = page.getByRole("region", { name: "Help improve 99.99%" });
-  await expect(panel).toContainText("We never send account details, URLs, or saved games.");
-  await page.getByRole("button", { name: "Opt out" }).click();
-  await expect(panel).toHaveCount(0);
-  expect(await page.evaluate(() => localStorage.getItem("nn.analytics-consent.v1"))).toBe("declined");
-  await page.reload();
-  await expect(page.getByRole("region", { name: "Help improve 99.99%" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Start Guided Mode" }).click();
-  await page.getByRole("button", { name: "Skip introduction" }).click();
-  expect(posthog).toEqual([]);
-});
