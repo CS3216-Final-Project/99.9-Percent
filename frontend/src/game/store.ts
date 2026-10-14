@@ -83,6 +83,9 @@ export interface Tour {
 /** The walkthroughs, one per mode, whose start and end are measured. The other guides are a single card. */
 export type Walkthrough = "basics" | "campaign";
 const isWalkthrough = (track: TourTrack): track is Walkthrough => track === "basics" || track === "campaign";
+/** How many steps each walkthrough has (Tutorial.tsx holds them). Reaching the last one finishes it. */
+export const WALKTHROUGH_STEPS: Record<Walkthrough, number> = { basics: 5, campaign: 8 };
+const lastStep = (track: Walkthrough) => WALKTHROUGH_STEPS[track] - 1;
 
 /** What started a walkthrough: the first visit, resuming a fresh run, a new company, the menu or the home screen. */
 export type TourStart = "first_visit" | "resume" | "new_company" | "menu" | "home";
@@ -336,9 +339,23 @@ export const useGame = create<Store>()((set, get) => {
   }
   /** The profile with the walkthrough done, saved; a failed save is reported and the walkthrough stays done for the visit. */
   function walkthroughDone(meta: Meta): Meta {
-    const next = { ...meta, tutorialDone: true, onboarded: true };
+    const next = { ...meta, tutorialDone: true, onboarded: true, walkthroughStep: null };
     if (!saveMeta(next, get().mode)) get().notify("Onboarding preferences could not be saved.", "error");
     return next;
+  }
+  /** The profile with Guided Mode's walkthrough under way at `step`, or none, saved. If that fails it only starts over. */
+  function walkthroughAt(meta: Meta, step: number | null): Meta {
+    const next = { ...meta, walkthroughStep: step };
+    saveMeta(next, get().mode);
+    return next;
+  }
+  /**
+   * The walkthrough a Guided Mode company in its Opening shows until the player has finished or skipped it, carrying
+   * on from the step it was left on. Later chapters have their own guides.
+   */
+  function campaignWalkthrough(meta: Meta, game: GameState): Tour | null {
+    if (meta.tutorialDone || game.phase === "ended" || chapterTourOf(game.campaign!)) return null;
+    return { track: "campaign", step: Math.min(meta.walkthroughStep ?? 0, lastStep("campaign")) };
   }
   /** The change that takes the view to `floor`, recorded for the analytics; nothing if it is there already. */
   function floorPatch(floor: Floor, how: FloorSwitch): Partial<Store> {
@@ -368,15 +385,17 @@ export const useGame = create<Store>()((set, get) => {
         patch.meta=meta;
       }
       // Entering a chapter closes any guide still open from before, and shows the chapter's own guide once, paused.
-      // A walkthrough left open through the Opening counts as done: the player has been through what it teaches.
+      // A walkthrough left open through the Opening ends there; short of its last step it is not done, so the next
+      // company offers it again.
       const chapter=chapterTourOf(c);
       if(chapter && was && chapter!==chapterTourOf(was)) {
         const open=get().tour;
         if(open) {
           patch.tour=null;
           if(open.track==="campaign") {
-            recordTour("skipped",open,{reason:"chapter_entered"});
-            patch.meta=walkthroughDone(patch.meta??get().meta);
+            if(open.step<lastStep("campaign"))recordTour("skipped",open,{reason:"chapter_entered"});
+            const meta=patch.meta??get().meta;
+            if(meta.walkthroughStep!==null)patch.meta=walkthroughAt(meta,null);
           }
         }
         const seen=(patch.meta??get().meta).chapterTours;
@@ -701,15 +720,16 @@ export const useGame = create<Store>()((set, get) => {
       const state=get();
       let game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID());
       if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended") game=applyCampaignInput(game,{type:"enter_scaling"}).state;
-      const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
+      const counted=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
       const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
-      // The walkthrough's steps line up only with a company where nothing has happened yet.
-      const tour:Tour|null=!meta.tutorialDone&&isFreshRun(game)?{track:"campaign",step:0}:null;
+      // A walkthrough already under way carries on where it was left; only a new one is a start.
+      const tour=campaignWalkthrough(counted,game),begins=!!tour&&counted.walkthroughStep===null;
+      const meta=begins?{...counted,walkthroughStep:0}:counted;
       set({game,hasRun:true,meta,measurement,started:true,running:false,
         // Starting a fresh company replaces the game, like a new run.
         ...(state.hasRun?{}:{generation:state.generation+1,lastAction:null,lastIntro:intro("begin")}),
         tour,activeMark:document.hidden?null:performance.now()});
-      if(tour)recordTour("started",tour,{from:state.hasRun?"resume":"first_visit"});
+      if(begins)recordTour("started",tour!,{from:state.hasRun?"resume":"first_visit"});
       if(!saveMeta(meta))get().notify("Onboarding preferences could not be saved.","error");
       persist();
     },
@@ -851,14 +871,16 @@ export const useGame = create<Store>()((set, get) => {
       if(pending.length&&!archiveEvents(pending)) {
         get().notify("Export playtest records before resetting: the archive could not retain this run.","error");return;
       }
-      const nextMeta={...old.meta,runsStarted:old.meta.runsStarted+1};
+      const counted={...old.meta,runsStarted:old.meta.runsStarted+1};
       const measurement=beginSession(m,game,crypto.randomUUID(),new Date().toISOString());
       if(m.replayOf)event(measurement,game,"replay_started",{previousRunId:m.replayOf,seed:game.seed});
-      const tour:Tour|null=nextMeta.tutorialDone?null:{track:"campaign",step:0};
+      // A walkthrough still under way carries on into the new company.
+      const tour=campaignWalkthrough(counted,game),begins=!!tour&&counted.walkthroughStep===null;
+      const nextMeta=begins?{...counted,walkthroughStep:0}:counted;
       set({game,generation:get().generation+1,lastAction:null,lastIntro:intro("begin"),measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
         selected:null,selectedAppId:null,hovered:null,affected:[],view:null,techFocus:null,running:false,rating:null,
         onboarding:false,tour,started:true,toast:null,activeMark:document.hidden?null:performance.now()});
-      if(tour)recordTour("started",tour,{from:"new_company"});
+      if(begins)recordTour("started",tour!,{from:"new_company"});
       saveMeta(nextMeta);persist(true);
       return;
       }
@@ -970,21 +992,34 @@ export const useGame = create<Store>()((set, get) => {
       // Replaying Guided Mode's walkthrough keeps the company as it is, so it is not a start.
       const campaign = !!get().game.campaign;
       const tour: Tour = { track: track_, step: 0 };
+      // Going back to the start of the walkthrough already showing is not another start.
+      const begins = get().tour?.track !== track_;
       set({ tour, view: null, selected: null, running: false, onboarding: false, started: true, ...(campaign ? {} : { lastIntro: intro("begin") }) });
-      recordTour("started", tour, { from });
+      if (begins) recordTour("started", tour, { from });
+      if (campaign && track_ === "campaign" && !get().meta.tutorialDone) set({ meta: walkthroughAt(get().meta, 0) });
       // Guided Mode's playtest records are kept with the company.
       if (campaign && isWalkthrough(track_)) persist();
     },
     tourNext: () => {
       const tour = get().tour;
-      if (tour) set({ tour: { ...tour, step: tour.step + 1 } });
+      if (!tour) return;
+      const next = { ...tour, step: tour.step + 1 };
+      set({ tour: next });
+      if (!isWalkthrough(tour.track)) return;
+      // Reaching the last step finishes the walkthrough, whether or not the player then closes its card.
+      if (next.step === lastStep(tour.track)) {
+        recordTour("completed", next);
+        set({ meta: walkthroughDone(get().meta) });
+      } else if (tour.track === "campaign" && !get().meta.tutorialDone) set({ meta: walkthroughAt(get().meta, next.step) });
+      if (get().game.campaign) persist();
     },
     endTour: (completed) => {
       const { tour, meta, game } = get();
       if (!tour) return;
       let next = meta;
       const walkthrough = isWalkthrough(tour.track);
-      if (walkthrough) {
+      // On its last step the walkthrough has already finished; closing the card there records nothing more.
+      if (isWalkthrough(tour.track) && (tour.step < lastStep(tour.track) || !meta.tutorialDone)) {
         recordTour(completed ? "completed" : "skipped", tour, completed ? {} : { reason: "player" });
         next = walkthroughDone(meta);
       } else if (tour.track === "incident") {

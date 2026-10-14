@@ -39,8 +39,10 @@ export interface Meta {
   runsFinished: number;
   firstIncidentStarted: boolean;
   firstIncidentCompleted: boolean;
-  /** The guided walkthrough (Challenge Mode's first week, Guided Mode's Opening) has been finished or skipped. */
+  /** The guided walkthrough (Challenge Mode's first week, Guided Mode's Opening) has reached its last step or been skipped. */
   tutorialDone: boolean;
+  /** The step Guided Mode's walkthrough is on while it is under way, so a reload or a new company carries on from it. */
+  walkthroughStep: number | null;
   /** The short guide shown on the first incident has been seen. */
   incidentGuideDone: boolean;
   /** Guided Mode chapters whose guide has been shown, so it appears once. */
@@ -56,6 +58,7 @@ export const DEFAULT_META: Meta = {
   firstIncidentStarted: false,
   firstIncidentCompleted: false,
   tutorialDone: false,
+  walkthroughStep: null,
   incidentGuideDone: false,
   chapterTours: [],
   challengeUnlocked: false,
@@ -252,7 +255,12 @@ export function saveClassicGame(game: GameState): boolean {
  * Older metadata also held the music switch, which now lives in the sound settings, and the state of Guided Mode's
  * former three-prompt introduction, which the spotlight walkthrough replaced.
  */
-type StoredMeta = Omit<Partial<Meta>, "chapterTours"> & { music?: unknown; openingOnboarding?: unknown; chapterTours?: unknown };
+type StoredMeta = Omit<Partial<Meta>, "chapterTours" | "walkthroughStep"> & {
+  music?: unknown;
+  openingOnboarding?: unknown;
+  chapterTours?: unknown;
+  walkthroughStep?: unknown;
+};
 
 function parseMeta(raw: string | null): StoredMeta | null {
   if (!raw) return null;
@@ -272,9 +280,10 @@ function introductionDone(introduction: unknown): boolean {
 
 /** `campaign` reads Guided Mode's profile, where a player done with the former introduction is done with the walkthrough. */
 function decodeMeta(raw: string | null, campaign = false): Meta {
-  const { music: _music, openingOnboarding, chapterTours, ...stored } = parseMeta(raw) ?? {};
+  const { music: _music, openingOnboarding, chapterTours, walkthroughStep, ...stored } = parseMeta(raw) ?? {};
   const seen = Array.isArray(chapterTours) ? CHAPTER_TOURS.filter((id) => chapterTours.includes(id)) : [];
-  const meta: Meta = { ...DEFAULT_META, ...stored, chapterTours: seen };
+  const step = Number.isInteger(walkthroughStep) && (walkthroughStep as number) >= 0 ? (walkthroughStep as number) : null;
+  const meta: Meta = { ...DEFAULT_META, ...stored, chapterTours: seen, walkthroughStep: step };
   if (campaign && introductionDone(openingOnboarding)) meta.tutorialDone = true;
   return meta;
 }

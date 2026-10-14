@@ -48,8 +48,8 @@ An event has its own `$insert_id`. The SDK supplies a persistent anonymous brows
 | `gameplay_chapter_completed` | A previously incomplete chapter becomes complete during observed play. |
 | `gameplay_run_completed` | All Campaign chapters are complete in the same run, or Classic reaches its winning outcome. |
 | `gameplay_run_failed` | A run reaches a losing outcome. Includes `outcome` and the last reached chapter. |
-| `gameplay_tutorial_started` | A mode's walkthrough begins: Guided Mode's Opening walkthrough or Challenge Mode's first-week tutorial. Includes `tutorial_track`, `tutorial_step` and `tutorial_from`. |
-| `gameplay_tutorial_completed` | The player finishes the walkthrough's last step. Includes `tutorial_track` and `tutorial_step`. |
+| `gameplay_tutorial_started` | A mode's walkthrough begins, once until it ends (Guided Mode's carries on across reloads and companies without a new start): Guided Mode's Opening walkthrough or Challenge Mode's first-week tutorial. Includes `tutorial_track`, `tutorial_step` and `tutorial_from`. |
+| `gameplay_tutorial_completed` | The player reaches the walkthrough's last step, whether or not they then close its card. Includes `tutorial_track` and `tutorial_step`. |
 | `gameplay_tutorial_skipped` | The walkthrough ends unfinished. Includes `tutorial_track`, `tutorial_step` and `reason`. |
 
 Campaign chapter IDs are `opening`, `scaling`, `data`, `spikes`, `reliability`.
@@ -64,7 +64,7 @@ Build IDs distinguish releases within a content version.
 Tutorial events describe the two walkthroughs only; Guided Mode's one-card chapter guides and Challenge Mode's incident guide are not reported.
 `tutorial_track` is `campaign` (Guided Mode) or `basics` (Challenge Mode).
 `tutorial_step` is the step showing when the event happened, counted from 0, so a skip on the third card has step 2.
-`tutorial_from` is `first_visit`, `resume` (a fresh run reopened before any decision), `new_company`, `menu` or `home`.
+`tutorial_from` is `first_visit`, `resume` (Guided Mode: a company in the Opening reopened with no walkthrough under way; Challenge Mode: a fresh run reopened before any decision), `new_company`, `menu` or `home`.
 A skip's `reason` is `player` (the Skip button) or `chapter_entered` (a Guided Mode walkthrough still open when the company moved on from the Opening, which counts as done).
 Each start and end is reported once; Challenge Mode's walkthrough, offered behind the title screen, is reported when play begins.
 A reload does not repeat an event, but a fresh company reopened before its first decision offers the walkthrough again and so starts it again.

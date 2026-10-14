@@ -1,8 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { useGame } from "@/game/store";
+import { useGame, WALKTHROUGH_STEPS } from "@/game/store";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
-import Tutorial, { CAMPAIGN_STEPS } from "./Tutorial";
+import Tutorial, { BASICS_STEPS, CAMPAIGN_STEPS } from "./Tutorial";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -46,6 +46,10 @@ it("walks a first company from its system and evidence to its first purchase, wi
   const c = useGame.getState().game.campaign!;
   expect([c.step, c.cashCents, c.pending, c.actions]).toEqual([before.step, before.cashCents, before.pending, before.actions]);
   expect(useGame.getState().running).toBe(false);
+});
+
+it("finishes each walkthrough on the step the store counts as its last", () => {
+  expect(WALKTHROUGH_STEPS).toEqual({ basics: BASICS_STEPS, campaign: CAMPAIGN_STEPS });
 });
 
 it("skips at any step, stays skipped after a reload, and replays from the menu on the same company", () => {

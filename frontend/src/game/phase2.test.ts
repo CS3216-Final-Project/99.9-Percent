@@ -1,7 +1,7 @@
 import {beforeEach,afterEach,it,expect,vi} from "vitest";
 import {newGame,applyAction,type GameState} from "../sim";
 import {advanceSteps} from "../sim/step";
-import {useGame,inspectOrSelect} from "./store";
+import {useGame,inspectOrSelect,WALKTHROUGH_STEPS} from "./store";
 import {makeEnvelope,decodeSave,CAMPAIGN_SAVE_KEY} from "./saveEnvelope";
 import {loadGame,saveGame,readAnalytics,archiveEvents,exportPlaytest,DEFAULT_META,saveMeta} from "./persist";
 import {emptyMeasurement,beginSession,projectEvents} from "./telemetry";
@@ -59,13 +59,43 @@ it("offers the Opening walkthrough once, on a fresh company, without holding the
  expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
  expect(useGame.getState().game).toEqual(before);
 });
-it("does not start the walkthrough mid-company, and a new company offers it until it is done",()=>{
- saveGame(advanceSteps(newGame(1,"walkthrough-test"),3).state);enter();
+it("finishes the walkthrough on its last step, not before, even if its card is never closed",()=>{
+ enter();
+ for(let i=0;i<WALKTHROUGH_STEPS.campaign-2;i++)useGame.getState().tourNext();
+ expect(useGame.getState().meta.tutorialDone).toBe(false);
+ useGame.getState().tourNext();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:WALKTHROUGH_STEPS.campaign-1});
+ expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!)).toMatchObject({tutorialDone:true,walkthroughStep:null});
+ // A reload before Got it neither shows it again nor records it twice.
+ useGame.setState(useGame.getInitialState(),true);enter();
  expect(useGame.getState().tour).toBeNull();
+ expect(tutorialEvents().map(e=>e.name)).toEqual(["tutorial_started","tutorial_completed"]);
+});
+it("carries an unfinished walkthrough on where it was left, after the clock has run, into a new company, as one start",()=>{
+ enter();
+ for(let i=0;i<5;i++)useGame.getState().tourNext();
+ // The walkthrough asks the player to run the clock, so the company moves on before it ends.
+ useGame.getState().setRunning(true);useGame.getState().tick(3);useGame.getState().setRunning(false);
+ useGame.getState().endSession();useGame.getState().play();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:5});
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(useGame.getState().game.campaign!.step).toBe(3);
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:5});
  useGame.getState().newRun();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:5});
+ // Showing it again from the menu goes back to its start without starting another.
+ useGame.getState().showOnboarding();
  expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
- useGame.getState().endTour(true);
- expect(useGame.getState().meta.tutorialDone).toBe(true);
+ expect(tutorialEvents()).toEqual([{name:"tutorial_started",track:"campaign",step:0,from:"first_visit"}]);
+});
+it("offers the walkthrough on a company already under way in the Opening, but not in a later chapter",()=>{
+ saveGame(advanceSteps(newGame(1,"walkthrough-test"),3).state);enter();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
+ expect(tutorialEvents().at(-1)).toMatchObject({name:"tutorial_started",from:"resume"});
+ useGame.setState(useGame.getInitialState(),true);localStorage.clear();
+ saveGame(act(act(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"}));enter();
+ expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+ expect(useGame.getState().tour).toBeNull();
 });
 it("keeps the walkthrough working in memory when its preference cannot be saved",()=>{
  enter();
@@ -77,7 +107,7 @@ it("keeps the walkthrough working in memory when its preference cannot be saved"
  expect(useGame.getState().toast).toMatchObject({kind:"error",text:"Onboarding preferences could not be saved."});
 });
 it("shows a chapter's guide once, paused, when the company first enters it",()=>{
- saveGame(act(recovered(),{type:"acknowledge_review"}));enter();
+ saveGame(act(recovered(),{type:"acknowledge_review"}));saveMeta({...DEFAULT_META,tutorialDone:true});enter();
  expect(useGame.getState().tour).toBeNull();
  // Acknowledging the Opening milestone continues the company into Scaling & Routing.
  expect(useGame.getState().act({type:"acknowledge_milestone"})).toBe(true);
@@ -98,17 +128,17 @@ it("continues a company whose Opening is acknowledged straight into scaling, wit
  expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
  expect(useGame.getState().tour).toBeNull();
 });
-it("closes a walkthrough still open when the company leaves the Opening, counts it done and shows the chapter's guide",()=>{
+it("closes an unfinished walkthrough when the company leaves the Opening, shows the chapter's guide and offers it again on the next company",()=>{
  saveGame(act(recovered(),{type:"acknowledge_review"}));
- enter();useGame.getState().startTour("campaign");useGame.getState().tourNext();
+ enter();useGame.getState().tourNext();
  expect(useGame.getState().act({type:"acknowledge_milestone"})).toBe(true);
  expect(useGame.getState().tour).toEqual({track:"scaling",step:0});
- expect(useGame.getState().meta).toMatchObject({tutorialDone:true,chapterTours:["scaling"]});
- expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!)).toMatchObject({tutorialDone:true,chapterTours:["scaling"]});
+ expect(useGame.getState().meta).toMatchObject({tutorialDone:false,walkthroughStep:null,chapterTours:["scaling"]});
+ expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!)).toMatchObject({tutorialDone:false,walkthroughStep:null,chapterTours:["scaling"]});
  expect(tutorialEvents().at(-1)).toEqual({name:"tutorial_skipped",track:"campaign",step:1,reason:"chapter_entered"});
- // A new company does not offer it again.
  useGame.getState().endTour(true);useGame.getState().newRun();
- expect(useGame.getState().tour).toBeNull();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
+ expect(tutorialEvents().at(-1)).toMatchObject({name:"tutorial_started",from:"new_company"});
 });
 it("records each walkthrough start, finish and skip once in the playtest records, with the step reached",()=>{
  enter();

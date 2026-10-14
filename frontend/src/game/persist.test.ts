@@ -77,6 +77,15 @@ describe('browser metadata and analytics', () => {
     expect(loadMeta('classic').tutorialDone).toBe(false);
   });
 
+  it('keeps a walkthrough step only when it is a step', () => {
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ walkthroughStep: 3 }));
+    expect(loadMeta().walkthroughStep).toBe(3);
+    for (const step of [-1, 1.5, '2', null, {}]) {
+      localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ walkthroughStep: step }));
+      expect(loadMeta().walkthroughStep).toBeNull();
+    }
+  });
+
   it('keeps only known chapter guides as seen, once each and in chapter order', () => {
     saveMeta({ ...DEFAULT_META, chapterTours: ['data', 'scaling'] });
     expect(loadMeta().chapterTours).toEqual(['scaling', 'data']);
