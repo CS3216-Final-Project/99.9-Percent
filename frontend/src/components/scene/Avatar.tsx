@@ -34,7 +34,7 @@ const SEAT = 0.46;
 const BLEND = 0.25;
 const BOUNCE = 0.6;
 /** How fast each clip plays: the walk and run keep pace with the avatar's speed. */
-const PACE: Record<string, number> = { walk: 1.6, run: 1.4 };
+const PACE: Record<string, number> = { walk: 2.5, run: 2.2 };
 
 const materials = new Map<string, THREE.Material>();
 /** The pack's one texture, matte at basic detail and softly lit at HD, shared by every avatar. */

@@ -72,9 +72,11 @@ test("in walk mode, clicking equipment walks the avatar to it, and Space then in
   await label(page, "Monitoring").click();
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "true");
   await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 40_000 });
-  // Close the inspector, then Space opens it again from where the avatar stands.
+  // Close the inspector, then Space opens it again from where the avatar stands: a nearby
+  // prompt wins even while a room control like Zoom in still holds the page's focus.
   await page.getByRole("complementary", { name: "Details" }).getByRole("button", { name: "Close" }).click();
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Zoom in", exact: true }).focus();
   await page.keyboard.press("Space");
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "true");
   // The prompt is a button too, for a phone with no Space key.

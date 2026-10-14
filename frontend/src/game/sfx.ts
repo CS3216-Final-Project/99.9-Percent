@@ -204,17 +204,25 @@ const ZONE_VOICES = {
     burst(ctx, out, at, hiss, 1600, 0.03, hit(ctx, at, 0.2, 0.025));
     osc(ctx, "sine", 640, at + 0.1, at + 0.14).connect(hit(ctx, at + 0.1, 0.14, 0.03)).connect(out);
   },
-  /** Nearby voices: two or three low, indistinct tones overlapping, no words. */
-  murmur: (ctx, out, at) => {
-    const lp = filter(ctx, "lowpass", 900);
-    lp.connect(out);
-    [
-      [0, 52, 0.34, 0.18],
-      [0.07, 55, 0.26, 0.14],
-      [0.16, 48, 0.3, 0.12],
-    ].forEach(([t, m, len, peak]) => {
-      osc(ctx, "triangle", note(m), at + t, at + t + len).connect(envelope(ctx, at + t, len, peak, 0.06, 0.12)).connect(lp);
-    });
+  /** Nearby voices: short, alternating speech-like syllables softened into an indistinct murmur, never words. */
+  murmur: (ctx, out, at, hiss) => {
+    const room = filter(ctx, "lowpass", 1450);
+    room.connect(out);
+    for (const [delay, fundamental, formant, length, peak] of [
+      [0, 145, 620, 0.2, 0.13],
+      [0.2, 165, 860, 0.17, 0.1],
+      [0.43, 132, 700, 0.23, 0.14],
+      [0.7, 152, 940, 0.18, 0.1],
+    ] as const) {
+      const t = at + delay;
+      const vowel = filter(ctx, "bandpass", formant);
+      vowel.Q.value = 1.6;
+      osc(ctx, "sawtooth", fundamental, t, t + length)
+        .connect(envelope(ctx, t, length, peak, 0.035, 0.08))
+        .connect(vowel)
+        .connect(room);
+      burst(ctx, room, t, hiss, formant * 1.8, Math.min(0.045, length), hit(ctx, t, peak * 0.35, 0.035));
+    }
   },
   /** Typing at a desk: a few tiny high clicks at an uneven pace. */
   keyboard: (ctx, out, at, hiss) => {
