@@ -28,13 +28,15 @@ const SOFTWARE: QualityProfile = { detail: "basic", effects: false, shadows: fal
 const PRESETS: Record<Exclude<GraphicsQuality, "auto">, QualityProfile> = { high: HIGH, medium: MEDIUM, low: LOW };
 
 /**
- * The profile to draw with. Auto means High on a graphics card and the lightest settings in software
- * rendering. Until the renderer is known the room is not drawn, so detail stays basic and a machine without
+ * The profile to draw with. Auto means Medium on a graphics card and the lightest settings in software
+ * rendering. High's effects pass alone halves a phone's frame rate and costs a weak laptop the same, while
+ * Medium keeps the HD look; a player with the graphics card for it can choose High. Until the renderer is
+ * known the room is not drawn, so detail stays basic and a machine without
  * a GPU never starts downloading HD textures. A forced detail from the page address (`?graphics=hd` or
  * `?graphics=basic`) overrides the profile's detail once the renderer is known; effects follow HD only.
  */
 export function resolveQuality(quality: GraphicsQuality, renderer: Renderer, override: Detail | null = null): QualityProfile {
-  const base = quality === "auto" ? (renderer === "software" ? SOFTWARE : HIGH) : PRESETS[quality];
+  const base = quality === "auto" ? (renderer === "software" ? SOFTWARE : MEDIUM) : PRESETS[quality];
   const detail = renderer === "unknown" ? "basic" : (override ?? base.detail);
   return { ...base, detail, effects: base.effects && detail === "hd" };
 }
@@ -44,7 +46,7 @@ export const QUALITY_OPTIONS: { id: GraphicsQuality; label: string; summary: str
   {
     id: "auto",
     label: "Auto",
-    summary: "Recommended. Picks High on a graphics card, easing off sharpness and glow if the frame rate drops, and the lightest look when the browser draws on the CPU.",
+    summary: "Recommended. Picks Medium on a graphics card, easing off sharpness if the frame rate drops, and the lightest look when the browser draws on the CPU.",
     details: "Matches your machine",
   },
   {
@@ -69,8 +71,6 @@ export const QUALITY_OPTIONS: { id: GraphicsQuality; label: string; summary: str
 
 /** Auto never draws with fewer pixels than this per CSS pixel, however slow the machine. */
 export const ADAPT_MIN_DPR = 0.75;
-/** Below this share of its full quality, Auto drops the glow and ambient-shading pass. */
-export const ADAPT_EFFECTS_FROM = 0.4;
 
 /** Whether Auto should watch the frame rate: only on a graphics card with the frame rate uncapped. */
 export function adapts(quality: GraphicsQuality, renderer: Renderer, profile: QualityProfile): boolean {
@@ -78,15 +78,14 @@ export function adapts(quality: GraphicsQuality, renderer: Renderer, profile: Qu
 }
 
 /**
- * What Auto draws with when the frame rate has fallen, as a share of its full quality from 1 down to 0: first fewer
- * pixels, down to ADAPT_MIN_DPR, then without the effects pass. Neither needs a new canvas, so the camera stays put;
- * shadows and detail would, so they never change on their own. Once the monitor gives up flipping between two
- * levels, it settles on the lower and the effects stay off. `deviceRatio` is the display's pixel density.
+ * The pixels per CSS pixel Auto draws with when the frame rate has fallen, as a share of its full quality from 1
+ * down to 0: fewer the lower it falls, down to ADAPT_MIN_DPR. That needs no new canvas, so the camera stays put;
+ * shadows and detail would, so they never change on their own. `deviceRatio` is the display's pixel density.
  */
-export function adapt(profile: QualityProfile, factor: number, settled: boolean, deviceRatio: number): { dpr: number; effects: boolean } {
+export function adapt(profile: QualityProfile, factor: number, deviceRatio: number): number {
   // The profile's own pixels: a range is clamped to the display's density, as the canvas does with it.
   const top = Array.isArray(profile.dpr) ? Math.min(profile.dpr[1], Math.max(profile.dpr[0], deviceRatio)) : profile.dpr;
   const share = Math.min(1, Math.max(0, factor));
   const bottom = Math.min(ADAPT_MIN_DPR, top);
-  return { dpr: bottom + (top - bottom) * share, effects: profile.effects && !settled && share >= ADAPT_EFFECTS_FROM };
+  return bottom + (top - bottom) * share;
 }
