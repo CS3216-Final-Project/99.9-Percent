@@ -3516,7 +3516,8 @@ button:disabled {
 }
 
 /* Sound: a label, a slider and its percentage on one line. */
-.menu-toggle.is-on {
+.menu-toggle.is-on,
+.menu-toggle.is-on:hover:not(:disabled) {
   background: var(--ink);
   color: var(--paper);
 }

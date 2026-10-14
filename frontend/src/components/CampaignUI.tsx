@@ -30,6 +30,7 @@ import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { Campaign, CampaignPostmortem, Intervention, ScheduledAction } from "@/sim/campaignTypes";
 import { completedTechIds, TECH_ORDER, type EventKind, type GameState } from "@/sim";
+import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
@@ -343,7 +344,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
           </section>
         </div>
       </div>}
-      {tab === "playtest" && <section className="menu-section" aria-label="Playtest records"><h4><Icon name="analytics" size={20} />Playtest records</h4>
+      {tab === "playtest" && <><AnalyticsSettings /><section className="menu-section" aria-label="Playtest records"><h4><Icon name="analytics" size={20} />Playtest records</h4>
         <FeedbackButton inline />
         <div className="menu-actions"><button type="button" className="btn" onClick={()=>{useGame.getState().measureTime();const s=useGame.getState();download("playtest-session.json",exportPlaytest(s.game,s.measurement));}}><Icon name="download" size={20} />Export playtest record</button></div>
         <details className="more"><summary>Playtest observer notes</summary>
@@ -352,7 +353,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
           <label>Exact facilitator intervention <textarea value={intervention} onChange={e=>setIntervention(e.target.value)} /></label>
           <button className="btn" disabled={!intervention.trim()} onClick={()=>{useGame.getState().observer(measurement.session?.source??"unspecified",intervention);setIntervention("");}}>Record intervention</button>
         </details>
-      </section>}
+      </section></>}
     </MenuTabs>
   </Modal>;
 }
