@@ -6,7 +6,7 @@ import { pendingSpikeAcknowledgement, spikeInput } from "@/sim/autoscaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
 import { canEnterData, databaseUpgrade, pendingStop } from "@/sim/step";
-import { canEnterReliability, pendingReliability, effectiveTargets, researchBalance } from "@/sim/reliability";
+import { pendingReliability, effectiveTargets, researchBalance } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
@@ -14,6 +14,7 @@ import TechTree from "./TechTree";
 import { AccountSection } from "./Account";
 import { HomeScreen } from "./HomeScreen";
 import { CampaignChapters } from "./CampaignChapters";
+import { isChapterEntry } from "@/game/campaignChapters";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest } from "@/game/persist";
 import { money, num } from "@/game/format";
@@ -80,8 +81,7 @@ function CampaignGuidance() {
       {model.notice&&<p role="note">{model.notice}</p>}
       {model.optional&&<p className="muted">{model.optional}</p>}
     </details></section>}
-    {action?.action&&<button className="btn btn-primary" disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
-    {!c.reliabilityStage&&c.spikeStage?.acknowledged&&<button className="btn btn-primary" disabled={!canEnterReliability(game)} onClick={()=>act({type:"enter_reliability"})}>Continue to reliability<Icon name="next" /></button>}
+    {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
     {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
     {c.openingMilestone?.acknowledged&&!c.dataStage&&!c.scaling?.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}>View run scorecard</button>}

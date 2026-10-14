@@ -1,16 +1,18 @@
 import {render,screen,within,fireEvent,cleanup} from "@testing-library/react";
 import {beforeEach,afterEach,it,expect} from "vitest";
 import {CampaignPanel} from "./CampaignUI";
+import {CampaignChapters} from "./CampaignChapters";
 import {useGame} from "../game/store";
 import {dataCompany} from "../sim/__tests__/dataFixture";
 import {advanceSteps} from "../sim/step";
 import {applyAction,type GameState} from "../sim";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});
 afterEach(cleanup);
-function show(game:GameState){useGame.setState({game,ready:true,started:true,onboarding:false});render(<CampaignPanel/>);}
+function show(game:GameState){useGame.setState({game,ready:true,started:true,onboarding:false});render(<><CampaignChapters/><CampaignPanel/></>);}
 it("keeps the selected workload hidden until actual growth and enters through the paused store",()=>{
  show(dataCompany("read-heavy",false));const guide=screen.getByRole("region",{name:"Guided Mode guidance"});
- fireEvent.click(within(guide).getByRole("button",{name:/Continue to data strategy/}));
+ expect(within(guide).queryByRole("button",{name:/Continue to data strategy/})).toBeNull();
+ fireEvent.click(within(screen.getByRole("region",{name:"Guided Mode chapters"})).getByRole("button",{name:/Continue to data strategy/}));
  const data=screen.getByRole("region",{name:"Data strategy"});expect(data.textContent).toContain("Waiting for workload growth");
  expect(data.textContent).not.toMatch(/read-heavy|write-heavy|80%|20%/);expect(useGame.getState().running).toBe(false);
 });
