@@ -7,6 +7,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('completes the first-week tutorial on the basic look, purchases equipment and resumes after reload', async ({ page }) => {
+  // This journey renders the live room through the whole tutorial and again after reload. SwiftShader can spend
+  // most of the default budget drawing those transitions, so give the interaction assertions CPU headroom.
+  test.setTimeout(120_000);
   // CI draws with SwiftShader, which the room detects as software rendering, so no HD asset may be downloaded.
   const hd: string[] = [];
   const crew = new Set<string>();
