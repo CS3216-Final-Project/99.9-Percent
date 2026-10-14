@@ -4,7 +4,7 @@ import { Line, MapControls, PerformanceMonitor } from "@react-three/drei";
 import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
@@ -14,7 +14,8 @@ import {
   symptomaticEquipment,
   type EquipmentId,
 } from "@/sim";
-import type { GraphicsQuality } from "@/game/persist";
+import type { GameMode, GraphicsQuality } from "@/game/persist";
+import { loadExploration, saveExploration, type SavedCameraView } from "@/game/exploration";
 import { inspectOrSelect, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import {
@@ -128,7 +129,21 @@ function centreOn(p: THREE.Vector3, dir: THREE.Vector3, zoom: number, width: num
 /** The darkening laid over the room as the elevator passes between floors, moved by the camera each frame. */
 let dipEl: HTMLDivElement | null = null;
 
-function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean>; floor: Floor }) {
+/** How often the camera's view may be written to storage while it is on the move. */
+const VIEW_SAVE_EVERY = 0.5;
+/** Written positions are rounded so the controls' quiet damping is not a change worth saving. */
+const round4 = (n: number) => Math.round(n * 1e4) / 1e4;
+
+/** The view exactly as it is remembered: what it looks at, the camera's stand-off from it and the zoom. */
+function viewOf(target: THREE.Vector3, camera: THREE.Camera): SavedCameraView {
+  return {
+    target: { x: round4(target.x), z: round4(target.z) },
+    offset: { x: round4(camera.position.x - target.x), y: round4(camera.position.y - target.y), z: round4(camera.position.z - target.z) },
+    zoom: round4((camera as THREE.OrthographicCamera).zoom),
+  };
+}
+
+function CameraRig({ footprints, built, floor, mode }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean>; floor: Floor; mode: GameMode }) {
   const controls = useRef<MapControlsImpl>(null);
   const camera = useThree((s) => s.camera) as THREE.OrthographicCamera;
   /** The player has panned, zoomed or dragged the view, so it no longer follows the facility. */
@@ -140,6 +155,8 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
   /** The marker a campaign action asked the view to centre on, until the camera arrives or the player takes it. */
   const focusing = useRef<string | null>(null);
   const box = useRef<THREE.Box3 | null>(null);
+  /** The last view written down or seen, and the latest view worth writing on leaving. */
+  const persisting = useRef<{ last: number; json: string; view: SavedCameraView | null }>({ last: -Infinity, json: "", view: null });
   const v = useMemo(
     () => ({ offset: new THREE.Vector3(), dir: new THREE.Vector3(), before: new THREE.Vector3(), from: new THREE.Vector3(), centre: new THREE.Vector3() }),
     [],
@@ -182,6 +199,44 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
       spin.current += radians;
     };
   }, [camera]);
+
+  // Once the controls exist, put the camera back where this mode left it: its target on the floor in view, the
+  // same stand-off and the same zoom. The view then counts as taken, so the automatic framing leaves it alone.
+  // A layout effect: the frame loop may tick before a passive effect, and the first snapshot must see the
+  // restored view, not the mount's defaults.
+  useLayoutEffect(() => {
+    const c = controls.current;
+    const saved = loadExploration(mode).camera;
+    if (!c || !saved) return;
+    c.target.set(saved.target.x, FLOOR_Y[floor], saved.target.z);
+    camera.position.set(c.target.x + saved.offset.x, c.target.y + saved.offset.y, c.target.z + saved.offset.z);
+    camera.zoom = saved.zoom;
+    camera.updateProjectionMatrix();
+    camera.lookAt(c.target);
+    c.update();
+    touched.current = true;
+    homing.current = false;
+    spin.current = 0;
+    const view = viewOf(c.target, camera);
+    persisting.current.json = JSON.stringify(view);
+    persisting.current.view = view;
+    // Restores the mount's own mode and floor only; a mode switch remounts the rig (see the key below).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The latest steady view is written on the way out: hiding the page or the rig unmounting. A view mid-ride or
+  // from before a run started is never written — the title screen's framing behind it is not the player's.
+  useEffect(() => {
+    const flush = () => {
+      const p = persisting.current;
+      if (p.view && !riding()) saveExploration(mode, { camera: p.view });
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [mode]);
 
   // A campaign action centres its machine at the default zoom, then leaves the camera where the player can take it.
   useEffect(
@@ -327,6 +382,20 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
     updateWalls(dir.copy(c.target).sub(camera.position).normalize());
     // Last, so the labels follow the camera as it ends up this frame.
     placeLabels(camera, size);
+    // And the view as it ended up is worth remembering — but only the player's own, never while the title
+    // screen is up or the elevator is between floors.
+    const p = persisting.current;
+    if (useGame.getState().started && !riding()) {
+      const view = viewOf(c.target, camera);
+      p.view = view;
+      const json = JSON.stringify(view);
+      const t = now();
+      if (json !== p.json && t - p.last >= VIEW_SAVE_EVERY) {
+        p.last = t;
+        p.json = json;
+        saveExploration(mode, { camera: view });
+      }
+    }
   });
 
   return (
@@ -895,6 +964,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
   const m = useSceneModel();
   const campaign = useGame(s => s.game.campaign);
   const floor = useGame((s) => s.floor);
+  const mode = useGame((s) => s.mode);
   const walking = useGame((s) => s.walking && s.started);
   const office = useRef<THREE.Group>(null);
   const servers = useRef<THREE.Group>(null);
@@ -1033,7 +1103,8 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
       </group>
       <LabelAnchors footprints={m.footprints} />
 
-      <CameraRig footprints={m.footprints} built={m.built} floor={floor} />
+      {/* Each mode remembers its own view, so the rig remounts on a switch and restores that mode's camera. */}
+      <CameraRig key={mode} footprints={m.footprints} built={m.built} floor={floor} mode={mode} />
       {effects && <Effects />}
     </>
   );
@@ -1110,16 +1181,23 @@ function FrameLimiter({ fps }: { fps: number }) {
 }
 
 /** Do what is within the avatar's reach: exactly what clicking it does, the elevator's ride, or a fun thing. */
-function actOn(prompt: Prompt): void {
-  if (prompt.kind === "equipment") inspectOrSelect(prompt.id);
-  else if (prompt.kind === "elevator") useGame.getState().goToFloor(prompt.to, "elevator");
-  else play(prompt.prop, now());
+function actOn(prompt: Prompt): string | null {
+  if (prompt.kind === "equipment") {
+    inspectOrSelect(prompt.id);
+    return null;
+  }
+  if (prompt.kind === "elevator") {
+    useGame.getState().goToFloor(prompt.to, "elevator");
+    return null;
+  }
+  play(prompt.prop, now());
+  return prompt.prop.doing;
 }
 
 /** What a typing field, an open dialog or a menu does with keys is theirs, not the room's. */
 const typing = (el: HTMLElement | null) => !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
 const inOverlay = (el: HTMLElement | null) => !!el?.closest('[role="dialog"], [role="menu"], [role="listbox"]');
-/** Space and the arrow keys belong to a focused button, tab, radio or slider. */
+/** The arrow keys, and Space when the avatar has nothing in reach, belong to a focused button, tab, radio or slider. */
 const onControl = (el: HTMLElement | null) => !!el?.closest('button, a, [role="tab"], [role="radio"], [role="slider"], [role="checkbox"]');
 
 /**
@@ -1129,23 +1207,48 @@ const onControl = (el: HTMLElement | null) => !!el?.closest('button, a, [role="t
 function WalkControls() {
   const walking = useGame((s) => s.walking && s.started);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
+  // What the prompt button says a fun thing is doing, while its animation plays.
+  const [activity, setActivity] = useState<{ propId: string; label: string } | null>(null);
+  const activityTimer = useRef<number | null>(null);
   useEffect(() => onPrompt(setPrompt), []);
+  // Stopping walk mode drops whatever the button said the avatar was doing.
+  useEffect(() => useGame.subscribe((s) => { if (!s.walking) setActivity(null); }), []);
+  const perform = useCallback((p: Prompt) => {
+    const doing = actOn(p);
+    if (!doing) return;
+    setActivity({ propId: p.kind === "prop" ? p.prop.id : "", label: doing });
+    if (activityTimer.current !== null) window.clearTimeout(activityTimer.current);
+    // For as long as the prop's animation runs.
+    activityTimer.current = window.setTimeout(() => {
+      activityTimer.current = null;
+      setActivity(null);
+    }, 2600);
+  }, []);
   useEffect(() => {
     if (!walking) {
       clearPrompt();
+      if (activityTimer.current !== null) {
+        window.clearTimeout(activityTimer.current);
+        activityTimer.current = null;
+      }
       return;
     }
     const down = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (typing(el) || inOverlay(el) || e.ctrlKey || e.metaKey || e.altKey) return;
       const arrow = e.code.startsWith("Arrow");
+      if (e.code === "Space" && avatar.prompt && !riding()) {
+        // A nearby thing to use beats whatever button last held focus.
+        e.preventDefault();
+        if (!e.repeat) perform(avatar.prompt);
+        return;
+      }
       if ((arrow || e.code === "Space") && onControl(el)) return;
       if (movesAvatar(e.code) || e.code === "ShiftLeft" || e.code === "ShiftRight") {
         if (!riding()) held.add(e.code);
         if (arrow) e.preventDefault();
       } else if (e.code === "Space") {
         e.preventDefault();
-        if (!e.repeat && avatar.prompt && !riding()) actOn(avatar.prompt);
       }
     };
     const up = (e: KeyboardEvent) => held.delete(e.code);
@@ -1162,18 +1265,25 @@ function WalkControls() {
       document.removeEventListener("visibilitychange", letGo);
       held.clear();
     };
-  }, [walking]);
+  }, [walking, perform]);
+  useEffect(
+    () => () => {
+      if (activityTimer.current !== null) window.clearTimeout(activityTimer.current);
+    },
+    []
+  );
   const shown = walking ? prompt : null;
+  const doing = shown?.kind === "prop" && activity?.propId === shown.prop.id ? activity.label : null;
   return (
     <>
       {shown && (
-        <button type="button" className="walk-prompt" onClick={() => actOn(shown)}>
+        <button type="button" className="walk-prompt" onClick={() => perform(shown)}>
           <kbd>Space</kbd>
-          {shown.label}
+          {doing ?? shown.label}
         </button>
       )}
       <span className="visually-hidden" role="status" aria-live="polite">
-        {shown ? `${shown.label}: press Space` : ""}
+        {shown ? (doing ?? `${shown.label}: press Space`) : ""}
       </span>
     </>
   );

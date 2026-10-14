@@ -103,6 +103,21 @@ describe("sound effects", () => {
     sfx.dispose();
   });
 
+  it("voice a murmur as a few short alternating syllables with consonant breath, not one chord", () => {
+    let t = 0;
+    const sfx = createSfx(() => true, () => t);
+    sfx.setVolume(80);
+    sfx.play("blip");
+    const ctx = FakeAudioContext.made[0];
+    t += 10_000;
+    const oscillators = ctx.oscillators.length;
+    const sources = ctx.sources.length;
+    sfx.playZone("murmur", 0.3);
+    expect(ctx.oscillators.length - oscillators).toBe(4);
+    expect(ctx.sources.length - sources).toBeGreaterThanOrEqual(4);
+    sfx.dispose();
+  });
+
   it("ride the elevator: a click and a hum setting off, a chime and the doors arriving, and nothing while muted", () => {
     const sfx = createSfx(() => true);
     sfx.liftDepart(false, 0.6);

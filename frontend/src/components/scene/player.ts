@@ -12,8 +12,8 @@ import { AVATAR_RADIUS, blocked, type World } from "./navgrid";
  * Kept free of React and three.js so the moves can be tested.
  */
 
-/** Metres a second: a walk, and a run with Shift held. */
-export const SPEED = { walk: 1.4, run: 2.8 };
+/** Metres a second: a brisk walk, and a run with Shift held. */
+export const SPEED = { walk: 2.2, run: 4.4 };
 
 /** Radians a second the avatar turns to face where it goes. */
 export const TURN_RATE = 10;

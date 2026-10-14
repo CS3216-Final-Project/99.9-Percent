@@ -5,7 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { avatarModel, type AvatarId } from "@/game/avatars";
+import { loadExploration, saveExploration } from "@/game/exploration";
 import type { Floor } from "@/game/floors";
+import type { GameMode } from "@/game/persist";
 import { useGame } from "@/game/store";
 import type { EquipmentId } from "@/sim";
 import { useDetail, type Detail } from "./detail";
@@ -14,6 +16,7 @@ import { ignoreRay } from "./furniture";
 import { loadGltf } from "./gltf";
 import { ROOM, type Footprint } from "./layout";
 import { FLOOR_Y } from "./levels";
+import { blocked, worldOf } from "./navgrid";
 import { onRide, ride, riding, shownFloor, now } from "./ride";
 import { puffTexture } from "./textures";
 import { avatar, CAR, LOBBY, placeAvatar, stepAvatar, walkTo } from "./walk";
@@ -34,7 +37,7 @@ const SEAT = 0.46;
 const BLEND = 0.25;
 const BOUNCE = 0.6;
 /** How fast each clip plays: the walk and run keep pace with the avatar's speed. */
-const PACE: Record<string, number> = { walk: 1.6, run: 1.4 };
+const PACE: Record<string, number> = { walk: 2.5, run: 2.2 };
 
 const materials = new Map<string, THREE.Material>();
 /** The pack's one texture, matte at basic detail and softly lit at HD, shared by every avatar. */
@@ -192,13 +195,40 @@ const forward = new THREE.Vector3();
 /** How loud footsteps are on each footing, as a share of the effects volume, and louder running. */
 const STEPS = { soft: { cue: "stepSoft", level: 0.35 }, hard: { cue: "stepHard", level: 0.4 }, hollow: { cue: "stepHollow", level: 0.45 } } as const;
 
+/** How often the avatar's spot may be written to storage while it is on the move. */
+const SAVE_EVERY = 0.5;
+
+/**
+ * Where the avatar stands now, for remembering: riding the elevator counts as standing in its lobby on the
+ * floor it is heading for, so a visit never resumes inside the car.
+ */
+function standingSpot(): { floor: Floor; x: number; z: number; yaw: number } {
+  if (riding()) return { floor: ride.to, x: LOBBY[0], z: LOBBY[1], yaw: avatar.yaw };
+  return { floor: avatar.floor, x: avatar.x, z: avatar.z, yaw: avatar.yaw };
+}
+
 export function WalkDriver({ walking, footprints, names }: { walking: boolean; footprints: Record<EquipmentId, Footprint>; names: Record<EquipmentId, string> }) {
   const camera = useThree((s) => s.camera);
+  const mode = useGame((s) => s.mode);
   const stride = useRef(0);
+  /** The mode this walk belongs to and when it was last written down, while the walk lasts. */
+  const persisting = useRef<{ mode: GameMode; last: number } | null>(null);
   useEffect(() => {
     if (!walking) return;
-    placeAvatar(useGame.getState().floor);
-    return onRide((event) => {
+    // Pick up where this mode was left, but only somewhere that is still on the floor in view and free to stand.
+    const saved = loadExploration(mode).avatar;
+    const floor = useGame.getState().floor;
+    if (saved && saved.floor === floor && !blocked(worldOf(saved.floor), saved.x, saved.z)) placeAvatar(saved.floor, [saved.x, saved.z], saved.yaw);
+    else placeAvatar(floor);
+    const p = { mode, last: 0 };
+    persisting.current = p;
+    const flush = (whileWalking: boolean) => {
+      const spot = standingSpot();
+      saveExploration(p.mode, { floor: spot.floor, ...(whileWalking ? { walking: true } : {}), avatar: spot });
+    };
+    const onHide = () => flush(true);
+    window.addEventListener("pagehide", onHide);
+    const offRide = onRide((event) => {
       if (event === "depart") {
         // Into the car, whatever sent it: a press in the car, the floor menu or a choice in a panel.
         Object.assign(avatar, { floor: ride.to, x: CAR[0], z: CAR[1], path: [], busy: null, moving: false });
@@ -206,7 +236,15 @@ export function WalkDriver({ walking, footprints, names }: { walking: boolean; f
         walkTo(LOBBY[0], LOBBY[1]);
       }
     });
-  }, [walking]);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      offRide();
+      // The spot is always worth remembering; whether the walk itself was is the store's own record — an explicit
+      // stop already wrote walking:false, and the title screen's automatic stop kept walking:true.
+      flush(false);
+      persisting.current = null;
+    };
+  }, [walking, mode]);
   useFrame((_, dt) => {
     if (!walking || riding()) return;
     camera.getWorldDirection(forward);
@@ -214,6 +252,13 @@ export function WalkDriver({ walking, footprints, names }: { walking: boolean; f
     const z = avatar.z;
     // Movement is checked in small steps whatever the frame's length, so a slow renderer only walks it in bigger strides.
     stepAvatar(Math.min(dt, 0.25), [forward.x, forward.z], footprints, names, now());
+    // The spot is written down as it moves, but never every frame and never mid-ride.
+    const p = persisting.current;
+    const t = now();
+    if (p && avatar.moving && t - p.last >= SAVE_EVERY) {
+      p.last = t;
+      saveExploration(p.mode, { floor: avatar.floor, walking: true, avatar: standingSpot() });
+    }
     // A footstep every stride, sounding of what is underfoot.
     stride.current += Math.hypot(avatar.x - x, avatar.z - z);
     if (!avatar.moving) stride.current = 0;

@@ -393,3 +393,65 @@ describe("challenge mode lock", () => {
     expect(useGame.getState().mode).toBe("classic");
   });
 });
+
+describe("exploration state", () => {
+  const seed = (mode: "campaign" | "classic", state: object) =>
+    localStorage.setItem(`nn.${mode}.exploration.v1`, JSON.stringify({ version: 1, avatar: null, camera: null, ...state }));
+
+  it("restores the floor at boot and walk mode on play", () => {
+    seed("campaign", { floor: "office", walking: true });
+    useGame.getState().boot();
+    expect(useGame.getState()).toMatchObject({ floor: "office", walking: false, started: false });
+    useGame.getState().play();
+    expect(useGame.getState()).toMatchObject({ floor: "office", walking: true });
+  });
+
+  it("lets a ?floor= address win and stops walk mode resuming", () => {
+    window.history.pushState({}, "", "/?floor=office");
+    try {
+      seed("campaign", { floor: "servers", walking: true });
+      useGame.getState().boot();
+      useGame.getState().play();
+      expect(useGame.getState()).toMatchObject({ floor: "office", walking: false });
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+  });
+
+  it("remembers each mode's floor and walk state separately", () => {
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+    seed("campaign", { floor: "office", walking: true });
+    seed("classic", { floor: "servers", walking: false });
+    useGame.getState().boot();
+    useGame.getState().play();
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", floor: "office", walking: true });
+    expect(useGame.getState().switchMode("classic")).toBe(true);
+    expect(useGame.getState()).toMatchObject({ mode: "classic", floor: "servers", walking: false });
+    expect(useGame.getState().switchMode("campaign")).toBe(true);
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", floor: "office", walking: true });
+  });
+
+  it("keeps the remembered walk choice when the title screen ends the walk", () => {
+    seed("campaign", { floor: "office", walking: true });
+    enter();
+    expect(useGame.getState().walking).toBe(true);
+    useGame.getState().endSession();
+    expect(useGame.getState().walking).toBe(false);
+    // The session's end still sounds, but the player's choice to walk is not unmade.
+    expect(useGame.getState().measurement.pending.some((e) => e.name === "walk_ended")).toBe(true);
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true });
+    useGame.getState().play();
+    expect(useGame.getState().walking).toBe(true);
+  });
+
+  it("persists an explicit Walk or floor choice, without toasting on failure", () => {
+    seed("campaign", { floor: "servers", walking: false });
+    enter();
+    useGame.getState().goToFloor("office", "menu");
+    useGame.getState().setWalking(true);
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ floor: "office", walking: true });
+    useGame.getState().setWalking(false);
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: false });
+    expect(useGame.getState().toast).toBeNull();
+  });
+});

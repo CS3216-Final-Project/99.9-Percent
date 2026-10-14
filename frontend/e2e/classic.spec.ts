@@ -7,6 +7,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('completes the first-week tutorial on the basic look, purchases equipment and resumes after reload', async ({ page }) => {
+  // This journey renders the live room through the whole tutorial and again after reload. SwiftShader can spend
+  // most of the default budget drawing those transitions, so give the interaction assertions CPU headroom.
+  test.setTimeout(120_000);
   // CI draws with SwiftShader, which the room detects as software rendering, so no HD asset may be downloaded.
   const hd: string[] = [];
   const crew = new Set<string>();
@@ -46,6 +49,8 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   expect(before.tasks.some(task => task.techId === 'larger_servers') || before.releases.some(release => release.techId === 'larger_servers') || before.techDone.includes('larger_servers')).toBe(true);
   await page.reload();
   await page.getByRole('button', { name: 'Continue week 2' }).click();
+  // The tutorial left the view on the office floor, which is the floor the reload restores.
+  await page.getByRole('button', { name: 'Server floor', exact: true }).click();
   await expectRoom(page);
   expect(await savedGame(page)).toEqual(before);
   await expect(page.getByRole('dialog', { name: /Tutorial/ })).toHaveCount(0);
