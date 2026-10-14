@@ -7,6 +7,7 @@ import { creature, standsAtDesk } from "./cast";
 import { Creature, Walker } from "./creatures";
 import { BENCHES, CAGE, CHILLER, CHILLERS, PALLETS, PUMPS, RACK_FRAMES, RESPONDERS, SERVER_GLASS, SERVER_ZONE_NAMES, SHELF_RUNS, SHELF_UNITS, SPOTS } from "./floorplan";
 import { heading } from "./routes";
+import { others } from "./walk";
 import { ModelBatch, type Placement } from "./models";
 import { deskGear, deskModels, glassFrames, ignoreRay, mdl, PANEL, placeModels, placeProps, rand } from "./furniture";
 import { Beacon, Floors, GlassPanes, ScreenPlane, ZoneNames, type Zone } from "./Office";
@@ -329,6 +330,8 @@ function Responder({ index }: { index: number }) {
   const start = useRef(-1);
   const [there, setThere] = useState(false);
   const legs = useMemo(() => walkLegs(path), [path]);
+  // While on the move, glass doors open as the engineer comes near.
+  useEffect(() => () => void others.delete(`responder ${index}`), [index]);
   useFrame(() => {
     const g = group.current;
     if (!g) return;
@@ -341,12 +344,14 @@ function Responder({ index }: { index: number }) {
     if (!leg) {
       const [x, z] = path[path.length - 1];
       g.position.set(x, 0, z);
+      others.delete(`responder ${index}`);
       g.rotation.y = heading(face[0] - x, face[1] - z);
       if (!there) setThere(true);
       return;
     }
     const f = (d - leg.from) / leg.len;
     g.position.set(leg.a[0] + (leg.b[0] - leg.a[0]) * f, 0, leg.a[1] + (leg.b[1] - leg.a[1]) * f);
+    others.set(`responder ${index}`, { floor: "servers", x: g.position.x, z: g.position.z });
     g.rotation.y = heading(leg.b[0] - leg.a[0], leg.b[1] - leg.a[1]);
   });
   return (

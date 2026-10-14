@@ -124,3 +124,13 @@ describe("walking the building", () => {
     expect(worldOf("office").walls).not.toEqual(expect.arrayContaining(SERVER_GLASS));
   });
 });
+
+describe("walk mode's starting places", () => {
+  it("are free, inside the meeting room upstairs and in front of the elevator downstairs, and lead out", async () => {
+    const { MEETING_START, LOBBY } = await import("./walk");
+    expect(blocked(worldOf("office"), ...MEETING_START)).toBe(false);
+    expect(MEETING_START[1]).toBeGreaterThan(10.2);
+    expect(blocked(worldOf("servers"), ...LOBBY)).toBe(false);
+    expect(findPath(gridOf("office"), MEETING_START, [13.2, 3.35])).not.toBeNull();
+  });
+});

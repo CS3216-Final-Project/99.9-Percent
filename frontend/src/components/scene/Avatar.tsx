@@ -17,6 +17,8 @@ import { FLOOR_Y } from "./levels";
 import { onRide, ride, riding, shownFloor, now } from "./ride";
 import { puffTexture } from "./textures";
 import { avatar, CAR, LOBBY, placeAvatar, stepAvatar, walkTo } from "./walk";
+import { footingAt, STRIDE } from "./footing";
+import { sceneSound } from "./sceneSounds";
 
 /*
  * The player's avatar: one of Kenney's cube animals (see game/avatars.ts), drawn only once chosen. In walk mode it
@@ -187,8 +189,12 @@ const forward = new THREE.Vector3();
  * Walk mode's frame: steer the avatar from the keys held relative to the view, and carry it in the elevator's car
  * when the floor changes, stepping out on arrival.
  */
+/** How loud footsteps are on each footing, as a share of the effects volume, and louder running. */
+const STEPS = { soft: { cue: "stepSoft", level: 0.35 }, hard: { cue: "stepHard", level: 0.4 }, hollow: { cue: "stepHollow", level: 0.45 } } as const;
+
 export function WalkDriver({ walking, footprints, names }: { walking: boolean; footprints: Record<EquipmentId, Footprint>; names: Record<EquipmentId, string> }) {
   const camera = useThree((s) => s.camera);
+  const stride = useRef(0);
   useEffect(() => {
     if (!walking) return;
     placeAvatar(useGame.getState().floor);
@@ -204,7 +210,17 @@ export function WalkDriver({ walking, footprints, names }: { walking: boolean; f
   useFrame((_, dt) => {
     if (!walking || riding()) return;
     camera.getWorldDirection(forward);
+    const x = avatar.x;
+    const z = avatar.z;
     stepAvatar(Math.min(dt, 0.1), [forward.x, forward.z], footprints, names, now());
+    // A footstep every stride, sounding of what is underfoot.
+    stride.current += Math.hypot(avatar.x - x, avatar.z - z);
+    if (!avatar.moving) stride.current = 0;
+    else if (stride.current >= (avatar.running ? STRIDE.run : STRIDE.walk)) {
+      stride.current = 0;
+      const step = STEPS[footingAt(avatar.floor, avatar.x, avatar.z)];
+      sceneSound(step.cue, step.level * (avatar.running ? 1.3 : 1));
+    }
   });
   return null;
 }

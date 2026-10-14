@@ -41,6 +41,7 @@ import { ElevatorCar, Landing } from "./Elevator";
 import { FLOOR_NUMBER, FLOOR_Y, rideAt } from "./levels";
 import { arrive, depart, now, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
 import { Avatar, WalkDriver, WalkFloor } from "./Avatar";
+import { GlassDoors } from "./Doors";
 import { avatar, clearPrompt, held, movesAvatar, onPrompt, play } from "./walk";
 import type { Prompt } from "./player";
 import { applyDaylight } from "./cityLight";
@@ -881,6 +882,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
         <Room />
         <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
         <Landing floor="office" interactive={landed === "office"} />
+        <GlassDoors floor="office" />
         {walking && landed === "office" && <WalkFloor />}
         {onFloor("office").map((id) => (
           <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
@@ -892,6 +894,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
         <Room servers />
         <ServerFloor incident={m.incident} engineers={m.engineers} />
         <Landing floor="servers" interactive={landed === "servers"} />
+        <GlassDoors floor="servers" />
         {walking && landed === "servers" && <WalkFloor />}
 
         {/* Network edge */}

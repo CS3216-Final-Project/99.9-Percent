@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMusic } from "./music";
-import { createSfx, CUE_NAMES, ZONE_CUES } from "./sfx";
+import { createSfx, CUE_NAMES, SCENE_CUES, ZONE_CUES } from "./sfx";
 import { loudness } from "./synth";
 import { FakeAudioContext, FakeOfflineAudioContext } from "./testing/fakeAudio";
 
@@ -127,6 +127,30 @@ describe("sound effects", () => {
     const quiet = ctx.voices;
     sfx.liftDepart(false, 0.6);
     sfx.liftArrive(true, { close: 2.8, shut: 3.2 });
+    expect(ctx.voices).toBe(quiet);
+    sfx.dispose();
+  });
+
+  it("play footsteps and doors only while the audio runs, a new avatar's pop on a press, and none while muted", () => {
+    const sfx = createSfx(() => true);
+    sfx.setVolume(80);
+    // Nothing has started the audio: footsteps never start it, the pop of the player's own choice does.
+    sfx.playScene("stepSoft", 0.4);
+    expect(FakeAudioContext.made).toHaveLength(0);
+    sfx.playScene("pop", 0.9, true);
+    const ctx = FakeAudioContext.made[0];
+    expect(ctx.voices).toBeGreaterThan(0);
+    for (const cue of SCENE_CUES) {
+      const before = ctx.voices;
+      const gains = ctx.gains.length;
+      sfx.playScene(cue, 0.4);
+      expect(ctx.voices, cue).toBeGreaterThan(before);
+      expect(ctx.gains[gains].gain.value, cue).toBeCloseTo(0.4);
+    }
+    sfx.setVolume(0);
+    const quiet = ctx.voices;
+    sfx.playScene("hiss", 0.5);
+    sfx.playScene("pop", 0.9, true);
     expect(ctx.voices).toBe(quiet);
     sfx.dispose();
   });

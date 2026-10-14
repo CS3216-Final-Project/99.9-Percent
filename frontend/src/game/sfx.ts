@@ -260,6 +260,33 @@ const LIFT_VOICES = {
 export type LiftCue = keyof typeof LIFT_VOICES;
 export const LIFT_CUES = Object.keys(LIFT_VOICES) as LiftCue[];
 
+/**
+ * Sounds of walking the building: footsteps on carpet, on tile or concrete and on the server hall's raised floor;
+ * the hiss of a glass door sliding; and the pop of a new avatar arriving.
+ */
+const SCENE_VOICES = {
+  stepSoft: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 320, 0.07, hit(ctx, at, 0.22, 0.06)),
+  stepHard: (ctx, out, at, hiss) => {
+    burst(ctx, out, at, hiss, 1900, 0.03, hit(ctx, at, 0.18, 0.025));
+    burst(ctx, out, at, hiss, 380, 0.05, hit(ctx, at, 0.14, 0.045));
+  },
+  stepHollow: (ctx, out, at, hiss) => {
+    osc(ctx, "triangle", 150, at, at + 0.12).connect(hit(ctx, at, 0.2, 0.09)).connect(out);
+    burst(ctx, out, at, hiss, 650, 0.05, hit(ctx, at, 0.12, 0.05));
+  },
+  hiss: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 2600, 0.38, envelope(ctx, at, 0.38, 0.14, 0.03, 0.3)),
+  pop: (ctx, out, at) => {
+    const o = osc(ctx, "sine", 880, at, at + 0.16);
+    o.frequency.setValueAtTime(880, at);
+    o.frequency.exponentialRampToValueAtTime(420, at + 0.12);
+    o.connect(hit(ctx, at, 0.3, 0.14)).connect(out);
+    osc(ctx, "triangle", 1320, at + 0.05, at + 0.14).connect(hit(ctx, at + 0.05, 0.08, 0.08)).connect(out);
+  },
+} satisfies Record<string, Voice>;
+
+export type SceneCue = keyof typeof SCENE_VOICES;
+export const SCENE_CUES = Object.keys(SCENE_VOICES) as SceneCue[];
+
 /** When the elevator's doors move after the car arrives, in seconds: they open at once, start closing at `close` and meet at `shut`. */
 export interface LiftDoors {
   close: number;
@@ -316,6 +343,11 @@ export interface Sfx {
   /** The car arrives: its hum stops, the chime sounds and the doors open, wait and close. */
   liftArrive(up: boolean, doors: LiftDoors): void;
   /**
+   * Play a sound of walking the building at `level` (0 to 1) of the effects volume. With `wake`, as for a press of
+   * the player's own, it may start the audio; otherwise, like the zones' sounds, it plays only while the audio runs.
+   */
+  playScene(cue: SceneCue, level: number, wake?: boolean): void;
+  /**
    * Play a zone's sound at `level` (0 to 1) of the effects volume, unless the sound is off, the audio is asleep or
    * the same sound has only just played. Zone sounds never wake the audio: they are only scenery.
    */
@@ -328,7 +360,7 @@ export interface Sfx {
   dispose(): void;
 }
 
-const SILENT: Sfx = { play() {}, playZone() {}, liftDepart() {}, liftArrive() {}, setVolume() {}, dispose() {} };
+const SILENT: Sfx = { play() {}, playZone() {}, liftDepart() {}, liftArrive() {}, playScene() {}, setVolume() {}, dispose() {} };
 
 /**
  * `wanted` says whether the player has effects on, so a click can start the
@@ -440,6 +472,17 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
         LIFT_VOICES.tick(c, humming, at + tickIn, hiss);
       });
     },
+    playScene(cue, level, wake = false) {
+      if (level <= 0) return;
+      const voice = (c: AudioContext) => {
+        if (!bus || !hiss) return;
+        const g = lane(c, bus);
+        g.gain.value = Math.min(1, level);
+        SCENE_VOICES[cue](c, g, c.currentTime + 0.005, hiss);
+      };
+      if (wake) whenAwake(voice);
+      else if (!disposed && percent > 0 && ctx && ctx.state === "running") voice(ctx);
+    },
     liftArrive(up, doors) {
       whenAwake((c) => {
         if (!bus || !hiss) return;
@@ -512,9 +555,10 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
 }
 
 /** Render one cue offline at full volume, for checking levels in a browser. */
-export async function renderCue(cue: Cue | ZoneCue | LiftCue, rate = 44100): Promise<AudioBuffer> {
+export async function renderCue(cue: Cue | ZoneCue | LiftCue | SceneCue, rate = 44100): Promise<AudioBuffer> {
   const ctx = new OfflineAudioContext(1, Math.round(rate * 2), rate);
-  const voice: Voice = cue in ZONE_VOICES ? ZONE_VOICES[cue as ZoneCue] : cue in LIFT_VOICES ? LIFT_VOICES[cue as LiftCue] : VOICES[cue as Cue];
+  const voice: Voice =
+    cue in ZONE_VOICES ? ZONE_VOICES[cue as ZoneCue] : cue in LIFT_VOICES ? LIFT_VOICES[cue as LiftCue] : cue in SCENE_VOICES ? SCENE_VOICES[cue as SceneCue] : VOICES[cue as Cue];
   voice(ctx, ctx.destination, 0.01, hissBuffer(ctx));
   return ctx.startRendering();
 }

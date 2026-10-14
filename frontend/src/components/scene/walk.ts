@@ -1,6 +1,6 @@
 import type { Floor } from "@/game/floors";
 import type { EquipmentId } from "@/sim";
-import { ELEVATOR_DOOR, ELEVATOR_SPOT, SPOTS, type FunProp } from "./floorplan";
+import { ELEVATOR_DOOR, ELEVATOR_SPOT, type FunProp } from "./floorplan";
 import type { Footprint } from "./layout";
 import { findPath, gridOf, nearestFree } from "./navgrid";
 import { facing, followPath, promptAt, slide, SPEED, steer, turnTowards, type Keys, type Prompt } from "./player";
@@ -28,6 +28,9 @@ export interface AvatarState {
 
 export const avatar: AvatarState = { floor: "office", x: 0, z: 0, yaw: 0, moving: false, running: false, path: [], busy: null, prompt: null };
 
+/** Others on the move who open doors as they come near, by name: the engineers called down to the racks. */
+export const others = new Map<string, { floor: Floor; x: number; z: number }>();
+
 /** The movement keys held, by `KeyboardEvent.code`. */
 export const held = new Set<string>();
 
@@ -43,10 +46,13 @@ export function onPrompt(listener: (p: Prompt | null) => void): () => void {
 export const CAR: [number, number] = [(ELEVATOR_SPOT[0] + ELEVATOR_SPOT[2]) / 2 - 0.1, ELEVATOR_DOOR.z];
 export const LOBBY: [number, number] = [ELEVATOR_DOOR.x + 0.8, ELEVATOR_DOOR.z];
 
-/** Where walk mode begins: beside the founder's chair in the meeting room, or out of the elevator downstairs. */
+/**
+ * Where walk mode begins: up from the founder's chair, in the open east end of the meeting room by its door, or out
+ * of the elevator downstairs.
+ */
+export const MEETING_START: [number, number] = [-6.6, 11.8];
 export function startAt(floor: Floor): [number, number] {
-  if (floor === "servers") return LOBBY;
-  return nearestFree(gridOf("office"), SPOTS.founder.x + 0.75, SPOTS.founder.z - 0.55, 2) ?? LOBBY;
+  return floor === "servers" ? LOBBY : MEETING_START;
 }
 
 /** Stand the avatar on a floor, still, facing away from the camera's usual view. */
