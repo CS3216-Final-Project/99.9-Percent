@@ -206,12 +206,27 @@ export const ZONE_CUES = Object.keys(ZONE_VOICES) as ZoneCue[];
 /** The car's hum as it rides: a low tone sliding up or down under a soft rush of air, for about the length of a ride. */
 function hum(ctx: Ctx, out: AudioNode, at: number, hiss: AudioBuffer, rising: boolean): void {
   const length = 1.25;
-  const [from, to] = rising ? [62, 98] : [98, 62];
-  const o = osc(ctx, "sawtooth", from, at, at + length);
-  o.frequency.setValueAtTime(from, at);
-  o.frequency.linearRampToValueAtTime(to, at + length);
-  o.connect(filter(ctx, "lowpass", 240)).connect(envelope(ctx, at, length, 0.11, 0.25, 0.35)).connect(out);
-  noise(ctx, at, at + length, hiss).connect(filter(ctx, "bandpass", rising ? 700 : 520)).connect(envelope(ctx, at, length, 0.05, 0.3, 0.4)).connect(out);
+  // The motor's whir and its octave, in the range a laptop's speakers play, sliding with the car's speed.
+  const [from, to] = rising ? [170, 250] : [250, 170];
+  for (const [octave, peak] of [
+    [1, 0.08],
+    [2, 0.03],
+  ] as const) {
+    const o = osc(ctx, "triangle", from * octave, at, at + length);
+    o.frequency.setValueAtTime(from * octave, at);
+    o.frequency.linearRampToValueAtTime(to * octave, at + length);
+    o.connect(envelope(ctx, at, length, peak, 0.2, 0.35)).connect(out);
+  }
+  // Air rushing past the car, its pitch sweeping the way it travels.
+  const [low, high] = rising ? [500, 1400] : [1400, 500];
+  const air = filter(ctx, "bandpass", low);
+  air.frequency.setValueAtTime(low, at);
+  air.frequency.exponentialRampToValueAtTime(high, at + length);
+  noise(ctx, at, at + length, hiss).connect(air).connect(envelope(ctx, at, length, 0.2, 0.3, 0.45)).connect(out);
+  // The low rumble of the shaft, for speakers that can play it.
+  const rumble = osc(ctx, "sawtooth", rising ? 62 : 98, at, at + length);
+  rumble.frequency.linearRampToValueAtTime(rising ? 98 : 62, at + length);
+  rumble.connect(filter(ctx, "lowpass", 240)).connect(envelope(ctx, at, length, 0.06, 0.25, 0.35)).connect(out);
 }
 
 /**
@@ -229,6 +244,11 @@ const LIFT_VOICES = {
   chimeDown: (ctx, out, at) => {
     bell(ctx, out, at, 76, 0.15, 1.0);
     bell(ctx, out, at + 0.24, 72, 0.15, 1.3);
+  },
+  /** The indicator ticking over as the car passes between the floors. */
+  tick: (ctx, out, at, hiss) => {
+    osc(ctx, "square", 1760, at, at + 0.04).connect(filter(ctx, "lowpass", 3200)).connect(hit(ctx, at, 0.07, 0.035)).connect(out);
+    burst(ctx, out, at, hiss, 3800, 0.02, hit(ctx, at, 0.12, 0.02));
   },
   doors: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 900, 0.45, envelope(ctx, at, 0.45, 0.3, 0.12, 0.25)),
   thud: (ctx, out, at, hiss) => {
@@ -288,8 +308,11 @@ const SLEEP_MS = 10_000;
 const SLIDE = 0.05;
 
 export interface Sfx {
-  /** The elevator sets off, up or down: the call button's click and the car's hum. Doors still to close from the last ride fall silent. */
-  liftDepart(up: boolean): void;
+  /**
+   * The elevator sets off, up or down: the call button's click, the car's whir and rush of air, and the indicator's
+   * tick `tickIn` seconds later as it passes between the floors. Doors still to close from the last ride fall silent.
+   */
+  liftDepart(up: boolean, tickIn: number): void;
   /** The car arrives: its hum stops, the chime sounds and the doors open, wait and close. */
   liftArrive(up: boolean, doors: LiftDoors): void;
   /**
@@ -404,7 +427,7 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
   };
 
   return {
-    liftDepart(up) {
+    liftDepart(up, tickIn) {
       whenAwake((c) => {
         if (!bus || !hiss) return;
         if (ride) fade(ride, c, 0.08);
@@ -413,6 +436,8 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
         const at = c.currentTime + 0.005;
         LIFT_VOICES.call(c, ride, at, hiss);
         LIFT_VOICES[up ? "humUp" : "humDown"](c, humming, at + 0.05, hiss);
+        // On the hum's lane, so arriving early silences a tick still to come.
+        LIFT_VOICES.tick(c, humming, at + tickIn, hiss);
       });
     },
     liftArrive(up, doors) {

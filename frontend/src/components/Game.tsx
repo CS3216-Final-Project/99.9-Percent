@@ -315,7 +315,7 @@ function useSoundEffects(): void {
     // The elevator: a click and the car's hum as it sets off, then the chime and the doors as it arrives.
     const stopRide = onRide((event) => {
       const up = FLOOR_Y[ride.to] > FLOOR_Y[ride.from];
-      if (event === "depart") sfx.liftDepart(up);
+      if (event === "depart") sfx.liftDepart(up, RIDE_SECONDS / 2);
       else sfx.liftArrive(up, { close: DOORS.move + DOORS.hold, shut: 2 * DOORS.move + DOORS.hold });
     });
     // The zones' own sounds, near where the camera looks, while a run is on screen and nothing covers the room.
