@@ -391,7 +391,9 @@ export default function Game() {
       const s = useGame.getState();
       if (!s.started || target?.closest('[role="dialog"]')) return;
       if (e.key === "Escape") {
+        // In a fixed order: a view sheet, then walk mode, then the selection. Dialogs close themselves first.
         if (s.view) s.openView(null);
+        else if (s.walking) s.setWalking(false);
         else if (s.selected && s.game.phase !== "incident") s.select(null);
       } else if (e.key === "p" || e.key === "P") {
         if (s.game.phase === "incident" || s.game.phase === "management") s.setRunning(!s.running);
