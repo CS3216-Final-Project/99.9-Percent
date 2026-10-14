@@ -9,6 +9,7 @@ Use CC0 assets only, so nothing needs credit and nothing restricts redistributio
 | Folder | Source | Licence |
 | --- | --- | --- |
 | `models/creatures` | Quaternius, Ultimate Monsters | CC0 |
+| `models/avatars` | Kenney, Cube Pets 2.0 (the 18 animals the crew are not) | CC0 |
 | `models/kenney` | Kenney, Furniture Kit | CC0 |
 | `models/kaykit` | Kay Lousberg, KayKit Furniture Bits | CC0 |
 | `models/polyhaven` | Poly Haven models | CC0 |

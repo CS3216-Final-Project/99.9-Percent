@@ -29,6 +29,8 @@ import {
   loadLegacyMeta,
   saveAudio,
   saveGraphics,
+  loadAvatar,
+  saveAvatar,
   DEFAULT_AUDIO,
   DEFAULT_GRAPHICS,
   DEFAULT_META,
@@ -55,6 +57,7 @@ import { AccountApiError, getSession, logout, listRuns, putRun, getRun, emailLog
 import type { AppSession, CloudRun, RunSummary } from "../../../shared/campaign.ts";
 import { checkpointCloud, localCloudCopy, rememberCloud } from "./cloud";
 import { floorFromSearch, floorOf, type Floor, type FloorSwitch } from "./floors";
+import { DEFAULT_AVATAR, type AvatarId } from "./avatars";
 
 
 export type View = "tech" | "engineers" | "history" | "menu" | null;
@@ -169,6 +172,12 @@ interface Store {
   floor: Floor;
   /** Take the view to a floor; `how` says what asked, for the analytics. */
   goToFloor: (floor: Floor, how: FloorSwitch) => void;
+  /** Walk mode: the player steers their avatar round the building. View state like the floor, never saved. */
+  walking: boolean;
+  setWalking: (on: boolean) => void;
+  /** The player's avatar, a browser setting kept across runs and modes. */
+  avatar: AvatarId;
+  setAvatar: (id: AvatarId) => void;
   hovered: EquipmentId | null;
   view: View;
   techFocus: TechId | null;
@@ -250,6 +259,8 @@ function storedRunId(raw: string): string {
 
 export const useGame = create<Store>()((set, get) => {
   let accountRequest = 0;
+  /** When walk mode last began, for how long it lasted. */
+  let walkStart = 0;
   function persist(explicitReset=false):boolean {
     const s=get();
     if(s.mode === "classic") return saveClassicGame(s.game);
@@ -562,6 +573,25 @@ export const useGame = create<Store>()((set, get) => {
     // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
     floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
     goToFloor: (floor, how) => set(floorPatch(floor, how)),
+    walking: false,
+    setWalking: (on) => {
+      if (on === get().walking) return;
+      const now = performance.now();
+      const data: Record<string, string | number> = on ? { floor: get().floor } : { seconds: Math.round((now - walkStart) / 1000) };
+      if (get().game.campaign) uiEvent(on ? "walk_started" : "walk_ended", data);
+      else track(on ? "walk_started" : "walk_ended", { ...data, mode: get().mode });
+      if (on) walkStart = now;
+      set({ walking: on });
+    },
+    avatar: DEFAULT_AVATAR,
+    setAvatar: (id) => {
+      if (id === get().avatar) return;
+      if (get().game.campaign) uiEvent("avatar_changed", { avatar: id });
+      else track("avatar_changed", { avatar: id, mode: get().mode });
+      set({ avatar: id });
+      // Unsaved, the choice still applies for this visit.
+      saveAvatar(id);
+    },
     hovered: null,
     view: null,
     techFocus: null,
@@ -575,7 +605,7 @@ export const useGame = create<Store>()((set, get) => {
     boot: () => {
       if (get().ready) return;
       // Read once here, not on every mode switch: if storage fails, the in-memory settings are the ones to keep.
-      set({ audio: loadAudio(), graphics: loadGraphics() });
+      set({ audio: loadAudio(), graphics: loadGraphics(), avatar: loadAvatar() });
       enter(loadMode(), false);
     },
 
@@ -915,6 +945,11 @@ export const useGame = create<Store>()((set, get) => {
     notify: (text, kind = "info") => set({ toast: { id: toastId++, text, kind } }),
     dismissToast: () => set({ toast: null }),
   };
+});
+
+// Walk mode belongs to a run on screen: going back to the title screen ends it.
+useGame.subscribe((s, prev) => {
+  if (prev.started && !s.started && s.walking) s.setWalking(false);
 });
 
 /**

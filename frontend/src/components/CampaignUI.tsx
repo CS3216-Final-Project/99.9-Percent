@@ -17,6 +17,7 @@ import { money, num } from "@/game/format";
 import { useState } from "react";
 import { inspectOrSelect, useGame, type Speed } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
+import { AvatarSettings } from "./AvatarPicker";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { MenuRun, MenuTile } from "./MenuRun";
 import { SaveFiles } from "./SaveFiles";
@@ -340,6 +341,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
       </>}
       {tab === "sound" && <SoundSettings />}
       {tab === "graphics" && <GraphicsSettings />}
+      {tab === "avatar" && <AvatarSettings />}
       {tab === "saves" && <div className="menu-columns">
         <div className="menu-col"><SaveFiles /></div>
         <div className="menu-col">

@@ -159,10 +159,10 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
   const campaignMenu = openMenu();
   const labels = (menu: HTMLElement) => within(within(menu).getByRole("tablist", { name: "Menu sections" })).getAllByRole("tab").map((t) => t.textContent);
-  expect(labels(campaignMenu)).toEqual(["Run", "Sound", "Graphics", "Saves", "Playtest"]);
+  expect(labels(campaignMenu)).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Playtest"]);
   // As in Classic, the run card (with the paused notice) and Resume stay above the tabs; the Run tab opens first.
   expect(within(campaignMenu).getByRole("tab", { name: "Run" }).getAttribute("aria-selected")).toBe("true");
-  for (const tab of ["Run", "Sound", "Graphics", "Saves", "Playtest"]) {
+  for (const tab of ["Run", "Sound", "Graphics", "Avatar", "Saves", "Playtest"]) {
     openTab(campaignMenu, tab);
     expect(within(campaignMenu).getByRole("region", { name: "This company" }).textContent).toContain("Time is paused");
     expect(within(campaignMenu).getByRole("button", { name: "Resume" })).toBeTruthy();
@@ -184,9 +184,9 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   fireEvent.click(within(campaignMenu).getByRole("button", { name: "Switch to Challenge Mode" }));
 
   const classicMenu = openMenu();
-  expect(labels(classicMenu)).toEqual(["Run", "Sound", "Graphics", "Saves", "Playtest"]);
+  expect(labels(classicMenu)).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Playtest"]);
   // The run summary and Resume stay above the tabs whichever one is open.
-  for (const tab of ["Run", "Sound", "Graphics", "Saves", "Playtest"]) {
+  for (const tab of ["Run", "Sound", "Graphics", "Avatar", "Saves", "Playtest"]) {
     openTab(classicMenu, tab);
     expect(within(classicMenu).getByRole("region", { name: "This run" })).toBeTruthy();
     expect(within(classicMenu).getByRole("button", { name: "Resume" })).toBeTruthy();
