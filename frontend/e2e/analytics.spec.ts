@@ -35,7 +35,7 @@ test("optional product analytics observes Play and survives reload with no title
   expect(captured.filter(e => e.event === "gameplay_run_started")).toHaveLength(0);
   if (enabled) await expect.poll(() => page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith("ph_phc_test")))).toBe(true);
   await page.getByRole("button", { name: "Start Guided Mode" }).click();
-  await page.getByRole("button", { name: "Skip introduction" }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.clock.runFor(20_000);
   if (enabled) {
     await expect.poll(async () => { await page.clock.runFor(3000); return captured.filter(e => e.event === "gameplay_run_started").length; }).toBe(1);
@@ -71,6 +71,6 @@ test("the analytics choice is asked once and remembered", async ({ page, without
   await page.reload();
   await expect(page.getByRole("region", { name: "Help improve 99.99%" })).toHaveCount(0);
   await page.getByRole("button", { name: "Start Guided Mode" }).click();
-  await page.getByRole("button", { name: "Skip introduction" }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
   expect(posthog).toEqual([]);
 });

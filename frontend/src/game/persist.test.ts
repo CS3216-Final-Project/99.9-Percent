@@ -56,6 +56,22 @@ describe('browser metadata and analytics', () => {
     expect(loadMeta().tutorialDone).toBe(true);
   });
 
+  it('reads a profile from before the walkthrough without its introduction state, keeping its progress', () => {
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({
+      openingOnboarding: { version: 1, step: 2, status: 'completed' }, runsStarted: 2, challengeUnlocked: true,
+    }));
+    expect(loadMeta()).toEqual({ ...DEFAULT_META, runsStarted: 2, challengeUnlocked: true });
+  });
+
+  it('keeps only known chapter guides as seen, once each and in chapter order', () => {
+    saveMeta({ ...DEFAULT_META, chapterTours: ['data', 'scaling'] });
+    expect(loadMeta().chapterTours).toEqual(['scaling', 'data']);
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ chapterTours: ['spikes', 'opening', 7, 'spikes'] }));
+    expect(loadMeta().chapterTours).toEqual(['spikes']);
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ chapterTours: 'scaling' }));
+    expect(loadMeta().chapterTours).toEqual([]);
+  });
+
   it('leaves the old music switch out of the metadata it reads back', () => {
     localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ music: 'loud', onboarded: true }));
     expect(loadMeta()).toEqual({ ...DEFAULT_META, onboarded: true });

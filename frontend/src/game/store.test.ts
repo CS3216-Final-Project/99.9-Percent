@@ -10,7 +10,6 @@ beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialStat
 afterEach(() => vi.restoreAllMocks());
 function enter() {
   useGame.getState().boot(); useGame.getState().play();
-  if (useGame.getState().onboarding) useGame.getState().onboardingMove("skip");
 }
 describe("shared campaign runtime", () => {
   it("boots once", () => {

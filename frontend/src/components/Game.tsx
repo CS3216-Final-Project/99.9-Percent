@@ -389,7 +389,8 @@ export default function Game() {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       const s = useGame.getState();
-      if (!s.started || target?.closest('[role="dialog"]')) return;
+      // The guide's card is labelled a dialog for assistive technology, but it is not modal: shortcuts still apply.
+      if (!s.started || target?.closest('[role="dialog"]:not(.tour-card)')) return;
       if (e.key === "Escape") {
         if (s.view) s.openView(null);
         else if (s.selected && s.game.phase !== "incident") s.select(null);
@@ -438,7 +439,7 @@ export default function Game() {
       {!campaign && !started && <HomeScreen />}
       {!campaign && started && view === "menu" && <Menu />}
       {!campaign && started && onboarding && <HowToPlay />}
-      {!campaign && started && <Tutorial />}
+      {started && <Tutorial />}
       {!campaign && started && phase === "review" && <PostmortemModal />}
       {!campaign && started && phase === "ended" && <EndReport />}
     </div>

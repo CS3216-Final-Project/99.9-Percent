@@ -3,7 +3,7 @@ import {test,expect,expectRoom,savedGame} from "./fixtures";
 
 test("Opening prevention: fresh player, new observations and reloads keep Scaling locked without API",async({page})=>{
  test.setTimeout(90000);await page.route("**/api/**",r=>r.abort());await page.goto("/");
- await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await page.getByRole("button",{name:"Skip introduction"}).click();await expectRoom(page);
+ await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await page.getByRole("button", { name: "Skip", exact: true }).click();await expectRoom(page);
  const id=(await savedGame(page)).campaign!.runId;
  await page.getByRole("button",{name:/Limit to 500 requests\/s/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await page.getByRole("button",{name:/Upgrade database/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();

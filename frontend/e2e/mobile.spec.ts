@@ -1,5 +1,5 @@
 import { advanceCampaignStep } from "./fixtures";
-import { test, expect, expectRoom, savedGame, seedSave, unlockChallenge } from "./fixtures";
+import { test, expect, expectRoom, savedGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
@@ -92,7 +92,7 @@ test("reliability: inspection and effective recipients remain clear on narrow to
 
 test("inspects evidence and advances a physical step on touch", async ({ page }) => {
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap();
-  await page.getByRole("button", { name: "Skip introduction" }).tap();
+  await page.getByRole("button", { name: "Skip", exact: true }).tap();
   await expectRoom(page);
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await mute.tap(); await expect(mute).toHaveAttribute("aria-pressed", "true");
@@ -136,7 +136,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
 });
 
 test("a tap explains a term, and tapping a button does not leave a tooltip over it", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap(); await page.getByRole("button", { name: "Skip introduction" }).tap();
+  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap(); await page.getByRole("button", { name: "Skip", exact: true }).tap();
   await expectRoom(page);
   const tip = page.getByRole("tooltip");
   await page.getByRole("complementary", { name: "System metrics" }).getByText("System evidence", { exact: true }).tap();
@@ -180,7 +180,7 @@ test('account controls remain usable on touch while accounts are offline',async(
   await page.screenshot({path:'test-results/phase3-account-mobile.png'});
   await dialog.getByRole('button',{name:'Close'}).tap();
   await page.getByRole('button',{name:'Start Guided Mode',exact:true}).tap();
-  await expect(page.getByRole('dialog',{name:'Company introduction'})).toBeVisible();
+  await expect(tutorial(page)).toBeVisible();
 });
 
 
@@ -219,13 +219,24 @@ test("traffic spikes: touch selects an instance after retirement leaves an ID ga
 
 test("combined: touch scorecard, completed guidance, technology inspection and paused reload",async({page})=>{const {finishedCompany}=await import("../src/sim/__tests__/combinedFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,finishedCompany());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Grow the Company");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Grow the Company"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("50,000");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
 
-test("Campaign UX: touch introduction, comparison and secondary controls fit the mobile viewport",async({page,withoutRoom})=>{
- await withoutRoom();await page.setViewportSize({width:390,height:844});await page.goto("/");await page.getByRole("button",{name:"Start Guided Mode",exact:true}).tap();
- const intro=page.getByRole("dialog",{name:"Company introduction"});await intro.getByRole("button",{name:"App Server",exact:true}).tap();await expect(intro).toContainText("capacity 1,000 req/s");
- await intro.getByRole("button",{name:"Next",exact:true}).tap();await intro.getByRole("button",{name:"Rejected request",exact:true}).tap();await expect(intro).toContainText("$0 earned");
- await intro.getByRole("button",{name:"Next",exact:true}).tap();await intro.getByRole("button",{name:"Finish introduction",exact:true}).tap();
+test("Campaign UX: the touch walkthrough and secondary controls fit the mobile viewport",async({page})=>{
+ // The room is drawn in software, and its labels settle only as the camera brings each machine above the panel.
+ test.setTimeout(90_000);
+ await page.goto("/");await page.getByRole("button",{name:"Start Guided Mode",exact:true}).tap();
+ await expectRoom(page);
+ const card=tutorial(page),room=page.getByRole("main");
+ await expect(card).toBeInViewport({ratio:1});
+ // The camera brings each machine above the panel, where it can be tapped.
+ await room.getByRole("button",{name:"Servers",exact:true}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 2 of 8");
+ await room.getByRole("button",{name:"Database",exact:true}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 3 of 8");
+ for(let step=4;step<=7;step++){await card.getByRole("button",{name:"Next",exact:true}).tap();await expect(card).toHaveAccessibleName(`Tutorial, step ${step} of 8`);await expect(card).toBeInViewport({ratio:1});}
+ await page.getByRole("button",{name:/Upgrade database/}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 8 of 8");
+ await page.screenshot({path:"test-results/campaign-tutorial-mobile.png"});
+ await page.getByRole("region",{name:"Confirm Upgrade database"}).getByRole("button",{name:"Cancel"}).tap();
+ await card.getByRole("button",{name:"Got it",exact:true}).tap();await expect(card).toBeHidden();
+ expect((await savedGame(page)).campaign!.actions).toEqual([]);
  await expect(page.getByRole("button",{name:"Run",exact:true})).toBeInViewport();await expect(page.getByRole("button",{name:"Advance step",exact:true})).toBeHidden();
- expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
  await page.locator(".campaign-advanced > summary").tap();await expect(page.getByRole("button",{name:"Advance step",exact:true})).toBeInViewport();
  await page.getByRole("button",{name:"Advance step",exact:true}).tap();expect((await savedGame(page)).campaign!.step).toBe(1);
  await page.screenshot({path:"test-results/campaign-ux-mobile.png"});

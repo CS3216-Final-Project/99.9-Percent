@@ -9,7 +9,7 @@ beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),
 afterEach(()=>vi.restoreAllMocks());
 function act(g:GameState,a:Parameters<typeof applyAction>[1]) {const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 function recovered() {let g=advanceSteps(newGame(1,"phase2-test"),6).state;g=act(g,{type:"start_db_upgrade"});return advanceSteps(g,30).state;}
-function enter(){useGame.getState().boot();useGame.getState().play();useGame.getState().onboardingMove("skip");}
+function enter(){useGame.getState().boot();useGame.getState().play();}
 function v1(g:GameState) {
  const e=JSON.parse(JSON.stringify(makeEnvelope(g)));e.schemaVersion=1;
  delete e.runtime.measurement;
@@ -32,18 +32,72 @@ it("landing boot creates neither durable company nor run event; explicit entry i
  useGame.getState().play();useGame.getState().play();
  expect(readAnalytics().filter(e=>e.name==="run_started")).toHaveLength(1);
 });
-it("onboarding next/back/skip persists and blocks physical and economic advancement",()=>{
- useGame.getState().boot();useGame.getState().play();
- const before=structuredClone(useGame.getState().game);
- useGame.getState().advance();useGame.getState().setRunning(true);useGame.getState().tick(60);
- expect(useGame.getState().act({type:"start_db_upgrade"})).toBe(false);
- expect(useGame.getState().game).toEqual(before);
- useGame.getState().onboardingMove("next");useGame.getState().onboardingMove("back");
- useGame.getState().onboardingMove("skip");expect(useGame.getState().running).toBe(false);
- useGame.setState(useGame.getInitialState(),true);useGame.getState().boot();useGame.getState().play();
+it("offers the Opening walkthrough once, on a fresh company, without holding the company back",()=>{
+ enter();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
  expect(useGame.getState().onboarding).toBe(false);
- useGame.getState().showOnboarding();for(let i=0;i<3;i++)useGame.getState().onboardingMove("next");
- expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!).openingOnboarding.status).toBe("completed");
+ // The guide never blocks: time and inspection work while it shows.
+ useGame.getState().setRunning(true);useGame.getState().tick(1);
+ expect(useGame.getState().game.campaign!.step).toBe(1);
+ useGame.getState().setRunning(false);
+ useGame.getState().endTour(false);
+ expect(useGame.getState().tour).toBeNull();
+ expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!).tutorialDone).toBe(true);
+ // Neither the same company after a reload nor a new company offers it again.
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(useGame.getState().tour).toBeNull();
+ useGame.getState().newRun();
+ expect(useGame.getState().tour).toBeNull();
+ // The menu replays it on the same company, which it leaves untouched.
+ const before=structuredClone(useGame.getState().game);
+ useGame.getState().showOnboarding();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
+ expect(useGame.getState().game).toEqual(before);
+});
+it("does not start the walkthrough mid-company, and a new company offers it until it is done",()=>{
+ saveGame(advanceSteps(newGame(1,"walkthrough-test"),3).state);enter();
+ expect(useGame.getState().tour).toBeNull();
+ useGame.getState().newRun();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
+ useGame.getState().endTour(true);
+ expect(useGame.getState().meta.tutorialDone).toBe(true);
+});
+it("keeps the walkthrough working in memory when its preference cannot be saved",()=>{
+ enter();
+ vi.spyOn(Storage.prototype,"setItem").mockImplementation(()=>{throw Error("quota");});
+ useGame.getState().endTour(true);
+ expect(useGame.getState().tour).toBeNull();
+ expect(useGame.getState().meta.tutorialDone).toBe(true);
+ expect(useGame.getState().toast).toMatchObject({kind:"error",text:"Onboarding preferences could not be saved."});
+});
+it("shows a chapter's guide once, paused, when the company first enters it",()=>{
+ saveGame(act(recovered(),{type:"acknowledge_review"}));enter();
+ expect(useGame.getState().tour).toBeNull();
+ // Acknowledging the Opening milestone continues the company into Scaling & Routing.
+ expect(useGame.getState().act({type:"acknowledge_milestone"})).toBe(true);
+ expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+ expect(useGame.getState().tour).toEqual({track:"scaling",step:0});
+ expect(useGame.getState().running).toBe(false);
+ expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!).chapterTours).toEqual(["scaling"]);
+ // Seen when shown: a reload in the middle of it, or ending it, does not bring it back.
+ useGame.getState().endTour(true);
+ expect(useGame.getState().meta.chapterTours).toEqual(["scaling"]);
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(useGame.getState().tour).toBeNull();
+});
+it("leaves a guide that is already showing in place when a chapter begins",()=>{
+ saveGame(act(act(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"}));
+ saveMeta({...DEFAULT_META,tutorialDone:true});
+ useGame.getState().boot();useGame.getState().play();
+ // Play continues a company whose Opening is acknowledged straight into scaling, without a guide.
+ expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+ expect(useGame.getState().tour).toBeNull();
+ useGame.setState(useGame.getInitialState(),true);
+ saveGame(act(recovered(),{type:"acknowledge_review"}));
+ enter();useGame.getState().startTour("campaign");
+ expect(useGame.getState().act({type:"acknowledge_milestone"})).toBe(true);
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
+ expect(useGame.getState().meta.chapterTours).toEqual([]);
 });
 it("milestone is awarded only on report acknowledgement and never changes physical or financial state",()=>{
  const g=recovered();expect(g.campaign!.openingMilestone).toBeNull();
@@ -171,7 +225,7 @@ it("bankruptcy telemetry survives explicit restart",()=>{
  let g=advanceSteps(newGame(),6).state;
  const ending=advanceSteps(g,100000).state;
  g=advanceSteps(g,ending.campaign!.step-g.campaign!.step-1).state;saveGame(g);
- saveMeta({...DEFAULT_META,openingOnboarding:{version:1,step:2,status:"completed"}});
+ saveMeta({...DEFAULT_META});
  enter();useGame.getState().setRunning(true);useGame.getState().tick(1);
  expect(useGame.getState().game.phase).toBe("ended");
  expect(readAnalytics().filter(e=>e.name==="run_failed")).toHaveLength(1);

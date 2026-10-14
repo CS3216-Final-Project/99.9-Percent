@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { useGame, type TourTrack } from "@/game/store";
 import { floorOf } from "@/game/floors";
+import { num } from "@/game/format";
 import type { EquipmentId } from "@/sim";
+import { pendingStop } from "@/sim/step";
+import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
+import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
+import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
+import { EDGE, openRoomArea } from "./roomArea";
 
 /**
  * Guided walkthroughs. Each step is a goal ("Add a server") plus one short
@@ -17,7 +23,7 @@ type Place = "top" | "bottom" | "left" | "right";
 interface Step {
   title: string;
   /** One short reason, if the goal needs one. */
-  why?: string;
+  why?: string | ((s: Snapshot) => string);
   /** What to click right now. It changes as the player moves through the step. */
   hint: (s: Snapshot) => string;
   /** CSS selector of the thing to spotlight right now. */
@@ -97,8 +103,116 @@ const INCIDENT: Step[] = [
   },
 ];
 
-const TRACKS: Record<TourTrack, Step[]> = { basics: BASICS, incident: INCIDENT };
+/*
+ * Guided Mode's Opening: what the system is, how to read its evidence, what earns money, who controls the clock and
+ * what an action costs. It stops at the first purchase without asking for it: the Opening is about finding the
+ * bottleneck from evidence, so the walkthrough never names the fix.
+ */
+const snapshot = (s: Snapshot) => s.game.campaign!.snapshot;
+const CAMPAIGN: Step[] = [
+  {
+    title: "Meet your system",
+    why: (s) => `Customers send ${num(snapshot(s).incoming)} requests a second. Your App Servers run the product and handle each one.`,
+    hint: () => "Click Servers.",
+    target: () => label("app"),
+    done: (s) => s.selected === "app",
+  },
+  {
+    title: "Follow a request",
+    why: "To answer a request, the App Server reads and writes data in the Database.",
+    hint: () => "Click Database.",
+    target: () => label("db"),
+    done: (s) => s.selected === "db",
+  },
+  {
+    title: "Read the evidence",
+    why: (s) =>
+      `The Database is doing ${num(snapshot(s).db.demand)} of the ${num(snapshot(s).db.capacity)} operations a second it can. Work above capacity waits in a backlog.`,
+    hint: () => "Compare demand with capacity. Inspecting is free.",
+    target: () => ".campaign-panel .incident-investigate",
+  },
+  {
+    title: "Spot trouble",
+    why: "Latency is how long customers wait. Errors are requests that failed.",
+    hint: () => `Over ${num(Q.latencyThresholdMs)} ms or ${Q.errorThreshold * 100}% errors, customers are failing.`,
+    target: () => ".campaign-panel .incident-symptoms",
+  },
+  {
+    title: "Know what earns money",
+    why: `Each successful request earns $${(Q.revenueCents / 100).toFixed(2)}. It becomes cash every ${Q.periodSteps} steps. Rejected requests earn nothing, but costs stay the same.`,
+    hint: () => "Purchases are paid from cash, right away.",
+    target: () => ".topbar .stats-strip",
+  },
+  {
+    title: "You control the clock",
+    why: "Time is paused. Each step is one second of traffic.",
+    hint: () => "Run to watch. Pause (P) to think.",
+    target: () => ".campaign-clock .campaign-play",
+  },
+  {
+    title: "Your actions",
+    why: "Each one costs cash now, takes a few steps to switch on, then adds upkeep.",
+    hint: () => "Click an action to see its costs.",
+    target: () => ".campaign-panel .actions",
+    done: () => confirmingAction() !== null,
+  },
+  {
+    title: "Compare before buying",
+    why: "Nothing is bought until you press Confirm.",
+    hint: () => "No need to buy yet. Cancel, then Run company and watch the evidence.",
+    target: () => (confirmingAction() ? ".campaign-action-popover" : ".campaign-panel .actions"),
+    nextLabel: "Got it",
+  },
+];
+
+/** Each later chapter gets one step on the controls it adds, the first time the company enters it. */
+const chapter = (title: string, why: string, hint: string, target: string): Step[] => [{ title, why, hint: () => hint, target: () => target, nextLabel: "Got it" }];
+const CHAPTERS = {
+  scaling: chapter(
+    "Scale and route",
+    `The next growth wave brings ${num(P.traffic)} requests a second.`,
+    "Scale up grows one server. Load balancing spreads traffic over several, once routing includes them.",
+    '[aria-label="Scaling controls"]',
+  ),
+  data: chapter(
+    "Data strategy",
+    "Some workloads mostly read, others mostly write.",
+    "A Read Cache answers repeated reads. Misses and writes still reach the Database.",
+    '[aria-label="Data strategy"]',
+  ),
+  spikes: chapter(
+    "Traffic spikes",
+    "Two short bursts of traffic are coming.",
+    "Autoscaling adds servers while they are busy. Adding capacity yourself works too.",
+    '[aria-label="Traffic spikes and autoscaling"]',
+  ),
+  reliability: chapter(
+    "Stay online",
+    "You start a test that makes one App Server fail.",
+    "Health Checks spot the failure. A spare and failover keep capacity online.",
+    '[aria-label="Stay Online"]',
+  ),
+  combined: chapter(
+    "Grow the company",
+    "Three growth waves use everything you have built.",
+    "Start each wave when you are ready, then review how it went.",
+    ".campaign-guidance",
+  ),
+} satisfies Record<string, Step[]>;
+
+const TRACKS: Record<TourTrack, Step[]> = { basics: BASICS, incident: INCIDENT, campaign: CAMPAIGN, ...CHAPTERS };
 export const BASICS_STEPS = BASICS.length;
+export const CAMPAIGN_STEPS = CAMPAIGN.length;
+
+const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", campaign: "Tutorial", incident: "Incident guide" };
+
+/** Where a track's steps make sense: Guided Mode's also wait for any review or milestone and for open views. */
+function fits(track: TourTrack, s: Snapshot): boolean {
+  if (track === "basics") return s.game.phase === "management";
+  if (track === "incident") return s.game.phase === "incident";
+  const c = s.game.campaign;
+  return !!c && s.game.phase === "management" && pendingStop(c) === null && !(c.openingMilestone && !c.openingMilestone.acknowledged) && s.view === null;
+}
 
 interface Box {
   x: number;
@@ -111,15 +225,22 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+/** Whether a box on screen lies in the part of the room the panel leaves open. */
+function inOpenRoom(r: DOMRect, stage: DOMRect): boolean {
+  const { right, bottom } = openRoomArea(stage);
+  return r.left >= stage.left + EDGE && r.top >= stage.top + EDGE && r.right <= stage.left + right && r.bottom <= stage.top + bottom;
+}
+
 /** Where the card sits relative to what it points at. */
 function placeFor(selector: string): Place {
   if (selector.startsWith(".eq-label") || selector.startsWith(".node")) return "right";
-  if (selector.startsWith(".view-tabs") || selector.startsWith(".advance")) return "top";
-  if (selector.startsWith(".next-chip")) return "bottom";
+  if (selector.startsWith(".view-tabs") || selector.startsWith(".advance") || selector.startsWith(".campaign-clock")) return "top";
+  if (selector.startsWith(".next-chip") || selector.startsWith(".topbar")) return "bottom";
   return "left";
 }
 
-function cardStyle(box: Box | null, place: Place, vw: number, vh: number): CSSProperties {
+/** `edge` is where the open room ends on the right: a panel there is left uncovered when the target is in the room. */
+function cardStyle(box: Box | null, place: Place, vw: number, vh: number, edge = vw): CSSProperties {
   const W = Math.min(280, vw - 24);
   if (!box) return { left: (vw - W) / 2, top: "50%", transform: "translateY(-50%)", width: W };
   // On small screens the card docks to whichever edge is away from the target.
@@ -130,7 +251,7 @@ function cardStyle(box: Box | null, place: Place, vw: number, vh: number): CSSPr
   const x = (v: number) => clamp(v, 12, vw - W - 12);
   // Never cover the thing being pointed at: flip sides when there is no room.
   if (place === "left" && box.x - gap - W < 12) place = "right";
-  else if (place === "right" && box.x + box.w + gap + W > vw - 12) place = "left";
+  else if (place === "right" && box.x + box.w + gap + W > edge - 12 && box.x - gap - W >= 12) place = "left";
   switch (place) {
     case "bottom":
       return { left: x(box.x), top: Math.min(box.y + box.h + gap, vh - 200), width: W };
@@ -154,14 +275,18 @@ export default function Tutorial() {
   const [box, setBox] = useState<Box | null>(null);
   const [selector, setSelector] = useState("");
   const [viewport, setViewport] = useState({ w: 1280, h: 800 });
+  // A dialog that needs the player (a review, the chapter list) covers the room; the guide waits behind it.
+  const [covered, setCovered] = useState(false);
+  const [edge, setEdge] = useState<number | undefined>(undefined);
   const card = useRef<HTMLDivElement>(null);
+  // Steps can wait on an action's confirmation, which lives outside the store.
+  useSyncExternalStore(subscribeConfirming, confirmingAction);
 
   const steps = tour ? TRACKS[tour.track] : [];
   const step = tour ? steps[tour.step] : undefined;
   const track = tour?.track;
   const index = tour?.step ?? -1;
-  const phaseFits = track === "basics" ? s.game.phase === "management" : s.game.phase === "incident";
-  const visible = !!step && phaseFits && !s.onboarding && s.view !== "menu";
+  const visible = !!step && !!track && fits(track, s) && !covered && !s.onboarding && s.view !== "menu";
 
   const advance = () => {
     const now = useGame.getState();
@@ -189,8 +314,10 @@ export default function Tutorial() {
     let last = "";
     let scrolledFor = "";
     let floorFor = "";
+    let focusedFor = "";
     const read = () => {
       setViewport((v) => (v.w === window.innerWidth && v.h === window.innerHeight ? v : { w: window.innerWidth, h: window.innerHeight }));
+      setCovered(!!document.querySelector(".modal-backdrop"));
       const sel = step.target(useGame.getState());
       setSelector(sel);
       // A step pointing at equipment on the other floor takes the view there first; its label appears as the car
@@ -201,19 +328,29 @@ export default function Tutorial() {
         const s = useGame.getState();
         if (floorOf(eq) !== s.floor) s.goToFloor(floorOf(eq), "tour");
       }
-      const el = document.querySelector(sel);
-      if (!el) {
+      const el = document.querySelector<HTMLElement>(sel);
+      // Something without a box of its own (hidden, or laid out with display: contents) cannot be pointed at.
+      if (!el || el.getClientRects().length === 0) {
         if (last !== "none") {
           last = "none";
           setBox(null);
         }
         return;
       }
+      // Guided Mode's panel can cover part of the room (its lower half on a phone). Once the label is placed, a machine
+      // out of the open part is brought into it, as Guided Mode's actions do; one in view is left where it is.
+      if (eq && focusedFor !== sel && el.style.visibility === "visible") {
+        focusedFor = sel;
+        const stage = document.querySelector("main.stage")?.getBoundingClientRect();
+        if (useGame.getState().game.campaign && stage && !inOpenRoom(el.getBoundingClientRect(), stage)) useGame.getState().focusCamera(eq);
+      }
       if (scrolledFor !== sel) {
         scrolledFor = sel;
         if (el.closest(".side, .sheet-body, .tree-scroll, .tree-detail")) el.scrollIntoView({ block: "nearest", inline: "nearest" });
       }
       const r = el.getBoundingClientRect();
+      const side = document.querySelector(".side")?.getBoundingClientRect();
+      setEdge(side && side.width > 0 && side.left > window.innerWidth / 2 && !el.closest(".side") ? side.left : undefined);
       // Equipment labels sit above their racks, so the spotlight reaches down to include them.
       const k = window.innerWidth < 900 ? 0.45 : 1;
       const [pt, pr, pb, pl] = sel.startsWith(".eq-label") ? [10 * k, 46 * k, 120 * k, 46 * k] : [5, 5, 5, 5];
@@ -244,7 +381,8 @@ export default function Tutorial() {
   if (!visible || !step || !tour) return null;
 
   const waiting = !!step.done;
-  const name = tour.track === "basics" ? "Tutorial" : "Incident guide";
+  const name = TRACK_NAMES[tour.track] ?? "Chapter guide";
+  const why = typeof step.why === "function" ? step.why(s) : step.why;
   return (
     <div className="tour" data-track={tour.track}>
       {box ? <div className="tour-hole" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} /> : <div className="tour-dim" />}
@@ -254,7 +392,7 @@ export default function Tutorial() {
         role="dialog"
         aria-label={`${name}, step ${tour.step + 1} of ${steps.length}`}
         tabIndex={-1}
-        style={cardStyle(box, placeFor(selector), viewport.w, viewport.h)}
+        style={cardStyle(box, placeFor(selector), viewport.w, viewport.h, edge)}
       >
         <div className="tour-dots" aria-hidden="true">
           {steps.map((_, i) => (
@@ -262,7 +400,7 @@ export default function Tutorial() {
           ))}
         </div>
         <h3>{step.title}</h3>
-        {step.why && <p className="muted">{step.why}</p>}
+        {why && <p className="muted">{why}</p>}
         <p className="tour-prompt">{step.hint(s)}</p>
         <div className="tour-foot">
           <button type="button" className="tour-skip" onClick={() => s.endTour(false)}>

@@ -202,7 +202,7 @@ it("ignores malformed analytics storage, storage failures and a throwing collect
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
   stop = watchProductAnalytics(useGame, () => { throw Error("collector blocked"); }, "test");
   expect(() => play()).not.toThrow();
-  useGame.getState().onboardingMove('skip');
+  
   expect(() => useGame.getState().advance()).not.toThrow();
   expect(useGame.getState().game.campaign!.step).toBe(1);
   expect(() => stop()).not.toThrow();

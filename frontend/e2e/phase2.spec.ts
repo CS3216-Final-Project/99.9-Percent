@@ -1,37 +1,42 @@
-import { test, expect, savedGame, seedSave } from "./fixtures";
+import { test, expect, savedGame, seedSave, tutorial } from "./fixtures";
 import { applyAction, newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
-test("keyboard introduction stays paused, contains focus and remembers completion", async ({ page }) => {
+test("the walkthrough works from the keyboard, keeps shortcuts working and remembers a skip", async ({ page }) => {
   await page.goto("/");
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBeNull();
   const preview = page.getByRole("img", { name: /furnished office/ });
   await expect(preview).toHaveCount(0);
   await page.screenshot({ path: "test-results/phase2-title.png" });
   await page.getByRole("button", { name: "Start Guided Mode" }).press("Enter");
-  const intro = page.getByRole("dialog", { name: "Company introduction" });
-  await expect(intro).toContainText("Prompt 1 of 3");
-  await page.keyboard.press("p");
-  expect((await savedGame(page)).campaign!.step).toBe(0);
-  await intro.getByRole("button", { name: "Next", exact: true }).focus();
+  const card = tutorial(page);
+  await expect(card).toHaveAccessibleName("Tutorial, step 1 of 8");
+  // Each step takes focus, so a screen reader announces it; the card is not modal, so Tab leads on into the game.
+  await expect(card).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(intro.getByRole("button", { name: "Close" })).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
-  await expect(intro.getByRole("button", { name: "Next", exact: true })).toBeFocused();
-  await page.keyboard.press("Enter");
-  await intro.getByRole("button", { name: "Back", exact: true }).press("Enter");
-  await expect(intro).toContainText("Prompt 1 of 3");
-  await intro.getByRole("button", { name: "Next", exact: true }).press("Enter");
-  await intro.getByRole("button", { name: "Next", exact: true }).press("Enter");
-  await intro.getByRole("button", { name: "Finish introduction" }).press("Enter");
-  await expect(intro).toBeHidden();
+  await expect(card.getByRole("button", { name: "Skip", exact: true })).toBeFocused();
+  const room = page.getByRole("main");
+  await room.getByRole("button", { name: "Servers", exact: true }).press("Enter");
+  await expect(card).toHaveAccessibleName("Tutorial, step 2 of 8");
+  await expect(card).toBeFocused();
+  await room.getByRole("button", { name: "Database", exact: true }).press("Enter");
+  await expect(card).toHaveAccessibleName("Tutorial, step 3 of 8");
+  await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
+  await expect(card).toHaveAccessibleName("Tutorial, step 4 of 8");
+  // P runs and pauses the company even while the guide's card has focus.
+  await expect(card).toBeFocused();
+  await page.keyboard.press("p");
+  await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+  await page.keyboard.press("p");
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
-  expect((await savedGame(page)).campaign!.step).toBe(0);
+  await card.getByRole("button", { name: "Skip", exact: true }).press("Enter");
+  await expect(card).toBeHidden();
   await page.screenshot({ path: "test-results/phase2-healthy.png" });
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.screenshot({ path: "test-results/phase2-menu.png" });
   await page.reload(); await page.getByRole("button", { name: "Continue company" }).click();
-  await expect(intro).toBeHidden();
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+  await expect(card).toHaveCount(0);
 });
 
 test("pending milestone reload keeps the company paused and awards it only once", async ({ page }) => {

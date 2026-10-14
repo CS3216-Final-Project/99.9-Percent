@@ -34,7 +34,7 @@ it("loads acknowledged Phase 2 companies without entering the stage on boot or r
  const raw=oldEnvelope(2,true);localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);useGame.getState().boot();
  expect(useGame.getState().game.campaign).toMatchObject({scaling:null,runId:"main-company",step:14});
  useGame.getState().play();expect(useGame.getState().game.campaign!.scaling).not.toBeNull();
- useGame.getState().onboardingMove("skip");inspectOrSelect("app","app-1");expect(useGame.getState().selectedAppId).toBe("app-1");
+ inspectOrSelect("app","app-1");expect(useGame.getState().selectedAppId).toBe("app-1");
  const saved=loadGame();expect(saved.status).toBe("ok");if(saved.status!=="ok")throw Error("load");
  expect(saved.game.campaign!.scaling).toEqual(useGame.getState().game.campaign!.scaling);
  expect(saved.game.campaign!.trace.filter(t=>t.type==="scaling-stage-entered")).toHaveLength(1);

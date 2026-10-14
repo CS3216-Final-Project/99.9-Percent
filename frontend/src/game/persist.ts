@@ -27,23 +27,27 @@ let lastWrittenCampaign: string | null = null;
 /** Campaign is the step-based simulation; classic is the original week-by-week game. */
 export type GameMode = "campaign" | "classic";
 
+/** The Guided Mode chapters after the Opening, each with a short guide shown when the company first enters it. */
+export const CHAPTER_TOURS = ["scaling", "data", "spikes", "reliability", "combined"] as const;
+export type ChapterTour = (typeof CHAPTER_TOURS)[number];
+
 export interface Meta {
-  openingOnboarding: {version: 1; step: number; status: "not-started" | "in-progress" | "completed" | "skipped"};
   onboarded: boolean;
   runsStarted: number;
   runsFinished: number;
   firstIncidentStarted: boolean;
   firstIncidentCompleted: boolean;
-  /** The guided first-week walkthrough has been finished or skipped. */
+  /** The guided walkthrough (Challenge Mode's first week, Guided Mode's Opening) has been finished or skipped. */
   tutorialDone: boolean;
   /** The short guide shown on the first incident has been seen. */
   incidentGuideDone: boolean;
+  /** Guided Mode chapters whose guide has been shown, so it appears once. */
+  chapterTours: ChapterTour[];
   /** Challenge Mode stays unlocked once earned; completing Guided Mode cannot be taken back. */
   challengeUnlocked: boolean;
 }
 
 export const DEFAULT_META: Meta = {
-  openingOnboarding: {version: 1, step: 0, status: "not-started"},
   onboarded: false,
   runsStarted: 0,
   runsFinished: 0,
@@ -51,6 +55,7 @@ export const DEFAULT_META: Meta = {
   firstIncidentCompleted: false,
   tutorialDone: false,
   incidentGuideDone: false,
+  chapterTours: [],
   challengeUnlocked: false,
 };
 
@@ -241,8 +246,11 @@ export function saveClassicGame(game: GameState): boolean {
   return write(CLASSIC_SAVE_KEY, exportGame(game));
 }
 
-/** Older metadata also held the music switch, which now lives in the sound settings. */
-type StoredMeta = Partial<Meta> & { music?: unknown };
+/**
+ * Older metadata also held the music switch, which now lives in the sound settings, and the state of Guided Mode's
+ * former three-prompt introduction, which the spotlight walkthrough replaced.
+ */
+type StoredMeta = Omit<Partial<Meta>, "chapterTours"> & { music?: unknown; openingOnboarding?: unknown; chapterTours?: unknown };
 
 function parseMeta(raw: string | null): StoredMeta | null {
   if (!raw) return null;
@@ -255,11 +263,9 @@ function parseMeta(raw: string | null): StoredMeta | null {
 }
 
 function decodeMeta(raw: string | null): Meta {
-  const { music: _music, ...stored } = parseMeta(raw) ?? {};
-  const meta: Meta = { ...DEFAULT_META, ...stored };
-  const o=meta.openingOnboarding;
-  if(!o || o.version!==1 || !Number.isInteger(o.step) || o.step<0 || o.step>2 || !["not-started","in-progress","completed","skipped"].includes(o.status)) meta.openingOnboarding=structuredClone(DEFAULT_META.openingOnboarding);
-  return meta;
+  const { music: _music, openingOnboarding: _introduction, chapterTours, ...stored } = parseMeta(raw) ?? {};
+  const seen = Array.isArray(chapterTours) ? CHAPTER_TOURS.filter((id) => chapterTours.includes(id)) : [];
+  return { ...DEFAULT_META, ...stored, chapterTours: seen };
 }
 
 /** Each mode keeps its own tutorial/counters; sound is a shared player preference (see loadAudio). */
