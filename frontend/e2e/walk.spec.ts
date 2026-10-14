@@ -41,16 +41,6 @@ async function trackEffectFrequencies(page: Page) {
 /** Whether `hz` appears in the captured frequencies, allowing a small floating-point tolerance. */
 const near = (frequencies: number[], hz: number) => frequencies.some((f) => Math.abs(f - hz) < 0.6);
 
-/** Hold several keys down for `ms`, always letting every one go again. */
-async function holdKeys(page: Page, codes: string[], ms: number) {
-  try {
-    for (const code of codes) await page.keyboard.down(code);
-    await page.waitForTimeout(ms);
-  } finally {
-    for (const code of [...codes].reverse()) await page.keyboard.up(code);
-  }
-}
-
 test("walks the building as an avatar: the elevator by Space, Walk keeping out of Space's way, and Esc to stop", async ({ page }) => {
   // The opening framing and the walk move a share of the way each frame, so software rendering takes a while.
   test.slow();
@@ -110,21 +100,20 @@ test("walking away from the meeting leaves its nearby presentation sound behind"
   await expect
     .poll(async () => heard(await audio.frequencies()), { timeout: 10_000 })
     .toBe(true);
-  // North to the meeting-room wall, a diagonal grind east along it through the glass door, east along the aisle,
-  // south through the gap at its end, then east and north again into the open floor, out of earshot of the talk.
-  const before = (await audio.frequencies()).length;
-  await holdKeys(page, ["Shift", "w", "d"], 1200);
-  await holdKeys(page, ["Shift", "d"], 450);
-  await holdKeys(page, ["Shift", "s", "d"], 2500);
-  await holdKeys(page, ["Shift", "s", "a"], 700);
-  await holdKeys(page, ["Shift", "s", "d"], 2500);
-  await holdKeys(page, ["Shift", "w", "d"], 1200);
-  // Frames and audio were live through the walk: footsteps and nearby sounds kept oscillators coming.
-  expect((await audio.frequencies()).length).toBeGreaterThan(before);
+  // Let the room plan a route through the meeting-room door to Growth, rather than assuming
+  // timed key presses travel far enough on every renderer. Its arrival prompt proves the avatar
+  // is on the open floor, well beyond the presentation's 11 m reach.
+  await label(page, "Growth").click();
+  await expect(prompt(page)).toContainText("Inspect Growth", { timeout: 40_000 });
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
   // Out of earshot now: over longer than the talk's longest gap it never sounds its three tones together again.
   await audio.reset();
   await page.waitForTimeout(8_200);
-  expect(heard(await audio.frequencies())).toBe(false);
+  const away = await audio.frequencies();
+  // Other nearby sources keep playing: absence of the talk must not pass because all audio stopped.
+  expect(away.length).toBeGreaterThan(0);
+  expect(heard(away)).toBe(false);
 });
 
 test("changes the avatar mid-game from the menu, fetching only the one chosen", async ({ page }) => {
