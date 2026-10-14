@@ -12,6 +12,37 @@ const label = (page: Page, name: string) => page.getByRole("main").locator(".eq-
 const floor = (page: Page, name: "Office floor" | "Server floor") => page.getByRole("group", { name: "Floors" }).getByRole("button", { name: new RegExp(`^${name}`) });
 const walk = (page: Page) => page.getByRole("main").getByRole("button", { name: "Walk", exact: true });
 const prompt = (page: Page) => page.locator(".walk-prompt");
+const exploration = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem("nn.classic.exploration.v1") ?? "null"));
+
+/** The stored camera view, once its exact JSON has stayed unchanged for a beat longer than the write throttle. */
+async function settledView(page: Page): Promise<{ target: { x: number; z: number }; offset: { x: number; y: number; z: number }; zoom: number }> {
+  let lastJson = "";
+  let unchangedSince = Date.now();
+  let view: { target: { x: number; z: number }; offset: { x: number; y: number; z: number }; zoom: number } | null = null;
+  await expect
+    .poll(
+      async () => {
+        const camera = (await exploration(page))?.camera ?? null;
+        const json = JSON.stringify(camera);
+        if (json !== lastJson) {
+          lastJson = json;
+          unchangedSince = Date.now();
+        }
+        view = camera;
+        return camera !== null && Date.now() - unchangedSince >= 1200;
+      },
+      { timeout: 45_000, intervals: [300, 350, 400] },
+    )
+    .toBe(true);
+  return view!;
+}
+
+/** The centre of a room label's box on screen: where the camera's target, angle and zoom put it. */
+async function labelCentre(page: Page, name: string): Promise<{ x: number; y: number }> {
+  const box = await label(page, name).boundingBox();
+  if (!box) throw new Error(`The ${name} label is not on screen`);
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
 const events = (page: Page, prefix: string) =>
   page.evaluate((p) => (JSON.parse(localStorage.getItem("nn.campaign.analytics.v1") ?? "[]") as { name: string }[]).filter((e) => e.name.startsWith(p)).map((e) => e.name), prefix);
 
@@ -72,9 +103,11 @@ test("in walk mode, clicking equipment walks the avatar to it, and Space then in
   await label(page, "Monitoring").click();
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "true");
   await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 40_000 });
-  // Close the inspector, then Space opens it again from where the avatar stands.
+  // Close the inspector, then Space opens it again from where the avatar stands: a nearby
+  // prompt wins even while a room control like Zoom in still holds the page's focus.
   await page.getByRole("complementary", { name: "Details" }).getByRole("button", { name: "Close" }).click();
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Zoom in", exact: true }).focus();
   await page.keyboard.press("Space");
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "true");
   // The prompt is a button too, for a phone with no Space key.
@@ -135,4 +168,46 @@ test("changes the avatar mid-game from the menu, fetching only the one chosen", 
   expect(await page.evaluate(() => localStorage.getItem("nn.avatar.v1"))).toBe("panda");
   expect(await page.evaluate(() => localStorage.getItem("nn.classic.save.v1") ?? "")).not.toContain("panda");
   expect(await events(page, "avatar_")).toEqual(["avatar_changed"]);
+});
+
+test("restores the mode, floor, walk position and camera view after a reload", async ({ page }) => {
+  test.slow();
+  await open(page);
+  await walk(page).click();
+  await expect(prompt(page)).toContainText("Ride up");
+  // Send the avatar to the monitoring room, so its spot is worth remembering.
+  await label(page, "Monitoring").click();
+  await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 40_000 });
+  await page.getByRole("complementary", { name: "Details" }).getByRole("button", { name: "Close" }).click();
+  await expect.poll(async () => (await exploration(page))?.avatar?.floor).toBe("servers");
+  // A turn and a closer look, taken through the room's own camera buttons.
+  const before = await settledView(page);
+  await page.getByRole("button", { name: "Rotate right" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect.poll(async () => (await exploration(page))?.camera?.zoom ?? 0).toBeGreaterThan(before.zoom);
+  const view = await settledView(page);
+  expect(view.zoom).toBeGreaterThan(before.zoom);
+  // What the camera settled on: where two labels stand on screen now.
+  const monitoring = await labelCentre(page, "Monitoring");
+  const database = await labelCentre(page, "Database");
+
+  await page.reload();
+  await page.getByRole("button", { name: "Continue week 2" }).click();
+  await expectRoom(page);
+  // Mode, floor and walk mode are picked up exactly where they were left.
+  await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+  // The avatar stands by Monitoring without being walked there again: the prompt is back in reach.
+  await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 20_000 });
+  // And the camera came back to the same view: both labels return to their screen spots.
+  await expect
+    .poll(async () => Math.hypot((await labelCentre(page, "Monitoring")).x - monitoring.x, (await labelCentre(page, "Monitoring")).y - monitoring.y), { timeout: 20_000 })
+    .toBeLessThan(4);
+  await expect
+    .poll(async () => Math.hypot((await labelCentre(page, "Database")).x - database.x, (await labelCentre(page, "Database")).y - database.y), { timeout: 20_000 })
+    .toBeLessThan(4);
+  // Challenge Mode stays the last mode played, and the view record is its own, not the campaign's.
+  expect(await page.evaluate(() => localStorage.getItem("nn.mode.v1"))).toBe("classic");
+  expect(await page.evaluate(() => localStorage.getItem("nn.campaign.exploration.v1"))).toBeNull();
 });
