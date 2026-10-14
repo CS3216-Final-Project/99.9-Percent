@@ -104,8 +104,9 @@ it("walks Stay Online through unlocking Health Checks in Tech and deploying it",
   expect(useGame.getState().game.campaign!.reliabilityStage!.owned).toContain("health_checks");
   expect(guide(3).textContent).toContain("Close Tech.");
   fireEvent.click(screen.getByRole("button", { name: "Tech" }));
-  expect(guide(3).textContent).toContain("Press Deploy Health Checks, then Confirm.");
+  expect(guide(3).textContent).toContain("Press Deploy Health Checks.");
   fireEvent.click(screen.getByRole("button", { name: /^Deploy Health Checks/ }));
+  expect(guide(3).textContent).toContain("Press Confirm.");
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   expect(useGame.getState().tour).toBeNull();
 });

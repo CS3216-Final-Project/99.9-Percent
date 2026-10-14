@@ -208,8 +208,9 @@ const CHAPTERS = {
     {
       title: "Deploy Health Checks",
       why: "Unlocking does not deploy it.",
-      hint: (s) => (s.view === "tech" ? "Close Tech." : "Press Deploy Health Checks, then Confirm."),
-      target: (s) => (s.view === "tech" ? TECH_TAB : '[aria-label="Stay Online"]'),
+      hint: (s) => (s.view === "tech" ? "Close Tech." : confirmingAction() ? "Press Confirm." : "Press Deploy Health Checks."),
+      // The confirmation opens beside the panel; light it up rather than leaving it under the dim.
+      target: (s) => (s.view === "tech" ? TECH_TAB : confirmingAction() ? ".campaign-action-popover" : '[data-tour="deploy-checks"]'),
       inTech: true,
       done: (s) => {
         const c = s.game.campaign;
