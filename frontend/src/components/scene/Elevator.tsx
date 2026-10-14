@@ -16,7 +16,7 @@ import { bx, cy, type Prim } from "./shapes";
 import { liftDisplay } from "./textures";
 
 /*
- * The elevator between the floors, in the east corridor beside the monitoring room's door. Each floor has a glass
+ * The elevator between the floors, in the east corridor below the monitoring room and the huddle room. Each floor has a glass
  * shaft with steel doors facing the corridor, a floor indicator over them and a call button beside them; one car
  * rides between the floors with the view (see ride.ts), so it always stands at the floor on screen. Clicking the
  * shaft rides to the other floor, as the floor menu does.

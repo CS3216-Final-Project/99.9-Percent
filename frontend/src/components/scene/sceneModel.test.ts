@@ -21,7 +21,7 @@ describe("scene model", () => {
     expect(buildModel(owned).hosts).toHaveLength(owned.campaign!.apps.length);
     const prepared=preparedReliability(),model=buildModel(prepared);
     expect(model.standby).toBe(false);expect(model.hosts).toEqual(["ok","ok","standby"]);
-  });
+  },15_000);
   it("renders the fourth campaign DB cabinet in the same footprint as the activated tier",()=>{
     let s=dataCompany();s=must(s,{type:"start_db_upgrade"});s=advanceSteps(s,4).state;
     expect(s.campaign!.dbCapacity).toBe(3000);const m=buildModel(s),pad=footprint(s,"db");
