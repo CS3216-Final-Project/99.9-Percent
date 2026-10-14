@@ -15,12 +15,12 @@ import "./HomeScreen.css";
 /** What a mode's card says about its saved game. Nothing here changes a save. */
 interface Summary { progress: string | null; resumable: boolean; ended: boolean; tutorialDone: boolean; continueLabel: string }
 
-function campaignSummary(game: GameState | null): Summary {
-  if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone: false, continueLabel: "Start Guided Mode" };
+function campaignSummary(game: GameState | null, tutorialDone: boolean): Summary {
+  if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Guided Mode" };
   const chapters = campaignChapters(game);
   const chapter = chapters.find((c) => c.current) ?? chapters.filter((c) => c.completed).at(-1) ?? chapters[0];
   const ended = game.phase === "ended";
-  return { progress: ended ? "Company closed" : `Chapter ${chapter.number} of ${chapters.length}: ${chapter.name}`, resumable: true, ended, tutorialDone: false, continueLabel: "Continue company" };
+  return { progress: ended ? "Company closed" : `Chapter ${chapter.number} of ${chapters.length}: ${chapter.name}`, resumable: true, ended, tutorialDone, continueLabel: "Continue company" };
 }
 function classicSummary(game: GameState | null, tutorialDone: boolean): Summary {
   if (!game || game.campaign || isFreshRun(game)) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Challenge Mode" };
@@ -76,11 +76,11 @@ export function HomeScreen() {
       return classicSummary(loaded.status === "ok" ? loaded.game : null, loadMeta("classic").tutorialDone);
     }
     const loaded = loadGame();
-    return campaignSummary(loaded.status === "ok" ? loaded.game : null);
+    return campaignSummary(loaded.status === "ok" ? loaded.game : null, loadMeta("campaign").tutorialDone);
     // A new generation means the active game was replaced, which can change the other mode's save too.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, generation]);
-  const active = mode === "campaign" ? campaignSummary(hasRun ? game : null) : classicSummary(game, meta.tutorialDone);
+  const active = mode === "campaign" ? campaignSummary(hasRun ? game : null, meta.tutorialDone) : classicSummary(game, meta.tutorialDone);
   const summary = (m: GameMode) => (m === mode ? active : other);
 
   /** Run `then` in mode `m`, switching first when it is not the loaded mode. */
@@ -105,6 +105,12 @@ export function HomeScreen() {
     if (m !== useGame.getState().mode) { inMode(m); return; }
     useGame.getState().play();
   };
+  // Challenge Mode's walkthrough is its first week, so it restarts the run; Guided Mode's runs on the company as it is.
+  const replayTutorial = (m: GameMode) => inMode(m, () => {
+    if (m === "classic") { useGame.getState().startTutorialRun("home"); return; }
+    useGame.getState().play();
+    useGame.getState().startTour("campaign", "home");
+  });
 
   return <div className="title-screen home-screen">
     <div className="home-card">
@@ -123,7 +129,7 @@ export function HomeScreen() {
           {(["campaign", "classic"] as const).map((m) => <ModeCard key={m} mode={m} summary={summary(m)} lastPlayed={m === mode && !!active.progress}
             locked={m === "classic" && !unlocked}
             unsaved={unsaved === m} busy={busy} autoFocus={m === mode && !!active.progress}
-            onPlay={() => playMode(m)} onNew={() => inMode(m, fresh)} onTutorial={() => inMode(m, () => useGame.getState().startTutorialRun())} />)}
+            onPlay={() => playMode(m)} onNew={() => inMode(m, fresh)} onTutorial={() => replayTutorial(m)} />)}
         </div>
         {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved">
           This run could not be saved, so switching now loses it. Press the red button again to switch anyway.
@@ -171,7 +177,8 @@ function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, autoFocus,
         </button>
         {mode === "classic" && summary.resumable && <button type="button" className="btn" disabled={busy} onClick={onNew}>New game</button>}
       </div>
-      {mode === "classic" && summary.tutorialDone && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>Replay the tutorial</button>}
+      {/* A closed company has no Opening left to walk through. */}
+      {summary.tutorialDone && !(mode === "campaign" && summary.ended) && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>Replay the tutorial</button>}
     </>}
   </section>;
 }

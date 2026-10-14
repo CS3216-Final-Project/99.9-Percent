@@ -66,6 +66,8 @@ export function watchProductAnalytics(store: GameStore, sink: AnalyticsSink, bui
   let lastActivity = lastSample;
   let hidden = document.hidden;
   let stopped = false;
+  // A walkthrough event already under way when the observer is installed mid-play is not a new observation.
+  let reportedTour = previous.started ? previous.lastTour?.id ?? 0 : 0;
   const device = window.matchMedia?.("(pointer: coarse)").matches ? "touch" : "desktop";
 
   const save = () => {
@@ -147,6 +149,15 @@ export function watchProductAnalytics(store: GameStore, sink: AnalyticsSink, bui
     if (state.started && (!prev.started || changed)) begin(state, prev);
     if (!session) return;
     session.state = state;
+    // A walkthrough that starts behind the title screen (Challenge Mode offers it on boot) is reported once play begins.
+    const tour = state.lastTour;
+    if (tour && tour.id !== reportedTour) {
+      reportedTour = tour.id;
+      emit(`gameplay_tutorial_${tour.kind}`, {
+        tutorial_track: tour.track, tutorial_step: tour.step,
+        ...(tour.from ? { tutorial_from: tour.from } : {}), ...(tour.reason ? { reason: tour.reason } : {}),
+      });
+    }
     const chapter = currentChapter(state);
     if (chapter && !session.run.entered.includes(chapter)) {
       session.run.entered.push(chapter);

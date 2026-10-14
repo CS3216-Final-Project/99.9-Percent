@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect } from "./fixtures";
+import { test, expect, tutorial } from "./fixtures";
 
 /** Count the voices the sound effects start. The music synthesises offline and only plays buffers in real time. */
 async function countEffects(page: Page) {
@@ -15,7 +15,7 @@ async function countEffects(page: Page) {
   return () => page.evaluate(() => (window as unknown as { effectVoices: number }).effectVoices);
 }
 
-test("sounds the company starting, each introduction prompt and the alarm, and nothing while muted", async ({ page, withoutRoom }) => {
+test("sounds the company starting and the alarm, and nothing for a skipped walkthrough or while muted", async ({ page, withoutRoom }) => {
   // The effects need no room; skipping its software WebGL keeps this journey fast.
   await withoutRoom();
   const problems: string[] = [];
@@ -29,10 +29,12 @@ test("sounds the company starting, each introduction prompt and the alarm, and n
   await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
   await expect.poll(voices).toBeGreaterThanOrEqual(5);
   const launch = await voices();
-  // Each prompt of the introduction ticks.
-  await page.getByRole("button", { name: "Skip introduction" }).click();
-  await expect.poll(voices).toBeGreaterThan(launch);
-  const introduced = await voices();
+  // Only finishing the walkthrough is marked; skipping it is silent.
+  await tutorial(page).getByRole("button", { name: "Skip", exact: true }).click();
+  await expect(tutorial(page)).toBeHidden();
+  await page.waitForTimeout(300);
+  expect(await voices()).toBe(launch);
+  const introduced = launch;
   await page.locator(".campaign-advanced > summary").click();
   const advance = page.getByRole("button", { name: "Advance step", exact: true });
   for (let i = 0; i < 5; i++) await advance.click();
@@ -61,7 +63,7 @@ test("sounds the company starting, each introduction prompt and the alarm, and n
 test("the header sound button follows the menu sliders and turns sound back on from silence", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
-  await page.getByRole("button", { name: "Skip introduction" }).click();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
@@ -85,8 +87,8 @@ test("starts a new company with the same sound, and lets a saved one continue qu
   await page.goto("/");
   await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
   await expect.poll(voices).toBeGreaterThanOrEqual(5);
-  await page.getByRole("button", { name: "Skip introduction" }).click();
-  await expect(page.getByRole("dialog", { name: "Company introduction" })).toBeHidden();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await expect(tutorial(page)).toBeHidden();
   // Reloading counts from zero again: the saved company continues without its start-up sound.
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();

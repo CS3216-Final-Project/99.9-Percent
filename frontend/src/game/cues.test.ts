@@ -290,7 +290,6 @@ describe("watching the store", () => {
     await settle();
     expect(heard).toEqual(["launch"]);
     heard.length = 0;
-    s().onboardingMove("skip");
     s().setRunning(true);
     s().tick(30);
     await settle();
@@ -308,8 +307,6 @@ describe("watching the store", () => {
     const s = () => useGame.getState();
     s().boot();
     s().play();
-    await settle();
-    s().onboardingMove("skip");
     await settle();
     heard.length = 0;
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
@@ -353,8 +350,6 @@ describe("watching the store", () => {
     s().play();
     await settle();
     expect(heard).toEqual(["launch"]);
-    s().onboardingMove("skip");
-    await settle();
     // Leaving to the title and reloading the page brings the same company back: Continue company.
     s().endSession();
     await settle();
@@ -367,8 +362,6 @@ describe("watching the store", () => {
     expect(s().hasRun).toBe(true);
     expect(heard).toEqual([]);
     // New company, and the reset to the first run: each starts once.
-    s().onboardingMove("skip");
-    await settle();
     heard.length = 0;
     s().newRun();
     await settle();
@@ -382,8 +375,6 @@ describe("watching the store", () => {
     const s = () => useGame.getState();
     s().boot();
     s().play();
-    await settle();
-    s().onboardingMove("skip");
     await settle();
     heard.length = 0;
     const before = s().game;
@@ -439,8 +430,6 @@ describe("watching the store", () => {
     await settle();
     expect(s().game.campaign).toBeTruthy();
     expect(heard).toEqual(["launch"]);
-    s().onboardingMove("skip");
-    await settle();
     heard.length = 0;
     // The classic run is saved, so going back resumes it.
     expect(s().switchMode("classic")).toBe(true);
@@ -455,33 +444,25 @@ describe("watching the store", () => {
     expect(heard).toEqual(["launch"]);
   });
 
-  it("ticks through the campaign introduction and marks its end", async () => {
+  it("marks the end of the campaign walkthrough, but not its steps, a skip or a replay starting", async () => {
     const s = () => useGame.getState();
     s().boot();
     s().play();
     await settle();
+    expect(s().tour).toEqual({ track: "campaign", step: 0 });
     heard.length = 0;
-    const move = async (direction: "next" | "back" | "skip") => {
-      s().onboardingMove(direction);
-      await settle();
-    };
-    await move("next");
-    await move("next");
-    await move("back");
-    expect(heard).toEqual(["blip", "blip", "blip"]);
-    expect(s().onboarding).toBe(true);
-    heard.length = 0;
-    await move("next");
-    await move("next");
-    expect(s().onboarding).toBe(false);
-    expect(s().meta.openingOnboarding.status).toBe("completed");
-    // The last prompt is the end of the introduction; skipping is only another tick.
-    expect(heard).toEqual(["blip", "unlock"]);
-    heard.length = 0;
-    s().showOnboarding();
+    s().tourNext();
     await settle();
-    await move("skip");
-    expect(heard).toEqual(["blip", "blip"]);
+    s().endTour(false);
+    await settle();
+    expect(heard).toEqual([]);
+    // Replaying it keeps the same company, so it is not a launch; finishing it is the end of the introduction.
+    s().startTour("campaign");
+    await settle();
+    expect(heard).toEqual([]);
+    s().endTour(true);
+    await settle();
+    expect(heard).toEqual(["unlock"]);
   });
 
   it("marks the end of the classic walkthrough, but not its steps or a skip", async () => {

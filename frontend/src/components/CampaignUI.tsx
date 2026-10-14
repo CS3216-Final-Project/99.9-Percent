@@ -1,5 +1,4 @@
 import "./CampaignUX.css";
-import CampaignIntroduction from "./CampaignIntroduction";
 import { CampaignAction as Act } from "./CampaignAction";
 import CampaignScorecard from "./CampaignScorecard";
 import { canPromote, combinedProfile, currentFault, pendingCombined } from "@/sim/combinedCampaign";
@@ -59,7 +58,7 @@ function RequirementList({items}:{items:Requirement[]}) {
 
 // Progress is derived from the engine; reading this panel never advances the run.
 function CampaignGuidance() {
-  const {game,act,onboarding}=useGame(),c=game.campaign!;
+  const {game,act}=useGame(),c=game.campaign!;
   const model=campaignGuidance(game),action=model.pendingAction;
   const objective=game.phase==="ended"?(game.outcome==="won"?"Inspect the final architecture and scorecard before starting another company.":"Review the company's finances and recorded evidence.")
     :game.phase==="review"?"Read the postmortem before continuing the same company."
@@ -81,14 +80,14 @@ function CampaignGuidance() {
       {model.notice&&<p role="note">{model.notice}</p>}
       {model.optional&&<p className="muted">{model.optional}</p>}
     </details></section>}
-    {action?.action&&<button className="btn btn-primary" disabled={onboarding||game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
-    {!c.reliabilityStage&&c.spikeStage?.acknowledged&&<button className="btn btn-primary" disabled={onboarding||!canEnterReliability(game)} onClick={()=>act({type:"enter_reliability"})}>Continue to reliability<Icon name="next" /></button>}
-    {action&&!action.action&&<button className="btn btn-primary" disabled={onboarding} onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
+    {action?.action&&<button className="btn btn-primary" disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
+    {!c.reliabilityStage&&c.spikeStage?.acknowledged&&<button className="btn btn-primary" disabled={!canEnterReliability(game)} onClick={()=>act({type:"enter_reliability"})}>Continue to reliability<Icon name="next" /></button>}
+    {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
     {c.openingMilestone?.acknowledged&&!c.dataStage&&!c.scaling?.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}>View run scorecard</button>}
     {model.prevention&&!c.openingPrevention?.outcome&&<section className="prevention-guidance" aria-label="Opening prevention progress">
       <p role="status">Stable service: {c.openingPrevention?.stableSteps??0} / {Q.stableSteps} steps. Pausing adds no time; unhealthy service restarts the counter.</p>
-      <div className="btn-row"><button className="btn btn-small" disabled={onboarding} onClick={()=>inspectOrSelect("app","app-1")}>Inspect Application</button><button className="btn btn-small" disabled={onboarding} onClick={()=>inspectOrSelect("db")}>Inspect Database</button></div>
+      <div className="btn-row"><button className="btn btn-small" onClick={()=>inspectOrSelect("app","app-1")}>Inspect Application</button><button className="btn btn-small" onClick={()=>inspectOrSelect("db")}>Inspect Database</button></div>
     </section>}
 
   </section>;
@@ -130,7 +129,7 @@ export function CampaignPanel() {
   const dbUpgrade=databaseUpgrade(c);
   const selectedApp = c.apps.find(a=>a.id===selectedAppId)??c.apps[0];
   const recipients = c.reliabilityStage ? effectiveTargets(c) : c.routing.targets;
-  const disabled = useGame(s=>s.onboarding) || pendingStop(c) !== null || !!(c.openingMilestone && !c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
+  const disabled = pendingStop(c) !== null || !!(c.openingMilestone && !c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
   const admissionPending = c.pending.some(a => a.type === "limit" || a.type === "unlimit");
   const place = PLACES.find(id => id === selected && (id!=="cache"||c.dataStage));
   const component = place === "app" ? m.app : place === "db" ? m.db : null;
@@ -260,7 +259,7 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
 
 export function CampaignControls() {
   const { game, running, setRunning, speed, setSpeed, advance } = useGame();
-  const active = useGame(s=>s.started && !s.onboarding) && pendingStop(game.campaign) === null && !(game.campaign!.openingMilestone && !game.campaign!.openingMilestone.acknowledged) && (game.phase === "management" || game.phase === "incident");
+  const active = useGame(s=>s.started) && pendingStop(game.campaign) === null && !(game.campaign!.openingMilestone && !game.campaign!.openingMilestone.acknowledged) && (game.phase === "management" || game.phase === "incident");
   return <footer className={`bottombar campaign-clock${running?" is-running":" is-paused"}`}>
     <ViewTabs tabs={[
       { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}` },
@@ -326,7 +325,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
       {tab === "run" && <>
         <div className="menu-grid" role="group" aria-label="Run">
           <MenuTile icon="save" kind="ok" title="Save now" text="Write this company to the browser." onClick={() => saveNow()} />
-          <MenuTile icon="info" kind="users" title="How to play" text="Replay the three-prompt introduction." onClick={() => useGame.getState().showOnboarding()} />
+          <MenuTile icon="info" kind="users" title="How to play" text="Replay the guided tour of your company." onClick={() => useGame.getState().startTour("campaign")} />
           <MenuTile icon="pause" kind="go" title="Save and exit" text="Stop here and return to the title screen." onClick={() => useGame.getState().endSession()} />
         </div>
         <ModeSwitch to="classic" />
@@ -368,17 +367,10 @@ export function CampaignOverlays() {
   </>;
 }
 
-const INTRODUCTION = [
-  ["Your architecture","Requests travel from Users through the Application to the Database. Select equipment in the office or its System evidence button to inspect the same component."],
-  ["Your evidence","Compare demand with capacity and unfinished work (backlog). Latency describes response time; service errors count failed completed requests. Deliberate rejections are shown separately."],
-  ["Your controls","Inspection is free. Run or Advance step to observe traffic changes, and Pause to think. Investments cost money and take time to activate. Watch what changes after a decision. P pauses and Esc closes a view."]
-] as const;
-
 /** The one dialog that currently needs the player, if any. */
 function CampaignDialog() {
-  const { game, view, openView, act, onboarding } = useGame();
+  const { game, view, openView, act } = useGame();
   const c = game.campaign!;
-  if (onboarding) return <CampaignIntroduction overview={INTRODUCTION} />;
   if(view==="scorecard"&&(c.scorecard||c.combinedStage?.finalReview))return <Modal title="Company scorecard" onClose={()=>openView("guidance")}><CampaignScorecard card={(c.scorecard??c.combinedStage!.finalReview)!} pendingReview={!c.scorecard}/></Modal>;
   if(pendingCombined(c)&&!["guidance","menu","history"].includes(view??"")){const d=c.combinedStage!,r=d.currentRound;return <Modal title={d.finalReview?"Final campaign review":"Growth outcome"} onClose={()=>openView("guidance")}>{d.finalReview?<><CampaignScorecard card={d.finalReview} pendingReview/><button className="btn btn-primary" onClick={()=>act({type:"complete_campaign"})}>Complete campaign</button></>:<><h3>What happened</h3><p>{r!.scenario.template}: registered users reached {r!.users.toLocaleString("en-US")}. Temporary pressure has ended.</p><h3>What the evidence showed</h3><p>All applications restored; five stable full-demand baseline steps; actual incident reports acknowledged.</p><h3>Trade-offs</h3><p>Rejected requests during this round: {c.cumulative.rejected-r!.rejectedBefore}; setup spending {dollars(c.investedCents-r!.setupBefore)}. Review actual actions and causal reports in History.</p><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_growth"})}>Continue company</button></>}</Modal>;}
   if (pendingReliability(c)) return <Modal title="Reliability outcome" icon={{ kind: "ok", name: "health" }}>
@@ -528,5 +520,5 @@ function ReliabilityControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
   </section>;
 }
 
-function ScalingRiskConsent(){const {act,onboarding}=useGame();const [confirm,setConfirm]=useState(false);return <section aria-label="Scaling growth risk"><p>Next wave: 1,400 req/s. Prepare 2,000 ops/s database headroom, or choose to take the risk.</p><button className="btn" disabled={onboarding} onClick={()=>setConfirm(true)}>Consider growth with current capacity</button>{confirm&&<><p>Accept growth risk? This waives only the database-headroom requirement. Existing timing, costs and service rules remain.</p><button className="btn" onClick={()=>{if(act({type:"accept_scaling_risk"}))setConfirm(false);}}>Accept growth risk</button><button className="btn" onClick={()=>setConfirm(false)}>Keep preparing</button></>}</section>;}
+function ScalingRiskConsent(){const {act}=useGame();const [confirm,setConfirm]=useState(false);return <section aria-label="Scaling growth risk"><p>Next wave: 1,400 req/s. Prepare 2,000 ops/s database headroom, or choose to take the risk.</p><button className="btn" onClick={()=>setConfirm(true)}>Consider growth with current capacity</button>{confirm&&<><p>Accept growth risk? This waives only the database-headroom requirement. Existing timing, costs and service rules remain.</p><button className="btn" onClick={()=>{if(act({type:"accept_scaling_risk"}))setConfirm(false);}}>Accept growth risk</button><button className="btn" onClick={()=>setConfirm(false)}>Keep preparing</button></>}</section>;}
 function CombinedControls({disabled}:{disabled:boolean}){const {game,act}=useGame(),c=game.campaign!,d=c.combinedStage!,r=d.currentRound;return <section aria-label="Grow the Company"><h3>Grow the Company</h3><p>Registered users: {d.users.toLocaleString("en-US")} / {d.finalUserTarget.toLocaleString("en-US")}. Growth outcomes acknowledged: {d.completedRounds.length} / 3.</p><p>{r?r.startedStep===null?"Growth wave announced. Prepare the architecture before pressure arrives.":`Current pressure: ${r.scenario.template}. Inspect actual workload and healthy routed capacity.`:"Between growth waves: operate full baseline demand and choose when to continue."}</p><p>Optional promotion: $500 setup · +400 req/s for 12 seconds.</p><details className="more"><summary>Promotion effect &amp; costs</summary><p>Activates next step; no registered-user award. Maximum additional gross revenue is $960 if every extra request succeeds. Existing operating costs still apply. Available between growth waves; cooldown 30 steps after it ends.</p></details><button className="btn" disabled={disabled||!canPromote(game)} onClick={()=>act({type:"run_promotion"})}>Run promotion · $500 · 1 step</button>{c.promotion&&<p>{c.promotion.activatedStep===null?"Promotion pending":c.step<c.promotion.endStep?"Promotion active":"Promotion ended"}; cooldown remaining {Math.max(0,c.promotion.cooldownUntil-c.step)} steps.</p>}</section>;}

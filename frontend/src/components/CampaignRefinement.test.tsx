@@ -1,4 +1,4 @@
-import { act as reactAct, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useGame } from "@/game/store";
 import { newGame, applyAction, type GameState } from "@/sim";
@@ -14,51 +14,10 @@ function renderCompany(game?: GameState) {
   if (game) useGame.setState({ game, ready: true, hasRun: true, started: true, onboarding: false });
   return render(<><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/></>);
 }
-function skip() { fireEvent.click(screen.getByRole("button", {name:"Skip introduction"})); }
-function move() { fireEvent.click(screen.getByRole("button", {name:"Next"})); }
 function perform(game:GameState, action:Parameters<typeof applyAction>[1]) { const r=applyAction(game,action); if(!r.ok) throw Error(r.message); return r.state; }
 
-it("interactive introduction inspects live component capacity without physical actions, money or trace changes", () => {
-  start(); const before=structuredClone(useGame.getState().game); renderCompany();
-  const intro=screen.getByRole("dialog",{name:"Company introduction"});
-  fireEvent.click(within(intro).getByRole("button",{name:"App Server"}));
-  expect(useGame.getState().selected).toBe("app"); expect(intro.textContent).toContain("capacity 1,000 req/s");
-  fireEvent.click(within(intro).getByRole("button",{name:"Database"}));
-  expect(useGame.getState().selected).toBe("db"); expect(intro.textContent).toContain("capacity 600 ops/s");
-  expect(useGame.getState().game).toEqual(before); expect(useGame.getState().running).toBe(false);
-});
-it("lets players compare actual request revenue and introduces ownership separately from deployment", () => {
-  start(); renderCompany(); move(); const intro=screen.getByRole("dialog",{name:"Company introduction"});
-  expect(intro.textContent).toContain("$0.20 earned per successful request");
-  fireEvent.click(within(intro).getByRole("button",{name:"Rejected request"}));
-  expect(intro.textContent).toContain("$0 earned"); expect(intro.textContent).toContain("still cost the same");
-  expect(intro.textContent).toContain("not spendable yet"); move();
-  fireEvent.click(within(intro).getByRole("button",{name:"Technology tree"}));
-  expect(intro.textContent).toContain("Owned does not mean deployed");
-});
-it("completion records existing onboarding metadata, stays paused and does not reappear after reload", () => {
-  start(); renderCompany(); move(); move(); fireEvent.click(screen.getByRole("button",{name:"Finish introduction"}));
-  expect(useGame.getState().meta.openingOnboarding.status).toBe("completed");
-  expect(screen.getByRole("region",{name:"Guided Mode chapters"}).textContent).toContain("Getting started");
-  expect(useGame.getState().game.campaign!.step).toBe(0); expect(useGame.getState().running).toBe(false);
-  cleanup(); useGame.setState(useGame.getInitialState(),true); start(); renderCompany();
-  expect(screen.queryByRole("dialog",{name:"Company introduction"})).toBeNull();
-});
-it("skip is durable and replay returns to the same company without changing its state", () => {
-  start(); renderCompany(); const before=structuredClone(useGame.getState().game); skip();
-  cleanup(); useGame.setState(useGame.getInitialState(),true); start(); renderCompany();
-  expect(screen.queryByRole("dialog",{name:"Company introduction"})).toBeNull();
-  reactAct(()=>useGame.getState().showOnboarding());
-  expect(screen.getByRole("dialog",{name:"Company introduction"})).toBeTruthy();
-  expect(useGame.getState().game).toEqual(before);
-});
-it("resumes the existing unfinished introduction prompt after reload", () => {
-  start(); renderCompany(); move(); cleanup(); useGame.setState(useGame.getInitialState(),true); start(); renderCompany();
-  expect(screen.getByRole("dialog",{name:"Company introduction"}).textContent).toContain("Know what earns money");
-  expect(useGame.getState().game.campaign!.step).toBe(0);
-});
 it("makes Run primary and keeps manual advancement behind optional controls", () => {
-  start(); renderCompany(); skip(); const run=screen.getByRole("button",{name:"Run"});
+  start(); renderCompany(); const run=screen.getByRole("button",{name:"Run"});
   expect(run.textContent).toContain("Run company"); expect(run.className).toContain("btn-primary");
   expect(screen.getByRole("button",{name:"Advance step",hidden:true}).closest("details")!.hasAttribute("open")).toBe(false);
   fireEvent.click(screen.getByText("More controls"));
@@ -66,7 +25,7 @@ it("makes Run primary and keeps manual advancement behind optional controls", ()
   fireEvent.click(step); expect(useGame.getState().game.campaign!.step).toBe(1);
 });
 it("system evidence records a real free inspection without advancing the clock", () => {
-  start(); renderCompany(); skip();
+  start(); renderCompany();
   expect(screen.queryByRole("button",{name:"Pause & inspect"})).toBeNull();
   expect(screen.queryByLabelText("Request dependencies")).toBeNull();
   const step=useGame.getState().game.campaign!.step;
@@ -78,7 +37,7 @@ it("system evidence records a real free inspection without advancing the clock",
   fireEvent.click(screen.getByRole("button",{name:"Close"})); expect(useGame.getState().running).toBe(false);
 });
 it("shows what the machine does, paid-now cash, delayed upkeep and routing limitation only when adding an App Server", () => {
-  start(); renderCompany(); skip();
+  start(); renderCompany();
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
   expect(card.textContent).not.toContain("$700 / 60s"); expect(screen.queryByText("Effect & costs")).toBeNull();
   fireEvent.click(screen.getByRole("button",{name:/Add server/}));
@@ -89,7 +48,7 @@ it("shows what the machine does, paid-now cash, delayed upkeep and routing limit
   expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
 });
 it("asks for confirmation before an action is dispatched, and Cancel or Escape leaves the company unchanged", () => {
-  start(); renderCompany(); skip();
+  start(); renderCompany();
   const add=screen.getByRole("button",{name:/Add server/}), before=useGame.getState().game;
   fireEvent.click(add);
   const confirm=screen.getByRole("region",{name:"Confirm Add server"});
@@ -107,7 +66,7 @@ it("asks for confirmation before an action is dispatched, and Cancel or Escape l
   expect(screen.queryByRole("button",{name:"Confirm"})).toBeNull();
 });
 it("visibly explains cash and pending-infrastructure reasons without altering accepted action rules", () => {
-  start(); renderCompany(); skip(); fireEvent.click(screen.getByRole("button",{name:/Upgrade database/})); fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
+  start(); renderCompany(); fireEvent.click(screen.getByRole("button",{name:/Upgrade database/})); fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
   expect(card.textContent).toContain("An infrastructure deployment is pending");
   cleanup(); const game=structuredClone(useGame.getState().game); game.campaign!.cashCents=100000; renderCompany(game);
@@ -137,13 +96,13 @@ it("postmortem keeps all actual causes and observations reachable while leading 
 it.each([
   [/Add server/, ["app"]], [/Upgrade database/, ["db"]], [/Limit to 500/, ["gateway"]],
 ] as const)("pointing at %s lights up the machine it changes, and leaving clears it", (name, ids) => {
-  start(); renderCompany(); skip();
+  start(); renderCompany();
   const card=screen.getByRole("button",{name}).closest(".campaign-action-card")!;
   fireEvent.pointerEnter(card); expect(useGame.getState().affected).toEqual(ids);
   fireEvent.pointerLeave(card); expect(useGame.getState().affected).toEqual([]);
 });
 it("keeps the affected machine lit while its confirmation is open, and clears it after Confirm", () => {
-  start(); renderCompany(); skip();
+  start(); renderCompany();
   const button=screen.getByRole("button",{name:/Upgrade database/}), card=button.closest(".campaign-action-card")!;
   fireEvent.pointerEnter(card); fireEvent.click(button); fireEvent.pointerLeave(card);
   expect(useGame.getState().affected).toEqual(["db"]);
@@ -151,7 +110,7 @@ it("keeps the affected machine lit while its confirmation is open, and clears it
   expect(useGame.getState().affected).toEqual([]);
 });
 it("opening an action's confirmation from the office floor rides to the floor of the machine it changes", () => {
-  start(); renderCompany(); skip(); useGame.setState({floor:"office"});
+  start(); renderCompany(); useGame.setState({floor:"office"});
   fireEvent.click(screen.getByRole("button",{name:/Upgrade database/}));
   expect(useGame.getState().floor).toBe("servers");
   expect(screen.getByRole("region",{name:"Confirm Upgrade database"}).textContent).toContain("The database stores");

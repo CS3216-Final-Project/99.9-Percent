@@ -12,12 +12,7 @@ import { pendingStop } from "@/sim/step";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { Act, Row } from "./ui";
 import { EDGE, openRoomArea } from "./roomArea";
-
-// One action confirmation is open at a time across the panel, keyed by the action label.
-let confirming: string | null = null;
-const listeners = new Set<() => void>();
-function setConfirming(label: string | null) { confirming = label; listeners.forEach(l => l()); }
-function subscribe(l: () => void) { listeners.add(l); return () => { listeners.delete(l); }; }
+import { confirmingAction, setConfirming, subscribeConfirming } from "./actionConfirmation";
 
 /** What each machine an action can change does, shown above the action's effect and costs. */
 const MACHINES: Partial<Record<EquipmentId, { name: string; does: string }>> = {
@@ -31,11 +26,11 @@ const MACHINES: Partial<Record<EquipmentId, { name: string; does: string }>> = {
 
 /** Asks before dispatching; the parent's disabled predicate and dispatcher stay authoritative. */
 export function CampaignAction(props: ComponentProps<typeof Act>) {
-  const { game, onboarding, selectedAppId } = useGame();
+  const { game, selectedAppId } = useGame();
   const c = game.campaign!, id = useId(), card = useRef<HTMLDivElement>(null);
-  const open = useSyncExternalStore(subscribe, () => confirming === props.label);
+  const open = useSyncExternalStore(subscribeConfirming, () => confirmingAction() === props.label);
   const [pointing, setPointing] = useState(false);
-  useEffect(() => () => { if (confirming === props.label) setConfirming(null); }, [props.label]);
+  useEffect(() => () => { if (confirmingAction() === props.label) setConfirming(null); }, [props.label]);
   const app = c.apps.find(a => a.id === selectedAppId) ?? c.apps[0];
   const busy = c.pending.some(a => !["limit", "unlimit", "routing"].includes(a.type));
   const label = props.label;
@@ -57,8 +52,7 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
   const currentDbUpkeep = c.dbCapacity === Q.dbCapacity ? Q.dbWeeklyCents : c.dbCapacity === Q.upgradedDbCapacity ? Q.upgradedDbWeeklyCents : c.dbCapacity === P.dbCapacity ? P.dbWeeklyCents : D.dbWeeklyCents;
   const increase = upkeep === null ? null : isScale ? upkeep - Q.appWeeklyCents : label === "Upgrade database" ? upkeep - currentDbUpkeep : upkeep;
   let reason = "See this action's requirements for details.";
-  if (onboarding) reason = "Finish or skip the introduction first.";
-  else if (game.phase === "ended") reason = "This company has ended.";
+  if (game.phase === "ended") reason = "This company has ended.";
   else if (game.phase === "review" || pendingStop(c) !== null || c.openingMilestone && !c.openingMilestone.acknowledged) reason = "Acknowledge the pending review or milestone first.";
   else if (props.price && c.cashCents <= props.price * 100) reason = "Not enough available cash. Pending revenue cannot fund purchases.";
   else if (isAdd && c.apps.length >= (c.spikeStage ? T.maximum : Q.maxApps)) reason = "All instance slots are occupied.";

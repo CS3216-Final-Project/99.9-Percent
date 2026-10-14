@@ -16,6 +16,7 @@ const PROPERTY_ALLOWLIST = new Set([
   "event_version", "build_id", "content_version", "mode", "run_id", "gameplay_session_id",
   "device_category", "chapter_id", "progress_step", "session_active_ms", "run_active_ms",
   "active_delta_ms", "eligible_started_run", "entry_type", "replay", "reason", "outcome",
+  "tutorial_track", "tutorial_step", "tutorial_from",
 ]);
 
 /** Only deliberate gameplay events/properties leave the browser; no URLs, account data or raw saves. */

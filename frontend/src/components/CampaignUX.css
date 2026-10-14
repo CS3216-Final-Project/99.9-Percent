@@ -36,22 +36,11 @@
 .campaign-clock .campaign-clock-state { font-size: 12px; font-weight: 700; }
 .campaign-clock.is-paused { border-top: 3px solid var(--focus); }
 .campaign-clock .campaign-step { font-size: 12px; opacity: .85; }
-.campaign-introduction { max-width: 620px; }
-.campaign-introduction .campaign-intro-meta { font-size: 12px; font-weight: 700; }
-.campaign-introduction h3 { margin: 12px 0 8px; }
-.campaign-introduction .campaign-intro-flow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 20px 0; flex-wrap: wrap; }
-.campaign-introduction .campaign-intro-flow > span:first-child { display: grid; justify-items: center; gap: 4px; }
-.campaign-introduction .campaign-intro-example { border-left: 4px solid var(--focus); background: var(--paper-2); padding: 12px; margin: 12px 0; min-height: 90px; }
-.campaign-introduction .campaign-intro-example p { margin: 6px 0; }
-.campaign-introduction .btn[aria-pressed="true"] { outline: 3px solid var(--focus); outline-offset: 2px; }
-.campaign-introduction .campaign-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .campaign-tech-intro { font-size: 13px; line-height: 1.5; max-width: 75ch; }
 @media (max-width: 600px) {
   .campaign-clock .campaign-play span { font-size: 12px; }
   .campaign-clock .campaign-clock-state { display: none; }
   .campaign-clock .campaign-step { padding: 8px; }
-  .campaign-introduction .campaign-intro-flow { gap: 6px; }
-  .campaign-introduction .btn { min-height: 44px; }
 }
 
 .campaign-clock .campaign-advanced { position: relative; font-size: 12px; }
