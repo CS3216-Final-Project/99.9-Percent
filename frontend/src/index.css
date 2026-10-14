@@ -805,6 +805,70 @@ button:disabled {
   background-size: 100% 300%;
 }
 
+/* Walk mode: the Walk button among the camera's, lit while walking, and what the avatar can reach, over the room. */
+.camera-buttons .walk-button {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 0.9rem;
+}
+
+.camera-buttons .walk-button.is-on {
+  background: var(--go);
+}
+
+.stage-canvas:focus {
+  outline: none;
+}
+
+.walk-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 64px;
+  z-index: 26;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--press);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.walk-prompt kbd {
+  padding: 1px 6px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 3px;
+  font-family: var(--font-num);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* On a phone the floor menu and camera buttons fill the bottom corner, so what is within reach shows at the top. */
+@media (max-width: 900px) {
+  .walk-prompt {
+    top: 10px;
+    bottom: auto;
+  }
+}
+
+/* A touch screen has no Space key: the prompt is tapped. */
+@media (hover: none) {
+  .walk-prompt kbd {
+    display: none;
+  }
+}
+
 /* Read by screen readers, not drawn. */
 .visually-hidden {
   position: absolute;

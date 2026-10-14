@@ -15,6 +15,7 @@ import { daylightNow } from "./scene/dayClock";
 import { nextGap, viewFocus, ZONE_SOUNDS, zoneLevel, type ZoneSound } from "./scene/zoneSounds";
 import { DOORS, FLOOR_Y, RIDE_SECONDS } from "./scene/levels";
 import { onRide, ride } from "./scene/ride";
+import { onSceneSound } from "./scene/sceneSounds";
 import { buildModel } from "./scene/sceneModel";
 import { SoundButton } from "./SoundButton";
 import { tipProps } from "./tips";
@@ -313,9 +314,14 @@ function useSoundEffects(): void {
     });
     const stopCues = watchCues(useGame.subscribe, (cue) => sfx.play(cue));
     // The elevator: a click and the car's hum as it sets off, then the chime and the doors as it arrives.
+    // Footsteps and doors, while the audio is already playing; a new avatar's pop answers the player's own choice.
+    const stopScene = onSceneSound((cue, level) => sfx.playScene(cue, level));
+    const stopAvatar = useGame.subscribe((s, prev) => {
+      if (s.avatar !== prev.avatar) sfx.playScene("pop", 0.9, true);
+    });
     const stopRide = onRide((event) => {
       const up = FLOOR_Y[ride.to] > FLOOR_Y[ride.from];
-      if (event === "depart") sfx.liftDepart(up);
+      if (event === "depart") sfx.liftDepart(up, RIDE_SECONDS / 2);
       else sfx.liftArrive(up, { close: DOORS.move + DOORS.hold, shut: 2 * DOORS.move + DOORS.hold });
     });
     // The zones' own sounds, near where the camera looks, while a run is on screen and nothing covers the room.
@@ -343,6 +349,8 @@ function useSoundEffects(): void {
     }, ZONE_TICK_MS);
     return () => {
       window.clearInterval(zones);
+      stopScene();
+      stopAvatar();
       stopRide();
       stopCues();
       stopVolume();
@@ -391,7 +399,9 @@ export default function Game() {
       const s = useGame.getState();
       if (!s.started || target?.closest('[role="dialog"]')) return;
       if (e.key === "Escape") {
+        // In a fixed order: a view sheet, then walk mode, then the selection. Dialogs close themselves first.
         if (s.view) s.openView(null);
+        else if (s.walking) s.setWalking(false);
         else if (s.selected && s.game.phase !== "incident") s.select(null);
       } else if (e.key === "p" || e.key === "P") {
         if (s.game.phase === "incident" || s.game.phase === "management") s.setRunning(!s.running);

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { AvatarButton } from "./AvatarPicker";
 import { BALANCE, type GameState } from "@/sim";
 import { num } from "@/game/format";
 import { campaignChapters } from "@/game/campaignChapters";
@@ -113,7 +114,10 @@ export function HomeScreen() {
     <div className="home-card">
       <header className="home-head">
         <span className="title-kicker"><Icon name="server" size={16} />A system design tycoon</span>
-        <AccountButton />
+        <div className="home-chips">
+          <AvatarButton />
+          <AccountButton />
+        </div>
         <h1>99.99%</h1>
         <p className="title-tag">Grow a startup. Keep it online.</p>
       </header>

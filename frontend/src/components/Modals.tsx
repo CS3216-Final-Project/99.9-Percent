@@ -8,6 +8,7 @@ import { useGame } from "@/game/store";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
 import { GraphicsSettings } from "./GraphicsSettings";
+import { AvatarSettings } from "./AvatarPicker";
 import { MenuRun, MenuTile } from "./MenuRun";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { ModeSwitch } from "./ModeSwitch";
@@ -322,6 +323,8 @@ export function Menu() {
         {tab === "sound" && <SoundSettings />}
 
         {tab === "graphics" && <GraphicsSettings />}
+
+        {tab === "avatar" && <AvatarSettings />}
 
         {tab === "saves" && (
           <div className="menu-columns">

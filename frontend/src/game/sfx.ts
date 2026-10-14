@@ -206,12 +206,27 @@ export const ZONE_CUES = Object.keys(ZONE_VOICES) as ZoneCue[];
 /** The car's hum as it rides: a low tone sliding up or down under a soft rush of air, for about the length of a ride. */
 function hum(ctx: Ctx, out: AudioNode, at: number, hiss: AudioBuffer, rising: boolean): void {
   const length = 1.25;
-  const [from, to] = rising ? [62, 98] : [98, 62];
-  const o = osc(ctx, "sawtooth", from, at, at + length);
-  o.frequency.setValueAtTime(from, at);
-  o.frequency.linearRampToValueAtTime(to, at + length);
-  o.connect(filter(ctx, "lowpass", 240)).connect(envelope(ctx, at, length, 0.11, 0.25, 0.35)).connect(out);
-  noise(ctx, at, at + length, hiss).connect(filter(ctx, "bandpass", rising ? 700 : 520)).connect(envelope(ctx, at, length, 0.05, 0.3, 0.4)).connect(out);
+  // The motor's whir and its octave, in the range a laptop's speakers play, sliding with the car's speed.
+  const [from, to] = rising ? [170, 250] : [250, 170];
+  for (const [octave, peak] of [
+    [1, 0.08],
+    [2, 0.03],
+  ] as const) {
+    const o = osc(ctx, "triangle", from * octave, at, at + length);
+    o.frequency.setValueAtTime(from * octave, at);
+    o.frequency.linearRampToValueAtTime(to * octave, at + length);
+    o.connect(envelope(ctx, at, length, peak, 0.2, 0.35)).connect(out);
+  }
+  // Air rushing past the car, its pitch sweeping the way it travels.
+  const [low, high] = rising ? [500, 1400] : [1400, 500];
+  const air = filter(ctx, "bandpass", low);
+  air.frequency.setValueAtTime(low, at);
+  air.frequency.exponentialRampToValueAtTime(high, at + length);
+  noise(ctx, at, at + length, hiss).connect(air).connect(envelope(ctx, at, length, 0.2, 0.3, 0.45)).connect(out);
+  // The low rumble of the shaft, for speakers that can play it.
+  const rumble = osc(ctx, "sawtooth", rising ? 62 : 98, at, at + length);
+  rumble.frequency.linearRampToValueAtTime(rising ? 98 : 62, at + length);
+  rumble.connect(filter(ctx, "lowpass", 240)).connect(envelope(ctx, at, length, 0.06, 0.25, 0.35)).connect(out);
 }
 
 /**
@@ -230,6 +245,11 @@ const LIFT_VOICES = {
     bell(ctx, out, at, 76, 0.15, 1.0);
     bell(ctx, out, at + 0.24, 72, 0.15, 1.3);
   },
+  /** The indicator ticking over as the car passes between the floors. */
+  tick: (ctx, out, at, hiss) => {
+    osc(ctx, "square", 1760, at, at + 0.04).connect(filter(ctx, "lowpass", 3200)).connect(hit(ctx, at, 0.07, 0.035)).connect(out);
+    burst(ctx, out, at, hiss, 3800, 0.02, hit(ctx, at, 0.12, 0.02));
+  },
   doors: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 900, 0.45, envelope(ctx, at, 0.45, 0.3, 0.12, 0.25)),
   thud: (ctx, out, at, hiss) => {
     osc(ctx, "triangle", 68, at, at + 0.2).connect(hit(ctx, at, 0.22, 0.16)).connect(out);
@@ -239,6 +259,33 @@ const LIFT_VOICES = {
 
 export type LiftCue = keyof typeof LIFT_VOICES;
 export const LIFT_CUES = Object.keys(LIFT_VOICES) as LiftCue[];
+
+/**
+ * Sounds of walking the building: footsteps on carpet, on tile or concrete and on the server hall's raised floor;
+ * the hiss of a glass door sliding; and the pop of a new avatar arriving.
+ */
+const SCENE_VOICES = {
+  stepSoft: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 320, 0.07, hit(ctx, at, 0.22, 0.06)),
+  stepHard: (ctx, out, at, hiss) => {
+    burst(ctx, out, at, hiss, 1900, 0.03, hit(ctx, at, 0.18, 0.025));
+    burst(ctx, out, at, hiss, 380, 0.05, hit(ctx, at, 0.14, 0.045));
+  },
+  stepHollow: (ctx, out, at, hiss) => {
+    osc(ctx, "triangle", 150, at, at + 0.12).connect(hit(ctx, at, 0.2, 0.09)).connect(out);
+    burst(ctx, out, at, hiss, 650, 0.05, hit(ctx, at, 0.12, 0.05));
+  },
+  hiss: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 2600, 0.38, envelope(ctx, at, 0.38, 0.14, 0.03, 0.3)),
+  pop: (ctx, out, at) => {
+    const o = osc(ctx, "sine", 880, at, at + 0.16);
+    o.frequency.setValueAtTime(880, at);
+    o.frequency.exponentialRampToValueAtTime(420, at + 0.12);
+    o.connect(hit(ctx, at, 0.3, 0.14)).connect(out);
+    osc(ctx, "triangle", 1320, at + 0.05, at + 0.14).connect(hit(ctx, at + 0.05, 0.08, 0.08)).connect(out);
+  },
+} satisfies Record<string, Voice>;
+
+export type SceneCue = keyof typeof SCENE_VOICES;
+export const SCENE_CUES = Object.keys(SCENE_VOICES) as SceneCue[];
 
 /** When the elevator's doors move after the car arrives, in seconds: they open at once, start closing at `close` and meet at `shut`. */
 export interface LiftDoors {
@@ -288,10 +335,18 @@ const SLEEP_MS = 10_000;
 const SLIDE = 0.05;
 
 export interface Sfx {
-  /** The elevator sets off, up or down: the call button's click and the car's hum. Doors still to close from the last ride fall silent. */
-  liftDepart(up: boolean): void;
+  /**
+   * The elevator sets off, up or down: the call button's click, the car's whir and rush of air, and the indicator's
+   * tick `tickIn` seconds later as it passes between the floors. Doors still to close from the last ride fall silent.
+   */
+  liftDepart(up: boolean, tickIn: number): void;
   /** The car arrives: its hum stops, the chime sounds and the doors open, wait and close. */
   liftArrive(up: boolean, doors: LiftDoors): void;
+  /**
+   * Play a sound of walking the building at `level` (0 to 1) of the effects volume. With `wake`, as for a press of
+   * the player's own, it may start the audio; otherwise, like the zones' sounds, it plays only while the audio runs.
+   */
+  playScene(cue: SceneCue, level: number, wake?: boolean): void;
   /**
    * Play a zone's sound at `level` (0 to 1) of the effects volume, unless the sound is off, the audio is asleep or
    * the same sound has only just played. Zone sounds never wake the audio: they are only scenery.
@@ -305,7 +360,7 @@ export interface Sfx {
   dispose(): void;
 }
 
-const SILENT: Sfx = { play() {}, playZone() {}, liftDepart() {}, liftArrive() {}, setVolume() {}, dispose() {} };
+const SILENT: Sfx = { play() {}, playZone() {}, liftDepart() {}, liftArrive() {}, playScene() {}, setVolume() {}, dispose() {} };
 
 /**
  * `wanted` says whether the player has effects on, so a click can start the
@@ -404,7 +459,7 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
   };
 
   return {
-    liftDepart(up) {
+    liftDepart(up, tickIn) {
       whenAwake((c) => {
         if (!bus || !hiss) return;
         if (ride) fade(ride, c, 0.08);
@@ -413,7 +468,20 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
         const at = c.currentTime + 0.005;
         LIFT_VOICES.call(c, ride, at, hiss);
         LIFT_VOICES[up ? "humUp" : "humDown"](c, humming, at + 0.05, hiss);
+        // On the hum's lane, so arriving early silences a tick still to come.
+        LIFT_VOICES.tick(c, humming, at + tickIn, hiss);
       });
+    },
+    playScene(cue, level, wake = false) {
+      if (level <= 0) return;
+      const voice = (c: AudioContext) => {
+        if (!bus || !hiss) return;
+        const g = lane(c, bus);
+        g.gain.value = Math.min(1, level);
+        SCENE_VOICES[cue](c, g, c.currentTime + 0.005, hiss);
+      };
+      if (wake) whenAwake(voice);
+      else if (!disposed && percent > 0 && ctx && ctx.state === "running") voice(ctx);
     },
     liftArrive(up, doors) {
       whenAwake((c) => {
@@ -487,9 +555,10 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
 }
 
 /** Render one cue offline at full volume, for checking levels in a browser. */
-export async function renderCue(cue: Cue | ZoneCue | LiftCue, rate = 44100): Promise<AudioBuffer> {
+export async function renderCue(cue: Cue | ZoneCue | LiftCue | SceneCue, rate = 44100): Promise<AudioBuffer> {
   const ctx = new OfflineAudioContext(1, Math.round(rate * 2), rate);
-  const voice: Voice = cue in ZONE_VOICES ? ZONE_VOICES[cue as ZoneCue] : cue in LIFT_VOICES ? LIFT_VOICES[cue as LiftCue] : VOICES[cue as Cue];
+  const voice: Voice =
+    cue in ZONE_VOICES ? ZONE_VOICES[cue as ZoneCue] : cue in LIFT_VOICES ? LIFT_VOICES[cue as LiftCue] : cue in SCENE_VOICES ? SCENE_VOICES[cue as SceneCue] : VOICES[cue as Cue];
   voice(ctx, ctx.destination, 0.01, hissBuffer(ctx));
   return ctx.startRendering();
 }

@@ -9,6 +9,8 @@ import { motionFor, SPECIES, type Activity, type Species } from "./cast";
 import { useDetail, type Detail } from "./detail";
 import { loadCrew, type Crew } from "./creatureCatalog";
 import { poseAt, type Plan } from "./routes";
+import { avatar } from "./walk";
+import { useGame } from "@/game/store";
 
 /*
  * The office crew: animated monsters (see cast.ts). Every creature is a copy of
@@ -296,17 +298,36 @@ export function Walker({ from, to, speed, species, phase = 0 }: { from: [number,
   );
 }
 
+/** How near ahead the player's avatar must be for a walker to wait for it to pass. */
+const MAKE_WAY = 1.0;
+
+/** Whether the player's avatar stands in the way of a walker at (x, z) facing `yaw`, on the office floor. */
+function avatarAhead(x: number, z: number, yaw: number): boolean {
+  if (!useGame.getState().walking || avatar.floor !== "office") return false;
+  const dx = avatar.x - x;
+  const dz = avatar.z - z;
+  // Creatures face -z at a yaw of 0.
+  return Math.hypot(dx, dz) < MAKE_WAY && dx * -Math.sin(yaw) + dz * -Math.cos(yaw) > 0;
+}
+
 /**
  * A creature on a wandering loop (see routes.ts): walking the corridors,
  * turning at corners and pausing at whatever it visits. Its place comes from
- * the clock alone, so a remount carries on where it was.
+ * the clock, so a remount carries on where it was; in walk mode it also waits
+ * for the player's avatar to pass rather than walk through it, falling behind
+ * the clock by as long as it waited.
  */
 export function Wanderer({ plan, species, offset = 0 }: { plan: Plan; species: Species; offset?: number }) {
   const g = useRef<THREE.Group>(null);
   const [activity, setActivity] = useState<Activity>(() => poseAt(plan, offset).activity);
   const shown = useRef(activity);
-  useFrame(({ clock }) => {
-    const pose = poseAt(plan, clock.elapsedTime + offset);
+  const lag = useRef(0);
+  useFrame(({ clock }, dt) => {
+    let pose = poseAt(plan, clock.elapsedTime + offset - lag.current);
+    if (pose.activity === "walk" && avatarAhead(pose.x, pose.z, pose.yaw)) {
+      lag.current += Math.min(dt, 0.1);
+      pose = { ...poseAt(plan, clock.elapsedTime + offset - lag.current), activity: "idle" };
+    }
     if (g.current) {
       g.current.position.set(pose.x, 0, pose.z);
       g.current.rotation.y = pose.yaw;
