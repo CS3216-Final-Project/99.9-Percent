@@ -46,7 +46,7 @@ function AnalyticsConsentPanel() {
   if (consent !== null) return null;
   return <section className="consent-panel" aria-labelledby="analytics-consent-heading">
     <h2 id="analytics-consent-heading">Help improve <span className="consent-logo">99.99%</span></h2>
-    <p>We track anonymous gameplay events, like which chapters you finish and how long they take, to help make the game better. We never send account details, URLs, or saved games. If you would rather not share, press Opt out.</p>
+    <p>We track anonymous gameplay events, like which chapters you finish and how long they take, to help make the game better. We never send account details, URLs, or saved games. Nothing is sent while your browser's Do Not Track or Global Privacy Control setting is on. If you would rather not share, press Opt out.</p>
     <div className="consent-actions">
       <button type="button" className="btn btn-small btn-primary" onClick={() => saveAnalyticsConsent("accepted")}><Icon name="check" />OK</button>
       <button type="button" className="btn btn-small btn-danger" onClick={() => saveAnalyticsConsent("declined")}>Opt out</button>

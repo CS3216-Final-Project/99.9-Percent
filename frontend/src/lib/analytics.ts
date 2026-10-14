@@ -163,19 +163,29 @@ export function subscribeAnalyticsConsent(onChange: () => void): () => void {
   };
 }
 
+/** Do Not Track or Global Privacy Control, read exactly as PostHog's `respect_dnt` reads them. */
+export function browserAsksNotToTrack(): boolean {
+  const nav = navigator as Navigator & { msDoNotTrack?: unknown; globalPrivacyControl?: unknown };
+  const signals = [nav.doNotTrack, nav.msDoNotTrack, (window as Window & { doNotTrack?: unknown }).doNotTrack, nav.globalPrivacyControl];
+  return signals.some(value => [true, "true", 1, "1", "yes"].includes(value as never));
+}
+
 /** Removes what analytics kept in this browser: the run ledger and PostHog's anonymous ids. */
 function forgetAnalyticsData() {
   try {
     for (const key of Object.keys(localStorage)) {
-      if (key === ANALYTICS_STORAGE_KEY || key.startsWith("ph_")) localStorage.removeItem(key);
+      if (key === ANALYTICS_STORAGE_KEY || key.startsWith("ph_")) {
+        localStorage.removeItem(key);
+      }
     }
   } catch { /* Unreadable storage holds nothing to forget. */ }
 }
 
 /**
  * Starts product analytics unless the player has opted out: an undecided or
- * accepted choice runs it, while a decline means no SDK load, observer, timer
- * or event, and clears what analytics stored. A later decline, in any tab,
+ * accepted choice runs it, while a decline, or a browser asking not to track,
+ * means no SDK load, observer, timer or event, and clears what analytics stored.
+ * The browser setting overrides the stored choice without changing it. A later decline, in any tab,
  * stops everything immediately and silently; a renewed acceptance starts it
  * once again. The returned cleanup stops everything it started.
  */
@@ -183,7 +193,7 @@ export function startProductAnalyticsUnlessOptedOut(store: typeof useGame, confi
   let stop: ((optedOut?: boolean) => void) | null = null;
   const apply = () => {
     syncPosthogConsent();
-    if (loadAnalyticsConsent() !== "declined") {
+    if (!browserAsksNotToTrack() && loadAnalyticsConsent() !== "declined") {
       stop ??= startProductAnalytics(store, config);
       return;
     }

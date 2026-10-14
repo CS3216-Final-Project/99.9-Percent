@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PostHogConfig } from "posthog-js/dist/module.no-external";
-import { ANALYTICS_CONSENT_KEY, configuredAnalytics, createAnalyticsSink, loadAnalyticsConsent, POSTHOG_OPTIONS, saveAnalyticsConsent, startProductAnalyticsUnlessOptedOut, startProductAnalytics, type AnalyticsConfig } from "./analytics";
+import { ANALYTICS_CONSENT_KEY, browserAsksNotToTrack, configuredAnalytics, createAnalyticsSink, loadAnalyticsConsent, POSTHOG_OPTIONS, saveAnalyticsConsent, startProductAnalyticsUnlessOptedOut, startProductAnalytics, type AnalyticsConfig } from "./analytics";
 import { useGame } from "@/game/store";
 
 const config: AnalyticsConfig = { enabled: true, token: "phc_test_public_token", host: "https://us.i.posthog.com", buildId: "test" };
@@ -91,6 +91,49 @@ it("installs no observers, timers or storage writes when unconfigured", () => {
   stop();
   expect(subscribe).not.toHaveBeenCalled();
   expect(listener).not.toHaveBeenCalled();
+});
+
+// Runs before any test loads the real SDK, while the module holds no PostHog instance.
+describe("a browser that asks not to track", () => {
+  const signal = (target: object, name: string, value: unknown) => Object.defineProperty(target, name, { value, configurable: true });
+  const clear = () => {
+    for (const name of ["doNotTrack", "msDoNotTrack", "globalPrivacyControl"]) Reflect.deleteProperty(navigator, name);
+    Reflect.deleteProperty(window, "doNotTrack");
+  };
+  afterEach(() => { clear(); localStorage.clear(); });
+
+  it("is read from every source with PostHog's values", () => {
+    expect(browserAsksNotToTrack()).toBe(false);
+    for (const [target, name] of [[navigator, "doNotTrack"], [navigator, "msDoNotTrack"], [window, "doNotTrack"], [navigator, "globalPrivacyControl"]] as const) {
+      for (const value of [true, "true", 1, "1", "yes"]) {
+        signal(target, name, value);
+        expect(browserAsksNotToTrack()).toBe(true);
+      }
+      for (const value of [false, "0", "no", "unspecified", null]) {
+        signal(target, name, value);
+        expect(browserAsksNotToTrack()).toBe(false);
+      }
+      clear();
+    }
+  });
+
+  it("overrides an acceptance from any tab and clears leftovers without changing the stored choice", () => {
+    saveAnalyticsConsent("accepted");
+    for (const key of ["nn.product-analytics.v1", "ph_phc_test_public_token_posthog", "__ph_opt_in_out_phc_test_public_token"]) localStorage.setItem(key, "1");
+    signal(navigator, "globalPrivacyControl", true);
+    const subscribe = vi.spyOn(useGame, "subscribe");
+    const stop = startProductAnalyticsUnlessOptedOut(useGame, config);
+    try {
+      saveAnalyticsConsent("accepted");
+      window.dispatchEvent(new StorageEvent("storage", { key: ANALYTICS_CONSENT_KEY }));
+      expect(subscribe).not.toHaveBeenCalled();
+      // The opt-out flag holds no id, and a live SDK in another tab still reads it.
+      expect(Object.keys(localStorage).sort()).toEqual(["__ph_opt_in_out_phc_test_public_token", ANALYTICS_CONSENT_KEY]);
+      expect(loadAnalyticsConsent()).toBe("accepted");
+    } finally {
+      stop();
+    }
+  });
 });
 
 describe("analytics consent", () => {

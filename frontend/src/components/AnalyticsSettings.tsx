@@ -32,7 +32,7 @@ export function AnalyticsSettings() {
       <p className="menu-note" role="status">
         {optedOut
           ? "You have opted out. No gameplay events are sent from this browser."
-          : "We track anonymous gameplay events, like which chapters you finish and how long they take, to help make the game better. We never send account details, URLs, or saved games."}
+          : "We track anonymous gameplay events, like which chapters you finish and how long they take, to help make the game better. We never send account details, URLs, or saved games. Nothing is sent while your browser's Do Not Track or Global Privacy Control setting is on."}
       </p>
     </section>
   );
