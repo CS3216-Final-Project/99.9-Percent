@@ -27,7 +27,7 @@ it("counts stable spike observations and waits for an explicit acknowledgement",
  renderAct(()=>useGame.setState({game:tick(g,4)}));
  expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(false);
  fireEvent.click(within(screen.getByRole("dialog",{name:"Spike response handled"})).getByRole("button",{name:/Continue operating/}));
- expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(true);expect(guidance().textContent).toContain("available through Continue to reliability");
+ expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(true);expect(guidance().textContent).toContain("available through Next in the chapter bar");
 });
 it("keeps a pending postmortem in front of the guidance",()=>{
  show(recovered());

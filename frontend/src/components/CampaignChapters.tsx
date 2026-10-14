@@ -27,7 +27,7 @@ export function CampaignChapters() {
         </li>)}
       </ol>
       <div className="chapter-actions">
-        {advance && <button type="button" className="btn btn-primary chapter-advance" disabled={!advance.ready} onClick={() => useGame.getState().act(advance.action)}>{advance.label}<Icon name="next" /></button>}
+        {advance && <button type="button" className="btn btn-primary chapter-advance" disabled={!advance.ready} aria-label={`Next: ${advance.label}`} title={advance.label} onClick={() => useGame.getState().act(advance.action)}>Next<Icon name="next" /></button>}
         <button type="button" className="btn" aria-haspopup="dialog" onClick={() => {
           useGame.getState().setRunning(false);
           setOpen(true);
@@ -42,7 +42,7 @@ export function CampaignChapters() {
           <div><h3>{chapter.name}</h3><span className="chapter-status">{chapter.status}{chapter.current && chapter.completed ? " · You are here" : ""}</span><p>{chapter.description}</p></div>
         </li>)}
       </ol>
-      <p className="muted">Complete each chapter’s requirements and choose Continue when it becomes available. Time is paused while you look around.</p>
+      <p className="muted">Complete each chapter’s requirements and choose Next when it becomes available. Time is paused while you look around.</p>
       <div className="modal-foot">
         <span />
         <button className="btn btn-primary" onClick={() => setOpen(false)}>Back to company</button>

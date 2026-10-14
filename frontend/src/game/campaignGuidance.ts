@@ -48,7 +48,7 @@ export function campaignGuidance(g: GameState) {
   add("healthy","Healthy latency and service errors with completed requests",qualifiesForRecovery(c.snapshot));
   add("observations",`Stable baseline observations: ${d.baselineStableSteps} / 5`,d.completedStep!==null);
   add("recognition","Spike response acknowledged",d.acknowledged);
-  notice=canEnterReliability(g)?"Stay Online is available through Continue to reliability.":"Stay Online requires acknowledged spike completion, stable baseline management and empty queues.";
+  notice=canEnterReliability(g)?"Stay Online is available through Next in the chapter bar.":"Stay Online requires acknowledged spike completion, stable baseline management and empty queues.";
   optional="Autoscaling is optional. Manual capacity, admission relief and hybrid responses remain valid.";
   if(c.step<d.deadlines[3])waiting="Waiting for both announced traffic pulses to end.";
   else if(d.completedStep===null&&!c.incident&&queuesEmpty&&reportsAcknowledged&&g.phase==="management"&&qualifiesForRecovery(c.snapshot))waiting="Observe new stable baseline steps with Run or Advance step. Pausing adds no observations.";
