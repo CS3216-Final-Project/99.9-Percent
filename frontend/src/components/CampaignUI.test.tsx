@@ -41,3 +41,11 @@ it("labels the last completed profile separately from an immediate contrast",()=
  expect(data.textContent).toContain(`Workload evidence · step ${g.campaign!.step} · read-heavy`);
  expect(data.textContent).toContain("Reads 80% / writes 20%");
 });
+it("offers each routing choice once and marks the one in use",()=>{
+ show(dataCompany("read-heavy",false));const route=screen.getByRole("group",{name:/Send traffic to/});
+ expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All apps","App 1 only","App 2 only"]);
+ expect(within(route).getByRole("button",{name:"All apps"}).getAttribute("aria-pressed")).toBe("true");
+ expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
+ fireEvent.click(within(route).getByRole("button",{name:"App 2 only"}));
+ expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-2"]});
+});
