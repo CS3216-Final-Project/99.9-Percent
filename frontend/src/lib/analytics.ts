@@ -34,6 +34,8 @@ export const POSTHOG_OPTIONS: Partial<PostHogConfig> = {
   respect_dnt: true,
   // An opt-out also clears PostHog's stored anonymous ids.
   opt_out_persistence_by_default: true,
+  // Each event is sent at once, so an opt-out leaves no queued batch to flush afterwards.
+  request_batching: false,
   before_send: event => {
     if (!event || !event.event.startsWith("gameplay_")) return null;
     event.properties = Object.fromEntries(Object.entries(event.properties)
@@ -42,21 +44,27 @@ export const POSTHOG_OPTIONS: Partial<PostHogConfig> = {
   },
 };
 let posthog: PostHog | null = null;
+/** Whether this tab opted the SDK out; the SDK's own flag is shared with, and cleared by, other tabs. */
+let posthogOptedOut = false;
 const loadPosthog: Loader = async (token, config) => {
   const { default: instance } = await import("posthog-js/dist/module.no-external");
   instance.init(token, config);
   posthog = instance;
+  posthogOptedOut = instance.has_opted_out_capturing();
   syncPosthogConsent();
   return { capture: (name, properties) => { instance.capture(name, properties); } };
 };
 
-/** A decline blocks the loaded SDK, queued events included; a later acceptance resumes as a new anonymous device. */
+/** A decline blocks the loaded SDK; a later acceptance resumes as a new anonymous device. */
 function syncPosthogConsent() {
   if (!posthog) return;
-  if (loadAnalyticsConsent() === "declined") posthog.opt_out_capturing();
-  else if (posthog.has_opted_out_capturing()) {
+  if (loadAnalyticsConsent() === "declined") {
+    posthog.opt_out_capturing();
+    posthogOptedOut = true;
+  } else if (posthogOptedOut) {
     posthog.opt_in_capturing({ captureEventName: false });
     posthog.reset(true);
+    posthogOptedOut = false;
   }
 }
 
