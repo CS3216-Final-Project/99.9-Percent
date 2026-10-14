@@ -111,7 +111,7 @@ a visible active session produces about four progress events per minute; idle he
 
 The SDK uses localStorage for a pseudonymous browser identity.
 Analytics is on by default and stops at once when the player opts out, which also removes the run ledger and PostHog's stored identity.
-While the browser's Do Not Track or Global Privacy Control setting is on, the SDK is not loaded and nothing is observed or stored; the stored choice applies again once the setting is off.
+While the browser's Do Not Track or Global Privacy Control setting is on, the SDK is not loaded and no analytics data is observed or stored; the stored choice applies again once the setting is off.
 Person profiles, automatic clicks/pageviews, session recording, surveys, automatic exception
 capture and performance capture are disabled. The outgoing property allowlist removes URLs,
 query strings, referrers, account identities, raw saves, observer notes and feedback.

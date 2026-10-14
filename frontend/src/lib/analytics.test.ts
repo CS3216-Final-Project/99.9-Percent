@@ -122,7 +122,8 @@ describe("a browser that asks not to track", () => {
       saveAnalyticsConsent("accepted");
       window.dispatchEvent(new StorageEvent("storage", { key: ANALYTICS_CONSENT_KEY }));
       expect(subscribe).not.toHaveBeenCalled();
-      expect(Object.keys(localStorage)).toEqual([ANALYTICS_CONSENT_KEY]);
+      // The opt-out flag holds no id, and a live SDK in another tab still reads it.
+      expect(Object.keys(localStorage).sort()).toEqual(["__ph_opt_in_out_phc_test_public_token", ANALYTICS_CONSENT_KEY]);
       expect(loadAnalyticsConsent()).toBe("accepted");
     } finally {
       stop();

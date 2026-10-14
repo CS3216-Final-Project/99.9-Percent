@@ -173,8 +173,7 @@ export function browserAsksNotToTrack(): boolean {
 function forgetAnalyticsData() {
   try {
     for (const key of Object.keys(localStorage)) {
-      // A loaded SDK reads its opt-out flag live, so that flag is only removed while none is loaded.
-      if (key === ANALYTICS_STORAGE_KEY || key.startsWith("ph_") || (!posthog && key.startsWith("__ph_opt_in_out_"))) {
+      if (key === ANALYTICS_STORAGE_KEY || key.startsWith("ph_")) {
         localStorage.removeItem(key);
       }
     }
