@@ -30,8 +30,8 @@ it("shows Guided Mode first with Challenge Mode locked until the chapters are do
   const choices = boot("campaign");
   const guided = card(choices, "Guided Mode"), challenge = card(choices, "Challenge Mode");
   expect(choices.compareDocumentPosition(guided) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(guided.textContent).toContain("Continuous play · Five guided chapters");
-  expect(challenge.textContent).toContain("Complete all five Guided Mode chapters to unlock.");
+  expect(guided.textContent).toContain("Continuous play · Six guided chapters");
+  expect(challenge.textContent).toContain("Complete the first five Guided Mode chapters to unlock.");
   // The locked card's only action is disabled and cannot switch modes.
   const lockedButton = within(challenge).getByRole("button", { name: "Complete Guided Mode to unlock" });
   expect(lockedButton).toHaveProperty("disabled", true);
@@ -47,7 +47,7 @@ it("shows a Guided Mode run in progress beside Challenge Mode, and switches with
   const choices = boot("campaign");
   const campaign = card(choices, "Guided Mode"), classic = card(choices, "Challenge Mode");
   expect(campaign.textContent).toContain("Last played");
-  expect(campaign.textContent).toMatch(/Saved game\s*Chapter 1 of 5: Opening/);
+  expect(campaign.textContent).toMatch(/Saved game\s*Chapter 1 of 6: Opening/);
   expect(within(campaign).getByRole("button", { name: "Continue company" })).toBeTruthy();
   expect(classic.textContent).toContain("No saved game");
   // Reading the other mode for its card must not write a Classic save.
@@ -67,7 +67,7 @@ it("shows a Challenge Mode run in progress beside Guided Mode, with the same car
   expect(classic.textContent).toContain("Week 2 of 26");
   expect(within(classic).getByRole("button", { name: "Continue week 2" })).toBeTruthy();
   expect(within(classic).getByRole("button", { name: "New game" })).toBeTruthy();
-  expect(campaign.textContent).toContain("Chapter 1 of 5");
+  expect(campaign.textContent).toContain("Chapter 1 of 6");
   expect(campaign.textContent).not.toContain("Last played");
   fireEvent.click(within(campaign).getByRole("button", { name: "Continue company" }));
   expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, hasRun: true });

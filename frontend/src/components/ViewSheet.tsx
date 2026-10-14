@@ -5,7 +5,7 @@ import { tipProps } from "./tips";
 import { Concept, type ConceptKind } from "./ui";
 
 /** The views that open over the room from the bottom bar. */
-export type SheetView = Exclude<View, null | "menu">;
+export type SheetView = Extract<View, "tech" | "engineers" | "history">;
 
 const VIEW_TITLES: Record<SheetView, string> = { tech: "Tech tree", engineers: "Team", history: "History" };
 const VIEW_ICONS: Record<SheetView, [ConceptKind, IconName]> = {

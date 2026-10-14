@@ -30,7 +30,7 @@ export function ModeSwitch({ to }: { to: GameMode }) {
       </p>
       {locked ? (
         <>
-          <p className="menu-note">Complete all five Guided Mode chapters to unlock Challenge Mode.</p>
+          <p className="menu-note">Complete the first five Guided Mode chapters to unlock Challenge Mode.</p>
           <div className="menu-actions">
             <button type="button" className="btn" disabled>
               <Icon name="lock" size={20} />

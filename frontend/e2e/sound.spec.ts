@@ -33,6 +33,7 @@ test("sounds the company starting, each introduction prompt and the alarm, and n
   await page.getByRole("button", { name: "Skip introduction" }).click();
   await expect.poll(voices).toBeGreaterThan(launch);
   const introduced = await voices();
+  await page.locator(".campaign-advanced > summary").click();
   const advance = page.getByRole("button", { name: "Advance step", exact: true });
   for (let i = 0; i < 5; i++) await advance.click();
   // Quiet steps make no sound.

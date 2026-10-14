@@ -9,6 +9,7 @@ export interface CampaignEnvelope {
   inputs: { step: number; action: { type: string } }[];
   foundation?: { step: number; inputs: number };
   legacyPreventionInputs?: number;
+  serviceMeasurementStart?: { fromStep: number; scope: "full-run" | "since-upgrade" };
   runtime: { remainderMs: number };
   savedAt: number;
 }

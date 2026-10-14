@@ -1,4 +1,4 @@
-import { test, expect, expectRoom, savedGame, savedClassicGame, seedSave, unlockChallenge } from "./fixtures";
+import { advanceCampaignStep, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 
 test("new players see Guided Mode first with Challenge Mode locked", async ({ page }) => {
@@ -6,9 +6,9 @@ test("new players see Guided Mode first with Challenge Mode locked", async ({ pa
   const choices = page.getByRole("region", { name: "Choose how you want to play" });
   const guided = choices.getByRole("region", { name: "Guided Mode" });
   const challenge = choices.getByRole("region", { name: "Challenge Mode" });
-  await expect(guided).toContainText("Continuous play · Five guided chapters");
+  await expect(guided).toContainText("Continuous play · Six guided chapters");
   await expect(challenge).toContainText("50,000 users in 26 weeks");
-  await expect(challenge).toContainText("Complete all five Guided Mode chapters to unlock.");
+  await expect(challenge).toContainText("Complete the first five Guided Mode chapters to unlock.");
   await expect(guided.getByRole("button", { name: "Start Guided Mode" })).toBeVisible();
   await expect(challenge.getByRole("button", { name: "Complete Guided Mode to unlock" })).toBeDisabled();
   await page.keyboard.press("p");
@@ -26,7 +26,7 @@ test("switches between Guided Mode and unlocked Challenge Mode from the menu, ke
   await unlockChallenge(page);
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await expectRoom(page);
-  await page.getByRole("button", { name: "Advance step", exact: true }).click();
+  await advanceCampaignStep(page);
   const campaign = await savedGame(page);
   expect(campaign.campaign!.step).toBe(1);
 
@@ -55,7 +55,7 @@ test("the menu offers a disabled unlock instead of a switch while Challenge Mode
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
-  await expect(menu.getByRole("region", { name: "Game mode" })).toContainText("Complete all five Guided Mode chapters to unlock Challenge Mode.");
+  await expect(menu.getByRole("region", { name: "Game mode" })).toContainText("Complete the first five Guided Mode chapters to unlock Challenge Mode.");
   await expect(menu.getByRole("button", { name: "Complete Guided Mode to unlock" })).toBeDisabled();
   await expect(menu.getByRole("button", { name: /Switch to/ })).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem("nn.classic.save.v1"))).toBeNull();
@@ -82,7 +82,7 @@ test("the home screen is the same in both modes and can continue or switch eithe
   const choices = page.getByRole("region", { name: "Choose how you want to play" });
   const campaign = choices.getByRole("region", { name: "Guided Mode" }), classic = choices.getByRole("region", { name: "Challenge Mode" });
   await expect(campaign).toContainText("Last played");
-  await expect(campaign).toContainText("Chapter 1 of 5: Opening");
+  await expect(campaign).toContainText("Chapter 1 of 6: Opening");
   await expect(classic).toContainText("No saved game");
   await page.screenshot({ path: "test-results/home-campaign-in-progress.png" });
   // Halfway through Guided Mode, Challenge Mode is one click away from the home screen.
@@ -93,7 +93,7 @@ test("the home screen is the same in both modes and can continue or switch eithe
   await expect(classic).toContainText("Last played");
   await expect(classic).toContainText("Week 2 of 26");
   await expect(classic.getByRole("button", { name: "New game" })).toBeVisible();
-  await expect(campaign).toContainText("Chapter 1 of 5: Opening");
+  await expect(campaign).toContainText("Chapter 1 of 6: Opening");
   await page.screenshot({ path: "test-results/home-classic-in-progress.png" });
   // And Guided Mode is one click away from a Challenge Mode home screen.
   await campaign.getByRole("button", { name: "Continue company" }).click();

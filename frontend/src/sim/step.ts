@@ -1,3 +1,5 @@
+import { advanceCombinedTraffic, combinedAction, combinedProfile, currentFault, observeCombined, pendingCombined } from "./combinedCampaign";
+import { captureScorecard, emptyServiceMeasurement, observeService } from "./campaignScorecard";
 import { activateReliability, advanceHealth, detect, effectiveTargets, initializeHealth, observeReliability, pendingReliability, recoverySafe, reliabilityAction } from "./reliability";
 import { pendingPreventionReview, observePrevention, recordPreventionInspection } from "./openingPrevention";
 import type { GameState, Action, ActionResult } from "./types";
@@ -77,6 +79,7 @@ export function initialCampaign(runId: string): Campaign {
     };
     const c: Campaign = {
         scenarioId: Q.id, scenarioVersion: Q.version, runId, step: 0,
+        combinedStage:null,scalingConsent:null,promotion:null,serviceMeasurement:emptyServiceMeasurement(),scorecard:null,
         incomingRate: Q.startingTraffic, limit: null,
         apps: [{ id: "app-1", capacity: Q.appCapacity, backlog: 0, routed: true, tier: "base", state: "active" }],
         routing: { mode: "single", targets: ["app-1"] }, loadBalancer: false, routingEnabledOnce: false,
@@ -95,7 +98,7 @@ export function initialCampaign(runId: string): Campaign {
 export function projectCampaign(s: GameState): GameState {
     const c = s.campaign!;
     s.cash = c.cashCents / 100;
-    s.users = Q.users;
+    s.users = c.combinedStage?.users ?? Q.users;
     s.engineers = Q.engineers;
     s.turn = Math.floor(c.step / Q.periodSteps) + 1;
     s.infra.appHosts = c.apps.map(a => ({ id: a.id, status: "healthy", bornTurn: 1 }));
@@ -115,7 +118,7 @@ export function qualifiesForRecovery(m: Snapshot): boolean {
     return m.latencyMs < Q.latencyThresholdMs && m.serviceErrorRate !== null &&
         m.serviceErrorRate < Q.errorThreshold && m.admitted > 0 && m.successful + m.failed > 0;
 }
-export type StopReason = "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | "reliability-review" | null;
+export type StopReason = "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | "reliability-review" | "combined-review" | null;
 export function step(prev: GameState): {
     state: GameState;
     stopReason: StopReason;
@@ -132,8 +135,8 @@ export function step(prev: GameState): {
     return { state: projectCampaign(s), stopReason };
 }
 /** A recognition the player must acknowledge before time can advance again. */
-export function pendingStop(c: Campaign | undefined): "reliability-review" | "prevention-review" | "spike-acknowledgement" | null {
-    return pendingReliability(c) ? "reliability-review" : pendingPreventionReview(c) ? "prevention-review" : pendingSpikeAcknowledgement(c) ? "spike-acknowledgement" : null;
+export function pendingStop(c: Campaign | undefined): "reliability-review" | "prevention-review" | "spike-acknowledgement" | "combined-review" | null {
+    return pendingCombined(c) ? "combined-review" : pendingReliability(c) ? "reliability-review" : pendingPreventionReview(c) ? "prevention-review" : pendingSpikeAcknowledgement(c) ? "spike-acknowledgement" : null;
 }
 /**
  * Advance one physical step by mutating `s`. The caller owns `s`, rules out
@@ -184,6 +187,7 @@ export function stepInPlace(s: GameState): StopReason {
         if(action.type==="routing"&&action.source==="autoscaler") {
           const a=c.spikeStage!.controller!;a.joiningAppId=null;a.cooldownUntil=c.step+T.cooldown;a.expectedRouting=JSON.stringify(c.routing);
         }
+        if(action.type==="promotion"){c.promotion!.activatedStep=c.step;trace(c,"promotion-started",{actionId:action.id,increment:400,endStep:c.promotion!.endStep});}
         if (action.type === "limit")
             c.limit = Q.admissionLimit;
         if (action.type === "unlimit")
@@ -201,7 +205,7 @@ export function stepInPlace(s: GameState): StopReason {
         if (action.type === "routing" && c.routing.mode === "balanced") c.routingEnabledOnce = true;
     }
     if (c.scaling && !c.scaling.consumed) {
-        const ready = c.openingMilestone?.acknowledged && c.dbCapacity >= P.dbCapacity && s.phase === "management" &&
+        const ready = c.openingMilestone?.acknowledged && (c.dbCapacity >= P.dbCapacity || !!c.scalingConsent) && s.phase === "management" &&
             !c.incident && c.dbBacklog === 0 && c.apps.every(a=>a.backlog===0);
         if (ready && c.scaling.dueStep === null) {
             c.scaling.dueStep = c.step + P.observationSteps;
@@ -232,6 +236,7 @@ export function stepInPlace(s: GameState): StopReason {
         trace(c, "traffic-change", { eventId: "opening-growth", from: Q.startingTraffic, to: c.incomingRate });
     }
     advanceSpikeTraffic(c);
+    advanceCombinedTraffic(c);
     advanceHealth(c);
     const incoming = c.incomingRate, admitted = Math.min(incoming, c.limit ?? incoming), rejected = incoming - admitted;
     const recipients=c.reliabilityStage?effectiveTargets(c):c.routing.targets;
@@ -252,7 +257,7 @@ export function stepInPlace(s: GameState): StopReason {
         busyUtilisation:appBusyBudget?sum("processed")/appBusyBudget:0,demandRatio:effectiveAppCapacity?admitted/effectiveAppCapacity:0 };
     let data: DataSnapshot | undefined;
     if(c.dataStage?.consumed) {
-        const profile=c.dataStage.profile,shares=DATA_PROFILES[profile],warmth=c.readCache?.warmth??0;
+        const profile=c.combinedStage?combinedProfile(c):c.dataStage.profile,shares=DATA_PROFILES[profile],warmth=c.readCache?.warmth??0;
         const target=c.readCache?.target??0,rate=Math.min(warmth,target);
         const work=classifyData(app.processed,shares.readShare,shares.cacheableReadShare,rate);
         if(c.readCache && work.eligibleReads>0)c.readCache.warmth=Math.min(target,warmth+D.warmIncrement);
@@ -263,7 +268,7 @@ export function stepInPlace(s: GameState): StopReason {
     c.dbBacklog = db.backlog;
     const successful = db.processed+(data?.hits??0), failed = app.failed + db.failed;
     c.snapshot = {
-        version: c.reliabilityStage?6:c.spikeStage?5:data?4:3, ...(c.reliabilityStage?{reliability:{configured:[...c.routing.targets],effective:recipients,healthyCapacity:c.apps.filter(a=>a.health!=="failed").reduce((n,a)=>n+a.capacity,0),healthyRoutedCapacity:effectiveAppCapacity,spareCapacity:c.apps.filter(a=>a.role==="spare").reduce((n,a)=>n+a.capacity,0),failedDeliveries:instances.filter(a=>a.health==="failed").reduce((n,a)=>n+a.failed,0)+unroutable,unroutable,faultId:c.reliabilityStage.fault?.id??null}}:{}), ...(data?{data}:{}), instances, effectiveAppCapacity, appBusyBudget, routing: clone(c.routing), step: c.step, incoming, admitted, rejected, app, db,
+        version: c.combinedStage?7:c.reliabilityStage?6:c.spikeStage?5:data?4:3, ...(c.reliabilityStage?{reliability:{configured:[...c.routing.targets],effective:recipients,healthyCapacity:c.apps.filter(a=>a.health!=="failed").reduce((n,a)=>n+a.capacity,0),healthyRoutedCapacity:effectiveAppCapacity,spareCapacity:c.apps.filter(a=>a.role==="spare").reduce((n,a)=>n+a.capacity,0),failedDeliveries:instances.filter(a=>a.health==="failed").reduce((n,a)=>n+a.failed,0)+unroutable,unroutable,faultId:currentFault(c)?.id??null}}:{}), ...(data?{data}:{}), instances, effectiveAppCapacity, appBusyBudget, routing: clone(c.routing), step: c.step, incoming, admitted, rejected, app, db,
         installedAppCapacity: c.apps.reduce((n, a) => n + a.capacity, 0), successful, failed,
         latencyMs: Q.baseLatencyMs + 1000 * (Math.max(...instances.map(a=>a.backlog/a.capacity)) + db.backlog / c.dbCapacity),
         serviceErrorRate: successful + failed > 0 ? failed / (successful + failed) : null
@@ -297,6 +302,8 @@ export function stepInPlace(s: GameState): StopReason {
     c.recent = c.recent.slice(-600);
     if (c.incident)
         c.incident.snapshots.push(c.snapshot);
+    if(c.serviceMeasurement)observeService(c.serviceMeasurement,c.snapshot);
+    if(c.combinedStage)observeService(c.combinedStage.service,c.snapshot);
     accruePeriod(c);
     settlePeriod(c);
     if(c.reliabilityStage)c.reliabilityStage.failureSteps=c.snapshot.reliability!.failedDeliveries>0?c.reliabilityStage.failureSteps+1:0;
@@ -309,6 +316,7 @@ export function stepInPlace(s: GameState): StopReason {
         s.outcome = "bankrupt";
         stopReason = "ended";
         trace(c, "bankruptcy", { cashCents: c.cashCents });
+        c.scorecard=captureScorecard(s,"bankrupt");
     }
     else if (c.incident) {
         const prior = c.incident.stableSteps;
@@ -328,7 +336,7 @@ export function stepInPlace(s: GameState): StopReason {
     }
     else {
         const components = [...instances].sort((a,b)=>Number(a.id.split("-")[1])-Number(b.id.split("-")[1])).map(a=>a.id).concat("db").filter(id=>c.overload[id]>=Q.overloadSteps);
-        const failure=c.reliabilityStage?.fault;
+        const failure=currentFault(c);
         const failedIncident=(c.reliabilityStage?.failureSteps??0)>=3&&!!failure;
         if(failedIncident&&!components.includes(failure!.targetId))components.unshift(failure!.targetId);
         if (components.length) {
@@ -345,6 +353,8 @@ export function stepInPlace(s: GameState): StopReason {
     if(pendingPreventionReview(c))stopReason="prevention-review";
     runAutoscaler(s);
     observeReliability(s);
+    observeCombined(s);
+    if(pendingCombined(c))stopReason="combined-review";
     if(pendingReliability(c))stopReason="reliability-review";
     if(pendingSpikeAcknowledgement(c))stopReason="spike-acknowledgement";
     trace(c, "metrics", { snapshotStep: c.step, ...(data?{profile:data.profile,hits:data.hits,eligibleMisses:data.eligibleMisses,effectiveHitRate:data.effectiveHitRateUsed,dbDemand:db.demand,dbCapacity:db.capacity}: {}) });
@@ -403,6 +413,13 @@ type Rejection = Extract<ActionResult, { ok: false }>;
 function actInPlace(s: GameState, action: Action, legacyPreventionMilestone: boolean): Rejection | null {
     const fail = (message: string): Rejection => ({ ok: false, reason: "invalid", message });
     const c0 = s.campaign!;
+    const combined = combinedAction(s, action);
+    if (combined) {
+        if (!combined.ok) return combined;
+        Object.assign(s, projectCampaign(combined.state));
+        return null;
+    }
+    if (pendingCombined(c0)) return fail("Review the company outcome first.");
     const reliability = reliabilityAction(s, action);
     if (reliability !== undefined) return reliability;
     if (action.type === "acknowledge_prevention_review") {

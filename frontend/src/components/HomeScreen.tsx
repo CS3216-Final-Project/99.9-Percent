@@ -31,7 +31,7 @@ function classicSummary(game: GameState | null, tutorialDone: boolean): Summary 
 
 const MODES: Record<GameMode, { name: string; icon: IconName; pace: string; about: string }> = {
   campaign: {
-    name: "Guided Mode", icon: "server", pace: "Continuous play · Five guided chapters",
+    name: "Guided Mode", icon: "server", pace: "Continuous play · Six guided chapters",
     about: "Learn infrastructure concepts through guided challenges. Inspect problems, upgrade servers and watch your changes take effect. Pause whenever you need.",
   },
   classic: {
@@ -132,7 +132,7 @@ export function HomeScreen() {
         {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved">
           This run could not be saved, so switching now loses it. Press the red button again to switch anyway.
         </Callout>}
-        <p className="mode-note">Guided Mode comes first: finish all five chapters to unlock Challenge Mode. Each mode keeps its own save.</p>
+        <p className="mode-note">Guided Mode comes first: finish the first five chapters to unlock Challenge Mode. Each mode keeps its own save.</p>
       </section>
       <AnalyticsConsentPanel />
       <footer className="home-foot">
@@ -159,7 +159,7 @@ function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, autoFocus,
     {locked ? <>
       <div className="mode-progress is-empty">
         <Icon name="lock" size={20} />
-        <span><span className="mode-progress-label">Locked</span>Complete all five Guided Mode chapters to unlock.</span>
+        <span><span className="mode-progress-label">Locked</span>Complete the first five Guided Mode chapters to unlock.</span>
       </div>
       <div className="mode-actions">
         <button type="button" className="btn" disabled><Icon name="lock" />Complete Guided Mode to unlock</button>

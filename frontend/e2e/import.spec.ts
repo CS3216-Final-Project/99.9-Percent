@@ -1,10 +1,11 @@
+import { advanceCampaignStep } from "./fixtures";
 import { readFile } from "node:fs/promises";
 import { test, expect, savedGame, unlockChallenge } from "./fixtures";
 
 test("exports a company and imports it into a fresh browser", async ({ page, browser, baseURL, withoutRoom }) => {
   await withoutRoom();
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
-  for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Advance step", exact: true }).click();
+  for (let i = 0; i < 3; i++) await advanceCampaignStep(page);
   const exported = await savedGame(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("tab", { name: "Saves" }).click();

@@ -91,3 +91,10 @@ export async function seedClassicSave(page: Page, game: GameState) {
 export async function savedClassicGame(page: Page): Promise<GameState> {
   return page.evaluate(() => JSON.parse(localStorage.getItem('nn.classic.save.v1')!).game);
 }
+
+/** Open Campaign's secondary precision control through the real UI. */
+export async function advanceCampaignStep(page: Page) {
+  const more = page.locator(".campaign-advanced");
+  if (!(await more.evaluate(el => (el as HTMLDetailsElement).open))) await more.locator("summary").click();
+  await page.getByRole("button", { name: "Advance step", exact: true }).click();
+}

@@ -59,8 +59,7 @@ import { checkpointCloud, localCloudCopy, rememberCloud } from "./cloud";
 import { floorFromSearch, floorOf, type Floor, type FloorSwitch } from "./floors";
 import { DEFAULT_AVATAR, type AvatarId } from "./avatars";
 
-
-export type View = "tech" | "engineers" | "history" | "menu" | null;
+export type View = "tech" | "engineers" | "history" | "menu" | "guidance" | "scorecard" | null;
 export type Speed = 0.5 | 1 | 2;
 
 /** The first-week walkthrough ("basics") and the first-incident guide ("incident"). */
@@ -179,6 +178,10 @@ interface Store {
   avatar: AvatarId;
   setAvatar: (id: AvatarId) => void;
   hovered: EquipmentId | null;
+  /** The machines a campaign action the player is considering would change, lit up in the room. Never saved. */
+  affected: EquipmentId[];
+  /** The latest request to centre the camera on a machine's marker (an equipment or App Server id). Never saved. */
+  cameraFocus: { anchor: string; seq: number } | null;
   view: View;
   techFocus: TechId | null;
   /** Management: auto-advance is on. Incident: the crisis clock is running. */
@@ -197,6 +200,8 @@ interface Store {
   tick: (dt: number) => void;
   select: (id: EquipmentId | null) => void;
   hover: (id: EquipmentId | null) => void;
+  setAffected: (ids: EquipmentId[]) => void;
+  focusCamera: (anchor: string) => void;
   openView: (view: View) => void;
   focusTech: (id: TechId | null) => void;
   setRunning: (running: boolean) => void;
@@ -237,7 +242,7 @@ let introId = 1;
 const intro = (kind: IntroKind): LastIntro => ({ id: introId++, kind });
 let lastIncidentSave = 0;
 
-const CHALLENGE_LOCKED = "Complete all five Guided Mode chapters to unlock Challenge Mode.";
+const CHALLENGE_LOCKED = "Complete the first five Guided Mode chapters to unlock Challenge Mode.";
 
 const ACKNOWLEDGEMENTS = {
   "reliability-review": "acknowledge_reliability",
@@ -247,6 +252,7 @@ const ACKNOWLEDGEMENTS = {
 /** The only action accepted while a recognition or milestone awaits the player; time stays paused meanwhile. */
 function requiredAcknowledgement(c: Campaign): Action["type"] | null {
   const stop = pendingStop(c);
+  if (stop === "combined-review") return c.combinedStage?.finalReview ? "complete_campaign" : "acknowledge_growth";
   if (stop) return ACKNOWLEDGEMENTS[stop];
   return c.openingMilestone && !c.openingMilestone.acknowledged ? "acknowledge_milestone" : null;
 }
@@ -405,6 +411,8 @@ export const useGame = create<Store>()((set, get) => {
       selected: null,
       selectedAppId: null,
       hovered: null,
+      affected: [],
+      cameraFocus: null,
       view: null,
       techFocus: null,
       onboarding: false,
@@ -593,6 +601,8 @@ export const useGame = create<Store>()((set, get) => {
       saveAvatar(id);
     },
     hovered: null,
+    affected: [],
+    cameraFocus: null,
     view: null,
     techFocus: null,
     running: false,
@@ -673,7 +683,7 @@ export const useGame = create<Store>()((set, get) => {
       if (c) {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
-        if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability"].includes(action.type)) set({running:false});
+        if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","enter_combined","start_growth_wave","acknowledge_growth","complete_campaign","accept_scaling_risk"].includes(action.type)) set({running:false});
         record(result.ok);
         commit(state);
         if (!result.ok) get().notify(result.message, "error");
@@ -730,12 +740,18 @@ export const useGame = create<Store>()((set, get) => {
     hover: (id) => {
       if (get().hovered !== id) set({ hovered: id });
     },
+    setAffected: (ids) => {
+      const was = get().affected;
+      if (was.length !== ids.length || was.some((id, i) => id !== ids[i])) set({ affected: ids });
+    },
+    focusCamera: (anchor) => set({ cameraFocus: { anchor, seq: (get().cameraFocus?.seq ?? 0) + 1 } }),
     openView: (view) => {
       const campaign = !!get().game.campaign;
       if (campaign && view === "tech" && get().view !== "tech") uiEvent("technology_tree_opened");
-      if (campaign && view && !["menu", "history", "tech"].includes(view)) return;
+      if (campaign && view === "scorecard" && get().view !== "scorecard") uiEvent("scorecard_viewed");
+      if (campaign && view && !["menu", "history", "tech", "guidance", "scorecard"].includes(view)) return;
       set({ view });
-      if (view === "menu" || (campaign && view === "tech")) get().setRunning(false);
+      if (view === "menu" || (campaign && (view === "tech" || view === "scorecard"))) get().setRunning(false);
     },
     focusTech: (id) => {
       if (id && get().game.campaign) uiEvent("technology_node_selected", { techId: id });
@@ -743,7 +759,7 @@ export const useGame = create<Store>()((set, get) => {
       if (id && get().game.campaign) get().setRunning(false);
     },
     setRunning: (running) => {
-      set({ running: running && (!get().game.campaign || (get().started && !get().onboarding && !awaitingAcknowledgement(get().game.campaign!))) && get().view!=="menu" && !(get().game.campaign && get().view==="tech") && !document.hidden && !["review","ended"].includes(get().game.phase) });
+      set({ running: running && (!get().game.campaign || (get().started && !get().onboarding && !awaitingAcknowledgement(get().game.campaign!))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase) });
       if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
     setSpeed: (speed) => set({ speed }),
@@ -759,9 +775,12 @@ export const useGame = create<Store>()((set, get) => {
         uiEvent("run_reset",{previousRunId:old.game.campaign!.runId,replacementRunId});
         if(old.game.campaign!.incident)uiEvent("incident_abandoned",{incidentId:old.game.campaign!.incident!.id});
         uiEvent("run_evidence",{campaign:JSON.stringify(old.game)});
+        if(old.game.campaign?.scorecard)uiEvent("run_scorecard",{scorecard:JSON.stringify(old.game.campaign.scorecard)});
       }
       const pending=get().measurement.pending;
-      const game=newGame(opts.seed??BALANCE.introSeed,replacementRunId);
+      let replaySeed=crypto.getRandomValues(new Uint32Array(1))[0]|0;
+      if(replaySeed===old.game.seed)replaySeed=(replaySeed+1)|0;
+      const game=newGame(opts.seed??replaySeed,replacementRunId);
       const m=emptyMeasurement();m.replayOf=old.hasRun?old.game.campaign!.runId:null;
       // Preserve unsaved old-run records in the same archive. Refuse reset if it cannot retain them.
       if(pending.length&&!archiveEvents(pending)) {
@@ -769,8 +788,9 @@ export const useGame = create<Store>()((set, get) => {
       }
       const nextMeta={...old.meta,runsStarted:old.meta.runsStarted+1};
       const measurement=beginSession(m,game,crypto.randomUUID(),new Date().toISOString());
+      if(m.replayOf)event(measurement,game,"replay_started",{previousRunId:m.replayOf,seed:game.seed});
       set({game,generation:get().generation+1,lastAction:null,lastIntro:intro("begin"),measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
-        selected:null,hovered:null,view:null,techFocus:null,running:false,rating:null,
+        selected:null,selectedAppId:null,hovered:null,affected:[],view:null,techFocus:null,running:false,rating:null,
         onboarding:["not-started","in-progress"].includes(nextMeta.openingOnboarding.status),tour:null,
         started:true,toast:null,activeMark:document.hidden?null:performance.now()});
       saveMeta(nextMeta);persist(true);
@@ -795,6 +815,7 @@ export const useGame = create<Store>()((set, get) => {
         meta: nextMeta,
         selected: null,
         hovered: null,
+        affected: [],
         view: null,
         techFocus: null,
         running: false,
@@ -845,7 +866,7 @@ export const useGame = create<Store>()((set, get) => {
       const saved = mode === "campaign" ? saveGame(game, remainderMs, true, measurement) && archiveEvents(measurement.pending) : saveClassicGame(game);
       saveMode(mode);
       set({ mode, importGeneration: get().importGeneration + 1, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, view: null,
-        selected: null, hovered: null, started: true, tour: null, onboarding: false, techFocus: null, rating: null });
+        selected: null, hovered: null, affected: [], started: true, tour: null, onboarding: false, techFocus: null, rating: null });
       track("save_imported", { mode, step: game.campaign?.step ?? game.turn });
       get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
       return true;
