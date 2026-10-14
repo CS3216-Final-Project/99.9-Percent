@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { creature, standsAtDesk } from "./cast";
 import { Creature, Walker } from "./creatures";
-import { RESPONDERS, SERVER_GLASS, SERVER_ZONE_NAMES, SPOTS } from "./floorplan";
+import { BENCHES, CAGE, CHILLER, CHILLERS, PALLETS, PUMPS, RACK_FRAMES, RESPONDERS, SERVER_GLASS, SERVER_ZONE_NAMES, SHELF_RUNS, SHELF_UNITS, SPOTS } from "./floorplan";
 import { heading } from "./routes";
 import { ModelBatch, type Placement } from "./models";
 import { deskGear, deskModels, glassFrames, ignoreRay, mdl, PANEL, placeModels, placeProps, rand } from "./furniture";
@@ -60,16 +60,6 @@ const VENTS: [number, number][] = [
   [0.9, 0.6],
 ];
 
-/** The cooling plant's two chillers, each with two fans on top, standing along x. */
-const CHILLERS: [number, number][] = [
-  [-20.2, 3.2],
-  [-20.2, 7.6],
-];
-const CHILLER = { w: 1.5, d: 3.2, h: 1.9, fanZ: 0.8, fan: 1.05 };
-
-/** The stores' shelving: runs along z in the east wing, with a cross aisle in the middle. */
-const SHELF_RUNS = [16.2, 18.8, 21.4];
-const SHELF_UNITS = [-7.8, -5.4, -3.0, 2.6, 5.0, 7.4];
 
 /** A run of steel shelving 2.4 m long along z and 0.6 m deep, stocked with boxes and bins. */
 function shelving(seed: number): Prim[] {
@@ -189,7 +179,7 @@ function buildStatic(): Prim[] {
     add(chiller(), x, z);
     out.push(bx([x, 0.008, z - CHILLER.d / 2 - 0.45], [CHILLER.w + 1.4, 0.012, 0.08], SAFETY), bx([x, 0.008, z + CHILLER.d / 2 + 0.45], [CHILLER.w + 1.4, 0.012, 0.08], SAFETY));
   }
-  for (const z of [2.3, 4.1]) add(pump(), -16.4, z);
+  for (const [x, z] of PUMPS) add(pump(), x, z);
   for (const [x, colour] of [
     [-18.15, CHILLED],
     [-17.75, RETURN],
@@ -205,27 +195,23 @@ function buildStatic(): Prim[] {
   ] as const) {
     out.push(cy([-15.5, PIPE_Y, z], 0.22, 5.3, PIPE, [0, 0, Math.PI / 2]), cy([-14.2, PIPE_Y, z], 0.24, 0.12, colour, [0, 0, Math.PI / 2]));
   }
-  for (const z of [2.3, 4.1]) out.push(cy([-16.15, (PIPE_Y + 0.75) / 2, z], 0.16, PIPE_Y - 0.75, PIPE));
+  for (const [x, z] of PUMPS) out.push(cy([x + 0.25, (PIPE_Y + 0.75) / 2, z], 0.16, PIPE_Y - 0.75, PIPE));
   add([cy([0, 0.85, 0], 0.7, 1.5, "#3d6fa8"), ball([0, 1.6, 0], [0.7, 0.3, 0.7], "#3d6fa8"), bx([0, 0.04, 0], [0.8, 0.08, 0.8], TRIM)], -14.3, 9.6);
   add([bx([0, 0.95, 0], [0.5, 1.9, 1.2], PALE), bx([0.26, 1.4, 0], [0.01, 0.4, 0.6], INK), bx([0.265, 1.42, 0.12], [0.005, 0.1, 0.16], "#3ddc84")], -21.65, 11.2);
 
   // The workshop: benches, rack frames being fitted, pallets of servers in boxes and the cage for spare parts
-  add(workbench(), -6.4, 8.0);
-  add(workbench(), -2.8, 8.0);
-  [3, 1, 0].forEach((fitted, i) => add(rackFrame(fitted), 2.6 + i * 1.3, 8.0));
-  add(pallet(), -10.6, 11.6);
-  add(pallet(), -10.6, 13.2);
+  for (const [x, z] of BENCHES) add(workbench(), x, z);
+  RACK_FRAMES.forEach(([x, z], i) => add(rackFrame([3, 1, 0][i]), x, z));
+  for (const [x, z] of PALLETS) add(pallet(), x, z);
   const cage: Prim[] = [bx([0, 0.008, 0], [3.0, 0.012, 1.6], TRIM)];
   for (let i = 0; i <= 10; i++) cage.push(bx([-1.5 + i * 0.3, 1.1, -0.8], [0.02, 2.2, 0.02], ALU));
   for (let i = 0; i <= 5; i++) cage.push(bx([1.5, 1.1, -0.8 + i * 0.32], [0.02, 2.2, 0.02], ALU), bx([-1.5, 1.1, -0.8 + i * 0.32], [0.02, 2.2, 0.02], ALU));
   cage.push(bx([0, 2.2, -0.8], [3.0, 0.04, 0.04], ALU), bx([0, 0.05, -0.8], [3.0, 0.04, 0.04], ALU));
-  add([...cage, ...place(shelving(91), 0, 0.4, Math.PI / 2)], 5.6, 12.8);
+  add([...cage, ...place(shelving(91), 0, 0.4, Math.PI / 2)], CAGE.x, CAGE.z);
   out.push(bx([-4.6, 0.008, 9.4], [9.0, 0.012, 0.08], SAFETY));
 
   // The stores: runs of shelving in the east wing
   SHELF_RUNS.forEach((x, run) => SHELF_UNITS.forEach((z, i) => add(shelving(run * 17 + i * 5), x, z)));
-  add(pallet(), 19.6, 12.2);
-  add(pallet(), 17.4, 12.2);
 
   // The elevator lobby's mat
   out.push(bx([12.4, 0.006, -2.25], [1.6, 0.012, 1.9], INK));
@@ -239,12 +225,7 @@ function buildModels(): Placement[] {
   out.push(mdl("boxClosed", 7.3, -4.1, 0.2, 1.3), mdl("boxClosed", 7.32, -4.1, 0.5, 1.1, 0.7), mdl("boxOpen", 8.2, -4.0, -0.3, 1.1));
   out.push(mdl("pottedPlant", 6.0, -5.1), mdl("trashcan", 10.9, -9.0, 0, 0.8));
   // Servers still in their boxes on the pallets, and a stool at each workbench
-  for (const [x, z] of [
-    [-10.6, 11.6],
-    [-10.6, 13.2],
-    [19.6, 12.2],
-    [17.4, 12.2],
-  ]) {
+  for (const [x, z] of PALLETS) {
     for (let k = 0; k < 4; k++) out.push(mdl("boxClosed", x + (k % 2 ? 0.3 : -0.3), z + (k < 2 ? -0.3 : 0.3), (k * 0.3) % 1, 1.3, 0.14));
     out.push(mdl("boxClosed", x, z, 0.4, 1.2, 0.68));
   }
