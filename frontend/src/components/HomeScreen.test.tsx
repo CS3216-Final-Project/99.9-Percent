@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { advanceTurn, newGame, newLegacyGame } from "@/sim";
+import { advanceSteps } from "@/sim/step";
 import { DEFAULT_META, loadClassicGame, loadGame, saveClassicGame, saveGame, saveMeta, saveMode } from "@/game/persist";
 import { ANALYTICS_CONSENT_KEY } from "@/lib/analytics";
 import { useGame } from "@/game/store";
@@ -85,6 +86,45 @@ it("starts a new Challenge Mode game from a Guided Mode home screen when asked",
   fireEvent.click(within(classic).getByRole("button", { name: "New game" }));
   expect(useGame.getState()).toMatchObject({ mode: "classic", started: true });
   expect(useGame.getState().game.turn).toBe(1);
+});
+
+it("replays Guided Mode's walkthrough from its card once it is done, on the same company", () => {
+  saveGame(advanceSteps(newGame(4, "replay-company"), 3).state, 0, true);
+  let choices = boot("campaign");
+  expect(within(card(choices, "Guided Mode")).queryByRole("button", { name: "Replay the tutorial" })).toBeNull();
+  cleanup();
+  useGame.setState(useGame.getInitialState(), true);
+  saveMeta({ ...DEFAULT_META, tutorialDone: true });
+  choices = boot("campaign");
+  fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay the tutorial" }));
+  expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, tour: { track: "campaign", step: 0 } });
+  expect(useGame.getState().game.campaign).toMatchObject({ runId: "replay-company", step: 3 });
+});
+
+it("replays Guided Mode's walkthrough from a Challenge Mode home screen, keeping both saves", () => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true, tutorialDone: true });
+  saveGame(advanceSteps(newGame(4, "waiting-company"), 3).state, 0, true);
+  saveClassicGame(advanceTurn(newLegacyGame(2)));
+  saveMode("classic");
+  useGame.getState().boot();
+  render(<StrictMode><HomeScreen /></StrictMode>);
+  const choices = screen.getByRole("region", { name: "Choose how you want to play" });
+  fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay the tutorial" }));
+  expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, tour: { track: "campaign", step: 0 } });
+  expect(useGame.getState().game.campaign!.runId).toBe("waiting-company");
+  const kept = loadClassicGame();
+  expect(kept.status === "ok" && kept.game.turn).toBe(2);
+});
+
+it("offers no Guided Mode walkthrough for a closed company", () => {
+  saveMeta({ ...DEFAULT_META, tutorialDone: true });
+  saveMode("campaign");
+  useGame.getState().boot();
+  useGame.setState({ hasRun: true, game: { ...newGame(4, "closed-company"), phase: "ended", outcome: "bankrupt" } });
+  render(<StrictMode><HomeScreen /></StrictMode>);
+  const guided = card(screen.getByRole("region", { name: "Choose how you want to play" }), "Guided Mode");
+  expect(guided.textContent).toContain("Company closed");
+  expect(within(guided).queryByRole("button", { name: "Replay the tutorial" })).toBeNull();
 });
 
 it("asks before switching away from a game that cannot be saved", () => {

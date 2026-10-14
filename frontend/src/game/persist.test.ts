@@ -58,9 +58,23 @@ describe('browser metadata and analytics', () => {
 
   it('reads a profile from before the walkthrough without its introduction state, keeping its progress', () => {
     localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({
-      openingOnboarding: { version: 1, step: 2, status: 'completed' }, runsStarted: 2, challengeUnlocked: true,
+      openingOnboarding: { version: 1, step: 1, status: 'in-progress' }, runsStarted: 2, challengeUnlocked: true,
     }));
     expect(loadMeta()).toEqual({ ...DEFAULT_META, runsStarted: 2, challengeUnlocked: true });
+  });
+
+  it('counts a finished or skipped former introduction as the walkthrough done, in Guided Mode only', () => {
+    for (const status of ['completed', 'skipped']) {
+      localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ openingOnboarding: { version: 1, step: 2, status }, tutorialDone: false }));
+      expect(loadMeta()).toEqual({ ...DEFAULT_META, tutorialDone: true });
+    }
+    for (const introduction of [{ status: 'not-started' }, 'completed', null, { step: 2 }]) {
+      localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ openingOnboarding: introduction }));
+      expect(loadMeta().tutorialDone).toBe(false);
+    }
+    // Challenge Mode's walkthrough is its own: Guided Mode's introduction never stood for it.
+    localStorage.setItem('nn.classic.meta.v1', JSON.stringify({ openingOnboarding: { version: 1, step: 2, status: 'completed' } }));
+    expect(loadMeta('classic').tutorialDone).toBe(false);
   });
 
   it('keeps only known chapter guides as seen, once each and in chapter order', () => {

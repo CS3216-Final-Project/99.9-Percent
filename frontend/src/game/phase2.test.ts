@@ -16,6 +16,11 @@ function v1(g:GameState) {
  e.inputs=e.inputs.filter((i:{action:{type:string}})=>i.action.type!=="acknowledge_milestone");
  return JSON.stringify(e);
 }
+/** The walkthrough's records among the playtest events, archived or still pending. */
+function tutorialEvents() {
+ const {events}=JSON.parse(exportPlaytest(useGame.getState().game,useGame.getState().measurement)) as {events:{name:string;payload:Record<string,unknown>}[]};
+ return events.filter(e=>e.name.startsWith("tutorial_")).map(({name,payload:{track,step,from,reason}})=>({name,track,step,from,reason}));
+}
 function backup(raw:string) {const e=JSON.parse(raw);return CAMPAIGN_SAVE_KEY+".backup.v1."+e.runId+"."+e.savedAt;}
 function aggregate(snapshot:NonNullable<GameState["campaign"]>["snapshot"]) {
  const {version: _version,instances: _instances,effectiveAppCapacity: _effective,appBusyBudget: _budget,routing: _routing,...recorded}=snapshot;
@@ -64,7 +69,8 @@ it("does not start the walkthrough mid-company, and a new company offers it unti
 });
 it("keeps the walkthrough working in memory when its preference cannot be saved",()=>{
  enter();
- vi.spyOn(Storage.prototype,"setItem").mockImplementation(()=>{throw Error("quota");});
+ const setItem=Storage.prototype.setItem;
+ vi.spyOn(Storage.prototype,"setItem").mockImplementation(function(this:Storage,key,value){if(key==="nn.campaign.meta.v1")throw Error("quota");setItem.call(this,key,value);});
  useGame.getState().endTour(true);
  expect(useGame.getState().tour).toBeNull();
  expect(useGame.getState().meta.tutorialDone).toBe(true);
@@ -85,19 +91,45 @@ it("shows a chapter's guide once, paused, when the company first enters it",()=>
  useGame.setState(useGame.getInitialState(),true);enter();
  expect(useGame.getState().tour).toBeNull();
 });
-it("leaves a guide that is already showing in place when a chapter begins",()=>{
+it("continues a company whose Opening is acknowledged straight into scaling, without a guide",()=>{
  saveGame(act(act(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"}));
  saveMeta({...DEFAULT_META,tutorialDone:true});
- useGame.getState().boot();useGame.getState().play();
- // Play continues a company whose Opening is acknowledged straight into scaling, without a guide.
+ enter();
  expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
  expect(useGame.getState().tour).toBeNull();
- useGame.setState(useGame.getInitialState(),true);
+});
+it("closes a walkthrough still open when the company leaves the Opening, counts it done and shows the chapter's guide",()=>{
  saveGame(act(recovered(),{type:"acknowledge_review"}));
- enter();useGame.getState().startTour("campaign");
+ enter();useGame.getState().startTour("campaign");useGame.getState().tourNext();
  expect(useGame.getState().act({type:"acknowledge_milestone"})).toBe(true);
+ expect(useGame.getState().tour).toEqual({track:"scaling",step:0});
+ expect(useGame.getState().meta).toMatchObject({tutorialDone:true,chapterTours:["scaling"]});
+ expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!)).toMatchObject({tutorialDone:true,chapterTours:["scaling"]});
+ expect(tutorialEvents().at(-1)).toEqual({name:"tutorial_skipped",track:"campaign",step:1,reason:"chapter_entered"});
+ // A new company does not offer it again.
+ useGame.getState().endTour(true);useGame.getState().newRun();
+ expect(useGame.getState().tour).toBeNull();
+});
+it("records each walkthrough start, finish and skip once in the playtest records, with the step reached",()=>{
+ enter();
+ useGame.getState().tourNext();useGame.getState().tourNext();useGame.getState().endTour(false);
+ useGame.getState().showOnboarding();useGame.getState().endTour(true);
+ // A chapter's one-card guide is not the walkthrough, and a reload with the walkthrough done starts nothing.
+ useGame.getState().startTour("scaling");useGame.getState().endTour(true);
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(tutorialEvents()).toEqual([
+  {name:"tutorial_started",track:"campaign",step:0,from:"first_visit"},
+  {name:"tutorial_skipped",track:"campaign",step:2,reason:"player"},
+  {name:"tutorial_started",track:"campaign",step:0,from:"menu"},
+  {name:"tutorial_completed",track:"campaign",step:0},
+ ]);
+});
+it("does not offer the walkthrough to a player who finished or skipped the former introduction, but replays it on request",()=>{
+ localStorage.setItem("nn.campaign.meta.v1",JSON.stringify({openingOnboarding:{version:1,step:0,status:"skipped"},runsStarted:1}));
+ enter();
+ expect(useGame.getState().tour).toBeNull();
+ useGame.getState().showOnboarding();
  expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
- expect(useGame.getState().meta.chapterTours).toEqual([]);
 });
 it("milestone is awarded only on report acknowledgement and never changes physical or financial state",()=>{
  const g=recovered();expect(g.campaign!.openingMilestone).toBeNull();

@@ -44,6 +44,9 @@ test("optional product analytics observes Play and survives reload with no title
     expect(JSON.stringify(captured)).not.toContain("not-for-analytics");
     expect(captured.every(e => e.event.startsWith("gameplay_"))).toBe(true);
     expect(captured.some(e => e.event === "gameplay_session_progress" && Number(e.properties.session_active_ms) > 0)).toBe(true);
+    // The walkthrough the player skipped is reported once each way, with only its track, step and start.
+    const tutorial = () => captured.filter(e => e.event.startsWith("gameplay_tutorial_")).map(e => [e.event, e.properties.tutorial_track, e.properties.tutorial_step, e.properties.tutorial_from ?? e.properties.reason]);
+    expect(tutorial()).toEqual([["gameplay_tutorial_started", "campaign", 0, "first_visit"], ["gameplay_tutorial_skipped", "campaign", 0, "player"]]);
     await page.reload();
     await page.getByRole("button", { name: "Continue company", exact: true }).click();
     await page.clock.runFor(20_000);
@@ -52,6 +55,7 @@ test("optional product analytics observes Play and survives reload with no title
     const resumed = captured.find(e => e.event === "gameplay_run_resumed")!.properties;
     expect(resumed.run_id).toBe(run.run_id);
     expect(resumed.gameplay_session_id).not.toBe(run.gameplay_session_id);
+    expect(tutorial()).toHaveLength(2);
   } else {
     expect(captured).toEqual([]);
     expect(await page.evaluate(() => localStorage.getItem("nn.product-analytics.v1"))).toBeNull();

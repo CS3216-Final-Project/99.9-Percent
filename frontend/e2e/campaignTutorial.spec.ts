@@ -54,6 +54,17 @@ test("a first company's walkthrough points at the room and panel, finishes its s
   await card.getByRole("button", { name: "Skip", exact: true }).click();
   await expect(card).toBeHidden();
   expect((await savedGame(page)).campaign!.actions).toEqual([]);
+
+  // The home screen replays it too, on the same company.
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: /Save and exit/ }).click();
+  const guided = page.getByRole("region", { name: "Guided Mode" });
+  await guided.getByRole("button", { name: "Replay the tutorial", exact: true }).click();
+  await expectRoom(page);
+  await expect(card).toHaveAccessibleName("Tutorial, step 1 of 8");
+  await card.getByRole("button", { name: "Skip", exact: true }).click();
+  await expect(card).toBeHidden();
+  expect((await savedGame(page)).campaign).toMatchObject({ runId: company.runId, step: 0, actions: [] });
 });
 
 function act(game: GameState, action: Parameters<typeof applyAction>[1]): GameState {

@@ -262,15 +262,24 @@ function parseMeta(raw: string | null): StoredMeta | null {
   }
 }
 
-function decodeMeta(raw: string | null): Meta {
-  const { music: _music, openingOnboarding: _introduction, chapterTours, ...stored } = parseMeta(raw) ?? {};
+/** Whether Guided Mode's former introduction was finished or skipped, in a profile from before the walkthrough. */
+function introductionDone(introduction: unknown): boolean {
+  const status = introduction && typeof introduction === "object" ? (introduction as { status?: unknown }).status : null;
+  return status === "completed" || status === "skipped";
+}
+
+/** `campaign` reads Guided Mode's profile, where a player done with the former introduction is done with the walkthrough. */
+function decodeMeta(raw: string | null, campaign = false): Meta {
+  const { music: _music, openingOnboarding, chapterTours, ...stored } = parseMeta(raw) ?? {};
   const seen = Array.isArray(chapterTours) ? CHAPTER_TOURS.filter((id) => chapterTours.includes(id)) : [];
-  return { ...DEFAULT_META, ...stored, chapterTours: seen };
+  const meta: Meta = { ...DEFAULT_META, ...stored, chapterTours: seen };
+  if (campaign && introductionDone(openingOnboarding)) meta.tutorialDone = true;
+  return meta;
 }
 
 /** Each mode keeps its own tutorial/counters; sound is a shared player preference (see loadAudio). */
 export function loadMeta(mode: GameMode = "campaign"): Meta {
-  return decodeMeta(read(mode === "classic" ? CLASSIC_META_KEY : META_KEY));
+  return decodeMeta(read(mode === "classic" ? CLASSIC_META_KEY : META_KEY), mode === "campaign");
 }
 export function loadLegacyMeta(): Meta {
   return decodeMeta(read(LEGACY_META_KEY));
