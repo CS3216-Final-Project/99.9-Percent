@@ -208,18 +208,22 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Tell the office's sounds where the camera looks, and whether the office floor is on screen.
+  // Tell the office's sounds where they are heard: the camera's target, or in walk mode on the office floor the
+  // avatar's own spot — not the camera easing after it — and whether the office floor is on screen.
   useFrame((state) => {
     const c = controls.current;
     if (!c) return;
-    viewFocus.x = c.target.x;
-    viewFocus.z = c.target.z;
+    const walking = useGame.getState().walking && avatar.floor === "office" && !riding();
+    viewFocus.x = walking ? avatar.x : c.target.x;
+    viewFocus.z = walking ? avatar.z : c.target.z;
     viewFocus.zoom = (state.camera as THREE.OrthographicCamera).zoom;
+    viewFocus.walking = walking;
     viewFocus.live = shownFloor() === "office";
   });
   useEffect(
     () => () => {
       viewFocus.live = false;
+      viewFocus.walking = false;
     },
     [],
   );

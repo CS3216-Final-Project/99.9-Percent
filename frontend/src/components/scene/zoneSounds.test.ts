@@ -1,12 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { ZONE_CUES } from '@/game/sfx';
+import { GROUPS } from './conversations';
+import { RALLY } from './rally';
 import { nextGap, ZONE_PEAK, ZONE_REACH, ZONE_SOUNDS, ZONE_ZOOM, zoneLevel, type ZoneSound } from './zoneSounds';
 
 const foosball = ZONE_SOUNDS.find((s) => s.cue === 'foosball') as ZoneSound;
 
 describe('zone sounds', () => {
   it('give every zone voice a place in the office, and every place a voice', () => {
-    expect(ZONE_SOUNDS.map((s) => s.cue).sort()).toEqual([...ZONE_CUES].sort());
+    expect([...new Set(ZONE_SOUNDS.map((s) => s.cue))].sort()).toEqual([...ZONE_CUES].sort());
+  });
+
+  it('sound where the activity is: the rally at its table and a murmur at every chatting group', () => {
+    const pingPong = ZONE_SOUNDS.find((s) => s.cue === 'pingPong') as ZoneSound;
+    expect(pingPong.x).toBe(RALLY.x);
+    expect(pingPong.z).toBe(RALLY.z);
+    const murmurs = ZONE_SOUNDS.filter((s) => s.cue === 'murmur');
+    for (const { centre } of GROUPS) {
+      expect(murmurs.some((s) => s.x === centre[0] && s.z === centre[1])).toBe(true);
+    }
   });
 
   it('play quietly at full strength only up close and zoomed in', () => {
@@ -30,6 +42,13 @@ describe('zone sounds', () => {
     expect(at(10)).toBe(0);
     expect(at(30)).toBeGreaterThan(0);
     expect(at(30)).toBeLessThan(ZONE_PEAK / 2);
+  });
+
+  it('in walk mode are heard from the avatar at full strength, however far out the camera is zoomed', () => {
+    const at = zoneLevel(foosball, { x: foosball.x, z: foosball.z, zoom: 0, walking: true });
+    expect(at).toBeCloseTo(ZONE_PEAK, 9);
+    // The same spot through the camera at that zoom is silent.
+    expect(zoneLevel(foosball, { x: foosball.x, z: foosball.z, zoom: 0 })).toBe(0);
   });
 
   it('wait between plays within each sound\'s range', () => {
