@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { Tabs, type TabItem } from "./ui";
 
-/** The menu's sections, the same labels in the same order in Classic and Campaign. */
-export type MenuTab = "run" | "sound" | "graphics" | "avatar" | "saves" | "playtest";
+/** The menu's sections, the same labels in the same order in Classic and Campaign: run, preferences, avatar, save files, account, then playtest data. */
+export type MenuTab = "run" | "sound" | "graphics" | "avatar" | "saves" | "account" | "playtest";
 
 const MENU_TABS: TabItem<MenuTab>[] = [
   { id: "run", label: "Run", icon: "play" },
@@ -10,10 +10,11 @@ const MENU_TABS: TabItem<MenuTab>[] = [
   { id: "graphics", label: "Graphics", icon: "monitor" },
   { id: "avatar", label: "Avatar", icon: "user" },
   { id: "saves", label: "Saves", icon: "save" },
+  { id: "account", label: "Account", icon: "cloud" },
   { id: "playtest", label: "Playtest", icon: "analytics" },
 ];
 
-/** The menu's tab strip. Pass only the selected tab's content, so other tabs' sections are not mounted. */
+/** The menu's tab navigation. Pass only the selected tab's content, so other tabs' sections are not mounted. */
 export function MenuTabs({ value, onChange, children }: { value: MenuTab; onChange: (tab: MenuTab) => void; children: ReactNode }) {
   return (
     <Tabs label="Menu sections" tabs={MENU_TABS} value={value} onChange={onChange}>

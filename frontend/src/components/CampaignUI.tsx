@@ -337,13 +337,13 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
       {tab === "saves" && <div className="menu-columns">
         <div className="menu-col"><SaveFiles /></div>
         <div className="menu-col">
-          <AccountSection />
           <section className="menu-section menu-danger" aria-label="Start over"><h4><Icon name="refresh" size={20} />Start over</h4>
             <div className="menu-actions"><button type="button" className={`btn${confirmReset ? " btn-danger" : ""}`} onClick={reset}><Icon name="refresh" size={20} />{confirmReset ? "Lose this company? Press again" : "New company"}</button></div>
             {confirmReset && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces only the current Guided Mode save. Export it first if you want to keep it. Press the red button again to confirm.</Callout>}
           </section>
         </div>
       </div>}
+      {tab === "account" && <AccountSection />}
       {tab === "playtest" && <><AnalyticsSettings /><section className="menu-section" aria-label="Playtest records"><h4><Icon name="analytics" size={20} />Playtest records</h4>
         <FeedbackButton inline />
         <div className="menu-actions"><button type="button" className="btn" onClick={()=>{useGame.getState().measureTime();const s=useGame.getState();download("playtest-session.json",exportPlaytest(s.game,s.measurement));}}><Icon name="download" size={20} />Export playtest record</button></div>

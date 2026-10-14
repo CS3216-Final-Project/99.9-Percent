@@ -15,7 +15,7 @@ export interface MenuRunStat {
  */
 export function MenuRun({ title, saved, stats, note, onResume }: { title: string; saved: boolean; stats: MenuRunStat[]; note: ReactNode; onResume: () => void }) {
   return (
-    <>
+    <div className="menu-overview">
       <section className="menu-run" aria-label={title}>
         <div className="menu-run-head">
           <span className="menu-run-title">{title}</span>
@@ -43,11 +43,14 @@ export function MenuRun({ title, saved, stats, note, onResume }: { title: string
         <p className="menu-seed">{note}</p>
       </section>
 
-      <button type="button" className="btn btn-primary btn-big menu-resume" autoFocus onClick={onResume}>
+      <button type="button" className="btn btn-primary btn-big menu-resume" aria-label="Resume" autoFocus onClick={onResume}>
         <Icon name="play" />
-        Resume
+        <span>
+          <strong>Resume</strong>
+          <small>Back to the server room</small>
+        </span>
       </button>
-    </>
+    </div>
   );
 }
 

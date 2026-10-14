@@ -161,10 +161,10 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip" }));
   const campaignMenu = openMenu();
   const labels = (menu: HTMLElement) => within(within(menu).getByRole("tablist", { name: "Menu sections" })).getAllByRole("tab").map((t) => t.textContent);
-  expect(labels(campaignMenu)).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Playtest"]);
+  expect(labels(campaignMenu)).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]);
   // As in Classic, the run card (with the paused notice) and Resume stay above the tabs; the Run tab opens first.
   expect(within(campaignMenu).getByRole("tab", { name: "Run" }).getAttribute("aria-selected")).toBe("true");
-  for (const tab of ["Run", "Sound", "Graphics", "Avatar", "Saves", "Playtest"]) {
+  for (const tab of ["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]) {
     openTab(campaignMenu, tab);
     expect(within(campaignMenu).getByRole("region", { name: "This company" }).textContent).toContain("Time is paused");
     expect(within(campaignMenu).getByRole("button", { name: "Resume" })).toBeTruthy();
@@ -180,15 +180,19 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   expect(useGame.getState().graphics.quality).toBe("low");
   openTab(campaignMenu, "Saves");
   expectButtons(campaignMenu, ["New company", "Export current company", "Export original stored save", "Import save"]);
+  // Account is its own tab now, not part of Saves.
+  expect(within(campaignMenu).queryByRole("region", { name: "Account and cloud saves" })).toBeNull();
+  openTab(campaignMenu, "Account");
+  expect(within(campaignMenu).getByRole("region", { name: "Account and cloud saves" })).toBeTruthy();
   openTab(campaignMenu, "Playtest");
   expectButtons(campaignMenu, ["Export playtest record"]);
   openTab(campaignMenu, "Run");
   fireEvent.click(within(campaignMenu).getByRole("button", { name: "Switch to Challenge Mode" }));
 
   const classicMenu = openMenu();
-  expect(labels(classicMenu)).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Playtest"]);
+  expect(labels(classicMenu)).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]);
   // The run summary and Resume stay above the tabs whichever one is open.
-  for (const tab of ["Run", "Sound", "Graphics", "Avatar", "Saves", "Playtest"]) {
+  for (const tab of ["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]) {
     openTab(classicMenu, tab);
     expect(within(classicMenu).getByRole("region", { name: "This run" })).toBeTruthy();
     expect(within(classicMenu).getByRole("button", { name: "Resume" })).toBeTruthy();
@@ -206,6 +210,8 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   expectButtons(classicMenu, ["New game", "Reset to first run", "Export current run", "Import save"]);
   for (const region of ["Save files", "Start over"]) expect(within(classicMenu).getByRole("region", { name: region })).toBeTruthy();
   expect(within(classicMenu).getAllByRole("textbox")).toHaveLength(1);
+  openTab(classicMenu, "Account");
+  expect(within(classicMenu).getByRole("region", { name: "Account and cloud saves" })).toBeTruthy();
   openTab(classicMenu, "Playtest");
   expect(within(classicMenu).getByRole("region", { name: "Playtest data" })).toBeTruthy();
 });
