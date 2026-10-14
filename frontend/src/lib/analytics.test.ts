@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PostHogConfig } from "posthog-js/dist/module.no-external";
-import { ANALYTICS_CONSENT_KEY, configuredAnalytics, createAnalyticsSink, loadAnalyticsConsent, POSTHOG_OPTIONS, saveAnalyticsConsent, startConsentedProductAnalytics, startProductAnalytics, type AnalyticsConfig } from "./analytics";
+import { ANALYTICS_CONSENT_KEY, configuredAnalytics, createAnalyticsSink, loadAnalyticsConsent, POSTHOG_OPTIONS, saveAnalyticsConsent, startProductAnalyticsUnlessOptedOut, startProductAnalytics, type AnalyticsConfig } from "./analytics";
 import { useGame } from "@/game/store";
 
 const config: AnalyticsConfig = { enabled: true, token: "phc_test_public_token", host: "https://us.i.posthog.com", buildId: "test" };
@@ -118,20 +118,23 @@ describe("analytics consent", () => {
     }
   });
 
-  it("starts nothing while undecided or declined, and exactly once on acceptance", () => {
+  it("starts once while undecided, never while declined, and keeps one observer on acceptance", () => {
     const subscribe = vi.spyOn(useGame, "subscribe");
-    const stop = startConsentedProductAnalytics(useGame, config);
+    const stop = startProductAnalyticsUnlessOptedOut(useGame, config);
     try {
-      expect(subscribe).not.toHaveBeenCalled();
-      saveAnalyticsConsent("declined");
-      expect(subscribe).not.toHaveBeenCalled();
-      saveAnalyticsConsent("accepted");
       expect(subscribe).toHaveBeenCalledTimes(1);
-      // A second decision, or the same acceptance repeated, does not add an observer.
+      // Confirming the notice keeps the running observer rather than adding one.
       saveAnalyticsConsent("accepted");
       expect(subscribe).toHaveBeenCalledTimes(1);
     } finally {
       stop();
+    }
+    localStorage.setItem(ANALYTICS_CONSENT_KEY, "declined");
+    const stopDeclined = startProductAnalyticsUnlessOptedOut(useGame, config);
+    try {
+      expect(subscribe).toHaveBeenCalledTimes(1);
+    } finally {
+      stopDeclined();
     }
   });
 
@@ -142,7 +145,8 @@ describe("analytics consent", () => {
       unsubscribers.push(unsubscribe);
       return unsubscribe;
     });
-    const stop = startConsentedProductAnalytics(useGame, config);
+    localStorage.setItem(ANALYTICS_CONSENT_KEY, "declined");
+    const stop = startProductAnalyticsUnlessOptedOut(useGame, config);
     try {
       saveAnalyticsConsent("accepted");
       expect(subscribe).toHaveBeenCalledTimes(1);
@@ -170,7 +174,7 @@ describe("analytics consent", () => {
     localStorage.setItem(ANALYTICS_CONSENT_KEY, "accepted");
     const subscribe = vi.spyOn(useGame, "subscribe");
     const remove = vi.spyOn(window, "removeEventListener");
-    const stop = startConsentedProductAnalytics(useGame, config);
+    const stop = startProductAnalyticsUnlessOptedOut(useGame, config);
     expect(subscribe).toHaveBeenCalledTimes(1);
     stop();
     expect(remove).toHaveBeenCalledWith("nn:analytics-consent", expect.any(Function));
@@ -179,13 +183,14 @@ describe("analytics consent", () => {
     expect(subscribe).toHaveBeenCalledTimes(1);
   });
 
-  it("applies an acceptance for this visit even when storage fails", () => {
+  it("applies an opt-out for this visit even when storage fails", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
-    const subscribe = vi.spyOn(useGame, "subscribe");
-    const stop = startConsentedProductAnalytics(useGame, config);
+    const unsubscribe = vi.fn();
+    vi.spyOn(useGame, "subscribe").mockImplementation(() => unsubscribe);
+    const stop = startProductAnalyticsUnlessOptedOut(useGame, config);
     try {
-      saveAnalyticsConsent("accepted");
-      expect(subscribe).toHaveBeenCalledTimes(1);
+      saveAnalyticsConsent("declined");
+      expect(unsubscribe).toHaveBeenCalledTimes(1);
     } finally {
       stop();
     }

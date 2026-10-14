@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { AvatarButton } from "./AvatarPicker";
 import { BALANCE, type GameState } from "@/sim";
 import { num } from "@/game/format";
 import { campaignChapters } from "@/game/campaignChapters";
 import { loadClassicGame, loadGame, loadMeta, type GameMode } from "@/game/persist";
-import { loadAnalyticsConsent, saveAnalyticsConsent, type AnalyticsConsent } from "@/lib/analytics";
+import { loadAnalyticsConsent, saveAnalyticsConsent, subscribeAnalyticsConsent } from "@/lib/analytics";
 import { isFreshRun, useGame } from "@/game/store";
 import { AccountButton } from "./Account";
 import { FeedbackButton } from "./FeedbackButton";
@@ -39,20 +40,16 @@ const MODES: Record<GameMode, { name: string; icon: IconName; pace: string; abou
   },
 };
 
-/** The analytics opt-in, shown only until the player decides either way. */
+/** The analytics notice, shown only until the player confirms it or opts out. */
 function AnalyticsConsentPanel() {
-  const [consent, setConsent] = useState<AnalyticsConsent>(() => loadAnalyticsConsent());
+  const consent = useSyncExternalStore(subscribeAnalyticsConsent, loadAnalyticsConsent, () => null);
   if (consent !== null) return null;
-  const decide = (value: Exclude<AnalyticsConsent, null>) => {
-    saveAnalyticsConsent(value);
-    setConsent(value);
-  };
   return <section className="consent-panel" aria-labelledby="analytics-consent-heading">
-    <h2 id="analytics-consent-heading">Help improve 99.99%</h2>
-    <p>Share anonymous gameplay events and timing so we can improve the learning experience. We never send account details, URLs, or saved games.</p>
+    <h2 id="analytics-consent-heading">Help improve <span className="consent-logo">99.99%</span></h2>
+    <p>We track anonymous gameplay events, like which chapters you finish and how long they take, to help make the game better. We never send account details, URLs, or saved games. If you would rather not share, press Opt out.</p>
     <div className="consent-actions">
-      <button type="button" className="btn btn-primary" onClick={() => decide("accepted")}><Icon name="check" />Allow anonymous analytics</button>
-      <button type="button" className="btn" onClick={() => decide("declined")}>No thanks</button>
+      <button type="button" className="btn btn-small btn-primary" onClick={() => saveAnalyticsConsent("accepted")}><Icon name="check" />OK</button>
+      <button type="button" className="btn btn-small btn-danger" onClick={() => saveAnalyticsConsent("declined")}>Opt out</button>
     </div>
   </section>;
 }
@@ -113,7 +110,10 @@ export function HomeScreen() {
     <div className="home-card">
       <header className="home-head">
         <span className="title-kicker"><Icon name="server" size={16} />A system design tycoon</span>
-        <AccountButton />
+        <div className="home-chips">
+          <AvatarButton />
+          <AccountButton />
+        </div>
         <h1>99.99%</h1>
         <p className="title-tag">Grow a startup. Keep it online.</p>
       </header>
