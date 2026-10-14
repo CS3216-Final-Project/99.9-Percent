@@ -100,11 +100,12 @@ it("asks before switching away from a game that cannot be saved", () => {
 });
 
 describe("analytics consent", () => {
-  it("offers the opt-in only until the player decides, persisting either way", () => {
+  it("shows the notice only until the player confirms it, persisting the choice", () => {
     boot("campaign");
     const panel = screen.getByRole("region", { name: "Help improve 99.99%" });
     expect(panel.textContent).toContain("We never send account details, URLs, or saved games.");
-    fireEvent.click(within(panel).getByRole("button", { name: "Allow anonymous analytics" }));
+    expect(panel.textContent).toContain("If you would rather not share, press Opt out.");
+    fireEvent.click(within(panel).getByRole("button", { name: "OK" }));
     expect(localStorage.getItem(ANALYTICS_CONSENT_KEY)).toBe("accepted");
     expect(screen.queryByRole("region", { name: "Help improve 99.99%" })).toBeNull();
     cleanup();
@@ -112,9 +113,9 @@ describe("analytics consent", () => {
     expect(screen.queryByRole("region", { name: "Help improve 99.99%" })).toBeNull();
   });
 
-  it("remembers a decline too", () => {
+  it("remembers an opt-out too", () => {
     boot("campaign");
-    fireEvent.click(screen.getByRole("button", { name: "No thanks" }));
+    fireEvent.click(screen.getByRole("button", { name: "Opt out" }));
     expect(localStorage.getItem(ANALYTICS_CONSENT_KEY)).toBe("declined");
     expect(screen.queryByRole("region", { name: "Help improve 99.99%" })).toBeNull();
   });

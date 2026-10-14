@@ -58,7 +58,7 @@ function readLedger(): Ledger {
  * Observe user-visible play, without modifying the engine, saves or local playtest records.
  * One installation per page, outside React, also avoids StrictMode setup/cleanup duplicates.
  */
-export function watchProductAnalytics(store: GameStore, sink: AnalyticsSink, buildId: string): () => void {
+export function watchProductAnalytics(store: GameStore, sink: AnalyticsSink, buildId: string): (optedOut?: boolean) => void {
   const ledger = readLedger();
   let session: ActiveSession | null = null;
   let previous = store.getState();
@@ -193,7 +193,8 @@ export function watchProductAnalytics(store: GameStore, sink: AnalyticsSink, bui
     sample();
     if (session && !hidden && session.activeMs > session.reportedMs) { emit("gameplay_session_progress", { reason: "heartbeat" }); save(); }
   }, HEARTBEAT_MS);
-  return () => {
+  // An opt-out stops silently: no closing event and no ledger write.
+  return (optedOut = false) => {
     if (stopped) return;
     stopped = true;
     unsubscribe();
@@ -202,6 +203,6 @@ export function watchProductAnalytics(store: GameStore, sink: AnalyticsSink, bui
     document.removeEventListener("visibilitychange", visibility);
     window.removeEventListener("pagehide", pagehide);
     window.removeEventListener("pageshow", pageshow);
-    finish("unmount");
+    if (optedOut) session = null; else finish("unmount");
   };
 }
