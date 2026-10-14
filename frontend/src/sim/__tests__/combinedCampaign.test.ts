@@ -1,4 +1,4 @@
-import {describe,it,expect} from "vitest";
+import {describe,it,expect,vi} from "vitest";
 import {applyAction,newGame} from "../index";
 import {step,advanceSteps} from "../step";
 import {canRetire} from "../autoscaling";
@@ -7,6 +7,9 @@ import {baselineDemand,growthUsers,sequenceValid} from "../scenarios/combinedCam
 import {captureScorecard,emptyServiceMeasurement,observeService} from "../campaignScorecard";
 import {makeEnvelope,validateEnvelope} from "@/game/saveEnvelope";
 import {act,tick,completedReliability,combinedCompany,finishRound,finishedCompany,sequence} from "./combinedFixture";
+
+// Most tests here play whole Campaign runs (1-2s each alone); a busy full suite can push them past the 5s default.
+vi.setConfig({testTimeout:15_000});
 describe("Combined campaign",()=>{
  it("enters explicitly with the same company, resources, ownership and history",()=>{const p=completedReliability(),before=structuredClone(p);const s=act(p,{type:"enter_combined"});expect(p).toEqual(before);expect(canEnterCombined(p)).toBe(true);expect(s.campaign!.runId).toBe(p.campaign!.runId);expect(s.campaign!.cashCents).toBe(p.campaign!.cashCents);expect(s.campaign!.apps).toEqual(p.campaign!.apps);expect(s.campaign!.reliabilityStage).toEqual(p.campaign!.reliabilityStage);expect(s.campaign!.combinedStage!.users).toBe(2000);expect(sequenceValid(s.campaign!.combinedStage!.sequence)).toBe(true);expect(validateEnvelope(makeEnvelope(s)).status).toBe("ok");});
  it("rejects premature entry without changing the company",()=>{const s=newGame(1);expect(applyAction(s,{type:"enter_combined"}).ok).toBe(false);expect(s.campaign!.combinedStage).toBeNull();});
