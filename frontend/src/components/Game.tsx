@@ -12,7 +12,7 @@ import { createSfx } from "@/game/sfx";
 import { useGame, type Speed } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { daylightNow } from "./scene/dayClock";
-import { nextGap, viewFocus, ZONE_SOUNDS, zoneLevel, type ZoneSound } from "./scene/zoneSounds";
+import { entryGap, nextGap, viewFocus, ZONE_SOUNDS, zoneLevel, type ZoneSound } from "./scene/zoneSounds";
 import { DOORS, FLOOR_Y, RIDE_SECONDS } from "./scene/levels";
 import { onRide, ride } from "./scene/ride";
 import { onSceneSound } from "./scene/sceneSounds";
@@ -339,8 +339,8 @@ function useSoundEffects(): void {
           due.delete(zone);
           continue;
         }
-        // A zone coming into earshot waits a gap before its first sound, so a pan never sets off a burst.
-        const at = due.get(zone) ?? now + nextGap(zone, Math.random());
+        // A zone coming into earshot answers promptly, but a short entry gap means a pan never sets off a burst.
+        const at = due.get(zone) ?? now + entryGap(Math.random());
         if (now >= at) {
           sfx.playZone(zone.cue, level);
           due.set(zone, now + nextGap(zone, Math.random()));
