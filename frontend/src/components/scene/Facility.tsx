@@ -4,7 +4,7 @@ import { Line, MapControls, PerformanceMonitor } from "@react-three/drei";
 import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
@@ -1110,16 +1110,23 @@ function FrameLimiter({ fps }: { fps: number }) {
 }
 
 /** Do what is within the avatar's reach: exactly what clicking it does, the elevator's ride, or a fun thing. */
-function actOn(prompt: Prompt): void {
-  if (prompt.kind === "equipment") inspectOrSelect(prompt.id);
-  else if (prompt.kind === "elevator") useGame.getState().goToFloor(prompt.to, "elevator");
-  else play(prompt.prop, now());
+function actOn(prompt: Prompt): string | null {
+  if (prompt.kind === "equipment") {
+    inspectOrSelect(prompt.id);
+    return null;
+  }
+  if (prompt.kind === "elevator") {
+    useGame.getState().goToFloor(prompt.to, "elevator");
+    return null;
+  }
+  play(prompt.prop, now());
+  return prompt.prop.doing;
 }
 
 /** What a typing field, an open dialog or a menu does with keys is theirs, not the room's. */
 const typing = (el: HTMLElement | null) => !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
 const inOverlay = (el: HTMLElement | null) => !!el?.closest('[role="dialog"], [role="menu"], [role="listbox"]');
-/** Space and the arrow keys belong to a focused button, tab, radio or slider. */
+/** The arrow keys, and Space when the avatar has nothing in reach, belong to a focused button, tab, radio or slider. */
 const onControl = (el: HTMLElement | null) => !!el?.closest('button, a, [role="tab"], [role="radio"], [role="slider"], [role="checkbox"]');
 
 /**
@@ -1129,23 +1136,48 @@ const onControl = (el: HTMLElement | null) => !!el?.closest('button, a, [role="t
 function WalkControls() {
   const walking = useGame((s) => s.walking && s.started);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
+  // What the prompt button says a fun thing is doing, while its animation plays.
+  const [activity, setActivity] = useState<{ propId: string; label: string } | null>(null);
+  const activityTimer = useRef<number | null>(null);
   useEffect(() => onPrompt(setPrompt), []);
+  // Stopping walk mode drops whatever the button said the avatar was doing.
+  useEffect(() => useGame.subscribe((s) => { if (!s.walking) setActivity(null); }), []);
+  const perform = useCallback((p: Prompt) => {
+    const doing = actOn(p);
+    if (!doing) return;
+    setActivity({ propId: p.kind === "prop" ? p.prop.id : "", label: doing });
+    if (activityTimer.current !== null) window.clearTimeout(activityTimer.current);
+    // For as long as the prop's animation runs.
+    activityTimer.current = window.setTimeout(() => {
+      activityTimer.current = null;
+      setActivity(null);
+    }, 2600);
+  }, []);
   useEffect(() => {
     if (!walking) {
       clearPrompt();
+      if (activityTimer.current !== null) {
+        window.clearTimeout(activityTimer.current);
+        activityTimer.current = null;
+      }
       return;
     }
     const down = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (typing(el) || inOverlay(el) || e.ctrlKey || e.metaKey || e.altKey) return;
       const arrow = e.code.startsWith("Arrow");
+      if (e.code === "Space" && avatar.prompt && !riding()) {
+        // A nearby thing to use beats whatever button last held focus.
+        e.preventDefault();
+        if (!e.repeat) perform(avatar.prompt);
+        return;
+      }
       if ((arrow || e.code === "Space") && onControl(el)) return;
       if (movesAvatar(e.code) || e.code === "ShiftLeft" || e.code === "ShiftRight") {
         if (!riding()) held.add(e.code);
         if (arrow) e.preventDefault();
       } else if (e.code === "Space") {
         e.preventDefault();
-        if (!e.repeat && avatar.prompt && !riding()) actOn(avatar.prompt);
       }
     };
     const up = (e: KeyboardEvent) => held.delete(e.code);
@@ -1162,18 +1194,25 @@ function WalkControls() {
       document.removeEventListener("visibilitychange", letGo);
       held.clear();
     };
-  }, [walking]);
+  }, [walking, perform]);
+  useEffect(
+    () => () => {
+      if (activityTimer.current !== null) window.clearTimeout(activityTimer.current);
+    },
+    []
+  );
   const shown = walking ? prompt : null;
+  const doing = shown?.kind === "prop" && activity?.propId === shown.prop.id ? activity.label : null;
   return (
     <>
       {shown && (
-        <button type="button" className="walk-prompt" onClick={() => actOn(shown)}>
+        <button type="button" className="walk-prompt" onClick={() => perform(shown)}>
           <kbd>Space</kbd>
-          {shown.label}
+          {doing ?? shown.label}
         </button>
       )}
       <span className="visually-hidden" role="status" aria-live="polite">
-        {shown ? `${shown.label}: press Space` : ""}
+        {shown ? (doing ?? `${shown.label}: press Space`) : ""}
       </span>
     </>
   );

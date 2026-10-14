@@ -526,6 +526,8 @@ export const SERVER_DOORS: Door[] = [
 export interface FunProp {
   id: string;
   label: string;
+  /** What the prompt button says while the prop's animation plays. */
+  doing: string;
   x: number;
   z: number;
   /** The way to face while playing. */
@@ -535,9 +537,9 @@ export interface FunProp {
 
 /** The office's fun things to do. None of them changes the game. */
 export const FUN_PROPS: FunProp[] = [
-  { id: "espresso", label: "Make a coffee", x: 17.23, z: -7.95, face: [17.23, -9.15], clip: "eat" },
-  { id: "vending", label: "Get a snack", x: 13.15, z: -7.9, face: [13.15, -9.0], clip: "eat" },
-  { id: "cooler", label: "Have some water", x: 15.75, z: -3.6, face: [15.0, -4.0], clip: "eat" },
-  { id: "arcade", label: "Play the arcade", x: (ARCADES[0][1] + ARCADES[1][1]) / 2, z: ARCADE_Z + 0.95, face: [(ARCADES[0][1] + ARCADES[1][1]) / 2, ARCADE_Z], clip: "dance" },
-  { id: "nap", label: "Rest in a nap pod", x: 10.0, z: NAP_PODS[0][1], face: [NAP_PODS[0][0], NAP_PODS[0][1]], clip: "gesture-positive" },
+  { id: "espresso", label: "Make a coffee", doing: "Making a coffee…", x: 17.23, z: -7.95, face: [17.23, -9.15], clip: "eat" },
+  { id: "vending", label: "Get a snack", doing: "Getting a snack…", x: 13.15, z: -7.9, face: [13.15, -9.0], clip: "eat" },
+  { id: "cooler", label: "Have some water", doing: "Having some water…", x: 15.75, z: -3.6, face: [15.0, -4.0], clip: "eat" },
+  { id: "arcade", label: "Play the arcade", doing: "Playing the arcade…", x: (ARCADES[0][1] + ARCADES[1][1]) / 2, z: ARCADE_Z + 0.95, face: [(ARCADES[0][1] + ARCADES[1][1]) / 2, ARCADE_Z], clip: "dance" },
+  { id: "nap", label: "Rest in a nap pod", doing: "Resting in a nap pod…", x: 10.0, z: NAP_PODS[0][1], face: [NAP_PODS[0][0], NAP_PODS[0][1]], clip: "gesture-positive" },
 ];
