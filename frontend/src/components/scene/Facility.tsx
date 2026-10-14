@@ -40,7 +40,11 @@ import { Office } from "./Office";
 import { ServerFloor } from "./ServerFloor";
 import { ElevatorCar, Landing } from "./Elevator";
 import { FLOOR_NUMBER, FLOOR_Y, rideAt } from "./levels";
-import { arrive, depart, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
+import { arrive, depart, now, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
+import { Avatar, WalkDriver, WalkFloor } from "./Avatar";
+import { GlassDoors } from "./Doors";
+import { avatar, clearPrompt, held, movesAvatar, onPrompt, play, walkTo } from "./walk";
+import type { Prompt } from "./player";
 import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
 import { Exterior } from "./exterior";
@@ -221,12 +225,15 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
   );
 
   // Read the camera from the frame state: R3F expects per-frame mutation here, not on the hook's render value.
-  useFrame((state) => {
+  useFrame((state, dt) => {
     const c = controls.current;
     if (!c) return;
     const camera = state.camera as THREE.OrthographicCamera;
     const { size } = state;
     const { offset, dir, before, from, centre } = v;
+    // In walk mode the view follows the avatar, so it no longer frames the equipment.
+    const walking = useGame.getState().walking;
+    if (walking) touched.current = true;
     offset.copy(camera.position).sub(c.target);
     const distance = offset.length();
     from.copy(offset).normalize().negate();
@@ -247,8 +254,10 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
       turned = true;
     }
     if (turned) {
-      // While the view follows the facility, turn about the built equipment so it holds its place on screen.
-      if (!touched.current && box.current) turnAbout(c.target, box.current.getCenter(centre), from, dir.copy(offset).normalize().negate(), c.target.y);
+      // While the view follows the facility, turn about the built equipment so it holds its place on screen; in walk
+      // mode, about the avatar.
+      if (walking) turnAbout(c.target, centre.set(avatar.x, c.target.y + 0.4, avatar.z), from, dir.copy(offset).normalize().negate(), c.target.y);
+      else if (!touched.current && box.current) turnAbout(c.target, box.current.getCenter(centre), from, dir.copy(offset).normalize().negate(), c.target.y);
       camera.position.copy(c.target).add(offset);
       // The controls aimed the camera earlier this frame, from where it stood before the turn.
       camera.lookAt(c.target);
@@ -279,6 +288,13 @@ function CameraRig({ footprints, built, floor }: { footprints: Record<EquipmentI
       camera.position.add(c.target).sub(before);
       camera.updateProjectionMatrix();
       if (Math.abs(zoom - camera.zoom) < 0.05 && Math.hypot(goal.x - c.target.x, goal.z - c.target.z) < 0.01) focusing.current = null;
+    } else if (walking && !riding()) {
+      // Follow the avatar when no campaign action is centring its machine.
+      const k = reducedMotion() ? 1 : 1 - Math.exp(-Math.min(dt, 0.1) * 3);
+      before.copy(c.target);
+      c.target.x += (avatar.x - c.target.x) * k;
+      c.target.z += (avatar.z - c.target.z) * k;
+      camera.position.add(c.target).sub(before);
     }
     // Ride with the elevator: the view's height follows the car on the clock, however few frames are drawn.
     const y = viewHeight();
@@ -516,6 +532,7 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
     if (e.delta > 6) return;
     e.stopPropagation();
     inspectOrSelect(id);
+    approach(id, f);
   };
 
   return (
@@ -631,6 +648,12 @@ function bindLabel(key: string) {
   };
 }
 
+/** In walk mode, choosing equipment on the avatar's floor also sends the avatar over to it. */
+function approach(id: EquipmentId, f: Footprint): void {
+  if (!useGame.getState().walking || riding() || floorOf(id) !== avatar.floor) return;
+  walkTo(f.x, f.z);
+}
+
 function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
   const selected = useGame((s) => s.selected === id);
   const hovered = useGame((s) => s.hovered === id);
@@ -645,7 +668,10 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       ref={bindLabel(id)}
       data-eq={id}
       className={`eq-label tone-${tone}${selected ? " is-selected" : ""}${affected ? " is-affected" : ""}${!built && !selected && !hovered && !affected ? " is-quiet" : ""}`}
-      onClick={() => inspectOrSelect(id)}
+      onClick={() => {
+        inspectOrSelect(id);
+        approach(id, m.footprints[id]);
+      }}
       onFocus={() => useGame.getState().hover(id)}
       onBlur={() => useGame.getState().hover(null)}
       aria-pressed={selected}
@@ -865,6 +891,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
   const m = useSceneModel();
   const campaign = useGame(s => s.game.campaign);
   const floor = useGame((s) => s.floor);
+  const walking = useGame((s) => s.walking && s.started);
   const office = useRef<THREE.Group>(null);
   const servers = useRef<THREE.Group>(null);
   const lights = useRef<(THREE.PointLight | null)[]>([]);
@@ -921,12 +948,16 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
 
       <Exterior />
       <ElevatorCar />
+      <Avatar walking={walking} />
+      <WalkDriver walking={walking} footprints={m.footprints} names={m.names} />
 
       {/* The office floor, on top */}
       <group ref={office}>
         <Room />
         <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
         <Landing floor="office" interactive={landed === "office"} />
+        <GlassDoors floor="office" />
+        {walking && landed === "office" && <WalkFloor />}
         {onFloor("office").map((id) => (
           <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
         ))}
@@ -937,6 +968,8 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
         <Room servers />
         <ServerFloor incident={m.incident} engineers={m.engineers} />
         <Landing floor="servers" interactive={landed === "servers"} />
+        <GlassDoors floor="servers" />
+        {walking && landed === "servers" && <WalkFloor />}
 
         {/* Network edge */}
         <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
@@ -1072,6 +1105,111 @@ function FrameLimiter({ fps }: { fps: number }) {
   return null;
 }
 
+/** Do what is within the avatar's reach: exactly what clicking it does, the elevator's ride, or a fun thing. */
+function actOn(prompt: Prompt): void {
+  if (prompt.kind === "equipment") inspectOrSelect(prompt.id);
+  else if (prompt.kind === "elevator") useGame.getState().goToFloor(prompt.to, "elevator");
+  else play(prompt.prop, now());
+}
+
+/** What a typing field, an open dialog or a menu does with keys is theirs, not the room's. */
+const typing = (el: HTMLElement | null) => !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+const inOverlay = (el: HTMLElement | null) => !!el?.closest('[role="dialog"], [role="menu"], [role="listbox"]');
+/** Space and the arrow keys belong to a focused button, tab, radio or slider. */
+const onControl = (el: HTMLElement | null) => !!el?.closest('button, a, [role="tab"], [role="radio"], [role="slider"], [role="checkbox"]');
+
+/**
+ * Walk mode's controls on the page: the keys that move the avatar and use what is within its reach, a button with
+ * what that is (so a tap works on a phone), and the same news for screen readers.
+ */
+function WalkControls() {
+  const walking = useGame((s) => s.walking && s.started);
+  const [prompt, setPrompt] = useState<Prompt | null>(null);
+  useEffect(() => onPrompt(setPrompt), []);
+  useEffect(() => {
+    if (!walking) {
+      clearPrompt();
+      return;
+    }
+    const down = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (typing(el) || inOverlay(el) || e.ctrlKey || e.metaKey || e.altKey) return;
+      const arrow = e.code.startsWith("Arrow");
+      if ((arrow || e.code === "Space") && onControl(el)) return;
+      if (movesAvatar(e.code) || e.code === "ShiftLeft" || e.code === "ShiftRight") {
+        if (!riding()) held.add(e.code);
+        if (arrow) e.preventDefault();
+      } else if (e.code === "Space") {
+        e.preventDefault();
+        if (!e.repeat && avatar.prompt && !riding()) actOn(avatar.prompt);
+      }
+    };
+    const up = (e: KeyboardEvent) => held.delete(e.code);
+    // A key let go while the page was elsewhere would otherwise stay held.
+    const letGo = () => held.clear();
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", letGo);
+    document.addEventListener("visibilitychange", letGo);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", letGo);
+      document.removeEventListener("visibilitychange", letGo);
+      held.clear();
+    };
+  }, [walking]);
+  const shown = walking ? prompt : null;
+  return (
+    <>
+      {shown && (
+        <button type="button" className="walk-prompt" onClick={() => actOn(shown)}>
+          <kbd>Space</kbd>
+          {shown.label}
+        </button>
+      )}
+      <span className="visually-hidden" role="status" aria-live="polite">
+        {shown ? `${shown.label}: press Space` : ""}
+      </span>
+    </>
+  );
+}
+
+/** The Walk button among the camera's: on, the player steers their avatar; Esc or the button again stops. */
+function WalkButton({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) {
+  const walking = useGame((s) => s.walking);
+  return (
+    <button
+      type="button"
+      className={`walk-button${walking ? " is-on" : ""}`}
+      aria-pressed={walking}
+      onClick={() => {
+        useGame.getState().setWalking(!walking);
+        // Leave the keys to the room: a focused button would take Space for itself.
+        stage.current?.focus({ preventScroll: true });
+      }}
+      {...tipProps(walking ? "Stop walking (Esc)" : "Walk the building as your avatar")}
+    >
+      <Icon name="user" size={16} />
+      Walk
+    </button>
+  );
+}
+
+/** The keys to know, for the camera or, in walk mode, for walking. */
+function CameraHint() {
+  const walking = useGame((s) => s.walking);
+  return walking ? (
+    <>
+      <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> to walk · <kbd>Shift</kbd> to run · click the floor to go there · <kbd>Space</kbd> to use · <kbd>Esc</kbd> to stop
+    </>
+  ) : (
+    <>
+      <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn · <kbd>PgUp</kbd> <kbd>PgDn</kbd> to change floor
+    </>
+  );
+}
+
 /** The player has asked their system for less motion: floors cut rather than ride. */
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -1172,7 +1310,7 @@ export default function Facility() {
   const tuned = adaptive ? adapt(profile, current.factor, current.settled, window.devicePixelRatio || 1) : null;
   const quality: QualityProfile = tuned ? { ...profile, dpr: tuned.dpr, effects: tuned.effects } : profile;
   return (
-    <div className="stage-canvas" ref={container}>
+    <div className="stage-canvas" ref={container} tabIndex={-1}>
       {/* Shadow maps cannot be resized or switched on and off once materials are compiled, so a new quality starts a new canvas. */}
       <Canvas
         key={chosen}
@@ -1220,6 +1358,7 @@ export default function Facility() {
       <Labels landed={landed} />
       <HoverTip container={container} />
       <FloorMenu />
+      <WalkControls />
       <div className="camera-buttons" role="group" aria-label="Camera">
         <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" {...tipProps("Zoom in")}>
           +
@@ -1233,11 +1372,12 @@ export default function Facility() {
         <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" {...tipProps("Rotate right (E)")}>
           <Icon name="rotateRight" size={16} />
         </button>
+        <WalkButton stage={container} />
         <button type="button" onClick={() => cameraApi.reset()} aria-label="Reset view" {...tipProps("Reset view: fit the room and face the starting angle")}>
           ⌂
         </button>
         <span className="camera-hint" aria-hidden="true">
-          <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn · <kbd>PgUp</kbd> <kbd>PgDn</kbd> to change floor
+          <CameraHint />
         </span>
       </div>
     </div>

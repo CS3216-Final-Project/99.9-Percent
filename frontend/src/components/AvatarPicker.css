@@ -1,0 +1,72 @@
+/* Avatar choices: pictures of the cube animals in a grid of radio cards, the chosen one filled and outlined. */
+.avatar-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
+}
+
+.avatar-option {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 6px 6px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--paper-3);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.avatar-option:hover {
+  border-color: var(--ink);
+}
+
+.avatar-option.is-on {
+  background: var(--go);
+  border-color: var(--ink);
+  box-shadow: var(--press);
+  font-weight: 600;
+}
+
+.avatar-option input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.avatar-option:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.avatar-option img {
+  width: 56px;
+  height: 56px;
+  image-rendering: auto;
+}
+
+/* The home screen's chip shows the chosen animal's picture where the account chip has its icon. */
+.avatar-chip-picture {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--paper);
+}
+
+.home-chips {
+  grid-area: account;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-avatar .avatar-options {
+  margin: 12px 0 16px;
+}

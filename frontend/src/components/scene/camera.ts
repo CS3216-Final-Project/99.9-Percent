@@ -8,9 +8,9 @@ export const CAMERA_DISTANCE = 2 * REACH;
 export const CAMERA_FAR = 2 * CAMERA_DISTANCE;
 export const CAMERA_NEAR = 0.1;
 
-/** Tilt measured from straight down: nearly top-down to a low three-quarter view. */
+/** Tilt measured from straight down: nearly top-down to a low view about 10 degrees above the horizon. */
 export const MIN_TILT = 0.22;
-export const MAX_TILT = 1.2;
+export const MAX_TILT = 1.4;
 
 const UP = new THREE.Vector3(0, 1, 0);
 const right = new THREE.Vector3();
