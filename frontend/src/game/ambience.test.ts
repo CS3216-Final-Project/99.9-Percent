@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blend, createAmbience, dayEvents, LOOP_SECONDS, mix, nightEvents, type Event } from './ambience';
+import { blend, CITY_INDOOR_LEVEL, createAmbience, dayEvents, LOOP_SECONDS, mix, nightEvents, type Event } from './ambience';
 
 const kinds = (events: Event[]) => new Set(events.map((e) => e.kind));
 
@@ -59,19 +59,26 @@ describe('crossfading with the dark', () => {
 });
 
 describe('the server floor', () => {
-  it('takes over from the city as the hall is heard, and leaves the city as it was with the office in view', () => {
+  it('takes over from the city as the hall is heard, and in the office the city is only faint through the walls', () => {
     for (const dark of [0, 0.4, 1]) {
-      expect(blend(dark, 0)).toEqual({ ...mix(dark), hall: 0 });
+      expect(blend(dark, 0)).toEqual({ day: mix(dark).day * CITY_INDOOR_LEVEL, night: mix(dark).night * CITY_INDOOR_LEVEL, hall: 0 });
       const indoors = blend(dark, 1);
       expect(indoors.hall).toBe(1);
       expect(indoors.day).toBeCloseTo(0, 9);
       expect(indoors.night).toBeCloseTo(0, 9);
     }
     const half = blend(0, 0.5);
-    expect(half.day).toBeCloseTo(0.5, 9);
+    expect(half.day).toBeCloseTo(CITY_INDOOR_LEVEL * 0.5, 9);
     expect(half.hall).toBe(0.5);
     expect(blend(0, 3)).toEqual(blend(0, 1));
     expect(blend(0, -1)).toEqual(blend(0, 0));
+  });
+
+  it('keeps the hall louder than the faint city heard indoors, and the city never fully silent in the office', () => {
+    const full = blend(0.3, 1);
+    expect(full.hall).toBeGreaterThan(CITY_INDOOR_LEVEL);
+    const office = blend(0.3, 0);
+    expect(office.day + office.night).toBeGreaterThan(0);
   });
 });
 

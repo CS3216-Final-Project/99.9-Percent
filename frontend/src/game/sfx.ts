@@ -175,7 +175,7 @@ function burst(ctx: Ctx, out: AudioNode, at: number, hiss: AudioBuffer, hz: numb
 }
 
 /**
- * The sounds of the office's zones, heard quietly when the camera is near them (see scene/zoneSounds.ts). They are
+ * The sounds of the office's zones, heard clearly up close near where they are heard (see scene/zoneSounds.ts). They are
  * not game events, so they have no place among the cues above and never compete with them.
  */
 const ZONE_VOICES = {
@@ -185,7 +185,7 @@ const ZONE_VOICES = {
     burst(ctx, out, at + 0.11, hiss, 1400, 0.05, hit(ctx, at + 0.11, 0.28, 0.05));
   },
   /** Three quick chiptune notes from an arcade cabinet. */
-  arcade: (ctx, out, at) => run(ctx, out, at, [76, 83, 88], 0.07, 0.11, 0.06, 2600),
+  arcade: (ctx, out, at) => run(ctx, out, at, [76, 83, 88], 0.07, 0.24, 0.06, 2600),
   /** The espresso machine: a hiss of steam over a low gurgle. */
   espresso: (ctx, out, at, hiss) => {
     burst(ctx, out, at, hiss, 3600, 1.4, envelope(ctx, at, 1.4, 0.16, 0.15, 0.6));
@@ -200,18 +200,18 @@ const ZONE_VOICES = {
   },
   /** Table tennis: the hollow knock of a paddle, then the ball's quieter bounce on the table. */
   pingPong: (ctx, out, at, hiss) => {
-    osc(ctx, "sine", 420, at, at + 0.07).connect(hit(ctx, at, 0.14, 0.05)).connect(out);
-    burst(ctx, out, at, hiss, 1600, 0.03, hit(ctx, at, 0.1, 0.025));
-    osc(ctx, "sine", 640, at + 0.1, at + 0.14).connect(hit(ctx, at + 0.1, 0.06, 0.03)).connect(out);
+    osc(ctx, "sine", 420, at, at + 0.07).connect(hit(ctx, at, 0.32, 0.05)).connect(out);
+    burst(ctx, out, at, hiss, 1600, 0.03, hit(ctx, at, 0.2, 0.025));
+    osc(ctx, "sine", 640, at + 0.1, at + 0.14).connect(hit(ctx, at + 0.1, 0.14, 0.03)).connect(out);
   },
   /** Nearby voices: two or three low, indistinct tones overlapping, no words. */
   murmur: (ctx, out, at) => {
     const lp = filter(ctx, "lowpass", 900);
     lp.connect(out);
     [
-      [0, 52, 0.34, 0.05],
-      [0.07, 55, 0.26, 0.04],
-      [0.16, 48, 0.3, 0.03],
+      [0, 52, 0.34, 0.18],
+      [0.07, 55, 0.26, 0.14],
+      [0.16, 48, 0.3, 0.12],
     ].forEach(([t, m, len, peak]) => {
       osc(ctx, "triangle", note(m), at + t, at + t + len).connect(envelope(ctx, at + t, len, peak, 0.06, 0.12)).connect(lp);
     });
@@ -219,7 +219,7 @@ const ZONE_VOICES = {
   /** Typing at a desk: a few tiny high clicks at an uneven pace. */
   keyboard: (ctx, out, at, hiss) => {
     for (const t of [0, 0.07, 0.19, 0.26, 0.38, 0.47]) {
-      burst(ctx, out, at + t, hiss, 5200, 0.015, hit(ctx, at + t, 0.07, 0.012));
+      burst(ctx, out, at + t, hiss, 5200, 0.015, hit(ctx, at + t, 0.16, 0.012));
     }
   },
   /** Someone in the phone booth: two short, muffled syllables, not a ring. */
@@ -234,7 +234,7 @@ const ZONE_VOICES = {
       const o = osc(ctx, "sawtooth", note(m), at + t, at + t + len);
       o.frequency.setValueAtTime(note(m), at + t);
       o.frequency.linearRampToValueAtTime(note(m + 1), at + t + len);
-      o.connect(envelope(ctx, at + t, len, 0.07, 0.02, 0.05)).connect(bp);
+      o.connect(envelope(ctx, at + t, len, 0.16, 0.02, 0.05)).connect(bp);
     });
   },
   /** A talk in the meeting room: one low phrase that moves through three pitches. */
@@ -246,22 +246,22 @@ const ZONE_VOICES = {
       [0.22, 55, 0.2],
       [0.42, 52, 0.26],
     ].forEach(([t, m, len]) => {
-      osc(ctx, "triangle", note(m), at + t, at + t + len).connect(envelope(ctx, at + t, len, 0.06, 0.04, 0.08)).connect(lp);
+      osc(ctx, "triangle", note(m), at + t, at + t + len).connect(envelope(ctx, at + t, len, 0.16, 0.04, 0.08)).connect(lp);
     });
   },
   /** The kitchen counter: two light clinks of crockery. */
   kitchen: (ctx, out, at, hiss) => {
-    burst(ctx, out, at, hiss, 4300, 0.04, hit(ctx, at, 0.11, 0.035));
-    osc(ctx, "sine", 2400, at, at + 0.09).connect(hit(ctx, at, 0.04, 0.08)).connect(out);
-    burst(ctx, out, at + 0.13, hiss, 3600, 0.04, hit(ctx, at + 0.13, 0.08, 0.03));
-    osc(ctx, "sine", 1900, at + 0.13, at + 0.2).connect(hit(ctx, at + 0.13, 0.03, 0.06)).connect(out);
+    burst(ctx, out, at, hiss, 4300, 0.04, hit(ctx, at, 0.24, 0.035));
+    osc(ctx, "sine", 2400, at, at + 0.09).connect(hit(ctx, at, 0.08, 0.08)).connect(out);
+    burst(ctx, out, at + 0.13, hiss, 3600, 0.04, hit(ctx, at + 0.13, 0.18, 0.03));
+    osc(ctx, "sine", 1900, at + 0.13, at + 0.2).connect(hit(ctx, at + 0.13, 0.06, 0.06)).connect(out);
   },
   /** The television murmuring in the corner: a low wash of noise and two quiet blips. */
   television: (ctx, out, at, hiss) => {
     const lp = filter(ctx, "lowpass", 800);
-    noise(ctx, at, at + 0.5, hiss).connect(lp).connect(envelope(ctx, at, 0.5, 0.07, 0.08, 0.2)).connect(out);
-    osc(ctx, "sine", note(69), at + 0.1, at + 0.16).connect(hit(ctx, at + 0.1, 0.04, 0.05)).connect(out);
-    osc(ctx, "sine", note(74), at + 0.28, at + 0.34).connect(hit(ctx, at + 0.28, 0.04, 0.05)).connect(out);
+    noise(ctx, at, at + 0.5, hiss).connect(lp).connect(envelope(ctx, at, 0.5, 0.15, 0.08, 0.2)).connect(out);
+    osc(ctx, "sine", note(69), at + 0.1, at + 0.16).connect(hit(ctx, at + 0.1, 0.09, 0.05)).connect(out);
+    osc(ctx, "sine", note(74), at + 0.28, at + 0.34).connect(hit(ctx, at + 0.28, 0.09, 0.05)).connect(out);
   },
 } satisfies Record<string, Voice>;
 

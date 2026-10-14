@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ZONE_CUES } from '@/game/sfx';
 import { GROUPS } from './conversations';
 import { RALLY } from './rally';
-import { nextGap, ZONE_PEAK, ZONE_REACH, ZONE_SOUNDS, ZONE_ZOOM, zoneLevel, type ZoneSound } from './zoneSounds';
+import { entryGap, nextGap, ZONE_ENTRY_GAP, ZONE_PEAK, ZONE_REACH, ZONE_SOUNDS, ZONE_ZOOM, zoneLevel, type ZoneSound } from './zoneSounds';
 
 const foosball = ZONE_SOUNDS.find((s) => s.cue === 'foosball') as ZoneSound;
 
@@ -49,6 +49,14 @@ describe('zone sounds', () => {
     expect(at).toBeCloseTo(ZONE_PEAK, 9);
     // The same spot through the camera at that zoom is silent.
     expect(zoneLevel(foosball, { x: foosball.x, z: foosball.z, zoom: 0 })).toBe(0);
+  });
+
+  it('answer promptly on first coming into earshot, sooner than any recurring cadence', () => {
+    expect(entryGap(0)).toBe(ZONE_ENTRY_GAP[0]);
+    expect(entryGap(1)).toBe(ZONE_ENTRY_GAP[1]);
+    for (const s of ZONE_SOUNDS) {
+      expect(ZONE_ENTRY_GAP[1]).toBeLessThan(s.every[1]);
+    }
   });
 
   it('wait between plays within each sound\'s range', () => {
