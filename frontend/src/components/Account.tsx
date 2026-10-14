@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useGame } from "@/game/store";
 import { exportCloudCopies, localCloudCopy } from "@/game/cloud";
 import type { RunSummary } from "../../../shared/campaign.ts";
+import { AnalyticsSettings } from "./AnalyticsSettings";
 import { Icon } from "./icons";
 import { Callout, Modal } from "./ui";
 import "./Account.css";
@@ -75,6 +76,7 @@ export function AccountButton() {
     {open && createPortal(
       <Modal title="Account" icon={{ kind: "users", name: "user" }} onClose={() => setOpen(false)} className="modal-account">
         <AccountContent onLoaded={() => setOpen(false)} />
+        <AnalyticsSettings />
       </Modal>,
       document.body,
     )}

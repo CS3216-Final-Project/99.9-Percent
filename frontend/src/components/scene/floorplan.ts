@@ -1,4 +1,4 @@
-import { deskSlot, POS } from "./layout";
+import { appSlot, DB_CABINET, dbSlot, deskSlot, MAX_TEMP_SHOWN, POS, RACK, tempSlot } from "./layout";
 import { RALLY, TABLE } from "./rally";
 
 /*
@@ -339,4 +339,205 @@ export const OBSTACLES: Obstacle[] = [
   // Games corner
   box("ping-pong table", RALLY.x, RALLY.z, TABLE.length, TABLE.width),
   ...ARCADES.map(([variant, x]) => box(`${variant} arcade`, x, ARCADE_Z, 0.72, 0.75)),
+];
+
+/* ------------------------------------------------------------------ */
+/* The server floor's layout, shared by its drawing and its walks      */
+/* ------------------------------------------------------------------ */
+
+/** The cooling plant's two chillers, each with two fans on top, standing along z. */
+export const CHILLERS: [number, number][] = [
+  [-20.2, 3.2],
+  [-20.2, 7.6],
+];
+export const CHILLER = { w: 1.5, d: 3.2, h: 1.9, fanZ: 0.8, fan: 1.05 };
+/** The pumps beside the chillers, motors along x. */
+export const PUMPS: [number, number][] = [
+  [-16.4, 2.3],
+  [-16.4, 4.1],
+];
+/** The stores' shelving: runs along z in the east wing, with a cross aisle in the middle. */
+export const SHELF_RUNS = [16.2, 18.8, 21.4];
+export const SHELF_UNITS = [-7.8, -5.4, -3.0, 2.6, 5.0, 7.4];
+/** The workshop's benches, the rack frames being fitted and the pallets of boxed servers. */
+export const BENCHES: [number, number][] = [
+  [-6.4, 8.0],
+  [-2.8, 8.0],
+];
+export const RACK_FRAMES: [number, number][] = [
+  [2.6, 8.0],
+  [3.9, 8.0],
+  [5.2, 8.0],
+];
+export const PALLETS: [number, number][] = [
+  [-10.6, 11.6],
+  [-10.6, 13.2],
+  [19.6, 12.2],
+  [17.4, 12.2],
+];
+/** The wire cage for spare parts, open towards the hall. */
+export const CAGE = { x: 5.6, z: 12.8, w: 3.0, d: 1.6 };
+
+/** How many database cabinets can ever stand: one per tier. */
+const DB_CABINETS = 4;
+
+/**
+ * Everything on the server floor to walk round. Every place a machine can stand counts, built or not, so a walk
+ * never runs into one fitted later.
+ */
+export const SERVER_OBSTACLES: Obstacle[] = [
+  // The machines
+  box("gateway", POS.gateway.x, POS.gateway.z, RACK.w, RACK.d),
+  box("load balancer", POS.loadBalancer.x, POS.loadBalancer.z, RACK.w, RACK.d),
+  ...Array.from({ length: 12 }, (_, i) => appSlot(i)).map((p, i) => box(`app server ${i}`, p.x, p.z, RACK.w, RACK.d)),
+  ...Array.from({ length: MAX_TEMP_SHOWN }, (_, i) => tempSlot(i)).map((p, i) => box(`temporary server ${i}`, p.x, p.z, RACK.w, RACK.d)),
+  box("standby", POS.standby.x, POS.standby.z, RACK.w, RACK.d),
+  box("cache", POS.cache.x, POS.cache.z, RACK.w, RACK.d),
+  ...Array.from({ length: DB_CABINETS }, (_, i) => dbSlot(i)).map((p, i) => box(`database cabinet ${i}`, p.x, p.z, DB_CABINET.w, DB_CABINET.d)),
+  box("replica", POS.replica.x, POS.replica.z, DB_CABINET.w, DB_CABINET.d),
+  box("backup", POS.backup.x, POS.backup.z, 1.9, 1.05),
+
+  // The hall's cooling units, crash cart, extinguisher and the boxes of hardware by the monitoring room
+  box("cooling unit, north", -12.45, -2.6, 0.95, 1.9),
+  box("cooling unit, south", -12.45, 2.2, 0.95, 1.9),
+  box("crash cart", 5.3, -2.6, 0.95, 0.8),
+  disc("extinguisher", -12.6, 4.4, 0.14),
+  box("boxes of hardware", 7.75, -4.05, 1.7, 0.85),
+
+  // The monitoring room
+  box("monitoring desk", 8.2, -6.9, 1.8, 0.78),
+  box("monitoring chair", SPOTS.onCall.x, SPOTS.onCall.z, 0.93, 0.85),
+  disc("monitoring plant", 6.0, -5.1, PLANT_R),
+  disc("monitoring bin", 10.9, -9.0, 0.3),
+
+  // The network and power room
+  box("batteries", -21.45, -7.6, 0.95, 3.0),
+  box("power cabinets", -18.0, -8.95, 3.7, 0.6),
+  disc("fire suppression", -14.2, -8.9, 0.3),
+  box("patch panel", -14.3, -6.6, 0.62, 0.62),
+
+  // The cooling plant
+  ...CHILLERS.map(([x, z], i) => box(`chiller ${i}`, x + 0.15, z, CHILLER.w + 0.6, CHILLER.d)),
+  ...PUMPS.map(([x, z], i) => box(`pump ${i}`, x + 0.05, z, 1.1, 0.6)),
+  disc("expansion tank", -14.3, 9.6, 0.42),
+  box("water treatment", -21.65, 11.2, 0.5, 1.2),
+
+  // The workshop
+  ...BENCHES.map(([x, z], i) => box(`workbench ${i}`, x, z - 0.05, 2.4, 0.95)),
+  ...BENCHES.map(([x, z], i) => disc(`workbench stool ${i}`, x, z + 0.8, 0.22)),
+  ...RACK_FRAMES.map(([x, z], i) => box(`rack frame ${i}`, x, z, 0.95, 1.05)),
+  ...PALLETS.map(([x, z], i) => box(`pallet ${i}`, x, z, 1.25, 1.25)),
+  box("parts cage", CAGE.x, CAGE.z, CAGE.w, CAGE.d),
+  disc("workshop bin", 0.4, 7.8, 0.3),
+
+  // The stores
+  ...SHELF_RUNS.flatMap((x, r) => SHELF_UNITS.map((z, i) => box(`shelving ${r}.${i}`, x, z, 0.65, 2.4))),
+];
+
+/**
+ * The office's furniture inside its glass rooms, which the crew never enter but the player's avatar can: the meeting
+ * room, the nap room, the quiet room and the huddle room. The phone booths are already among the obstacles.
+ */
+export const ROOM_OBSTACLES: Obstacle[] = [
+  box("meeting table", -9.2, 12.35, 3.4, 1.3),
+  box("meeting chairs, near", -9.2, MEETING_CHAIRS.near, 3.1, 0.6),
+  box("meeting chairs, far", -9.2, MEETING_CHAIRS.far, 3.1, 0.6),
+  box("meeting room television", -12.75, 12.35, 0.55, 1.6),
+  disc("presenter", SPOTS.presenter.x, SPOTS.presenter.z, 0.3),
+  disc("meeting room plant", -6.0, 14.0, PLANT_R),
+  ...NAP_PODS.map(([x, z], i) => box(`nap pod ${i}`, x, z, 2.0, 0.82)),
+  disc("nap room table", NAP_ROOM[0] + 0.5, NAP_ROOM[3] - 0.5, 0.3),
+  disc("nap room plant", NAP_ROOM[0] + 0.45, NAP_ROOM[1] + 0.45, PLANT_R),
+  ...QUIET_DESKS.map((s, i) => box(`quiet desk ${i}`, s.x, s.z, 1.4, 0.78)),
+  ...QUIET_DESKS.map((s, i) => box(`quiet chair ${i}`, seatAt(s).x, seatAt(s).z, 0.93, 0.85)),
+  ...QUIET_DESKS.slice(0, -1).map((s, i) => box(`quiet screen ${i}`, s.x + 1.0, s.z + 0.15, 0.06, 1.05)),
+  box("quiet room shelf", -21.75, -4.4, 0.45, 1.9),
+  box("quiet room armchair", -18.6, -3.0, 0.95, 0.95),
+  disc("quiet room lamp", -20.9, -2.0, 0.15),
+  disc("quiet room plant, east", QUIET_ROOM[2] - 0.5, QUIET_ROOM[1] + 0.5, PLANT_R),
+  disc("quiet room plant, west", QUIET_ROOM[0] + 0.5, QUIET_ROOM[3] - 0.5, PLANT_R),
+  box("huddle table", (HUDDLE_ROOM[0] + HUDDLE_ROOM[2]) / 2, -7.3, 1.8, 1.0),
+  box("huddle chairs, back", (HUDDLE_ROOM[0] + HUDDLE_ROOM[2]) / 2, -8.15, 1.9, 0.6),
+  box("huddle chairs, front", (HUDDLE_ROOM[0] + HUDDLE_ROOM[2]) / 2, -6.45, 1.9, 0.6),
+  box("huddle screen", (HUDDLE_ROOM[0] + HUDDLE_ROOM[2]) / 2, HUDDLE_ROOM[1] + 0.4, 0.8, 0.4),
+  disc("huddle plant", HUDDLE_ROOM[0] + 0.45, HUDDLE_ROOM[3] - 0.45, PLANT_R),
+];
+
+/* ------------------------------------------------------------------ */
+/* Walls, doors and the elevator, for walking                          */
+/* ------------------------------------------------------------------ */
+
+/** A wall to walk along, as [x1, z1, x2, z2]: the outer walls, glass and the elevator's shaft. */
+export type Segment = [number, number, number, number];
+
+/** The elevator's doorway, in the middle of the shaft's front, facing the corridor. */
+export const ELEVATOR_DOOR = { x: ELEVATOR_SPOT[2], z: (ELEVATOR_SPOT[1] + ELEVATOR_SPOT[3]) / 2, w: 1.1 };
+
+/** The shaft's sides, apart from the doorway, the same on both floors. */
+export const SHAFT: Segment[] = [
+  [ELEVATOR_SPOT[0], ELEVATOR_SPOT[1], ELEVATOR_SPOT[0], ELEVATOR_SPOT[3]],
+  [ELEVATOR_SPOT[0], ELEVATOR_SPOT[1], ELEVATOR_SPOT[2], ELEVATOR_SPOT[1]],
+  [ELEVATOR_SPOT[0], ELEVATOR_SPOT[3], ELEVATOR_SPOT[2], ELEVATOR_SPOT[3]],
+  [ELEVATOR_SPOT[2], ELEVATOR_SPOT[1], ELEVATOR_SPOT[2], ELEVATOR_DOOR.z - ELEVATOR_DOOR.w / 2],
+  [ELEVATOR_SPOT[2], ELEVATOR_DOOR.z + ELEVATOR_DOOR.w / 2, ELEVATOR_SPOT[2], ELEVATOR_SPOT[3]],
+];
+
+/** The building's outer walls. */
+export const OUTER_WALLS: Segment[] = [
+  [-22, -9.5, 22, -9.5],
+  [22, -9.5, 22, 14.5],
+  [22, 14.5, -22, 14.5],
+  [-22, 14.5, -22, -9.5],
+];
+
+/**
+ * A sliding glass door in a gap left in a partition: its middle, its width and which way the gap runs. Doors open
+ * for whoever comes near, so every room can be walked into.
+ */
+export interface Door {
+  name: string;
+  x: number;
+  z: number;
+  w: number;
+  along: "x" | "z";
+}
+
+const door = (name: string, along: "x" | "z", a: number, b: number, at: number): Door =>
+  along === "x" ? { name, along, x: (a + b) / 2, z: at, w: b - a } : { name, along, x: at, z: (a + b) / 2, w: b - a };
+
+/** The office floor's glass doors. */
+export const OFFICE_DOORS: Door[] = [
+  door("meeting room", "x", -6.8, -5.9, 10.2),
+  door("nap room", "z", 7.05, 8.05, NAP_ROOM[0]),
+  door("quiet room", "x", -15.2, -14.0, QUIET_ROOM[3]),
+  door("huddle room", "x", 9.6, 10.6, HUDDLE_ROOM[3]),
+];
+
+/** The server floor's glass doors. */
+export const SERVER_DOORS: Door[] = [
+  door("server hall, south", "x", -2.0, -0.8, 5),
+  door("server hall, east", "z", -0.2, 1.0, 9),
+  door("server hall, west", "z", -0.6, 0.6, -13),
+  door("monitoring room", "x", 9.6, 10.6, HUDDLE_ROOM[3]),
+  door("network and power room", "x", -15.2, -14.0, -1),
+];
+
+/** Something the avatar can play with: where to stand, what the prompt says and the animation it plays. */
+export interface FunProp {
+  id: string;
+  label: string;
+  x: number;
+  z: number;
+  /** The way to face while playing. */
+  face: [number, number];
+  clip: "eat" | "dance" | "gesture-positive";
+}
+
+/** The office's fun things to do. None of them changes the game. */
+export const FUN_PROPS: FunProp[] = [
+  { id: "espresso", label: "Make a coffee", x: 17.23, z: -7.95, face: [17.23, -9.15], clip: "eat" },
+  { id: "vending", label: "Get a snack", x: 13.15, z: -7.9, face: [13.15, -9.0], clip: "eat" },
+  { id: "cooler", label: "Have some water", x: 15.75, z: -3.6, face: [15.0, -4.0], clip: "eat" },
+  { id: "arcade", label: "Play the arcade", x: (ARCADES[0][1] + ARCADES[1][1]) / 2, z: ARCADE_Z + 0.95, face: [(ARCADES[0][1] + ARCADES[1][1]) / 2, ARCADE_Z], clip: "dance" },
+  { id: "nap", label: "Rest in a nap pod", x: 10.0, z: NAP_PODS[0][1], face: [NAP_PODS[0][0], NAP_PODS[0][1]], clip: "gesture-positive" },
 ];

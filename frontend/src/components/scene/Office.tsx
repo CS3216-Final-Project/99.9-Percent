@@ -1044,7 +1044,7 @@ function Staff({ crew }: { crew: Crew }) {
       {/* A meeting in progress */}
       <ScreenPlane kind="slides" w={meetingTv.w} h={meetingTv.h} position={meetingTv.position} rot={Math.PI / 2} />
       <Creature pose="stand" activity="present" species={creature(36, "pm")} position={[SPOTS.presenter.x, 0, SPOTS.presenter.z]} rotation={SPOTS.presenter.rot} phase={1} />
-      <Creature pose="sit" activity="listen" species={creature(33, "founder")} position={[SPOTS.founder.x, 0, SPOTS.founder.z]} rotation={SPOTS.founder.rot} phase={2} />
+      {/* The founder's chair is the player's: their avatar sits there when not walking (see Avatar.tsx). */}
       <Creature pose="sit" activity="listen" species={creature(34, "designer")} position={[SPOTS.designerInMeeting.x, 0, SPOTS.designerInMeeting.z]} phase={4} />
       <Creature pose="sit" activity="listen" species={creature(35, "data")} position={[SPOTS.analystInMeeting.x, 0, SPOTS.analystInMeeting.z]} phase={6} />
 

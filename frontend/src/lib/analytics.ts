@@ -1,5 +1,5 @@
-import type { PostHogConfig } from "posthog-js/dist/module.no-external";
-import { watchProductAnalytics, type AnalyticsProperties, type AnalyticsSink } from "@/game/productAnalytics";
+import type { PostHog, PostHogConfig } from "posthog-js/dist/module.no-external";
+import { ANALYTICS_STORAGE_KEY, watchProductAnalytics, type AnalyticsProperties, type AnalyticsSink } from "@/game/productAnalytics";
 import type { useGame } from "@/game/store";
 
 export interface AnalyticsConfig {
@@ -33,6 +33,10 @@ export const POSTHOG_OPTIONS: Partial<PostHogConfig> = {
   person_profiles: "never",
   persistence: "localStorage",
   respect_dnt: true,
+  // An opt-out also clears PostHog's stored anonymous ids.
+  opt_out_persistence_by_default: true,
+  // Each event is sent at once, so an opt-out leaves no queued batch to flush afterwards.
+  request_batching: false,
   before_send: event => {
     if (!event || !event.event.startsWith("gameplay_")) return null;
     event.properties = Object.fromEntries(Object.entries(event.properties)
@@ -40,11 +44,30 @@ export const POSTHOG_OPTIONS: Partial<PostHogConfig> = {
     return event;
   },
 };
+let posthog: PostHog | null = null;
+/** Whether this tab opted the SDK out; the SDK's own flag is shared with, and cleared by, other tabs. */
+let posthogOptedOut = false;
 const loadPosthog: Loader = async (token, config) => {
-  const { default: posthog } = await import("posthog-js/dist/module.no-external");
-  posthog.init(token, config);
-  return { capture: (name, properties) => { posthog.capture(name, properties); } };
+  const { default: instance } = await import("posthog-js/dist/module.no-external");
+  instance.init(token, config);
+  posthog = instance;
+  posthogOptedOut = instance.has_opted_out_capturing();
+  syncPosthogConsent();
+  return { capture: (name, properties) => { instance.capture(name, properties); } };
 };
+
+/** A decline blocks the loaded SDK; a later acceptance resumes as a new anonymous device. */
+function syncPosthogConsent() {
+  if (!posthog) return;
+  if (loadAnalyticsConsent() === "declined") {
+    posthog.opt_out_capturing();
+    posthogOptedOut = true;
+  } else if (posthogOptedOut) {
+    posthog.opt_in_capturing({ captureEventName: false });
+    posthog.reset(true);
+    posthogOptedOut = false;
+  }
+}
 
 export function configuredAnalytics(): AnalyticsConfig {
   return {
@@ -88,15 +111,18 @@ export function startProductAnalytics(store: typeof useGame, config = configured
 }
 
 /* ------------------------------------------------------------------ */
-/* Explicit opt-in: PostHog is not loaded until the player says yes.    */
+/* Opt-out: analytics runs unless the player has opted out.            */
 /* ------------------------------------------------------------------ */
 
 export type AnalyticsConsent = "accepted" | "declined" | null;
 export const ANALYTICS_CONSENT_KEY = "nn.analytics-consent.v1";
 export const ANALYTICS_CONSENT_EVENT = "nn:analytics-consent";
+/** A choice storage refused to keep, applied for the rest of this visit. */
+let unsaved: AnalyticsConsent = null;
 
-/** The saved decision; a missing, corrupt or unreadable record means undecided. */
+/** The choice in effect; a missing, corrupt or unreadable record means undecided. */
 export function loadAnalyticsConsent(): AnalyticsConsent {
+  if (unsaved) return unsaved;
   try {
     const stored = window.localStorage.getItem(ANALYTICS_CONSENT_KEY);
     return stored === "accepted" || stored === "declined" ? stored : null;
@@ -114,39 +140,62 @@ export function saveAnalyticsConsent(value: Exclude<AnalyticsConsent, null>): bo
   try {
     window.localStorage.setItem(ANALYTICS_CONSENT_KEY, value);
     saved = true;
+    unsaved = null;
   } catch {
-    /* best effort: the event below still applies the decision for this visit */
+    unsaved = value;
   }
   window.dispatchEvent(new CustomEvent(ANALYTICS_CONSENT_EVENT, { detail: value }));
   return saved;
 }
 
-/**
- * Starts product analytics only after an explicit acceptance: no SDK load,
- * observer, timer, listener or storage write happens while consent is missing
- * or declined. A later decline stops everything immediately; a renewed
- * acceptance may start it once again. The returned cleanup stops everything
- * it started.
- */
-export function startConsentedProductAnalytics(store: typeof useGame, config = configuredAnalytics()): () => void {
-  let consent = loadAnalyticsConsent();
-  let stop: (() => void) | null = null;
-  const begin = () => {
-    if (consent === "accepted" && !stop) stop = startProductAnalytics(store, config);
+/** Calls `onChange` whenever the choice changes, in this tab or another one. */
+export function subscribeAnalyticsConsent(onChange: () => void): () => void {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== ANALYTICS_CONSENT_KEY && event.key !== null) return;
+    unsaved = null;
+    onChange();
   };
-  const end = () => {
+  window.addEventListener(ANALYTICS_CONSENT_EVENT, onChange);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(ANALYTICS_CONSENT_EVENT, onChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+/** Removes what analytics kept in this browser: the run ledger and PostHog's anonymous ids. */
+function forgetAnalyticsData() {
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key === ANALYTICS_STORAGE_KEY || key.startsWith("ph_")) localStorage.removeItem(key);
+    }
+  } catch { /* Unreadable storage holds nothing to forget. */ }
+}
+
+/**
+ * Starts product analytics unless the player has opted out: an undecided or
+ * accepted choice runs it, while a decline means no SDK load, observer, timer
+ * or event, and clears what analytics stored. A later decline, in any tab,
+ * stops everything immediately and silently; a renewed acceptance starts it
+ * once again. The returned cleanup stops everything it started.
+ */
+export function startProductAnalyticsUnlessOptedOut(store: typeof useGame, config = configuredAnalytics()): () => void {
+  let stop: ((optedOut?: boolean) => void) | null = null;
+  const apply = () => {
+    syncPosthogConsent();
+    if (loadAnalyticsConsent() !== "declined") {
+      stop ??= startProductAnalytics(store, config);
+      return;
+    }
+    stop?.(true);
+    stop = null;
+    forgetAnalyticsData();
+  };
+  apply();
+  const unsubscribe = subscribeAnalyticsConsent(apply);
+  return () => {
+    unsubscribe();
     stop?.();
     stop = null;
-  };
-  begin();
-  const onConsent = (event: Event) => {
-    const decision = (event as CustomEvent<AnalyticsConsent>).detail;
-    consent = decision === "accepted" || decision === "declined" ? decision : loadAnalyticsConsent();
-    if (consent === "accepted") begin(); else end();
-  };
-  window.addEventListener(ANALYTICS_CONSENT_EVENT, onConsent);
-  return () => {
-    window.removeEventListener(ANALYTICS_CONSENT_EVENT, onConsent);
-    end();
   };
 }

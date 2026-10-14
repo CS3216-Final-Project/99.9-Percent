@@ -34,6 +34,11 @@ const RATE = 22050;
 /** Overall loudness at full effects volume: a background, under the effects themselves. */
 const PEAK = 0.4;
 const FADE = 1.2;
+/**
+ * The fraction of the city loop heard through the office walls: the outdoor bed is the lowest priority of all, so
+ * indoors it sits well under the office's own sounds. The server hall's bed is never scaled by this.
+ */
+export const CITY_INDOOR_LEVEL = 0.18;
 
 /** One sound in a loop: when it starts, how long it lasts, and its own settings. */
 export type Event =
@@ -89,11 +94,16 @@ export function mix(dark: number): { day: number; night: number } {
   return { day: Math.cos((s * Math.PI) / 2), night: Math.sin((s * Math.PI) / 2) };
 }
 
-/** How loud the day, the night and the server hall play: the hall takes over from the city as it rises. */
+/**
+ * How loud the day, the night and the server hall play. Indoors the city is only what faintly reaches through the
+ * walls, at `CITY_INDOOR_LEVEL` of itself — the lowest-priority bed — and it fades out entirely as the hall takes
+ * over; the hall itself is never subdued.
+ */
 export function blend(dark: number, hall: number): { day: number; night: number; hall: number } {
   const h = Math.min(1, Math.max(0, hall));
   const city = mix(dark);
-  return { day: city.day * (1 - h), night: city.night * (1 - h), hall: h };
+  const outside = CITY_INDOOR_LEVEL * (1 - h);
+  return { day: city.day * outside, night: city.night * outside, hall: h };
 }
 
 type Ctx = BaseAudioContext;

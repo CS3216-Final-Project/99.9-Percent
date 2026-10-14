@@ -1,4 +1,5 @@
 import { emptyMeasurement, type Measurement, type PlaytestEvent } from "./telemetry";
+import { DEFAULT_AVATAR, isAvatar, type AvatarId } from "./avatars";
 import { decodeSave, makeEnvelope, replaceable } from "./saveEnvelope";
 import { BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
 
@@ -16,6 +17,7 @@ const CLASSIC_META_KEY = "nn.classic.meta.v1";
 const MODE_KEY = "nn.mode.v1";
 const AUDIO_KEY = "nn.audio.v1";
 const GRAPHICS_KEY = "nn.graphics.v1";
+const AVATAR_KEY = "nn.avatar.v1";
 /** Music on or off, from before the volume settings. Still written, so an older build keeps the player's choice. */
 const MUSIC_KEY = "nn.music.v1";
 const LEGACY_SAVE_KEY = "nn.save.v1";
@@ -347,6 +349,16 @@ export function saveGraphics(settings: GraphicsSettings): boolean {
   return write(GRAPHICS_KEY, JSON.stringify(settings));
 }
 
+/** The player's avatar, or the default when none was chosen, storage fails or what is stored is not an avatar. */
+export function loadAvatar(): AvatarId {
+  const stored = read(AVATAR_KEY);
+  return isAvatar(stored) ? stored : DEFAULT_AVATAR;
+}
+
+export function saveAvatar(id: AvatarId): boolean {
+  return write(AVATAR_KEY, id);
+}
+
 export function saveMeta(meta: Meta, mode: GameMode = "campaign"): boolean {
   return write(mode === "classic" ? CLASSIC_META_KEY : META_KEY, JSON.stringify(meta));
 }
@@ -373,7 +385,10 @@ export type AnalyticsName =
   | "save_resumed"
   | "save_imported"
   | "mode_switched"
-  | "floor_switched";
+  | "floor_switched"
+  | "walk_started"
+  | "walk_ended"
+  | "avatar_changed";
 
 export interface AnalyticsEvent {
   t: string;
