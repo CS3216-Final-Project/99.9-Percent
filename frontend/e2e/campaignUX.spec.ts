@@ -1,32 +1,8 @@
 import { test, expect, savedGame } from "./fixtures";
 
 test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
-test("Campaign getting-started exploration, keyboard navigation and reload do not run the simulation", async ({page}) => {
-  await page.route("**/api/**",r=>r.abort()); await page.goto("/");
-  await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();
-  const intro=page.getByRole("dialog",{name:"Company introduction"});
-  const before=await savedGame(page);
-  await intro.getByRole("button",{name:"App Server",exact:true}).focus(); await page.keyboard.press("Enter");
-  await expect(intro).toContainText("capacity 1,000 req/s");
-  await intro.getByRole("button",{name:"Database",exact:true}).click(); await expect(intro).toContainText("capacity 600 ops/s");
-  await page.screenshot({path:"test-results/campaign-ux-introduction.png"});
-  await intro.getByRole("button",{name:"Next",exact:true}).click();
-  await intro.getByRole("button",{name:"Rejected request",exact:true}).click(); await expect(intro).toContainText("$0 earned");
-  expect((await savedGame(page)).campaign).toEqual(before.campaign);
-  await page.reload(); await page.getByRole("button",{name:"Continue company",exact:true}).click();
-  await expect(intro).toContainText("Know what earns money");
-  await intro.getByRole("button",{name:"Next",exact:true}).click();
-  await intro.getByRole("button",{name:"Technology tree",exact:true}).click(); await expect(intro).toContainText("Owned does not mean deployed");
-  await intro.getByRole("button",{name:"Finish introduction",exact:true}).click();
-  await expect(intro).toBeHidden(); await expect(page.getByRole("button",{name:"Run",exact:true})).toContainText("Run company");
-  await expect(page.getByRole("button",{name:"Advance step",exact:true})).toBeHidden();
-  await expect(page.getByRole("region",{name:"Guided Mode chapters"})).toContainText("Getting started");
-  await page.screenshot({path:"test-results/campaign-ux-desktop.png"});
-  expect((await savedGame(page)).campaign!.step).toBe(0);
-  await page.reload(); await page.getByRole("button",{name:"Continue company",exact:true}).click(); await expect(intro).toBeHidden();
-});
 test("Campaign option comparison, confirmation, precision control and pause-to-investigate use public controls", async ({page}) => {
-  await page.goto("/"); await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
+  await page.goto("/"); await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
   await expect(page.getByText("Effect & costs")).toHaveCount(0);
   await expect(page.getByText("Operating finances")).toHaveCount(0); await expect(page.getByLabel("Request dependencies")).toHaveCount(0);
   await page.getByRole("button",{name:/Add server/}).click(); const confirm=page.getByRole("region",{name:"Confirm Add server"});

@@ -35,7 +35,7 @@ The repository also retains older simulation, tutorial, research and incident co
 
 ```mermaid
 flowchart TD
-    A[Try Prototype or Continue company] --> B[Optional introduction; simulation paused]
+    A[Try Prototype or Continue company] --> B[Skippable spotlight walkthrough on a fresh company]
     B --> C[Opening: observe growth and inspect evidence]
     C --> D[Actual incident: respond and reach measured recovery]
     C --> R[Prevent incident: full demand, both inspections, five stable steps]
@@ -68,9 +68,9 @@ This is a typical path, not a scripted sequence of guaranteed incidents. Prepara
 - **System evidence:** incoming/admitted/rejected traffic; demand, capacity, busy utilisation, backlog, processed and failed work; latency and service errors.
 - **Actions:** available investments, admission changes, routing and stage-specific controls; pending activation countdowns. Each action asks for confirmation, showing its setup, cash after, upkeep and activation, before it is dispatched.
 - **Office and System evidence buttons:** two views of the same infrastructure and selection. Selecting equipment does not create another simulation.
-- **History/Menu:** read-only reports and trends, exports, onboarding replay, save/exit and confirmed new-company reset.
+- **History/Menu:** read-only reports and trends, exports, walkthrough replay, save/exit and confirmed new-company reset.
 
-Try Prototype enters immediately as a guest. Continue company restores a saved company. The three-prompt introduction is skippable and separately persisted; it does not advance simulation time or reveal an incident solution.
+Try Prototype enters immediately as a guest. Continue company restores a saved company. A fresh company starts with a skippable spotlight walkthrough of the Opening: the system, its evidence, money, the clock and what an action costs. It never blocks play, stops at the first purchase without buying it, and does not reveal an incident solution. It is done once the player reaches its last step or skips it; until then it carries on from the step it was left on, through a reload or into a new company. Its progress is stored in the campaign profile, not the save. Each later chapter shows a one-step guide to its new controls the first time the company enters it; entering a chapter closes a guide still open, and a walkthrough left open through the Opening is offered again on the next company. The walkthrough replays on the same company from Menu > How to play or the home screen's Replay the tutorial. A player who finished or skipped the former three-prompt introduction is not offered it again.
 
 Run starts the shared clock; Pause freezes physical work. Advance step is available in management. During an active incident, use Run/Pause to observe consequences; the current UI disables Advance step there. Speed controls change real-time pacing, not the amount of work modeled by one physical step.
 

@@ -41,7 +41,7 @@ it("replays pending provisioning, disabled policy and protected upgrades exactly
 });
 it("pending completion blocks the shared clock after reload until explicit acknowledgement",()=>{
  let g=act(spikeCompany(false),{type:"set_traffic_limit",enabled:true});g=untilOffset(g,72);expect(saveGame(g)).toBe(true);
- useGame.getState().boot();useGame.getState().play();useGame.getState().onboardingMove("skip");
+ useGame.getState().boot();useGame.getState().play();
  const step=useGame.getState().game.campaign!.step;useGame.getState().setRunning(true);useGame.getState().tick(10);useGame.getState().advance();
  expect(useGame.getState().game.campaign!.step).toBe(step);
  expect(useGame.getState().act({type:"acknowledge_spikes"})).toBe(true);expect(useGame.getState().running).toBe(false);

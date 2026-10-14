@@ -1,7 +1,7 @@
 import {beforeEach,afterEach,it,expect,vi} from "vitest";
 import {newGame,applyAction,type GameState} from "../sim";
 import {advanceSteps} from "../sim/step";
-import {useGame,inspectOrSelect} from "./store";
+import {useGame,inspectOrSelect,WALKTHROUGH_STEPS} from "./store";
 import {makeEnvelope,decodeSave,CAMPAIGN_SAVE_KEY} from "./saveEnvelope";
 import {loadGame,saveGame,readAnalytics,archiveEvents,exportPlaytest,DEFAULT_META,saveMeta} from "./persist";
 import {emptyMeasurement,beginSession,projectEvents} from "./telemetry";
@@ -9,12 +9,17 @@ beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),
 afterEach(()=>vi.restoreAllMocks());
 function act(g:GameState,a:Parameters<typeof applyAction>[1]) {const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 function recovered() {let g=advanceSteps(newGame(1,"phase2-test"),6).state;g=act(g,{type:"start_db_upgrade"});return advanceSteps(g,30).state;}
-function enter(){useGame.getState().boot();useGame.getState().play();useGame.getState().onboardingMove("skip");}
+function enter(){useGame.getState().boot();useGame.getState().play();}
 function v1(g:GameState) {
  const e=JSON.parse(JSON.stringify(makeEnvelope(g)));e.schemaVersion=1;
  delete e.runtime.measurement;
  e.inputs=e.inputs.filter((i:{action:{type:string}})=>i.action.type!=="acknowledge_milestone");
  return JSON.stringify(e);
+}
+/** The walkthrough's records among the playtest events, archived or still pending. */
+function tutorialEvents() {
+ const {events}=JSON.parse(exportPlaytest(useGame.getState().game,useGame.getState().measurement)) as {events:{name:string;payload:Record<string,unknown>}[]};
+ return events.filter(e=>e.name.startsWith("tutorial_")).map(({name,payload:{track,step,from,reason}})=>({name,track,step,from,reason}));
 }
 function backup(raw:string) {const e=JSON.parse(raw);return CAMPAIGN_SAVE_KEY+".backup.v1."+e.runId+"."+e.savedAt;}
 function aggregate(snapshot:NonNullable<GameState["campaign"]>["snapshot"]) {
@@ -32,18 +37,129 @@ it("landing boot creates neither durable company nor run event; explicit entry i
  useGame.getState().play();useGame.getState().play();
  expect(readAnalytics().filter(e=>e.name==="run_started")).toHaveLength(1);
 });
-it("onboarding next/back/skip persists and blocks physical and economic advancement",()=>{
- useGame.getState().boot();useGame.getState().play();
- const before=structuredClone(useGame.getState().game);
- useGame.getState().advance();useGame.getState().setRunning(true);useGame.getState().tick(60);
- expect(useGame.getState().act({type:"start_db_upgrade"})).toBe(false);
- expect(useGame.getState().game).toEqual(before);
- useGame.getState().onboardingMove("next");useGame.getState().onboardingMove("back");
- useGame.getState().onboardingMove("skip");expect(useGame.getState().running).toBe(false);
- useGame.setState(useGame.getInitialState(),true);useGame.getState().boot();useGame.getState().play();
+it("offers the Opening walkthrough once, on a fresh company, without holding the company back",()=>{
+ enter();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
  expect(useGame.getState().onboarding).toBe(false);
- useGame.getState().showOnboarding();for(let i=0;i<3;i++)useGame.getState().onboardingMove("next");
- expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!).openingOnboarding.status).toBe("completed");
+ // The guide never blocks: time and inspection work while it shows.
+ useGame.getState().setRunning(true);useGame.getState().tick(1);
+ expect(useGame.getState().game.campaign!.step).toBe(1);
+ useGame.getState().setRunning(false);
+ useGame.getState().endTour(false);
+ expect(useGame.getState().tour).toBeNull();
+ expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!).tutorialDone).toBe(true);
+ // Neither the same company after a reload nor a new company offers it again.
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(useGame.getState().tour).toBeNull();
+ useGame.getState().newRun();
+ expect(useGame.getState().tour).toBeNull();
+ // The menu replays it on the same company, which it leaves untouched.
+ const before=structuredClone(useGame.getState().game);
+ useGame.getState().showOnboarding();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
+ expect(useGame.getState().game).toEqual(before);
+});
+it("finishes the walkthrough on its last step, not before, even if its card is never closed",()=>{
+ enter();
+ for(let i=0;i<WALKTHROUGH_STEPS.campaign-2;i++)useGame.getState().tourNext();
+ expect(useGame.getState().meta.tutorialDone).toBe(false);
+ useGame.getState().tourNext();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:WALKTHROUGH_STEPS.campaign-1});
+ expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!)).toMatchObject({tutorialDone:true,walkthroughStep:null});
+ // A reload before Got it neither shows it again nor records it twice.
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(useGame.getState().tour).toBeNull();
+ expect(tutorialEvents().map(e=>e.name)).toEqual(["tutorial_started","tutorial_completed"]);
+});
+it("carries an unfinished walkthrough on where it was left, after the clock has run, into a new company, as one start",()=>{
+ enter();
+ for(let i=0;i<5;i++)useGame.getState().tourNext();
+ // The walkthrough asks the player to run the clock, so the company moves on before it ends.
+ useGame.getState().setRunning(true);useGame.getState().tick(3);useGame.getState().setRunning(false);
+ useGame.getState().endSession();useGame.getState().play();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:5});
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(useGame.getState().game.campaign!.step).toBe(3);
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:5});
+ useGame.getState().newRun();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:5});
+ // Showing it again from the menu goes back to its start without starting another.
+ useGame.getState().showOnboarding();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
+ expect(tutorialEvents()).toEqual([{name:"tutorial_started",track:"campaign",step:0,from:"first_visit"}]);
+});
+it("offers the walkthrough on a company already under way in the Opening, but not in a later chapter",()=>{
+ saveGame(advanceSteps(newGame(1,"walkthrough-test"),3).state);enter();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
+ expect(tutorialEvents().at(-1)).toMatchObject({name:"tutorial_started",from:"resume"});
+ useGame.setState(useGame.getInitialState(),true);localStorage.clear();
+ saveGame(act(act(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"}));enter();
+ expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+ expect(useGame.getState().tour).toBeNull();
+});
+it("keeps the walkthrough working in memory when its preference cannot be saved",()=>{
+ enter();
+ const setItem=Storage.prototype.setItem;
+ vi.spyOn(Storage.prototype,"setItem").mockImplementation(function(this:Storage,key,value){if(key==="nn.campaign.meta.v1")throw Error("quota");setItem.call(this,key,value);});
+ useGame.getState().endTour(true);
+ expect(useGame.getState().tour).toBeNull();
+ expect(useGame.getState().meta.tutorialDone).toBe(true);
+ expect(useGame.getState().toast).toMatchObject({kind:"error",text:"Onboarding preferences could not be saved."});
+});
+it("shows a chapter's guide once, paused, when the company first enters it",()=>{
+ saveGame(act(recovered(),{type:"acknowledge_review"}));saveMeta({...DEFAULT_META,tutorialDone:true});enter();
+ expect(useGame.getState().tour).toBeNull();
+ // Acknowledging the Opening milestone continues the company into Scaling & Routing.
+ expect(useGame.getState().act({type:"acknowledge_milestone"})).toBe(true);
+ expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+ expect(useGame.getState().tour).toEqual({track:"scaling",step:0});
+ expect(useGame.getState().running).toBe(false);
+ expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!).chapterTours).toEqual(["scaling"]);
+ // Seen when shown: a reload in the middle of it, or ending it, does not bring it back.
+ useGame.getState().endTour(true);
+ expect(useGame.getState().meta.chapterTours).toEqual(["scaling"]);
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(useGame.getState().tour).toBeNull();
+});
+it("continues a company whose Opening is acknowledged straight into scaling, without a guide",()=>{
+ saveGame(act(act(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"}));
+ saveMeta({...DEFAULT_META,tutorialDone:true});
+ enter();
+ expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+ expect(useGame.getState().tour).toBeNull();
+});
+it("closes an unfinished walkthrough when the company leaves the Opening, shows the chapter's guide and offers it again on the next company",()=>{
+ saveGame(act(recovered(),{type:"acknowledge_review"}));
+ enter();useGame.getState().tourNext();
+ expect(useGame.getState().act({type:"acknowledge_milestone"})).toBe(true);
+ expect(useGame.getState().tour).toEqual({track:"scaling",step:0});
+ expect(useGame.getState().meta).toMatchObject({tutorialDone:false,walkthroughStep:null,chapterTours:["scaling"]});
+ expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!)).toMatchObject({tutorialDone:false,walkthroughStep:null,chapterTours:["scaling"]});
+ expect(tutorialEvents().at(-1)).toEqual({name:"tutorial_skipped",track:"campaign",step:1,reason:"chapter_entered"});
+ useGame.getState().endTour(true);useGame.getState().newRun();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
+ expect(tutorialEvents().at(-1)).toMatchObject({name:"tutorial_started",from:"new_company"});
+});
+it("records each walkthrough start, finish and skip once in the playtest records, with the step reached",()=>{
+ enter();
+ useGame.getState().tourNext();useGame.getState().tourNext();useGame.getState().endTour(false);
+ useGame.getState().showOnboarding();useGame.getState().endTour(true);
+ // A chapter's one-card guide is not the walkthrough, and a reload with the walkthrough done starts nothing.
+ useGame.getState().startTour("scaling");useGame.getState().endTour(true);
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(tutorialEvents()).toEqual([
+  {name:"tutorial_started",track:"campaign",step:0,from:"first_visit"},
+  {name:"tutorial_skipped",track:"campaign",step:2,reason:"player"},
+  {name:"tutorial_started",track:"campaign",step:0,from:"menu"},
+  {name:"tutorial_completed",track:"campaign",step:0},
+ ]);
+});
+it("does not offer the walkthrough to a player who finished or skipped the former introduction, but replays it on request",()=>{
+ localStorage.setItem("nn.campaign.meta.v1",JSON.stringify({openingOnboarding:{version:1,step:0,status:"skipped"},runsStarted:1}));
+ enter();
+ expect(useGame.getState().tour).toBeNull();
+ useGame.getState().showOnboarding();
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
 });
 it("milestone is awarded only on report acknowledgement and never changes physical or financial state",()=>{
  const g=recovered();expect(g.campaign!.openingMilestone).toBeNull();
@@ -171,7 +287,7 @@ it("bankruptcy telemetry survives explicit restart",()=>{
  let g=advanceSteps(newGame(),6).state;
  const ending=advanceSteps(g,100000).state;
  g=advanceSteps(g,ending.campaign!.step-g.campaign!.step-1).state;saveGame(g);
- saveMeta({...DEFAULT_META,openingOnboarding:{version:1,step:2,status:"completed"}});
+ saveMeta({...DEFAULT_META});
  enter();useGame.getState().setRunning(true);useGame.getState().tick(1);
  expect(useGame.getState().game.phase).toBe("ended");
  expect(readAnalytics().filter(e=>e.name==="run_failed")).toHaveLength(1);

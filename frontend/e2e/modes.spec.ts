@@ -1,4 +1,4 @@
-import { advanceCampaignStep, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, unlockChallenge } from "./fixtures";
+import { advanceCampaignStep, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 
 test("new players see Guided Mode first with Challenge Mode locked", async ({ page }) => {
@@ -15,8 +15,8 @@ test("new players see Guided Mode first with Challenge Mode locked", async ({ pa
   expect(await page.evaluate(() => [localStorage.getItem("nn.campaign.save.v1"), localStorage.getItem("nn.classic.save.v1")])).toEqual([null, null]);
   await page.screenshot({ path: "test-results/mode-choice-guided-first.png" });
   await guided.getByRole("button", { name: "Start Guided Mode" }).press("Enter");
-  await expect(page.getByRole("dialog", { name: "Company introduction" })).toBeVisible();
-  await page.getByRole("button", { name: "Skip introduction" }).click();
+  await expect(tutorial(page)).toBeVisible();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
   expect((await savedGame(page)).campaign!.step).toBe(0);
   await expectRoom(page);
 });
@@ -24,7 +24,7 @@ test("new players see Guided Mode first with Challenge Mode locked", async ({ pa
 // The room stays mounted while the game underneath it is swapped, so this journey keeps drawing it.
 test("switches between Guided Mode and unlocked Challenge Mode from the menu, keeping each run", async ({ page }) => {
   await unlockChallenge(page);
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
   await expectRoom(page);
   await advanceCampaignStep(page);
   const campaign = await savedGame(page);
@@ -52,7 +52,7 @@ test("switches between Guided Mode and unlocked Challenge Mode from the menu, ke
 
 test("the menu offers a disabled unlock instead of a switch while Challenge Mode is locked", async ({ page, withoutRoom }) => {
   await withoutRoom();
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
   await expect(menu.getByRole("region", { name: "Game mode" })).toContainText("Complete the first five Guided Mode chapters to unlock Challenge Mode.");
@@ -65,7 +65,7 @@ test("asks before switching away from a run that cannot be saved", async ({ page
   await withoutRoom();
   await unlockChallenge(page);
   await page.addInitScript(() => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("nn.campaign.save.v1", "{"); } });
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button",{name:"Skip introduction"}).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
   await menu.getByRole("button", { name: "Switch to Challenge Mode" }).click();

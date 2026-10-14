@@ -48,6 +48,9 @@ An event has its own `$insert_id`. The SDK supplies a persistent anonymous brows
 | `gameplay_chapter_completed` | A previously incomplete chapter becomes complete during observed play. |
 | `gameplay_run_completed` | All Campaign chapters are complete in the same run, or Classic reaches its winning outcome. |
 | `gameplay_run_failed` | A run reaches a losing outcome. Includes `outcome` and the last reached chapter. |
+| `gameplay_tutorial_started` | A mode's walkthrough begins, once until it ends (Guided Mode's carries on across reloads and companies without a new start): Guided Mode's Opening walkthrough or Challenge Mode's first-week tutorial. Includes `tutorial_track`, `tutorial_step` and `tutorial_from`. |
+| `gameplay_tutorial_completed` | The player reaches the walkthrough's last step, whether or not they then close its card. Includes `tutorial_track` and `tutorial_step`. |
+| `gameplay_tutorial_skipped` | The walkthrough ends unfinished. Includes `tutorial_track`, `tutorial_step` and `reason`. |
 
 Campaign chapter IDs are `opening`, `scaling`, `data`, `spikes`, `reliability`.
 Completion reuses the same chapter-status function as the visible chapter list.
@@ -57,6 +60,15 @@ duration measurement for that run; continuing to operate the finished company do
 time to completion. Campaign's content definition is versioned as `chapters-v1`;
 increment it when the set/meaning of required chapters changes. Classic is `classic-v1`.
 Build IDs distinguish releases within a content version.
+
+Tutorial events describe the two walkthroughs only; Guided Mode's one-card chapter guides and Challenge Mode's incident guide are not reported.
+`tutorial_track` is `campaign` (Guided Mode) or `basics` (Challenge Mode).
+`tutorial_step` is the step showing when the event happened, counted from 0, so a skip on the third card has step 2.
+`tutorial_from` is `first_visit`, `resume` (Guided Mode: a company in the Opening reopened with no walkthrough under way; Challenge Mode: a fresh run reopened before any decision), `new_company`, `menu` or `home`.
+A skip's `reason` is `player` (the Skip button) or `chapter_entered` (a Guided Mode walkthrough still open when the company moved on from the Opening, which counts as done).
+Each start and end is reported once; Challenge Mode's walkthrough, offered behind the title screen, is reported when play begins.
+A reload does not repeat an event, but a fresh company reopened before its first decision offers the walkthrough again and so starts it again.
+The same transitions are recorded in each mode's local records: Guided Mode's playtest events and Challenge Mode's prototype analytics, as `tutorial_started`, `tutorial_completed` and `tutorial_skipped`.
 
 Visible planning, onboarding, incident and review time counts even while simulation time is paused.
 Hidden-tab time and time beyond two minutes without pointer, keyboard, wheel or touch activity
@@ -92,6 +104,8 @@ Use a default filter for `mode`, `content_version` and a date range, with option
 | Day 1 / Day 7 retention | First gameplay-session-started event to a session-started event or a progress event with active_delta_ms > 0 on the following calendar day / day 7, by anonymous browser identity. This also captures returning to a tab left open overnight. |
 | Replay rate | Players who start a new run after a completed/failed run, divided by players who completed/failed. Match players and time order; the `replay` flag is a convenient browser-local breakdown. |
 | Failures | Unique `run_id` on run-failed, broken down by chapter and mode. |
+| Tutorial completion rate | Funnel from `gameplay_tutorial_started` to `gameplay_tutorial_completed`, filtered to `tutorial_from` = `first_visit` or `new_company` (first-time starts, not replays) and broken down by `tutorial_track`. Match steps by `run_id`. |
+| Tutorial drop-off | `gameplay_tutorial_skipped` broken down by `tutorial_step` and `reason`, per `tutorial_track`: which card players leave on. |
 
 Use PostHog trends/funnels/retention where supported; use SQL insights for snapshot MAX aggregations
 and matching completion cohorts by run ID. For the completion cohort, select starts in the date
@@ -126,7 +140,7 @@ dissatisfaction.
 ## Verification
 
 Focused regression tests cover the real store and StrictMode shell, no title-screen starts,
-reload/resume/replay identity, all-chapter completion, historical completed saves, failure,
+reload/resume/replay identity, tutorial start/finish/skip in both modes, all-chapter completion, historical completed saves, failure,
 visibility, inactivity, back/forward cache and storage/collector failures. Adapter tests check
 disabled environments, bounded SDK startup buffering, region routing and the outgoing allowlist.
 Browser journeys exercise the build-time integration with synthetic credentials and intercepted

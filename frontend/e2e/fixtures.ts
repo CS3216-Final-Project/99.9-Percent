@@ -1,6 +1,6 @@
 import { test as base, expect, type BrowserContext, type Page } from '@playwright/test';
 import type { GameState } from '../src/sim';
-import { DEFAULT_META } from '../src/game/persist';
+import { CHAPTER_TOURS, DEFAULT_META, type Meta } from '../src/game/persist';
 import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
 
 // Unhandled browser errors fail each case. Journeys that call withoutRoom() skip the WebGL scene; the rest draw it.
@@ -31,7 +31,11 @@ export const test = base.extend<{ healthyBrowser: void; withoutRoom: (target?: P
 });
 export { expect };
 
-export async function seedSave(page: Page, game: GameState) {
+/** The Guided Mode walkthrough's card, whichever step it shows. */
+export const tutorial = (page: Page) => page.getByRole('dialog', { name: /^Tutorial, step/ });
+
+/** Seeds a company whose player has finished the walkthrough and seen every chapter's guide, unless `meta` says otherwise. */
+export async function seedSave(page: Page, game: GameState, extraMeta: Partial<Meta> = {}) {
   await page.addInitScript(({ save, meta }) => {
     // Only create the fixture once; a reload must exercise the real saved state.
     if (localStorage.getItem('nn.campaign.save.v1') === null) {
@@ -41,7 +45,7 @@ export async function seedSave(page: Page, game: GameState) {
       try { const parsed = JSON.parse(localStorage.getItem('nn.campaign.meta.v1') ?? '{}'); if (parsed && typeof parsed === 'object') earlier = parsed; } catch { /* defaults below */ }
       localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ ...earlier, ...meta }));
     }
-  }, { save: JSON.stringify(makeEnvelope(game)), meta: { ...DEFAULT_META, openingOnboarding:{version:1,step:2,status:"completed"}, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 } });
+  }, { save: JSON.stringify(makeEnvelope(game)), meta: { ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, chapterTours: [...CHAPTER_TOURS], runsStarted: 1, ...extraMeta } });
 }
 
 /**

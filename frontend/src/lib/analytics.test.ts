@@ -77,6 +77,11 @@ it("drops automatic events and any properties outside the gameplay allowlist", (
   expect(result?.properties).toEqual({
     distinct_id: "anonymous-browser", run_id: "run-1", $insert_id: "event-1", token: "public-token", $process_person_profile: false,
   });
+  // The walkthrough's events add only which walkthrough, the step reached and what started it.
+  const tutorial = filter({ uuid: "test-3", event: "gameplay_tutorial_skipped", properties: {
+    run_id: "run-1", tutorial_track: "campaign", tutorial_step: 2, tutorial_from: "home", reason: "player", tutorial_title: "Read the evidence",
+  } });
+  expect(tutorial?.properties).toEqual({ run_id: "run-1", tutorial_track: "campaign", tutorial_step: 2, tutorial_from: "home", reason: "player" });
 });
 
 it("installs no observers, timers or storage writes when unconfigured", () => {

@@ -7,7 +7,7 @@ import {newGame,newLegacyGame} from '../sim';
 import * as api from '../lib/api';
 vi.mock('../lib/api',async original=>{const actual=await original<typeof import('../lib/api')>();return {...actual,getSession:vi.fn(),listRuns:vi.fn(),getRun:vi.fn(),putRun:vi.fn(),logout:vi.fn(),emailLogin:vi.fn(),emailRegister:vi.fn()};});
 const a={account:{id:'owner-a',displayName:'A'},csrfToken:'csrf-a'},b={account:{id:'owner-b',displayName:'B'},csrfToken:'csrf-b'};
-beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);vi.clearAllMocks();vi.mocked(api.getSession).mockResolvedValue(a);vi.mocked(api.logout).mockResolvedValue();useGame.getState().boot();useGame.getState().play();useGame.getState().onboardingMove('skip');});
+beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);vi.clearAllMocks();vi.mocked(api.getSession).mockResolvedValue(a);vi.mocked(api.logout).mockResolvedValue();useGame.getState().boot();useGame.getState().play();});
 afterEach(()=>vi.restoreAllMocks());
 function current(){const s=useGame.getState();return makeEnvelope(s.game,s.remainderMs,1,s.measurement);}
 it('restores an account once while pending without automatically attaching a guest',async()=>{

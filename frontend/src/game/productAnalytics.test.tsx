@@ -42,6 +42,50 @@ it("counts actual Campaign play once under StrictMode, never the title screen", 
   });
 });
 
+const tutorial = () => events.filter(e => e.name.startsWith("gameplay_tutorial_")).map(({ name, properties: p }) =>
+  [name, p.tutorial_track, p.tutorial_step, p.tutorial_from ?? p.reason ?? null]);
+
+it("reports Guided Mode's walkthrough starting, skipped at its step and finished once each, under StrictMode and across a reload", () => {
+  watch();
+  render(<StrictMode><App /></StrictMode>);
+  fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+  useGame.getState().play();
+  reactAct(() => { useGame.getState().tourNext(); useGame.getState().tourNext(); useGame.getState().endTour(false); });
+  reactAct(() => { useGame.getState().startTour("campaign", "home"); useGame.getState().endTour(true); });
+  // A chapter's one-card guide is not the walkthrough.
+  reactAct(() => { useGame.getState().startTour("scaling"); useGame.getState().endTour(true); });
+  cleanup(); stop();
+  useGame.setState(useGame.getInitialState(), true);
+  watch(); play();
+  expect(tutorial()).toEqual([
+    ["gameplay_tutorial_started", "campaign", 0, "first_visit"],
+    ["gameplay_tutorial_skipped", "campaign", 2, "player"],
+    ["gameplay_tutorial_started", "campaign", 0, "home"],
+    ["gameplay_tutorial_completed", "campaign", 0, null],
+  ]);
+  expect(named("gameplay_tutorial_started")[0].properties).toMatchObject({ mode: "campaign", chapter_id: "opening", progress_step: 0 });
+});
+
+it("reports Challenge Mode's walkthrough, offered behind the title screen, once play begins", () => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+  saveMode("classic"); watch();
+  useGame.getState().boot();
+  expect(tutorial()).toEqual([]);
+  useGame.getState().play();
+  useGame.getState().endTour(false);
+  expect(tutorial()).toEqual([
+    ["gameplay_tutorial_started", "basics", 0, "first_visit"],
+    ["gameplay_tutorial_skipped", "basics", 0, "player"],
+  ]);
+  expect(named("gameplay_tutorial_started")[0].properties.mode).toBe("classic");
+});
+
+it("does not report a walkthrough already under way when it starts observing, only how it ends", () => {
+  play(); watch();
+  useGame.getState().endTour(true);
+  expect(tutorial()).toEqual([["gameplay_tutorial_completed", "campaign", 0, null]]);
+});
+
 it("includes paused planning time, caps idle time, and resumes timing on input", () => {
   watch(); play();
   expect(useGame.getState().running).toBe(false);
@@ -202,7 +246,7 @@ it("ignores malformed analytics storage, storage failures and a throwing collect
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
   stop = watchProductAnalytics(useGame, () => { throw Error("collector blocked"); }, "test");
   expect(() => play()).not.toThrow();
-  useGame.getState().onboardingMove('skip');
+  
   expect(() => useGame.getState().advance()).not.toThrow();
   expect(useGame.getState().game.campaign!.step).toBe(1);
   expect(() => stop()).not.toThrow();

@@ -168,7 +168,7 @@ describe("game interface", () => {
     render(<App />);
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
-    fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
     fireEvent.click(screen.getByText("More controls"));
     for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
@@ -179,7 +179,7 @@ describe("game interface", () => {
   it("explains a header metric and a locked time control in the shared bubble", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
-    fireEvent.click(screen.getByRole("button", { name: "Skip introduction" }));
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
 
     over(screen.getByText("Cash"));
     settle();

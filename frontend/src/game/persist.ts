@@ -29,30 +29,38 @@ let lastWrittenCampaign: string | null = null;
 /** Campaign is the step-based simulation; classic is the original week-by-week game. */
 export type GameMode = "campaign" | "classic";
 
+/** The Guided Mode chapters after the Opening, each with a short guide shown when the company first enters it. */
+export const CHAPTER_TOURS = ["scaling", "data", "spikes", "reliability", "combined"] as const;
+export type ChapterTour = (typeof CHAPTER_TOURS)[number];
+
 export interface Meta {
-  openingOnboarding: {version: 1; step: number; status: "not-started" | "in-progress" | "completed" | "skipped"};
   onboarded: boolean;
   runsStarted: number;
   runsFinished: number;
   firstIncidentStarted: boolean;
   firstIncidentCompleted: boolean;
-  /** The guided first-week walkthrough has been finished or skipped. */
+  /** The guided walkthrough (Challenge Mode's first week, Guided Mode's Opening) has reached its last step or been skipped. */
   tutorialDone: boolean;
+  /** The step Guided Mode's walkthrough is on while it is under way, so a reload or a new company carries on from it. */
+  walkthroughStep: number | null;
   /** The short guide shown on the first incident has been seen. */
   incidentGuideDone: boolean;
+  /** Guided Mode chapters whose guide has been shown, so it appears once. */
+  chapterTours: ChapterTour[];
   /** Challenge Mode stays unlocked once earned; completing Guided Mode cannot be taken back. */
   challengeUnlocked: boolean;
 }
 
 export const DEFAULT_META: Meta = {
-  openingOnboarding: {version: 1, step: 0, status: "not-started"},
   onboarded: false,
   runsStarted: 0,
   runsFinished: 0,
   firstIncidentStarted: false,
   firstIncidentCompleted: false,
   tutorialDone: false,
+  walkthroughStep: null,
   incidentGuideDone: false,
+  chapterTours: [],
   challengeUnlocked: false,
 };
 
@@ -243,8 +251,16 @@ export function saveClassicGame(game: GameState): boolean {
   return write(CLASSIC_SAVE_KEY, exportGame(game));
 }
 
-/** Older metadata also held the music switch, which now lives in the sound settings. */
-type StoredMeta = Partial<Meta> & { music?: unknown };
+/**
+ * Older metadata also held the music switch, which now lives in the sound settings, and the state of Guided Mode's
+ * former three-prompt introduction, which the spotlight walkthrough replaced.
+ */
+type StoredMeta = Omit<Partial<Meta>, "chapterTours" | "walkthroughStep"> & {
+  music?: unknown;
+  openingOnboarding?: unknown;
+  chapterTours?: unknown;
+  walkthroughStep?: unknown;
+};
 
 function parseMeta(raw: string | null): StoredMeta | null {
   if (!raw) return null;
@@ -256,17 +272,25 @@ function parseMeta(raw: string | null): StoredMeta | null {
   }
 }
 
-function decodeMeta(raw: string | null): Meta {
-  const { music: _music, ...stored } = parseMeta(raw) ?? {};
-  const meta: Meta = { ...DEFAULT_META, ...stored };
-  const o=meta.openingOnboarding;
-  if(!o || o.version!==1 || !Number.isInteger(o.step) || o.step<0 || o.step>2 || !["not-started","in-progress","completed","skipped"].includes(o.status)) meta.openingOnboarding=structuredClone(DEFAULT_META.openingOnboarding);
+/** Whether Guided Mode's former introduction was finished or skipped, in a profile from before the walkthrough. */
+function introductionDone(introduction: unknown): boolean {
+  const status = introduction && typeof introduction === "object" ? (introduction as { status?: unknown }).status : null;
+  return status === "completed" || status === "skipped";
+}
+
+/** `campaign` reads Guided Mode's profile, where a player done with the former introduction is done with the walkthrough. */
+function decodeMeta(raw: string | null, campaign = false): Meta {
+  const { music: _music, openingOnboarding, chapterTours, walkthroughStep, ...stored } = parseMeta(raw) ?? {};
+  const seen = Array.isArray(chapterTours) ? CHAPTER_TOURS.filter((id) => chapterTours.includes(id)) : [];
+  const step = Number.isInteger(walkthroughStep) && (walkthroughStep as number) >= 0 ? (walkthroughStep as number) : null;
+  const meta: Meta = { ...DEFAULT_META, ...stored, chapterTours: seen, walkthroughStep: step };
+  if (campaign && introductionDone(openingOnboarding)) meta.tutorialDone = true;
   return meta;
 }
 
 /** Each mode keeps its own tutorial/counters; sound is a shared player preference (see loadAudio). */
 export function loadMeta(mode: GameMode = "campaign"): Meta {
-  return decodeMeta(read(mode === "classic" ? CLASSIC_META_KEY : META_KEY));
+  return decodeMeta(read(mode === "classic" ? CLASSIC_META_KEY : META_KEY), mode === "campaign");
 }
 export function loadLegacyMeta(): Meta {
   return decodeMeta(read(LEGACY_META_KEY));

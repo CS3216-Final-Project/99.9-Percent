@@ -7,7 +7,7 @@ import "./CampaignChapters.css";
 
 export function CampaignChapters() {
   const game = useGame((s) => s.game);
-  const introduction = useGame(s => s.meta.openingOnboarding.status);
+  const tutorialDone = useGame(s => s.meta.tutorialDone);
   const [open, setOpen] = useState(false);
   const chapters = campaignChapters(game);
   const current = chapters.find((chapter) => chapter.current)!;
@@ -17,7 +17,7 @@ export function CampaignChapters() {
       <div className="chapter-current">
         <p>Guided Mode · Chapter {current.number} of {chapters.length}</p>
         <h2 aria-label="Current chapter"><span aria-label="Current Guided Mode stage">{current.name}</span></h2>
-        {introduction === "completed" && <span className="campaign-intro-badge">Getting started ✓</span>}
+        {tutorialDone && <span className="campaign-intro-badge">Getting started ✓</span>}
       </div>
       <ol className="chapter-trail" aria-label="Chapter progress">
         {chapters.map((chapter) => <li key={chapter.id} aria-current={chapter.current ? "step" : undefined} className={chapter.completed ? "is-complete" : ""}>

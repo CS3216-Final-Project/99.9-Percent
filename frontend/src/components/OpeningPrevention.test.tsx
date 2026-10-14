@@ -38,7 +38,7 @@ it("records prevention and explains why Scaling remains locked",()=>{
 it.each(["streak","outcome","acknowledged"])("reload preserves prevention %s with paused time",kind=>{
  let g=kind==="streak"?advanceSteps(inspected(),2).state:qualified();
  if(kind==="acknowledged")g=act(g,{type:"acknowledge_prevention_review"});
- expect(saveGame(g)).toBe(true);saveMeta({...DEFAULT_META,openingOnboarding:{version:1,step:2,status:"completed"}});useGame.getState().boot();useGame.getState().play();
+ expect(saveGame(g)).toBe(true);saveMeta({...DEFAULT_META});useGame.getState().boot();useGame.getState().play();
  render(ui());expect(useGame.getState().running).toBe(false);
  if(kind==="streak")expect(screen.getByRole("region",{name:"Opening prevention progress"}).textContent).toContain("Stable service: 2 / 5");
  if(kind==="outcome")expect(screen.getByRole("dialog",{name:"Prevention review"})).toBeTruthy();

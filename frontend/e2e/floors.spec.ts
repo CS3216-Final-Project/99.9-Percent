@@ -56,10 +56,13 @@ test("rides between the floors by the floor menu and the keyboard, each floor wi
 test("an incident downstairs badges the server floor from the office, and the incident panel takes the view there", async ({ page }) => {
   const game = advanceTurn({ ...newLegacyGame(1), users: 4500 });
   expect(game.phase).toBe("incident");
+  // The room's first frame takes about 20 s in software, and this journey opens on the office, where expectRoom's
+  // server-floor label never appears, so the first label waits for that frame instead.
+  test.setTimeout(120_000);
   await seedClassicSave(page, game);
   await page.goto("/?floor=office");
   await page.getByRole("button", { name: /^Continue week/ }).click();
-  await expect(label(page, "Growth")).toBeVisible();
+  await expect(label(page, "Growth")).toBeVisible({ timeout: 60_000 });
   // The incident never moves the view on its own; the menu and the panel say where it is.
   await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
   await expect(floor(page, "Server floor")).toHaveAccessibleName(/incident here/);
