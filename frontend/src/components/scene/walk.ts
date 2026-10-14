@@ -8,7 +8,8 @@ import { facing, followPath, promptAt, slide, SPEED, steer, turnTowards, type Ke
 /*
  * The player's avatar in walk mode, shared by the room that draws it, the camera that follows it and the controls
  * on the page: where it stands, the keys held, a walk it is following, what it is busy with and what is within
- * reach. Moving it is plain arithmetic on the clock (see player.ts and navgrid.ts); none of it is ever saved.
+ * reach. Moving it is plain arithmetic on the clock (see player.ts and navgrid.ts); only where it stands is
+ * remembered in the browser (see game/exploration.ts), never its path, busy animation or keys held.
  */
 
 export interface AvatarState {

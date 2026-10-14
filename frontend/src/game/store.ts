@@ -57,6 +57,7 @@ import { makeEnvelope, validateEnvelope, type SaveEnvelope } from "./saveEnvelop
 import { AccountApiError, getSession, logout, listRuns, putRun, getRun, emailLogin, emailRegister } from "@/lib/api";
 import type { AppSession, CloudRun, RunSummary } from "../../../shared/campaign.ts";
 import { checkpointCloud, localCloudCopy, rememberCloud } from "./cloud";
+import { loadExploration, saveExploration } from "./exploration";
 import { floorFromSearch, floorOf, type Floor, type FloorSwitch } from "./floors";
 import { DEFAULT_AVATAR, type AvatarId } from "./avatars";
 
@@ -167,14 +168,17 @@ interface Store {
   selectApp: (id: string) => void;
   /**
    * The floor of the building in view. Choosing a piece of equipment takes the view to its floor; an incident never
-   * moves it on its own. Kept across runs on this page, but never saved.
+   * moves it on its own. Remembered in this browser per mode (see game/exploration.ts), never in a run's save.
    */
   floor: Floor;
   /** Take the view to a floor; `how` says what asked, for the analytics. */
   goToFloor: (floor: Floor, how: FloorSwitch) => void;
-  /** Walk mode: the player steers their avatar round the building. View state like the floor, never saved. */
+  /**
+   * Walk mode: the player steers their avatar round the building. Remembered in this browser per mode like the
+   * floor, never in a run's save.
+   */
   walking: boolean;
-  setWalking: (on: boolean) => void;
+  setWalking: (on: boolean, remember?: boolean) => void;
   /** The player's avatar, a browser setting kept across runs and modes. */
   avatar: AvatarId;
   setAvatar: (id: AvatarId) => void;
@@ -293,7 +297,18 @@ export const useGame = create<Store>()((set, get) => {
     if (get().floor === floor) return {};
     if (get().game.campaign) uiEvent("floor_switched", { to: floor, how });
     else track("floor_switched", { to: floor, how, mode: get().mode });
+    // Unsaved, the choice still applies for this visit.
+    saveExploration(get().mode, { floor });
     return { floor };
+  }
+  /**
+   * Whether leaving the title screen should bring walk mode back: this mode's last visit had it on, on the floor
+   * now in view, and no `?floor=` address is directing the view elsewhere.
+   */
+  function resumedWalk(): boolean {
+    if (typeof window !== "undefined" && floorFromSearch(window.location.search) !== null) return false;
+    const exploration = loadExploration(get().mode);
+    return exploration.walking && exploration.floor === get().floor;
   }
   /** The unlock already earned in memory, or the one durable in the campaign profile/save. */
   function challengeUnlockedNow():boolean {
@@ -397,6 +412,9 @@ export const useGame = create<Store>()((set, get) => {
   /** Make a mode's saved run (or a fresh one) the active game, with every view closed. */
   function enter(mode: GameMode, started: boolean): void {
     const meta = loadMeta(mode);
+    // Where this mode was last left: a `?floor=` address wins, and walk mode only resumes when it applies.
+    const exploration = loadExploration(mode);
+    const urlFloor = typeof window === "undefined" ? null : floorFromSearch(window.location.search);
     const fresh: Partial<Store> = {
       hasRun: false, measurement: emptyMeasurement(), activeMark: null,
       ready: true,
@@ -407,6 +425,8 @@ export const useGame = create<Store>()((set, get) => {
       lastIntro: null,
       meta,
       running: false,
+      floor: urlFloor ?? exploration.floor,
+      walking: started && urlFloor === null && exploration.walking,
       remainderMs: 0,
       saveBlocked: false,
       selected: null,
@@ -583,7 +603,7 @@ export const useGame = create<Store>()((set, get) => {
     floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
     goToFloor: (floor, how) => set(floorPatch(floor, how)),
     walking: false,
-    setWalking: (on) => {
+    setWalking: (on, remember = true) => {
       if (on === get().walking) return;
       const now = performance.now();
       const data: Record<string, string | number> = on ? { floor: get().floor } : { seconds: Math.round((now - walkStart) / 1000) };
@@ -591,6 +611,8 @@ export const useGame = create<Store>()((set, get) => {
       else track(on ? "walk_started" : "walk_ended", { ...data, mode: get().mode });
       if (on) walkStart = now;
       set({ walking: on });
+      // Remembering is skipped by the title screen's automatic stop: that is not the player's choice to leave.
+      if (remember) saveExploration(get().mode, { floor: get().floor, walking: on });
     },
     avatar: DEFAULT_AVATAR,
     setAvatar: (id) => {
@@ -623,14 +645,14 @@ export const useGame = create<Store>()((set, get) => {
     play: () => {
       if(get().started)return;
       // A fresh classic run says "Play" on the title screen and a resumed one "Continue", so only the first is a start.
-      if(get().mode === "classic") { set({started:true,...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
+      if(get().mode === "classic") { set({started:true,walking:resumedWalk(),...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
       const state=get();
       let game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID());
       if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended") game=applyCampaignInput(game,{type:"enter_scaling"}).state;
       const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
       const status=meta.openingOnboarding.status;
       const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
-      set({game,hasRun:true,meta,measurement,started:true,running:false,
+      set({game,hasRun:true,meta,measurement,started:true,running:false,walking:resumedWalk(),
         // Starting a fresh company replaces the game, like a new run.
         ...(state.hasRun?{}:{generation:state.generation+1,lastAction:null,lastIntro:intro("begin")}),
         onboarding:status==="not-started"||status==="in-progress",activeMark:document.hidden?null:performance.now()});
@@ -970,9 +992,10 @@ export const useGame = create<Store>()((set, get) => {
   };
 });
 
-// Walk mode belongs to a run on screen: going back to the title screen ends it.
+// Walk mode belongs to a run on screen: going back to the title screen ends it for now, but the player's choice
+// to be walking is remembered, so the next visit picks it up again.
 useGame.subscribe((s, prev) => {
-  if (prev.started && !s.started && s.walking) s.setWalking(false);
+  if (prev.started && !s.started && s.walking) s.setWalking(false, false);
 });
 
 /**
