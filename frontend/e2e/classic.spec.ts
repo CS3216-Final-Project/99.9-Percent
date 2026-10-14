@@ -46,6 +46,8 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   expect(before.tasks.some(task => task.techId === 'larger_servers') || before.releases.some(release => release.techId === 'larger_servers') || before.techDone.includes('larger_servers')).toBe(true);
   await page.reload();
   await page.getByRole('button', { name: 'Continue week 2' }).click();
+  // The tutorial left the view on the office floor, which is the floor the reload restores.
+  await page.getByRole('button', { name: 'Server floor', exact: true }).click();
   await expectRoom(page);
   expect(await savedGame(page)).toEqual(before);
   await expect(page.getByRole('dialog', { name: /Tutorial/ })).toHaveCount(0);
