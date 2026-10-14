@@ -2,6 +2,7 @@ import { canEnterCombined } from "@/sim/combinedCampaign";
 import type { Action, GameState } from "@/sim";
 import { canEnterReliability } from "@/sim/reliability";
 import { campaignGuidance } from "./campaignGuidance";
+import type { ChapterCompletion } from "./persist";
 
 /** Presentation only: chapter status follows the existing progression gates. */
 export function campaignChapters(game: GameState) {
@@ -36,9 +37,6 @@ export function chapterAdvance(game: GameState): { label: string; action: Action
   if (!c.reliabilityStage && c.spikeStage?.acknowledged) return { label: "Continue to reliability", action: { type: "enter_reliability" }, ready: canEnterReliability(game) };
   return null;
 }
-
-/** Chapters that end without a recognition of their own, so the company stops to say so. */
-export type ChapterCompletion = "scaling" | "data";
 
 /** The chapter whose requirements are met while the company waits for the player to continue past it. */
 export function finishedChapter(game: GameState): ChapterCompletion | null {

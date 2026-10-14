@@ -10,14 +10,14 @@ import { pendingReliability, effectiveTargets, researchBalance } from "@/sim/rel
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
-import { campaignChapters, finishedChapter, type ChapterCompletion } from "@/game/campaignChapters";
+import { campaignChapters, finishedChapter } from "@/game/campaignChapters";
 import TechTree from "./TechTree";
 import { AccountSection } from "./Account";
 import { HomeScreen } from "./HomeScreen";
 import { CampaignChapters } from "./CampaignChapters";
 import { isChapterEntry } from "@/game/campaignChapters";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
-import { exportPlaytest } from "@/game/persist";
+import { exportPlaytest, type ChapterCompletion } from "@/game/persist";
 import { money, num } from "@/game/format";
 import { useState } from "react";
 import { inspectOrSelect, useGame, type Speed } from "@/game/store";
@@ -386,7 +386,8 @@ function CampaignDialog() {
     <ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_milestone"})} />
   </Modal>;
   if(pendingSpikeAcknowledgement(c) && view!=="menu" && view!=="history") return <Modal title="Spike response handled" icon={{ kind: "go", name: "goal" }} onClose={()=>openView("history")}><p>Both demand pulses ended and five baseline steps qualified for stable service. The same company continues with its investments and operating costs.</p><ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_spikes"})} /></Modal>;
-  if(chapterComplete&&chapterComplete===finishedChapter(game)&&view===null)return <ChapterComplete chapter={chapterComplete} />;
+  // It pauses the clock when it appears, so it shows over History and guidance rather than waiting behind them.
+  if(chapterComplete&&chapterComplete===finishedChapter(game)&&view!=="menu")return <ChapterComplete chapter={chapterComplete} />;
   if(game.phase==="ended"&&game.outcome==="won"&&!["guidance","menu","history","tech"].includes(view??""))return <Modal title="Campaign complete" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard!}/><button className="btn" onClick={()=>openView("guidance")}>Inspect final company</button><button className="btn" onClick={()=>openView("menu")}>Export or start a new company</button></Modal>;
   if (game.phase === "ended" && game.outcome !== "won" && view === null) return <Modal title="Company bankrupt" tone="alert" icon={{ kind: "critical", name: "cash" }} onClose={() => openView("menu")}>
     <Callout tone="critical" icon="cash" kicker="Company closed">Cash reached {dollars(c.cashCents)} after settlement at step {c.step}. Final metrics and history remain available.</Callout>

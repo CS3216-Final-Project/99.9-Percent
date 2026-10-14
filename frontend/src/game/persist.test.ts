@@ -86,6 +86,17 @@ describe('browser metadata and analytics', () => {
     }
   });
 
+  it('keeps the announced chapters of one company, dropping anything malformed', () => {
+    saveMeta({ ...DEFAULT_META, chapterCompletions: { runId: 'run-1', chapters: ['scaling', 'data'] } });
+    expect(loadMeta().chapterCompletions).toEqual({ runId: 'run-1', chapters: ['scaling', 'data'] });
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ chapterCompletions: { runId: 'run-1', chapters: ['data', 'spikes', 'data'] } }));
+    expect(loadMeta().chapterCompletions).toEqual({ runId: 'run-1', chapters: ['data'] });
+    for (const record of [null, 'run-1', [], { runId: 1, chapters: [] }, { runId: 'run-1' }]) {
+      localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ chapterCompletions: record }));
+      expect(loadMeta().chapterCompletions).toBeNull();
+    }
+  });
+
   it('keeps only known chapter guides as seen, once each and in chapter order', () => {
     saveMeta({ ...DEFAULT_META, chapterTours: ['data', 'scaling'] });
     expect(loadMeta().chapterTours).toEqual(['scaling', 'data']);

@@ -1,7 +1,7 @@
 "use client";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
-import { finishedChapter, type ChapterCompletion } from "./campaignChapters";
+import { finishedChapter } from "./campaignChapters";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
 import type { Campaign } from "@/sim/campaignTypes";
 
@@ -49,6 +49,7 @@ import {
   track,
   GRAPHICS_QUALITIES,
   type AudioSettings,
+  type ChapterCompletion,
   type ChapterTour,
   type GameMode,
   type GraphicsSettings,
@@ -351,6 +352,14 @@ export const useGame = create<Store>()((set, get) => {
     if (!saveMeta(next, get().mode)) get().notify("Onboarding preferences could not be saved.", "error");
     return next;
   }
+  function chapterAnnounced(meta: Meta, runId: string, chapter: ChapterCompletion): boolean {
+    return meta.chapterCompletions?.runId === runId && meta.chapterCompletions.chapters.includes(chapter);
+  }
+  /** Each company keeps its own record; a new company replaces the last one's. */
+  function announceChapter(meta: Meta, runId: string, chapter: ChapterCompletion): Meta {
+    const chapters = meta.chapterCompletions?.runId === runId ? meta.chapterCompletions.chapters : [];
+    return { ...meta, chapterCompletions: { runId, chapters: [...chapters, chapter] } };
+  }
   /** The profile with Guided Mode's walkthrough under way at `step`, or none, saved. If that fails it only starts over. */
   function walkthroughAt(meta: Meta, step: number | null): Meta {
     const next = { ...meta, walkthroughStep: step };
@@ -397,13 +406,23 @@ export const useGame = create<Store>()((set, get) => {
       if(!was?.firstPauseConsumed && c.firstPauseConsumed)patch.running=false;
       if(get().selectedAppId&&!c.apps.some(a=>a.id===get().selectedAppId))patch.selectedAppId=c.apps[0].id;
       if(awaitingAcknowledgement(c)||next.phase==="review"||next.phase==="ended")patch.running=false;
-      // Finishing Scaling & Routing or Data Strategy pauses once to say so; the chapter bar keeps the way forward.
-      const finished=finishedChapter(next);
-      if(finished&&was?.runId===c.runId&&finishedChapter(prev)!==finished)Object.assign(patch,{chapterComplete:finished,running:false});
+      // Finishing Scaling & Routing or Data Strategy pauses to say so the first time only; the chapter bar keeps the
+      // way forward. A chapter already finished when the company loaded is remembered without being announced.
+      const sameRun=was?.runId===c.runId, before=sameRun?finishedChapter(prev):null, finished=finishedChapter(next);
+      let meta=get().meta;
+      if(before&&!chapterAnnounced(meta,c.runId,before))meta=announceChapter(meta,c.runId,before);
+      if(finished&&!chapterAnnounced(meta,c.runId,finished)) {
+        meta=announceChapter(meta,c.runId,finished);
+        if(sameRun)Object.assign(patch,{chapterComplete:finished,running:false});
+      }
       else if(!finished&&get().chapterComplete)patch.chapterComplete=null;
+      if(meta!==get().meta) {
+        saveMeta(meta);
+        patch.meta=meta;
+      }
       // The first acknowledged reliability outcome permanently unlocks Challenge Mode.
       if(!was?.reliabilityStage?.acknowledged && c.reliabilityStage?.acknowledged && !get().meta.challengeUnlocked) {
-        const meta={...get().meta,challengeUnlocked:true};
+        const meta={...(patch.meta??get().meta),challengeUnlocked:true};
         saveMeta(meta);
         patch.meta=meta;
       }
