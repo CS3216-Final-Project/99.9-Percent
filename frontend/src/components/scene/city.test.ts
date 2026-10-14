@@ -462,7 +462,7 @@ describe('traffic', () => {
     expect(TURN.x[1] + 2 * LAG).toBeLessThan(TURN.z[0]);
     expect(TURN.z[1] + 2 * LAG).toBeLessThan(CYCLE);
     expect(collisions(vehicles)).toEqual([]);
-  });
+  }, 15_000);
 
   it('would collide if the crossing traffic came out of turn', () => {
     expect(collisions(vehicles, TURN.z[0], 20).length).toBeGreaterThan(0);

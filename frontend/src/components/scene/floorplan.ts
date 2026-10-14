@@ -33,12 +33,23 @@ export const QUIET_ROOM: [number, number, number, number] = [-22, -9.5, -13, -1]
 /** On the office floor, the small meeting room over the monitoring room, by the elevator. */
 export const HUDDLE_ROOM: [number, number, number, number] = [5.5, -9.5, 11.5, -4.6];
 
-/** The glass round the monitoring room below and the huddle room above it, the same on both floors. Its door faces the elevator. */
-const CORNER_GLASS: [number, number, number, number][] = [
-  [5.5, -9.5, 5.5, -4.6],
-  [5.5, -4.6, 9.6, -4.6],
-  [10.6, -4.6, 11.5, -4.6],
-  [11.5, -9.5, 11.5, -4.6],
+/** The glass round the huddle room on the office floor. Its door faces the elevator. */
+const HUDDLE_GLASS: [number, number, number, number][] = [
+  [HUDDLE_ROOM[0], HUDDLE_ROOM[1], HUDDLE_ROOM[0], HUDDLE_ROOM[3]],
+  [HUDDLE_ROOM[0], HUDDLE_ROOM[3], 9.6, HUDDLE_ROOM[3]],
+  [10.6, HUDDLE_ROOM[3], HUDDLE_ROOM[2], HUDDLE_ROOM[3]],
+  [HUDDLE_ROOM[2], HUDDLE_ROOM[1], HUDDLE_ROOM[2], HUDDLE_ROOM[3]],
+];
+
+/** The monitoring room's door, in its west glass, which opens into the server hall away from the elevator, as [z0, z1]. */
+const MONITORING_DOOR: [number, number] = [-7.6, -6.6];
+
+/** The glass round the monitoring room on the server floor, below the huddle room and the same size. */
+const MONITORING_GLASS: [number, number, number, number][] = [
+  [HUDDLE_ROOM[0], HUDDLE_ROOM[1], HUDDLE_ROOM[0], MONITORING_DOOR[0]],
+  [HUDDLE_ROOM[0], MONITORING_DOOR[1], HUDDLE_ROOM[0], HUDDLE_ROOM[3]],
+  [HUDDLE_ROOM[0], HUDDLE_ROOM[3], HUDDLE_ROOM[2], HUDDLE_ROOM[3]],
+  [HUDDLE_ROOM[2], HUDDLE_ROOM[1], HUDDLE_ROOM[2], HUDDLE_ROOM[3]],
 ];
 
 /** The server floor's glass: the server hall, the monitoring room and the network and power room. */
@@ -50,7 +61,7 @@ export const SERVER_GLASS: [number, number, number, number][] = [
   [9, 1.0, 9, 5],
   [-13, -9.5, -13, -0.6],
   [-13, 0.6, -13, 5],
-  ...CORNER_GLASS,
+  ...MONITORING_GLASS,
   // Network and power room
   [-22, -1, -15.2, -1],
   [-14.0, -1, -13, -1],
@@ -63,7 +74,7 @@ export const GLASS: [number, number, number, number][] = [
   [-14.0, QUIET_ROOM[3], QUIET_ROOM[2], QUIET_ROOM[3]],
   [QUIET_ROOM[2], QUIET_ROOM[1], QUIET_ROOM[2], QUIET_ROOM[3]],
   // The huddle room
-  ...CORNER_GLASS,
+  ...HUDDLE_GLASS,
   // Meeting room
   [-13, 10.2, -6.8, 10.2],
   [-5.9, 10.2, -5.5, 10.2],
@@ -93,8 +104,8 @@ export const RESPONDERS: { path: [number, number][]; face: [number, number] }[] 
 export const CLOSED_ROOMS: [number, number, number, number][] = [QUIET_ROOM, HUDDLE_ROOM, [-13, 10.2, -5.5, 14.5], NAP_ROOM];
 
 /**
- * The elevator's shaft between the floors, as [x0, z0, x1, z1], in the east corridor beside the monitoring room's
- * door. Its doors face the corridor (+x). Nothing else may stand in it and no walk may cross it.
+ * The elevator's shaft between the floors, as [x0, z0, x1, z1], in the east corridor just south of the monitoring
+ * room. Its doors face the corridor (+x). Nothing else may stand in it and no walk may cross it.
  */
 export const ELEVATOR_SPOT: [number, number, number, number] = [9, -3.5, 11.5, -1];
 
@@ -380,23 +391,47 @@ export const CAGE = { x: 5.6, z: 12.8, w: 3.0, d: 1.6 };
 
 /** How many database cabinets can ever stand: one per tier. */
 const DB_CABINETS = 4;
+/** How many app servers can ever stand: two rows of six. */
+const APP_PLACES = 12;
 
-/**
- * Everything on the server floor to walk round. Every place a machine can stand counts, built or not, so a walk
- * never runs into one fitted later.
- */
-export const SERVER_OBSTACLES: Obstacle[] = [
-  // The machines
-  box("gateway", POS.gateway.x, POS.gateway.z, RACK.w, RACK.d),
-  box("load balancer", POS.loadBalancer.x, POS.loadBalancer.z, RACK.w, RACK.d),
-  ...Array.from({ length: 12 }, (_, i) => appSlot(i)).map((p, i) => box(`app server ${i}`, p.x, p.z, RACK.w, RACK.d)),
-  ...Array.from({ length: MAX_TEMP_SHOWN }, (_, i) => tempSlot(i)).map((p, i) => box(`temporary server ${i}`, p.x, p.z, RACK.w, RACK.d)),
-  box("standby", POS.standby.x, POS.standby.z, RACK.w, RACK.d),
-  box("cache", POS.cache.x, POS.cache.z, RACK.w, RACK.d),
-  ...Array.from({ length: DB_CABINETS }, (_, i) => dbSlot(i)).map((p, i) => box(`database cabinet ${i}`, p.x, p.z, DB_CABINET.w, DB_CABINET.d)),
-  box("replica", POS.replica.x, POS.replica.z, DB_CABINET.w, DB_CABINET.d),
-  box("backup", POS.backup.x, POS.backup.z, 1.9, 1.05),
+/** The machines standing in the server hall: how many of each kind's places are filled. */
+export interface Racks {
+  apps: number;
+  temp: number;
+  loadBalancer: boolean;
+  standby: boolean;
+  cache: boolean;
+  dbCabinets: number;
+  replica: boolean;
+  backup: boolean;
+}
 
+/** Every place in the hall filled: the most it can ever hold. */
+export const ALL_RACKS: Racks = { apps: APP_PLACES, temp: MAX_TEMP_SHOWN, loadBalancer: true, standby: true, cache: true, dbCabinets: DB_CABINETS, replica: true, backup: true };
+
+/** The machines standing in the hall, to walk round. An empty place is open floor. */
+function machines(r: Racks): Obstacle[] {
+  const count = (n: number, most: number) => Math.max(0, Math.min(n, most));
+  return [
+    box("gateway", POS.gateway.x, POS.gateway.z, RACK.w, RACK.d),
+    ...(r.loadBalancer ? [box("load balancer", POS.loadBalancer.x, POS.loadBalancer.z, RACK.w, RACK.d)] : []),
+    ...Array.from({ length: count(r.apps, APP_PLACES) }, (_, i) => appSlot(i)).map((p, i) => box(`app server ${i}`, p.x, p.z, RACK.w, RACK.d)),
+    ...Array.from({ length: count(r.temp, MAX_TEMP_SHOWN) }, (_, i) => tempSlot(i)).map((p, i) => box(`temporary server ${i}`, p.x, p.z, RACK.w, RACK.d)),
+    ...(r.standby ? [box("standby", POS.standby.x, POS.standby.z, RACK.w, RACK.d)] : []),
+    ...(r.cache ? [box("cache", POS.cache.x, POS.cache.z, RACK.w, RACK.d)] : []),
+    ...Array.from({ length: count(r.dbCabinets, DB_CABINETS) }, (_, i) => dbSlot(i)).map((p, i) => box(`database cabinet ${i}`, p.x, p.z, DB_CABINET.w, DB_CABINET.d)),
+    ...(r.replica ? [box("replica", POS.replica.x, POS.replica.z, DB_CABINET.w, DB_CABINET.d)] : []),
+    ...(r.backup ? [box("backup", POS.backup.x, POS.backup.z, 1.9, 1.05)] : []),
+  ];
+}
+
+/** Everything on the server floor to walk round: the machines standing now, and the furniture. */
+export function serverObstacles(racks: Racks): Obstacle[] {
+  return [...machines(racks), ...SERVER_FURNITURE];
+}
+
+/** The server floor's furniture and plant, which always stand. */
+const SERVER_FURNITURE: Obstacle[] = [
   // The hall's cooling units, crash cart, extinguisher and the boxes of hardware by the monitoring room
   box("cooling unit, north", -12.45, -2.6, 0.95, 1.9),
   box("cooling unit, south", -12.45, 2.2, 0.95, 1.9),
@@ -518,7 +553,7 @@ export const SERVER_DOORS: Door[] = [
   door("server hall, south", "x", -2.0, -0.8, 5),
   door("server hall, east", "z", -0.2, 1.0, 9),
   door("server hall, west", "z", -0.6, 0.6, -13),
-  door("monitoring room", "x", 9.6, 10.6, HUDDLE_ROOM[3]),
+  door("monitoring room", "z", MONITORING_DOOR[0], MONITORING_DOOR[1], HUDDLE_ROOM[0]),
   door("network and power room", "x", -15.2, -14.0, -1),
 ];
 

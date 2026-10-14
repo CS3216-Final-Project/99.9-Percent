@@ -52,7 +52,7 @@ import { Exterior } from "./exterior";
 import { daylightNow } from "./dayClock";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
-import { buildModel, type SceneModel } from "./sceneModel";
+import { buildModel, racksOf, type SceneModel } from "./sceneModel";
 import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
 import { screenPoint } from "./labels";
 import { EQUIPMENT, ROOM_PALETTE } from "./palette";
@@ -999,6 +999,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
     return () => window.clearTimeout(id);
   }, [gl, scene, camera, warm]);
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
+  const racks = useMemo(() => racksOf(m), [m]);
 
   const appCount = Math.min(m.hosts.length, 12);
   const routedCount = campaign ? Math.max(...campaign.routing.targets.map(id => campaign.apps.findIndex(a=>a.id===id)+1)) : appCount;
@@ -1023,7 +1024,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
       <Exterior />
       <ElevatorCar />
       <Avatar walking={walking} />
-      <WalkDriver walking={walking} footprints={m.footprints} names={m.names} />
+      <WalkDriver walking={walking} footprints={m.footprints} names={m.names} racks={racks} />
 
       {/* The office floor, on top */}
       <group ref={office}>

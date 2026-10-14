@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { EQUIPMENT_ORDER, newLegacyGame, type EquipmentId } from "@/sim";
-import { ELEVATOR_DOOR, ELEVATOR_SPOT, FUN_PROPS, OFFICE_DOORS } from "./floorplan";
+import { ALL_RACKS, ELEVATOR_DOOR, ELEVATOR_SPOT, FUN_PROPS, OFFICE_DOORS } from "./floorplan";
 import { footprint, POS, type Footprint } from "./layout";
 import { AVATAR_RADIUS, blocked, findPath, gridOf, worldOf } from "./navgrid";
 import { facing, followPath, promptAt, slide, SPEED, steer, turnTowards } from "./player";
 
-const office = worldOf("office");
+const office = worldOf("office", ALL_RACKS);
 const s = newLegacyGame(1);
 const footprints = Object.fromEntries(EQUIPMENT_ORDER.map((id) => [id, footprint(s, id)])) as Record<EquipmentId, Footprint>;
 const names = Object.fromEntries(EQUIPMENT_ORDER.map((id) => [id, id === "db" ? "Database" : id])) as Record<EquipmentId, string>;
@@ -65,7 +65,7 @@ describe("moving", () => {
   });
 
   it("follows a planned walk to its end, and stops at something in the way", () => {
-    const g = gridOf("office");
+    const g = gridOf("office", ALL_RACKS);
     const from: [number, number] = [-7.3, 9.75];
     const to: [number, number] = [13.2, 3.35];
     const path = findPath(g, from, to) as [number, number][];
