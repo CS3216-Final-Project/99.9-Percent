@@ -162,4 +162,18 @@ Migration `0002_fearless_exodus.sql` adds the table without changing existing ta
 
 ### Product analytics
 
-Optional PostHog tracking measures active gameplay duration, chapter progression, all-chapter Campaign completion, failures and returning players. Tracking is off until configured in the frontend's Production environment. Development, tests and preview builds do not collect product analytics. See [analytics setup and dashboard metrics](docs/ANALYTICS.md) for public token configuration, event definitions, dashboard recipes and measurement limits. Existing local playtest records and saves retain their formats.
+PostHog tracking measures active gameplay duration, chapter progression, all-chapter Campaign completion, failures and returning players.
+Tracking only runs once configured in the frontend's Production environment.
+Development, tests and preview builds do not collect product analytics.
+
+In production, gameplay analytics is on by default.
+It sends only `gameplay_*` events with an allowlist of properties, tied to a random browser ID kept in localStorage.
+It never sends URLs, account details, saves, feedback or observer notes.
+PostHog does see the network details of each request, such as the IP address.
+Players can opt out, or back in, from the notice on the home screen, Menu > Playtest or the Account dialog.
+The choice is kept in this browser only.
+Opting out stops tracking at once and removes the stored browser ID and run records.
+Nothing is collected while the browser's Do Not Track or Global Privacy Control setting is on.
+
+See [analytics setup and dashboard metrics](docs/ANALYTICS.md) for public token configuration, event definitions, dashboard recipes and measurement limits.
+Existing local playtest records and saves retain their formats.
