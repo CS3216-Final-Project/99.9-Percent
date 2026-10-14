@@ -1,15 +1,10 @@
 import { useSyncExternalStore } from "react";
-import { ANALYTICS_CONSENT_EVENT, loadAnalyticsConsent, saveAnalyticsConsent, type AnalyticsConsent } from "@/lib/analytics";
+import { loadAnalyticsConsent, saveAnalyticsConsent, subscribeAnalyticsConsent, type AnalyticsConsent } from "@/lib/analytics";
 import { Icon } from "./icons";
 
-const subscribe = (onChange: () => void) => {
-  window.addEventListener(ANALYTICS_CONSENT_EVENT, onChange);
-  return () => window.removeEventListener(ANALYTICS_CONSENT_EVENT, onChange);
-};
-
-/** The saved analytics choice, kept in step with every other control that changes it. */
+/** The analytics choice in effect, kept in step with every other control and tab that changes it. */
 function useAnalyticsConsent(): AnalyticsConsent {
-  return useSyncExternalStore(subscribe, loadAnalyticsConsent, () => null);
+  return useSyncExternalStore(subscribeAnalyticsConsent, loadAnalyticsConsent, () => null);
 }
 
 /**
