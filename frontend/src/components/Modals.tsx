@@ -5,7 +5,7 @@ import { BALANCE, buildReport } from "@/sim";
 import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { useGame } from "@/game/store";
-import { AccountSection } from "./Account";
+import { AccountSection, CloudSavesSection } from "./Account";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
@@ -358,34 +358,37 @@ export function Menu() {
         {tab === "avatar" && <AvatarSettings />}
 
         {tab === "saves" && (
-          <div className="menu-columns">
-            <div className="menu-col">
-              <SaveFiles />
-            </div>
-            <div className="menu-col">
-              <section className="menu-section menu-danger" aria-label="Start over">
-                <h4>
-                  <Icon name="refresh" size={20} />
-                  Start over
-                </h4>
-                <label className="field">
-                  <span>Seed (optional): leave empty for a random run.</span>
-                  <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
-                </label>
-                <div className="menu-actions">
-                  <button type="button" className={`btn${confirm === "new" ? " btn-danger" : ""}`} onClick={() => start("new")}>
-                    <Icon name="play" size={20} />
-                    {label("new", "New game")}
-                  </button>
-                  <button type="button" className={`btn${confirm === "reset" ? " btn-danger" : ""}`} onClick={() => start("reset")}>
+          <>
+            <div className="menu-columns">
+              <div className="menu-col">
+                <SaveFiles />
+              </div>
+              <div className="menu-col">
+                <section className="menu-section menu-danger" aria-label="Start over">
+                  <h4>
                     <Icon name="refresh" size={20} />
-                    {label("reset", "Reset to first run")}
-                  </button>
-                </div>
-                {(confirm === "new" || confirm === "reset") && warning}
-              </section>
+                    Start over
+                  </h4>
+                  <label className="field">
+                    <span>Seed (optional): leave empty for a random run.</span>
+                    <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="Random" inputMode="text" maxLength={24} />
+                  </label>
+                  <div className="menu-actions">
+                    <button type="button" className={`btn${confirm === "new" ? " btn-danger" : ""}`} onClick={() => start("new")}>
+                      <Icon name="play" size={20} />
+                      {label("new", "New game")}
+                    </button>
+                    <button type="button" className={`btn${confirm === "reset" ? " btn-danger" : ""}`} onClick={() => start("reset")}>
+                      <Icon name="refresh" size={20} />
+                      {label("reset", "Reset to first run")}
+                    </button>
+                  </div>
+                  {(confirm === "new" || confirm === "reset") && warning}
+                </section>
+              </div>
             </div>
-          </div>
+            <CloudSavesSection onOpenAccount={() => goTo("account")} />
+          </>
         )}
 
         {tab === "account" && <AccountSection />}

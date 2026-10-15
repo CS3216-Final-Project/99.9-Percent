@@ -180,10 +180,11 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   expect(useGame.getState().graphics.quality).toBe("low");
   openTab(campaignMenu, "Saves");
   expectButtons(campaignMenu, ["New company", "Export current company", "Export original stored save", "Import save"]);
-  // Account is its own tab now, not part of Saves.
-  expect(within(campaignMenu).queryByRole("region", { name: "Account and cloud saves" })).toBeNull();
+  // Cloud saves live in Saves; the Account tab keeps only sign-in and profile.
+  expect(within(campaignMenu).getByRole("region", { name: "Cloud saves" })).toBeTruthy();
   openTab(campaignMenu, "Account");
-  expect(within(campaignMenu).getByRole("region", { name: "Account and cloud saves" })).toBeTruthy();
+  expect(within(campaignMenu).getByRole("region", { name: "Account" })).toBeTruthy();
+  expect(within(campaignMenu).queryByRole("region", { name: "Cloud saves" })).toBeNull();
   openTab(campaignMenu, "Playtest");
   expectButtons(campaignMenu, ["Export playtest record"]);
   openTab(campaignMenu, "Run");
@@ -208,10 +209,11 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   expect(within(classicMenu).getByRole("radio", { name: "Low" })).toHaveProperty("checked", true);
   openTab(classicMenu, "Saves");
   expectButtons(classicMenu, ["New game", "Reset to first run", "Export current run", "Import save"]);
-  for (const region of ["Save files", "Start over"]) expect(within(classicMenu).getByRole("region", { name: region })).toBeTruthy();
+  for (const region of ["Save files", "Start over", "Cloud saves"]) expect(within(classicMenu).getByRole("region", { name: region })).toBeTruthy();
   expect(within(classicMenu).getAllByRole("textbox")).toHaveLength(1);
   openTab(classicMenu, "Account");
-  expect(within(classicMenu).getByRole("region", { name: "Account and cloud saves" })).toBeTruthy();
+  expect(within(classicMenu).getByRole("region", { name: "Account" })).toBeTruthy();
+  expect(within(classicMenu).queryByRole("region", { name: "Cloud saves" })).toBeNull();
   openTab(classicMenu, "Playtest");
   expect(within(classicMenu).getByRole("region", { name: "Playtest data" })).toBeTruthy();
 });
