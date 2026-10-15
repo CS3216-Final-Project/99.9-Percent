@@ -56,7 +56,7 @@ test("spikes: manual planning prevents overload without an autoscaler",async({pa
  test.setTimeout(90000);const api=await blockedGuest(page,spikeCompany(false));const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
  await page.getByRole("button",{name:/Add server/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();for(let i=0;i<2;i++)await advanceCampaignStep(page);
  await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await page.getByRole("button",{name:/Scale up App 3/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();for(let i=0;i<3;i++)await advanceCampaignStep(page);
- await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"Balance across installed apps"}).click();await advanceCampaignStep(page);
+ await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"All apps",exact:true}).click();await advanceCampaignStep(page);
  await page.getByRole("button",{name:"2×",exact:true}).click();await runTo(page,n+28);const c=(await savedGame(page)).campaign!;
  expect(c.apps).toHaveLength(3);expect(c.spikeStage!.controller).toBeNull();expect(c.incident).toBeNull();expect(c.snapshot.app.capacity).toBe(4800);expect(c.investedCents).toBeGreaterThan(0);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
@@ -75,6 +75,6 @@ test("spikes: disabling keeps paid installation and allows an explicit manual ro
  await runTo(page,before.step+3);
  const idle=(await savedGame(page)).campaign!;expect(idle.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(idle.cashCents).toBe(before.cashCents);expect(idle.pending.some(a=>a.type==="routing")).toBe(false);
  await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await expect(page.getByRole("note",{name:"App 3 routing status"})).toBeVisible();
- await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"Balance across installed apps"}).click();await runTo(page,(await savedGame(page)).campaign!.step+1);
+ await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"All apps",exact:true}).click();await runTo(page,(await savedGame(page)).campaign!.step+1);
  const routed=(await savedGame(page)).campaign!;expect(routed.apps.find(a=>a.id==="app-3")!.routed).toBe(true);expect(routed.spikeStage!.controller!.enabled).toBe(false);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });

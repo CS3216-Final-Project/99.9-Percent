@@ -4593,5 +4593,11 @@ button:disabled {
 .instance-choices .chip { display: block; width: 100%; white-space: normal; text-align: left; }
 .instance-choices .chip span { display: block; font-family: var(--font-num); font-size: 0.8rem; margin-top: 4px; }
 .scaling-controls fieldset { display: grid; gap: 6px; min-width: 0; border: 1px solid var(--paper-3); padding: 8px; }
+.route-choice { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+.route-choice legend { grid-column: 1 / -1; }
+.route-choice button { min-height: 40px; padding: 6px 10px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--paper); color: var(--ink); font-family: var(--font-num); font-weight: 700; font-size: 0.9rem; box-shadow: var(--press); }
+.route-choice button:hover:not(:disabled):not(.is-active) { background: var(--paper-2); }
+.route-choice button.is-active { background: var(--go); }
+.route-choice:disabled button { opacity: .55; box-shadow: none; }
 .scaling-controls legend { font-size: 0.85rem; }
 .scaling-controls .btn { white-space: normal; }
