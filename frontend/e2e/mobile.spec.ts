@@ -241,3 +241,26 @@ test("Campaign UX: the touch walkthrough and secondary controls fit the mobile v
  await page.getByRole("button",{name:"Advance step",exact:true}).tap();expect((await savedGame(page)).campaign!.step).toBe(1);
  await page.screenshot({path:"test-results/campaign-ux-mobile.png"});
 });
+
+// The test browser draws in software, which Auto treats as a machine without a graphics card. Naming a phone's
+// graphics card instead takes the path a real phone takes.
+test("Auto draws Medium on a graphics card: the screen's normal pixel size, not High's sharper canvas", async ({ page }) => {
+  await page.addInitScript(() => {
+    const getParameter = WebGL2RenderingContext.prototype.getParameter;
+    WebGL2RenderingContext.prototype.getParameter = function (this: WebGL2RenderingContext, name: number) {
+      return name === 0x9246 ? "ANGLE (Qualcomm, Adreno (TM) 730, OpenGL ES 3.2)" : getParameter.call(this, name);
+    };
+  });
+  await page.route("**/api/**", route => route.abort());
+  await page.goto("/");
+  await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap();
+  await page.getByRole("button", { name: "Skip", exact: true }).tap();
+  await expectRoom(page);
+  const canvas = page.getByRole("main").locator("canvas");
+  // High would draw 1.75 pixels per CSS pixel on this screen; Medium draws one, or a little fewer if the frame rate falls.
+  await expect.poll(() => canvas.evaluate(el => (el as HTMLCanvasElement).width / (el as HTMLCanvasElement).clientWidth)).toBeLessThanOrEqual(1.01);
+  expect(await canvas.evaluate(el => (el as HTMLCanvasElement).width / (el as HTMLCanvasElement).clientWidth)).toBeGreaterThanOrEqual(0.74);
+  await page.getByRole("button", { name: "Menu", exact: true }).tap();
+  await page.getByRole("tab", { name: "Graphics" }).tap();
+  await expect(page.getByRole("radio", { name: "Auto" })).toBeChecked();
+});

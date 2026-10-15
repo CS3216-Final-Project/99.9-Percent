@@ -582,15 +582,19 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
   });
 
   const color = inspecting ? AMBER : symptomatic ? ALERT : selected || hovered || affected ? ACCENT : built ? ROOM_PALETTE.footprint.built : ROOM_PALETTE.footprint.empty;
-  const hw = f.w / 2;
-  const hd = f.d / 2;
-  const outline: [number, number, number][] = [
-    [-hw, 0, -hd],
-    [hw, 0, -hd],
-    [hw, 0, hd],
-    [-hw, 0, hd],
-    [-hw, 0, -hd],
-  ];
+  // The same points while the footprint is unchanged: drei's Line disposes its material whenever new points arrive,
+  // so a fresh array on every tick of the game rebuilt the outline's shader every few seconds.
+  const outline = useMemo((): [number, number, number][] => {
+    const hw = f.w / 2;
+    const hd = f.d / 2;
+    return [
+      [-hw, 0, -hd],
+      [hw, 0, -hd],
+      [hw, 0, hd],
+      [-hw, 0, hd],
+      [-hw, 0, -hd],
+    ];
+  }, [f.w, f.d]);
 
   const onOver = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
@@ -868,6 +872,57 @@ function Room({ servers = false }: { servers?: boolean }) {
 /** How long after the room opens the floor out of view is prepared for its first ride, in milliseconds. */
 const WARM_MS = 4000;
 
+/** How long preparing shaders may hold up a frame, in milliseconds, before it waits for the next. */
+const PREPARE_BUDGET_MS = 6;
+
+/** Up to how many objects are prepared together; bigger groups are split into their children. */
+const PREPARE_PIECE = 24;
+
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+/** The room cut into pieces of at most PREPARE_PIECE objects where it can be: a drawn object keeps its children. */
+function pieces(o: THREE.Object3D): THREE.Object3D[] {
+  const drawn = (o as THREE.Mesh).isMesh || (o as THREE.Line).isLine || (o as THREE.Points).isPoints || (o as THREE.Sprite).isSprite;
+  if (drawn || o.children.length === 0) return [o];
+  let size = 0;
+  o.traverse(() => void size++);
+  return size <= PREPARE_PIECE ? [o] : o.children.flatMap(pieces);
+}
+
+/**
+ * Prepares the shaders of both floors for how the room is drawn: through the effects pass, into its buffer with
+ * linear colour and no tone mapping, or straight to the screen in sRGB with the renderer's tone mapping. three keys
+ * each material's shader on where it draws, and the effects pass turns the renderer's tone mapping off, so outside
+ * a frame the screen with no tone mapping would be prepared, a way nothing ever draws. With effects the pass's
+ * buffer is set here instead; without them the screen is already right. Building them all at once would hold the
+ * page up, so the room is prepared a piece at a time, a few milliseconds a frame.
+ */
+async function prepareShaders(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, effects: boolean, signal: AbortSignal): Promise<void> {
+  const buffer = effects ? new THREE.WebGLRenderTarget(1, 1) : null;
+  try {
+    let started = performance.now();
+    // three prepares every object in a piece, shown or not, so the floor out of view is included.
+    for (const piece of pieces(scene)) {
+      if (performance.now() - started > PREPARE_BUDGET_MS) {
+        await nextFrame();
+        started = performance.now();
+      }
+      if (signal.aborted) return;
+      const target = gl.getRenderTarget();
+      try {
+        gl.setRenderTarget(buffer);
+        gl.compile(piece, camera, scene);
+      } catch {
+        // Only a head start: the shaders build when first drawn anyway.
+      } finally {
+        gl.setRenderTarget(target);
+      }
+    }
+  } finally {
+    buffer?.dispose();
+  }
+}
+
 /** Sky light and reflection strength at HD detail. */
 const HD_SKY = 1.45;
 const HD_REFLECTIONS = 0.3;
@@ -983,21 +1038,13 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
   const { gl, scene, camera } = useThree();
   useEffect(() => {
     if (!warm) return;
-    const id = window.setTimeout(() => {
-      const groups = [office.current, servers.current];
-      const shown = groups.map((g) => g?.visible ?? false);
-      for (const g of groups) if (g) g.visible = true;
-      try {
-        gl.compile(scene, camera);
-      } catch {
-        // Only a head start: the floor compiles when first shown anyway.
-      }
-      groups.forEach((g, i) => {
-        if (g) g.visible = shown[i];
-      });
-    }, WARM_MS);
-    return () => window.clearTimeout(id);
-  }, [gl, scene, camera, warm]);
+    const job = new AbortController();
+    const id = window.setTimeout(() => void prepareShaders(gl, scene, camera, effects, job.signal), WARM_MS);
+    return () => {
+      window.clearTimeout(id);
+      job.abort();
+    };
+  }, [gl, scene, camera, warm, effects]);
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
 
   const appCount = Math.min(m.hosts.length, 12);
@@ -1413,16 +1460,16 @@ export default function Facility() {
   const chosen = useGame((s) => s.graphics.quality);
   // Without a graphics card the browser draws on the CPU. Auto keeps that playable: no shadows, half the pixels
   // (labels and the interface are HTML and stay sharp) and 20 frames a second. A GPU gets HD detail: photo
-  // textures, physically based shading and reflections. The player can pick a quality instead (see the menu).
+  // textures, physically based shading and reflections, without the effects pass. The player can pick a quality
+  // instead (see the menu).
   const profile = resolveQuality(chosen, renderer, override);
   const capped = profile.fps !== null;
-  // Auto on a graphics card watches the frame rate and, if it falls, draws fewer pixels and then drops the effects
-  // pass (see adapt in quality.ts). A quality the player chose is left exactly as chosen.
-  const [load, setLoad] = useState<{ quality: GraphicsQuality; factor: number; settled: boolean }>({ quality: chosen, factor: 1, settled: false });
-  const current = load.quality === chosen ? load : { quality: chosen, factor: 1, settled: false };
+  // Auto on a graphics card watches the frame rate and, if it falls, draws fewer pixels (see adapt in quality.ts).
+  // A quality the player chose is left exactly as chosen.
+  const [load, setLoad] = useState<{ quality: GraphicsQuality; factor: number }>({ quality: chosen, factor: 1 });
+  const factor = load.quality === chosen ? load.factor : 1;
   const adaptive = adapts(chosen, renderer, profile);
-  const tuned = adaptive ? adapt(profile, current.factor, current.settled, window.devicePixelRatio || 1) : null;
-  const quality: QualityProfile = tuned ? { ...profile, dpr: tuned.dpr, effects: tuned.effects } : profile;
+  const quality: QualityProfile = adaptive ? { ...profile, dpr: adapt(profile, factor, window.devicePixelRatio || 1) } : profile;
   return (
     <div className="stage-canvas" ref={container} tabIndex={-1}>
       {/* Shadow maps cannot be resized or switched on and off once materials are compiled, so a new quality starts a new canvas. */}
@@ -1457,8 +1504,7 @@ export default function Facility() {
           <PerformanceMonitor
             factor={1}
             flipflops={3}
-            onChange={({ factor }) => setLoad((l) => ({ quality: chosen, factor, settled: l.quality === chosen && l.settled }))}
-            onFallback={({ factor }) => setLoad({ quality: chosen, factor, settled: true })}
+            onChange={({ factor }) => setLoad({ quality: chosen, factor })}
           />
         )}
       </Canvas>
