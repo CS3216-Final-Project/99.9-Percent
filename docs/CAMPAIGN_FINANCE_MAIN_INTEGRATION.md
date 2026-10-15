@@ -2,16 +2,16 @@
 
 Branch: `fe/campaign-finance-main`.
 Worktree: `C:/Users/user/99.9-Percent-Latest/test-results/campaign-finance-main`.
-Approved base: `065b047d1d38b5883591b61b68cdb120c2af060a`.
-Validated code snapshot: `16423f9` (the final report commit changes documentation only).
-Pre-update backup: `fe/campaign-finance-main-backup-5f63f52` at `5f63f52dd121d3210a0af0ceb7b3303db0a553a6`.
-The earlier backup `fe/campaign-finance-main-backup-0605867` remains available.
+Approved base: `275081388a51d0832c05fd9b45848b461ce10b94`.
+Validated code snapshot: `4c89bcf` (the final report commit changes documentation only).
+Pre-update backup: `fe/campaign-finance-main-backup-a11be33` at `a11be338126724ca288da5080b746d45e3808f35`.
+Earlier backups at `5f63f52` and `0605867` remain available.
 
 ## Integration and scope
 
-Rebased the two Finance integration/report commits onto the approved main. The only conflict was the `CampaignUI.tsx` import block: retain `AccountSection, CloudSavesSection` from main together with `FinanceEntry`, the infrastructure/disabled-action helpers and infrastructure descriptions from Finance. Main's Cloud Saves section remains in the Saves tab; Account remains in its own tab.
+Rebased the three Finance integration/report commits onto `2750813` without conflicts. `git range-diff` confirms that all three commits were replayed unchanged. The earlier Cloud Saves/Finance import resolution remains: `AccountSection, CloudSavesSection` from main together with `FinanceEntry`, the infrastructure/disabled-action helpers and descriptions from Finance. Cloud Saves remains in the Saves tab; Account remains in its own tab.
 
-PR #86's Cloud Saves implementation and PR #88's walking destination marker implementation are unchanged from main. The marker still follows the actual planned path, respects reduced motion, clears when the path ends and does not intercept room raycasts. The diff was reviewed against `065b047`; no teammate implementation was replaced wholesale.
+PR #86's Cloud Saves, PR #88's walking destination markers and PR #89's elevator cutscene implementations are unchanged from main. The floor timing, levels helpers, cutscene styles and room transition code remain main's versions; Finance adds only its previously reviewed tooltip import/props in `Facility.tsx`. The marker still follows the actual planned path, respects reduced motion, clears when the path ends and does not intercept room raycasts. The diff was reviewed against `2750813`; no teammate implementation was replaced wholesale.
 
 Finance retains the four-section dashboard, collapsed Advanced details, clickable keyboard/touch Cash card, actual/estimated accounting distinction, engine-derived purchase quotes and refusal reasons, warnings, stale-quote review, duplicate-click protection, infrastructure tooltips and closed About Equipment disclosure. Desktop purchase cards stay on the left of the usable scene; mobile sheets remain above navigation. Warnings and Confirm/Cancel remain outside optional scrolling details. Equipment highlights and camera focus remain.
 
@@ -19,7 +19,24 @@ The spotlight/shared confirmation observer, Health Checks guidance, chapter Next
 
 Scope remains **27 files: 26 frontend files and this report**. Backend, shared contracts, dependency manifests/locks, workflows, deployment settings, main's store/persistence/simulation step, graphics profiles, Account/Modals and Avatar/palette implementations have no diff from updated main. The only simulation-file diff is the previously approved `sim/settlement.ts` helper extraction, unchanged from the validated Finance version. No new formulas, costs, timing, bankruptcy rules, save schemas or replay formats changed.
 
-## Focused validation on 065b047
+## Latest focused validation on 2750813
+
+Node 22.23.3 was used. Existing separately installed dependencies were reused. After rebasing main, no additional product source, test assertion, timeout, package or lockfile was edited; only this report changes after the validated code snapshot.
+
+| Check | Result |
+| --- | --- |
+| Frontend lint and typecheck | Passed |
+| Production build | Passed |
+| Focused Finance/Campaign UI/accounting/elevator/walking tests | 48 passed across 6 files (15.65 seconds) |
+| Focused room/purchase browser journeys | 17 passed (16 desktop, 1 touch) in 4.4 minutes; no failures |
+
+The unit targets were `CampaignFinance.test.tsx`, `CampaignUI.test.tsx`, `CampaignRefinement.test.tsx`, `campaignFinance.test.ts`, `scene/levels.test.ts` and `scene/walk.test.ts`. The browser scope is purchase focus/highlights and left-side layout, floor/elevator transitions, tutorial-guided floor changes, walking inspections and a narrow touch purchase sheet. The complete frontend coverage, balance and browser suites were intentionally not repeated under the approved focused workflow. Backend and shared inputs remain unchanged from the prior complete 61-test backend pass, so backend checks were not repeated for this elevator-only main update. Hosted full checks remain required.
+
+All 17 journeys passed unchanged: purchase camera focus/highlights, desktop/laptop card expansion and resizing, every supported later-stage purchase, the Health Checks unlock/deployment guide, menu/keyboard elevator and floor switching, incident/tutorial floor transitions, walking elevator controls, Classic and Guided equipment walking inspections, and the 390x844 touch purchase sheet. No assertion or timeout was relaxed; no further failure required expanded testing.
+
+Latest logs/reports are ignored under `test-results/publication-2750813/`: `lint.log`, `typecheck.log`, `targeted-unit.log`, `build.log`, `browser-focused.log`, `browser-report/`, `browser-artifacts/` and `browser-exit.txt`. The validation-input manifest records 503 tracked frontend/backend/shared file hashes, checked again before publication. From `frontend/`, view the latest browser report with `npx playwright show-report ../test-results/publication-2750813/browser-report`.
+
+## Previous focused validation on 065b047
 
 All check executables use Node 22.23.3. Existing separately installed frontend/backend dependencies were reused; no package or lock changes were needed. Per the user's approved efficient-validation scope, the complete local frontend coverage and browser suites were not repeated. No new failure justified broadening local testing.
 
@@ -39,7 +56,7 @@ The 18 focused browser journeys all passed. They cover Cloud Saves in the Saves 
 
 The user-authorized focused scope passed without new failures, so no additional full local suite was necessary. Full frontend/browser regression validation remains a hosted-CI requirement.
 
-Current logs and browser artifacts are ignored under `test-results/publication-065b047/`: `lint.log`, `typecheck.log`, `targeted-unit.log`, `build.log`, `backend-lint.log`, `backend-typecheck.log`, `backend-coverage.log`, `backend-migrations.log`, `browser-focused.log`, `browser-report/`, `browser-artifacts/` and `browser-exit.txt`. The input manifest records hashes for 503 tracked frontend/backend/shared files. Final comparison confirms zero differences across all 503 validation-input hashes; only this report changes after the validated snapshot.
+Previous-step logs and browser artifacts are ignored under `test-results/publication-065b047/`: `lint.log`, `typecheck.log`, `targeted-unit.log`, `build.log`, `backend-lint.log`, `backend-typecheck.log`, `backend-coverage.log`, `backend-migrations.log`, `browser-focused.log`, `browser-report/`, `browser-artifacts/` and `browser-exit.txt`. The input manifest records hashes for 503 tracked frontend/backend/shared files. At that previous step, all 503 validation-input hashes matched and only the report changed afterward. The latest snapshot is recorded separately above.
 
 ## Previous complete-suite results (prior base 75d486a)
 
@@ -58,9 +75,9 @@ Older `0605867` evidence also remains disclosed: frontend coverage had 1,003 pas
 
 Only the Finance integration worktree was used for this update. Neither original Finance worktree was modified. The pre-update branch is preserved at the backup reference above. Validation-input hashes and the final diff are checked before publication; generated outputs are excluded from Git.
 
-Publication is authorized only after a final fetch confirms main is still `065b047`, a clean branch and no blocking conflicts. If main advances again, stop and report; do not automatically rebase again. Hosted `frontend` and `backend` checks, including complete frontend coverage and all browser shards, must pass on the published PR result. The repo workflow also calls for one reviewer approval before merge. No hosted CI success is claimed in this local report.
+The user authorized publication after successful focused checks and diff review. A newer main commit alone does not block PR creation: publish the reviewed branch and report any update requirement through the PR, without silently starting another integration cycle. Authentication, permission or actual publication failures must be reported. Hosted `frontend` and `backend` checks, including complete frontend coverage and all browser shards, must pass on the eventual merge result, and GitHub's strict up-to-date policy applies before merging. The repo workflow also calls for one reviewer approval. No hosted CI success is claimed in this local report.
 
-The complete local browser suite on the new base was intentionally not run; the previous complete run retains its timeout. Safari/Firefox, physical-device testing, real-provider production authentication and human comprehension testing remain unverified. No merge, manual deployment, production configuration change or live migration is authorized.
+The complete local browser suite on `2750813` was intentionally not run; the previous complete run retains its timeout. Safari/Firefox, physical-device testing, real-provider production authentication and human comprehension testing remain unverified. No merge, manual deployment, production configuration change or live migration is authorized.
 
 ## Preview and evidence
 
@@ -70,7 +87,7 @@ $env:PATH = "C:\Users\user\AppData\Local\npm-cache\_npx\52027bd8fc0022aa\node_mo
 npm run preview -- --host 127.0.0.1 --port 4188 --strictPort
 ```
 
-Open http://127.0.0.1:4188. The focused browser run uses port 4193. From `frontend/`, open its report with `npx playwright show-report ../test-results/publication-065b047/browser-report`. Prior inspected screenshots at 1440x900, 1366x768 and 390x844 remain in ignored `test-results/main-update/review-screenshots/`.
+Open http://127.0.0.1:4188. The latest focused browser run uses port 4194. Prior inspected screenshots at 1440x900, 1366x768 and 390x844 remain in ignored `test-results/main-update/review-screenshots/`.
 
 ## PR description
 
@@ -86,25 +103,25 @@ Campaign finances were difficult to discover, and lengthy purchase confirmations
 
 Preserve equipment highlighting, camera focus, the shared tutorial confirmation observer, Health Checks guidance, chapter/menu behavior, latest routing choices, graphics improvements and walking inspections. Retain economic constants, settlement arithmetic, purchase rules and save contracts.
 
-Rebased onto `065b047`, retaining PR #86's Cloud Saves in the Saves tab and PR #88's walking destination markers. The only conflict combined main's Cloud Saves import with Finance's imports. Scope is 27 files (26 frontend files and the integration report); no backend contracts, save schemas, dependency versions or deployment settings changed. The settlement helper extracts the previously approved recurring charges without new economic constants or settlement formulas.
+Updated onto `2750813` without conflicts, preserving PR #86's Cloud Saves tab, PR #88's walking destination markers and PR #89's elevator cutscene. The reviewed diff contains 27 files: 26 frontend files and the integration report. Backend contracts, save schemas, dependencies and deployment settings are unchanged. The settlement helper is the previously approved extraction of recurring charges; it adds no new economic constants or settlement formulas.
 
-### Validation on updated main (`065b047`)
+### Latest focused validation (base 2750813)
 
-Node 22.23.3, against code snapshot `16423f9`; the publication commit adds only the final report:
+Node 22.23.3, against code snapshot `4c89bcf`; the publication commit adds only the report:
 
 - Frontend lint, typecheck and production build passed.
-- **81 targeted frontend tests passed** across 9 files: Finance, Campaign UI/refinement/tutorials, Account/Cloud Saves, App/menu behavior, accounting and walking paths.
-- Backend lint/typecheck and **61 complete coverage tests passed**. Migration consistency found no schema changes or generated migrations.
-- **18 focused browser journeys passed** in 6.1 minutes (15 desktop, 3 touch): Finance/Cash keyboard and touch access, spotlight coexistence, purchase quotes/safeguards and left-side panels at 1440x900, 1366x768 and 390x844, later-stage purchases/Health Checks guidance, Cloud Saves navigation/conflict/ownership/load, and equipment-directed walking/inspection.
+- **48 focused tests passed** across Finance, Campaign UI/refinement, accounting, elevator levels/timing and walking paths.
+- **17 browser journeys passed** in 4.4 minutes: purchase camera focus, equipment highlights and left-side card bounds at 1440x900/1366x768, expanded details and persistent warning/Confirm/Cancel controls, later-stage purchases and Health Checks guidance, floor/elevator switching via menu/keyboard, incident/tutorial floor changes, walking/Space inspections and a 390x844 touch purchase sheet.
+- No test assertion, timeout or unrelated gameplay behavior was changed.
 
-The complete local frontend coverage, balance and browser suites were intentionally not repeated for this import-only update. Complete frontend coverage, all browser shards and the required `frontend`/`backend` gates remain pending in hosted CI; these focused passes are not a full-suite result.
+Complete frontend coverage, balance and the full browser suite were intentionally not repeated locally for this conflict-free rebase. Backend inputs remain unchanged from the prior 61-test full pass. The required hosted `frontend` and `backend` checks must pass on the eventual merge result; current focused passes are not a full-suite result on this base.
 
-### Previous complete-suite evidence (base `75d486a`)
+### Prior validation and timeout disclosure
 
-- **1,006 frontend tests passed**, one existing optional trace test skipped; **61 backend tests** and **25 balance tests passed**.
-- Complete browsers: **104 passed, one unchanged walking-audio timeout**. All 17 touch cases passed. The 180-second walking-audio test reported 20.7 minutes across a user/tool interruption; the cause is not established.
-- That test subsequently passed twice unchanged in isolation, in **38.6 and 33.6 seconds**. The complete browser suite is **not green**; isolated diagnostics do not erase the failure. No assertion, timeout or gameplay rule was weakened.
+On base `065b047`: frontend lint/typecheck/build, **81 targeted frontend tests**, **18 focused browser journeys**, backend lint/typecheck and **61 complete backend coverage tests** passed. Migration consistency found no changes. This included Cloud Saves navigation/conflict/ownership/loading, Finance/Cash keyboard and touch access, spotlight coexistence and walking interactions.
 
-Older `0605867` results remain disclosed in the integration report: a Combined UI full-coverage timeout and a mobile-incident full-browser timeout both passed unchanged isolated diagnostics, without turning those full runs green.
+Previous complete validation on base `75d486a`: **1,006 frontend tests passed**, one existing optional trace test skipped; **61 backend tests** and **25 balance tests passed**. Complete browsers: **104 passed, one unchanged walking-audio timeout**, with all 17 touch cases passing. The test's existing 180-second budget expired across a long user/tool interruption; the cause is not established. It subsequently passed twice unchanged in isolation, in **38.6 and 33.6 seconds**. The complete browser suite is **not green**; isolated passes do not erase the failure. No assertion, timeout or gameplay rule was weakened.
 
-Original Finance worktrees and backup references are preserved. Hosted CI, Safari/Firefox, physical-device testing and real-provider production authentication are not established by local checks. The repository workflow calls for one reviewer approval before merging. No merge or production deployment is part of this PR.
+Older `0605867` complete-run timeouts and successful unchanged isolated diagnostics remain disclosed in the integration report. No historical failed complete run is relabeled green.
+
+Original Finance worktrees and local backups are preserved. Full hosted CI, Safari/Firefox, physical devices and real-provider production authentication remain unverified locally. The repository workflow calls for one reviewer approval before merging. No merge or manual deployment is authorized by this PR.
