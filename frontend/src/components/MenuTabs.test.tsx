@@ -61,10 +61,22 @@ describe("menu tabs", () => {
     expect(tab("Run").getAttribute("aria-selected")).toBe("true");
   });
 
-  it("leaves other keys and modified arrows alone", () => {
+  it("puts Account between Saves and Playtest, and mounts it on click", () => {
     render(<Harness />);
-    const notHandled = fireEvent.keyDown(tab("Run"), { key: "ArrowDown" });
-    expect(notHandled).toBe(true);
+    const names = screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(names).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]);
+    fireEvent.click(tab("Account"));
+    expect(screen.getByText("Showing account")).toBeTruthy();
+  });
+
+  it("moves with the up and down arrows like left and right, and leaves other keys alone", () => {
+    render(<Harness />);
+    tab("Run").focus();
+    fireEvent.keyDown(tab("Run"), { key: "ArrowDown" });
+    expect(tab("Sound").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tab("Sound"));
+    fireEvent.keyDown(tab("Sound"), { key: "ArrowUp" });
+    expect(tab("Run").getAttribute("aria-selected")).toBe("true");
     fireEvent.keyDown(tab("Run"), { key: "ArrowRight", altKey: true });
     fireEvent.keyDown(tab("Run"), { key: "constructor" });
     expect(tab("Run").getAttribute("aria-selected")).toBe("true");

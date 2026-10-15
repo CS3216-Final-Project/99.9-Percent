@@ -32,7 +32,7 @@ test('saves to the cloud only when asked, resolves conflicts, keeps owners apart
   await dialog.getByRole('button',{name:'Close'}).click();
   await page.getByRole('button',{name:'Continue company',exact:true}).click();await expectRoom(page);
   await advanceCampaignStep(page);await page.getByRole('button',{name:'Menu',exact:true}).click();
-  await page.getByRole('tab',{name:'Saves'}).click();
+  await page.getByRole('tab',{name:'Account'}).click();
   const account=page.getByRole('region',{name:'Account and cloud saves'});
   // Another browser has saved revision 2 since this tab saved revision 1.
   cloud={...cloud!,revision:2};await account.getByRole('button',{name:'Save to cloud',exact:true}).click();

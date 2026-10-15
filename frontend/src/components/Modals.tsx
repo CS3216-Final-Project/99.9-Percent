@@ -5,6 +5,7 @@ import { BALANCE, buildReport } from "@/sim";
 import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { useGame } from "@/game/store";
+import { AccountSection } from "./Account";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
@@ -386,6 +387,8 @@ export function Menu() {
             </div>
           </div>
         )}
+
+        {tab === "account" && <AccountSection />}
 
         {tab === "playtest" && (
           <>

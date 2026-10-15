@@ -328,9 +328,10 @@ export interface TabItem<Id extends string> {
 }
 
 /**
- * A row of tabs with the panel of the selected one beneath it. The caller passes only the selected tab's
- * content as `children`, so a section that is not on screen is not mounted and forgets any half-finished
- * choice (a pending confirmation, a chosen file). Arrow keys, Home and End move between tabs, and the
+ * A row or rail of tabs beside or above the panel of the selected one. The caller passes only the selected
+ * tab's content as `children`, so a section that is not on screen is not mounted and forgets any
+ * half-finished choice (a pending confirmation, a chosen file). The arrow keys (right/down for next,
+ * left/up for previous, whichever direction the strip runs), Home and End move between tabs, and the
  * selected tab is the only one in the Tab order.
  */
 export function Tabs<Id extends string>({
@@ -359,9 +360,11 @@ export function Tabs<Id extends string>({
     let target: number;
     switch (e.key) {
       case "ArrowRight":
+      case "ArrowDown":
         target = at + 1;
         break;
       case "ArrowLeft":
+      case "ArrowUp":
         target = at - 1;
         break;
       case "Home":

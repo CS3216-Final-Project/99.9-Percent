@@ -3245,10 +3245,18 @@ button:disabled {
   margin-top: 18px;
 }
 
-/* Menu: the run at a glance, Resume, three big choices, then starting over. */
+/* Menu: the run at a glance beside a tall Resume in one overview row, then the section tabs. */
+.menu-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
 .menu-run {
   padding: 12px;
-  margin-bottom: 12px;
+  margin: 0;
   background: var(--ink);
   color: var(--on-night);
   border-radius: 6px;
@@ -3333,8 +3341,30 @@ button:disabled {
 }
 
 .menu-resume {
-  width: 100%;
-  margin: 2px 0 14px;
+  width: auto;
+  min-height: 100%;
+  margin: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+}
+
+.menu-resume > span {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.menu-resume strong {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+}
+
+.menu-resume small {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--ink);
 }
 
 .menu-grid {
@@ -3393,9 +3423,9 @@ button:disabled {
   margin-top: 10px;
 }
 
-/* The menu: run card, Resume and the run tiles across the top, then two columns of sections. */
+/* The menu: run card and Resume across the top, a navigation rail left of the sections on wide screens. */
 .modal-menu {
-  width: min(920px, 100%);
+  width: min(1000px, 100%);
 }
 
 .modal-menu > .modal-body > .callout + .callout {
@@ -3411,6 +3441,40 @@ button:disabled {
   .menu-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
+  }
+
+  /* The menu's tabs become a left rail: the panel fills the rest of the width. */
+  .modal-menu .tabset {
+    display: grid;
+    grid-template-columns: 174px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+    margin-top: 0;
+  }
+
+  .modal-menu .tab-strip {
+    grid-auto-flow: row;
+    grid-auto-columns: unset;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 0 14px 0 0;
+    border-right: 3px solid var(--ink);
+    border-bottom: 0;
+  }
+
+  .modal-menu .tab-strip button {
+    justify-content: flex-start;
+    min-height: 46px;
+    padding: 8px 10px;
+  }
+
+  .modal-menu .tab-strip button.is-active {
+    transform: translateX(3px);
+  }
+
+  .modal-menu .tab-panel {
+    min-width: 0;
+    padding-top: 0;
   }
 }
 
@@ -3876,9 +3940,26 @@ button:disabled {
 }
 
 @media (max-width: 759px) {
-  /* Narrow screens: five tabs in two rows, icon above its label, so every label stays full size. */
+  /* Narrow screens: the menu's run card and Resume stack, and its seven tabs take two rows of
+     icon-above-label buttons, so every label stays full size and tappable. */
+  .modal-menu .menu-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .modal-menu .menu-resume {
+    width: 100%;
+    min-height: 56px;
+    display: flex;
+  }
+
+  .modal-menu .menu-resume small {
+    display: none;
+  }
+
+  /* Narrow screens: tabs go to two rows with the icon above its label, so every label stays full size. */
   .tab-strip {
     grid-auto-flow: row;
+    grid-auto-columns: unset;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
   }
@@ -3889,6 +3970,25 @@ button:disabled {
     min-height: 56px;
     padding: 6px 2px;
     font-size: 1.1rem;
+  }
+
+  /* The menu's seven tabs take four columns, still two rows. */
+  .modal-menu .tab-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-bottom: 12px;
+  }
+
+  .modal-menu .tab-strip button {
+    padding: 6px 4px;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Phones keep the same two tab rows at a slightly smaller label size rather than adding a row. */
+  .modal-menu .tab-strip button {
+    padding: 4px;
+    font-size: 0.9rem;
   }
 }
 
