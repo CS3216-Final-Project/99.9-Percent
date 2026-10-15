@@ -5,7 +5,7 @@ import { canPromote, combinedProfile, currentFault, pendingCombined } from "@/si
 import { pendingSpikeAcknowledgement, spikeInput } from "@/sim/autoscaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
-import { canEnterData, databaseUpgrade, pendingStop } from "@/sim/step";
+import { canEnterData, databaseUpgrade, pendingStop, routableApps } from "@/sim/step";
 import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
@@ -51,15 +51,15 @@ const ACTION_NAMES: Record<Intervention, string> = {
 };
 const appName = (id: string) => `App ${id.slice(4)}`;
 const sameTargets = (a: string[], b: string[]) => a.length === b.length && b.every(id => a.includes(id));
-/** Where the load balancer can send traffic: every installed app, or one of them. */
+/** Where the load balancer can send traffic: every installed app, or one of them. A reserved spare is not a choice. */
 function routeOptions(c: Campaign) {
-  const apps = c.apps.map(a => a.id);
+  const apps = routableApps(c).map(a => a.id);
   const one = apps.map(id => ({ label: `${appName(id)} only`, targets: [id], tip: `Send every request to ${appName(id)}. The other apps stay installed and keep their running costs.` }));
   return apps.length > 1 ? [{ label: "All apps", targets: apps, tip: "The load balancer spreads requests across every installed app." }, ...one] : one;
 }
 function routeName(c: Campaign) {
-  const t = c.routing.targets;
-  return c.apps.length > 1 && sameTargets(t, c.apps.map(a => a.id)) ? "all apps" : t.length === 1 ? `${appName(t[0])} only` : t.map(appName).join(", ");
+  const t = c.routing.targets, apps = routableApps(c).map(a => a.id);
+  return apps.length > 1 && sameTargets(t, apps) ? "all apps" : t.length === 1 ? `${appName(t[0])} only` : t.map(appName).join(", ");
 }
 function stageName(g: GameState) {
   const c=g.campaign!;
