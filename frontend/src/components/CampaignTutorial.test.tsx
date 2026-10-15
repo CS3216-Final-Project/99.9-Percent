@@ -111,6 +111,19 @@ it("walks Stay Online through unlocking Health Checks in Tech and deploying it",
   expect(useGame.getState().tour).toBeNull();
 });
 
+it("keeps the Deploy Health Checks step on its own action when the player buys something else first", () => {
+  useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 1 } });
+  renderCompany();
+  act(() => useGame.getState().act({ type: "unlock_reliability", tech: "health_checks" }));
+  const guide = () => screen.getByRole("dialog", { name: "Chapter guide, step 3 of 3" });
+  expect(guide().textContent).toContain("Press Deploy Health Checks.");
+  fireEvent.click(screen.getByRole("button", { name: /^Add server/ }));
+  expect(guide().textContent).not.toContain("Press Confirm.");
+  fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+  expect(screen.getByRole("button", { name: /^Deploy Health Checks/ })).toHaveProperty("disabled", true);
+  expect(guide().textContent).toContain("Run until the current install finishes, then press Deploy Health Checks.");
+});
+
 it("shows a chapter's guide on the controls the chapter adds", () => {
   start(); renderCompany();
   act(() => useGame.getState().endTour(false));

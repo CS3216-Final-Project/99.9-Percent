@@ -6,6 +6,7 @@ import { floorOf } from "@/game/floors";
 import { num } from "@/game/format";
 import type { EquipmentId } from "@/sim";
 import { pendingStop } from "@/sim/step";
+import { installPending } from "@/sim/reliability";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
@@ -39,6 +40,8 @@ interface Step {
 const label = (id: string) => `.eq-label[data-eq="${id}"]`;
 const PRIMARY = '[data-tour="primary"]';
 const TECH_TAB = '.view-tabs button[data-view="tech"]';
+/** Only Deploy Health Checks' own confirmation belongs to its step; another action's is the player's detour. */
+const confirmingChecks = () => confirmingAction() === "Deploy Health Checks";
 const clear = (s: Snapshot) => {
   s.openView(null);
   s.select(null);
@@ -208,9 +211,16 @@ const CHAPTERS = {
     {
       title: "Deploy Health Checks",
       why: "Unlocking does not deploy it.",
-      hint: (s) => (s.view === "tech" ? "Close Tech." : confirmingAction() ? "Press Confirm." : "Press Deploy Health Checks."),
+      hint: (s) =>
+        s.view === "tech"
+          ? "Close Tech."
+          : confirmingChecks()
+            ? "Press Confirm."
+            : s.game.campaign && installPending(s.game.campaign)
+              ? "Run until the current install finishes, then press Deploy Health Checks."
+              : "Press Deploy Health Checks.",
       // The confirmation opens beside the panel; light it up rather than leaving it under the dim.
-      target: (s) => (s.view === "tech" ? TECH_TAB : confirmingAction() ? ".campaign-action-popover" : '[data-tour="deploy-checks"]'),
+      target: (s) => (s.view === "tech" ? TECH_TAB : confirmingChecks() ? ".campaign-action-popover" : '[data-tour="deploy-checks"]'),
       inTech: true,
       done: (s) => {
         const c = s.game.campaign;

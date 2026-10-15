@@ -6,7 +6,7 @@ import { pendingSpikeAcknowledgement, spikeInput } from "@/sim/autoscaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
 import { canEnterData, databaseUpgrade, pendingStop } from "@/sim/step";
-import { pendingReliability, effectiveTargets, researchBalance } from "@/sim/reliability";
+import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
@@ -176,7 +176,7 @@ export function CampaignPanel() {
         <li><Act label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbUpgrade?`${dbUpgrade.delay} steps · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next Guided Mode stage."} onClick={() => act({ type: "start_db_upgrade" })} /></li>
         <li><Act label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} step`} disabled={disabled || admissionPending} tip="Changes admitted traffic at the next physical step. Rejected requests earn no revenue." onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
       </ul>
-      {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type))} />}
+      {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={installPending(c)} />}
       {unlocked && <section aria-label="Scaling controls" className="scaling-controls">
         <h4 className="step-head">Scale and route</h4>
         <ul className="actions">
