@@ -6,6 +6,7 @@ import { floorOf } from "@/game/floors";
 import { num } from "@/game/format";
 import type { EquipmentId } from "@/sim";
 import { pendingStop } from "@/sim/step";
+import { installPending } from "@/sim/reliability";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
@@ -32,10 +33,15 @@ interface Step {
   done?: (s: Snapshot) => boolean;
   enter?: (s: Snapshot) => void;
   nextLabel?: string;
+  /** The step leads through the Tech tree, so an open tree does not hide it. */
+  inTech?: boolean;
 }
 
 const label = (id: string) => `.eq-label[data-eq="${id}"]`;
 const PRIMARY = '[data-tour="primary"]';
+const TECH_TAB = '.view-tabs button[data-view="tech"]';
+/** Only Deploy Health Checks' own confirmation belongs to its step; another action's is the player's detour. */
+const confirmingChecks = () => confirmingAction() === "Deploy Health Checks";
 const clear = (s: Snapshot) => {
   s.openView(null);
   s.select(null);
@@ -55,7 +61,7 @@ const BASICS: Step[] = [
     why: "Larger servers handle more traffic but cost more to run.",
     hint: (s) => (s.view !== "tech" ? "Open Tech." : s.techFocus !== "larger_servers" ? "Click Scale Up." : "Press Start."),
     target: (s) =>
-      s.view !== "tech" ? '.view-tabs button[data-view="tech"]' : s.techFocus !== "larger_servers" ? '.node[data-tech="larger_servers"]' : `.tree-detail ${PRIMARY}`,
+      s.view !== "tech" ? TECH_TAB : s.techFocus !== "larger_servers" ? '.node[data-tech="larger_servers"]' : `.tree-detail ${PRIMARY}`,
     enter: (s) => s.select(null),
     done: (s) => s.game.tasks.some((t) => t.techId === "larger_servers") || s.game.releases.some((r) => r.techId === "larger_servers") || s.game.techDone.includes("larger_servers"),
   },
@@ -186,12 +192,42 @@ const CHAPTERS = {
     "Autoscaling adds servers while they are busy. Adding capacity yourself works too.",
     '[aria-label="Traffic spikes and autoscaling"]',
   ),
-  reliability: chapter(
-    "Stay online",
-    "You start a test that makes one App Server fail.",
-    "Health Checks spot the failure. A spare and failover keep capacity online.",
-    '[aria-label="Stay Online"]',
-  ),
+  reliability: [
+    ...chapter(
+      "Stay online",
+      "You start a test that makes one App Server fail.",
+      "Health Checks spot the failure. A spare and failover keep capacity online.",
+      '[aria-label="Stay Online"]',
+    ),
+    {
+      title: "Unlock Health Checks",
+      why: "This chapter's capabilities are unlocked in Tech with research points.",
+      hint: (s) => (s.view !== "tech" ? "Open Tech." : s.techFocus !== "health_checks" ? "Click Health Checks." : "Press Unlock Health Checks."),
+      target: (s) =>
+        s.view !== "tech" ? TECH_TAB : s.techFocus !== "health_checks" ? '.node[data-tech="health_checks"]' : `.tree-detail ${PRIMARY}`,
+      inTech: true,
+      done: (s) => !!s.game.campaign?.reliabilityStage?.owned.includes("health_checks"),
+    },
+    {
+      title: "Deploy Health Checks",
+      why: "Unlocking does not deploy it.",
+      hint: (s) =>
+        s.view === "tech"
+          ? "Close Tech."
+          : confirmingChecks()
+            ? "Press Confirm."
+            : s.game.campaign && installPending(s.game.campaign)
+              ? "Run until the current install finishes, then press Deploy Health Checks."
+              : "Press Deploy Health Checks.",
+      // The confirmation opens beside the panel; light it up rather than leaving it under the dim.
+      target: (s) => (s.view === "tech" ? TECH_TAB : confirmingChecks() ? ".campaign-action-popover" : '[data-tour="deploy-checks"]'),
+      inTech: true,
+      done: (s) => {
+        const c = s.game.campaign;
+        return !!c && (c.reliabilityStage?.checksStep != null || c.pending.some((a) => a.type === "health-checks"));
+      },
+    },
+  ],
   combined: chapter(
     "Grow the company",
     "Three growth waves use everything you have built.",
@@ -207,11 +243,11 @@ export const CAMPAIGN_STEPS = CAMPAIGN.length;
 const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", campaign: "Tutorial", incident: "Incident guide" };
 
 /** Where a track's steps make sense: Guided Mode's also wait for any review or milestone and for open views. */
-function fits(track: TourTrack, s: Snapshot): boolean {
+function fits(track: TourTrack, s: Snapshot, step: Step): boolean {
   if (track === "basics") return s.game.phase === "management";
   if (track === "incident") return s.game.phase === "incident";
   const c = s.game.campaign;
-  return !!c && s.game.phase === "management" && pendingStop(c) === null && !(c.openingMilestone && !c.openingMilestone.acknowledged) && s.view === null;
+  return !!c && s.game.phase === "management" && pendingStop(c) === null && !(c.openingMilestone && !c.openingMilestone.acknowledged) && (s.view === null || (!!step.inTech && s.view === "tech"));
 }
 
 interface Box {
@@ -286,7 +322,7 @@ export default function Tutorial() {
   const step = tour ? steps[tour.step] : undefined;
   const track = tour?.track;
   const index = tour?.step ?? -1;
-  const visible = !!step && !!track && fits(track, s) && !covered && !s.onboarding && s.view !== "menu";
+  const visible = !!step && !!track && fits(track, s, step) && !covered && !s.onboarding && s.view !== "menu";
 
   const advance = () => {
     const now = useGame.getState();

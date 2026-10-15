@@ -9,6 +9,8 @@ export const reportsAcknowledged=(c:Campaign)=>c.reports.every(r=>c.trace.some(t
 export const healthy=(a:AppInstance)=>a.health!=="failed";
 export const serving=(a:AppInstance)=>a.role!=="spare";
 export function researchBalance(c:Campaign):number {return (c.spikeStage?.researchEarned??0)+(c.reliabilityStage?.researchEarned??0)-(c.spikeStage?.researchSpent??0)-(c.reliabilityStage?.owned.length??0);}
+/** An infrastructure change still installing; reliability installs wait for it. */
+export const installPending=(c:Campaign)=>c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type));
 export function pendingReliability(c:Campaign|undefined):boolean {return !!c?.reliabilityStage&&c.reliabilityStage.completedStep!==null&&!c.reliabilityStage.acknowledged;}
 export function canEnterReliability(s:GameState):boolean {
  const c=s.campaign;return !!c?.spikeStage?.acknowledged&&c.spikeStage.completedStep!==null&&!c.reliabilityStage&&s.phase==="management"&&c.cashCents>0&&!c.incident&&!!c.openingMilestone?.acknowledged&&reportsAcknowledged(c)&&!c.dbBacklog&&c.apps.every(a=>!a.backlog)&&c.incomingRate===2400&&qualifiesForRecovery(c.snapshot);
@@ -108,7 +110,7 @@ export function reliabilityAction(s:GameState,action:Action):Rejection|null|unde
  }
  if(action.type==="set_failover"){if(!d.failover||d.failover.enabled===action.enabled)return fail("Failover is unavailable or already set.");d.failover.enabled=action.enabled;trace(c,action.enabled?"failover-enabled":"failover-disabled");return null;}
  const type=action.type==="deploy_health_checks"?"health-checks":action.type==="install_spare"?"create-spare":action.type==="reserve_spare"?"reserve-spare":action.type==="release_spare"?"release-spare":action.type==="deploy_failover"?"failover":"restore-app";
- if(c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type)))return fail("An infrastructure action is pending.");
+ if(installPending(c))return fail("An infrastructure action is pending.");
  const target=(action.type==="reserve_spare"||action.type==="restore_app")?c.apps.find(a=>a.id===action.appId):type==="release-spare"?c.apps.find(a=>a.id===d.spareId):undefined;
  if(type==="health-checks"&&(!d.owned.includes("health_checks")||d.checksStep!==null))return fail("Unlock Health Checks before deployment.");
  if(["create-spare","reserve-spare"].includes(type)&&(!d.owned.includes("standby")||d.spareId))return fail("Unlock Spare Application; only one spare may be reserved.");
