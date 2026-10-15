@@ -6,16 +6,18 @@ import { pendingSpikeAcknowledgement, spikeInput } from "@/sim/autoscaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
 import { canEnterData, databaseUpgrade, pendingStop } from "@/sim/step";
-import { canEnterReliability, pendingReliability, effectiveTargets, researchBalance } from "@/sim/reliability";
+import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
+import { campaignChapters, finishedChapter } from "@/game/campaignChapters";
 import TechTree from "./TechTree";
 import { AccountSection } from "./Account";
 import { HomeScreen } from "./HomeScreen";
 import { CampaignChapters } from "./CampaignChapters";
+import { isChapterEntry } from "@/game/campaignChapters";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
-import { exportPlaytest } from "@/game/persist";
+import { exportPlaytest, type ChapterCompletion } from "@/game/persist";
 import { money, num } from "@/game/format";
 import { useState } from "react";
 import { inspectOrSelect, useGame, type Speed } from "@/game/store";
@@ -80,8 +82,7 @@ function CampaignGuidance() {
       {model.notice&&<p role="note">{model.notice}</p>}
       {model.optional&&<p className="muted">{model.optional}</p>}
     </details></section>}
-    {action?.action&&<button className="btn btn-primary" disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
-    {!c.reliabilityStage&&c.spikeStage?.acknowledged&&<button className="btn btn-primary" disabled={!canEnterReliability(game)} onClick={()=>act({type:"enter_reliability"})}>Continue to reliability<Icon name="next" /></button>}
+    {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
     {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
     {c.openingMilestone?.acknowledged&&!c.dataStage&&!c.scaling?.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}>View run scorecard</button>}
@@ -175,7 +176,7 @@ export function CampaignPanel() {
         <li><Act label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbUpgrade?`${dbUpgrade.delay} steps · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next Guided Mode stage."} onClick={() => act({ type: "start_db_upgrade" })} /></li>
         <li><Act label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} step`} disabled={disabled || admissionPending} tip="Changes admitted traffic at the next physical step. Rejected requests earn no revenue." onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
       </ul>
-      {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type))} />}
+      {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={installPending(c)} />}
       {unlocked && <section aria-label="Scaling controls" className="scaling-controls">
         <h4 className="step-head">Scale and route</h4>
         <ul className="actions">
@@ -336,13 +337,13 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
       {tab === "saves" && <div className="menu-columns">
         <div className="menu-col"><SaveFiles /></div>
         <div className="menu-col">
-          <AccountSection />
           <section className="menu-section menu-danger" aria-label="Start over"><h4><Icon name="refresh" size={20} />Start over</h4>
             <div className="menu-actions"><button type="button" className={`btn${confirmReset ? " btn-danger" : ""}`} onClick={reset}><Icon name="refresh" size={20} />{confirmReset ? "Lose this company? Press again" : "New company"}</button></div>
             {confirmReset && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces only the current Guided Mode save. Export it first if you want to keep it. Press the red button again to confirm.</Callout>}
           </section>
         </div>
       </div>}
+      {tab === "account" && <AccountSection />}
       {tab === "playtest" && <><AnalyticsSettings /><section className="menu-section" aria-label="Playtest records"><h4><Icon name="analytics" size={20} />Playtest records</h4>
         <FeedbackButton inline />
         <div className="menu-actions"><button type="button" className="btn" onClick={()=>{useGame.getState().measureTime();const s=useGame.getState();download("playtest-session.json",exportPlaytest(s.game,s.measurement));}}><Icon name="download" size={20} />Export playtest record</button></div>
@@ -369,7 +370,7 @@ export function CampaignOverlays() {
 
 /** The one dialog that currently needs the player, if any. */
 function CampaignDialog() {
-  const { game, view, openView, act } = useGame();
+  const { game, view, openView, act, chapterComplete } = useGame();
   const c = game.campaign!;
   if(view==="scorecard"&&(c.scorecard||c.combinedStage?.finalReview))return <Modal title="Company scorecard" onClose={()=>openView("guidance")}><CampaignScorecard card={(c.scorecard??c.combinedStage!.finalReview)!} pendingReview={!c.scorecard}/></Modal>;
   if(pendingCombined(c)&&!["guidance","menu","history"].includes(view??"")){const d=c.combinedStage!,r=d.currentRound;return <Modal title={d.finalReview?"Final campaign review":"Growth outcome"} onClose={()=>openView("guidance")}>{d.finalReview?<><CampaignScorecard card={d.finalReview} pendingReview/><button className="btn btn-primary" onClick={()=>act({type:"complete_campaign"})}>Complete campaign</button></>:<><h3>What happened</h3><p>{r!.scenario.template}: registered users reached {r!.users.toLocaleString("en-US")}. Temporary pressure has ended.</p><h3>What the evidence showed</h3><p>All applications restored; five stable full-demand baseline steps; actual incident reports acknowledged.</p><h3>Trade-offs</h3><p>Rejected requests during this round: {c.cumulative.rejected-r!.rejectedBefore}; setup spending {dollars(c.investedCents-r!.setupBefore)}. Review actual actions and causal reports in History.</p><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_growth"})}>Continue company</button></>}</Modal>;}
@@ -385,6 +386,8 @@ function CampaignDialog() {
     <ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_milestone"})} />
   </Modal>;
   if(pendingSpikeAcknowledgement(c) && view!=="menu" && view!=="history") return <Modal title="Spike response handled" icon={{ kind: "go", name: "goal" }} onClose={()=>openView("history")}><p>Both demand pulses ended and five baseline steps qualified for stable service. The same company continues with its investments and operating costs.</p><ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_spikes"})} /></Modal>;
+  // It pauses the clock when it appears, so it shows over History and guidance rather than waiting behind them.
+  if(chapterComplete&&chapterComplete===finishedChapter(game)&&view!=="menu")return <ChapterComplete chapter={chapterComplete} />;
   if(game.phase==="ended"&&game.outcome==="won"&&!["guidance","menu","history","tech"].includes(view??""))return <Modal title="Campaign complete" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard!}/><button className="btn" onClick={()=>openView("guidance")}>Inspect final company</button><button className="btn" onClick={()=>openView("menu")}>Export or start a new company</button></Modal>;
   if (game.phase === "ended" && game.outcome !== "won" && view === null) return <Modal title="Company bankrupt" tone="alert" icon={{ kind: "critical", name: "cash" }} onClose={() => openView("menu")}>
     <Callout tone="critical" icon="cash" kicker="Company closed">Cash reached {dollars(c.cashCents)} after settlement at step {c.step}. Final metrics and history remain available.</Callout>
@@ -394,6 +397,27 @@ function CampaignDialog() {
   </Modal>;
   if (view === "menu") return <CampaignMenu initialTab={game.phase === "ended" ? "saves" : "run"} />;
   return null;
+}
+
+const COMPLETIONS: Record<ChapterCompletion, { title: string; text: string; next: string }> = {
+  scaling: { title: "Scaling & Routing complete", text: "Your added capacity and routing carried the growth wave.", next: "data" },
+  data: { title: "Data Strategy complete", text: "Your Database kept up with the new workload.", next: "spikes" },
+};
+
+/** Scaling & Routing and Data Strategy have no recognition of their own, so finishing them stops here once. */
+function ChapterComplete({ chapter }: { chapter: ChapterCompletion }) {
+  const { game, act, dismissChapterComplete } = useGame();
+  const done = COMPLETIONS[chapter];
+  const next = campaignChapters(game).find(c => c.id === done.next)!;
+  const action = campaignGuidance(game).pendingAction!;
+  return <Modal title={done.title} icon={{ kind: "go", name: "goal" }} onClose={dismissChapterComplete}>
+    <p>{done.text} Your architecture, cash and investments carry forward.</p>
+    <p>Next: {next.name}. {next.description}</p>
+    <div className="modal-foot">
+      <button className="btn btn-quiet" onClick={dismissChapterComplete}>Stay in this chapter</button>
+      <button className="btn btn-primary" onClick={() => { dismissChapterComplete(); act(action.action!); }}>{action.label}<Icon name="next" /></button>
+    </div>
+  </Modal>;
 }
 
 /** Every acknowledgement ends the same way: the company carries on, and one button says so. */
@@ -501,7 +525,7 @@ function ReliabilityControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
     <p role="status">{!f?"Prepare, then explicitly start the reliability test.":f.startedStep===null?"Reliability test scheduled. Run to observe it.":f.restoredStep===null?`${appName(f.targetId)} failed. Inspect health, surviving capacity and routing.`:"Application restored. Observe stable service."} Stable after restoration: {c.combinedStage?.currentRound?.stableSteps??d.stableSteps} / {Q.stableSteps}.</p>
     {c.spikeStage?.controller&&f&&!d.acknowledged&&<p className="muted">Autoscaling waits while the reliability test runs; its enabled state and upkeep are preserved.</p>}
     <ul className="actions">
-      <li><Act label="Deploy Health Checks" price={R.checksCostCents/100} note="2 steps" disabled={checksUnavailable} tip="Requires its research unlock and available cash. Detects health changes; load balancing is required for routing exclusion." onClick={()=>act({type:"deploy_health_checks"})} /></li>
+      <li><Act label="Deploy Health Checks" tour="deploy-checks" price={R.checksCostCents/100} note="2 steps" disabled={checksUnavailable} tip="Requires its research unlock and available cash. Detects health changes; load balancing is required for routing exclusion." onClick={()=>act({type:"deploy_health_checks"})} /></li>
       <li><Act label="Install spare" price={R.spareCostCents/100} note="2 steps" disabled={spareUnavailable} tip="Requires Spare Application research, available cash and a free instance slot. A spare receives no traffic until promoted." onClick={()=>act({type:"install_spare"})} /></li>
       <li><Act label="Deploy Automatic Failover" price={R.failoverCostCents/100} note="2 steps" disabled={failoverUnavailable} tip="Requires its research unlock, deployed Health Checks and Load Balancing, a healthy reserved spare and available cash. Creates no capacity." onClick={()=>act({type:"deploy_failover"})} /></li>
       {d.failover&&<li><Act label={d.failover.enabled?"Disable failover":"Enable failover"} price={0} disabled={disabled} onClick={()=>act({type:"set_failover",enabled:!d.failover!.enabled})} /></li>}

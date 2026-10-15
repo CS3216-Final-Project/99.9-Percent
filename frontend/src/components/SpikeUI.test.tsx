@@ -8,7 +8,7 @@ function show(g:ReturnType<typeof dataCompany>){useGame.setState({game:g,started
 const chapter=(name:string)=>within(screen.getByRole("list",{name:"Chapter progress"})).getAllByRole("listitem").find(li=>li.textContent!.includes(name))!.textContent;
 it("extends the current strip with factual available continuation and no new store",()=>{
  show(dataCompany());expect(chapter("Traffic Spikes")).toContain("Available next");
- fireEvent.click(screen.getByRole("button",{name:"Continue to traffic spikes"}));expect(chapter("Data Strategy")).toContain("Completed");expect(screen.getByLabelText("Current chapter").textContent).toBe("Traffic Spikes & Autoscaling");expect(useGame.getState().running).toBe(false);expect(screen.getByRole("region",{name:"Guided Mode requirements"}).textContent).not.toContain("before continuing to traffic spikes");
+ fireEvent.click(screen.getByRole("button",{name:"Next: Continue to traffic spikes"}));expect(chapter("Data Strategy")).toContain("Completed");expect(screen.getByLabelText("Current chapter").textContent).toBe("Traffic Spikes & Autoscaling");expect(useGame.getState().running).toBe(false);expect(screen.getByRole("region",{name:"Guided Mode requirements"}).textContent).not.toContain("before continuing to traffic spikes");
 });
 it("shows live provisioning, counters, delayed routing and per-instance shared selection",()=>{
  show(untilOffset(spikeCompany(),13));const control=screen.getByRole("region",{name:"Traffic spikes and autoscaling"});expect(control.textContent).toContain("TRAFFIC SPIKE ACTIVE");expect(control.textContent).toContain("3 steps, followed by 1 routing step");

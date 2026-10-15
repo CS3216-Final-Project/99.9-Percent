@@ -1,7 +1,8 @@
 import { canEnterCombined } from "@/sim/combinedCampaign";
-import type { GameState } from "@/sim";
+import type { Action, GameState } from "@/sim";
 import { canEnterReliability } from "@/sim/reliability";
 import { campaignGuidance } from "./campaignGuidance";
+import type { ChapterCompletion } from "./persist";
 
 /** Presentation only: chapter status follows the existing progression gates. */
 export function campaignChapters(game: GameState) {
@@ -20,4 +21,25 @@ export function campaignChapters(game: GameState) {
     const status = chapter.completed ? "Completed" : current ? "Current" : chapter.available ? "Available next" : "Locked";
     return { ...chapter, number: index + 1, current, status };
   });
+}
+
+const CHAPTER_ENTRIES: ReadonlySet<Action["type"]> = new Set(["enter_scaling", "enter_data", "enter_spikes", "enter_reliability", "enter_combined"]);
+
+/** Whether an action moves the company into the next chapter. */
+export const isChapterEntry = (action: Action) => CHAPTER_ENTRIES.has(action.type);
+
+/** The control that moves the company into the next chapter, while one is on offer. */
+export function chapterAdvance(game: GameState): { label: string; action: Action; ready: boolean } | null {
+  const c = game.campaign!;
+  const next = campaignGuidance(game).pendingAction;
+  if (next?.action && isChapterEntry(next.action)) return { label: next.label, action: next.action, ready: true };
+  // Stay Online is announced once the spike response is acknowledged, and opens when the company is ready for it.
+  if (!c.reliabilityStage && c.spikeStage?.acknowledged) return { label: "Continue to reliability", action: { type: "enter_reliability" }, ready: canEnterReliability(game) };
+  return null;
+}
+
+/** The chapter whose requirements are met while the company waits for the player to continue past it. */
+export function finishedChapter(game: GameState): ChapterCompletion | null {
+  const next = campaignGuidance(game).pendingAction?.action?.type;
+  return next === "enter_data" ? "scaling" : next === "enter_spikes" ? "data" : null;
 }

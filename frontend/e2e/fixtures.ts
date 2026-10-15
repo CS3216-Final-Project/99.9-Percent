@@ -4,7 +4,16 @@ import { CHAPTER_TOURS, DEFAULT_META, type Meta } from '../src/game/persist';
 import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
 
 // Unhandled browser errors fail each case. Journeys that call withoutRoom() skip the WebGL scene; the rest draw it.
-export const test = base.extend<{ healthyBrowser: void; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
+export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
+  /**
+   * Finishing Scaling & Routing or Data Strategy stops on a dialog at whatever step the company qualifies.
+   * Journeys that walk through those chapters stay in the chapter and carry on as before; a case that checks
+   * the dialog itself calls page.removeLocatorHandler(chapterComplete(page)).
+   */
+  chapterCompletions: [async ({ page }, use) => {
+    await page.addLocatorHandler(chapterComplete(page), dialog => dialog.getByRole('button', { name: 'Stay in this chapter', exact: true }).click());
+    await use();
+  }, { auto: true }],
   healthyBrowser: [async ({ page }, use) => {
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -30,6 +39,9 @@ export const test = base.extend<{ healthyBrowser: void; withoutRoom: (target?: P
   },
 });
 export { expect };
+
+/** The dialog that announces a finished Scaling & Routing or Data Strategy chapter. */
+export const chapterComplete = (page: Page) => page.getByRole('dialog', { name: /^(Scaling & Routing|Data Strategy) complete$/ });
 
 /** The Guided Mode walkthrough's card, whichever step it shows. */
 export const tutorial = (page: Page) => page.getByRole('dialog', { name: /^Tutorial, step/ });

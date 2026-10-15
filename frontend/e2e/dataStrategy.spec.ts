@@ -17,7 +17,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  await seedSave(page,prepared());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
  const guidance=page.getByRole("region",{name:"Guided Mode guidance"});
  await expect(page.getByRole("list",{name:"Chapter progress"}).getByRole("listitem").filter({hasText:"Data Strategy"})).toContainText("Available next");
- await page.getByRole("button",{name:"Continue to data strategy",exact:true}).click();
+ await page.getByRole("button",{name:"Next: Continue to data strategy",exact:true}).click();
  await expect(guidance).toContainText("Current stage: Data Strategy");
  await expect(page.getByRole("region",{name:"Data strategy"})).toContainText("Waiting for workload growth");
  expect((await savedGame(page)).campaign!.dataStage!.profile).toBe("read-heavy");

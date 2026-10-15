@@ -9,5 +9,5 @@ test("guardrail: pulses ended, pending observations, explicit recognition and re
  for(let i=0;i<4;i++)await advanceCampaignStep(page);
  const recognition=page.getByRole("dialog",{name:"Spike response handled"});await expect(recognition).toBeVisible();expect((await savedGame(page)).campaign!.spikeStage!.acknowledged).toBe(false);
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(recognition).toBeVisible();
- await recognition.getByRole("button",{name:"Continue operating"}).click();await guidance.locator("summary").click();await expect(guidance).toContainText("Stay Online is available through Continue to reliability");expect((await savedGame(page)).campaign!.runId).toBe(g.campaign!.runId);
+ await recognition.getByRole("button",{name:"Continue operating"}).click();await guidance.locator("summary").click();await expect(guidance).toContainText("Stay Online is available through Next in the chapter bar");expect((await savedGame(page)).campaign!.runId).toBe(g.campaign!.runId);
 });
