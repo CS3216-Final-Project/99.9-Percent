@@ -872,9 +872,6 @@ function Room({ servers = false }: { servers?: boolean }) {
 /** How long after the room opens the floor out of view is prepared for its first ride, in milliseconds. */
 const WARM_MS = 4000;
 
-/** The tone mapping the renderer applies when it draws straight to the screen: react-three-fiber's default. */
-const SCREEN_TONE_MAPPING = THREE.ACESFilmicToneMapping;
-
 /** How long preparing shaders may hold up a frame, in milliseconds, before it waits for the next. */
 const PREPARE_BUDGET_MS = 6;
 
@@ -894,10 +891,11 @@ function pieces(o: THREE.Object3D): THREE.Object3D[] {
 
 /**
  * Prepares the shaders of both floors for how the room is drawn: through the effects pass, into its buffer with
- * linear colour and no tone mapping, or straight to the screen in sRGB with the filmic curve. three keys each
- * material's shader on both, so the two ways need separate shaders; outside a frame neither is set up, so they are
- * set here: compiling outside a frame prepared a third way, which nothing ever draws. Building them all at once
- * would hold the page up, so the room is prepared a piece at a time, a few milliseconds a frame.
+ * linear colour and no tone mapping, or straight to the screen in sRGB with the renderer's tone mapping. three keys
+ * each material's shader on where it draws, and the effects pass turns the renderer's tone mapping off, so outside
+ * a frame the screen with no tone mapping would be prepared, a way nothing ever draws. With effects the pass's
+ * buffer is set here instead; without them the screen is already right. Building them all at once would hold the
+ * page up, so the room is prepared a piece at a time, a few milliseconds a frame.
  */
 async function prepareShaders(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, effects: boolean, signal: AbortSignal): Promise<void> {
   const buffer = effects ? new THREE.WebGLRenderTarget(1, 1) : null;
@@ -911,16 +909,13 @@ async function prepareShaders(gl: THREE.WebGLRenderer, scene: THREE.Scene, camer
       }
       if (signal.aborted) return;
       const target = gl.getRenderTarget();
-      const toneMapping = gl.toneMapping;
       try {
         gl.setRenderTarget(buffer);
-        if (!effects) gl.toneMapping = SCREEN_TONE_MAPPING;
         gl.compile(piece, camera, scene);
       } catch {
         // Only a head start: the shaders build when first drawn anyway.
       } finally {
         gl.setRenderTarget(target);
-        gl.toneMapping = toneMapping;
       }
     }
   } finally {
