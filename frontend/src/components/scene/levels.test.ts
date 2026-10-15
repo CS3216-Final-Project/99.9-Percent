@@ -13,6 +13,10 @@ describe("the floors' heights", () => {
 describe("an elevator ride", () => {
   const samples = Array.from({ length: 61 }, (_, i) => rideAt((i / 60) * RIDE_SECONDS));
 
+  it("takes three seconds, leaving enough time for the floor-change cutscene", () => {
+    expect(RIDE_SECONDS).toBe(3);
+  });
+
   it("eases the car from one floor to the other, never backwards", () => {
     expect(rideAt(0).car).toBe(0);
     expect(rideAt(RIDE_SECONDS).car).toBe(1);
