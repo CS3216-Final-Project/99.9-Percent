@@ -1,0 +1,14 @@
+.stat-action { font: inherit; color: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.stat-action:hover, .stat-action:active { background: var(--night-2); }
+.stat-action:focus-visible { outline: 2px solid var(--on-night); outline-offset: 2px; }
+.stat-action-label { display: flex; justify-content: space-between; gap: 8px; }
+.finance-overview { padding-bottom: 4px; }
+.finance-warning { border-left: 3px solid var(--warn); padding-left: 10px; }
+.finance-advanced { margin-top: 16px; }
+.finance-cash-compact { display: none; }
+@media (max-width: 900px) {
+    .finance-cash-full { display: none; }
+    .finance-cash-compact { display: inline; }
+    .stat-action { position: relative; }
+    .stat-action::after { content: "↗"; position: absolute; top: 0; right: 2px; font-size: 9px; color: var(--on-night-soft); }
+}

@@ -8,6 +8,7 @@ import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { tipProps } from "./tips";
 import { TECH_ICON } from "./presentation";
+import { CampaignUnavailable } from "./CampaignInfrastructure";
 import { Act, Chip, Concept, ReleaseRow, TaskRow } from "./ui";
 
 const NODE_W = 204;
@@ -279,6 +280,7 @@ function CampaignDetail({game,id}:{game:GameState;id:TechId}) {
       {status === "locked" && <p className="muted">{reliability && !c.reliabilityStage ? "Enter Stay Online to unlock this capability." : "Meet the displayed prerequisite or Guided Mode stage first."}</p>}
       {reliability && status === "available" && <Act primary tour="primary" icon="plus" label={`Unlock ${TECH[id].name}`} note="1 research point" noteIcon="bulb" disabled={blocked} onClick={() => act({ type: "unlock_reliability", tech: id as "health_checks" | "standby" | "auto_failover" })} />}
       {id === "autoscaling" && status === "available" && <Act primary icon="plus" label="Unlock autoscaling" note="1 research point" noteIcon="bulb" disabled={blocked} onClick={() => act({ type: "unlock_autoscaling" })} />}
+      {status === "available" && (reliability || id === "autoscaling") && <CampaignUnavailable disabled={blocked} action={reliability ? {type:"unlock_reliability",tech:id as "health_checks"|"standby"|"auto_failover"} : {type:"unlock_autoscaling"}} />}
       {!reliability && <Act icon="next" label="View existing actions" tip="Close the tree and select the equipment this capability acts on." onClick={choose} />}
     </div>
   );

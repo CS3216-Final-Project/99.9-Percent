@@ -59,9 +59,16 @@ it("offers each routing choice once and marks the one in use",()=>{
  show(dataCompany("read-heavy",false));const route=screen.getByRole("group",{name:/Send traffic to/});
  expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All apps","App 1 only","App 2 only"]);
  expect(within(route).getByRole("button",{name:"All apps"}).getAttribute("aria-pressed")).toBe("true");
+ const before=useGame.getState().game;
+ fireEvent.click(within(route).getByRole("button",{name:"All apps"}));
+ expect(useGame.getState().game).toBe(before);
  expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
  fireEvent.click(within(route).getByRole("button",{name:"App 2 only"}));
  expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-2"]});
+ const reason=screen.getByText("Routing requires deployed load balancing, valid active targets and a changed configuration.");
+ expect(reason.getAttribute("tabindex")).toBe("0");
+ expect(reason.closest("fieldset")).toBeNull();
+ expect(route.hasAttribute("disabled")).toBe(true);
 });
 it("leaves a reserved spare out of the routing choices, so the apps in use still read as all apps",()=>{
  const g=protectedCombined();expect(g.campaign!.apps.find(a=>a.id==="app-2")!.role).toBe("spare");

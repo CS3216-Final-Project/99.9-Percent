@@ -14,3 +14,21 @@ export function openRoomArea(stage: DOMRect): { right: number; bottom: number } 
   }
   return { right, bottom };
 }
+
+/** Purchase cards also leave the navigation and room controls accessible. Coordinates are stage-relative. */
+export function confirmationRoomArea(stage: DOMRect, sheet: boolean) {
+  const viewport = window.visualViewport;
+  const left = Math.max(EDGE, (viewport?.offsetLeft ?? 0) - stage.left + EDGE);
+  const top = Math.max(EDGE, (viewport?.offsetTop ?? 0) - stage.top + EDGE);
+  const open = sheet ? {right:stage.width-EDGE,bottom:stage.height-EDGE} : openRoomArea(stage);
+  const right = Math.min(open.right, (viewport?.offsetLeft ?? 0)+(viewport?.width ?? window.innerWidth)-stage.left-EDGE);
+  let bottom = Math.min(open.bottom, (viewport?.offsetTop ?? 0)+(viewport?.height ?? window.innerHeight)-stage.top-EDGE);
+  for (const selector of [".bottombar", ".floor-menu", ".camera-buttons", ".walk-prompt"]) {
+    const node = document.querySelector<HTMLElement>(selector);
+    if (!node || !node.getClientRects().length || getComputedStyle(node).visibility==="hidden") continue;
+    const box = node.getBoundingClientRect();
+    if (box.right>stage.left+left && box.left<stage.left+right && box.top>stage.top+top)
+      bottom = Math.min(bottom,box.top-stage.top-EDGE);
+  }
+  return {left,top,right,bottom};
+}

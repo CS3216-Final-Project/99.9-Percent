@@ -6,8 +6,8 @@ test("Campaign option comparison, confirmation, precision control and pause-to-i
   await expect(page.getByText("Effect & costs")).toHaveCount(0);
   await expect(page.getByText("Operating finances")).toHaveCount(0); await expect(page.getByLabel("Request dependencies")).toHaveCount(0);
   await page.getByRole("button",{name:/Add server/}).click(); const confirm=page.getByRole("region",{name:"Confirm Add server"});
-  await expect(confirm).toContainText("Add server?"); await expect(confirm).toContainText("App Servers run the product");
-  await expect(confirm).toContainText("$700 / 60s"); await expect(confirm).toContainText("$19,000");
+  await expect(confirm).toContainText("Add App Server?"); await expect(confirm).toContainText("App Servers run the product");
+  await expect(confirm).toContainText("+$700 per 60 game seconds"); await expect(confirm).toContainText("$19,000");
   await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("region",{name:"Confirm Add server"})).toHaveCount(0);
   await expect(confirm.getByRole("button",{name:"Confirm"})).toBeFocused();
   await page.keyboard.press("Escape"); await expect(confirm).toBeHidden(); expect((await savedGame(page)).campaign!.apps).toHaveLength(1);
