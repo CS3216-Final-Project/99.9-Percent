@@ -1,8 +1,8 @@
-import {render,screen,within,fireEvent,cleanup} from "@testing-library/react";
+import {render,screen,within,fireEvent,cleanup,act} from "@testing-library/react";
 import {beforeEach,afterEach,it,expect} from "vitest";
 import {CampaignPanel} from "./CampaignUI";
 import {CampaignChapters} from "./CampaignChapters";
-import {useGame} from "../game/store";
+import {inspectOrSelect,useGame} from "../game/store";
 import {dataCompany} from "../sim/__tests__/dataFixture";
 import {protectedCombined} from "../sim/__tests__/combinedFixture";
 import {advanceSteps} from "../sim/step";
@@ -30,6 +30,19 @@ it("selects the cache through the same inspection action and displays actual use
  expect(useGame.getState().game.campaign!.trace.at(-1)).toMatchObject({type:"inspection",data:{component:"cache"}});
  const data=screen.getByRole("region",{name:"Data strategy"});expect(data.textContent).toContain("Reads 80% / writes 20%");
  expect(data.textContent).toContain("effective hit rate used 0%");expect(data.textContent).toContain("eligible misses 1920");
+});
+
+it("inspects the Team office as company operations, and ignores equipment Guided Mode does not support",()=>{
+ show(dataCompany());const before=useGame.getState().game.campaign!;
+ act(()=>inspectOrSelect("team"));
+ expect(useGame.getState().selected).toBe("team");
+ const after=useGame.getState().game.campaign!;
+ expect(after.step).toBe(before.step);expect(after.inputs).toBe(before.inputs);expect(after.trace).toBe(before.trace);
+ const callout=screen.getByText("Engineers operate the infrastructure and carry out scheduled changes.");
+ expect(callout.closest('[role="status"]')).not.toBeNull();
+ act(()=>inspectOrSelect("standby"));
+ expect(useGame.getState().selected).toBe("team");
+ expect(useGame.getState().game.campaign!.inputs).toBe(before.inputs);
 });
 
 it("labels the last completed profile separately from an immediate contrast",()=>{

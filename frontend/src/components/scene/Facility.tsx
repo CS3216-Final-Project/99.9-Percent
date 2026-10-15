@@ -16,7 +16,7 @@ import {
 } from "@/sim";
 import type { GameMode, GraphicsQuality } from "@/game/persist";
 import { loadExploration, saveExploration, type SavedCameraView } from "@/game/exploration";
-import { inspectOrSelect, useGame } from "@/game/store";
+import { canInspectEquipment, inspectOrSelect, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import {
   AISLE_Z,
@@ -771,7 +771,8 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
  */
 function Labels({ landed }: { landed: Floor | null }) {
   const m = useSceneModel();
-  const c=useGame(s=>s.game.campaign);
+  const game=useGame(s=>s.game);
+  const c=game.campaign;
   const selectedAppId=useGame(s=>s.selectedAppId);
   const selected=useGame(s=>s.selected);
   const appsAffected=useGame(s=>s.affected.includes("app"));
@@ -784,7 +785,7 @@ function Labels({ landed }: { landed: Floor | null }) {
           Internet
         </span>
       )}
-      {EQUIPMENT_ORDER.filter((id) => floorOf(id) === landed && (m.opening ? ["gateway","app","db","monitoring",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id])).map((id) => (
+      {EQUIPMENT_ORDER.filter((id) => floorOf(id) === landed && canInspectEquipment(game, id) && (m.opening ? ["gateway","app","db","monitoring","team","deploy","growth",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id])).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
       {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span></button>)}
@@ -1017,7 +1018,8 @@ function Effects() {
 function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Floor | null; warm: boolean }) {
   const effects = quality.effects;
   const m = useSceneModel();
-  const campaign = useGame(s => s.game.campaign);
+  const game = useGame(s => s.game);
+  const campaign = game.campaign;
   const floor = useGame((s) => s.floor);
   const mode = useGame((s) => s.mode);
   const walking = useGame((s) => s.walking && s.started);
@@ -1032,7 +1034,14 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
     const y = FLOOR_Y[shown] + 3.4;
     for (const l of lights.current) if (l) l.position.y = y;
   });
-  const onFloor = (f: Floor) => EQUIPMENT_ORDER.filter((id) => floorOf(id) === f && landed === f);
+  const onFloor = (f: Floor) => EQUIPMENT_ORDER.filter((id) => floorOf(id) === f && landed === f && canInspectEquipment(game, id));
+  // In Guided Mode the avatar is never offered an inspection the game would ignore.
+  const inspectableFootprints = useMemo(() => {
+    if (!game.campaign) return m.footprints;
+    const f = {} as Record<EquipmentId, Footprint>;
+    for (const id of EQUIPMENT_ORDER) if (canInspectEquipment(game, id)) f[id] = m.footprints[id];
+    return f;
+  }, [game, m]);
   // Once the room has loaded, prepare the floor out of view as well, so the first ride does not stall on new shaders.
   // Only on a graphics card: drawing on the CPU, compiling everything at once would stall the page for longer.
   const { gl, scene, camera } = useThree();
@@ -1070,7 +1079,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
       <Exterior />
       <ElevatorCar />
       <Avatar walking={walking} />
-      <WalkDriver walking={walking} footprints={m.footprints} names={m.names} />
+      <WalkDriver walking={walking} footprints={inspectableFootprints} names={m.names} />
 
       {/* The office floor, on top */}
       <group ref={office}>
