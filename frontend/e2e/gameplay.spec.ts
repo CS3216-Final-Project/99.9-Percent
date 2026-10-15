@@ -29,6 +29,10 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       });
       expect(await responsesFit()).toBe(true);
       await page.getByRole("main").getByRole("button", { name: "Database", exact: true }).click();
+      // Clicking in the room opens the diagnostic card; the panel's inspection behind it is unchanged.
+      const dbReveal = page.getByRole("dialog", { name: "Database inspected" });
+      await expect(dbReveal).toBeVisible();
+      await dbReveal.getByRole("button", { name: "Return to room" }).click();
       await expect(panel.getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");
       await expect(panel.getByRole("status")).toContainText("Demand 800/s · capacity 600/s · backlog 600");
       expect(await responsesFit()).toBe(true);

@@ -11,7 +11,7 @@ import type { IntroKind, useGame } from "./store";
  */
 
 type StoreState = ReturnType<typeof useGame.getState>;
-export type CueState = Pick<StoreState, "game" | "generation" | "lastAction" | "lastIntro" | "toast" | "started" | "audio">;
+export type CueState = Pick<StoreState, "game" | "generation" | "lastAction" | "lastIntro" | "toast" | "started" | "audio" | "roomInspection">;
 
 /** The sound for each accepted decision; decisions that open or close a screen make none. */
 const ACTION_CUE: Partial<Record<Action["type"], Cue>> = {
@@ -62,6 +62,7 @@ export const CUE_PRIORITY: readonly Cue[] = [
   "hire",
   "clunk",
   "confirm",
+  "scan",
   "buzz",
   "blip",
   "preview",
@@ -76,6 +77,8 @@ export function cuesBetween(prev: CueState, next: CueState): Cue[] {
   if (next.lastIntro && next.lastIntro !== prev.lastIntro) cues.push(INTRO_CUE[next.lastIntro.kind]);
   if (next.generation !== prev.generation || !prev.started || !next.started) return cues;
 
+  // A room-originated inspection's reveal outranks the blip its own incident_inspect action earns.
+  if (next.roomInspection && next.roomInspection !== prev.roomInspection) cues.push("scan");
   const decided = next.lastAction;
   if (decided && decided !== prev.lastAction) {
     const cue = decided.ok ? ACTION_CUE[decided.type] : "buzz";

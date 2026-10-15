@@ -21,6 +21,7 @@ import { SoundButton } from "./SoundButton";
 import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
 import { HomeScreen } from "./HomeScreen";
+import InspectionReveal from "./InspectionReveal";
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
 import Tutorial from "./Tutorial";
@@ -450,6 +451,7 @@ export default function Game() {
       {!campaign && started && view === "menu" && <Menu />}
       {!campaign && started && onboarding && <HowToPlay />}
       {started && <Tutorial />}
+      {started && <InspectionReveal />}
       {!campaign && started && phase === "review" && <PostmortemModal />}
       {!campaign && started && phase === "ended" && <EndReport />}
     </div>

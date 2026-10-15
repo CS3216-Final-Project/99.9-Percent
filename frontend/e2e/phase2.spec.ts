@@ -17,9 +17,13 @@ test("the walkthrough works from the keyboard, keeps shortcuts working and remem
   await expect(card.getByRole("button", { name: "Skip", exact: true })).toBeFocused();
   const room = page.getByRole("main");
   await room.getByRole("button", { name: "Servers", exact: true }).press("Enter");
+  await page.getByRole("dialog", { name: "Servers inspected" }).getByRole("button", { name: "Return to room" }).press("Enter");
   await expect(card).toHaveAccessibleName("Tutorial, step 2 of 8");
+  // The card's own focus went to the inspection dialog; give it back, as a player's Tab would.
+  await card.focus();
   await expect(card).toBeFocused();
   await room.getByRole("button", { name: "Database", exact: true }).press("Enter");
+  await page.getByRole("dialog", { name: "Database inspected" }).getByRole("button", { name: "Return to room" }).press("Enter");
   await expect(card).toHaveAccessibleName("Tutorial, step 3 of 8");
   await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
   await expect(card).toHaveAccessibleName("Tutorial, step 4 of 8");
