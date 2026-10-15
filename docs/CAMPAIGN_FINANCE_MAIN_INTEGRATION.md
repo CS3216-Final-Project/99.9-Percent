@@ -1,107 +1,68 @@
-# Campaign Finance integration onto updated main
+# Campaign Finance publication readiness
 
 Branch: `fe/campaign-finance-main`.
 Worktree: `C:/Users/user/99.9-Percent-Latest/test-results/campaign-finance-main`.
-Approved base: `75d486a1678e8916a617696bed9819a51cd7e24d`.
-Validated code commit: `32b8f7b75c7d661754147d2c98dd32fa81f6c5ec`; the final report is a subsequent documentation-only commit.
-Local backup: `fe/campaign-finance-main-backup-0605867` at `0605867ba0ce3deb961c584c4f33ba6ee13b3895`.
-Finance source remains the completed work through `f34870c`, originally integrated onto `2df332a` as `0605867`.
+Approved base: `065b047d1d38b5883591b61b68cdb120c2af060a`.
+Validated code snapshot: `16423f9` (the final report commit changes documentation only).
+Pre-update backup: `fe/campaign-finance-main-backup-5f63f52` at `5f63f52dd121d3210a0af0ceb7b3303db0a553a6`.
+The earlier backup `fe/campaign-finance-main-backup-0605867` remains available.
 
-## Update and conflict resolutions
+## Integration and scope
 
-The original Finance commit was rebased locally onto the approved updated main. This retains PR #85's unique routing choices, PR #80's Medium graphics defaults and rendering improvements, and PR #87's Guided Mode walking inspections. No branch was merged, pushed or submitted as a PR.
+Rebased the two Finance integration/report commits onto the approved main. The only conflict was the `CampaignUI.tsx` import block: retain `AccountSection, CloudSavesSection` from main together with `FinanceEntry`, the infrastructure/disabled-action helpers and infrastructure descriptions from Finance. Main's Cloud Saves section remains in the Saves tab; Account remains in its own tab.
 
-Two conflicts required manual resolution:
+PR #86's Cloud Saves implementation and PR #88's walking destination marker implementation are unchanged from main. The marker still follows the actual planned path, respects reduced motion, clears when the path ends and does not intercept room raycasts. The diff was reviewed against `065b047`; no teammate implementation was replaced wholesale.
 
-- `CampaignUI.tsx`: retain main's `routeOptions`, `routeName`, serving-app filtering, active styling, `aria-pressed` and no-op when selecting the current route. Add typed Finance decisions without reinstating the old duplicate routing buttons. Keep the engine refusal explanation outside the disabled fieldset, using only routable serving apps. Purchase previews, safeguards and warnings elsewhere remain unchanged from the backup.
-- `e2e/mobile.spec.ts`: keep both the complete newer Medium/Auto graphics test and the 390px Finance purchase-sheet test as separate tests, with their assertions and budgets intact.
+Finance retains the four-section dashboard, collapsed Advanced details, clickable keyboard/touch Cash card, actual/estimated accounting distinction, engine-derived purchase quotes and refusal reasons, warnings, stale-quote review, duplicate-click protection, infrastructure tooltips and closed About Equipment disclosure. Desktop purchase cards stay on the left of the usable scene; mobile sheets remain above navigation. Warnings and Confirm/Cancel remain outside optional scrolling details. Equipment highlights and camera focus remain.
 
-The automatically combined `scene/Facility.tsx` retains main's inspection eligibility, office inspections, camera/walk behavior, outline memoization and shader preparation. Finance adds only its tooltip import and tooltip props. No graphics implementation was replaced.
+The spotlight/shared confirmation observer, Health Checks guidance, chapter Next/completion behavior, routing selection, analytics privacy, menu/account navigation, graphics improvements and walking inspections remain. The purchase, positioning and Finance calculation implementations are unchanged from `5f63f52`.
 
-A focused extension to `CampaignUI.test.tsx` checks that selecting the current route leaves the game unchanged and that a pending route produces the engine reason outside the disabled fieldset with keyboard access. Main's existing tests still cover unique routing choices and omission of reserved spares.
+Scope remains **27 files: 26 frontend files and this report**. Backend, shared contracts, dependency manifests/locks, workflows, deployment settings, main's store/persistence/simulation step, graphics profiles, Account/Modals and Avatar/palette implementations have no diff from updated main. The only simulation-file diff is the previously approved `sim/settlement.ts` helper extraction, unchanged from the validated Finance version. No new formulas, costs, timing, bankruptcy rules, save schemas or replay formats changed.
 
-## Preserved behavior and diff review
+## Focused validation on 065b047
 
-The four-section Finance dashboard, collapsed Advanced details, fully clickable Cash card, actual/estimated accounting distinction, financial warnings, cloned engine previews, stale-quote review, duplicate-click guard, infrastructure explanations, unavailable-action reasons and initially closed About Equipment disclosure remain.
-
-Desktop purchase cards remain on the left of the usable scene, with machine highlighting and camera focus. The same compact mobile sheet remains above navigation. Warnings and Confirm/Cancel stay outside the optional scrolling More details area. The purchase/positioning implementations are unchanged from `0605867`.
-
-The spotlight/shared confirmation observer, Health Checks Tech/unlock/deploy guide, `installPending()` gates, chapter Next/completion behavior, account/menu navigation and analytics privacy remain. Tutorial, persistence, store, analytics, main's simulation step and graphics-profile files have no diff from updated main. Shared component changes were reviewed separately.
-
-Only `sim/settlement.ts` differs within the simulation: it is exactly the previously approved Finance helper extraction from `0605867` and `f34870c`. No new simulation formulas, constants, timing, purchase rules, bankruptcy rules, save schemas or replay formats were introduced. Classic's default Stat behavior remains, with the shared modal focus handling covered by regressions.
-
-The final changed-file scope against `75d486a` is 27 files: 26 frontend files and this report. Compared with the old Finance integration, the extra path is the routing integration regression in `CampaignUI.test.tsx`. Backend, shared contracts, package manifests/locks, workflows, deployment settings and generated outputs have no diff.
-
-## Validation on updated main
-
-All check executables use Node 22.23.3. Existing frontend dependencies were reused because manifests/lockfiles match the previously installed integration version. Backend dependencies were installed separately with `npm ci` in this worktree. No dependency versions were changed.
-
-The initial sandboxed Vitest/build and backend install could not start required subprocesses (`EPERM`); they did not execute tests successfully. They were rerun with approved process access. These startup failures are retained in the logs and are distinct from assertion failures.
+All check executables use Node 22.23.3. Existing separately installed frontend/backend dependencies were reused; no package or lock changes were needed. Per the user's approved efficient-validation scope, the complete local frontend coverage and browser suites were not repeated. No new failure justified broadening local testing.
 
 | Check | Result |
 | --- | --- |
-| Frontend lint, typecheck and production build | Passed |
-| Targeted Finance/routing/refinement/graphics unit checks | 51 passed across 5 files |
-| Complete serial frontend coverage | 1,006 passed, 1 existing optional trace test skipped; no failures (673.09 seconds) |
-| Standalone balance | 25 passed (310.86 seconds) |
+| Frontend lint and typecheck | Passed |
+| Production build | Passed |
+| Targeted frontend tests | 81 passed across 9 files (26.03 seconds) |
 | Backend lint and typecheck | Passed |
-| Complete serial backend coverage | 61 passed across 10 files; no failures (32.80 seconds) |
-| Local migration consistency (`db:generate`) | No schema changes; no migration files generated |
-| Complete desktop/touch browser suite | 104 passed, 1 timeout in 55.2 minutes; 87 desktop and all 17 touch cases passed |
-| Unchanged isolated walking-audio diagnostic, repeated twice | Both passed: 38.6 and 33.6 seconds (1.3 minutes for the command) |
+| Complete backend coverage | 61 passed across 10 files (16.86 seconds) |
+| Migration consistency | No schema changes; no migration files generated |
+| Focused desktop/touch browser journeys | 18 passed (15 desktop, 3 touch) in 6.1 minutes; no failures |
 
-The complete browser run is **not green**. Its only failure was the unchanged `e2e/walk.spec.ts:144` case, ?walking away from the meeting leaves its nearby presentation sound behind?. The existing 180,000ms budget expired; the trace locates it at the initial presentation-audio polling check (`walk.spec.ts:158?159`, before walking away), then page evaluation failed when timeout cleanup closed the browser. The case reported 20.7 minutes elapsed across the user/tool interruption. This timing coincidence is recorded, not proof of cause. The two unchanged isolated passes establish non-reproduction only and do not replace the full-run failure. No assertion, timeout, fixture or gameplay rule was weakened. No additional complete run was performed after the diagnostic; no source change required one.
+Frontend targets: `CampaignFinance.test.tsx`, `CampaignUI.test.tsx`, `CampaignRefinement.test.tsx`, `Account.test.tsx`, `App.test.tsx`, `campaignFinance.test.ts`, `scene/walk.test.ts`, `CampaignTutorial.test.tsx` and `MenuTabs.test.tsx`. These cover purchase safety/revalidation, finance accounting, tutorial observers, routing, Cloud Saves and Account separation in Guided and Challenge modes, menu accessibility and walking paths.
 
-Every purchase layout/highlight journey passed in the complete run: App Server, Database and traffic limiting at desktop/laptop/touch sizes, scaling, load balancing, cache/tuning, autoscaling, Health Checks, spares and failover. The Health Checks Tech-to-deployment guide passed. Finance/spotlight coexistence and focus restoration passed on desktop and touch; so did Cash keyboard/touch and compact-number bounds, chapter guidance/completion/Next, unique routing, account/menu navigation, same-company progression, Classic, save/replay, camera controls, equipment walking inspections and the new Guided Mode Deploy-office inspection. The previously timed-out mobile incident journey passed unchanged in this complete run in 25.4 seconds. Both the newer Medium/Auto graphics test and the Finance purchase-sheet test passed.
+The 18 focused browser journeys all passed. They cover Cloud Saves in the Saves tab (explicit saving, conflict resolution, owner isolation and loading in a fresh browser), purchase camera focus/highlights, App Server/Database/traffic-limit card bounds at 1440x900 and 1366x768 through expansion/resize, all supported later-stage purchases, the Health Checks Tech-to-deployment guide, Finance/spotlight focus restoration, Cash keyboard access and status-card sizing, equipment-directed walking and Space inspection, Guided Mode office walking/inspection, and three touch journeys for Finance/spotlight, reduced-motion finance/help and the 390x844 purchase sheet. The destination-marker implementation remains identical to main and is exercised with the real WebGL room during walking interactions. A fresh Cloud Saves menu screenshot was inspected. No browser assertions or timeouts were changed.
 
-The complete frontend coverage run also includes engine, financial safety, deterministic replay, persistence, chapter/tutorial, menu and analytics/privacy regressions. Its one skipped case is the existing optional trace harness requiring an explicit scenario environment variable. Dependency sourcemap/deprecation and terminal-color warnings were emitted; these are not test passes or failures.
+The user-authorized focused scope passed without new failures, so no additional full local suite was necessary. Full frontend/browser regression validation remains a hosted-CI requirement.
 
-Current evidence:
+Current logs and browser artifacts are ignored under `test-results/publication-065b047/`: `lint.log`, `typecheck.log`, `targeted-unit.log`, `build.log`, `backend-lint.log`, `backend-typecheck.log`, `backend-coverage.log`, `backend-migrations.log`, `browser-focused.log`, `browser-report/`, `browser-artifacts/` and `browser-exit.txt`. The input manifest records hashes for 503 tracked frontend/backend/shared files. Final comparison confirms zero differences across all 503 validation-input hashes; only this report changes after the validated snapshot.
 
-- `test-results/main-update/targeted-unit-approved.log`, `lint.log`, `typecheck.log`, `build-approved.log`.
-- `test-results/main-update/frontend-coverage.log`, `frontend-coverage-exit.txt`, `balance.log`.
-- `test-results/main-update/backend-install-approved.log`, `backend-lint.log`, `backend-typecheck.log`, `backend-coverage.log`, `backend-migrations.log`.
-- Full browser log/report/trace: `test-results/main-update/browser-full.log`, `browser-report/`, `browser-artifacts/`; `browser-exit.txt` records exit 1.
-- Separate unchanged diagnostic: `test-results/main-update/walking-isolated.log`, `walking-diagnostic-report/`, `walking-diagnostic-artifacts/`; `walking-isolated-exit.txt` records exit 0.
+## Previous complete-suite results (prior base 75d486a)
 
-From `frontend/`, open the preserved complete report with `npx playwright show-report ../test-results/main-update/browser-report`. The diagnostic report is separate; it does not overwrite the complete result. The current frontend coverage directory represents the complete updated-main run, not an isolated diagnostic.
+These are historical evidence for `32b8f7b`/`5f63f52`, not complete-suite results on `065b047`:
 
-Fresh default/expanded purchase cards at 1440?900, 1366?768 and 390?844, the resized narrow card, and desktop/touch Finance dashboards were inspected visually. Warnings and Confirm/Cancel remain above controls; optional details scroll within the purchase card. Thirteen current-run screenshots are copied to ignored `test-results/main-update/review-screenshots/`, including:
+- Frontend lint/typecheck/build passed; complete serial frontend coverage: **1,006 passed, one existing optional trace test skipped, no failures**. Balance: **25 passed**.
+- Backend lint/typecheck and complete coverage: **61 passed**; migration consistency found no changes. Backend coverage has also passed again in this update as recorded above.
+- Complete browser suite: **104 passed, one timeout** in 55.2 minutes; 87 desktop and all 17 touch cases passed. The unchanged walking-audio test (`walk.spec.ts:144`) exceeded its existing 180,000ms budget while polling initial meeting-room audio. It reported 20.7 minutes across the user/tool interruption. That timing coincidence is not proof of cause.
+- The same walking-audio test passed unchanged twice in isolation, in **38.6 and 33.6 seconds**. Those diagnostics did not make the complete browser run green. No assertion, timeout, fixture or gameplay rule was weakened.
 
-- [Desktop expanded purchase](../test-results/main-update/review-screenshots/purchase-1440x900-expanded.png)
-- [Laptop expanded purchase](../test-results/main-update/review-screenshots/purchase-1366x768-expanded.png)
-- [Touch expanded purchase](../test-results/main-update/review-screenshots/purchase-390x844-expanded.png)
-- [Desktop Finance](../test-results/main-update/review-screenshots/finance-refinement-desktop.png)
-- [Touch Finance](../test-results/main-update/review-screenshots/finance-refinement-touch.png)
+The previous full report is preserved at `git show fe/campaign-finance-main-backup-5f63f52:docs/CAMPAIGN_FINANCE_MAIN_INTEGRATION.md`. Complete-run and isolated logs/reports remain separate under `test-results/main-update/`.
 
-Current-run logs and reports are under ignored `test-results/main-update/`. The validation-input manifest records hashes for 503 tracked frontend/backend/shared files so the final report commit can be checked against the code exercised by validation. Generated screenshots, builds, reports and dependency directories stay ignored.
+Older `0605867` evidence also remains disclosed: frontend coverage had 1,003 passes, one Combined UI timeout and one optional skip; all five unchanged Combined UI cases then passed in isolation. Browsers had 102 passes and one mobile incident timeout; that case then passed twice unchanged (32.1 and 32.2 seconds). Neither historical complete run became green. The later full frontend run and mobile incident browser case passed on the prior base as recorded in the backup report.
 
-## Historical validation at 0605867
+## Preservation and publication gates
 
-These are historical results on the prior base, not results of this update:
+Only the Finance integration worktree was used for this update. Neither original Finance worktree was modified. The pre-update branch is preserved at the backup reference above. Validation-input hashes and the final diff are checked before publication; generated outputs are excluded from Git.
 
-- Complete final frontend coverage: 1,003 passed, one timeout and one existing optional trace test skipped. The unchanged Combined UI case exceeded its 5,000ms budget. All five tests in that file passed in the isolated coverage diagnostic.
-- Complete browser suite: 102 passed and one timeout, including all 87 desktop cases. The unchanged mobile incident journey timed out waiting for stability at `scrollIntoViewIfNeeded()`. It subsequently passed unchanged twice, in 32.1 and 32.2 seconds.
+Publication is authorized only after a final fetch confirms main is still `065b047`, a clean branch and no blocking conflicts. If main advances again, stop and report; do not automatically rebase again. Hosted `frontend` and `backend` checks, including complete frontend coverage and all browser shards, must pass on the published PR result. The repo workflow also calls for one reviewer approval before merge. No hosted CI success is claimed in this local report.
 
-Neither historical full suite is claimed as green. Isolated reruns establish non-reproduction only; no assertion or timeout was relaxed. The full old report is preserved in the backup commit (`git show fe/campaign-finance-main-backup-0605867:docs/CAMPAIGN_FINANCE_MAIN_INTEGRATION.md`); its original logs/reports remain under this worktree's ignored `test-results/`.
+The complete local browser suite on the new base was intentionally not run; the previous complete run retains its timeout. Safari/Firefox, physical-device testing, real-provider production authentication and human comprehension testing remain unverified. No merge, manual deployment, production configuration change or live migration is authorized.
 
-## Preservation and readiness
-
-Final preservation checks confirm:
-
-- Original `fe/campaign-finance-ux` worktree remains at `806cd3a`: all 17 original file hashes match `test-results/finance-snapshot/manifest.json`, and its original Git status matches `status.txt`.
-- Original refinement worktree remains clean at `f34870c39895a9b5123b8760e52a4dc891d70a65`.
-- Backup branch still points to `0605867ba0ce3deb961c584c4f33ba6ee13b3895`.
-- All 503 tracked frontend/backend/shared validation-input hashes still match. Only this report changes after the validated code commit `32b8f7b`.
-- The final diff against `75d486a` was reviewed; no conflict markers, whitespace errors, unrelated files, generated reports or dependency changes are included.
-
-The local integration is complete and ready for contributor review with a disclosed validation limitation: the complete browser run retains one timeout despite two successful unchanged diagnostics. It is not a fully green browser regression result. Hosted CI on the eventual pushed commit must still pass; no hosted PR/CI outcome is claimed.
-
-Hosted CI, Safari/Firefox, physical devices, real-provider authentication and human comprehension testing are not established by local Chromium/touch emulation. Both existing required CI gates and one reviewer approval remain required before any eventual merge. No push, PR creation, merge, deployment or live database migration was performed.
-
-## Reproduction and preview
-
-From PowerShell, use this integration frontend (not either original Finance worktree):
+## Preview and evidence
 
 ```powershell
 cd C:\Users\user\99.9-Percent-Latest\test-results\campaign-finance-main\frontend
@@ -109,11 +70,9 @@ $env:PATH = "C:\Users\user\AppData\Local\npm-cache\_npx\52027bd8fc0022aa\node_mo
 npm run preview -- --host 127.0.0.1 --port 4188 --strictPort
 ```
 
-Open http://127.0.0.1:4188 and start or continue Guided Mode. Browser saves are isolated by origin/port.
+Open http://127.0.0.1:4188. The focused browser run uses port 4193. From `frontend/`, open its report with `npx playwright show-report ../test-results/publication-065b047/browser-report`. Prior inspected screenshots at 1440x900, 1366x768 and 390x844 remain in ignored `test-results/main-update/review-screenshots/`.
 
-Check commands from `frontend/` are `npm run lint`, `npm run typecheck`, `npm run build`, `npm run test:coverage -- --maxWorkers=1`, `npm run balance` and `npx playwright test` (this run uses `PLAYWRIGHT_PORT=4191`). From `backend/`: `npm ci`, `npm run lint`, `npm run typecheck`, `npm run test:coverage -- --maxWorkers=1` and `npm run db:generate`. The latter only checks/generates local migration files; it does not apply a live migration.
-
-## Proposed PR text (local draft only)
+## PR description
 
 Title: `feat(campaign): simplify Finance and keep purchase controls accessible`
 
@@ -127,8 +86,25 @@ Campaign finances were difficult to discover, and lengthy purchase confirmations
 
 Preserve equipment highlighting, camera focus, the shared tutorial confirmation observer, Health Checks guidance, chapter/menu behavior, latest routing choices, graphics improvements and walking inspections. Retain economic constants, settlement arithmetic, purchase rules and save contracts.
 
-Validation on the rebased code: Node 22 lint/typecheck/build passed; targeted frontend 51 passed; complete frontend coverage 1,006 passed and one existing optional trace case skipped; balance 25 passed. Backend lint/typecheck and all 61 coverage tests passed; migration consistency found no schema changes. Complete desktop/touch browsers: **104 passed, one unchanged walking-audio timeout**, with all 17 touch cases passing. That walking case subsequently passed twice unchanged in isolation (38.6 and 33.6 seconds). The complete browser run remains failed; no assertion or timeout was relaxed.
+Rebased onto `065b047`, retaining PR #86's Cloud Saves in the Saves tab and PR #88's walking destination markers. The only conflict combined main's Cloud Saves import with Finance's imports. Scope is 27 files (26 frontend files and the integration report); no backend contracts, save schemas, dependency versions or deployment settings changed. The settlement helper extracts the previously approved recurring charges without new economic constants or settlement formulas.
 
-Historical validation at `0605867` also had two complete-run timeouts: frontend coverage had 1,003 passes, one Combined UI timeout and one optional skip (all five unchanged Combined UI tests then passed in isolation); browsers had 102 passes and one mobile incident timeout (the unchanged case then passed twice in 32.1 and 32.2 seconds). Those isolated passes did not make either historical full suite green. The current full frontend run and current full-run mobile incident case passed as recorded above.
+### Validation on updated main (`065b047`)
 
-Hosted CI, real-device/Safari/Firefox checks and real-provider production authentication remain unverified. Original Finance worktrees are preserved. This local draft does not authorize a push, PR, merge or deployment.
+Node 22.23.3, against code snapshot `16423f9`; the publication commit adds only the final report:
+
+- Frontend lint, typecheck and production build passed.
+- **81 targeted frontend tests passed** across 9 files: Finance, Campaign UI/refinement/tutorials, Account/Cloud Saves, App/menu behavior, accounting and walking paths.
+- Backend lint/typecheck and **61 complete coverage tests passed**. Migration consistency found no schema changes or generated migrations.
+- **18 focused browser journeys passed** in 6.1 minutes (15 desktop, 3 touch): Finance/Cash keyboard and touch access, spotlight coexistence, purchase quotes/safeguards and left-side panels at 1440x900, 1366x768 and 390x844, later-stage purchases/Health Checks guidance, Cloud Saves navigation/conflict/ownership/load, and equipment-directed walking/inspection.
+
+The complete local frontend coverage, balance and browser suites were intentionally not repeated for this import-only update. Complete frontend coverage, all browser shards and the required `frontend`/`backend` gates remain pending in hosted CI; these focused passes are not a full-suite result.
+
+### Previous complete-suite evidence (base `75d486a`)
+
+- **1,006 frontend tests passed**, one existing optional trace test skipped; **61 backend tests** and **25 balance tests passed**.
+- Complete browsers: **104 passed, one unchanged walking-audio timeout**. All 17 touch cases passed. The 180-second walking-audio test reported 20.7 minutes across a user/tool interruption; the cause is not established.
+- That test subsequently passed twice unchanged in isolation, in **38.6 and 33.6 seconds**. The complete browser suite is **not green**; isolated diagnostics do not erase the failure. No assertion, timeout or gameplay rule was weakened.
+
+Older `0605867` results remain disclosed in the integration report: a Combined UI full-coverage timeout and a mobile-incident full-browser timeout both passed unchanged isolated diagnostics, without turning those full runs green.
+
+Original Finance worktrees and backup references are preserved. Hosted CI, Safari/Firefox, physical-device testing and real-provider production authentication are not established by local checks. The repository workflow calls for one reviewer approval before merging. No merge or production deployment is part of this PR.
