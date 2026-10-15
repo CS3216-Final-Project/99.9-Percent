@@ -6,7 +6,7 @@ import { pendingSpikeAcknowledgement, spikeInput } from "@/sim/autoscaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
 import { canEnterData, databaseUpgrade, pendingStop } from "@/sim/step";
-import { pendingReliability, effectiveTargets, researchBalance } from "@/sim/reliability";
+import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
@@ -176,7 +176,7 @@ export function CampaignPanel() {
         <li><Act label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbUpgrade?`${dbUpgrade.delay} steps · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next Guided Mode stage."} onClick={() => act({ type: "start_db_upgrade" })} /></li>
         <li><Act label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} step`} disabled={disabled || admissionPending} tip="Changes admitted traffic at the next physical step. Rejected requests earn no revenue." onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
       </ul>
-      {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type))} />}
+      {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={installPending(c)} />}
       {unlocked && <section aria-label="Scaling controls" className="scaling-controls">
         <h4 className="step-head">Scale and route</h4>
         <ul className="actions">
@@ -525,7 +525,7 @@ function ReliabilityControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
     <p role="status">{!f?"Prepare, then explicitly start the reliability test.":f.startedStep===null?"Reliability test scheduled. Run to observe it.":f.restoredStep===null?`${appName(f.targetId)} failed. Inspect health, surviving capacity and routing.`:"Application restored. Observe stable service."} Stable after restoration: {c.combinedStage?.currentRound?.stableSteps??d.stableSteps} / {Q.stableSteps}.</p>
     {c.spikeStage?.controller&&f&&!d.acknowledged&&<p className="muted">Autoscaling waits while the reliability test runs; its enabled state and upkeep are preserved.</p>}
     <ul className="actions">
-      <li><Act label="Deploy Health Checks" price={R.checksCostCents/100} note="2 steps" disabled={checksUnavailable} tip="Requires its research unlock and available cash. Detects health changes; load balancing is required for routing exclusion." onClick={()=>act({type:"deploy_health_checks"})} /></li>
+      <li><Act label="Deploy Health Checks" tour="deploy-checks" price={R.checksCostCents/100} note="2 steps" disabled={checksUnavailable} tip="Requires its research unlock and available cash. Detects health changes; load balancing is required for routing exclusion." onClick={()=>act({type:"deploy_health_checks"})} /></li>
       <li><Act label="Install spare" price={R.spareCostCents/100} note="2 steps" disabled={spareUnavailable} tip="Requires Spare Application research, available cash and a free instance slot. A spare receives no traffic until promoted." onClick={()=>act({type:"install_spare"})} /></li>
       <li><Act label="Deploy Automatic Failover" price={R.failoverCostCents/100} note="2 steps" disabled={failoverUnavailable} tip="Requires its research unlock, deployed Health Checks and Load Balancing, a healthy reserved spare and available cash. Creates no capacity." onClick={()=>act({type:"deploy_failover"})} /></li>
       {d.failover&&<li><Act label={d.failover.enabled?"Disable failover":"Enable failover"} price={0} disabled={disabled} onClick={()=>act({type:"set_failover",enabled:!d.failover!.enabled})} /></li>}
