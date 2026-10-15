@@ -1523,7 +1523,15 @@ export default function Facility() {
         ref={(el) => {
           dipEl = el;
         }}
-      />
+      >
+        {landed === null && (
+          <div className="ride-route">
+            <span>{FLOOR_NUMBER[ride.from]}</span>
+            <span className="ride-route-arrow">{FLOOR_Y[ride.to] > FLOOR_Y[ride.from] ? "↑" : "↓"}</span>
+            <span>{FLOOR_NUMBER[ride.to]}</span>
+          </div>
+        )}
+      </div>
       <Labels landed={landed} />
       <HoverTip container={container} />
       <FloorMenu />

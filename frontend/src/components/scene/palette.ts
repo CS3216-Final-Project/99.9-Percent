@@ -91,6 +91,12 @@ export const EQUIPMENT = {
   screen: { code: "#151b26", idle: "#0f121a", dash: "#131a26", chart: "#131a26", off: "#0a0b0f", game: "#0d0f17", idleBar: "#2a2e36", tile: "#1f2430", grid: "#2f343d" },
 } as const;
 
+/** Walk-mode wayfinding: the avatar's ring and the target marking a click-planned destination. */
+export const WALK_MARKER = {
+  primary: "#ffd84a",
+  contrast: "#3a3218",
+} as const;
+
 /** The low-quality look's pixel floors: each a base, a lighter and a darker speck, and its grout or seams. */
 export const PIXEL_FLOORS = {
   concrete: { base: "#9a968d", light: "#a29e95", dark: "#928e86", seam: "#86827a" },

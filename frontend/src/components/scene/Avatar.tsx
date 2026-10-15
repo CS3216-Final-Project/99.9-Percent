@@ -17,6 +17,7 @@ import { loadGltf } from "./gltf";
 import { ROOM, type Footprint } from "./layout";
 import { FLOOR_Y } from "./levels";
 import { blocked, worldOf } from "./navgrid";
+import { WALK_MARKER } from "./palette";
 import { onRide, ride, riding, shownFloor, now } from "./ride";
 import { puffTexture } from "./textures";
 import { avatar, CAR, LOBBY, placeAvatar, stepAvatar, walkTo } from "./walk";
@@ -169,7 +170,7 @@ export function Avatar({ walking }: { walking: boolean }) {
       </group>
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]} raycast={ignoreRay} visible={false}>
         <ringGeometry args={[0.36, 0.46, 40]} />
-        <meshBasicMaterial ref={ringMaterial} color="#ffd84a" transparent opacity={0.7} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial ref={ringMaterial} color={WALK_MARKER.primary} transparent opacity={0.7} depthWrite={false} toneMapped={false} />
       </mesh>
       {puffMaterials.map((m, i) => (
         <sprite
@@ -272,6 +273,50 @@ export function WalkDriver({ walking, footprints, names }: { walking: boolean; f
 }
 
 /**
+ * A target reticle on the floor at the end of the avatar's planned path, breathing while it walks. It reads
+ * `avatar.path` each frame, so it shows where the walk will actually end and is gone the moment the path is.
+ */
+function WalkDestination() {
+  const group = useRef<THREE.Group>(null);
+  const reduceMotion = useMemo(() => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false, []);
+  useFrame(() => {
+    const g = group.current;
+    if (!g) return;
+    const destination = avatar.path[avatar.path.length - 1];
+    g.visible = destination !== undefined;
+    if (!destination) return;
+    g.position.set(destination[0], 0.018, destination[1]);
+    const scale = reduceMotion ? 1 : 1 + Math.sin(now() * 4) * 0.04;
+    g.scale.setScalar(scale);
+  });
+  return (
+    <group ref={group} visible={false}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={ignoreRay}>
+        <circleGeometry args={[0.13, 32]} />
+        <meshBasicMaterial color={WALK_MARKER.primary} transparent opacity={0.3} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={ignoreRay}>
+        <ringGeometry args={[0.27, 0.48, 40]} />
+        <meshBasicMaterial color={WALK_MARKER.contrast} transparent opacity={0.72} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={ignoreRay}>
+        <ringGeometry args={[0.31, 0.44, 40]} />
+        <meshBasicMaterial color={WALK_MARKER.primary} transparent opacity={0.95} depthWrite={false} toneMapped={false} />
+      </mesh>
+      {[0, 1, 2, 3].map((i) => {
+        const a = (i / 4) * Math.PI * 2;
+        return (
+          <mesh key={i} position={[Math.sin(a) * 0.55, 0, Math.cos(a) * 0.55]} rotation={[-Math.PI / 2, 0, a]} raycast={ignoreRay}>
+            <planeGeometry args={[0.1, 0.18]} />
+            <meshBasicMaterial color={WALK_MARKER.primary} transparent opacity={0.95} depthWrite={false} toneMapped={false} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+/**
  * In walk mode, the floor the elevator stands at catches clicks and taps that miss everything else: the avatar walks
  * there, or as near as it can get. Equipment above it still takes its own clicks.
  */
@@ -285,9 +330,12 @@ export function WalkFloor() {
     if (s.game.phase !== "incident") s.select(null);
   };
   return (
-    <mesh position={[ROOM.cx, 0.002, ROOM.cz]} rotation={[-Math.PI / 2, 0, 0]} onClick={onClick}>
-      <planeGeometry args={[ROOM.w, ROOM.d]} />
-      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-    </mesh>
+    <>
+      <mesh position={[ROOM.cx, 0.002, ROOM.cz]} rotation={[-Math.PI / 2, 0, 0]} onClick={onClick}>
+        <planeGeometry args={[ROOM.w, ROOM.d]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      <WalkDestination />
+    </>
   );
 }
