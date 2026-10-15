@@ -3,7 +3,7 @@ import { captureScorecard, emptyServiceMeasurement, observeService } from "./cam
 import { activateReliability, advanceHealth, detect, effectiveTargets, initializeHealth, observeReliability, pendingReliability, recoverySafe, reliabilityAction } from "./reliability";
 import { pendingPreventionReview, observePrevention, recordPreventionInspection } from "./openingPrevention";
 import type { GameState, Action, ActionResult } from "./types";
-import type { Campaign, Snapshot, ComponentSnapshot, Intervention, Routing, ScheduledAction, TraceEvent } from "./campaignTypes";
+import type { AppInstance, Campaign, Snapshot, ComponentSnapshot, Intervention, Routing, ScheduledAction, TraceEvent } from "./campaignTypes";
 import { pendingSpikeAcknowledgement, spikeAction, advanceSpikeTraffic, runAutoscaler, activateRetirement } from "./autoscaling";
 import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
 import { clone } from "./state";
@@ -29,9 +29,13 @@ export function allocateTraffic(demand: number, targets: string[]): Record<strin
     const ordered = [...targets].sort((a, b) => Number(a.split("-")[1]) - Number(b.split("-")[1]));
     return Object.fromEntries(ordered.map((id, i) => [id, Math.floor(demand / ordered.length) + (i < demand % ordered.length ? 1 : 0)]));
 }
+/** Apps the load balancer may send traffic to: installed and serving, so not a reserved spare. */
+export function routableApps(c: Campaign): AppInstance[] {
+    return c.apps.filter(a => a.state === "active" && a.role !== "spare");
+}
 export function routingValid(c: Campaign, r: Routing): boolean {
     return ["single", "balanced"].includes(r.mode) && Array.isArray(r.targets) && r.targets.length > 0 &&
-        new Set(r.targets).size === r.targets.length && r.targets.every(id => c.apps.some(a => a.id === id && a.state === "active" && a.role!=="spare")) &&
+        new Set(r.targets).size === r.targets.length && r.targets.every(id => routableApps(c).some(a => a.id === id)) &&
         (r.mode === "single" ? r.targets.length === 1 && r.targets[0] === "app-1" : c.loadBalancer);
 }
 function recoveredOpening(c: Campaign): boolean {

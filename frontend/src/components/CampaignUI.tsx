@@ -5,7 +5,7 @@ import { canPromote, combinedProfile, currentFault, pendingCombined } from "@/si
 import { pendingSpikeAcknowledgement, spikeInput } from "@/sim/autoscaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
-import { canEnterData, databaseUpgrade, pendingStop } from "@/sim/step";
+import { canEnterData, databaseUpgrade, pendingStop, routableApps } from "@/sim/step";
 import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
@@ -50,6 +50,17 @@ const ACTION_NAMES: Record<Intervention, string> = {
   "deploy-autoscaler":"Autoscaling controller deployment", "retire-app":"Safe application retirement", "health-checks":"Health Checks deployment", "create-spare":"Spare application install", "reserve-spare":"Reserve spare", "release-spare":"Release spare", failover:"Automatic Failover deployment", "promote-spare":"Promote spare", "restore-app":"Restore application", promotion:"Promotion",
 };
 const appName = (id: string) => `App ${id.slice(4)}`;
+const sameTargets = (a: string[], b: string[]) => a.length === b.length && b.every(id => a.includes(id));
+/** Where the load balancer can send traffic: every installed app, or one of them. A reserved spare is not a choice. */
+function routeOptions(c: Campaign) {
+  const apps = routableApps(c).map(a => a.id);
+  const one = apps.map(id => ({ label: `${appName(id)} only`, targets: [id], tip: `Send every request to ${appName(id)}. The other apps stay installed and keep their running costs.` }));
+  return apps.length > 1 ? [{ label: "All apps", targets: apps, tip: "The load balancer spreads requests across every installed app." }, ...one] : one;
+}
+function routeName(c: Campaign) {
+  const t = c.routing.targets, apps = routableApps(c).map(a => a.id);
+  return apps.length > 1 && sameTargets(t, apps) ? "all apps" : t.length === 1 ? `${appName(t[0])} only` : t.map(appName).join(", ");
+}
 function stageName(g: GameState) {
   const c=g.campaign!;
   return c.combinedStage?"Grow the Company":c.reliabilityStage?"Stay Online":c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":c.openingMilestone?.acknowledged?"Scaling & Routing":"Opening";
@@ -183,11 +194,9 @@ export function CampaignPanel() {
           <li><Act label={`Scale up ${appName(selectedApp.id)}`} price={P.appCostCents/100} note={`${P.appDelay} steps`} disabled={disabled||busy||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip="Increases only the selected application's capacity. Database capacity stays unchanged." onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>
           <li><Act label="Deploy load balancing" price={P.lbCostCents/100} note={`${P.lbDelay} steps`} disabled={disabled||busy||c.loadBalancer||c.cashCents<=P.lbCostCents} tip="Installs a load balancer. Traffic changes only after you explicitly configure routing." onClick={()=>act({type:"deploy_load_balancer"})}/></li>
         </ul>
-        <details className="more"><summary>Configure routing · {c.routing.mode}</summary>
-        <fieldset disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Routing · activates next step</legend>
-          <button className="btn btn-small" disabled={c.routing.mode==="balanced"&&c.routing.targets.length===c.apps.length} onClick={()=>act({type:"set_routing",mode:"balanced",targets:c.apps.map(a=>a.id)})}>Balance across installed apps</button>
-          {c.apps.map(a=><button key={a.id} className="btn btn-small" disabled={c.routing.mode==="balanced"&&c.routing.targets.length===1&&c.routing.targets[0]===a.id} onClick={()=>act({type:"set_routing",mode:"balanced",targets:[a.id]})}>Balance to {appName(a.id)} only</button>)}
-          <button className="btn btn-small" disabled={c.routing.mode==="single"} onClick={()=>act({type:"set_routing",mode:"single",targets:["app-1"]})}>Route only to App 1</button>
+        <details className="more"><summary>Configure routing · {routeName(c)}</summary>
+        <fieldset className="route-choice" disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Send traffic to · changes next step</legend>
+          {routeOptions(c).map(o=>{const on=sameTargets(c.routing.targets,o.targets);return <button key={o.label} type="button" className={on?"is-active":""} aria-pressed={on} onClick={()=>{if(!on)act({type:"set_routing",mode:"balanced",targets:o.targets});}} {...tipProps(o.tip)}>{o.label}</button>;})}
         </fieldset>{!c.loadBalancer&&<p role="note">Deploy load balancing before configuring routing.</p>}{c.pending.some(a=>a.type==="routing"||a.type==="retire-app")&&<p role="note">A routing or retirement change is pending; wait for activation.</p>}</details>
         <p className="muted">{c.scaling?.consumed?(c.dataStage?"Scaling growth recorded: 1,400 requests/s before data growth.":"Traffic growth applied: 1,400 requests/s."):c.dbCapacity<P.dbCapacity&&!c.scalingConsent?"Next growth waits for a paid database upgrade to 2,000 ops/s.":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Growth waits until the incident and backlogs clear.":c.scaling?.dueStep?`Growth due at step ${c.scaling.dueStep} while ready.`:"Growth readiness is checked on the next step."}</p>
       </section>}

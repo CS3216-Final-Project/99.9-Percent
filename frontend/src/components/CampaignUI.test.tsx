@@ -4,6 +4,7 @@ import {CampaignPanel} from "./CampaignUI";
 import {CampaignChapters} from "./CampaignChapters";
 import {useGame} from "../game/store";
 import {dataCompany} from "../sim/__tests__/dataFixture";
+import {protectedCombined} from "../sim/__tests__/combinedFixture";
 import {advanceSteps} from "../sim/step";
 import {applyAction,type GameState} from "../sim";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});
@@ -40,4 +41,21 @@ it("labels the last completed profile separately from an immediate contrast",()=
  expect(data.textContent).toContain("Workload: write-heavy");
  expect(data.textContent).toContain(`Workload evidence · step ${g.campaign!.step} · read-heavy`);
  expect(data.textContent).toContain("Reads 80% / writes 20%");
+});
+it("offers each routing choice once and marks the one in use",()=>{
+ show(dataCompany("read-heavy",false));const route=screen.getByRole("group",{name:/Send traffic to/});
+ expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All apps","App 1 only","App 2 only"]);
+ expect(within(route).getByRole("button",{name:"All apps"}).getAttribute("aria-pressed")).toBe("true");
+ expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
+ fireEvent.click(within(route).getByRole("button",{name:"App 2 only"}));
+ expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-2"]});
+});
+it("leaves a reserved spare out of the routing choices, so the apps in use still read as all apps",()=>{
+ const g=protectedCombined();expect(g.campaign!.apps.find(a=>a.id==="app-2")!.role).toBe("spare");
+ show(g);const route=screen.getByRole("group",{name:/Send traffic to/});
+ expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All apps","App 1 only","App 3 only"]);
+ expect(within(route).getByRole("button",{name:"All apps"}).getAttribute("aria-pressed")).toBe("true");
+ expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
+ fireEvent.click(within(route).getByRole("button",{name:"App 3 only"}));
+ expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-3"]});
 });

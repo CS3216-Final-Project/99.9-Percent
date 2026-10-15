@@ -25,8 +25,8 @@ for(const path of ["vertical","horizontal"] as const)test(`scaling continuation:
   await page.getByRole("button",{name:/Deploy load balancing/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await page.getByRole("button",{name:"Run",exact:true}).click();
   await expect.poll(async()=>(await savedGame(page)).campaign!.loadBalancer).toBe(true);await page.getByRole("button",{name:"Pause",exact:true}).click();
   expect((await savedGame(page)).campaign!.routing.mode).toBe("single");
-  await page.getByText("Configure routing · single",{exact:true}).click();
-  await page.getByRole("button",{name:"Balance across installed apps"}).click();
+  await page.getByText("Configure routing · App 1 only",{exact:true}).click();
+  await page.getByRole("button",{name:"All apps",exact:true}).click();
  }else{await page.getByRole("button",{name:/Scale up App 1/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();}
  await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
