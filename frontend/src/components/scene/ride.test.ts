@@ -34,7 +34,7 @@ describe("the elevator's ride", () => {
     expect(shownFloor()).toBe("office");
     expect(viewHeight()).toBeGreaterThan(FLOOR_Y.servers);
     expect(viewHeight()).toBeLessThan(FLOOR_Y.office);
-    vi.advanceTimersByTime(RIDE_SECONDS * 1000);
+    vi.advanceTimersByTime((RIDE_SECONDS * 1000) / 2);
     expect(heard).toEqual(["depart", "arrive"]);
     expect(riding()).toBe(false);
     expect(viewHeight()).toBe(FLOOR_Y.office);

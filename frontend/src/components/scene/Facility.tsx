@@ -364,9 +364,11 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       const moving = riding();
       const f = rideAt(rideClock());
       dipEl.style.opacity = moving ? f.dip.toFixed(3) : "0";
-      // Light from each floor sweeps past the car: up the view going down, down it going up.
       const down = FLOOR_Y[ride.to] < FLOOR_Y[ride.from];
-      dipEl.style.backgroundPosition = `0 ${((down ? f.car : 1 - f.car) * 100).toFixed(1)}%`;
+      const progress = down ? f.car : 1 - f.car;
+      dipEl.style.setProperty("--ride-shift", `${(-18 + progress * 36).toFixed(1)}%`);
+      dipEl.style.setProperty("--ride-glow-y", `${(12 + progress * 76).toFixed(1)}%`);
+      dipEl.style.backgroundPosition = `0 ${(progress * 100).toFixed(1)}%`;
     }
     // Keep the view over the building while panning.
     const t = c.target;
@@ -1523,15 +1525,7 @@ export default function Facility() {
         ref={(el) => {
           dipEl = el;
         }}
-      >
-        {landed === null && (
-          <div className="ride-route">
-            <span>{FLOOR_NUMBER[ride.from]}</span>
-            <span className="ride-route-arrow">{FLOOR_Y[ride.to] > FLOOR_Y[ride.from] ? "↑" : "↓"}</span>
-            <span>{FLOOR_NUMBER[ride.to]}</span>
-          </div>
-        )}
-      </div>
+      />
       <Labels landed={landed} />
       <HoverTip container={container} />
       <FloorMenu />
