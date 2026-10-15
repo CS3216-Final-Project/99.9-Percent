@@ -17,11 +17,11 @@ export const FLOOR_Y: Record<Floor, number> = { office: 0, servers: -STOREY };
 export const FLOOR_NUMBER: Record<Floor, number> = { office: 7, servers: 6 };
 
 /** Seconds from pressing a floor to arriving there. A second press, any click or a key skips the rest. */
-export const RIDE_SECONDS = 3;
+export const RIDE_SECONDS = 5;
 /** Seconds the doors take to open or close, and how long they stand open after the car arrives. */
 export const DOORS = { move: 0.4, hold: 2.4 };
 /** How dark the view goes as the car passes between the floors, and over what share of the ride either side of halfway. */
-export const DIP = { most: 0.9, half: 0.4 };
+export const DIP = { most: 0.76, half: 0.42 };
 
 const smooth = (t: number) => {
   const c = Math.min(1, Math.max(0, t));
