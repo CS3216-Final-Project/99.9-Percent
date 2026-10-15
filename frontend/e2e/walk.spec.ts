@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
-import { test, expect, expectRoom, seedClassicSave, unlockChallenge } from "./fixtures";
-import { advanceTurn, newLegacyGame } from "../src/sim";
+import { test, expect, expectRoom, seedClassicSave, seedSave, unlockChallenge } from "./fixtures";
+import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 
 test.beforeEach(async ({ page }) => {
   await unlockChallenge(page);
@@ -114,6 +114,31 @@ test("in walk mode, clicking equipment walks the avatar to it, and Space then in
   await page.getByRole("complementary", { name: "Details" }).getByRole("button", { name: "Close" }).click();
   await prompt(page).click();
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Guided Mode: the avatar inspects the Deploy office and the panel reports company operations", async ({ page }) => {
+  test.slow();
+  await page.route("**/api/**", (r) => r.abort());
+  await page.addInitScript(() => localStorage.setItem("nn.mode.v1", "campaign"));
+  await seedSave(page, newGame(7, "walk-office"));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expectRoom(page);
+  const metrics = page.getByRole("complementary", { name: "System metrics" });
+  await walk(page).click();
+  await expect(prompt(page)).toContainText("Ride up to the office floor");
+  await page.keyboard.press("Space");
+  await expect(prompt(page)).toContainText("Ride down to the server floor", { timeout: 20_000 });
+  // The office's labels are visible in Guided Mode; clicking one walks the avatar over.
+  await label(page, "Deploy").click();
+  await expect(prompt(page)).toContainText("Inspect Deploy", { timeout: 40_000 });
+  await expect(metrics).toContainText("Deploy · Company operations");
+  // Deselect through the canvas' own empty-space click, then let Space do the inspection.
+  await page.getByRole("main").locator("canvas").click({ position: { x: 8, y: 8 } });
+  await expect(metrics).not.toContainText("Company operations");
+  await page.keyboard.press("Space");
+  await expect(metrics).toContainText("Infrastructure changes activate after their listed delay.");
+  await expect(metrics).toContainText("Deploy · Company operations");
 });
 
 test("walking away from the meeting leaves its nearby presentation sound behind", async ({ page }) => {

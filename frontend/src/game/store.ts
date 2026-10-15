@@ -1137,16 +1137,37 @@ useGame.subscribe((s, prev) => {
   if (prev.started && !s.started && s.walking) s.setWalking(false, false);
 });
 
+/** Equipment whose inspection records component evidence in Guided Mode. */
+const CAMPAIGN_EVIDENCE: EquipmentId[] = ["app", "db", "monitoring", "gateway"];
+/** Office equipment a campaign game lets the player look at without logging a component inspection. */
+const CAMPAIGN_OFFICE: EquipmentId[] = ["team", "deploy", "growth"];
+
+/** Whether this run answers an inspection of `id`: everything in Challenge Mode, only evidence and office rooms in Guided Mode. */
+export function canInspectEquipment(game: GameState, id: EquipmentId): boolean {
+  if (!game.campaign) return true;
+  return CAMPAIGN_EVIDENCE.includes(id) || CAMPAIGN_OFFICE.includes(id) || (id === "cache" && !!game.campaign.dataStage);
+}
+
+/** Whether inspecting `id` in this campaign is a measured component inspection rather than a room inspection. */
+function isCampaignEvidence(game: GameState, id: EquipmentId): boolean {
+  return !!game.campaign && (CAMPAIGN_EVIDENCE.includes(id) || (id === "cache" && !!game.campaign.dataStage));
+}
+
 /**
  * Clicking or tapping a piece of equipment. Normally it opens the inspector;
  * during an incident it also sends the team to investigate that equipment.
  */
 export function inspectOrSelect(id: EquipmentId, appId?: string): void {
   const { game, select, act } = useGame.getState();
-  if(game.campaign && !["app","db","monitoring","gateway",...(game.campaign?.dataStage?["cache"]:[])].includes(id))return;
+  if (!canInspectEquipment(game, id)) return;
   select(id);
   if (appId) useGame.getState().selectApp(appId);
-  if(game.campaign) { if(["app","db","monitoring","gateway",...(game.campaign?.dataStage?["cache"]:[])].includes(id))act({type:"incident_inspect",equipment:id,...(id==="app"?{appId:useGame.getState().selectedAppId??"app-1"}:{})}); return; }
+  if (game.campaign) {
+    if (isCampaignEvidence(game, id)) {
+      act({ type: "incident_inspect", equipment: id, ...(id === "app" ? { appId: useGame.getState().selectedAppId ?? "app-1" } : {}) });
+    }
+    return;
+  }
   const inc = game.incident;
   if (game.phase !== "incident" || !inc || inc.status !== "active") return;
   if (!inspectable(game).includes(id)) return;

@@ -45,6 +45,12 @@ const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency
 const percent = (v: number | null) => v === null ? "No completed requests" : (v * 100).toFixed(2) + "%";
 const PLACES = ["gateway", "app", "cache", "db", "monitoring"] as const;
 const PLACE_NAMES = { gateway: "Network", app: "App Server", db: "Database", monitoring: "Monitoring", cache: "Read Cache" };
+/** Inspecting the office rooms reports how the company works; they are room inspections, not measured components. */
+const OFFICE_EVIDENCE = {
+  team: { name: "Team", text: "Engineers operate the infrastructure and carry out scheduled changes." },
+  deploy: { name: "Deploy", text: "Infrastructure changes activate after their listed delay." },
+  growth: { name: "Growth", text: "Growth stages increase demand on the system." },
+} as const;
 const ACTION_NAMES: Record<Intervention, string> = {
   "add-app": "Add server", "upgrade-db": "Database upgrade", limit: "Traffic limit", unlimit: "Remove traffic limit", "scale-up":"Application scale up", "deploy-lb":"Load balancer deployment", routing:"Routing change", cache:"Read Cache deployment", "cache-tuning":"Cache tuning",
   "deploy-autoscaler":"Autoscaling controller deployment", "retire-app":"Safe application retirement", "health-checks":"Health Checks deployment", "create-spare":"Spare application install", "reserve-spare":"Reserve spare", "release-spare":"Release spare", failover:"Automatic Failover deployment", "promote-spare":"Promote spare", "restore-app":"Restore application", promotion:"Promotion",
@@ -144,6 +150,7 @@ export function CampaignPanel() {
   const disabled = pendingStop(c) !== null || !!(c.openingMilestone && !c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
   const admissionPending = c.pending.some(a => a.type === "limit" || a.type === "unlimit");
   const place = PLACES.find(id => id === selected && (id!=="cache"||c.dataStage));
+  const office = selected === "team" || selected === "deploy" || selected === "growth" ? selected : null;
   const component = place === "app" ? m.app : place === "db" ? m.db : null;
   return <aside className="side campaign-panel" aria-label="System metrics">
     <section className={`panel-section${incident ? " incident" : ""}`} aria-label={incident ? "Incident" : "System overview"}>
@@ -174,6 +181,9 @@ export function CampaignPanel() {
         </button>)}</div>
         {place && <div className="campaign-evidence" role="status"><Callout compact tone="info" icon={EQUIPMENT_ICON[place]} kicker={`${PLACE_NAMES[place]} · step ${m.step}`}>
           {component ? <>Demand {num(component.demand)}/s · capacity {num(component.capacity)}/s · backlog {num(component.backlog)}.</> : place === "cache" ? <>Cache {c.readCache?"deployed":"not deployed"} · effective rate used {m.data?`${m.data.effectiveHitRateUsed/100}%`:"not yet observed"} · hits {m.data?.hits??"not yet observed"}. Misses and writes reach the database.</> : place === "gateway" ? <>Incoming {num(m.incoming)}/s · admitted {num(m.admitted)}/s · rejected {num(m.rejected)}/s.</> : <>Latency {m.latencyMs.toFixed(0)} ms · errors {percent(m.serviceErrorRate)} · backlog {num(m.app.backlog + m.db.backlog)}.</>}
+        </Callout></div>}
+        {office && <div className="campaign-evidence" role="status"><Callout compact tone="info" icon={EQUIPMENT_ICON[office]} kicker={`${OFFICE_EVIDENCE[office].name} · Company operations`}>
+          {OFFICE_EVIDENCE[office].text}
         </Callout></div>}
         {unlocked && <details className="more" open={selected==="app"}><summary>Application instances · {c.routing.mode} routing</summary>
           <section aria-label="Application instances"><p className="muted">Load balancer: {c.loadBalancer?"Deployed":"Not deployed"}. Receiving new traffic: {recipients.map(appName).join(", ") || "None"}.</p>
