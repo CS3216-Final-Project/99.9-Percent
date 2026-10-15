@@ -32,14 +32,16 @@ test('saves to the cloud only when asked, resolves conflicts, keeps owners apart
   await dialog.getByRole('button',{name:'Close'}).click();
   await page.getByRole('button',{name:'Continue company',exact:true}).click();await expectRoom(page);
   await advanceCampaignStep(page);await page.getByRole('button',{name:'Menu',exact:true}).click();
-  await page.getByRole('tab',{name:'Account'}).click();
-  const account=page.getByRole('region',{name:'Account and cloud saves'});
+  await page.getByRole('tab',{name:'Saves'}).click();
+  const saves=page.getByRole('region',{name:'Cloud saves'});
   // Another browser has saved revision 2 since this tab saved revision 1.
-  cloud={...cloud!,revision:2};await account.getByRole('button',{name:'Save to cloud',exact:true}).click();
-  await expect(account.getByText('The cloud has a different version of this save. Both are kept: choose which to continue.',{exact:true})).toBeVisible();
-  await account.getByRole('button',{name:'Keep this browser’s version',exact:true}).click();await expect(account.getByText('Saved to the cloud.',{exact:true})).toBeVisible();
+  cloud={...cloud!,revision:2};await saves.getByRole('button',{name:'Save to cloud',exact:true}).click();
+  await expect(saves.getByText('The cloud has a different version of this save. Both are kept: choose which to continue.',{exact:true})).toBeVisible();
+  await saves.getByRole('button',{name:'Keep this browser’s version',exact:true}).click();await expect(saves.getByText('Saved to the cloud.',{exact:true})).toBeVisible();
   expect(cloud!.revision).toBe(3);expect(cloud!.envelope.step).toBe(1);
-  await page.screenshot({path:'test-results/phase3-account-menu.png'});
+  await page.screenshot({path:'test-results/phase3-saves-menu.png'});
+  await page.getByRole('tab',{name:'Account'}).click();
+  const account=page.getByRole('region',{name:'Account'});
   await account.getByRole('button',{name:'Sign out',exact:true}).click();await expect(account.getByRole('link',{name:'Continue with Google'})).toBeVisible();
   session={account:{id:'owner-b',displayName:'Player B'},csrfToken:'csrf-b'};await page.reload();
   await page.getByRole('button',{name:/Player B/}).click();dialog=page.getByRole('dialog',{name:'Account'});

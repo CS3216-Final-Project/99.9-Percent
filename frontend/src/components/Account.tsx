@@ -83,20 +83,36 @@ export function AccountButton() {
   </>;
 }
 
-/** Menu, Saves: the same account content, inline in the menu's own dialog. */
+/** Menu, Account: sign-in or profile controls; save management lives in Saves. */
 export function AccountSection() {
   useAccountRestore();
-  return <section className="menu-section menu-account" aria-label="Account and cloud saves">
-    <h4><Icon name="cloud" size={20} />Account and cloud saves</h4>
-    <AccountContent nested />
+  const session = useGame((s) => s.accountSession);
+  return <section className="menu-section menu-account" aria-label="Account">
+    <h4><Icon name="user" size={20} />Account</h4>
+    {session ? <AccountProfile /> : <SignIn Heading="h5" />}
   </section>;
 }
 
-/** `nested` content sits under the menu's own section heading, so its headings drop a level. */
-function AccountContent({ onLoaded, nested = false }: { onLoaded?: () => void; nested?: boolean }) {
+/** Menu, Saves: cloud save management belongs beside the browser save files. */
+export function CloudSavesSection({ onOpenAccount }: { onOpenAccount: () => void }) {
+  useAccountRestore();
   const session = useGame((s) => s.accountSession);
-  const Heading = nested ? "h5" : "h3";
-  return session ? <SignedIn onLoaded={onLoaded} Heading={Heading} /> : <SignIn Heading={Heading} />;
+  const status = useGame((s) => s.accountStatus);
+  const checking = status === "unchecked" || status === "checking";
+  return <section className="menu-section menu-account" aria-label="Cloud saves">
+    <h4><Icon name="cloud" size={20} />Cloud saves</h4>
+    {session
+      ? <CloudSaves Heading="h5" />
+      : <div className="account-signin">
+          <p className="account-lede" role="status">{checking ? "Checking your account…" : "Sign in from Account to save your Guided Mode company to the cloud and continue it on another device. Progress still saves in this browser."}</p>
+          {!checking && <button type="button" className="btn" onClick={onOpenAccount}><Icon name="user" size={20} />Go to Account</button>}
+        </div>}
+  </section>;
+}
+
+function AccountContent({ onLoaded }: { onLoaded?: () => void }) {
+  const session = useGame((s) => s.accountSession);
+  return session ? <SignedIn onLoaded={onLoaded} Heading="h3" /> : <SignIn Heading="h3" />;
 }
 type HeadingTag = "h3" | "h5";
 
@@ -200,19 +216,23 @@ function GoogleMark() {
 /* ------------------------------------------------------------------ */
 
 function SignedIn({ onLoaded, Heading }: { onLoaded?: () => void; Heading: HeadingTag }) {
+  return <div className="account-signed-in">
+    <AccountProfile />
+    <CloudSaves onLoaded={onLoaded} Heading={Heading} />
+  </div>;
+}
+
+function AccountProfile() {
   const session = useGame((s) => s.accountSession)!;
   const busy = useGame((s) => s.cloudBusy);
   const signOut = useGame((s) => s.signOut);
-  return <div className="account-signed-in">
-    <div className="account-profile">
-      <span className="account-avatar account-avatar-big" aria-hidden="true">{initials(session.account.displayName)}</span>
-      <div className="account-profile-text">
-        <strong>{session.account.displayName}</strong>
-        <span>Signed in</span>
-      </div>
-      <button type="button" className="btn btn-small" disabled={busy} onClick={() => void signOut()}><Icon name="logout" size={20} />Sign out</button>
+  return <div className="account-profile">
+    <span className="account-avatar account-avatar-big" aria-hidden="true">{initials(session.account.displayName)}</span>
+    <div className="account-profile-text">
+      <strong>{session.account.displayName}</strong>
+      <span>Signed in</span>
     </div>
-    <CloudSaves onLoaded={onLoaded} Heading={Heading} />
+    <button type="button" className="btn btn-small" disabled={busy} onClick={() => void signOut()}><Icon name="logout" size={20} />Sign out</button>
   </div>;
 }
 

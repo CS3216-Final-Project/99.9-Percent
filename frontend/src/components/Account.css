@@ -1,4 +1,4 @@
-/* Account: a chip on the home screen, and the same content in its dialog and in Menu, Saves. */
+/* Account: a chip on the home screen and its dialog; in the menu, sign-in/profile in Account and cloud saves in Saves. */
 .account-chip {
   display: inline-flex;
   align-items: center;
@@ -336,7 +336,7 @@
   margin: 8px 0;
 }
 
-/* Menu, Saves: the menu's own type sizes apply to the same content. */
+/* Menu, Account and Saves: the menu's own type sizes apply to the same content. */
 .modal-menu .account-form .field,
 .modal-menu .account-lede,
 .modal-menu .account-status,

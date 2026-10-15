@@ -12,7 +12,7 @@ import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliabi
 import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
 import { campaignChapters, finishedChapter } from "@/game/campaignChapters";
 import TechTree from "./TechTree";
-import { AccountSection } from "./Account";
+import { AccountSection, CloudSavesSection } from "./Account";
 import { HomeScreen } from "./HomeScreen";
 import { CampaignChapters } from "./CampaignChapters";
 import { isChapterEntry } from "@/game/campaignChapters";
@@ -353,7 +353,8 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
       {tab === "sound" && <SoundSettings />}
       {tab === "graphics" && <GraphicsSettings />}
       {tab === "avatar" && <AvatarSettings />}
-      {tab === "saves" && <div className="menu-columns">
+      {tab === "saves" && <>
+        <div className="menu-columns">
         <div className="menu-col"><SaveFiles /></div>
         <div className="menu-col">
           <section className="menu-section menu-danger" aria-label="Start over"><h4><Icon name="refresh" size={20} />Start over</h4>
@@ -361,7 +362,9 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
             {confirmReset && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces only the current Guided Mode save. Export it first if you want to keep it. Press the red button again to confirm.</Callout>}
           </section>
         </div>
-      </div>}
+        </div>
+        <CloudSavesSection onOpenAccount={() => goTo("account")} />
+      </>}
       {tab === "account" && <AccountSection />}
       {tab === "playtest" && <><AnalyticsSettings /><section className="menu-section" aria-label="Playtest records"><h4><Icon name="analytics" size={20} />Playtest records</h4>
         <FeedbackButton inline />

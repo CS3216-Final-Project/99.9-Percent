@@ -6,7 +6,7 @@ import { makeEnvelope } from "@/game/saveEnvelope";
 import { DEFAULT_META, saveMeta } from "@/game/persist";
 import { useGame } from "@/game/store";
 import * as api from "@/lib/api";
-import { AccountButton, AccountSection } from "./Account";
+import { AccountButton, AccountSection, CloudSavesSection } from "./Account";
 
 vi.mock("@/lib/api", async (original) => ({
   ...(await original<typeof import("@/lib/api")>()),
@@ -139,7 +139,7 @@ it("lists cloud saves once signed in, loads one and closes, and signs out", asyn
 it("does not claim the account is empty when its cloud saves cannot be listed", async () => {
   vi.mocked(api.getSession).mockResolvedValue(ada);
   vi.mocked(api.listRuns).mockRejectedValueOnce(TypeError("Failed to fetch"));
-  render(<StrictMode><AccountSection /></StrictMode>);
+  render(<StrictMode><CloudSavesSection onOpenAccount={() => {}} /></StrictMode>);
   expect(await screen.findByText(/could not be listed/)).toBeTruthy();
   expect(screen.queryByText("No cloud saves yet.")).toBeNull();
   expect(screen.getByText("Cloud saves are unavailable right now. Your local save is unchanged.")).toBeTruthy();
@@ -152,7 +152,25 @@ it("explains in Menu, Saves that Challenge Mode progress stays in this browser",
   vi.mocked(api.getSession).mockResolvedValue(ada);
   saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
   useGame.getState().switchMode("classic");
-  render(<StrictMode><AccountSection /></StrictMode>);
+  render(<StrictMode><CloudSavesSection onOpenAccount={() => {}} /></StrictMode>);
   expect(await screen.findByText("Cloud saves are for Guided Mode. Challenge Mode progress stays in this browser.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Save to cloud" })).toBeNull();
+});
+
+it("keeps Menu, Account to the profile: no save or cloud controls once signed in", async () => {
+  vi.mocked(api.getSession).mockResolvedValue(ada);
+  render(<StrictMode><AccountSection /></StrictMode>);
+  expect(await screen.findByText("Ada Lovelace")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Save to cloud" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
+});
+
+it("points a signed-out player from Menu, Saves to the Account tab", async () => {
+  const openAccount = vi.fn();
+  render(<StrictMode><CloudSavesSection onOpenAccount={openAccount} /></StrictMode>);
+  const go = await screen.findByRole("button", { name: "Go to Account" });
+  expect(screen.getByText(/Sign in from Account/)).toBeTruthy();
+  fireEvent.click(go);
+  expect(openAccount).toHaveBeenCalledTimes(1);
 });
