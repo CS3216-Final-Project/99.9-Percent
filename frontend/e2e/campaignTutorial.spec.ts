@@ -16,10 +16,12 @@ test("a first company's walkthrough points at the room and panel, finishes its s
   await expect(card.getByRole("button", { name: "Next" })).toHaveCount(0);
   await page.screenshot({ path: "test-results/campaign-tutorial-system.png" });
 
-  // The interactive steps move on once the player clicks what is lit up in the room.
+  // The interactive steps move on once the player clicks what is lit up in the room; each opens its diagnostic card.
   await room.getByRole("button", { name: "Servers", exact: true }).click();
+  await page.getByRole("dialog", { name: "Servers inspected" }).getByRole("button", { name: "Return to room" }).click();
   await expect(card).toHaveAccessibleName("Tutorial, step 2 of 8");
   await room.getByRole("button", { name: "Database", exact: true }).click();
+  await page.getByRole("dialog", { name: "Database inspected" }).getByRole("button", { name: "Return to room" }).click();
   await expect(card).toHaveAccessibleName("Tutorial, step 3 of 8");
   await expect(card).toContainText("The Database is doing 300 of the 600 operations a second it can.");
   await page.screenshot({ path: "test-results/campaign-tutorial-evidence.png" });
@@ -76,7 +78,9 @@ test("a walkthrough left after running the clock carries on from the same step a
   const card = tutorial(page);
   const room = page.getByRole("main");
   await room.getByRole("button", { name: "Servers", exact: true }).click();
+  await page.getByRole("dialog", { name: "Servers inspected" }).getByRole("button", { name: "Return to room" }).click();
   await room.getByRole("button", { name: "Database", exact: true }).click();
+  await page.getByRole("dialog", { name: "Database inspected" }).getByRole("button", { name: "Return to room" }).click();
   for (let i = 0; i < 3; i++) await card.getByRole("button", { name: "Next", exact: true }).click();
   await expect(card).toHaveAccessibleName("Tutorial, step 6 of 8");
 

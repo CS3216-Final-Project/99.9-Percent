@@ -25,6 +25,9 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   await expect.poll(() => crew.size).toBe(14);
   await expect(page.getByRole('dialog', { name: /Tutorial, step 1/ })).toBeVisible();
   await page.getByRole('button', { name: 'Servers', exact: true }).click();
+  const reveal = page.getByRole('dialog', { name: 'Servers inspected' });
+  await expect(reveal).toBeVisible();
+  await reveal.getByRole('button', { name: 'Return to room' }).click();
   await page.getByRole('button', { name: /Add server/ }).click();
   await expect(page.getByRole('dialog', { name: /Tutorial, step 2/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tech', exact: true }).click();
@@ -38,6 +41,9 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   await page.getByRole('button', { name: /^Start/ }).click();
   await expect(page.getByRole('dialog', { name: /Tutorial, step 3/ })).toBeVisible();
   await page.getByRole('button', { name: 'Growth', exact: true }).click();
+  const growthReveal = page.getByRole('dialog', { name: 'Growth inspected' });
+  await expect(growthReveal).toBeVisible();
+  await growthReveal.getByRole('button', { name: 'Return to room' }).click();
   await page.getByRole('button', { name: /^Launch/ }).first().click();
   await expect(page.getByRole('dialog', { name: /Tutorial, step 4/ })).toBeVisible();
   await page.getByRole('button', { name: 'Next week', exact: true }).click();

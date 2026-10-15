@@ -96,6 +96,9 @@ test("walks the building as an avatar: the elevator by Space, Walk keeping out o
 
 test("in walk mode, clicking equipment walks the avatar to it, and Space then inspects it", async ({ page }) => {
   test.slow();
+  // The scan cue's first readout chirp is a fixed 1244 Hz square wave, heard through the real audio.
+  const SCAN_CHIRP = 1244;
+  const audio = await trackEffectFrequencies(page);
   await open(page);
   await walk(page).click();
   await expect(prompt(page)).toContainText("Ride up");
@@ -103,17 +106,28 @@ test("in walk mode, clicking equipment walks the avatar to it, and Space then in
   await label(page, "Monitoring").click();
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "true");
   await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 40_000 });
+  // An inspection started in the room opens the diagnostic card, with its scan, over the inspector.
+  const reveal = page.getByRole("dialog", { name: "Monitoring inspected" });
+  await expect(reveal).toBeVisible();
+  await expect(reveal.locator(".inspection-status")).toContainText("Healthy");
+  await expect(reveal).toContainText("dashboards");
+  await expect.poll(async () => near(await audio.frequencies(), SCAN_CHIRP)).toBe(true);
+  await reveal.getByRole("button", { name: "Return to room" }).click();
+  await expect(reveal).not.toBeVisible();
   // Close the inspector, then Space opens it again from where the avatar stands: a nearby
   // prompt wins even while a room control like Zoom in still holds the page's focus.
   await page.getByRole("complementary", { name: "Details" }).getByRole("button", { name: "Close" }).click();
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("button", { name: "Zoom in", exact: true }).focus();
   await page.keyboard.press("Space");
+  await expect(reveal).toBeVisible();
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "true");
+  await reveal.getByRole("button", { name: "Return to room" }).click();
   // The prompt is a button too, for a phone with no Space key.
   await page.getByRole("complementary", { name: "Details" }).getByRole("button", { name: "Close" }).click();
   await prompt(page).click();
-  await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "true");
+  await expect(reveal).toBeVisible();
+  await reveal.getByRole("button", { name: "Return to room" }).click();
 });
 
 test("Guided Mode: the avatar inspects the Deploy office and the panel reports company operations", async ({ page }) => {
@@ -132,13 +146,18 @@ test("Guided Mode: the avatar inspects the Deploy office and the panel reports c
   // The office's labels are visible in Guided Mode; clicking one walks the avatar over.
   await label(page, "Deploy").click();
   await expect(prompt(page)).toContainText("Inspect Deploy", { timeout: 40_000 });
+  const deployReveal = page.getByRole("dialog", { name: "Deploy inspected" });
+  await expect(deployReveal).toBeVisible();
   await expect(metrics).toContainText("Deploy · Company operations");
+  await deployReveal.getByRole("button", { name: "Return to room" }).click();
   // Deselect through the canvas' own empty-space click, then let Space do the inspection.
   await page.getByRole("main").locator("canvas").click({ position: { x: 8, y: 8 } });
   await expect(metrics).not.toContainText("Company operations");
   await page.keyboard.press("Space");
+  await expect(deployReveal).toBeVisible();
   await expect(metrics).toContainText("Infrastructure changes activate after their listed delay.");
   await expect(metrics).toContainText("Deploy · Company operations");
+  await deployReveal.getByRole("button", { name: "Return to room" }).click();
 });
 
 test("walking away from the meeting leaves its nearby presentation sound behind", async ({ page }) => {
@@ -162,6 +181,9 @@ test("walking away from the meeting leaves its nearby presentation sound behind"
   // timed key presses travel far enough on every renderer. Its arrival prompt proves the avatar
   // is on the open floor, well beyond the presentation's 11 m reach.
   await label(page, "Growth").click();
+  const growthReveal = page.getByRole("dialog", { name: "Growth inspected" });
+  await expect(growthReveal).toBeVisible();
+  await growthReveal.getByRole("button", { name: "Return to room" }).click();
   await expect(prompt(page)).toContainText("Inspect Growth", { timeout: 40_000 });
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
@@ -202,6 +224,9 @@ test("restores the mode, floor, walk position and camera view after a reload", a
   await expect(prompt(page)).toContainText("Ride up");
   // Send the avatar to the monitoring room, so its spot is worth remembering.
   await label(page, "Monitoring").click();
+  const restoreReveal = page.getByRole("dialog", { name: "Monitoring inspected" });
+  await expect(restoreReveal).toBeVisible();
+  await restoreReveal.getByRole("button", { name: "Return to room" }).click();
   await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 40_000 });
   await page.getByRole("complementary", { name: "Details" }).getByRole("button", { name: "Close" }).click();
   await expect.poll(async () => (await exploration(page))?.avatar?.floor).toBe("servers");

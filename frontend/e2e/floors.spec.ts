@@ -36,9 +36,12 @@ test("rides between the floors by the floor menu and the keyboard, each floor wi
   await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
   await expect(label(page, "Growth")).toBeVisible();
   await expect(label(page, "Database")).toHaveCount(0);
-  // The office's equipment is clicked in the room as before.
+  // The office's equipment is clicked in the room as before, opening its inspection card.
   await label(page, "Growth").click();
   await expect(label(page, "Growth")).toHaveAttribute("aria-pressed", "true");
+  const reveal = page.getByRole("dialog", { name: "Growth inspected" });
+  await expect(reveal).toBeVisible();
+  await reveal.getByRole("button", { name: "Return to room" }).click();
 
   await page.keyboard.press("PageDown");
   await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");

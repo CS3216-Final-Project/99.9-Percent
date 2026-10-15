@@ -3292,6 +3292,132 @@ button:disabled {
   margin-top: 18px;
 }
 
+/* The room inspection's diagnostic card: a scanner disc beside the reading, one sweep as it opens. */
+.inspection-reveal {
+  width: min(460px, 100%);
+}
+
+.inspection-reveal.modal {
+  animation: inspection-pop 0.28s ease-out;
+}
+
+@keyframes inspection-pop {
+  from {
+    transform: translateY(14px) scale(0.96);
+    opacity: 0;
+  }
+}
+
+.inspection-scan-layout {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.inspection-scanner {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, var(--night-3), var(--night) 72%);
+  color: var(--go);
+  box-shadow: var(--press);
+  overflow: hidden;
+}
+
+.inspection-scanner > .icon {
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 2px 0 rgb(0 0 0 / 0.45));
+}
+
+.inspection-scanner-rings,
+.inspection-scanner-rings::before {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid var(--night-line);
+  content: "";
+}
+
+.inspection-scanner-rings {
+  inset: 10px;
+}
+
+.inspection-scanner-rings::before {
+  inset: 16px;
+  border-style: dashed;
+  border-color: var(--night-4);
+}
+
+.inspection-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from -40deg, transparent 0 70%, rgb(255 216 74 / 0.55) 88%, var(--go) 96%, transparent 100%);
+  animation: inspection-sweep 0.9s ease-out 0.1s forwards;
+}
+
+@keyframes inspection-sweep {
+  from {
+    transform: rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.inspection-reading > p {
+  margin: 0 0 8px;
+}
+
+.inspection-reading > p:last-child {
+  margin-bottom: 0;
+}
+
+.inspection-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.inspection-instance {
+  padding: 1px 8px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--go);
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 540px) {
+  .inspection-scan-layout {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .inspection-status {
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inspection-reveal.modal {
+    animation: none;
+  }
+
+  .inspection-sweep {
+    display: none;
+  }
+}
+
 /* Menu: the run at a glance beside a tall Resume in one overview row, then the section tabs. */
 .menu-overview {
   display: grid;
