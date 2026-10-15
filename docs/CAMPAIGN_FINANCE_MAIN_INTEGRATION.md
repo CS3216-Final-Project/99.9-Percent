@@ -3,9 +3,33 @@
 Branch: `fe/campaign-finance-main`.
 Worktree: `C:/Users/user/99.9-Percent-Latest/test-results/campaign-finance-main`.
 Approved base: `275081388a51d0832c05fd9b45848b461ce10b94`.
-Validated code snapshot: `4c89bcf` (the final report commit changes documentation only).
+Initial publication code snapshot: `4c89bcf`, published with its report as `b6eb5e3`. The mobile CI correction below changes UI code and tests after that snapshot.
 Pre-update backup: `fe/campaign-finance-main-backup-a11be33` at `a11be338126724ca288da5080b746d45e3808f35`.
 Earlier backups at `5f63f52` and `0605867` remain available.
+
+## PR #90 mobile CI correction
+
+Follow-up to published commit `b6eb5e3`, on the same base `2750813`. This correction changes only `CampaignFinance.css`, `CampaignAction.tsx`, `e2e/mobile.spec.ts`, `e2e/purchaseLayout.ts` and this report. No simulation, finance calculation, purchase validation, save, backend, tutorial or scene implementation changes are included. All work remained inside this integration worktree; the original Finance worktrees were not modified.
+
+The original hosted run `38702401704` failed browser shard 3: Cash clearance failed twice, and purchase-details End scrolling failed once before passing on retry. Other frontend checks, backend and browser shards 1/2 passed. CI correctly rejected the flaky result.
+
+The unchanged two tests passed all six Windows baseline executions. An isolated Ubuntu/WSL Node 22.23.3 environment using the same Playwright Chromium headless-shell revision 1243, Pixel 7 settings, SwiftShader and one worker reproduced Cash failure on all three Linux attempts; the purchase test passed its three Linux baseline attempts. This is a platform-focused reproduction, not an identical hosted runner. The intermittent scrolling failure was not reproduced as a full local baseline failure. Its hosted trace and a local geometry probe were inspected instead.
+
+Cash's 53px compact amount exceeded the 46.5px available body width at 390px, leaving only 1.5px of right clearance against the existing 2px minimum. The compact Cash body now reserves its intrinsic number width, uses a smaller gap, and lets the decorative icon shrink. Shared padding, card dimensions, font size, formatting and keyboard/button behavior remain. Final Linux measurements show 8px right clearance at 320/360/375/390px and 15.5px at 430px; the original equal-card-size and 2px minimum assertions remain.
+
+The details region genuinely overflowed (247px content in a 74px viewport) and held focus. A local probe observed End still at zero immediately after animation frames; native scrolling could occur asynchronously, while the hosted failure remained at zero through the assertion. The precise intermittent browser cause is not established. Plain End/Home now explicitly move the focused details region to its endpoint, removing reliance on native scroll routing. Nested targets and modified keys retain their behavior. No artificial overflow, timeout increase or retry workaround was added. The test checks the actual current bottom within 1px for integer/fractional scroll geometry, rather than merely any positive movement, and accepts naturally fitting content. Added cases verify both real overflow and fitting content after resize. Existing full-room purchase and Cash journeys retain the actual WebGL room; the additional DOM-only cases use the existing UI fixture.
+
+Final validation with Node 22.23.3:
+
+- Frontend lint, typecheck and production build passed.
+- All 33 focused Finance, Campaign UI and purchase/refinement component tests passed.
+- Linux Chromium: both originally failing tests and both added responsive/keyboard tests passed five times each: **20 passed in 7.0 minutes, retries disabled**.
+- Nearby Windows Chromium desktop/touch journeys: **14 passed in 4.3 minutes, retries disabled**, including Finance/spotlight focus restoration, Cash keyboard/touch access, tooltip/scaling interactions, camera/highlighting, left-side cards at desktop/laptop sizes and the touch purchase sheet.
+- Fresh mobile Cash and expanded purchase screenshots were inspected. Financial warnings and Confirm/Cancel remain visible above controls.
+
+The complete browser and coverage suites were intentionally not repeated locally for this scoped fix. Backend/balance inputs are unchanged. Historical full-suite results and their timeout limitations below remain historical; hosted CI must validate the new pushed commit. No assertion was weakened and no failing baseline/intermediate run was relabeled green. An intermediate padding adjustment was rejected by the unchanged equal-card-width check and corrected before final verification.
+
+Ignored evidence is under `test-results/ci-mobile-fix/`: hosted artifacts, `linux-connected-baseline.log`, `linux-final.log`, `linux-final-report/`, `linux-final-artifacts/`, `nearby.log`, `nearby-report/`, `nearby-artifacts/`, and final lint/typecheck/build/unit logs. The isolated Linux runtime and helper files remain ignored; helper servers were stopped. No dependency or workflow change is included.
 
 ## Integration and scope
 

@@ -7,6 +7,12 @@
 .finance-advanced { margin-top: 16px; }
 .finance-cash-compact { display: none; }
 @media (max-width: 900px) {
+    /* Reserve the number's intrinsic width; the decorative icon yields space first. */
+    .stat-cash.stat-action { gap: 2px; }
+    .stat-cash.stat-action .stat-body { display: block; flex: none; }
+    .stat-cash.stat-action .stat-icon { min-width: 0; flex: 0 1 22px; }
+    .stat-cash.stat-action .stat-icon .concept { width: 100%; height: auto; aspect-ratio: 1; }
+    .stat-cash.stat-action .stat-icon .icon { max-width: 100%; max-height: 100%; }
     .finance-cash-full { display: none; }
     .finance-cash-compact { display: inline; }
     .stat-action { position: relative; }

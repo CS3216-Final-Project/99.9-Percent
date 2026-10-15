@@ -175,7 +175,14 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
         </div>
         <details className="campaign-purchase-details">
           <summary>More details</summary>
-          <div className="campaign-purchase-details-content" tabIndex={0} role="region" aria-label="Purchase details">
+          <div className="campaign-purchase-details-content" tabIndex={0} role="region" aria-label="Purchase details" onKeyDown={e => {
+            if (e.target !== e.currentTarget || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (e.key === "End" || e.key === "Home") {
+              // Keep endpoint navigation in this region instead of relying on platform scroll routing.
+              e.preventDefault();
+              e.currentTarget.scrollTop = e.key === "End" ? e.currentTarget.scrollHeight : 0;
+            }
+          }}>
             {machine && <p className="campaign-action-machine"><b>{machine.name}</b> {machine.does}</p>}
             {props.tip && <p>{props.tip}</p>}
             {props.note && <p>{props.note}</p>}

@@ -25,6 +25,18 @@ export async function usableCard(page:Page) {
     await expect(card.getByRole("button",{name:"Cancel",exact:true})).toBeEnabled();
 }
 
+export async function keyboardDetails(page:Page) {
+    const content=page.locator(".campaign-action-popover").getByRole("region",{name:"Purchase details",exact:true});
+    await content.focus();await expect(content).toBeFocused();
+    await content.press("End");
+    // Integer dimensions can differ from fractional scrollTop by a pixel.
+    // One current-boundary check also accepts the valid no-overflow case.
+    await expect.poll(()=>content.evaluate(el=>Math.max(0,el.scrollHeight-el.clientHeight)-el.scrollTop)).toBeLessThanOrEqual(1);
+    await usableCard(page);
+    await content.press("Home");await expect.poll(()=>content.evaluate(el=>el.scrollTop)).toBe(0);
+    await usableCard(page);
+}
+
 export async function purchaseLayout(page:Page,width:number,height:number,touch=false) {
     await page.setViewportSize({width,height});
     if(touch)await page.emulateMedia({reducedMotion:"reduce"});
@@ -68,10 +80,7 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
         await usableCard(page);
         await page.screenshot({path:`test-results/purchase-${width}-resized-touch.png`});
     }
-    const content=card.getByRole("region",{name:"Purchase details",exact:true});
-    await content.focus();await expect(content).toBeFocused();
-    await content.press("End");await usableCard(page);
-    if(await content.evaluate(el=>el.scrollHeight>el.clientHeight))await expect.poll(()=>content.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+    await keyboardDetails(page);
     const cancel=card.getByRole("button",{name:"Cancel",exact:true});
     if(touch)await cancel.tap();else await cancel.click();
     await expect(card).toBeHidden();await expect(panel).toBeVisible();await expect(entry).toBeFocused();
