@@ -2,10 +2,31 @@
 
 Branch: `fe/campaign-finance-main`.
 Worktree: `C:/Users/user/99.9-Percent-Latest/test-results/campaign-finance-main`.
-Approved base: `275081388a51d0832c05fd9b45848b461ce10b94`.
+Initial approved base: `275081388a51d0832c05fd9b45848b461ce10b94`. Current branch includes main `814ec29` through the existing merge `5bb5ecf`.
 Initial publication code snapshot: `4c89bcf`, published with its report as `b6eb5e3`. The mobile CI correction below changes UI code and tests after that snapshot.
 Pre-update backup: `fe/campaign-finance-main-backup-a11be33` at `a11be338126724ca288da5080b746d45e3808f35`.
 Earlier backups at `5f63f52` and `0605867` remain available.
+
+## PR #90 inspection-dialog test-flow correction
+
+Follow-up to existing published merge `5bb5ecf`, which brought PR #91 (room inspection reveals) and PR #92 (animated elevator cutscene) into the Finance branch. The clean integration worktree was fast-forwarded from `449329d` to that already-published merge; no new main integration or rebase was performed. This correction changes only `frontend/e2e/financeIntegration.ts` and this report. Original Finance worktrees were not modified.
+
+Hosted run `38837794978` failed desktop and mobile Finance/spotlight journeys. Logs, both projects' screenshots, error contexts and Playwright traces were inspected. PR #91 intentionally opens a diagnostic modal after a room inspection. Main's existing tutorial journeys already close each diagnostic using Return to room, but the Finance helper still assumed an immediate return to the spotlight. The desktop trace shows the Database button resolving while the Servers inspected modal intercepts pointer events; the screenshot retains that dialog. The mobile trace/screenshot likewise retains Servers inspected while the test waits for tutorial step 2. The spotlight correctly yields to modal backdrops. A desktop assertion can briefly see step 2 before the modal coverage update; that timing difference explains the different reported stopping points, without changing the underlying missing user action.
+
+Both unchanged journeys failed locally without retries, at the step-2 assertion with the inspection modal still open. This reproduces the outdated assumption; the desktop hosted run progressed one assertion further before the same modal blocked its click. No tutorial or gameplay regression was established. PR #92's elevator implementation is unrelated to this missing dismissal and remains unchanged.
+
+The shared Finance journey now follows the visible flow for Servers and Database: click/tap the equipment, assert the diagnostic is visible and the spotlight hidden, return through its Return to room button, assert the dialog closes and the equipment remains selected, then verify the exact next tutorial step. Existing Finance modal/spotlight coexistence, focus restoration, unchanged company state and step-zero/no-purchase checks remain. Touch journeys use taps for the inspections and returns. No step is bypassed, no forced click, arbitrary wait, timeout increase or retry workaround is added.
+
+Validation on Node 22.23.3:
+
+- Exact formerly failing desktop/mobile journeys: **10 passed in 2.2 minutes**, five executions each, retries disabled.
+- Nearby desktop/mobile Finance/tutorial journeys: **12 passed in 2.4 minutes**, retries disabled. Includes walkthrough completion/replay, paused tutorial reload, chapter guidance, Finance accounting and keyboard access, floor/elevator menu/keyboard behavior and tutorial floor selection, touch walkthrough, Cash spacing and purchase End/Home/visible-footer checks.
+- Frontend lint, typecheck and production build passed.
+- Failed hosted screenshots and fresh desktop/touch Finance screenshots inspected.
+
+No runtime, simulation, accounting, purchase validation, tutorial, scene, backend, dependency or workflow implementation changed. Full local coverage/browser/backend suites were not repeated for this test-only correction. The complete hosted CI run on `449329d` passed; that is historical evidence, not a CI result for this new correction. New hosted frontend/backend checks must validate the pushed commit. Earlier timeout disclosures below remain historical and are not relabeled green.
+
+Ignored evidence: `test-results/tutorial-ci-fix/shard-2/`, `shard-3/`, `failed.log`, `baseline.log`, `baseline-report/`, `baseline-artifacts/`, `repeat.log`, `repeat-report/`, `repeat-artifacts/`, `nearby.log`, `nearby-report/`, `nearby-artifacts/`, and lint/typecheck/build logs. Generated artifacts are excluded from Git.
 
 ## PR #90 mobile CI correction
 
