@@ -35,9 +35,9 @@ test("finance and infrastructure help are reachable by touch with reduced motion
  await expect(finance.getByText(/Complete a period before we can estimate your financial health/)).toBeInViewport();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
  await finance.getByRole("button",{name:"Close",exact:true}).tap();
- await page.getByText("What does each component do?",{exact:true}).tap();
- await page.locator('.campaign-panel .tip').filter({hasText:/^App Server$/}).tap();
- await expect(page.getByRole("tooltip")).toContainText("needs routing");
+ await page.locator('.campaign-panel .chip').filter({hasText:/^App Server$/}).tap();
+ await page.getByText("About App Server",{exact:true}).tap();
+ await expect(page.locator('.campaign-evidence')).toContainText("needs routing");
  await page.getByRole("button",{name:/Add server/}).tap();const confirmation=page.getByRole("region",{name:"Confirm Add server"});
  await expect(confirmation).toContainText("$19,000");await confirmation.getByRole("button",{name:"Cancel"}).tap();
  expect((await savedGame(page)).campaign!.cashCents).toBe(2000000);

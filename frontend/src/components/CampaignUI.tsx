@@ -15,7 +15,7 @@ import TechTree from "./TechTree";
 import { AccountSection, CloudSavesSection } from "./Account";
 import { FinanceEntry } from "./CampaignFinance";
 import { AppHealthEntry } from "./CampaignAppHealth";
-import { InfrastructureHelp, CampaignUnavailable, CampaignDecisionButton } from "./CampaignInfrastructure";
+import { CampaignUnavailable, CampaignDecisionButton } from "./CampaignInfrastructure";
 import { INFRASTRUCTURE_HELP } from "@/game/infrastructureHelp";
 import { HomeScreen } from "./HomeScreen";
 import { CampaignChapters } from "./CampaignChapters";
@@ -161,7 +161,6 @@ export function CampaignPanel() {
         <div className="chips">{PLACES.filter(id=>id!=="cache"||c.dataStage).map(id => <button type="button" key={id} className={`chip${place === id ? " is-selected" : ""}`} aria-pressed={place === id} disabled={disabled} {...tipProps(INFRASTRUCTURE_HELP[id])} onClick={() => inspectOrSelect(id)}>
           <span className="chip-icon" aria-hidden="true"><Icon name={EQUIPMENT_ICON[id]} size={16} /></span>{PLACE_NAMES[id]}
         </button>)}</div>
-        <InfrastructureHelp />
         {place && <div className="campaign-evidence" role="status"><details className="more"><summary>About {PLACE_NAMES[place]}</summary><p>{INFRASTRUCTURE_HELP[place]}</p></details><Callout compact tone="info" icon={EQUIPMENT_ICON[place]} kicker={`${PLACE_NAMES[place]} · step ${m.step}`}>
           {component ? <>Demand {num(component.demand)}/s · capacity {num(component.capacity)}/s · backlog {num(component.backlog)}.</> : place === "cache" ? <>Cache {c.readCache?"deployed":"not deployed"} · effective rate used {m.data?`${m.data.effectiveHitRateUsed/100}%`:"not yet observed"} · hits {m.data?.hits??"not yet observed"}. Misses and writes reach the database.</> : place === "gateway" ? <>Incoming {num(m.incoming)}/s · admitted {num(m.admitted)}/s · rejected {num(m.rejected)}/s.</> : <>Latency {m.latencyMs.toFixed(0)} ms · errors {percent(m.serviceErrorRate)} · backlog {num(m.app.backlog + m.db.backlog)}.</>}
         </Callout></div>}
