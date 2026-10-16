@@ -14,6 +14,7 @@ import { campaignChapters, finishedChapter } from "@/game/campaignChapters";
 import TechTree from "./TechTree";
 import { AccountSection, CloudSavesSection } from "./Account";
 import { FinanceEntry } from "./CampaignFinance";
+import { AppHealthEntry } from "./CampaignAppHealth";
 import { InfrastructureHelp, CampaignUnavailable, CampaignDecisionButton } from "./CampaignInfrastructure";
 import { INFRASTRUCTURE_HELP } from "@/game/infrastructureHelp";
 import { HomeScreen } from "./HomeScreen";
@@ -117,9 +118,6 @@ function CampaignGuidance() {
 export function CampaignHeader() {
   const { game, openView, started } = useGame(), c = game.campaign!;
   const incident = game.phase === "incident";
-  const atRisk = c.snapshot.latencyMs >= Q.latencyThresholdMs;
-  const word = incident ? "Incident" : game.phase === "ended" ? game.outcome === "won" ? "Campaign complete" : "Bankrupt" : game.phase === "review" ? "Recovered" : atRisk ? "At risk" : c.limit!==null ? "Traffic limited" : "Healthy";
-  const tone = incident || (game.phase === "ended" && game.outcome !== "won") ? "critical" : atRisk ? "warn" : "health";
   return <><header className={`topbar${incident ? " is-incident" : ""}`}>
     <div className="brand"><span className="brand-mark">99.99%</span>
     </div>
@@ -131,9 +129,7 @@ export function CampaignHeader() {
       <Stat icon="revenue" kind="revenue" label="Pending revenue" tip={`${dollars(c.ledger.successes * Q.revenueCents)} earned this operating week, not yet added to cash. Only successful requests earn revenue.`}>
         <strong>{money(c.ledger.successes * Q.revenueCents / 100)}</strong><span className="muted">unsettled</span>
       </Stat>
-      <Stat icon={incident ? "incident" : atRisk ? "alert" : "health"} kind={tone} label="Health" tip="Recovery needs five consecutive steps below 500 ms latency and 1% service errors, with admitted traffic and completed requests. There is no incident timeout.">
-        <strong>{word}</strong>
-      </Stat>
+      <AppHealthEntry />
     </div>
     <SoundButton />
     <button type="button" className="icon-btn menu-btn" aria-label="Menu" {...tipProps("Menu")} onClick={() => openView("menu")}><Icon name="menu" /></button>
