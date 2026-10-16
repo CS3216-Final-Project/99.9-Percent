@@ -1,8 +1,8 @@
 import type { Floor } from "@/game/floors";
 import type { EquipmentId } from "@/sim";
-import { ELEVATOR_DOOR, ELEVATOR_SPOT, type FunProp } from "./floorplan";
+import { ALL_RACKS, ELEVATOR_DOOR, ELEVATOR_SPOT, type FunProp, type Racks } from "./floorplan";
 import type { Footprint } from "./layout";
-import { findPath, gridOf, nearestFree } from "./navgrid";
+import { blocked, findPath, gridOf, nearestFree, type Grid } from "./navgrid";
 import { facing, followPath, promptAt, slide, SPEED, steer, turnTowards, type Keys, type Prompt } from "./player";
 
 /*
@@ -31,6 +31,26 @@ export const avatar: AvatarState = { floor: "office", x: 0, z: 0, yaw: 0, moving
 
 /** Others on the move who open doors as they come near, by name: the engineers called down to the racks. */
 export const others = new Map<string, { floor: Floor; x: number; z: number }>();
+
+/** The machines standing in the server hall, which the avatar walks round. Every place counts until the room says. */
+let racks: Racks = ALL_RACKS;
+
+/** Where the avatar can walk on a floor, with the machines standing now. */
+export const gridHere = (floor: Floor = avatar.floor): Grid => gridOf(floor, racks);
+
+/**
+ * Hear which machines stand in the server hall now. A machine fitted where the avatar stands moves it aside to the
+ * nearest free place, and a walk planned before it was fitted is dropped.
+ */
+export function setRacks(next: Racks): void {
+  racks = next;
+  if (avatar.floor !== "servers") return;
+  const g = gridHere();
+  if (!blocked(g.world, avatar.x, avatar.z)) return;
+  const free = nearestFree(g, avatar.x, avatar.z);
+  if (!free) return;
+  Object.assign(avatar, { x: free[0], z: free[1], path: [] });
+}
 
 /** The movement keys held, by `KeyboardEvent.code`. */
 export const held = new Set<string>();
@@ -64,7 +84,7 @@ export function placeAvatar(floor: Floor, at: [number, number] = startAt(floor),
 
 /** Walk to (x, z) by the shortest way, or to the nearest free place to it; false if there is no way there. */
 export function walkTo(x: number, z: number): boolean {
-  const g = gridOf(avatar.floor);
+  const g = gridHere();
   const target = nearestFree(g, x, z, 2);
   if (!target) return false;
   const path = findPath(g, [avatar.x, avatar.z], target);
@@ -110,7 +130,7 @@ function keysHeld(): Keys {
  * reach, telling the page when that changes.
  */
 export function stepAvatar(dt: number, forward: [number, number], footprints: Record<EquipmentId, Footprint>, names: Record<EquipmentId, string>, now: number): void {
-  const world = gridOf(avatar.floor).world;
+  const world = gridHere().world;
   const run = held.has("ShiftLeft") || held.has("ShiftRight");
   const speed = run ? SPEED.run : SPEED.walk;
   const [dx, dz] = steer(keysHeld(), forward);

@@ -11,16 +11,16 @@ import type { GameMode } from "@/game/persist";
 import { useGame } from "@/game/store";
 import type { EquipmentId } from "@/sim";
 import { useDetail, type Detail } from "./detail";
-import { SPOTS } from "./floorplan";
+import { SPOTS, type Racks } from "./floorplan";
 import { ignoreRay } from "./furniture";
 import { loadGltf } from "./gltf";
 import { ROOM, type Footprint } from "./layout";
 import { FLOOR_Y } from "./levels";
-import { blocked, worldOf } from "./navgrid";
+import { blocked } from "./navgrid";
 import { WALK_MARKER } from "./palette";
 import { onRide, ride, riding, shownFloor, now } from "./ride";
 import { puffTexture } from "./textures";
-import { avatar, CAR, LOBBY, placeAvatar, stepAvatar, walkTo } from "./walk";
+import { avatar, CAR, gridHere, LOBBY, placeAvatar, setRacks, stepAvatar, walkTo } from "./walk";
 import { footingAt, STRIDE } from "./footing";
 import { sceneSound } from "./sceneSounds";
 
@@ -208,18 +208,20 @@ function standingSpot(): { floor: Floor; x: number; z: number; yaw: number } {
   return { floor: avatar.floor, x: avatar.x, z: avatar.z, yaw: avatar.yaw };
 }
 
-export function WalkDriver({ walking, footprints, names }: { walking: boolean; footprints: Record<EquipmentId, Footprint>; names: Record<EquipmentId, string> }) {
+export function WalkDriver({ walking, footprints, names, racks }: { walking: boolean; footprints: Record<EquipmentId, Footprint>; names: Record<EquipmentId, string>; racks: Racks }) {
   const camera = useThree((s) => s.camera);
   const mode = useGame((s) => s.mode);
   const stride = useRef(0);
   /** The mode this walk belongs to and when it was last written down, while the walk lasts. */
   const persisting = useRef<{ mode: GameMode; last: number } | null>(null);
+  // The machines standing are known before a walk picks up where it was left, so a remembered spot is judged by them.
+  useEffect(() => setRacks(racks), [racks]);
   useEffect(() => {
     if (!walking) return;
     // Pick up where this mode was left, but only somewhere that is still on the floor in view and free to stand.
     const saved = loadExploration(mode).avatar;
     const floor = useGame.getState().floor;
-    if (saved && saved.floor === floor && !blocked(worldOf(saved.floor), saved.x, saved.z)) placeAvatar(saved.floor, [saved.x, saved.z], saved.yaw);
+    if (saved && saved.floor === floor && !blocked(gridHere(saved.floor).world, saved.x, saved.z)) placeAvatar(saved.floor, [saved.x, saved.z], saved.yaw);
     else placeAvatar(floor);
     const p = { mode, last: 0 };
     persisting.current = p;
