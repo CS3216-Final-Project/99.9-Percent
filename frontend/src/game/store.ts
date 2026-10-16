@@ -737,7 +737,13 @@ export const useGame = create<Store>()((set, get) => {
     dismissRoomInspection: () => set({ roomInspection: null }),
     // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
     floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
-    goToFloor: (floor, how) => set(floorPatch(floor, how)),
+    // Leaving a machine's floor closes its panel, as Escape would; an incident keeps its selection.
+    goToFloor: (floor, how) => {
+      const { selected, roomInspection, game } = get();
+      const leaving = selected !== null && floorOf(selected) !== floor && game.phase !== "incident";
+      const inspecting = roomInspection !== null && floorOf(roomInspection.equipment) !== floor;
+      set({ ...floorPatch(floor, how), ...(leaving ? { selected: null, selectedAppId: null } : {}), ...(inspecting ? { roomInspection: null } : {}) });
+    },
     walking: false,
     setWalking: (on, remember = true) => {
       if (on === get().walking) return;

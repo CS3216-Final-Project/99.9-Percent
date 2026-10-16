@@ -453,4 +453,21 @@ describe("exploration state", () => {
     expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: false });
     expect(useGame.getState().toast).toBeNull();
   });
+
+  it("closes a machine's panel when the view leaves its floor, and keeps one on the floor arrived at", () => {
+    seed("campaign", { floor: "servers", walking: false });
+    enter();
+    useGame.getState().selectApp("app-1");
+    useGame.setState({ roomInspection: { seq: 1, equipment: "app", appId: "app-1" } });
+    useGame.getState().goToFloor("office", "menu");
+    expect(useGame.getState()).toMatchObject({ floor: "office", selected: null, selectedAppId: null, roomInspection: null });
+
+    useGame.getState().select("team");
+    useGame.getState().goToFloor("servers", "elevator");
+    expect(useGame.getState()).toMatchObject({ floor: "servers", selected: null });
+
+    useGame.getState().select("growth");
+    useGame.getState().goToFloor("office", "action");
+    expect(useGame.getState()).toMatchObject({ floor: "office", selected: "growth" });
+  });
 });
