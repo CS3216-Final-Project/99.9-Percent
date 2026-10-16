@@ -326,6 +326,8 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
     if (!confirmReset) { setConfirmReset(true); return; }
     newRun(); setConfirmReset(false);
   };
+  const resetLabel = confirmReset ? "Lose this company? Press again" : "New company";
+  const resetWarning = confirmReset && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces only the current Guided Mode save. Export it first from Saves if you want to keep it. Press the red button again to confirm.</Callout>;
   return <Modal title="Menu" icon={{ kind: "go", name: "menu" }} onClose={close} className="modal-menu">
     <MenuRun title="This company" saved={!saveBlocked} onResume={close}
       stats={[
@@ -342,7 +344,10 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
           <MenuTile icon="save" kind="ok" title="Save now" text="Write this company to the browser." onClick={() => saveNow()} />
           <MenuTile icon="info" kind="users" title="How to play" text="Replay the guided tour of your company." onClick={() => useGame.getState().startTour("campaign")} />
           <MenuTile icon="pause" kind="go" title="Save and exit" text="Stop here and return to the title screen." onClick={() => useGame.getState().endSession()} />
+          <MenuTile icon="refresh" kind="go" title={resetLabel} text="Start again with a new company." danger={confirmReset}
+            dangerText="Your current company will be replaced." onClick={reset} />
         </div>
+        {resetWarning}
         <ModeSwitch to="classic" />
       </>}
       {tab === "sound" && <SoundSettings />}
@@ -353,8 +358,8 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
         <div className="menu-col"><SaveFiles /></div>
         <div className="menu-col">
           <section className="menu-section menu-danger" aria-label="Start over"><h4><Icon name="refresh" size={20} />Start over</h4>
-            <div className="menu-actions"><button type="button" className={`btn${confirmReset ? " btn-danger" : ""}`} onClick={reset}><Icon name="refresh" size={20} />{confirmReset ? "Lose this company? Press again" : "New company"}</button></div>
-            {confirmReset && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces only the current Guided Mode save. Export it first if you want to keep it. Press the red button again to confirm.</Callout>}
+            <div className="menu-actions"><button type="button" className={`btn${confirmReset ? " btn-danger" : ""}`} onClick={reset}><Icon name="refresh" size={20} />{resetLabel}</button></div>
+            {resetWarning}
           </section>
         </div>
         </div>

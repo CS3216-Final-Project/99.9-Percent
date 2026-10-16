@@ -55,13 +55,17 @@ export function MenuRun({ title, saved, stats, note, onResume }: { title: string
 }
 
 /** A big, labelled menu choice: what it is, and one line on what it does. */
-export function MenuTile({ icon, kind, title, text, onClick, danger = false }: { icon: IconName; kind: ConceptKind; title: string; text: string; onClick: () => void; danger?: boolean }) {
+export function MenuTile({ icon, kind, title, text, onClick, danger = false, dangerText = "Your current run will be replaced." }: {
+  icon: IconName; kind: ConceptKind; title: string; text: string; onClick: () => void; danger?: boolean;
+  /** What the tile says while it asks to be pressed again. */
+  dangerText?: string;
+}) {
   return (
     <button type="button" className={`menu-tile${danger ? " is-danger" : ""}`} onClick={onClick} aria-label={title}>
       <Concept kind={danger ? "critical" : kind} icon={danger ? "alert" : icon} />
       <span className="menu-tile-body">
         <strong>{title}</strong>
-        <span>{danger ? "Your current run will be replaced." : text}</span>
+        <span>{danger ? dangerText : text}</span>
       </span>
     </button>
   );
