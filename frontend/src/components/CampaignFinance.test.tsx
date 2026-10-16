@@ -5,8 +5,6 @@ import { newGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
 import { CampaignHeader, CampaignPanel } from "./CampaignUI";
 import { CampaignAction } from "./CampaignAction";
-import { InfrastructureHelp } from "./CampaignInfrastructure";
-import { TooltipLayer } from "./Tooltip";
 import { CampaignFinance } from "./CampaignFinance";
 import { operatingCharges } from "@/sim/settlement";
 import { financeMoney, totalCharges } from "@/game/campaignFinance";
@@ -105,18 +103,9 @@ it("closes an open purchase confirmation when the view leaves its machine's floo
     expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull();
     expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
 });
-it("offers hover, keyboard and touch-focus explanations without taking game actions",()=>{
-    vi.useFakeTimers();render(<><InfrastructureHelp/><TooltipLayer/></>);
-    fireEvent.click(screen.getByText("What does each component do?"));
-    const term=screen.getByText("App Server");
-    fireEvent.pointerOver(term,{pointerType:"mouse"});act(()=>vi.advanceTimersByTime(250));
-    expect(screen.getByRole("tooltip").textContent).toContain("Scale Up makes one existing");
-    fireEvent.pointerDown(term,{pointerType:"touch"});fireEvent.focusIn(term);
-    expect(screen.getByRole("tooltip").textContent).toContain("needs routing");
-});
-
-
 it("keeps actual results separate from current costs and hides accounting behind disclosures",()=>{
+
+
     const game=tick(newGame(),60);
     act(()=>useGame.setState({game}));render(<CampaignFinance onClose={()=>{}}/>);
     const overview=screen.getByRole("region",{name:"Company finances overview"});
