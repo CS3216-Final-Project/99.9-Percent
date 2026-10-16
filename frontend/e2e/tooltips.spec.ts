@@ -8,7 +8,7 @@ test("explains controls in the shared tooltip, never the browser's own", async (
   await expect(page.locator("[title]")).toHaveCount(0);
 
   const tip = page.getByRole("tooltip");
-  await page.getByRole("banner").getByText("Cash", { exact: true }).hover();
+  await page.getByRole("banner").getByRole("button", { name: "View finances", exact: true }).hover();
   await expect(tip).toContainText("Available cash");
   await expect(tip).toHaveCSS("opacity", "1");
   const box = (await tip.boundingBox())!, view = page.viewportSize()!;

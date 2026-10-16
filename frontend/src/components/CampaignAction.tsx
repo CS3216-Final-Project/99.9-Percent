@@ -1,6 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { EquipmentId } from "@/sim";
+import type { Action, EquipmentId } from "@/sim";
+import { previewCampaignAction } from "@/game/campaignFinance";
+import { PurchaseFinance, PurchaseWarning } from "./PurchaseFinance";
 import { useGame } from "@/game/store";
 import { floorOf } from "@/game/floors";
 import { moneyFull as money } from "@/game/format";
@@ -11,7 +13,7 @@ import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { pendingStop } from "@/sim/step";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { Act, Row } from "./ui";
-import { EDGE, openRoomArea } from "./roomArea";
+import { confirmationRoomArea } from "./roomArea";
 import { confirmingAction, setConfirming, subscribeConfirming } from "./actionConfirmation";
 
 /** What each machine an action can change does, shown above the action's effect and costs. */
@@ -23,12 +25,45 @@ const MACHINES: Partial<Record<EquipmentId, { name: string; does: string }>> = {
   monitoring: { name: "Monitoring", does: "Monitoring watches each machine's health and reports failures it detects." },
 };
 
+const PURCHASE_DESCRIPTIONS: Record<string,string> = {
+  "Add server":"Adds another server to help your app handle more customers.",
+  "Upgrade database":"Lets your database handle more requests at the same time.",
+  "Deploy load balancing":"Adds a load balancer to share traffic between your servers.",
+  "Deploy Read Cache":"Remembers repeated reads to reduce work for your database.",
+  "Deploy Health Checks":"Detects failed servers so you can respond sooner.",
+  "Install spare":"Adds a spare server you can use when another server fails.",
+  "Deploy Automatic Failover":"Switches traffic to a healthy spare after a server failure.",
+  "Unlock autoscaling":"Unlocks automatic server scaling. Installing it is a separate purchase.",
+  "Deploy autoscaling":"Adds a controller that adjusts servers as demand changes.",
+  "Remove traffic limit":"Lets all incoming customer requests reach your servers again.",
+};
+
 
 /** Asks before dispatching; the parent's disabled predicate and dispatcher stay authoritative. */
-export function CampaignAction(props: ComponentProps<typeof Act>) {
+export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: Action }) {
   const { game, selectedAppId } = useGame();
   const c = game.campaign!, id = useId(), card = useRef<HTMLDivElement>(null);
-  const open = useSyncExternalStore(subscribeConfirming, () => confirmingAction() === props.label);
+  const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
+  const open = confirming === props.label;
+  const restoreFocus = useRef(false);
+  useLayoutEffect(()=>{
+    if (!open && restoreFocus.current) {
+      restoreFocus.current=false;
+      let frame=0;
+      const focus = ()=>{
+        const target=card.current?.querySelector<HTMLElement>("button.act:not(:disabled), .campaign-action-reason");
+        if (!target) return;
+        // A mobile inspector can still inherit its hidden state during the closing style update.
+        if (getComputedStyle(target).visibility==="hidden") {
+          frame=requestAnimationFrame(focus);
+          return;
+        }
+        target.focus();
+      };
+      focus();
+      return ()=>cancelAnimationFrame(frame);
+    }
+  },[open]);
   const [pointing, setPointing] = useState(false);
   useEffect(() => () => { if (confirmingAction() === props.label) setConfirming(null); }, [props.label]);
   const app = c.apps.find(a => a.id === selectedAppId) ?? c.apps[0];
@@ -78,29 +113,47 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
   else if (label === "Deploy Automatic Failover" && !c.loadBalancer) reason = "Deploy load balancing first.";
   else if (label === "Deploy Automatic Failover" && !c.apps.some(a => a.id === c.reliabilityStage?.spareId && a.health !== "failed")) reason = "Reserve a healthy spare first.";
   else if (busy) reason = "An infrastructure deployment is pending. Wait for activation.";
-  const highlight = pointing || open, affectedKey = affected.join();
+  const reviewed = useRef("");
+  const dispatched = useRef(false);
+  const [changed,setChanged] = useState(false);
+  const introductionActive = useGame(s=>s.onboarding);
+  const preview = props.decision ? previewCampaignAction(game,props.decision) : null;
+  const signature = (p: typeof preview) => JSON.stringify(p);
+  useEffect(()=>()=>setConfirming(null),[c.runId]);
+  if (props.decision && preview && !preview.ok && !introductionActive) reason = preview.reason;
+  const highlight = open || pointing && confirming === null, affectedKey = affected.join();
   useEffect(() => {
     if (!highlight) return;
     useGame.getState().setAffected(affectedKey.split(",") as EquipmentId[]);
-    return () => useGame.getState().setAffected([]);
-  }, [highlight, affectedKey]);
-  const cancel = () => { setConfirming(null); card.current?.querySelector<HTMLButtonElement>("button.act")?.focus(); };
+    return () => {
+      // Focus leaving another action must not erase the currently open decision's highlight.
+      const active = confirmingAction();
+      if (active === null || active === props.label) useGame.getState().setAffected([]);
+    };
+  // Reapply on opening even if this action was already highlighted by hover before the click.
+  }, [highlight, affectedKey, props.label, open]);
+  const cancel = () => { restoreFocus.current=true; setConfirming(null); };
   const costs = <>
-    {props.tip && <p>{props.tip}</p>}
-    <dl className="rows">
-      {props.price !== undefined && <Row label="Setup" value={`${money(props.price)} now`} />}
-      {props.price !== undefined && <Row label="Cash after" value={money((c.cashCents - props.price * 100) / 100)} />}
-      {upkeep !== null && <Row label={isScale || label === "Upgrade database" ? "Total upkeep" : "Added upkeep"} value={`${money(upkeep / 100)} / ${Q.periodSteps}s${increase !== null && increase !== upkeep ? ` (${increase >= 0 ? "+" : ""}${money(increase / 100)})` : ""}`} />}
-      {props.note && <Row label="Activation" value={props.note} />}
-    </dl>
-    {props.price !== undefined && props.price > 0 && <p className="muted">No refund or undo. Upkeep starts at activation.</p>}
+    {preview?.ok ? <PurchaseFinance preview={preview} /> : <dl className="rows">
+      {props.price !== undefined && <Row label="Buy now" value={money(props.price)} />}
+      {props.price !== undefined && <Row label="Money left" value={money((c.cashCents - props.price * 100) / 100)} />}
+      {upkeep !== null && <Row label={isScale || label === "Upgrade database" ? "Equipment running costs" : "Extra running cost"} value={`${money(upkeep / 100)} / ${Q.periodSteps}s${increase !== null && increase !== upkeep ? ` (${increase >= 0 ? "+" : ""}${money(increase / 100)})` : ""}`} />}
+      {props.note && <Row label="Ready in" value={props.note} />}
+    </dl>}
   </>;
   const machine = MACHINES[affected[0]];
+  const description = isScale ? "Makes this server more powerful without adding another server."
+    : label.startsWith("Tune cache") ? "Lets your cache answer a larger share of repeated reads."
+    : label.startsWith("Limit to") ? "Reduces incoming traffic to give your servers room to recover."
+    : PURCHASE_DESCRIPTIONS[label] ?? props.tip;
   // A per-app action sits next to that app's marker; anything else next to the machine's own.
   const anchor = isScale ? c.apps.find(a => `Scale up App ${a.id.slice(4)}` === label)?.id ?? "app" : affected[0];
   const toggle = () => {
     if (open) { setConfirming(null); return; }
     setConfirming(label);
+    reviewed.current = signature(preview);
+    dispatched.current = false;
+    setChanged(false);
     const s = useGame.getState(), floor = floorOf(affected[0]);
     if (s.floor !== floor) s.goToFloor(floor, "action");
     s.focusCamera(anchor);
@@ -108,59 +161,99 @@ export function CampaignAction(props: ComponentProps<typeof Act>) {
   return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey}
     onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)}
     onFocus={() => setPointing(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPointing(false); }}>
-    <Act {...props} onClick={toggle} />
-    {props.disabled && <p className="campaign-action-reason" id={id}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
+    <Act {...props} disabled={props.disabled || preview?.ok === false} onClick={toggle} />
+    {!open && (props.disabled || preview?.ok === false) && <p className="campaign-action-reason" id={id} tabIndex={0}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
     {open && <ActionPopover anchor={anchor}>
       <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); cancel(); } }}>
-        {machine && <p className="campaign-action-machine"><b>{machine.name}</b> {machine.does}</p>}
-        <p className="campaign-action-confirm-title">{label}?</p>
-        {costs}
+        <div className="campaign-purchase-essential">
+          <p className="campaign-action-confirm-title">{isAdd ? "Add App Server" : label}?</p>
+          {description && <p>{description}</p>}
+          {costs}
+          {isAdd && <p className="campaign-purchase-note">New servers need traffic directed to them before they can help.</p>}
+          {label==="Unlock autoscaling" && props.note && <p className="campaign-purchase-note">{props.note}</p>}
+          {label==="Deploy load balancing" && <p className="campaign-purchase-note">Choose which servers receive traffic after installation.</p>}
+        </div>
+        <details className="campaign-purchase-details">
+          <summary>More details</summary>
+          <div className="campaign-purchase-details-content" tabIndex={0} role="region" aria-label="Purchase details" onKeyDown={e => {
+            if (e.target !== e.currentTarget || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (e.key === "End" || e.key === "Home") {
+              // Keep endpoint navigation in this region instead of relying on platform scroll routing.
+              e.preventDefault();
+              e.currentTarget.scrollTop = e.key === "End" ? e.currentTarget.scrollHeight : 0;
+            }
+          }}>
+            {machine && <p className="campaign-action-machine"><b>{machine.name}</b> {machine.does}</p>}
+            {props.tip && <p>{props.tip}</p>}
+            {props.note && <p>{props.note}</p>}
+            <p>Game steps advance only while the company is running. Running costs start when the upgrade becomes active.</p>
+            {props.price!==undefined && props.price>0 && <p>Purchases cannot be undone.</p>}
+            <p>Financial estimates assume recent earnings continue. Cash update timing, traffic and future decisions can change the outcome.</p>
+          </div>
+        </details>
+        <footer className="campaign-purchase-footer">
+        {preview?.ok && <PurchaseWarning preview={preview}/>}
+        {(props.disabled || preview?.ok===false) && <p role="status">{reason}</p>}
+        {changed && <p role="status">The purchase preview changed. Review the current figures, then confirm again.</p>}
         <div className="btn-row">
-          <button type="button" className="btn btn-primary btn-small" autoFocus disabled={props.disabled} onClick={() => { setConfirming(null); props.onClick(); }}>Confirm</button>
+          <button type="button" className="btn btn-primary btn-small" autoFocus disabled={props.disabled || preview?.ok === false} onClick={() => {
+            if (!open || dispatched.current) return;
+            if (props.decision) {
+              const latest = previewCampaignAction(useGame.getState().game,props.decision);
+              if (!latest.ok) { useGame.getState().notify(latest.reason,"error"); return; }
+              if (signature(latest) !== reviewed.current) { reviewed.current=signature(latest);setChanged(true);return; }
+            }
+            dispatched.current = true;
+            setConfirming(null); props.onClick();
+          }}>Confirm</button>
           <button type="button" className="btn btn-small" onClick={cancel}>Cancel</button>
         </div>
+        </footer>
       </section>
     </ActionPopover>}
   </div>;
 }
 
-const GAP = 14;
-
-/**
- * Floats its content over the room beside the marker of the machine an action changes, on its left where it fits,
- * following the marker as the camera moves and staying clear of the side panel. Without a room, or before the
- * elevator lands, it waits briefly and then settles in the open part of the room so the decision is never blocked.
- */
+/** Keep desktop decisions on the room's left, following the selected marker vertically. */
 function ActionPopover({ anchor, children }: { anchor: string; children: ReactNode }) {
   const pop = useRef<HTMLDivElement>(null);
   const stage = document.querySelector<HTMLElement>("main.stage");
   useLayoutEffect(() => {
     const el = pop.current;
     if (!el || !stage) return;
-    const opened = performance.now();
     let frame = 0;
     const place = () => {
       frame = requestAnimationFrame(place);
-      const s = stage.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
-      const { right, bottom } = openRoomArea(s);
-      (el.firstElementChild as HTMLElement).style.maxHeight = `${Math.max(160, bottom - EDGE)}px`;
-      const marker = document.querySelector<HTMLElement>(`.eq-label[data-eq="${anchor}"]`);
-      const a = marker && marker.style.visibility === "visible" ? marker.getBoundingClientRect() : null;
-      if (!a && document.querySelector(".stage-canvas") && performance.now() - opened < 1500) return;
-      let x: number, y: number, side = "none";
-      if (a) {
-        const mid = a.top + a.height / 2 - s.top;
-        // Prefer the marker's left, away from the panel; take its right only when the left runs off the room.
-        x = a.left - s.left - GAP - w; side = "right";
-        if (x < EDGE) { x = a.right - s.left + GAP; side = "left"; }
-        y = mid - h / 2;
-        if (side === "left" && x + w > right) { x = a.left + a.width / 2 - s.left - w / 2; y = a.bottom - s.top + GAP; side = "none"; }
-        y = Math.max(EDGE, Math.min(bottom - h, y));
-        el.style.setProperty("--notch", `${Math.max(16, Math.min(h - 16, mid - y))}px`);
-      } else {
-        x = (right - w) / 2; y = Math.max(EDGE, (bottom - h) / 2);
+      const s = stage.getBoundingClientRect();
+      const sheet = window.innerWidth <= 900;
+      el.dataset.layout = sheet ? "sheet" : "anchored";
+      const area = confirmationRoomArea(s,sheet);
+      // Size the complete border box before measuring or clamping its position.
+      el.style.width = `${Math.max(1,Math.min(sheet ? 420 : 320,area.right-area.left))}px`;
+      el.style.maxHeight = `${Math.max(1,area.bottom-area.top)}px`;
+      const essential = el.querySelector<HTMLElement>(".campaign-purchase-essential");
+      const footer = el.querySelector<HTMLElement>(".campaign-purchase-footer");
+      const summary = el.querySelector<HTMLElement>(".campaign-purchase-details > summary");
+      const section = el.querySelector<HTMLElement>(".campaign-action-confirm");
+      if (essential && footer && summary && section) {
+        const style = getComputedStyle(section);
+        const reserved = essential.offsetHeight+footer.offsetHeight+summary.offsetHeight
+          +parseFloat(style.paddingTop)+parseFloat(style.paddingBottom)+4+4; // footer margin and card borders
+        el.style.setProperty("--purchase-details-room",`${Math.max(0,area.bottom-area.top-reserved)}px`);
       }
-      x = Math.max(EDGE, Math.min(right - w, x));
+      const w = el.offsetWidth, h = el.offsetHeight;
+      const marker = document.querySelector<HTMLElement>(`.eq-label[data-eq="${anchor}"]`);
+      const a = marker?.style.visibility === "visible" ? marker.getBoundingClientRect() : null;
+      const clampX = (x:number)=>Math.max(area.left,Math.min(area.right-w,x));
+      const clampY = (y:number)=>Math.max(area.top,Math.min(area.bottom-h,y));
+      const x = sheet ? clampX((area.left+area.right-w)/2) : area.left;
+      let y = sheet ? area.bottom-h : clampY((area.top+area.bottom-h)/2), side = "none";
+      if (a && !sheet) {
+        const mid = a.top+a.height/2-s.top;
+        y = clampY(mid-h/2);
+        if (a.left-s.left>=x+w) side="right";
+        el.style.setProperty("--notch",`${Math.max(16,Math.min(h-16,mid-y))}px`);
+      }
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
       el.dataset.side = side;
       el.classList.add("is-placed");
@@ -168,6 +261,6 @@ function ActionPopover({ anchor, children }: { anchor: string; children: ReactNo
     place();
     return () => cancelAnimationFrame(frame);
   }, [anchor, stage]);
-  const body = <div className="campaign-action-popover" ref={pop}><div className="campaign-action-popover-body">{children}</div></div>;
+  const body = <div className="campaign-action-popover" ref={pop}>{children}</div>;
   return stage ? createPortal(body, stage) : body;
 }

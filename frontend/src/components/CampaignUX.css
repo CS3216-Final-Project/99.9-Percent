@@ -11,9 +11,22 @@
 .campaign-panel .campaign-action-reason { margin: 4px 0; font-size: 12px; color: var(--warn-ink); }
 /* An action's confirmation floats over the room beside the machine it changes (see ActionPopover). It wears the
    night of the header and room overlays, so it reads as part of the room rather than a second panel. */
-.campaign-action-popover { position: absolute; left: 0; top: 0; z-index: 6; width: min(320px, calc(100% - 24px)); border: 2px solid var(--night-line); border-left: 4px solid var(--focus); border-radius: var(--radius); background: var(--night-2); color: var(--on-night); box-shadow: var(--lift); font-size: 12px; line-height: 1.45; opacity: 0; transition: opacity .12s ease-out; }
+.campaign-action-popover { position: absolute; left: 0; top: 0; z-index: 6; width: min(320px, calc(100% - 24px)); border: 2px solid var(--night-line); border-left: 4px solid var(--focus); border-radius: var(--radius); background: var(--night-2); color: var(--on-night); box-shadow: var(--lift); font-size: 12px; line-height: 1.35; display: flex; overflow: hidden; opacity: 0; transition: opacity .12s ease-out; }
 .campaign-action-popover.is-placed { opacity: 1; }
-.campaign-action-popover-body { overflow-y: auto; padding: 12px 14px; }
+.campaign-action-confirm { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 10px 12px; }
+.campaign-purchase-essential, .campaign-purchase-footer { flex: none; }
+.campaign-purchase-details { display: flex; flex-direction: column; min-height: 0; flex: 0 1 auto; }
+.campaign-purchase-details > summary { flex: none; cursor: pointer; padding: 4px 0; color: var(--on-night-soft); }
+.campaign-purchase-details-content { min-height: 0; max-height: var(--purchase-details-room); overflow-y: auto; overscroll-behavior: contain; padding-top: 4px; }
+.campaign-purchase-details:not([open]) .campaign-purchase-details-content { display: none; }
+.campaign-purchase-footer { border-top: 1px solid var(--night-4); padding-top: 8px; margin-top: 4px; }
+.campaign-purchase-footer .finance-warning { margin: 0 0 8px; }
+.campaign-purchase-note { color: var(--go); }
+@media (max-width: 900px) {
+  /* The purchase sheet temporarily replaces the mobile inspector, preserving its state and focus target. */
+  .app:has(.campaign-action-popover[data-layout="sheet"]) .campaign-panel { visibility: hidden; }
+  .campaign-purchase-footer .btn { min-height: 44px; }
+}
 .campaign-action-popover p { margin: 0 0 6px; }
 .campaign-action-popover .muted { color: var(--on-night-soft); }
 .campaign-action-popover .campaign-action-machine { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--night-4); color: var(--on-night-soft); }
@@ -24,7 +37,7 @@
 .campaign-action-popover .row dt { color: var(--on-night-soft); }
 .campaign-action-popover .row:last-child { border-bottom: 0; }
 /* On a short room the details scroll while the decision stays in reach. */
-.campaign-action-popover .btn-row { position: sticky; bottom: -12px; margin: 8px 0 -12px; padding: 8px 0 12px; border-top: 1px solid var(--night-4); background: var(--night-2); }
+.campaign-action-popover .btn-row { margin: 0; gap: 8px; background: var(--night-2); }
 /* The notch points at the machine's marker on whichever side it sits. */
 .campaign-action-popover[data-side="left"]::before,
 .campaign-action-popover[data-side="right"]::before { content: ""; position: absolute; top: calc(var(--notch, 50%) - 8px); width: 10px; height: 16px; }

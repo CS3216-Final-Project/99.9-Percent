@@ -39,12 +39,12 @@ it("system evidence records a real free inspection without advancing the clock",
 it("shows what the machine does, paid-now cash, delayed upkeep and routing limitation only when adding an App Server", () => {
   start(); renderCompany();
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
-  expect(card.textContent).not.toContain("$700 / 60s"); expect(screen.queryByText("Effect & costs")).toBeNull();
+  expect(card.textContent).not.toContain("+$700 per 60 game seconds"); expect(screen.queryByText("Effect & costs")).toBeNull();
   fireEvent.click(screen.getByRole("button",{name:/Add server/}));
   const confirm=screen.getByRole("region",{name:"Confirm Add server"});
   expect(confirm.textContent).toContain("App Servers run the product"); expect(confirm.textContent).toContain("does not receive traffic");
-  expect(confirm.textContent).toContain("$19,000"); expect(confirm.textContent).toContain("$700 / 60s");
-  expect(confirm.textContent).toContain("No refund or undo");
+  expect(confirm.textContent).toContain("$19,000"); expect(confirm.textContent).toContain("+$700 per 60 game seconds");
+  expect(confirm.textContent).toContain("Purchases cannot be undone");
   expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
 });
 it("asks for confirmation before an action is dispatched, and Cancel or Escape leaves the company unchanged", () => {
@@ -52,7 +52,7 @@ it("asks for confirmation before an action is dispatched, and Cancel or Escape l
   const add=screen.getByRole("button",{name:/Add server/}), before=useGame.getState().game;
   fireEvent.click(add);
   const confirm=screen.getByRole("region",{name:"Confirm Add server"});
-  expect(confirm.textContent).toContain("Add server?"); expect(confirm.textContent).toContain("$19,000");
+  expect(confirm.textContent).toContain("Add App Server?"); expect(confirm.textContent).toContain("$19,000");
   expect(useGame.getState().game).toBe(before);
   fireEvent.click(within(confirm).getByRole("button",{name:"Cancel"}));
   expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull(); expect(document.activeElement).toBe(add);
@@ -68,9 +68,9 @@ it("asks for confirmation before an action is dispatched, and Cancel or Escape l
 it("visibly explains cash and pending-infrastructure reasons without altering accepted action rules", () => {
   start(); renderCompany(); fireEvent.click(screen.getByRole("button",{name:/Upgrade database/})); fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
-  expect(card.textContent).toContain("An infrastructure deployment is pending");
-  cleanup(); const game=structuredClone(useGame.getState().game); game.campaign!.cashCents=100000; renderCompany(game);
-  expect(screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!.textContent).toContain("Not enough available cash");
+  expect(card.textContent).toContain("An infrastructure deployment is already pending");
+  cleanup(); const game=newGame(); game.campaign!.cashCents=100000; renderCompany(game);
+  expect(screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!.textContent).toContain("This purchase would exhaust company cash");
 });
 it("traffic-limit warning explains rejection without inventing extra charges or discounts", () => {
   const game=advanceSteps(perform(newGame(1,"limit-info"),{type:"set_traffic_limit",enabled:true}),4).state;
@@ -83,7 +83,7 @@ it("Scale Up describes the selected server rather than implying another installe
   render(<CampaignAction label="Scale up App 1" price={2000} note="3 steps" onClick={()=>{}}/>);
   fireEvent.click(screen.getByRole("button",{name:/Scale up App 1/}));
   expect(screen.queryByText(/Makes this App Server larger/)).toBeNull();
-  expect(screen.getByText("Total upkeep").closest(".row")!.textContent).toContain("$1,100 / 60s (+$400)");
+  expect(screen.getByText("Equipment running costs").closest(".row")!.textContent).toContain("$1,100 / 60s (+$400)");
 });
 it("postmortem keeps all actual causes and observations reachable while leading with a compact summary", () => {
   let game=advanceSteps(newGame(1,"report-info"),6).state;

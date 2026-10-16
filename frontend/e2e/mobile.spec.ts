@@ -1,9 +1,77 @@
+import type { Page } from "@playwright/test";
+import { keyboardDetails, purchaseLayout } from "./purchaseLayout";
 import { advanceCampaignStep } from "./fixtures";
+import { financeDuringWalkthrough } from "./financeIntegration";
 import { test, expect, expectRoom, savedGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
 import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
+
+async function expectCashFits(page:Page) {
+ const cash=page.getByRole("button",{name:"View finances"});
+ const cashBox=(await cash.boundingBox())!,usersBox=(await page.locator(".stat-users").boundingBox())!,amount=(await cash.locator(".finance-cash-compact").boundingBox())!;
+ expect(cashBox.height).toBe(usersBox.height);expect(Math.abs(cashBox.width-usersBox.width)).toBeLessThan(2);
+ expect(amount.x).toBeGreaterThanOrEqual(cashBox.x+2);
+ expect(amount.x+amount.width).toBeLessThanOrEqual(cashBox.x+cashBox.width-2);
+ return {width:page.viewportSize()!.width,cashBox,amount,clearance:cashBox.x+cashBox.width-amount.x-amount.width};
+}
+
+test("touch Finance overlays the spotlight walkthrough and restores its step and focus",async({page})=>{
+ await page.setViewportSize({width:390,height:844});await page.emulateMedia({reducedMotion:"reduce"});
+ await financeDuringWalkthrough(page,true);
+});
+
+test("finance and infrastructure help are reachable by touch with reduced motion",async({page})=>{
+ await page.emulateMedia({reducedMotion:"reduce"});await page.setViewportSize({width:390,height:844});
+ await page.route("**/api/**",r=>r.abort());await seedSave(page,newGame(1,"touch-finance"));
+ await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ const cash=page.getByRole("button",{name:"View finances"});await expectCashFits(page);
+ await page.screenshot({path:"test-results/finance-cash-touch.png"});await cash.tap();const finance=page.getByRole("dialog",{name:"Company finances"});
+ await expect(finance).toContainText("$0.20");await expect(finance.getByText("Costs waiting to be paid",{exact:true})).toBeHidden();await page.screenshot({path:"test-results/finance-refinement-touch.png"});await finance.getByText("Advanced details",{exact:true}).tap();await finance.getByText("Detailed running costs",{exact:true}).tap();
+ await expect(finance.getByRole("table")).toBeVisible();await page.screenshot({path:"test-results/finance-touch.png"});
+ await finance.getByText(/Complete a period before we can estimate your financial health/).scrollIntoViewIfNeeded();
+ await expect(finance.getByText(/Complete a period before we can estimate your financial health/)).toBeInViewport();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+ await finance.getByRole("button",{name:"Close",exact:true}).tap();
+ await page.getByText("What does each component do?",{exact:true}).tap();
+ await page.locator('.campaign-panel .tip').filter({hasText:/^App Server$/}).tap();
+ await expect(page.getByRole("tooltip")).toContainText("needs routing");
+ await page.getByRole("button",{name:/Add server/}).tap();const confirmation=page.getByRole("region",{name:"Confirm Add server"});
+ await expect(confirmation).toContainText("$19,000");await confirmation.getByRole("button",{name:"Cancel"}).tap();
+ expect((await savedGame(page)).campaign!.cashCents).toBe(2000000);
+});
+
+test("Cash card preserves its inner margin across phone widths",async({page,withoutRoom})=>{
+ await withoutRoom();await page.route("**/api/**",r=>r.abort());await seedSave(page,newGame(1,"cash-widths"));
+ await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
+ const geometry=[];
+ for(const width of [320,360,375,390,430]) {
+  await page.setViewportSize({width,height:844});geometry.push(await expectCashFits(page));
+ }
+ await test.info().attach("Cash clearance by viewport",{body:JSON.stringify(geometry),contentType:"application/json"});
+ const cash=page.getByRole("button",{name:"View finances"});await cash.press("Enter");
+ await expect(page.getByRole("dialog",{name:"Company finances"})).toBeVisible();
+ await page.getByRole("button",{name:"Close",exact:true}).click();await expect(cash).toBeFocused();
+ await cash.press("Space");await expect(page.getByRole("dialog",{name:"Company finances"})).toBeVisible();
+});
+
+test("purchase details keyboard navigation handles overflow and fitting content",async({page,withoutRoom})=>{
+ await withoutRoom();await page.setViewportSize({width:390,height:844});await page.emulateMedia({reducedMotion:"reduce"});
+ await page.route("**/api/**",r=>r.abort());await seedSave(page,tick(newGame(1,"details-keyboard"),60));
+ await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
+ const before=(await savedGame(page)).campaign;
+ await page.getByRole("button",{name:/^Add server/}).tap();
+ const card=page.locator(".campaign-action-popover"),content=card.getByRole("region",{name:"Purchase details",exact:true});
+ await card.getByText("More details",{exact:true}).tap();
+ await expect.poll(()=>content.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(0);
+ await keyboardDetails(page);
+ await page.setViewportSize({width:390,height:1200});
+ await expect.poll(()=>content.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(0);
+ await keyboardDetails(page); // Natural fitting content; no artificial overflow.
+ await card.getByRole("button",{name:"Cancel",exact:true}).tap();
+ expect((await savedGame(page)).campaign).toEqual(before);
+});
 
 
 test("Opening prevention recognition keeps Scaling locked after touch review and reload",async({page})=>{
@@ -266,4 +334,8 @@ test("Auto draws Medium on a graphics card: the screen's normal pixel size, not 
   await page.getByRole("button", { name: "Menu", exact: true }).tap();
   await page.getByRole("tab", { name: "Graphics" }).tap();
   await expect(page.getByRole("radio", { name: "Auto" })).toBeChecked();
+});
+
+test("purchase sheet keeps warnings and decisions reachable on 390px touch",async({page})=>{
+ await purchaseLayout(page,390,844,true);
 });

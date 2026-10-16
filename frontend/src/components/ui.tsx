@@ -91,20 +91,18 @@ export function Tip({ text, children, side }: { text: string; children: ReactNod
 }
 
 /** Shared headline tile for both gameplay modes. */
-export function Stat({ icon, kind, label, tip, children }: { icon: IconName; kind: ConceptKind; label: string; tip: string; children: ReactNode }) {
-  return (
-    <div className={`stat stat-${kind}`}>
+export function Stat({ icon, kind, label, tip, children, onClick, actionLabel }: { icon: IconName; kind: ConceptKind; label: string; tip: string; children: ReactNode; onClick?: () => void; actionLabel?: string }) {
+  const body = <>
       <span className="stat-icon">
         <Concept kind={kind} icon={icon} />
       </span>
       <div className="stat-body">
-        <Tip text={tip}>
-          {label}
-        </Tip>
+        {onClick ? <span className="tip stat-action-label">{label}<span aria-hidden="true"> ↗</span></span> : <Tip text={tip}>{label}</Tip>}
         {children}
       </div>
-    </div>
-  );
+    </>;
+  return onClick ? <button type="button" className={`stat stat-${kind} stat-action`} aria-label={actionLabel} aria-description={tip} onClick={onClick} {...tipProps(tip)}>{body}</button>
+    : <div className={`stat stat-${kind}`}>{body}</div>;
 }
 
 export type Tone = "accent" | "ok" | "warn" | "critical";
@@ -442,7 +440,12 @@ export function Modal({
       <div className={`modal${wide ? " modal-wide" : ""}${tone ? ` modal-${tone}` : ""}${className ? ` ${className}` : ""}`} ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={e=>{
         if(e.key==="Escape"){e.stopPropagation();onClose?.();}
         if(e.key==="Tab"){
-          const nodes=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,select,textarea,[tabindex="0"]')??[]);
+          const nodes=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,select,textarea,summary,[tabindex="0"]')??[]).filter(node=>{
+            for(let parent=node.parentElement;parent && parent!==dialog.current;parent=parent.parentElement){
+              if(parent.hidden || parent instanceof HTMLDetailsElement && !parent.open && !parent.querySelector(":scope > summary")?.contains(node))return false;
+            }
+            return true;
+          });
           const first=nodes[0],last=nodes.at(-1);
           if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}
           else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}
