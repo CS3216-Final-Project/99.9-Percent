@@ -4,6 +4,9 @@ import { useGame, WALKTHROUGH_STEPS } from "@/game/store";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 import Tutorial, { BASICS_STEPS, CAMPAIGN_STEPS } from "./Tutorial";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
+import { saveGame } from "@/game/persist";
+import { newGame } from "@/sim";
+import { advanceSteps } from "@/sim/step";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -78,13 +81,49 @@ it("waits behind a dialog that covers the room and comes back when it closes", a
   await waitFor(() => expect(card(1)).toBeTruthy());
 });
 
-it("waits through an incident and its review, then resumes where the player left off", () => {
+it("holds the clock until its last step, so the first incident cannot open while it is still teaching", () => {
   start(); renderCompany();
+  const run = () => screen.getByRole("button", { name: "Run" });
+  expect(run()).toHaveProperty("disabled", true);
+  expect(run().getAttribute("data-tip")).toBe("Finish or skip the tutorial to run the company");
+  // The P shortcut and a stray tick go through the same store rule.
+  act(() => { useGame.getState().setRunning(true); useGame.getState().tick(30); useGame.getState().advance(); });
+  expect(useGame.getState()).toMatchObject({ running: false, game: { phase: "management", campaign: { step: 0 } } });
+
   fireEvent.click(evidence().getByRole("button", { name: "App Server" }));
-  act(() => { useGame.getState().setRunning(true); useGame.getState().tick(30); });
-  expect(useGame.getState().game.phase).toBe("incident");
+  fireEvent.click(evidence().getByRole("button", { name: "Database" }));
+  for (let i = 0; i < 4; i++) next();
+  expect(card(7)).toBeTruthy();
+  expect(run()).toHaveProperty("disabled", true);
+  fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  // The last step asks the player to run the company; doing so closes its card.
+  expect(card(8).textContent).toContain("Run company");
+  expect(run()).toHaveProperty("disabled", false);
+  fireEvent.click(run());
   expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
-  expect(useGame.getState().tour).toEqual({ track: "campaign", step: 1 });
+  expect(useGame.getState()).toMatchObject({ running: true, tour: null, meta: { tutorialDone: true } });
+  act(() => useGame.getState().tick(1));
+  expect(useGame.getState().game.campaign!.step).toBe(1);
+});
+
+it("lets the clock run once the walkthrough is skipped", () => {
+  start(); renderCompany();
+  fireEvent.click(within(card(1)).getByRole("button", { name: "Skip" }));
+  fireEvent.click(screen.getByRole("button", { name: "Run" }));
+  act(() => useGame.getState().tick(1));
+  expect(useGame.getState().game.campaign!.step).toBe(1);
+});
+
+it("waits through an incident on a resumed company without holding its clock, then resumes where the player left off", () => {
+  saveGame(advanceSteps(newGame(1, "resumed-incident"), 6).state);
+  start(); renderCompany();
+  expect(useGame.getState().game.phase).toBe("incident");
+  expect(useGame.getState().tour).toEqual({ track: "campaign", step: 0 });
+  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", false);
+  act(() => { useGame.getState().setRunning(true); useGame.getState().tick(1); });
+  expect(useGame.getState().game.campaign!.step).toBe(7);
 });
 
 it("walks Stay Online through unlocking Health Checks in Tech and deploying it", () => {

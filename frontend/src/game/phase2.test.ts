@@ -37,15 +37,18 @@ it("landing boot creates neither durable company nor run event; explicit entry i
  useGame.getState().play();useGame.getState().play();
  expect(readAnalytics().filter(e=>e.name==="run_started")).toHaveLength(1);
 });
-it("offers the Opening walkthrough once, on a fresh company, without holding the company back",()=>{
+it("offers the Opening walkthrough once, on a fresh company, holding its clock until it is skipped",()=>{
  enter();
  expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
  expect(useGame.getState().onboarding).toBe(false);
- // The guide never blocks: time and inspection work while it shows.
+ // The guide holds the clock, so the first incident cannot open while it is still teaching.
+ useGame.getState().setRunning(true);useGame.getState().tick(10);useGame.getState().advance();
+ expect(useGame.getState().running).toBe(false);
+ expect(useGame.getState().game.campaign!.step).toBe(0);
+ useGame.getState().endTour(false);
  useGame.getState().setRunning(true);useGame.getState().tick(1);
  expect(useGame.getState().game.campaign!.step).toBe(1);
  useGame.getState().setRunning(false);
- useGame.getState().endTour(false);
  expect(useGame.getState().tour).toBeNull();
  expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!).tutorialDone).toBe(true);
  // Neither the same company after a reload nor a new company offers it again.
@@ -71,15 +74,15 @@ it("finishes the walkthrough on its last step, not before, even if its card is n
  expect(useGame.getState().tour).toBeNull();
  expect(tutorialEvents().map(e=>e.name)).toEqual(["tutorial_started","tutorial_completed"]);
 });
-it("carries an unfinished walkthrough on where it was left, after the clock has run, into a new company, as one start",()=>{
+it("carries an unfinished walkthrough on where it was left, into a new company, as one start",()=>{
  enter();
  for(let i=0;i<5;i++)useGame.getState().tourNext();
- // The walkthrough asks the player to run the clock, so the company moves on before it ends.
- useGame.getState().setRunning(true);useGame.getState().tick(3);useGame.getState().setRunning(false);
  useGame.getState().endSession();useGame.getState().play();
  expect(useGame.getState().tour).toEqual({track:"campaign",step:5});
  useGame.setState(useGame.getInitialState(),true);enter();
- expect(useGame.getState().game.campaign!.step).toBe(3);
+ // Still held: the company has not moved on while the walkthrough was unfinished.
+ useGame.getState().setRunning(true);useGame.getState().tick(3);
+ expect(useGame.getState().game.campaign!.step).toBe(0);
  expect(useGame.getState().tour).toEqual({track:"campaign",step:5});
  useGame.getState().newRun();
  expect(useGame.getState().tour).toEqual({track:"campaign",step:5});
@@ -213,7 +216,7 @@ it("loads main's input-log envelope with queued work, fractional clock credit an
  const raw=JSON.stringify({schemaVersion:1,scenarioId:"opening-db",scenarioVersion:1,
   runId:"main-save",seed:1,step:7,inputs:[{step:6,action:{type:"start_db_upgrade"}}],
   runtime:{remainderMs:350},savedAt:123});
- localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);
+ localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);saveMeta({...DEFAULT_META,tutorialDone:true});
  const expected=advanceSteps(act(advanceSteps(newGame(1,"main-save"),6).state,{type:"start_db_upgrade"}),1).state;
  const loaded=loadGame();expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("load");
  expect(loaded.game.campaign).toMatchObject({runId:"main-save",step:7,cashCents:expected.campaign!.cashCents,
@@ -287,7 +290,7 @@ it("bankruptcy telemetry survives explicit restart",()=>{
  let g=advanceSteps(newGame(),6).state;
  const ending=advanceSteps(g,100000).state;
  g=advanceSteps(g,ending.campaign!.step-g.campaign!.step-1).state;saveGame(g);
- saveMeta({...DEFAULT_META});
+ saveMeta({...DEFAULT_META,tutorialDone:true});
  enter();useGame.getState().setRunning(true);useGame.getState().tick(1);
  expect(useGame.getState().game.phase).toBe("ended");
  expect(readAnalytics().filter(e=>e.name==="run_failed")).toHaveLength(1);

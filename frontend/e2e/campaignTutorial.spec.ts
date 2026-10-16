@@ -69,7 +69,7 @@ test("a first company's walkthrough points at the room and panel, finishes its s
   expect((await savedGame(page)).campaign).toMatchObject({ runId: company.runId, step: 0, actions: [] });
 });
 
-test("a walkthrough left after running the clock carries on from the same step after a reload", async ({ page }) => {
+test("a walkthrough holds the clock, so no incident opens before it is done, and carries on from the same step after a reload", async ({ page }) => {
   test.setTimeout(120_000);
   await page.route("**/api/**", r => r.abort());
   await page.goto("/");
@@ -84,16 +84,33 @@ test("a walkthrough left after running the clock carries on from the same step a
   for (let i = 0; i < 3; i++) await card.getByRole("button", { name: "Next", exact: true }).click();
   await expect(card).toHaveAccessibleName("Tutorial, step 6 of 8");
 
-  // The step asks the player to run the company, so it moves on before the walkthrough ends.
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect.poll(async () => (await savedGame(page)).campaign!.step, { timeout: 30_000 }).toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  // The step shows the clock, but the company cannot run into its first incident until the walkthrough is done.
+  const run = page.getByRole("button", { name: "Run", exact: true });
+  await expect(card).toContainText("After this guide, Run to watch.");
+  await expect(run).toBeDisabled();
+  await page.keyboard.press("p");
+  await expect(run).toBeDisabled();
+  await expect(page.getByTestId("physical-step")).toHaveText("0");
+  await expect(page.locator(".incident-clock")).toHaveCount(0);
+  await expect(card).toHaveAccessibleName("Tutorial, step 6 of 8");
+  await page.screenshot({ path: "test-results/campaign-tutorial-clock-held.png" });
 
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
   await expect(card).toHaveAccessibleName("Tutorial, step 6 of 8");
-  await expect(card).toContainText("Pause (P) to think");
+  await expect(run).toBeDisabled();
+
+  // The last step asks the player to run the company: doing so closes the card and starts the clock.
+  await card.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: /Upgrade database/ }).click();
+  await page.getByRole("region", { name: "Confirm Upgrade database" }).getByRole("button", { name: "Cancel" }).click();
+  await expect(card).toHaveAccessibleName("Tutorial, step 8 of 8");
+  await run.click();
+  await expect(card).toBeHidden();
+  await expect.poll(async () => (await savedGame(page)).campaign!.step, { timeout: 30_000 }).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  expect((await savedGame(page)).campaign!.actions).toEqual([]);
 });
 
 function act(game: GameState, action: Parameters<typeof applyAction>[1]): GameState {

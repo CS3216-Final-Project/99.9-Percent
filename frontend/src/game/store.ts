@@ -89,6 +89,15 @@ const isWalkthrough = (track: TourTrack): track is Walkthrough => track === "bas
 /** How many steps each walkthrough has (Tutorial.tsx holds them). Reaching the last one finishes it. */
 export const WALKTHROUGH_STEPS: Record<Walkthrough, number> = { basics: 5, campaign: 8 };
 const lastStep = (track: Walkthrough) => WALKTHROUGH_STEPS[track] - 1;
+/**
+ * Guided Mode's Opening walkthrough, first time or replayed, holds the clock until the player reaches its last step or
+ * skips it, so the first incident cannot open while the guide is still teaching. Chapter guides do not: some ask the
+ * player to run the company. A company resumed mid-incident hides the guide until it is over, so the hold never keeps
+ * an incident's clock from running.
+ */
+export function walkthroughHoldsClock(s: { game: GameState; tour: Tour | null }): boolean {
+  return !!s.game.campaign && s.game.phase === "management" && s.tour?.track === "campaign" && s.tour.step < lastStep("campaign");
+}
 
 /** What started a walkthrough: the first visit, resuming a fresh run, a new company, the menu or the home screen. */
 export type TourStart = "first_visit" | "resume" | "new_company" | "menu" | "home";
@@ -853,7 +862,7 @@ export const useGame = create<Store>()((set, get) => {
 
     advance: () => {
       const { game } = get();
-      if (game.phase !== "management" || (game.campaign && (!get().started || awaitingAcknowledgement(game.campaign)))) return;
+      if (game.phase !== "management" || (game.campaign && (!get().started || awaitingAcknowledgement(game.campaign) || walkthroughHoldsClock(get())))) return;
       const next = advanceTurn(game);
       commit(next);
       const r = next.lastReport;
@@ -869,7 +878,7 @@ export const useGame = create<Store>()((set, get) => {
     tick: (dt) => {
       const { game, running, speed } = get();
       if(game.campaign) {
-        if(!get().started || awaitingAcknowledgement(game.campaign) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
+        if(!get().started || awaitingAcknowledgement(game.campaign) || walkthroughHoldsClock(get()) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
         const credit=get().remainderMs+Math.round(dt*1000*speed);
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
@@ -911,7 +920,9 @@ export const useGame = create<Store>()((set, get) => {
       if (id && get().game.campaign) get().setRunning(false);
     },
     setRunning: (running) => {
-      set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game.campaign!))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase) });
+      set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game.campaign!) && !walkthroughHoldsClock(get()))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase) });
+      // Running the company from the walkthrough's last step is what that step asks for; its card closes.
+      if (get().running && get().game.campaign && get().tour?.track === "campaign") get().endTour(true);
       if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
     setSpeed: (speed) => set({ speed }),

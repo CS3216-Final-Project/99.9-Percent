@@ -152,7 +152,7 @@ const CAMPAIGN: Step[] = [
   {
     title: "You control the clock",
     why: "Time is paused. Each step is one second of traffic.",
-    hint: () => "Run to watch. Pause (P) to think.",
+    hint: () => "After this guide, Run to watch. Pause (P) to think.",
     target: () => ".campaign-clock .campaign-play",
   },
   {
