@@ -412,6 +412,20 @@ describe("challenge mode lock", () => {
     useGame.getState().boot();
     expect(useGame.getState().mode).toBe("classic");
   });
+  it("keeps an unlock that only the replaced company recorded when starting a new company", () => {
+    let game = act(preparedReliability(), { type: "arm_reliability" });
+    for (let i = 0; i < 60 && !pendingReliability(game.campaign); i++) {
+      if (game.phase === "review") game = act(game, { type: "acknowledge_review" });
+      game = tick(game);
+    }
+    saveGame(act(game, { type: "acknowledge_reliability" }));
+    useGame.getState().boot();
+    expect(useGame.getState().meta.challengeUnlocked).toBe(false);
+    useGame.getState().newRun();
+    expect(useGame.getState().game.campaign!.reliabilityStage).toBeFalsy();
+    expect(loadMeta().challengeUnlocked).toBe(true);
+    expect(useGame.getState().switchMode("classic")).toBe(true);
+  });
 });
 
 describe("exploration state", () => {
