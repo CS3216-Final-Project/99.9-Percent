@@ -418,10 +418,9 @@ function actInPlace(s: GameState, action: Action, legacyPreventionMilestone: boo
     const fail = (message: string): Rejection => ({ ok: false, reason: "invalid", message });
     const c0 = s.campaign!;
     const combined = combinedAction(s, action);
-    if (combined) {
-        if (!combined.ok) return combined;
-        Object.assign(s, projectCampaign(combined.state));
-        return null;
+    if (combined !== undefined) {
+        if (!combined) projectCampaign(s);
+        return combined;
     }
     if (pendingCombined(c0)) return fail("Review the company outcome first.");
     const reliability = reliabilityAction(s, action);

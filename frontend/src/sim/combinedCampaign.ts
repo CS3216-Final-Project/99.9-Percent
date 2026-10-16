@@ -1,5 +1,6 @@
 import type { Campaign, CombinedRound } from "./campaignTypes";
 import type { Action, ActionResult, GameState } from "./types";
+type Rejection = Extract<ActionResult, { ok: false }>;
 import { clone } from "./state";
 import { rand } from "./rng";
 import { trace } from "./trace";
@@ -81,39 +82,40 @@ export function observeCombined(s:GameState):void {
   if(d.finalStableSteps===5){d.finalReview=captureScorecard(s,"won");trace(c,"campaign-completion-qualified",{users:d.users,finalUserTarget:d.finalUserTarget});}
  }
 }
-export function combinedAction(prev:GameState,action:Action):ActionResult|null {
- if(!["enter_combined","start_growth_wave","acknowledge_growth","complete_campaign","accept_scaling_risk","run_promotion"].includes(action.type))return null;
- const fail=(message:string):ActionResult=>({ok:false,reason:"invalid",message});
- if(prev.phase==="ended"||prev.phase==="review")return fail("Finish the report or start a new company first.");
- const s=clone(prev),c=s.campaign!,d=c.combinedStage;
+/** Every check runs before the first mutation, so a rejection leaves `s` untouched. */
+export function combinedAction(s:GameState,action:Action):Rejection|null|undefined {
+ if(!["enter_combined","start_growth_wave","acknowledge_growth","complete_campaign","accept_scaling_risk","run_promotion"].includes(action.type))return undefined;
+ const fail=(message:string):Rejection=>({ok:false,reason:"invalid",message});
+ if(s.phase==="ended"||s.phase==="review")return fail("Finish the report or start a new company first.");
+ const c=s.campaign!,d=c.combinedStage;
  if(action.type==="accept_scaling_risk"){
-  if(!c.scaling||c.scaling.consumed||c.scalingConsent||d||!c.openingMilestone?.acknowledged||prev.phase!=="management")return fail("Risk consent is unavailable or already recorded.");
-  c.scalingConsent={policyVersion:1,acceptedStep:c.step};trace(c,"scaling-growth-risk-accepted",{policyVersion:1,dbCapacity:c.dbCapacity,incoming:c.incomingRate,nextDemand:1400,cashCents:c.cashCents});return {ok:true,state:s};
+  if(!c.scaling||c.scaling.consumed||c.scalingConsent||d||!c.openingMilestone?.acknowledged||s.phase!=="management")return fail("Risk consent is unavailable or already recorded.");
+  c.scalingConsent={policyVersion:1,acceptedStep:c.step};trace(c,"scaling-growth-risk-accepted",{policyVersion:1,dbCapacity:c.dbCapacity,incoming:c.incomingRate,nextDemand:1400,cashCents:c.cashCents});return null;
  }
  if(action.type==="enter_combined"){
-  if(!canEnterCombined(prev))return fail("Requires acknowledged Stay Online, stable baseline management, empty queues, healthy apps and finished actions/reports.");
+  if(!canEnterCombined(s))return fail("Requires acknowledged Stay Online, stable baseline management, empty queues, healthy apps and finished actions/reports.");
   const target=action.finalUserTarget??C.finalUserTarget;
   if(!targetValid(target)||(action.sequence&&!sequenceValid(action.sequence)))return fail("Invalid combined configuration.");
   c.combinedStage={id:C.id,version:1,configuration:JSON.stringify(C),enteredStep:c.step,source:action.sequence||action.finalUserTarget!==undefined?"evaluation":"seeded",
    finalUserTarget:target,users:2000,sequence:action.sequence?clone(action.sequence):selectSequence(s),nextRoundIndex:0,currentRound:null,completedRounds:[],readinessSteps:0,finalStableSteps:0,
    targetReachedStep:null,finalReview:null,acknowledged:false,service:emptyServiceMeasurement(c.step+1,"combined-stage")};
   trace(c,"late-game-entered",{stageId:C.id,stageVersion:1,poolId:C.poolId,poolVersion:1,users:2000,profile:"read-heavy",finalUserTarget:target,sequence:JSON.stringify(c.combinedStage.sequence)});
-  return {ok:true,state:s};
+  return null;
  }
  if(!d)return fail("Enter Grow the Company first.");
  if(action.type==="acknowledge_growth"){
   const r=d.currentRound;if(!r||r.completedStep===null||r.acknowledged)return fail("No growth outcome awaits acknowledgement.");
   r.acknowledged=true;d.completedRounds.push(clone(r));d.currentRound=null;d.nextRoundIndex++;d.readinessSteps=0;d.finalStableSteps=0;
-  trace(c,"scenario-acknowledged",{roundId:r.id});return {ok:true,state:s};
+  trace(c,"scenario-acknowledged",{roundId:r.id});return null;
  }
  if(action.type==="complete_campaign"){
-  if(!d.finalReview||d.acknowledged||!finalRequirements(prev))return fail("The full-demand final review is not ready.");
+  if(!d.finalReview||d.acknowledged||!finalRequirements(s))return fail("The full-demand final review is not ready.");
   d.acknowledged=true;c.scorecard=clone(d.finalReview);s.phase="ended";s.outcome="won";
-  trace(c,"campaign-completed",{users:d.users,finalUserTarget:d.finalUserTarget,cashCents:c.cashCents});return {ok:true,state:s};
+  trace(c,"campaign-completed",{users:d.users,finalUserTarget:d.finalUserTarget,cashCents:c.cashCents});return null;
  }
  if(pendingCombined(c))return fail("Review the company outcome first.");
  if(action.type==="start_growth_wave"){
-  if(!canStartGrowth(prev))return fail("Observe five fresh healthy full-demand steps, finish reports and actions, and end any promotion first.");
+  if(!canStartGrowth(s))return fail("Observe five fresh healthy full-demand steps, finish reports and actions, and end any promotion first.");
   const index=d.nextRoundIndex,scenario=d.sequence[index],start=c.step+C.warningSteps;
   const r:CombinedRound={id:`growth-${c.nextEventId}`,index,scenario:clone(scenario),scheduledStep:c.step,startStep:start,endStep:start+scenario.duration,users:growthUsers(d.finalUserTarget,index),baseline:baselineDemand(growthUsers(d.finalUserTarget,index),d.finalUserTarget),startedStep:null,pressureEndedStep:null,fault:null,stableSteps:0,completedStep:null,acknowledged:false,rejectedBefore:c.cumulative.rejected,setupBefore:c.investedCents,observations:[]};
   if(scenario.template==="failure-under-load"){
@@ -121,14 +123,14 @@ export function combinedAction(prev:GameState,action:Action):ActionResult|null {
    if(!target)return fail("A healthy serving application is required.");
    r.fault={id:`combined-failure-${c.nextEventId}`,targetId:target.id,armedStep:c.step,startStep:start,naturalStep:start+20,startedStep:null,restoredStep:null,restoreSource:null,promoted:false};
   }
-  d.currentRound=r;d.readinessSteps=0;trace(c,"scenario-scheduled",{roundId:r.id,index,template:scenario.template,startStep:start,endStep:r.endStep});return {ok:true,state:s};
+  d.currentRound=r;d.readinessSteps=0;trace(c,"scenario-scheduled",{roundId:r.id,index,template:scenario.template,startStep:start,endStep:r.endStep});return null;
  }
  if(action.type==="run_promotion"){
-  if(!canPromote(prev))return fail("Promotion requires stable baseline management between growth rounds, available cash and no pending work or cooldown.");
+  if(!canPromote(s))return fail("Promotion requires stable baseline management between growth rounds, available cash and no pending work or cooldown.");
   const a={id:`action-${c.nextEventId}`,type:"promotion" as const,requestedStep:c.step,activationStep:c.step+1,costCents:C.promotionCostCents,activatedStep:null,source:"player" as const};
   c.cashCents-=a.costCents;c.investedCents+=a.costCents;c.pending.push(a);c.actions.push(clone(a));
   c.promotion={actionId:a.id,requestedStep:c.step,activationStep:a.activationStep,activatedStep:null,endStep:a.activationStep+12,endedStep:null,cooldownUntil:a.activationStep+42,costCents:a.costCents};d.readinessSteps=0;d.finalStableSteps=0;
-  trace(c,"action-requested",{actionId:a.id,type:a.type,costCents:a.costCents,activationStep:a.activationStep});return {ok:true,state:s};
+  trace(c,"action-requested",{actionId:a.id,type:a.type,costCents:a.costCents,activationStep:a.activationStep});return null;
  }
  return fail("Unknown company action.");
 }

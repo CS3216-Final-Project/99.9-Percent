@@ -1,13 +1,14 @@
 import type { Floor } from "@/game/floors";
 import { GROUPS } from "./conversations";
-import { GLASS, OBSTACLES, OUTER_WALLS, ROOM_OBSTACLES, SERVER_GLASS, SERVER_OBSTACLES, SHAFT, SPOTS, type Obstacle, type Segment } from "./floorplan";
+import { GLASS, OBSTACLES, OUTER_WALLS, ROOM_OBSTACLES, SERVER_GLASS, serverObstacles, SHAFT, SPOTS, type Obstacle, type Racks, type Segment } from "./floorplan";
 import { ROOM } from "./layout";
 
 /*
  * Where the player's avatar can walk on each floor, and the shortest way between two places. A floor's world is its
  * walls (the outer walls, the glass with its doorways left open, and the elevator's shaft with its doorway) and the
- * things standing on it, furniture and the crew who stay put. Paths are planned on a grid of small cells; whether a
- * place is free is always decided against the walls and furniture themselves, so a doorway is never lost to rounding.
+ * things standing on it: furniture, the crew who stay put and, on the server floor, the machines built so far.
+ * Paths are planned on a grid of small cells; whether a place is free is always decided against the walls and
+ * furniture themselves, so a doorway is never lost to rounding.
  *
  * Kept free of React and three.js so the walks can be tested.
  */
@@ -56,19 +57,23 @@ function standingCrew(): Obstacle[] {
   ];
 }
 
-const worlds = new Map<Floor, World>();
+/** What a floor's world is made of: the office never changes; the server floor changes with the machines standing. */
+const keyOf = (floor: Floor, racks: Racks) => (floor === "office" ? floor : `${floor} ${JSON.stringify(racks)}`);
 
-/** A floor's walls and furniture. */
-export function worldOf(floor: Floor): World {
-  let w = worlds.get(floor);
-  if (!w) {
-    w =
-      floor === "office"
-        ? makeWorld([...OUTER_WALLS, ...GLASS, ...SHAFT], [...OBSTACLES, ...ROOM_OBSTACLES, ...standingCrew()])
-        : makeWorld([...OUTER_WALLS, ...SERVER_GLASS, ...SHAFT], SERVER_OBSTACLES);
-    worlds.set(floor, w);
-  }
-  return w;
+/** The latest world worked out for each floor, by what it was made of. */
+const worlds = new Map<Floor, { key: string; world: World }>();
+
+/** A floor's walls and furniture, with these machines standing in the server hall. */
+export function worldOf(floor: Floor, racks: Racks): World {
+  const key = keyOf(floor, racks);
+  const known = worlds.get(floor);
+  if (known?.key === key) return known.world;
+  const world =
+    floor === "office"
+      ? makeWorld([...OUTER_WALLS, ...GLASS, ...SHAFT], [...OBSTACLES, ...ROOM_OBSTACLES, ...standingCrew()])
+      : makeWorld([...OUTER_WALLS, ...SERVER_GLASS, ...SHAFT], serverObstacles(racks));
+  worlds.set(floor, { key, world });
+  return world;
 }
 
 /* ------------------------------------------------------------------ */
@@ -130,24 +135,26 @@ export interface Grid {
   free: Uint8Array;
 }
 
-const grids = new Map<Floor, Grid>();
+/** The latest grid worked out for each floor, by what its world was made of. */
+const grids = new Map<Floor, { key: string; grid: Grid }>();
 
 /** Each cell's middle, in metres. */
 export const cellX = (c: number) => ROOM.x0 + (c + 0.5) * CELL;
 export const cellZ = (r: number) => ROOM.z0 + (r + 0.5) * CELL;
 
-/** A floor's grid of free cells, worked out once. */
-export function gridOf(floor: Floor): Grid {
-  let g = grids.get(floor);
-  if (g) return g;
-  const world = worldOf(floor);
+/** A floor's grid of free cells with these machines standing, worked out again only when they change. */
+export function gridOf(floor: Floor, racks: Racks): Grid {
+  const key = keyOf(floor, racks);
+  const known = grids.get(floor);
+  if (known?.key === key) return known.grid;
+  const world = worldOf(floor, racks);
   const cols = Math.round(ROOM.w / CELL);
   const rows = Math.round(ROOM.d / CELL);
   const free = new Uint8Array(cols * rows);
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) free[r * cols + c] = blocked(world, cellX(c), cellZ(r)) ? 0 : 1;
-  g = { floor, world, cols, rows, free };
-  grids.set(floor, g);
-  return g;
+  const grid = { floor, world, cols, rows, free };
+  grids.set(floor, { key, grid });
+  return grid;
 }
 
 const colOf = (x: number) => Math.floor((x - ROOM.x0) / CELL);
