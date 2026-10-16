@@ -9,6 +9,7 @@ import {
   type EquipmentState,
   type GameState,
 } from "@/sim";
+import type { Racks } from "./floorplan";
 import { footprint, MAX_TEMP_SHOWN, type Footprint } from "./layout";
 import type { Led } from "./textures";
 
@@ -117,5 +118,19 @@ export function buildModel(s: GameState): SceneModel {
     symptomatic: inc ? symptomaticEquipment(s) : [],
     inspected,
     inspecting: inc?.inspecting?.equipment ?? null,
+  };
+}
+
+/** The machines the scene draws in the server hall, for walking round. */
+export function racksOf(m: SceneModel): Racks {
+  return {
+    apps: Math.min(m.hosts.length, 12),
+    temp: m.temp,
+    loadBalancer: m.lb,
+    standby: m.standby,
+    cache: m.cache,
+    dbCabinets: m.dbCabinets,
+    replica: m.replica,
+    backup: m.backup,
   };
 }

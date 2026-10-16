@@ -380,23 +380,47 @@ export const CAGE = { x: 5.6, z: 12.8, w: 3.0, d: 1.6 };
 
 /** How many database cabinets can ever stand: one per tier. */
 const DB_CABINETS = 4;
+/** How many app servers can ever stand: two rows of six. */
+const APP_PLACES = 12;
 
-/**
- * Everything on the server floor to walk round. Every place a machine can stand counts, built or not, so a walk
- * never runs into one fitted later.
- */
-export const SERVER_OBSTACLES: Obstacle[] = [
-  // The machines
-  box("gateway", POS.gateway.x, POS.gateway.z, RACK.w, RACK.d),
-  box("load balancer", POS.loadBalancer.x, POS.loadBalancer.z, RACK.w, RACK.d),
-  ...Array.from({ length: 12 }, (_, i) => appSlot(i)).map((p, i) => box(`app server ${i}`, p.x, p.z, RACK.w, RACK.d)),
-  ...Array.from({ length: MAX_TEMP_SHOWN }, (_, i) => tempSlot(i)).map((p, i) => box(`temporary server ${i}`, p.x, p.z, RACK.w, RACK.d)),
-  box("standby", POS.standby.x, POS.standby.z, RACK.w, RACK.d),
-  box("cache", POS.cache.x, POS.cache.z, RACK.w, RACK.d),
-  ...Array.from({ length: DB_CABINETS }, (_, i) => dbSlot(i)).map((p, i) => box(`database cabinet ${i}`, p.x, p.z, DB_CABINET.w, DB_CABINET.d)),
-  box("replica", POS.replica.x, POS.replica.z, DB_CABINET.w, DB_CABINET.d),
-  box("backup", POS.backup.x, POS.backup.z, 1.9, 1.05),
+/** The machines standing in the server hall: how many of each kind's places are filled. */
+export interface Racks {
+  apps: number;
+  temp: number;
+  loadBalancer: boolean;
+  standby: boolean;
+  cache: boolean;
+  dbCabinets: number;
+  replica: boolean;
+  backup: boolean;
+}
 
+/** Every place in the hall filled: the most it can ever hold. */
+export const ALL_RACKS: Racks = { apps: APP_PLACES, temp: MAX_TEMP_SHOWN, loadBalancer: true, standby: true, cache: true, dbCabinets: DB_CABINETS, replica: true, backup: true };
+
+/** The machines standing in the hall, to walk round. An empty place is open floor. */
+function machines(r: Racks): Obstacle[] {
+  const count = (n: number, most: number) => Math.max(0, Math.min(n, most));
+  return [
+    box("gateway", POS.gateway.x, POS.gateway.z, RACK.w, RACK.d),
+    ...(r.loadBalancer ? [box("load balancer", POS.loadBalancer.x, POS.loadBalancer.z, RACK.w, RACK.d)] : []),
+    ...Array.from({ length: count(r.apps, APP_PLACES) }, (_, i) => appSlot(i)).map((p, i) => box(`app server ${i}`, p.x, p.z, RACK.w, RACK.d)),
+    ...Array.from({ length: count(r.temp, MAX_TEMP_SHOWN) }, (_, i) => tempSlot(i)).map((p, i) => box(`temporary server ${i}`, p.x, p.z, RACK.w, RACK.d)),
+    ...(r.standby ? [box("standby", POS.standby.x, POS.standby.z, RACK.w, RACK.d)] : []),
+    ...(r.cache ? [box("cache", POS.cache.x, POS.cache.z, RACK.w, RACK.d)] : []),
+    ...Array.from({ length: count(r.dbCabinets, DB_CABINETS) }, (_, i) => dbSlot(i)).map((p, i) => box(`database cabinet ${i}`, p.x, p.z, DB_CABINET.w, DB_CABINET.d)),
+    ...(r.replica ? [box("replica", POS.replica.x, POS.replica.z, DB_CABINET.w, DB_CABINET.d)] : []),
+    ...(r.backup ? [box("backup", POS.backup.x, POS.backup.z, 1.9, 1.05)] : []),
+  ];
+}
+
+/** Everything on the server floor to walk round: the machines standing now, and the furniture. */
+export function serverObstacles(racks: Racks): Obstacle[] {
+  return [...machines(racks), ...SERVER_FURNITURE];
+}
+
+/** The server floor's furniture and plant, which always stand. */
+const SERVER_FURNITURE: Obstacle[] = [
   // The hall's cooling units, crash cart, extinguisher and the boxes of hardware by the monitoring room
   box("cooling unit, north", -12.45, -2.6, 0.95, 1.9),
   box("cooling unit, south", -12.45, 2.2, 0.95, 1.9),

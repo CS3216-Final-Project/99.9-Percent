@@ -217,6 +217,25 @@ test("changes the avatar mid-game from the menu, fetching only the one chosen", 
   expect(await events(page, "avatar_")).toEqual(["avatar_changed"]);
 });
 
+test("walks straight across the server hall where no machine has been fitted yet", async ({ page }) => {
+  test.slow();
+  // In the aisle between the second row of app server places and the row kept for autoscaling, all of them empty
+  // in week 2: one app server stands, at the first place of the front row.
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "nn.classic.exploration.v1",
+      JSON.stringify({ version: 1, floor: "servers", walking: true, avatar: { floor: "servers", x: -3.0, z: -2.3, yaw: 0 }, camera: null }),
+    ),
+  );
+  await open(page);
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => (await exploration(page))?.avatar?.z).toBe(-2.3);
+  // Up walks away from the camera, diagonally across the empty places, into the cold aisle in front of the server.
+  await page.keyboard.down("ArrowUp");
+  await expect.poll(async () => (await exploration(page))?.avatar?.z ?? 0, { timeout: 20_000 }).toBeLessThan(-4.6);
+  await page.keyboard.up("ArrowUp");
+});
+
 test("restores the mode, floor, walk position and camera view after a reload", async ({ page }) => {
   test.slow();
   await open(page);
