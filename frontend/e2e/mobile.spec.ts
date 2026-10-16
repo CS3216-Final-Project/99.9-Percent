@@ -1,3 +1,4 @@
+import { appHealthDuringTutorial, appHealthJourney, appHealthProblem } from "./appHealth";
 import type { Page } from "@playwright/test";
 import { keyboardDetails, purchaseLayout } from "./purchaseLayout";
 import { advanceCampaignStep } from "./fixtures";
@@ -339,3 +340,14 @@ test("Auto draws Medium on a graphics card: the screen's normal pixel size, not 
 test("purchase sheet keeps warnings and decisions reachable on 390px touch",async({page})=>{
  await purchaseLayout(page,390,844,true);
 });
+
+test("App Health dashboard and overlays work on narrow touch screens", async ({page}) => {
+ await appHealthJourney(page,390,844,true);
+});
+test("App Health restores the spotlight on touch without advancing it", async ({page}) => {
+ await page.setViewportSize({width:390,height:844}); await page.emulateMedia({reducedMotion:"reduce"});
+ await appHealthDuringTutorial(page);
+});
+test("App Health explains problem evidence on touch", async ({page}) => { await appHealthProblem(page,true); });
+
+test("App Health remains compact at 320px touch", async ({page}) => { await appHealthJourney(page,320,844,true); });
