@@ -1,6 +1,7 @@
-import { completeTutorial, advanceCampaignStep, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
-import { newGame } from "../src/sim";
+import { completeTutorial, advanceCampaignStep, test, expect, expectRoom, savedGame, savedClassicGame, seedClassicSave, seedSave, tutorial, unlockChallenge } from "./fixtures";
+import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
+import { act, finishedCompany } from "../src/sim/__tests__/combinedFixture";
 
 test("new players see Guided Mode first with Challenge Mode locked", async ({ page }) => {
   await page.goto("/");
@@ -104,4 +105,55 @@ test("the home screen is the same in both modes and can continue or switch eithe
   expect((await savedGame(page)).campaign!.runId).toBe("home-company");
   expect((await savedClassicGame(page)).turn).toBe(2);
   expect(await page.evaluate(() => localStorage.getItem("nn.mode.v1"))).toBe("campaign");
+});
+
+test("restarts Guided Mode from a Challenge Mode home screen in two presses, keeping the Challenge Mode run", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await seedSave(page, advanceSteps(newGame(4, "old-company"), 3).state);
+  await unlockChallenge(page);
+  await seedClassicSave(page, advanceTurn(newLegacyGame(2)));
+  await page.addInitScript(() => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("nn.mode.v1", "classic"); } });
+  await page.goto("/");
+  const choices = page.getByRole("region", { name: "Choose how you want to play" });
+  const guided = choices.getByRole("region", { name: "Guided Mode" });
+  await expect(choices.getByRole("region", { name: "Challenge Mode" })).toContainText("Last played");
+  const classic = await savedClassicGame(page);
+  await guided.getByRole("button", { name: "New company", exact: true }).click();
+  // The first press only asks, and offers an export first.
+  await expect(guided).toContainText("This replaces only your Guided Mode save.");
+  await expect(guided.getByRole("button", { name: "Export company", exact: true })).toBeVisible();
+  expect((await savedGame(page)).campaign!.runId).toBe("old-company");
+  await page.screenshot({ path: "test-results/home-restart-confirm.png" });
+  await guided.getByRole("button", { name: "Lose this company? Press again", exact: true }).click();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Menu", exact: true })).toBeVisible();
+  const next = (await savedGame(page)).campaign!;
+  expect(next.runId).not.toBe("old-company");
+  expect(next.step).toBe(0);
+  expect(await savedClassicGame(page)).toEqual(classic);
+  await page.reload();
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Menu", exact: true })).toBeVisible();
+  expect((await savedGame(page)).campaign!.runId).toBe(next.runId);
+});
+
+test("plays a finished Guided Mode campaign again from the home screen", async ({ page, withoutRoom }) => {
+  test.setTimeout(120000);
+  await withoutRoom();
+  const won = act(finishedCompany(), { type: "complete_campaign" });
+  await seedSave(page, won);
+  await page.goto("/");
+  const guided = page.getByRole("region", { name: "Choose how you want to play" }).getByRole("region", { name: "Guided Mode" });
+  await expect(guided).toContainText("Campaign complete");
+  await expect(guided.getByRole("button", { name: "Play again", exact: true })).toBeFocused();
+  await expect(guided.getByRole("button", { name: "Review company", exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/home-campaign-complete.png" });
+  await guided.getByRole("button", { name: "Play again", exact: true }).click();
+  await guided.getByRole("button", { name: "Lose this company? Press again", exact: true }).click();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Menu", exact: true })).toBeVisible();
+  const next = await savedGame(page);
+  expect(next.campaign!.runId).not.toBe(won.campaign!.runId);
+  expect(next).toMatchObject({ phase: "management", outcome: null });
+  // The finished company unlocked Challenge Mode; starting again keeps it unlocked.
+  await page.getByRole("banner").getByRole("button", { name: "Menu", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: "Switch to Challenge Mode" })).toBeEnabled();
 });
