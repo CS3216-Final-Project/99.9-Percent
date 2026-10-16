@@ -9,6 +9,8 @@ import { useGame } from "./store";
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => vi.restoreAllMocks());
 function enter() {
+  // These tests drive the clock, which the Opening walkthrough holds until it is done.
+  saveMeta({ ...loadMeta(), tutorialDone: true });
   useGame.getState().boot(); useGame.getState().play();
 }
 describe("shared campaign runtime", () => {
@@ -57,6 +59,7 @@ describe("shared campaign runtime", () => {
 
 
 it("reports quota failures on entry and reset while allowing in-memory play",()=>{
+  saveMeta({ ...DEFAULT_META, tutorialDone: true });
   vi.spyOn(Storage.prototype,"setItem").mockImplementation(()=>{throw Error("quota");});
   enter();
   expect(useGame.getState().toast?.kind).toBe("error");
