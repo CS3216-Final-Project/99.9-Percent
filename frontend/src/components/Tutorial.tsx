@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { useGame, type TourTrack } from "@/game/store";
-import { floorOf } from "@/game/floors";
+import { floorOf, selectedInView } from "@/game/floors";
 import { num } from "@/game/format";
 import type { EquipmentId } from "@/sim";
 import { pendingStop } from "@/sim/step";
@@ -51,8 +51,8 @@ const BASICS: Step[] = [
   {
     title: "Add a server",
     why: "A traffic surge hits in week 4.",
-    hint: (s) => (s.selected === "app" ? "Press Add server." : "Click Servers."),
-    target: (s) => (s.selected === "app" ? `.side ${PRIMARY}` : label("app")),
+    hint: (s) => (selectedInView(s.selected, s.floor) === "app" ? "Press Add server." : "Click Servers."),
+    target: (s) => (selectedInView(s.selected, s.floor) === "app" ? `.side ${PRIMARY}` : label("app")),
     enter: clear,
     done: (s) => s.game.infra.appHosts.length >= 2,
   },
@@ -68,8 +68,8 @@ const BASICS: Step[] = [
   {
     title: "Get more users",
     why: "Promotions bring users, and traffic.",
-    hint: (s) => (s.selected === "growth" ? "Press Launch." : "Click Growth."),
-    target: (s) => (s.selected === "growth" ? `.side ${PRIMARY}` : label("growth")),
+    hint: (s) => (selectedInView(s.selected, s.floor) === "growth" ? "Press Launch." : "Click Growth."),
+    target: (s) => (selectedInView(s.selected, s.floor) === "growth" ? `.side ${PRIMARY}` : label("growth")),
     enter: clear,
     done: (s) => s.game.totals.promosRun > 0,
   },

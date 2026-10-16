@@ -23,6 +23,11 @@ export function floorOf(id: EquipmentId): Floor {
   return OFFICE_EQUIPMENT.includes(id) ? "office" : "servers";
 }
 
+/** The selection whose details show: none while the selected equipment stands on the floor out of view. */
+export function selectedInView(selected: EquipmentId | null, floor: Floor): EquipmentId | null {
+  return selected !== null && floorOf(selected) === floor ? selected : null;
+}
+
 export function otherFloor(floor: Floor): Floor {
   return floor === "office" ? "servers" : "office";
 }
