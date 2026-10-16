@@ -124,6 +124,8 @@ it("waits through an incident on a resumed company without holding its clock, th
   expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", false);
   act(() => { useGame.getState().setRunning(true); useGame.getState().tick(1); });
   expect(useGame.getState().game.campaign!.step).toBe(7);
+  // Running through the incident neither finishes nor drops the walkthrough.
+  expect(useGame.getState()).toMatchObject({ tour: { track: "campaign", step: 0 }, meta: { tutorialDone: false }, lastIntro: null });
 });
 
 it("walks Stay Online through unlocking Health Checks in Tech and deploying it", () => {
