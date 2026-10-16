@@ -103,9 +103,9 @@ it("closes an open purchase confirmation when the view leaves its machine's floo
     expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull();
     expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
 });
+
+
 it("keeps actual results separate from current costs and hides accounting behind disclosures",()=>{
-
-
     const game=tick(newGame(),60);
     act(()=>useGame.setState({game}));render(<CampaignFinance onClose={()=>{}}/>);
     const overview=screen.getByRole("region",{name:"Company finances overview"});
