@@ -30,6 +30,7 @@ import { AvatarSettings } from "./AvatarPicker";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { MenuRun, MenuTile } from "./MenuRun";
 import { SaveFiles } from "./SaveFiles";
+import { download } from "./download";
 import { SoundButton } from "./SoundButton";
 import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
@@ -307,10 +308,6 @@ function Report({ report, meta = true }: { report: CampaignPostmortem; meta?: bo
   </div>;
 }
 
-function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
-}
 /** The campaign menu: the same run card, Resume, tabs and tiles as Classic's, with the company's own actions. */
 function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
   const { game, openView, newRun, saveNow, saveBlocked, measurement } = useGame();
