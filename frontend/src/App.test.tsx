@@ -4,7 +4,8 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import App from "./App";
 import { useGame } from "./game/store";
-import { DEFAULT_META, saveMeta } from "./game/persist";
+import { DEFAULT_META, saveClassicGame, saveMeta } from "./game/persist";
+import { advanceTurn, newLegacyGame } from "./sim";
 vi.mock("./components/scene/Facility", () => ({ default: () => <div data-testid="facility" /> }));
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -172,7 +173,7 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
     expect(within(campaignMenu).getByRole("button", { name: "Resume" })).toBeTruthy();
   }
   openTab(campaignMenu, "Run");
-  expectButtons(campaignMenu, ["Save now", "How to play", "Save and exit", "Switch to Challenge Mode"]);
+  expectButtons(campaignMenu, ["Save now", "How to play", "Save and exit", "New company", "Switch to Challenge Mode"]);
   expect(within(campaignMenu).queryByRole("button", { name: "Import save" })).toBeNull();
   openTab(campaignMenu, "Sound");
   fireEvent.change(within(campaignMenu).getByRole("slider", { name: "Music" }), { target: { value: "25" } });
@@ -287,4 +288,30 @@ it("asks once before New company replaces the campaign, as Classic's Start over 
   fireEvent.click(within(menu).getByRole("button", { name: "Lose this company? Press again" }));
   expect(useGame.getState().game.campaign!.step).toBe(0);
   expect(useGame.getState().game.campaign!.runId).not.toBe(runId);
+});
+
+it("offers New company on the menu's Run tab too, asking once and forgetting the question on another tab", () => {
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+  saveClassicGame(advanceTurn(newLegacyGame(2)));
+  const classic = localStorage.getItem("nn.classic.save.v1");
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+  fireEvent.click(screen.getByText("More controls"));
+  fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
+  const runId = useGame.getState().game.campaign!.runId;
+  const menu = openMenu();
+  const run = within(menu).getByRole("group", { name: "Run" });
+  fireEvent.click(within(run).getByRole("button", { name: "New company" }));
+  expect(useGame.getState().game.campaign!.step).toBe(1);
+  const armed = within(run).getByRole("button", { name: "Lose this company? Press again" });
+  expect(armed.textContent).toContain("Your current company will be replaced.");
+  expect(within(menu).getByText("Are you sure?")).toBeTruthy();
+  openTab(menu, "Sound");
+  openTab(menu, "Run");
+  expect(within(menu).queryByText("Are you sure?")).toBeNull();
+  fireEvent.click(within(menu).getByRole("button", { name: "New company" }));
+  fireEvent.click(within(menu).getByRole("button", { name: "Lose this company? Press again" }));
+  expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, view: null });
+  expect(useGame.getState().game.campaign).toMatchObject({ step: 0 });
+  expect(useGame.getState().game.campaign!.runId).not.toBe(runId);
+  expect(localStorage.getItem("nn.classic.save.v1")).toBe(classic);
 });
