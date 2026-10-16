@@ -3,7 +3,7 @@
 Branch: `fe/campaign-ux-clarity`.
 Worktree: `C:/Users/user/99.9-Percent-Latest/test-results/campaign-ux-clarity`.
 Implementation base: `3e89c1f7a17de1dced4c0222b515d1f39bdc2781`, fetched main at the start of implementation.
-Publication was authorised after the player reviewed the chapter bar and spotlight tutorial in the browser. Finalisation changes documentation only; the implementation and corrected fixtures remain as locally tested. Development B was not started. No merge or production deployment is authorised.
+Publication was authorised after the player reviewed the chapter bar and spotlight tutorial in the browser. Original publication finalisation changed documentation only; the implementation and corrected fixtures remained as locally tested. The CI follow-up below records subsequent test fixes and main integration. Development B was not started. No merge or production deployment is authorised.
 
 ## Result
 
@@ -16,7 +16,7 @@ Interview feedback identified excessive chapter-navigation clutter, repeated obj
 
 There is no diff in simulation, store lifecycle, persistence, purchase confirmation/validation, Finance calculations/components, scene/graphics/walking, backend/shared contracts, dependencies, workflows or deployment settings. The only shared stylesheet addition applies to the new Campaign tutorial explanation class.
 
-## Integration boundaries
+## Original publication compatibility review
 
 Final publication review fetched main at `0c2d4f80f27626a3c8ca2224b587ddb5e6373ad7`. PR [#95](https://github.com/CS3216-Final-Project/99.9-Percent/pull/95) is now merged; [#96](https://github.com/CS3216-Final-Project/99.9-Percent/pull/96) and [#97](https://github.com/CS3216-Final-Project/99.9-Percent/pull/97) remain open. Main's #98 walking collision fix is already in this branch's baseline.
 
@@ -24,7 +24,29 @@ A line-ending-normalised three-way rehearsal on ignored copies found no textual 
 
 This branch does not independently implement #96's lifecycle. Its step-six instruction matches "After this guide", with the Run instruction at the final step where that PR allows it. No floor/purchase or component-help implementation was copied or replaced. There is no need for a conflict-resolution rebase now. Main is one commit ahead of this baseline, and strict up-to-date checks will require an update before merging; publication does not imply permission to make that update. Recheck the eventual combined result, including clock/skip/replay, floor-switch purchases and help removal.
 
-## Validation
+## PR #100 CI investigation and correction
+
+Original run [38922466800](https://github.com/CS3216-Final-Project/99.9-Percent/actions/runs/38922466800) failed on `e0851bc`. These were missed old-layout assertions introduced by the approved navigation change, not evidence of broken progression or a dependency/environment failure:
+
+| Job | Exact failures and error | Root cause / correction |
+| --- | --- | --- |
+| `frontend-checks`, `npm run test:coverage` | Two cases each in `CombinedUI.test.tsx` and `SpikeUI.test.tsx`: `Unable to find an accessible element with the role "list" and name "Chapter progress"` | Completion/availability now lives in View chapters. Open the actual overview, read the same status assertions and return before continuing. |
+| `frontend-browser (2)` | Both `data strategy: cache/database, continuity and reload` and `spikes: explicit continuation, delayed autoscaling, retirement and reload without API`: `element(s) not found`, expecting `Available next` in `Chapter progress` | Inspect availability through View chapters, retaining its status assertion and checking restored focus. Data Strategy's entry/reload assertions now check the compact current-chapter heading and exact goal instead of the deliberately removed `Current stage` callout. |
+| Required `frontend` gate | `Frontend checks: failure; browser journeys: failure` | Consequence of the two failed jobs above, not another defect. |
+
+Original full coverage: 1,046 passed, four failed, one optional skip. Browser shard 2: 37 passed, three failed (also failed on hosted retries). Backend and browser shards 1/3 passed. No original job remained pending, cancelled or skipped. The optional trace test is distinct from a skipped CI job. Branch status `BEHIND` was a separate strict up-to-date merge restriction.
+
+Downloaded shard-2 logs, error contexts, screenshots and trace events confirm that the compact bar and Next were present while the assertions waited for the removed list. Local unchanged reproduction produced the same four failures (four other tests passed) and the same three browser failures with `CI=true`, actual Chromium WebGL and retries disabled.
+
+Latest fetched main `0c2d4f8` was integrated once in feature-branch merge `66d8ad9`, without conflicts or rewritten published history. Backup `fe/campaign-ux-clarity-backup-e0851bc` retains the original head. This is not a merge of PR #100. PR #95's purchase/floor changes and Classic `selectedInView` tutorial behavior remain intact; #96/#97 remain open. No competing clock lifecycle or help-removal implementation was added. Against updated main, simulation, store, save formats, purchase implementation, floor helpers, Classic implementation, backend, dependencies and workflows have no diff.
+
+The regression fix changes only `frontend/src/components/CombinedUI.test.tsx`, `frontend/src/components/SpikeUI.test.tsx`, `frontend/e2e/dataStrategy.spec.ts`, `frontend/e2e/spikes.spec.ts` and this report. No fixture, timeout, test budget, engine rule or runtime UI was changed to obtain passing results. These four test paths extend the original 21-file PR scope to 25 files.
+
+Node 22.23.3 post-integration validation: the two failed component files passed all eight tests; focused coverage then passed 172 tests across 14 files with no failures/skips (the original ten focused files plus CombinedUI, SpikeUI, SidePanel and game/floors). The three failed browser journeys each passed twice (six passes), with `CI=true` and `--retries=0`. Lint, typecheck and production build passed. All ten nearby browsers passed without retries: Opening keyboard/inspection/purchase/replay, chapter entry, Health Checks Tech/deploy, Health/Finance spotlight coexistence, Classic tutorial/purchase/reload, touch chapter overview, touch Finance and complete 390px/320px walkthroughs. Full suites were not repeated locally; hosted CI must verify the exact pushed result, including backend. Backend files were unaffected, so no redundant local backend run was added.
+
+Ignored evidence is under `test-results/ci-fix/`: original logs and hosted shard-2 artifacts; `unit-before.log`, `browser-before.log` and their diagnostic artifacts; `unit-fixed.log`, `focused-coverage.log`, static/build logs, `reproduction-fixed.log`/report/artifacts and `nearby-browser.log`/report/artifacts. The coverage directory now represents the focused run, not full-suite coverage.
+
+## Original implementation validation
 
 All check entry points explicitly used Node 22.23.3. Dependencies were installed separately in this frontend with `npm ci`; package files are unchanged.
 
@@ -69,7 +91,7 @@ Logs are ignored under `frontend/`: `chapter-unit.log`, `chapter-browser.log`, `
 
 The original Finance worktree remains at `806cd3a`, with all 17 snapshot hashes and its saved Git status matching. Health remains clean at `215d841`, refinement clean at `f34870c`, and Finance integration clean at `c4009d5`. No files in those worktrees were edited.
 
-## Exact changed files (21)
+## Original implementation files (21)
 
 Runtime, under `frontend/src/`:
 `components/CampaignChapters.tsx`, `components/CampaignChapters.css`, `components/CampaignUI.tsx`, `components/Tutorial.tsx`, `components/CampaignAppHealth.tsx`, `game/campaignGuidance.ts`, `game/campaignAppHealth.ts`, `index.css`.

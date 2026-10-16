@@ -16,9 +16,16 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  test.setTimeout(150000);const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
  await seedSave(page,prepared());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
  const guidance=page.getByRole("region",{name:"Guided Mode guidance"});
- await expect(page.getByRole("list",{name:"Chapter progress"}).getByRole("listitem").filter({hasText:"Data Strategy"})).toContainText("Available next");
+ const chapters=page.getByRole("region",{name:"Guided Mode chapters"});
+ const viewChapters=chapters.getByRole("button",{name:"View chapters"});
+ await viewChapters.click();
+ const overview=page.getByRole("dialog",{name:"Guided Mode chapters"});
+ await expect(overview.getByRole("listitem").filter({hasText:"Data Strategy"})).toContainText("Available next");
+ await overview.getByRole("button",{name:"Back to company"}).click();
+ await expect(viewChapters).toBeFocused();
  await page.getByRole("button",{name:"Next: Continue to data strategy",exact:true}).click();
- await expect(guidance).toContainText("Current stage: Data Strategy");
+ await expect(chapters.getByLabel("Current chapter",{exact:true})).toHaveText("Data Strategy");
+ await expect(chapters.getByLabel("Current objective")).toHaveText("Goal: Compare workload, cache hits and database pressure as demand grows.");
  await expect(page.getByRole("region",{name:"Data strategy"})).toContainText("Waiting for workload growth");
  expect((await savedGame(page)).campaign!.dataStage!.profile).toBe("read-heavy");
  for(let i=0;i<6;i++)await advanceCampaignStep(page);
@@ -49,5 +56,8 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  await guidance.scrollIntoViewIfNeeded();
  await expect(guidance).toBeInViewport();
  await page.screenshot({path:`test-results/phase4-${strategy}.png`});c=(await savedGame(page)).campaign!;
- await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);await expect(guidance).toContainText("Current stage: Data Strategy");expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
+ await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);
+ await expect(chapters.getByLabel("Current chapter",{exact:true})).toHaveText("Data Strategy");
+ await expect(chapters.getByLabel("Current objective")).toHaveText("Goal: Compare workload, cache hits and database pressure as demand grows.");
+ expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
