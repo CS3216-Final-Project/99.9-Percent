@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { advanceTurn, newGame, newLegacyGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
-import { DEFAULT_META, loadClassicGame, loadGame, saveClassicGame, saveGame, saveMeta, saveMode } from "@/game/persist";
+import { DEFAULT_META, loadClassicGame, loadGame, readAnalytics, saveClassicGame, saveGame, saveMeta, saveMode } from "@/game/persist";
+import { decodeSave } from "@/game/saveEnvelope";
 import { ANALYTICS_CONSENT_KEY } from "@/lib/analytics";
 import { useGame } from "@/game/store";
 import { getSession } from "@/lib/api";
@@ -116,7 +117,7 @@ it("replays Guided Mode's walkthrough from a Challenge Mode home screen, keeping
   expect(kept.status === "ok" && kept.game.turn).toBe(2);
 });
 
-it("offers no Guided Mode walkthrough for a closed company", () => {
+it("offers no Guided Mode walkthrough for a closed company, only playing again or reviewing it", () => {
   saveMeta({ ...DEFAULT_META, tutorialDone: true });
   saveMode("campaign");
   useGame.getState().boot();
@@ -125,6 +126,128 @@ it("offers no Guided Mode walkthrough for a closed company", () => {
   const guided = card(screen.getByRole("region", { name: "Choose how you want to play" }), "Guided Mode");
   expect(guided.textContent).toContain("Company closed");
   expect(within(guided).queryByRole("button", { name: "Replay the tutorial" })).toBeNull();
+  expect(within(guided).getAllByRole("button").map((b) => b.textContent)).toEqual(["Play again", "Review company"]);
+});
+
+describe("restarting Guided Mode", () => {
+  const CLASSIC = "nn.classic.save.v1", CAMPAIGN = "nn.campaign.save.v1";
+  /** A company played for a few steps and left with Save and exit, beside a Challenge Mode run. */
+  function leftCompany(mode: "campaign" | "classic") {
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true, tutorialDone: true });
+    saveClassicGame(advanceTurn(newLegacyGame(2)));
+    useGame.getState().boot(); useGame.getState().play();
+    for (let i = 0; i < 3; i++) useGame.getState().advance();
+    useGame.getState().endSession();
+    const runId = useGame.getState().game.campaign!.runId;
+    if (mode === "classic") { saveMode("classic"); useGame.setState(useGame.getInitialState(), true); useGame.getState().boot(); }
+    render(<StrictMode><HomeScreen /></StrictMode>);
+    return { runId, guided: card(screen.getByRole("region", { name: "Choose how you want to play" }), "Guided Mode") };
+  }
+  const press = (guided: HTMLElement, name: string) => fireEvent.click(within(guided).getByRole("button", { name }));
+
+  it("offers no restart before there is a company", () => {
+    const guided = card(boot("campaign"), "Guided Mode");
+    expect(within(guided).getAllByRole("button").map((b) => b.textContent)).toEqual(["Start Guided Mode"]);
+  });
+
+  it("asks once, then replaces only the Guided Mode company and archives the old one", () => {
+    const { runId, guided } = leftCompany("campaign");
+    const classic = localStorage.getItem(CLASSIC);
+    press(guided, "New company");
+    // The first press only asks.
+    expect(useGame.getState()).toMatchObject({ started: false, game: { campaign: { runId, step: 3 } } });
+    expect(within(guided).getByText("Are you sure?")).toBeTruthy();
+    expect(within(guided).getByText(/replaces only your Guided Mode save/)).toBeTruthy();
+    press(guided, "Lose this company? Press again");
+    const next = useGame.getState().game.campaign!;
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, hasRun: true });
+    expect(next.runId).not.toBe(runId);
+    expect(next.step).toBe(0);
+    const saved = loadGame();
+    expect(saved.status === "ok" && saved.game.campaign!.runId).toBe(next.runId);
+    expect(localStorage.getItem(CLASSIC)).toBe(classic);
+    expect(readAnalytics().find((e) => e.name === "run_reset")).toMatchObject({ runId, payload: { previousRunId: runId, replacementRunId: next.runId } });
+  });
+
+  it("restarts from a Challenge Mode home screen without resuming the old company or touching the Challenge Mode run", () => {
+    const { runId, guided } = leftCompany("classic");
+    const classic = loadClassicGame();
+    press(guided, "New company");
+    expect(useGame.getState().mode).toBe("classic");
+    press(guided, "Lose this company? Press again");
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true });
+    expect(useGame.getState().game.campaign!.runId).not.toBe(runId);
+    // Switching saves the departing run as it always does; its game is unchanged.
+    expect(loadClassicGame()).toEqual(classic);
+    expect(readAnalytics().find((e) => e.name === "run_reset")).toMatchObject({ runId, payload: { previousRunId: runId } });
+  });
+
+  it("drops a pending restart when the player continues instead", () => {
+    const { runId, guided } = leftCompany("campaign");
+    press(guided, "New company");
+    press(guided, "Continue company");
+    expect(useGame.getState()).toMatchObject({ started: true, game: { campaign: { runId, step: 3 } } });
+  });
+
+  it("makes Play again the main action for a finished campaign, beside its review", () => {
+    saveMeta({ ...DEFAULT_META, tutorialDone: true });
+    useGame.getState().boot();
+    const won = { ...newGame(4, "won-company"), phase: "ended" as const, outcome: "won" as const };
+    useGame.setState({ hasRun: true, game: won });
+    render(<StrictMode><HomeScreen /></StrictMode>);
+    const guided = card(screen.getByRole("region", { name: "Choose how you want to play" }), "Guided Mode");
+    expect(guided.textContent).toMatch(/Saved game\s*Campaign complete/);
+    const [again, review] = within(guided).getAllByRole("button");
+    expect([again.textContent, review.textContent]).toEqual(["Play again", "Review company"]);
+    expect(again.className).toContain("btn-primary");
+    expect(document.activeElement).toBe(again);
+    press(guided, "Play again");
+    expect(useGame.getState().game.campaign!.runId).toBe("won-company");
+    press(guided, "Lose this company? Press again");
+    expect(useGame.getState()).toMatchObject({ started: true, game: { phase: "management", outcome: null } });
+    expect(useGame.getState().game.campaign!.runId).not.toBe("won-company");
+  });
+
+  it("reviews a finished campaign without replacing it", () => {
+    saveMeta({ ...DEFAULT_META, tutorialDone: true });
+    useGame.getState().boot();
+    useGame.setState({ hasRun: true, game: { ...newGame(4, "won-company"), phase: "ended", outcome: "won" } });
+    render(<StrictMode><HomeScreen /></StrictMode>);
+    press(card(screen.getByRole("region", { name: "Choose how you want to play" }), "Guided Mode"), "Review company");
+    expect(useGame.getState()).toMatchObject({ started: true, game: { phase: "ended", campaign: { runId: "won-company" } } });
+  });
+
+  describe("export before restarting", () => {
+    let files: { name: string; blob: Blob }[];
+    beforeEach(() => {
+      files = [];
+      let blob: Blob | null = null;
+      Object.assign(URL, { createObjectURL: (b: Blob) => { blob = b; return "blob:save"; }, revokeObjectURL: () => {} });
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) { files.push({ name: this.download, blob: blob! }); });
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    it("exports the stored company from a Challenge Mode home screen, and one more press still restarts", async () => {
+      const { runId, guided } = leftCompany("classic");
+      const stored = localStorage.getItem(CAMPAIGN);
+      press(guided, "New company");
+      press(guided, "Export company");
+      expect(files.map((f) => f.name)).toEqual(["stored-campaign.json"]);
+      expect(await files[0].blob.text()).toBe(stored);
+      press(guided, "Lose this company? Press again");
+      expect(useGame.getState().game.campaign!.runId).not.toBe(runId);
+    });
+
+    it("exports the loaded company from a Guided Mode home screen", async () => {
+      const { runId, guided } = leftCompany("campaign");
+      press(guided, "New company");
+      press(guided, "Export company");
+      expect(files.map((f) => f.name)).toEqual(["campaign.json"]);
+      const exported = decodeSave(await files[0].blob.text());
+      expect(exported.status === "ok" && exported.game.campaign).toMatchObject({ runId, step: 3 });
+      expect(useGame.getState().started).toBe(false);
+    });
+  });
 });
 
 it("asks before switching away from a game that cannot be saved", () => {

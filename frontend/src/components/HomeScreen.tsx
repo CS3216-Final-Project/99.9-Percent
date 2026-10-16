@@ -3,31 +3,36 @@ import { AvatarButton } from "./AvatarPicker";
 import { BALANCE, type GameState } from "@/sim";
 import { num } from "@/game/format";
 import { campaignChapters } from "@/game/campaignChapters";
-import { loadClassicGame, loadGame, loadMeta, type GameMode } from "@/game/persist";
+import { exportGame, loadClassicGame, loadGame, loadMeta, rawSave, type GameMode } from "@/game/persist";
 import { loadAnalyticsConsent, saveAnalyticsConsent, subscribeAnalyticsConsent } from "@/lib/analytics";
 import { isFreshRun, useGame } from "@/game/store";
 import { AccountButton } from "./Account";
+import { download } from "./download";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon, type IconName } from "./icons";
 import { Callout } from "./ui";
 import "./HomeScreen.css";
 
 /** What a mode's card says about its saved game. Nothing here changes a save. */
-interface Summary { progress: string | null; resumable: boolean; ended: boolean; tutorialDone: boolean; continueLabel: string }
+interface Summary { progress: string | null; resumable: boolean; ended: boolean; tutorialDone: boolean; continueLabel: string; restartable: boolean }
 
 function campaignSummary(game: GameState | null, tutorialDone: boolean): Summary {
-  if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Guided Mode" };
+  if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Guided Mode", restartable: false };
   const chapters = campaignChapters(game);
   const chapter = chapters.find((c) => c.current) ?? chapters.filter((c) => c.completed).at(-1) ?? chapters[0];
   const ended = game.phase === "ended";
-  return { progress: ended ? "Company closed" : `Chapter ${chapter.number} of ${chapters.length}: ${chapter.name}`, resumable: true, ended, tutorialDone, continueLabel: "Continue company" };
+  const progress = !ended ? `Chapter ${chapter.number} of ${chapters.length}: ${chapter.name}` : game.outcome === "won" ? "Campaign complete" : "Company closed";
+  return { progress, resumable: true, ended, tutorialDone, continueLabel: ended ? "Review company" : "Continue company", restartable: true };
 }
 function classicSummary(game: GameState | null, tutorialDone: boolean): Summary {
-  if (!game || game.campaign || isFreshRun(game)) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Challenge Mode" };
+  if (!game || game.campaign || isFreshRun(game)) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Challenge Mode", restartable: false };
   const ended = game.phase === "ended";
   return { progress: ended ? "Last game finished" : `Week ${game.turn} of ${BALANCE.maxTurns}`, resumable: !ended, ended, tutorialDone,
-    continueLabel: ended ? "Start Challenge Mode" : `Continue week ${game.turn}` };
+    continueLabel: ended ? "Start Challenge Mode" : `Continue week ${game.turn}`, restartable: false };
 }
+
+/** The pressed restart button's label once it has asked, as the in-game New company does. */
+const ARMED = "Lose this company? Press again";
 
 const MODES: Record<GameMode, { name: string; icon: IconName; pace: string; about: string }> = {
   campaign: {
@@ -66,6 +71,8 @@ export function HomeScreen() {
   const busy = useGame((s) => s.cloudBusy);
   const generation = useGame((s) => s.generation);
   const [unsaved, setUnsaved] = useState<GameMode | null>(null);
+  // A pending Guided Mode restart: its first press only asks.
+  const [confirmRestart, setConfirmRestart] = useState(false);
   // Challenge Mode unlocks when the Guided Mode company acknowledges its final chapter.
   const unlocked = useGame((s) => s.mode === "classic" || s.meta.challengeUnlocked || s.game.campaign?.reliabilityStage?.acknowledged === true);
 
@@ -83,10 +90,10 @@ export function HomeScreen() {
   const active = mode === "campaign" ? campaignSummary(hasRun ? game : null, meta.tutorialDone) : classicSummary(game, meta.tutorialDone);
   const summary = (m: GameMode) => (m === mode ? active : other);
 
-  /** Run `then` in mode `m`, switching first when it is not the loaded mode. */
-  const inMode = (m: GameMode, then?: () => void) => {
+  /** Run `then` in mode `m`, switching first when it is not the loaded mode; `start: false` switches without playing. */
+  const inMode = (m: GameMode, then?: () => void, start = true) => {
     const s = useGame.getState();
-    if (m !== s.mode && !s.switchMode(m, { discard: unsaved === m })) {
+    if (m !== s.mode && !s.switchMode(m, { discard: unsaved === m, start })) {
       if (!useGame.getState().cloudBusy) setUnsaved(m);
       return;
     }
@@ -111,6 +118,19 @@ export function HomeScreen() {
     useGame.getState().play();
     useGame.getState().startTour("campaign", "home");
   });
+  // Replacing the company starts a new one, so the saved company is loaded without being resumed first.
+  const restartCampaign = () => {
+    if (!confirmRestart) { setConfirmRestart(true); return; }
+    inMode("campaign", () => { setConfirmRestart(false); useGame.getState().newRun(); }, false);
+  };
+  const exportCampaign = () => {
+    const s = useGame.getState();
+    if (s.mode === "campaign" && s.hasRun) { download("campaign.json", exportGame(s.game, s.remainderMs, s.measurement)); return; }
+    const raw = rawSave("campaign");
+    if (raw !== null) download("stored-campaign.json", raw);
+  };
+  /** Any other action drops a pending restart: the confirmation belongs to the button that asked. */
+  const disarm = (action: () => void) => () => { setConfirmRestart(false); action(); };
 
   return <div className="title-screen home-screen">
     <div className="home-card">
@@ -128,8 +148,9 @@ export function HomeScreen() {
         <div className="mode-options">
           {(["campaign", "classic"] as const).map((m) => <ModeCard key={m} mode={m} summary={summary(m)} lastPlayed={m === mode && !!active.progress}
             locked={m === "classic" && !unlocked}
-            unsaved={unsaved === m} busy={busy} autoFocus={m === mode && !!active.progress}
-            onPlay={() => playMode(m)} onNew={() => inMode(m, fresh)} onTutorial={() => replayTutorial(m)} />)}
+            unsaved={unsaved === m} busy={busy} autoFocus={m === mode && !!active.progress} confirmRestart={confirmRestart}
+            onPlay={disarm(() => playMode(m))} onNew={disarm(() => inMode(m, fresh))} onTutorial={disarm(() => replayTutorial(m))}
+            onRestart={restartCampaign} onExport={exportCampaign} />)}
         </div>
         {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved">
           This run could not be saved, so switching now loses it. Press the red button again to switch anyway.
@@ -144,13 +165,20 @@ export function HomeScreen() {
   </div>;
 }
 
-function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, autoFocus, onPlay, onNew, onTutorial }: {
-  mode: GameMode; summary: Summary; lastPlayed: boolean; locked: boolean; unsaved: boolean; busy: boolean; autoFocus: boolean;
-  onPlay: () => void; onNew: () => void; onTutorial: () => void;
+function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, autoFocus, confirmRestart, onPlay, onNew, onTutorial, onRestart, onExport }: {
+  mode: GameMode; summary: Summary; lastPlayed: boolean; locked: boolean; unsaved: boolean; busy: boolean; autoFocus: boolean; confirmRestart: boolean;
+  onPlay: () => void; onNew: () => void; onTutorial: () => void; onRestart: () => void; onExport: () => void;
 }) {
   const info = MODES[mode];
   const heading = `${mode}-heading`;
   const label = unsaved ? "Switch and lose this run" : summary.continueLabel;
+  // A finished company's main action is to play again, with its review as a link; one in progress continues, with a new company beside it.
+  const finished = summary.restartable && summary.ended;
+  // Asking does not move the button, so the second press lands on it; beside Continue it has room only for "Press again".
+  const restart = summary.restartable && <button type="button" className={`btn${confirmRestart ? " btn-danger" : finished ? " btn-primary" : ""}`}
+    disabled={busy} autoFocus={finished && autoFocus} onClick={onRestart} aria-label={confirmRestart ? ARMED : undefined}>
+    {finished && <Icon name="refresh" />}{!confirmRestart ? finished ? "Play again" : "New company" : finished ? ARMED : "Press again"}
+  </button>;
   return <section className={`mode-option${lastPlayed ? " is-last-played" : ""}${locked ? " is-locked" : ""}`} aria-labelledby={heading}>
     <div className="mode-option-head">
       <h3 id={heading}><Icon name={info.icon} />{info.name}</h3>
@@ -172,13 +200,19 @@ function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, autoFocus,
         <span><span className="mode-progress-label">{summary.progress ? "Saved game" : "No saved game"}</span>{summary.progress ?? "Starts from the beginning"}</span>
       </div>
       <div className="mode-actions">
-        <button type="button" className={`btn ${unsaved ? "btn-danger" : "btn-primary"}`} disabled={busy} autoFocus={autoFocus} onClick={onPlay}>
+        {!finished && <button type="button" className={`btn ${unsaved ? "btn-danger" : "btn-primary"}`} disabled={busy} autoFocus={autoFocus} onClick={onPlay}>
           <Icon name="play" />{label}
-        </button>
+        </button>}
+        {restart}
         {mode === "classic" && summary.resumable && <button type="button" className="btn" disabled={busy} onClick={onNew}>New game</button>}
       </div>
-      {/* A closed company has no Opening left to walk through. */}
-      {summary.tutorialDone && !(mode === "campaign" && summary.ended) && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>Replay the tutorial</button>}
+      {summary.restartable && confirmRestart && <Callout compact tone="warn" icon="alert" kicker="Are you sure?" className="mode-restart-warning"
+        action={<button type="button" className="btn btn-small" disabled={busy} onClick={onExport}><Icon name="download" size={16} />Export company</button>}>
+        This replaces only your Guided Mode save. Challenge Mode is not affected. Export the company first if you want to keep it.
+      </Callout>}
+      {/* A closed company has no Opening left to walk through; it can still be looked over. */}
+      {finished ? <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onPlay}>{label}</button>
+        : summary.tutorialDone && !(mode === "campaign" && summary.ended) && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>Replay the tutorial</button>}
     </>}
   </section>;
 }
