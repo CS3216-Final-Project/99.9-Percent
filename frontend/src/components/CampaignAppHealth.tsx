@@ -39,6 +39,7 @@ export function CampaignAppHealth({ onClose }: { onClose: () => void }) {
         <p className="muted">Compare App Server, Database and Monitoring in System Overview.</p>
         <details className="app-health-details"><summary>More details</summary>
             <p><b>Response time (latency)</b> estimates how long requests take, including time waiting for processing.</p>
+            <p>{Q.latencyThresholdMs} ms is a target for this game, not a rule for every real app.</p>
             <p><b>Failed requests (error rate)</b>: Of requests that succeeded or failed, this is the percentage that failed. Waiting and rejected requests are excluded. With no outcomes, the percentage is unavailable.</p>
             <p><b>Requests waiting (backlog)</b> counts work not processed yet. These requests may still finish later.</p>
             <p><b>Rejected requests:</b> {health.rejected === null ? "Unavailable" : num(health.rejected)} in this snapshot. Rejected requests were not admitted for processing; they are separate from failed requests.</p>

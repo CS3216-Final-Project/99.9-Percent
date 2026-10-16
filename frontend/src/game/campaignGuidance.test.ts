@@ -1,5 +1,5 @@
 ﻿import {it,expect} from "vitest";
-import {campaignGuidance} from "./campaignGuidance";
+import {campaignGuidance,campaignObjective} from "./campaignGuidance";
 import {newGame,applyAction,type GameState,type Action} from "../sim";
 import {advanceSteps,canEnterData} from "../sim/step";
 import {canEnterSpikes} from "../sim/autoscaling";
@@ -9,6 +9,19 @@ function recovered(){return advanceSteps(decision(advanceSteps(newGame(),6).stat
 function scaling(){return decision(decision(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"});}
 function prevented(){return advanceSteps(decision(decision(newGame(),{type:"set_traffic_limit",enabled:true}),{type:"start_db_upgrade"}),4).state;}
 function row(g:GameState,id:string){return campaignGuidance(g).requirements.find(r=>r.id===id)!;}
+it("objectives follow actual phase before chapter without replacing required actions",()=>{
+ const g=scaling();
+ expect(campaignObjective(g)).toBe("Prepare the system for the next growth wave.");
+ g.campaign!.incident=advanceSteps(newGame(),6).state.campaign!.incident;
+ expect(campaignObjective(g)).toContain("Restore stable service");
+ g.phase="review";
+ expect(campaignObjective(g)).toContain("Read the postmortem");
+ expect(campaignGuidance(g).pendingAction?.label).toBe("Review postmortem");
+ g.phase="ended";g.outcome="won";
+ expect(campaignObjective(g)).toContain("final architecture and scorecard");
+ g.outcome="bankrupt";
+ expect(campaignObjective(g)).toContain("finances and recorded evidence");
+});
 it("initial growth waiting does not expose a scheduled deadline",()=>{
  const m=campaignGuidance(newGame());expect(m.waiting).toContain("Waiting for the next company growth event");expect(m.pendingAction).toBeNull();expect(m.incomplete.map(r=>r.id)).toContain("growth");
 });

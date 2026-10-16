@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { useGame, type TourTrack } from "@/game/store";
-import { floorOf } from "@/game/floors";
+import { floorOf, selectedInView } from "@/game/floors";
 import { num } from "@/game/format";
 import type { EquipmentId } from "@/sim";
 import { pendingStop } from "@/sim/step";
@@ -51,8 +51,8 @@ const BASICS: Step[] = [
   {
     title: "Add a server",
     why: "A traffic surge hits in week 4.",
-    hint: (s) => (s.selected === "app" ? "Press Add server." : "Click Servers."),
-    target: (s) => (s.selected === "app" ? `.side ${PRIMARY}` : label("app")),
+    hint: (s) => (selectedInView(s.selected, s.floor) === "app" ? "Press Add server." : "Click Servers."),
+    target: (s) => (selectedInView(s.selected, s.floor) === "app" ? `.side ${PRIMARY}` : label("app")),
     enter: clear,
     done: (s) => s.game.infra.appHosts.length >= 2,
   },
@@ -68,8 +68,8 @@ const BASICS: Step[] = [
   {
     title: "Get more users",
     why: "Promotions bring users, and traffic.",
-    hint: (s) => (s.selected === "growth" ? "Press Launch." : "Click Growth."),
-    target: (s) => (s.selected === "growth" ? `.side ${PRIMARY}` : label("growth")),
+    hint: (s) => (selectedInView(s.selected, s.floor) === "growth" ? "Press Launch." : "Click Growth."),
+    target: (s) => (selectedInView(s.selected, s.floor) === "growth" ? `.side ${PRIMARY}` : label("growth")),
     enter: clear,
     done: (s) => s.game.totals.promosRun > 0,
   },
@@ -118,35 +118,35 @@ const snapshot = (s: Snapshot) => s.game.campaign!.snapshot;
 const CAMPAIGN: Step[] = [
   {
     title: "Meet your system",
-    why: (s) => `Customers send ${num(snapshot(s).incoming)} requests a second. Your App Servers run the product and handle each one.`,
-    hint: () => "Click Servers.",
+    why: (s) => `Customers send ${num(snapshot(s).incoming)} requests a second. App Servers handle them.`,
+    hint: () => "Click Servers to inspect your app.",
     target: () => label("app"),
     done: (s) => s.selected === "app",
   },
   {
     title: "Follow a request",
-    why: "To answer a request, the App Server reads and writes data in the Database.",
-    hint: () => "Click Database.",
+    why: "App Servers read and write data in the Database.",
+    hint: () => "Click Database to inspect its workload.",
     target: () => label("db"),
     done: (s) => s.selected === "db",
   },
   {
     title: "Read the evidence",
     why: (s) =>
-      `The Database is doing ${num(snapshot(s).db.demand)} of the ${num(snapshot(s).db.capacity)} operations a second it can. Work above capacity waits in a backlog.`,
-    hint: () => "Compare demand with capacity. Inspecting is free.",
+      `Demand: ${num(snapshot(s).db.demand)} operations/s. Capacity: ${num(snapshot(s).db.capacity)} operations/s. Work above capacity waits. Inspection is free.`,
+    hint: () => "Compare Database demand with its capacity.",
     target: () => ".campaign-panel .incident-investigate",
   },
   {
     title: "Spot trouble",
-    why: "Latency is how long customers wait. Errors are requests that failed.",
-    hint: () => `Over ${num(Q.latencyThresholdMs)} ms or ${Q.errorThreshold * 100}% errors, customers are failing.`,
+    why: `${num(Q.latencyThresholdMs)} ms or more means slow responses. Errors measure failed requests; ${Q.errorThreshold * 100}% is the game's error warning threshold.`,
+    hint: () => "Compare response time and failed requests.",
     target: () => ".campaign-panel .incident-symptoms",
   },
   {
     title: "Know what earns money",
-    why: `Each successful request earns $${(Q.revenueCents / 100).toFixed(2)}. It becomes cash every ${Q.periodSteps} steps. Rejected requests earn nothing, but costs stay the same.`,
-    hint: () => "Purchases are paid from cash, right away.",
+    why: `Each successful request earns $${(Q.revenueCents / 100).toFixed(2)}. Money and running costs settle every ${Q.periodSteps} steps. Rejected requests earn nothing.`,
+    hint: () => "Check Cash before buying. Purchases are paid immediately.",
     target: () => ".topbar .stats-strip",
   },
   {
@@ -157,15 +157,15 @@ const CAMPAIGN: Step[] = [
   },
   {
     title: "Your actions",
-    why: "Each one costs cash now, takes a few steps to switch on, then adds upkeep.",
-    hint: () => "Click an action to see its costs.",
+    why: "Check the price, activation delay and extra running costs before deciding.",
+    hint: () => "Select an action to preview its costs.",
     target: () => ".campaign-panel .actions",
     done: () => confirmingAction() !== null,
   },
   {
     title: "Compare before buying",
     why: "Nothing is bought until you press Confirm.",
-    hint: () => "No need to buy yet. Cancel, then Run company and watch the evidence.",
+    hint: () => "Cancel the preview, then press Run company.",
     target: () => (confirmingAction() ? ".campaign-action-popover" : ".campaign-panel .actions"),
     nextLabel: "Got it",
   },
@@ -177,26 +177,26 @@ const CHAPTERS = {
   scaling: chapter(
     "Scale and route",
     `The next growth wave brings ${num(P.traffic)} requests a second.`,
-    "Scale up grows one server. Load balancing spreads traffic over several, once routing includes them.",
+    "Compare scaling and routing options. Extra servers help only when traffic reaches them.",
     '[aria-label="Scaling controls"]',
   ),
   data: chapter(
     "Data strategy",
-    "Some workloads mostly read, others mostly write.",
-    "A Read Cache answers repeated reads. Misses and writes still reach the Database.",
+    "Cache hits answer repeated reads; misses and writes still reach the Database.",
+    "Inspect the workload and compare your options.",
     '[aria-label="Data strategy"]',
   ),
   spikes: chapter(
     "Traffic spikes",
     "Two short bursts of traffic are coming.",
-    "Autoscaling adds servers while they are busy. Adding capacity yourself works too.",
+    "Inspect demand and compare manual capacity with autoscaling.",
     '[aria-label="Traffic spikes and autoscaling"]',
   ),
   reliability: [
     ...chapter(
       "Stay online",
-      "You start a test that makes one App Server fail.",
-      "Health Checks spot the failure. A spare and failover keep capacity online.",
+      "The test makes one App Server fail. Manual and automatic responses are available.",
+      "Explore the reliability controls before starting the test.",
       '[aria-label="Stay Online"]',
     ),
     {
@@ -419,6 +419,7 @@ export default function Tutorial() {
   const waiting = !!step.done;
   const name = TRACK_NAMES[tour.track] ?? "Chapter guide";
   const why = typeof step.why === "function" ? step.why(s) : step.why;
+  const campaign = !!s.game.campaign;
   return (
     <div className="tour" data-track={tour.track}>
       {box ? <div className="tour-hole" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} /> : <div className="tour-dim" />}
@@ -436,8 +437,9 @@ export default function Tutorial() {
           ))}
         </div>
         <h3>{step.title}</h3>
-        {why && <p className="muted">{why}</p>}
+        {!campaign && why && <p className="muted">{why}</p>}
         <p className="tour-prompt">{step.hint(s)}</p>
+        {campaign && why && <p className="muted tour-explanation">{why}</p>}
         <div className="tour-foot">
           <button type="button" className="tour-skip" onClick={() => s.endTour(false)}>
             Skip

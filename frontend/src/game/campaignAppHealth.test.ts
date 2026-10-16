@@ -64,3 +64,12 @@ it("uses the approved recovery explanation without changing review status",()=>{
     const g=fixture("review",900,true);
     expect(campaignAppHealth(g)).toMatchObject({word:"Recovered",reason:"Service recovered. The incident outcome is ready for review."});
 });
+
+it("explains At risk at the unchanged 500 ms boundary without implying failed requests",()=>{
+    const g=fixture("management",499.999,false);
+    expect(campaignAppHealth(g).word).toBe("Healthy");
+    g.campaign!.snapshot.latencyMs=500;
+    expect(campaignAppHealth(g)).toMatchObject({word:"At risk",failedRate:0,reason:"Your app is responding too slowly. Keep response time below 500 ms."});
+    g.phase="incident";
+    expect(campaignAppHealth(g).reason).toBe("An incident is still open, even if the latest measurements have improved.");
+});

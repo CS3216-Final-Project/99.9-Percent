@@ -5,7 +5,13 @@ import {useGame} from "../game/store";
 import {dataCompany,spikeCompany,untilOffset,act} from "../sim/__tests__/spikeFixtures";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});afterEach(cleanup);
 function show(g:ReturnType<typeof dataCompany>){useGame.setState({game:g,started:true,ready:true,onboarding:false});render(<><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/></>);}
-const chapter=(name:string)=>within(screen.getByRole("list",{name:"Chapter progress"})).getAllByRole("listitem").find(li=>li.textContent!.includes(name))!.textContent;
+function chapter(name:string) {
+ fireEvent.click(screen.getByRole("button",{name:"View chapters"}));
+ const dialog=screen.getByRole("dialog",{name:"Guided Mode chapters"});
+ const text=within(dialog).getAllByRole("listitem").find(li=>li.textContent!.includes(name))!.textContent;
+ fireEvent.click(within(dialog).getByRole("button",{name:"Back to company"}));
+ return text;
+}
 it("extends the current strip with factual available continuation and no new store",()=>{
  show(dataCompany());expect(chapter("Traffic Spikes")).toContain("Available next");
  fireEvent.click(screen.getByRole("button",{name:"Next: Continue to traffic spikes"}));expect(chapter("Data Strategy")).toContain("Completed");expect(screen.getByLabelText("Current chapter").textContent).toBe("Traffic Spikes & Autoscaling");expect(useGame.getState().running).toBe(false);expect(screen.getByRole("region",{name:"Guided Mode requirements"}).textContent).not.toContain("before continuing to traffic spikes");

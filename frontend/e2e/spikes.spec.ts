@@ -26,7 +26,11 @@ async function clockUntilDialog(page:Page,name:string){
 
 test("spikes: explicit continuation, delayed autoscaling, retirement and reload without API",async({page,withoutRoom})=>{
  test.setTimeout(150000);await page.clock.install({time:new Date("2026-10-10T00:00:00Z")});const api=await blockedGuest(page,dataCompany());await page.clock.pauseAt(new Date("2026-10-10T00:01:00Z"));
- await expect(page.getByRole("list",{name:"Chapter progress"}).getByRole("listitem").filter({hasText:"Traffic Spikes"})).toContainText("Available next");
+ await page.getByRole("button",{name:"View chapters",exact:true}).click();
+ const overview=page.getByRole("dialog",{name:"Guided Mode chapters"});
+ await expect(overview.getByRole("listitem").filter({hasText:"Traffic Spikes"})).toContainText("Available next");
+ await overview.getByRole("button",{name:"Back to company"}).click();
+ await expect(page.getByRole("button",{name:"View chapters",exact:true})).toBeFocused();
  const before=(await savedGame(page)).campaign!;await page.getByRole("button",{name:"Next: Continue to traffic spikes"}).click();
  const unlock=page.getByRole("button",{name:/Unlock autoscaling/});await unlock.focus();await expect(unlock).toBeFocused();await page.keyboard.press("Enter");await expect(page.getByRole("button",{name:"Confirm",exact:true})).toBeFocused();await page.keyboard.press("Enter");await page.getByRole("button",{name:/Deploy autoscaling/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;

@@ -81,7 +81,7 @@ export function validateEnvelope(value: unknown): Validation {
         // It must remain replayable when that migrated run is saved under the current schema.
         const foundationReliabilityActions = reliabilityActions.filter(type=>type!=="acknowledge_prevention_review");
         if(foundation && (!integer(foundation.step) || foundation.step>e.step || !integer(foundation.inputs) || foundation.inputs>inputs.length ||
-            inputs.slice(0,foundation.inputs).some(input=>input.step>foundation.step || ["enter_scaling","scale_up","deploy_load_balancer","set_routing",...dataActions,...spikeActions,...foundationReliabilityActions].includes(input.action.type) ||
+            inputs.slice(0,foundation.inputs).some(input=>input.step>foundation.step || ["enter_scaling","scale_up","deploy_load_balancer","set_routing",...dataActions,...spikeActions,...foundationReliabilityActions,...combinedActions].includes(input.action.type) ||
                 (input.action.type==="acknowledge_milestone" && input.action.enterScaling!==false)))) return {status:"corrupt"};
         const game = replayCampaign(e.seed, e.runId, inputs, e.step, legacy, foundation, !phase6 && e.schemaVersion !== SCHEMA_VERSION, legacyPreventionInputs, serviceStart);
         if(legacy && game.campaign!.foundation)game.campaign!.foundation.inputs=game.campaign!.inputs.length;

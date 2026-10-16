@@ -4394,6 +4394,8 @@ button:disabled {
   clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
+.tour-card .tour-explanation { margin-top: 8px; }
+
 .tour-foot {
   display: flex;
   justify-content: space-between;
