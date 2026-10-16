@@ -976,7 +976,8 @@ export const useGame = create<Store>()((set, get) => {
       if(pending.length&&!archiveEvents(pending)) {
         get().notify("Export playtest records before resetting: the archive could not retain this run.","error");return;
       }
-      const counted={...old.meta,runsStarted:old.meta.runsStarted+1};
+      // An unlock that only the replaced company records (an older or imported save) moves into the profile, so it is not lost with it.
+      const counted={...old.meta,runsStarted:old.meta.runsStarted+1,challengeUnlocked:challengeUnlockedNow()};
       const measurement=beginSession(m,game,crypto.randomUUID(),new Date().toISOString());
       if(m.replayOf)event(measurement,game,"replay_started",{previousRunId:m.replayOf,seed:game.seed});
       // A walkthrough still under way carries on into the new company.
