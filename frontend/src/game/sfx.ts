@@ -129,6 +129,17 @@ const VOICES = {
   },
   /** A decision is accepted: two short high notes. */
   confirm: (ctx, out, at) => run(ctx, out, at, [81, 88], 0.05, 0.13, 0.08, 3500),
+  /** A room inspection's diagnostic card: a rising hiss as the scanner sweeps, then two readout chirps. */
+  scan: (ctx, out, at, hiss) => {
+    const band = filter(ctx, "bandpass", 700);
+    band.frequency.setValueAtTime(700, at);
+    band.frequency.exponentialRampToValueAtTime(3200, at + 0.3);
+    noise(ctx, at, at + 0.36, hiss).connect(band).connect(envelope(ctx, at, 0.36, 0.16, 0.05, 0.12)).connect(out);
+    // The scanner's answer: 1244 Hz and its fifth, fixed pitches rather than scale notes.
+    for (const [t, hz] of [[0.3, 1244], [0.42, 1865]] as const) {
+      osc(ctx, "square", hz, at + t, at + t + 0.1).connect(hit(ctx, at + t, 0.11, 0.08)).connect(out);
+    }
+  },
   /** Not allowed: a low, soft buzz. */
   buzz: (ctx, out, at) => {
     const lp = filter(ctx, "lowpass", 700);
@@ -401,6 +412,7 @@ const GAP: Record<Cue, number> = {
   hire: 200,
   clunk: 150,
   confirm: 100,
+  scan: 120,
   buzz: 200,
   blip: 70,
   preview: 120,

@@ -16,6 +16,7 @@ const state = (game: GameState, over: Partial<CueState> = {}): CueState => ({
   toast: null,
   started: true,
   audio: { ...DEFAULT_AUDIO },
+  roomInspection: null,
   ...over,
 });
 const between = (a: GameState, b: GameState) => cuesBetween(state(a), state(b));
@@ -186,6 +187,18 @@ describe("cues from the player and the settings", () => {
     expect(decided("add_server", false)).toEqual(["buzz"]);
     expect(cuesBetween(state(game), state(game, { toast: { id: 1, text: "No", kind: "error" } }))).toEqual(["buzz"]);
     expect(cuesBetween(state(game), state(game, { toast: { id: 1, text: "Saved", kind: "success" } }))).toEqual([]);
+  });
+
+  it("scans for an inspection opened in the room, over its own inspect blip", () => {
+    const inspection = { seq: 1, equipment: "monitoring" as const };
+    expect(cuesBetween(state(game), state(game, { roomInspection: inspection }))).toEqual(["scan"]);
+    // The same burst carries the incident_inspect decision the click caused; the scan outranks its blip.
+    const burst = state(game, { roomInspection: inspection, lastAction: { id: 1, type: "incident_inspect", ok: true } });
+    expect(cuesBetween(state(game), burst)).toEqual(["scan", "blip"]);
+    expect(topCue(cuesBetween(state(game), burst))).toBe("scan");
+    // Dismissing the card, or holding the same inspection, says nothing.
+    expect(cuesBetween(burst, state(game, { lastAction: burst.lastAction }))).toEqual([]);
+    expect(cuesBetween(burst, { ...burst })).toEqual([]);
   });
 
   it("say nothing for a replaced game or behind the title screen", () => {

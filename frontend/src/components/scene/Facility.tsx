@@ -16,7 +16,7 @@ import {
 } from "@/sim";
 import type { GameMode, GraphicsQuality } from "@/game/persist";
 import { loadExploration, saveExploration, type SavedCameraView } from "@/game/exploration";
-import { canInspectEquipment, inspectOrSelect, useGame } from "@/game/store";
+import { canInspectEquipment, inspectInRoom, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import {
   AISLE_Z,
@@ -365,9 +365,11 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       const moving = riding();
       const f = rideAt(rideClock());
       dipEl.style.opacity = moving ? f.dip.toFixed(3) : "0";
-      // Light from each floor sweeps past the car: up the view going down, down it going up.
       const down = FLOOR_Y[ride.to] < FLOOR_Y[ride.from];
-      dipEl.style.backgroundPosition = `0 ${((down ? f.car : 1 - f.car) * 100).toFixed(1)}%`;
+      const progress = down ? f.car : 1 - f.car;
+      dipEl.style.setProperty("--ride-shift", `${(-18 + progress * 36).toFixed(1)}%`);
+      dipEl.style.setProperty("--ride-glow-y", `${(12 + progress * 76).toFixed(1)}%`);
+      dipEl.style.backgroundPosition = `0 ${(progress * 100).toFixed(1)}%`;
     }
     // Keep the view over the building while panning.
     const t = c.target;
@@ -609,7 +611,7 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (e.delta > 6) return;
     e.stopPropagation();
-    inspectOrSelect(id);
+    inspectInRoom(id);
     approach(id, f);
   };
 
@@ -748,7 +750,7 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       {...tipProps(useGame.getState().game.campaign ? INFRASTRUCTURE_HELP[id] : undefined)}
       className={`eq-label tone-${tone}${selected ? " is-selected" : ""}${affected ? " is-affected" : ""}${!built && !selected && !hovered && !affected ? " is-quiet" : ""}`}
       onClick={() => {
-        inspectOrSelect(id);
+        inspectInRoom(id);
         approach(id, m.footprints[id]);
       }}
       onFocus={() => useGame.getState().hover(id)}
@@ -790,7 +792,7 @@ function Labels({ landed }: { landed: Floor | null }) {
       {EQUIPMENT_ORDER.filter((id) => floorOf(id) === landed && canInspectEquipment(game, id) && (m.opening ? ["gateway","app","db","monitoring","team","deploy","growth",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id])).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectOrSelect("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span></button>)}
+      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectInRoom("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span></button>)}
     </div>
   );
 }
@@ -1110,7 +1112,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
         {/* App servers */}
         {m.hosts.slice(0, 12).map((led, i) => {
           const p = appSlot(i);
-          return <group key={i} onClick={landed==="servers"?e=>{if(e.delta<=6){e.stopPropagation();inspectOrSelect("app",campaign?.apps[i]?.id??`app-${i+1}`);}}:undefined}><Rack x={p.x} z={p.z} led={led} /></group>;
+          return <group key={i} onClick={landed==="servers"?e=>{if(e.delta<=6){e.stopPropagation();inspectInRoom("app",campaign?.apps[i]?.id??`app-${i+1}`);}}:undefined}><Rack x={p.x} z={p.z} led={led} /></group>;
         })}
         {Array.from({ length: m.temp }, (_, i) => {
           const p = tempSlot(i);
@@ -1241,7 +1243,7 @@ function FrameLimiter({ fps }: { fps: number }) {
 /** Do what is within the avatar's reach: exactly what clicking it does, the elevator's ride, or a fun thing. */
 function actOn(prompt: Prompt): string | null {
   if (prompt.kind === "equipment") {
-    inspectOrSelect(prompt.id);
+    inspectInRoom(prompt.id);
     return null;
   }
   if (prompt.kind === "elevator") {
@@ -1525,15 +1527,7 @@ export default function Facility() {
         ref={(el) => {
           dipEl = el;
         }}
-      >
-        {landed === null && (
-          <div className="ride-route">
-            <span>{FLOOR_NUMBER[ride.from]}</span>
-            <span className="ride-route-arrow">{FLOOR_Y[ride.to] > FLOOR_Y[ride.from] ? "↑" : "↓"}</span>
-            <span>{FLOOR_NUMBER[ride.to]}</span>
-          </div>
-        )}
-      </div>
+      />
       <Labels landed={landed} />
       <HoverTip container={container} />
       <FloorMenu />

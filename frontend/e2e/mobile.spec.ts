@@ -231,6 +231,7 @@ test("selects scaling instances through room and evidence on touch",async({page}
  await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
  await page.getByRole("main").getByRole("button",{name:"App 2",exact:true}).tap();
  await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 2:/})).toHaveAttribute("aria-pressed","true");
+ await page.getByRole("dialog",{name:"Servers inspected"}).getByRole("button",{name:"Return to room"}).tap();
  await page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 1:/}).tap();
  await expect(page.getByRole("main").getByRole("button",{name:"App 1",exact:true})).toHaveAttribute("aria-pressed","true");
  await page.screenshot({path:"test-results/phase3-mobile.png"});
@@ -261,6 +262,7 @@ test("cache selection, paid activation and warmth reload on touch",async({page})
  for(let i=0;i<2;i++)await advanceCampaignStep(page);
  const roomCache=page.getByRole("main").getByRole("button",{name:/Read Cache/});
  await roomCache.tap();await expect(roomCache).toHaveAttribute("aria-pressed","true");await expect(panel.getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");
+ await page.getByRole("dialog",{name:"Read Cache inspected"}).getByRole("button",{name:"Return to room"}).tap();
  await advanceCampaignStep(page);
  const before=(await savedGame(page)).campaign!;expect(before.readCache).not.toBeNull();expect(before.readCache!.warmth).toBe(0);
  await advanceCampaignStep(page);
@@ -279,6 +281,7 @@ test("traffic spikes: touch selects an instance after retirement leaves an ID ga
  const room=page.getByRole("main"),app=room.getByRole("button",{name:"App 5",exact:true});
  await app.tap();await expect(app).toHaveAttribute("aria-pressed","true");
  await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 5:/})).toHaveAttribute("aria-pressed","true");
+ await page.getByRole("dialog",{name:"Servers inspected"}).getByRole("button",{name:"Return to room"}).tap();
  await page.getByRole("region",{name:"Traffic spikes and autoscaling"}).scrollIntoViewIfNeeded();
  await page.screenshot({path:"test-results/phase5-mobile.png"});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
@@ -295,8 +298,8 @@ test("Campaign UX: the touch walkthrough and secondary controls fit the mobile v
  const card=tutorial(page),room=page.getByRole("main");
  await expect(card).toBeInViewport({ratio:1});
  // The camera brings each machine above the panel, where it can be tapped.
- await room.getByRole("button",{name:"Servers",exact:true}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 2 of 8");
- await room.getByRole("button",{name:"Database",exact:true}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 3 of 8");
+ await room.getByRole("button",{name:"Servers",exact:true}).tap();await page.getByRole("dialog",{name:"Servers inspected"}).getByRole("button",{name:"Return to room"}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 2 of 8");
+ await room.getByRole("button",{name:"Database",exact:true}).tap();await page.getByRole("dialog",{name:"Database inspected"}).getByRole("button",{name:"Return to room"}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 3 of 8");
  for(let step=4;step<=7;step++){await card.getByRole("button",{name:"Next",exact:true}).tap();await expect(card).toHaveAccessibleName(`Tutorial, step ${step} of 8`);await expect(card).toBeInViewport({ratio:1});}
  await page.getByRole("button",{name:/Upgrade database/}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 8 of 8");
  await page.screenshot({path:"test-results/campaign-tutorial-mobile.png"});

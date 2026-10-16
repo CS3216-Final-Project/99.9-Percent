@@ -147,6 +147,16 @@ export interface LastIntro {
   kind: IntroKind;
 }
 
+/**
+ * An inspection started in the 3D room itself — a model or label clicked, or the avatar's prompt — waiting for
+ * its diagnostic card. Panels keep calling `inspectOrSelect`, which never sets this. Never saved.
+ */
+export interface RoomInspection {
+  seq: number;
+  equipment: EquipmentId;
+  appId?: string;
+}
+
 interface Store {
   prepareSignIn: () => boolean;
   accountSession: AppSession | null;
@@ -201,6 +211,9 @@ interface Store {
   selected: EquipmentId | null;
   selectedAppId: string | null;
   selectApp: (id: string) => void;
+  /** The room-originated inspection asking for its reveal, or none. */
+  roomInspection: RoomInspection | null;
+  dismissRoomInspection: () => void;
   /**
    * The floor of the building in view. Choosing a piece of equipment takes the view to its floor; an incident never
    * moves it on its own. Remembered in this browser per mode (see game/exploration.ts), never in a run's save.
@@ -548,6 +561,7 @@ export const useGame = create<Store>()((set, get) => {
       saveBlocked: false,
       selected: null,
       selectedAppId: null,
+      roomInspection: null,
       hovered: null,
       affected: [],
       cameraFocus: null,
@@ -719,6 +733,8 @@ export const useGame = create<Store>()((set, get) => {
     selected: null,
     selectedAppId: null,
     selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
+    roomInspection: null,
+    dismissRoomInspection: () => set({ roomInspection: null }),
     // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
     floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
     goToFloor: (floor, how) => set(floorPatch(floor, how)),
@@ -1173,6 +1189,18 @@ export function inspectOrSelect(id: EquipmentId, appId?: string): void {
   if (!inspectable(game).includes(id)) return;
   if (inc.inspecting || inc.evidence.some((e) => e.equipment === id)) return;
   act({ type: "incident_inspect", equipment: id });
+}
+
+let roomInspectionSeq = 0;
+/**
+ * An inspection the player starts in the 3D room — clicking a model or label, or the avatar's prompt: the shared
+ * gameplay action runs, then the diagnostic reveal opens. Panels and the Campaign UI call `inspectOrSelect`
+ * directly, so their inspections stay with the inspector alone.
+ */
+export function inspectInRoom(id: EquipmentId, appId?: string): void {
+  if (!canInspectEquipment(useGame.getState().game, id)) return;
+  inspectOrSelect(id, appId);
+  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) } });
 }
 
 function loadMetaSafe(): Meta {

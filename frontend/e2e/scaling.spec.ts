@@ -21,6 +21,7 @@ for(const path of ["vertical","horizontal"] as const)test(`scaling continuation:
   await expect.poll(async()=>(await savedGame(page)).campaign!.apps.length).toBe(2);await page.getByRole("button",{name:"Pause",exact:true}).click();
   const c=(await savedGame(page)).campaign!;expect(c.snapshot.instances!.map(a=>a.demand)).toEqual([1400,0]);expect(c.incident).not.toBeNull();
   await page.getByRole("main").getByRole("button",{name:"App 2",exact:true}).click();
+  const appReveal=page.getByRole("dialog",{name:"Servers inspected"});await expect(appReveal).toBeVisible();await expect(appReveal).toContainText("App 2");await appReveal.getByRole("button",{name:"Return to room"}).click();
   await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 2:/})).toHaveAttribute("aria-pressed","true");
   await page.getByRole("button",{name:/Deploy load balancing/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await page.getByRole("button",{name:"Run",exact:true}).click();
   await expect.poll(async()=>(await savedGame(page)).campaign!.loadBalancer).toBe(true);await page.getByRole("button",{name:"Pause",exact:true}).click();
