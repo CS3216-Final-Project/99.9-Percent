@@ -5,8 +5,6 @@ import { useGame } from "@/game/store";
 import SidePanel from "./SidePanel";
 
 beforeEach(() => {
-  // jsdom lays nothing out, so it has no scrolling; the panel scrolls back to the top on each selection.
-  Element.prototype.scrollTo = () => {};
   localStorage.clear();
   saveMeta({ ...DEFAULT_META, challengeUnlocked: true, tutorialDone: true });
   saveMode("classic");

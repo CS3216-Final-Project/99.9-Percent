@@ -90,8 +90,17 @@ it("closes an open purchase confirmation when the view leaves its machine's floo
     // Opening it took the view to the App Servers' floor, and the card stays while the view is there.
     expect(useGame.getState().floor).toBe("servers");
     expect(screen.getByRole("region",{name:"Confirm Add server"})).toBeTruthy();
+    screen.getByRole("button",{name:"Confirm"}).focus();
+    act(()=>useGame.getState().goToFloor("office","key"));
+    expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull();
+    // Focus that was in the card returns to its action rather than falling to the page.
+    expect(document.activeElement).toBe(screen.getByRole("button",{name:/Add server/}));
+    act(()=>useGame.getState().goToFloor("servers","key"));
+    const elsewhere=document.createElement("button");document.body.append(elsewhere);
+    fireEvent.click(screen.getByRole("button",{name:/Add server/}));elsewhere.focus();
     act(()=>useGame.getState().goToFloor("office","elevator"));
     expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull();
+    expect(document.activeElement).toBe(elsewhere);elsewhere.remove();
     act(()=>useGame.getState().goToFloor("servers","key"));
     expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull();
     expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);

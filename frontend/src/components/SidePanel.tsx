@@ -25,7 +25,7 @@ import {
 } from "@/sim";
 import { moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
-import { floorOf } from "@/game/floors";
+import { selectedInView } from "@/game/floors";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
 import { EQUIPMENT_ICON, moodIcon, STATE_META, TECH_ICON, utilTone } from "./presentation";
@@ -421,7 +421,7 @@ export default function SidePanel() {
   const phase = useGame((s) => s.game.phase);
   const selected = useGame((s) => s.selected);
   // A machine's details stay with its floor, however the view left it.
-  const shown = useGame((s) => (s.selected && floorOf(s.selected) === s.floor ? s.selected : null));
+  const shown = useGame((s) => selectedInView(s.selected, s.floor));
   const el = useRef<HTMLElement>(null);
   useEffect(() => {
     el.current?.scrollTo({ top: 0 });

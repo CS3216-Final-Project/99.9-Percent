@@ -122,7 +122,12 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   useEffect(()=>()=>setConfirming(null),[c.runId]);
   // A decision belongs beside its machine: leaving that machine's floor closes it.
   const floor = useGame(s=>s.floor), home = floorOf(affected[0]);
-  useEffect(()=>{ if (open && floor !== home) setConfirming(null); },[open, floor, home]);
+  useEffect(()=>{
+    if (!open || floor === home) return;
+    // Focus inside the closing card goes back to its action, as Cancel does; focus elsewhere stays put.
+    restoreFocus.current = !!document.activeElement?.closest(".campaign-action-popover");
+    setConfirming(null);
+  },[open, floor, home]);
   if (props.decision && preview && !preview.ok && !introductionActive) reason = preview.reason;
   const highlight = open || pointing && confirming === null, affectedKey = affected.join();
   useEffect(() => {
