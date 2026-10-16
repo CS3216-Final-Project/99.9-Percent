@@ -34,7 +34,7 @@ import { SoundButton } from "./SoundButton";
 import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { Campaign, CampaignPostmortem, Intervention, ScheduledAction } from "@/sim/campaignTypes";
-import { completedTechIds, TECH_ORDER, type EventKind, type GameState } from "@/sim";
+import { completedTechIds, TECH_ORDER, type EventKind } from "@/sim";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
@@ -71,10 +71,6 @@ function routeName(c: Campaign) {
   const t = c.routing.targets, apps = routableApps(c).map(a => a.id);
   return apps.length > 1 && sameTargets(t, apps) ? "all apps" : t.length === 1 ? `${appName(t[0])} only` : t.map(appName).join(", ");
 }
-function stageName(g: GameState) {
-  const c=g.campaign!;
-  return c.combinedStage?"Grow the Company":c.reliabilityStage?"Stay Online":c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":c.openingMilestone?.acknowledged?"Scaling & Routing":"Opening";
-}
 function RequirementList({items}:{items:Requirement[]}) {
   return <ul className="progression-requirements">{items.map(r=><li key={r.id} data-requirement={r.id} data-met={r.met}><Icon name={r.met?"check":"close"} size={12} /> {r.label}</li>)}</ul>;
 }
@@ -83,19 +79,8 @@ function RequirementList({items}:{items:Requirement[]}) {
 function CampaignGuidance() {
   const {game,act}=useGame(),c=game.campaign!;
   const model=campaignGuidance(game),action=model.pendingAction;
-  const objective=game.phase==="ended"?(game.outcome==="won"?"Inspect the final architecture and scorecard before starting another company.":"Review the company's finances and recorded evidence.")
-    :game.phase==="review"?"Read the postmortem before continuing the same company."
-    :c.incident?"Restore stable service while weighing cost and rejected demand."
-    :c.combinedStage?"Grow the company while serving full demand, managing cost and reviewing each outcome."
-    :c.reliabilityStage?"Keep stable service through an application failure, then review the evidence."
-    :c.spikeStage?"Maintain service through changing demand while managing capacity cost."
-    :c.dataStage?"Compare logical work, cache hits and database pressure as demand grows."
-    :model.openingDone?"Prepare the system for the next growth wave."
-    :model.prevention?"Handle the traffic increase without an incident: inspect the Application and Database, then keep service healthy at full demand."
-    :"Observe demand and compare component evidence.";
 
   return <section className="campaign-guidance" aria-label="Guided Mode guidance">
-    <Callout compact tone="info" icon="monitor" kicker={`Current stage: ${stageName(game)}`}>{objective}</Callout>
     {c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
     {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><details className="more"><summary>{c.combinedStage?"Next growth requirements":"Chapter requirements"} · {model.completed.length}/{model.requirements.length}</summary>
       <RequirementList items={c.combinedStage?model.incomplete:model.requirements}/>

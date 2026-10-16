@@ -22,7 +22,37 @@ it.each([
   const bar = screen.getByRole("region", { name: "Guided Mode chapters" });
   expect(within(bar).getByLabelText("Current chapter").textContent).toBe(name);
   expect(bar.textContent).toContain(`Chapter ${number} of 6`);
-  expect(bar.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
+  expect(within(bar).queryByRole("list", { name: "Chapter progress" })).toBeNull();
+  expect(within(bar).getByLabelText("Current objective").textContent).not.toBe("");
+  expect(within(bar).getAllByRole("button", { name: "View chapters" })).toHaveLength(1);
+});
+
+it("keeps Next absent before eligibility, then advances through the existing paused action", () => {
+  useGame.setState({ game: newGame(), started: true, ready: true });
+  const view = render(<CampaignChapters />);
+  expect(screen.queryByRole("button", { name: /^Next:/ })).toBeNull();
+  view.unmount();
+  const game = dataCompany("read-heavy", false);
+  useGame.setState({ game, running: true });
+  render(<CampaignChapters />);
+  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to data strategy" }));
+  expect(useGame.getState().game.campaign!.dataStage).toBeTruthy();
+  expect(useGame.getState().game.campaign!.runId).toBe(game.campaign!.runId);
+  expect(useGame.getState().running).toBe(false);
+});
+
+it("explains a disabled Next without changing its engine gate", () => {
+  const game = spikeCompany(false);
+  game.campaign!.spikeStage!.acknowledged = true;
+  useGame.setState({ game, started: true, ready: true });
+  render(<CampaignChapters />);
+  const next = screen.getByRole("button", { name: "Next: Continue to reliability" });
+  expect(next.hasAttribute("disabled")).toBe(true);
+  const reason = document.getElementById(next.getAttribute("aria-describedby")!)!;
+  expect(reason.textContent).toContain("stable baseline management and empty queues");
+  expect(reason.tabIndex).toBe(0);
+  fireEvent.click(next);
+  expect(useGame.getState().game).toBe(game);
 });
 
 it("opens all six chapters without advancing the company and stays paused on close", () => {

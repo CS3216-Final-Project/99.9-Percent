@@ -14,7 +14,7 @@ export function campaignAppHealth(game: GameState) {
         : word === "Campaign complete" ? "You have completed this company's campaign."
         : word === "Bankrupt" ? "This company has closed because it ran out of money."
         : word === "Recovered" ? "Service recovered. The incident outcome is ready for review."
-        : word === "At risk" ? `Estimated response time is at least ${Q.latencyThresholdMs} ms.`
+        : word === "At risk" ? `Your app is responding too slowly. Keep response time below ${Q.latencyThresholdMs} ms.`
         : word === "Traffic limited" ? "A traffic limit is configured for this app."
         : "No incident, response-time warning or traffic limit is active.";
     const available = (n: number | null | undefined) => typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;

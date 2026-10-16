@@ -20,29 +20,34 @@ it("walks a first company from its system and evidence to its first purchase, wi
   start(); renderCompany();
   const before = structuredClone(useGame.getState().game.campaign!);
   expect(card(1).textContent).toContain("Customers send 300 requests a second");
-  expect(card(1).textContent).toContain("Click Servers.");
+  expect(card(1).textContent).toContain("Click Servers to inspect your app.");
+  expect(card(1).querySelector(".tour-prompt")!.nextElementSibling!.className).toContain("tour-explanation");
   // Interactive steps finish when the player does what they ask, through the real controls.
   expect(within(card(1)).queryByRole("button", { name: "Next" })).toBeNull();
   fireEvent.click(evidence().getByRole("button", { name: "App Server" }));
-  expect(card(2).textContent).toContain("Click Database.");
+  expect(card(2).textContent).toContain("Click Database to inspect its workload.");
   fireEvent.click(evidence().getByRole("button", { name: "Database" }));
-  expect(card(3).textContent).toContain("The Database is doing 300 of the 600 operations a second it can.");
+  expect(card(3).textContent).toContain("Demand: 300 operations/s. Capacity: 600 operations/s.");
   next();
-  expect(card(4).textContent).toContain("Over 500 ms or 1% errors, customers are failing.");
+  expect(card(4).textContent).toContain("500 ms or more means slow responses.");
+  expect(card(4).textContent).toContain("Errors measure failed requests; 1% is the game's error warning threshold.");
   next();
-  expect(card(5).textContent).toContain("Each successful request earns $0.20. It becomes cash every 60 steps.");
+  expect(card(5).textContent).toContain("Each successful request earns $0.20. Money and running costs settle every 60 steps.");
   next();
   expect(card(6).textContent).toContain("Pause (P) to think");
+  expect(card(6).querySelector(".tour-prompt")!.textContent).toMatch(/^After this guide/);
   next();
-  expect(card(7).textContent).toContain("Click an action to see its costs.");
+  expect(card(7).textContent).toContain("Select an action to preview its costs.");
   fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
   expect(screen.getByRole("region", { name: "Confirm Upgrade database" })).toBeTruthy();
-  expect(card(8).textContent).toContain("No need to buy yet.");
+  expect(card(8).textContent).toContain("Cancel the preview, then press Run company.");
   fireEvent.click(within(card(8)).getByRole("button", { name: "Got it" }));
 
   expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
   expect(useGame.getState().meta.tutorialDone).toBe(true);
-  expect(screen.getByRole("region", { name: "Guided Mode chapters" }).textContent).toContain("Getting started");
+  fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
+  expect(screen.getByRole("dialog", { name: "Guided Mode chapters" }).textContent).toContain("Getting started");
+  fireEvent.click(screen.getByRole("button", { name: "Back to company" }));
   // Inspection is free and the walkthrough never bought or advanced anything.
   const c = useGame.getState().game.campaign!;
   expect([c.step, c.cashCents, c.pending, c.actions]).toEqual([before.step, before.cashCents, before.pending, before.actions]);
