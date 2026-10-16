@@ -27,14 +27,18 @@ test("the walkthrough works from the keyboard, keeps shortcuts working and remem
   await expect(card).toHaveAccessibleName("Tutorial, step 3 of 8");
   await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
   await expect(card).toHaveAccessibleName("Tutorial, step 4 of 8");
-  // P runs and pauses the company even while the guide's card has focus.
+  // The guide holds the clock until it is done, so P does nothing while the card has focus.
   await expect(card).toBeFocused();
+  await page.keyboard.press("p");
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeDisabled();
+  await card.getByRole("button", { name: "Skip", exact: true }).press("Enter");
+  await expect(card).toBeHidden();
+  expect((await savedGame(page)).campaign!.step).toBe(0);
+  // Skipped, P runs and pauses the company.
   await page.keyboard.press("p");
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
   await page.keyboard.press("p");
-  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
-  await card.getByRole("button", { name: "Skip", exact: true }).press("Enter");
-  await expect(card).toBeHidden();
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
   await page.screenshot({ path: "test-results/phase2-healthy.png" });
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.screenshot({ path: "test-results/phase2-menu.png" });

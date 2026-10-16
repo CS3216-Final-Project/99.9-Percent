@@ -243,6 +243,7 @@ it("does not replay milestones from an existing save or leak saves and observer 
 
 it("ignores malformed analytics storage, storage failures and a throwing collector", () => {
   localStorage.setItem(ANALYTICS_STORAGE_KEY, '{"runs":{"bad":{"activeMs":-1}}}');
+  saveMeta({ ...DEFAULT_META, tutorialDone: true });
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
   stop = watchProductAnalytics(useGame, () => { throw Error("collector blocked"); }, "test");
   expect(() => play()).not.toThrow();

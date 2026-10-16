@@ -296,6 +296,7 @@ describe("watching the store", () => {
   });
 
   it("plays one cue for a burst of steps, and one buzz for a rejected decision", async () => {
+    saveMeta({ ...DEFAULT_META, tutorialDone: true });
     const s = () => useGame.getState();
     s().boot();
     s().play();
@@ -317,6 +318,7 @@ describe("watching the store", () => {
   });
 
   it("buzzes once for a save that keeps failing, not on every step", async () => {
+    saveMeta({ ...DEFAULT_META, tutorialDone: true });
     const s = () => useGame.getState();
     s().boot();
     s().play();

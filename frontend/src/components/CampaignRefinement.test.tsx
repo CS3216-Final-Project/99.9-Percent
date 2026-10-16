@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useGame } from "@/game/store";
+import { DEFAULT_META, saveMeta } from "@/game/persist";
 import { newGame, applyAction, type GameState } from "@/sim";
 import { advanceSteps } from "@/sim/step";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
@@ -9,7 +10,8 @@ import { CampaignAction } from "./CampaignAction";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-function start() { useGame.getState().boot(); useGame.getState().play(); }
+// These tests drive the clock, which the Opening walkthrough holds until it is done.
+function start() { saveMeta({ ...DEFAULT_META, tutorialDone: true }); useGame.getState().boot(); useGame.getState().play(); }
 function renderCompany(game?: GameState) {
   if (game) useGame.setState({ game, ready: true, hasRun: true, started: true, onboarding: false });
   return render(<><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/></>);
