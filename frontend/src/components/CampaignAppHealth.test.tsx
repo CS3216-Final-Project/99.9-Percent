@@ -11,6 +11,16 @@ beforeEach(() => {
     useGame.getState().boot(); useGame.getState().play(); useGame.setState({ onboarding: false, tour: null });
 });
 afterEach(() => { cleanup(); setConfirming(null); });
+it("keeps the estimated reading visible and the game-specific target explanation under More details", () => {
+    const g=newGame(); g.campaign!.snapshot.latencyMs=500;
+    useGame.setState({game:g}); render(<CampaignHeader />);
+    fireEvent.click(screen.getByRole("button",{name:"View app health"}));
+    const dialog=screen.getByRole("dialog",{name:"App Health"});
+    expect(within(dialog).getByText("Your app is responding too slowly. Keep response time below 500 ms.")).toBeTruthy();
+    expect(within(dialog).getByText("500 ms (estimated)")).toBeTruthy();
+    const explanation=within(dialog).getByText("500 ms is a target for this game, not a rule for every real app.");
+    expect(explanation.closest("details")!.open).toBe(false);
+});
 it("opens from the shared status card, pauses, and restores focus without changing the company", () => {
     render(<CampaignHeader />);
     const entry = screen.getByRole("button", { name: "View app health" });

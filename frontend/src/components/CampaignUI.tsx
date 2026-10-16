@@ -15,7 +15,7 @@ import TechTree from "./TechTree";
 import { AccountSection, CloudSavesSection } from "./Account";
 import { FinanceEntry } from "./CampaignFinance";
 import { AppHealthEntry } from "./CampaignAppHealth";
-import { InfrastructureHelp, CampaignUnavailable, CampaignDecisionButton } from "./CampaignInfrastructure";
+import { CampaignUnavailable, CampaignDecisionButton } from "./CampaignInfrastructure";
 import { INFRASTRUCTURE_HELP } from "@/game/infrastructureHelp";
 import { HomeScreen } from "./HomeScreen";
 import { CampaignChapters } from "./CampaignChapters";
@@ -24,7 +24,7 @@ import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest, type ChapterCompletion } from "@/game/persist";
 import { money, num } from "@/game/format";
 import { useState } from "react";
-import { inspectOrSelect, useGame, type Speed } from "@/game/store";
+import { inspectOrSelect, useGame, walkthroughHoldsClock, type Speed } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { AvatarSettings } from "./AvatarPicker";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
@@ -35,7 +35,7 @@ import { SoundButton } from "./SoundButton";
 import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { Campaign, CampaignPostmortem, Intervention, ScheduledAction } from "@/sim/campaignTypes";
-import { completedTechIds, TECH_ORDER, type EventKind, type GameState } from "@/sim";
+import { completedTechIds, TECH_ORDER, type EventKind } from "@/sim";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
@@ -72,10 +72,6 @@ function routeName(c: Campaign) {
   const t = c.routing.targets, apps = routableApps(c).map(a => a.id);
   return apps.length > 1 && sameTargets(t, apps) ? "all apps" : t.length === 1 ? `${appName(t[0])} only` : t.map(appName).join(", ");
 }
-function stageName(g: GameState) {
-  const c=g.campaign!;
-  return c.combinedStage?"Grow the Company":c.reliabilityStage?"Stay Online":c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":c.openingMilestone?.acknowledged?"Scaling & Routing":"Opening";
-}
 function RequirementList({items}:{items:Requirement[]}) {
   return <ul className="progression-requirements">{items.map(r=><li key={r.id} data-requirement={r.id} data-met={r.met}><Icon name={r.met?"check":"close"} size={12} /> {r.label}</li>)}</ul>;
 }
@@ -84,19 +80,8 @@ function RequirementList({items}:{items:Requirement[]}) {
 function CampaignGuidance() {
   const {game,act}=useGame(),c=game.campaign!;
   const model=campaignGuidance(game),action=model.pendingAction;
-  const objective=game.phase==="ended"?(game.outcome==="won"?"Inspect the final architecture and scorecard before starting another company.":"Review the company's finances and recorded evidence.")
-    :game.phase==="review"?"Read the postmortem before continuing the same company."
-    :c.incident?"Restore stable service while weighing cost and rejected demand."
-    :c.combinedStage?"Grow the company while serving full demand, managing cost and reviewing each outcome."
-    :c.reliabilityStage?"Keep stable service through an application failure, then review the evidence."
-    :c.spikeStage?"Maintain service through changing demand while managing capacity cost."
-    :c.dataStage?"Compare logical work, cache hits and database pressure as demand grows."
-    :model.openingDone?"Prepare the system for the next growth wave."
-    :model.prevention?"Handle the traffic increase without an incident: inspect the Application and Database, then keep service healthy at full demand."
-    :"Observe demand and compare component evidence.";
 
   return <section className="campaign-guidance" aria-label="Guided Mode guidance">
-    <Callout compact tone="info" icon="monitor" kicker={`Current stage: ${stageName(game)}`}>{objective}</Callout>
     {c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
     {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><details className="more"><summary>{c.combinedStage?"Next growth requirements":"Chapter requirements"} · {model.completed.length}/{model.requirements.length}</summary>
       <RequirementList items={c.combinedStage?model.incomplete:model.requirements}/>
@@ -177,7 +162,6 @@ export function CampaignPanel() {
         <div className="chips">{PLACES.filter(id=>id!=="cache"||c.dataStage).map(id => <button type="button" key={id} className={`chip${place === id ? " is-selected" : ""}`} aria-pressed={place === id} disabled={disabled} {...tipProps(INFRASTRUCTURE_HELP[id])} onClick={() => inspectOrSelect(id)}>
           <span className="chip-icon" aria-hidden="true"><Icon name={EQUIPMENT_ICON[id]} size={16} /></span>{PLACE_NAMES[id]}
         </button>)}</div>
-        <InfrastructureHelp />
         {place && <div className="campaign-evidence" role="status"><details className="more"><summary>About {PLACE_NAMES[place]}</summary><p>{INFRASTRUCTURE_HELP[place]}</p></details><Callout compact tone="info" icon={EQUIPMENT_ICON[place]} kicker={`${PLACE_NAMES[place]} · step ${m.step}`}>
           {component ? <>Demand {num(component.demand)}/s · capacity {num(component.capacity)}/s · backlog {num(component.backlog)}.</> : place === "cache" ? <>Cache {c.readCache?"deployed":"not deployed"} · effective rate used {m.data?`${m.data.effectiveHitRateUsed/100}%`:"not yet observed"} · hits {m.data?.hits??"not yet observed"}. Misses and writes reach the database.</> : place === "gateway" ? <>Incoming {num(m.incoming)}/s · admitted {num(m.admitted)}/s · rejected {num(m.rejected)}/s.</> : <>Latency {m.latencyMs.toFixed(0)} ms · errors {percent(m.serviceErrorRate)} · backlog {num(m.app.backlog + m.db.backlog)}.</>}
         </Callout></div>}
@@ -278,7 +262,8 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
 
 export function CampaignControls() {
   const { game, running, setRunning, speed, setSpeed, advance } = useGame();
-  const active = useGame(s=>s.started) && pendingStop(game.campaign) === null && !(game.campaign!.openingMilestone && !game.campaign!.openingMilestone.acknowledged) && (game.phase === "management" || game.phase === "incident");
+  const held = useGame(walkthroughHoldsClock);
+  const active = useGame(s=>s.started) && !held && pendingStop(game.campaign) === null && !(game.campaign!.openingMilestone && !game.campaign!.openingMilestone.acknowledged) && (game.phase === "management" || game.phase === "incident");
   return <footer className={`bottombar campaign-clock${running?" is-running":" is-paused"}`}>
     <ViewTabs tabs={[
       { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}` },
@@ -288,7 +273,7 @@ export function CampaignControls() {
       <div className={`week${game.phase === "incident" ? " is-incident" : ""}`}><span className="brand-week"><Icon name={game.phase === "incident" ? "incident" : "week"} size={16} />
         Week <strong>{game.turn}</strong> · Step <strong data-testid="physical-step">{game.campaign!.step}</strong>
       </span></div>
-      <button type="button" className={`btn btn-primary campaign-play${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps("Run or pause physical steps (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /><span>{running?"Pause company":"Run company"}</span></button>
+      <button type="button" className={`btn btn-primary campaign-play${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps(held ? "Finish or skip the tutorial to run the company" : "Run or pause physical steps (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /><span>{running?"Pause company":"Run company"}</span></button>
       <div className="speed" role="group" aria-label="Game speed">{([.5, 1, 2] as Speed[]).map(v => <button type="button" key={v} className={speed === v ? "is-active" : ""} aria-pressed={speed === v} onClick={() => setSpeed(v)} {...tipProps(`${v}× speed`)}>{v}×</button>)}</div>
       <span className="campaign-clock-state" role="status">{running?"Running":"Paused"}</span><details className="campaign-advanced"><summary>More controls</summary><div><p>Optional: advance exactly one modeled second. During an incident, use Run/Pause.</p><button type="button" className="btn btn-quiet advance campaign-step" aria-description="Optional precision control. One step is one modeled second; use Run company for continuous play." disabled={!active || game.phase !== "management"} onClick={advance} {...tipProps("Advance one physical step. One step models one second of requests; 60 steps settle an operating week.")}><span className="advance-label">{game.phase === "incident" ? "Incident" : game.phase === "ended" ? "Company closed" : game.phase === "review" ? "Review" : "Advance step"}</span><Icon name="next" /></button></div></details>
     </div>

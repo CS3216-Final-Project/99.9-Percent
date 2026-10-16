@@ -9,6 +9,20 @@ import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 
 export interface Requirement { id: string; label: string; met: boolean }
 export interface GuidanceAction { label: string; action?: Action }
+/** One shared objective for the chapter bar; detailed actions and gates remain in the overview. */
+export function campaignObjective(g: GameState) {
+ const c=g.campaign!;
+ if(g.phase==="ended") return g.outcome==="won"?"Inspect the final architecture and scorecard.":"Review the company's finances and recorded evidence.";
+ if(g.phase==="review") return "Read the postmortem before continuing the same company.";
+ if(c.incident) return "Restore stable service while weighing cost and rejected demand.";
+ if(c.combinedStage) return "Serve growing demand, manage costs and review each outcome.";
+ if(c.reliabilityStage) return "Keep service stable through an application failure, then review the evidence.";
+ if(c.spikeStage) return "Handle changing demand while managing capacity costs.";
+ if(c.dataStage) return "Compare workload, cache hits and database pressure as demand grows.";
+ if(c.openingMilestone?.acknowledged) return "Prepare the system for the next growth wave.";
+ if(preventionAvailable(c)) return "Inspect the Application and Database; keep service healthy at full demand.";
+ return "Observe demand and compare component evidence.";
+}
 /** Read-only presentation of existing gates. Never saved and never changes engine inputs. */
 export function campaignGuidance(g: GameState) {
  const c=g.campaign!;

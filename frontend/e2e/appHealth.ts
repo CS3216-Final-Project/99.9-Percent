@@ -29,6 +29,7 @@ export async function appHealthJourney(page: Page, width: number, height: number
     await expect(dialog.getByRole("heading", { name: "Healthy", exact: true })).toBeVisible();
     await expect(dialog).toContainText("100 ms (estimated)"); await expect(dialog).toContainText("0.00%");
     await expect(dialog.getByText(/Rejected requests:/)).toBeHidden();
+    await expect(dialog.getByText("500 ms is a target for this game, not a rule for every real app.")).toBeHidden();
     await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
     const bounds = (await dialog.boundingBox())!, toolbar = (await page.locator(".bottombar").boundingBox())!;
     expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
@@ -40,6 +41,7 @@ export async function appHealthJourney(page: Page, width: number, height: number
     await page.keyboard.press("Tab"); await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeFocused();
     if (touch) await details.tap(); else { await details.focus(); await page.keyboard.press("Enter"); }
     await expect(dialog.getByText(/Rejected requests:/)).toBeVisible();
+    await expect(dialog.getByText("500 ms is a target for this game, not a rule for every real app.")).toBeVisible();
     await expect(dialog).toContainText("separate from failed requests");
     await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeInViewport({ ratio: 1 });
     await page.screenshot({ path: `test-results/app-health-${width}-details.png` });

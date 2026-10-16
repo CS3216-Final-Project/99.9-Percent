@@ -2,14 +2,6 @@ import type { Action } from "@/sim";
 import type { ButtonHTMLAttributes } from "react";
 import { useGame } from "@/game/store";
 import { previewCampaignAction } from "@/game/campaignFinance";
-import { Tip } from "./ui";
-import { INFRASTRUCTURE_HELP } from "@/game/infrastructureHelp";
-export function InfrastructureHelp() {
-    return <details className="more"><summary>What does each component do?</summary>
-        <p>Hover, focus or tap a term for its explanation.</p>
-        <div className="chips">{([ ["gateway","Network"], ["app","App Server"], ["db","Database"], ["monitoring","Monitoring"], ["cache","Read Cache"] ] as const).map(([id,name])=><Tip key={id} text={INFRASTRUCTURE_HELP[id]!}>{name}</Tip>)}</div>
-    </details>;
-}
 /** A reachable explanation outside native disabled buttons and fieldsets. */
 export function CampaignUnavailable({action,disabled}:{action:Action;disabled:boolean}) {
     const game = useGame(s=>s.game);

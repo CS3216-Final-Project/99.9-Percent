@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EQUIPMENT_ORDER, type EquipmentId, type EquipmentState } from "@/sim";
-import { attentionOn, FLOORS, floorFromSearch, floorOf, otherFloor, type Watched } from "./floors";
+import { attentionOn, FLOORS, floorFromSearch, floorOf, otherFloor, selectedInView, type Watched } from "./floors";
 
 const calm = (): Watched => ({
   symptomatic: [],
@@ -19,6 +19,14 @@ describe("the building's floors", () => {
   it("go up and down between the two", () => {
     expect(otherFloor("office")).toBe("servers");
     expect(otherFloor("servers")).toBe("office");
+  });
+
+  it("show a selection's details only on its own floor", () => {
+    expect(selectedInView("app", "servers")).toBe("app");
+    expect(selectedInView("app", "office")).toBeNull();
+    expect(selectedInView("growth", "office")).toBe("growth");
+    expect(selectedInView("growth", "servers")).toBeNull();
+    expect(selectedInView(null, "office")).toBeNull();
   });
 
   it("read a floor from the page address, and ignore anything else", () => {
