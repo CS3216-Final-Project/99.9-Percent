@@ -1,14 +1,8 @@
 import { useId, useRef, useState } from "react";
 import { exportGame, rawLegacySave, rawSave } from "@/game/persist";
 import { useGame } from "@/game/store";
+import { download } from "./download";
 import { Icon } from "./icons";
-
-function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  const a = document.createElement("a");
-  a.href = url; a.download = name; a.click();
-  URL.revokeObjectURL(url);
-}
 
 /** Shared file controls; importing validates first and asks before replacing a run. */
 export function SaveFiles() {
