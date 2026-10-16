@@ -120,6 +120,9 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   const preview = props.decision ? previewCampaignAction(game,props.decision) : null;
   const signature = (p: typeof preview) => JSON.stringify(p);
   useEffect(()=>()=>setConfirming(null),[c.runId]);
+  // A decision belongs beside its machine: leaving that machine's floor closes it.
+  const floor = useGame(s=>s.floor), home = floorOf(affected[0]);
+  useEffect(()=>{ if (open && floor !== home) setConfirming(null); },[open, floor, home]);
   if (props.decision && preview && !preview.ok && !introductionActive) reason = preview.reason;
   const highlight = open || pointing && confirming === null, affectedKey = affected.join();
   useEffect(() => {

@@ -25,6 +25,7 @@ import {
 } from "@/sim";
 import { moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
+import { floorOf } from "@/game/floors";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
 import { EQUIPMENT_ICON, moodIcon, STATE_META, TECH_ICON, utilTone } from "./presentation";
@@ -415,19 +416,21 @@ function Inspector({ id }: { id: EquipmentId }) {
   );
 }
 
-/** Closed until the player selects something or an incident starts. */
+/** Closed until the player selects something on the floor in view, or an incident starts. */
 export default function SidePanel() {
   const phase = useGame((s) => s.game.phase);
   const selected = useGame((s) => s.selected);
+  // A machine's details stay with its floor, however the view left it.
+  const shown = useGame((s) => (s.selected && floorOf(s.selected) === s.floor ? s.selected : null));
   const el = useRef<HTMLElement>(null);
   useEffect(() => {
     el.current?.scrollTo({ top: 0 });
   }, [selected, phase]);
 
-  if (phase !== "incident" && !selected) return null;
+  if (phase !== "incident" && !shown) return null;
   return (
     <aside ref={el} className="side" aria-label="Details">
-      {phase === "incident" ? <IncidentPanel /> : selected ? <Inspector id={selected} /> : null}
+      {phase === "incident" ? <IncidentPanel /> : shown ? <Inspector id={shown} /> : null}
     </aside>
   );
 }
