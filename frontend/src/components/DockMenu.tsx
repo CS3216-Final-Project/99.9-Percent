@@ -10,6 +10,9 @@ export function DockMenu({ label, children, className = "" }: { label: ReactNode
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || !ref.current?.open) return;
+      // A timed review or keyboard inspection can open a modal over an existing menu.
+      // Its Escape handler and focus trap take priority over the controls behind it.
+      if (event.target instanceof Element && event.target.closest('[role="dialog"][aria-modal="true"]')) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       ref.current.open = false;
