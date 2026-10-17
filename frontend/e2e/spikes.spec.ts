@@ -1,7 +1,7 @@
 import { setGameSpeed } from "./fixtures";
 import { advanceCampaignStep } from "./fixtures";
 import {test,expect,expectRoom,seedSave,savedGame} from "./fixtures";
-import {dataCompany,spikeCompany,untilOffset} from "../src/sim/__tests__/spikeFixtures";
+import {act,tick,dataCompany,spikeCompany,untilOffset} from "../src/sim/__tests__/spikeFixtures";
 import type {Page} from "@playwright/test";
 async function blockedGuest(page:Page,g:ReturnType<typeof dataCompany>){
  const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
@@ -59,14 +59,45 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(page.getByRole("dialog",{name:"Spike response handled"})).toBeVisible();
  await page.getByRole("button",{name:"Continue operating",exact:true}).click();expect((await savedGame(page)).campaign!.runId).toBe(before.runId);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
-test("spikes: manual planning prevents overload without an autoscaler",async({page, installClock})=>{
+test("spikes: manual planning installs, scales and routes capacity through room controls",async({page, installClock})=>{
  await installClock();
- test.setTimeout(90000);const api=await blockedGuest(page,spikeCompany(false));const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;await setGameSpeed(page,2);
- await page.getByRole("button",{name:/Add server/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:2});
- await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();const scaleReveal=page.getByRole("dialog",{name:"Servers inspected"});await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Return to room"}).click();await page.getByRole("button",{name:/Scale up App 3/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3});
- await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"All apps",exact:true}).click();await advanceCampaignStep(page);
- await advanceCampaignStep(page,{seconds:n+28-(await savedGame(page)).campaign!.step});const c=(await savedGame(page)).campaign!;
- expect(c.apps).toHaveLength(3);expect(c.spikeStage!.controller).toBeNull();expect(c.incident).toBeNull();expect(c.snapshot.app.capacity).toBe(4800);expect(c.investedCents).toBeGreaterThan(0);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
+ const api=await blockedGuest(page,spikeCompany(false));const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
+ await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
+ await setGameSpeed(page,2);
+ await page.getByRole("button",{name:/Add server/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:2,resumeClock:false});
+ // Render the installed rack while physical game time stays paused.
+ await page.clock.runFor(1000);
+ await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();const scaleReveal=page.getByRole("dialog",{name:"Servers inspected"});await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Return to room"}).click();await page.getByRole("button",{name:/Scale up App 3/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3,resumeClock:false});
+ await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"All apps",exact:true}).click();await advanceCampaignStep(page,{resumeClock:false});
+ const c=(await savedGame(page)).campaign!,expected=manualSpikePlan().campaign!;
+ expect(c.step).toBe(n+6);
+ expect(c.apps.map(({id,tier,capacity,routed})=>({id,tier,capacity,routed}))).toEqual(expected.apps.map(({id,tier,capacity,routed})=>({id,tier,capacity,routed})));
+ expect(c.routing).toEqual(expected.routing);expect(c.pending).toEqual([]);
+ expect(c.cashCents).toBe(expected.cashCents);expect(c.investedCents).toBe(expected.investedCents);
+ expect(c.spikeStage!.controller).toBeNull();expect(c.incident).toBeNull();
+ expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
+});
+
+/** Same configuration reached by the public controls above, built only through engine actions. */
+function manualSpikePlan(){
+ let g=spikeCompany(false);
+ g=tick(act(g,{type:"add_server"}),2);
+ g=tick(act(g,{type:"scale_up",appId:"app-3"}),3);
+ return tick(act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}),1);
+}
+
+test("spikes: manually planned capacity survives the announced wave without an autoscaler",async({page,installClock})=>{
+ await installClock();
+ test.setTimeout(90000);
+ const api=await blockedGuest(page,manualSpikePlan());
+ await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
+ await setGameSpeed(page,2);
+ const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
+ await advanceCampaignStep(page,{seconds:n+28-(await savedGame(page)).campaign!.step,resumeClock:false});
+ const c=(await savedGame(page)).campaign!;
+ expect(c.step).toBe(n+28);expect(c.apps).toHaveLength(3);expect(c.spikeStage!.controller).toBeNull();
+ expect(c.incident).toBeNull();expect(c.snapshot.app.capacity).toBe(4800);expect(c.investedCents).toBeGreaterThan(0);
+ expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
 test("spikes: write-heavy DB constraint remains after automatic app routing",async({page})=>{
  test.setTimeout(90000);const api=await blockedGuest(page,untilOffset(spikeCompany(true,"write-heavy"),24));

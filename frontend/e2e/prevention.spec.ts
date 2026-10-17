@@ -1,4 +1,4 @@
-import { advanceCampaignStep } from "./fixtures";
+import { advanceCampaignStep, setGameSpeed } from "./fixtures";
 import {test,expect,expectRoom,savedGame} from "./fixtures";
 
 test("Opening prevention: fresh player, new observations and reloads keep Scaling locked without API",async({page, installClock})=>{
@@ -6,9 +6,11 @@ test("Opening prevention: fresh player, new observations and reloads keep Scalin
  test.setTimeout(90000);await page.route("**/api/**",r=>r.abort());await page.goto("/");
  await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await page.getByRole("button", { name: "Skip", exact: true }).click();await expectRoom(page);
  const id=(await savedGame(page)).campaign!.runId;
+ await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
+ await setGameSpeed(page,2);
  await page.getByRole("button",{name:/Limit to 500 requests\/s/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await page.getByRole("button",{name:/Upgrade database/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
- await advanceCampaignStep(page,{seconds:4});
+ await advanceCampaignStep(page,{seconds:4,resumeClock:false});
  let c=(await savedGame(page)).campaign!;expect(c.consumedEvents).toContain("opening-growth");expect(c.incident).toBeNull();expect(c.reports).toEqual([]);
  const guidance=page.getByRole("region",{name:"Guided Mode requirements"}),progress=page.getByRole("region",{name:"Opening prevention progress"});
  await expect(progress).toContainText("Stable service: 0 / 5");await expect(guidance.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","false");
