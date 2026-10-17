@@ -23,9 +23,9 @@ export function confirmationRoomArea(stage: DOMRect, sheet: boolean) {
   const open = sheet ? {right:stage.width-EDGE,bottom:stage.height-EDGE} : openRoomArea(stage);
   const right = Math.min(open.right, (viewport?.offsetLeft ?? 0)+(viewport?.width ?? window.innerWidth)-stage.left-EDGE);
   let bottom = Math.min(open.bottom, (viewport?.offsetTop ?? 0)+(viewport?.height ?? window.innerHeight)-stage.top-EDGE);
-  for (const selector of [".bottombar", ".floor-menu", ".camera-buttons", ".walk-prompt"]) {
-    const node = document.querySelector<HTMLElement>(selector);
-    if (!node || !node.getClientRects().length || getComputedStyle(node).visibility==="hidden") continue;
+  for (const node of document.querySelectorAll<HTMLElement>(".bottombar, .floor-menu, .camera-buttons, .walk-prompt")) {
+    // Closed disclosures can retain measurable descendant boxes, although none are painted.
+    if (node.closest("details:not([open])") || !node.getClientRects().length || getComputedStyle(node).visibility==="hidden") continue;
     const box = node.getBoundingClientRect();
     if (box.right>stage.left+left && box.left<stage.left+right && box.top>stage.top+top)
       bottom = Math.min(bottom,box.top-stage.top-EDGE);

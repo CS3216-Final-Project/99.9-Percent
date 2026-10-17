@@ -170,13 +170,13 @@ describe("game interface", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
-    fireEvent.click(screen.getByText("More controls"));
-    for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    act(() => vi.advanceTimersByTime(6000));
     expect(screen.getByText(/Stable game seconds: 0\/5/)).toBeTruthy();
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
   });
 
-  it("explains a header metric and a locked time control in the shared bubble", () => {
+  it("explains a header metric and the shared Run control in the bubble", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
@@ -186,12 +186,9 @@ describe("game interface", () => {
     expect(tooltip()?.textContent).toMatch(/Available cash: \$20,000/);
     out(screen.getByText("Cash"));
 
-    fireEvent.click(screen.getByText("More controls"));
-    for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
-    const advance = screen.getByRole("button", { name: "Incident" });
-    expect(advance.hasAttribute("disabled")).toBe(true);
-    over(advance);
+    const run = screen.getByRole("button", { name: "Run" });
+    over(run);
     settle();
-    expect(tooltip()?.textContent).toMatch(/Advance one game second/);
+    expect(tooltip()?.textContent).toMatch(/Run or pause the company/);
   });
 });

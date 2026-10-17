@@ -12,7 +12,8 @@ function prepared(){
  install({type:"deploy_load_balancer"},2);install({type:"set_routing",mode:"balanced",targets:["app-1","app-2"]},1);
  install({type:"set_traffic_limit",enabled:false},1);return g;
 }
-for(const strategy of ["cache","database"] as const)test(`data strategy: ${strategy}, continuity and reload`,async({page})=>{
+for(const strategy of ["cache","database"] as const)test(`data strategy: ${strategy}, continuity and reload`,async({page, installClock})=>{
+ await installClock();
  test.setTimeout(150000);const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
  await seedSave(page,prepared());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
  const guidance=page.getByRole("region",{name:"Guided Mode guidance"});
@@ -28,7 +29,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  await expect(chapters.getByLabel("Current objective")).toHaveText("Goal: Compare workload, cache hits and database pressure as demand grows.");
  await expect(page.getByRole("region",{name:"Data strategy"})).toContainText("Waiting for workload growth");
  expect((await savedGame(page)).campaign!.dataStage!.profile).toBe("read-heavy");
- for(let i=0;i<6;i++)await advanceCampaignStep(page);
+ await advanceCampaignStep(page,{seconds:6});
  expect((await savedGame(page)).campaign!.incident!.primaryComponent).toBe("db");
  const data=page.getByRole("region",{name:"Data strategy"});
  if(strategy==="cache")await data.getByRole("button",{name:/Deploy Read Cache/}).click();

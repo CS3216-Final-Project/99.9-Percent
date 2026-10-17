@@ -194,9 +194,9 @@ const CAMPAIGN: Step[] = [
   },
   {
     title: "Find your way around",
-    why: "The server floor holds your machines; the office holds the crew. Floor buttons switch between them. Zoom, rotate and Reset view change your view. Walk mode is optional; equipment can always be selected directly.",
+    why: "The server floor holds your machines; the office holds the crew. Open the floor selector (Room on phones) to change floors. Camera (inside Room on phones) contains zoom, rotation and Reset view. Walk mode is optional; equipment can always be selected directly.",
     hint: () => "Use the room controls to explore. On a keyboard, Q/E rotate and Page Up/Page Down switch floors.",
-    target: () => ".camera-buttons",
+    target: () => ".room-controls",
   },
   {
     title: "Technology and deployment",
@@ -348,7 +348,7 @@ function inOpenRoom(r: DOMRect, stage: DOMRect): boolean {
 /** Where the card sits relative to what it points at. */
 function placeFor(selector: string): Place {
   if (selector.startsWith(".eq-label") || selector.startsWith(".node")) return "right";
-  if (selector.startsWith(".view-tabs") || selector.startsWith(".advance") || selector.startsWith(".campaign-clock") || selector.startsWith(".camera-buttons")) return "top";
+  if (selector.startsWith(".view-tabs") || selector.startsWith(".advance") || selector.startsWith(".campaign-clock") || selector.startsWith(".room-controls")) return "top";
   if (selector.startsWith(".next-chip") || selector.startsWith(".topbar")) return "bottom";
   return "left";
 }
@@ -434,7 +434,9 @@ export default function Tutorial() {
       const height = card.current?.getBoundingClientRect().height;
       if (height) setCardHeight(previous => previous === height ? previous : height);
       setViewport((v) => (v.w === window.innerWidth && v.h === window.innerHeight ? v : { w: window.innerWidth, h: window.innerHeight }));
-      setCovered(!!document.querySelector(".modal-backdrop"));
+      const hiddenByModal = !!document.querySelector(".modal-backdrop");
+      setCovered(hiddenByModal);
+      if (hiddenByModal) focusedFor = "";
       const sel = step.target(useGame.getState());
       setSelector(sel);
       // A step pointing at equipment on the other floor takes the view there first; its label appears as the car
@@ -456,10 +458,16 @@ export default function Tutorial() {
       }
       // Guided Mode's panel can cover part of the room (its lower half on a phone). Once the label is placed, a machine
       // out of the open part is brought into it, as Guided Mode's actions do; one in view is left where it is.
-      if (eq && focusedFor !== sel && el.style.visibility === "visible") {
-        focusedFor = sel;
+      if (eq && !hiddenByModal && el.style.visibility === "visible") {
         const stage = document.querySelector("main.stage")?.getBoundingClientRect();
-        if (useGame.getState().game.campaign && stage && !inOpenRoom(el.getBoundingClientRect(), stage)) useGame.getState().focusCamera(eq);
+        if (stage) {
+          const area = openRoomArea(stage);
+          const layout = `${sel}:${Math.round(stage.width)}:${Math.round(stage.height)}:${Math.round(area.right)}:${Math.round(area.bottom)}`;
+          if (focusedFor !== layout) {
+            focusedFor = layout;
+            if (useGame.getState().game.campaign && !inOpenRoom(el.getBoundingClientRect(), stage)) useGame.getState().focusCamera(eq);
+          }
+        }
       }
       if (scrolledFor !== sel) {
         scrolledFor = sel;

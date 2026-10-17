@@ -1,7 +1,8 @@
 import { gunzipSync } from "node:zlib";
 import { test, expect } from "./fixtures";
 
-test("optional product analytics observes Play and survives reload with no title-screen start", async ({ page, withoutRoom }) => {
+test("optional product analytics observes Play and survives reload with no title-screen start", async ({ page, withoutRoom , installClock}) => {
+ await installClock();
   await withoutRoom();
   const enabled = process.env.ANALYTICS_SMOKE === "1";
   const captured: { event: string; properties: Record<string, unknown> }[] = [];
@@ -24,7 +25,7 @@ test("optional product analytics observes Play and survives reload with no title
     Object.defineProperty(navigator, "webdriver", { get: () => false });
     Object.defineProperty(navigator, "userAgentData", { get: () => ({ brands: [{ brand: "Chromium", version: "153" }], mobile: false, platform: "Windows" }) });
   });
-  await page.clock.install();
+
   await page.goto("/?test_secret=not-for-analytics");
   await expect(page.getByRole("button", { name: "Start Guided Mode" })).toBeVisible();
   // Analytics is on by default: PostHog starts before the player answers the notice.

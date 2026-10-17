@@ -1,3 +1,4 @@
+import { openCameraControls } from "./fixtures";
 import { purchaseActions, purchaseLayout } from "./purchaseLayout";
 import { test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
 import { newGame } from "../src/sim";
@@ -10,10 +11,11 @@ test("an action centres the camera on the machine it changes and opens its confi
   await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
   await page.getByRole("button", { name: "Skip", exact: true }).click();
   // Zoomed far in, so the action has to bring the view back out to its default framing.
+  await openCameraControls(page);
   for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Zoom in" }).click();
   const panel = page.getByRole("complementary", { name: "System metrics" });
   await panel.getByRole("button", { name: /^Upgrade database/ }).click();
-  await expect(page.getByRole("group", { name: "Floors" }).getByRole("button", { name: /^Server floor/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('.floor-menu button[data-floor="servers"]')).toHaveAttribute("aria-pressed", "true");
   await expectRoom(page);
   const confirm = page.getByRole("main").getByRole("region", { name: "Confirm Upgrade database" });
   await expect(confirm).toContainText("The database stores");
