@@ -1479,14 +1479,14 @@ function CameraTools() {
   return <>
     <div className="camera-buttons" role="group" aria-label="Camera">
       <div className="camera-control-row"><span>Zoom</span><div>
-        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in"><Icon name="plus" /></button>
-        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out"><Icon name="minus" /></button>
+        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" {...tipProps("Zoom in")}><Icon name="plus" /></button>
+        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" {...tipProps("Zoom out")}><Icon name="minus" /></button>
       </div></div>
       <div className="camera-control-row"><span>Rotate</span><div>
         <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" {...tipProps("Rotate left (Q)")}><Icon name="rotateLeft" /></button>
         <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" {...tipProps("Rotate right (E)")}><Icon name="rotateRight" /></button>
       </div></div>
-      <button type="button" className="camera-reset" onClick={() => cameraApi.reset()}><Icon name="monitor" />Reset view</button>
+      <button type="button" className="camera-reset" onClick={() => cameraApi.reset()} {...tipProps("Reset view: fit the room and face the starting angle")}><Icon name="monitor" />Reset view</button>
     </div>
     <details className="dock-shortcuts"><summary>Keyboard shortcuts</summary><p><CameraHint /></p></details>
   </>;
