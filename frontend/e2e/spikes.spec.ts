@@ -61,11 +61,11 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
 });
 test("spikes: manual planning prevents overload without an autoscaler",async({page, installClock})=>{
  await installClock();
- test.setTimeout(90000);const api=await blockedGuest(page,spikeCompany(false));const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
+ test.setTimeout(90000);const api=await blockedGuest(page,spikeCompany(false));const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;await setGameSpeed(page,2);
  await page.getByRole("button",{name:/Add server/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:2});
  await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();const scaleReveal=page.getByRole("dialog",{name:"Servers inspected"});await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Return to room"}).click();await page.getByRole("button",{name:/Scale up App 3/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3});
  await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"All apps",exact:true}).click();await advanceCampaignStep(page);
- await setGameSpeed(page,2);await runTo(page,n+28);const c=(await savedGame(page)).campaign!;
+ await advanceCampaignStep(page,{seconds:n+28-(await savedGame(page)).campaign!.step});const c=(await savedGame(page)).campaign!;
  expect(c.apps).toHaveLength(3);expect(c.spikeStage!.controller).toBeNull();expect(c.incident).toBeNull();expect(c.snapshot.app.capacity).toBe(4800);expect(c.investedCents).toBeGreaterThan(0);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
 test("spikes: write-heavy DB constraint remains after automatic app routing",async({page})=>{
