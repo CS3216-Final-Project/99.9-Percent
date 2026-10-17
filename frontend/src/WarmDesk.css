@@ -55,7 +55,7 @@
 .app .controls-dock .dock-primary > .icon { width: 30px; height: 30px; padding: 5px; border-radius: 9px; color: var(--ink); background: var(--go); }
 
 /* The purchase card uses the same paper and primary action as other dialogs. Its measured layout is preserved. */
-.campaign-action-popover { background: var(--paper); color: var(--ink); border: 1px solid var(--control-edge); border-radius: var(--radius-panel); font-size: var(--text-sm); }
+.campaign-action-popover { background: var(--paper); color: var(--ink); border: 1px solid var(--control-edge); border-radius: var(--radius-panel); }
 .campaign-action-popover .muted, .campaign-action-popover .row dt, .campaign-action-popover .campaign-purchase-details > summary { color: var(--text-soft); }
 .campaign-action-popover .campaign-action-machine { color: var(--text-soft); border-bottom-color: var(--control-edge); }
 .campaign-action-popover .campaign-action-machine b { color: #315845; }
@@ -70,6 +70,12 @@
   .controls-dock .room-controls[data-label]::before { position: static; margin-right: auto; }
 }
 @media (max-width: 900px) {
+  /* Keep a complete status word readable; the icon yields width before the text. */
+  .topbar .stat-action[aria-label="View app health"] .stat-body { flex: none; width: min-content; }
+  .topbar .stat-action[aria-label="View app health"] .stat-body > strong { white-space: normal; overflow-wrap: normal; }
+  .topbar .stat-action[aria-label="View app health"] .stat-icon { min-width: 12px; flex: 0 1 22px; }
+  .topbar .stat-action[aria-label="View app health"] .stat-icon .concept { width: 100%; height: auto; aspect-ratio: 1; }
+  .topbar .stat-action[aria-label="View app health"] .stat-icon .icon { max-width: 100%; max-height: 100%; }
   .topbar .stat .stat-icon .concept { width: 22px; height: 22px; }
   .topbar .stat .stat-icon .icon { width: 16px; height: 16px; }
 }
