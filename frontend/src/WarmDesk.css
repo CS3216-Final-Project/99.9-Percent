@@ -81,6 +81,8 @@
   .topbar .stat .stat-icon .icon { width: 16px; height: 16px; }
 }
 @media (max-width: 640px) {
+  .topbar .stat-action[aria-label="View app health"] { padding-inline: 1px; }
+  .topbar .stat-action[aria-label="View app health"] .stat-icon { flex-basis: 18px; }
   .controls-dock [data-label] { padding-top: 0; }
   .controls-dock [data-label]::before { display: none; }
   .app .controls-dock .room-controls { width: 148px; }
@@ -89,7 +91,6 @@
   .topbar .stat .stat-icon .concept { width: 18px; height: 18px; }
 }
 @media (max-width: 360px) {
-  .topbar .stat-action[aria-label="View app health"] { padding-inline: 1px; }
   .topbar .stat { padding: 3px; gap: 3px; min-width: 0; }
   .topbar .stat .stat-icon { flex: none; }
   .topbar .stat .stat-body { min-width: 0; flex: 1; }
