@@ -1,17 +1,24 @@
-import { advanceCampaignStep } from "./fixtures";
+import { advanceCampaignStep, setGameSpeed } from "./fixtures";
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
 for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
   test(`opening acceptance: ${path}`, async ({ page, withoutRoom , installClock}) => {
- await installClock();
+    if (path !== "upgrade") await installClock();
     // Only the upgrade path inspects a machine by clicking it in the room.
     const room = path === "upgrade";
     if (!room) await withoutRoom();
     await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
     if (room) await expectRoom(page);
-    await advanceCampaignStep(page,{seconds:6});
+    if (room) {
+      // The Opening pauses itself at the first incident. Keep native scene frames
+      // while reaching that exact boundary through the player's Run control.
+      await setGameSpeed(page, 2);
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      await expect(page.getByTestId("physical-step")).toHaveText("6");
+      await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+    } else await advanceCampaignStep(page,{seconds:6});
     if (path === "upgrade") {
       await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
       const panel = page.getByRole("complementary", { name: "System metrics" });
