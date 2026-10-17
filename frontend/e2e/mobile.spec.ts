@@ -110,7 +110,7 @@ test("current chapter is prominent and the full journey opens on touch", async (
   const before = await savedGame(page);
   await bar.getByRole("button", { name: "View chapters" }).tap();
   const dialog = page.getByRole("dialog", { name: "Guided Mode chapters" });
-  await expect(dialog.getByRole("listitem")).toHaveCount(6);
+  await expect(dialog.getByRole("listitem")).toHaveCount(7);
   await expect(dialog.getByRole("heading", { name: "Stay Online" })).toBeVisible();
   await dialog.getByRole("button", { name: "Back to company" }).tap();
   await expect(dialog).toBeHidden();
@@ -142,7 +142,7 @@ for (const next of [false,true]) test(`compact chapter bar keeps goal and naviga
     const view=bar.getByRole("button",{name:"View chapters"});
     await view.tap();
     const dialog=page.getByRole("dialog",{name:"Guided Mode chapters"});
-    await expect(dialog.getByRole("listitem")).toHaveCount(6);
+    await expect(dialog.getByRole("listitem")).toHaveCount(7);
     await dialog.getByRole("button",{name:"Back to company"}).tap();
     await expect(view).toBeFocused();
   }
