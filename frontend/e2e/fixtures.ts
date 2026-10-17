@@ -113,7 +113,9 @@ export async function savedClassicGame(page: Page): Promise<GameState> {
 export async function advanceCampaignStep(page: Page) {
   const counter = page.getByTestId("physical-step");
   const before = Number(await counter.textContent());
-  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 100));
+  // The company is paused. Leave enough lead time for a busy software-rendered browser
+  // to deliver pauseAt without its target already being in the past.
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
   await page.getByRole("button", { name: "Run", exact: true }).click();
   for (let tick = 0; tick < 10 && Number(await counter.textContent()) === before; tick++) await page.clock.runFor(200);
   await expect(counter).toHaveText(String(before + 1));
