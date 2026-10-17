@@ -1,145 +1,216 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useGame, WALKTHROUGH_STEPS } from "@/game/store";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 import Tutorial, { BASICS_STEPS, CAMPAIGN_STEPS } from "./Tutorial";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
-import { saveGame } from "@/game/persist";
+import { saveGame, saveMeta, DEFAULT_META } from "@/game/persist";
 import { newGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-
 function start() { useGame.getState().boot(); useGame.getState().play(); }
-function renderCompany() {
-  return render(<><CampaignHeader /><CampaignPanel /><CampaignControls /><CampaignOverlays /><Tutorial /></>);
-}
+function renderCompany() { return render(<><CampaignHeader /><CampaignPanel /><CampaignControls /><CampaignOverlays /><Tutorial /></>); }
 const card = (step: number) => screen.getByRole("dialog", { name: `Tutorial, step ${step} of ${CAMPAIGN_STEPS}` });
-const evidence = () => within(screen.getByRole("complementary", { name: "System metrics" }));
-const next = () => fireEvent.click(within(screen.getByRole("dialog", { name: /^Tutorial/ })).getByRole("button", { name: "Next" }));
-const remainingLessons = () => { while (useGame.getState().tour!.step < CAMPAIGN_STEPS - 1) next(); };
+const current = () => within(screen.getByRole("dialog", { name: /^Tutorial/ }));
+const next = () => fireEvent.click(current().getByRole("button", { name: "Next" }));
+function exercise() {
+  const step = useGame.getState().tour!.step;
+  const panel = within(screen.getByRole("complementary", { name: "System metrics" }));
+  if (step === 0) fireEvent.click(panel.getByRole("button", { name: "App Server" }));
+  if (step === 1) fireEvent.click(panel.getByRole("button", { name: "Database" }));
+  if (step === 2) { fireEvent.click(panel.getByRole("button", { name: "App Server" })); fireEvent.click(panel.getByRole("button", { name: "Database" })); }
+  if (step === 5) { fireEvent.click(screen.getByRole("button", { name: "Run" })); act(() => useGame.getState().tick(20)); }
+  if (step === 6) fireEvent.click(panel.getByRole("button", { name: /^Add server/ }));
+  if (step === 7) fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  if (step === 11) fireEvent.click(within(screen.getByRole("group", { name: "Game speed" })).getByRole("button", { name: useGame.getState().speed === 2 ? "1×" : "2×" }));
+  if (step === 13 || step === 14) {
+    fireEvent.click(screen.getByRole("button", { name: step === 13 ? "Tech" : "History" }));
+    fireEvent.click(within(screen.getByRole("region", { name: step === 13 ? "Tech tree" : "History" })).getByRole("button", { name: "Close" }));
+  }
+  if (step === 15) {
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Menu" })).getByRole("button", { name: /Save now/ }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Menu" })).getByRole("button", { name: "Resume" }));
+  }
+}
+function reach(step: number) { let attempts = 0; while (useGame.getState().tour!.step < step - 1) { if (++attempts > 30) throw new Error("Tutorial did not advance"); exercise(); next(); } }
 
-it("walks a first company from its system and evidence to its first purchase, without buying it", () => {
+it("requires inspection through real game controls and lets focus leave the nonmodal guide", () => {
   start(); renderCompany();
-  const before = structuredClone(useGame.getState().game.campaign!);
-  expect(card(1).textContent).toContain("Customers send 300 requests a second");
-  expect(card(1).textContent).toContain("Click Servers to inspect your app.");
-  expect(card(1).querySelector(".tour-prompt")!.nextElementSibling!.className).toContain("tour-explanation");
-  // Interactive steps finish when the player does what they ask, through the real controls.
-  expect(within(card(1)).queryByRole("button", { name: "Next" })).toBeNull();
-  fireEvent.click(evidence().getByRole("button", { name: "App Server" }));
-  expect(card(2).textContent).toContain("Click Database to inspect its workload.");
-  fireEvent.click(evidence().getByRole("button", { name: "Database" }));
-  expect(card(3).textContent).toContain("Demand: 300 operations/s. Capacity: 600 operations/s.");
-  next();
-  expect(card(4).textContent).toContain("500 ms or more means slow responses.");
-  expect(card(4).textContent).toContain("Errors measure failed requests; 1% is the game's error warning threshold.");
-  next();
-  expect(card(5).textContent).toContain("Each successful request earns $0.20. Money and running costs settle every 60 game seconds.");
-  next();
-  expect(card(6).textContent).toContain("Pause (P) to think");
-  expect(card(6).querySelector(".tour-prompt")!.textContent).toMatch(/^After this guide/);
-  next();
-  expect(card(7).textContent).toContain("Select an action to preview its costs.");
-  fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
-  expect(screen.getByRole("region", { name: "Confirm Upgrade database" })).toBeTruthy();
-  expect(card(8).textContent).toContain("Cancel the preview, then choose Next to keep learning.");
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  next();
-  expect(card(9).textContent).toContain("at game second 60, Week 1 settles and Week 2 begins");
-  next();
-  expect(card(10).textContent).toContain("equipment costs and salaries are deducted");
-  remainingLessons();
-  fireEvent.click(within(card(CAMPAIGN_STEPS)).getByRole("button", { name: "Finish Chapter 0" }));
+  expect(card(1).getAttribute("aria-modal")).toBe("false");
+  expect(current().queryByRole("button", { name: "Skip" })).toBeNull();
+  expect(current().queryByRole("button", { name: /Inspect|demo|Preview/ })).toBeNull();
+  expect(current().getByRole("button", { name: "Back" })).toHaveProperty("disabled", true);
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  fireEvent.keyDown(current().getByRole("heading", { name: "Meet your system" }), { key: "Tab" });
+  expect(document.activeElement).toBe(within(screen.getByRole("complementary", { name: "System metrics" })).getByRole("button", { name: "App Server" }));
+  next(); expect(card(1)).toBeTruthy(); exercise();
+  expect(useGame.getState().selected).toBe("app");
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+  next(); expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  exercise(); expect(useGame.getState().selected).toBe("db");
+});
 
-  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
-  expect(useGame.getState().meta.tutorialDone).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
-  expect(screen.getByRole("dialog", { name: "Guided Mode chapters" }).textContent).toContain("Getting started");
-  fireEvent.click(screen.getByRole("button", { name: "Back to company" }));
-  // Inspection is free and the walkthrough never bought or advanced anything.
+it("requires a fresh comparison of both live components in lesson three without advancing time", () => {
+  start(); renderCompany(); reach(3);
+  const before = structuredClone(useGame.getState().game.campaign!);
+  const panel = within(screen.getByRole("complementary", { name: "System metrics" }));
+  const forward = () => current().getByRole("button", { name: "Next" });
+  expect(forward()).toHaveProperty("disabled", true);
+  fireEvent.click(panel.getByRole("button", { name: "Database" }));
+  expect(forward()).toHaveProperty("disabled", true);
+  fireEvent.click(panel.getByRole("button", { name: "App Server" }));
+  expect(forward()).toHaveProperty("disabled", true);
+  fireEvent.click(panel.getByRole("button", { name: "Database" }));
+  expect(forward()).toHaveProperty("disabled", false);
+  const rows = current().getByRole("figure").querySelectorAll("dl > div");
+  expect(rows).toHaveLength(2);
+  expect(rows[0].textContent).toContain("Demand");
+  expect(rows[1].textContent).toContain("Capacity");
+  const after = useGame.getState().game.campaign!;
+  expect([after.step, after.cashCents, after.snapshot, after.pending]).toEqual([before.step, before.cashCents, before.snapshot, before.pending]);
+});
+
+it("runs exactly one real second even with a large tick, and cancels the real company's quote without spending", () => {
+  start(); renderCompany(); const before = structuredClone(useGame.getState().game.campaign!);
+  reach(6); exercise();
+  expect(useGame.getState()).toMatchObject({ running: false, game: { campaign: { step: 1 } } });
+  act(() => { useGame.getState().setRunning(true); useGame.getState().tick(20); });
+  expect(useGame.getState().game.campaign!.step).toBe(1);
+  next(); expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  exercise(); expect(screen.getByRole("region", { name: "Confirm Add server" })).toBeTruthy();
+  next(); expect(card(8)).toBeTruthy(); expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  exercise(); expect(screen.queryByRole("region", { name: "Confirm Add server" })).toBeNull();
   const c = useGame.getState().game.campaign!;
-  expect([c.step, c.cashCents, c.pending, c.actions]).toEqual([before.step, before.cashCents, before.pending, before.actions]);
-  expect(useGame.getState().running).toBe(false);
+  expect([c.cashCents, c.apps, c.actions, c.pending]).toEqual([before.cashCents, before.apps, before.actions, before.pending]);
+});
+
+it("keeps the quote open until the Cancel lesson and never permits a tutorial purchase", () => {
+  start(); renderCompany(); reach(7); exercise();
+  const cash = useGame.getState().game.campaign!.cashCents;
+  expect(screen.getByRole("button", { name: "Confirm" })).toHaveProperty("disabled", true);
+  expect(screen.getByRole("button", { name: "Cancel" })).toHaveProperty("disabled", true);
+  fireEvent.keyDown(screen.getByRole("region", { name: "Confirm Add server" }), { key: "Escape" });
+  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  expect(screen.getByRole("region", { name: "Confirm Add server" })).toBeTruthy();
+  expect(useGame.getState().view).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm" })); next();
+  expect(card(8)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Cancel" })).toHaveProperty("disabled", false);
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  fireEvent.click(screen.getByRole("button", { name: /^Limit to 500/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+  expect(useGame.getState().game.campaign!.cashCents).toBe(cash);
+});
+
+it("locks unrelated controls during inspection and restores them when the guide unmounts", () => {
+  start(); const rendered = renderCompany();
+  const menu = screen.getByRole("button", { name: "Menu" });
+  const db = within(screen.getByRole("complementary", { name: "System metrics" })).getByRole("button", { name: "Database" });
+  expect(menu.getAttribute("aria-disabled")).toBe("true");
+  expect(menu.getAttribute("tabindex")).toBe("-1");
+  fireEvent.click(menu); fireEvent.click(db);
+  expect(useGame.getState()).toMatchObject({ view: null, selected: null });
+  rendered.unmount();
+  expect(menu.hasAttribute("aria-disabled")).toBe(false);
+  expect(menu.hasAttribute("tabindex")).toBe(false);
+});
+
+it("restores a real quote when resuming directly into the Cancel lesson", () => {
+  saveMeta({ ...DEFAULT_META, walkthroughStep: 7, walkthroughFurthestStep: 7 });
+  start(); act(() => useGame.getState().goToFloor("office", "menu")); renderCompany();
+  expect(card(8)).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Confirm Add server" })).toBeTruthy();
+  expect(useGame.getState().floor).toBe("servers");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+});
+
+it("opens and closes real Tech, History and Menu views while keeping guidance visible", () => {
+  start(); renderCompany(); reach(14); exercise();
+  expect(card(14)).toBeTruthy(); expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+  next(); exercise(); next(); exercise();
+  expect(useGame.getState().toast?.text).toBe("Saved");
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+});
+
+it("goes Back without forcing completed interactions again and preserves the lesson on reload", () => {
+  start(); renderCompany(); reach(3); fireEvent.click(current().getByRole("button", { name: "Back" }));
+  expect(card(2)).toBeTruthy(); expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+  cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
+  expect(card(2)).toBeTruthy(); expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+});
+
+it("How to play clears previous exercise completion, including a restart on lesson one", () => {
+  start(); renderCompany(); reach(3);
+  const before = structuredClone(useGame.getState().game.campaign!);
+  // Restart is a store action; unrelated Menu controls are locked during an active lesson.
+  const replay = () => act(() => useGame.getState().startTour("campaign"));
+  replay();
+  expect(card(1).textContent).not.toContain("Completed earlier");
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  expect(useGame.getState().meta.walkthroughFurthestStep).toBe(0);
+  expect(useGame.getState().game.campaign).toEqual(before);
+  exercise(); expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+  replay();
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  expect(card(1).textContent).not.toContain("Completed earlier");
+  cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
+  expect(card(1)).toBeTruthy();
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+});
+
+it("teaches the real save failure without trapping a player whose browser blocks storage", () => {
+  start(); renderCompany(); reach(16);
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("storage blocked"); });
+  exercise();
+  expect(useGame.getState().toast?.text).toBe("Could not save: browser storage is unavailable.");
+  expect(card(16).textContent).toContain("Browser storage is unavailable");
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+});
+
+it("cannot skip or finish early, holds the clock outside its Run lesson, and completes only on Finish", () => {
+  start(); renderCompany();
+  act(() => { useGame.getState().endTour(false); useGame.getState().endTour(true); useGame.getState().setRunning(true); useGame.getState().tick(20); });
+  expect(card(1)).toBeTruthy(); expect(useGame.getState().game.campaign!.step).toBe(0);
+  reach(21);
+  act(() => { useGame.getState().setRunning(true); useGame.getState().advance(); });
+  expect(useGame.getState()).toMatchObject({ running: false, meta: { tutorialDone: false }, game: { campaign: { step: 1 } } });
+  fireEvent.click(current().getByRole("button", { name: "Finish Chapter 0" }));
+  expect(useGame.getState().meta.tutorialDone).toBe(true);
+});
+
+it("saves and exits unfinished and resumes the same company at its saved lesson", () => {
+  start(); renderCompany(); reach(9); const runId = useGame.getState().game.campaign!.runId;
+  fireEvent.click(current().getByRole("button", { name: "Save and exit" }));
+  expect(useGame.getState().meta.tutorialDone).toBe(false);
+  cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
+  expect(card(9)).toBeTruthy(); expect(useGame.getState().game.campaign!.runId).toBe(runId);
+});
+
+it("preserves existing completed profiles", () => {
+  saveMeta({ ...DEFAULT_META, tutorialDone: true }); start(); renderCompany();
+  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
 });
 
 it("finishes each walkthrough on the step the store counts as its last", () => {
   expect(WALKTHROUGH_STEPS).toEqual({ basics: BASICS_STEPS, campaign: CAMPAIGN_STEPS });
 });
 
-it("skips at any step, stays skipped after a reload, and replays from the menu on the same company", () => {
-  start(); renderCompany();
-  fireEvent.click(evidence().getByRole("button", { name: "App Server" }));
-  fireEvent.click(within(card(2)).getByRole("button", { name: "Skip" }));
-  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
-  cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
-  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
-
-  const before = structuredClone(useGame.getState().game);
-  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-  fireEvent.click(screen.getByRole("button", { name: /How to play/ }));
-  expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull();
-  expect(card(1)).toBeTruthy();
-  expect(useGame.getState().game).toEqual(before);
-});
-
-it("waits behind a dialog that covers the room and comes back when it closes", async () => {
-  start(); renderCompany();
-  expect(card(1)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull());
-  fireEvent.click(screen.getByRole("button", { name: "Back to company" }));
-  await waitFor(() => expect(card(1)).toBeTruthy());
-});
-
-it("holds the clock until its last step, so the first incident cannot open while it is still teaching", () => {
-  start(); renderCompany();
-  const run = () => screen.getByRole("button", { name: "Run" });
-  expect(run()).toHaveProperty("disabled", true);
-  expect(run().getAttribute("data-tip")).toBe("Finish or skip the tutorial to run the company");
-  // The P shortcut and a stray tick go through the same store rule.
-  act(() => { useGame.getState().setRunning(true); useGame.getState().tick(30); useGame.getState().advance(); });
-  expect(useGame.getState()).toMatchObject({ running: false, game: { phase: "management", campaign: { step: 0 } } });
-
-  fireEvent.click(evidence().getByRole("button", { name: "App Server" }));
-  fireEvent.click(evidence().getByRole("button", { name: "Database" }));
-  for (let i = 0; i < 4; i++) next();
-  expect(card(7)).toBeTruthy();
-  expect(run()).toHaveProperty("disabled", true);
-  fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  // The last step asks the player to run the company; doing so closes its card.
-  expect(run()).toHaveProperty("disabled", true);
-  remainingLessons();
-  expect(card(CAMPAIGN_STEPS).textContent).toContain("Run company");
-  expect(run()).toHaveProperty("disabled", false);
-  fireEvent.click(run());
-  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
-  expect(useGame.getState()).toMatchObject({ running: true, tour: null, meta: { tutorialDone: true } });
-  act(() => useGame.getState().tick(1));
-  expect(useGame.getState().game.campaign!.step).toBe(1);
-});
-
-it("lets the clock run once the walkthrough is skipped", () => {
-  start(); renderCompany();
-  fireEvent.click(within(card(1)).getByRole("button", { name: "Skip" }));
-  fireEvent.click(screen.getByRole("button", { name: "Run" }));
-  act(() => useGame.getState().tick(1));
-  expect(useGame.getState().game.campaign!.step).toBe(1);
-});
-
-it("waits through an incident on a resumed company without holding its clock, then resumes where the player left off", () => {
+it("waits through an incident on a resumed company without holding its clock", () => {
   saveGame(advanceSteps(newGame(1, "resumed-incident"), 6).state);
+  saveMeta({ ...DEFAULT_META, walkthroughStep: 6, walkthroughFurthestStep: 6 });
   start(); renderCompany();
-  expect(useGame.getState().game.phase).toBe("incident");
-  expect(useGame.getState().tour).toEqual({ track: "campaign", step: 0 });
   expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
-  expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", false);
+  fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+  expect(screen.getByRole("button", { name: "Confirm" })).toHaveProperty("disabled", false);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   act(() => { useGame.getState().setRunning(true); useGame.getState().tick(1); });
   expect(useGame.getState().game.campaign!.step).toBe(7);
-  // Running through the incident neither finishes nor drops the walkthrough.
-  expect(useGame.getState()).toMatchObject({ tour: { track: "campaign", step: 0 }, meta: { tutorialDone: false }, lastIntro: null });
+  expect(useGame.getState().meta.tutorialDone).toBe(false);
 });
 
 it("walks Stay Online through unlocking Health Checks in Tech and deploying it", () => {

@@ -26,8 +26,13 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
     expect((await savedGame(page)).campaign!.cashCents).toBe(before.campaign!.cashCents-100000);
     const reason=page.locator('.campaign-action-card').filter({has:page.getByRole("button",{name:/Add server/})}).locator('.campaign-action-reason');
     await expect(reason).toContainText("deployment is already pending");await reason.focus();await expect(reason).toBeFocused();
-    await page.locator('.campaign-panel .chip').filter({hasText:/^App Server$/}).hover();
-    await expect(page.getByRole("tooltip")).toContainText("Scale Up makes one existing");
+    const app=page.locator('.campaign-panel .chip').filter({hasText:/^App Server$/});
+    await app.hover();
+    await expect(page.getByRole("tooltip")).toHaveText("Handles customer requests and uses the Database for data.");
+    await app.click();
+    const evidence=page.locator('.campaign-panel .campaign-evidence');
+    await evidence.getByText("About App Server",{exact:true}).click();
+    await expect(evidence).toContainText("Scale Up makes one existing");
 });
 
 

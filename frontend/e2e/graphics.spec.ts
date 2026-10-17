@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect, expectRoom } from "./fixtures";
+import { completeTutorial, test, expect, expectRoom } from "./fixtures";
 
 /** Pixels drawn per CSS pixel of the room's canvas. */
 const pixelRatio = (page: Page) =>
@@ -9,7 +9,7 @@ const pixelRatio = (page: Page) =>
 test("changes the graphics quality from the menu, redraws the room and remembers the choice", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
-  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await completeTutorial(page);
   await expectRoom(page);
   // The test browser draws in software, so Auto means half the pixels.
   await expect.poll(() => pixelRatio(page)).toBeCloseTo(0.5, 1);

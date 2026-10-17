@@ -77,8 +77,7 @@ export function campaignGuidance(g: GameState) {
   add("reports","All recovered incident reports acknowledged",reportsAcknowledged);
   add("healthy","Healthy latency and service errors with completed requests",qualifiesForRecovery(c.snapshot));
   optional="Workload contrast is optional; cache purchase and database upgrades are not required for continuation.";
-  if(!c.dataStage.consumed&&canEnterData(g))waiting="Waiting for the next company growth event. Run or Advance game second checks readiness.";
-  else if(!c.dataStage.consumed)notice="Data growth waits for management, empty queues, no active incident and acknowledged reports.";
+  if(!c.dataStage.consumed&&!canEnterData(g))notice="Data growth waits for management, empty queues, no active incident and acknowledged reports.";
   if(spikesAvailable)pendingAction={label:"Continue to traffic spikes",action:{type:"enter_spikes"}};
  } else if(openingDone) {
   add("opening","Opening completed",openingDone);
@@ -89,7 +88,6 @@ export function campaignGuidance(g: GameState) {
   add("queues","Application and Database queues empty",queuesEmpty);
   add("growth","Scaling growth occurred",!!c.scaling?.consumed);
   add("reports","All recovered incident reports acknowledged",reportsAcknowledged);
-  if(c.scaling&&!c.scaling.consumed&&(c.dbCapacity>=P.dbCapacity||!!c.scalingConsent)&&g.phase==="management"&&!c.incident&&queuesEmpty)waiting="Waiting for the next company growth event. Run or Advance game second checks readiness.";
   if(!c.scaling?.consumed&&!c.scalingConsent&&c.dbCapacity<P.dbCapacity&&c.cashCents<=P.dbCostCents)notice="Next growth requires paid database headroom, but current cash cannot fund that investment. Pending revenue is available only after settlement; inspect finances and operating costs before advancing. Solvency alone does not guarantee an affordable growth investment.";
   if(!c.scaling&&g.phase!=="ended")pendingAction={label:"Continue to scaling and routing",action:{type:"enter_scaling"}};
   else if(dataAvailable)pendingAction={label:"Continue to data strategy",action:{type:"enter_data"}};
@@ -121,7 +119,6 @@ export function campaignGuidance(g: GameState) {
   add("growth","Opening growth occurred",c.consumedEvents.includes("opening-growth"));
   add("outcome","Real Opening incident recovered and postmortem acknowledged",false);
   add("milestone","Opening milestone acknowledged",false);
-  waiting="Waiting for the next company growth event. Run or Advance game second to observe demand.";
  }
  // Required acknowledgements take priority over stage continuation in every stage.
  if(g.phase==="review"&&c.reports.length)pendingAction={label:"Review postmortem"};

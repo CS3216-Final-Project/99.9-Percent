@@ -399,7 +399,7 @@ export default function Game() {
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       const s = useGame.getState();
       // The guide's card is labelled a dialog for assistive technology, but it is not modal: shortcuts still apply.
-      if (!s.started || target?.closest('[role="dialog"]:not(.tour-card)')) return;
+      if (!s.started || target?.closest('[role="dialog"]:not([aria-modal="false"]):not(.tour-card)')) return;
       if (e.key === "Escape") {
         // In a fixed order: a view sheet, then walk mode, then the selection. Dialogs close themselves first.
         if (s.view) s.openView(null);

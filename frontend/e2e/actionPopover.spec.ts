@@ -1,5 +1,5 @@
 import { purchaseActions, purchaseLayout } from "./purchaseLayout";
-import { test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
+import { completeTutorial, test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
 import { newGame } from "../src/sim";
 import { act, tick, spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 import { dataCompany } from "../src/sim/__tests__/dataFixture";
@@ -8,7 +8,7 @@ import { reliabilityCompany, readyReliability } from "../src/sim/__tests__/relia
 test("an action centres the camera on the machine it changes and opens its confirmation beside it, clear of the panel", async ({ page }) => {
   await page.goto("/?floor=office");
   await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
-  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await completeTutorial(page);
   // Zoomed far in, so the action has to bring the view back out to its default framing.
   for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Zoom in" }).click();
   const panel = page.getByRole("complementary", { name: "System metrics" });

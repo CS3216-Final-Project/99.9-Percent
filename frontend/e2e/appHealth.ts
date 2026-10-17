@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, expectRoom, savedGame, seedSave, tutorial } from "./fixtures";
+import { finishChapterZero, nextChapterZero, expect, expectRoom, savedGame, seedSave, tutorial } from "./fixtures";
 import { newGame } from "../src/sim";
 import { step } from "../src/sim/step";
 
@@ -68,17 +68,18 @@ export async function appHealthDuringTutorial(page: Page) {
     await page.route("**/api/**", r => r.abort()); await page.goto("/");
     await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await expectRoom(page);
     const card = tutorial(page), entry = page.getByRole("button", { name: "View app health", exact: true });
-    await expect(card).toHaveAccessibleName("Tutorial, step 1 of 21");
+    await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "App Server", exact: true }).click();
+    await expect(card).toContainText("Done in your game");
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+    await nextChapterZero(page); await nextChapterZero(page);
+    await card.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
+    await finishChapterZero(page);
     const before = (await savedGame(page)).campaign;
     await entry.click(); const dialog = page.getByRole("dialog", { name: "App Health", exact: true });
     await expect(dialog).toBeVisible(); await expect(card).toBeHidden(); await page.keyboard.press("p");
-    await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
-    await expect(entry).toBeFocused(); await expect(card).toHaveAccessibleName("Tutorial, step 1 of 21");
-    expect((await savedGame(page)).campaign).toEqual(before);
-    await page.getByRole("main").getByRole("button", { name: "Servers", exact: true }).click();
-    await page.getByRole("dialog", { name: "Servers inspected", exact: true }).getByRole("button", { name: "Return to room", exact: true }).click();
-    await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
+    await expect(entry).toBeFocused(); expect((await savedGame(page)).campaign).toEqual(before);
 }
 
 export async function appHealthProblem(page: Page, touch = false) {
