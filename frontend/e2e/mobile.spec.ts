@@ -207,6 +207,7 @@ test("inspects evidence and advances a physical step on touch", async ({ page })
   const before=(await savedGame(page)).campaign!.step;
   await advanceCampaignStep(page);
   expect((await savedGame(page)).campaign!.step).toBe(before+1);
+  await expect(page.locator(".campaign-advanced > div")).toBeInViewport({ratio:1});
   await page.getByRole("button", { name: "History", exact: true }).tap();
   await expect(page.getByRole("region", { name: "History" })).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).tap();
@@ -247,7 +248,7 @@ test("a tap explains a term, and tapping a button does not leave a tooltip over 
   await expectRoom(page);
   const tip = page.getByRole("tooltip");
   await page.getByRole("complementary", { name: "System metrics" }).getByText("System evidence", { exact: true }).tap();
-  await expect(tip).toContainText("Inspection is free");
+  await expect(tip).toHaveText("Inspect equipment for free. Inspection does not advance time.");
   await expect(tip).toHaveCSS("opacity", "1");
   const box = (await tip.boundingBox())!, view = page.viewportSize()!;
   expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(view.width);
@@ -362,12 +363,19 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
  await page.locator(".campaign-advanced > summary").tap();await expect(page.getByRole("button",{name:"Advance game second",exact:true})).toBeInViewport();
  await page.getByRole("button",{name:"Advance game second",exact:true}).tap();expect((await savedGame(page)).campaign!.step).toBe(2);
+ await expect(page.locator(".campaign-advanced > div")).toBeInViewport({ratio:1});
+ const popup=(await page.locator(".campaign-advanced > div").boundingBox())!,bar=(await page.locator(".bottombar").boundingBox())!;
+ expect(popup.y+popup.height).toBeLessThanOrEqual(bar.y);
+ await page.getByRole("button",{name:"History",exact:true}).tap();
+ await expect(page.getByRole("region",{name:"History"})).toBeVisible();
+ await page.getByRole("button",{name:"Close",exact:true}).tap();
  await page.screenshot({path:"test-results/campaign-ux-mobile.png"});
 });
 
 // The test browser draws in software, which Auto treats as a machine without a graphics card. Naming a phone's
 // graphics card instead takes the path a real phone takes.
 test("Auto draws Medium on a graphics card: the screen's normal pixel size, not High's sharper canvas", async ({ page }) => {
+  await seedSave(page,newGame(1,"medium-renderer"));
   await page.addInitScript(() => {
     const getParameter = WebGL2RenderingContext.prototype.getParameter;
     WebGL2RenderingContext.prototype.getParameter = function (this: WebGL2RenderingContext, name: number) {
@@ -376,8 +384,7 @@ test("Auto draws Medium on a graphics card: the screen's normal pixel size, not 
   });
   await page.route("**/api/**", route => route.abort());
   await page.goto("/");
-  await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap();
-  await completeTutorial(page);
+  await page.getByRole("button", { name: "Continue company", exact: true }).tap();
   await expectRoom(page);
   const canvas = page.getByRole("main").locator("canvas");
   // High would draw 1.75 pixels per CSS pixel on this screen; Medium draws one, or a little fewer if the frame rate falls.

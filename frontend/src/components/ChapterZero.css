@@ -298,6 +298,12 @@ body:has(.chapter-zero-guide) [aria-disabled="true"]:not(canvas) { opacity: .45;
 .app:has(> .chapter-zero-guide) .campaign-panel { max-height: calc(100% - 24px); }
 /* Speed remains available in the real mobile game after the tutorial too. */
 .campaign-clock .speed { display: flex; }
+@media (max-width: 640px) {
+  /* Anchor precision controls above the whole bar when its controls wrap onto several rows. */
+  .campaign-clock { position: relative; }
+  .campaign-clock .campaign-advanced { position: static; margin-inline-start: auto; }
+  .campaign-clock .campaign-advanced > div { right: 8px; }
+}
 @media (max-width: 900px) {
   .app:has(> .chapter-zero-guide) .campaign-panel { max-height: 100%; }
 }
