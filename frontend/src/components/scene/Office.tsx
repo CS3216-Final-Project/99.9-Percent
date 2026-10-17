@@ -767,7 +767,7 @@ export function ZoneNames({ names }: { names: [string, number, number][] }) {
   const [fonts, setFonts] = useState(0);
   useEffect(() => {
     let live = true;
-    document.fonts?.load('600 40px Rubik').then(() => live && setFonts(1), () => {});
+    document.fonts?.load('600 40px "Space Grotesk"').then(() => live && setFonts(1), () => {});
     return () => {
       live = false;
     };

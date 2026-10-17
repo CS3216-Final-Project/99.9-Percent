@@ -58,7 +58,8 @@ test("Cash card preserves its inner margin across phone widths",async({page,with
 });
 
 test("purchase details keyboard navigation handles overflow and fitting content",async({page,withoutRoom})=>{
- await withoutRoom();await page.setViewportSize({width:390,height:844});await page.emulateMedia({reducedMotion:"reduce"});
+ // Source Sans 3 fits these details at 844px; a shorter phone still exercises real overflow.
+ await withoutRoom();await page.setViewportSize({width:390,height:667});await page.emulateMedia({reducedMotion:"reduce"});
  await page.route("**/api/**",r=>r.abort());await seedSave(page,tick(newGame(1,"details-keyboard"),60));
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  const before=(await savedGame(page)).campaign;
