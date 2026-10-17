@@ -55,7 +55,7 @@ it("explains a disabled Next without changing its engine gate", () => {
   expect(useGame.getState().game).toBe(game);
 });
 
-it("opens all six chapters without advancing the company and stays paused on close", () => {
+it("opens Chapter 0 and the six gameplay chapters without advancing the company and stays paused on close", () => {
   const game = newGame();
   useGame.setState({ game, started: true, ready: true, running: true });
   render(<CampaignChapters />);
@@ -63,10 +63,23 @@ it("opens all six chapters without advancing the company and stays paused on clo
   expect(useGame.getState().running).toBe(false);
   expect(useGame.getState().game).toBe(game);
   const dialog = screen.getByRole("dialog", { name: "Guided Mode chapters" });
-  expect(within(dialog).getAllByRole("listitem")).toHaveLength(6);
+  expect(within(dialog).getAllByRole("listitem")).toHaveLength(7);
   expect(dialog.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
   expect(within(dialog).getByRole("heading", { name: "Stay Online" }).closest("li")!.textContent).toContain("Locked");
   fireEvent.click(within(dialog).getByRole("button", { name: "Back to company" }));
   expect(screen.queryByRole("dialog")).toBeNull();
+  expect(useGame.getState().running).toBe(false);
+});
+
+it("integrates How to play into Chapter 0 and replays it on the same company", () => {
+  const game = newGame();
+  useGame.setState({ game, started: true, ready: true, tour: { track: "campaign", step: 0 } });
+  render(<CampaignChapters />);
+  expect(screen.getByLabelText("Current chapter").textContent).toBe("Getting started");
+  expect(screen.getByRole("region", { name: "Guided Mode chapters" }).textContent).toContain("Chapter 0 · Tutorial");
+  fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
+  fireEvent.click(screen.getByRole("button", { name: "Replay Chapter 0" }));
+  expect(useGame.getState().game).toBe(game);
+  expect(useGame.getState().tour).toEqual({ track: "campaign", step: 0 });
   expect(useGame.getState().running).toBe(false);
 });

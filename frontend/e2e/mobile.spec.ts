@@ -1,7 +1,7 @@
 import { appHealthDuringTutorial, appHealthJourney, appHealthProblem } from "./appHealth";
 import type { Page } from "@playwright/test";
 import { keyboardDetails, purchaseLayout } from "./purchaseLayout";
-import { advanceCampaignStep } from "./fixtures";
+import { advanceCampaignStep, finishChapterZero } from "./fixtures";
 import { financeDuringWalkthrough } from "./financeIntegration";
 import { test, expect, expectRoom, savedGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
@@ -58,7 +58,8 @@ test("Cash card preserves its inner margin across phone widths",async({page,with
 });
 
 test("purchase details keyboard navigation handles overflow and fitting content",async({page,withoutRoom})=>{
- await withoutRoom();await page.setViewportSize({width:390,height:844});await page.emulateMedia({reducedMotion:"reduce"});
+ // Source Sans 3 fits these details at 844px; a shorter phone still exercises real overflow.
+ await withoutRoom();await page.setViewportSize({width:390,height:667});await page.emulateMedia({reducedMotion:"reduce"});
  await page.route("**/api/**",r=>r.abort());await seedSave(page,tick(newGame(1,"details-keyboard"),60));
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  const before=(await savedGame(page)).campaign;
@@ -109,7 +110,7 @@ test("current chapter is prominent and the full journey opens on touch", async (
   const before = await savedGame(page);
   await bar.getByRole("button", { name: "View chapters" }).tap();
   const dialog = page.getByRole("dialog", { name: "Guided Mode chapters" });
-  await expect(dialog.getByRole("listitem")).toHaveCount(6);
+  await expect(dialog.getByRole("listitem")).toHaveCount(7);
   await expect(dialog.getByRole("heading", { name: "Stay Online" })).toBeVisible();
   await dialog.getByRole("button", { name: "Back to company" }).tap();
   await expect(dialog).toBeHidden();
@@ -141,7 +142,7 @@ for (const next of [false,true]) test(`compact chapter bar keeps goal and naviga
     const view=bar.getByRole("button",{name:"View chapters"});
     await view.tap();
     const dialog=page.getByRole("dialog",{name:"Guided Mode chapters"});
-    await expect(dialog.getByRole("listitem")).toHaveCount(6);
+    await expect(dialog.getByRole("listitem")).toHaveCount(7);
     await dialog.getByRole("button",{name:"Back to company"}).tap();
     await expect(view).toBeFocused();
   }
@@ -182,7 +183,7 @@ test("reliability: inspection and effective recipients remain clear on narrow to
  const instances=page.getByRole("region",{name:"Application instances"});
  await expect(instances.getByRole("button",{name:/App 2: Installed - not receiving traffic/})).toHaveAttribute("aria-pressed","true");
  await expect(panel).toContainText("detected unhealthy");
- await expect(page.getByRole("button",{name:"Restore App 2 · free · 3 steps",exact:true})).toBeEnabled();
+ await expect(page.getByRole("button",{name:"Restore App 2 · free · 3 game seconds",exact:true})).toBeEnabled();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
  await page.getByRole("button",{name:"Tech",exact:true}).tap();
  const tree=page.getByRole("region",{name:"Tech tree"});
@@ -229,7 +230,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   await expect(panel.getByRole("table")).toContainText("133.33%");
   await panel.locator("summary").filter({ hasText: "Full system evidence" }).tap();
   await panel.getByRole("button", { name: /Upgrade database/ }).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
-  await expect(panel.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("3 step(s)");
+  await expect(panel.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("3 game second(s)");
   await expect(panel.getByRole("button", { name: /Add server/ })).toBeDisabled();
   await page.screenshot({ path: "test-results/phase1-mobile-incident.png" });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
@@ -338,19 +339,19 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  await expect(card.locator(".tour-prompt")).toHaveText("Click Servers to inspect your app.");
  await page.screenshot({path:`test-results/clarity-tutorial-${width}-first.png`});
  // The camera brings each machine above the panel, where it can be tapped.
- await room.getByRole("button",{name:"Servers",exact:true}).tap();await page.getByRole("dialog",{name:"Servers inspected"}).getByRole("button",{name:"Return to room"}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 2 of 8");
- await room.getByRole("button",{name:"Database",exact:true}).tap();await page.getByRole("dialog",{name:"Database inspected"}).getByRole("button",{name:"Return to room"}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 3 of 8");
- for(let step=4;step<=7;step++){await card.getByRole("button",{name:"Next",exact:true}).tap();await expect(card).toHaveAccessibleName(`Tutorial, step ${step} of 8`);await expect(card).toBeInViewport({ratio:1});}
- await page.getByRole("button",{name:/Upgrade database/}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 8 of 8");
+ await room.getByRole("button",{name:"Servers",exact:true}).tap();await page.getByRole("dialog",{name:"Servers inspected"}).getByRole("button",{name:"Return to room"}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
+ await room.getByRole("button",{name:"Database",exact:true}).tap();await page.getByRole("dialog",{name:"Database inspected"}).getByRole("button",{name:"Return to room"}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 3 of 21");
+ for(let step=4;step<=7;step++){await card.getByRole("button",{name:"Next",exact:true}).tap();await expect(card).toHaveAccessibleName(`Tutorial, step ${step} of 21`);await expect(card).toBeInViewport({ratio:1});}
+ await page.getByRole("button",{name:/Upgrade database/}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 8 of 21");
  await expect(card).toBeInViewport({ratio:1});
  await page.screenshot({path:`test-results/clarity-tutorial-${width}-purchase.png`});
  await page.getByRole("region",{name:"Confirm Upgrade database"}).getByRole("button",{name:"Cancel"}).tap();
- await card.getByRole("button",{name:"Got it",exact:true}).tap();await expect(card).toBeHidden();
+ await finishChapterZero(page);await expect(card).toBeHidden();
  expect((await savedGame(page)).campaign!.actions).toEqual([]);
- await expect(page.getByRole("button",{name:"Run",exact:true})).toBeInViewport();await expect(page.getByRole("button",{name:"Advance step",exact:true})).toBeHidden();
+ await expect(page.getByRole("button",{name:"Run",exact:true})).toBeInViewport();await expect(page.getByRole("button",{name:"Advance game second",exact:true})).toBeHidden();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
- await page.locator(".campaign-advanced > summary").tap();await expect(page.getByRole("button",{name:"Advance step",exact:true})).toBeInViewport();
- await page.getByRole("button",{name:"Advance step",exact:true}).tap();expect((await savedGame(page)).campaign!.step).toBe(1);
+ await page.locator(".campaign-advanced > summary").tap();await expect(page.getByRole("button",{name:"Advance game second",exact:true})).toBeInViewport();
+ await page.getByRole("button",{name:"Advance game second",exact:true}).tap();expect((await savedGame(page)).campaign!.step).toBe(1);
  await page.screenshot({path:"test-results/campaign-ux-mobile.png"});
 });
 

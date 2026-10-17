@@ -21,9 +21,9 @@ function perform(game:GameState, action:Parameters<typeof applyAction>[1]) { con
 it("makes Run primary and keeps manual advancement behind optional controls", () => {
   start(); renderCompany(); const run=screen.getByRole("button",{name:"Run"});
   expect(run.textContent).toContain("Run company"); expect(run.className).toContain("btn-primary");
-  expect(screen.getByRole("button",{name:"Advance step",hidden:true}).closest("details")!.hasAttribute("open")).toBe(false);
+  expect(screen.getByRole("button",{name:"Advance game second",hidden:true}).closest("details")!.hasAttribute("open")).toBe(false);
   fireEvent.click(screen.getByText("More controls"));
-  const step=screen.getByRole("button",{name:"Advance step"}); expect(step.className).not.toContain("btn-primary");
+  const step=screen.getByRole("button",{name:"Advance game second"}); expect(step.className).not.toContain("btn-primary");
   fireEvent.click(step); expect(useGame.getState().game.campaign!.step).toBe(1);
 });
 it("system evidence records a real free inspection without advancing the clock", () => {
@@ -82,7 +82,7 @@ it("traffic-limit warning explains rejection without inventing extra charges or 
 });
 it("Scale Up describes the selected server rather than implying another installed instance", () => {
   useGame.setState({game:dataCompany(),ready:true,started:true,onboarding:false,selectedAppId:"app-1"});
-  render(<CampaignAction label="Scale up App 1" price={2000} note="3 steps" onClick={()=>{}}/>);
+  render(<CampaignAction label="Scale up App 1" price={2000} note="3 game seconds" onClick={()=>{}}/>);
   fireEvent.click(screen.getByRole("button",{name:/Scale up App 1/}));
   expect(screen.queryByText(/Makes this App Server larger/)).toBeNull();
   expect(screen.getByText("Equipment running costs").closest(".row")!.textContent).toContain("$1,100 / 60s (+$400)");

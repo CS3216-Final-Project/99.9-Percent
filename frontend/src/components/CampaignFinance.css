@@ -16,5 +16,5 @@
     .finance-cash-full { display: none; }
     .finance-cash-compact { display: inline; }
     .stat-action { position: relative; }
-    .stat-action::after { content: "↗"; position: absolute; top: 0; right: 2px; font-size: 9px; color: var(--on-night-soft); }
+    .stat-action::after { content: "↗"; position: absolute; top: 0; right: 2px; font-size: var(--text-xs); color: var(--on-night-soft); }
 }

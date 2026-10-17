@@ -137,7 +137,7 @@ export function LineChart({
   targetLabel?: string;
   max?: number;
   min?: number;
-  axisLabel?: "Week" | "Step";
+  axisLabel?: "Week" | "Game second";
 }) {
   const W = 340;
   const H = 170;
@@ -169,7 +169,7 @@ export function LineChart({
         </span>
       </figcaption>
       {turns.length < 2 ? (
-        <p className="empty">Advance two {axisLabel === "Step" ? "steps" : "weeks"} to see a trend.</p>
+        <p className="empty">Advance two {axisLabel === "Game second" ? "game seconds" : "weeks"} to see a trend.</p>
       ) : (
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title} by ${axisLabel.toLowerCase()}`}>
           {ticks.map((t) => (

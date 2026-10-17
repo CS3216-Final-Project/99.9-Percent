@@ -32,7 +32,7 @@ const currentChapter = (state: State): string | null => {
   return c ? c.reliabilityStage ? "reliability" : c.spikeStage ? "spikes" : c.dataStage ? "data" : c.scaling ? "scaling" : "opening" : null;
 };
 const completedChapters = (state: State) => state.game.campaign
-  ? campaignChapters(state.game).filter(chapter => chapter.completed).map(chapter => chapter.id) : [];
+  ? campaignChapters(state.game).filter(chapter => chapter.number > 0 && chapter.completed).map(chapter => chapter.id) : [];
 const runKey = (state: State) => state.game.campaign
   ? `campaign:${state.game.campaign.runId}:${CAMPAIGN_CONTENT_VERSION}`
   : `classic:${state.game.seed}:${state.meta.runsStarted}`;

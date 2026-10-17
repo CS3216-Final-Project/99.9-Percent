@@ -87,7 +87,7 @@ export interface Tour {
 export type Walkthrough = "basics" | "campaign";
 const isWalkthrough = (track: TourTrack): track is Walkthrough => track === "basics" || track === "campaign";
 /** How many steps each walkthrough has (Tutorial.tsx holds them). Reaching the last one finishes it. */
-export const WALKTHROUGH_STEPS: Record<Walkthrough, number> = { basics: 5, campaign: 8 };
+export const WALKTHROUGH_STEPS: Record<Walkthrough, number> = { basics: 5, campaign: 21 };
 const lastStep = (track: Walkthrough) => WALKTHROUGH_STEPS[track] - 1;
 /**
  * Guided Mode's Opening walkthrough, first time or replayed, holds the clock until the player reaches its last step or

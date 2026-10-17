@@ -105,9 +105,9 @@ describe("opening UI", () => {
   it("visible interventions lead to review and the same company", () => {
     vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     fireEvent.click(screen.getByText("More controls"));
-    for (let i = 0; i < 6; i++)fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
+    for (let i = 0; i < 6; i++)fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
     const id = useGame.getState().game.campaign!.runId;
-    expect(screen.getByText(/Stable steps: 0\/5/)).toBeTruthy();
+    expect(screen.getByText(/Stable game seconds: 0\/5/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
@@ -251,13 +251,13 @@ it("forgets a pending Start over confirmation when the player leaves its tab", (
 it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip" }));
   fireEvent.click(screen.getByText("More controls"));
-  fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
+  fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
   const views = screen.getByRole("navigation", { name: "Views" });
   fireEvent.click(within(views).getByRole("button", { name: "History" }));
   const history = screen.getByRole("region", { name: "History" });
   expect(within(history).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Charts", "Events", "Incidents (0)"]);
   fireEvent.click(within(history).getByRole("tab", { name: "Events" }));
-  expect(history.textContent).toMatch(/Step \d+/);
+  expect(history.textContent).toMatch(/Game second \d+/);
   // Esc closes the sheet back to the room, as in Classic.
   fireEvent.keyDown(document.body, { key: "Escape" });
   expect(screen.queryByRole("region", { name: "History" })).toBeNull();
@@ -271,7 +271,7 @@ it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", (
 it("asks once before New company replaces the campaign, as Classic's Start over does", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip" }));
   fireEvent.click(screen.getByText("More controls"));
-  fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
+  fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
   const runId = useGame.getState().game.campaign!.runId;
   const menu = openMenu();
   openTab(menu, "Saves");

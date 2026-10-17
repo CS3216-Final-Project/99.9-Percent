@@ -20,7 +20,8 @@
   background: var(--paper);
   color: var(--ink);
   font: inherit;
-  font-size: 1rem;
+  font-family: var(--font-body);
+  font-size: var(--text-md);
   resize: vertical;
 }
 .feedback-form textarea:focus-visible {

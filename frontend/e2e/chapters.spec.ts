@@ -20,7 +20,7 @@ test("chapter bar stays visible and follows the same company into Data Strategy"
   const before = await savedGame(page);
   await bar.getByRole("button", { name: "View chapters" }).press("Enter");
   const dialog = page.getByRole("dialog", { name: "Guided Mode chapters" });
-  await expect(dialog.getByRole("listitem")).toHaveCount(6);
+  await expect(dialog.getByRole("listitem")).toHaveCount(7);
   await expect(dialog.getByRole("listitem").filter({ hasText: "Data Strategy" })).toContainText("Available next");
   await expect(dialog.getByRole("listitem").filter({ hasText: "Stay Online" })).toContainText("Locked");
   expect(await savedGame(page)).toEqual(before);
