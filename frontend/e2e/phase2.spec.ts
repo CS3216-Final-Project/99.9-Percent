@@ -1,49 +1,35 @@
-import { test, expect, savedGame, seedSave, tutorial } from "./fixtures";
+import { test, expect, savedGame, seedSave, tutorial, finishChapterZero } from "./fixtures";
 import { applyAction, newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
-test("the walkthrough works from the keyboard, keeps shortcuts working and remembers a skip", async ({ page }) => {
+test("the mandatory walkthrough works from the keyboard across the guide and real game controls and remembers Back", async ({ page }) => {
   await page.goto("/");
-  expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBeNull();
-  const preview = page.getByRole("img", { name: /furnished office/ });
-  await expect(preview).toHaveCount(0);
-  await page.screenshot({ path: "test-results/phase2-title.png" });
   await page.getByRole("button", { name: "Start Guided Mode" }).press("Enter");
   const card = tutorial(page);
-  await expect(card).toHaveAccessibleName("Tutorial, step 1 of 21");
-  // Each step takes focus, so a screen reader announces it; the card is not modal, so Tab leads on into the game.
-  await expect(card).toBeFocused();
+  await expect(card.getByRole("heading", { name: "Meet your system" })).toBeFocused();
+  const panel = page.getByRole("complementary", { name: "System metrics" });
   await page.keyboard.press("Tab");
-  await expect(card.getByRole("button", { name: "Skip", exact: true })).toBeFocused();
-  const room = page.getByRole("main");
-  await room.getByRole("button", { name: "Servers", exact: true }).press("Enter");
-  await page.getByRole("dialog", { name: "Servers inspected" }).getByRole("button", { name: "Return to room" }).press("Enter");
-  await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
-  // The card's own focus went to the inspection dialog; give it back, as a player's Tab would.
-  await card.focus();
-  await expect(card).toBeFocused();
-  await room.getByRole("button", { name: "Database", exact: true }).press("Enter");
-  await page.getByRole("dialog", { name: "Database inspected" }).getByRole("button", { name: "Return to room" }).press("Enter");
-  await expect(card).toHaveAccessibleName("Tutorial, step 3 of 21");
+  await expect(panel.getByRole("button", { name: "App Server", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
   await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
-  await expect(card).toHaveAccessibleName("Tutorial, step 4 of 21");
-  // The guide holds the clock until it is done, so P does nothing while the card has focus.
-  await expect(card).toBeFocused();
-  await page.keyboard.press("p");
+  await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
+  await panel.getByRole("button", { name: "Database", exact: true }).press("Enter");
+  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+  await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
+  await expect(card).toHaveAccessibleName("Tutorial, step 3 of 21");
+  await card.getByRole("button", { name: "Back", exact: true }).press("Enter");
+  await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
+  await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
+  await panel.getByRole("button", { name: "Database", exact: true }).focus();
+  await expect(panel.getByRole("button", { name: "Database", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape"); await page.keyboard.press("p");
+  await expect(card).toBeVisible();
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeDisabled();
-  await card.getByRole("button", { name: "Skip", exact: true }).press("Enter");
-  await expect(card).toBeHidden();
-  expect((await savedGame(page)).campaign!.step).toBe(0);
-  // Skipped, P runs and pauses the company.
-  await page.keyboard.press("p");
-  await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
-  await page.keyboard.press("p");
-  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
-  await page.screenshot({ path: "test-results/phase2-healthy.png" });
-  await page.getByRole("button", { name: "Menu", exact: true }).click();
-  await page.screenshot({ path: "test-results/phase2-menu.png" });
+  await finishChapterZero(page);
+  await page.keyboard.press("p"); await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+  await page.keyboard.press("p"); await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
   await page.reload(); await page.getByRole("button", { name: "Continue company" }).click();
-  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
   await expect(card).toHaveCount(0);
 });
 

@@ -1,4 +1,4 @@
-import { advanceCampaignStep } from "./fixtures";
+import { completeTutorial, advanceCampaignStep } from "./fixtures";
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -8,9 +8,10 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     // Only the upgrade path inspects a machine by clicking it in the room.
     const room = path === "upgrade";
     if (!room) await withoutRoom();
-    await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
+    await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await completeTutorial(page);
     if (room) await expectRoom(page);
-    for (let i = 0; i < 6; i++)await advanceCampaignStep(page);
+    // Chapter 0's Run exercise has already advanced this real company by one second.
+    for (let step = (await savedGame(page)).campaign!.step; step < 6; step++) await advanceCampaignStep(page);
     if (path === "upgrade") {
       await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
       const panel = page.getByRole("complementary", { name: "System metrics" });
@@ -34,7 +35,8 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       await expect(dbReveal).toBeVisible();
       await dbReveal.getByRole("button", { name: "Return to room" }).click();
       await expect(panel.getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");
-      await expect(panel.getByRole("status")).toContainText("Demand 800/s · capacity 600/s · backlog 600");
+      const evidence=panel.locator(".campaign-evidence .rows");
+      await expect(evidence.locator("dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
       expect(await responsesFit()).toBe(true);
       await panel.locator("summary").filter({ hasText: "Full system evidence" }).click();
       await expect(panel.getByRole("table")).toContainText("133.33%");
@@ -76,7 +78,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
 test("preserves a corrupt campaign save until explicit reset", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await page.addInitScript(() => { localStorage.setItem("nn.campaign.save.v1", "{"); });
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await completeTutorial(page);
   await advanceCampaignStep(page);
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBe("{");
   await page.getByRole("button", { name: "Menu", exact: true }).click();
@@ -97,9 +99,9 @@ test("resumes an incident paused", async ({ page, withoutRoom }) => {
 });
 test("keeps the room playable without downloaded furniture", async ({ page }) => {
   await page.route("**/models/**", route => route.abort());
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
-  await expectRoom(page); await advanceCampaignStep(page);
-  expect((await savedGame(page)).campaign!.step).toBe(1);
+  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await completeTutorial(page);
+  await expectRoom(page); const before=(await savedGame(page)).campaign!.step; await advanceCampaignStep(page);
+  expect((await savedGame(page)).campaign!.step).toBe(before+1);
 });
 test("keeps history reachable after bankruptcy", async ({ page, withoutRoom }) => {
   await withoutRoom();

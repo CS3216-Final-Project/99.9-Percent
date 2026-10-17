@@ -304,3 +304,12 @@ describe("graphics settings", () => {
     expect(saveGraphics({ quality: "medium" })).toBe(false);
   });
 });
+
+it("keeps the furthest completed lessons when revisiting and migrates absent or corrupt progress", () => {
+  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 1, walkthroughFurthestStep: 8 }));
+  expect(loadMeta()).toMatchObject({ walkthroughStep: 1, walkthroughFurthestStep: 8 });
+  for (const invalid of [undefined, null, -1, 2.5, "eight", {}]) {
+    localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 3, walkthroughFurthestStep: invalid }));
+    expect(loadMeta()).toMatchObject({ walkthroughStep: 3, walkthroughFurthestStep: 3 });
+  }
+ });

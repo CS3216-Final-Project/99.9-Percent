@@ -22,8 +22,8 @@ it("objectives follow actual phase before chapter without replacing required act
  g.outcome="bankrupt";
  expect(campaignObjective(g)).toContain("finances and recorded evidence");
 });
-it("initial growth waiting does not expose a scheduled deadline",()=>{
- const m=campaignGuidance(newGame());expect(m.waiting).toContain("Waiting for the next company growth event");expect(m.pendingAction).toBeNull();expect(m.incomplete.map(r=>r.id)).toContain("growth");
+it("Opening requirements need no generic waiting message or scheduled deadline",()=>{
+ const m=campaignGuidance(newGame());expect(m.waiting).toBeNull();expect(m.pendingAction).toBeNull();expect(m.incomplete.map(r=>r.id)).toContain("growth");
 });
 it("active Opening incident requires recovery and hides all prevention requirements",()=>{
  const g=advanceSteps(newGame(),6).state,m=campaignGuidance(g);expect(m.prevention).toBe(false);expect(row(g,"recovery").met).toBe(false);expect(m.pendingAction).toBeNull();expect(m.requirements.some(r=>r.id==="admission")).toBe(false);
@@ -44,7 +44,7 @@ it("new inspections and observations update prevention without auto-completing i
 });
 it("Scaling exposes purchased headroom readiness separately from consumed growth",()=>{
  const g=scaling();expect(row(g,"headroom").met).toBe(false);expect(row(g,"growth").met).toBe(false);expect(campaignGuidance(g).waiting).toBeNull();
- const ready=advanceSteps(decision(g,{type:"start_db_upgrade"}),3).state;expect(row(ready,"headroom").met).toBe(true);expect(campaignGuidance(ready).waiting).toContain("Waiting for the next company growth event");
+ const ready=advanceSteps(decision(g,{type:"start_db_upgrade"}),3).state;expect(row(ready,"headroom").met).toBe(true);expect(campaignGuidance(ready).waiting).toBeNull();
  const copy=structuredClone(ready);copy.campaign!.scaling!.dueStep=999999;expect(campaignGuidance(copy)).toEqual(campaignGuidance(ready));
 });
 it.each(["management","incident","queues","reports"])("Scaling explains missing %s readiness/continuation",id=>{
@@ -71,9 +71,9 @@ it("Data optional investments and contrast are never mandatory",()=>{
  const g=dataCompany();g.campaign!.readCache=null;g.campaign!.dataStage!.contrastConsumed=false;
  expect(campaignGuidance(g).pendingAction?.action?.type).toBe("enter_spikes");expect(campaignGuidance(g).requirements.some(r=>/cache|contrast|upgrade/i.test(r.label))).toBe(false);expect(campaignGuidance(g).optional).toContain("optional");
 });
-it("Data waiting wording hides due game second and explains readiness",()=>{
+it("Data omits generic waiting copy but explains blocked readiness",()=>{
  const g=dataCompany();g.campaign!.dataStage!.consumed=false;g.campaign!.dataStage!.dueStep=999999;
- expect(campaignGuidance(g).waiting).toContain("Waiting for the next company growth event");expect(JSON.stringify(campaignGuidance(g))).not.toContain("999999");
+ expect(campaignGuidance(g).waiting).toBeNull();expect(JSON.stringify(campaignGuidance(g))).not.toContain("999999");
  g.campaign!.dbBacklog=1;expect(campaignGuidance(g).waiting).toBeNull();expect(campaignGuidance(g).notice).toContain("empty queues");
 });
 it("Spikes observes completion and acknowledgement without requiring automation",()=>{

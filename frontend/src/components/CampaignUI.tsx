@@ -16,7 +16,7 @@ import { AccountSection, CloudSavesSection } from "./Account";
 import { FinanceEntry } from "./CampaignFinance";
 import { AppHealthEntry } from "./CampaignAppHealth";
 import { CampaignUnavailable, CampaignDecisionButton } from "./CampaignInfrastructure";
-import { INFRASTRUCTURE_HELP } from "@/game/infrastructureHelp";
+import { INFRASTRUCTURE_HELP, INFRASTRUCTURE_TIPS } from "@/game/infrastructureHelp";
 import { HomeScreen } from "./HomeScreen";
 import { CampaignChapters } from "./CampaignChapters";
 import { isChapterEntry } from "@/game/campaignChapters";
@@ -82,12 +82,12 @@ function CampaignGuidance() {
 
   return <section className="campaign-guidance" aria-label="Guided Mode guidance">
     {c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
-    {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><details className="more"><summary>{c.combinedStage?"Next growth requirements":"Chapter requirements"} · {model.completed.length}/{model.requirements.length}</summary>
+    {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">{c.combinedStage?"Next growth requirements":"Chapter requirements"}<span> · {model.completed.length}/{model.requirements.length}</span></h3>
       <RequirementList items={c.combinedStage?model.incomplete:model.requirements}/>
       {!c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
       {model.notice&&<p role="note">{model.notice}</p>}
       {model.optional&&<p className="muted">{model.optional}</p>}
-    </details></section>}
+    </section>}
     {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
     {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
     {c.openingMilestone?.acknowledged&&!c.dataStage&&!c.scaling?.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
@@ -157,12 +157,12 @@ export function CampaignPanel() {
         </dl>
       </div>
       <div className="incident-investigate">
-        <h4 className="step-head"><span className="step-num" aria-hidden="true">1</span><Tip text="Click equipment in the room or here. Inspection is free, immediate and repeatable; it never advances time.">System evidence</Tip></h4>
-        <div className="chips">{PLACES.filter(id=>id!=="cache"||c.dataStage).map(id => <button type="button" key={id} className={`chip${place === id ? " is-selected" : ""}`} aria-pressed={place === id} disabled={disabled} {...tipProps(INFRASTRUCTURE_HELP[id])} onClick={() => inspectOrSelect(id)}>
+        <h4 className="step-head"><span className="step-num" aria-hidden="true">1</span><Tip text="Inspect equipment for free. Inspection does not advance time.">System evidence</Tip></h4>
+        <div className="chips">{PLACES.filter(id=>id!=="cache"||c.dataStage).map(id => <button type="button" key={id} data-tutorial={`inspect-${id}`} className={`chip${place === id ? " is-selected" : ""}`} aria-pressed={place === id} disabled={disabled} {...tipProps(INFRASTRUCTURE_TIPS[id])} onClick={() => inspectOrSelect(id)}>
           <span className="chip-icon" aria-hidden="true"><Icon name={EQUIPMENT_ICON[id]} size={16} /></span>{PLACE_NAMES[id]}
         </button>)}</div>
         {place && <div className="campaign-evidence" role="status"><details className="more"><summary>About {PLACE_NAMES[place]}</summary><p>{INFRASTRUCTURE_HELP[place]}</p></details><Callout compact tone="info" icon={EQUIPMENT_ICON[place]} kicker={`${PLACE_NAMES[place]} · game second ${m.step}`}>
-          {component ? <>Demand {num(component.demand)}/s · capacity {num(component.capacity)}/s · backlog {num(component.backlog)}.</> : place === "cache" ? <>Cache {c.readCache?"deployed":"not deployed"} · effective rate used {m.data?`${m.data.effectiveHitRateUsed/100}%`:"not yet observed"} · hits {m.data?.hits??"not yet observed"}. Misses and writes reach the database.</> : place === "gateway" ? <>Incoming {num(m.incoming)}/s · admitted {num(m.admitted)}/s · rejected {num(m.rejected)}/s.</> : <>Latency {m.latencyMs.toFixed(0)} ms · errors {percent(m.serviceErrorRate)} · backlog {num(m.app.backlog + m.db.backlog)}.</>}
+          {component ? <dl className="rows"><Row label="Demand" value={`${num(component.demand)} ${place === "app" ? "requests/s" : "operations/s"}`} /><Row label="Capacity" value={`${num(component.capacity)} ${place === "app" ? "requests/s" : "operations/s"}`} /><Row label="Backlog" value={num(component.backlog)} /></dl> : place === "cache" ? <>Cache {c.readCache?"deployed":"not deployed"} · effective rate used {m.data?`${m.data.effectiveHitRateUsed/100}%`:"not yet observed"} · hits {m.data?.hits??"not yet observed"}. Misses and writes reach the database.</> : place === "gateway" ? <>Incoming {num(m.incoming)}/s · admitted {num(m.admitted)}/s · rejected {num(m.rejected)}/s.</> : <>Latency {m.latencyMs.toFixed(0)} ms · errors {percent(m.serviceErrorRate)} · backlog {num(m.app.backlog + m.db.backlog)}.</>}
         </Callout></div>}
         {office && <div className="campaign-evidence" role="status"><Callout compact tone="info" icon={EQUIPMENT_ICON[office]} kicker={`${OFFICE_EVIDENCE[office].name} · Company operations`}>
           {OFFICE_EVIDENCE[office].text}
@@ -272,7 +272,7 @@ export function CampaignControls() {
       <div className={`week${game.phase === "incident" ? " is-incident" : ""}`}><span className="brand-week"><Icon name={game.phase === "incident" ? "incident" : "week"} size={16} />
         Week <strong>{game.turn}</strong> · Game second <strong data-testid="physical-step">{game.campaign!.step}</strong>
       </span></div>
-      <button type="button" className={`btn btn-primary campaign-play${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps(held ? "Finish or skip the tutorial to run the company" : "Run or pause game seconds (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /><span>{running?"Pause company":"Run company"}</span></button>
+      <button type="button" className={`btn btn-primary campaign-play${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps(held ? "Finish Chapter 0 to run the company" : "Run or pause game seconds (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /><span>{running?"Pause company":"Run company"}</span></button>
       <div className="speed" role="group" aria-label="Game speed">{([.5, 1, 2] as Speed[]).map(v => <button type="button" key={v} className={speed === v ? "is-active" : ""} aria-pressed={speed === v} onClick={() => setSpeed(v)} {...tipProps(`${v}× speed`)}>{v}×</button>)}</div>
       <span className="campaign-clock-state" role="status">{running?"Running":"Paused"}</span><details className="campaign-advanced"><summary>More controls</summary><div><p>Optional: advance exactly one modeled second. During an incident, use Run/Pause.</p><button type="button" className="btn btn-quiet advance campaign-step" aria-description="Optional precision control. One game second is one modeled second; use Run company for continuous play." disabled={!active || game.phase !== "management"} onClick={advance} {...tipProps("Advance one game second. One game second models one second of requests; 60 game seconds settle an operating week.")}><span className="advance-label">{game.phase === "incident" ? "Incident" : game.phase === "ended" ? "Company closed" : game.phase === "review" ? "Review" : "Advance game second"}</span><Icon name="next" /></button></div></details>
     </div>
@@ -327,7 +327,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
     <MenuTabs value={tab} onChange={goTo}>
       {tab === "run" && <>
         <div className="menu-grid" role="group" aria-label="Run">
-          <MenuTile icon="save" kind="ok" title="Save now" text="Write this company to the browser." onClick={() => saveNow()} />
+          <div data-tutorial="save-now"><MenuTile icon="save" kind="ok" title="Save now" text="Write this company to the browser." onClick={() => saveNow()} /></div>
           <MenuTile icon="info" kind="users" title="How to play" text="Replay Chapter 0: controls, game time, finances and the route through your company." onClick={() => useGame.getState().startTour("campaign")} />
           <MenuTile icon="pause" kind="go" title="Save and exit" text="Stop here and return to the title screen." onClick={() => useGame.getState().endSession()} />
         </div>
