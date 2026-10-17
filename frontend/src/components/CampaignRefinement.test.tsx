@@ -21,7 +21,7 @@ function perform(game:GameState, action:Parameters<typeof applyAction>[1]) { con
 it("makes Run/Pause primary and removes manual advancement", () => {
   start(); renderCompany(); const run=screen.getByRole("button",{name:"Run"});
   expect(run.className).toContain("btn-primary");
-  expect(screen.queryByRole("button",{name:"Advance step",hidden:true})).toBeNull();
+  expect(screen.queryByRole("button",{name:/Advance (?:game second|step)/,hidden:true})).toBeNull();
   fireEvent.click(run); expect(useGame.getState().running).toBe(true);
   fireEvent.click(screen.getByRole("button",{name:"Pause"})); expect(useGame.getState().running).toBe(false);
 });

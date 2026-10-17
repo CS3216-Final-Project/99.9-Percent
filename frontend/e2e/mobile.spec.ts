@@ -9,6 +9,24 @@ import { advanceSteps } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
 import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 
+test("the touch Room menu keeps floors, walking and camera tools clear of time controls", async ({ page }) => {
+ await seedSave(page,newGame(1,"touch-dock"));
+ await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
+ await expectRoom(page);
+ const dock=page.locator(".controls-dock"),room=dock.locator(".room-menu");
+ const run=dock.getByRole("button",{name:"Run",exact:true}),before=(await run.boundingBox())!;
+ await room.locator(":scope > summary").tap();
+ await room.getByRole("group",{name:"Floors"}).getByRole("button",{name:/^Office floor/}).tap();
+ await expect(room.locator(":scope > summary .floor-number")).toHaveText("7");
+ const walk=room.getByRole("button",{name:"Walk",exact:true});await walk.tap();await expect(walk).toHaveAttribute("aria-pressed","true");
+ await room.getByRole("button",{name:"Zoom out",exact:true}).tap();
+ const menu=(await room.locator(".dock-panel").boundingBox())!,bar=(await dock.boundingBox())!;
+ expect(menu.y+menu.height).toBeLessThanOrEqual(bar.y);
+ await run.tap();await expect(room.locator(".dock-panel")).toBeHidden();
+ const pause=dock.getByRole("button",{name:"Pause",exact:true}),after=(await pause.boundingBox())!;
+ expect([after.width,after.height]).toEqual([before.width,before.height]);await pause.tap();
+});
+
 async function expectCashFits(page:Page) {
  const cash=page.getByRole("button",{name:"View finances"});
  const cashBox=(await cash.boundingBox())!,usersBox=(await page.locator(".stat-users").boundingBox())!,amount=(await cash.locator(".finance-cash-compact").boundingBox())!;

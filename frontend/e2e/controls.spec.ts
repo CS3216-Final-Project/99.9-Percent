@@ -57,18 +57,22 @@ for (const width of [1440, 320]) {
     await page.getByRole("button", { name: /^Continue week/ }).click();
     await expectRoom(page);
     const dock = page.locator(".controls-dock");
-    const pause = dock.getByRole("button", { name: "Pause the incident clock", exact: true });
-    const before = (await pause.boundingBox())!;
-    await pause.click();
     const resume = dock.getByRole("button", { name: "Resume the incident clock", exact: true });
-    const after = (await resume.boundingBox())!;
+    const before = (await resume.boundingBox())!;
+    await resume.click();
+    const pause = dock.getByRole("button", { name: "Pause the incident clock", exact: true });
+    const after = (await pause.boundingBox())!;
     expect([after.width, after.height]).toEqual([before.width, before.height]);
+    await pause.click();
     await expect(dock.getByRole("button", { name: "Tech", exact: true })).toBeDisabled();
     const clock = await dock.locator(".brand-week").textContent();
     await page.clock.runFor(1000);
     await expect(dock.locator(".brand-week")).toHaveText(clock!);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await expect(resume).toBeInViewport({ ratio: 1 });
+    const readout = (await dock.locator(".brand-week").boundingBox())!;
+    const speed = (await dock.locator(".time-menu > summary").boundingBox())!;
+    expect(readout.x + readout.width).toBeLessThanOrEqual(speed.x - 4);
     await page.screenshot({ path: `test-results/controls-challenge-${width}.png` });
   });
 }

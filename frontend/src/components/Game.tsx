@@ -115,7 +115,7 @@ function WeekClock() {
     <div className={`week${inc ? " is-incident" : ""}`}>
       <span className="brand-week">
         <Icon name={inc ? "incident" : "week"} size={16} />
-        {inc ? (
+        <span>{inc ? (
           <>
             Incident <strong>{clock(inc.elapsed)}</strong>
           </>
@@ -123,7 +123,7 @@ function WeekClock() {
           <>
             Week <strong>{week}</strong>/{BALANCE.maxTurns}
           </>
-        )}
+        )}</span>
       </span>
       <span className="week-track" aria-hidden="true">
         {Array.from({ length: BALANCE.maxTurns }, (_, i) => (

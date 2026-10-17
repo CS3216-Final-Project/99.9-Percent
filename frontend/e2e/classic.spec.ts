@@ -1,3 +1,4 @@
+import { setGameSpeed } from "./fixtures";
 import { test, expect, expectRoom, savedClassicGame as savedGame, seedClassicSave as seedSave, unlockChallenge } from './fixtures';
 import { advanceTurn, newLegacyGame as newGame } from '../src/sim';
 
@@ -180,7 +181,7 @@ test('resumes an incident paused, investigates, fixes it and acknowledges the po
   await expect(clock).toHaveText(pausedClock!);
   expect((await savedGame(page)).incident!.elapsed).toBe(elapsed);
   await panel.getByRole('button', { name: /^Add (a|\d+) server/ }).click();
-  await page.getByRole('button', { name: '2×', exact: true }).click();
+  await setGameSpeed(page,2);
   await page.getByRole('button', { name: 'Resume the incident clock' }).click();
   await page.clock.runFor(8000);
   const report = page.getByRole('dialog');
