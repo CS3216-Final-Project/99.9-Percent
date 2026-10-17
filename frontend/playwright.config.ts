@@ -10,7 +10,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: !!process.env.CI,
   // Software WebGL rendering competes for the small CI runner's CPU.
-  // CI splits tests across three runners with --shard; each still uses one worker.
+  // CI splits tests across ten runners with --shard; each still uses one worker.
   workers: 1,
   timeout: 60_000,
   expect: { timeout: 10_000 },

@@ -237,6 +237,35 @@ test("walks straight across the server hall where no machine has been fitted yet
   await page.keyboard.up("ArrowUp");
 });
 
+test("walking leaves the camera in place", async ({ page }) => {
+  test.slow();
+  // Resume mid-walk in the open aisle, as in the hall-crossing test, so Up has room to carry the avatar.
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "nn.classic.exploration.v1",
+      JSON.stringify({ version: 1, floor: "servers", walking: true, avatar: { floor: "servers", x: -3.0, z: -2.3, yaw: 0 }, camera: null }),
+    ),
+  );
+  await open(page);
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+  const before = await settledView(page);
+  const start = (await exploration(page))?.avatar as { x: number; z: number };
+  const walked = async () => {
+    const a = (await exploration(page))?.avatar as { x: number; z: number };
+    return Math.hypot(a.x - start.x, a.z - start.z);
+  };
+  try {
+    await page.keyboard.down("ArrowUp");
+    await expect.poll(walked, { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
+  } finally {
+    await page.keyboard.up("ArrowUp");
+  }
+  expect(await walked()).toBeGreaterThanOrEqual(1);
+  const after = await settledView(page);
+  expect(after.target.x).toBeCloseTo(before.target.x, 3);
+  expect(after.target.z).toBeCloseTo(before.target.z, 3);
+});
+
 test("restores the mode, floor, walk position and camera view after a reload", async ({ page }) => {
   test.slow();
   await open(page);
