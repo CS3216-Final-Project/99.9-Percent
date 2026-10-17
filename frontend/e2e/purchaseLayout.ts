@@ -1,3 +1,4 @@
+import { openCameraControls } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { expect, expectRoom, seedSave, savedGame } from "./fixtures";
 import { newGame, type GameState } from "../src/sim";
@@ -73,7 +74,7 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
     await usableCard(page);
     await page.screenshot({path:`test-results/purchase-${width}x${height}-expanded.png`});
     if(!touch){
-        await page.getByRole("button",{name:"Rotate left",exact:true}).click();await usableCard(page);
+        await openCameraControls(page); await page.getByRole("button",{name:"Rotate left",exact:true}).click();await usableCard(page);
         await page.setViewportSize({width:width===1440?1366:1440,height:width===1440?768:900});
         await usableCard(page);
         await page.setViewportSize({width:390,height:844});await expect(card).toHaveAttribute("data-layout","sheet");

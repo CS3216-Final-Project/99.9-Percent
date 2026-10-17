@@ -1,4 +1,6 @@
+import { RoomControlsSlot } from "./RoomControlsHost";
 import "./CampaignUX.css";
+import { TimeMenu } from "./TimeMenu";
 import { CampaignAction as Act } from "./CampaignAction";
 import CampaignScorecard from "./CampaignScorecard";
 import { canPromote, combinedProfile, currentFault, pendingCombined } from "@/sim/combinedCampaign";
@@ -24,7 +26,7 @@ import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest, type ChapterCompletion } from "@/game/persist";
 import { money, num } from "@/game/format";
 import { useState } from "react";
-import { inspectOrSelect, useGame, walkthroughHoldsClock, type Speed } from "@/game/store";
+import { inspectOrSelect, useGame, walkthroughHoldsClock } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { AvatarSettings } from "./AvatarPicker";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
@@ -260,21 +262,22 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
 }
 
 export function CampaignControls() {
-  const { game, running, setRunning, speed, setSpeed, advance } = useGame();
+  const { game, running, setRunning } = useGame();
   const held = useGame(walkthroughHoldsClock);
   const active = useGame(s=>s.started) && !held && pendingStop(game.campaign) === null && !(game.campaign!.openingMilestone && !game.campaign!.openingMilestone.acknowledged) && (game.phase === "management" || game.phase === "incident");
-  return <footer className={`bottombar campaign-clock${running?" is-running":" is-paused"}`}>
+  return <footer className={`bottombar controls-dock campaign-clock${running?" is-running":" is-paused"}`}>
     <ViewTabs tabs={[
       { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}` },
       { id: "history", label: "History", icon: "history", badge: game.campaign!.reports.length > 0 ? String(game.campaign!.reports.length) : null },
     ]} />
+    <RoomControlsSlot />
     <div className="time-controls">
       <div className={`week${game.phase === "incident" ? " is-incident" : ""}`}><span className="brand-week"><Icon name={game.phase === "incident" ? "incident" : "week"} size={16} />
-        Week <strong>{game.turn}</strong> · Game second <strong data-testid="physical-step">{game.campaign!.step}</strong>
+        <span>Week <strong>{game.turn}</strong><span className="dock-second">Game second <strong data-testid="physical-step">{game.campaign!.step}</strong></span></span>
       </span></div>
-      <button type="button" className={`btn btn-primary campaign-play${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps(held ? "Finish or skip the tutorial to run the company" : "Run or pause game seconds (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /><span>{running?"Pause company":"Run company"}</span></button>
-      <div className="speed" role="group" aria-label="Game speed">{([.5, 1, 2] as Speed[]).map(v => <button type="button" key={v} className={speed === v ? "is-active" : ""} aria-pressed={speed === v} onClick={() => setSpeed(v)} {...tipProps(`${v}× speed`)}>{v}×</button>)}</div>
-      <span className="campaign-clock-state" role="status">{running?"Running":"Paused"}</span><details className="campaign-advanced"><summary>More controls</summary><div><p>Optional: advance exactly one modeled second. During an incident, use Run/Pause.</p><button type="button" className="btn btn-quiet advance campaign-step" aria-description="Optional precision control. One game second is one modeled second; use Run company for continuous play." disabled={!active || game.phase !== "management"} onClick={advance} {...tipProps("Advance one game second. One game second models one second of requests; 60 game seconds settle an operating week.")}><span className="advance-label">{game.phase === "incident" ? "Incident" : game.phase === "ended" ? "Company closed" : game.phase === "review" ? "Review" : "Advance game second"}</span><Icon name="next" /></button></div></details>
+      <TimeMenu />
+      <button type="button" className={`btn btn-primary campaign-play dock-primary${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps(held ? "Finish or skip the tutorial to run the company" : "Run or pause the company (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /><span>{running ? "Pause" : "Run"}</span></button>
+      <span className="visually-hidden" role="status">{running ? "Running" : "Paused"}</span>
     </div>
   </footer>;
 }

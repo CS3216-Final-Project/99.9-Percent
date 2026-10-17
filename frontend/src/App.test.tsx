@@ -103,8 +103,9 @@ describe("opening UI", () => {
   });
   it("visible interventions lead to review and the same company", () => {
     vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-    fireEvent.click(screen.getByText("More controls"));
-    for (let i = 0; i < 6; i++)fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    act(() => vi.advanceTimersByTime(6000));
+    expect(useGame.getState().running).toBe(false);
     const id = useGame.getState().game.campaign!.runId;
     expect(screen.getByText(/Stable game seconds: 0\/5/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
@@ -249,8 +250,10 @@ it("forgets a pending Start over confirmation when the player leaves its tab", (
 
 it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-  fireEvent.click(screen.getByText("More controls"));
-  fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
+  vi.useFakeTimers();
+  fireEvent.click(screen.getByRole("button", { name: "Run" }));
+  act(() => vi.advanceTimersByTime(1000));
+  fireEvent.click(screen.getByRole("button", { name: "Pause" }));
   const views = screen.getByRole("navigation", { name: "Views" });
   fireEvent.click(within(views).getByRole("button", { name: "History" }));
   const history = screen.getByRole("region", { name: "History" });
@@ -269,8 +272,10 @@ it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", (
 
 it("asks once before New company replaces the campaign, as Classic's Start over does", () => {
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-  fireEvent.click(screen.getByText("More controls"));
-  fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
+  vi.useFakeTimers();
+  fireEvent.click(screen.getByRole("button", { name: "Run" }));
+  act(() => vi.advanceTimersByTime(1000));
+  fireEvent.click(screen.getByRole("button", { name: "Pause" }));
   const runId = useGame.getState().game.campaign!.runId;
   const menu = openMenu();
   openTab(menu, "Saves");

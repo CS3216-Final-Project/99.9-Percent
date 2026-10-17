@@ -350,8 +350,7 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  expect((await savedGame(page)).campaign!.actions).toEqual([]);
  await expect(page.getByRole("button",{name:"Run",exact:true})).toBeInViewport();await expect(page.getByRole("button",{name:"Advance game second",exact:true})).toBeHidden();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
- await page.locator(".campaign-advanced > summary").tap();await expect(page.getByRole("button",{name:"Advance game second",exact:true})).toBeInViewport();
- await page.getByRole("button",{name:"Advance game second",exact:true}).tap();expect((await savedGame(page)).campaign!.step).toBe(1);
+ await advanceCampaignStep(page);expect((await savedGame(page)).campaign!.step).toBe(1);
  await page.screenshot({path:"test-results/campaign-ux-mobile.png"});
 });
 

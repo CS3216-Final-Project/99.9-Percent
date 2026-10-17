@@ -8,6 +8,7 @@ import { Bug } from "pixelarticons/react/Bug.js";
 import { CalendarWeeks } from "pixelarticons/react/CalendarWeeks.js";
 import { ChartLine } from "pixelarticons/react/ChartLine.js";
 import { Check } from "pixelarticons/react/Check.js";
+import { ChevronDown } from "pixelarticons/react/ChevronDown.js";
 import { CheckboxOn } from "pixelarticons/react/CheckboxOn.js";
 import { Close } from "pixelarticons/react/Close.js";
 import { Cloud } from "pixelarticons/react/Cloud.js";
@@ -124,6 +125,7 @@ const ICONS = {
   play: Play,
   pause: Pause,
   next: ArrowRight,
+  down: ChevronDown,
   plus: Plus,
   plusBox: PlusBox,
   minus: Minus,

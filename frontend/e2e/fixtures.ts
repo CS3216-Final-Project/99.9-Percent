@@ -15,6 +15,7 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
     await use();
   }, { auto: true }],
   healthyBrowser: [async ({ page }, use) => {
+    await page.clock.install();
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await use();
@@ -108,11 +109,34 @@ export async function savedClassicGame(page: Page): Promise<GameState> {
   return page.evaluate(() => JSON.parse(localStorage.getItem('nn.classic.save.v1')!).game);
 }
 
-/** Open Campaign's secondary precision control through the real UI. */
+/** Advance through Run/Pause with virtual fixed-duration ticks, without a production test hook. */
 export async function advanceCampaignStep(page: Page) {
-  const more = page.locator(".campaign-advanced");
-  if (!(await more.evaluate(el => (el as HTMLDetailsElement).open))) await more.locator("summary").click();
-  await page.getByRole("button", { name: "Advance game second", exact: true }).click();
+  const counter = page.getByTestId("physical-step");
+  const before = Number(await counter.textContent());
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 100));
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  for (let tick = 0; tick < 10 && Number(await counter.textContent()) === before; tick++) await page.clock.runFor(200);
+  await expect(counter).toHaveText(String(before + 1));
+  const pause = page.getByRole("button", { name: "Pause", exact: true });
+  if (await pause.isVisible()) await pause.click();
+  await page.clock.resume();
+}
+
+export async function openRoomControls(page: Page) {
+  const menu = page.locator(".room-menu");
+  if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await menu.locator(":scope > summary").click();
+}
+export async function openCameraControls(page: Page) {
+  const menu = page.locator(".camera-menu");
+  if (await menu.isVisible()) {
+    if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await menu.locator(":scope > summary").click();
+  } else await openRoomControls(page);
+}
+export async function setGameSpeed(page: Page, speed: number) {
+  const menu = page.locator(".time-menu");
+  if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await menu.locator(":scope > summary").click();
+  await page.getByRole("group", { name: "Game speed" }).getByRole("button", { name: `${speed}×`, exact: true }).click();
+  await menu.locator(":scope > summary").click();
 }
 
 /** Finish Chapter 0's explanations after the free inspection and purchase-preview lessons. */

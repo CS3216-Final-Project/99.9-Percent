@@ -34,7 +34,7 @@ export function ViewTabs({ tabs }: { tabs: ViewTab[] }) {
             <Icon name={icon} />
           </span>
           <span className="tab-label">{label}</span>
-          {badge && <span className="badge">{badge}</span>}
+          <span className="badge" aria-hidden={!badge}>{badge ?? ""}</span>
         </button>
       ))}
     </nav>

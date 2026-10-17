@@ -1,3 +1,4 @@
+import { openCameraControls } from "./fixtures";
 import { test, expect, expectRoom, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -20,6 +21,7 @@ test("explains controls in the shared tooltip, never the browser's own", async (
   await expect(tip).toBeHidden();
 
   // A shortcut reads as a key.
+  await openCameraControls(page);
   await page.getByRole("button", { name: "Rotate left", exact: true }).hover();
   await expect(tip.locator("kbd")).toHaveText("Q");
   await expect(tip).toContainText("Rotate left");

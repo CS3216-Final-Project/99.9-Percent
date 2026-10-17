@@ -45,21 +45,7 @@
 .campaign-action-popover[data-side="right"]::before { right: -12px; background: var(--night-line); clip-path: polygon(0 0, 100% 50%, 0 100%); }
 @media (prefers-reduced-motion: reduce) { .campaign-action-popover { transition: none; } }
 .campaign-panel .campaign-action-card.is-confirming .act { outline: 3px solid var(--focus); outline-offset: 1px; }
-.campaign-clock .campaign-play { gap: 6px; min-height: 44px; }
-.campaign-clock .campaign-clock-state { font-size: var(--text-xs); font-weight: 700; }
-.campaign-clock.is-paused { border-top: 3px solid var(--focus); }
-.campaign-clock .campaign-step { font-size: var(--text-xs); opacity: .85; }
 .campaign-tech-intro { font-size: var(--text-sm); line-height: 1.5; max-width: 75ch; }
-@media (max-width: 600px) {
-  .campaign-clock .campaign-play span { font-size: var(--text-xs); }
-  .campaign-clock .campaign-clock-state { display: none; }
-  .campaign-clock .campaign-step { padding: 8px; }
-}
-
-.campaign-clock .campaign-advanced { position: relative; font-size: var(--text-xs); }
-.campaign-clock .campaign-advanced > summary { cursor: pointer; padding: 10px 6px; }
-.campaign-clock .campaign-advanced > div { position: absolute; bottom: calc(100% + 12px); right: 0; padding: 12px; width: 230px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--paper); color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
-.campaign-clock .campaign-advanced p { margin: 4px 0 10px; }
 .chapter-current .campaign-intro-badge { display: inline-block; color: var(--on-night-soft); font-size: var(--text-xs); margin-top: 4px; }
 
 .campaign-panel .campaign-action-card { padding-bottom: 4px; }

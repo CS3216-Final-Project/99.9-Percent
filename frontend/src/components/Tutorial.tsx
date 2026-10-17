@@ -194,9 +194,9 @@ const CAMPAIGN: Step[] = [
   },
   {
     title: "Find your way around",
-    why: "The server floor holds your machines; the office holds the crew. Floor buttons switch between them. Zoom, rotate and Reset view change your view. Walk mode is optional; equipment can always be selected directly.",
+    why: "The server floor holds your machines; the office holds the crew. Open the floor selector (Room on phones) to change floors. Camera (inside Room on phones) contains zoom, rotation and Reset view. Walk mode is optional; equipment can always be selected directly.",
     hint: () => "Use the room controls to explore. On a keyboard, Q/E rotate and Page Up/Page Down switch floors.",
-    target: () => ".camera-buttons",
+    target: () => ".room-controls",
   },
   {
     title: "Technology and deployment",
@@ -348,7 +348,7 @@ function inOpenRoom(r: DOMRect, stage: DOMRect): boolean {
 /** Where the card sits relative to what it points at. */
 function placeFor(selector: string): Place {
   if (selector.startsWith(".eq-label") || selector.startsWith(".node")) return "right";
-  if (selector.startsWith(".view-tabs") || selector.startsWith(".advance") || selector.startsWith(".campaign-clock") || selector.startsWith(".camera-buttons")) return "top";
+  if (selector.startsWith(".view-tabs") || selector.startsWith(".advance") || selector.startsWith(".campaign-clock") || selector.startsWith(".room-controls")) return "top";
   if (selector.startsWith(".next-chip") || selector.startsWith(".topbar")) return "bottom";
   return "left";
 }

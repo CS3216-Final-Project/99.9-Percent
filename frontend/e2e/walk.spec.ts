@@ -1,3 +1,4 @@
+import { openRoomControls, openCameraControls } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { test, expect, expectRoom, seedClassicSave, seedSave, unlockChallenge } from "./fixtures";
 import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
@@ -9,8 +10,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 const label = (page: Page, name: string) => page.getByRole("main").locator(".eq-labels").getByRole("button", { name, exact: true });
-const floor = (page: Page, name: "Office floor" | "Server floor") => page.getByRole("group", { name: "Floors" }).getByRole("button", { name: new RegExp(`^${name}`) });
-const walk = (page: Page) => page.getByRole("main").getByRole("button", { name: "Walk", exact: true });
+const floor = (page: Page, name: "Office floor" | "Server floor") => page.locator(`.floor-menu button[data-floor="${name === "Office floor" ? "office" : "servers"}"]`);
+const walk = (page: Page) => page.locator(".desktop-walk").getByRole("button", { name: "Walk", exact: true });
 const prompt = (page: Page) => page.locator(".walk-prompt");
 const exploration = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem("nn.classic.exploration.v1") ?? "null"));
 
@@ -118,7 +119,7 @@ test("in walk mode, clicking equipment walks the avatar to it, and Space then in
   // prompt wins even while a room control like Zoom in still holds the page's focus.
   await page.getByRole("complementary", { name: "Details" }).getByRole("button", { name: "Close" }).click();
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "false");
-  await page.getByRole("button", { name: "Zoom in", exact: true }).focus();
+  await openCameraControls(page); await page.getByRole("button", { name: "Zoom in", exact: true }).focus();
   await page.keyboard.press("Space");
   await expect(reveal).toBeVisible();
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "true");
@@ -168,7 +169,7 @@ test("walking away from the meeting leaves its nearby presentation sound behind"
   const heard = (frequencies: number[]) => frequencies.some((_, i) => PRESENTATION.every((hz) => near(frequencies.slice(i, i + 4), hz)));
   const audio = await trackEffectFrequencies(page);
   await open(page);
-  await floor(page, "Office floor").click();
+  await openRoomControls(page); await floor(page, "Office floor").click();
   await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
   await walk(page).click();
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
@@ -251,9 +252,9 @@ test("restores the mode, floor, walk position and camera view after a reload", a
   await expect.poll(async () => (await exploration(page))?.avatar?.floor).toBe("servers");
   // A turn and a closer look, taken through the room's own camera buttons.
   const before = await settledView(page);
-  await page.getByRole("button", { name: "Rotate right" }).click();
-  await page.getByRole("button", { name: "Zoom in" }).click();
-  await page.getByRole("button", { name: "Zoom in" }).click();
+  await openCameraControls(page); await page.getByRole("button", { name: "Rotate right" }).click();
+  await openCameraControls(page); await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await openCameraControls(page); await page.getByRole("button", { name: "Zoom in", exact: true }).click();
   await expect.poll(async () => (await exploration(page))?.camera?.zoom ?? 0).toBeGreaterThan(before.zoom);
   const view = await settledView(page);
   expect(view.zoom).toBeGreaterThan(before.zoom);
