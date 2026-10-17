@@ -173,32 +173,34 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     {!open && (props.disabled || preview?.ok === false) && <p className="campaign-action-reason" id={id} tabIndex={0}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
     {open && <ActionPopover anchor={anchor}>
       <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); cancel(); } }}>
-        <div className="campaign-purchase-essential">
-          <p className="campaign-action-confirm-title">{isAdd ? "Add App Server" : label}?</p>
-          {description && <p>{description}</p>}
-          {costs}
-          {isAdd && <p className="campaign-purchase-note">New servers need traffic directed to them before they can help.</p>}
-          {label==="Unlock autoscaling" && props.note && <p className="campaign-purchase-note">{props.note}</p>}
-          {label==="Deploy load balancing" && <p className="campaign-purchase-note">Choose which servers receive traffic after installation.</p>}
-        </div>
-        <details className="campaign-purchase-details">
-          <summary>More details</summary>
-          <div className="campaign-purchase-details-content" tabIndex={0} role="region" aria-label="Purchase details" onKeyDown={e => {
-            if (e.target !== e.currentTarget || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-            if (e.key === "End" || e.key === "Home") {
-              // Keep endpoint navigation in this region instead of relying on platform scroll routing.
-              e.preventDefault();
-              e.currentTarget.scrollTop = e.key === "End" ? e.currentTarget.scrollHeight : 0;
-            }
-          }}>
-            {machine && <p className="campaign-action-machine"><b>{machine.name}</b> {machine.does}</p>}
-            {props.tip && <p>{props.tip}</p>}
-            {props.note && <p>{props.note}</p>}
-            <p>Game game seconds advance only while the company is running. Running costs start when the upgrade becomes active.</p>
-            {props.price!==undefined && props.price>0 && <p>Purchases cannot be undone.</p>}
-            <p>Financial estimates assume recent earnings continue. Cash update timing, traffic and future decisions can change the outcome.</p>
+        <div className="campaign-purchase-body" role="region" aria-label="Purchase preview" tabIndex={0}>
+          <div className="campaign-purchase-essential">
+            <p className="campaign-action-confirm-title">{isAdd ? "Add App Server" : label}?</p>
+            {description && <p>{description}</p>}
+            {costs}
+            {isAdd && <p className="campaign-purchase-note">New servers need traffic directed to them before they can help.</p>}
+            {label==="Unlock autoscaling" && props.note && <p className="campaign-purchase-note">{props.note}</p>}
+            {label==="Deploy load balancing" && <p className="campaign-purchase-note">Choose which servers receive traffic after installation.</p>}
           </div>
-        </details>
+          <details className="campaign-purchase-details">
+            <summary>More details</summary>
+            <div className="campaign-purchase-details-content" tabIndex={0} role="region" aria-label="Purchase details" onKeyDown={e => {
+              if (e.target !== e.currentTarget || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+              if (e.key === "End" || e.key === "Home") {
+                // Keep endpoint navigation in this region instead of relying on platform scroll routing.
+                e.preventDefault();
+                e.currentTarget.scrollTop = e.key === "End" ? e.currentTarget.scrollHeight : 0;
+              }
+            }}>
+              {machine && <p className="campaign-action-machine"><b>{machine.name}</b> {machine.does}</p>}
+              {props.tip && <p>{props.tip}</p>}
+              {props.note && <p>{props.note}</p>}
+              <p>Game game seconds advance only while the company is running. Running costs start when the upgrade becomes active.</p>
+              {props.price!==undefined && props.price>0 && <p>Purchases cannot be undone.</p>}
+              <p>Financial estimates assume recent earnings continue. Cash update timing, traffic and future decisions can change the outcome.</p>
+            </div>
+          </details>
+        </div>
         <footer className="campaign-purchase-footer">
         {preview?.ok && <PurchaseWarning preview={preview}/>}
         {(props.disabled || preview?.ok===false) && <p role="status">{reason}</p>}
@@ -245,9 +247,12 @@ function ActionPopover({ anchor, children }: { anchor: string; children: ReactNo
       const section = el.querySelector<HTMLElement>(".campaign-action-confirm");
       if (essential && footer && summary && section) {
         const style = getComputedStyle(section);
-        const reserved = essential.offsetHeight+footer.offsetHeight+summary.offsetHeight
-          +parseFloat(style.paddingTop)+parseFloat(style.paddingBottom)+4+4; // footer margin and card borders
-        el.style.setProperty("--purchase-details-room",`${Math.max(0,area.bottom-area.top-reserved)}px`);
+        const insets = parseFloat(style.paddingTop)+parseFloat(style.paddingBottom)+4+4; // footer margin and card borders
+        const bodyRoom = Math.max(0,area.bottom-area.top-footer.offsetHeight-insets);
+        const remaining = bodyRoom-essential.offsetHeight-summary.offsetHeight;
+        // Short sheets scroll the preview body instead of reducing the expanded text to a few pixels.
+        const readable = Math.min(96,Math.max(0,bodyRoom-summary.offsetHeight));
+        el.style.setProperty("--purchase-details-room",`${Math.max(readable,remaining)}px`);
       }
       const w = el.offsetWidth, h = el.offsetHeight;
       const marker = document.querySelector<HTMLElement>(`.eq-label[data-eq="${anchor}"]`);

@@ -86,6 +86,7 @@ test("purchase details keyboard navigation handles overflow and fitting content"
  const card=page.locator(".campaign-action-popover"),content=card.getByRole("region",{name:"Purchase details",exact:true});
  await card.getByText("More details",{exact:true}).tap();
  await expect.poll(()=>content.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(0);
+ await expect.poll(()=>content.evaluate(el=>el.clientHeight/parseFloat(getComputedStyle(el).lineHeight))).toBeGreaterThanOrEqual(3);
  await keyboardDetails(page);
  await page.setViewportSize({width:390,height:1200});
  await expect.poll(()=>content.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(0);

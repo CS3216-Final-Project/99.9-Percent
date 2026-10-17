@@ -55,7 +55,7 @@
 .app .controls-dock .dock-primary > .icon { width: 30px; height: 30px; padding: 5px; border-radius: 9px; color: var(--ink); background: var(--go); }
 
 /* The purchase card uses the same paper and primary action as other dialogs. Its measured layout is preserved. */
-.campaign-action-popover { background: var(--paper); color: var(--ink); border: 1px solid var(--control-edge); border-radius: var(--radius-panel); }
+.campaign-action-popover { background: var(--paper); color: var(--ink); border: 1px solid var(--control-edge); border-radius: var(--radius-panel); font-size: var(--text-sm); }
 .campaign-action-popover .muted, .campaign-action-popover .row dt, .campaign-action-popover .campaign-purchase-details > summary { color: var(--text-soft); }
 .campaign-action-popover .campaign-action-machine { color: var(--text-soft); border-bottom-color: var(--control-edge); }
 .campaign-action-popover .campaign-action-machine b { color: #315845; }
