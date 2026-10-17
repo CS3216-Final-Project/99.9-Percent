@@ -124,7 +124,17 @@ export async function advanceCampaignStep(page: Page, { seconds = 1, resumeClock
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
   await page.getByRole("button", { name: "Run", exact: true }).click();
   const target = before + seconds;
-  for (let tick = 0; tick < seconds * 10 && Number(await counter.textContent()) < target; tick++) await page.clock.runFor(200);
+  for (let tick = 0; tick < seconds * 10 && Number(await counter.textContent()) < target; tick++) {
+    const completed = chapterComplete(page);
+    if (await completed.isVisible()) {
+      // Trigger the journey's acknowledgement handler before delivering more ticks.
+      // Staying in a chapter deliberately leaves the game paused, so this requested
+      // batch must explicitly run again to deliver its remaining game seconds.
+      await expect(completed).toBeHidden();
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+    }
+    await page.clock.runFor(200);
+  }
   await expect(counter).toHaveText(String(target));
   const pause = page.getByRole("button", { name: "Pause", exact: true });
   if (await pause.isVisible()) await pause.click();
