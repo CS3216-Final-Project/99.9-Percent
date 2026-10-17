@@ -14,8 +14,10 @@
 .campaign-action-popover { position: absolute; left: 0; top: 0; z-index: 6; width: min(320px, calc(100% - 24px)); border: 2px solid var(--night-line); border-left: 4px solid var(--focus); border-radius: var(--radius); background: var(--night-2); color: var(--on-night); box-shadow: var(--lift); font-size: var(--text-xs); line-height: 1.35; display: flex; overflow: hidden; opacity: 0; transition: opacity .12s ease-out; }
 .campaign-action-popover.is-placed { opacity: 1; }
 .campaign-action-confirm { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 10px 12px; }
+.campaign-purchase-body { display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.campaign-purchase-body:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .campaign-purchase-essential, .campaign-purchase-footer { flex: none; }
-.campaign-purchase-details { display: flex; flex-direction: column; min-height: 0; flex: 0 1 auto; }
+.campaign-purchase-details { display: flex; flex-direction: column; flex: none; }
 .campaign-purchase-details > summary { flex: none; cursor: pointer; padding: 4px 0; color: var(--on-night-soft); }
 .campaign-purchase-details-content { min-height: 0; max-height: var(--purchase-details-room); overflow-y: auto; overscroll-behavior: contain; padding-top: 4px; }
 .campaign-purchase-details:not([open]) .campaign-purchase-details-content { display: none; }

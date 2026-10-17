@@ -194,7 +194,7 @@ const CAMPAIGN: Step[] = [
   },
   {
     title: "Find your way around",
-    why: "The server floor holds your machines; the office holds the crew. Open the floor selector (Room on phones) to change floors. Camera (inside Room on phones) contains zoom, rotation and Reset view. Walk mode is optional; equipment can always be selected directly.",
+    why: "The server floor holds your machines; the office holds the crew. Floor changes floors. View mode chooses Overview or optional Walk mode. Camera contains zoom, rotation and Reset view. On phones, all three are inside Navigation. Equipment can always be selected directly.",
     hint: () => "Use the room controls to explore. On a keyboard, Q/E rotate and Page Up/Page Down switch floors.",
     target: () => ".room-controls",
   },

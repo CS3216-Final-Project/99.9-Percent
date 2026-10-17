@@ -2,12 +2,12 @@
  * 99.99% - interface styles.
  *
  * Night shift at a tiny startup: an indigo server room, cream index cards with
- * ink outlines and chunky buttons that press down. Space Grotesk gives the
+ * warm borders and rounded controls with subtle pressed depth. Space Grotesk gives the
  * logo, headings, controls and metrics a technical character; Source Sans 3
  * keeps body text and longer explanations easy to read.
  *
  * Every idea has one colour and one icon (see components/icons.tsx):
- * cash is gold coins, users are blue, revenue teal, uptime a pink heart,
+ * cash is a gold wallet, users are blue, revenue teal, uptime a pink pulse,
  * upgrades violet, engineers orange. Status is always green / orange / red.
  */
 
@@ -65,10 +65,16 @@
   --text-title-max: 4.4rem;
 
   color-scheme: dark;
-  --radius: 4px;
+  --radius: 14px;
+  --radius-panel: 22px;
+  --control-edge: #d8c8ad;
+  --control-inset: #f2e8d4;
+  --selection: #e8dcf5;
+  --tech-tile: #f6dda4;
+  --tech-ink: #604626;
   --side-w: 348px;
-  --press: 0 3px 0 0 var(--ink);
-  --lift: 0 4px 0 0 var(--ink), 0 16px 32px rgb(8 6 22 / 0.5);
+  --press: inset 0 1px 0 #ffffff30, 0 2px 0 #a28eae;
+  --lift: 0 4px 0 #ccbba066, 0 16px 35px #1c142a45;
 }
 
 .tour-chapter { display: grid; gap: 4px; margin: 0 0 10px; font-family: var(--font-display); font-size: var(--text-sm); font-weight: 600; }
