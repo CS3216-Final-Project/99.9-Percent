@@ -11,10 +11,15 @@ test.beforeEach(async ({ page }) => {
 
 const label = (page: Page, name: string) => page.getByRole("main").locator(".eq-labels").getByRole("button", { name, exact: true });
 const floor = (page: Page, name: "Office floor" | "Server floor") => page.locator(`.floor-menu button[data-floor="${name === "Office floor" ? "office" : "servers"}"]`);
-const walk = (page: Page) => page.locator(".desktop-walk").getByRole("button", { name: "Walk", exact: true });
+const walk = (page: Page) => page.locator(".desktop-walk").getByRole("button", { name: "Walk mode", exact: true, includeHidden: true });
 const prompt = (page: Page) => page.locator(".walk-prompt");
 const exploration = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem("nn.classic.exploration.v1") ?? "null"));
 
+async function chooseWalkMode(page: Page) {
+  const menu = page.locator(".view-mode-menu");
+  await menu.locator(":scope > summary").click();
+  await walk(page).click();
+}
 /** The stored camera view, once its exact JSON has stayed unchanged for a beat longer than the write throttle. */
 async function settledView(page: Page): Promise<{ target: { x: number; z: number }; offset: { x: number; y: number; z: number }; zoom: number }> {
   let lastJson = "";
@@ -77,7 +82,7 @@ test("walks the building as an avatar: the elevator by Space, Walk keeping out o
   // The opening framing and the walk move a share of the way each frame, so software rendering takes a while.
   test.slow();
   await open(page);
-  await walk(page).click();
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   // On the server floor the avatar steps out of the elevator, so the ride is within reach at once.
   await expect(prompt(page)).toContainText("Ride up to the office floor");
@@ -101,7 +106,7 @@ test("in walk mode, clicking equipment walks the avatar to it, and Space then in
   const SCAN_CHIRP = 1244;
   const audio = await trackEffectFrequencies(page);
   await open(page);
-  await walk(page).click();
+  await chooseWalkMode(page);
   await expect(prompt(page)).toContainText("Ride up");
   // The monitoring room is just past the elevator, through its glass door.
   await label(page, "Monitoring").click();
@@ -140,7 +145,7 @@ test("Guided Mode: the avatar inspects the Deploy office and the panel reports c
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
   const metrics = page.getByRole("complementary", { name: "System metrics" });
-  await walk(page).click();
+  await chooseWalkMode(page);
   await expect(prompt(page)).toContainText("Ride up to the office floor");
   await page.keyboard.press("Space");
   await expect(prompt(page)).toContainText("Ride down to the server floor", { timeout: 20_000 });
@@ -171,7 +176,7 @@ test("walking away from the meeting leaves its nearby presentation sound behind"
   await open(page);
   await openRoomControls(page); await floor(page, "Office floor").click();
   await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
-  await walk(page).click();
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   // Walk mode begins beside the meeting room: its talk is heard through real Web Audio.
   await audio.reset();
@@ -240,7 +245,7 @@ test("walks straight across the server hall where no machine has been fitted yet
 test("restores the mode, floor, walk position and camera view after a reload", async ({ page }) => {
   test.slow();
   await open(page);
-  await walk(page).click();
+  await chooseWalkMode(page);
   await expect(prompt(page)).toContainText("Ride up");
   // Send the avatar to the monitoring room, so its spot is worth remembering.
   await label(page, "Monitoring").click();
