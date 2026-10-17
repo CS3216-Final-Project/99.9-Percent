@@ -269,7 +269,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
   }, []);
 
   // Tell the office's sounds where they are heard: the camera's target, or in walk mode on the office floor the
-  // avatar's own spot — not the camera easing after it — and whether the office floor is on screen.
+  // avatar's own spot, independent of the camera, and whether the office floor is on screen.
   useFrame((state) => {
     const c = controls.current;
     if (!c) return;
@@ -289,13 +289,13 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
   );
 
   // Read the camera from the frame state: R3F expects per-frame mutation here, not on the hook's render value.
-  useFrame((state, dt) => {
+  useFrame((state) => {
     const c = controls.current;
     if (!c) return;
     const camera = state.camera as THREE.OrthographicCamera;
     const { size } = state;
     const { offset, dir, before, from, centre } = v;
-    // In walk mode the view follows the avatar, so it no longer frames the equipment.
+    // Entering walk mode takes the camera over, so it no longer frames the equipment.
     const walking = useGame.getState().walking;
     if (walking) touched.current = true;
     offset.copy(camera.position).sub(c.target);
@@ -318,10 +318,8 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       turned = true;
     }
     if (turned) {
-      // While the view follows the facility, turn about the built equipment so it holds its place on screen; in walk
-      // mode, about the avatar.
-      if (walking) turnAbout(c.target, centre.set(avatar.x, c.target.y + 0.4, avatar.z), from, dir.copy(offset).normalize().negate(), c.target.y);
-      else if (!touched.current && box.current) turnAbout(c.target, box.current.getCenter(centre), from, dir.copy(offset).normalize().negate(), c.target.y);
+      // While the view follows the facility, turn about the built equipment so it holds its place on screen.
+      if (!touched.current && box.current) turnAbout(c.target, box.current.getCenter(centre), from, dir.copy(offset).normalize().negate(), c.target.y);
       camera.position.copy(c.target).add(offset);
       // The controls aimed the camera earlier this frame, from where it stood before the turn.
       camera.lookAt(c.target);
@@ -352,13 +350,6 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       camera.position.add(c.target).sub(before);
       camera.updateProjectionMatrix();
       if (Math.abs(zoom - camera.zoom) < 0.05 && Math.hypot(goal.x - c.target.x, goal.z - c.target.z) < 0.01) focusing.current = null;
-    } else if (walking && !riding()) {
-      // Follow the avatar when no campaign action is centring its machine.
-      const k = reducedMotion() ? 1 : 1 - Math.exp(-Math.min(dt, 0.1) * 3);
-      before.copy(c.target);
-      c.target.x += (avatar.x - c.target.x) * k;
-      c.target.z += (avatar.z - c.target.z) * k;
-      camera.position.add(c.target).sub(before);
     }
     // Ride with the elevator: the view's height follows the car on the clock, however few frames are drawn.
     const y = viewHeight();

@@ -47,7 +47,7 @@ jobs:
       # Collect failures from every shard instead of cancelling the others.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     defaults:
       run:
         working-directory: frontend
@@ -63,7 +63,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       # Each runner keeps one worker: software WebGL needs its CPU to itself.
       - name: Browser journeys against the production build
-        run: npx playwright test --shard=${{ matrix.shard }}/3
+        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
