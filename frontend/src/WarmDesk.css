@@ -89,9 +89,10 @@
   .topbar .stat .stat-icon .concept { width: 18px; height: 18px; }
 }
 @media (max-width: 360px) {
+  .topbar .stat-action[aria-label="View app health"] { padding-inline: 1px; }
   .topbar .stat { padding: 3px; gap: 3px; min-width: 0; }
   .topbar .stat .stat-icon { flex: none; }
   .topbar .stat .stat-body { min-width: 0; flex: 1; }
-  .topbar .stat .stat-body > strong { font-size: var(--text-sm); white-space: nowrap; }
+  .topbar .stat .stat-body > strong { font-size: var(--text-xs); white-space: nowrap; }
 }
 @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
