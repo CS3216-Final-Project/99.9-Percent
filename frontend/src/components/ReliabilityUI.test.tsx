@@ -16,7 +16,7 @@ it("shows the stage and a legal way to start the test",()=>{
 it("exposes actual and detected health and surviving capacity",()=>{
  show(tick(act(preparedReliability(),{type:"arm_reliability"}),8));const panel=screen.getByRole("region",{name:"Stay Online"});
  expect(panel.textContent).toContain("failed");expect(panel.textContent).toContain("detected healthy");expect(panel.textContent).toContain("1,600 /");
- expect(within(panel).getByRole("button",{name:"Restore App 2 · free · 3 steps"})).toBeTruthy();
+ expect(within(panel).getByRole("button",{name:"Restore App 2 · free · 3 game seconds"})).toBeTruthy();
 });
 it("uses effective routing for labels and selects an inspected application",()=>{
  show(tick(act(preparedReliability(),{type:"arm_reliability"}),9));

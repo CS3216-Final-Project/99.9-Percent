@@ -11,7 +11,7 @@ test("Campaign option comparison, confirmation, precision control and pause-to-i
   await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("region",{name:"Confirm Add server"})).toHaveCount(0);
   await expect(confirm.getByRole("button",{name:"Confirm"})).toBeFocused();
   await page.keyboard.press("Escape"); await expect(confirm).toBeHidden(); expect((await savedGame(page)).campaign!.apps).toHaveLength(1);
-  await page.locator(".campaign-advanced > summary").click(); await page.getByRole("button",{name:"Advance step",exact:true}).click();
+  await page.locator(".campaign-advanced > summary").click(); await page.getByRole("button",{name:"Advance game second",exact:true}).click();
   expect((await savedGame(page)).campaign!.step).toBe(1);
   await page.clock.install(); await page.getByRole("button",{name:"Run",exact:true}).click(); await page.clock.runFor(1000);
   await expect(page.getByRole("button",{name:"Pause & inspect"})).toHaveCount(0); await page.getByRole("button",{name:"Pause",exact:true}).click(); const stopped=(await savedGame(page)).campaign!.step;

@@ -36,7 +36,7 @@ test("sounds the company starting and the alarm, and nothing for a skipped walkt
   expect(await voices()).toBe(launch);
   const introduced = launch;
   await page.locator(".campaign-advanced > summary").click();
-  const advance = page.getByRole("button", { name: "Advance step", exact: true });
+  const advance = page.getByRole("button", { name: "Advance game second", exact: true });
   for (let i = 0; i < 5; i++) await advance.click();
   // Quiet steps make no sound.
   expect(await voices()).toBe(introduced);

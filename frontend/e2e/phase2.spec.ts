@@ -10,7 +10,7 @@ test("the walkthrough works from the keyboard, keeps shortcuts working and remem
   await page.screenshot({ path: "test-results/phase2-title.png" });
   await page.getByRole("button", { name: "Start Guided Mode" }).press("Enter");
   const card = tutorial(page);
-  await expect(card).toHaveAccessibleName("Tutorial, step 1 of 8");
+  await expect(card).toHaveAccessibleName("Tutorial, step 1 of 21");
   // Each step takes focus, so a screen reader announces it; the card is not modal, so Tab leads on into the game.
   await expect(card).toBeFocused();
   await page.keyboard.press("Tab");
@@ -18,15 +18,15 @@ test("the walkthrough works from the keyboard, keeps shortcuts working and remem
   const room = page.getByRole("main");
   await room.getByRole("button", { name: "Servers", exact: true }).press("Enter");
   await page.getByRole("dialog", { name: "Servers inspected" }).getByRole("button", { name: "Return to room" }).press("Enter");
-  await expect(card).toHaveAccessibleName("Tutorial, step 2 of 8");
+  await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
   // The card's own focus went to the inspection dialog; give it back, as a player's Tab would.
   await card.focus();
   await expect(card).toBeFocused();
   await room.getByRole("button", { name: "Database", exact: true }).press("Enter");
   await page.getByRole("dialog", { name: "Database inspected" }).getByRole("button", { name: "Return to room" }).press("Enter");
-  await expect(card).toHaveAccessibleName("Tutorial, step 3 of 8");
+  await expect(card).toHaveAccessibleName("Tutorial, step 3 of 21");
   await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
-  await expect(card).toHaveAccessibleName("Tutorial, step 4 of 8");
+  await expect(card).toHaveAccessibleName("Tutorial, step 4 of 21");
   // The guide holds the clock until it is done, so P does nothing while the card has focus.
   await expect(card).toBeFocused();
   await page.keyboard.press("p");

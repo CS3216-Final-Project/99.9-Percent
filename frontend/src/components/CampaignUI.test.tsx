@@ -24,7 +24,7 @@ it("shows the current stage cap instead of advertising a locked database tier",(
  show(dataCompany("read-heavy",false));const button=screen.getByRole("button",{name:/Upgrade database/});
  expect(button.hasAttribute("disabled")).toBe(true);expect(button.textContent).toContain("Current stage tier reached");expect(button.textContent).not.toContain("3,000");
  fireEvent.click(screen.getByRole("button",{name:/Continue to data strategy/}));
- expect(button.hasAttribute("disabled")).toBe(false);expect(button.textContent).toContain("4,000");expect(button.textContent).toContain("4 steps");
+ expect(button.hasAttribute("disabled")).toBe(false);expect(button.textContent).toContain("4,000");expect(button.textContent).toContain("4 game seconds");
 });
 it("selects the cache through the same inspection action and displays actual used evidence",()=>{
  show(advanceSteps(dataCompany(),6).state);const c=useGame.getState().game.campaign!,step=c.step;
@@ -55,7 +55,7 @@ it("labels the last completed profile separately from an immediate contrast",()=
  const contrast=applyAction(acknowledge.state,{type:"contrast_workload"});if(!contrast.ok)throw Error(contrast.message);
  show(contrast.state);const data=screen.getByRole("region",{name:"Data strategy"});
  expect(data.textContent).toContain("Workload: write-heavy");
- expect(data.textContent).toContain(`Workload evidence · step ${g.campaign!.step} · read-heavy`);
+ expect(data.textContent).toContain(`Workload evidence · game second ${g.campaign!.step} · read-heavy`);
  expect(data.textContent).toContain("Reads 80% / writes 20%");
 });
 it("offers each routing choice once and marks the one in use",()=>{

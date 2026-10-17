@@ -18,6 +18,7 @@ function renderCompany() {
 const card = (step: number) => screen.getByRole("dialog", { name: `Tutorial, step ${step} of ${CAMPAIGN_STEPS}` });
 const evidence = () => within(screen.getByRole("complementary", { name: "System metrics" }));
 const next = () => fireEvent.click(within(screen.getByRole("dialog", { name: /^Tutorial/ })).getByRole("button", { name: "Next" }));
+const remainingLessons = () => { while (useGame.getState().tour!.step < CAMPAIGN_STEPS - 1) next(); };
 
 it("walks a first company from its system and evidence to its first purchase, without buying it", () => {
   start(); renderCompany();
@@ -35,7 +36,7 @@ it("walks a first company from its system and evidence to its first purchase, wi
   expect(card(4).textContent).toContain("500 ms or more means slow responses.");
   expect(card(4).textContent).toContain("Errors measure failed requests; 1% is the game's error warning threshold.");
   next();
-  expect(card(5).textContent).toContain("Each successful request earns $0.20. Money and running costs settle every 60 steps.");
+  expect(card(5).textContent).toContain("Each successful request earns $0.20. Money and running costs settle every 60 game seconds.");
   next();
   expect(card(6).textContent).toContain("Pause (P) to think");
   expect(card(6).querySelector(".tour-prompt")!.textContent).toMatch(/^After this guide/);
@@ -43,8 +44,14 @@ it("walks a first company from its system and evidence to its first purchase, wi
   expect(card(7).textContent).toContain("Select an action to preview its costs.");
   fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
   expect(screen.getByRole("region", { name: "Confirm Upgrade database" })).toBeTruthy();
-  expect(card(8).textContent).toContain("Cancel the preview, then press Run company.");
-  fireEvent.click(within(card(8)).getByRole("button", { name: "Got it" }));
+  expect(card(8).textContent).toContain("Cancel the preview, then choose Next to keep learning.");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  next();
+  expect(card(9).textContent).toContain("at game second 60, Week 1 settles and Week 2 begins");
+  next();
+  expect(card(10).textContent).toContain("equipment costs and salaries are deducted");
+  remainingLessons();
+  fireEvent.click(within(card(CAMPAIGN_STEPS)).getByRole("button", { name: "Finish Chapter 0" }));
 
   expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
   expect(useGame.getState().meta.tutorialDone).toBe(true);
@@ -103,7 +110,9 @@ it("holds the clock until its last step, so the first incident cannot open while
   fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   // The last step asks the player to run the company; doing so closes its card.
-  expect(card(8).textContent).toContain("Run company");
+  expect(run()).toHaveProperty("disabled", true);
+  remainingLessons();
+  expect(card(CAMPAIGN_STEPS).textContent).toContain("Run company");
   expect(run()).toHaveProperty("disabled", false);
   fireEvent.click(run());
   expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();

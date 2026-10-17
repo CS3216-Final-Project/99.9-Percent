@@ -41,7 +41,7 @@
   overflow: hidden;
   max-width: 22ch;
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: var(--text-md);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -50,7 +50,7 @@
 .account-chip-sub {
   font-family: var(--font-body);
   color: var(--on-night-soft);
-  font-size: 0.85rem;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
@@ -71,7 +71,7 @@
 .account-avatar-big {
   width: 48px;
   height: 48px;
-  font-size: 1.2rem;
+  font-size: var(--text-lg);
 }
 
 .modal-account {
@@ -111,7 +111,7 @@
   align-items: center;
   gap: 12px;
   color: var(--text-soft);
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
 }
 
 .account-divider::before,
@@ -129,13 +129,13 @@
 .account-form-title {
   margin: 0 0 2px;
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
 }
 
 .account-form .field {
   margin: 4px 0;
   color: var(--ink);
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 
@@ -147,7 +147,7 @@
 .account-form .field input {
   box-sizing: border-box;
   width: 100%;
-  font-size: 1rem;
+  font-size: var(--text-md);
 }
 
 .account-form .field input:focus-visible {
@@ -189,7 +189,7 @@
   font-family: var(--font-body);
   margin: 0 0 4px;
   color: var(--text-soft);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .form-error {
@@ -256,13 +256,13 @@
 
 .account-profile-text strong {
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
   overflow-wrap: anywhere;
 }
 
 .account-profile-text span {
   color: var(--text-soft);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .cloud-saves {
@@ -277,7 +277,7 @@
   gap: 8px;
   margin: 8px 0 0;
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 
 .cloud-heading-row {
@@ -323,7 +323,7 @@
 
 .cloud-row-text span {
   color: var(--text-soft);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .cloud-row .btn {
@@ -344,7 +344,7 @@
 .modal-menu .account-lede,
 .modal-menu .account-status,
 .modal-menu .cloud-note {
-  font-size: 1.05rem;
+  font-size: var(--text-md);
 }
 
 @media (max-width: 640px) {

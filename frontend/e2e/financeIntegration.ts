@@ -8,7 +8,7 @@ export async function financeDuringWalkthrough(page:Page,touch=false) {
     await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();
     await expectRoom(page);
     const card=tutorial(page),room=page.getByRole("main");
-    await expect(card).toHaveAccessibleName("Tutorial, step 1 of 8");
+    await expect(card).toHaveAccessibleName("Tutorial, step 1 of 21");
     // Room inspections open diagnostic dialogs; return before following the next spotlight.
     for (const [equipment,step] of [["Servers",2],["Database",3]] as const) {
         const label=room.getByRole("button",{name:equipment,exact:true});
@@ -20,11 +20,11 @@ export async function financeDuringWalkthrough(page:Page,touch=false) {
         if(touch)await back.tap();else await back.click();
         await expect(inspection).toBeHidden();
         await expect(label).toHaveAttribute("aria-pressed","true");
-        await expect(card).toHaveAccessibleName(`Tutorial, step ${step} of 8`);
+        await expect(card).toHaveAccessibleName(`Tutorial, step ${step} of 21`);
     }
     await card.getByRole("button",{name:"Next",exact:true}).click();
     await card.getByRole("button",{name:"Next",exact:true}).click();
-    await expect(card).toHaveAccessibleName("Tutorial, step 5 of 8");
+    await expect(card).toHaveAccessibleName("Tutorial, step 5 of 21");
     const before=(await savedGame(page)).campaign;
     const entry=page.getByRole("button",{name:"View finances",exact:true});
     if(touch)await entry.tap();else await entry.click();
@@ -35,10 +35,10 @@ export async function financeDuringWalkthrough(page:Page,touch=false) {
     await page.keyboard.press("p");
     if(touch)await finance.getByRole("button",{name:"Close",exact:true}).tap();else await page.keyboard.press("Escape");
     await expect(finance).toBeHidden();await expect(entry).toBeFocused();
-    await expect(card).toHaveAccessibleName("Tutorial, step 5 of 8");
+    await expect(card).toHaveAccessibleName("Tutorial, step 5 of 21");
     expect((await savedGame(page)).campaign).toEqual(before);
     await card.getByRole("button",{name:"Next",exact:true}).click();
-    await expect(card).toHaveAccessibleName("Tutorial, step 6 of 8");
+    await expect(card).toHaveAccessibleName("Tutorial, step 6 of 21");
     await card.getByRole("button",{name:"Skip",exact:true}).click();
     await expect(card).toBeHidden();
     expect((await savedGame(page)).campaign!.step).toBe(0);

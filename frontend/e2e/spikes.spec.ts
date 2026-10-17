@@ -36,7 +36,7 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
  for(let i=0;i<9;i++)await advanceCampaignStep(page);
  expect((await savedGame(page)).campaign!.spikeStage!.controller!.highSteps).toBe(2);
- await clockTo(page,n+10);await expect(page.getByRole("status").filter({hasText:"Add server (App 3)"})).toContainText("activates in 3 step(s)");
+ await clockTo(page,n+10);await expect(page.getByRole("status").filter({hasText:"Add server (App 3)"})).toContainText("activates in 3 game second(s)");
  await clockTo(page,n+13);let c=(await savedGame(page)).campaign!;expect(c.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(c.snapshot.app.capacity).toBe(3200);
  // Paint the new room label while the company stays paused.
  await page.clock.runFor(1000);

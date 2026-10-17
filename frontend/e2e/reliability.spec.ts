@@ -29,7 +29,7 @@ test("reliability: manual restoration, measured report, outcome and paused reloa
  await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect.poll(async()=>(await savedGame(page)).campaign!.step).toBeGreaterThan(resumedStep);
  await page.getByRole("button",{name:"Pause",exact:true}).click();
- await page.getByRole("button",{name:`Restore App ${f.targetId.slice(4)} · free · 3 steps`,exact:true}).click();
+ await page.getByRole("button",{name:`Restore App ${f.targetId.slice(4)} · free · 3 game seconds`,exact:true}).click();
  const restoring=(await savedGame(page)).campaign!;
  expect(restoring.apps.find(app=>app.id===f.targetId)!.health).toBe("failed");
  expect(restoring.pending.find(action=>action.type==="restore-app")!.activationStep).toBe(restoring.step+3);

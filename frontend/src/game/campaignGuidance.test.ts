@@ -71,7 +71,7 @@ it("Data optional investments and contrast are never mandatory",()=>{
  const g=dataCompany();g.campaign!.readCache=null;g.campaign!.dataStage!.contrastConsumed=false;
  expect(campaignGuidance(g).pendingAction?.action?.type).toBe("enter_spikes");expect(campaignGuidance(g).requirements.some(r=>/cache|contrast|upgrade/i.test(r.label))).toBe(false);expect(campaignGuidance(g).optional).toContain("optional");
 });
-it("Data waiting wording hides due step and explains readiness",()=>{
+it("Data waiting wording hides due game second and explains readiness",()=>{
  const g=dataCompany();g.campaign!.dataStage!.consumed=false;g.campaign!.dataStage!.dueStep=999999;
  expect(campaignGuidance(g).waiting).toContain("Waiting for the next company growth event");expect(JSON.stringify(campaignGuidance(g))).not.toContain("999999");
  g.campaign!.dbBacklog=1;expect(campaignGuidance(g).waiting).toBeNull();expect(campaignGuidance(g).notice).toContain("empty queues");

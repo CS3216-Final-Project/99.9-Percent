@@ -5,10 +5,11 @@ import { campaignGuidance } from "./campaignGuidance";
 import type { ChapterCompletion } from "./persist";
 
 /** Presentation only: chapter status follows the existing progression gates. */
-export function campaignChapters(game: GameState) {
+export function campaignChapters(game: GameState, learning = false, tutorialDone = true) {
   const c = game.campaign!;
   const model = campaignGuidance(game);
   const chapters = [
+    { id: "getting-started", name: "Getting started", shortName: "Getting started", description: "Chapter 0: learn the room, game seconds, weekly finances, controls, purchases, incidents and the route through the game. Replay without resetting your company.", completed: tutorialDone, available: true },
     { id: "opening", name: "Opening", shortName: "Opening", description: "Inspect your first bottleneck and keep the company serving traffic.", completed: model.openingDone, available: false },
     { id: "scaling", name: "Scaling & Routing", shortName: "Scaling & Routing", description: "Expand server capacity and make sure traffic reaches it.", completed: !!c.dataStage, available: model.openingDone },
     { id: "data", name: "Data Strategy", shortName: "Data Strategy", description: "Explore how caching and different workloads affect your database.", completed: !!c.spikeStage, available: model.dataAvailable },
@@ -17,9 +18,9 @@ export function campaignChapters(game: GameState) {
     { id: "combined", name: "Grow the Company", shortName: "Grow the Company", description: "Serve growing demand, review each growth outcome and complete the company campaign.", completed: !!c.combinedStage?.acknowledged, available: canEnterCombined(game) },
   ];
   return chapters.map((chapter, index) => {
-    const current = chapter.name === model.stage;
+    const current = chapter.id === "getting-started" ? learning : !learning && chapter.name === model.stage;
     const status = chapter.completed ? "Completed" : current ? "Current" : chapter.available ? "Available next" : "Locked";
-    return { ...chapter, number: index + 1, current, status };
+    return { ...chapter, number: index, current, status };
   });
 }
 

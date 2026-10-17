@@ -41,7 +41,7 @@ test("explains a locked control, which is where the reason for being locked is s
   await expect(advance).toBeDisabled();
   await advance.hover();
   const tip = page.getByRole("tooltip");
-  await expect(tip).toContainText("Advance one physical step");
+  await expect(tip).toContainText("Advance one game second");
   await expect(tip).toHaveCSS("opacity", "1");
   const box = (await tip.boundingBox())!, view = page.viewportSize()!;
   expect(box.x + box.width).toBeLessThanOrEqual(view.width);

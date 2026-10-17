@@ -171,8 +171,8 @@ describe("game interface", () => {
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
     fireEvent.click(screen.getByText("More controls"));
-    for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
-    expect(screen.getByText(/Stable steps: 0\/5/)).toBeTruthy();
+    for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
+    expect(screen.getByText(/Stable game seconds: 0\/5/)).toBeTruthy();
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
   });
 
@@ -187,11 +187,11 @@ describe("game interface", () => {
     out(screen.getByText("Cash"));
 
     fireEvent.click(screen.getByText("More controls"));
-    for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Advance step" }));
+    for (let i = 0; i < 6; i++) fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
     const advance = screen.getByRole("button", { name: "Incident" });
     expect(advance.hasAttribute("disabled")).toBe(true);
     over(advance);
     settle();
-    expect(tooltip()?.textContent).toMatch(/Advance one physical step/);
+    expect(tooltip()?.textContent).toMatch(/Advance one game second/);
   });
 });
