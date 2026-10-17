@@ -166,6 +166,19 @@
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 }
 
+/* The export sits under the warning's text, in line with it, so a narrow card keeps the text readable. */
+.mode-restart-warning {
+  flex-wrap: wrap;
+}
+
+.mode-restart-warning .callout-body {
+  flex-basis: calc(100% - 32px);
+}
+
+.mode-restart-warning > .btn {
+  margin-left: 32px;
+}
+
 .mode-actions .btn {
   width: 100%;
   min-height: 48px;
@@ -250,6 +263,10 @@
   .mode-option {
     padding: 16px;
     gap: 10px;
+  }
+  /* A phone's card is too narrow for a second action beside the first, so each gets its own row. */
+  .mode-actions:has(> :nth-child(2)) {
+    grid-template-columns: minmax(0, 1fr);
   }
   .consent-panel {
     grid-template-columns: minmax(0, 1fr);

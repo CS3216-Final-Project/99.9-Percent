@@ -276,8 +276,9 @@ interface Store {
   /**
    * Save the current run and continue the other mode's saved run, or start one.
    * Refuses (returning false) when the current run cannot be saved, unless `discard` accepts losing it.
+   * `start: false` loads it behind the title screen, for a caller that replaces it straight away.
    */
-  switchMode: (mode: GameMode, opts?: { discard?: boolean }) => boolean;
+  switchMode: (mode: GameMode, opts?: { discard?: boolean; start?: boolean }) => boolean;
   saveNow: (quiet?: boolean) => void;
   /** Replace the current company with an exported save. Returns false if the file is not a usable save. */
   importSave: (raw: string) => boolean;
@@ -936,7 +937,8 @@ export const useGame = create<Store>()((set, get) => {
       if (get().mode === "campaign") {
       const replacementRunId=crypto.randomUUID();
       const old=get();
-      if(old.started) {
+      // The replaced company's evidence is archived whether it is replaced in play or from the home screen.
+      if(old.hasRun) {
         uiEvent("run_reset",{previousRunId:old.game.campaign!.runId,replacementRunId});
         if(old.game.campaign!.incident)uiEvent("incident_abandoned",{incidentId:old.game.campaign!.incident!.id});
         uiEvent("run_evidence",{campaign:JSON.stringify(old.game)});
@@ -951,7 +953,8 @@ export const useGame = create<Store>()((set, get) => {
       if(pending.length&&!archiveEvents(pending)) {
         get().notify("Export playtest records before resetting: the archive could not retain this run.","error");return;
       }
-      const counted={...old.meta,runsStarted:old.meta.runsStarted+1};
+      // An unlock that only the replaced company records (an older or imported save) moves into the profile, so it is not lost with it.
+      const counted={...old.meta,runsStarted:old.meta.runsStarted+1,challengeUnlocked:challengeUnlockedNow()};
       const measurement=beginSession(m,game,crypto.randomUUID(),new Date().toISOString());
       if(m.replayOf)event(measurement,game,"replay_started",{previousRunId:m.replayOf,seed:game.seed});
       // A walkthrough still under way carries on into the new company.
@@ -1004,7 +1007,7 @@ export const useGame = create<Store>()((set, get) => {
       if (!persist() && !opts.discard) return false;
       saveMode(mode);
       track("mode_switched", { to: mode });
-      enter(mode, true);
+      enter(mode, opts.start ?? true);
       return true;
     },
 

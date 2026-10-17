@@ -169,6 +169,27 @@ describe("game modes", () => {
     expect(useGame.getState().switchMode("classic")).toBe(false);
     expect(localStorage.getItem("nn.campaign.save.v1")).toBe("{");
   });
+  it("loads the other mode's saved run behind the title screen when asked not to start it", () => {
+    enter(); useGame.getState().advance();
+    const company = useGame.getState().game;
+    useGame.getState().switchMode("classic");
+    expect(useGame.getState().switchMode("campaign", { start: false })).toBe(true);
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", started: false, hasRun: true, game: company });
+  });
+  it("archives a company replaced from the home screen, but not a preserved unreadable save", () => {
+    enter(); useGame.getState().advance();
+    const runId = useGame.getState().game.campaign!.runId;
+    useGame.getState().endSession();
+    useGame.getState().newRun();
+    const next = useGame.getState().game.campaign!.runId;
+    expect(readAnalytics().filter(e => e.name === "run_reset")).toMatchObject([{ runId, payload: { previousRunId: runId, replacementRunId: next } }]);
+    expect(readAnalytics()).toContainEqual(expect.objectContaining({ name: "run_evidence", runId }));
+    expect(readAnalytics()).toContainEqual(expect.objectContaining({ name: "replay_started", runId: next }));
+    localStorage.clear(); useGame.setState(useGame.getInitialState(), true);
+    localStorage.setItem("nn.campaign.save.v1", "{"); useGame.getState().boot();
+    useGame.getState().newRun();
+    expect(readAnalytics().some(e => e.name === "run_reset")).toBe(false);
+  });
   it("clears the previous mode's toast", () => {
     useGame.getState().boot(); useGame.getState().notify("Campaign news");
     useGame.getState().switchMode("classic");
@@ -393,6 +414,20 @@ describe("challenge mode lock", () => {
     expect(loadMode()).toBe("classic");
     useGame.getState().boot();
     expect(useGame.getState().mode).toBe("classic");
+  });
+  it("keeps an unlock that only the replaced company recorded when starting a new company", () => {
+    let game = act(preparedReliability(), { type: "arm_reliability" });
+    for (let i = 0; i < 60 && !pendingReliability(game.campaign); i++) {
+      if (game.phase === "review") game = act(game, { type: "acknowledge_review" });
+      game = tick(game);
+    }
+    saveGame(act(game, { type: "acknowledge_reliability" }));
+    useGame.getState().boot();
+    expect(useGame.getState().meta.challengeUnlocked).toBe(false);
+    useGame.getState().newRun();
+    expect(useGame.getState().game.campaign!.reliabilityStage).toBeFalsy();
+    expect(loadMeta().challengeUnlocked).toBe(true);
+    expect(useGame.getState().switchMode("classic")).toBe(true);
   });
 });
 

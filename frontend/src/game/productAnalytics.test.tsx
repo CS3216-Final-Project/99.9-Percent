@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
-import { act as reactAct, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act as reactAct, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import App from "@/App";
+import { HomeScreen } from "@/components/HomeScreen";
 import { useGame } from "./store";
 import { newGame, newLegacyGame } from "@/sim";
 import { DEFAULT_META, saveClassicGame, saveMeta, saveMode } from "./persist";
@@ -155,6 +156,57 @@ it("tracks the end of Classic independently from Campaign chapters and marks a s
   expect(named("gameplay_run_completed")[0].properties.mode).toBe("classic");
   useGame.getState().newRun({ seed: 2 });
   expect(named("gameplay_run_started").at(-1)?.properties.replay).toBe(true);
+});
+
+describe("restarting Guided Mode", () => {
+  const restartFromHome = () => {
+    const guided = screen.getByRole("region", { name: "Guided Mode" });
+    fireEvent.click(within(guided).getByRole("button", { name: "New company" }));
+    fireEvent.click(within(guided).getByRole("button", { name: "Lose this company? Press again" }));
+  };
+
+  it("reports a restart from the home screen as a new run", () => {
+    saveMeta({ ...DEFAULT_META, tutorialDone: true });
+    watch(); play();
+    const first = named("gameplay_run_started")[0].properties.run_id;
+    useGame.getState().endSession();
+    render(<StrictMode><HomeScreen /></StrictMode>);
+    restartFromHome();
+    expect(named("gameplay_run_started")).toHaveLength(2);
+    const next = named("gameplay_run_started")[1].properties;
+    expect(next.run_id).not.toBe(first);
+    expect(next.run_id).toBe(useGame.getState().game.campaign!.runId);
+    expect(next).toMatchObject({ mode: "campaign", entry_type: "new", eligible_started_run: true });
+  });
+
+  it("does not resume the old company when restarting from a Challenge Mode home screen", () => {
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true, tutorialDone: true });
+    watch(); play();
+    const first = named("gameplay_run_started")[0].properties.run_id;
+    stop(); events = [];
+    saveMode("classic"); useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+    watch();
+    render(<StrictMode><HomeScreen /></StrictMode>);
+    restartFromHome();
+    expect(named("gameplay_run_resumed")).toEqual([]);
+    expect(named("gameplay_run_started").map(e => e.properties.run_id)).toEqual([useGame.getState().game.campaign!.runId]);
+    expect(useGame.getState().game.campaign!.runId).not.toBe(first);
+  });
+
+  it("reports a restart from the in-game menu as a new run", () => {
+    saveMeta({ ...DEFAULT_META, tutorialDone: true });
+    watch();
+    render(<StrictMode><App /></StrictMode>);
+    fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+    const first = named("gameplay_run_started")[0].properties.run_id;
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    const menu = screen.getByRole("dialog", { name: "Menu" });
+    fireEvent.click(within(menu).getByRole("tab", { name: "Saves" }));
+    fireEvent.click(within(menu).getByRole("button", { name: "New company" }));
+    fireEvent.click(within(menu).getByRole("button", { name: "Lose this company? Press again" }));
+    expect(named("gameplay_run_started").map(e => e.properties.run_id)).toEqual([first, useGame.getState().game.campaign!.runId]);
+    expect(first).not.toBe(useGame.getState().game.campaign!.runId);
+  });
 });
 
 function pendingFinalChapter() {
