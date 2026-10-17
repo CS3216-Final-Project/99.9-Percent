@@ -76,11 +76,11 @@ function signTexture(sign: Sign): THREE.CanvasTexture {
     g.fillStyle = sign.fg;
     // As large as the sign is tall, but never wider than nine tenths of it.
     let size = Math.round(h * 0.62);
-    g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
+    g.font = `700 ${size}px "Space Grotesk", sans-serif`;
     const width = g.measureText(sign.text).width;
     if (width > w * 0.9) {
       size = Math.floor((size * w * 0.9) / width);
-      g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
+      g.font = `700 ${size}px "Space Grotesk", sans-serif`;
     }
     g.fillText(sign.text, w / 2, h / 2 + 2);
   });

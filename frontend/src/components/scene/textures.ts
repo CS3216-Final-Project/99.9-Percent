@@ -380,7 +380,7 @@ export function skylineDay(): THREE.CanvasTexture {
 const lettered = new Map<string, THREE.CanvasTexture>();
 
 /**
- * A canvas texture with lettering in the pixel font, made once per key. It is
+ * A canvas texture with lettering in Space Grotesk, made once per key. It is
  * drawn straight away and again once the font has loaded, so text drawn before
  * the font arrives does not stay in the fallback face.
  */
@@ -395,7 +395,7 @@ export function letteredTexture(key: string, w: number, h: number, draw: (g: Can
   paint();
   const t = finish(c);
   t.magFilter = THREE.LinearFilter;
-  document.fonts?.load('700 40px "Pixelify Sans"').then(() => {
+  document.fonts?.load('700 40px "Space Grotesk"').then(() => {
     paint();
     t.needsUpdate = true;
   });
@@ -414,7 +414,7 @@ export function liftDisplay(floor: number, arrow: "up" | "down" | null): THREE.C
     g.fillStyle = "#ffb43d";
     g.shadowColor = "#ffb43d";
     g.shadowBlur = 8;
-    g.font = '700 44px "Pixelify Sans", monospace';
+    g.font = '700 44px "Space Grotesk", "Source Sans 3", sans-serif';
     g.textAlign = "center";
     g.textBaseline = "middle";
     g.fillText(String(floor), w * 0.64, h / 2 + 3);
@@ -441,12 +441,12 @@ export function bubbleTexture(text: string, alarmed: boolean): THREE.CanvasTextu
     const tail = 18;
     const line = 5;
     let size = 36;
-    g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
+    g.font = `700 ${size}px "Space Grotesk", sans-serif`;
     let width = g.measureText(text).width;
     const room = w - 2 * pad - 2 * line;
     if (width > room) {
       size = Math.floor((size * room) / width);
-      g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
+      g.font = `700 ${size}px "Space Grotesk", sans-serif`;
       width = g.measureText(text).width;
     }
     const bw = Math.min(w - 2 * line, width + 2 * pad);
@@ -477,7 +477,7 @@ export function bubbleTexture(text: string, alarmed: boolean): THREE.CanvasTextu
   });
 }
 
-/** The company's neon sign. Redrawn once the pixel font has loaded. */
+/** The company's neon sign. Redrawn once Space Grotesk has loaded. */
 export function logoSign(): THREE.CanvasTexture {
   const [c, g] = canvas(512, 160);
   const draw = () => {
@@ -487,18 +487,18 @@ export function logoSign(): THREE.CanvasTexture {
     g.shadowColor = "#ffd84a";
     g.shadowBlur = 18;
     g.fillStyle = "#ffe680";
-    g.font = '700 104px "Pixelify Sans", sans-serif';
+    g.font = '700 104px "Space Grotesk", sans-serif';
     g.fillText("99.99%", 256, 70);
     g.shadowColor = "#ff7ad9";
     g.shadowBlur = 12;
     g.fillStyle = "#ff9be3";
-    g.font = '700 30px "Pixelify Sans", sans-serif';
+    g.font = '700 30px "Space Grotesk", sans-serif';
     g.fillText("keep it online", 256, 134);
   };
   draw();
   const t = finish(c);
   t.magFilter = THREE.LinearFilter;
-  document.fonts?.load('700 104px "Pixelify Sans"').then(() => {
+  document.fonts?.load('700 104px "Space Grotesk"').then(() => {
     draw();
     t.needsUpdate = true;
   });
@@ -520,7 +520,7 @@ const ADS: { head: string; line: string; paper: string; ink: string; accent: str
   { head: "DEBUG IN PROD?", line: "Tracewise sees everything", paper: "#0f2b2a", ink: "#7de8d3", accent: "#ff5a5f" },
 ];
 
-/** Every billboard advertisement on one sheet, in the pixel font. */
+/** Every billboard advertisement on one sheet, in Space Grotesk. */
 export function adsTexture(): THREE.CanvasTexture {
   const [cw, ch] = AD_CELL;
   return letteredTexture("ads", cw * 2, ch * 4, (g) => {
@@ -537,9 +537,9 @@ export function adsTexture(): THREE.CanvasTexture {
       g.fillStyle = ad.ink;
       // Each line shrinks, if it must, to fit the board.
       const fit = (text: string, size: number, at: number) => {
-        g.font = `700 ${size}px "Pixelify Sans", sans-serif`;
+        g.font = `700 ${size}px "Space Grotesk", sans-serif`;
         const width = g.measureText(text).width;
-        if (width > cw - 70) g.font = `700 ${Math.floor((size * (cw - 70)) / width)}px "Pixelify Sans", sans-serif`;
+        if (width > cw - 70) g.font = `700 ${Math.floor((size * (cw - 70)) / width)}px "Space Grotesk", sans-serif`;
         g.fillText(text, x + 50, y + at);
       };
       fit(ad.head, 58, 60);
@@ -564,7 +564,7 @@ export function whiteboard(): THREE.CanvasTexture {
       g.strokeRect(x, y, w, h);
       g.setLineDash([]);
       g.fillStyle = color;
-      g.font = '600 14px "Rubik", sans-serif';
+      g.font = '600 14px "Space Grotesk", sans-serif';
       g.textAlign = "center";
       g.textBaseline = "middle";
       g.fillText(label, x + w / 2, y + h / 2);
@@ -584,7 +584,7 @@ export function whiteboard(): THREE.CanvasTexture {
       g.stroke();
     };
     g.fillStyle = "#1d1834";
-    g.font = '700 16px "Rubik", sans-serif';
+    g.font = '700 16px "Space Grotesk", sans-serif';
     g.textAlign = "left";
     g.fillText("v2 architecture", 14, 20);
     box(14, 70, 56, 34, "#1d1834", "users");
@@ -611,7 +611,7 @@ export function whiteboard(): THREE.CanvasTexture {
   draw();
   const t = finish(c);
   t.magFilter = THREE.LinearFilter;
-  document.fonts?.load('600 14px "Rubik"').then(() => {
+  Promise.all([document.fonts?.load('600 14px "Space Grotesk"'), document.fonts?.load('700 16px "Space Grotesk"')]).then(() => {
     draw();
     t.needsUpdate = true;
   });
@@ -641,7 +641,7 @@ export function concreteFloor(): THREE.CanvasTexture {
  */
 export function zoneName(name: string): THREE.CanvasTexture {
   const H = 72;
-  const font = '600 40px Rubik, "Segoe UI", system-ui, sans-serif';
+  const font = '600 40px "Space Grotesk", "Source Sans 3", sans-serif';
   const probe = document.createElement("canvas").getContext("2d") as CanvasRenderingContext2D;
   probe.font = font;
   const W = Math.ceil(probe.measureText(name).width) + 52;
@@ -686,17 +686,16 @@ let snore: THREE.CanvasTexture | null = null;
 /** A pale "z" with a dark outline, for someone asleep. Shared, so never disposed. */
 export function zzzTexture(): THREE.CanvasTexture {
   if (snore) return snore;
-  const [c, g] = canvas(64, 64);
-  g.font = 'bold 52px "Pixelify Letters", Rubik, system-ui, sans-serif';
-  g.textAlign = "center";
-  g.textBaseline = "middle";
-  g.lineWidth = 7;
-  g.strokeStyle = "rgba(29, 32, 38, 0.9)";
-  g.strokeText("z", 32, 34);
-  g.fillStyle = "#f4f1ea";
-  g.fillText("z", 32, 34);
-  snore = new THREE.CanvasTexture(c);
-  snore.colorSpace = THREE.SRGBColorSpace;
+  snore = letteredTexture("zzz", 64, 64, (g) => {
+    g.font = '700 52px "Space Grotesk", "Source Sans 3", sans-serif';
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.lineWidth = 7;
+    g.strokeStyle = "rgba(29, 32, 38, 0.9)";
+    g.strokeText("z", 32, 34);
+    g.fillStyle = "#f4f1ea";
+    g.fillText("z", 32, 34);
+  });
   return snore;
 }
 

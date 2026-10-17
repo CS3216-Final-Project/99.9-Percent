@@ -48,6 +48,7 @@
 }
 
 .account-chip-sub {
+  font-family: var(--font-body);
   color: var(--on-night-soft);
   font-size: 0.85rem;
   white-space: nowrap;
@@ -185,6 +186,7 @@
 }
 
 .field-hint {
+  font-family: var(--font-body);
   margin: 0 0 4px;
   color: var(--text-soft);
   font-size: 0.9rem;
@@ -219,6 +221,7 @@
   border: 0;
   color: var(--ink);
   font: inherit;
+  font-family: var(--font-display);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
