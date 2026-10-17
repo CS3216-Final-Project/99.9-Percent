@@ -230,7 +230,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   await expect(panel.getByRole("table")).toContainText("133.33%");
   await panel.locator("summary").filter({ hasText: "Full system evidence" }).tap();
   await panel.getByRole("button", { name: /Upgrade database/ }).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
-  await expect(panel.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("3 step(s)");
+  await expect(panel.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("3 game second(s)");
   await expect(panel.getByRole("button", { name: /Add server/ })).toBeDisabled();
   await page.screenshot({ path: "test-results/phase1-mobile-incident.png" });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);

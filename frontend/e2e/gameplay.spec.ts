@@ -57,7 +57,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     }
     await page.getByRole("button", { name: path === "limit" ? /Limit to 500 requests\/s/ : /Upgrade database/ }).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
     if (path === "upgrade") {
-      await expect(page.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("activates in 3 step(s)");
+      await expect(page.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("activates in 3 game second(s)");
       await expect(page.getByRole("button", { name: /Add server/ })).toBeDisabled();
     }
     await page.getByRole("button", { name: "Run", exact: true }).click();
