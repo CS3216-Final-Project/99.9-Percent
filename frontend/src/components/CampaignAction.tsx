@@ -182,7 +182,9 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
             {label==="Unlock autoscaling" && props.note && <p className="campaign-purchase-note">{props.note}</p>}
             {label==="Deploy load balancing" && <p className="campaign-purchase-note">Choose which servers receive traffic after installation.</p>}
           </div>
-          <details className="campaign-purchase-details">
+          <details className="campaign-purchase-details" onToggle={e => {
+            if (e.currentTarget.open) e.currentTarget.querySelector<HTMLElement>(".campaign-purchase-details-content")?.scrollIntoView?.({ block: "nearest" });
+          }}>
             <summary>More details</summary>
             <div className="campaign-purchase-details-content" tabIndex={0} role="region" aria-label="Purchase details" onKeyDown={e => {
               if (e.target !== e.currentTarget || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;

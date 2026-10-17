@@ -78,7 +78,7 @@ Pressing an action never buys it straight away. The view rides to the affected m
 The camera eases to centre that marker in the part of the room the panel leaves open, at the default zoom whether the player had zoomed in or out; panning, zooming or dragging stops it.
 The confirmation uses warm paper, a softly rounded outline and a plum primary button, matching other Warm Desk panels. Equipment targeting and the anchored notch retain their existing meaning.
 The confirmation names the machine and says in one sentence what it does, then gives the action as its title, the action's effect, Setup, Cash after, upkeep and Activation as label/value rows, the no-refund note, and Confirm (focused) and Cancel.
-It follows the marker as the camera moves, sits on the marker's left, away from the panel, unless that runs off the room, when it takes the right, and when space is short the preview body scrolls while Confirm and Cancel stay pinned at its foot. Expanded details retain a readable scroll region rather than collapsing beneath the warning.
+It follows the marker as the camera moves, sits on the marker's left, away from the panel, unless that runs off the room, when it takes the right, and when space is short the preview body scrolls while Confirm and Cancel stay pinned at its foot. Expanded details scroll into view and retain at least three readable lines on the supported short-phone viewport rather than collapsing beneath the warning.
 Without a drawn room it settles in the open part of the stage.
 Escape or Cancel closes it and returns focus to the action. Only one confirmation is open at a time, and Confirm follows the action's own disabled rule.
 
