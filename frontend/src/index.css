@@ -52,12 +52,30 @@
   --font-body: "Source Sans 3", "Space Grotesk", sans-serif;
   --font-num: var(--font-display);
 
+  /* Shared type scale. Use these sizes for UI text instead of one-off values. */
+  --text-xs: .8rem;
+  --text-sm: .9rem;
+  --text-md: 1rem;
+  --text-lg: 1.15rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.6rem;
+  --text-3xl: 2.1rem;
+  --text-4xl: 2.9rem;
+  --text-title-min: 3rem;
+  --text-title-max: 4.4rem;
+
   color-scheme: dark;
   --radius: 4px;
   --side-w: 348px;
   --press: 0 3px 0 0 var(--ink);
   --lift: 0 4px 0 0 var(--ink), 0 16px 32px rgb(8 6 22 / 0.5);
 }
+
+.tour-chapter { display: grid; gap: 4px; margin: 0 0 10px; font-family: var(--font-display); font-size: var(--text-sm); font-weight: 600; }
+.tour-chapter span { color: var(--text-soft); font-family: var(--font-body); font-weight: 400; }
+.tour[data-track="campaign"] .tour-dots { display: none; }
+.tour[data-track="campaign"] .tour-foot .btn { min-inline-size: 11rem; }
+.chapter-overview .btn { margin-top: 10px; }
 
 * {
   box-sizing: border-box;
@@ -95,19 +113,19 @@ h6 {
 }
 
 h2 {
-  font-size: 1.45rem;
+  font-size: var(--text-xl);
   line-height: 1.1;
 }
 
 h3 {
-  font-size: 1.2rem;
+  font-size: var(--text-lg);
 }
 
 h4 {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 1rem;
+  font-size: var(--text-md);
   margin: 16px 0 8px;
 }
 
@@ -222,7 +240,7 @@ button:disabled {
 .brand-mark {
   font-family: var(--font-logo);
   font-weight: 700;
-  font-size: 1.7rem;
+  font-size: var(--text-2xl);
   line-height: 1;
   color: var(--go);
   text-shadow: 2px 2px 0 var(--ink);
@@ -254,7 +272,7 @@ button:disabled {
   border: 2px solid var(--ink);
   border-radius: var(--radius);
   font-family: var(--font-display);
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
   color: var(--on-night-soft);
 }
 
@@ -382,7 +400,7 @@ button:disabled {
   font-family: var(--font-num);
   font-weight: 600;
   color: var(--on-night-soft);
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -452,7 +470,7 @@ button:disabled {
   column-gap: 8px;
   align-items: baseline;
   min-width: 0;
-  font-size: 0.84rem;
+  font-size: var(--text-xs);
 }
 
 .stat-body > .tip {
@@ -460,7 +478,7 @@ button:disabled {
   grid-column: 1 / -1;
   width: fit-content;
   color: var(--on-night-soft);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -470,7 +488,7 @@ button:disabled {
 .stat-body > strong {
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 1.4rem;
+  font-size: var(--text-xl);
   line-height: 1.15;
   color: var(--on-night);
   font-variant-numeric: tabular-nums;
@@ -539,7 +557,7 @@ button:disabled {
     0 3px 0 0 rgb(8 6 22 / 0.55),
     0 14px 28px rgb(8 6 22 / 0.45);
   font-family: var(--font-body);
-  font-size: 0.84rem;
+  font-size: var(--text-xs);
   font-weight: 400;
   line-height: 1.45;
   letter-spacing: 0;
@@ -575,7 +593,7 @@ button:disabled {
   border-radius: 3px;
   box-shadow: 0 2px 0 0 var(--paper-3);
   font-family: var(--font-num);
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   line-height: 1.55;
   text-align: center;
@@ -654,7 +672,7 @@ button:disabled {
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-size: var(--text-lg);
   line-height: 1;
 }
 
@@ -675,7 +693,7 @@ button:disabled {
   border: 2px solid var(--night-line);
   border-radius: var(--radius);
   color: var(--on-night-soft);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 
@@ -688,7 +706,7 @@ button:disabled {
   border-radius: 3px;
   box-shadow: 0 2px 0 var(--ink);
   font-family: var(--font-num);
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   text-align: center;
 }
@@ -720,7 +738,7 @@ button:disabled {
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
 
@@ -742,7 +760,7 @@ button:disabled {
   background: var(--ink);
   color: var(--paper-3);
   font-family: var(--font-num);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   font-weight: 700;
 }
 
@@ -830,7 +848,7 @@ button:disabled {
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .camera-buttons .walk-button.is-on {
@@ -858,7 +876,7 @@ button:disabled {
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
 
@@ -868,7 +886,7 @@ button:disabled {
   color: var(--paper);
   border-radius: 3px;
   font-family: var(--font-num);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 700;
 }
 
@@ -939,7 +957,7 @@ button:disabled {
   box-shadow: var(--press);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.98rem;
+  font-size: var(--text-md);
   line-height: 1;
   white-space: nowrap;
 }
@@ -1019,7 +1037,7 @@ button:disabled {
 .eq-note {
   font-family: var(--font-body);
   font-weight: 500;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   color: var(--text-soft);
 }
 
@@ -1078,7 +1096,7 @@ button:disabled {
   align-items: center;
   gap: 4px;
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: var(--text-xs);
   color: var(--on-night-soft);
   background: rgb(26 22 51 / 0.85);
   border: 2px solid var(--night-line);
@@ -1114,7 +1132,7 @@ button:disabled {
   pointer-events: none;
   opacity: 0;
   z-index: 26;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
 }
 
 .hover-tip.is-on {
@@ -1123,7 +1141,7 @@ button:disabled {
 
 .hover-tip strong {
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 
 .hover-state {
@@ -1240,7 +1258,7 @@ button:disabled {
 .callout-kicker {
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -1249,7 +1267,7 @@ button:disabled {
 
 .callout-text {
   font-family: var(--font-body);
-  font-size: 0.96rem;
+  font-size: var(--text-md);
   font-weight: 500;
   line-height: 1.35;
 }
@@ -1295,7 +1313,7 @@ button:disabled {
 }
 
 .callout-compact .callout-text {
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   font-weight: 400;
 }
 
@@ -1322,7 +1340,7 @@ button:disabled {
   box-shadow: var(--press);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1rem;
+  font-size: var(--text-md);
   line-height: 1.2;
   transition:
     transform 0.05s,
@@ -1374,7 +1392,7 @@ button:disabled {
 
 .btn-small {
   padding: 5px 10px;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 .btn-small .icon {
@@ -1384,7 +1402,7 @@ button:disabled {
 
 .btn-big {
   padding: 13px 26px;
-  font-size: 1.45rem;
+  font-size: var(--text-xl);
   box-shadow: 0 5px 0 0 var(--ink);
 }
 
@@ -1408,7 +1426,7 @@ button:disabled {
   border-radius: 3px;
   background: rgb(29 24 52 / 0.1);
   font-family: var(--font-num);
-  font-size: 0.84rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1449,7 +1467,7 @@ button:disabled {
   box-shadow: var(--press);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.02rem;
+  font-size: var(--text-md);
   text-align: left;
   transition:
     transform 0.05s,
@@ -1553,7 +1571,7 @@ button:disabled {
   color: var(--ink);
   border: 2px solid var(--paper-3);
   border-radius: var(--radius);
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1573,7 +1591,7 @@ button:disabled {
   color: var(--ink);
   border: 2px solid var(--c-tech);
   border-radius: var(--radius);
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 
@@ -1623,7 +1641,7 @@ button:disabled {
   border-radius: var(--radius);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   line-height: 1.35;
   background: var(--paper-3);
   color: var(--ink);
@@ -1659,7 +1677,7 @@ button:disabled {
   gap: 8px;
   margin-bottom: 6px;
   color: var(--text-soft);
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 
@@ -1672,7 +1690,7 @@ button:disabled {
   margin-left: auto;
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 1.3rem;
+  font-size: var(--text-xl);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -1726,7 +1744,7 @@ button:disabled {
   color: var(--text-soft);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
   cursor: pointer;
   width: fit-content;
   list-style: none;
@@ -1768,7 +1786,7 @@ button:disabled {
   gap: 12px;
   padding: 6px 0;
   border-bottom: 2px dotted var(--paper-3);
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 .row dt {
@@ -1789,7 +1807,7 @@ button:disabled {
   list-style: none;
   display: grid;
   gap: 5px;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 .plain-list li,
@@ -1901,7 +1919,7 @@ button:disabled {
   border: 2px solid var(--ink);
   border-radius: var(--radius);
   font-family: var(--font-display);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   background: var(--ok);
   color: var(--ink);
@@ -1926,7 +1944,7 @@ button:disabled {
 }
 
 .panel-section > p:not(.muted) {
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
 }
 
 .task,
@@ -1959,7 +1977,7 @@ button:disabled {
 }
 
 .task-top .muted {
-  font-size: 0.84rem;
+  font-size: var(--text-xs);
   text-align: right;
 }
 
@@ -1969,7 +1987,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   margin-top: 8px;
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -2002,7 +2020,7 @@ button:disabled {
   min-width: 48px;
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 1rem;
+  font-size: var(--text-md);
 }
 
 .stepper span .icon {
@@ -2017,7 +2035,7 @@ button:disabled {
   background: var(--paper-2);
   border: 0;
   font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-size: var(--text-lg);
   line-height: 1;
 }
 
@@ -2070,7 +2088,7 @@ button:disabled {
   box-shadow: var(--press);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.08rem;
+  font-size: var(--text-lg);
 }
 
 .tab-icon {
@@ -2115,7 +2133,7 @@ button:disabled {
 .badge {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   padding: 1px 6px;
   border-radius: 3px;
   background: var(--ink);
@@ -2153,7 +2171,7 @@ button:disabled {
   border-left: 2px solid var(--ink);
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2173,7 +2191,7 @@ button:disabled {
   min-width: 190px;
   min-height: 48px;
   padding: 10px 22px;
-  font-size: 1.35rem;
+  font-size: var(--text-xl);
   box-shadow: 0 4px 0 0 var(--ink);
 }
 
@@ -2231,7 +2249,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 1.6rem;
+  font-size: var(--text-2xl);
 }
 
 .sheet-head h2 .concept {
@@ -2535,7 +2553,7 @@ button:disabled {
 }
 
 .tree-detail h3 {
-  font-size: 1.5rem;
+  font-size: var(--text-2xl);
   line-height: 1.1;
 }
 
@@ -2626,7 +2644,7 @@ button:disabled {
   box-shadow: var(--press);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.02rem;
+  font-size: var(--text-md);
 }
 
 .tabs button .icon {
@@ -2664,18 +2682,18 @@ button:disabled {
   justify-content: space-between;
   gap: 4px 12px;
   margin-bottom: 4px;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 .chart figcaption strong {
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 
 .chart-legend {
   display: flex;
   gap: 12px;
-  font-size: 0.84rem;
+  font-size: var(--text-xs);
   color: var(--text-soft);
 }
 
@@ -2714,7 +2732,7 @@ button:disabled {
 
 .chart-tick {
   fill: var(--text-soft);
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-family: var(--font-num);
 }
 
@@ -2739,7 +2757,7 @@ button:disabled {
   gap: 10px;
   padding: 6px 8px;
   border-bottom: 2px dotted var(--paper-3);
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 .feed-item:last-child {
@@ -2862,7 +2880,7 @@ button:disabled {
   grid-column: 1 / -1;
   grid-row: 2;
   margin-top: 5px;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--text-soft);
   white-space: nowrap;
@@ -2876,7 +2894,7 @@ button:disabled {
   min-width: 0;
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: var(--text-lg);
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -2890,7 +2908,7 @@ button:disabled {
 }
 
 .stats dd {
-  font-size: 1.35rem;
+  font-size: var(--text-xl);
 }
 
 /* The side panel is narrow: three smaller tiles in a row. */
@@ -2915,7 +2933,7 @@ button:disabled {
 }
 
 .side .impact dd {
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 
 /* ---------------------------------------------------------------- */
@@ -2980,7 +2998,7 @@ button:disabled {
 .clock-time {
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 2.1rem;
+  font-size: var(--text-3xl);
   line-height: 1;
   color: #fff;
   font-variant-numeric: tabular-nums;
@@ -3009,7 +3027,7 @@ button:disabled {
   padding: 0;
   display: grid;
   gap: 2px;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 /* The two jobs during an incident, numbered so the order is obvious. */
@@ -3020,7 +3038,7 @@ button:disabled {
   margin: 18px 0 8px;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 
 .step-num {
@@ -3033,7 +3051,7 @@ button:disabled {
   border-radius: 3px;
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
 }
 
 .step-head .tip {
@@ -3060,7 +3078,7 @@ button:disabled {
   box-shadow: var(--press);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
 }
 
 .chip-icon {
@@ -3125,7 +3143,7 @@ button:disabled {
   gap: 6px;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.98rem;
+  font-size: var(--text-md);
 }
 
 .actions {
@@ -3169,7 +3187,7 @@ button:disabled {
   flex: 1;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1rem;
+  font-size: var(--text-md);
 }
 
 .hint-box {
@@ -3229,7 +3247,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 1.6rem;
+  font-size: var(--text-2xl);
 }
 
 .modal-head h2 .concept {
@@ -3365,7 +3383,7 @@ button:disabled {
   border-radius: var(--radius);
   background: var(--go);
   font-family: var(--font-display);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
 }
 
 @media (max-width: 540px) {
@@ -3418,7 +3436,7 @@ button:disabled {
 .menu-run-title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.35rem;
+  font-size: var(--text-xl);
 }
 
 .menu-run-stats {
@@ -3453,7 +3471,7 @@ button:disabled {
 
 .menu-run-stats dt {
   font-family: var(--font-num);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -3464,13 +3482,13 @@ button:disabled {
   margin: 0;
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 1.35rem;
+  font-size: var(--text-xl);
   white-space: nowrap;
 }
 
 .menu-seed {
   margin: 10px 0 0;
-  font-size: 1rem;
+  font-size: var(--text-md);
   line-height: 1.4;
   color: var(--on-night-soft);
 }
@@ -3503,13 +3521,13 @@ button:disabled {
 
 .menu-resume strong {
   font-family: var(--font-display);
-  font-size: 1.35rem;
+  font-size: var(--text-xl);
 }
 
 .menu-resume small {
   font-family: var(--font-body);
   display: block;
-  font-size: 0.85rem;
+  font-size: var(--text-xs);
   color: var(--ink);
 }
 
@@ -3552,12 +3570,12 @@ button:disabled {
 
 .menu-tile-body strong {
   font-family: var(--font-display);
-  font-size: 1.25rem;
+  font-size: var(--text-lg);
 }
 
 .menu-tile-body span {
   font-family: var(--font-body);
-  font-size: 1rem;
+  font-size: var(--text-md);
   line-height: 1.35;
   color: var(--text-soft);
 }
@@ -3637,7 +3655,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   margin: 12px 0 8px;
-  font-size: 1.3rem;
+  font-size: var(--text-xl);
 }
 
 .menu-section-head {
@@ -3650,7 +3668,7 @@ button:disabled {
 .menu-section > p,
 .menu-note {
   margin: 0 0 10px;
-  font-size: 1.05rem;
+  font-size: var(--text-md);
   line-height: 1.45;
   color: var(--text-soft);
 }
@@ -3688,7 +3706,7 @@ button:disabled {
 
 .menu-confirm p {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--text-md);
   line-height: 1.45;
 }
 
@@ -3707,7 +3725,7 @@ button:disabled {
 .menu-sub h5 {
   margin: 0 0 6px;
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
 }
 
 /* Starting over replaces the run: set apart, in the colours of a warning. */
@@ -3744,12 +3762,12 @@ button:disabled {
 .volume label {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
 }
 
 .volume output {
   font-family: var(--font-num);
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -3838,7 +3856,7 @@ button:disabled {
 
   .menu-run-stats dd {
     grid-column: 1 / -1;
-    font-size: 1.15rem;
+    font-size: var(--text-lg);
   }
 
   .menu-grid {
@@ -3867,42 +3885,42 @@ button:disabled {
  */
 .modal-menu .btn:not(.btn-big) {
   padding: 10px 16px;
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
 }
 
 .modal-menu .btn-small:not(.btn-big) {
   padding: 7px 12px;
-  font-size: 1.05rem;
+  font-size: var(--text-md);
 }
 
 .modal-menu .field {
-  font-size: 1.05rem;
+  font-size: var(--text-md);
 }
 
 .modal-menu .field input {
   padding: 11px 13px;
-  font-size: 1.05rem;
+  font-size: var(--text-md);
 }
 
 .modal-menu .callout-text,
 .modal-menu .callout-compact .callout-text {
-  font-size: 1.05rem;
+  font-size: var(--text-md);
 }
 
 .modal-menu .callout-kicker {
-  font-size: 0.85rem;
+  font-size: var(--text-xs);
 }
 
 .modal-menu .tag {
-  font-size: 1rem;
+  font-size: var(--text-md);
 }
 
 .modal-menu .more > summary {
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 
 .modal-menu .row {
-  font-size: 1.05rem;
+  font-size: var(--text-md);
 }
 
 /* Tabs: a strip of chunky buttons, the selected one dark. Only the selected tab's panel is in the page. */
@@ -3943,7 +3961,7 @@ button:disabled {
   box-shadow: var(--press);
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.2rem;
+  font-size: var(--text-lg);
   line-height: 1.2;
   transition:
     transform 0.05s,
@@ -4071,18 +4089,18 @@ button:disabled {
 
 .quality-head strong {
   font-family: var(--font-display);
-  font-size: 1.3rem;
+  font-size: var(--text-xl);
 }
 
 .quality-hint {
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-soft);
 }
 
 .quality-text {
   font-family: var(--font-body);
-  font-size: 1.02rem;
+  font-size: var(--text-md);
   line-height: 1.4;
   color: var(--text-soft);
 }
@@ -4117,7 +4135,7 @@ button:disabled {
     gap: 2px;
     min-height: 56px;
     padding: 6px 2px;
-    font-size: 1.1rem;
+    font-size: var(--text-lg);
   }
 
   /* The menu's seven tabs take four columns, still two rows. */
@@ -4128,7 +4146,7 @@ button:disabled {
 
   .modal-menu .tab-strip button {
     padding: 6px 4px;
-    font-size: 1rem;
+    font-size: var(--text-md);
   }
 }
 
@@ -4136,7 +4154,7 @@ button:disabled {
   /* Phones keep the same two tab rows at a slightly smaller label size rather than adding a row. */
   .modal-menu .tab-strip button {
     padding: 4px;
-    font-size: 0.9rem;
+    font-size: var(--text-sm);
   }
 }
 
@@ -4144,7 +4162,7 @@ button:disabled {
   display: grid;
   gap: 6px;
   margin: 6px 0 10px;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: var(--text-soft);
 }
 
@@ -4198,7 +4216,7 @@ button:disabled {
   box-shadow: inset 0 -6px 0 rgb(0 0 0 / 0.18);
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 2.9rem;
+  font-size: var(--text-4xl);
   line-height: 1;
   color: var(--ink);
 }
@@ -4206,7 +4224,7 @@ button:disabled {
 .grade::before {
   content: "Grade";
   font-family: var(--font-display);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   margin-bottom: 2px;
 }
@@ -4227,7 +4245,7 @@ button:disabled {
 }
 
 .report-summary {
-  font-size: 1.08rem;
+  font-size: var(--text-lg);
   margin: 0;
 }
 
@@ -4264,7 +4282,7 @@ button:disabled {
   box-shadow: var(--press);
   font-family: var(--font-num);
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: var(--text-md);
 }
 
 .rating-buttons button:hover {
@@ -4359,13 +4377,13 @@ button:disabled {
 }
 
 .tour-card h3 {
-  font-size: 1.4rem;
+  font-size: var(--text-xl);
   margin-bottom: 4px;
 }
 
 .tour-card p {
   margin: 0;
-  font-size: 0.94rem;
+  font-size: var(--text-sm);
 }
 
 .tour-prompt {
@@ -4404,7 +4422,7 @@ button:disabled {
   background: none;
   border: 0;
   color: var(--text-soft);
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -4450,7 +4468,7 @@ button:disabled {
     height: 20px;
   }
   .stat-body > strong {
-    font-size: 1.25rem;
+    font-size: var(--text-lg);
   }
   .brand {
     min-width: 112px;
@@ -4471,7 +4489,7 @@ button:disabled {
 
 @media (max-width: 900px) {
   body {
-    font-size: 14px;
+    font-size: var(--text-sm);
   }
   .topbar {
     flex-wrap: wrap;
@@ -4486,7 +4504,7 @@ button:disabled {
     min-width: 0;
   }
   .brand-mark {
-    font-size: 1.3rem;
+    font-size: var(--text-xl);
   }
   .stats-strip {
     order: 3;
@@ -4515,7 +4533,7 @@ button:disabled {
     display: none;
   }
   .stat-body > strong {
-    font-size: 0.98rem;
+    font-size: var(--text-md);
   }
   /* Phones show the four headline numbers only. */
   .stat-body > span {
@@ -4539,7 +4557,7 @@ button:disabled {
   }
   .view-tabs button {
     padding: 4px;
-    font-size: 1rem;
+    font-size: var(--text-md);
   }
   .view-tabs .badge,
   .view-tabs .tab-label,
@@ -4559,7 +4577,7 @@ button:disabled {
   .advance {
     min-width: 0;
     padding: 8px 14px;
-    font-size: 1.15rem;
+    font-size: var(--text-lg);
   }
   .sheet {
     position: fixed;
@@ -4590,7 +4608,7 @@ button:disabled {
     padding: 8px;
   }
   .lane-label strong {
-    font-size: 1rem;
+    font-size: var(--text-md);
   }
   .lane-label strong .icon {
     width: 16px;
@@ -4604,7 +4622,7 @@ button:disabled {
     display: none;
   }
   .eq-label {
-    font-size: 0.8rem;
+    font-size: var(--text-xs);
     padding: 2px 6px 2px 2px;
     gap: 4px;
     border-width: 2px;
@@ -4618,7 +4636,7 @@ button:disabled {
     height: 12px;
   }
   .eq-note {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   .hud {
     left: 8px;
@@ -4641,7 +4659,7 @@ button:disabled {
     height: 16px;
   }
   .hud .callout-text {
-    font-size: 0.88rem;
+    font-size: var(--text-sm);
   }
   .title-screen {
     align-items: end;
@@ -4688,7 +4706,7 @@ button:disabled {
 
 /* Campaign uses the shared HUD, incident workspace and disclosure styles.
    Only physical-step evidence needs additional layout. See docs/UI_DESIGN.md. */
-.campaign-stability strong { font-family: var(--font-num); font-size: 1.1rem; }
+.campaign-stability strong { font-family: var(--font-num); font-size: var(--text-lg); }
 .campaign-stability .clock-row { margin-bottom: 6px; }
 .chip.is-selected { background: var(--go); border-color: var(--ink); }
 .campaign-evidence, .campaign-working { margin-top: 10px; }
@@ -4721,7 +4739,7 @@ button:disabled {
 .campaign-panel .actions { gap: 6px; }
 .campaign-panel .more { margin-top: 8px; padding-top: 8px; }
 .campaign-panel .panel-section { padding-bottom: 12px; }
-.campaign-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.campaign-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
 .campaign-table caption { text-align: left; padding: 8px 0; color: var(--text-soft); }
 .campaign-table th, .campaign-table td { padding: 6px; text-align: left; border-bottom: 1px solid var(--paper-3); }
 .campaign-details { overflow-x: auto; }
@@ -4736,19 +4754,19 @@ button:disabled {
 .history-card { padding-top: 12px; }
 .history-incidents { display: grid; gap: 10px; }
 .campaign-feed .feed-item { grid-template-columns: 28px 76px 1fr; }
-.request-path { margin: 0 0 4px; font-size: 12px; }
+.request-path { margin: 0 0 4px; font-size: var(--text-xs); }
 .modal select, .modal textarea { display: block; width: 100%; padding: 8px; margin: 8px 0; }
 .modal :focus-visible { outline: 3px solid #426788; outline-offset: 2px; }
 
 .instance-choices { display: grid; gap: 6px; margin-top: 8px; }
 .instance-choices .chip { display: block; width: 100%; white-space: normal; text-align: left; }
-.instance-choices .chip span { display: block; font-family: var(--font-num); font-size: 0.8rem; margin-top: 4px; }
+.instance-choices .chip span { display: block; font-family: var(--font-num); font-size: var(--text-xs); margin-top: 4px; }
 .scaling-controls fieldset { display: grid; gap: 6px; min-width: 0; border: 1px solid var(--paper-3); padding: 8px; }
 .route-choice { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
 .route-choice legend { grid-column: 1 / -1; }
-.route-choice button { min-height: 40px; padding: 6px 10px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--paper); color: var(--ink); font-family: var(--font-num); font-weight: 700; font-size: 0.9rem; box-shadow: var(--press); }
+.route-choice button { min-height: 40px; padding: 6px 10px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--paper); color: var(--ink); font-family: var(--font-num); font-weight: 700; font-size: var(--text-sm); box-shadow: var(--press); }
 .route-choice button:hover:not(:disabled):not(.is-active) { background: var(--paper-2); }
 .route-choice button.is-active { background: var(--go); }
 .route-choice:disabled button { opacity: .55; box-shadow: none; }
-.scaling-controls legend { font-size: 0.85rem; }
+.scaling-controls legend { font-size: var(--text-xs); }
 .scaling-controls .btn { white-space: normal; }

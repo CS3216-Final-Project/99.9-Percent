@@ -20,7 +20,7 @@ function campaignSummary(game: GameState | null, tutorialDone: boolean): Summary
   const chapters = campaignChapters(game);
   const chapter = chapters.find((c) => c.current) ?? chapters.filter((c) => c.completed).at(-1) ?? chapters[0];
   const ended = game.phase === "ended";
-  return { progress: ended ? "Company closed" : `Chapter ${chapter.number} of ${chapters.length}: ${chapter.name}`, resumable: true, ended, tutorialDone, continueLabel: "Continue company" };
+  return { progress: ended ? "Company closed" : `Chapter ${chapter.number} of ${chapters.length - 1}: ${chapter.name}`, resumable: true, ended, tutorialDone, continueLabel: "Continue company" };
 }
 function classicSummary(game: GameState | null, tutorialDone: boolean): Summary {
   if (!game || game.campaign || isFreshRun(game)) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Challenge Mode" };
@@ -32,7 +32,7 @@ function classicSummary(game: GameState | null, tutorialDone: boolean): Summary 
 const MODES: Record<GameMode, { name: string; icon: IconName; pace: string; about: string }> = {
   campaign: {
     name: "Guided Mode", icon: "server", pace: "Continuous play · Six guided chapters",
-    about: "Learn infrastructure concepts through guided challenges. Inspect problems, upgrade servers and watch your changes take effect. Pause whenever you need.",
+    about: "Begin with Chapter 0 to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.",
   },
   classic: {
     name: "Challenge Mode", icon: "week", pace: `Week by week · ${BALANCE.maxTurns}-week challenge`,

@@ -8,7 +8,7 @@ type Preview = Extract<ReturnType<typeof previewCampaignAction>,{ok:true}>;
 export function PurchaseFinance({preview:p}:{preview:Preview}) {
     return <dl className="rows"><Row label="Buy now" value={money(p.spentCents)} /><Row label="Money left" value={money(p.cashAfterCents)} />
         <Row label="Extra running cost" value={p.upkeepDelta===0 ? "None" : `${p.upkeepDelta>0?"+":""}${money(p.upkeepDelta)} per ${Q.periodSteps*Q.stepSeconds} game seconds`} />
-        <Row label="Ready in" value={`${p.delay} ${p.delay===1?"step":"steps"}`} /></dl>;
+        <Row label="Ready in" value={`${p.delay} game ${p.delay===1?"second":"seconds"}`} /></dl>;
 }
 
 /** Outside the optional scrolling details, immediately before Confirm/Cancel. */

@@ -112,5 +112,16 @@ export async function savedClassicGame(page: Page): Promise<GameState> {
 export async function advanceCampaignStep(page: Page) {
   const more = page.locator(".campaign-advanced");
   if (!(await more.evaluate(el => (el as HTMLDetailsElement).open))) await more.locator("summary").click();
-  await page.getByRole("button", { name: "Advance step", exact: true }).click();
+  await page.getByRole("button", { name: "Advance game second", exact: true }).click();
+}
+
+/** Finish Chapter 0's explanations after the free inspection and purchase-preview lessons. */
+export async function finishChapterZero(page: Page) {
+  const card = tutorial(page);
+  for (let lesson = 0; lesson < 21; lesson++) {
+    const finish = card.getByRole("button", { name: "Finish Chapter 0", exact: true });
+    if (await finish.count()) { await finish.click(); return; }
+    await card.getByRole("button", { name: "Next", exact: true }).click();
+  }
+  throw new Error("Chapter 0 did not reach its explicit finish action");
 }

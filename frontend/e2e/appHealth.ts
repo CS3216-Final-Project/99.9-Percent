@@ -68,17 +68,17 @@ export async function appHealthDuringTutorial(page: Page) {
     await page.route("**/api/**", r => r.abort()); await page.goto("/");
     await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await expectRoom(page);
     const card = tutorial(page), entry = page.getByRole("button", { name: "View app health", exact: true });
-    await expect(card).toHaveAccessibleName("Tutorial, step 1 of 8");
+    await expect(card).toHaveAccessibleName("Tutorial, step 1 of 21");
     const before = (await savedGame(page)).campaign;
     await entry.click(); const dialog = page.getByRole("dialog", { name: "App Health", exact: true });
     await expect(dialog).toBeVisible(); await expect(card).toBeHidden(); await page.keyboard.press("p");
     await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
-    await expect(entry).toBeFocused(); await expect(card).toHaveAccessibleName("Tutorial, step 1 of 8");
+    await expect(entry).toBeFocused(); await expect(card).toHaveAccessibleName("Tutorial, step 1 of 21");
     expect((await savedGame(page)).campaign).toEqual(before);
     await page.getByRole("main").getByRole("button", { name: "Servers", exact: true }).click();
     await page.getByRole("dialog", { name: "Servers inspected", exact: true }).getByRole("button", { name: "Return to room", exact: true }).click();
-    await expect(card).toHaveAccessibleName("Tutorial, step 2 of 8");
+    await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
 }
 
 export async function appHealthProblem(page: Page, touch = false) {

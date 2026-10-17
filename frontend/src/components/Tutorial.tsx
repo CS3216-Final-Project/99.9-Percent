@@ -145,13 +145,13 @@ const CAMPAIGN: Step[] = [
   },
   {
     title: "Know what earns money",
-    why: `Each successful request earns $${(Q.revenueCents / 100).toFixed(2)}. Money and running costs settle every ${Q.periodSteps} steps. Rejected requests earn nothing.`,
+    why: `Each successful request earns $${(Q.revenueCents / 100).toFixed(2)}. Money and running costs settle every ${Q.periodSteps} game seconds. Rejected requests earn nothing.`,
     hint: () => "Check Cash before buying. Purchases are paid immediately.",
     target: () => ".topbar .stats-strip",
   },
   {
     title: "You control the clock",
-    why: "Time is paused. Each step is one second of traffic.",
+    why: "Time is paused. A game second simulates one second of requests, queues and work. It passes only while Run is on.",
     hint: () => "After this guide, Run to watch. Pause (P) to think.",
     target: () => ".campaign-clock .campaign-play",
   },
@@ -165,9 +165,87 @@ const CAMPAIGN: Step[] = [
   {
     title: "Compare before buying",
     why: "Nothing is bought until you press Confirm.",
-    hint: () => "Cancel the preview, then press Run company.",
+    hint: () => "Cancel the preview, then choose Next to keep learning.",
     target: () => (confirmingAction() ? ".campaign-action-popover" : ".campaign-panel .actions"),
-    nextLabel: "Got it",
+  },
+  {
+    title: "Game time and operating weeks",
+    why: `The clock counts total game seconds. Every ${Q.periodSteps} game seconds is one operating week, the company's billing period. It is compressed game time, not a real calendar week.`,
+    hint: () => "For example: at game second 60, Week 1 settles and Week 2 begins. The total seconds keep counting.",
+    target: () => ".campaign-clock",
+  },
+  {
+    title: "What happens at week end?",
+    why: "Successful requests build pending revenue. At week end it is added to cash, equipment costs and salaries are deducted, and the result appears in History. The company keeps running into the next week.",
+    hint: () => "Select Cash or Pending revenue any time to see the financial breakdown.",
+    target: () => ".topbar .stats-strip",
+  },
+  {
+    title: "Cash is your spending budget",
+    why: "Pending revenue cannot pay for purchases yet. Setup costs are paid immediately; running costs continue each week, including for idle equipment. Cash at zero or below after settlement closes the company.",
+    hint: () => "Leave room in your budget for running costs before buying an upgrade.",
+    target: () => ".topbar .stats-strip",
+  },
+  {
+    title: "Pause, run and change speed",
+    why: "Pause stops requests, activation delays and recovery progress so you can inspect and decide. Speed changes how quickly game seconds pass in real time; it does not change prices or the amount of work per game second.",
+    hint: () => "After Chapter 0, use Run/Pause or P. Choose 0.5×, 1× or 2× to suit your pace.",
+    target: () => ".campaign-clock",
+  },
+  {
+    title: "Find your way around",
+    why: "The server floor holds your machines; the office holds the crew. Floor buttons switch between them. Zoom, rotate and Reset view change your view. Walk mode is optional; equipment can always be selected directly.",
+    hint: () => "Use the room controls to explore. On a keyboard, Q/E rotate and Page Up/Page Down switch floors.",
+    target: () => ".camera-buttons",
+  },
+  {
+    title: "Technology and deployment",
+    why: "Tech shows the nine capabilities and their prerequisites. Later chapters award research points to unlock capabilities. Owning a technology does not deploy it, create a server or send traffic to it.",
+    hint: () => "Use Tech to see what is owned; use the chapter's actions to deploy and configure it.",
+    target: () => TECH_TAB,
+  },
+  {
+    title: "Check what changed in History",
+    why: "History has Charts for trends, Events for decisions and activations, and Incidents for reports. Traffic and response charts use game seconds; revenue and cost charts use operating weeks.",
+    hint: () => "After running the company, compare changes over time instead of judging a single reading.",
+    target: () => '.view-tabs button[data-view="history"]',
+  },
+  {
+    title: "Save and come back",
+    why: "Your company autosaves in this browser when storage is available. Menu has Save now, backups and Save and exit. Optional Account sign-in enables explicit cloud saves. Changing device or clearing browser data needs a cloud save or backup.",
+    hint: () => "Menu also holds sound, graphics, your avatar, game modes and a replay of Chapter 0 under How to play.",
+    target: () => ".topbar .menu-btn",
+  },
+  {
+    title: "Capacity, routing and data",
+    why: "More app capacity helps only when traffic is routed to it. A database can still be the bottleneck. Later, caching answers eligible repeated reads; misses and writes still reach the Database.",
+    hint: () => "Inspect each component's demand, capacity and queue before choosing where to invest.",
+    target: () => ".campaign-panel .incident-investigate",
+  },
+  {
+    title: "Respond to incidents with evidence",
+    why: "An incident means service is struggling. Inspect equipment for free, compare the evidence and choose a response. Some actions take game seconds to activate. Traffic limits can relieve pressure but rejected requests earn nothing.",
+    hint: () => "Run to observe your response. Recovery requires five consecutive healthy game seconds; a failing second resets that streak.",
+    target: () => ".campaign-panel .incident-symptoms",
+  },
+  {
+    title: "Later challenges build on this",
+    why: "Later chapters introduce changing demand, autoscaling, health checks, spare servers, failover and growth. Automation still needs installed capacity, configuration and activation time. Each chapter introduces its new controls when you reach it.",
+    hint: () => "You do not need to buy everything. Compare service, cost and rejected demand, then review the outcome.",
+    target: () => ".chapter-bar",
+  },
+  {
+    title: "Chapters advance through goals",
+    why: "A week ending does not complete a chapter. Follow its Goal, meet the requirements, review the outcome and choose Next when available. The same company, investments and finances carry forward through six gameplay chapters.",
+    hint: () => "View chapters shows the route. You can replay Chapter 0 there or from Menu → How to play without resetting your company.",
+    target: () => ".chapter-bar",
+  },
+  {
+    title: "Ready to run your company",
+    why: "Your company is still paused and this introduction has bought nothing. Chapter 1: Opening asks you to observe changing demand and find a bottleneck from evidence. A replay returns to your existing chapter.",
+    hint: () => "Choose Finish Chapter 0, then Run company when you are ready. You can pause whenever you need to think.",
+    target: () => ".campaign-clock .campaign-play",
+    nextLabel: "Finish Chapter 0",
   },
 ];
 
@@ -270,13 +348,13 @@ function inOpenRoom(r: DOMRect, stage: DOMRect): boolean {
 /** Where the card sits relative to what it points at. */
 function placeFor(selector: string): Place {
   if (selector.startsWith(".eq-label") || selector.startsWith(".node")) return "right";
-  if (selector.startsWith(".view-tabs") || selector.startsWith(".advance") || selector.startsWith(".campaign-clock")) return "top";
+  if (selector.startsWith(".view-tabs") || selector.startsWith(".advance") || selector.startsWith(".campaign-clock") || selector.startsWith(".camera-buttons")) return "top";
   if (selector.startsWith(".next-chip") || selector.startsWith(".topbar")) return "bottom";
   return "left";
 }
 
 /** `edge` is where the open room ends on the right: a panel there is left uncovered when the target is in the room. */
-function cardStyle(box: Box | null, place: Place, vw: number, vh: number, edge = vw): CSSProperties {
+function cardStyle(box: Box | null, place: Place, vw: number, vh: number, edge = vw, height = 240): CSSProperties {
   const W = Math.min(280, vw - 24);
   if (!box) return { left: (vw - W) / 2, top: "50%", transform: "translateY(-50%)", width: W };
   // On small screens the card docks to whichever edge is away from the target.
@@ -285,23 +363,23 @@ function cardStyle(box: Box | null, place: Place, vw: number, vh: number, edge =
   }
   const gap = 14;
   const x = (v: number) => clamp(v, 12, vw - W - 12);
+  const y = (v: number) => clamp(v, 12, Math.max(12, vh - height - 12));
   // Never cover the thing being pointed at: flip sides when there is no room.
   if (place === "left" && box.x - gap - W < 12) place = "right";
   else if (place === "right" && box.x + box.w + gap + W > edge - 12 && box.x - gap - W >= 12) place = "left";
   switch (place) {
     case "bottom":
-      return { left: x(box.x), top: Math.min(box.y + box.h + gap, vh - 200), width: W };
+      return { left: x(box.x), top: y(box.y + box.h + gap), width: W };
     case "top":
       return {
         left: x(box.x + box.w / 2 < vw / 2 ? box.x : box.x + box.w - W),
-        top: Math.max(12, box.y - gap),
-        transform: "translateY(-100%)",
+        top: y(box.y - gap - height),
         width: W,
       };
     case "left":
-      return { left: Math.max(12, box.x - gap - W), top: clamp(box.y - 10, 12, vh - 220), width: W };
+      return { left: Math.max(12, box.x - gap - W), top: y(box.y - 10), width: W };
     case "right":
-      return { left: x(box.x + box.w + gap), top: clamp(box.y, 12, vh - 220), width: W };
+      return { left: x(box.x + box.w + gap), top: y(box.y), width: W };
   }
 }
 
@@ -314,6 +392,7 @@ export default function Tutorial() {
   // A dialog that needs the player (a review, the chapter list) covers the room; the guide waits behind it.
   const [covered, setCovered] = useState(false);
   const [edge, setEdge] = useState<number | undefined>(undefined);
+  const [cardHeight, setCardHeight] = useState(240);
   const card = useRef<HTMLDivElement>(null);
   // Steps can wait on an action's confirmation, which lives outside the store.
   useSyncExternalStore(subscribeConfirming, confirmingAction);
@@ -352,6 +431,8 @@ export default function Tutorial() {
     let floorFor = "";
     let focusedFor = "";
     const read = () => {
+      const height = card.current?.getBoundingClientRect().height;
+      if (height) setCardHeight(previous => previous === height ? previous : height);
       setViewport((v) => (v.w === window.innerWidth && v.h === window.innerHeight ? v : { w: window.innerWidth, h: window.innerHeight }));
       setCovered(!!document.querySelector(".modal-backdrop"));
       const sel = step.target(useGame.getState());
@@ -429,13 +510,14 @@ export default function Tutorial() {
         role="dialog"
         aria-label={`${name}, step ${tour.step + 1} of ${steps.length}`}
         tabIndex={-1}
-        style={cardStyle(box, placeFor(selector), viewport.w, viewport.h, edge)}
+        style={cardStyle(box, placeFor(selector), viewport.w, viewport.h, edge, cardHeight)}
       >
         <div className="tour-dots" aria-hidden="true">
           {steps.map((_, i) => (
             <i key={i} className={i < tour.step ? "is-done" : i === tour.step ? "is-now" : ""} />
           ))}
         </div>
+        {tour.track === "campaign" && <p className="tour-chapter">Chapter 0 · Getting started <span>Lesson {tour.step + 1} of {steps.length}</span></p>}
         <h3>{step.title}</h3>
         {!campaign && why && <p className="muted">{why}</p>}
         <p className="tour-prompt">{step.hint(s)}</p>

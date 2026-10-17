@@ -12,5 +12,5 @@
 }
 
 @media (max-width: 360px) {
-    .stat-action[aria-label="View app health"] strong { font-size: 0.9rem; }
+    .stat-action[aria-label="View app health"] strong { font-size: var(--text-sm); }
 }

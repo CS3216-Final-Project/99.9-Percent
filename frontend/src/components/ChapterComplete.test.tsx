@@ -41,7 +41,7 @@ function recover() {
   runUntil(game => finishedChapter(game) === "data");
 }
 
-it("announces Scaling & Routing once, paused, on the step that finishes it", () => {
+it("announces Scaling & Routing once, paused, on the game second that finishes it", () => {
   show(finishingScaling());
   expect(finishedChapter(useGame.getState().game)).toBeNull();
   expect(dialog()).toBeNull();

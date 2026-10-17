@@ -45,7 +45,7 @@ export function CampaignAppHealth({ onClose }: { onClose: () => void }) {
             <p><b>Rejected requests:</b> {health.rejected === null ? "Unavailable" : num(health.rejected)} in this snapshot. Rejected requests were not admitted for processing; they are separate from failed requests.</p>
             <p>These readings describe the latest game measurements, not a prediction of future performance.</p>
             <p><b>How status works:</b> incident, completion and review states take priority. Otherwise, response time of {Q.latencyThresholdMs} ms or more means At risk; a configured traffic limit means Traffic limited; otherwise the label is Healthy. Errors and queues are separate evidence, not extra status rules.</p>
-            <p>Incident recovery needs {Q.stableSteps} consecutive qualifying steps below {Q.latencyThresholdMs} ms and {Q.errorThreshold * 100}% failed outcomes, with admitted traffic and completed outcomes. Reliability safety checks also apply. There is no incident timeout.</p>
+            <p>Incident recovery needs {Q.stableSteps} consecutive qualifying game seconds below {Q.latencyThresholdMs} ms and {Q.errorThreshold * 100}% failed outcomes, with admitted traffic and completed outcomes. Reliability safety checks also apply. There is no incident timeout.</p>
         </details>
     </Modal>, document.body);
 }
