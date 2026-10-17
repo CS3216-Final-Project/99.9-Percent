@@ -22,7 +22,8 @@ test("new players see Guided Mode first with Challenge Mode locked", async ({ pa
 });
 
 // The room stays mounted while the game underneath it is swapped, so this journey keeps drawing it.
-test("switches between Guided Mode and unlocked Challenge Mode from the menu, keeping each run", async ({ page }) => {
+test("switches between Guided Mode and unlocked Challenge Mode from the menu, keeping each run", async ({ page , installClock}) => {
+ await installClock();
   await unlockChallenge(page);
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
   await expectRoom(page);

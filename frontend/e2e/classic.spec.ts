@@ -1,4 +1,4 @@
-import { setGameSpeed } from "./fixtures";
+import { setGameSpeed, openRoomControls } from "./fixtures";
 import { test, expect, expectRoom, savedClassicGame as savedGame, seedClassicSave as seedSave, unlockChallenge } from './fixtures';
 import { advanceTurn, newLegacyGame as newGame } from '../src/sim';
 
@@ -57,6 +57,7 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   await page.reload();
   await page.getByRole('button', { name: 'Continue week 2' }).click();
   // The tutorial left the view on the office floor, which is the floor the reload restores.
+  await openRoomControls(page);
   await page.getByRole('button', { name: 'Server floor', exact: true }).click();
   await expectRoom(page);
   expect(await savedGame(page)).toEqual(before);
@@ -154,13 +155,14 @@ test('confirms replacing a run and starts the supplied replay seed', async ({ pa
   expect(await savedGame(page)).toEqual(newGame('e2e-repeatable'));
 });
 
-test('resumes an incident paused, investigates, fixes it and acknowledges the postmortem', async ({ page, withoutRoom }) => {
+test('resumes an incident paused, investigates, fixes it and acknowledges the postmortem', async ({ page, withoutRoom , installClock}) => {
+ await installClock();
   // Clock.runFor would also draw every WebGL animation frame, turning 13 virtual seconds into a minute.
   await withoutRoom();
   const incident = advanceTurn({ ...newGame(1), users: 4500, techDone: ['monitoring'] });
   expect(incident.incident?.type).toBe('app_overload');
   await seedSave(page, incident);
-  await page.clock.install();
+
   await page.goto('/');
   await page.getByRole('button', { name: 'Continue week 1' }).click();
   await page.clock.pauseAt(new Date(Date.now() + 1000));

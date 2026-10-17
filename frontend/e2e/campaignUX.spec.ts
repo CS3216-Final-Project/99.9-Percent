@@ -1,7 +1,8 @@
 import { advanceCampaignStep, test, expect, savedGame } from "./fixtures";
 
 test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
-test("Campaign option comparison, confirmation, Run/Pause and pause-to-investigate use public controls", async ({page}) => {
+test("Campaign option comparison, confirmation, Run/Pause and pause-to-investigate use public controls", async ({page, installClock}) => {
+ await installClock();
   await page.goto("/"); await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
   await expect(page.getByText("Effect & costs")).toHaveCount(0);
   await expect(page.getByText("Operating finances")).toHaveCount(0); await expect(page.getByLabel("Request dependencies")).toHaveCount(0);
@@ -13,7 +14,7 @@ test("Campaign option comparison, confirmation, Run/Pause and pause-to-investiga
   await page.keyboard.press("Escape"); await expect(confirm).toBeHidden(); expect((await savedGame(page)).campaign!.apps).toHaveLength(1);
   await advanceCampaignStep(page);
   expect((await savedGame(page)).campaign!.step).toBe(1);
-  await page.clock.install(); await page.getByRole("button",{name:"Run",exact:true}).click(); await page.clock.runFor(1000);
+   await page.getByRole("button",{name:"Run",exact:true}).click(); await page.clock.runFor(1000);
   await expect(page.getByRole("button",{name:"Pause & inspect"})).toHaveCount(0); await page.getByRole("button",{name:"Pause",exact:true}).click(); const stopped=(await savedGame(page)).campaign!.step;
   await page.clock.runFor(3000); expect((await savedGame(page)).campaign!.step).toBe(stopped);
   await expect(page.getByRole("button",{name:"Run",exact:true})).toBeVisible();

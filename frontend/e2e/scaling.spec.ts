@@ -4,14 +4,15 @@ import {newGame,applyAction,type GameState,type Action} from "../src/sim";
 import {advanceSteps} from "../src/sim/step";
 function act(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 function company(){let g=advanceSteps(newGame(3,"browser-scaling"),6).state;g=act(g,{type:"start_db_upgrade"});g=advanceSteps(g,30).state;g=act(g,{type:"acknowledge_review"});return act(g,{type:"acknowledge_milestone"});}
-for(const path of ["vertical","horizontal"] as const)test(`scaling continuation: ${path}`,async({page})=>{
+for(const path of ["vertical","horizontal"] as const)test(`scaling continuation: ${path}`,async({page, installClock})=>{
+ await installClock();
  test.setTimeout(150000);
  const apiRequests:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))apiRequests.push(r.url());});
  await page.route("**/api/**",route=>route.abort());
  await seedSave(page,company());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
  const id=(await savedGame(page)).campaign!.runId;
  await page.getByRole("button",{name:/Upgrade database/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
- for(let i=0;i<8;i++)await advanceCampaignStep(page);
+ await advanceCampaignStep(page,{seconds:8});
  await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect.poll(async()=>!!(await savedGame(page)).campaign!.incident).toBe(true);
  await page.getByRole("button",{name:"Pause",exact:true}).click();

@@ -16,7 +16,8 @@ async function countEffects(page: Page) {
   return () => page.evaluate(() => (window as unknown as { effectVoices: number }).effectVoices);
 }
 
-test("sounds the company starting and the alarm, and nothing for a skipped walkthrough or while muted", async ({ page, withoutRoom }) => {
+test("sounds the company starting and the alarm, and nothing for a skipped walkthrough or while muted", async ({ page, withoutRoom , installClock}) => {
+ await installClock();
   // The effects need no room; skipping its software WebGL keeps this journey fast.
   await withoutRoom();
   const problems: string[] = [];
@@ -36,7 +37,7 @@ test("sounds the company starting and the alarm, and nothing for a skipped walkt
   await page.waitForTimeout(300);
   expect(await voices()).toBe(launch);
   const introduced = launch;
-  for (let i = 0; i < 5; i++) await advanceCampaignStep(page);
+  await advanceCampaignStep(page,{seconds:5});
   // Quiet steps make no sound.
   expect(await voices()).toBe(introduced);
   await advanceCampaignStep(page);

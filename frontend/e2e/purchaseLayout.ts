@@ -12,7 +12,7 @@ export async function usableCard(page:Page) {
         if(box.left<Math.max(0,stage.left) || box.top<Math.max(0,stage.top) || box.right>Math.min(innerWidth,stage.right)+1 || box.bottom>Math.min(innerHeight,stage.bottom)+1)return false;
         if(innerWidth>900 && Math.abs(box.left-stage.left-12)>1)return false;
         for(const node of document.querySelectorAll<HTMLElement>(".campaign-panel,.bottombar,.floor-menu,.camera-buttons")){
-            if(getComputedStyle(node).visibility==="hidden" || !node.getClientRects().length)continue;
+            if(node.closest("details:not([open])") || getComputedStyle(node).visibility==="hidden" || !node.getClientRects().length)continue;
             const r=node.getBoundingClientRect();
             if(box.left<r.right && box.right>r.left && box.top<r.bottom && box.bottom>r.top)return false;
         }

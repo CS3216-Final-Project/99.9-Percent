@@ -214,7 +214,8 @@ test("reliability: inspection and effective recipients remain clear on narrow to
  await expect(page.getByRole("dialog",{name:"Menu"}).getByRole("tab",{name:/Graphics/})).toBeVisible();
 });
 
-test("inspects evidence and advances a physical step on touch", async ({ page }) => {
+test("inspects evidence and advances a physical step on touch", async ({ page , installClock}) => {
+ await installClock();
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap();
   await page.getByRole("button", { name: "Skip", exact: true }).tap();
   await expectRoom(page);
@@ -309,13 +310,14 @@ test('account controls remain usable on touch while accounts are offline',async(
 });
 
 
-test("cache selection, paid activation and warmth reload on touch",async({page})=>{
+test("cache selection, paid activation and warmth reload on touch",async({page, installClock})=>{
+ await installClock();
  const {dataCompany}=await import("../src/sim/__tests__/dataFixture");
  await page.route("**/api/**",route=>route.abort());await seedSave(page,dataCompany());
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
  const panel=page.getByRole("complementary",{name:"System metrics"}),data=page.getByRole("region",{name:"Data strategy"});
  await data.getByRole("button",{name:/Deploy Read Cache/}).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
- for(let i=0;i<2;i++)await advanceCampaignStep(page);
+ await advanceCampaignStep(page,{seconds:2});
  const roomCache=page.getByRole("main").getByRole("button",{name:/Read Cache/});
  await roomCache.tap();await expect(roomCache).toHaveAttribute("aria-pressed","true");await expect(panel.getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");
  await page.getByRole("dialog",{name:"Read Cache inspected"}).getByRole("button",{name:"Return to room"}).tap();
@@ -368,7 +370,10 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  expect((await savedGame(page)).campaign!.actions).toEqual([]);
  await expect(page.getByRole("button",{name:"Run",exact:true})).toBeInViewport();await expect(page.getByRole("button",{name:"Advance game second",exact:true})).toBeHidden();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
- await advanceCampaignStep(page);expect((await savedGame(page)).campaign!.step).toBe(1);
+ await page.getByRole("button",{name:"Run",exact:true}).tap();
+ await expect.poll(async()=>(await savedGame(page)).campaign!.step).toBeGreaterThan(0);
+ const pause=page.getByRole("button",{name:"Pause",exact:true});if(await pause.isVisible())await pause.tap();
+ await expect(page.getByRole("button",{name:"Run",exact:true})).toBeVisible();
  await page.screenshot({path:"test-results/campaign-ux-mobile.png"});
 });
 

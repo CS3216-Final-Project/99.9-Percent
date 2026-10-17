@@ -2,7 +2,8 @@ import { test, expect, expectRoom, seedSave, seedClassicSave, unlockChallenge, s
 import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 
 for (const width of [1440, 390, 320]) {
-  test(`bottom dock stays usable and stable at ${width}px`, async ({ page }) => {
+  test(`bottom dock stays usable and stable at ${width}px`, async ({ page, installClock }) => {
+    await installClock();
     await page.setViewportSize({ width, height: 900 });
     await seedSave(page, newGame(1, "dock"));
     await page.goto("/");
@@ -52,7 +53,8 @@ for (const width of [1440, 390, 320]) {
 }
 
 for (const width of [1440, 320]) {
-  test(`Challenge incident transport keeps its footprint at ${width}px`, async ({ page }) => {
+  test(`Challenge incident transport keeps its footprint at ${width}px`, async ({ page, installClock }) => {
+    await installClock();
     await page.setViewportSize({ width, height: 900 });
     await unlockChallenge(page);
     await page.addInitScript(() => localStorage.setItem("nn.mode.v1", "classic"));
