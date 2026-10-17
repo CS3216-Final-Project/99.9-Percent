@@ -38,7 +38,7 @@
 .controls-dock .walk-button.is-on { background: var(--go); color: var(--ink); }
 .controls-dock .room-menu > summary { position: relative; width: 142px; }
 .controls-dock .camera-menu > summary { width: 118px; }
-.controls-dock .time-menu > summary { width: 64px; font-variant-numeric: tabular-nums; }
+.controls-dock .time-menu > summary { width: 64px; padding-inline: 4px; gap: 4px; font-variant-numeric: tabular-nums; }
 .dock-panel {
   position: absolute; bottom: calc(100% + 10px); right: 12px; z-index: 60;
   width: 294px; max-width: calc(100vw - 24px); max-height: min(440px, 55dvh); overflow: auto;
@@ -50,8 +50,11 @@
 .camera-menu .dock-panel { right: max(12px, calc(50% - 294px)); }
 .controls-dock .floor-menu { position: static; display: flex; margin-bottom: 8px; }
 .controls-dock .floor-button { height: 44px; width: 100%; font-size: var(--text-md); }
-.controls-dock .camera-buttons { position: static; display: flex; flex-wrap: wrap; gap: 6px; }
-.controls-dock .camera-buttons button { flex: 1; min-width: 40px; height: 44px; display: grid; place-items: center; padding: 0; }
+.controls-dock .camera-buttons { position: static; display: grid; gap: 8px; }
+.controls-dock .camera-control-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.controls-dock .camera-control-row > div { display: flex; gap: 6px; }
+.controls-dock .camera-buttons button { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; }
+.controls-dock .camera-buttons .camera-reset { display: flex; justify-content: center; gap: 8px; width: 100%; }
 .dock-shortcuts { margin-top: 12px; font-size: var(--text-md); }
 .dock-shortcuts summary { cursor: pointer; font-family: var(--font-display); }
 .dock-shortcuts p { line-height: 1.5; margin-bottom: 0; }

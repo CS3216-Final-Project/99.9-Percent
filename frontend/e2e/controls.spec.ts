@@ -25,6 +25,10 @@ for (const width of [1440, 390, 320]) {
     await setGameSpeed(page, 0.5);
     const changedSize = (await dock.locator(".time-menu > summary").boundingBox())!;
     expect([changedSize.width, changedSize.height]).toEqual([speedSize.width, speedSize.height]);
+    expect(await dock.locator(".time-menu > summary").evaluate(el => {
+      const box=el.getBoundingClientRect();
+      return [...el.children].every(child => { const r=child.getBoundingClientRect(); return r.left>=box.left+4 && r.right<=box.right-4; });
+    })).toBe(true);
     await openCameraControls(page);
     const cameraPanel = dock.locator(".dock-menu[open] > .dock-panel");
     await expect(cameraPanel.getByRole("button", { name: "Zoom in", exact: true })).toBeInViewport({ ratio: 1 });
