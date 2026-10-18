@@ -19,7 +19,7 @@
 .lesson-progress::-webkit-progress-bar { background: var(--paper-3); }
 .lesson-progress::-webkit-progress-value { background: var(--ink); }
 .lesson-progress::-moz-progress-bar { background: var(--ink); }
-.lesson-reading { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding-right: 8px; }
+.lesson-reading { flex: 1; min-height: 0; overflow-y: auto; }
 .chapter-zero-modal .lesson-category { font-family: var(--font-display); font-size: var(--text-sm); color: var(--text-soft); letter-spacing: .06em; text-transform: uppercase; margin: 0 0 8px; }
 .lesson-reading h3 { font-size: var(--text-3xl); line-height: 1.15; margin: 0 0 16px; }
 .lesson-reading h3:focus { outline: none; }
