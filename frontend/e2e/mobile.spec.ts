@@ -9,6 +9,26 @@ import { advanceSteps } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
 import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 
+test("completed Chapter 0 replays can be exited by touch while an incident hides the guide", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/api/**", route => route.abort());
+  const incident = advanceSteps(newGame(1, "touch-exit-replay"), 6).state;
+  await seedSave(page, incident, { walkthroughStep: 0, walkthroughFurthestStep: 0 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).tap();
+  await expect(tutorial(page)).toHaveCount(0);
+  await page.getByRole("button", { name: "View chapters", exact: true }).tap();
+  await page.getByRole("dialog", { name: "Guided Mode chapters" }).getByRole("button", { name: "Exit Chapter 0", exact: true }).tap();
+  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
+  expect((await savedGame(page)).campaign).toEqual(incident.campaign);
+  await page.reload();
+  await page.getByRole("button", { name: "Continue company", exact: true }).tap();
+  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
+  await expect(tutorial(page)).toHaveCount(0);
+});
+
 test("the touch Navigation menu keeps floors, walking and camera tools clear of time controls", async ({ page }) => {
  await seedSave(page,newGame(1,"touch-dock"));
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
