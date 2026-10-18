@@ -75,3 +75,64 @@
   .campaign-panel .campaign-evidence .rows { margin: 4px 0 0; }
   .campaign-panel .campaign-evidence .row { padding-block: 4px; }
 }
+
+/* Action icons wear the warm gold icon tile, so each response is recognisable before its label is read. */
+.campaign-panel .act:has(> .icon) { grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+.campaign-panel .act:has(> .icon) .act-label { grid-column: 2; grid-row: 1; }
+.campaign-panel .act:has(> .icon) .act-meta { grid-column: 1 / -1; grid-row: 2; }
+.campaign-panel .act > .icon { grid-column: 1; grid-row: 1; width: 28px; height: 28px; padding: 4px; border-radius: 9px; background: var(--c-cash); color: var(--ink); border: 1.5px solid var(--ink); }
+.campaign-panel .act:disabled > .icon { background: var(--paper-2); }
+
+/* Equipment readings lead with icon rows and a load bar (CampaignReadings.tsx). Exact figures stay on the right. */
+.campaign-panel .evidence-rows { margin: 0; display: grid; }
+.campaign-panel .evidence-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--paper-3); font-size: var(--text-sm); line-height: 1.3; }
+.campaign-panel .evidence-rows .evidence-row:last-child { border-bottom: 0; }
+.campaign-panel .evidence-row dt { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-soft); }
+.campaign-panel .evidence-row dt .icon { flex: none; }
+.campaign-panel .evidence-row dd { margin: 0; text-align: right; font-family: var(--font-num); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+.campaign-panel .evidence-row[data-tone="ok"] dt .icon, .campaign-panel .evidence-row[data-tone="ok"] dd { color: var(--ok-ink); }
+.campaign-panel .evidence-row[data-tone="warn"] dt .icon, .campaign-panel .evidence-row[data-tone="warn"] dd { color: var(--warn-ink); }
+.campaign-panel .evidence-row[data-tone="critical"] dt .icon, .campaign-panel .evidence-row[data-tone="critical"] dd { color: var(--critical-ink); }
+.campaign-panel .evidence-row[data-tone="muted"] dd { color: var(--text-soft); font-weight: 500; }
+.campaign-panel .evidence-load .meter { height: 12px; }
+.campaign-panel .evidence-note { margin: 4px 0 0; color: var(--text-soft); font-size: var(--text-xs); line-height: 1.4; }
+
+/* One card per App Server: status dot, load bar, then its counts. */
+.campaign-panel .instance-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 6px; }
+.campaign-panel .instance-card { display: grid; gap: 5px; min-width: 0; padding: 6px 8px; text-align: left; cursor: pointer; border: 2px solid var(--paper-3); border-radius: var(--radius); background: var(--paper); color: var(--ink); font-size: var(--text-xs); line-height: 1.3; }
+.campaign-panel .instance-card:hover { border-color: var(--text-soft); }
+.campaign-panel .instance-card.is-selected { border-color: var(--ink); background: var(--paper-2); box-shadow: var(--press); }
+.campaign-panel .instance-head { display: flex; align-items: center; gap: 6px; font-family: var(--font-display); }
+.campaign-panel .instance-head strong { font-size: var(--text-sm); white-space: nowrap; }
+.campaign-panel .instance-status { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; color: var(--text-soft); white-space: nowrap; }
+.campaign-panel .instance-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--text-soft); background: transparent; }
+.campaign-panel .instance-status[data-receiving="true"] { color: var(--ok-ink); }
+.campaign-panel .instance-status[data-receiving="true"] .instance-dot { border-color: var(--ok-ink); background: var(--ok); }
+.campaign-panel .instance-bar { display: block; height: 8px; overflow: hidden; border-radius: 4px; border: 1px solid var(--paper-3); background: var(--paper-2); }
+.campaign-panel .instance-bar > span { display: block; height: 100%; background: var(--ok); transition: width .25s ease-out; }
+.campaign-panel .instance-bar[data-tone="warn"] > span { background: var(--warn); }
+.campaign-panel .instance-bar[data-tone="critical"] > span { background: var(--critical); }
+.campaign-panel .instance-figures { display: flex; flex-wrap: wrap; gap: 2px 8px; color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.campaign-panel .instance-figures b { color: var(--ink); font-family: var(--font-num); }
+@media (prefers-reduced-motion: reduce) { .campaign-panel .instance-bar > span { transition: none; } }
+
+/* Purchase quote tiles on the paper pop-up: red spending, green cash left, amber upkeep, blue timing. */
+.campaign-action-popover .purchase-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0 8px; }
+.campaign-action-popover .purchase-tile { --tile: var(--text-soft); min-width: 0; margin: 0; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--control-edge); border-left: 3px solid var(--tile); background: var(--paper-2); }
+.campaign-action-popover .purchase-tile[data-tone="cost"] { --tile: var(--critical-ink); }
+.campaign-action-popover .purchase-tile[data-tone="ok"] { --tile: var(--ok-ink); }
+.campaign-action-popover .purchase-tile[data-tone="warn"] { --tile: var(--warn-ink); }
+.campaign-action-popover .purchase-tile[data-tone="info"] { --tile: var(--tile-blue-ink); }
+.campaign-action-popover .purchase-tile dt { display: flex; align-items: center; gap: 4px; color: var(--text-soft); font-family: var(--font-display); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .03em; }
+.campaign-action-popover .purchase-tile dt .icon { flex: none; color: var(--tile); }
+.campaign-action-popover .purchase-tile dd { margin: 2px 0 0; color: var(--tile); font-family: var(--font-num); font-weight: 700; font-size: var(--text-md); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.campaign-action-popover .purchase-tile-sub { display: block; color: var(--text-soft); font-size: var(--text-xs); font-weight: 500; }
+
+/* At desktop the Opening's three responses must stay in view beside the selected readings: tighter rows, smaller tiles. */
+@media (min-width: 901px) {
+  .campaign-panel .evidence-row { padding-block: 1px; }
+  .campaign-panel .evidence-load { margin-top: 3px; }
+  .campaign-panel .evidence-load .meter { height: 8px; }
+  .campaign-panel .act:has(> .icon) { column-gap: 6px; }
+  .campaign-panel .act > .icon { width: 24px; height: 24px; padding: 3px; border-radius: 7px; }
+}

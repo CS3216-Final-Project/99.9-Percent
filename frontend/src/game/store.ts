@@ -103,6 +103,9 @@ export function walkthroughHoldsClock(s: { game: GameState; tour: Tour | null })
     && !(s.tour.step === 5 && s.tour.clockUntil != null && s.game.campaign.step < s.tour.clockUntil);
 }
 
+/** The game second Chapter 0's Run lesson lets the clock reach, while that lesson is open. */
+const runLessonLimit = (tour: Tour | null) => tour?.track === "campaign" && tour.step === 5 ? tour.clockUntil : undefined;
+
 /** What started a walkthrough: the first visit, resuming a fresh run, a new company, the menu or the home screen. */
 export type TourStart = "first_visit" | "resume" | "new_company" | "menu" | "home";
 
@@ -277,6 +280,8 @@ interface Store {
   act: (action: Action) => boolean;
   advance: () => void;
   tick: (dt: number) => void;
+  /** Guided Mode: pause the clock and advance exactly `count` game seconds, stopping early where running would. */
+  stepSeconds: (count: number) => void;
   select: (id: EquipmentId | null) => void;
   hover: (id: EquipmentId | null) => void;
   setAffected: (ids: EquipmentId[]) => void;
@@ -339,6 +344,12 @@ function requiredAcknowledgement(c: Campaign): Action["type"] | null {
   return c.openingMilestone && !c.openingMilestone.acknowledged ? "acknowledge_milestone" : null;
 }
 const awaitingAcknowledgement = (c: Campaign) => requiredAcknowledgement(c) !== null;
+/** Whether Guided Mode's clock may move now, by Run or by a manual step: never behind a guide, a pause-only view or an acknowledgement. */
+export function campaignClockAvailable(s: { game: GameState; started: boolean; tour: Tour | null; view: View }): boolean {
+  const c = s.game.campaign;
+  return !!c && s.started && !walkthroughHoldsClock(s) && !awaitingAcknowledgement(c) && !["menu", "tech", "scorecard"].includes(s.view ?? "")
+    && (s.game.phase === "management" || s.game.phase === "incident");
+}
 /** The run in a stored Campaign save, for naming its backup when that save is not the active game. */
 function storedRunId(raw: string): string {
   try { const runId = (JSON.parse(raw) as { runId?: unknown }).runId; return typeof runId === "string" ? runId : "unreadable"; }
@@ -923,7 +934,7 @@ export const useGame = create<Store>()((set, get) => {
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
         if(whole===0)return;
-        const until = get().tour?.track === "campaign" && get().tour?.step === 5 ? get().tour?.clockUntil : undefined;
+        const until = runLessonLimit(get().tour);
         const result=advanceSteps(game,until == null ? whole : Math.min(whole, Math.max(0, until - game.campaign.step)));
         if(result.stopReason || until != null && result.state.campaign!.step >= until)set({running:false});
         commit(result.state);
@@ -936,6 +947,17 @@ export const useGame = create<Store>()((set, get) => {
       const due = now - lastIncidentSave > 2000;
       if (due) lastIncidentSave = now;
       commit(next, { save: ended || due });
+    },
+
+    stepSeconds: (count) => {
+      const s = get(), { game } = s;
+      if (!game.campaign || !campaignClockAvailable(s) || !Number.isSafeInteger(count) || count <= 0) return;
+      // A manual step replaces auto-run, and any part-second credit belongs to the run it came from.
+      if (s.running) set({ running: false });
+      set({ remainderMs: 0 });
+      // Chapter 0's Run lesson lets time reach its limit and no further, by Run or by a step.
+      const until = runLessonLimit(s.tour);
+      commit(advanceSteps(game, until == null ? count : Math.min(count, Math.max(0, until - game.campaign.step))).state);
     },
 
     select: id => set({...(id ? {panelOpen:true} : {}),selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null,...(id?floorPatch(floorOf(id),"select"):{})}),

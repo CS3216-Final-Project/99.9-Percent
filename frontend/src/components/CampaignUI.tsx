@@ -19,6 +19,7 @@ import TechTree from "./TechTree";
 import { AccountSection, CloudSavesSection } from "./Account";
 import { FinanceEntry } from "./CampaignFinance";
 import { AppHealthEntry } from "./CampaignAppHealth";
+import { ApplicationInstances } from "./CampaignEvidence";
 import { CampaignUnavailable, CampaignDecisionButton } from "./CampaignInfrastructure";
 import { INFRASTRUCTURE_TIPS } from "@/game/infrastructureHelp";
 import { HomeScreen } from "./HomeScreen";
@@ -28,7 +29,7 @@ import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest, type ChapterCompletion } from "@/game/persist";
 import { money, num } from "@/game/format";
 import { useState } from "react";
-import { inspectOrSelect, useGame, walkthroughHoldsClock } from "@/game/store";
+import { campaignClockAvailable, inspectOrSelect, useGame, walkthroughHoldsClock } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { AvatarSettings } from "./AvatarPicker";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
@@ -182,23 +183,20 @@ export function CampaignPanel() {
           {OFFICE_EVIDENCE[office].text}
         </Callout></div>}
         {unlocked && selected === "app" && <details className="more" open><summary>Application instances · {c.routing.mode} routing</summary>
-          <section aria-label="Application instances"><p className="muted">Load balancer: {c.loadBalancer?"Deployed":"Not deployed"}. Receiving new traffic: {recipients.map(appName).join(", ") || "None"}.</p>
-            <div className="instance-choices">{c.apps.map(a=>{const x=m.instances?.find(x=>x.id===a.id),receiving=recipients.includes(a.id);return <button key={a.id} className={`chip${selected==="app"&&selectedAppId===a.id?" is-selected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} {...tipProps(`Capacity ${a.capacity} req/s; backlog ${a.backlog}. ${receiving?"Receiving traffic":"Installed - not receiving traffic"}`)} onClick={()=>inspectOrSelect("app",a.id)}>{appName(a.id)}: {receiving?"Receiving traffic":"Installed - not receiving traffic"}{x&&<span>{x.demand}/{x.capacity} req/s · processed {x.processed} · backlog {x.backlog}</span>}</button>;})}</div>
-            {c.apps.filter(a=>!a.routed).map(a=><p role="note" aria-label={`${appName(a.id)} routing status`} key={a.id}>Installed capacity does not receive traffic until routing includes this app.</p>)}
-          </section></details>}
+          <ApplicationInstances campaign={c} recipients={recipients} selectedAppId={selectedAppId} onSelect={id=>inspectOrSelect("app",id)} /></details>}
       </div>
       <h4 className="step-head">Actions</h4>
       <ul className="actions">
-        <li><Act label="Add server" price={Q.appCostCents / 100} note={`${Q.appDelay} game seconds`} disabled={disabled || busy || c.apps.length >= (c.spikeStage ? T.maximum : Q.maxApps) || c.cashCents <= Q.appCostCents} tip="Adds installed application capacity. Without routing, a new server does not receive traffic." decision={{ type: "add_server" }} onClick={() => act({ type: "add_server" })} /></li>
-        <li><Act label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbUpgrade?`${dbUpgrade.delay} game seconds · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next Guided Mode stage."} decision={{ type: "start_db_upgrade" }} onClick={() => act({ type: "start_db_upgrade" })} /></li>
-        <li><Act label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} game second`} disabled={disabled || admissionPending} tip="Changes admitted traffic at the next game second. Rejected requests earn no revenue." decision={{ type: "set_traffic_limit", enabled: c.limit === null }} onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
+        <li><Act icon="server" label="Add server" price={Q.appCostCents / 100} note={`${Q.appDelay} game seconds`} disabled={disabled || busy || c.apps.length >= (c.spikeStage ? T.maximum : Q.maxApps) || c.cashCents <= Q.appCostCents} tip="Adds installed application capacity. Without routing, a new server does not receive traffic." decision={{ type: "add_server" }} onClick={() => act({ type: "add_server" })} /></li>
+        <li><Act icon="database" label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbUpgrade?`${dbUpgrade.delay} game seconds · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next Guided Mode stage."} decision={{ type: "start_db_upgrade" }} onClick={() => act({ type: "start_db_upgrade" })} /></li>
+        <li><Act icon="limit" label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} game second`} disabled={disabled || admissionPending} tip="Changes admitted traffic at the next game second. Rejected requests earn no revenue." decision={{ type: "set_traffic_limit", enabled: c.limit === null }} onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
       </ul>
       {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={installPending(c)} />}
       {unlocked && <section aria-label="Scaling controls" className="scaling-controls">
         <h4 className="step-head">Scale and route</h4>
         <ul className="actions">
-          <li><Act label={`Scale up ${appName(selectedApp.id)}`} price={P.appCostCents/100} note={`${P.appDelay} game seconds`} disabled={disabled||busy||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip="Increases only the selected application's capacity. Database capacity stays unchanged." decision={{type:"scale_up",appId:selectedApp.id}} onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>
-          <li><Act label="Deploy load balancing" price={P.lbCostCents/100} note={`${P.lbDelay} game seconds`} disabled={disabled||busy||c.loadBalancer||c.cashCents<=P.lbCostCents} tip="Installs a load balancer. Traffic changes only after you explicitly configure routing." decision={{type:"deploy_load_balancer"}} onClick={()=>act({type:"deploy_load_balancer"})}/></li>
+          <li><Act icon="scaleUp" label={`Scale up ${appName(selectedApp.id)}`} price={P.appCostCents/100} note={`${P.appDelay} game seconds`} disabled={disabled||busy||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip="Increases only the selected application's capacity. Database capacity stays unchanged." decision={{type:"scale_up",appId:selectedApp.id}} onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>
+          <li><Act icon="shuffle" label="Deploy load balancing" price={P.lbCostCents/100} note={`${P.lbDelay} game seconds`} disabled={disabled||busy||c.loadBalancer||c.cashCents<=P.lbCostCents} tip="Installs a load balancer. Traffic changes only after you explicitly configure routing." decision={{type:"deploy_load_balancer"}} onClick={()=>act({type:"deploy_load_balancer"})}/></li>
         </ul>
         <details className="more"><summary>Configure routing · {routeName(c)}</summary>
         <fieldset className="route-choice" disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Send traffic to · changes next game second</legend>
@@ -210,8 +208,8 @@ export function CampaignPanel() {
         <h4 className="step-head"><Icon name={EQUIPMENT_ICON.cache} size={16} />Data strategy</h4>
         <p>Workload: {c.dataStage.consumed?(c.combinedStage?combinedProfile(c):c.dataStage.profile):"Waiting for workload growth"}. {c.dataStage.dueStep!==null&&!c.dataStage.consumed?`Growth due at game second ${c.dataStage.dueStep} while ready.`:""}</p>
         <ul className="actions">
-          <li><Act label="Deploy Read Cache" price={D.cacheCostCents/100} note={`${D.cacheDelay} game seconds`} disabled={disabled||busy||!!c.readCache||c.cashCents<=D.cacheCostCents} tip="Activates cold. Only eligible reads can hit; misses and writes still reach the database." decision={{type:"deploy_cache"}} onClick={()=>act({type:"deploy_cache"})}/></li>
-          <li><Act label={`Tune cache ceiling to ${D.tunedTarget/100}%`} price={D.tuningCostCents/100} note={`${D.tuningDelay} game seconds`} disabled={disabled||busy||!c.readCache||c.readCache.tuned||c.cashCents<=D.tuningCostCents} tip="Raises only the hit-rate ceiling; preserves warmth, warm-up speed and upkeep. Requires a deployed, untuned cache." decision={{type:"tune_cache"}} onClick={()=>act({type:"tune_cache"})}/></li>
+          <li><Act icon="bolt" label="Deploy Read Cache" price={D.cacheCostCents/100} note={`${D.cacheDelay} game seconds`} disabled={disabled||busy||!!c.readCache||c.cashCents<=D.cacheCostCents} tip="Activates cold. Only eligible reads can hit; misses and writes still reach the database." decision={{type:"deploy_cache"}} onClick={()=>act({type:"deploy_cache"})}/></li>
+          <li><Act icon="sliders" label={`Tune cache ceiling to ${D.tunedTarget/100}%`} price={D.tuningCostCents/100} note={`${D.tuningDelay} game seconds`} disabled={disabled||busy||!c.readCache||c.readCache.tuned||c.cashCents<=D.tuningCostCents} tip="Raises only the hit-rate ceiling; preserves warmth, warm-up speed and upkeep. Requires a deployed, untuned cache." decision={{type:"tune_cache"}} onClick={()=>act({type:"tune_cache"})}/></li>
         </ul>
         <details className="more"><summary>Observe another workload</summary>
           <CampaignDecisionButton className="btn" disabled={disabled||!c.dataStage.consumed||c.dataStage.contrastConsumed||!!c.spikeStage||!canEnterData(game)} decision={{type:"contrast_workload"}} onClick={()=>act({type:"contrast_workload"})}>Observe contrasting workload</CampaignDecisionButton>
@@ -239,8 +237,8 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
   </Callout>
   <p role="status">Controller: {a?(a.enabled?"Enabled":"Disabled"):"Not deployed"}. {a?.blockedReason??""}</p>
   <ul className="actions">
-   <li><Act label="Unlock autoscaling" note="1 research point" noteIcon="bulb" disabled={disabled||!!d.researchSpent} tip="Spend the data-readiness point to unlock this capability. Deployment is a separate purchase." decision={{type:"unlock_autoscaling"}} onClick={()=>act({type:"unlock_autoscaling"})}/></li>
-   <li><Act label="Deploy autoscaling" price={T.controllerCostCents/100} note={`${T.controllerDelay} game seconds`} disabled={disabled||busy||!d.researchSpent||!!a||!c.loadBalancer||c.routing.mode!=="balanced"||c.routing.targets.length<2||c.cashCents<=T.controllerCostCents} tip="Requires balanced routing to at least two apps. Controller upkeep is $100 per operating week, including while disabled." decision={{type:"deploy_autoscaler"}} onClick={()=>act({type:"deploy_autoscaler"})}/></li>
+   <li><Act icon="lock" label="Unlock autoscaling" note="1 research point" noteIcon="bulb" disabled={disabled||!!d.researchSpent} tip="Spend the data-readiness point to unlock this capability. Deployment is a separate purchase." decision={{type:"unlock_autoscaling"}} onClick={()=>act({type:"unlock_autoscaling"})}/></li>
+   <li><Act icon="scale" label="Deploy autoscaling" price={T.controllerCostCents/100} note={`${T.controllerDelay} game seconds`} disabled={disabled||busy||!d.researchSpent||!!a||!c.loadBalancer||c.routing.mode!=="balanced"||c.routing.targets.length<2||c.cashCents<=T.controllerCostCents} tip="Requires balanced routing to at least two apps. Controller upkeep is $100 per operating week, including while disabled." decision={{type:"deploy_autoscaler"}} onClick={()=>act({type:"deploy_autoscaler"})}/></li>
    {a&&<li><button className="btn" disabled={disabled} aria-pressed={a.enabled} onClick={()=>act({type:"set_autoscaling",enabled:!a.enabled})}>{a.enabled?"Disable autoscaling":"Enable autoscaling"}</button></li>}
   </ul>
   <details className="more"><summary>Controller evidence and costs</summary>
@@ -254,9 +252,13 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
  </section>;
 }
 
+/** Manual steps beside Run: one game second to watch a decision land, five to see a trend. */
+const STEPS = [{ count: 1, icon: "step" }, { count: 5, icon: "stepMany" }] as const;
+
 export function CampaignControls() {
-  const { game, running, setRunning } = useGame();
+  const { game, running, setRunning, stepSeconds } = useGame();
   const held = useGame(walkthroughHoldsClock);
+  const steppable = useGame(campaignClockAvailable);
   const active = useGame(s=>s.started) && !held && pendingStop(game.campaign) === null && !(game.campaign!.openingMilestone && !game.campaign!.openingMilestone.acknowledged) && (game.phase === "management" || game.phase === "incident");
   return <footer className={`bottombar controls-dock campaign-clock${running?" is-running":" is-paused"}`}>
     <ViewTabs tabs={[
@@ -272,6 +274,11 @@ export function CampaignControls() {
         <span className="visually-hidden" aria-hidden="true" data-testid="physical-step">{game.campaign!.step}</span>
       </div>
       <TimeMenu />
+      <div className="dock-steps" role="group" aria-label="Step time">
+        {STEPS.map(({ count, icon }) => <button type="button" key={count} className="dock-step" aria-label={`Step ${count} game ${count === 1 ? "second" : "seconds"}`}
+          {...tipProps(held ? "Finish the walkthrough to run the company" : `Pause and advance exactly ${count} game ${count === 1 ? "second" : "seconds"}${count === 1 ? " (N)" : ""}`)}
+          disabled={!steppable} onClick={() => stepSeconds(count)}><Icon name={icon} size={16} /><span>+{count}s</span></button>)}
+      </div>
       <button type="button" className={`btn btn-primary campaign-play dock-primary${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps(held ? "Finish the walkthrough to run the company" : "Run or pause the company (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /><span>{running ? "Pause" : "Run"}</span></button>
       <span className="visually-hidden" role="status">{running ? "Running" : "Paused"}</span>
     </div>
@@ -533,10 +540,10 @@ function ReliabilityControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
     <p role="status">{!f?"Prepare, then explicitly start the reliability test.":f.startedStep===null?"Reliability test scheduled. Run to observe it.":f.restoredStep===null?`${appName(f.targetId)} failed. Inspect health, surviving capacity and routing.`:"Application restored. Observe stable service."} Stable after restoration: {c.combinedStage?.currentRound?.stableSteps??d.stableSteps} / {Q.stableSteps}.</p>
     {c.spikeStage?.controller&&f&&!d.acknowledged&&<p className="muted">Autoscaling waits while the reliability test runs; its enabled state and upkeep are preserved.</p>}
     <ul className="actions">
-      <li><Act label="Deploy Health Checks" tour="deploy-checks" price={R.checksCostCents/100} note="2 game seconds" disabled={checksUnavailable} tip="Requires its research unlock and available cash. Detects health changes; load balancing is required for routing exclusion." decision={{type:"deploy_health_checks"}} onClick={()=>act({type:"deploy_health_checks"})} /></li>
-      <li><Act label="Install spare" price={R.spareCostCents/100} note="2 game seconds" disabled={spareUnavailable} tip="Requires Spare Application research, available cash and a free instance slot. A spare receives no traffic until promoted." decision={{type:"install_spare"}} onClick={()=>act({type:"install_spare"})} /></li>
-      <li><Act label="Deploy Automatic Failover" price={R.failoverCostCents/100} note="2 game seconds" disabled={failoverUnavailable} tip="Requires its research unlock, deployed Health Checks and Load Balancing, a healthy reserved spare and available cash. Creates no capacity." decision={{type:"deploy_failover"}} onClick={()=>act({type:"deploy_failover"})} /></li>
-      {d.failover&&<li><Act label={d.failover.enabled?"Disable failover":"Enable failover"} price={0} disabled={disabled} decision={{type:"set_failover",enabled:!d.failover!.enabled}} onClick={()=>act({type:"set_failover",enabled:!d.failover!.enabled})} /></li>}
+      <li><Act icon="checkbox" label="Deploy Health Checks" tour="deploy-checks" price={R.checksCostCents/100} note="2 game seconds" disabled={checksUnavailable} tip="Requires its research unlock and available cash. Detects health changes; load balancing is required for routing exclusion." decision={{type:"deploy_health_checks"}} onClick={()=>act({type:"deploy_health_checks"})} /></li>
+      <li><Act icon="plug" label="Install spare" price={R.spareCostCents/100} note="2 game seconds" disabled={spareUnavailable} tip="Requires Spare Application research, available cash and a free instance slot. A spare receives no traffic until promoted." decision={{type:"install_spare"}} onClick={()=>act({type:"install_spare"})} /></li>
+      <li><Act icon="switch" label="Deploy Automatic Failover" price={R.failoverCostCents/100} note="2 game seconds" disabled={failoverUnavailable} tip="Requires its research unlock, deployed Health Checks and Load Balancing, a healthy reserved spare and available cash. Creates no capacity." decision={{type:"deploy_failover"}} onClick={()=>act({type:"deploy_failover"})} /></li>
+      {d.failover&&<li><Act icon="switch" label={d.failover.enabled?"Disable failover":"Enable failover"} price={0} disabled={disabled} decision={{type:"set_failover",enabled:!d.failover!.enabled}} onClick={()=>act({type:"set_failover",enabled:!d.failover!.enabled})} /></li>}
     </ul>
     <div className="instance-choices">{c.apps.map(a=><div key={a.id} className="chip">
       <span>{appName(a.id)} · {a.health??"healthy"} · detected {a.detectedHealth??"unknown"} · {a.role??"serving"} · {recipients.includes(a.id)?"receiving traffic":"not receiving traffic"}</span>

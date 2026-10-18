@@ -388,6 +388,9 @@ export default function Game() {
         else if (s.selected && s.game.phase !== "incident") s.select(null);
       } else if (e.key === "p" || e.key === "P") {
         if (s.game.phase === "incident" || s.game.phase === "management") s.setRunning(!s.running);
+      } else if ((e.key === "n" || e.key === "N") && s.game.campaign && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Guided Mode steps one game second; the store refuses wherever Run would.
+        s.stepSeconds(1);
       }
     };
     window.addEventListener("keydown", onKey);

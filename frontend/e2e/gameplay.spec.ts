@@ -29,8 +29,9 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       await expect(dbReveal).toBeVisible();
       await dbReveal.getByRole("button", { name: "Return to room" }).click();
       await expect(panel.getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");
-      const evidence=panel.locator(".campaign-evidence .rows");
+      const evidence=panel.locator(".campaign-evidence .evidence-rows");
       await expect(evidence.locator("dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
+      await expect(panel.getByRole("progressbar", { name: "Database load: 800 of 600 operations/s" })).toBeVisible();
       await expect(panel.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
       await expect(panel.getByText("Live", { exact: true })).toBeVisible();
       await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
