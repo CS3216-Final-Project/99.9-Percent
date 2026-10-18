@@ -85,6 +85,29 @@ test("in first person a click takes the mouse and does nothing else, and Escape 
   await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
 });
 
+test("a new graphics quality in follow redraws the room and leaves the overview turning as before", async ({ page }) => {
+  await open(page);
+  await stage(page).focus();
+  await page.keyboard.press("v");
+  await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menu" });
+  await menu.getByRole("tab", { name: "Graphics" }).click();
+  await menu.getByRole("radio", { name: "Low" }).check();
+  await menu.getByRole("button", { name: "Close" }).click();
+  // The new canvas picks up the view from the avatar it was in.
+  await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
+  await stage(page).focus();
+  await page.keyboard.press("Escape");
+  await expect(stage(page)).toHaveAttribute("data-camera", "overview");
+  // The overview's own controls still turn the new canvas's camera.
+  const label = page.locator('.eq-label[data-eq="db"]');
+  await expect(label).toBeVisible();
+  const before = (await label.boundingBox())!;
+  await page.keyboard.press("e");
+  await expect.poll(async () => Math.abs(((await label.boundingBox())?.x ?? before.x) - before.x)).toBeGreaterThan(20);
+});
+
 test("the first-person view picks up again after a reload, with walk mode", async ({ page }) => {
   await open(page);
   await page.locator(".view-mode-menu > summary").click();

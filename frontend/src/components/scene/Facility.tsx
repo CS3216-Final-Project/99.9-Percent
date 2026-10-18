@@ -157,9 +157,13 @@ function viewOf(target: THREE.Vector3, camera: THREE.Camera): SavedCameraView {
 
 function CameraRig({ footprints, built, floor, mode }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean>; floor: Floor; mode: GameMode }) {
   const controls = useRef<MapControlsImpl>(null);
-  // Always the overview's orthographic camera, even while a view from the avatar draws with another.
+  // Always the overview's orthographic camera, even while a view from the avatar draws with another: the canvas's
+  // own while it draws (a new canvas, after a change of quality, has a new one), else the one kept for it.
   const get = useThree((s) => s.get);
-  const [camera] = useState(() => cameras.overview ?? (get().camera as THREE.OrthographicCamera));
+  const [camera] = useState(() => {
+    const drawing = get().camera as THREE.OrthographicCamera;
+    return drawing.isOrthographicCamera ? drawing : (cameras.overview ?? drawing);
+  });
   // The overview's controls rest while a view from the avatar is on.
   const resting = useGame((s) => s.walking && s.viewpoint !== "overview");
   /** The player has panned, zoomed or dragged the view, so it no longer follows the facility. */

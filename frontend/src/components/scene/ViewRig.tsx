@@ -129,11 +129,15 @@ function turnFor(dt: number, instant: boolean): void {
 
 export function ViewRig() {
   const set = useThree((s) => s.set);
+  const get = useThree((s) => s.get);
   const gl = useThree((s) => s.gl);
   const fov = useGame((s) => s.graphics.fov);
 
-  // A new room starts from the overview, and hands the canvas back its own camera, and the pointer, when it goes.
+  // A new room starts from the overview, keeping its canvas's own camera for it, and hands that camera back, and the
+  // pointer, when it goes.
   useEffect(() => {
+    const own = get().camera as THREE.OrthographicCamera;
+    if (own.isOrthographicCamera) cameras.overview = own;
     resetRig();
     return () => {
       letGoOfPointer();
@@ -141,7 +145,7 @@ export function ViewRig() {
       resetRig();
       setViewFade(0);
     };
-  }, [set]);
+  }, [set, get]);
 
   // Looking round: drag on the room, or with the pointer locked, move the mouse. A click in first person takes the
   // pointer, and that click does nothing else; Escape lets go without ending walk mode.
