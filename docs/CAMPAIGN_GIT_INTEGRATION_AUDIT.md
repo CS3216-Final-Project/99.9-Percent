@@ -1,5 +1,19 @@
 # Campaign Git integration audit
 
+## PR #119 native graphics follow-up
+
+Corrective commit `79b28e8cb5b1db665ca9489cf95d5a152c28ccfb` resolved both original failures. Its [complete CI run 39129068626](https://github.com/CS3216-Final-Project/99.9-Percent/actions/runs/39129068626) finished with **231 browser cases passed / one flaky case**, not a green sweep. Nine browser shards, frontend static/coverage, all 25 balance tests and all 61 backend tests passed. Shard 6 correctly failed under the unchanged fail-on-flaky policy: the native graphics case failed once, then passed its diagnostic retry.
+
+The exact additional case was `Auto draws Medium on a graphics card: the screen's normal pixel size, not High's sharper canvas` in `mobile.spec.ts`. Error: `Test timeout of 60000ms exceeded`; Menu tap repeatedly intercepted by the legitimate Hint offer's `.modal-backdrop`. The original unchanged test passed locally in **29.5 seconds**, with CI flags, production preview, real WebGL and a native clock. This is another test/modal race exposed by software rendering, not evidence of a changed graphics rule.
+
+The follow-up retains native frames for renderer detection and pixel adaptation. After the existing pixel-ratio assertions, it observes the real automatic offer and declines through the public No action, checking the complete saved company is unchanged. The one-time-per-stage dismissal prevents the offer racing Menu. The new 20-second offer assertion accommodates the real 15-second eligibility interval; the original 60-second test budget, all existing assertions, retries, graphics profiles and WebGL room are unchanged. No global dismissal handler or hidden state mutation is introduced. Only this browser case and this audit change in the follow-up commit.
+
+The broad local frontend unit selection also completed successfully on the unchanged runtime: **1,179 passed / one existing opt-in diagnostic skipped**, 104 passed files / one skipped file, **694.49 seconds**, one worker. Command: `npm test -- --maxWorkers=1 --exclude='src/sim/__tests__/balanceBounds*.test.ts'`. The separate CI balance job covers those exhaustive bounds. Existing third-party source-map/Three.js deprecation warnings were retained; they did not fail validation.
+
+Follow-up local browser verification passed both the graphics and touch evidence cases in **116.09 seconds**, zero failures/retries/skips. Graphics took 47.3 seconds within its original 60-second budget; the test deliberately observed and dismissed the native-clock offer. Node 22, `CI=true`, one worker, real WebGL, no development server or unit run competing with the browsers. Exact command: `node node_modules/@playwright/test/cli.js test mobile.spec.ts --project=mobile-chromium --grep 'Auto draws Medium on a graphics card|inspects evidence and advances a physical step on touch' --trace=on --output=../test-results/pr119-ci/graphics-correction-artifacts`.
+
+Frontend lint, typecheck and production build passed again after the follow-up. Runtime and unit-test files are unchanged; the completed 1,179-test local selection and the first corrective run's full coverage/balance/backend results apply to identical runtime source. Fresh required CI will run after the normal follow-up push.
+
 ## PR #119 browser CI correction
 
 The original published head was `dae2a844e7d6cf06b49636081d6c2a3d281a2499`, containing implementation `ac92e90` and this audit. Direct inspection of [CI run 39124583467](https://github.com/CS3216-Final-Project/99.9-Percent/actions/runs/39124583467) found two failing browser jobs. Static checks/coverage, balance, backend and eight browser shards passed. The required `frontend` aggregate failed because its browser dependency failed. Main remained `5cd86d3d6548dfcd99ab44c9978eacc085f3677f`; the PR was mergeable, with no reviews or review threads.

@@ -471,6 +471,10 @@ test("Auto draws Medium on a graphics card: the screen's normal pixel size, not 
   // High would draw 1.75 pixels per CSS pixel on this screen; Medium draws one, or a little fewer if the frame rate falls.
   await expect.poll(() => canvas.evaluate(el => (el as HTMLCanvasElement).width / (el as HTMLCanvasElement).clientWidth)).toBeLessThanOrEqual(1.01);
   expect(await canvas.evaluate(el => (el as HTMLCanvasElement).width / (el as HTMLCanvasElement).clientWidth)).toBeGreaterThanOrEqual(0.74);
+  // Renderer selection needs native frames. Observe and decline the real idle
+  // offer once so it cannot race Menu while software shaders are compiling.
+  await expect(page.getByRole("dialog", { name: "Need a little help?", exact: true })).toBeVisible({ timeout: 20_000 });
+  await declineIdleHint(page);
   await page.getByRole("button", { name: "Menu", exact: true }).tap();
   await page.getByRole("tab", { name: "Graphics" }).tap();
   await expect(page.getByRole("radio", { name: "Auto" })).toBeChecked();
