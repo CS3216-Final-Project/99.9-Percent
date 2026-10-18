@@ -3,7 +3,7 @@ import { applyAction, newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 function act(g: GameState, action: Parameters<typeof applyAction>[1]) { const r = applyAction(g, action); if (!r.ok) throw Error(r.message); return r.state; }
 
-for (const width of [1440, 390]) test(`A completed player can exit Chapter 0 behind an incident at ${width}px`, async ({ page }) => {
+for (const width of [1440, 390]) test(`A saved Chapter 0 replay resumes as visible practice during an incident at ${width}px`, async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width, height: 900 });
   await page.route("**/api/**", route => route.abort());
@@ -12,15 +12,11 @@ for (const width of [1440, 390]) test(`A completed player can exit Chapter 0 beh
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
-  await expect(tutorial(page)).toHaveCount(0);
-  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Getting started");
-  await page.getByRole("button", { name: "View chapters", exact: true }).click();
-  const chapters = page.getByRole("dialog", { name: "Guided Mode chapters" });
-  await expect(chapters.getByRole("listitem").filter({ hasText: "Getting started" })).toContainText("Replaying");
-  await expect(chapters.getByRole("listitem").filter({ hasText: "Opening" })).toContainText("Available next");
-  await page.screenshot({ path: `test-results/chapter-zero-exit-${width}.png` });
-  await chapters.getByRole("button", { name: "Exit Chapter 0", exact: true }).click();
-  await expect(chapters).toBeHidden();
+  await expect(tutorial(page)).toHaveAccessibleName("Tutorial, step 1 of 21");
+  await expect(tutorial(page)).toContainText("Practice · In progress · Lesson 1 of 21");
+  await expect(tutorial(page).getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+  await page.screenshot({ path: `test-results/chapter-zero-practice-${width}.png` });
+  await tutorial(page).getByRole("button", { name: "Exit Chapter 0", exact: true }).click();
   await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
   expect((await savedGame(page)).campaign).toEqual(incident.campaign);
@@ -206,4 +202,40 @@ test("entering Scaling & Routing shows its guide once, on the controls the chapt
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expect(page.getByRole("region", { name: "Scaling controls" })).toBeVisible();
   await expect(guide).toHaveCount(0);
+});
+
+for (const width of [1440, 390]) test(`How to play restarts all 21 lessons during an incident and returns to the saved company at ${width}px`, async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width, height: 900 });
+  await page.route("**/api/**", route => route.abort());
+  const company = advanceSteps(newGame(1, "how-to-play-incident"), 6).state;
+  await seedSave(page, company);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expectRoom(page);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("button", { name: "How to play", exact: true }).click();
+  const card = tutorial(page);
+  await expect(card).toHaveAccessibleName("Tutorial, step 1 of 21");
+  await expect(card).toContainText("Practice · In progress · Lesson 1 of 21");
+  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+  await expect(page.getByTestId("physical-step")).toHaveText("0");
+  expect((await savedGame(page)).campaign).toEqual(company.campaign);
+  await page.screenshot({ path: `test-results/how-to-play-practice-${width}.png` });
+  for (let lesson = 1; lesson < 8; lesson++) await nextChapterZero(page);
+  await card.getByRole("button", { name: "Save and exit", exact: true }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expect(card).toHaveAccessibleName("Tutorial, step 8 of 21");
+  await expectRoom(page);
+  await finishChapterZero(page);
+  await expect(card).toHaveCount(0);
+  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
+  await expect(page.getByTestId("physical-step")).toHaveText("6");
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
+  expect((await savedGame(page)).campaign).toEqual(company.campaign);
+  await page.getByRole("button", { name: "View chapters", exact: true }).click();
+  const chapter = page.getByRole("dialog", { name: "Guided Mode chapters" }).getByRole("listitem").filter({ hasText: "Getting started" });
+  await expect(chapter).toContainText("Completed");
+  await page.screenshot({ path: `test-results/how-to-play-returned-${width}.png` });
 });

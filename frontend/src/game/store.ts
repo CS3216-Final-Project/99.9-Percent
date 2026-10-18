@@ -2,6 +2,7 @@
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
 import { finishedChapter } from "./campaignChapters";
+import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
 import type { Campaign } from "@/sim/campaignTypes";
 
@@ -214,6 +215,8 @@ interface Store {
   generation: number;
   /** Explicit tutorial restarts reset exercise acknowledgements without replacing the company. */
   tutorialAttempt: number;
+  /** The paused company to return to after an optional Chapter 0 practice session. */
+  tutorialCompany: TutorialCompany | null;
   lastAction: LastAction | null;
   /** Only the player's own starts and introduction steps: loading, importing and resuming leave it empty. */
   lastIntro: LastIntro | null;
@@ -346,6 +349,12 @@ export const useGame = create<Store>()((set, get) => {
     if(s.mode === "classic") return saveClassicGame(s.game);
     if(s.saveBlocked)return false;
     if(!s.hasRun)return true;
+    if (s.tutorialCompany) {
+      const saved = saveTutorialPractice(s.tutorialCompany.game.campaign!.runId, s, s.tour?.step ?? s.meta.walkthroughStep ?? 0, s.meta.walkthroughFurthestStep ?? 0);
+      if (!saved) s.notify("Practice progress could not be saved. Your company save is unchanged.", "error");
+      if (saved && archiveEvents(s.measurement.pending)) set({measurement:{...s.measurement,pending:[]}});
+      return saved;
+    }
     const saved=saveGame(s.game,s.remainderMs,explicitReset,s.measurement);
     try { if (saved) checkpointCloud(makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement)); }
     catch { s.notify("Saved in this browser, but its cloud copy could not be kept. Download a backup from Menu, Saves before replacing this company.","error"); return false; }
@@ -403,7 +412,7 @@ export const useGame = create<Store>()((set, get) => {
     const replaying = meta.tutorialDone && meta.walkthroughStep !== null;
     if (!replaying && (meta.tutorialDone || chapterTourOf(game.campaign!))) return null;
     const step = Math.min(meta.walkthroughStep ?? 0, lastStep("campaign"));
-    return { track: "campaign", step, ...(step === 5 ? { clockUntil: game.campaign!.step + 1 } : {}) };
+    return { track: "campaign", step, ...(step === 5 ? { clockUntil: get().tutorialCompany ? 1 : game.campaign!.step + 1 } : {}) };
   }
   /** The change that takes the view to `floor`, recorded for the analytics; nothing if it is there already. */
   function floorPatch(floor: Floor, how: FloorSwitch): Partial<Store> {
@@ -564,7 +573,7 @@ export const useGame = create<Store>()((set, get) => {
     const exploration = loadExploration(mode);
     const urlFloor = typeof window === "undefined" ? null : floorFromSearch(window.location.search);
     const fresh: Partial<Store> = {
-      hasRun: false, measurement: emptyMeasurement(), activeMark: null,
+      hasRun: false, measurement: emptyMeasurement(), activeMark: null, tutorialCompany: null,
       ready: true,
       mode,
       started,
@@ -617,7 +626,10 @@ export const useGame = create<Store>()((set, get) => {
     }
     const loaded = loadGame();
     if (loaded.status === "ok") {
-      set({ ...fresh, started: false, hasRun: true, game: loaded.game, remainderMs: loaded.remainderMs, measurement: loaded.measurement });
+      const practice = meta.tutorialDone && meta.walkthroughStep !== null ? loadTutorialPractice(loaded.game.campaign!.runId) : null;
+      set({ ...fresh, started: false, hasRun: true, game: loaded.game, remainderMs: loaded.remainderMs, measurement: loaded.measurement,
+        ...(practice ? { game: practice.game, remainderMs: practice.remainderMs, measurement: practice.measurement,
+          tutorialCompany: { game: loaded.game, remainderMs: loaded.remainderMs, measurement: loaded.measurement }, meta: { ...meta, walkthroughStep: practice.step, walkthroughFurthestStep: practice.furthest } } : {}) });
     } else {
       set({ ...fresh, started: false, game: newGame(BALANCE.introSeed), saveBlocked: loaded.status !== "none" });
       if (loaded.status !== "none") get().notify("Existing save could not be loaded. It has been preserved. Export it from the menu before explicitly starting a new company.", "error");
@@ -640,7 +652,7 @@ export const useGame = create<Store>()((set, get) => {
     catch(error){return error instanceof AccountApiError?error.message:'Accounts are unavailable right now. You can keep playing; progress saves in this browser.';}
     finally{set({cloudBusy:false});}
   }
-  function currentEnvelope() { const s=get();if (!s.game.campaign) throw Error("Cloud saves are for Guided Mode. Challenge Mode progress stays in this browser.");return makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement); }
+  function currentEnvelope() { const s=get().tutorialCompany ?? get();if (!s.game.campaign) throw Error("Cloud saves are for Guided Mode. Challenge Mode progress stays in this browser.");return makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement); }
   function ownSession() {const session=get().accountSession;if(!session)throw Error('Sign in first. Your local save is unchanged.');return session;}
   return {
     prepareSignIn:()=>{set({running:false});return !get().hasRun||persist();},
@@ -730,7 +742,7 @@ export const useGame = create<Store>()((set, get) => {
         rememberCloud({ownerId:session.account.id,revision:run.revision,local:e});
         if(!saveGame(game,e.runtime.remainderMs,true,e.runtime.measurement))throw Error('This browser could not store the cloud save. Your local save is unchanged.');
         saveMode("campaign");
-        set({mode:"campaign",...(s.mode==='classic'?{meta:loadMeta("campaign"),tour:null}:{}),chapterComplete:null,game,generation:get().generation+1,lastAction:null,lastIntro:null,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
+        set({tutorialCompany:null,mode:"campaign",...(s.mode==='classic'?{meta:loadMeta("campaign"),tour:null}:{}),chapterComplete:null,game,generation:get().generation+1,lastAction:null,lastIntro:null,measurement:e.runtime.measurement,remainderMs:e.runtime.remainderMs,hasRun:true,saveBlocked:false,
           running:false,started:false,onboarding:false,view:null,selected:null,selectedAppId:null,activeMark:null,cloudConflict:null,cloudStatus:'Cloud save loaded. Continue when ready.'});
         return true;
       }catch(error){accountFailure(error);return false;}finally{set({cloudBusy:false});}
@@ -744,6 +756,7 @@ export const useGame = create<Store>()((set, get) => {
     game: newGame(BALANCE.introSeed),
     generation: 0,
     tutorialAttempt: 0,
+    tutorialCompany: null,
     lastAction: null,
     lastIntro: null,
     meta: loadMetaSafe(),
@@ -804,6 +817,8 @@ export const useGame = create<Store>()((set, get) => {
       // A fresh classic run says "Play" on the title screen and a resumed one "Continue", so only the first is a start.
       if(get().mode === "classic") { set({started:true,walking:resumedWalk(),...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
       const state=get();
+      // Upgrade older saved replays to practice too, so an incident cannot hide their lessons.
+      if (state.hasRun && state.meta.tutorialDone && state.meta.walkthroughStep !== null && !state.tutorialCompany) { get().startTour("campaign", "resume"); return; }
       let game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID());
       if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended") game=applyCampaignInput(game,{type:"enter_scaling"}).state;
       const counted=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
@@ -938,6 +953,7 @@ export const useGame = create<Store>()((set, get) => {
 
     newRun: (opts = {}) => {
       if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return;}
+      if (get().tutorialCompany) get().endTour(false);
       try {if(get().hasRun && get().game.campaign)checkpointCloud(currentEnvelope());}
       catch {get().notify("Download a backup from Menu, Saves before replacing this company: its cloud copy could not be kept.","error");return;}
       if (get().mode === "campaign") {
@@ -964,7 +980,8 @@ export const useGame = create<Store>()((set, get) => {
       // A walkthrough still under way carries on into the new company.
       const tour=campaignWalkthrough(counted,game),begins=!!tour&&counted.walkthroughStep===null;
       const nextMeta=begins?{...counted,walkthroughStep:0}:counted;
-      set({game,generation:get().generation+1,lastAction:null,lastIntro:intro("begin"),measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
+      clearTutorialPractice();
+      set({game,tutorialCompany:null,generation:get().generation+1,lastAction:null,lastIntro:intro("begin"),measurement,hasRun:true,remainderMs:0,saveBlocked:false,meta:nextMeta,
         selected:null,selectedAppId:null,hovered:null,affected:[],view:null,techFocus:null,running:false,rating:null,
         onboarding:false,tour,started:true,toast:null,activeMark:document.hidden?null:performance.now()});
       if(begins)recordTour("started",tour!,{from:"new_company"});
@@ -1041,7 +1058,7 @@ export const useGame = create<Store>()((set, get) => {
       const measurement = campaign.status === "ok" ? beginSession(campaign.envelope.runtime.measurement, game, crypto.randomUUID(), new Date().toISOString()) : emptyMeasurement();
       const saved = mode === "campaign" ? saveGame(game, remainderMs, true, measurement) && archiveEvents(measurement.pending) : saveClassicGame(game);
       saveMode(mode);
-      set({ mode, importGeneration: get().importGeneration + 1, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, view: null,
+      set({ tutorialCompany: null, mode, importGeneration: get().importGeneration + 1, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, view: null,
         selected: null, hovered: null, affected: [], started: true, tour: null, chapterComplete: null, onboarding: false, techFocus: null, rating: null });
       track("save_imported", { mode, step: game.campaign?.step ?? game.turn });
       get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
@@ -1077,11 +1094,26 @@ export const useGame = create<Store>()((set, get) => {
     },
 
     startTour: (track_, from = "menu") => {
-      // Replaying Guided Mode's walkthrough keeps the company as it is, so it is not a start.
+      // Completed players practice on a fresh company; the paused original keeps its own save and measurement.
+      if (track_ === "campaign" && get().game.campaign && get().meta.tutorialDone) {
+        get().measureTime();
+        if (!persist()) return;
+        const s = get();
+        const company = s.tutorialCompany ?? { game: s.game, remainderMs: s.remainderMs, measurement: s.measurement };
+        const game = newGame(BALANCE.introSeed, crypto.randomUUID());
+        const measurement = beginSession(emptyMeasurement(), game, crypto.randomUUID(), new Date().toISOString());
+        if (!saveTutorialPractice(company.game.campaign!.runId, { game, remainderMs: 0, measurement }, 0, 0)) {
+          s.notify("Could not start practice: browser storage is unavailable. Your company is unchanged.", "error");
+          return;
+        }
+        set({ game, measurement, tutorialCompany: company, activeMark: document.hidden ? null : performance.now(), generation: s.generation + 1, remainderMs: 0,
+          lastAction: null, lastIntro: null, chapterComplete: null, selectedAppId: null, roomInspection: null,
+          affected: [], hovered: null, cameraFocus: null, techFocus: null, rating: null, toast: null });
+      }
       const campaign = !!get().game.campaign;
       const tour: Tour = { track: track_, step: 0 };
-      // Going back to the start of the walkthrough already showing is not another start.
-      const begins = get().tour?.track !== track_;
+      // A fresh practice company is a new attempt; restarting first-time lessons keeps its existing start.
+      const begins = get().tour?.track !== track_ || (track_ === "campaign" && !!get().tutorialCompany);
       const restart = campaign && track_ === "campaign";
       const meta = restart
         ? walkthroughAt({ ...get().meta, walkthroughFurthestStep: 0 }, 0)
@@ -1096,7 +1128,7 @@ export const useGame = create<Store>()((set, get) => {
       if (!tour) return;
       if (tour.track === "campaign" && tour.step >= lastStep("campaign")) return;
       const step = tour.step + 1;
-      const next: Tour = { track: tour.track, step, ...(tour.track === "campaign" && step === 5 ? { clockUntil: get().game.campaign!.step + 1 } : {}) };
+      const next: Tour = { track: tour.track, step, ...(tour.track === "campaign" && step === 5 ? { clockUntil: get().tutorialCompany ? 1 : get().game.campaign!.step + 1 } : {}) };
       set({ tour: next });
       if (!isWalkthrough(tour.track)) return;
       // Challenge Mode retains its short spotlight guide; Chapter 0 requires explicit completion.
@@ -1110,7 +1142,7 @@ export const useGame = create<Store>()((set, get) => {
       const { tour, meta } = get();
       if (tour?.track !== "campaign" || tour.step <= 0) return;
       const step = tour.step - 1;
-      set({ tour: { track: tour.track, step, ...(step === 5 ? { clockUntil: get().game.campaign!.step + 1 } : {}) }, running: false, meta: walkthroughAt(meta, step) });
+      set({ tour: { track: tour.track, step, ...(step === 5 ? { clockUntil: get().tutorialCompany ? 1 : get().game.campaign!.step + 1 } : {}) }, running: false, meta: walkthroughAt(meta, step) });
       persist();
     },
     dismissChapterComplete: () => set({ chapterComplete: null }),
@@ -1133,7 +1165,11 @@ export const useGame = create<Store>()((set, get) => {
       // A chapter's guide was recorded as seen when it appeared.
       // The incident guide holds the clock; closing it lets the incident run.
       // Only finishing a walkthrough is marked; skipping it, like its steps, stays quiet (the steps' own decisions already sound).
-      set({ tour: null, meta: next, running: tour.track === "campaign" ? false : tour.track === "incident" && game.phase === "incident" ? true : get().running, ...(completed && walkthrough ? { lastIntro: intro("finish") } : {}) });
+      const company = tour.track === "campaign" ? get().tutorialCompany : null;
+      if (company) { persist(); clearTutorialPractice(); }
+      set({ ...(company ? { ...company, tutorialCompany: null, generation: get().generation + 1, selected: null, selectedAppId: null,
+        roomInspection: null, affected: [], hovered: null, cameraFocus: null, view: null, techFocus: null, lastAction: null, toast: null, activeMark: document.hidden ? null : performance.now() } : {}),
+        tour: null, meta: next, running: tour.track === "campaign" ? false : tour.track === "incident" && game.phase === "incident" ? true : get().running, ...(completed && walkthrough ? { lastIntro: intro("finish") } : {}) });
       if (game.campaign && walkthrough) persist();
     },
     startTutorialRun: (from) => {

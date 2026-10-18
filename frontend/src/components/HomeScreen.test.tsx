@@ -88,7 +88,7 @@ it("starts a new Challenge Mode game from a Guided Mode home screen when asked",
   expect(useGame.getState().game.turn).toBe(1);
 });
 
-it("replays Guided Mode's walkthrough from its card once it is done, on the same company", () => {
+it("replays Guided Mode's walkthrough on a fresh practice company, preserving the saved company", () => {
   saveGame(advanceSteps(newGame(4, "replay-company"), 3).state, 0, true);
   let choices = boot("campaign");
   expect(within(card(choices, "Guided Mode")).queryByRole("button", { name: "Replay the tutorial" })).toBeNull();
@@ -98,7 +98,9 @@ it("replays Guided Mode's walkthrough from its card once it is done, on the same
   choices = boot("campaign");
   fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay the tutorial" }));
   expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, tour: { track: "campaign", step: 0 } });
-  expect(useGame.getState().game.campaign).toMatchObject({ runId: "replay-company", step: 3 });
+  expect(useGame.getState().game.campaign!.step).toBe(0);
+  expect(useGame.getState().tutorialCompany!.game.campaign).toMatchObject({ runId: "replay-company", step: 3 });
+  expect(loadGame()).toMatchObject({ status: "ok", game: { campaign: { runId: "replay-company", step: 3 } } });
 });
 
 it("replays Guided Mode's walkthrough from a Challenge Mode home screen, keeping both saves", () => {
@@ -111,7 +113,9 @@ it("replays Guided Mode's walkthrough from a Challenge Mode home screen, keeping
   const choices = screen.getByRole("region", { name: "Choose how you want to play" });
   fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay the tutorial" }));
   expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, tour: { track: "campaign", step: 0 } });
-  expect(useGame.getState().game.campaign!.runId).toBe("waiting-company");
+  expect(useGame.getState().tutorialCompany!.game.campaign!.runId).toBe("waiting-company");
+  expect(useGame.getState().game.campaign!.step).toBe(0);
+  expect(loadGame()).toMatchObject({ status: "ok", game: { campaign: { runId: "waiting-company", step: 3 } } });
   const kept = loadClassicGame();
   expect(kept.status === "ok" && kept.game.turn).toBe(2);
 });

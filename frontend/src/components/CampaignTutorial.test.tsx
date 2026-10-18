@@ -168,8 +168,11 @@ it("How to play clears previous exercise completion, including a restart on less
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
 });
 
-it("teaches the real save failure without trapping a player whose browser blocks storage", () => {
-  start(); renderCompany(); reach(16);
+it.each([false, true])("teaches save failure without trapping a player, practice=%s", practice => {
+  if (practice) saveMeta({ ...DEFAULT_META, tutorialDone: true });
+  start();
+  if (practice) useGame.getState().startTour("campaign");
+  renderCompany(); reach(16);
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("storage blocked"); });
   exercise();
   expect(useGame.getState().toast?.text).toBe("Could not save: browser storage is unavailable.");
@@ -203,8 +206,8 @@ it("preserves existing completed profiles", () => {
 
 it("exits a completed player's replay without finishing the lessons or buying the practice quote", () => {
   saveMeta({ ...DEFAULT_META, tutorialDone: true }); start();
-  useGame.getState().startTour("campaign"); renderCompany(); reach(7); exercise();
   const company = structuredClone(useGame.getState().game.campaign!);
+  useGame.getState().startTour("campaign"); renderCompany(); reach(7); exercise();
   fireEvent.click(current().getByRole("button", { name: "Exit Chapter 0" }));
   expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
   expect(screen.queryByRole("region", { name: "Confirm Add server" })).toBeNull();

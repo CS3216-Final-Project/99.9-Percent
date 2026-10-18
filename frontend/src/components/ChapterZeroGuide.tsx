@@ -134,7 +134,7 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
   }}>
     <header className="modal-head"><h2>Chapter 0 · Getting started</h2><div className="lesson-exit-actions"><button className="lesson-exit" onClick={() => s.endSession()}>Save and exit</button>{s.meta.tutorialDone && <button className="btn btn-small" aria-label="Exit Chapter 0" title="Exit Chapter 0" onClick={() => { s.openView(null); s.endTour(false); }}><Icon name="close" size={18} /></button>}</div></header>
     <div className="modal-body">
-      <div className="lesson-meta"><span>Lesson {index + 1} of {lessons.length}</span><span className="lesson-paused"><Icon name={s.running ? "play" : "pause"} size={14} />{s.running ? "Company running" : "Company paused"}</span></div>
+      <div className="lesson-meta"><span>{s.tutorialCompany ? "Practice · In progress · " : ""}Lesson {index + 1} of {lessons.length}</span><span className="lesson-paused"><Icon name={s.running ? "play" : "pause"} size={14} />{s.running ? "Company running" : "Company paused"}</span></div>
       <progress className="lesson-progress" aria-label="Chapter 0 progress" value={index + 1} max={lessons.length} />
       <div className="lesson-reading" ref={reading}>
         <h3 ref={heading} tabIndex={-1}>{lesson.title}</h3>
@@ -143,6 +143,7 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
         {index === 15 && ready && s.toast?.text === "Could not save: browser storage is unavailable." && <p role="status">Browser storage is unavailable. Keep this tab open to preserve this session; saving will need working browser storage.</p>}
         {index === 2 && <LessonVisual key={index} index={index} />}
         <p className="lesson-intro">{text}</p>
+        {s.tutorialCompany && index === 0 && <p className="lesson-intro">Practise on a fresh company. Your saved company is paused; finishing or exiting Chapter 0 returns you to it.</p>}
         {index !== 2 && <LessonVisual key={index} index={index} />}
         {TIPS[index] && <aside className="lesson-tip"><Icon name="bulb" size={24} /><p><strong>Keep in mind</strong>{TIPS[index]}</p></aside>}
       </div>
