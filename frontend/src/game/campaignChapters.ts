@@ -20,7 +20,16 @@ export function campaignChapters(game: GameState, learning = false, tutorialDone
   return chapters.map((chapter, index) => {
     const current = chapter.id === "getting-started" ? learning : !learning && chapter.name === model.stage;
     const status = chapter.id === "getting-started" && current && tutorialDone ? "In progress" : chapter.completed ? "Completed" : current ? "Current" : chapter.available ? "Available next" : "Locked";
-    return { ...chapter, number: index, current, status };
+    const objectives: Record<string, string> = {
+      "getting-started": "Learn the controls, game time and finances before running your company.",
+      opening: "Understand how bottlenecks affect reliable service.",
+      scaling: "Understand how server capacity and routing work together.",
+      data: "Understand how workloads and caching affect database demand.",
+      spikes: "Keep your company reliable during sudden traffic spikes.",
+      reliability: "Keep service available when application servers fail.",
+      combined: "Keep a growing company reliable while serving full demand.",
+    };
+    return { ...chapter, objective: objectives[chapter.id], number: index, current, status };
   });
 }
 

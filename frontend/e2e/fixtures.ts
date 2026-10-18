@@ -113,6 +113,16 @@ export async function savedClassicGame(page: Page): Promise<GameState> {
   return page.evaluate(() => JSON.parse(localStorage.getItem('nn.classic.save.v1')!).game);
 }
 
+/** Clock-positioning setup may trigger legitimate idle help; decline through the public UI. */
+export async function declineIdleHint(page: Page) {
+  const offer = page.getByRole("dialog", { name: "Need a little help?", exact: true });
+  if (!(await offer.isVisible())) return;
+  const before = await savedGame(page);
+  await offer.getByRole("button", { name: "No, thanks", exact: true }).click();
+  await expect(offer).toBeHidden();
+  expect(await savedGame(page)).toEqual(before);
+}
+
 /** Run for exact game seconds through public controls and fixed-duration ticks. */
 export async function advanceCampaignStep(page: Page, { seconds = 1, resumeClock = true }: { seconds?: number; resumeClock?: boolean } = {}) {
   if (seconds <= 0) return;
@@ -122,6 +132,14 @@ export async function advanceCampaignStep(page: Page, { seconds = 1, resumeClock
   // The company is paused. Leave enough lead time for a busy software-rendered browser
   // to deliver pauseAt without its target already being in the past.
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
+  // Positioning the paused clock can legitimately trigger the inactivity offer.
+  // Decline through the UI before operating; never click through its modal or request advice.
+  const offer = page.getByRole("dialog", { name: "Need a little help?", exact: true });
+  if (await offer.isVisible()) {
+    await expect(counter).toHaveText(String(before));
+    await offer.getByRole("button", { name: "No, thanks", exact: true }).click();
+    await expect(offer).toBeHidden();
+  }
   await page.getByRole("button", { name: "Run", exact: true }).click();
   const target = before + seconds;
   for (let tick = 0; tick < seconds * 10 && Number(await counter.textContent()) < target; tick++) {
@@ -210,15 +228,26 @@ export async function finishChapterZero(page: Page, touch = false) {
   throw new Error("Chapter 0 did not reach its explicit finish action");
 }
 
+/** Follow the live recovery acknowledgement without acknowledging its recorded incident. */
+export async function reviewRecovery(page: Page, timeout = 25000) {
+  const recovery = page.getByRole("dialog", { name: "System Recovered!", exact: true });
+  await expect(recovery).toBeVisible({ timeout });
+  const before = await savedGame(page);
+  expect(before.phase).toBe("review");
+  await recovery.getByRole("button", { name: "Review What Happened", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Incident postmortem", exact: true })).toBeVisible();
+  expect(await savedGame(page)).toEqual(before);
+}
+
 /** Unrelated journeys complete mandatory Chapter 0; optional spotlight guides retain their Skip action. */
-export async function completeTutorial(page: Page) {
+export async function completeTutorial(page: Page, touch = false) {
   if (await page.locator(".chapter-zero-modal").count()) {
     // Completing 21 real lessons is setup for these journeys. Bound that setup
     // separately, then preserve the journey's original budget and assertion timeouts.
     const journeyBudget = test.info().timeout;
     const started = performance.now();
     test.setTimeout(journeyBudget + 180_000);
-    await test.step("Complete mandatory Chapter 0 setup", () => finishChapterZero(page), { timeout: 180_000 });
+    await test.step("Complete mandatory Chapter 0 setup", () => finishChapterZero(page, touch), { timeout: 180_000 });
     test.setTimeout(journeyBudget + Math.ceil(performance.now() - started));
   }
   else await page.getByRole("button", { name: "Skip", exact: true }).click();

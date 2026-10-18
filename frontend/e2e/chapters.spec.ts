@@ -19,7 +19,7 @@ test("chapter bar stays visible and follows the same company into Data Strategy"
   await expect(bar).toContainText("Chapter 2 of 6");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Scaling & Routing");
   await expect(bar.getByRole("list", { name: "Chapter progress" })).toHaveCount(0);
-  await expect(bar.getByLabel("Current objective")).toContainText("Prepare the system for the next growth wave.");
+  await expect(bar.getByLabel("Current objective")).toContainText("Understand how server capacity and routing work together.");
   const before = await savedGame(page);
   await bar.getByRole("button", { name: "View chapters" }).press("Enter");
   const dialog = page.getByRole("dialog", { name: "Guided Mode chapters" });
@@ -93,7 +93,7 @@ test("compact Opening bar leaves its goal and overview available without Next", 
   for(const [width,height] of [[1440,900],[1366,768]]) {
     await page.setViewportSize({width,height});
     await expect(bar.getByRole("button",{name:/^Next:/})).toHaveCount(0);
-    await expect(bar.getByLabel("Current objective")).toHaveText("Goal: Observe demand and compare component evidence.");
+    await expect(bar.getByLabel("Current objective")).toHaveText("Goal: Understand how bottlenecks affect reliable service.");
     await expect(bar.getByRole("button",{name:"View chapters"})).toBeInViewport();
     await page.screenshot({path:`test-results/clarity-after-${width}-next-false.png`});
   }

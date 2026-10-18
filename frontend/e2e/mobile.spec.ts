@@ -1,3 +1,6 @@
+import { guidanceJourney, recoveryJourney, ordinaryRunJourney, incidentAttentionJourney } from "./guidanceRewards";
+import { reviewRecovery } from "./fixtures";
+import { chapterHintJourney, recoveryVerificationJourney } from "./chapterHints";
 import { appHealthDuringTutorial, appHealthJourney, appHealthProblem } from "./appHealth";
 import type { Page } from "@playwright/test";
 import { keyboardDetails, purchaseLayout } from "./purchaseLayout";
@@ -46,6 +49,22 @@ test("the touch Navigation menu keeps floors, walking and camera tools clear of 
  await run.tap();await expect(room.locator(".dock-panel")).toBeHidden();
  const pause=dock.getByRole("button",{name:"Pause",exact:true}),after=(await pause.boundingBox())!;
  expect([after.width,after.height]).toEqual([before.width,before.height]);await pause.tap();
+});
+
+for(const width of [390,320])test(`Automatic Hint touch: incident offer and diagnosis at ${width}`,async({page})=>{
+  await page.setViewportSize({width,height:844});await page.emulateMedia({reducedMotion:"reduce"});await page.clock.install();
+  const game=advanceSteps(newGame(),7).state;await seedSave(page,game);await page.goto("/");
+  await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+  await page.clock.pauseAt(await page.evaluate(()=>Date.now()+1000));
+  const hint=page.getByRole("region",{name:"Incident",exact:true}).getByRole("button",{name:"Hint",exact:true});
+  await hint.focus();await page.clock.fastForward(10000);await expect(hint).toHaveClass(/campaign-context-cue/);
+  await page.clock.fastForward(5000);
+  const offer=page.getByRole("dialog",{name:"Need a little help?"});await expect(offer).toBeVisible();
+  await offer.getByRole("button",{name:"Yes, show hint"}).tap();
+  const details=page.getByRole("dialog",{name:"Here's a hint"});await expect(details).toContainText("Compare database demand");
+  await details.getByRole("button",{name:"Got it"}).tap();
+  await expect(page.locator('[data-guidance="db"]')).toHaveClass(/campaign-context-cue/);
+  expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step);
 });
 
 async function expectCashFits(page:Page) {
@@ -288,6 +307,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   await page.screenshot({ path: "test-results/phase1-mobile-incident.png" });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
   await page.getByRole("button", { name: "Run", exact: true }).tap();
+  await reviewRecovery(page);
   const report = page.getByRole("dialog", { name: "Incident postmortem" });
   await expect(report).toBeVisible({ timeout: 25000 });
   await report.getByRole("button", { name: "Continue company" }).tap();
@@ -465,3 +485,20 @@ test("Chapter 0 inspections and App Health work on touch", async ({page}) => {
 test("App Health explains problem evidence on touch", async ({page}) => { await appHealthProblem(page,true); });
 
 test("App Health remains compact at 320px touch", async ({page}) => { await appHealthJourney(page,320,844,true); });
+
+for (const width of [390, 320]) {
+ test(`Development B: touch guidance at ${width}`, async ({page}) => { await page.emulateMedia({ reducedMotion: "reduce" }); await guidanceJourney(page, width, 844); });
+ test(`Development B: touch recovery at ${width}`, async ({page}) => { await page.emulateMedia({ reducedMotion: "reduce" }); await recoveryJourney(page, width, 844, true, width === 320); });
+}
+
+for (const width of [390, 320]) {
+ test.describe(`Touch visual attention at ${width}`, () => {
+  test(`Spotlight refinement: ordinary idle Run at ${width}`, async ({page}) => { await ordinaryRunJourney(page,width,844); });
+  test(`Spotlight refinement: live incident Pause and Confirm priority at ${width}`, async ({page}) => { await incidentAttentionJourney(page,width,844); });
+ });
+}
+
+for (const width of [390, 320]) {
+ test(`Final B: Chapter 6 touch hints at ${width}`, async ({page}) => { await chapterHintJourney(page,width,844); });
+ test(`Final B: touch recovery verification at ${width}`, async ({page}) => { await recoveryVerificationJourney(page,width,844); });
+}

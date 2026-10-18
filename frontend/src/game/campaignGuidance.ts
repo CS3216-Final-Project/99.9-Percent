@@ -6,16 +6,17 @@ import { canEnterSpikes, pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { pendingPreventionReview, preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
+import { growthGuidance, incidentGuidance } from "./campaignFeedback";
 
 export interface Requirement { id: string; label: string; met: boolean }
 export interface GuidanceAction { label: string; action?: Action }
 /** One shared objective for the chapter bar; detailed actions and gates remain in the overview. */
-export function campaignObjective(g: GameState) {
+export function campaignObjective(g: GameState, running = false) {
  const c=g.campaign!;
  if(g.phase==="ended") return g.outcome==="won"?"Inspect the final architecture and scorecard.":"Review the company's finances and recorded evidence.";
  if(g.phase==="review") return "Read the postmortem before continuing the same company.";
- if(c.incident) return "Restore stable service while weighing cost and rejected demand.";
- if(c.combinedStage) return "Serve growing demand, manage costs and review each outcome.";
+ if(c.incident) return incidentGuidance(g, running)!.message;
+ if(c.combinedStage) return growthGuidance(g, running)!.objective;
  if(c.reliabilityStage) return "Keep service stable through an application failure, then review the evidence.";
  if(c.spikeStage) return "Handle changing demand while managing capacity costs.";
  if(c.dataStage) return "Compare workload, cache hits and database pressure as demand grows.";

@@ -1,4 +1,4 @@
-﻿import {it,expect} from "vitest";
+import {it,expect} from "vitest";
 import {campaignGuidance,campaignObjective} from "./campaignGuidance";
 import {newGame,applyAction,type GameState,type Action} from "../sim";
 import {advanceSteps,canEnterData} from "../sim/step";
@@ -13,7 +13,7 @@ it("objectives follow actual phase before chapter without replacing required act
  const g=scaling();
  expect(campaignObjective(g)).toBe("Prepare the system for the next growth wave.");
  g.campaign!.incident=advanceSteps(newGame(),6).state.campaign!.incident;
- expect(campaignObjective(g)).toContain("Restore stable service");
+ expect(campaignObjective(g)).toContain("Investigate the problem");
  g.phase="review";
  expect(campaignObjective(g)).toContain("Read the postmortem");
  expect(campaignGuidance(g).pendingAction?.label).toBe("Review postmortem");

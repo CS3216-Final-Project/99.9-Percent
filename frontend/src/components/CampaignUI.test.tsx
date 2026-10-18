@@ -7,6 +7,9 @@ import {dataCompany} from "../sim/__tests__/dataFixture";
 import {protectedCombined} from "../sim/__tests__/combinedFixture";
 import {advanceSteps} from "../sim/step";
 import {applyAction,newGame,type GameState} from "../sim";
+import {spikeCompany,act as decide,tick,untilOffset} from "../sim/__tests__/spikeFixtures";
+import {preparedReliability} from "../sim/__tests__/reliabilityFixture";
+import {combinedCompany} from "../sim/__tests__/combinedFixture";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});
 afterEach(cleanup);
 function show(game:GameState){useGame.setState({game,ready:true,started:true,onboarding:false});render(<><CampaignChapters/><CampaignPanel/></>);}
@@ -19,13 +22,78 @@ it("shows all Opening requirements without a disclosure or generic growth-waitin
 });
 it("keeps the selected workload hidden until actual growth and enters through the paused store",()=>{
  show(dataCompany("read-heavy",false));const guide=screen.getByRole("region",{name:"Guided Mode guidance"});
- expect(screen.getByLabelText("Current objective").textContent).toContain("Prepare the system for the next growth wave.");
- expect(guide.textContent).not.toContain("Prepare the system for the next growth wave.");
+ expect(screen.getByLabelText("Current objective").textContent).toContain("Understand how server capacity and routing work together.");
+ expect(guide.textContent).not.toContain("Understand how server capacity and routing work together.");
  expect(within(guide).getByText(/Chapter requirements/)).toBeTruthy();
  expect(within(guide).queryByRole("button",{name:/Continue to data strategy/})).toBeNull();
  fireEvent.click(within(screen.getByRole("region",{name:"Guided Mode chapters"})).getByRole("button",{name:/Continue to data strategy/}));
  const data=screen.getByRole("region",{name:"Data strategy"});expect(data.textContent).toContain("Waiting for workload growth");
  expect(data.textContent).not.toMatch(/read-heavy|write-heavy|80%|20%/);expect(useGame.getState().running).toBe(false);
+});
+
+it.each([
+ [1,()=>newGame()], [2,()=>dataCompany("read-heavy",false)], [3,()=>dataCompany()],
+ [4,()=>spikeCompany(false)], [5,()=>preparedReliability()], [6,()=>combinedCompany()],
+] as const)("chapter %i separates its educational goal, situation and requested Hint",(_chapter,company)=>{
+ const game=company();show(game);
+ const goal=screen.getByLabelText("Current objective").textContent!;
+ const guide=screen.getByRole("region",{name:"Guided Mode guidance"});
+ expect(goal).not.toMatch(/Run your company|Keep running|Press |Inspect |Prepare if/);
+ expect(guide.textContent).toContain("Current situation:");
+ expect(guide.textContent).not.toContain(goal.replace("Goal: ",""));
+ expect(guide.textContent).not.toMatch(/Next required step:|Run your company|Keep running|Prepare if you wish/);
+ fireEvent.click(screen.getByRole("button",{name:"Hint"}));
+ expect(screen.getByRole("dialog",{name:"Here's a hint"}).textContent).toMatch(/Run|Start|Continue|Prepare/);
+ expect(useGame.getState().game).toBe(game);
+});
+
+it("keeps incident warnings and factual measurements visible without disclosing the diagnosis",()=>{
+ const game=advanceSteps(newGame(),7).state;show(game);
+ const incident=screen.getByRole("region",{name:"Incident"});
+ expect(incident.textContent).toContain("Checking recovery: 0/5 game seconds");
+ expect(incident.textContent).toContain("Active service incident");
+ expect(incident.textContent).not.toContain("Compare database demand");
+ fireEvent.click(within(incident).getByRole("button",{name:"Hint"}));
+ expect(screen.getByRole("dialog").textContent).toContain("Compare database demand");
+ expect(useGame.getState().game).toBe(game);
+});
+
+it("keeps Chapter 4's goal stable and exposes its actual final baseline observation",()=>{
+ let game=spikeCompany(false);game=tick(decide(game,{type:"add_server"}),2);
+ game=tick(decide(game,{type:"scale_up",appId:"app-3"}),3);
+ game=tick(decide(game,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}));
+ game=untilOffset(game,71);show(game);
+ expect(screen.getByLabelText("Current objective").textContent).toBe("Goal: Keep your company reliable during sudden traffic spikes.");
+ const progress=screen.getByLabelText("Spike progress");
+ expect(progress.textContent).toContain("Traffic pulses completed2 / 2");
+ expect(progress.textContent).toContain("Stable baseline observations4 / 5");
+ expect(screen.getByRole("region",{name:"Guided Mode guidance"}).textContent).not.toContain("Run your company");
+ fireEvent.click(screen.getByRole("button",{name:"Hint"}));
+ expect(screen.getByRole("dialog").textContent).toContain("One more stable observation");
+ expect(screen.getByRole("dialog").textContent).toContain("Run your company");
+});
+
+it("keeps the reliability decision and factual requirements available before Hint",()=>{
+ show(preparedReliability());
+ expect(screen.getByRole("button",{name:"Start reliability test"}).hasAttribute("disabled")).toBe(false);
+ const requirements=screen.getByRole("region",{name:"Reliability requirements"});
+ expect(requirements.querySelector('[data-requirement="armed"]')?.getAttribute("data-met")).toBe("false");
+ expect(requirements.textContent).toContain("Stable service: 0 / 5");
+ expect(screen.getByRole("region",{name:"Stay Online"}).textContent).not.toContain("Prepare, then");
+});
+
+it("preserves reliability restoration and remaining observation facts without Run advice",()=>{
+ let game=decide(preparedReliability(),{type:"arm_reliability"});
+ for(let i=0;i<100&&game.campaign!.reliabilityStage!.stableSteps!==4;i++){
+  if(game.phase==="review")game=decide(game,{type:"acknowledge_review"});game=tick(game);
+ }
+ show(game);
+ const requirements=screen.getByRole("region",{name:"Reliability requirements"});
+ for(const id of ["armed","observed","restored"])expect(requirements.querySelector(`[data-requirement="${id}"]`)?.getAttribute("data-met")).toBe("true");
+ expect(requirements.textContent).toContain("Stable service: 4 / 5");
+ expect(screen.getByRole("region",{name:"Guided Mode guidance"}).textContent).not.toContain("Run your company");
+ fireEvent.click(screen.getByRole("button",{name:"Hint"}));
+ expect(screen.getByRole("dialog").textContent).toContain("One more stable observation");
 });
 it("shows the current stage cap instead of advertising a locked database tier",()=>{
  show(dataCompany("read-heavy",false));const button=screen.getByRole("button",{name:/Upgrade database/});

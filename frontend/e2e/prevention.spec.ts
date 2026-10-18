@@ -1,4 +1,4 @@
-import { completeTutorial, advanceCampaignStep, setGameSpeed } from "./fixtures";
+import { completeTutorial, advanceCampaignStep, declineIdleHint, setGameSpeed } from "./fixtures";
 import {test,expect,savedGame} from "./fixtures";
 
 // These journeys exercise panels and persistence; room interaction has dedicated browser coverage.
@@ -10,6 +10,7 @@ test("Opening prevention: fresh player, new observations and reloads keep Scalin
  await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await completeTutorial(page);
  const id=(await savedGame(page)).campaign!.runId;
  await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
+ await declineIdleHint(page);
  await setGameSpeed(page,2);
  await page.getByRole("button",{name:/Limit to 500 requests\/s/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await page.getByRole("button",{name:/Upgrade database/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
@@ -29,7 +30,9 @@ test("Opening prevention: fresh player, new observations and reloads keep Scalin
  await outcome.getByRole("button",{name:"Continue company",exact:true}).click();
  await expect(page.getByRole("dialog",{name:"First growth challenge handled"})).toHaveCount(0);
  await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Opening");
- await expect(guidance).toContainText("prevention does not unlock Scaling");
+ await expect(guidance).toContainText("Scaling requires a real recovered Opening incident");
+ await expect(guidance.locator('[data-requirement="recovery"]')).toHaveAttribute("data-met","false");
+ await expect(page.getByRole("button",{name:/^Next:/})).toHaveCount(0);
  await expect(page.getByRole("region",{name:"Scaling controls"})).toHaveCount(0);
  c=(await savedGame(page)).campaign!;expect(c.runId).toBe(id);expect(c.step).toBe(9);expect(c.openingRecovered).toBe(false);expect(c.scaling).toBeNull();expect(c.openingMilestone).toBeNull();expect(c.openingPrevention!.outcome!.acknowledged).toBe(true);
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);

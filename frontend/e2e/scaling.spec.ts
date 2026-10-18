@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect, seedSave, savedGame, expectRoom, advanceCampaignStep } from "./fixtures";
+import { declineIdleHint, reviewRecovery, test, expect, seedSave, savedGame, expectRoom, advanceCampaignStep } from "./fixtures";
 import { newGame, applyAction, type GameState, type Action } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
@@ -85,8 +85,10 @@ for (const path of ["vertical", "horizontal"] as const) {
     const api = await boot(page, pendingRecovery(path));
     const report = page.getByRole("dialog", { name: "Incident postmortem" });
     await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
+    await declineIdleHint(page);
     await page.getByRole("button", { name: "Run", exact: true }).click();
-    for (let tick = 0; tick < 150 && !(await report.isVisible()); tick++) await page.clock.runFor(200);
+    for (let tick = 0; tick < 150 && !(await page.getByRole("dialog", { name: "System Recovered!", exact: true }).isVisible()); tick++) await page.clock.runFor(200);
+    await reviewRecovery(page);
     await expect(report).toBeVisible({ timeout: 30_000 });
     if (path === "horizontal") expect((await savedGame(page)).campaign!.snapshot.instances!.map(app => app.demand)).toEqual([700, 700]);
     await report.getByRole("button", { name: "Continue company", exact: true }).click();

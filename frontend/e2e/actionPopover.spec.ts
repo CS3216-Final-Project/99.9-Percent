@@ -47,6 +47,9 @@ test("an action centres the camera on the machine it changes and opens its confi
 
 for(const [width,height] of [[1440,900],[1366,768]]) {
   test(`purchase card keeps its footer and warning accessible at ${width}x${height}, through expansion and resize`,async({page})=>{
+    // Four real-room previews, keyboard checks, three captures and desktop/touch resizing can exceed 60s
+    // in software WebGL (trace: final assertions passed at 64.8s). Keep every assertion's own deadline.
+    test.setTimeout(120_000);
     await purchaseLayout(page,width,height);
   });
 }
