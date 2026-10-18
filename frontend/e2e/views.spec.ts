@@ -61,6 +61,30 @@ test("V goes from the overview to follow and first person and back, and Escape e
   ]);
 });
 
+test("in first person a click takes the mouse and does nothing else, and Escape lets go before it ends the walk", async ({ page }) => {
+  await open(page);
+  await stage(page).focus();
+  await page.keyboard.press("v");
+  await page.keyboard.press("v");
+  await expect(page.locator(".view-dot")).toBeVisible();
+  await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
+  const canvas = (await stage(page).locator("canvas").boundingBox())!;
+  // Low in the view, where a click would otherwise walk the avatar across the floor.
+  await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height * 0.8);
+  await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName ?? null)).toBe("CANVAS");
+  await expect(page.locator(".view-hint")).toContainText("to let go of the mouse");
+  await expect(map(page).locator(".map-destination")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect.poll(() => page.evaluate(() => document.pointerLockElement)).toBeNull();
+  await expect(page.locator(".view-dot")).toBeVisible();
+  expect(await exploration(page)).toMatchObject({ walking: true, viewpoint: "first" });
+  // Once the mouse is free, Escape ends the walk as it always has.
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".view-dot")).toHaveCount(0);
+  await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
+});
+
 test("the first-person view picks up again after a reload, with walk mode", async ({ page }) => {
   await open(page);
   await page.locator(".view-mode-menu > summary").click();

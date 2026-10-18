@@ -77,12 +77,15 @@
   }
 }
 
-/* The map: a paper card in the room's top right corner, folded down to a button when hidden. */
+/*
+ * The map: a paper card in the room's top right corner, folded down to a button when hidden. It sits over the room
+ * and its labels but under anything the game opens over the room, such as a purchase's confirmation.
+ */
 .room-map {
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 24;
+  z-index: 5;
   width: min(300px, calc(100% - 24px));
   padding: 8px;
   background: var(--paper);
