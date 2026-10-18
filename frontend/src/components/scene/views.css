@@ -78,13 +78,14 @@
 }
 
 /*
- * The map: a paper card in the room's top right corner, folded down to a button when hidden. It sits over the room
- * and its labels but under anything the game opens over the room, such as a purchase's confirmation.
+ * The map: a paper card in the room's bottom left corner, clear of the equipment panel on the right and the walk
+ * prompt in the middle, folded down to a button when hidden. It sits over the room and its labels but under anything
+ * the game opens over the room, such as a purchase's confirmation or the equipment panel.
  */
 .room-map {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  left: 12px;
+  bottom: 12px;
   z-index: 5;
   width: min(300px, calc(100% - 24px));
   padding: 8px;
@@ -278,11 +279,9 @@
   margin-top: 12px;
 }
 
-/* A narrow room's top belongs to the walk prompt: the map goes to the bottom corner and the hint under the prompt. */
+/* A narrow room's top belongs to the walk prompt, so the hint goes under it. */
 @media (max-width: 900px) {
   .room-map {
-    top: auto;
-    bottom: 12px;
     width: min(240px, calc(100% - 24px));
   }
 
