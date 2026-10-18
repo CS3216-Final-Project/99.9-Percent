@@ -33,7 +33,7 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
   const cancellations = useSyncExternalStore(subscribeConfirming, confirmationCancelCount);
   const appCompared = useRef(false);
   const [readyFor, setReadyFor] = useState<number | null>(null);
-  const [completedThrough, setCompletedThrough] = useState(s.meta.tutorialDone ? -1 : Math.max(index, s.meta.walkthroughFurthestStep ?? 0) - 1);
+  const [completedThrough, setCompletedThrough] = useState(Math.max(index, s.meta.walkthroughFurthestStep ?? 0) - 1);
   const entry = useRef({ index, speed: s.speed, floor: s.floor, toast: s.toast?.id, cancellations });
   const viewSeen = useRef(false);
   const reading = useRef<HTMLDivElement>(null), heading = useRef<HTMLHeadingElement>(null);

@@ -200,7 +200,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
               {machine && <p className="campaign-action-machine"><b>{machine.name}</b> {machine.does}</p>}
               {props.tip && <p>{props.tip}</p>}
               {props.note && <p>{props.note}</p>}
-              <p>Game game seconds advance only while the company is running. Running costs start when the upgrade becomes active.</p>
+              <p>Game seconds advance only while the company is running. Running costs start when the upgrade becomes active.</p>
               {props.price!==undefined && props.price>0 && <p>Purchases cannot be undone.</p>}
               <p>Financial estimates assume recent earnings continue. Cash update timing, traffic and future decisions can change the outcome.</p>
             </div>

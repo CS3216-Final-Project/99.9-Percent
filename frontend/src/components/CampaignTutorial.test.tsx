@@ -200,6 +200,19 @@ it("preserves existing completed profiles", () => {
   expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
 });
 
+it("restores completed replay exercises after Back and reload, and resets them on an explicit restart", () => {
+  saveMeta({ ...DEFAULT_META, tutorialDone: true }); start();
+  useGame.getState().startTour("campaign"); renderCompany(); reach(3);
+  fireEvent.click(current().getByRole("button", { name: "Back" }));
+  cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
+  expect(card(2)).toBeTruthy();
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+  act(() => useGame.getState().startTour("campaign"));
+  expect(card(1).textContent).not.toContain("Completed earlier");
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  expect(useGame.getState().meta.tutorialDone).toBe(true);
+});
+
 it("finishes each walkthrough on the step the store counts as its last", () => {
   expect(WALKTHROUGH_STEPS).toEqual({ basics: BASICS_STEPS, campaign: CAMPAIGN_STEPS });
 });

@@ -2,6 +2,8 @@
 
 Chapter 0 control restrictions have focused component and browser checks for unrelated clicks and shortcuts, read-only purchase quotes, automatic quote recovery on the correct floor, and restored control accessibility after the guide unmounts. Responsive journeys traverse every lesson; the quote exercises also cover room clicks, Escape, disabled Confirm and reload before Cancel.
 
+Completed players' explicit Chapter 0 replays retain their lesson and completed exercises across Back, reload and Save and exit. Store regressions cover Opening and later chapters without clearing the profile's completion or recording another start on resume; desktop and narrow-browser journeys resume the real Cancel quote and finish on the same company.
+
 Use Node 22 and install with `npm ci` separately in `frontend/` and `backend/`. Tests use browser-local saves, Supertest and an in-memory PGlite database; no production database or API key is needed.
 
 ## Commands

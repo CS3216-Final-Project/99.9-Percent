@@ -3,6 +3,38 @@ import { applyAction, newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 function act(g: GameState, action: Parameters<typeof applyAction>[1]) { const r = applyAction(g, action); if (!r.ok) throw Error(r.message); return r.state; }
 
+for (const width of [1440, 390]) test(`A completed player's Chapter 0 replay resumes after reload and Save and exit at ${width}px`, async ({ page }) => {
+  test.setTimeout(150_000);
+  await page.setViewportSize({ width, height: 900 });
+  await page.route("**/api/**", route => route.abort());
+  await seedSave(page, newGame(1, "replay-resume"));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Replay the tutorial", exact: true }).click();
+  await expectRoom(page);
+  const card = tutorial(page);
+  for (let lesson = 1; lesson < 8; lesson++) await nextChapterZero(page);
+  const before = (await savedGame(page)).campaign!;
+  await page.reload();
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expect(card).toHaveAccessibleName("Tutorial, step 8 of 21");
+  const quote = page.getByRole("region", { name: "Confirm Add server", exact: true });
+  await expect(quote).toBeVisible();
+  await expect(quote.getByRole("button", { name: "Confirm", exact: true })).toBeDisabled();
+  await quote.getByRole("button", { name: "Cancel", exact: true }).click();
+  await nextChapterZero(page);
+  await card.getByRole("button", { name: "Back", exact: true }).click();
+  await card.getByRole("button", { name: "Save and exit", exact: true }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expect(card).toHaveAccessibleName("Tutorial, step 8 of 21");
+  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+  await finishChapterZero(page);
+  expect((await savedGame(page)).campaign).toEqual(before);
+  await page.reload();
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expect(card).toHaveCount(0);
+});
+
 for (const width of [1440, 390]) test(`Cancel lesson restores its quote after reload at ${width}px`, async ({ page }) => {
   test.setTimeout(120_000); // This journey initializes the real WebGL room twice.
   await page.setViewportSize({ width, height: 900 });
