@@ -1,16 +1,24 @@
-import { advanceCampaignStep } from "./fixtures";
+import { advanceCampaignStep, setGameSpeed } from "./fixtures";
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
 for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
-  test(`opening acceptance: ${path}`, async ({ page, withoutRoom }) => {
+  test(`opening acceptance: ${path}`, async ({ page, withoutRoom , installClock}) => {
+    if (path !== "upgrade") await installClock();
     // Only the upgrade path inspects a machine by clicking it in the room.
     const room = path === "upgrade";
     if (!room) await withoutRoom();
     await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
     if (room) await expectRoom(page);
-    for (let i = 0; i < 6; i++)await advanceCampaignStep(page);
+    if (room) {
+      // The Opening pauses itself at the first incident. Keep native scene frames
+      // while reaching that exact boundary through the player's Run control.
+      await setGameSpeed(page, 2);
+      await page.getByRole("button", { name: "Run", exact: true }).click();
+      await expect(page.getByTestId("physical-step")).toHaveText("6");
+      await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+    } else await advanceCampaignStep(page,{seconds:6});
     if (path === "upgrade") {
       await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
       const panel = page.getByRole("complementary", { name: "System metrics" });
@@ -73,7 +81,8 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     expect(await savedGame(page)).toEqual(after); if (room) await expectRoom(page);
   });
 }
-test("preserves a corrupt campaign save until explicit reset", async ({ page, withoutRoom }) => {
+test("preserves a corrupt campaign save until explicit reset", async ({ page, withoutRoom , installClock}) => {
+ await installClock();
   await withoutRoom();
   await page.addInitScript(() => { localStorage.setItem("nn.campaign.save.v1", "{"); });
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
@@ -95,7 +104,8 @@ test("resumes an incident paused", async ({ page, withoutRoom }) => {
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
   expect((await savedGame(page)).campaign!.step).toBe(6);
 });
-test("keeps the room playable without downloaded furniture", async ({ page }) => {
+test("keeps the room playable without downloaded furniture", async ({ page , installClock}) => {
+ await installClock();
   await page.route("**/models/**", route => route.abort());
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
   await expectRoom(page); await advanceCampaignStep(page);

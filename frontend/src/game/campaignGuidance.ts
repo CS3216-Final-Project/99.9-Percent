@@ -65,7 +65,7 @@ export function campaignGuidance(g: GameState) {
   notice=canEnterReliability(g)?"Stay Online is available through Next in the chapter bar.":"Stay Online requires acknowledged spike completion, stable baseline management and empty queues.";
   optional="Autoscaling is optional. Manual capacity, admission relief and hybrid responses remain valid.";
   if(c.step<d.deadlines[3])waiting="Waiting for both announced traffic pulses to end.";
-  else if(d.completedStep===null&&!c.incident&&queuesEmpty&&reportsAcknowledged&&g.phase==="management"&&qualifiesForRecovery(c.snapshot))waiting="Observe new stable baseline game seconds with Run or Advance game second. Pausing adds no observations.";
+  else if(d.completedStep===null&&!c.incident&&queuesEmpty&&reportsAcknowledged&&g.phase==="management"&&qualifiesForRecovery(c.snapshot))waiting="Observe new stable baseline game seconds with Run. Pausing adds no observations.";
   if(pendingSpikeAcknowledgement(c))pendingAction={label:"Review spike recognition"};
  } else if(c.dataStage) {
   add("growth","Data growth occurred",c.dataStage.consumed);
@@ -77,7 +77,7 @@ export function campaignGuidance(g: GameState) {
   add("reports","All recovered incident reports acknowledged",reportsAcknowledged);
   add("healthy","Healthy latency and service errors with completed requests",qualifiesForRecovery(c.snapshot));
   optional="Workload contrast is optional; cache purchase and database upgrades are not required for continuation.";
-  if(!c.dataStage.consumed&&canEnterData(g))waiting="Waiting for the next company growth event. Run or Advance game second checks readiness.";
+  if(!c.dataStage.consumed&&canEnterData(g))waiting="Waiting for the next company growth event. Run checks readiness.";
   else if(!c.dataStage.consumed)notice="Data growth waits for management, empty queues, no active incident and acknowledged reports.";
   if(spikesAvailable)pendingAction={label:"Continue to traffic spikes",action:{type:"enter_spikes"}};
  } else if(openingDone) {
@@ -89,7 +89,7 @@ export function campaignGuidance(g: GameState) {
   add("queues","Application and Database queues empty",queuesEmpty);
   add("growth","Scaling growth occurred",!!c.scaling?.consumed);
   add("reports","All recovered incident reports acknowledged",reportsAcknowledged);
-  if(c.scaling&&!c.scaling.consumed&&(c.dbCapacity>=P.dbCapacity||!!c.scalingConsent)&&g.phase==="management"&&!c.incident&&queuesEmpty)waiting="Waiting for the next company growth event. Run or Advance game second checks readiness.";
+  if(c.scaling&&!c.scaling.consumed&&(c.dbCapacity>=P.dbCapacity||!!c.scalingConsent)&&g.phase==="management"&&!c.incident&&queuesEmpty)waiting="Waiting for the next company growth event. Run checks readiness.";
   if(!c.scaling?.consumed&&!c.scalingConsent&&c.dbCapacity<P.dbCapacity&&c.cashCents<=P.dbCostCents)notice="Next growth requires paid database headroom, but current cash cannot fund that investment. Pending revenue is available only after settlement; inspect finances and operating costs before advancing. Solvency alone does not guarantee an affordable growth investment.";
   if(!c.scaling&&g.phase!=="ended")pendingAction={label:"Continue to scaling and routing",action:{type:"enter_scaling"}};
   else if(dataAvailable)pendingAction={label:"Continue to data strategy",action:{type:"enter_data"}};
@@ -121,7 +121,7 @@ export function campaignGuidance(g: GameState) {
   add("growth","Opening growth occurred",c.consumedEvents.includes("opening-growth"));
   add("outcome","Real Opening incident recovered and postmortem acknowledged",false);
   add("milestone","Opening milestone acknowledged",false);
-  waiting="Waiting for the next company growth event. Run or Advance game second to observe demand.";
+  waiting="Waiting for the next company growth event. Run to observe demand.";
  }
  // Required acknowledgements take priority over stage continuation in every stage.
  if(g.phase==="review"&&c.reports.length)pendingAction={label:"Review postmortem"};

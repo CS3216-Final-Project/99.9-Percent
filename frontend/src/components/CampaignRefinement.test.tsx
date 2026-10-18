@@ -18,13 +18,12 @@ function renderCompany(game?: GameState) {
 }
 function perform(game:GameState, action:Parameters<typeof applyAction>[1]) { const r=applyAction(game,action); if(!r.ok) throw Error(r.message); return r.state; }
 
-it("makes Run primary and keeps manual advancement behind optional controls", () => {
+it("makes Run/Pause primary and removes manual advancement", () => {
   start(); renderCompany(); const run=screen.getByRole("button",{name:"Run"});
-  expect(run.textContent).toContain("Run company"); expect(run.className).toContain("btn-primary");
-  expect(screen.getByRole("button",{name:"Advance game second",hidden:true}).closest("details")!.hasAttribute("open")).toBe(false);
-  fireEvent.click(screen.getByText("More controls"));
-  const step=screen.getByRole("button",{name:"Advance game second"}); expect(step.className).not.toContain("btn-primary");
-  fireEvent.click(step); expect(useGame.getState().game.campaign!.step).toBe(1);
+  expect(run.className).toContain("btn-primary");
+  expect(screen.queryByRole("button",{name:/Advance (?:game second|step)/,hidden:true})).toBeNull();
+  fireEvent.click(run); expect(useGame.getState().running).toBe(true);
+  fireEvent.click(screen.getByRole("button",{name:"Pause"})); expect(useGame.getState().running).toBe(false);
 });
 it("system evidence records a real free inspection without advancing the clock", () => {
   start(); renderCompany();

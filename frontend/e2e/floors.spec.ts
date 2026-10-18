@@ -1,3 +1,4 @@
+import { openRoomControls } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { test, expect, expectRoom, seedClassicSave, unlockChallenge } from "./fixtures";
 import { advanceTurn, newLegacyGame, type GameState } from "../src/sim";
@@ -10,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 
 /** An equipment label in the room, as opposed to the panels' buttons of the same name. */
 const label = (page: Page, name: string) => page.getByRole("main").locator(".eq-labels").getByRole("button", { name, exact: true });
-const floor = (page: Page, name: "Office floor" | "Server floor") => page.getByRole("group", { name: "Floors" }).getByRole("button", { name: new RegExp(`^${name}`) });
+const floor = (page: Page, name: "Office floor" | "Server floor") => page.locator(`.floor-menu button[data-floor="${name === "Office floor" ? "office" : "servers"}"]`);
 
 /** A Classic save the next week of which brings an incident, with the incident guide still to be shown. */
 async function seedBeforeIncident(page: Page, game: GameState) {
@@ -32,7 +33,7 @@ test("rides between the floors by the floor menu and the keyboard, each floor wi
   await expect(label(page, "Database")).toBeVisible();
   await expect(label(page, "Growth")).toHaveCount(0);
 
-  await floor(page, "Office floor").click();
+  await openRoomControls(page); await floor(page, "Office floor").click();
   await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
   await expect(label(page, "Growth")).toBeVisible();
   await expect(label(page, "Database")).toHaveCount(0);
@@ -68,6 +69,7 @@ test("an incident downstairs badges the server floor from the office, and the in
   await expect(label(page, "Growth")).toBeVisible({ timeout: 60_000 });
   // The incident never moves the view on its own; the menu and the panel say where it is.
   await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
+  await openRoomControls(page);
   await expect(floor(page, "Server floor")).toHaveAccessibleName(/incident here/);
   await page.getByRole("button", { name: "Go to the server floor" }).click();
   await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");
@@ -91,7 +93,7 @@ test("the tutorial takes the view to its step's floor once, and never pulls the 
   await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");
   await expect(label(page, "Servers")).toBeVisible();
   // Riding up mid-step stays up. The step's card has the keyboard, as a dialog, so the player uses the floor menu.
-  await floor(page, "Office floor").click();
+  await openRoomControls(page); await floor(page, "Office floor").click();
   await expect(label(page, "Growth")).toBeVisible();
   await page.waitForTimeout(1500);
   await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");

@@ -6,6 +6,9 @@ import { ToneMappingMode } from "postprocessing";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { createPortal } from "react-dom";
+import { DockMenu } from "../DockMenu";
+import { useRoomControlsHost } from "../roomControlsContext";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
 import {
@@ -1444,6 +1447,42 @@ function FloorMenu() {
   );
 }
 
+/** Renderer actions stay with the scene; only their DOM is placed in the shared dock. */
+function RoomDock({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) {
+  const floor = useGame(s => s.floor);
+  const model = useSceneModel();
+  const other = floor === "servers" ? "office" : "servers";
+  const attention = attentionOn(other, model);
+  const host = useRoomControlsHost();
+  if (!host) return null;
+  return createPortal(<>
+    <DockMenu className="room-menu" label={<><span className="floor-number">{FLOOR_NUMBER[floor]}</span><span className="desktop-room-name">{floor === "servers" ? "Servers" : "Office"}</span><span className="mobile-room-name">Room</span>{attention !== "none" && <span className={`floor-badge tone-${attention}`}><span className="visually-hidden">{attention === "alert" ? "Incident on another floor" : "Another floor needs a look"}</span></span>}</>}>
+      <h3>Room controls</h3>
+      <FloorMenu />
+      <div className="mobile-room-tools"><WalkButton stage={stage} /><CameraTools /></div>
+    </DockMenu>
+    <div className="desktop-walk"><WalkButton stage={stage} /></div>
+    <DockMenu className="camera-menu" label={<><Icon name="monitor" size={24} /><span>Camera</span></>}><h3>Camera</h3><CameraTools /></DockMenu>
+  </>, host);
+}
+
+function CameraTools() {
+  return <>
+    <div className="camera-buttons" role="group" aria-label="Camera">
+      <div className="camera-control-row"><span>Zoom</span><div>
+        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" {...tipProps("Zoom in")}><Icon name="plus" /></button>
+        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" {...tipProps("Zoom out")}><Icon name="minus" /></button>
+      </div></div>
+      <div className="camera-control-row"><span>Rotate</span><div>
+        <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" {...tipProps("Rotate left (Q)")}><Icon name="rotateLeft" /></button>
+        <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" {...tipProps("Rotate right (E)")}><Icon name="rotateRight" /></button>
+      </div></div>
+      <button type="button" className="camera-reset" onClick={() => cameraApi.reset()} {...tipProps("Reset view: fit the room and face the starting angle")}><Icon name="monitor" />Reset view</button>
+    </div>
+    <details className="dock-shortcuts"><summary>Keyboard shortcuts</summary><p><CameraHint /></p></details>
+  </>;
+}
+
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
   const landed = useLanded();
@@ -1522,29 +1561,8 @@ export default function Facility() {
       />
       <Labels landed={landed} />
       <HoverTip container={container} />
-      <FloorMenu />
       <WalkControls />
-      <div className="camera-buttons" role="group" aria-label="Camera">
-        <button type="button" onClick={() => cameraApi.zoomBy(1.25)} aria-label="Zoom in" {...tipProps("Zoom in")}>
-          +
-        </button>
-        <button type="button" onClick={() => cameraApi.zoomBy(0.8)} aria-label="Zoom out" {...tipProps("Zoom out")}>
-          −
-        </button>
-        <button type="button" onClick={() => cameraApi.rotateBy(-TURN)} aria-label="Rotate left" {...tipProps("Rotate left (Q)")}>
-          <Icon name="rotateLeft" size={16} />
-        </button>
-        <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" {...tipProps("Rotate right (E)")}>
-          <Icon name="rotateRight" size={16} />
-        </button>
-        <WalkButton stage={container} />
-        <button type="button" onClick={() => cameraApi.reset()} aria-label="Reset view" {...tipProps("Reset view: fit the room and face the starting angle")}>
-          ⌂
-        </button>
-        <span className="camera-hint" aria-hidden="true">
-          <CameraHint />
-        </span>
-      </div>
+      <RoomDock stage={container} />
     </div>
   );
 }

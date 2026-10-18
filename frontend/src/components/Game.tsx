@@ -1,5 +1,7 @@
 "use client";
+import { RoomControlsHost, RoomControlsSlot } from "./RoomControlsHost";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
+import "./ControlsDock.css";
 
 import { lazy, Suspense, useEffect, useRef } from "react";
 import { BALANCE, completedTechIds, metrics, TECH_ORDER, type GameState } from "@/sim";
@@ -9,7 +11,7 @@ import { createAmbience } from "@/game/ambience";
 import { createMusic, type Music } from "@/game/music";
 import type { AudioSettings } from "@/game/persist";
 import { createSfx } from "@/game/sfx";
-import { useGame, type Speed } from "@/game/store";
+import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { daylightNow } from "./scene/dayClock";
 import { entryGap, nextGap, viewFocus, ZONE_SOUNDS, zoneLevel, type ZoneSound } from "./scene/zoneSounds";
@@ -29,6 +31,7 @@ import { Callout, Meter, Stat } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
 import OperationsRail from "./OperationsRail";
 import { ViewSheet, ViewTabs, type ViewTab } from "./ViewSheet";
+import { TimeMenu } from "./TimeMenu";
 
 // Keep the WebGL scene in its own chunk; Vite renders this app in the browser.
 const Facility = lazy(() => import("./scene/Facility"));
@@ -103,8 +106,6 @@ function TopBar() {
 /* Bottom controls                                                     */
 /* ------------------------------------------------------------------ */
 
-const SPEEDS: Speed[] = [0.5, 1, 2];
-
 /** Which week it is, or how long the incident has run: kept beside the controls that move it on. */
 function WeekClock() {
   const game = useGame((s) => s.game);
@@ -114,7 +115,7 @@ function WeekClock() {
     <div className={`week${inc ? " is-incident" : ""}`}>
       <span className="brand-week">
         <Icon name={inc ? "incident" : "week"} size={16} />
-        {inc ? (
+        <span>{inc ? (
           <>
             Incident <strong>{clock(inc.elapsed)}</strong>
           </>
@@ -122,7 +123,7 @@ function WeekClock() {
           <>
             Week <strong>{week}</strong>/{BALANCE.maxTurns}
           </>
-        )}
+        )}</span>
       </span>
       <span className="week-track" aria-hidden="true">
         {Array.from({ length: BALANCE.maxTurns }, (_, i) => (
@@ -138,7 +139,6 @@ function BottomBar() {
   const running = useGame((s) => s.running);
   const speed = useGame((s) => s.speed);
   const setRunning = useGame((s) => s.setRunning);
-  const setSpeed = useGame((s) => s.setSpeed);
   const advance = useGame((s) => s.advance);
   const m = metrics(game);
   const management = game.phase === "management";
@@ -147,10 +147,9 @@ function BottomBar() {
   // Controls appear once they have something to control.
   const hasWork = game.tasks.length > 0 || game.releases.length > 0 || game.turn > 1;
   const hasPast = game.history.length > 0;
-  const showTime = incident || game.turn > 1;
 
   return (
-    <footer className="bottombar">
+    <footer className="bottombar controls-dock">
       <ViewTabs
         tabs={[
           { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}`, disabled: incident },
@@ -159,32 +158,14 @@ function BottomBar() {
         ]}
       />
 
+      <RoomControlsSlot />
       <div className="time-controls">
         <WeekClock />
-        {showTime && (
-          <>
-            <button
-              type="button"
-              className={`icon-btn${running ? " is-on" : ""}`}
-              onClick={() => setRunning(!running)}
-              aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : running ? "Stop auto-advance" : "Auto-advance weeks"}
-              {...tipProps(incident ? "Pause or resume the clock (P)" : "Advance weeks automatically (P)")}
-            >
-              <Icon name={running ? "pause" : "play"} />
-            </button>
-            <div className="speed" role="group" aria-label="Game speed">
-              {SPEEDS.map((s) => (
-                <button type="button" key={s} className={speed === s ? "is-active" : ""} aria-pressed={speed === s} onClick={() => setSpeed(s)} {...tipProps(`${s}× speed`)}>
-                  {s}×
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-        <button type="button" className="btn btn-primary advance" disabled={!management} onClick={advance}>
+        <TimeMenu automatic={management} />
+        <button type="button" className="btn btn-primary advance dock-primary" disabled={!management && !incident} onClick={incident ? () => setRunning(!running) : advance} aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : undefined}>
           {management && running && <span key={`${game.turn}-${speed}`} className="advance-timer" style={{ animationDuration: `${AUTO_SECONDS / speed}s` }} />}
-          <span className="advance-label">{incident ? "Incident" : game.phase === "ended" ? "Run over" : "Next week"}</span>
-          <Icon name="next" />
+          <Icon name={incident ? (running ? "pause" : "play") : "next"} />
+          <span className="advance-label">{incident ? (running ? "Pause" : "Resume") : game.phase === "ended" ? "Run over" : "Next week"}</span>
         </button>
       </div>
     </footer>
@@ -437,7 +418,7 @@ export default function Game() {
   }
 
   return (
-    <div className={`app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`}>
+    <RoomControlsHost><div className={`app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`}>
       {campaign ? <CampaignHeader /> : <TopBar />}
       {started && !campaign && <OperationsRail />}
       <main className="stage">
@@ -454,6 +435,6 @@ export default function Game() {
       {started && <InspectionReveal />}
       {!campaign && started && phase === "review" && <PostmortemModal />}
       {!campaign && started && phase === "ended" && <EndReport />}
-    </div>
+    </div></RoomControlsHost>
   );
 }

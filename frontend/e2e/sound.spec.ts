@@ -1,3 +1,4 @@
+import { advanceCampaignStep } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { test, expect, tutorial } from "./fixtures";
 
@@ -15,7 +16,8 @@ async function countEffects(page: Page) {
   return () => page.evaluate(() => (window as unknown as { effectVoices: number }).effectVoices);
 }
 
-test("sounds the company starting and the alarm, and nothing for a skipped walkthrough or while muted", async ({ page, withoutRoom }) => {
+test("sounds the company starting and the alarm, and nothing for a skipped walkthrough or while muted", async ({ page, withoutRoom , installClock}) => {
+ await installClock();
   // The effects need no room; skipping its software WebGL keeps this journey fast.
   await withoutRoom();
   const problems: string[] = [];
@@ -35,12 +37,10 @@ test("sounds the company starting and the alarm, and nothing for a skipped walkt
   await page.waitForTimeout(300);
   expect(await voices()).toBe(launch);
   const introduced = launch;
-  await page.locator(".campaign-advanced > summary").click();
-  const advance = page.getByRole("button", { name: "Advance game second", exact: true });
-  for (let i = 0; i < 5; i++) await advance.click();
+  await advanceCampaignStep(page,{seconds:5});
   // Quiet steps make no sound.
   expect(await voices()).toBe(introduced);
-  await advance.click();
+  await advanceCampaignStep(page);
   await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
   // The alarm: two siren whoops over a low hit.
   await expect.poll(voices).toBeGreaterThanOrEqual(introduced + 3);

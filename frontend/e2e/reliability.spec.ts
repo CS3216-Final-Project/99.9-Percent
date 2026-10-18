@@ -3,7 +3,7 @@ import {test,expect,seedSave,savedGame,expectRoom} from "./fixtures";
 import {readyReliability,preparedReliability,act} from "../src/sim/__tests__/reliabilityFixture";
 import type {Page} from "@playwright/test";
 async function boot(page:Page,g:ReturnType<typeof readyReliability>){await page.route("**/api/**",r=>r.abort());await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);}
-async function advance(page:Page,n:number){for(let i=0;i<n;i++)await advanceCampaignStep(page);}
+async function advance(page:Page,n:number){await advanceCampaignStep(page,{seconds:n});}
 test("reliability: same-company entry, nine-node ownership and explicit research",async({page})=>{
  await boot(page,readyReliability());const before=(await savedGame(page)).campaign!;await page.getByRole("button",{name:"Next: Continue to reliability",exact:true}).click();await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Stay Online");await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Tech",exact:true}).click();const dialog=page.getByRole("region",{name:"Tech tree"});await expect(dialog.locator("[data-tech]")).toHaveCount(9);await expect(dialog.getByRole("button",{name:"Larger Database: Owned",exact:true})).toBeVisible();await dialog.getByRole("button",{name:"Health Checks: Available",exact:true}).click();await dialog.getByRole("button",{name:/^Unlock Health Checks/}).click();await expect(dialog.getByRole("button",{name:"Health Checks: Owned",exact:true})).toBeVisible();const after=(await savedGame(page)).campaign!;expect(after.runId).toBe(before.runId);expect(after.cashCents).toBe(before.cashCents);expect(after.step).toBe(before.step);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign!.reliabilityStage!.owned).toContain("health_checks");
  const tree=page.getByRole("region",{name:"Tech tree"});
@@ -13,7 +13,8 @@ test("reliability: same-company entry, nine-node ownership and explicit research
   return box.left>=viewport.left&&box.right<=viewport.right;
  })),"All nine technologies fit beside the detail panel on desktop").toBe(true);
 });
-test("reliability: manual restoration, measured report, outcome and paused reload without API",async({page})=>{
+test("reliability: manual restoration, measured report, outcome and paused reload without API",async({page, installClock})=>{
+ await installClock();
  test.setTimeout(120000);
  await boot(page,act(readyReliability(),{type:"enter_reliability"}));
  await page.getByRole("button",{name:"Start reliability test",exact:true}).click();
@@ -44,6 +45,9 @@ test("reliability: manual restoration, measured report, outcome and paused reloa
  await page.getByRole("button",{name:"Continue operating",exact:true}).click();
  expect((await savedGame(page)).campaign!.reliabilityStage!.acknowledged).toBe(true);
 });
-test("reliability: one-step detection and delayed real spare promotion",async({page})=>{
+test("reliability: one-step detection and delayed real spare promotion",async({page, installClock})=>{
+ // Exact clock ticks render the live room; allow both boots and the final promotion on CI.
+ test.setTimeout(120_000);
+ await installClock();
  await boot(page,preparedReliability());await page.getByRole("button",{name:"Start reliability test",exact:true}).click();await advance(page,8);let c=(await savedGame(page)).campaign!;expect(c.apps[1].health).toBe("failed");expect(c.apps[1].detectedHealth).toBe("healthy");await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.apps[1].detectedHealth).toBe("unhealthy");expect(c.pending.some(a=>a.type==="promote-spare")).toBe(true);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.routing.targets).toEqual(["app-1","app-3"]);expect(c.apps).toHaveLength(3);await expect(page.getByRole("region",{name:"Stay Online"})).toContainText("3,200 /");
 });

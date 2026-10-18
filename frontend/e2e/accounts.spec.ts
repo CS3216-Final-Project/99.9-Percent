@@ -2,7 +2,8 @@ import { advanceCampaignStep } from "./fixtures";
 import {test,expect,seedSave,expectRoom,savedGame} from './fixtures';
 import {newGame} from '../src/sim';
 import type {AppSession,CloudRun} from '../../shared/campaign';
-test('saves to the cloud only when asked, resolves conflicts, keeps owners apart and loads in a fresh browser',async({page,context})=>{
+test('saves to the cloud only when asked, resolves conflicts, keeps owners apart and loads in a fresh browser',async({page,context, installClock})=>{
+ await installClock();
   test.setTimeout(150000);
   let session:AppSession|null={account:{id:'owner-a',displayName:'Player A'},csrfToken:'csrf-a'};
   let cloud:CloudRun|null=null,putCount=0;

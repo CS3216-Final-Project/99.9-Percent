@@ -96,7 +96,8 @@ test("compact Opening bar leaves its goal and overview available without Next", 
   }
 });
 
-test("finishing Scaling & Routing stops once to announce it and continues from the dialog", async ({ page, withoutRoom }) => {
+test("finishing Scaling & Routing stops once to announce it and continues from the dialog", async ({ page, withoutRoom , installClock}) => {
+ await installClock();
   await withoutRoom();
   await page.removeLocatorHandler(chapterComplete(page));
   await page.route("**/api/**", route => route.abort());
