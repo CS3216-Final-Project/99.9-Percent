@@ -34,7 +34,7 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
     await expect(page.getByRole("tooltip")).toHaveText("Handles customer requests and uses the Database for data.");
     await app.click();
     const evidence=page.locator('.campaign-panel .campaign-evidence');
-    await evidence.getByText("About App Server",{exact:true}).click();
+    await evidence.getByText("About Servers",{exact:true}).click();
     await expect(evidence).toContainText("Scale Up makes one existing");
 });
 

@@ -2,7 +2,7 @@
  * 99.99% - interface styles.
  *
  * Night shift at a tiny startup: an indigo server room, cream index cards with
- * warm borders and rounded controls with subtle pressed depth. Space Grotesk gives the
+ * warm borders and flat rounded controls with clear colour states. Space Grotesk gives the
  * logo, headings, controls and metrics a technical character; Source Sans 3
  * keeps body text and longer explanations easy to read.
  *
@@ -39,7 +39,7 @@
   /* Actions and status */
   --go: #ffd84a;
   --go-hover: #ffe680;
-  --focus: #4cb8ff;
+  --focus: #2d79ad;
   --ok: #3ddc84;
   --ok-ink: #0f7a45;
   --warn: #ff9f1a;
@@ -70,11 +70,28 @@
   --control-edge: #d8c8ad;
   --control-inset: #f2e8d4;
   --selection: #e8dcf5;
-  --tech-tile: #f6dda4;
-  --tech-ink: #604626;
+  --selection-edge: #9a82b1;
+  --control-hover: #f4e6ca;
+  --control-active: #ead8b5;
+  --primary-hover: #40334f;
+  --primary-active: #120e24;
+  --tile-gold: #f6dda4;
+  --tile-gold-ink: #604626;
+  --tile-blue: #dceaf6;
+  --tile-blue-ink: #345978;
+  --tile-green: #d7eee0;
+  --tile-green-ink: #315845;
+  --tile-pink: #f7dce5;
+  --tile-pink-ink: #84384f;
+  --tile-orange: #f7dfc6;
+  --tile-orange-ink: #79502b;
+  --tile-purple: #e8e1ed;
+  --tile-purple-ink: #665477;
+  --tech-tile: var(--tile-gold);
+  --tech-ink: var(--tile-gold-ink);
   --side-w: 348px;
-  --press: inset 0 1px 0 #ffffff30, 0 2px 0 #a28eae;
-  --lift: 0 4px 0 #ccbba066, 0 16px 35px #1c142a45;
+  --press: none;
+  --lift: 0 16px 40px rgb(28 20 42 / .22);
 }
 
 .tour-chapter { display: grid; gap: 4px; margin: 0 0 10px; font-family: var(--font-display); font-size: var(--text-sm); font-weight: 600; }
@@ -275,7 +292,7 @@ button:disabled {
   padding: 4px 10px 4px 6px;
   margin-bottom: 6px;
   background: var(--night-3);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   font-family: var(--font-display);
   font-size: var(--text-sm);
@@ -317,11 +334,11 @@ button:disabled {
   flex: none;
   display: grid;
   place-content: center;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   background: var(--paper-2);
   color: var(--ink);
-  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.18);
+  box-shadow: none;
 }
 
 .concept-cash {
@@ -461,9 +478,9 @@ button:disabled {
   gap: 10px;
   padding: 4px 10px 4px 4px;
   background: var(--night-3);
-  border: 2px solid var(--ink);
-  border-radius: 6px;
-  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.22);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
+  box-shadow: none;
 }
 
 .stat-icon {
@@ -559,9 +576,7 @@ button:disabled {
   color: var(--on-night);
   border: 2px solid var(--night-line);
   border-radius: var(--radius);
-  box-shadow:
-    0 3px 0 0 rgb(8 6 22 / 0.55),
-    0 14px 28px rgb(8 6 22 / 0.45);
+  box-shadow: var(--lift);
   font-family: var(--font-body);
   font-size: var(--text-xs);
   font-weight: 400;
@@ -597,7 +612,7 @@ button:disabled {
   background: var(--paper);
   color: var(--ink);
   border-radius: 3px;
-  box-shadow: 0 2px 0 0 var(--paper-3);
+  box-shadow: none;
   font-family: var(--font-num);
   font-size: var(--text-xs);
   font-weight: 700;
@@ -674,7 +689,7 @@ button:disabled {
   place-content: center;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
@@ -687,8 +702,8 @@ button:disabled {
 }
 
 .camera-buttons button:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .camera-hint {
@@ -710,7 +725,7 @@ button:disabled {
   background: var(--paper);
   color: var(--ink);
   border-radius: 3px;
-  box-shadow: 0 2px 0 var(--ink);
+  box-shadow: none;
   font-family: var(--font-num);
   font-size: var(--text-xs);
   font-weight: 700;
@@ -740,7 +755,7 @@ button:disabled {
   padding: 0 12px 0 5px;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
@@ -753,8 +768,8 @@ button:disabled {
 }
 
 .floor-button:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .floor-number {
@@ -776,7 +791,7 @@ button:disabled {
 
 .floor-button.is-here .floor-number {
   color: var(--go);
-  box-shadow: 0 0 6px 1px rgb(255 216 74 / 0.8);
+  box-shadow: none;
 }
 
 /* Something on a floor out of view needs the player: amber for a warning, red and pulsing for an incident. */
@@ -786,7 +801,7 @@ button:disabled {
   right: -6px;
   width: 14px;
   height: 14px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 50%;
   background: var(--warn);
 }
@@ -878,7 +893,7 @@ button:disabled {
   transform: translateX(-50%);
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
@@ -958,7 +973,7 @@ button:disabled {
   margin-top: -6px;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
@@ -1022,10 +1037,10 @@ button:disabled {
 @keyframes affected-glow {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgb(76 184 255 / 0.9), var(--press);
+    box-shadow: 0 0 0 0 rgb(76 184 255 / 0.9);
   }
   50% {
-    box-shadow: 0 0 0 8px rgb(76 184 255 / 0), var(--press);
+    box-shadow: 0 0 0 8px rgb(76 184 255 / 0);
   }
 }
 
@@ -1132,7 +1147,7 @@ button:disabled {
   padding: 10px 12px;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--lift);
   pointer-events: none;
@@ -1209,8 +1224,8 @@ button:disabled {
   padding: 8px 10px 8px 8px;
   background: var(--tone-wash);
   color: var(--ink);
-  border: 2px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   box-shadow: var(--press);
   font: inherit;
   text-align: left;
@@ -1245,9 +1260,9 @@ button:disabled {
   place-content: center;
   background: var(--tone);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
-  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.18);
+  box-shadow: none;
 }
 
 .callout-critical .callout-icon {
@@ -1290,8 +1305,8 @@ button:disabled {
 .callout-button {
   cursor: pointer;
   transition:
-    transform 0.05s,
-    box-shadow 0.05s;
+    background-color .12s ease,
+    border-color .12s ease;
 }
 
 .callout-button:hover {
@@ -1299,8 +1314,8 @@ button:disabled {
 }
 
 .callout-button:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 /* Inside panels: the same message, smaller and flat. */
@@ -1341,7 +1356,7 @@ button:disabled {
   padding: 8px 14px;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
@@ -1349,8 +1364,8 @@ button:disabled {
   font-size: var(--text-md);
   line-height: 1.2;
   transition:
-    transform 0.05s,
-    box-shadow 0.05s;
+    background-color .12s ease,
+    border-color .12s ease;
 }
 
 .btn:hover:not(:disabled) {
@@ -1358,8 +1373,8 @@ button:disabled {
 }
 
 .btn:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .btn:disabled {
@@ -1409,12 +1424,12 @@ button:disabled {
 .btn-big {
   padding: 13px 26px;
   font-size: var(--text-xl);
-  box-shadow: 0 5px 0 0 var(--ink);
+  box-shadow: none;
 }
 
 .btn-big:active:not(:disabled) {
-  transform: translateY(3px);
-  box-shadow: 0 2px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-row {
@@ -1468,7 +1483,7 @@ button:disabled {
   margin: 10px 0 0;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
@@ -1476,8 +1491,8 @@ button:disabled {
   font-size: var(--text-md);
   text-align: left;
   transition:
-    transform 0.05s,
-    box-shadow 0.05s;
+    background-color .12s ease,
+    border-color .12s ease;
 }
 
 /* The label keeps its line; the badges move under it when a narrow panel cannot fit both. */
@@ -1500,8 +1515,8 @@ button:disabled {
 }
 
 .act:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .act:disabled {
@@ -1531,7 +1546,7 @@ button:disabled {
   place-content: center;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
 }
@@ -1541,8 +1556,8 @@ button:disabled {
 }
 
 .icon-btn:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .icon-btn.is-on {
@@ -1643,7 +1658,7 @@ button:disabled {
   align-items: center;
   gap: 5px;
   padding: 1px 8px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   font-family: var(--font-display);
   font-weight: 600;
@@ -1705,7 +1720,7 @@ button:disabled {
 .meter {
   height: 14px;
   background: var(--paper-2);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -1714,7 +1729,7 @@ button:disabled {
   height: 100%;
   background-color: var(--c-users);
   background-image: repeating-linear-gradient(90deg, transparent 0 8px, rgb(29 24 52 / 0.2) 8px 10px);
-  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.15);
+  box-shadow: none;
   transition: width 0.25s steps(8, end);
 }
 
@@ -1863,8 +1878,8 @@ button:disabled {
   margin: 12px;
   overflow-y: auto;
   background: var(--paper);
-  border: 3px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   box-shadow: var(--lift);
   z-index: 28;
 }
@@ -1898,11 +1913,11 @@ button:disabled {
   flex: none;
   display: grid;
   place-content: center;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   background: var(--ok);
   color: var(--ink);
-  box-shadow: inset 0 -4px 0 rgb(0 0 0 / 0.18);
+  box-shadow: none;
 }
 
 .panel-icon.state-warn {
@@ -1922,7 +1937,7 @@ button:disabled {
   align-items: center;
   gap: 5px;
   padding: 1px 7px 1px 4px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   font-family: var(--font-display);
   font-size: var(--text-sm);
@@ -2013,7 +2028,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   background: var(--paper);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   overflow: hidden;
 }
@@ -2089,7 +2104,7 @@ button:disabled {
   padding: 6px 12px 6px 6px;
   background: var(--night-3);
   color: var(--on-night);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
@@ -2121,8 +2136,8 @@ button:disabled {
 }
 
 .view-tabs button:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .view-tabs button.is-active,
@@ -2161,7 +2176,7 @@ button:disabled {
 
 .speed {
   display: inline-flex;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--press);
@@ -2198,7 +2213,7 @@ button:disabled {
   min-height: 48px;
   padding: 10px 22px;
   font-size: var(--text-xl);
-  box-shadow: 0 4px 0 0 var(--ink);
+  box-shadow: none;
 }
 
 .advance-label,
@@ -2302,8 +2317,8 @@ button:disabled {
   position: absolute;
   left: 0;
   width: 100%;
-  border: 2px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   background: rgb(255 255 255 / 0.04);
 }
 
@@ -2378,8 +2393,8 @@ button:disabled {
   padding: 10px clamp(10px, 1cqi, 18px) 10px 10px;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   box-shadow: var(--press);
   text-align: left;
   overflow: hidden;
@@ -2393,10 +2408,10 @@ button:disabled {
   height: clamp(38px, 3cqi, 52px);
   display: grid;
   place-content: center;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   background: var(--c-tech);
-  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.18);
+  box-shadow: none;
 }
 
 .node-badge {
@@ -2408,7 +2423,7 @@ button:disabled {
   display: grid;
   place-content: center;
   background: var(--paper);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 3px;
 }
 
@@ -2445,8 +2460,8 @@ button:disabled {
 }
 
 .node:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .node.is-selected {
@@ -2513,7 +2528,7 @@ button:disabled {
 .swatch {
   width: 18px;
   height: 18px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 3px;
   background: var(--paper-3);
 }
@@ -2579,8 +2594,8 @@ button:disabled {
 .eng-col {
   padding: 14px 16px 18px;
   background: var(--paper);
-  border: 3px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   box-shadow: var(--press);
 }
 
@@ -2612,7 +2627,7 @@ button:disabled {
   height: 36px;
   display: grid;
   place-content: center;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   background: var(--paper-2);
   color: var(--text-soft);
@@ -2645,7 +2660,7 @@ button:disabled {
   padding: 7px 14px;
   background: var(--night-3);
   color: var(--on-night);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
@@ -2677,8 +2692,8 @@ button:disabled {
   margin: 0;
   padding: 10px 12px 8px;
   background: var(--paper);
-  border: 3px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   box-shadow: var(--press);
 }
 
@@ -2709,7 +2724,7 @@ button:disabled {
   height: 12px;
   margin-right: 5px;
   vertical-align: -1px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
 }
 
 .chart-legend b {
@@ -2752,8 +2767,8 @@ button:disabled {
   padding: 6px;
   max-width: 880px;
   background: var(--paper);
-  border: 3px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
 }
 
 .feed-item {
@@ -2799,8 +2814,8 @@ button:disabled {
 
 .pm-list > li {
   background: var(--paper);
-  border: 3px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
@@ -2863,7 +2878,7 @@ button:disabled {
   align-items: center;
   padding: 8px;
   background: var(--paper-2);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
 }
 
@@ -3079,7 +3094,7 @@ button:disabled {
   padding: 4px 10px 4px 4px;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
@@ -3106,8 +3121,8 @@ button:disabled {
 }
 
 .chip:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .chip.is-alert .chip-icon {
@@ -3165,7 +3180,7 @@ button:disabled {
   padding: 7px 10px;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   text-align: left;
@@ -3180,8 +3195,8 @@ button:disabled {
 }
 
 .action:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .action:disabled {
@@ -3227,11 +3242,9 @@ button:disabled {
   display: flex;
   flex-direction: column;
   background: var(--paper);
-  border: 3px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 8px;
-  box-shadow:
-    0 6px 0 0 var(--ink),
-    0 30px 60px rgb(0 0 0 / 0.5);
+  box-shadow: var(--lift);
   overflow: hidden;
 }
 
@@ -3317,7 +3330,7 @@ button:disabled {
   height: 120px;
   display: grid;
   place-items: center;
-  border: 3px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 50%;
   background: radial-gradient(circle at 50% 38%, var(--night-3), var(--night) 72%);
   color: var(--go);
@@ -3385,7 +3398,7 @@ button:disabled {
 
 .inspection-instance {
   padding: 1px 8px;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   background: var(--go);
   font-family: var(--font-display);
@@ -3428,7 +3441,7 @@ button:disabled {
   margin: 0;
   background: var(--ink);
   color: var(--on-night);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .menu-run-head {
@@ -3551,13 +3564,13 @@ button:disabled {
   padding: 10px;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   box-shadow: var(--press);
   text-align: left;
   transition:
-    transform 0.05s,
-    box-shadow 0.05s;
+    background-color .12s ease,
+    border-color .12s ease;
 }
 
 .menu-tile:hover {
@@ -3565,8 +3578,8 @@ button:disabled {
 }
 
 .menu-tile:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .menu-tile-body {
@@ -3640,7 +3653,7 @@ button:disabled {
   }
 
   .modal-menu .tab-strip button.is-active {
-    transform: translateX(3px);
+    transform: none;
   }
 
   .modal-menu .tab-panel {
@@ -3707,7 +3720,7 @@ button:disabled {
   padding: 10px 12px;
   background: #fff;
   border: 2px solid var(--paper-3);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .menu-confirm p {
@@ -3725,7 +3738,7 @@ button:disabled {
   margin-top: 14px;
   padding: 10px 12px 12px;
   background: var(--paper-2);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .menu-sub h5 {
@@ -3739,7 +3752,7 @@ button:disabled {
   padding: 4px 12px 12px;
   background: #ffedf0;
   border: 2px solid var(--critical);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .menu-danger > h4 {
@@ -3792,14 +3805,14 @@ button:disabled {
 .volume input[type="range"]::-webkit-slider-runnable-track {
   height: 10px;
   background: linear-gradient(to right, var(--go) var(--fill), var(--paper-2) var(--fill));
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 3px;
 }
 
 .volume input[type="range"]::-moz-range-track {
   height: 6px;
   background: var(--paper-2);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 3px;
 }
 
@@ -3813,9 +3826,9 @@ button:disabled {
   height: 22px;
   margin-top: -8px;
   background: var(--paper);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 3px;
-  box-shadow: 0 2px 0 0 var(--ink);
+  box-shadow: none;
   appearance: none;
 }
 
@@ -3823,9 +3836,9 @@ button:disabled {
   width: 14px;
   height: 18px;
   background: var(--paper);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 3px;
-  box-shadow: 0 2px 0 0 var(--ink);
+  box-shadow: none;
 }
 
 .volume input[type="range"]:focus-visible {
@@ -3962,7 +3975,7 @@ button:disabled {
   padding: 8px 6px;
   background: var(--paper-2);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-display);
@@ -3970,8 +3983,8 @@ button:disabled {
   font-size: var(--text-lg);
   line-height: 1.2;
   transition:
-    transform 0.05s,
-    box-shadow 0.05s;
+    background-color .12s ease,
+    border-color .12s ease;
 }
 
 .tab-strip button .icon {
@@ -3985,8 +3998,8 @@ button:disabled {
 .tab-strip button.is-active {
   background: var(--ink);
   color: var(--paper);
-  box-shadow: 0 0 0 0 var(--ink);
-  transform: translateY(3px);
+  box-shadow: none;
+  transform: none;
 }
 
 .tab-strip button:focus-visible {
@@ -4045,8 +4058,8 @@ button:disabled {
   height: 100%;
   padding: 12px 14px 12px 50px;
   background: var(--paper);
-  border: 2px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   box-shadow: var(--press);
 }
 
@@ -4059,7 +4072,7 @@ button:disabled {
   width: 24px;
   height: 24px;
   background: #fff;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: 50%;
 }
 
@@ -4175,12 +4188,12 @@ button:disabled {
 .field input {
   padding: 9px 11px;
   background: #fff;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   color: var(--ink);
   font: inherit;
   font-family: var(--font-body);
-  box-shadow: inset 0 3px 0 rgb(0 0 0 / 0.06);
+  box-shadow: none;
 }
 
 .howto {
@@ -4216,10 +4229,10 @@ button:disabled {
   display: grid;
   place-content: center;
   justify-items: center;
-  border: 3px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   background: var(--c-users);
-  box-shadow: inset 0 -6px 0 rgb(0 0 0 / 0.18);
+  box-shadow: none;
   font-family: var(--font-num);
   font-weight: 700;
   font-size: var(--text-4xl);
@@ -4283,7 +4296,7 @@ button:disabled {
   height: 36px;
   background: var(--paper);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   font-family: var(--font-num);
@@ -4330,7 +4343,7 @@ button:disabled {
 /* A window onto the one thing the step is about; everything else is dimmed. */
 .tour-hole {
   position: absolute;
-  border-radius: 6px;
+  border-radius: var(--radius);
   outline: 4px solid var(--go);
   box-shadow: 0 0 0 200vmax rgb(14 11 30 / 0.66);
   animation: pulse 1.2s steps(2) infinite;
@@ -4353,8 +4366,8 @@ button:disabled {
   pointer-events: auto;
   padding: 12px 14px 12px;
   background: var(--paper);
-  border: 3px solid var(--ink);
-  border-radius: 6px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
   box-shadow: var(--lift);
 }
 
@@ -4399,7 +4412,7 @@ button:disabled {
   margin-top: 10px !important;
   padding: 7px 10px;
   background: var(--go);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   font-weight: 600;
 }
@@ -4753,7 +4766,7 @@ button:disabled {
 .campaign-panel .step-head { margin-top: 10px; }
 /* Campaign history shares Classic's sheet, tabs, chart cards and feed. Its disclosures and
    stage outcomes sit on the same paper cards so they read on the night background. */
-.history-notes, .history-card { max-width: 880px; padding: 0 14px 12px; background: var(--paper); color: var(--ink); border: 3px solid var(--ink); border-radius: 6px; box-shadow: var(--press); }
+.history-notes, .history-card { max-width: 880px; padding: 0 14px 12px; background: var(--paper); color: var(--ink); border: 1px solid var(--control-edge); border-radius: var(--radius); box-shadow: var(--press); }
 .history-notes { margin-top: 14px; }
 .history-notes > .more:first-child { margin-top: 0; border-top: 0; }
 .history-notes > .more { padding-top: 12px; }
@@ -4762,7 +4775,7 @@ button:disabled {
 .campaign-feed .feed-item { grid-template-columns: 28px 76px 1fr; }
 .request-path { margin: 0 0 4px; font-size: var(--text-xs); }
 .modal select, .modal textarea { display: block; width: 100%; padding: 8px; margin: 8px 0; }
-.modal :focus-visible { outline: 3px solid #426788; outline-offset: 2px; }
+.modal :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 .instance-choices { display: grid; gap: 6px; margin-top: 8px; }
 .instance-choices .chip { display: block; width: 100%; white-space: normal; text-align: left; }
@@ -4770,7 +4783,7 @@ button:disabled {
 .scaling-controls fieldset { display: grid; gap: 6px; min-width: 0; border: 1px solid var(--paper-3); padding: 8px; }
 .route-choice { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
 .route-choice legend { grid-column: 1 / -1; }
-.route-choice button { min-height: 40px; padding: 6px 10px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--paper); color: var(--ink); font-family: var(--font-num); font-weight: 700; font-size: var(--text-sm); box-shadow: var(--press); }
+.route-choice button { min-height: 40px; padding: 6px 10px; border: 1px solid var(--control-edge); border-radius: var(--radius); background: var(--paper); color: var(--ink); font-family: var(--font-num); font-weight: 700; font-size: var(--text-sm); box-shadow: var(--press); }
 .route-choice button:hover:not(:disabled):not(.is-active) { background: var(--paper-2); }
 .route-choice button.is-active { background: var(--go); }
 .route-choice:disabled button { opacity: .55; box-shadow: none; }

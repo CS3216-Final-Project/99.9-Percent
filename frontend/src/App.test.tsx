@@ -108,7 +108,12 @@ describe("opening UI", () => {
     act(() => vi.advanceTimersByTime(6000));
     expect(useGame.getState().running).toBe(false);
     const id = useGame.getState().game.campaign!.runId;
-    expect(screen.getByText(/Stable game seconds: 0\/5/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Recovery progress" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Guided Mode requirements" }).textContent).toContain("Chapter requirements");
+    const recovery = screen.getByRole("region", { name: "Incident recovery" });
+    expect(recovery.textContent).toContain("Latency below 500 ms");
+    expect(recovery.textContent).toContain("Service errors below 1%");
+    expect(recovery.textContent).toContain("Traffic is being accepted and requests are completing");
     fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
@@ -164,15 +169,16 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   const campaignMenu = openMenu();
   const labels = (menu: HTMLElement) => within(within(menu).getByRole("tablist", { name: "Menu sections" })).getAllByRole("tab").map((t) => t.textContent);
   expect(labels(campaignMenu)).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]);
-  // As in Classic, the run card (with the paused notice) and Resume stay above the tabs; the Run tab opens first.
+  // The summary stays above the tabs; matching action buttons live in Run.
   expect(within(campaignMenu).getByRole("tab", { name: "Run" }).getAttribute("aria-selected")).toBe("true");
   for (const tab of ["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]) {
     openTab(campaignMenu, tab);
-    expect(within(campaignMenu).getByRole("region", { name: "This company" }).textContent).toContain("Time is paused");
-    expect(within(campaignMenu).getByRole("button", { name: "Resume" })).toBeTruthy();
+    expect(within(campaignMenu).getByRole("region", { name: "At a glance" })).toBeTruthy();
+    expect(within(campaignMenu).queryByText(/Time is paused/)).toBeNull();
+    expect(within(campaignMenu).queryByRole("button", { name: "Resume" }) !== null).toBe(tab === "Run");
   }
   openTab(campaignMenu, "Run");
-  expectButtons(campaignMenu, ["Save now", "How to play", "Save and exit", "Switch to Challenge Mode"]);
+  expectButtons(campaignMenu, ["Resume", "Save now", "How to play", "Exit", "Switch to Challenge Mode"]);
   expect(within(campaignMenu).queryByRole("button", { name: "Import save" })).toBeNull();
   openTab(campaignMenu, "Sound");
   fireEvent.change(within(campaignMenu).getByRole("slider", { name: "Music" }), { target: { value: "25" } });
@@ -194,14 +200,16 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
 
   const classicMenu = openMenu();
   expect(labels(classicMenu)).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]);
-  // The run summary and Resume stay above the tabs whichever one is open.
+  // The run summary stays above the tabs whichever one is open.
   for (const tab of ["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]) {
     openTab(classicMenu, tab);
-    expect(within(classicMenu).getByRole("region", { name: "This run" })).toBeTruthy();
-    expect(within(classicMenu).getByRole("button", { name: "Resume" })).toBeTruthy();
+    expect(within(classicMenu).getByRole("region", { name: "At a glance" })).toBeTruthy();
+    expect(within(classicMenu).queryByRole("button", { name: "Resume" }) !== null).toBe(tab === "Run");
   }
   openTab(classicMenu, "Run");
   expectButtons(classicMenu, ["Save now", "How to play", "Tutorial", "Switch to Guided Mode"]);
+  fireEvent.click(within(classicMenu).getByRole("button", { name: "Save now" }));
+  expect(screen.getByText("Saved", { exact: true })).toBeTruthy();
   expect(within(classicMenu).getByRole("region", { name: "Game mode" })).toBeTruthy();
   openTab(classicMenu, "Sound");
   expect(within(classicMenu).getByRole("slider", { name: "Music" }).getAttribute("aria-valuetext")).toBe("25%");
@@ -287,4 +295,71 @@ it("asks once before New company replaces the campaign, as Classic's Start over 
   fireEvent.click(within(menu).getByRole("button", { name: "Lose this company? Press again" }));
   expect(useGame.getState().game.campaign!.step).toBe(0);
   expect(useGame.getState().game.campaign!.runId).not.toBe(runId);
+});
+
+
+it("exits directly after saving the current progress and shows four matching Run actions", () => {
+  render(<StrictMode><App /></StrictMode>);
+  fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+  act(() => completeTutorialFixture());
+  const menu = openMenu();
+  expect(within(within(menu).getByRole("group", { name: "Run" })).getAllByRole("button").map(button => button.textContent)).toEqual(["Resume", "Save now", "How to play", "Exit"]);
+  fireEvent.click(within(menu).getByRole("button", { name: "Exit" }));
+  expect(useGame.getState().started).toBe(false);
+  expect(localStorage.getItem("nn.campaign.save.v1")).not.toBeNull();
+  expect(screen.queryByRole("dialog", { name: "Exit without saving?" })).toBeNull();
+});
+
+it("keeps an unsaved run open through cancellation and failed save retries, then saves before exiting", () => {
+  render(<StrictMode><App /></StrictMode>);
+  fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+  act(() => completeTutorialFixture());
+  const menu = openMenu();
+  const raw = localStorage.getItem("nn.campaign.save.v1");
+  const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("Full", "QuotaExceededError"); });
+  try {
+    fireEvent.click(within(menu).getByRole("button", { name: "Exit" }));
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(useGame.getState().started).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    const exit = screen.getByRole("button", { name: "Exit" });
+    expect(document.activeElement).toBe(exit);
+    expect(screen.getByText("Not saved", { exact: true })).toBeTruthy();
+    fireEvent.click(exit);
+    fireEvent.click(screen.getByRole("button", { name: "Save and exit" }));
+    expect(screen.getByRole("dialog", { name: "Exit without saving?" })).toBeTruthy();
+    expect(useGame.getState().started).toBe(true);
+    expect(localStorage.getItem("nn.campaign.save.v1")).toBe(raw);
+  } finally { write.mockRestore(); }
+  fireEvent.click(screen.getByRole("button", { name: "Save and exit" }));
+  expect(useGame.getState().started).toBe(false);
+  expect(useGame.getState().saveStatus).toBe("saved");
+});
+
+it("requires explicit exit confirmation for a blocked save and preserves its original bytes", () => {
+  localStorage.setItem("nn.campaign.save.v1", "{");
+  render(<StrictMode><App /></StrictMode>);
+  fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+  act(() => completeTutorialFixture());
+  const menu = openMenu();
+  fireEvent.click(within(menu).getByRole("button", { name: "Exit" }));
+  expect(useGame.getState().started).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Exit without saving" }));
+  expect(useGame.getState().started).toBe(false);
+  expect(localStorage.getItem("nn.campaign.save.v1")).toBe("{");
+});
+
+
+it("wraps the week clock without losing the total elapsed counter", () => {
+  render(<App />);
+  act(() => { useGame.getState().play(); completeTutorialFixture(); });
+  act(() => {
+    const game = structuredClone(useGame.getState().game);
+    game.campaign!.step = 65; game.turn = 2;
+    useGame.setState({ game, running: false });
+  });
+  expect(document.querySelector(".dock-second")?.textContent).toBe("5 / 60 s");
+  expect(screen.getByTestId("physical-step").textContent).toBe("65");
+  expect(screen.getByRole("progressbar", { name: "Operating week progress" }).getAttribute("aria-valuenow")).toBe("8");
+  expect(document.querySelector(".week")?.textContent).toContain("Week 2");
 });

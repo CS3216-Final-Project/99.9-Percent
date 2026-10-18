@@ -27,7 +27,7 @@
   display: flex; align-items: center; justify-content: center; gap: 6px;
   height: 44px; padding: 0 10px; cursor: pointer; list-style: none;
   background: var(--night-3); color: var(--on-night);
-  border: 2px solid var(--ink); border-radius: var(--radius); box-shadow: var(--press);
+  border: 1px solid var(--control-edge); border-radius: var(--radius); box-shadow: var(--press);
   font-family: var(--font-display); font-weight: 600; font-size: var(--text-sm); white-space: nowrap;
 }
 .dock-menu > summary::-webkit-details-marker { display: none; }
@@ -43,7 +43,7 @@
   position: absolute; bottom: calc(100% + 10px); right: 12px; z-index: 60;
   width: 294px; max-width: calc(100vw - 24px); max-height: min(440px, 55dvh); overflow: auto;
   padding: 14px; background: var(--paper); color: var(--ink);
-  border: 2px solid var(--ink); border-radius: var(--radius); box-shadow: 0 4px 0 var(--ink);
+  border: 1px solid var(--control-edge); border-radius: var(--radius); box-shadow: var(--lift);
 }
 .dock-panel h3 { font-family: var(--font-display); font-size: var(--text-md); margin: 0 0 12px; }
 .room-menu .dock-panel { right: max(12px, calc(50% - 147px)); }

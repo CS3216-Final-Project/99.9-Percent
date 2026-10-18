@@ -98,9 +98,6 @@ export default function IncidentPanel() {
 
       <div className="incident-investigate">
         <h4 className="step-head">
-          <span className="step-num" aria-hidden="true">
-            1
-          </span>
           <Tip text={`Click equipment in the room or here. Each look takes ${lookSeconds < 2 ? "about a second" : `${Math.round(lookSeconds)} seconds`} of clock time. Monitoring makes it faster.`}>
             Find the cause
           </Tip>
@@ -146,9 +143,6 @@ export default function IncidentPanel() {
       </div>
 
       <h4 className="step-head">
-        <span className="step-num" aria-hidden="true">
-          2
-        </span>
         Pick the fix
       </h4>
       {pending && (
@@ -162,14 +156,14 @@ export default function IncidentPanel() {
           <li key={o.id}>
             <button type="button" className="action" {...tipProps(o.description)} disabled={!!pending} onClick={() => act({ type: "incident_action", recovery: o.id })}>
               <span className="action-title">{o.label}</span>
-              <span className="price">
+              <span className="act-meta"><span className="price">
                 <Icon name="cash" size={12} />
                 {o.costNote ?? (o.cost > 0 ? moneyFull(o.cost) : "Free")}
               </span>
               <span className="price">
-                <Icon name="latency" size={12} />
+                <Icon name="time" size={16} />
                 {o.secondsNote ?? `${o.seconds}s`}
-              </span>
+              </span></span>
             </button>
           </li>
         ))}

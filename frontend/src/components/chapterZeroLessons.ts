@@ -15,17 +15,17 @@ const snapshot = (s: Snapshot) => s.game.campaign!.snapshot;
 export const CHAPTER_ZERO_LESSONS: ChapterZeroLesson[] = [
   {
     title: "Meet your system",
-    emphasis: ["System evidence", "App Server", "App Servers", "demand", "capacity", "backlog"],
+    emphasis: ["Inspect equipment", "App Server", "App Servers", "demand", "capacity", "backlog"],
     why: (s) => `Your customers currently send ${num(snapshot(s).incoming)} requests each second. App Servers handle those requests, asking the Database for data when needed. Inspecting a component shows how much work reaches it, how much it can handle and whether any work is waiting. These readings help you decide where an upgrade would actually help.`,
   },
   {
     title: "Follow a request",
-    emphasis: ["System evidence", "Database", "App Servers"],
+    emphasis: ["Inspect equipment", "Database", "App Servers"],
     why: "A request often needs more than one part of your system. The App Server handles the customer's request, while the Database stores and retrieves the data it needs. Even when the App Server has spare capacity, a busy Database can hold up the response. Inspect both components to understand where work is waiting.",
   },
   {
     title: "Read the evidence",
-    emphasis: ["App Server", "Database", "System evidence", "demand", "capacity", "Inspection is free"],
+    emphasis: ["App Server", "Database", "Inspect equipment", "demand", "capacity", "Inspection is free"],
     why: "Demand is the work arriving each second; capacity is the work a component can handle in that time. When demand exceeds capacity, unfinished work builds up in the backlog and customers may wait longer. Compare the two readings for each component before spending money. Inspection is free and keeps the company paused.",
   },
   {
@@ -76,7 +76,7 @@ export const CHAPTER_ZERO_LESSONS: ChapterZeroLesson[] = [
   {
     title: "Find your way around",
     emphasis: ["server floor", "office", "Floor buttons", "Reset view", "Walk mode is optional"],
-    why: "Your company has two floors: the server floor contains its infrastructure, and the office contains its crew and work areas. Use the floor buttons to move between them, then zoom or rotate to get a clearer view. Reset view brings the camera back when you lose your bearings. Walking is optional; you can inspect equipment directly through its label or System evidence.",
+    why: "Your company has two floors: the server floor contains its infrastructure, and the office contains its crew and work areas. Use the floor buttons to move between them, then zoom or rotate to get a clearer view. Reset view brings the camera back when you lose your bearings. Walking is optional; you can inspect equipment directly through its label or Inspect equipment.",
   },
   {
     title: "Technology and deployment",

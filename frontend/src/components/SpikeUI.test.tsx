@@ -18,6 +18,7 @@ it("extends the current strip with factual available continuation and no new sto
 });
 it("shows live provisioning, counters, delayed routing and per-instance shared selection",()=>{
  show(untilOffset(spikeCompany(),13));const control=screen.getByRole("region",{name:"Traffic spikes and autoscaling"});expect(control.textContent).toContain("TRAFFIC SPIKE ACTIVE");expect(control.textContent).toContain("3 game seconds, followed by 1 routing game second");
+ fireEvent.click(screen.getByRole("button",{name:"App Server"}));
  expect(screen.getByRole("note",{name:"App 3 routing status"}).textContent).toContain("Installed capacity does not receive traffic");
  fireEvent.click(within(screen.getByRole("region",{name:"Application instances"})).getByRole("button",{name:/App 3:/}));expect(useGame.getState().selectedAppId).toBe("app-3");
  expect(screen.getAllByRole("status").some(x=>x.textContent?.includes("Routing change: activates in 1"))).toBe(true);

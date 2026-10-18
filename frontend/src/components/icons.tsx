@@ -1,5 +1,5 @@
 import {
-  AlarmClock, ChartNoAxesCombined, ArrowBigUp, ArrowRight, Bug, CalendarDays,
+  AlarmClock, Clock, Timer, CircleAlert, LayoutDashboard, PanelRightClose, PanelRightOpen, ChartNoAxesCombined, ArrowBigUp, ArrowRight, Bug, CalendarDays,
   ChartLine, Check, ChevronDown, SquareCheck, X, Cloud, Wallet, Copy, Database,
   Download, Eye, EyeOff, Flame, Flag, Frown, Network, Globe, HeartPulse,
   Hourglass, Info, Laptop, Lightbulb, LockKeyhole, LogIn, LogOut, Mail,
@@ -14,7 +14,7 @@ import {
 /** Stable concept names shared by the HUD, room, panels and reports. */
 const ICONS = {
   cash: Wallet, users: Users, revenue: TrendingUp, health: HeartPulse,
-  week: CalendarDays, goal: Trophy,
+  overview: LayoutDashboard, panelClose: PanelRightClose, panelOpen: PanelRightOpen, error: CircleAlert, backlog: Layers, timer: Timer, week: CalendarDays, time: Clock, goal: Trophy,
   server: Server, database: Database, network: Globe, bolt: Zap, copy: Copy,
   save: Save, download: Download, upload: Upload, monitor: Monitor, plug: Plug,
   ship: Ship, megaphone: Megaphone, team: Laptop,

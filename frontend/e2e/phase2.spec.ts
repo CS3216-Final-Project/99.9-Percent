@@ -13,13 +13,13 @@ test("the mandatory walkthrough works from the keyboard across the guide and rea
   await page.keyboard.press("Enter");
   await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
   await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
-  await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
+  await expect(card).toHaveAccessibleName("Walkthrough, step 2 of 21");
   await panel.getByRole("button", { name: "Database", exact: true }).press("Enter");
   await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
   await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
-  await expect(card).toHaveAccessibleName("Tutorial, step 3 of 21");
+  await expect(card).toHaveAccessibleName("Walkthrough, step 3 of 21");
   await card.getByRole("button", { name: "Back", exact: true }).press("Enter");
-  await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
+  await expect(card).toHaveAccessibleName("Walkthrough, step 2 of 21");
   await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
   await panel.getByRole("button", { name: "Database", exact: true }).focus();
   await expect(panel.getByRole("button", { name: "Database", exact: true })).toBeFocused();

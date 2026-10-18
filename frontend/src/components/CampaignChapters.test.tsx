@@ -77,10 +77,10 @@ it("integrates How to play into Chapter 0 and replays it on the same company", (
   const game = newGame();
   useGame.setState({ game, started: true, ready: true, tour: { track: "campaign", step: 0 } });
   render(<CampaignChapters />);
-  expect(screen.getByLabelText("Current chapter").textContent).toBe("Getting started");
-  expect(screen.getByRole("region", { name: "Guided Mode chapters" }).textContent).toContain("Chapter 0 · Tutorial");
+  expect(screen.getByLabelText("Current chapter").textContent).toBe("Walkthrough");
+  expect(screen.getByRole("region", { name: "Guided Mode chapters" }).textContent).toContain("Chapter 0");
   fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
-  fireEvent.click(screen.getByRole("button", { name: "Replay Chapter 0" }));
+  fireEvent.click(screen.getByRole("button", { name: "Replay walkthrough" }));
   expect(useGame.getState().game).toBe(game);
   expect(useGame.getState().tour).toEqual({ track: "campaign", step: 0 });
   expect(useGame.getState().running).toBe(false);
@@ -93,12 +93,12 @@ it("marks practice in progress without a completed checkmark and restores the sa
   render(<CampaignChapters />);
   fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
   const dialog = screen.getByRole("dialog", { name: "Guided Mode chapters" });
-  const chapter = within(dialog).getByRole("heading", { name: "Getting started" }).closest("li")!;
+  const chapter = within(dialog).getByRole("heading", { name: "Walkthrough" }).closest("li")!;
   expect(chapter.textContent).toContain("In progress");
   expect(chapter.textContent).not.toContain("Completed");
   expect(chapter.querySelector(".chapter-number")!.textContent).toBe("0");
   expect(within(dialog).getByRole("heading", { name: "Opening" }).closest("li")!.textContent).toContain("Available next");
-  fireEvent.click(within(dialog).getByRole("button", { name: "Exit Chapter 0" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Exit walkthrough" }));
   expect(screen.getByLabelText("Current chapter").textContent).toBe("Opening");
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(useGame.getState()).toMatchObject({ tour: null, running: false, meta: { tutorialDone: true, walkthroughStep: null } });

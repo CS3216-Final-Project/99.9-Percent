@@ -42,7 +42,7 @@ it.each(["streak","outcome","acknowledged"])("reload preserves prevention %s wit
  render(ui());expect(useGame.getState().running).toBe(false);
  if(kind==="streak")expect(screen.getByRole("region",{name:"Opening prevention progress"}).textContent).toContain("Stable service: 2 / 5");
  if(kind==="outcome")expect(screen.getByRole("dialog",{name:"Prevention review"})).toBeTruthy();
- if(kind==="acknowledged"){expect(screen.queryByRole("dialog")).toBeNull();expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe("Getting started");}
+ if(kind==="acknowledged"){expect(screen.queryByRole("dialog")).toBeNull();expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe("Walkthrough");}
  expect(useGame.getState().game.campaign).toEqual(g.campaign);
 });
 it("history excludes purchases made after qualification",()=>{

@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { Icon, type IconName } from "./icons";
 import { Concept, type ConceptKind } from "./ui";
+import { tipProps } from "./tips";
 
 export interface MenuRunStat {
   icon: IconName;
@@ -10,15 +11,26 @@ export interface MenuRunStat {
 }
 
 /**
- * What stays above the menu's tabs in both modes: the run at a glance, whether it is saved,
- * and the way back to it.
+ * What stays above the menu's tabs in both modes: the run at a glance and its save status.
  */
-export function MenuRun({ title, saved, stats, note, onResume }: { title: string; saved: boolean; stats: MenuRunStat[]; note: ReactNode; onResume: () => void }) {
+export function MenuRun({ title, saved, stats, note }: { title: string; saved: boolean; stats: MenuRunStat[]; note?: ReactNode }) {
   return (
     <div className="menu-overview">
       <section className="menu-run" aria-label={title}>
         <div className="menu-run-head">
-          <span className="menu-run-title">{title}</span>
+          <span className="menu-run-title"><Icon name="overview" size={22} />{title}</span>
+        </div>
+        <dl className={`menu-run-stats${stats.length > 3 ? " menu-run-stats-expanded" : ""}`}>
+          {stats.map((s) => (
+            <div key={s.label}>
+              <Concept kind={s.kind} icon={s.icon} />
+              <dt>{s.label}</dt>
+              <dd>{s.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="menu-run-foot">
+          {note && <p className="menu-seed">{note}</p>}
           {saved ? (
             <span className="tag tag-ok">
               <Icon name="save" size={12} />
@@ -31,38 +43,26 @@ export function MenuRun({ title, saved, stats, note, onResume }: { title: string
             </span>
           )}
         </div>
-        <dl className="menu-run-stats">
-          {stats.map((s) => (
-            <div key={s.label}>
-              <Concept kind={s.kind} icon={s.icon} />
-              <dt>{s.label}</dt>
-              <dd>{s.value}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="menu-seed">{note}</p>
       </section>
 
-      <button type="button" className="btn btn-primary btn-big menu-resume" aria-label="Resume" autoFocus onClick={onResume}>
-        <Icon name="play" />
-        <span>
-          <strong>Resume</strong>
-          <small>Back to the server room</small>
-        </span>
-      </button>
     </div>
   );
 }
 
-/** A big, labelled menu choice: what it is, and one line on what it does. */
-export function MenuTile({ icon, kind, title, text, onClick, danger = false }: { icon: IconName; kind: ConceptKind; title: string; text: string; onClick: () => void; danger?: boolean }) {
+/** Matching action buttons in the Run tab, with Resume first. */
+export function MenuActions({ onResume, children }: { onResume: () => void; children: ReactNode }) {
+  return <div className="menu-grid" role="group" aria-label="Run">
+    <MenuTile icon="play" title="Resume" text="Return to the room." onClick={onResume} primary />
+    {children}
+  </div>;
+}
+
+/** A compact menu button; its explanation is available on hover or focus. */
+export function MenuTile({ icon, title, text, onClick, danger = false, primary = false, buttonRef }: { icon: IconName; kind?: ConceptKind; title: string; text: string; onClick: () => void; danger?: boolean; primary?: boolean; buttonRef?: Ref<HTMLButtonElement> }) {
   return (
-    <button type="button" className={`menu-tile${danger ? " is-danger" : ""}`} onClick={onClick} aria-label={title}>
-      <Concept kind={danger ? "critical" : kind} icon={danger ? "alert" : icon} />
-      <span className="menu-tile-body">
-        <strong>{title}</strong>
-        <span>{danger ? "Your current run will be replaced." : text}</span>
-      </span>
+    <button ref={buttonRef} type="button" className={`menu-tile${primary ? " menu-resume" : ""}${danger ? " is-danger" : ""}${primary ? " is-primary" : ""}`} onClick={onClick} aria-label={title} {...tipProps(danger ? "Your current run will be replaced." : text)}>
+      <Icon name={danger ? "alert" : icon} size={20} />
+      <span>{title}</span>
     </button>
   );
 }

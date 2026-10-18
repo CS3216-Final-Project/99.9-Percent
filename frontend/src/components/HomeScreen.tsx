@@ -32,7 +32,7 @@ function classicSummary(game: GameState | null, tutorialDone: boolean): Summary 
 const MODES: Record<GameMode, { name: string; icon: IconName; pace: string; about: string }> = {
   campaign: {
     name: "Guided Mode", icon: "server", pace: "Continuous play · Six guided chapters",
-    about: "Begin with Chapter 0 to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.",
+    about: "Begin with the walkthrough to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.",
   },
   classic: {
     name: "Challenge Mode", icon: "week", pace: `Week by week · ${BALANCE.maxTurns}-week challenge`,
@@ -115,7 +115,6 @@ export function HomeScreen() {
   return <div className="title-screen home-screen">
     <div className="home-card">
       <header className="home-head">
-        <span className="title-kicker"><Icon name="server" size={16} />A system design tycoon</span>
         <div className="home-chips">
           <AvatarButton />
           <AccountButton />
@@ -134,7 +133,6 @@ export function HomeScreen() {
         {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved">
           This run could not be saved, so switching now loses it. Press the red button again to switch anyway.
         </Callout>}
-        <p className="mode-note">Guided Mode comes first: finish the first five chapters to unlock Challenge Mode. Each mode keeps its own save.</p>
       </section>
       <AnalyticsConsentPanel />
       <footer className="home-foot">
@@ -178,7 +176,7 @@ function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, autoFocus,
         {mode === "classic" && summary.resumable && <button type="button" className="btn" disabled={busy} onClick={onNew}>New game</button>}
       </div>
       {/* A closed company has no Opening left to walk through. */}
-      {summary.tutorialDone && !(mode === "campaign" && summary.ended) && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>Replay the tutorial</button>}
+      {summary.tutorialDone && !(mode === "campaign" && summary.ended) && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>{mode === "campaign" ? "Replay walkthrough" : "Replay the tutorial"}</button>}
     </>}
   </section>;
 }

@@ -50,7 +50,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  if(strategy==="cache") {
   await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Read Cache",exact:true}).click();
   await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");
-  await data.locator("summary").filter({hasText:"Detailed workload and cache evidence"}).click();
+  await data.locator("summary").filter({hasText:"Observe another workload"}).click();
   await data.getByRole("button",{name:"Observe contrasting workload",exact:true}).click();
   await page.getByRole("button",{name:"Run",exact:true}).click();await expect.poll(async()=>(await savedGame(page)).campaign!.snapshot.db.demand).toBe(2112);
   await expect.poll(async()=>!!(await savedGame(page)).campaign!.incident).toBe(true);await page.getByRole("button",{name:"Pause",exact:true}).click();

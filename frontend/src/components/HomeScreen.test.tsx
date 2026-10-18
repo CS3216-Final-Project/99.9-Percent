@@ -91,12 +91,12 @@ it("starts a new Challenge Mode game from a Guided Mode home screen when asked",
 it("replays Guided Mode's walkthrough on a fresh practice company, preserving the saved company", () => {
   saveGame(advanceSteps(newGame(4, "replay-company"), 3).state, 0, true);
   let choices = boot("campaign");
-  expect(within(card(choices, "Guided Mode")).queryByRole("button", { name: "Replay the tutorial" })).toBeNull();
+  expect(within(card(choices, "Guided Mode")).queryByRole("button", { name: "Replay walkthrough" })).toBeNull();
   cleanup();
   useGame.setState(useGame.getInitialState(), true);
   saveMeta({ ...DEFAULT_META, tutorialDone: true });
   choices = boot("campaign");
-  fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay the tutorial" }));
+  fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay walkthrough" }));
   expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, tour: { track: "campaign", step: 0 } });
   expect(useGame.getState().game.campaign!.step).toBe(0);
   expect(useGame.getState().tutorialCompany!.game.campaign).toMatchObject({ runId: "replay-company", step: 3 });
@@ -111,7 +111,7 @@ it("replays Guided Mode's walkthrough from a Challenge Mode home screen, keeping
   useGame.getState().boot();
   render(<StrictMode><HomeScreen /></StrictMode>);
   const choices = screen.getByRole("region", { name: "Choose how you want to play" });
-  fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay the tutorial" }));
+  fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay walkthrough" }));
   expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, tour: { track: "campaign", step: 0 } });
   expect(useGame.getState().tutorialCompany!.game.campaign!.runId).toBe("waiting-company");
   expect(useGame.getState().game.campaign!.step).toBe(0);
@@ -128,7 +128,7 @@ it("offers no Guided Mode walkthrough for a closed company", () => {
   render(<StrictMode><HomeScreen /></StrictMode>);
   const guided = card(screen.getByRole("region", { name: "Choose how you want to play" }), "Guided Mode");
   expect(guided.textContent).toContain("Company closed");
-  expect(within(guided).queryByRole("button", { name: "Replay the tutorial" })).toBeNull();
+  expect(within(guided).queryByRole("button", { name: "Replay walkthrough" })).toBeNull();
 });
 
 it("asks before switching away from a game that cannot be saved", () => {

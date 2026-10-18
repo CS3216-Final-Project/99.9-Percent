@@ -28,6 +28,7 @@ for (const width of [1440, 390]) {
       const expandedRail = await operations.boundingBox();
       expect(expandedRail!.y).toBeGreaterThanOrEqual(expandedRoom!.y + expandedRoom!.height - 1);
       expect(expandedRoom!.height).toBeGreaterThan(300);
+      expect(expandedRail!.height).toBeLessThanOrEqual(page.viewportSize()!.height * 0.3 + 1);
     } else {
       expect(railBox!.x).toBe(0);
       expect(roomBox!.x).toBeGreaterThanOrEqual(railBox!.x + railBox!.width);

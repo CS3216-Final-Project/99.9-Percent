@@ -8,13 +8,13 @@
   padding: 6px 14px 6px 8px;
   background: var(--night-3);
   color: var(--on-night);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   box-shadow: var(--press);
   text-align: left;
   transition:
-    transform 0.05s,
-    box-shadow 0.05s;
+    background-color .12s ease,
+    border-color .12s ease;
 }
 
 .account-chip:hover {
@@ -22,8 +22,8 @@
 }
 
 .account-chip:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 0 var(--ink);
+  transform: none;
+  box-shadow: none;
 }
 
 .account-chip > .icon {
@@ -62,7 +62,7 @@
   height: 36px;
   background: var(--c-tech);
   color: var(--ink);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   font-family: var(--font-display);
   font-weight: 700;
@@ -244,7 +244,7 @@
   gap: 12px;
   padding: 12px;
   background: var(--paper-2);
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
 }
 
@@ -308,7 +308,7 @@
   gap: 10px 12px;
   padding: 10px 12px;
   background: #fff;
-  border: 2px solid var(--ink);
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius);
 }
 

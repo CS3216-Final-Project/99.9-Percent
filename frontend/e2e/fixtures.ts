@@ -49,7 +49,7 @@ export { expect };
 export const chapterComplete = (page: Page) => page.getByRole('dialog', { name: /^(Scaling & Routing|Data Strategy) complete$/ });
 
 /** The Guided Mode walkthrough's card, whichever step it shows. */
-export const tutorial = (page: Page) => page.getByRole('dialog', { name: /^Tutorial, step/ });
+export const tutorial = (page: Page) => page.getByRole('dialog', { name: /^(?:Walkthrough|Tutorial), step/ });
 
 /** Seeds a company whose player has finished the walkthrough and seen every chapter's guide, unless `meta` says otherwise. */
 export async function seedSave(page: Page, game: GameState, extraMeta: Partial<Meta> = {}) {
@@ -203,7 +203,7 @@ export async function nextChapterZero(page: Page, touch = false) {
 export async function finishChapterZero(page: Page, touch = false) {
   const card = tutorial(page);
   for (let lesson = 0; lesson < 21; lesson++) {
-    const finish = card.getByRole("button", { name: "Finish Chapter 0", exact: true });
+    const finish = card.getByRole("button", { name: "Finish walkthrough", exact: true });
     if (await finish.count()) { if (touch) await finish.tap(); else await finish.click(); return; }
     await nextChapterZero(page, touch);
   }
