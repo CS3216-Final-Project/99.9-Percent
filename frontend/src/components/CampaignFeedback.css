@@ -1,0 +1,22 @@
+.campaign-guidance-cue, .campaign-context-cue, .campaign-traffic-cue > .act {
+  outline: 4px solid var(--go);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--night), 0 0 18px 7px color-mix(in srgb, var(--go) 65%, transparent);
+  animation: campaign-guidance-glow 1.8s ease-in-out infinite;
+}
+.campaign-context-cue { scroll-margin: 12px; }
+.campaign-guidance-cue:focus-visible, .campaign-context-cue:focus-visible, .campaign-traffic-cue > .act:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 8px;
+  box-shadow: 0 0 0 3px var(--night), 0 0 0 7px var(--go), 0 0 18px 7px color-mix(in srgb, var(--go) 65%, transparent);
+}
+@keyframes campaign-guidance-glow {
+  50% { box-shadow: 0 0 0 3px var(--night), 0 0 0 7px var(--go), 0 0 24px 9px color-mix(in srgb, var(--go) 80%, transparent); }
+}
+.campaign-recovery { text-align: center; }
+.campaign-recovery .recovery-mark { display: inline-flex; margin: 8px auto; animation: campaign-recovery-arrive .45s ease-out; }
+.campaign-recovery .modal-foot { justify-content: center; }
+@keyframes campaign-recovery-arrive { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .campaign-guidance-cue, .campaign-context-cue, .campaign-traffic-cue > .act, .campaign-recovery .recovery-mark { animation: none; }
+}

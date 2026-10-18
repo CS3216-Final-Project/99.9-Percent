@@ -1,4 +1,4 @@
-import { setGameSpeed } from "./fixtures";
+import { reviewRecovery, declineIdleHint, setGameSpeed } from "./fixtures";
 import { advanceCampaignStep } from "./fixtures";
 import {test,expect,expectRoom,seedSave,savedGame} from "./fixtures";
 import {act,tick,dataCompany,spikeCompany,untilOffset} from "../src/sim/__tests__/spikeFixtures";
@@ -27,7 +27,7 @@ async function clockUntilDialog(page:Page,name:string){
 
 test("spikes: explicit continuation, delayed autoscaling, retirement and reload without API",async({page,withoutRoom, installClock})=>{
  await installClock({time:new Date("2026-10-10T00:00:00Z")});
- test.setTimeout(150000);const api=await blockedGuest(page,dataCompany());await page.clock.pauseAt(new Date("2026-10-10T00:01:00Z"));
+ test.setTimeout(150000);const api=await blockedGuest(page,dataCompany());await page.clock.pauseAt(new Date("2026-10-10T00:01:00Z"));await declineIdleHint(page);
  await page.getByRole("button",{name:"View chapters",exact:true}).click();
  const overview=page.getByRole("dialog",{name:"Guided Mode chapters"});
  await expect(overview.getByRole("listitem").filter({hasText:"Traffic Spikes"})).toContainText("Available next");
@@ -51,10 +51,10 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);
  await clockTo(page,n+14);expect((await savedGame(page)).campaign!.snapshot.app.capacity).toBe(4200);
  await setGameSpeed(page,2);await page.getByRole("button",{name:"Run",exact:true}).click();
- await clockUntilDialog(page,"Incident postmortem");
+ await clockUntilDialog(page,"System Recovered!");await reviewRecovery(page);
  await expect(page.getByRole("dialog")).toContainText("provisioning and routing");await page.getByRole("button",{name:"Continue company",exact:true}).click();
  await clockTo(page,n+40);c=(await savedGame(page)).campaign!;expect(c.apps.some(a=>a.id==="app-4")).toBe(false);expect(c.trace.some(t=>t.type==="autoscale-instance-retired")).toBe(true);
- await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Incident postmortem");await page.getByRole("button",{name:"Continue company",exact:true}).click();
+ await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"System Recovered!");await reviewRecovery(page);await page.getByRole("button",{name:"Continue company",exact:true}).click();
  await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Spike response handled");
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(page.getByRole("dialog",{name:"Spike response handled"})).toBeVisible();
  await page.getByRole("button",{name:"Continue operating",exact:true}).click();expect((await savedGame(page)).campaign!.runId).toBe(before.runId);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
@@ -62,7 +62,7 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
 test("spikes: manual planning installs, scales and routes capacity through room controls",async({page, installClock})=>{
  await installClock();
  const api=await blockedGuest(page,spikeCompany(false));const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
- await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
+ await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));await declineIdleHint(page);
  await setGameSpeed(page,2);
  await page.getByRole("button",{name:/Add server/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:2,resumeClock:false});
  // Render the installed rack while physical game time stays paused.
@@ -91,7 +91,7 @@ test("spikes: manually planned capacity survives the announced wave without an a
  await installClock();
  test.setTimeout(90000);
  const api=await blockedGuest(page,manualSpikePlan(),false);
- await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
+ await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));await declineIdleHint(page);
  await setGameSpeed(page,2);
  const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
  await advanceCampaignStep(page,{seconds:n+28-(await savedGame(page)).campaign!.step,resumeClock:false});
@@ -106,7 +106,7 @@ test("spikes: write-heavy DB constraint remains after automatic app routing",asy
  const control=page.getByRole("region",{name:"Traffic spikes and autoscaling"});await expect(control).toContainText("cannot increase DB capacity");
  expect((await savedGame(page)).campaign!.snapshot.db.demand).toBeGreaterThan(3000);
  await page.getByRole("button",{name:"Limit to 500 requests/s"}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await setGameSpeed(page,2);await page.getByRole("button",{name:"Run",exact:true}).click();
- await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});await expect(page.getByRole("dialog")).toContainText("does not increase database capacity");
+ await reviewRecovery(page);await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});await expect(page.getByRole("dialog")).toContainText("does not increase database capacity");
  const c=(await savedGame(page)).campaign!;expect(c.dbCapacity).toBe(3000);expect(c.readCache!.target).toBe(6000);expect(c.limit).toBe(500);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
 

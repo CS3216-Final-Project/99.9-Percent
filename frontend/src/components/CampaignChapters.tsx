@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { campaignChapters, chapterAdvance } from "@/game/campaignChapters";
-import { campaignGuidance, campaignObjective } from "@/game/campaignGuidance";
+import { campaignGuidance } from "@/game/campaignGuidance";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { Modal } from "./ui";
@@ -26,9 +26,9 @@ export function CampaignChapters() {
         <p>{learning ? "Chapter 0 · Tutorial" : `Chapter ${current.number} of 6`}</p>
         <h2 aria-label="Current chapter"><span aria-label="Current Guided Mode stage">{current.name}</span></h2>
       </div>
-      <p className="chapter-objective" aria-label="Current objective"><b>Goal:</b> {learning ? "Learn the controls, game time and finances before running your company." : campaignObjective(game)}</p>
+      <p className="chapter-objective" aria-label="Current objective"><b>Goal:</b> {current.objective}</p>
       <div className="chapter-actions">
-        {advance && <button type="button" className="btn btn-primary chapter-advance" disabled={!advance.ready} aria-label={`Next: ${advance.label}`} aria-describedby={reason ? reasonId : undefined} {...tipProps(advance.label)} onClick={() => useGame.getState().act(advance.action)}>Next<Icon name="next" /></button>}
+        {advance && <button data-guidance="next" type="button" className="btn btn-primary chapter-advance" disabled={!advance.ready} aria-label={`Next: ${advance.label}`} aria-describedby={reason ? reasonId : undefined} {...tipProps(advance.label)} onClick={() => useGame.getState().act(advance.action)}>Next<Icon name="next" /></button>}
         <button type="button" className="btn" aria-haspopup="dialog" onClick={() => {
           useGame.getState().setRunning(false);
           setOpen(true);

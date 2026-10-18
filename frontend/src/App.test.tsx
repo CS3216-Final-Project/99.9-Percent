@@ -108,11 +108,13 @@ describe("opening UI", () => {
     act(() => vi.advanceTimersByTime(6000));
     expect(useGame.getState().running).toBe(false);
     const id = useGame.getState().game.campaign!.runId;
-    expect(screen.getByText(/Stable game seconds: 0\/5/)).toBeTruthy();
+    expect(screen.getByText(/Checking recovery: 0\/5 game seconds/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(8000));
+    expect(screen.getByRole("dialog", { name: "System Recovered!" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Review What Happened" }));
     expect(screen.getByRole("dialog", { name: "Incident postmortem" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Continue company" })); fireEvent.click(screen.getByRole("button", { name: "Continue operating" }));
     expect(useGame.getState().game.phase).toBe("management"); expect(useGame.getState().running).toBe(false);

@@ -1,3 +1,4 @@
+import { reviewRecovery } from "./fixtures";
 import { advanceCampaignStep } from "./fixtures";
 import {test,expect,seedSave,savedGame} from "./fixtures";
 import {newGame,applyAction,type Action,type GameState} from "../src/sim";
@@ -31,7 +32,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  await expect(viewChapters).toBeFocused();
  await page.getByRole("button",{name:"Next: Continue to data strategy",exact:true}).click();
  await expect(chapters.getByLabel("Current chapter",{exact:true})).toHaveText("Data Strategy");
- await expect(chapters.getByLabel("Current objective")).toHaveText("Goal: Compare workload, cache hits and database pressure as demand grows.");
+ await expect(chapters.getByLabel("Current objective")).toHaveText("Goal: Understand how workloads and caching affect database demand.");
  await expect(page.getByRole("region",{name:"Data strategy"})).toContainText("Waiting for workload growth");
  expect((await savedGame(page)).campaign!.dataStage!.profile).toBe("read-heavy");
  await advanceCampaignStep(page,{seconds:6});
@@ -40,7 +41,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  if(strategy==="cache")await data.getByRole("button",{name:/Deploy Read Cache/}).click();
  else await page.getByRole("button",{name:/Upgrade database/}).click();
  await page.getByRole("button", { name: "Confirm", exact: true }).click();
- await page.getByRole("button",{name:"Run",exact:true}).click();await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
+ await page.getByRole("button",{name:"Run",exact:true}).click();await reviewRecovery(page);await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
  let c=(await savedGame(page)).campaign!;expect(c.runId).toBe("data-browser");
  if(strategy==="cache") {
   expect(c.snapshot.data!.effectiveHitRateUsed).toBe(6000);expect(c.snapshot.db.demand).toBe(1248);
@@ -56,7 +57,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
   await expect.poll(async()=>!!(await savedGame(page)).campaign!.incident).toBe(true);await page.getByRole("button",{name:"Pause",exact:true}).click();
   await expect(data).toContainText("write-heavy");expect((await savedGame(page)).campaign!.snapshot.data!.writes).toBe(1920);
   await page.getByRole("button",{name:/Upgrade database/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await page.getByRole("button",{name:"Run",exact:true}).click();
-  await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
+  await reviewRecovery(page);await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
   expect((await savedGame(page)).campaign!.dbCapacity).toBe(3000);await page.getByRole("button",{name:"Continue company",exact:true}).click();
  }
  await guidance.scrollIntoViewIfNeeded();
@@ -64,6 +65,6 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  await page.screenshot({path:`test-results/phase4-${strategy}.png`});c=(await savedGame(page)).campaign!;
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);
  await expect(chapters.getByLabel("Current chapter",{exact:true})).toHaveText("Data Strategy");
- await expect(chapters.getByLabel("Current objective")).toHaveText("Goal: Compare workload, cache hits and database pressure as demand grows.");
+ await expect(chapters.getByLabel("Current objective")).toHaveText("Goal: Understand how workloads and caching affect database demand.");
  expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });

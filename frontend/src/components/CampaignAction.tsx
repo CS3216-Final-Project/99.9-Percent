@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { Action, EquipmentId } from "@/sim";
 import { previewCampaignAction } from "@/game/campaignFinance";
@@ -15,6 +15,10 @@ import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliabi
 import { Act, Row } from "./ui";
 import { confirmationRoomArea } from "./roomArea";
 import { confirmingAction, setConfirming, subscribeConfirming } from "./actionConfirmation";
+import { useGuidanceCue } from "./useGuidanceCue";
+import { campaignNextView as campaignNextStep, useTrafficHint } from "./chapterHintAttention";
+import { incidentGuidance } from "@/game/campaignFeedback";
+import "./CampaignFeedback.css";
 
 /** What each machine an action can change does, shown above the action's effect and costs. */
 const MACHINES: Partial<Record<EquipmentId, { name: string; does: string }>> = {
@@ -41,12 +45,14 @@ const PURCHASE_DESCRIPTIONS: Record<string,string> = {
 
 /** Asks before dispatching; the parent's disabled predicate and dispatcher stay authoritative. */
 export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: Action }) {
-  const { game, selectedAppId } = useGame();
+  const { game, selectedAppId, running } = useGame();
   const c = game.campaign!, id = useId(), card = useRef<HTMLDivElement>(null);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
   const quoteLesson = useGame(s => s.started && !s.onboarding && s.game.phase === "management" && s.tour?.track === "campaign" ? s.tour.step : -1);
   const practiceQuote = quoteLesson === 6 || quoteLesson === 7;
   const open = confirming === props.label;
+  const trafficHint = useTrafficHint();
+  const { view, roomInspection, chapterComplete } = useGame();
   const restoreFocus = useRef(false);
   useLayoutEffect(()=>{
     if (!open && restoreFocus.current) {
@@ -116,11 +122,33 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   else if (label === "Deploy Automatic Failover" && !c.apps.some(a => a.id === c.reliabilityStage?.spareId && a.health !== "failed")) reason = "Reserve a healthy spare first.";
   else if (busy) reason = "An infrastructure deployment is pending. Wait for activation.";
   const reviewed = useRef("");
+  const [quoted, setQuoted] = useState("");
   const dispatched = useRef(false);
   const [changed,setChanged] = useState(false);
   const introductionActive = useGame(s=>s.onboarding);
-  const preview = props.decision ? previewCampaignAction(game,props.decision) : null;
+  const decisionKey = props.decision ? JSON.stringify(props.decision) : null;
+  // Store game states are immutable. Reuse only the rendered quote across focus/hover
+  // updates; Confirm still obtains a fresh authoritative preview before dispatching.
+  const preview = useMemo(() => decisionKey ? previewCampaignAction(game, JSON.parse(decisionKey) as Action) : null, [game, decisionKey]);
   const signature = (p: typeof preview) => JSON.stringify(p);
+  // The live incident clock takes priority; warnings remain visible and quote validation stays authoritative.
+  const confirmCue = useGuidanceCue(open ? `${c.runId}:${label}` : null,
+    open && !practiceQuote && !props.disabled && preview?.ok === true && !(running && incidentGuidance(game)?.investigate) && !changed && signature(preview) === quoted,
+    0, "confirm");
+  const trafficCue = useGuidanceCue(`${c.runId}:unlimit`, trafficHint && label === "Remove traffic limit" &&
+    campaignNextStep(game).target === "traffic" && !props.disabled && preview?.ok === true && !confirming && !running && !c.incident &&
+    !view && !roomInspection && !chapterComplete, 0, "confirm");
+  const revealedTrafficHint = useRef(false);
+  useEffect(() => {
+    // After explicit hint acceptance, reveal a keyboard-reachable control; never click it or select equipment.
+    if (!trafficHint) revealedTrafficHint.current = false;
+    if (trafficCue && !revealedTrafficHint.current) {
+      revealedTrafficHint.current = true;
+      const target = card.current?.querySelector<HTMLElement>("button.act");
+      target?.scrollIntoView?.({ block: "center" });
+      target?.focus({ preventScroll: true });
+    }
+  }, [trafficCue, trafficHint]);
   useEffect(()=>()=>setConfirming(null),[c.runId]);
   // A decision belongs beside its machine: leaving that machine's floor closes it.
   const floor = useGame(s=>s.floor), home = floorOf(affected[0]);
@@ -163,13 +191,14 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     if (open) { if (!practiceQuote) setConfirming(null); return; }
     setConfirming(label);
     reviewed.current = signature(preview);
+    setQuoted(signature(preview));
     dispatched.current = false;
     setChanged(false);
     const s = useGame.getState(), floor = floorOf(affected[0]);
     if (s.floor !== floor) s.goToFloor(floor, "action");
     s.focusCamera(anchor);
   };
-  return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey} data-campaign-action={label}
+  return <div className={`campaign-action-card${open ? " is-confirming" : ""}${trafficCue ? " campaign-traffic-cue" : ""}`} ref={card} data-affects={affectedKey} data-campaign-action={label}
     onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)}
     onFocus={() => setPointing(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPointing(false); }}>
     <Act {...props} disabled={props.disabled || preview?.ok === false} onClick={toggle} />
@@ -211,7 +240,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
         {(props.disabled || preview?.ok===false) && <p role="status">{reason}</p>}
         {changed && <p role="status">The purchase preview changed. Review the current figures, then confirm again.</p>}
         <div className="btn-row">
-          <button type="button" className="btn btn-primary btn-small" autoFocus={!practiceQuote} disabled={practiceQuote || props.disabled || preview?.ok === false} onClick={() => {
+          <button type="button" className={`btn btn-primary btn-small${confirmCue ? " campaign-guidance-cue" : ""}`} autoFocus={!practiceQuote} disabled={practiceQuote || props.disabled || preview?.ok === false} onClick={() => {
             if (practiceQuote || !open || dispatched.current) return;
             if (props.decision) {
               const latest = previewCampaignAction(useGame.getState().game,props.decision);

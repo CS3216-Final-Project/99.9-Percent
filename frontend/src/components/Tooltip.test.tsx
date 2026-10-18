@@ -173,7 +173,7 @@ describe("game interface", () => {
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(6000));
-    expect(screen.getByText(/Stable game seconds: 0\/5/)).toBeTruthy();
+    expect(screen.getByText(/Checking recovery: 0\/5 game seconds/)).toBeTruthy();
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
   });
 

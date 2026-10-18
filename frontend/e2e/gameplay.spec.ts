@@ -1,4 +1,4 @@
-import { completeTutorial, advanceCampaignStep, setGameSpeed } from "./fixtures";
+import { reviewRecovery, completeTutorial, advanceCampaignStep, setGameSpeed } from "./fixtures";
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -71,7 +71,8 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       await expect(page.getByRole("button", { name: /Add server/ })).toBeDisabled();
     }
     await page.getByRole("button", { name: "Run", exact: true }).click();
-    const report = page.getByRole("dialog", { name: "Incident postmortem" });
+    await reviewRecovery(page);
+  const report = page.getByRole("dialog", { name: "Incident postmortem" });
     await expect(report).toBeVisible({ timeout: 25000 });
     if (path === "app-then-upgrade") await expect(report).toContainText("did not relieve");
     await report.getByRole("button", { name: "Continue company" }).click();

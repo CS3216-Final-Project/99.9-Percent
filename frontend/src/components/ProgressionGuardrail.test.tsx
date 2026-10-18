@@ -1,12 +1,13 @@
 import {render,screen,within,cleanup,fireEvent,act as renderAct} from "@testing-library/react";
 import {it,expect,beforeEach,afterEach} from "vitest";
 import {CampaignPanel,CampaignOverlays} from "./CampaignUI";
+import {CampaignChapters} from "./CampaignChapters";
 import {useGame} from "../game/store";
 import {newGame,applyAction,type GameState,type Action} from "../sim";
 import {advanceSteps} from "../sim/step";
 import {dataCompany,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
 function decision(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
-function show(g:GameState){useGame.setState({game:g,started:true,ready:true,onboarding:false});render(<><CampaignPanel/><CampaignOverlays/></>);}
+function show(g:GameState){useGame.setState({game:g,started:true,ready:true,onboarding:false});render(<><CampaignChapters/><CampaignPanel/><CampaignOverlays/></>);}
 const guidance=()=>screen.getByRole("region",{name:"Guided Mode requirements"});
 const met=(id:string)=>guidance().querySelector(`[data-requirement="${id}"]`)!.getAttribute("data-met");
 const recovered=()=>advanceSteps(decision(advanceSteps(newGame(),6).state,{type:"start_db_upgrade"}),30).state;
@@ -27,7 +28,7 @@ it("counts stable spike observations and waits for an explicit acknowledgement",
  renderAct(()=>useGame.setState({game:tick(g,4)}));
  expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(false);
  fireEvent.click(within(screen.getByRole("dialog",{name:"Spike response handled"})).getByRole("button",{name:/Continue operating/}));
- expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(true);expect(guidance().textContent).toContain("available through Next in the chapter bar");
+ expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(true);expect(screen.getByRole("button",{name:"Next: Continue to reliability"}).hasAttribute("disabled")).toBe(false);
 });
 it("keeps a pending postmortem in front of the guidance",()=>{
  show(recovered());

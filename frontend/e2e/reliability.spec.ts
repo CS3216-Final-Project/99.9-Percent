@@ -1,3 +1,4 @@
+import { reviewRecovery } from "./fixtures";
 import { advanceCampaignStep } from "./fixtures";
 import {test,expect,seedSave,savedGame} from "./fixtures";
 import {readyReliability,preparedReliability,act} from "../src/sim/__tests__/reliabilityFixture";
@@ -37,7 +38,7 @@ test("reliability: manual restoration, measured report, outcome and paused reloa
  expect(restoring.apps.find(app=>app.id===f.targetId)!.health).toBe("failed");
  expect(restoring.pending.find(action=>action.type==="restore-app")!.activationStep).toBe(restoring.step+3);
  await page.getByRole("button",{name:"Run",exact:true}).click();
- await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});
+ await reviewRecovery(page);await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});
  await page.getByRole("button",{name:"Continue company",exact:true}).click();
  await advance(page,5);
  await expect(page.getByRole("dialog",{name:"Reliability outcome"})).toBeVisible();
