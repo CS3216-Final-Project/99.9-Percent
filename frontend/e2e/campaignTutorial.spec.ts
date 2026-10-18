@@ -76,7 +76,9 @@ for (const width of [1440, 390]) test(`A completed player's Chapter 0 replay res
   await quote.getByRole("button", { name: "Cancel", exact: true }).click();
   await nextChapterZero(page);
   await card.getByRole("button", { name: "Back", exact: true }).click();
-  await card.getByRole("button", { name: "Save and exit", exact: true }).click();
+  await expect(card.getByRole("button", { name: "Save and exit", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: "Save and exit", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expect(card).toHaveAccessibleName("Tutorial, step 8 of 21");
@@ -170,7 +172,8 @@ test("Back and Save and exit resume the same lesson, and the final card still ho
   const card = tutorial(page);
   await expect(card).toHaveAccessibleName("Tutorial, step 17 of 21");
   await card.getByRole("button", { name: "Back", exact: true }).click();
-  await card.getByRole("button", { name: "Save and exit", exact: true }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: "Save and exit", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expect(card).toHaveAccessibleName("Tutorial, step 16 of 21");
@@ -231,7 +234,8 @@ for (const width of [1440, 390]) test(`How to play restarts all 21 lessons durin
   expect((await savedGame(page)).campaign).toEqual(company.campaign);
   await page.screenshot({ path: `test-results/how-to-play-practice-${width}.png` });
   for (let lesson = 1; lesson < 8; lesson++) await nextChapterZero(page);
-  await card.getByRole("button", { name: "Save and exit", exact: true }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: "Save and exit", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expect(card).toHaveAccessibleName("Tutorial, step 8 of 21");
