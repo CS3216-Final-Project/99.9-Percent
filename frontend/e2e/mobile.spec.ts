@@ -226,8 +226,9 @@ test("reliability: inspection and effective recipients remain clear on narrow to
 
 test("inspects evidence and advances a physical step on touch", async ({ page , installClock}) => {
  await installClock();
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap();
-  await completeTutorial(page);
+  // This journey checks evidence and the dock; full Chapter 0 is covered separately.
+  await seedSave(page, newGame(1, "touch-evidence"));
+  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).tap();
   await expectRoom(page);
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await mute.tap(); await expect(mute).toHaveAttribute("aria-pressed", "true");
