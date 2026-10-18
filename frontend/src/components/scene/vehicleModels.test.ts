@@ -80,7 +80,7 @@ describe('vehicle models', () => {
     for (const kind of KINDS) {
       const full = vehicleBody(kind).attributes.position.count;
       const lite = vehicleBody(kind, true).attributes.position.count;
-      expect(full, kind).toBeLessThan(isLong(kind) ? 1200 : 1000);
+      expect(full, kind).toBeLessThan(isLong(kind) ? 1800 : 1400);
       expect(lite, `${kind} lite`).toBeLessThan(isLong(kind) ? 260 : 160);
       expect(lite, `${kind} lite`).toBeLessThan(full / 3);
     }

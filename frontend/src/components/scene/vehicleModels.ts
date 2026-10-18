@@ -254,19 +254,21 @@ function loft(s: Shell, lite: boolean): THREE.BufferGeometry {
  * A tyre on its side at `x`, open on the inside where the body hides it, and its outer face pale at the hub and dark
  * toward the rim. It is turned so that a vertex rests on the ground.
  */
-function tyre(x: number, { z, r }: Wheel, width: number): THREE.BufferGeometry[] {
+function tyre(x: number, { z, r }: Wheel, width: number, segments: number): THREE.BufferGeometry[] {
   const out = Math.sign(x);
-  const tread = part(new THREE.CylinderGeometry(r, r, width, 10, 1, true, Math.PI / 10).rotateZ(Math.PI / 2).translate(x, r, z), TYRE, FINISH.trim);
-  const face = part(new THREE.CircleGeometry(r, 10, Math.PI / 10).rotateY((out * Math.PI) / 2).translate(x + (out * width) / 2, r, z), TYRE, FINISH.trim);
+  // A vertex at the bottom of the circle rests on the ground, whatever the segment count.
+  const phase = -Math.PI / 2;
+  const tread = part(new THREE.CylinderGeometry(r, r, width, segments, 1, true, phase).rotateZ(Math.PI / 2).translate(x, r, z), TYRE, FINISH.trim);
+  const face = part(new THREE.CircleGeometry(r, segments, phase).rotateY((out * Math.PI) / 2).translate(x + (out * width) / 2, r, z), TYRE, FINISH.trim);
   const hub = new THREE.Color(HUB);
   face.attributes.color.setXYZ(0, hub.r, hub.g, hub.b);
   return [tread, face];
 }
 
 /** A pair of wheels on an axle, just inside the body's sides, and the axle between them to close the arches. */
-function axle(w: Wheel, half: number, width: number): THREE.BufferGeometry[] {
+function axle(w: Wheel, half: number, width: number, segments: number): THREE.BufferGeometry[] {
   const x = half - width / 2 - 0.02;
-  return [...tyre(-x, w, width), ...tyre(x, w, width), box(2 * x - width, w.r * 0.9, w.r * 1.3, 0, w.r * 0.95, w.z, TRIM, FINISH.trim)];
+  return [...tyre(-x, w, width, segments), ...tyre(x, w, width, segments), box(2 * x - width, w.r * 0.9, w.r * 1.3, 0, w.r * 0.95, w.z, TRIM, FINISH.trim)];
 }
 
 /* ------------------------------------------------------------------ */
@@ -380,22 +382,22 @@ export function vehicleBody(kind: VehicleKind, lite = false): THREE.BufferGeomet
   const car = CARS[kind];
   if (car) {
     const parts = [loft(car, lite)];
-    if (!lite) for (const w of car.arches) parts.push(...axle(w, along(car.half, w.z), 0.22));
+    if (!lite) for (const w of car.arches) parts.push(...axle(w, along(car.half, w.z), 0.22, 16));
     if (kind === "robotaxi") {
       // A spinning sensor on the roof and a camera pod on each wing.
-      parts.push(part(lite ? new THREE.BoxGeometry(0.56, 0.26, 0.56).translate(0, 1.54, 0.4) : new THREE.CylinderGeometry(0.28, 0.33, 0.26, 10).translate(0, 1.54, 0.4), "#2b2d33", FINISH.trim));
+      parts.push(part(lite ? new THREE.BoxGeometry(0.56, 0.26, 0.56).translate(0, 1.54, 0.4) : new THREE.CylinderGeometry(0.28, 0.33, 0.26, 16).translate(0, 1.54, 0.4), "#2b2d33", FINISH.trim));
       if (!lite) for (const x of [-0.8, 0.8]) parts.push(box(0.1, 0.16, 0.24, x, 0.91, -1.15, "#2b2d33", FINISH.trim));
     }
     return join(parts);
   }
   if (kind === "truck") {
     const parts = [loft(CAB, lite), loft(LOAD, lite), box(1.7, 0.4, 6.1, 0, 0.78, 1.2, TRIM, FINISH.trim)];
-    if (!lite) for (const w of [{ z: -3.25, r: 0.45 }, { z: 2.35, r: 0.45 }, { z: 3.45, r: 0.45 }]) parts.push(...axle(w, 1.15, 0.3));
+    if (!lite) for (const w of [{ z: -3.25, r: 0.45 }, { z: 2.35, r: 0.45 }, { z: 3.45, r: 0.45 }]) parts.push(...axle(w, 1.15, 0.3, 16));
     return join(parts);
   }
   // The bus, with its windscreen and rear window set in its ends.
   const parts = [loft(BUS, lite), box(2.0, 1.25, 0.04, 0, 1.75, -4.46, GLASS, FINISH.glass), box(1.8, 0.8, 0.04, 0, 2.0, 4.46, GLASS, FINISH.glass)];
-  if (!lite) for (const w of BUS.arches) parts.push(...axle(w, 1.17, 0.3));
+  if (!lite) for (const w of BUS.arches) parts.push(...axle(w, 1.17, 0.3, 16));
   return join(parts);
 }
 

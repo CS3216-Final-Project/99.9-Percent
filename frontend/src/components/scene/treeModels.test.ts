@@ -40,7 +40,7 @@ describe('tree models', () => {
       }
       const size = (x: typeof m) => x.bark.attributes.position.count + x.leaves.attributes.position.count;
       if (!lite) expect(size(treeModel(shape, variant, true))).toBeLessThan(size(m) / 2);
-      expect(size(m)).toBeLessThan(1000);
+      expect(size(m)).toBeLessThan(lite ? 1000 : 1800);
     }
   });
 

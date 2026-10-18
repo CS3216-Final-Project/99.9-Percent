@@ -46,12 +46,12 @@ const round = (radius: number, w: number, h: number) => new THREE.SphereGeometry
 
 /** A person, facing -z: shirt, skin and hair above, trousers and shoes below. */
 export function walkerModel(lite = false): THREE.BufferGeometry {
-  const sides = lite ? 4 : 6;
+  const sides = lite ? 4 : 10;
   const parts: THREE.BufferGeometry[] = [
     // A torso narrower at the waist than the shoulders, and shallower front to back than across.
-    piece(new THREE.CylinderGeometry(0.2, 0.165, 0.58, lite ? 5 : 8).scale(1, 1, 0.6).translate(0, 1.17, 0), PART.shirt, LIMB.none),
-    piece(round(0.105, lite ? 6 : 8, lite ? 4 : 6).scale(0.92, 1.12, 1).translate(0, 1.6245, 0), PART.skin, LIMB.none),
-    piece(new THREE.SphereGeometry(0.112, lite ? 6 : 8, lite ? 3 : 4, 0, Math.PI * 2, 0, Math.PI * 0.55).scale(0.93, 1.12, 1.02).translate(0, 1.6245, 0.01), PART.hair, LIMB.none),
+    piece(new THREE.CylinderGeometry(0.2, 0.165, 0.58, lite ? 5 : 12).scale(1, 1, 0.6).translate(0, 1.17, 0), PART.shirt, LIMB.none),
+    piece(round(0.105, lite ? 6 : 12, lite ? 4 : 8).scale(0.92, 1.12, 1).translate(0, 1.6245, 0), PART.skin, LIMB.none),
+    piece(new THREE.SphereGeometry(0.112, lite ? 6 : 12, lite ? 3 : 6, 0, Math.PI * 2, 0, Math.PI * 0.55).scale(0.93, 1.12, 1.02).translate(0, 1.6245, 0.01), PART.hair, LIMB.none),
   ];
   if (!lite) parts.push(piece(new THREE.CylinderGeometry(0.05, 0.055, 0.1, sides, 1, true).translate(0, 1.5, 0), PART.skin, LIMB.none));
   for (const [side, leg, arm] of [
@@ -71,7 +71,7 @@ export function walkerModel(lite = false): THREE.BufferGeometry {
       // A short sleeve, the forearm and the hand.
       piece(new THREE.CylinderGeometry(0.05, 0.045, 0.3, sides).translate(ax, SHOULDER - 0.15, 0), PART.shirt, arm),
       piece(new THREE.CylinderGeometry(0.042, 0.036, 0.28, sides, 1, true).translate(ax, SHOULDER - 0.44, 0), PART.skin, arm),
-      piece(round(0.045, 6, 4).translate(ax, SHOULDER - 0.61, 0), PART.skin, arm),
+      piece(round(0.045, 8, 6).translate(ax, SHOULDER - 0.61, 0), PART.skin, arm),
     );
   }
   const g = mergeGeometries(parts);

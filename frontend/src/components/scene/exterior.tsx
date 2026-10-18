@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { rand, type RngHolder } from "@/sim/rng";
@@ -59,7 +59,6 @@ import {
   type Vehicle,
   type VehicleKind,
 } from "./city";
-import { zoomedOut } from "./camera";
 import { useDetail } from "./detail";
 import { world } from "./cityLight";
 import { ROOM } from "./layout";
@@ -1696,21 +1695,11 @@ function Crowd({ share, lite }: { share: number; lite: boolean }) {
 /* Downtown                                                            */
 /* ------------------------------------------------------------------ */
 
-/** Whether the camera is zoomed out far enough for the city's lighter models (see zoomedOut in camera.ts). */
-function useZoomedOut(): boolean {
-  const [far, setFar] = useState(false);
-  useFrame(({ camera }) => {
-    const next = zoomedOut((camera as THREE.OrthographicCamera).zoom, far);
-    if (next !== far) setFar(next);
-  });
-  return far;
-}
-
 /** The world outside the office, lit for the time of day by applyDaylight. */
 export function Exterior() {
   const basic = useDetail() === "basic";
-  // Far out, the trees, cars and people draw their lighter models, as they always do at basic detail.
-  const lite = useZoomedOut() || basic;
+  // HD keeps the detailed silhouettes at every zoom; Low alone uses the lighter models.
+  const lite = basic;
   const looks = useLooks();
   return (
     <group>
