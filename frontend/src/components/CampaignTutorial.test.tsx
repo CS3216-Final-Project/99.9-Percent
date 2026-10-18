@@ -205,7 +205,9 @@ it("cannot skip or finish early, holds the clock outside its Run lesson, and com
 
 it("saves and exits unfinished and resumes the same company at its saved lesson", () => {
   start(); renderCompany(); reach(9); const runId = useGame.getState().game.campaign!.runId;
-  fireEvent.click(current().getByRole("button", { name: "Save and exit" }));
+  expect(current().queryByRole("button", { name: "Save and exit" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Menu" })).getByRole("button", { name: "Save and exit" }));
   expect(useGame.getState().meta.tutorialDone).toBe(false);
   cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
   expect(card(9)).toBeTruthy(); expect(useGame.getState().game.campaign!.runId).toBe(runId);
