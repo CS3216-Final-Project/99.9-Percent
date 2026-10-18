@@ -3,6 +3,9 @@ import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 
 for (const width of [1440, 390, 320]) {
   test(`bottom dock stays usable and stable at ${width}px`, async ({ page, installClock }) => {
+    // CI can spend over a minute rendering camera/floor changes and the final screenshot.
+    // Keep the per-assertion timeouts unchanged.
+    test.setTimeout(120_000);
     await installClock();
     await page.setViewportSize({ width, height: 900 });
     await seedSave(page, newGame(1, "dock"));

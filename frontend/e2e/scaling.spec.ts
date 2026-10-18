@@ -6,7 +6,9 @@ function act(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error
 function company(){let g=advanceSteps(newGame(3,"browser-scaling"),6).state;g=act(g,{type:"start_db_upgrade"});g=advanceSteps(g,30).state;g=act(g,{type:"acknowledge_review"});return act(g,{type:"acknowledge_milestone"});}
 for(const path of ["vertical","horizontal"] as const)test(`scaling continuation: ${path}`,async({page, installClock})=>{
  await installClock();
- test.setTimeout(150000);
+ // Software WebGL can use 150s before the final reload/resume check.
+ // Allow the full journey while retaining shorter per-outcome assertions.
+ test.setTimeout(240_000);
  const apiRequests:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))apiRequests.push(r.url());});
  await page.route("**/api/**",route=>route.abort());
  await seedSave(page,company());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
