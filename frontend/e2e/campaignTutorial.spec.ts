@@ -149,7 +149,7 @@ test("Chapter 0 requires real game interactions, previews without spending, and 
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: /How to play/ }).click();
   await finishChapterZero(page);
-  expect((await savedGame(page)).campaign).toMatchObject({ runId: company.runId, step: 2, actions: [] });
+  expect((await savedGame(page)).campaign).toEqual(company);
 });
 
 test("Back and Save and exit resume the same lesson, and the final card still holds the clock until Finish", async ({ page }) => {
