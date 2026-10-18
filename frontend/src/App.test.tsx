@@ -294,9 +294,8 @@ it("offers New company on the menu's Run tab too, asking once and forgetting the
   saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
   saveClassicGame(advanceTurn(newLegacyGame(2)));
   const classic = localStorage.getItem("nn.classic.save.v1");
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-  fireEvent.click(screen.getByText("More controls"));
-  fireEvent.click(screen.getByRole("button", { name: "Advance game second" }));
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+  act(() => useGame.getState().advance());
   const runId = useGame.getState().game.campaign!.runId;
   const menu = openMenu();
   const run = within(menu).getByRole("group", { name: "Run" });
