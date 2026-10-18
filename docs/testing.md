@@ -17,6 +17,16 @@ Use Node 22 and install with `npm ci` separately in `frontend/` and `backend/`. 
 
 On Linux CI, use `npx playwright install --with-deps chromium` for browser/system dependencies. For interactive tests rebuild with `npm run build` after changing application code. Preview runs on port 4175 by default (override with PLAYWRIGHT_PORT when another checkout is active); a reused local server must serve the current build.
 
+## PR check duration budget
+
+Aim for **at most 60 seconds per required PR CI job**, including each browser runner. Measure from job start to completion, including checkout, dependency and browser setup, builds, tests, and report uploads. Report queue time separately.
+
+When a job exceeds this budget, profile its slowest tests and setup steps. Optimize fixtures and rendering, move suitable checks into faster unit or integration tests, split long journeys at meaningful boundaries, and rebalance runners using measured durations. Preserve meaningful gameplay, persistence, recovery and failure coverage and all required checks. Keep assertion timeouts based on the behavior being tested; the one-minute goal is not a blanket test timeout.
+
+For performance changes, report before/after GitHub timings for the slowest browser runner and other affected jobs, plus failures, skipped checks and remaining budget overruns. Record an overrun and its bottleneck while working toward the target.
+
+The target is currently unmet. In the [18 October 2026 measured run](https://github.com/CS3216-Final-Project/99.9-Percent/actions/runs/39100227699), the slowest browser runner took 8m 41s, frontend checks took 2m 43s, and the separate balance check took 1m 50s, including setup.
+
 ## What is covered
 
 | Layer | Evidence | Boundaries |
