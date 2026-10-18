@@ -18,8 +18,8 @@ test("an action centres the camera on the machine it changes and opens its confi
   await expect(page.locator('.floor-menu button[data-floor="servers"]')).toHaveAttribute("aria-pressed", "true");
   await expectRoom(page);
   const confirm = page.getByRole("main").getByRole("region", { name: "Confirm Upgrade database" });
-  await expect(confirm).toContainText("The database stores");
-  await expect(confirm.getByText("Buy now",{exact:true}).locator("..").locator("dd")).toHaveText("$3,000");
+  await expect(confirm).toContainText("Stores data");
+  await expect(confirm.getByText("Setup",{exact:true}).locator("..").locator("dd")).toHaveText("$3,000");
   await expect(confirm.getByText("Lets your database handle more requests at the same time.",{exact:true})).toBeVisible();
   await expect(confirm.locator(".campaign-action-machine")).toBeHidden();
   await expect(panel.getByText("Effect & costs")).toHaveCount(0);

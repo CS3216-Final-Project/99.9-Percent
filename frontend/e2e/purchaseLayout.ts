@@ -52,7 +52,7 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
         if(touch)await action.tap();else await action.click();
         await usableCard(page);
         await expect(page.locator(`.eq-label[data-eq="${equipment}"]`)).toHaveClass(/is-affected/);
-        await page.locator(".campaign-action-popover").getByText("More details",{exact:true}).click();
+        await page.locator(".campaign-action-popover").getByText("How it works",{exact:true}).click();
         await usableCard(page);
         await page.keyboard.press("Escape");await expect(action).toBeFocused();
     }
@@ -60,15 +60,15 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
     if(touch)await entry.tap();else await entry.click();
     const card=page.locator(".campaign-action-popover"),confirm=card.getByRole("button",{name:"Confirm",exact:true});
     await expect(confirm).toBeFocused();
-    await expect(card.getByText("Adds another server to help your app handle more customers.",{exact:true})).toBeVisible();
-    await expect(card.getByText("New servers need traffic directed to them before they can help.",{exact:true})).toBeVisible();
+    await expect(card.getByText("Handle more traffic with another server.",{exact:true})).toBeVisible();
+    await expect(card.getByText("Route traffic to this server after activation.",{exact:true})).toBeVisible();
     await expect(card.getByRole("note")).toBeVisible();
     await expect(page.locator('.eq-label[data-eq="app"]')).toHaveClass(/is-affected/);
     await expect(card.locator(".campaign-action-machine")).toBeHidden();
     if(touch)await expect(panel).toBeHidden();else await expect(panel).toBeVisible();
     await usableCard(page);
     await page.screenshot({path:`test-results/purchase-${width}x${height}.png`});
-    const summary=card.getByText("More details",{exact:true});
+    const summary=card.getByText("How it works",{exact:true});
     if(touch)await summary.tap();else {await summary.focus();await page.keyboard.press("Enter");}
     await expect(card.getByRole("region",{name:"Purchase details",exact:true})).toBeVisible();
     await usableCard(page);
@@ -103,7 +103,7 @@ export async function purchaseActions(page:Page,game:GameState,actions:readonly 
         const button=page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:label});
         await button.click();await usableCard(page);
         await expect(page.locator(`.eq-label[data-eq="${equipment}"]`)).toHaveClass(/is-affected/);
-        await page.locator(".campaign-action-popover").getByText("More details",{exact:true}).click();await usableCard(page);
+        await page.locator(".campaign-action-popover").getByText("How it works",{exact:true}).click();await usableCard(page);
         await page.locator(".campaign-action-popover").getByRole("button",{name:"Cancel",exact:true}).click();
         await expect(button).toBeFocused();
     }

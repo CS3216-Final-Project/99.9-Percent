@@ -106,7 +106,7 @@ test("purchase details keyboard navigation handles overflow and fitting content"
  const before=(await savedGame(page)).campaign;
  await page.getByRole("button",{name:/^Add server/}).tap();
  const card=page.locator(".campaign-action-popover"),content=card.getByRole("region",{name:"Purchase details",exact:true});
- await card.getByText("More details",{exact:true}).tap();
+ await card.getByText("How it works",{exact:true}).tap();
  await expect.poll(()=>content.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(0);
  await expect.poll(()=>content.evaluate(el=>{
   const box=el.getBoundingClientRect(),preview=el.closest(".campaign-purchase-body")!.getBoundingClientRect();

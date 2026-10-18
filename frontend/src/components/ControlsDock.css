@@ -123,3 +123,26 @@
   .campaign-clock.controls-dock .time-menu > summary { width: 54px; }
   .campaign-clock.controls-dock .dock-second { white-space: nowrap; }
 }
+/* Keep the Time heading with its controls instead of positioning it from the whole dock. */
+.campaign-clock.controls-dock .time-controls {
+  display: grid;
+  grid-template-columns: 132px 64px auto 142px;
+  justify-content: end;
+  padding-top: 0;
+}
+.campaign-clock.controls-dock .time-controls::before {
+  position: static;
+  grid-column: 1 / -1;
+}
+.controls-dock .time-menu > summary { height: 48px; }
+.controls-dock .time-menu > summary > span { flex: 1; text-align: center; }
+@media (max-width: 640px) {
+  .campaign-clock.controls-dock .time-controls { grid-template-columns: minmax(0, 1fr) 58px auto 96px; }
+  .campaign-clock.controls-dock .time-controls .week { width: auto; display: grid; gap: 2px; justify-items: start; }
+  .campaign-clock.controls-dock .dock-second { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .campaign-clock.controls-dock .week > .meter { display: none; }
+  .controls-dock .time-menu > summary { height: 44px; }
+}
+@media (max-width: 360px) {
+  .campaign-clock.controls-dock .time-controls { grid-template-columns: minmax(0, 1fr) 54px auto 80px; }
+}

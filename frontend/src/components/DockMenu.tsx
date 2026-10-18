@@ -5,6 +5,34 @@ import { Icon } from "./icons";
 export function DockMenu({ label, children, className = "" }: { label: ReactNode; children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
+    const menu = ref.current;
+    const dock = menu?.closest<HTMLElement>(".controls-dock");
+    if (!menu || !dock) return;
+    const positionPanel = () => {
+      const trigger = menu.querySelector("summary"), panel = menu.querySelector<HTMLElement>(".dock-panel");
+      if (!trigger || !panel) return;
+      const bounds = dock.getBoundingClientRect(), gutter = parseFloat(getComputedStyle(dock).paddingLeft) || 8;
+      const left = Math.max(8, bounds.left + gutter), right = Math.min(window.innerWidth - 8, bounds.right - gutter);
+      panel.style.maxWidth = `${Math.max(0, right - left)}px`;
+      const parent = panel.offsetParent as HTMLElement | null ?? dock;
+      const panelWidth = panel.getBoundingClientRect().width || parseFloat(getComputedStyle(panel).width);
+      // Keep the panel above the entire dock, but align its left edge with its own trigger.
+      const x = Math.max(left, Math.min(trigger.getBoundingClientRect().left, right - panelWidth));
+      panel.style.left = `${x - parent.getBoundingClientRect().left - parent.clientLeft}px`;
+      panel.style.right = "auto";
+    };
+    positionPanel();
+    menu.addEventListener("toggle", positionPanel);
+    window.addEventListener("resize", positionPanel);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(positionPanel);
+    observer?.observe(dock);
+    return () => {
+      menu.removeEventListener("toggle", positionPanel);
+      window.removeEventListener("resize", positionPanel);
+      observer?.disconnect();
+    };
+  }, []);
+  useEffect(() => {
     const closeOutside = (event: PointerEvent) => {
       if (ref.current && !ref.current.contains(event.target as Node)) ref.current.open = false;
     };
