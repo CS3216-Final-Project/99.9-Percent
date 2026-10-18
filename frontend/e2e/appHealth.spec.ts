@@ -6,7 +6,7 @@ for (const [width, height] of [[1440, 900], [1366, 768]]) {
         await appHealthJourney(page, width, height);
     });
 }
-test("App Health yields to and restores the spotlight without advancing it", async ({ page }) => {
+test("Chapter 0 keeps inspections in-card and App Health remains available after completion", async ({ page }) => {
     await appHealthDuringTutorial(page);
 });
 

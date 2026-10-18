@@ -1,3 +1,4 @@
+import { completeTutorialFixture } from "@/testing/tutorial";
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -168,7 +169,7 @@ describe("game interface", () => {
     render(<App />);
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
-    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    act(() => completeTutorialFixture());
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(6000));
@@ -179,7 +180,7 @@ describe("game interface", () => {
   it("explains a header metric and the shared Run control in the bubble", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
-    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    act(() => completeTutorialFixture());
 
     over(screen.getByText("Cash"));
     settle();

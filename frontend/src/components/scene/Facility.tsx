@@ -39,7 +39,7 @@ import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
 import { Icon } from "../icons";
 import { tipProps } from "../tips";
-import { INFRASTRUCTURE_HELP } from "@/game/infrastructureHelp";
+import { INFRASTRUCTURE_TIPS } from "@/game/infrastructureHelp";
 import { openRoomArea } from "../roomArea";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
@@ -742,7 +742,7 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       type="button"
       ref={bindLabel(id)}
       data-eq={id}
-      {...tipProps(useGame.getState().game.campaign ? INFRASTRUCTURE_HELP[id] : undefined)}
+      {...tipProps(useGame.getState().game.campaign ? INFRASTRUCTURE_TIPS[id] : undefined)}
       className={`eq-label tone-${tone}${selected ? " is-selected" : ""}${affected ? " is-affected" : ""}${!built && !selected && !hovered && !affected ? " is-quiet" : ""}`}
       onClick={() => {
         inspectInRoom(id);

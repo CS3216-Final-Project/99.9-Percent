@@ -56,6 +56,11 @@ describe("splitShortcut", () => {
     expect(splitShortcut("Cancel (50% refund)")).toEqual({ label: "Cancel (50% refund)" });
     expect(splitShortcut("(Q)")).toEqual({ label: "(Q)" });
   });
+
+  it("renders floor shortcuts using the same key labels as the camera hints", () => {
+    expect(splitShortcut("Office floor (Page Up)")).toEqual({ label: "Office floor", key: "PgUp" });
+    expect(splitShortcut("Server floor (Page Down)")).toEqual({ label: "Server floor", key: "PgDn" });
+  });
 });
 
 describe("tipProps", () => {

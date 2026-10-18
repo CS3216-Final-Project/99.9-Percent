@@ -1,7 +1,7 @@
 import { appHealthDuringTutorial, appHealthJourney, appHealthProblem } from "./appHealth";
 import type { Page } from "@playwright/test";
 import { keyboardDetails, purchaseLayout } from "./purchaseLayout";
-import { advanceCampaignStep, finishChapterZero } from "./fixtures";
+import { completeTutorial, advanceCampaignStep, finishChapterZero, nextChapterZero } from "./fixtures";
 import { financeDuringWalkthrough } from "./financeIntegration";
 import { test, expect, expectRoom, savedGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
@@ -37,7 +37,7 @@ async function expectCashFits(page:Page) {
  return {width:page.viewportSize()!.width,cashBox,amount,clearance:cashBox.x+cashBox.width-amount.x-amount.width};
 }
 
-test("touch Finance overlays the spotlight walkthrough and restores its step and focus",async({page})=>{
+test("touch Chapter 0 explains weekly finances in-card and preserves the real Finance dialog",async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.emulateMedia({reducedMotion:"reduce"});
  await financeDuringWalkthrough(page,true);
 });
@@ -191,7 +191,7 @@ test("new players can compare both modes and start Challenge Mode on touch", asy
   expect(await page.locator(".home-card").evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.screenshot({ path: "test-results/mode-choice-mobile.png" });
   await choices.getByRole("button", { name: "Start Challenge Mode" }).tap();
-  await page.getByRole("button", { name: "Skip", exact: true }).tap();
+  await completeTutorial(page);
   await expectRoom(page);
   await page.getByRole("button", { name: /Next week/ }).tap();
   await page.reload();
@@ -227,14 +227,16 @@ test("reliability: inspection and effective recipients remain clear on narrow to
 test("inspects evidence and advances a physical step on touch", async ({ page , installClock}) => {
  await installClock();
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap();
-  await page.getByRole("button", { name: "Skip", exact: true }).tap();
+  await completeTutorial(page);
   await expectRoom(page);
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await mute.tap(); await expect(mute).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: "test-results/phase1-mobile.png" });
   await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).tap();
+  const before=(await savedGame(page)).campaign!.step;
   await advanceCampaignStep(page);
-  expect((await savedGame(page)).campaign!.step).toBe(1);
+  expect((await savedGame(page)).campaign!.step).toBe(before+1);
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeInViewport({ratio:1});
   await page.getByRole("button", { name: "History", exact: true }).tap();
   await expect(page.getByRole("region", { name: "History" })).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).tap();
@@ -248,7 +250,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   const panel = page.getByRole("complementary", { name: "System metrics" });
   await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
   await panel.getByRole("button", { name: "Database", exact: true }).tap();
-  await expect(panel.getByRole("status")).toContainText("Demand 800/s · capacity 600/s · backlog 600");
+  await expect(panel.locator(".campaign-evidence .rows dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
   expect((await savedGame(page)).campaign!.step).toBe(6);
   for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
     const button = panel.getByRole("button", { name });
@@ -272,11 +274,10 @@ test("investigates and responds through the incident panel on touch", async ({ p
 
 test("a tap explains a term, and tapping a button does not leave a tooltip over it", async ({ page, withoutRoom }) => {
  await withoutRoom();
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap(); await page.getByRole("button", { name: "Skip", exact: true }).tap();
-
+ await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap(); await completeTutorial(page);
   const tip = page.getByRole("tooltip");
   await page.getByRole("complementary", { name: "System metrics" }).getByText("System evidence", { exact: true }).tap();
-  await expect(tip).toContainText("Inspection is free");
+  await expect(tip).toHaveText("Inspect equipment for free. Inspection does not advance time.");
   await expect(tip).toHaveCSS("opacity", "1");
   const box = (await tip.boundingBox())!, view = page.viewportSize()!;
   expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(view.width);
@@ -365,24 +366,34 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  await page.setViewportSize({width,height:844});
  await page.goto("/");await page.getByRole("button",{name:"Start Guided Mode",exact:true}).tap();
  await expectRoom(page);
- const card=tutorial(page),room=page.getByRole("main");
+ const card=tutorial(page);
  await expect(card).toBeInViewport({ratio:1});
- await expect(card.locator(".tour-prompt")).toHaveText("Click Servers to inspect your app.");
+ await expect(card.getByRole("button",{name:"Next",exact:true})).toBeDisabled();
+ await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"App Server",exact:true}).tap();
+ await expect(card).toContainText("Done in your game");
+ await expect(page.locator(".campaign-evidence")).toBeVisible();
+ await expect(page.getByRole("dialog")).toHaveCount(1);
  await page.screenshot({path:`test-results/clarity-tutorial-${width}-first.png`});
- // The camera brings each machine above the panel, where it can be tapped.
- await room.getByRole("button",{name:"Servers",exact:true}).tap();await page.getByRole("dialog",{name:"Servers inspected"}).getByRole("button",{name:"Return to room"}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
- await room.getByRole("button",{name:"Database",exact:true}).tap();await page.getByRole("dialog",{name:"Database inspected"}).getByRole("button",{name:"Return to room"}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 3 of 21");
- for(let step=4;step<=7;step++){await card.getByRole("button",{name:"Next",exact:true}).tap();await expect(card).toHaveAccessibleName(`Tutorial, step ${step} of 21`);await expect(card).toBeInViewport({ratio:1});}
- await page.getByRole("button",{name:/Upgrade database/}).tap();await expect(card).toHaveAccessibleName("Tutorial, step 8 of 21");
+ await nextChapterZero(page,true);await nextChapterZero(page,true);
+ await card.getByRole("button",{name:"Back",exact:true}).tap();
+ await expect(card.getByRole("button",{name:"Next",exact:true})).toBeEnabled();
+ await nextChapterZero(page,true);
+ for(let step=3;step<8;step++)await nextChapterZero(page,true);
+ await expect(card).toHaveAccessibleName("Tutorial, step 8 of 21");
+ await expect(card.getByRole("button",{name:"Next",exact:true})).toBeDisabled();
+ await page.getByRole("button",{name:"Cancel",exact:true}).tap();
  await expect(card).toBeInViewport({ratio:1});
  await page.screenshot({path:`test-results/clarity-tutorial-${width}-purchase.png`});
- await page.getByRole("region",{name:"Confirm Upgrade database"}).getByRole("button",{name:"Cancel"}).tap();
- await finishChapterZero(page);await expect(card).toBeHidden();
+ for(let step=8;step<13;step++)await nextChapterZero(page,true);
+ await page.getByRole("button",{name:"Office floor",exact:true}).tap();
+ await expect(page.getByRole("button",{name:"Office floor",exact:true})).toHaveAttribute("aria-pressed","true");
+ await finishChapterZero(page,true);await expect(card).toBeHidden();
  expect((await savedGame(page)).campaign!.actions).toEqual([]);
  await expect(page.getByRole("button",{name:"Run",exact:true})).toBeInViewport();await expect(page.getByRole("button",{name:"Advance game second",exact:true})).toBeHidden();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+ const beforeRun=(await savedGame(page)).campaign!.step;
  await page.getByRole("button",{name:"Run",exact:true}).tap();
- await expect.poll(async()=>(await savedGame(page)).campaign!.step).toBeGreaterThan(0);
+ await expect.poll(async()=>(await savedGame(page)).campaign!.step).toBeGreaterThan(beforeRun);
  const pause=page.getByRole("button",{name:"Pause",exact:true});if(await pause.isVisible())await pause.tap();
  await expect(page.getByRole("button",{name:"Run",exact:true})).toBeVisible();
  await page.screenshot({path:"test-results/campaign-ux-mobile.png"});
@@ -391,6 +402,7 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
 // The test browser draws in software, which Auto treats as a machine without a graphics card. Naming a phone's
 // graphics card instead takes the path a real phone takes.
 test("Auto draws Medium on a graphics card: the screen's normal pixel size, not High's sharper canvas", async ({ page }) => {
+  await seedSave(page,newGame(1,"medium-renderer"));
   await page.addInitScript(() => {
     const getParameter = WebGL2RenderingContext.prototype.getParameter;
     WebGL2RenderingContext.prototype.getParameter = function (this: WebGL2RenderingContext, name: number) {
@@ -399,9 +411,10 @@ test("Auto draws Medium on a graphics card: the screen's normal pixel size, not 
   });
   await page.route("**/api/**", route => route.abort());
   await page.goto("/");
-  await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap();
-  await page.getByRole("button", { name: "Skip", exact: true }).tap();
-  await expectRoom(page);
+  await page.getByRole("button", { name: "Continue company", exact: true }).tap();
+  // Auto initializes HD after renderer detection. Compiling those materials in
+  // software can occupy the emulated phone beyond the normal 10s assertion budget.
+  await expectRoom(page, 30_000);
   const canvas = page.getByRole("main").locator("canvas");
   // High would draw 1.75 pixels per CSS pixel on this screen; Medium draws one, or a little fewer if the frame rate falls.
   await expect.poll(() => canvas.evaluate(el => (el as HTMLCanvasElement).width / (el as HTMLCanvasElement).clientWidth)).toBeLessThanOrEqual(1.01);
@@ -418,7 +431,7 @@ test("purchase sheet keeps warnings and decisions reachable on 390px touch",asyn
 test("App Health dashboard and overlays work on narrow touch screens", async ({page}) => {
  await appHealthJourney(page,390,844,true);
 });
-test("App Health restores the spotlight on touch without advancing it", async ({page}) => {
+test("Chapter 0 inspections and App Health work on touch", async ({page}) => {
  await page.setViewportSize({width:390,height:844}); await page.emulateMedia({reducedMotion:"reduce"});
  await appHealthDuringTutorial(page);
 });

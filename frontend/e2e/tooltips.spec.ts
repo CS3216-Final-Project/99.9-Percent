@@ -1,8 +1,8 @@
 import { openCameraControls } from "./fixtures";
-import { test, expect, expectRoom } from "./fixtures";
+import { completeTutorial, test, expect, expectRoom } from "./fixtures";
 
 test("explains controls in the shared tooltip, never the browser's own", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await completeTutorial(page);
   await expectRoom(page);
   await expect(page.locator("[title]")).toHaveCount(0);
 
