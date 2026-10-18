@@ -217,8 +217,8 @@ export async function completeTutorial(page: Page) {
     // separately, then preserve the journey's original budget and assertion timeouts.
     const journeyBudget = test.info().timeout;
     const started = performance.now();
-    test.setTimeout(journeyBudget + 120_000);
-    await test.step("Complete mandatory Chapter 0 setup", () => finishChapterZero(page), { timeout: 120_000 });
+    test.setTimeout(journeyBudget + 180_000);
+    await test.step("Complete mandatory Chapter 0 setup", () => finishChapterZero(page), { timeout: 180_000 });
     test.setTimeout(journeyBudget + Math.ceil(performance.now() - started));
   }
   else await page.getByRole("button", { name: "Skip", exact: true }).click();

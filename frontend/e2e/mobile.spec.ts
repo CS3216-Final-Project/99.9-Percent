@@ -386,8 +386,12 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  await expect(card).toBeInViewport({ratio:1});
  await page.screenshot({path:`test-results/clarity-tutorial-${width}-purchase.png`});
  for(let step=8;step<13;step++)await nextChapterZero(page,true);
- await page.getByRole("button",{name:"Office floor",exact:true}).tap();
- await expect(page.getByRole("button",{name:"Office floor",exact:true})).toHaveAttribute("aria-pressed","true");
+ const navigation = page.locator(".room-menu");
+ await navigation.locator(":scope > summary").tap();
+ const officeFloor = navigation.getByRole("group", { name: "Floors" }).getByRole("button", { name: /^Office floor/ });
+ await officeFloor.tap();
+ await expect(officeFloor).toHaveAttribute("aria-pressed","true");
+ await navigation.locator(":scope > summary").tap();
  await finishChapterZero(page,true);await expect(card).toBeHidden();
  expect((await savedGame(page)).campaign!.actions).toEqual([]);
  await expect(page.getByRole("button",{name:"Run",exact:true})).toBeInViewport();await expect(page.getByRole("button",{name:"Advance game second",exact:true})).toBeHidden();
