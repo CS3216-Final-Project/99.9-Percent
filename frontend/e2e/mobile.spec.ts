@@ -9,7 +9,7 @@ import { advanceSteps } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
 import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 
-test("the touch Room menu keeps floors, walking and camera tools clear of time controls", async ({ page }) => {
+test("the touch Navigation menu keeps floors, walking and camera tools clear of time controls", async ({ page }) => {
  await seedSave(page,newGame(1,"touch-dock"));
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  await expectRoom(page);
@@ -18,7 +18,8 @@ test("the touch Room menu keeps floors, walking and camera tools clear of time c
  await room.locator(":scope > summary").tap();
  await room.getByRole("group",{name:"Floors"}).getByRole("button",{name:/^Office floor/}).tap();
  await expect(room.locator(":scope > summary .floor-number")).toHaveText("7");
- const walk=room.getByRole("button",{name:"Walk",exact:true});await walk.tap();await expect(walk).toHaveAttribute("aria-pressed","true");
+ const walk=room.getByRole("button",{name:"Walk mode",exact:true,includeHidden:true});await walk.tap();await expect(walk).toHaveAttribute("aria-pressed","true");
+ await room.locator(":scope > summary").tap();
  await room.getByRole("button",{name:"Zoom out",exact:true}).tap();
  const menu=(await room.locator(".dock-panel").boundingBox())!,bar=(await dock.boundingBox())!;
  expect(menu.y+menu.height).toBeLessThanOrEqual(bar.y);
@@ -85,6 +86,10 @@ test("purchase details keyboard navigation handles overflow and fitting content"
  const card=page.locator(".campaign-action-popover"),content=card.getByRole("region",{name:"Purchase details",exact:true});
  await card.getByText("More details",{exact:true}).tap();
  await expect.poll(()=>content.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(0);
+ await expect.poll(()=>content.evaluate(el=>{
+  const box=el.getBoundingClientRect(),preview=el.closest(".campaign-purchase-body")!.getBoundingClientRect();
+  return (Math.min(box.bottom,preview.bottom)-Math.max(box.top,preview.top))/parseFloat(getComputedStyle(el).lineHeight);
+ })).toBeGreaterThanOrEqual(3);
  await keyboardDetails(page);
  await page.setViewportSize({width:390,height:1200});
  await expect.poll(()=>content.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(0);
