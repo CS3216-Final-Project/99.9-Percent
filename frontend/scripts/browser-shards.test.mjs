@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectTests, balanceTests } from './browser-shards.mjs';
+import { collectTests, balanceTests, recordDurations } from './browser-shards.mjs';
 
 test('assigns every discovered project and nested test exactly once, including new tests', () => {
   const report = { suites: [{ title: 'example.spec.ts', specs: [
@@ -22,4 +22,21 @@ test('separates the slowest tests and refuses unsafe shard inputs', () => {
   assert.deepEqual(shards.map(shard => shard.duration), [110, 110]);
   assert.throws(() => balanceTests(tests, {}, 0), /positive integer/);
   assert.throws(() => balanceTests([{ key: 'same' }, { key: 'same' }], {}, 2), /Duplicate/);
+});
+
+
+test('records only clean passes without dropping failed or unmeasured tests from shards', () => {
+  const report = { suites: [{ specs: [
+    { file: 'example.spec.ts', title: 'clean', tests: [{ projectName: 'chromium', status: 'expected', results: [{ status: 'passed', duration: 1200 }] }] },
+    { file: 'example.spec.ts', title: 'failed', tests: [{ projectName: 'chromium', status: 'unexpected', results: [{ status: 'failed', duration: 60000 }] }] },
+    { file: 'example.spec.ts', title: 'flaky', tests: [{ projectName: 'chromium', status: 'flaky', results: [{ status: 'failed', duration: 60000 }, { status: 'passed', duration: 1000 }] }] },
+    { file: 'example.spec.ts', title: 'skipped', tests: [{ projectName: 'chromium', status: 'skipped', results: [{ status: 'skipped', duration: 0 }] }] },
+  ] }] };
+  const discovered = collectTests(report);
+  const durations = recordDurations([report]);
+  assert.deepEqual(durations, { [discovered[0].key]: 1200 });
+  const shards = balanceTests(discovered, durations, 2);
+  assert.equal(shards.flatMap(shard => shard.tests).length, 4);
+  assert.equal(shards.reduce((total, shard) => total + shard.duration, 0), 91200);
+  assert.throws(() => recordDurations([{ suites: [] }]), /no clean passing measurements/);
 });

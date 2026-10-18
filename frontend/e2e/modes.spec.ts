@@ -25,8 +25,7 @@ test("new players see Guided Mode first with Challenge Mode locked", async ({ pa
 // The room stays mounted while the game underneath it is swapped, so this journey keeps drawing it.
 test("switches between Guided Mode and unlocked Challenge Mode from the menu, keeping each run", async ({ page , installClock}) => {
  await installClock();
-  await unlockChallenge(page);
-  await seedSave(page, advanceSteps(newGame(1, "mode-switch"), 1).state);
+  await seedSave(page, advanceSteps(newGame(1, "mode-switch"), 1).state, { challengeUnlocked: true });
   await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
   await advanceCampaignStep(page);
