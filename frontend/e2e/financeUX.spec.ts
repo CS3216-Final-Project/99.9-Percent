@@ -1,11 +1,14 @@
-import { test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
+import { test, expect, seedSave, savedGame } from "./fixtures";
 import { newGame } from "../src/sim";
 import { tick } from "../src/sim/__tests__/spikeFixtures";
+
+// These journeys exercise panels and persistence; room interaction has dedicated browser coverage.
+test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
 
 test("finance explains actual accounting, purchase risk and accessible unavailable actions",async({page})=>{
     await page.route("**/api/**",r=>r.abort());
     await seedSave(page,tick(newGame(1,"finance-browser"),60));
-    await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
+    await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();
     const before=await savedGame(page);
     await page.getByRole("button",{name:"View finances"}).click();
     const finance=page.getByRole("dialog",{name:"Company finances"});
@@ -33,7 +36,7 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
 
 test("Cash card supports keyboard access without enlarging neighbouring status cards",async({page})=>{
     await seedSave(page,newGame(1,"finance-keyboard"));
-    await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
+    await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();
     const cash=page.getByRole("button",{name:"View finances",exact:true});
     const users=page.locator(".stat-users");
     const cashBox=(await cash.boundingBox())!,usersBox=(await users.boundingBox())!;

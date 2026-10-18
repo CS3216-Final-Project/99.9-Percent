@@ -42,10 +42,11 @@ test("touch Finance overlays the spotlight walkthrough and restores its step and
  await financeDuringWalkthrough(page,true);
 });
 
-test("finance and infrastructure help are reachable by touch with reduced motion",async({page})=>{
+test("finance and infrastructure help are reachable by touch with reduced motion",async({ page, withoutRoom })=>{
+ await withoutRoom();
  await page.emulateMedia({reducedMotion:"reduce"});await page.setViewportSize({width:390,height:844});
  await page.route("**/api/**",r=>r.abort());await seedSave(page,newGame(1,"touch-finance"));
- await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  const cash=page.getByRole("button",{name:"View finances"});await expectCashFits(page);
  await page.screenshot({path:"test-results/finance-cash-touch.png"});await cash.tap();const finance=page.getByRole("dialog",{name:"Company finances"});
  await expect(finance).toContainText("$0.20");await expect(finance.getByText("Costs waiting to be paid",{exact:true})).toBeHidden();await page.screenshot({path:"test-results/finance-refinement-touch.png"});await finance.getByText("Advanced details",{exact:true}).tap();await finance.getByText("Detailed running costs",{exact:true}).tap();
@@ -99,13 +100,14 @@ test("purchase details keyboard navigation handles overflow and fitting content"
 });
 
 
-test("Opening prevention recognition keeps Scaling locked after touch review and reload",async({page})=>{
+test("Opening prevention recognition keeps Scaling locked after touch review and reload",async({ page, withoutRoom })=>{
+ await withoutRoom();
  let g=newGame(0,"touch-prevention");
  g=act(g,{type:"set_traffic_limit",enabled:true});g=act(g,{type:"start_db_upgrade"});g=advanceSteps(g,4).state;
  g=act(g,{type:"incident_inspect",equipment:"app"});g=act(g,{type:"incident_inspect",equipment:"db"});
  g=act(g,{type:"set_traffic_limit",enabled:false});g=advanceSteps(g,5).state;
  await page.route("**/api/**",r=>r.abort());await page.setViewportSize({width:390,height:844});
- await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  const review=page.getByRole("dialog",{name:"Prevention review"});
  await expect(review).toContainText("Scaling unlocks only after a real Opening incident");
  await review.getByRole("button",{name:"Continue company",exact:true}).tap();
@@ -117,13 +119,14 @@ test("Opening prevention recognition keeps Scaling locked after touch review and
  expect((await savedGame(page)).campaign).toEqual(before);await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Opening");
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
-test("current chapter is prominent and the full journey opens on touch", async ({ page }) => {
+test("current chapter is prominent and the full journey opens on touch", async ({ page, withoutRoom }) => {
+ await withoutRoom();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/**", route => route.abort());
   await seedSave(page, spikeCompany(false));
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
-  await expectRoom(page);
+
   const bar = page.getByRole("region", { name: "Guided Mode chapters" });
   await expect(bar).toContainText("Chapter 4 of 6");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Traffic Spikes & Autoscaling");
@@ -141,13 +144,14 @@ test("current chapter is prominent and the full journey opens on touch", async (
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
 });
 
-for (const next of [false,true]) test(`compact chapter bar keeps goal and navigation reachable on touch, Next=${next}`, async ({page}) => {
+for (const next of [false,true]) test(`compact chapter bar keeps goal and navigation reachable on touch, Next=${next}`, async ({page,withoutRoom}) => {
+  await withoutRoom();
   const {completedReliability}=await import("../src/sim/__tests__/combinedFixture");
   await page.route("**/api/**",route=>route.abort());
   await seedSave(page,next?completedReliability():newGame());
   await page.goto("/");
   await page.getByRole("button",{name:"Continue company",exact:true}).tap();
-  await expectRoom(page);
+
   const bar=page.getByRole("region",{name:"Guided Mode chapters"});
   const before=await savedGame(page);
   for (const width of [390,320]) {
@@ -196,11 +200,12 @@ test("new players can compare both modes and start Challenge Mode on touch", asy
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.save.v1"))).toBeNull();
 });
 
-test("reliability: inspection and effective recipients remain clear on narrow touch screens",async({page})=>{
+test("reliability: inspection and effective recipients remain clear on narrow touch screens",async({ page, withoutRoom })=>{
+ await withoutRoom();
  await page.setViewportSize({width:390,height:844});
  await page.route("**/api/**",route=>route.abort());
  await seedSave(page,tick(act(preparedReliability(),{type:"arm_reliability"}),9));
- await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
+ await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  const panel=page.getByRole("region",{name:"Stay Online"});
  await panel.getByRole("button",{name:"Inspect App 2 health · free",exact:true}).tap();
  const instances=page.getByRole("region",{name:"Application instances"});
@@ -265,9 +270,10 @@ test("investigates and responds through the incident panel on touch", async ({ p
   expect((await savedGame(page)).phase).toBe("management");
 });
 
-test("a tap explains a term, and tapping a button does not leave a tooltip over it", async ({ page }) => {
+test("a tap explains a term, and tapping a button does not leave a tooltip over it", async ({ page, withoutRoom }) => {
+ await withoutRoom();
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap(); await page.getByRole("button", { name: "Skip", exact: true }).tap();
-  await expectRoom(page);
+
   const tip = page.getByRole("tooltip");
   await page.getByRole("complementary", { name: "System metrics" }).getByText("System evidence", { exact: true }).tap();
   await expect(tip).toContainText("Inspection is free");

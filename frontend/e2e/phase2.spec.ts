@@ -47,7 +47,8 @@ test("the walkthrough works from the keyboard, keeps shortcuts working and remem
   await expect(card).toHaveCount(0);
 });
 
-test("pending milestone reload keeps the company paused and awards it only once", async ({ page }) => {
+test("pending milestone reload keeps the company paused and awards it only once", async ({ page, withoutRoom }) => {
+  await withoutRoom();
   const incident = advanceSteps(newGame(1, "pending-milestone"), 6).state;
   const response = applyAction(incident, { type: "start_db_upgrade" });
   if (!response.ok) throw Error(response.message);

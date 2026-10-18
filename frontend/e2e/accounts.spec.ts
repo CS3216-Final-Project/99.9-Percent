@@ -1,8 +1,9 @@
 import { advanceCampaignStep } from "./fixtures";
-import {test,expect,seedSave,expectRoom,savedGame} from './fixtures';
+import {test,expect,seedSave,savedGame} from './fixtures';
 import {newGame} from '../src/sim';
 import type {AppSession,CloudRun} from '../../shared/campaign';
-test('saves to the cloud only when asked, resolves conflicts, keeps owners apart and loads in a fresh browser',async({page,context, installClock})=>{
+test('saves to the cloud only when asked, resolves conflicts, keeps owners apart and loads in a fresh browser',async({page,context, installClock,withoutRoom})=>{
+  await withoutRoom(context);
  await installClock();
   test.setTimeout(150000);
   let session:AppSession|null={account:{id:'owner-a',displayName:'Player A'},csrfToken:'csrf-a'};
@@ -31,7 +32,7 @@ test('saves to the cloud only when asked, resolves conflicts, keeps owners apart
   await expect(dialog.getByRole('listitem')).toContainText('Guided Mode save (this game)');
   await page.screenshot({path:'test-results/account-signed-in.png'});
   await dialog.getByRole('button',{name:'Close'}).click();
-  await page.getByRole('button',{name:'Continue company',exact:true}).click();await expectRoom(page);
+  await page.getByRole('button',{name:'Continue company',exact:true}).click();
   await advanceCampaignStep(page);await page.getByRole('button',{name:'Menu',exact:true}).click();
   await page.getByRole('tab',{name:'Saves'}).click();
   const saves=page.getByRole('region',{name:'Cloud saves'});
@@ -51,9 +52,7 @@ test('saves to the cloud only when asked, resolves conflicts, keeps owners apart
   expect(putCount).toBe(3);
   // A fresh isolated context has no local save, but the same provider-backed app account.
   session={account:{id:'owner-a',displayName:'Player A'},csrfToken:'csrf-a'};
-  // A fresh browser has no other tab drawing the room. Left open, this one keeps rendering it behind the home screen
-  // in the same software renderer, which can stall the fresh tab for longer than an assertion waits. Its errors are
-  // still checked when the test ends.
+  // Close the original page before loading the cloud save in a fresh page.
   await page.close();
   // The tabs share storage, so the fresh one drops the save before the game reads it.
   const fresh=await context.newPage();
@@ -63,10 +62,11 @@ test('saves to the cloud only when asked, resolves conflicts, keeps owners apart
   await expect(freshDialog.getByText(/No Guided Mode game in this browser yet/)).toBeVisible();
   await freshDialog.getByRole('button',{name:/^Load cloud save from/}).click();await expect(freshDialog).toBeHidden();
   await expect(fresh.getByRole('region',{name:'Guided Mode'})).toContainText('Last played');
-  await fresh.getByRole('button',{name:'Continue company',exact:true}).click();await expectRoom(fresh);
+  await fresh.getByRole('button',{name:'Continue company',exact:true}).click();
   expect((await savedGame(fresh)).campaign!.step).toBe(1);await fresh.close();
 });
-test('cancelled Google sign-in keeps the guest save and says so',async({page})=>{
+test('cancelled Google sign-in keeps the guest save and says so',async({page,withoutRoom})=>{
+  await withoutRoom();
   await seedSave(page,newGame(5,'cancel-company'));
   await page.route('**/api/session',route=>route.fulfill({status:401,json:{error:'guest'}}));
   await page.route('**/api/auth/google',route=>route.fulfill({status:302,headers:{location:'/?auth=cancelled'}}));
@@ -76,7 +76,7 @@ test('cancelled Google sign-in keeps the guest save and says so',async({page})=>
   await expect(page.getByRole('dialog',{name:'Account'}).getByText('Google sign-in was cancelled. Your local save is unchanged.',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Close'}).click();
   expect((await savedGame(page)).campaign!.runId).toBe('cancel-company');
-  await page.getByRole('button',{name:'Continue company',exact:true}).click();await expectRoom(page);
+  await page.getByRole('button',{name:'Continue company',exact:true}).click();
 });
 test('signs in with email after a wrong password, and refuses a duplicate account',async({page,withoutRoom})=>{
   await withoutRoom();

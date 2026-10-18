@@ -1,5 +1,5 @@
 import { advanceCampaignStep } from "./fixtures";
-import {test,expect,seedSave,savedGame,expectRoom} from "./fixtures";
+import {test,expect,seedSave,savedGame} from "./fixtures";
 import {newGame,applyAction,type Action,type GameState} from "../src/sim";
 import {advanceSteps} from "../src/sim/step";
 function act(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
@@ -12,12 +12,15 @@ function prepared(){
  install({type:"deploy_load_balancer"},2);install({type:"set_routing",mode:"balanced",targets:["app-1","app-2"]},1);
  install({type:"set_traffic_limit",enabled:false},1);return g;
 }
+// These journeys exercise panels and persistence; room interaction has dedicated browser coverage.
+test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
+
 for(const strategy of ["cache","database"] as const)test(`data strategy: ${strategy}, continuity and reload`,async({page, installClock})=>{
  await installClock();
- // The cache path renders two recoveries and reloads the room, taking over 150s on CI.
+ // The cache path exercises two recoveries and reloads; retain its existing test budget.
  // Keep the existing per-outcome assertion timeouts.
  test.setTimeout(240_000);const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
- await seedSave(page,prepared());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
+ await seedSave(page,prepared());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();
  const guidance=page.getByRole("region",{name:"Guided Mode guidance"});
  const chapters=page.getByRole("region",{name:"Guided Mode chapters"});
  const viewChapters=chapters.getByRole("button",{name:"View chapters"});
