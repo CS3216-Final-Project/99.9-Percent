@@ -280,7 +280,8 @@ interface Store {
   focusTech: (id: TechId | null) => void;
   setRunning: (running: boolean) => void;
   setSpeed: (speed: Speed) => void;
-  newRun: (opts?: { seed?: string | number; voluntary?: boolean }) => void;
+  /** Replace the current company. Returns false if it refused, leaving the current company in place. */
+  newRun: (opts?: { seed?: string | number; voluntary?: boolean }) => boolean;
   /**
    * Save the current run and continue the other mode's saved run, or start one.
    * Refuses (returning false) when the current run cannot be saved, unless `discard` accepts losing it.
@@ -953,10 +954,10 @@ export const useGame = create<Store>()((set, get) => {
     setSpeed: (speed) => set({ speed }),
 
     newRun: (opts = {}) => {
-      if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return;}
+      if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return false;}
       if (get().tutorialCompany) get().endTour(false);
       try {if(get().hasRun && get().game.campaign)checkpointCloud(currentEnvelope());}
-      catch {get().notify("Download a backup from Menu, Saves before replacing this company: its cloud copy could not be kept.","error");return;}
+      catch {get().notify("Download a backup from Menu, Saves before replacing this company: its cloud copy could not be kept.","error");return false;}
       if (get().mode === "campaign") {
       const replacementRunId=crypto.randomUUID();
       const old=get();
@@ -974,7 +975,7 @@ export const useGame = create<Store>()((set, get) => {
       const m=emptyMeasurement();m.replayOf=old.hasRun?old.game.campaign!.runId:null;
       // Preserve unsaved old-run records in the same archive. Refuse reset if it cannot retain them.
       if(pending.length&&!archiveEvents(pending)) {
-        get().notify("Export playtest records before resetting: the archive could not retain this run.","error");return;
+        get().notify("Export playtest records before resetting: the archive could not retain this run.","error");return false;
       }
       // An unlock that only the replaced company records (an older or imported save) moves into the profile, so it is not lost with it.
       const counted={...old.meta,runsStarted:old.meta.runsStarted+1,challengeUnlocked:challengeUnlockedNow()};
@@ -989,7 +990,7 @@ export const useGame = create<Store>()((set, get) => {
         onboarding:false,tour,started:true,toast:null,activeMark:document.hidden?null:performance.now()});
       if(begins)recordTour("started",tour!,{from:"new_company"});
       saveMeta(nextMeta);persist(true);
-      return;
+      return true;
       }
 
       const { meta, mode, game: old } = get();
@@ -1022,6 +1023,7 @@ export const useGame = create<Store>()((set, get) => {
         toast: null,
       });
       if(!saved)get().notify("Could not save. Play continues in memory; export your company from the menu.","error");
+      return true;
     },
 
     switchMode: (mode, opts = {}) => {

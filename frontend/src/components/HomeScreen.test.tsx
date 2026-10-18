@@ -148,6 +148,15 @@ describe("restarting Guided Mode", () => {
     return { runId, guided: card(screen.getByRole("region", { name: "Choose how you want to play" }), "Guided Mode") };
   }
   const press = (guided: HTMLElement, name: string) => fireEvent.click(within(guided).getByRole("button", { name }));
+  const ARMED = "Lose this company? Press again";
+  /** Makes the Challenge Mode slot refuse writes, as a full or blocked storage would. */
+  const blockClassicSaves = () => {
+    const setItem = Storage.prototype.setItem;
+    return vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+      if (key === CLASSIC) throw new Error("QuotaExceededError");
+      setItem.call(this, key, value);
+    });
+  };
 
   it("offers no restart before there is a company", () => {
     const guided = card(boot("campaign"), "Guided Mode");
@@ -161,8 +170,10 @@ describe("restarting Guided Mode", () => {
     // The first press only asks.
     expect(useGame.getState()).toMatchObject({ started: false, game: { campaign: { runId, step: 3 } } });
     expect(within(guided).getByText("Are you sure?")).toBeTruthy();
-    expect(within(guided).getByText(/replaces only your Guided Mode save/)).toBeTruthy();
-    press(guided, "Lose this company? Press again");
+    // Screen readers hear the warning as soon as the button asks.
+    expect(within(guided).getByRole("alert").textContent).toMatch(/replaces only your Guided Mode save/);
+    expect(within(guided).getByRole("button", { name: ARMED }).textContent).toBe("Press again");
+    press(guided, ARMED);
     const next = useGame.getState().game.campaign!;
     expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, hasRun: true });
     expect(next.runId).not.toBe(runId);
@@ -186,6 +197,47 @@ describe("restarting Guided Mode", () => {
     expect(readAnalytics().find((e) => e.name === "run_reset")).toMatchObject({ runId, payload: { previousRunId: runId } });
   });
 
+  it("keeps the question when the replacement is refused, so the next press tries again", () => {
+    const { runId, guided } = leftCompany("campaign");
+    const newRun = vi.fn(() => false);
+    useGame.setState({ newRun });
+    press(guided, "New company");
+    press(guided, ARMED);
+    expect(newRun).toHaveBeenCalledOnce();
+    expect(useGame.getState().game.campaign!.runId).toBe(runId);
+    expect(within(guided).getByRole("button", { name: ARMED })).toBeTruthy();
+    expect(within(guided).getByRole("alert")).toBeTruthy();
+  });
+
+  it("asks once more before a restart loses an unsaved Challenge Mode run, and only the restart goes ahead", () => {
+    const { runId, guided } = leftCompany("classic");
+    const blocked = blockClassicSaves();
+    press(guided, "New company");
+    press(guided, ARMED);
+    expect(useGame.getState()).toMatchObject({ mode: "classic", started: false });
+    expect(screen.getByText(/switching now loses it/)).toBeTruthy();
+    // The card's main action still only continues; it does not borrow the restart's go-ahead.
+    expect(within(guided).getByRole("button", { name: "Continue company" }).className).toContain("btn-primary");
+    press(guided, ARMED);
+    blocked.mockRestore();
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true });
+    expect(useGame.getState().game.campaign!.runId).not.toBe(runId);
+  });
+
+  it("does not let Continue inherit an unsaved-run go-ahead the restart asked for", () => {
+    const { runId, guided } = leftCompany("classic");
+    const blocked = blockClassicSaves();
+    press(guided, "New company");
+    press(guided, ARMED);
+    press(guided, "Continue company");
+    // Continuing is a different decision, so it asks for itself and the restart is dropped.
+    expect(useGame.getState().mode).toBe("classic");
+    expect(within(guided).queryByRole("button", { name: ARMED })).toBeNull();
+    press(guided, "Switch and lose this run");
+    blocked.mockRestore();
+    expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, game: { campaign: { runId, step: 3 } } });
+  });
+
   it("drops a pending restart when the player continues instead", () => {
     const { runId, guided } = leftCompany("campaign");
     press(guided, "New company");
@@ -204,10 +256,12 @@ describe("restarting Guided Mode", () => {
     const [again, review] = within(guided).getAllByRole("button");
     expect([again.textContent, review.textContent]).toEqual(["Play again", "Review company"]);
     expect(again.className).toContain("btn-primary");
-    expect(document.activeElement).toBe(again);
+    // Focus starts on the safe action, so a held Enter cannot arm and confirm the restart in one go.
+    expect(document.activeElement).toBe(review);
     press(guided, "Play again");
     expect(useGame.getState().game.campaign!.runId).toBe("won-company");
-    press(guided, "Lose this company? Press again");
+    expect(within(guided).getByRole("button", { name: ARMED }).textContent).toBe(ARMED);
+    press(guided, ARMED);
     expect(useGame.getState()).toMatchObject({ started: true, game: { phase: "management", outcome: null } });
     expect(useGame.getState().game.campaign!.runId).not.toBe("won-company");
   });
@@ -250,6 +304,16 @@ describe("restarting Guided Mode", () => {
       const exported = decodeSave(await files[0].blob.text());
       expect(exported.status === "ok" && exported.game.campaign).toMatchObject({ runId, step: 3 });
       expect(useGame.getState().started).toBe(false);
+    });
+
+    it("says so when the stored company is gone by the time Export is pressed", () => {
+      const { guided } = leftCompany("classic");
+      press(guided, "New company");
+      localStorage.removeItem(CAMPAIGN);
+      press(guided, "Export company");
+      expect(files).toEqual([]);
+      expect(useGame.getState().toast).toMatchObject({ kind: "error", text: "There is no stored Guided Mode company to export." });
+      expect(within(guided).getByRole("button", { name: ARMED })).toBeTruthy();
     });
   });
 });

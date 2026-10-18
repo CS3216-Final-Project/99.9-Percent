@@ -190,6 +190,16 @@ describe("game modes", () => {
     useGame.getState().newRun();
     expect(readAnalytics().some(e => e.name === "run_reset")).toBe(false);
   });
+  it("says whether it replaced the company, so a refused replacement can be asked again", () => {
+    enter();
+    const runId = useGame.getState().game.campaign!.runId;
+    useGame.setState({ cloudBusy: true });
+    expect(useGame.getState().newRun()).toBe(false);
+    expect(useGame.getState().game.campaign!.runId).toBe(runId);
+    useGame.setState({ cloudBusy: false });
+    expect(useGame.getState().newRun()).toBe(true);
+    expect(useGame.getState().game.campaign!.runId).not.toBe(runId);
+  });
   it("clears the previous mode's toast", () => {
     useGame.getState().boot(); useGame.getState().notify("Campaign news");
     useGame.getState().switchMode("classic");

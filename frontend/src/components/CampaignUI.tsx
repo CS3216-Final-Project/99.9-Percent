@@ -312,10 +312,10 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
   // As in Classic, the first press only asks and the second, on the now red button, replaces the company.
   const reset = () => {
     if (!confirmReset) { setConfirmReset(true); return; }
-    newRun(); setConfirmReset(false);
+    if (newRun()) setConfirmReset(false);
   };
   const resetLabel = confirmReset ? "Lose this company? Press again" : "New company";
-  const resetWarning = confirmReset && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces only the current Guided Mode save. Export it first from Saves if you want to keep it. Press the red button again to confirm.</Callout>;
+  const resetWarning = confirmReset && <Callout compact tone="warn" icon="alert" kicker="Are you sure?" live="alert">This replaces only the current Guided Mode save. Export it first from Saves if you want to keep it. Press the red button again to confirm.</Callout>;
   return <Modal title="Menu" icon={{ kind: "go", name: "menu" }} onClose={close} className="modal-menu">
     <MenuRun title={tutorialCompany ? "Chapter 0 practice" : "This company"} saved={!saveBlocked} onResume={close}
       stats={[

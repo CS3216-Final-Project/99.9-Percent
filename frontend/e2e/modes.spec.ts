@@ -144,8 +144,9 @@ test("plays a finished Guided Mode campaign again from the home screen", async (
   await page.goto("/");
   const guided = page.getByRole("region", { name: "Choose how you want to play" }).getByRole("region", { name: "Guided Mode" });
   await expect(guided).toContainText("Campaign complete");
-  await expect(guided.getByRole("button", { name: "Play again", exact: true })).toBeFocused();
-  await expect(guided.getByRole("button", { name: "Review company", exact: true })).toBeVisible();
+  await expect(guided.getByRole("button", { name: "Play again", exact: true })).toBeVisible();
+  // The safe action takes focus, so holding Enter cannot arm and confirm the restart.
+  await expect(guided.getByRole("button", { name: "Review company", exact: true })).toBeFocused();
   await page.screenshot({ path: "test-results/home-campaign-complete.png" });
   await guided.getByRole("button", { name: "Play again", exact: true }).click();
   await guided.getByRole("button", { name: "Lose this company? Press again", exact: true }).click();
