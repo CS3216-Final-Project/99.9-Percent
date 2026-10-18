@@ -200,7 +200,7 @@ describe("restarting Guided Mode", () => {
   it("keeps the question when the replacement is refused, so the next press tries again", () => {
     const { runId, guided } = leftCompany("campaign");
     const newRun = vi.fn(() => false);
-    useGame.setState({ newRun });
+    act(() => useGame.setState({ newRun }));
     press(guided, "New company");
     press(guided, ARMED);
     expect(newRun).toHaveBeenCalledOnce();

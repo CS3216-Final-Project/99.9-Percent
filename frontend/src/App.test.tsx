@@ -305,11 +305,12 @@ it("offers New company on the menu's Run tab too, asking once and forgetting the
   expect(armed.textContent).toContain("Your current company will be replaced.");
   expect(within(menu).getByRole("alert").textContent).toMatch(/replaces only the current Guided Mode save/);
   // A refused replacement keeps the question, so the next press tries again.
-  const { newRun } = useGame.getState();
-  useGame.setState({ newRun: () => false });
+  act(() => useGame.setState({ cloudBusy: true }));
   fireEvent.click(armed);
+  expect(menu.isConnected).toBe(true);
+  expect(useGame.getState().game.campaign!.runId).toBe(runId);
   expect(within(run).getByRole("button", { name: "Lose this company? Press again" })).toBeTruthy();
-  useGame.setState({ newRun });
+  act(() => useGame.setState({ cloudBusy: false }));
   expect(within(menu).getByText("Are you sure?")).toBeTruthy();
   openTab(menu, "Sound");
   openTab(menu, "Run");
