@@ -66,8 +66,9 @@
   display: none;
 }
 
+/* A touch screen has no keys or mouse to tell of, only dragging. */
 @media (hover: none) {
-  .view-hint-fine {
+  .view-hint-keys {
     display: none;
   }
 
@@ -274,9 +275,16 @@
   margin-top: 12px;
 }
 
+/* A narrow room's top belongs to the walk prompt: the map goes to the bottom corner and the hint under the prompt. */
 @media (max-width: 900px) {
   .room-map {
+    top: auto;
+    bottom: 12px;
     width: min(240px, calc(100% - 24px));
+  }
+
+  .view-hint {
+    top: 58px;
   }
 
   .map-names {
