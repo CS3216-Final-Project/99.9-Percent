@@ -33,6 +33,11 @@ test("the touch Navigation menu keeps floors, walking and camera tools clear of 
  await seedSave(page,newGame(1,"touch-dock"));
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  await expectRoom(page);
+ // On a phone the map starts folded away to a button, and opens by touch inside the screen.
+ const fold=page.locator(".room-map.is-closed").getByRole("button",{name:"Map",exact:true});await expect(fold).toBeVisible();
+ await fold.tap();const plan=(await page.getByRole("region",{name:"Map"}).boundingBox())!;
+ expect(plan.x).toBeGreaterThanOrEqual(0);expect(plan.x+plan.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+ await page.getByRole("button",{name:"Hide map"}).tap();
  const dock=page.locator(".controls-dock"),room=dock.locator(".room-menu");
  const run=dock.getByRole("button",{name:"Run",exact:true}),before=(await run.boundingBox())!;
  await room.locator(":scope > summary").tap();

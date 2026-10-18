@@ -282,6 +282,8 @@ export function ViewRig() {
     const wantPerspective = showing !== "overview";
     if (wantPerspective !== viewNow.perspective) {
       viewNow.perspective = wantPerspective;
+      // The page can tell which camera draws, for the browser tests and anything styled by it.
+      state.gl.domElement.closest(".stage-canvas")?.setAttribute("data-camera", wantPerspective ? "perspective" : "overview");
       const overview = cameras.overview;
       if (wantPerspective) set({ camera: cameras.perspective });
       else if (overview) {
