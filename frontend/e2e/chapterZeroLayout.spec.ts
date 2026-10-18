@@ -20,7 +20,16 @@ for (const [width, height] of [[1440, 900], [390, 844], [320, 568], [844, 390]])
       await expect(card).toHaveAccessibleName(`Tutorial, step ${lesson} of 21`);
       await expect(card).toBeInViewport({ ratio: 1 });
       const menu = page.getByRole("button", { name: "Menu", exact: true });
-      if (lesson !== 16) await expect(menu).toBeDisabled();
+      await expect(menu).toBeEnabled();
+      if (lesson === 1 || lesson === 7 || lesson === 8) {
+        await menu.click();
+        const settings = page.getByRole("dialog", { name: "Menu", exact: true });
+        await settings.getByRole("tab", { name: "Sound", exact: true }).click();
+        await expect(settings.getByRole("button", { name: "Mute all", exact: true })).toBeEnabled();
+        await page.keyboard.press("Escape");
+        await expect(settings).toBeHidden();
+        await expect(card).toHaveAccessibleName(`Tutorial, step ${lesson} of 21`);
+      }
       if (lesson === 1) {
         await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Database", exact: true })).toBeDisabled();
         await page.keyboard.press("PageUp");
@@ -34,8 +43,8 @@ for (const [width, height] of [[1440, 900], [390, 844], [320, 568], [844, 390]])
       if (lesson === 8) {
         const quote = page.getByRole("region", { name: "Confirm Add server", exact: true });
         await page.keyboard.press("Escape");
-        const room = (await page.getByRole("main").boundingBox())!;
-        await page.mouse.click(room.x + room.width / 2, room.y + room.height - 30);
+        // The quote's Cancel button can occupy the room's centre on short screens.
+        await page.getByRole("main").locator("canvas").click({ position: { x: 4, y: 4 } });
         await expect(quote).toBeVisible();
         await expect(quote.getByRole("button", { name: "Confirm", exact: true })).toBeDisabled();
         await expect(quote.getByRole("button", { name: "Cancel", exact: true })).toBeEnabled();

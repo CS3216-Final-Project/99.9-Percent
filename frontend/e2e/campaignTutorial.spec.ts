@@ -16,7 +16,15 @@ for (const width of [1440, 390]) test(`A saved Chapter 0 replay resumes as visib
   await expect(tutorial(page)).toContainText("Practice · In progress · Lesson 1 of 21");
   await expect(tutorial(page).getByRole("button", { name: "Next", exact: true })).toBeDisabled();
   await page.screenshot({ path: `test-results/chapter-zero-practice-${width}.png` });
-  await tutorial(page).getByRole("button", { name: "Exit Chapter 0", exact: true }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expectRoom(page);
+  await expect(tutorial(page)).toHaveAccessibleName("Tutorial, step 1 of 21");
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menu", exact: true });
+  await menu.getByRole("tab", { name: "Sound", exact: true }).click();
+  await expect(menu.getByRole("button", { name: "Mute all", exact: true })).toBeEnabled();
+  await menu.getByRole("button", { name: "Return to game", exact: true }).click();
   await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
   expect((await savedGame(page)).campaign).toEqual(incident.campaign);
@@ -38,7 +46,7 @@ for (const width of [1440, 390]) test(`A visible Chapter 0 replay can be closed 
   await page.getByRole("button", { name: "Replay the tutorial", exact: true }).click();
   const card = tutorial(page);
   await expect(card.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
-  const exit = card.getByRole("button", { name: "Exit Chapter 0", exact: true });
+  const exit = card.getByRole("button", { name: "Return to game", exact: true });
   await expect(exit).toBeInViewport();
   await page.screenshot({ path: `test-results/chapter-zero-visible-exit-${width}.png` });
   await exit.click();
@@ -94,7 +102,7 @@ for (const width of [1440, 390]) test(`Cancel lesson restores its quote after re
   const quote = page.getByRole("region", { name: "Confirm Add server", exact: true });
   await expect(quote).toBeVisible();
   await expect(quote.getByRole("button", { name: "Confirm", exact: true })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeEnabled();
   await page.keyboard.press("Escape");
   await expect(quote).toBeVisible();
   await quote.getByRole("button", { name: "Cancel", exact: true }).click();

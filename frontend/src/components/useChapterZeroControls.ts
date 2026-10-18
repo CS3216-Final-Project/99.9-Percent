@@ -1,7 +1,7 @@
 import { useLayoutEffect } from "react";
 
 const CONTROLS = 'button, a, input, select, textarea, summary, [tabindex], canvas';
-const ALWAYS = '.chapter-zero-guide, .music-btn';
+const ALWAYS = '.chapter-zero-guide, .music-btn, .menu-btn, .modal-backdrop:has(> .modal-menu)';
 
 /** The walkthrough enables real controls for the current lesson, without changing their game rules. */
 export function useChapterZeroControls(step: number, quote: string | null, view: string | null) {
@@ -17,7 +17,6 @@ export function useChapterZeroControls(step: number, quote: string | null, view:
     : step === 12 ? '.room-controls, .walk-prompt, canvas'
     : step === 13 ? view === 'tech' ? '.sheet-tech' : '.view-tabs [data-view="tech"]'
     : step === 14 ? view === 'history' ? '.sheet-history' : '.view-tabs [data-view="history"]'
-    : step === 15 ? view === 'menu' ? '.modal-menu [data-tutorial="save-now"], .modal-menu [aria-label="How to play"], .modal-menu [aria-label="Save and exit"], .modal-menu .menu-resume, .modal-menu .modal-head button' : '.menu-btn'
     : '';
 
   useLayoutEffect(() => {
