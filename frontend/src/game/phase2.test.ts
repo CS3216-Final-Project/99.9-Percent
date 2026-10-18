@@ -87,6 +87,22 @@ it("persists Back navigation and bounds it at the first lesson",()=>{
  useGame.setState(useGame.getInitialState(),true);enter();
  expect(useGame.getState().tour).toEqual({track:"campaign",step:1});
 });
+it.each([false,true])("resumes an explicitly replayed walkthrough without clearing completion, later chapter=%s",later=>{
+ const game=later?act(act(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"}):newGame(1,"replay-resume");
+ saveGame(game);saveMeta({...DEFAULT_META,tutorialDone:true});enter();
+ expect(useGame.getState().tour).toBeNull();
+ useGame.getState().startTour("campaign","home");
+ for(let i=0;i<8;i++)useGame.getState().tourNext();
+ useGame.getState().tourBack();useGame.getState().endSession();
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(useGame.getState()).toMatchObject({tour:{track:"campaign",step:7},running:false,meta:{tutorialDone:true,walkthroughStep:7,walkthroughFurthestStep:8}});
+ expect(useGame.getState().game.campaign).toEqual(game.campaign);
+ expect(tutorialEvents().filter(e=>e.name==="tutorial_started")).toHaveLength(1);
+ completeTutorialFixture();
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(useGame.getState().tour).toBeNull();
+ expect(useGame.getState().meta).toMatchObject({tutorialDone:true,walkthroughStep:null});
+});
 it("carries an unfinished walkthrough on where it was left, into a new company, as one start",()=>{
  enter();
  for(let i=0;i<5;i++)useGame.getState().tourNext();

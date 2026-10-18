@@ -395,11 +395,13 @@ export const useGame = create<Store>()((set, get) => {
     return next;
   }
   /**
-   * The walkthrough a Guided Mode company in its Opening shows until the player has finished it, carrying
-   * on from the step it was left on. Later chapters have their own guides.
+   * Resume an explicitly started replay in any chapter. Otherwise, offer the walkthrough only to
+   * an unfinished player in the Opening; later chapters have their own guides.
    */
   function campaignWalkthrough(meta: Meta, game: GameState): Tour | null {
-    if (meta.tutorialDone || game.phase === "ended" || chapterTourOf(game.campaign!)) return null;
+    if (game.phase === "ended") return null;
+    const replaying = meta.tutorialDone && meta.walkthroughStep !== null;
+    if (!replaying && (meta.tutorialDone || chapterTourOf(game.campaign!))) return null;
     const step = Math.min(meta.walkthroughStep ?? 0, lastStep("campaign"));
     return { track: "campaign", step, ...(step === 5 ? { clockUntil: game.campaign!.step + 1 } : {}) };
   }
@@ -1081,7 +1083,7 @@ export const useGame = create<Store>()((set, get) => {
       // Going back to the start of the walkthrough already showing is not another start.
       const begins = get().tour?.track !== track_;
       const restart = campaign && track_ === "campaign";
-      const meta = restart && !get().meta.tutorialDone
+      const meta = restart
         ? walkthroughAt({ ...get().meta, walkthroughFurthestStep: 0 }, 0)
         : get().meta;
       set({ tour, meta, tutorialAttempt: get().tutorialAttempt + (restart ? 1 : 0), view: null, selected: null, running: false, onboarding: false, started: true, ...(campaign ? {} : { lastIntro: intro("begin") }) });
@@ -1101,14 +1103,14 @@ export const useGame = create<Store>()((set, get) => {
       if (tour.track === "basics" && next.step === lastStep(tour.track)) {
         recordTour("completed", next);
         set({ meta: walkthroughDone(get().meta) });
-      } else if (tour.track === "campaign" && !get().meta.tutorialDone) set({ meta: walkthroughAt(get().meta, next.step) });
+      } else if (tour.track === "campaign") set({ meta: walkthroughAt(get().meta, next.step) });
       if (get().game.campaign) persist();
     },
     tourBack: () => {
       const { tour, meta } = get();
       if (tour?.track !== "campaign" || tour.step <= 0) return;
       const step = tour.step - 1;
-      set({ tour: { track: tour.track, step, ...(step === 5 ? { clockUntil: get().game.campaign!.step + 1 } : {}) }, running: false, ...(!meta.tutorialDone ? { meta: walkthroughAt(meta, step) } : {}) });
+      set({ tour: { track: tour.track, step, ...(step === 5 ? { clockUntil: get().game.campaign!.step + 1 } : {}) }, running: false, meta: walkthroughAt(meta, step) });
       persist();
     },
     dismissChapterComplete: () => set({ chapterComplete: null }),
