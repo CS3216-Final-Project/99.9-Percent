@@ -19,7 +19,7 @@ test("Chapter 0 practice stays visible and can be exited by touch during a saved
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
   await expect(tutorial(page)).toHaveAccessibleName("Tutorial, step 1 of 21");
   await expect(tutorial(page)).toContainText("In progress");
-  await tutorial(page).getByRole("button", { name: "Exit Chapter 0", exact: true }).tap();
+  await tutorial(page).getByRole("button", { name: "Return to game", exact: true }).tap();
   await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
   expect((await savedGame(page)).campaign).toEqual(incident.campaign);

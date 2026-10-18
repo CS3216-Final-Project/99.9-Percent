@@ -301,7 +301,7 @@ function download(name: string, text: string) {
 }
 /** The campaign menu: the same run card, Resume, tabs and tiles as Classic's, with the company's own actions. */
 function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
-  const { game, openView, newRun, saveNow, saveBlocked, measurement } = useGame();
+  const { game, openView, newRun, saveNow, saveBlocked, measurement, tutorialCompany } = useGame();
   const c = game.campaign!;
   const [tab, setTab] = useState<MenuTab>(initialTab);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -318,13 +318,14 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
     newRun(); setConfirmReset(false);
   };
   return <Modal title="Menu" icon={{ kind: "go", name: "menu" }} onClose={close} className="modal-menu">
-    <MenuRun title="This company" saved={!saveBlocked} onResume={close}
+    <MenuRun title={tutorialCompany ? "Chapter 0 practice" : "This company"} saved={!saveBlocked} onResume={close}
       stats={[
         { icon: "week", kind: "go", label: "Week · game second", value: `${game.turn} · ${c.step}` },
         { icon: "users", kind: "users", label: "Users", value: num(game.users) },
         { icon: "cash", kind: "cash", label: "Cash", value: money(c.cashCents / 100) },
       ]}
       note={<><strong>Time is paused.</strong> One game second models one second of requests; every 60 game seconds settles an operating week.</>} />
+    {tutorialCompany && <button className="btn btn-primary" onClick={() => useGame.getState().endTour(false)}><Icon name="next" size={18} />Return to game</button>}
     {(c.scorecard||c.combinedStage?.finalReview)&&<button className="btn" onClick={()=>openView("scorecard")}>View run scorecard</button>}
     {saveBlocked && <Callout tone="warn" icon="save" kicker="Save preserved" live="alert">Your stored save is unreadable or unsupported and has been preserved. This run stays in memory until you explicitly reset.</Callout>}
     <MenuTabs value={tab} onChange={goTo}>

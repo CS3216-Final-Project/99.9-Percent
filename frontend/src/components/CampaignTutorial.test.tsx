@@ -45,7 +45,7 @@ it("requires inspection through real game controls and lets focus leave the nonm
   start(); renderCompany();
   expect(card(1).getAttribute("aria-modal")).toBe("false");
   expect(current().queryByRole("button", { name: "Skip" })).toBeNull();
-  expect(current().queryByRole("button", { name: "Exit Chapter 0" })).toBeNull();
+  expect(current().queryByRole("button", { name: "Return to game" })).toBeNull();
   expect(current().queryByRole("button", { name: /Inspect|demo|Preview/ })).toBeNull();
   expect(current().getByRole("button", { name: "Back" })).toHaveProperty("disabled", true);
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
@@ -100,6 +100,8 @@ it("keeps the quote open until the Cancel lesson and never permits a tutorial pu
   fireEvent.keyDown(screen.getByRole("region", { name: "Confirm Add server" }), { key: "Escape" });
   fireEvent.click(screen.getByRole("button", { name: "Menu" }));
   expect(screen.getByRole("region", { name: "Confirm Add server" })).toBeTruthy();
+  expect(useGame.getState().view).toBe("menu");
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Menu" })).getByRole("button", { name: "Resume" }));
   expect(useGame.getState().view).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Confirm" })); next();
   expect(card(8)).toBeTruthy();
@@ -111,17 +113,27 @@ it("keeps the quote open until the Cancel lesson and never permits a tutorial pu
   expect(useGame.getState().game.campaign!.cashCents).toBe(cash);
 });
 
-it("locks unrelated controls during inspection and restores them when the guide unmounts", () => {
+it("keeps Menu and its settings usable during inspection while locking unrelated game controls", () => {
   start(); const rendered = renderCompany();
   const menu = screen.getByRole("button", { name: "Menu" });
   const db = within(screen.getByRole("complementary", { name: "System metrics" })).getByRole("button", { name: "Database" });
-  expect(menu.getAttribute("aria-disabled")).toBe("true");
-  expect(menu.getAttribute("tabindex")).toBe("-1");
-  fireEvent.click(menu); fireEvent.click(db);
+  expect(menu.getAttribute("aria-disabled")).not.toBe("true");
+  expect(menu.getAttribute("tabindex")).not.toBe("-1");
+  fireEvent.click(menu);
+  const dialog = within(screen.getByRole("dialog", { name: "Menu" }));
+  expect(dialog.queryByRole("button", { name: "Return to game" })).toBeNull();
+  fireEvent.click(dialog.getByRole("tab", { name: "Sound" }));
+  const mute = dialog.getByRole("button", { name: "Mute all" });
+  fireEvent.click(mute);
+  expect(useGame.getState().audio.muted).toBe(true);
+  fireEvent.keyDown(mute, { key: "Escape" });
+  fireEvent.click(db);
   expect(useGame.getState()).toMatchObject({ view: null, selected: null });
+  expect(db.getAttribute("aria-disabled")).toBe("true");
+  expect(db.getAttribute("tabindex")).toBe("-1");
   rendered.unmount();
-  expect(menu.hasAttribute("aria-disabled")).toBe(false);
-  expect(menu.hasAttribute("tabindex")).toBe(false);
+  expect(db.hasAttribute("aria-disabled")).toBe(false);
+  expect(db.hasAttribute("tabindex")).toBe(false);
 });
 
 it("restores a real quote when resuming directly into the Cancel lesson", () => {
@@ -208,13 +220,36 @@ it("exits a completed player's replay without finishing the lessons or buying th
   saveMeta({ ...DEFAULT_META, tutorialDone: true }); start();
   const company = structuredClone(useGame.getState().game.campaign!);
   useGame.getState().startTour("campaign"); renderCompany(); reach(7); exercise();
-  fireEvent.click(current().getByRole("button", { name: "Exit Chapter 0" }));
+  fireEvent.click(current().getByRole("button", { name: "Return to game" }));
   expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
   expect(screen.queryByRole("region", { name: "Confirm Add server" })).toBeNull();
   expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", false);
   expect(useGame.getState()).toMatchObject({ running: false, meta: { tutorialDone: true, walkthroughStep: null } });
   expect(useGame.getState().game.campaign).toEqual(company);
   cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
+  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
+});
+
+it("returns from practice through Menu after reload without changing the saved company", () => {
+  const game = advanceSteps(newGame(1, "return-from-menu"), 6).state;
+  saveGame(game);
+  saveMeta({ ...DEFAULT_META, tutorialDone: true }); start();
+  const company = structuredClone(useGame.getState().game.campaign!);
+  useGame.getState().startTour("campaign"); renderCompany(); reach(8);
+  cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
+  expect(card(8)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  const menu = within(screen.getByRole("dialog", { name: "Menu" }));
+  expect(menu.getByRole("region", { name: "Chapter 0 practice" })).toBeTruthy();
+  fireEvent.click(menu.getByRole("tab", { name: "Graphics" }));
+  fireEvent.click(menu.getByRole("button", { name: "Return to game" }));
+  expect(useGame.getState()).toMatchObject({ running: false, tour: null, tutorialCompany: null, view: null });
+  expect(useGame.getState().game.campaign).toEqual(company);
+  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
+  expect(screen.queryByRole("region", { name: "Confirm Add server" })).toBeNull();
+  expect(localStorage.getItem("nn.campaign.tutorial.v1")).toBeNull();
+  cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
+  expect(useGame.getState().game.campaign).toEqual(company);
   expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
 });
 
