@@ -1,5 +1,5 @@
-import { guidanceJourney, recoveryJourney, ordinaryRunJourney, incidentAttentionJourney } from "./guidanceRewards";
-import { reviewRecovery } from "./fixtures";
+import { guidanceJourney, onboardingHintHoldJourney, recoveryJourney, ordinaryRunJourney, incidentAttentionJourney } from "./guidanceRewards";
+import { declineIdleHint, reviewRecovery } from "./fixtures";
 import { chapterHintJourney, recoveryVerificationJourney } from "./chapterHints";
 import { appHealthDuringTutorial, appHealthJourney, appHealthProblem } from "./appHealth";
 import type { Page } from "@playwright/test";
@@ -273,6 +273,11 @@ test("inspects evidence and advances a physical step on touch", async ({ page , 
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await mute.tap(); await expect(mute).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: "test-results/phase1-mobile.png" });
+  // A slow compositor capture can legitimately reach the inactivity offer.
+  // Freeze time, decline through its UI and verify that the company is unchanged.
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
+  await expect(page.getByRole("dialog", { name: "Need a little help?", exact: true })).toBeVisible();
+  await declineIdleHint(page);
   await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).tap();
   const before=(await savedGame(page)).campaign!.step;
   await advanceCampaignStep(page);
@@ -487,6 +492,7 @@ test("App Health explains problem evidence on touch", async ({page}) => { await 
 test("App Health remains compact at 320px touch", async ({page}) => { await appHealthJourney(page,320,844,true); });
 
 for (const width of [390, 320]) {
+ test(`Development B: onboarding Hint and clock hold at ${width}`, async ({page}) => { await page.emulateMedia({ reducedMotion: "reduce" }); await onboardingHintHoldJourney(page, width, 844); });
  test(`Development B: touch guidance at ${width}`, async ({page}) => { await page.emulateMedia({ reducedMotion: "reduce" }); await guidanceJourney(page, width, 844); });
  test(`Development B: touch recovery at ${width}`, async ({page}) => { await page.emulateMedia({ reducedMotion: "reduce" }); await recoveryJourney(page, width, 844, true, width === 320); });
 }

@@ -1,7 +1,8 @@
 import { test } from "./fixtures";
-import { guidanceJourney, recoveryJourney, ordinaryRunJourney, incidentAttentionJourney } from "./guidanceRewards";
+import { guidanceJourney, onboardingHintHoldJourney, recoveryJourney, ordinaryRunJourney, incidentAttentionJourney } from "./guidanceRewards";
 
 for (const [width, height] of [[1440, 900], [1366, 768]]) {
+  test(`Development B: onboarding Hint and clock hold at ${width}`, async ({ page }) => { await onboardingHintHoldJourney(page, width, height); });
   test(`Development B: contextual Run and Confirm at ${width}`, async ({ page }) => { await guidanceJourney(page, width, height); });
   test(`Development B: live recovery and postmortem at ${width}`, async ({ page }) => { await recoveryJourney(page, width, height, width === 1366); });
 }

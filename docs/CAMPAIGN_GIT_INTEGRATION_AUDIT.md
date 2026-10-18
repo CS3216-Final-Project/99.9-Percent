@@ -1,5 +1,45 @@
 # Campaign Git integration audit
 
+## PR #119 browser CI correction
+
+The original published head was `dae2a844e7d6cf06b49636081d6c2a3d281a2499`, containing implementation `ac92e90` and this audit. Direct inspection of [CI run 39124583467](https://github.com/CS3216-Final-Project/99.9-Percent/actions/runs/39124583467) found two failing browser jobs. Static checks/coverage, balance, backend and eight browser shards passed. The required `frontend` aggregate failed because its browser dependency failed. Main remained `5cd86d3d6548dfcd99ab44c9978eacc085f3677f`; the PR was mergeable, with no reviews or review threads.
+
+| Failed job / case | Exact failure and evidence | Classification and correction |
+| --- | --- | --- |
+| `frontend-browser (10)` / `inspects evidence and advances a physical step on touch` (`mobile.spec.ts`) | `Test timeout of 60000ms exceeded`; Monitoring tap repeatedly intercepted by `.modal-backdrop` containing the legitimate Hint offer. Both CI attempts failed. Capturing the software-rendered room took 7.2 / 11.3 seconds. | Test fixture defect exposed by CI rendering cost: inactivity can reach 15 seconds while capturing the room. Freeze the clock after capture, assert the offer, decline through No and verify the entire saved company is unchanged before tapping Monitoring. Preserve exact step advancement, mute, dock, History and overflow assertions. |
+| `frontend-browser (1)` / `Development B: touch guidance at 390` (`guidanceRewards.ts`, `fixtures.ts:completeTutorial`) | `Step timeout of 180000ms exceeded`; `locator.tap: Test ended` on tutorial Next. Both attempts steadily advanced through lessons rather than sticking at one gate. Completed taps: 35 / 34; total tap cost 179.8 / 182.5 seconds; median 5.1 / 5.3 seconds. | Test clock/software-rendering setup cost. Keep all 21 real lessons and touch input on native frames; install the controlled clock before reloading the preserved company for the spotlight checks. Move the unchanged timed onboarding Hint/clock-hold assertions into four focused viewport cases. No timeout, retry or assertion budget increases. |
+
+The unchanged failing cases were first run locally with Node 22.23.3, locked Playwright 1.63.0, CI flags/retry policy, one worker, production preview and real SwiftShader WebGL. Both passed (170.65 seconds overall); the 390px case took approximately 2.5 minutes. The Ubuntu failures did not reproduce on this Windows host. With native frames, a measured complete 390px onboarding setup took 19.07 seconds; its subsequent successful complete journey took 17.9 seconds in another context.
+
+Local diagnostics also exposed independent host suspension: a one-second parent-process heartbeat recorded a 432,815ms gap while an external 20-second wait took 436 seconds. A previous attempt stalled 268 seconds during reload. These failed/flaky attempts remain in ignored diagnostics and are not reported as clean batches. An experimental blank-document navigation produced a fixture storage-access error and was discarded. No application error was suppressed and no retry policy was changed.
+
+The correction changes browser tests and documentation only. All application, simulation, financial/progression, save, backend/shared, dependency, workflow and deployment files remain identical to the published PR. Main's ruleset requires `frontend` and `backend` with strict up-to-date checks; repository instructions continue to call for reviewer approval. Nothing authorizes merging or manual deployment.
+
+The corrective commit is limited to `frontend/e2e/guidanceRewards.ts`, `frontend/e2e/guidanceRewards.spec.ts`, `frontend/e2e/mobile.spec.ts`, `docs/testing.md` and this audit. The original 47-path staging inventory below records the initial publication; the correction also touches the existing testing guide, giving 48 distinct paths in the resulting PR. All diagnostic scripts, logs, traces, screenshots, browser reports and generated output remain ignored.
+
+Validation commands use Node 22 and `PLAYWRIGHT_PORT=4197`. Browser commands retain `CI=true`, the repository's single worker, one diagnostic retry and fail-on-flaky policy. The two initial nine-case correction batches each had eight passing cases and one flaky case; neither batch passed. The first stalled 268 seconds during reload; the second coincided with the independently measured 433-second parent-process pause. All nine distinct cases have passing observations across these attempts. The discarded blank-document experiment was interrupted after its fixture error. A fresh relevant browser batch then passed all **40 cases**, with zero retries, flaky cases, failures or skips (863.08 seconds; results below).
+
+A concurrent local unit attempt was stopped after `CampaignTutorial.test.tsx` reported eight failures in 97.52 seconds (the same unchanged 23-test file passed original Ubuntu CI in 16.58 seconds); the fresh serial run then passed all **63 tests** across CampaignTutorial, CampaignUI and ChapterHints in **93.60 seconds**, including all 23 tutorial tests. No unit test or application source was edited during this investigation.
+
+| Correction validation | Result |
+| --- | --- |
+| Frontend lint, typecheck, production build | Passed on Node 22.23.3. |
+| Serial component tests | **63 passed** in three files, 93.60 seconds, no skips or retries. No browser run overlapped this verification. |
+| CI shard-planner unit tests | Three passed; complete current browser inventory is **232 cases**, including four new timed onboarding cases. |
+| Relevant CI-policy browser regressions | **40 passed**, 863.08 seconds, zero retries/flaky cases/skips. Both originally failing cases passed. Includes all automatic Hint journeys, all chapter hierarchies, practice replay/reload, complete Chapter 0, Classic tutorial/purchases/reload and four dock spotlight widths. |
+| Backend/shared | No changes; original required backend check passed. The new commit will receive fresh required GitHub checks. |
+| Git / scope | Whitespace check passed; no runtime, lockfile or workflow changes. Diagnostic outputs are ignored. |
+
+Exact clean browser command (from `frontend/`, Node 22, `CI=true`, `PLAYWRIGHT_PORT=4197`):
+
+```powershell
+node node_modules/@playwright/test/cli.js test automaticHints.spec.ts guidanceHierarchy.spec.ts campaignTutorial.spec.ts guidanceRewards.spec.ts mobile.spec.ts classic.spec.ts --grep 'Automatic Hint:|Guidance hierarchy:|Spotlight refinement: live incident Pause and Confirm priority|Chapter 0 requires real game interactions|A completed player.s Chapter 0 replay resumes|inspects evidence and advances a physical step on touch|Development B: touch guidance at 390|completes the first-week tutorial' --output=../test-results/pr119-ci/related-artifacts
+```
+
+Serial component command: `node node_modules/vitest/vitest.mjs run src/components/CampaignTutorial.test.tsx src/components/CampaignUI.test.tsx src/components/ChapterHints.test.tsx --maxWorkers=1`.
+
+The local monitor wraps that unchanged CLI command only to record parent-process timer gaps; it does not alter the browser or application. Optional account-proxy connection refusals and color/deprecation warnings also appeared in passing cases; they were not the failing checks. Browser coverage remains Chromium desktop/touch emulation; real devices, Safari/Firefox and live-provider acceptance remain outside these checks. GitHub CI must pass on the new exact pushed head; follow PR #119's current checks for publication readiness. The earlier full sweeps and corrective-run counts below remain historical, without a claim of one green batch.
+
 ## Clean final refresh onto `5cd86d3`
 
 The publication-time fetch found two further main commits: `8e386a5` (#116, Chapter 0 focus animation and Menu/Return-to-game refinements) and `5cd86d3d6548dfcd99ab44c9978eacc085f3677f` (#117, remove the duplicate guide exit button). Nine upstream paths changed. Read-only previews found two overlapping files, `CampaignUI.tsx` and `mobile.spec.ts`, merging cleanly with **no conflict blocks**. No simulation, financial/progression, save, backend/shared or dependency change appeared. This did not trigger the user's significant-conflict approval boundary.

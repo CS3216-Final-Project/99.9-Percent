@@ -4,7 +4,8 @@ import { applyAction, newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 import { dataCompany } from "../src/sim/__tests__/dataFixture";
 
-export async function guidanceJourney(page: Page, width: number, height: number) {
+/** Timed onboarding checks run separately from the full, native-frame walkthrough. */
+export async function onboardingHintHoldJourney(page: Page, width: number, height: number) {
   const touch=width<900;
   await page.setViewportSize({width,height});await page.clock.install();
   await seedSave(page,newGame(),{tutorialDone:false,walkthroughStep:0});await page.goto("/");
@@ -17,9 +18,26 @@ export async function guidanceJourney(page: Page, width: number, height: number)
   await expect(page.getByRole("dialog",{name:"Need a little help?"})).toBeHidden();
   await expect(run).toBeDisabled();await expect(run).not.toHaveClass(/campaign-guidance-cue/);
   expect((await savedGame(page)).campaign!.step).toBe(0);
-  await page.clock.resume();await completeTutorial(page,touch);await expect(card).toBeHidden();
+}
+
+export async function guidanceJourney(page: Page, width: number, height: number) {
+  const touch=width<900;
+  // Keep native scene frames while tapping all 21 interactive lessons. Running
+  // Playwright's virtual frame loop here made each CI touch action cost ~5s.
+  await page.setViewportSize({width,height});
+  await seedSave(page,newGame(),{tutorialDone:false,walkthroughStep:0});await page.goto("/");
+  const choose=async(button:ReturnType<Page["getByRole"]>)=>touch?button.tap():button.click();
+  await choose(page.getByRole("button",{name:"Continue company",exact:true}));await expectRoom(page);
+  const card=tutorial(page),run=page.getByRole("button",{name:"Run",exact:true});
+  await expect(card).toHaveAccessibleName("Tutorial, step 1 of 21");
+  await completeTutorial(page,touch);await expect(card).toBeHidden();
   const before=await savedGame(page);
   expect(before.campaign!.step).toBe(1);expect(before.campaign!.cashCents).toBe(2000000);expect(before.campaign!.pending).toEqual([]);
+  // Install before reloading, preserving the completed company's real save.
+  // Only the attention checks below need controlled time.
+  await page.clock.install();await page.reload();
+  await choose(page.getByRole("button",{name:"Continue company",exact:true}));await expectRoom(page);
+  await expect(card).toBeHidden();expect(await savedGame(page)).toEqual(before);
   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));await declineIdleHint(page);
   const hint=page.getByRole("button",{name:"Hint",exact:true});await choose(hint);
   await choose(page.getByRole("dialog",{name:"Here's a hint"}).getByRole("button",{name:"Got it"}));
