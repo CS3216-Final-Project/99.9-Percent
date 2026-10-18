@@ -49,6 +49,8 @@ Browser contexts are isolated. Advanced scenarios use engine-generated states in
 
 Journeys that need exact game seconds opt in with the `installClock` fixture before navigation. `advanceCampaignStep(page, { seconds })` runs that many seconds through Run/Pause; use `resumeClock: false` when the caller deliberately keeps virtual time frozen. Scene, walking and audio journeys otherwise retain native browser clocks.
 
+When Chapter 0 is setup for another journey, `completeTutorial` bounds its 21 real lessons to 120 seconds and adds only their measured duration to that journey's test budget. The journey keeps its original remaining budget and assertion timeouts. Seed a completed-tutorial save when the case only exercises an existing company; dedicated tutorial journeys still walk the full guide.
+
 A timed batch acknowledges a Scaling or Data Strategy completion through the existing journey handler, then explicitly clicks Run for its remaining seconds. It finishes paused; dismissing a completion dialog outside a timed batch also leaves the player paused.
 
 - The Opening room-inspection journey keeps native scene frames, selects 2x through the public speed menu and waits for the built-in first-incident pause at game second 6.

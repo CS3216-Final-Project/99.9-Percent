@@ -213,10 +213,13 @@ export async function finishChapterZero(page: Page, touch = false) {
 /** Unrelated journeys complete mandatory Chapter 0; optional spotlight guides retain their Skip action. */
 export async function completeTutorial(page: Page) {
   if (await page.locator(".chapter-zero-modal").count()) {
-    // These journeys previously skipped one card. Their setup now performs 21 real lessons,
-    // including a bounded clock run; reserve that work without relaxing any assertion timeout.
-    test.setTimeout(test.info().timeout + 60_000);
-    await finishChapterZero(page);
+    // Completing 21 real lessons is setup for these journeys. Bound that setup
+    // separately, then preserve the journey's original budget and assertion timeouts.
+    const journeyBudget = test.info().timeout;
+    const started = performance.now();
+    test.setTimeout(journeyBudget + 120_000);
+    await test.step("Complete mandatory Chapter 0 setup", () => finishChapterZero(page), { timeout: 120_000 });
+    test.setTimeout(journeyBudget + Math.ceil(performance.now() - started));
   }
   else await page.getByRole("button", { name: "Skip", exact: true }).click();
 }
