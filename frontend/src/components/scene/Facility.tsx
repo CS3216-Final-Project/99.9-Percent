@@ -1412,11 +1412,11 @@ function CameraHint() {
   const walking = useGame((s) => s.walking);
   return walking ? (
     <>
-      <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> to walk · <kbd>Shift</kbd> to run · click the floor to go there · <kbd>Space</kbd> to use · <kbd>Esc</kbd> to stop
+      <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> to walk · <kbd>Shift</kbd> to run · click the floor to go there · <kbd>Space</kbd> to use · <kbd>V</kbd> to change view · <kbd>Esc</kbd> to stop
     </>
   ) : (
     <>
-      <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn · <kbd>PgUp</kbd> <kbd>PgDn</kbd> to change floor
+      <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn · <kbd>PgUp</kbd> <kbd>PgDn</kbd> to change floor · <kbd>V</kbd> to walk and see from your avatar
     </>
   );
 }
