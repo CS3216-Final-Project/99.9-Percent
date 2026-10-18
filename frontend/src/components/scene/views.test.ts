@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ELEVATOR_DOOR, SHAFT } from "./floorplan";
 import { ROOM } from "./layout";
+import { AVATAR_RADIUS } from "./navgrid";
 import { facing } from "./player";
 import {
   blendPose,
@@ -85,7 +86,25 @@ describe("the follow view", () => {
     expect(firstHit(at.x, at.z, open.x, open.z, SHAFT)).toBeLessThan(1);
     const kept = followPose(at.x, 0, at.z, -Math.PI / 2, FOLLOW.pitch, FOLLOW.distance, SHAFT);
     expect(firstHit(at.x, at.z, kept.x, kept.z, SHAFT)).toBe(1);
-    expect(Math.hypot(kept.x - at.x, kept.z - at.z)).toBeGreaterThanOrEqual(FOLLOW.closest * Math.cos(FOLLOW.pitch) - 1e-9);
+    expect(Math.hypot(kept.x - kept.lx, kept.y - kept.ly, kept.z - kept.lz)).toBeGreaterThan(0.5);
+  });
+
+  it("rises and looks down more steeply rather than come up to the avatar's face when a wall is close behind", () => {
+    // A metre and a half from the east wall, looking west: the camera has little floor behind it.
+    const p = followPose(ROOM.x1 - 1.5, 0, MIDDLE.z, Math.PI / 2, FOLLOW.pitch, FOLLOW.distance);
+    const pitch = Math.atan2(p.y - p.ly, Math.hypot(p.x - p.lx, p.z - p.lz));
+    expect(pitch).toBeGreaterThan(FOLLOW.pitch + 0.3);
+    expect(Math.hypot(p.x - p.lx, p.y - p.ly, p.z - p.lz)).toBeGreaterThanOrEqual(FOLLOW.nearest);
+    expect(p.x).toBeLessThanOrEqual(ROOM.x1 - FOLLOW.margin + 1e-9);
+    expect(p.y).toBeLessThanOrEqual(ROOM.wallH - FOLLOW.margin + 1e-9);
+  });
+
+  it("keeps a little way off and above even with the avatar's back to a wall", () => {
+    expect(FOLLOW.least).toBeLessThan(AVATAR_RADIUS);
+    const p = followPose(ROOM.x1 - AVATAR_RADIUS, 0, MIDDLE.z, Math.PI / 2, FOLLOW.pitch, FOLLOW.distance);
+    for (const v of Object.values(p)) expect(Number.isFinite(v)).toBe(true);
+    expect(p.x).toBeLessThan(ROOM.x1);
+    expect(p.y - p.ly).toBeGreaterThan(0.5);
   });
 });
 

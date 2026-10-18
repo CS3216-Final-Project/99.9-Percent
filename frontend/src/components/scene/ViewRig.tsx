@@ -116,6 +116,11 @@ function aim(camera: THREE.PerspectiveCamera, pose: Pose, size: { width: number;
   }
 }
 
+/** Tell the page which camera draws, for the browser tests and anything styled by it. */
+function markCamera(canvas: HTMLCanvasElement, perspective: boolean): void {
+  canvas.closest(".stage-canvas")?.setAttribute("data-camera", perspective ? "perspective" : "overview");
+}
+
 /** Turning: Q and E swing, and through the eyes the left and right arrows turn. */
 function turnFor(dt: number, instant: boolean): void {
   const spin = viewNow.spin;
@@ -134,18 +139,20 @@ export function ViewRig() {
   const fov = useGame((s) => s.graphics.fov);
 
   // A new room starts from the overview, keeping its canvas's own camera for it, and hands that camera back, and the
-  // pointer, when it goes.
+  // pointer, when it goes. The page is told so: a canvas replaced mid-view must not leave the old canvas's camera named.
   useEffect(() => {
     const own = get().camera as THREE.OrthographicCamera;
     if (own.isOrthographicCamera) cameras.overview = own;
     resetRig();
+    markCamera(gl.domElement, false);
     return () => {
       letGoOfPointer();
       if (cameras.overview) set({ camera: cameras.overview });
       resetRig();
       setViewFade(0);
+      markCamera(gl.domElement, false);
     };
-  }, [set, get]);
+  }, [set, get, gl]);
 
   // Looking round: drag on the room, or with the pointer locked, move the mouse. A click in first person takes the
   // pointer, and that click does nothing else; Escape lets go without ending walk mode.
@@ -292,8 +299,7 @@ export function ViewRig() {
     const wantPerspective = showing !== "overview";
     if (wantPerspective !== viewNow.perspective) {
       viewNow.perspective = wantPerspective;
-      // The page can tell which camera draws, for the browser tests and anything styled by it.
-      state.gl.domElement.closest(".stage-canvas")?.setAttribute("data-camera", wantPerspective ? "perspective" : "overview");
+      markCamera(state.gl.domElement, wantPerspective);
       const overview = cameras.overview;
       if (wantPerspective) set({ camera: cameras.perspective });
       else if (overview) {

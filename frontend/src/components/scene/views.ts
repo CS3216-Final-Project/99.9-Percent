@@ -28,8 +28,10 @@ export const FOLLOW = {
   distance: 4.5,
   nearest: 2,
   farthest: 9,
-  /** As close as it comes when a wall is right behind it. */
-  closest: 0.6,
+  /** How steeply it may look down when a wall behind leaves it no room to stand back. */
+  steepest: 1.4,
+  /** Metres across the floor it keeps from the avatar however close the wall behind: less than the avatar's own clearance. */
+  least: 0.15,
   pitch: 0.45,
   lowest: 0.08,
   highest: 1.15,
@@ -110,21 +112,27 @@ export function reachInside(x: number, z: number, dx: number, dz: number, margin
 
 /**
  * The follow view of an avatar standing at (x, floorY, z): `distance` metres back from the point it looks at, along
- * `heading`, raised by `pitch`. It comes in closer rather than leave the room, rise above the walls' tops or stand
- * behind one of `walls`, so no wall is ever between it and the avatar.
+ * `heading`, raised by `pitch`. It never leaves the room, rises above the walls' tops or stands behind one of
+ * `walls`, so no wall is ever between it and the avatar. Short of room behind, it rises and looks down more steeply
+ * rather than come right up to the avatar's face, and only then comes in closer.
  */
 export function followPose(x: number, floorY: number, z: number, heading: number, pitch: number, distance: number, walls: readonly Wall[] = [], fov = FOLLOW.fov): Pose {
-  const p = clamp(pitch, FOLLOW.lowest, FOLLOW.highest);
+  let p = clamp(pitch, FOLLOW.lowest, FOLLOW.highest);
   let d = clamp(distance, FOLLOW.nearest, FOLLOW.farthest);
   const ly = floorY + FOLLOW.aim;
   const top = floorY + ROOM.wallH - FOLLOW.margin;
-  if (ly + Math.sin(p) * d > top) d = (top - ly) / Math.sin(p);
+  // How far behind the avatar there is floor to stand on, before the outer walls or one of `walls`.
   const [fx, fz] = headingDir(heading);
+  let room = Math.min(FOLLOW.farthest, reachInside(x, z, -fx, -fz));
+  const hit = firstHit(x, z, x - fx * room, z - fz * room, walls);
+  if (hit < 1) room = hit * room - FOLLOW.margin;
+  // Even with its back to a wall the avatar stands clear of it by more than this, so the camera always has a little.
+  room = Math.max(room, FOLLOW.least);
+  if (d * Math.cos(p) > room) p = Math.max(p, Math.min(FOLLOW.steepest, Math.acos(clamp(room / d, 0, 1))));
+  if (ly + Math.sin(p) * d > top) d = (top - ly) / Math.sin(p);
+  d = Math.min(d, room / Math.cos(p));
   const bx = -fx * Math.cos(p);
   const bz = -fz * Math.cos(p);
-  d = Math.min(d, reachInside(x, z, bx, bz));
-  const hit = firstHit(x, z, x + bx * d, z + bz * d, walls);
-  if (hit < 1) d = Math.max(FOLLOW.closest, hit * d - FOLLOW.margin);
   return { x: x + bx * d, y: ly + Math.sin(p) * d, z: z + bz * d, lx: x, ly, lz: z, fov };
 }
 
