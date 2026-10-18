@@ -203,6 +203,8 @@ interface Store {
   mode: GameMode;
   remainderMs: number;
   saveBlocked: boolean;
+  /** Result of the latest attempt to preserve the active run in this browser. */
+  saveStatus: "saved" | "unsaved";
   /** False until the saved game (if any) has been read from the browser. */
   ready: boolean;
   /** False while the title screen is showing. */
@@ -227,6 +229,9 @@ interface Store {
   graphics: GraphicsSettings;
   selected: EquipmentId | null;
   selectedAppId: string | null;
+  /** Temporary workspace visibility; never serialized into a save. */
+  panelOpen: boolean;
+  setPanelOpen: (open: boolean) => void;
   selectApp: (id: string) => void;
   /** The room-originated inspection asking for its reveal, or none. */
   roomInspection: RoomInspection | null;
@@ -286,7 +291,7 @@ interface Store {
    * Refuses (returning false) when the current run cannot be saved, unless `discard` accepts losing it.
    */
   switchMode: (mode: GameMode, opts?: { discard?: boolean }) => boolean;
-  saveNow: (quiet?: boolean) => void;
+  saveNow: (quiet?: boolean) => boolean;
   /** Replace the current company with an exported save. Returns false if the file is not a usable save. */
   importSave: (raw: string) => boolean;
   /** Resume a validated copy of the pre-update save in Classic, retaining original bytes. */
@@ -345,25 +350,30 @@ export const useGame = create<Store>()((set, get) => {
   /** When walk mode last began, for how long it lasted. */
   let walkStart = 0;
   function persist(explicitReset=false):boolean {
+    const finish = (saved: boolean) => {
+      const saveStatus = saved ? "saved" : "unsaved";
+      if (get().saveStatus !== saveStatus) set({ saveStatus });
+      return saved;
+    };
     const s=get();
-    if(s.mode === "classic") return saveClassicGame(s.game);
-    if(s.saveBlocked)return false;
-    if(!s.hasRun)return true;
+    if(s.mode === "classic") return finish(saveClassicGame(s.game));
+    if(s.saveBlocked)return finish(false);
+    if(!s.hasRun)return finish(true);
     if (s.tutorialCompany) {
       const saved = saveTutorialPractice(s.tutorialCompany.game.campaign!.runId, s, s.tour?.step ?? s.meta.walkthroughStep ?? 0, s.meta.walkthroughFurthestStep ?? 0);
       if (!saved) s.notify("Practice progress could not be saved. Your company save is unchanged.", "error");
       if (saved && archiveEvents(s.measurement.pending)) set({measurement:{...s.measurement,pending:[]}});
-      return saved;
+      return finish(saved);
     }
     const saved=saveGame(s.game,s.remainderMs,explicitReset,s.measurement);
     try { if (saved) checkpointCloud(makeEnvelope(s.game,s.remainderMs,Date.now(),s.measurement)); }
-    catch { s.notify("Saved in this browser, but its cloud copy could not be kept. Download a backup from Menu, Saves before replacing this company.","error"); return false; }
+    catch { s.notify("Saved in this browser, but its cloud copy could not be kept. Download a backup from Menu, Saves before replacing this company.","error"); return finish(false); }
     if(saved && archiveEvents(s.measurement.pending)) {
       set({measurement:{...s.measurement,pending:[]}});
-      return true;
+      return finish(true);
     }
     s.notify("Storage could not preserve all progress or playtest records. Keep this tab open and export from the menu.","error");
-    return false;
+    return finish(false);
   }
   function uiEvent(name:string,data:Record<string,string|number|boolean|null>={}) {
     get().measureTime();
@@ -586,6 +596,8 @@ export const useGame = create<Store>()((set, get) => {
       walking: started && urlFloor === null && exploration.walking,
       remainderMs: 0,
       saveBlocked: false,
+      saveStatus: "unsaved",
+      panelOpen: true,
       selected: null,
       selectedAppId: null,
       roomInspection: null,
@@ -751,6 +763,7 @@ export const useGame = create<Store>()((set, get) => {
     mode: "campaign",
     remainderMs: 0,
     saveBlocked: false,
+    saveStatus: "unsaved",
     ready: false,
     started: false,
     game: newGame(BALANCE.introSeed),
@@ -764,7 +777,9 @@ export const useGame = create<Store>()((set, get) => {
     graphics: loadGraphicsSafe(),
     selected: null,
     selectedAppId: null,
-    selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
+    panelOpen: true,
+    setPanelOpen: open => set({panelOpen: open}),
+    selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({panelOpen:true,selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
     roomInspection: null,
     dismissRoomInspection: () => set({ roomInspection: null }),
     // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
@@ -923,7 +938,7 @@ export const useGame = create<Store>()((set, get) => {
       commit(next, { save: ended || due });
     },
 
-    select: id => set({selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null,...(id?floorPatch(floorOf(id),"select"):{})}),
+    select: id => set({...(id ? {panelOpen:true} : {}),selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null,...(id?floorPatch(floorOf(id),"select"):{})}),
     hover: (id) => {
       if (get().hovered !== id) set({ hovered: id });
     },
@@ -1036,6 +1051,7 @@ export const useGame = create<Store>()((set, get) => {
       if(get().game.campaign) get().measureTime();
       const saved=persist();
       if(!quiet || !saved) get().notify(saved ? "Saved" : "Could not save: browser storage is unavailable.", saved ? "success" : "error");
+      return saved;
     },
 
     importSave: (raw) => {

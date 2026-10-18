@@ -38,8 +38,10 @@ it("selects the cache through the same inspection action and displays actual use
  fireEvent.click(screen.getByRole("button",{name:"Read Cache"}));
  expect(useGame.getState().selected).toBe("cache");expect(useGame.getState().game.campaign!.step).toBe(step);
  expect(useGame.getState().game.campaign!.trace.at(-1)).toMatchObject({type:"inspection",data:{component:"cache"}});
- const data=screen.getByRole("region",{name:"Data strategy"});expect(data.textContent).toContain("Reads 80% / writes 20%");
- expect(data.textContent).toContain("effective hit rate used 0%");expect(data.textContent).toContain("eligible misses 1920");
+ const readings=screen.getByRole("region",{name:"Read Cache readings"});
+ expect(readings.textContent).toContain("Read / write share80% / 20%");
+ expect(readings.textContent).toContain("Effective hit rate used0%");
+ expect(readings.textContent).toContain("Eligible misses1,920");
 });
 
 it("inspects the Team office as company operations, and ignores equipment Guided Mode does not support",()=>{
@@ -62,8 +64,11 @@ it("labels the last completed profile separately from an immediate contrast",()=
  const contrast=applyAction(acknowledge.state,{type:"contrast_workload"});if(!contrast.ok)throw Error(contrast.message);
  show(contrast.state);const data=screen.getByRole("region",{name:"Data strategy"});
  expect(data.textContent).toContain("Workload: write-heavy");
- expect(data.textContent).toContain(`Workload evidence · game second ${g.campaign!.step} · read-heavy`);
- expect(data.textContent).toContain("Reads 80% / writes 20%");
+ act(()=>inspectOrSelect("cache"));
+ const readings=screen.getByRole("region",{name:"Read Cache readings"});
+ expect(readings.textContent).toContain("read-heavy");
+ expect(readings.textContent).toContain("Reads / writes");
+ expect(readings.textContent).toContain(`${g.campaign!.snapshot.data!.reads.toLocaleString("en-US")} / ${g.campaign!.snapshot.data!.writes.toLocaleString("en-US")}`);
 });
 it("offers each routing choice once and marks the one in use",()=>{
  show(dataCompany("read-heavy",false));const route=screen.getByRole("group",{name:/Send traffic to/});
@@ -88,4 +93,28 @@ it("leaves a reserved spare out of the routing choices, so the apps in use still
  expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
  fireEvent.click(within(route).getByRole("button",{name:"App 3 only"}));
  expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-3"]});
+});
+
+it("toggles equipment readings without advancing or changing the company when dismissed",()=>{
+ show(newGame());
+ const app=screen.getByRole("button",{name:"App Server"});
+ const heading=screen.getByRole("heading",{name:"Inspect equipment"});
+ expect(heading.querySelector(".tip")).toBeNull();
+ fireEvent.click(app);
+ const readings=screen.getByRole("region",{name:"Servers readings"});
+ expect(app.getAttribute("aria-pressed")).toBe("true");
+ expect(readings.textContent).not.toMatch(/Latest measurement|Busy is the share|Installed servers only help/);
+ const inspected=useGame.getState().game;
+ fireEvent.click(app);
+ expect(screen.queryByRole("region",{name:"Servers readings"})).toBeNull();
+ expect(app.getAttribute("aria-pressed")).toBe("false");
+ expect(useGame.getState().selected).toBeNull();
+ expect(useGame.getState().game).toBe(inspected);
+ fireEvent.click(app);
+ expect(screen.getByRole("region",{name:"Servers readings"})).toBeTruthy();
+ fireEvent.click(screen.getByRole("button",{name:"Database"}));
+ expect(screen.queryByRole("region",{name:"Servers readings"})).toBeNull();
+ expect(screen.getByRole("region",{name:"Database readings"})).toBeTruthy();
+ expect(useGame.getState().game.campaign!.step).toBe(inspected.campaign!.step);
+ expect(useGame.getState().game.campaign!.cashCents).toBe(inspected.campaign!.cashCents);
 });

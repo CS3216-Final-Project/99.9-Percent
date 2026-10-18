@@ -1,6 +1,7 @@
 "use client";
+import { EquipmentPanel } from "./EquipmentPanel";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import {
   BALANCE,
   churnRate,
@@ -416,21 +417,28 @@ function Inspector({ id }: { id: EquipmentId }) {
   );
 }
 
-/** Closed until the player selects something on the floor in view, or an incident starts. */
-export default function SidePanel() {
-  const phase = useGame((s) => s.game.phase);
-  const selected = useGame((s) => s.selected);
-  // A machine's details stay with its floor, however the view left it.
-  const shown = useGame((s) => selectedInView(s.selected, s.floor));
-  const el = useRef<HTMLElement>(null);
-  useEffect(() => {
-    el.current?.scrollTo({ top: 0 });
-  }, [selected, phase]);
+function EquipmentChoices() {
+  const game = useGame(s => s.game);
+  const select = useGame(s => s.select);
+  const places: EquipmentId[] = ["gateway", "app", "db", "monitoring", "team", "deploy", "growth"];
+  return <section className="panel-section">
+    <h2 className="step-head">Inspect equipment</h2>
+    <p className="muted">Choose equipment to see its readings and available actions.</p>
+    <div className="chips">{places.map(id => {
+      const name = equipmentInfo(game, id).name;
+      return <button type="button" className="chip" key={id} aria-label={`Inspect ${name}`} onClick={() => select(id)}>
+        <span className="chip-icon"><Icon name={EQUIPMENT_ICON[id]} size={16} /></span>{name}
+      </button>;
+    })}</div>
+  </section>;
+}
 
-  if (phase !== "incident" && !shown) return null;
-  return (
-    <aside ref={el} className="side" aria-label="Details">
-      {phase === "incident" ? <IncidentPanel /> : shown ? <Inspector id={shown} /> : null}
-    </aside>
-  );
+/** Equipment starts available; individual inspections stay with the floor in view. */
+export default function SidePanel() {
+  const phase = useGame(s => s.game.phase);
+  // A machine's details stay with its floor, however the view left it.
+  const shown = useGame(s => selectedInView(s.selected, s.floor));
+  return <EquipmentPanel label="Details">
+    {phase === "incident" ? <IncidentPanel /> : shown ? <Inspector id={shown} /> : <EquipmentChoices />}
+  </EquipmentPanel>;
 }

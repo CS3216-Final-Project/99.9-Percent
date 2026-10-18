@@ -77,7 +77,7 @@ export async function appHealthDuringTutorial(page: Page) {
     await expect(page.getByRole("dialog")).toHaveCount(1);
     await nextChapterZero(page); await nextChapterZero(page);
     await card.getByRole("button", { name: "Back", exact: true }).click();
-    await expect(card).toHaveAccessibleName("Tutorial, step 2 of 21");
+    await expect(card).toHaveAccessibleName("Walkthrough, step 2 of 21");
     await finishChapterZero(page);
     const before = (await savedGame(page)).campaign;
     await entry.click(); const dialog = page.getByRole("dialog", { name: "App Health", exact: true });

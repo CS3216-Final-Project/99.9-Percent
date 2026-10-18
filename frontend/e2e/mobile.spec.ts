@@ -9,7 +9,7 @@ import { advanceSteps } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
 import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 
-test("Chapter 0 practice stays visible and can be exited by touch during a saved incident", async ({ page, withoutRoom }) => {
+test("Walkthrough practice stays visible and can be exited by touch during a saved incident", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/**", route => route.abort());
@@ -17,7 +17,7 @@ test("Chapter 0 practice stays visible and can be exited by touch during a saved
   await seedSave(page, incident, { walkthroughStep: 0, walkthroughFurthestStep: 0 });
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
-  await expect(tutorial(page)).toHaveAccessibleName("Tutorial, step 1 of 21");
+  await expect(tutorial(page)).toHaveAccessibleName("Walkthrough, step 1 of 21");
   await expect(tutorial(page)).toContainText("In progress");
   await tutorial(page).getByRole("button", { name: "Return to game", exact: true }).tap();
   await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
@@ -77,7 +77,7 @@ test("finance and infrastructure help are reachable by touch with reduced motion
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
  await finance.getByRole("button",{name:"Close",exact:true}).tap();
  await page.locator('.campaign-panel .chip').filter({hasText:/^App Server$/}).tap();
- await page.getByText("About App Server",{exact:true}).tap();
+ await page.getByText("About Servers",{exact:true}).tap();
  await expect(page.locator('.campaign-evidence')).toContainText("needs routing");
  await page.getByRole("button",{name:/Add server/}).tap();const confirmation=page.getByRole("region",{name:"Confirm Add server"});
  await expect(confirmation).toContainText("$19,000");await confirmation.getByRole("button",{name:"Cancel"}).tap();
@@ -271,6 +271,12 @@ test("investigates and responds through the incident panel on touch", async ({ p
   await expectRoom(page);
   const panel = page.getByRole("complementary", { name: "System metrics" });
   await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
+  const requirements = panel.getByRole("region", { name: "Guided Mode requirements", exact: true });
+  await expect(requirements.getByRole("heading", { name: /Chapter requirements/ })).toBeVisible();
+  const requirementBox = (await requirements.boundingBox())!;
+  const latencyBox = (await panel.getByText("Latency · ms", { exact: true }).boundingBox())!;
+  expect(requirementBox.y + requirementBox.height).toBeLessThanOrEqual(latencyBox.y);
+  await expect(panel.getByRole("region", { name: "Incident recovery" })).toContainText("Latency below 500 ms");
   await panel.getByRole("button", { name: "Database", exact: true }).tap();
   await expect(panel.locator(".campaign-evidence .rows dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
   expect((await savedGame(page)).campaign!.step).toBe(6);
@@ -279,9 +285,8 @@ test("investigates and responds through the incident panel on touch", async ({ p
     await button.scrollIntoViewIfNeeded();
     await expect(button).toBeVisible();
   }
-  await panel.locator("summary").filter({ hasText: "Full system evidence" }).tap();
-  await expect(panel.getByRole("table")).toContainText("133.33%");
-  await panel.locator("summary").filter({ hasText: "Full system evidence" }).tap();
+  await expect(panel.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
+  await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
   await panel.getByRole("button", { name: /Upgrade database/ }).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
   await expect(panel.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("3 game second(s)");
   await expect(panel.getByRole("button", { name: /Add server/ })).toBeDisabled();
@@ -294,17 +299,24 @@ test("investigates and responds through the incident panel on touch", async ({ p
   expect((await savedGame(page)).phase).toBe("management");
 });
 
-test("a tap explains a term, and tapping a button does not leave a tooltip over it", async ({ page, withoutRoom }) => {
+test("recovery conditions are visible without a tooltip, and tapping a button leaves none", async ({ page, withoutRoom }) => {
  await withoutRoom();
- await seedSave(page,newGame(1,"touch-tooltip"));
+ await seedSave(page,advanceSteps(newGame(1,"touch-tooltip"),6).state);
  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).tap();
   const tip = page.getByRole("tooltip");
-  await page.getByRole("complementary", { name: "System metrics" }).getByText("System evidence", { exact: true }).tap();
-  await expect(tip).toHaveText("Inspect equipment for free. Inspection does not advance time.");
-  await expect(tip).toHaveCSS("opacity", "1");
-  const box = (await tip.boundingBox())!, view = page.viewportSize()!;
-  expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(view.width);
-  await page.screenshot({ path: "test-results/tooltip-mobile.png" });
+  const heading = page.getByRole("complementary", { name: "System metrics" }).getByRole("heading", { name: "Inspect equipment", exact: true });
+  await heading.tap();
+  await expect(tip).toBeHidden();
+  await expect(heading.locator(".tip")).toHaveCount(0);
+  const recovery = page.getByRole("region", { name: "Incident recovery", exact: true });
+  await recovery.getByRole("heading", { name: "Recovery progress", exact: true }).tap();
+  await expect(tip).toBeHidden();
+  await expect(recovery).toContainText("5 consecutive game seconds");
+  await expect(recovery).toContainText("Latency below 500 ms");
+  await expect(recovery).toContainText("Service errors below 1%");
+  await expect(recovery).toContainText("Traffic is being accepted and requests are completing");
+  await expect(recovery).toContainText("An unhealthy second resets progress. Pausing freezes it.");
+  await page.screenshot({ path: "test-results/recovery-conditions-mobile.png" });
 
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await mute.tap();
@@ -402,7 +414,7 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  await expect(card.getByRole("button",{name:"Next",exact:true})).toBeEnabled();
  await nextChapterZero(page,true);
  for(let step=3;step<8;step++)await nextChapterZero(page,true);
- await expect(card).toHaveAccessibleName("Tutorial, step 8 of 21");
+ await expect(card).toHaveAccessibleName("Walkthrough, step 8 of 21");
  await expect(card.getByRole("button",{name:"Next",exact:true})).toBeDisabled();
  await page.getByRole("button",{name:"Cancel",exact:true}).tap();
  await expect(card).toBeInViewport({ratio:1});
@@ -465,3 +477,32 @@ test("Chapter 0 inspections and App Health work on touch", async ({page}) => {
 test("App Health explains problem evidence on touch", async ({page}) => { await appHealthProblem(page,true); });
 
 test("App Health remains compact at 320px touch", async ({page}) => { await appHealthJourney(page,320,844,true); });
+
+
+test("menu actions and unsaved exit confirmation are reachable by touch", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/api/**", route => route.abort());
+  await seedSave(page, newGame(1, "touch-exit"));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).tap();
+  await expectRoom(page);
+  await page.getByRole("button", { name: "Menu", exact: true }).tap();
+  const menu = page.getByRole("dialog", { name: "Menu", exact: true });
+  await expect(menu.getByRole("group", { name: "Run", exact: true }).getByRole("button")).toHaveText(["Resume", "Save now", "How to play", "Exit"]);
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "nn.campaign.save.v1") throw new DOMException("Full", "QuotaExceededError");
+      return original.call(this, key, value);
+    };
+  });
+  await menu.getByRole("button", { name: "Exit", exact: true }).tap();
+  const confirm = page.getByRole("dialog", { name: "Exit without saving?", exact: true });
+  await expect(confirm).toBeVisible();
+  await page.screenshot({ path: "test-results/menu-exit-touch.png" });
+  await confirm.getByRole("button", { name: "Cancel", exact: true }).tap();
+  await menu.getByRole("button", { name: "Exit", exact: true }).tap();
+  await confirm.getByRole("button", { name: "Exit without saving", exact: true }).tap();
+  await expect(page.getByRole("region", { name: "Choose how you want to play" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});

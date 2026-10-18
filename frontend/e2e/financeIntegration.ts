@@ -8,7 +8,7 @@ export async function financeDuringWalkthrough(page: Page, touch = false) {
   await page.route("**/api/**", route => route.abort()); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   const card = tutorial(page);
-  await expect(card).toHaveAccessibleName("Tutorial, step 10 of 21");
+  await expect(card).toHaveAccessibleName("Walkthrough, step 10 of 21");
   await expect(card).toContainText("Example · Week 1 settlement");
   await expect(page.getByRole("dialog")).toHaveCount(1);
   await page.screenshot({ path: `test-results/integration-finance-${touch ? "touch" : "desktop"}.png` });

@@ -145,7 +145,7 @@ export function Act({
   label,
   price,
   note,
-  noteIcon = "latency",
+  noteIcon = "time",
   onClick,
   disabled,
   primary,

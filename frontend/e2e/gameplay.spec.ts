@@ -23,20 +23,6 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     if (path === "upgrade") {
       await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
       const panel = page.getByRole("complementary", { name: "System metrics" });
-      // The compact overview must leave every response visible before expanding evidence.
-      const responsesFit = () => panel.locator(".actions").evaluate(el => {
-        const panelBox = el.closest("aside")!.getBoundingClientRect();
-        return [...el.querySelectorAll("button")].every(button => {
-          const box = button.getBoundingClientRect();
-          return box.top >= panelBox.top + 3 && box.bottom <= panelBox.bottom - 3 &&
-            box.left >= panelBox.left && box.right <= panelBox.right &&
-            [...button.querySelectorAll(".price, .act-label")].every(label=>{
-              const labelBox=label.getBoundingClientRect();
-              return labelBox.left>=box.left&&labelBox.right<=box.right;
-            });
-        });
-      });
-      expect(await responsesFit()).toBe(true);
       await page.getByRole("main").getByRole("button", { name: "Database", exact: true }).click();
       // Clicking in the room opens the diagnostic card; the panel's inspection behind it is unchanged.
       const dbReveal = page.getByRole("dialog", { name: "Database inspected" });
@@ -45,11 +31,14 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       await expect(panel.getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");
       const evidence=panel.locator(".campaign-evidence .rows");
       await expect(evidence.locator("dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
-      expect(await responsesFit()).toBe(true);
-      await panel.locator("summary").filter({ hasText: "Full system evidence" }).click();
-      await expect(panel.getByRole("table")).toContainText("133.33%");
-      await expect(panel.getByText("Installed server capacity", { exact: true })).toBeVisible();
-      await panel.locator("summary").filter({ hasText: "Full system evidence" }).click();
+      await expect(panel.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
+      await expect(panel.getByText("Live", { exact: true })).toBeVisible();
+      await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
+      for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
+        const action = panel.getByRole("button", { name });
+        await action.scrollIntoViewIfNeeded();
+        await expect(action).toBeInViewport();
+      }
       // Inspection is repeatable and cannot advance the physical clock.
       await panel.getByRole("button", { name: "Database", exact: true }).click();
       await panel.evaluate(el => { el.scrollTop = 0; });

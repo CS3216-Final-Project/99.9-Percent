@@ -17,7 +17,7 @@ for (const [width, height] of [[1440, 900], [390, 844], [320, 568], [844, 390]])
     const back = (await card.getByRole("button", { name: "Back", exact: true }).boundingBox())!;
     const forward = (await card.locator(".btn-primary").boundingBox())!;
     for (let lesson = 1; lesson <= 21; lesson++) {
-      await expect(card).toHaveAccessibleName(`Tutorial, step ${lesson} of 21`);
+      await expect(card).toHaveAccessibleName(`Walkthrough, step ${lesson} of 21`);
       await expect(card).toBeInViewport({ ratio: 1 });
       const menu = page.getByRole("button", { name: "Menu", exact: true });
       await expect(menu).toBeEnabled();
@@ -28,7 +28,7 @@ for (const [width, height] of [[1440, 900], [390, 844], [320, 568], [844, 390]])
         await expect(settings.getByRole("button", { name: "Mute all", exact: true })).toBeEnabled();
         await page.keyboard.press("Escape");
         await expect(settings).toBeHidden();
-        await expect(card).toHaveAccessibleName(`Tutorial, step ${lesson} of 21`);
+        await expect(card).toHaveAccessibleName(`Walkthrough, step ${lesson} of 21`);
       }
       if (lesson === 1) {
         await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Database", exact: true })).toBeDisabled();
@@ -91,7 +91,7 @@ for (const [width, height] of [[1440, 900], [390, 844], [320, 568], [844, 390]])
         expect(control.x >= box.x + box.width || control.y >= box.y + box.height || control.x + control.width <= box.x || control.y + control.height <= box.y).toBe(true);
       }
       if (lesson === 1 || lesson === 8) await page.screenshot({ path: `test-results/chapter-zero-real-${lesson}-${width}x${height}.png` });
-      if (lesson === 21) await card.getByRole("button", { name: "Finish Chapter 0", exact: true }).click();
+      if (lesson === 21) await card.getByRole("button", { name: "Finish walkthrough", exact: true }).click();
       else await nextChapterZero(page);
     }
     await expect(card).toBeHidden();

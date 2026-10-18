@@ -217,6 +217,7 @@ test('plays sound from the first click, follows the menu sliders and remembers a
   await effects.press('ArrowRight');
   await expect(effects).toHaveAttribute('aria-valuetext', '45%');
   await expect(menu).toBeVisible();
+  await menu.getByRole('tab', { name: 'Run', exact: true }).click();
   await menu.getByRole('button', { name: 'Resume', exact: true }).click();
   await mute.click();
   await expect(mute).toHaveAttribute('aria-pressed', 'true');

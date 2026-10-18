@@ -113,9 +113,9 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
   if (!s.started || !lesson) return null;
   const text = typeof lesson.why === "function" ? lesson.why(s) : lesson.why;
   const instructions: Partial<Record<number, string>> = {
-    0: "In System evidence, click App Server. Read its live demand, capacity and backlog.",
-    1: "In System evidence, click Database. Its readings appear in the game panel.",
-    2: s.selected !== "app" && !ready ? "Click App Server in System evidence. Compare its demand and capacity." : "Now click Database in System evidence. Compare its demand and capacity too.",
+    0: "In Inspect equipment, click App Server. Read its live demand, capacity and backlog.",
+    1: "In Inspect equipment, click Database. Its readings appear in the game panel.",
+    2: s.selected !== "app" && !ready ? "Click App Server in Inspect equipment. Compare its demand and capacity." : "Now click Database in Inspect equipment. Compare its demand and capacity too.",
     5: "Press Run in the game’s bottom bar. Watch one real game second pass; the tutorial then pauses it for you.",
     6: "Choose an available action under Actions in the game. Read the actual quote. Leave it open and press Next here.",
     7: confirming ? "Press Cancel on the game’s purchase quote. Keep your cash for now." : ready ? "Your quote is closed and your cash is unchanged. Press Next to continue." : "The game is reopening a purchase quote so you can practise Cancel.",
@@ -125,18 +125,18 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
     14: s.view === "history" ? "Look at Charts, Events and Incidents, then close History." : "Open History in the game’s bottom bar, then close it to return.",
     15: s.view === "menu" ? "Choose Save now under Run in the real Menu." : "Open the game’s Menu, then choose Save now under Run.",
   };
-  return <section role="dialog" aria-modal="false" aria-label={`Tutorial, step ${index + 1} of ${lessons.length}`} data-lesson={index} className="chapter-zero-modal chapter-zero-guide" onKeyDown={event => {
+  return <section role="dialog" aria-modal="false" aria-label={`Walkthrough, step ${index + 1} of ${lessons.length}`} data-lesson={index} className="chapter-zero-modal chapter-zero-guide" onKeyDown={event => {
     if (event.key !== "Tab" || event.shiftKey || event.target !== heading.current || ready || !target) return;
     const highlighted = document.querySelector<HTMLElement>(target);
     const control = highlighted?.matches("button:not(:disabled)") ? highlighted
       : highlighted?.querySelector<HTMLElement>(index === 7 ? ".btn-row button:last-child" : "summary, button:not(:disabled)");
     if (control) { event.preventDefault(); control.focus(); }
   }}>
-    <header className="modal-head"><h2>Chapter 0 · Getting started</h2></header>
+    <header className="modal-head"><h2>Walkthrough</h2></header>
     {s.meta.tutorialDone && <button className="btn lesson-return" onClick={() => { s.openView(null); s.endTour(false); }}><Icon name="next" size={18} />Return to game</button>}
     <div className="modal-body">
       <div className="lesson-meta"><span>{s.tutorialCompany ? "Practice · In progress · " : ""}Lesson {index + 1} of {lessons.length}</span><span className="lesson-paused"><Icon name={s.running ? "play" : "pause"} size={14} />{s.running ? "Company running" : "Company paused"}</span></div>
-      <progress className="lesson-progress" aria-label="Chapter 0 progress" value={index + 1} max={lessons.length} />
+      <progress className="lesson-progress" aria-label="Walkthrough progress" value={index + 1} max={lessons.length} />
       <div className="lesson-reading" ref={reading}>
         <h3 ref={heading} tabIndex={-1}>{lesson.title}</h3>
         {instructions[index] && <p className="lesson-task"><Icon name="eye" size={20} /><span><LessonText text={instructions[index]} terms={lesson.emphasis} /></span></p>}
@@ -144,11 +144,11 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
         {index === 15 && ready && s.toast?.text === "Could not save: browser storage is unavailable." && <p role="status">Browser storage is unavailable. Keep this tab open to preserve this session; saving will need working browser storage.</p>}
         {index === 2 && <LessonVisual key={index} index={index} />}
         <p className="lesson-intro">{text}</p>
-        {s.tutorialCompany && index === 0 && <p className="lesson-intro">Practise on a fresh company. Your saved company is paused; finishing or exiting Chapter 0 returns you to it.</p>}
+        {s.tutorialCompany && index === 0 && <p className="lesson-intro">Practise on a fresh company. Your saved company is paused; finishing or exiting the walkthrough returns you to it.</p>}
         {index !== 2 && <LessonVisual key={index} index={index} />}
         {TIPS[index] && <aside className="lesson-tip"><Icon name="bulb" size={24} /><p><strong>Keep in mind</strong>{TIPS[index]}</p></aside>}
       </div>
-      <footer className="lesson-footer"><button className="btn" disabled={index === 0} onClick={() => { s.openView(null); s.tourBack(); }}><Icon className="lesson-back-arrow" name="next" size={18} />Back</button><button className="btn btn-primary" disabled={!ready || s.running} onClick={() => { setCompletedThrough(Math.max(completedThrough, index)); if (!(index === 6 && confirming)) s.openView(null); if (index === lessons.length - 1) s.endTour(true); else s.tourNext(); }}>{index === lessons.length - 1 ? "Finish Chapter 0" : "Next"}<Icon name={index === lessons.length - 1 ? "check" : "next"} size={18} /></button></footer>
+      <footer className="lesson-footer"><button className="btn" disabled={index === 0} onClick={() => { s.openView(null); s.tourBack(); }}><Icon className="lesson-back-arrow" name="next" size={18} />Back</button><button className="btn btn-primary" disabled={!ready || s.running} onClick={() => { setCompletedThrough(Math.max(completedThrough, index)); if (!(index === 6 && confirming)) s.openView(null); if (index === lessons.length - 1) s.endTour(true); else s.tourNext(); }}>{index === lessons.length - 1 ? "Finish walkthrough" : "Next"}<Icon name={index === lessons.length - 1 ? "check" : "next"} size={18} /></button></footer>
     </div>
   </section>;
 }

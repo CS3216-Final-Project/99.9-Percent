@@ -40,7 +40,7 @@ test("explains a locked control, which is where the reason for being locked is s
   await expect(run).toBeDisabled();
   await run.hover();
   const tip = page.getByRole("tooltip");
-  await expect(tip).toContainText("Finish Chapter 0 to run the company");
+  await expect(tip).toContainText("Finish the walkthrough to run the company");
   await expect(tip).toHaveCSS("opacity", "1");
   const box = (await tip.boundingBox())!, view = page.viewportSize()!;
   expect(box.x + box.width).toBeLessThanOrEqual(view.width);

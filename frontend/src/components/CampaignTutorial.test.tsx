@@ -12,8 +12,8 @@ beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialStat
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 function start() { useGame.getState().boot(); useGame.getState().play(); }
 function renderCompany() { return render(<><CampaignHeader /><CampaignPanel /><CampaignControls /><CampaignOverlays /><Tutorial /></>); }
-const card = (step: number) => screen.getByRole("dialog", { name: `Tutorial, step ${step} of ${CAMPAIGN_STEPS}` });
-const current = () => within(screen.getByRole("dialog", { name: /^Tutorial/ }));
+const card = (step: number) => screen.getByRole("dialog", { name: `Walkthrough, step ${step} of ${CAMPAIGN_STEPS}` });
+const current = () => within(screen.getByRole("dialog", { name: /^Walkthrough/ }));
 const next = () => fireEvent.click(current().getByRole("button", { name: "Next" }));
 function exercise() {
   const step = useGame.getState().tour!.step;
@@ -164,7 +164,7 @@ it("goes Back without forcing completed interactions again and preserves the les
 it("How to play clears previous exercise completion, including a restart on lesson one", () => {
   start(); renderCompany(); reach(3);
   const before = structuredClone(useGame.getState().game.campaign!);
-  // Restart is a store action; unrelated Menu controls are locked during an active lesson.
+  // Restart through the store to isolate exercise acknowledgement from the Menu controls.
   const replay = () => act(() => useGame.getState().startTour("campaign"));
   replay();
   expect(card(1).textContent).not.toContain("Completed earlier");
@@ -199,7 +199,7 @@ it("cannot skip or finish early, holds the clock outside its Run lesson, and com
   reach(21);
   act(() => { useGame.getState().setRunning(true); useGame.getState().advance(); });
   expect(useGame.getState()).toMatchObject({ running: false, meta: { tutorialDone: false }, game: { campaign: { step: 1 } } });
-  fireEvent.click(current().getByRole("button", { name: "Finish Chapter 0" }));
+  fireEvent.click(current().getByRole("button", { name: "Finish walkthrough" }));
   expect(useGame.getState().meta.tutorialDone).toBe(true);
 });
 
@@ -207,7 +207,7 @@ it("saves and exits unfinished and resumes the same company at its saved lesson"
   start(); renderCompany(); reach(9); const runId = useGame.getState().game.campaign!.runId;
   expect(current().queryByRole("button", { name: "Save and exit" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-  fireEvent.click(within(screen.getByRole("dialog", { name: "Menu" })).getByRole("button", { name: "Save and exit" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Menu" })).getByRole("button", { name: "Exit" }));
   expect(useGame.getState().meta.tutorialDone).toBe(false);
   cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
   expect(card(9)).toBeTruthy(); expect(useGame.getState().game.campaign!.runId).toBe(runId);
@@ -215,7 +215,7 @@ it("saves and exits unfinished and resumes the same company at its saved lesson"
 
 it("preserves existing completed profiles", () => {
   saveMeta({ ...DEFAULT_META, tutorialDone: true }); start(); renderCompany();
-  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: /^Walkthrough/ })).toBeNull();
 });
 
 it("exits a completed player's replay without finishing the lessons or buying the practice quote", () => {
@@ -223,13 +223,13 @@ it("exits a completed player's replay without finishing the lessons or buying th
   const company = structuredClone(useGame.getState().game.campaign!);
   useGame.getState().startTour("campaign"); renderCompany(); reach(7); exercise();
   fireEvent.click(current().getByRole("button", { name: "Return to game" }));
-  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: /^Walkthrough/ })).toBeNull();
   expect(screen.queryByRole("region", { name: "Confirm Add server" })).toBeNull();
   expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", false);
   expect(useGame.getState()).toMatchObject({ running: false, meta: { tutorialDone: true, walkthroughStep: null } });
   expect(useGame.getState().game.campaign).toEqual(company);
   cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
-  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: /^Walkthrough/ })).toBeNull();
 });
 
 it("returns from practice through Menu after reload without changing the saved company", () => {
@@ -242,17 +242,17 @@ it("returns from practice through Menu after reload without changing the saved c
   expect(card(8)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Menu" }));
   const menu = within(screen.getByRole("dialog", { name: "Menu" }));
-  expect(menu.getByRole("region", { name: "Chapter 0 practice" })).toBeTruthy();
+  expect(menu.getByRole("region", { name: "Walkthrough practice" })).toBeTruthy();
   fireEvent.click(menu.getByRole("tab", { name: "Graphics" }));
   fireEvent.click(menu.getByRole("button", { name: "Return to game" }));
   expect(useGame.getState()).toMatchObject({ running: false, tour: null, tutorialCompany: null, view: null });
   expect(useGame.getState().game.campaign).toEqual(company);
-  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: /^Walkthrough/ })).toBeNull();
   expect(screen.queryByRole("region", { name: "Confirm Add server" })).toBeNull();
   expect(localStorage.getItem("nn.campaign.tutorial.v1")).toBeNull();
   cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
   expect(useGame.getState().game.campaign).toEqual(company);
-  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: /^Walkthrough/ })).toBeNull();
 });
 
 it("restores completed replay exercises after Back and reload, and resets them on an explicit restart", () => {
@@ -276,7 +276,7 @@ it("waits through an incident on a resumed company without holding its clock", (
   saveGame(advanceSteps(newGame(1, "resumed-incident"), 6).state);
   saveMeta({ ...DEFAULT_META, walkthroughStep: 6, walkthroughFurthestStep: 6 });
   start(); renderCompany();
-  expect(screen.queryByRole("dialog", { name: /^Tutorial/ })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: /^Walkthrough/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
   expect(screen.getByRole("button", { name: "Confirm" })).toHaveProperty("disabled", false);
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));

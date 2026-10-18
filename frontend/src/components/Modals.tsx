@@ -11,7 +11,7 @@ import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { AvatarSettings } from "./AvatarPicker";
-import { MenuRun, MenuTile } from "./MenuRun";
+import { MenuActions, MenuRun, MenuTile } from "./MenuRun";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { ModeSwitch } from "./ModeSwitch";
 import { SaveFiles } from "./SaveFiles";
@@ -271,6 +271,7 @@ export function Menu() {
   const game = useGame((s) => s.game);
   const openView = useGame((s) => s.openView);
   const saveNow = useGame((s) => s.saveNow);
+  const saveStatus = useGame((s) => s.saveStatus);
   const newRun = useGame((s) => s.newRun);
   const showOnboarding = useGame((s) => s.showOnboarding);
   const startTutorialRun = useGame((s) => s.startTutorialRun);
@@ -323,8 +324,8 @@ export function Menu() {
   return (
     <Modal title="Menu" onClose={close} icon={{ kind: "go", name: "menu" }} className="modal-menu">
       <MenuRun
-        title="This run"
-        saved
+        title="At a glance"
+        saved={saveStatus === "saved"}
         stats={[
           { icon: "week", kind: "go", label: "Week", value: `${week} / ${BALANCE.maxTurns}` },
           { icon: "users", kind: "users", label: "Users", value: num(game.users) },
@@ -335,17 +336,16 @@ export function Menu() {
             Seed <code>{game.seed}</code> Playing the same seed again gives the same run.
           </>
         }
-        onResume={close}
       />
 
       <MenuTabs value={tab} onChange={goTo}>
         {tab === "run" && (
           <>
-            <div className="menu-grid" role="group" aria-label="Run">
-              <MenuTile icon="save" kind="ok" title="Save now" text="Write this run to the browser." onClick={saveNow} />
+            <MenuActions onResume={close}>
+              <MenuTile icon="save" kind="ok" title="Save now" text="Write this run to the browser." onClick={() => saveNow()} />
               <MenuTile icon="info" kind="users" title="How to play" text="The rules on one card." onClick={showOnboarding} />
               <MenuTile icon="robot" kind="go" title={label("tutorial", "Tutorial")} text="Replay the guided first week." danger={confirm === "tutorial"} onClick={() => start("tutorial")} />
-            </div>
+            </MenuActions>
             {confirm === "tutorial" && warning}
             <ModeSwitch to="campaign" />
           </>

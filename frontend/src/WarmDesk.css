@@ -1,64 +1,98 @@
-/* Approved Warm Desk direction. Shared surfaces and controls keep both modes in the same visual language. */
+/* Approved Warm Classic direction. Shared surfaces and controls keep both modes in the same visual language. */
 .btn, .act, .action, .icon-btn, .chip, .account-chip { border-radius: var(--radius); }
 .btn { min-height: 44px; border-width: 1px; border-color: var(--control-edge); }
 .btn.btn-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-.btn.btn-primary:hover:not(:disabled) { background: #40334f; }
-.btn.btn-primary > .icon { color: var(--go); }
-.btn:active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 1px 3px #241a3420; }
+.btn.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn.btn-primary > .icon { color: inherit; }
+.btn:active:not(:disabled) { background: var(--control-active); }
+.btn.btn-primary:active:not(:disabled) { background: var(--primary-active); }
 .btn.btn-danger { border-color: var(--critical-ink); }
 .feedback-form button[type="submit"] { width: 11rem; max-width: 100%; height: 44px; }
 .act, .action { border-width: 1px; }
-.concept, .tab-icon { border-radius: 11px; box-shadow: inset 0 1px 0 #ffffff80; }
+.concept, .tab-icon { border-radius: 11px; box-shadow: none; border-width: 1px; }
 .concept-tech { background: var(--tech-tile); color: var(--tech-ink); }
 .modal, .tour, .sheet { border: 1px solid var(--control-edge); border-radius: var(--radius-panel); box-shadow: var(--lift); }
 .side { border: 1px solid var(--control-edge); border-radius: var(--radius-panel); }
 .panel-head { border-bottom: 1px solid var(--control-edge); }
 .topbar .icon-btn, .account-chip { border-color: #584866; background: #352c48; color: var(--paper); }
 .topbar .icon-btn:hover:not(:disabled), .account-chip:hover { background: #453856; }
-.topbar .stat { border-radius: var(--radius); }
+/* One paper readout keeps the HUD quiet; the concept tiles carry its colour. */
+.topbar { padding: 10px 16px; border-bottom: 1px solid var(--night-line); }
+.topbar .stats-strip { gap: 0; padding: 5px; background: var(--paper); color: var(--ink); border: 1px solid var(--control-edge); border-radius: 18px; }
+.topbar .stat { position: relative; min-height: 48px; padding: 4px 14px; gap: 12px; border: 0; border-radius: 11px; background: transparent; color: var(--ink); }
+.topbar .stat + .stat::before { content: ""; position: absolute; inset-block: 10px; inset-inline-start: 0; width: 1px; background: var(--control-edge); }
 .topbar .stat .stat-icon { display: flex; }
+.topbar .stat-body > .tip { color: var(--text-soft); text-transform: none; letter-spacing: 0; font-size: var(--text-sm); line-height: 1.3; }
+.topbar .stat-action-label { border-bottom: 0; cursor: pointer; }
+.topbar .stat-body > strong { color: var(--ink); }
+.topbar .stat .muted { color: var(--text-soft); }
+.topbar .stat .text-ok { color: var(--ok-ink); }
+.topbar .stat .text-warn { color: var(--warn-ink); }
+.topbar .stat .text-critical { color: var(--critical-ink); }
+.topbar .stat-action:hover { background: var(--control-inset); }
+.topbar .stat-action:active { background: var(--control-active); }
+.topbar .stat-action::after { color: var(--text-soft); }
+.topbar .icon-btn { width: 44px; height: 44px; }
+.topbar .meter { background: var(--paper-3); }
 
-/* Cream dock, three quiet labels, and distinct primary/secondary/selected controls. */
-.app .controls-dock { background: var(--paper); color: var(--ink); border-top: 3px solid #d4c098; box-shadow: inset 0 1px 0 #fffdf7; }
+/* Leave a little of the room visible around every shared view sheet. */
+.sheet { margin: 16px; min-width: 0; overflow: hidden; }
+.sheet-head { flex: none; }
+.sheet-body { min-width: 0; }
+.sheet-history .charts { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.sheet-history .tabs { flex-wrap: wrap; }
+.campaign-tech-intro { max-width: none; margin: 0; padding: 12px 16px; }
+.campaign-tech-intro > .icon { display: inline-block; vertical-align: -3px; margin-right: 4px; }
+@media (max-width: 900px) {
+  .topbar { padding: 6px 8px; }
+  .topbar .stats-strip { padding: 3px; border-radius: var(--radius); }
+  .topbar .stat { min-height: 44px; padding: 3px 6px; gap: 6px; }
+  .topbar .stat + .stat::before { inset-block: 8px; }
+  .sheet { margin: 8px; }
+}
+
+/* The purple dock matches the HUD shell; paper controls and pastel icons stay distinct. */
+.app .controls-dock { background: var(--night-2); color: var(--paper); border-top: 1px solid var(--night-line); box-shadow: none; }
 .controls-dock [data-label] { padding-top: 19px; }
-.controls-dock [data-label]::before { content: attr(data-label); position: absolute; top: 8px; margin-left: 6px; font: 500 var(--text-xs)/1.2 var(--font-display); color: var(--text-soft); letter-spacing: .07em; text-transform: uppercase; }
-.app .controls-dock .view-tabs button { background: transparent; color: var(--ink); border-color: transparent; border-width: 1px; box-shadow: none; }
-.app .controls-dock .view-tabs button:hover:not(:disabled) { background: var(--control-inset); }
-.app .controls-dock .view-tabs button.is-active { background: var(--selection); box-shadow: inset 0 -2px 0 #b7a1c7; }
+.controls-dock [data-label]::before { content: attr(data-label); position: absolute; top: 8px; margin-left: 6px; font: 500 var(--text-xs)/1.2 var(--font-display); color: var(--on-night-soft); letter-spacing: .07em; text-transform: uppercase; }
+.app .controls-dock .view-tabs button { background: transparent; color: var(--paper); border-color: transparent; border-width: 1px; box-shadow: none; }
+.app .controls-dock .view-tabs button:hover:not(:disabled):not(.is-active) { background: var(--night-3); }
+.app .controls-dock .view-tabs button.is-active { background: var(--selection); color: var(--ink); border-color: var(--selection-edge); }
 .app .controls-dock .view-tabs button[data-view="tech"] .tab-icon { background: var(--tech-tile); color: var(--tech-ink); }
-.app .controls-dock .view-tabs button[data-view="history"] .tab-icon { background: #dce6f3; color: #3e5a77; }
-.app .controls-dock .view-tabs .badge { background: transparent; color: var(--text-soft); border-color: transparent; }
-.app .controls-dock .room-controls { border-color: var(--control-edge); }
-.app .controls-dock .dock-menu > summary { background: #faf0de; color: var(--ink); border: 1px solid var(--control-edge); box-shadow: inset 0 1px 0 #fffdf7, 0 2px 0 #e3d4bb; }
+.app .controls-dock .view-tabs button[data-view="history"] .tab-icon { background: var(--tile-blue); color: var(--tile-blue-ink); }
+.app .controls-dock .view-tabs .badge { background: transparent; color: var(--on-night-soft); border-color: transparent; }
+.app .controls-dock .view-tabs button.is-active .badge { color: var(--text-soft); }
+.app .controls-dock .room-controls { border-color: var(--night-line); }
+.app .controls-dock .dock-menu > summary { background: #faf0de; color: var(--ink); border: 1px solid var(--control-edge); box-shadow: none; }
 .app .controls-dock .dock-menu > summary:hover { background: #ecdfc9; }
 .app .controls-dock .dock-menu[open] > summary { background: var(--selection); }
 .controls-dock .dock-menu > summary > .icon:last-child { margin-left: auto; flex: none; }
 .app .controls-dock .room-menu > summary { width: 148px; }
 .app .controls-dock .view-mode-menu > summary { width: 148px; }
-.app .controls-dock .view-mode-menu.is-walking > summary { background: #d7eee0; color: #315845; }
+.app .controls-dock .view-mode-menu.is-walking > summary { background: var(--tile-green); color: var(--tile-green-ink); }
 .app .controls-dock .floor-number { border-radius: 8px; background: #e6d8c0; color: #594766; font-variant-numeric: tabular-nums; }
 .app .controls-dock .dock-panel { border: 1px solid var(--control-edge); border-radius: 20px; box-shadow: var(--lift); }
 .controls-dock .view-mode-options { display: grid; gap: 6px; }
 .controls-dock .view-mode-options button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 60px; padding: 10px; text-align: left; color: var(--ink); background: var(--control-inset); border: 1px solid var(--control-edge); border-radius: var(--radius); }
 .controls-dock .view-mode-options button > span { display: grid; gap: 3px; }
 .controls-dock .view-mode-options small { font-family: var(--font-body); font-size: var(--text-sm); }
-.controls-dock .view-mode-options button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.controls-dock .view-mode-options button[aria-pressed="true"] { background: var(--selection); color: var(--ink); border-color: var(--selection-edge); }
 .controls-dock .mobile-room-tools h3 { margin-top: 16px; }
-.app .controls-dock .camera-buttons button, .app .controls-dock .speed button, .app .controls-dock .floor-button { background: var(--control-inset); border: 1px solid var(--control-edge); border-radius: var(--radius); color: var(--ink); box-shadow: 0 2px 0 #e3d4bb; }
-.app .controls-dock .floor-button.is-here, .app .controls-dock .speed button.is-active { background: var(--ink); color: var(--paper); }
+.app .controls-dock .camera-buttons button, .app .controls-dock .speed button, .app .controls-dock .floor-button { background: var(--control-inset); border: 1px solid var(--control-edge); border-radius: var(--radius); color: var(--ink); box-shadow: none; }
+.app .controls-dock .floor-button.is-here, .app .controls-dock .speed button.is-active { background: var(--selection); color: var(--ink); border-color: var(--selection-edge); }
 .app .controls-dock .floor-button.is-here .floor-number { background: var(--go); color: var(--ink); }
-.app .controls-dock .brand-week, .app .controls-dock .week { color: var(--ink); }
-.app .controls-dock .brand-week strong { color: var(--ink); }
-.app .controls-dock .dock-second { color: var(--text-soft); }
-.app .controls-dock .dock-primary { background: var(--ink); color: var(--paper); border: 1px solid var(--ink); }
-.app .controls-dock .dock-primary:hover:not(:disabled) { background: #40334f; }
-.app .controls-dock .dock-primary > .icon { width: 30px; height: 30px; padding: 5px; border-radius: 9px; color: var(--ink); background: var(--go); }
+.app .controls-dock .brand-week, .app .controls-dock .week { color: var(--paper); }
+.app .controls-dock .brand-week strong { color: var(--paper); }
+.app .controls-dock .dock-second { color: var(--on-night-soft); }
+.app .controls-dock .dock-primary { background: var(--ink); color: var(--paper); border: 1px solid var(--on-night-soft); }
+.app .controls-dock .dock-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.app .controls-dock .dock-primary > .icon { width: 22px; height: 22px; padding: 0; color: var(--paper); background: transparent; }
 
 /* The purchase card uses the same paper and primary action as other dialogs. Its measured layout is preserved. */
 .campaign-action-popover { background: var(--paper); color: var(--ink); border: 1px solid var(--control-edge); border-radius: var(--radius-panel); font-size: var(--text-sm); }
 .campaign-action-popover .muted, .campaign-action-popover .row dt, .campaign-action-popover .campaign-purchase-details > summary { color: var(--text-soft); }
 .campaign-action-popover .campaign-action-machine { color: var(--text-soft); border-bottom-color: var(--control-edge); }
-.campaign-action-popover .campaign-action-machine b { color: #315845; }
+.campaign-action-popover .campaign-action-machine b { color: var(--tile-green-ink); }
 .campaign-action-popover .campaign-action-confirm-title { color: var(--ink); }
 .campaign-action-popover .row, .campaign-action-popover .campaign-purchase-footer { border-color: var(--control-edge); }
 .campaign-action-popover .btn-row { background: var(--paper); }
@@ -97,3 +131,347 @@
   .topbar .stat .stat-body > strong { font-size: var(--text-xs); white-space: nowrap; }
 }
 @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+
+/* Menu uses the shared palette and control hierarchy, with its compact action row. */
+.modal-menu { --menu-accent: var(--ink); --menu-line: var(--control-edge); }
+.modal-menu .modal-head {
+  padding: 18px 20px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--menu-line);
+}
+.modal-menu .modal-head .icon-btn {
+  background: transparent;
+  color: var(--text-soft);
+  border-color: transparent;
+  box-shadow: none;
+}
+.modal-menu .modal-head .icon-btn:hover {
+  background: var(--control-inset);
+}
+.modal-menu .menu-overview { grid-template-columns: minmax(0, 1fr); }
+.modal-menu .menu-run {
+  padding: 16px;
+  background: var(--control-inset);
+  color: var(--ink);
+  border-radius: 18px;
+}
+.modal-menu .menu-run-stats > div {
+  background: var(--paper);
+  border: 1px solid var(--control-edge);
+  padding: 12px;
+}
+.modal-menu .menu-run-stats dt {
+  color: var(--text-soft);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.modal-menu .menu-run-stats dd { font-weight: 600; }
+.modal-menu .menu-seed { color: var(--text-soft); }
+.modal-menu .menu-seed code {
+  background: var(--paper);
+  color: var(--ink);
+}
+.modal-menu .menu-run .tag-ok {
+  background: #e6eee7;
+  color: #476b53;
+  border-color: transparent;
+  border-radius: 999px;
+}
+.modal-menu .btn { box-shadow: none; }
+.modal-menu .tab-strip {
+  border-width: 1px;
+  border-color: var(--menu-line);
+}
+.modal-menu .tab-strip button {
+  background: transparent;
+  color: var(--text-soft);
+  border-color: transparent;
+  border-radius: 14px;
+  box-shadow: none;
+  transform: none;
+}
+.modal-menu .tab-strip button:hover:not(.is-active) { background: var(--control-inset); }
+.modal-menu .tab-strip button.is-active {
+  background: var(--selection);
+  color: var(--ink);
+}
+.modal-menu .tab-strip button.is-active .icon { color: var(--menu-accent); }
+.modal-menu .menu-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.modal-menu .menu-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 12px;
+  gap: 8px;
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1px solid var(--control-edge);
+  border-radius: 14px;
+  box-shadow: none;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+.modal-menu .menu-tile .icon { flex: none; color: var(--menu-accent); }
+
+.modal-menu .menu-tile:hover { background: var(--control-hover); border-color: var(--menu-accent); }
+.modal-menu .menu-tile.is-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.modal-menu .menu-tile.is-primary .icon { color: inherit; }
+.modal-menu .menu-tile.is-primary:hover { background: var(--primary-hover); }
+.modal-menu .menu-tile:active { background: var(--control-active); }
+.modal-menu .menu-tile.is-primary:active { background: var(--primary-active); }
+.modal-menu .menu-tile:active { transform: none; box-shadow: none; }
+.modal-menu .menu-tile.is-danger {
+  background: color-mix(in srgb, var(--critical) 7%, var(--paper));
+  border-color: color-mix(in srgb, var(--critical) 25%, var(--paper));
+}
+.modal-menu.modal-exit { width: min(460px, 100%); }
+@media (max-width: 759px) {
+  .modal-menu .menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 359px) {
+  .modal-menu .menu-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.modal-menu .menu-section { border-top: 1px solid var(--menu-line); }
+.modal-menu .menu-sub,
+.modal-menu .menu-confirm,
+.modal-menu .quality-body {
+  border-color: var(--control-edge);
+  border-radius: 16px;
+  box-shadow: none;
+}
+.modal-menu .quality-option input:checked + .quality-body {
+  background: var(--selection);
+  border-color: var(--selection-edge);
+}
+.modal-menu .btn:disabled {
+  background: var(--control-inset);
+  color: var(--text-soft);
+  border-color: transparent;
+  opacity: 1;
+}
+
+.modal-menu .menu-run-stats-expanded {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.modal-menu .menu-run-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 12px;
+}
+.modal-menu .menu-run-foot .menu-seed {
+  flex: 1 1 26rem;
+  margin: 0;
+}
+.modal-menu .menu-run-foot .tag {
+  flex: none;
+  margin-left: auto;
+}
+@media (max-width: 759px) {
+  .modal-menu .menu-run-stats-expanded {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* One flat control system across management, incidents, views, settings and dialogs. */
+.act, .action, .chip, .icon-btn, .node, .tab-strip button, .route-choice button,
+.quality-body, .field input, .field textarea, .eq-label, .walk-prompt {
+  border-width: 1px;
+  border-color: var(--control-edge);
+}
+.btn:hover:not(:disabled), .act:hover:not(:disabled), .action:hover:not(:disabled),
+.chip:hover:not(:disabled), .icon-btn:hover:not(:disabled), .node:hover,
+.tab-strip button:hover:not(.is-active), .route-choice button:hover:not(:disabled):not(.is-active) {
+  background: var(--control-hover);
+}
+.btn.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn.btn-danger:hover:not(:disabled) { background: #d9364b; }
+.act:active:not(:disabled), .action:active:not(:disabled), .chip:active:not(:disabled),
+.icon-btn:active:not(:disabled), .node:active { background: var(--control-active); }
+.act-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.act-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.act-primary:active:not(:disabled) { background: var(--primary-active); }
+.act-primary > .icon { color: inherit; }
+.tab-strip button.is-active, .chip.is-selected, .node.is-selected,
+.route-choice button.is-active, .icon-btn.is-on {
+  background: var(--selection); color: var(--ink); border-color: var(--selection-edge);
+}
+.quality-body { border-radius: var(--radius); }
+.quality-option input:checked + .quality-body {
+  background: var(--selection); border: 1px solid var(--selection-edge); padding: 12px 14px 12px 50px;
+}
+.quality-option input:checked + .quality-body::before { left: 14px; top: 14px; }
+.eng-col, .chart, .history-card, .history-notes, .tour-card {
+  border: 1px solid var(--control-edge); border-radius: var(--radius-panel);
+}
+.node { border-radius: var(--radius); }
+.btn:disabled, .act:disabled, .action:disabled { opacity: .65; }
+.topbar .icon-btn:hover:not(:disabled), .account-chip:hover { background: #453856; }
+.topbar .icon-btn:active:not(:disabled), .account-chip:active { background: var(--night); }
+.app .controls-dock .dock-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.app .controls-dock .dock-primary:active:not(:disabled) { background: var(--primary-active); }
+.app .controls-dock .camera-buttons button:hover, .app .controls-dock .floor-button:hover,
+.app .controls-dock .speed button:hover { background: var(--control-hover); }
+.app .controls-dock .camera-buttons button:active, .app .controls-dock .floor-button:active,
+.app .controls-dock .speed button:active { background: var(--control-active); }
+.app .controls-dock .floor-button.is-here, .app .controls-dock .speed button.is-active {
+  background: var(--selection); border-color: var(--selection-edge);
+}
+
+.tabs button { border-color: var(--night-line); }
+.tabs button.is-active { background: var(--selection); color: var(--ink); border-color: var(--selection-edge); }
+.modal-menu .tab-strip button.is-active { border-color: var(--selection-edge); }
+.chip-icon { border-radius: 8px; }
+
+/* Press colours follow hover rules so an active pointer always gets feedback. */
+.btn:active:not(:disabled), .act:active:not(:disabled), .action:active:not(:disabled),
+.chip:active:not(:disabled), .icon-btn:active:not(:disabled), .node:active { background: var(--control-active); }
+.btn.btn-primary:active:not(:disabled), .act-primary:active:not(:disabled) { background: var(--primary-active); }
+.btn.btn-danger:active:not(:disabled) { background: var(--critical-ink); }
+.topbar .icon-btn:active:not(:disabled), .account-chip:active { background: var(--night); }
+.node.is-selected { outline: 2px solid var(--selection-edge); outline-offset: 2px; }
+.node:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.tab-strip button.is-active:active, .chip.is-selected:active,
+.node.is-selected:active, .route-choice button.is-active:active, .icon-btn.is-on:active,
+.app .controls-dock .floor-button.is-here:active, .app .controls-dock .speed button.is-active:active,
+.app .controls-dock .view-tabs button.is-active:active {
+  background: color-mix(in srgb, var(--selection) 88%, var(--ink));
+}
+
+/* Warm Classic equipment workspace: paper surfaces, concept tiles, and flat decisions. */
+.concept-cash, .concept-go { background: var(--tile-gold); color: var(--tile-gold-ink); }
+.concept-users { background: var(--tile-blue); color: var(--tile-blue-ink); }
+.concept-revenue, .concept-ok { background: var(--tile-green); color: var(--tile-green-ink); }
+.concept-health { background: var(--tile-pink); color: var(--tile-pink-ink); }
+.concept-team { background: var(--tile-orange); color: var(--tile-orange-ink); }
+.concept-growth { background: #f2dded; color: #7b426c; }
+.concept-muted { background: var(--tile-purple); color: var(--tile-purple-ink); }
+.concept-warn { background: #ffe3ba; color: #8b4d0f; }
+.concept-critical { background: #fbdce0; color: var(--critical-ink); }
+.concept { border-color: transparent; }
+.chip-icon { background: var(--tile-green); color: var(--tile-green-ink); border: 0; box-shadow: none; }
+.modal-menu .menu-run-title { display: flex; align-items: center; gap: 10px; }
+.modal-menu .menu-run-stats .concept { width: 36px; height: 36px; }
+.modal-menu .menu-run-stats .concept .icon { width: 21px; height: 21px; }
+.modal-menu .menu-grid > div { display: flex; }
+.modal-menu .menu-grid > div > .menu-tile { width: 100%; }
+.equipment-shell { grid-area: stage; justify-self: end; align-self: start; position: relative; z-index: 28; display: flex; flex-direction: column; min-height: 0; width: var(--side-w); max-width: calc(100% - 24px); max-height: calc(100% - 24px); margin: 12px; pointer-events: none; }
+.equipment-shell > .side { pointer-events: auto; width: 100%; margin: 0; max-height: 100%; min-height: 0; flex: 0 1 auto; box-shadow: var(--lift); }
+.equipment-shell > .side[hidden] { display: none; }
+.panel-toggle { position: absolute; left: -48px; top: 8px; background: var(--paper); pointer-events: auto; box-shadow: var(--lift); }
+.panel-reopen { align-self: end; pointer-events: auto; background: var(--paper); box-shadow: var(--lift); }
+.equipment-shell.is-collapsed { width: auto; }
+.equipment-readings { padding: 12px; background: var(--control-inset); border-radius: var(--radius); }
+.readings-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.readings-head h3 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.readings-head .chip-icon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 10px; }
+.live-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; background: var(--tile-green); color: var(--tile-green-ink); border-radius: 999px; font-size: var(--text-xs); font-weight: 600; white-space: nowrap; }
+.live-tag > span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.readings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin: 10px 0 0; }
+.readings-grid .row { display: block; padding: 0; border: 0; min-width: 0; }
+.readings-grid dt { color: var(--text-soft); font-size: var(--text-sm); }
+.readings-grid dd { margin: 0; text-align: left; font-size: var(--text-md); font-weight: 500; overflow-wrap: anywhere; }
+.readings-note { color: var(--text-soft); font-size: var(--text-xs); line-height: 1.4; margin: 10px 0 0; }
+.equipment-readings .more { border-top-color: var(--control-edge); font-size: var(--text-sm); }
+.side .impact .concept { display: grid; width: 28px; height: 28px; }
+.side .impact .concept .icon { width: 18px; height: 18px; }
+.side .impact > div { padding: 9px 8px; border: 0; }
+.side .impact dd { font-weight: 600; }
+.campaign-panel .incident-investigate .chip-icon { display: grid; place-items: center; width: 26px; height: 26px; flex: none; border-radius: 8px; }
+.campaign-panel .incident-investigate > .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.campaign-panel .incident-investigate .chip { min-height: 40px; padding: 5px 8px; gap: 6px; font-size: var(--text-sm); }
+.campaign-panel .step-head { margin: 14px 0 8px; }
+.act, .campaign-panel .act, .action { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; padding: 12px; min-height: 64px; }
+.act-label, .campaign-panel .act-label, .action-title { grid-column: 1 / -1; grid-row: auto; font-size: var(--text-md); white-space: normal; }
+.act:has(> .icon) .act-label { grid-column: 2; }
+.act-meta, .campaign-panel .act-meta, .campaign-panel .campaign-action-card .act-meta { grid-column: 1 / -1; grid-row: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; justify-items: start; gap: 6px 16px; margin: 0; max-width: none; }
+.act .price, .action .price { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); font-weight: 700; color: var(--ink); white-space: normal; background: transparent; padding: 0; }
+.act .price .icon, .action .price .icon { width: 16px; height: 16px; flex: none; }
+.act-primary .price { color: var(--paper); }
+.campaign-panel .campaign-action-card { border: 0; padding-bottom: 0; }
+.campaign-panel .actions { gap: 8px; }
+.campaign-clock.controls-dock .week { width: 142px; }
+.campaign-clock .dock-second { display: flex; align-items: center; gap: 6px; margin: 2px 0 5px; font-family: var(--font-display); font-size: var(--text-xs); }
+.campaign-clock .week > .meter { height: 4px; max-width: 120px; background: var(--paper-3); }
+.campaign-clock .week > .meter .meter-fill { background: #9a82b1; }
+@media (min-width: 901px) { .app.has-chapters .equipment-shell { width: 420px; } .app.has-chapters .equipment-shell.is-collapsed { width: auto; } }
+@media (max-width: 900px) {
+  .equipment-shell { width: auto; max-width: 100%; justify-self: stretch; align-self: end; margin: 0; max-height: 56%; }
+  .equipment-shell > .side { width: 100%; border: 1px solid var(--control-edge); border-bottom: 0; border-radius: 20px 20px 0 0; }
+  .panel-toggle { left: auto; right: 10px; top: -48px; }
+  .equipment-shell.is-collapsed { justify-self: end; align-self: start; margin: 12px; }
+}
+@media (max-width: 359px) { .modal-menu .menu-run-stats > div { padding: 8px; column-gap: 6px; } .modal-menu .menu-run-stats .concept { width: 28px; height: 28px; } .readings-grid { gap: 8px; } }
+
+/* The same soft tiles and thin edges extend to secondary controls and feedback. */
+.panel-icon { background: var(--tile-green); color: var(--tile-green-ink); border-color: transparent; }
+.panel-icon.state-warn { background: #ffe3ba; color: var(--warn-ink); }
+.panel-icon.state-critical, .panel-icon.state-down { background: #fbdce0; color: var(--critical-ink); }
+.panel-icon.state-absent { background: var(--tile-purple); color: var(--tile-purple-ink); }
+.app .controls-dock .view-tabs button[data-view="engineers"] .tab-icon { background: var(--tile-orange); color: var(--tile-orange-ink); }
+.callout-icon { background: color-mix(in srgb, var(--tone) 25%, var(--paper)); color: var(--tone-ink); border: 0; border-radius: 10px; box-shadow: none; }
+.callout-critical .callout-icon { color: var(--critical-ink); }
+.stepper { border: 1px solid var(--control-edge); border-radius: var(--radius); overflow: hidden; }
+.stepper button { width: 44px; height: 42px; background: var(--paper); }
+.stepper button:first-child { border-right: 1px solid var(--control-edge); }
+.stepper button:last-child { border-left: 1px solid var(--control-edge); }
+.stepper button:hover:not(:disabled) { background: var(--control-hover); }
+.stepper button:active:not(:disabled) { background: var(--control-active); }
+.tooltip, .tooltip-arrow { border-width: 1px; }
+
+.eq-icon { border-radius: 8px; background: var(--tile-green); color: var(--tile-green-ink); }
+.eq-label.tone-warn .eq-icon { background: #ffe3ba; color: var(--warn-ink); }
+.eq-label.tone-critical .eq-icon, .eq-label.tone-down .eq-icon { background: #fbdce0; color: var(--critical-ink); }
+.eq-label.tone-absent .eq-icon { background: var(--tile-purple); color: var(--tile-purple-ink); }
+.eq-label:hover { background: var(--control-hover); outline: none; }
+.eq-label.is-selected { background: var(--selection); border-color: var(--selection-edge); outline: none; }
+.eq-label.is-affected { outline: 3px solid var(--focus); }
+.eq-label:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.operations-rail { border-right: 1px solid var(--control-edge); }
+.operations-title, .operations-toggle { background: var(--paper-2); color: var(--ink); border-bottom: 1px solid var(--control-edge); }
+.operations-toggle > span { color: var(--text-soft); }
+.work-tracker-heading .badge { background: var(--selection); color: var(--ink); }
+.tag-ok { background: var(--tile-green); color: var(--tile-green-ink); border-color: transparent; }
+.tag-warn { background: #ffe3ba; color: var(--warn-ink); border-color: transparent; }
+.tag-critical { background: #fbdce0; color: var(--critical-ink); border-color: transparent; }
+.tag-accent { background: var(--tile-gold); color: var(--tile-gold-ink); border-color: transparent; }
+.rating-buttons button { width: 44px; height: 44px; }
+.rating-buttons button.is-on { background: var(--selection); border-color: var(--selection-edge); }
+@media (max-width: 900px) { .operations-rail { border-right: 0; border-top: 1px solid var(--control-edge); } }
+
+.topbar .stat-action:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.price.risk-ok { background: var(--tile-green); color: var(--tile-green-ink); }
+.price.risk-warn { background: #ffe3ba; color: var(--warn-ink); }
+.price.risk-critical { background: #fbdce0; color: var(--critical-ink); }
+
+.btn[aria-pressed="true"]:not(.btn-primary):not(.btn-danger),
+.modal-menu .menu-toggle.is-on, .modal-menu .menu-toggle.is-on:hover:not(:disabled) {
+  background: var(--selection); color: var(--ink); border-color: var(--selection-edge);
+}
+.btn[aria-pressed="true"]:not(.btn-primary):not(.btn-danger):active:not(:disabled),
+.modal-menu .menu-toggle.is-on:active:not(:disabled) {
+  background: color-mix(in srgb, var(--selection) 88%, var(--ink));
+}
+
+/* Recovery conditions stay readable inline, beneath the symptoms they explain. */
+.campaign-stability { margin-top: 12px; background: var(--control-inset); color: var(--ink); }
+.campaign-stability .clock-row { justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.campaign-stability h3 { display: flex; align-items: center; gap: 8px; font-size: var(--text-lg); }
+.campaign-stability p { margin: 10px 0 6px; font-size: var(--text-sm); line-height: 1.4; }
+.campaign-stability .meter { background: var(--paper-3); border-color: var(--control-edge); }
+.recovery-conditions { display: grid; gap: 6px; padding: 0; margin: 0; list-style: none; font-size: var(--text-sm); line-height: 1.4; }
+.recovery-conditions li { display: flex; align-items: flex-start; gap: 8px; }
+.recovery-conditions .icon { margin-top: 2px; color: var(--text-soft); }
+.campaign-stability .recovery-note { margin-bottom: 0; color: var(--text-soft); }
