@@ -251,6 +251,14 @@
 .chapter-zero-guide .lesson-footer .btn { grid-row: 1; height: 64px; padding: 8px 12px; display: flex; justify-content: center; align-items: center; font-size: var(--text-md); }
 .chapter-zero-guide .lesson-footer .btn-primary { min-width: 0; width: 100%; max-width: 220px; justify-self: end; }
 .chapter-zero-target { outline: 3px solid var(--c-tech); outline-offset: 3px; }
+/* Breathe around the target without moving or fading the control itself. */
+@media (prefers-reduced-motion: no-preference) {
+  .chapter-zero-target { animation: chapter-zero-focus 1.8s ease-in-out infinite; }
+}
+@keyframes chapter-zero-focus {
+  0%, 100% { outline-offset: 3px; outline-color: var(--c-tech); }
+  50% { outline-offset: 7px; outline-color: color-mix(in srgb, var(--c-tech) 75%, transparent); }
+}
 body:has(.chapter-zero-guide) [aria-disabled="true"]:not(canvas) { opacity: .45; cursor: not-allowed; }
 .app:has(> .chapter-zero-guide) .modal-backdrop { inset-inline-start: var(--guide-width); }
 .app:has(> .chapter-zero-guide) .campaign-action-popover {
