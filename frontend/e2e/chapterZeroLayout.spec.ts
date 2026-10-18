@@ -43,8 +43,8 @@ for (const [width, height] of [[1440, 900], [390, 844], [320, 568], [844, 390]])
       if (lesson === 8) {
         const quote = page.getByRole("region", { name: "Confirm Add server", exact: true });
         await page.keyboard.press("Escape");
-        const room = (await page.getByRole("main").boundingBox())!;
-        await page.mouse.click(room.x + room.width / 2, room.y + room.height - 30);
+        // The quote's Cancel button can occupy the room's centre on short screens.
+        await page.getByRole("main").locator("canvas").click({ position: { x: 4, y: 4 } });
         await expect(quote).toBeVisible();
         await expect(quote.getByRole("button", { name: "Confirm", exact: true })).toBeDisabled();
         await expect(quote.getByRole("button", { name: "Cancel", exact: true })).toBeEnabled();
