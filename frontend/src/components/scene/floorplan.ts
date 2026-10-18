@@ -1,4 +1,4 @@
-import { appSlot, DB_CABINET, dbSlot, deskSlot, MAX_TEMP_SHOWN, POS, RACK, tempSlot } from "./layout";
+import { appSlot, DB_CABINET, dbSlot, deskSlot, MAX_TEMP_SHOWN, POS, RACK, ROOM, tempSlot } from "./layout";
 import { RALLY, TABLE } from "./rally";
 
 /*
@@ -124,6 +124,17 @@ export const SERVER_ZONE_NAMES: [string, number, number][] = [
   ["Cooling plant", -17.5, 7.0],
   ["Workshop", -2.0, 9.9],
   ["Stores", 17.6, 3.0],
+];
+
+/**
+ * The server floor's rooms behind glass, as [name, [x0, z0, x1, z1]], in the order to look them up: the monitoring
+ * room stands in the server hall's corner. Their equipment names them in the room; the map and the location line
+ * name them here.
+ */
+export const SERVER_ROOMS: [string, [number, number, number, number]][] = [
+  ["Monitoring room", HUDDLE_ROOM],
+  ["Server hall", [-13, -9.5, 9, 5]],
+  ["Network and power room", [QUIET_ROOM[0], QUIET_ROOM[1], QUIET_ROOM[2], -1]],
 ];
 
 /** How high the zone names float: above the glass, below the walls' tops. */
@@ -545,6 +556,28 @@ export const SERVER_DOORS: Door[] = [
   door("monitoring room", "x", 9.6, 10.6, HUDDLE_ROOM[3]),
   door("network and power room", "x", -15.2, -14.0, -1),
 ];
+
+/* ------------------------------------------------------------------ */
+/* The ceiling, seen only from the avatar                              */
+/* ------------------------------------------------------------------ */
+
+/** Whether a point lies over the elevator's shaft, where the ceiling is open for the car. */
+const overShaft = (x: number, z: number, margin = 0.6) =>
+  x > ELEVATOR_SPOT[0] - margin && x < ELEVATOR_SPOT[2] + margin && z > ELEVATOR_SPOT[1] - margin && z < ELEVATOR_SPOT[3] + margin;
+
+/** A grid of points across the ceiling, `step` apart and set in from the walls, none over the shaft. */
+function ceilingGrid(stepX: number, stepZ: number, offset: number): [number, number][] {
+  const at: [number, number][] = [];
+  for (let x = ROOM.x0 + offset; x < ROOM.x1 - 0.8; x += stepX) {
+    for (let z = ROOM.z0 + offset; z < ROOM.z1 - 0.8; z += stepZ) if (!overShaft(x, z)) at.push([x, z]);
+  }
+  return at;
+}
+
+/** The ceiling's light panels, the same on both floors. */
+export const CEILING_LIGHTS = ceilingGrid(3.6, 3.0, 1.8);
+/** Its air vents, between the lights. */
+export const CEILING_VENTS = ceilingGrid(7.2, 6.0, 3.6).filter(([x, z]) => !CEILING_LIGHTS.some(([lx, lz]) => Math.abs(lx - x) < 1 && Math.abs(lz - z) < 1));
 
 /** Something the avatar can play with: where to stand, what the prompt says and the animation it plays. */
 export interface FunProp {

@@ -47,6 +47,8 @@ import {
   saveGame,
   saveMeta,
   saveMode,
+  loadMapOpen,
+  saveMapOpen,
   retrack,
   track,
   GRAPHICS_QUALITIES,
@@ -66,6 +68,7 @@ import { checkpointCloud, localCloudCopy, rememberCloud } from "./cloud";
 import { loadExploration, saveExploration } from "./exploration";
 import { floorFromSearch, floorOf, type Floor, type FloorSwitch } from "./floors";
 import { DEFAULT_AVATAR, type AvatarId } from "./avatars";
+import { clampFov, fromAvatar, type Viewpoint, type ViewSwitch } from "./viewpoints";
 
 export type View = "tech" | "engineers" | "history" | "menu" | "guidance" | "scorecard" | null;
 export type Speed = 0.5 | 1 | 2;
@@ -256,6 +259,17 @@ interface Store {
    */
   walking: boolean;
   setWalking: (on: boolean, remember?: boolean) => void;
+  /**
+   * Where the room is seen from (see game/viewpoints.ts). Follow and first person turn walk mode on, and ending walk
+   * mode returns to the overview. Remembered with walk mode, per mode, in this browser.
+   */
+  viewpoint: Viewpoint;
+  setViewpoint: (v: Viewpoint, how: ViewSwitch) => void;
+  /** The map in the room's corner is open, a browser setting kept across runs and modes. */
+  mapOpen: boolean;
+  setMapOpen: (open: boolean) => void;
+  /** Record, for the analytics, that a click on the map sent the avatar walking. */
+  noteMapWalk: () => void;
   /** The player's avatar, a browser setting kept across runs and modes. */
   avatar: AvatarId;
   setAvatar: (id: AvatarId) => void;
@@ -320,7 +334,7 @@ interface Store {
   setAudio: (patch: Partial<AudioSettings>) => void;
   /** Silence music and effects, or bring them back at their volumes. With both volumes at 0 there is nothing to bring back, so they return to the defaults. */
   toggleMute: () => void;
-  /** Change the graphics settings, remembered for next time. An unknown quality is ignored. */
+  /** Change the graphics settings, remembered for next time. An unknown quality is ignored; the field of view is kept in range. */
   setGraphics: (patch: Partial<GraphicsSettings>) => void;
   notify: (text: string, kind?: Toast["kind"]) => void;
   dismissToast: () => void;
@@ -456,6 +470,16 @@ export const useGame = create<Store>()((set, get) => {
     if (typeof window !== "undefined" && floorFromSearch(window.location.search) !== null) return false;
     const exploration = loadExploration(get().mode);
     return exploration.walking && exploration.floor === get().floor;
+  }
+  /** Walk mode as the title screen gives way to the run: picked up again with its view, or off and from above. */
+  function resumedView(): { walking: boolean; viewpoint: Viewpoint } {
+    const walking = resumedWalk();
+    return { walking, viewpoint: walking ? loadExploration(get().mode).viewpoint : "overview" };
+  }
+  /** An event for the analytics, wherever this mode keeps them. */
+  function record(name: "view_changed" | "map_toggled" | "map_walked", data: Record<string, string | number | boolean>) {
+    if (get().game.campaign) uiEvent(name, data);
+    else track(name, { ...data, mode: get().mode });
   }
   /** The unlock already earned in memory, or the one durable in the campaign profile/save. */
   function challengeUnlockedNow():boolean {
@@ -618,6 +642,7 @@ export const useGame = create<Store>()((set, get) => {
       running: false,
       floor: urlFloor ?? exploration.floor,
       walking: started && urlFloor === null && exploration.walking,
+      viewpoint: started && urlFloor === null && exploration.walking ? exploration.viewpoint : "overview",
       remainderMs: 0,
       saveBlocked: false,
       saveStatus: "unsaved",
@@ -817,10 +842,33 @@ export const useGame = create<Store>()((set, get) => {
       if (get().game.campaign) uiEvent(on ? "walk_started" : "walk_ended", data);
       else track(on ? "walk_started" : "walk_ended", { ...data, mode: get().mode });
       if (on) walkStart = now;
-      set({ walking: on });
+      // The views from the avatar end with the walk.
+      const from = get().viewpoint;
+      if (!on && from !== "overview") record("view_changed", { from, to: "overview", how: "walk_ended" });
+      set(on ? { walking: true } : { walking: false, viewpoint: "overview" });
       // Remembering is skipped by the title screen's automatic stop: that is not the player's choice to leave.
-      if (remember) saveExploration(get().mode, { floor: get().floor, walking: on });
+      if (remember) saveExploration(get().mode, { floor: get().floor, walking: on, ...(on ? {} : { viewpoint: "overview" as const }) });
     },
+    viewpoint: "overview",
+    setViewpoint: (v, how) => {
+      const s = get();
+      if (!s.started) return;
+      if (fromAvatar(v) && !s.walking) s.setWalking(true);
+      const from = get().viewpoint;
+      if (v === from) return;
+      record("view_changed", { from, to: v, how });
+      set({ viewpoint: v });
+      saveExploration(get().mode, { viewpoint: v });
+    },
+    mapOpen: true,
+    setMapOpen: (open) => {
+      if (open === get().mapOpen) return;
+      record("map_toggled", { open });
+      set({ mapOpen: open });
+      // Unsaved, the choice still applies for this visit.
+      saveMapOpen(open);
+    },
+    noteMapWalk: () => record("map_walked", { floor: get().floor }),
     avatar: DEFAULT_AVATAR,
     setAvatar: (id) => {
       if (id === get().avatar) return;
@@ -847,14 +895,16 @@ export const useGame = create<Store>()((set, get) => {
     boot: () => {
       if (get().ready) return;
       // Read once here, not on every mode switch: if storage fails, the in-memory settings are the ones to keep.
-      set({ audio: loadAudio(), graphics: loadGraphics(), avatar: loadAvatar() });
+      // The map starts folded away on a phone, where the room has little space to spare.
+      const narrow = typeof window !== "undefined" && (window.matchMedia?.("(max-width: 700px)").matches ?? false);
+      set({ audio: loadAudio(), graphics: loadGraphics(), avatar: loadAvatar(), mapOpen: loadMapOpen() ?? !narrow });
       enter(loadMode(), false);
     },
 
     play: () => {
       if(get().started)return;
       // A fresh classic run says "Play" on the title screen and a resumed one "Continue", so only the first is a start.
-      if(get().mode === "classic") { set({started:true,walking:resumedWalk(),...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
+      if(get().mode === "classic") { set({started:true,...resumedView(),...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
       const state=get();
       // Upgrade older saved replays to practice too, so an incident cannot hide their lessons.
       if (state.hasRun && state.meta.tutorialDone && state.meta.walkthroughStep !== null && !state.tutorialCompany) { get().startTour("campaign", "resume"); return; }
@@ -865,7 +915,7 @@ export const useGame = create<Store>()((set, get) => {
       // A walkthrough already under way carries on where it was left; only a new one is a start.
       const tour=campaignWalkthrough(counted,game),begins=!!tour&&counted.walkthroughStep===null;
       const meta=begins?{...counted,walkthroughStep:0}:counted;
-      set({game,hasRun:true,meta,measurement,started:true,running:false,walking:resumedWalk(),
+      set({game,hasRun:true,meta,measurement,started:true,running:false,...resumedView(),
         // Starting a fresh company replaces the game, like a new run.
         ...(state.hasRun?{}:{generation:state.generation+1,lastAction:null,lastIntro:intro("begin")}),
         tour,activeMark:document.hidden?null:performance.now()});
@@ -1249,9 +1299,11 @@ export const useGame = create<Store>()((set, get) => {
     },
 
     setGraphics: (patch) => {
-      const quality = GRAPHICS_QUALITIES.find((q) => q === patch.quality) ?? get().graphics.quality;
-      if (quality === get().graphics.quality) return;
-      const graphics: GraphicsSettings = { quality };
+      const now = get().graphics;
+      const quality = GRAPHICS_QUALITIES.find((q) => q === patch.quality) ?? now.quality;
+      const fov = patch.fov === undefined ? now.fov : clampFov(patch.fov);
+      if (quality === now.quality && fov === now.fov) return;
+      const graphics: GraphicsSettings = { quality, fov };
       set({ graphics });
       // Unsaved settings still apply for this visit.
       saveGraphics(graphics);

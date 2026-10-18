@@ -115,25 +115,36 @@ const KEYS: Record<string, keyof Keys> = {
 /** Whether a key is one that moves the avatar. */
 export const movesAvatar = (code: string) => code in KEYS;
 
-function keysHeld(): Keys {
+/** The arrow keys that turn the view through the avatar's eyes rather than step sideways. */
+export const TURN_KEYS = { left: "ArrowLeft", right: "ArrowRight" } as const;
+
+function keysHeld(turning: boolean): Keys {
   const k: Keys = { up: false, down: false, left: false, right: false };
   for (const code of held) {
+    if (turning && (code === TURN_KEYS.left || code === TURN_KEYS.right)) continue;
     const dir = KEYS[code];
     if (dir) k[dir] = true;
   }
   return k;
 }
 
+/** Seeing through the avatar's eyes: it faces where the view looks and walks a little slower. */
+export interface Eyes {
+  heading: number;
+  pace: number;
+}
+
 /**
  * One frame of walking, `dt` seconds long: steer by the keys held relative to `forward` (across the floor from the
  * camera to what it looks at), or follow the walk planned; turn to face the way it goes; and work out what is within
- * reach, telling the page when that changes.
+ * reach, telling the page when that changes. Seen through its `eyes`, the left and right arrows turn the view
+ * instead of stepping sideways, and the avatar faces wherever the view looks.
  */
-export function stepAvatar(dt: number, forward: [number, number], footprints: Record<EquipmentId, Footprint>, names: Record<EquipmentId, string>, now: number): void {
+export function stepAvatar(dt: number, forward: [number, number], footprints: Record<EquipmentId, Footprint>, names: Record<EquipmentId, string>, now: number, eyes?: Eyes): void {
   const world = gridHere().world;
   const run = held.has("ShiftLeft") || held.has("ShiftRight");
-  const speed = run ? SPEED.run : SPEED.walk;
-  const [dx, dz] = steer(keysHeld(), forward);
+  const speed = (run ? SPEED.run : SPEED.walk) * (eyes?.pace ?? 1);
+  const [dx, dz] = steer(keysHeld(!!eyes), forward);
   let moved = false;
   if (dx || dz) {
     // Steering takes over from a planned walk or a fun thing.
@@ -150,6 +161,7 @@ export function stepAvatar(dt: number, forward: [number, number], footprints: Re
     Object.assign(avatar, { x: next.x, z: next.z, path: next.path });
     if (next.dx || next.dz) avatar.yaw = turnTowards(avatar.yaw, facing(next.dx, next.dz), dt);
   }
+  if (eyes && !avatar.busy) avatar.yaw = eyes.heading;
   if (avatar.busy && now > avatar.busy.until) avatar.busy = null;
   avatar.moving = moved;
   avatar.running = moved && run;

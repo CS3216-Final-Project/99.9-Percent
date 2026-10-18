@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { EQUIPMENT, PIXEL_FLOORS, type TileColours } from "./palette";
+import { CEILING, EQUIPMENT, PIXEL_FLOORS, type TileColours } from "./palette";
 
 /**
  * Small procedural textures drawn on canvases. They give the racks and screens
@@ -633,6 +633,28 @@ export function concreteFloor(): THREE.CanvasTexture {
   g.fillRect(0, S - 1, S, 1);
   g.fillRect(S - 1, 0, 1, S);
   return repeating(finish(c));
+}
+
+let ceilingTexture: THREE.CanvasTexture | null = null;
+
+/** Suspended ceiling tiles, two by two to the texture, each 0.6 m across with a darker seam round it. */
+export function ceilingTiles(): THREE.CanvasTexture {
+  if (ceilingTexture) return ceilingTexture;
+  const S = 32;
+  const [c, g] = canvas(S, S);
+  g.fillStyle = CEILING.tile;
+  g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 60; i++) {
+    g.fillStyle = CEILING.speck;
+    g.fillRect(Math.floor(noise(i + 900) * S), Math.floor(noise(i + 1200) * S), 1, 1);
+  }
+  g.fillStyle = CEILING.seam;
+  for (const at of [0, S / 2]) {
+    g.fillRect(at, 0, 1, S);
+    g.fillRect(0, at, S, 1);
+  }
+  ceilingTexture = repeating(finish(c));
+  return ceilingTexture;
 }
 
 /**

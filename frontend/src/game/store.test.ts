@@ -299,23 +299,33 @@ describe("old saves and imports across modes", () => {
   });
   it("keeps the graphics quality across mode switches and reloads", () => {
     useGame.getState().boot();
-    expect(useGame.getState().graphics).toEqual({ quality: "auto" });
+    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 75 });
     useGame.getState().setGraphics({ quality: "low" });
-    useGame.getState().switchMode("classic"); expect(useGame.getState().graphics).toEqual({ quality: "low" });
-    useGame.getState().switchMode("campaign"); expect(useGame.getState().graphics).toEqual({ quality: "low" });
+    useGame.getState().switchMode("classic"); expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75 });
+    useGame.getState().switchMode("campaign"); expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75 });
     useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
-    expect(useGame.getState().graphics).toEqual({ quality: "low" });
+    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75 });
   });
   it("applies a graphics quality for this visit even when storage fails, and ignores an unknown one", () => {
     useGame.getState().boot();
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
     useGame.getState().setGraphics({ quality: "medium" });
-    expect(useGame.getState().graphics).toEqual({ quality: "medium" });
+    expect(useGame.getState().graphics).toEqual({ quality: "medium", fov: 75 });
     const before = useGame.getState().graphics;
     useGame.getState().setGraphics({ quality: "ultra" as never });
     useGame.getState().setGraphics({});
     useGame.getState().setGraphics({ quality: "medium" });
     expect(useGame.getState().graphics).toBe(before);
+  });
+  it("keeps the first-person field of view in range, and the quality and field of view apart", () => {
+    useGame.getState().boot();
+    useGame.getState().setGraphics({ fov: 120 });
+    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 90 });
+    useGame.getState().setGraphics({ quality: "low" });
+    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 90 });
+    useGame.getState().setGraphics({ fov: 70.4 });
+    useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 70 });
   });
   it("toggles mute at the saved volumes, and only unmutes a channel that has volume", () => {
     useGame.getState().boot();
@@ -477,6 +487,73 @@ describe("exploration state", () => {
     expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true });
     useGame.getState().play();
     expect(useGame.getState().walking).toBe(true);
+  });
+
+  it("picks the view back up with walk mode, and never without it", () => {
+    seed("campaign", { floor: "office", walking: true, viewpoint: "first" });
+    useGame.getState().boot();
+    expect(useGame.getState().viewpoint).toBe("overview");
+    useGame.getState().play();
+    expect(useGame.getState()).toMatchObject({ walking: true, viewpoint: "first" });
+    useGame.getState().endSession();
+    // The title screen's stop leaves the remembered view for next time.
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true, viewpoint: "first" });
+    localStorage.clear();
+    useGame.setState(useGame.getInitialState(), true);
+    seed("campaign", { floor: "office", walking: false, viewpoint: "follow" });
+    useGame.getState().boot();
+    useGame.getState().play();
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+  });
+
+  it("turns walk mode on for a view from the avatar, and back to the overview when the walk ends", () => {
+    enter();
+    const s = () => useGame.getState();
+    s().setViewpoint("follow", "key");
+    expect(s()).toMatchObject({ walking: true, viewpoint: "follow" });
+    s().setViewpoint("first", "menu");
+    expect(s().viewpoint).toBe("first");
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true, viewpoint: "first" });
+    s().setWalking(false);
+    expect(s()).toMatchObject({ walking: false, viewpoint: "overview" });
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: false, viewpoint: "overview" });
+    const views = s().measurement.pending.filter((e) => e.name === "view_changed").map((e) => e.payload);
+    expect(views).toEqual([
+      expect.objectContaining({ from: "overview", to: "follow", how: "key" }),
+      expect.objectContaining({ from: "follow", to: "first", how: "menu" }),
+      expect.objectContaining({ from: "first", to: "overview", how: "walk_ended" }),
+    ]);
+  });
+
+  it("ignores a view chosen before the run is on screen, and the same view twice", () => {
+    useGame.getState().boot();
+    useGame.getState().setViewpoint("first", "key");
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+    enter();
+    useGame.getState().setViewpoint("follow", "key");
+    useGame.getState().setViewpoint("follow", "key");
+    expect(useGame.getState().measurement.pending.filter((e) => e.name === "view_changed")).toHaveLength(1);
+  });
+
+  it("remembers whether the map is open, starts it folded on a phone, and records each change", () => {
+    enter();
+    expect(useGame.getState().mapOpen).toBe(true);
+    useGame.getState().setMapOpen(false);
+    expect(localStorage.getItem("nn.map.v1")).toBe("closed");
+    expect(useGame.getState().measurement.pending.filter((e) => e.name === "map_toggled").map((e) => e.payload)).toEqual([expect.objectContaining({ open: false })]);
+    useGame.setState(useGame.getInitialState(), true);
+    useGame.getState().boot();
+    expect(useGame.getState().mapOpen).toBe(false);
+    localStorage.removeItem("nn.map.v1");
+    useGame.setState(useGame.getInitialState(), true);
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("max-width"), media: q }) as MediaQueryList);
+    try {
+      useGame.getState().boot();
+      expect(useGame.getState().mapOpen).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("persists an explicit Walk or floor choice, without toasting on failure", () => {

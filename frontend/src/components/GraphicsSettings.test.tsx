@@ -33,7 +33,19 @@ describe("the Graphics section", () => {
     expect(useGame.getState().graphics.quality).toBe("medium");
     expect(screen.getByRole("radio", { name: "Medium" })).toHaveProperty("checked", true);
     expect(screen.getByRole("radio", { name: "Auto" })).toHaveProperty("checked", false);
-    expect(loadGraphics()).toEqual({ quality: "medium" });
+    expect(loadGraphics()).toEqual({ quality: "medium", fov: 75 });
+  });
+
+  it("sets the first-person field of view with a slider, in range, without changing the quality", () => {
+    render(<GraphicsSettings />);
+    const slider = screen.getByRole("slider", { name: "First-person field of view" });
+    expect(slider).toHaveProperty("value", "75");
+    expect(slider.getAttribute("min")).toBe("70");
+    expect(slider.getAttribute("max")).toBe("90");
+    fireEvent.change(slider, { target: { value: "86" } });
+    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 86 });
+    expect(slider.getAttribute("aria-valuetext")).toBe("86 degrees");
+    expect(loadGraphics()).toEqual({ quality: "auto", fov: 86 });
   });
 
   it("starts at the saved choice", () => {

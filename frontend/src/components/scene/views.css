@@ -1,0 +1,277 @@
+/*
+ * The views from the avatar and the map: the dimming as the view cuts between the overview and a view from the
+ * avatar, the dot in the middle of the first-person view with a line on how to look round, and the floor plan in
+ * the room's corner.
+ */
+
+.view-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--night);
+}
+
+.view-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.view-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.view-hint {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  margin: 0;
+  max-width: calc(100% - 32px);
+  padding: 4px 10px;
+  transform: translateX(-50%);
+  background: rgb(26 22 51 / 0.85);
+  border: 2px solid var(--night-line);
+  border-radius: var(--radius);
+  color: var(--on-night-soft);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.view-hint kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 0 var(--ink);
+  font-family: var(--font-num);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-align: center;
+}
+
+.view-hint-touch {
+  display: none;
+}
+
+@media (hover: none) {
+  .view-hint-fine {
+    display: none;
+  }
+
+  .view-hint-touch {
+    display: inline;
+  }
+}
+
+/* The map: a paper card in the room's top right corner, folded down to a button when hidden. */
+.room-map {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 24;
+  width: min(300px, calc(100% - 24px));
+  padding: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--press);
+}
+
+.room-map.is-closed {
+  width: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.map-floors {
+  display: flex;
+  gap: 4px;
+}
+
+.map-floors button,
+.map-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px 0 4px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--press);
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.map-floors button .floor-number {
+  width: 18px;
+  height: 18px;
+}
+
+.map-floors button[aria-pressed="true"] {
+  background: var(--go);
+}
+
+.map-floors button:hover,
+.map-toggle:hover {
+  background: #fff;
+}
+
+.map-floors button[aria-pressed="true"]:hover {
+  background: var(--go-hover);
+}
+
+.map-toggle {
+  padding: 0 7px;
+}
+
+.room-map.is-closed .map-toggle {
+  height: 34px;
+  padding: 0 11px 0 8px;
+  font-size: var(--text-sm);
+}
+
+.map-plan {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--night-2);
+  border-radius: 8px;
+}
+
+.room-map.can-walk .map-plan {
+  cursor: crosshair;
+}
+
+.map-floor {
+  fill: #e9dfcb;
+}
+
+.map-furniture {
+  fill: #cbbd9f;
+}
+
+.map-glass line {
+  stroke: #6fa6c9;
+  stroke-width: 0.18;
+}
+
+.map-shaft line {
+  stroke: var(--ink);
+  stroke-width: 0.3;
+}
+
+.map-walls {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 0.45;
+}
+
+.map-names text {
+  fill: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 1.35px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+
+.map-crew circle {
+  fill: var(--c-tech);
+  stroke: var(--ink);
+  stroke-width: 0.12;
+}
+
+.map-mark circle {
+  fill: var(--critical);
+  stroke: var(--ink);
+  stroke-width: 0.2;
+}
+
+.map-mark.tone-busy circle {
+  fill: var(--focus);
+}
+
+.map-mark text {
+  fill: #fff;
+  font-family: var(--font-num);
+  font-size: 1.4px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.map-mark.tone-alert circle {
+  animation: floor-alert 1s ease-in-out infinite;
+}
+
+.map-destination {
+  fill: none;
+  stroke: var(--go);
+  stroke-width: 0.3;
+}
+
+.map-avatar circle {
+  fill: rgb(255 216 74 / 0.35);
+}
+
+.map-avatar path {
+  fill: var(--go);
+  stroke: var(--ink);
+  stroke-width: 0.2;
+  stroke-linejoin: round;
+}
+
+.map-where {
+  margin: 6px 2px 0;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* The field of view slider sits under the quality choices, in the menu's graphics section. */
+.fov-setting {
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .room-map {
+    width: min(240px, calc(100% - 24px));
+  }
+
+  .map-names {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-mark.tone-alert circle {
+    animation: none;
+  }
+}

@@ -17,6 +17,8 @@ import { BUBBLE_CANVAS, bubbleTexture } from "./textures";
 
 /** A bubble's size on screen, in pixels. */
 const BUBBLE_PX = 190;
+/** Metres wide a bubble is, seen from the avatar. */
+const BUBBLE_WIDE = 1.3;
 /** Below this zoom the office is too small for bubbles to read. */
 const BUBBLE_MIN_ZOOM = 22;
 /** How far above a speaker's head the bubble's tail ends. */
@@ -33,9 +35,11 @@ function SpeechBubble({ text, alarmed, height }: { text: string; alarmed: boolea
   useFrame(({ camera }) => {
     const s = sprite.current;
     if (!s) return;
+    // Seen from the avatar there is no zoom, and the bubble keeps a size of its own above the speaker.
+    const flat = (camera as THREE.OrthographicCamera).isOrthographicCamera === true;
     const zoom = camera.zoom;
-    s.visible = zoom >= BUBBLE_MIN_ZOOM;
-    const w = BUBBLE_PX / zoom;
+    s.visible = !flat || zoom >= BUBBLE_MIN_ZOOM;
+    const w = flat ? BUBBLE_PX / zoom : BUBBLE_WIDE;
     s.scale.set(w, (w * BUBBLE_CANVAS[1]) / BUBBLE_CANVAS[0], 1);
   });
   return <sprite ref={sprite} material={material} position={[0, height + ABOVE_HEAD, 0]} center={[0.5, 0]} renderOrder={1000} raycast={noRaycast} />;

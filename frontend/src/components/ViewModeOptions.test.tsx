@@ -24,3 +24,22 @@ it("chooses an explicit exploration mode, closes its disclosure and returns keyb
   expect(useGame.getState().game).toBe(game);
   expect(useGame.getState().running).toBe(false);
 });
+
+it("offers the views from the avatar, which turn walk mode on, and the overview, which turns it off", () => {
+  useGame.setState({ started: true });
+  const stage = createRef<HTMLDivElement>();
+  render(<><div tabIndex={-1} ref={stage} /><ViewModeOptions stage={stage} /></>);
+  const pressed = () => screen.getAllByRole("button").filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.getAttribute("aria-label"));
+  expect(pressed()).toEqual(["Overview"]);
+  fireEvent.click(screen.getByRole("button", { name: "First person" }));
+  expect(useGame.getState()).toMatchObject({ walking: true, viewpoint: "first" });
+  expect(pressed()).toEqual(["First person"]);
+  fireEvent.click(screen.getByRole("button", { name: "Follow" }));
+  expect(useGame.getState()).toMatchObject({ walking: true, viewpoint: "follow" });
+  fireEvent.click(screen.getByRole("button", { name: "Walk mode" }));
+  expect(useGame.getState()).toMatchObject({ walking: true, viewpoint: "overview" });
+  expect(pressed()).toEqual(["Walk mode"]);
+  fireEvent.click(screen.getByRole("button", { name: "Follow" }));
+  fireEvent.click(screen.getByRole("button", { name: "Overview" }));
+  expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+});

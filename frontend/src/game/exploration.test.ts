@@ -17,7 +17,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("exploration persistence", () => {
   it("round-trips a full state", () => {
-    const full = { floor: "office", walking: true, avatar: AVATAR, camera: CAMERA } as const;
+    const full = { floor: "office", walking: true, viewpoint: "follow", avatar: AVATAR, camera: CAMERA } as const;
     expect(saveExploration("campaign", full)).toBe(true);
     expect(loadExploration("campaign")).toEqual({ version: 1, ...full });
     expect(JSON.parse(localStorage.getItem(CAMPAIGN)!)).toMatchObject(full);
@@ -32,7 +32,7 @@ describe("exploration persistence", () => {
   });
 
   it("starts from defaults and merges patches", () => {
-    expect(loadExploration("campaign")).toEqual({ version: 1, floor: "servers", walking: false, avatar: null, camera: null });
+    expect(loadExploration("campaign")).toEqual({ version: 1, floor: "servers", walking: false, viewpoint: "overview", avatar: null, camera: null });
     saveExploration("campaign", { walking: true });
     saveExploration("campaign", { avatar: AVATAR });
     expect(loadExploration("campaign")).toMatchObject({ floor: "servers", walking: true, avatar: AVATAR, camera: null });
@@ -45,10 +45,20 @@ describe("exploration persistence", () => {
   ])("falls back to defaults for %s", (_name, raw) => {
     localStorage.setItem(CAMPAIGN, raw);
     const state = loadExploration("campaign");
-    expect(state).toEqual({ version: 1, floor: "servers", walking: false, avatar: null, camera: null });
+    expect(state).toEqual({ version: 1, floor: "servers", walking: false, viewpoint: "overview", avatar: null, camera: null });
     // A corrupt read also clears the visit's memory: a later write does not resurrect it.
     saveExploration("campaign", { walking: true });
     expect(loadExploration("campaign")).toMatchObject({ floor: "servers", walking: true });
+  });
+
+  it("reads a record from before the views as the overview, and an unknown view as the overview too", () => {
+    localStorage.setItem(CAMPAIGN, JSON.stringify({ version: 1, floor: "office", walking: true, avatar: AVATAR, camera: CAMERA }));
+    expect(loadExploration("campaign")).toMatchObject({ floor: "office", walking: true, viewpoint: "overview", avatar: AVATAR });
+    localStorage.setItem(CAMPAIGN, JSON.stringify({ version: 1, floor: "office", walking: true, viewpoint: "roof" }));
+    expect(loadExploration("campaign")).toMatchObject({ walking: true, viewpoint: "overview" });
+    saveExploration("campaign", { viewpoint: "first" });
+    saveExploration("campaign", { viewpoint: "sideways" as never });
+    expect(loadExploration("campaign").viewpoint).toBe("first");
   });
 
   it("drops invalid fields without losing the valid ones", () => {
@@ -80,7 +90,7 @@ describe("exploration persistence", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("blocked");
     });
-    expect(loadExploration("campaign")).toEqual({ version: 1, floor: "servers", walking: false, avatar: null, camera: null });
+    expect(loadExploration("campaign")).toEqual({ version: 1, floor: "servers", walking: false, viewpoint: "overview", avatar: null, camera: null });
     vi.restoreAllMocks();
 
     // Storage already holds an older record; a failed write still leaves memory ahead of it.

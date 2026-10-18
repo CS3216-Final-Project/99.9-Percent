@@ -1,9 +1,10 @@
 import type { Floor } from "./floors";
 import type { GameMode } from "./persist";
+import { isViewpoint, type Viewpoint } from "./viewpoints";
 
 /*
- * Where the player last stood and looked, per mode: the floor in view, whether walk mode was on, the avatar's
- * spot and the camera's target, angle and zoom. This is browser-local convenience, not progress: it is kept out
+ * Where the player last stood and looked, per mode: the floor in view, whether walk mode was on and from which
+ * view, the avatar's spot and the overview camera's target, angle and zoom. This is browser-local convenience, not progress: it is kept out
  * of the save envelopes entirely, so a corrupt or missing record costs nothing but a return to the default view.
  */
 
@@ -26,6 +27,8 @@ export interface ExplorationState {
   version: 1;
   floor: Floor;
   walking: boolean;
+  /** The view walk mode was seen from; records from before there was a choice have none, and mean the overview. */
+  viewpoint: Viewpoint;
   avatar: SavedAvatarPosition | null;
   camera: SavedCameraView | null;
 }
@@ -35,7 +38,7 @@ const KEYS: Record<GameMode, string> = {
   classic: "nn.classic.exploration.v1",
 };
 
-const DEFAULTS: ExplorationState = { version: 1, floor: "servers", walking: false, avatar: null, camera: null };
+const DEFAULTS: ExplorationState = { version: 1, floor: "servers", walking: false, viewpoint: "overview", avatar: null, camera: null };
 
 /** Bounds a stored number can be trusted inside: the building spans a few tens of metres, the camera's stand-off a few hundred. */
 const NEAR = 100;
@@ -86,6 +89,7 @@ function parse(raw: string): ExplorationState | null {
       version: 1,
       floor: isFloor(s.floor) ? s.floor : DEFAULTS.floor,
       walking: typeof s.walking === "boolean" ? s.walking : DEFAULTS.walking,
+      viewpoint: isViewpoint(s.viewpoint) ? s.viewpoint : DEFAULTS.viewpoint,
       avatar: avatarOf(s.avatar),
       camera: cameraOf(s.camera),
     };
@@ -100,6 +104,7 @@ function copyOf(s: ExplorationState): ExplorationState {
     version: 1,
     floor: s.floor,
     walking: s.walking,
+    viewpoint: s.viewpoint,
     avatar: s.avatar ? { ...s.avatar } : null,
     camera: s.camera ? { target: { ...s.camera.target }, offset: { ...s.camera.offset }, zoom: s.camera.zoom } : null,
   };
@@ -150,6 +155,7 @@ export function saveExploration(mode: GameMode, patch: Partial<Omit<ExplorationS
     version: 1,
     floor: patch.floor === undefined ? base.floor : isFloor(patch.floor) ? patch.floor : base.floor,
     walking: patch.walking === undefined ? base.walking : typeof patch.walking === "boolean" ? patch.walking : base.walking,
+    viewpoint: patch.viewpoint === undefined ? base.viewpoint : isViewpoint(patch.viewpoint) ? patch.viewpoint : base.viewpoint,
     avatar: patch.avatar === undefined ? base.avatar : avatarOf(patch.avatar),
     camera: patch.camera === undefined ? base.camera : cameraOf(patch.camera),
   };
