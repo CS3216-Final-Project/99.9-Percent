@@ -132,7 +132,7 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
       : highlighted?.querySelector<HTMLElement>(index === 7 ? ".btn-row button:last-child" : "summary, button:not(:disabled)");
     if (control) { event.preventDefault(); control.focus(); }
   }}>
-    <header className="modal-head"><h2>Chapter 0 · Getting started</h2><button className="lesson-exit" onClick={() => s.endSession()}>Save and exit</button></header>
+    <header className="modal-head"><h2>Chapter 0 · Getting started</h2><div className="lesson-exit-actions"><button className="lesson-exit" onClick={() => s.endSession()}>Save and exit</button>{s.meta.tutorialDone && <button className="btn btn-small" aria-label="Exit Chapter 0" title="Exit Chapter 0" onClick={() => { s.openView(null); s.endTour(false); }}><Icon name="close" size={18} /></button>}</div></header>
     <div className="modal-body">
       <div className="lesson-meta"><span>Lesson {index + 1} of {lessons.length}</span><span className="lesson-paused"><Icon name={s.running ? "play" : "pause"} size={14} />{s.running ? "Company running" : "Company paused"}</span></div>
       <progress className="lesson-progress" aria-label="Chapter 0 progress" value={index + 1} max={lessons.length} />

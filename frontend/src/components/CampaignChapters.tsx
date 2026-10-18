@@ -11,6 +11,7 @@ export function CampaignChapters() {
   const game = useGame((s) => s.game);
   const tutorialDone = useGame(s => s.meta.tutorialDone);
   const learning = useGame(s => s.tour?.track === "campaign");
+  const replaying = learning && tutorialDone;
   const [open, setOpen] = useState(false);
   const chapters = campaignChapters(game, learning, tutorialDone);
   const current = chapters.find((chapter) => chapter.current)!;
@@ -40,7 +41,10 @@ export function CampaignChapters() {
       <ol className="chapter-overview">
         {chapters.map((chapter) => <li key={chapter.id} aria-current={chapter.current ? "step" : undefined}>
           <span className="chapter-number" aria-hidden="true">{chapter.completed ? <Icon name="check" size={18} /> : chapter.number}</span>
-          <div><h3>{chapter.name}</h3><span className="chapter-status">{chapter.status}{chapter.current && chapter.completed ? " · You are here" : ""}</span><p>{chapter.description}</p>{chapter.number === 0 && <button className="btn" disabled={game.phase !== "management"} onClick={() => { setOpen(false); useGame.getState().startTour("campaign"); }}>Replay Chapter 0</button>}</div>
+          <div><h3>{chapter.name}</h3><span className="chapter-status">{chapter.status}{chapter.current && chapter.completed ? " · You are here" : ""}</span><p>{chapter.description}</p>{chapter.number === 0 && (replaying ? <>
+            <p>You have already completed Chapter 0. Exit the replay to return to your company.</p>
+            <button className="btn btn-primary" onClick={() => { useGame.getState().endTour(false); setOpen(false); }}>Exit Chapter 0</button>
+          </> : <button className="btn" disabled={game.phase !== "management"} onClick={() => { setOpen(false); useGame.getState().startTour("campaign"); }}>Replay Chapter 0</button>)}</div>
         </li>)}
       </ol>
       <p className="muted">Complete each chapter’s requirements and choose Next when it becomes available. Time is paused while you look around.</p>

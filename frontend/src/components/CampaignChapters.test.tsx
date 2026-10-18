@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { useGame } from "@/game/store";
 import { newGame } from "@/sim";
+import { advanceSteps } from "@/sim/step";
+import { DEFAULT_META, saveGame, saveMeta } from "@/game/persist";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { preparedReliability } from "@/sim/__tests__/reliabilityFixture";
 import { spikeCompany } from "@/sim/__tests__/spikeFixtures";
@@ -82,4 +84,20 @@ it("integrates How to play into Chapter 0 and replays it on the same company", (
   expect(useGame.getState().game).toBe(game);
   expect(useGame.getState().tour).toEqual({ track: "campaign", step: 0 });
   expect(useGame.getState().running).toBe(false);
+});
+
+it("lets a completed player exit a Chapter 0 replay hidden behind an incident", () => {
+  const game = advanceSteps(newGame(1, "hidden-replay"), 6).state;
+  saveGame(game); saveMeta({ ...DEFAULT_META, tutorialDone: true });
+  useGame.getState().boot(); useGame.getState().play(); useGame.getState().startTour("campaign");
+  render(<CampaignChapters />);
+  fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
+  const dialog = screen.getByRole("dialog", { name: "Guided Mode chapters" });
+  expect(within(dialog).getByRole("heading", { name: "Getting started" }).closest("li")!.textContent).toContain("Replaying");
+  expect(within(dialog).getByRole("heading", { name: "Opening" }).closest("li")!.textContent).toContain("Available next");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Exit Chapter 0" }));
+  expect(screen.getByLabelText("Current chapter").textContent).toBe("Opening");
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(useGame.getState()).toMatchObject({ tour: null, running: false, meta: { tutorialDone: true, walkthroughStep: null } });
+  expect(useGame.getState().game.campaign).toEqual(game.campaign);
 });

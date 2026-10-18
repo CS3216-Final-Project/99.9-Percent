@@ -1117,10 +1117,12 @@ export const useGame = create<Store>()((set, get) => {
     endTour: (completed) => {
       const { tour, meta, game } = get();
       if (!tour) return;
-      if (tour.track === "campaign" && (!completed || tour.step !== lastStep("campaign"))) return;
+      // First-time Chapter 0 is mandatory; an already completed player's replay can be left at any lesson,
+      // including while an incident hides its card. Finishing still requires the final lesson.
+      if (tour.track === "campaign" && (completed ? tour.step !== lastStep("campaign") : !meta.tutorialDone)) return;
       let next = meta;
       const walkthrough = isWalkthrough(tour.track);
-      // On its last step the walkthrough has already finished; closing the card there records nothing more.
+      // Challenge Mode records completion on reaching its last step. Chapter 0 records an explicit finish or replay exit.
       if (tour.track === "campaign" || isWalkthrough(tour.track) && (tour.step < lastStep(tour.track) || !meta.tutorialDone)) {
         recordTour(completed ? "completed" : "skipped", tour, completed ? {} : { reason: "player" });
         next = walkthroughDone(meta);
@@ -1131,7 +1133,7 @@ export const useGame = create<Store>()((set, get) => {
       // A chapter's guide was recorded as seen when it appeared.
       // The incident guide holds the clock; closing it lets the incident run.
       // Only finishing a walkthrough is marked; skipping it, like its steps, stays quiet (the steps' own decisions already sound).
-      set({ tour: null, meta: next, running: tour.track === "incident" && game.phase === "incident" ? true : get().running, ...(completed && walkthrough ? { lastIntro: intro("finish") } : {}) });
+      set({ tour: null, meta: next, running: tour.track === "campaign" ? false : tour.track === "incident" && game.phase === "incident" ? true : get().running, ...(completed && walkthrough ? { lastIntro: intro("finish") } : {}) });
       if (game.campaign && walkthrough) persist();
     },
     startTutorialRun: (from) => {
