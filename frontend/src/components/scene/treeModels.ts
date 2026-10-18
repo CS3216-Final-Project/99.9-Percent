@@ -8,7 +8,9 @@ import { randRange, type RngHolder } from "@/sim/rng";
  * umbrella on spreading limbs; and a narrow flame of a cypress. Each is one unit tall, to be scaled by the tree's
  * height, and comes as two meshes: the bark, in its own colours, and the leaves, in pale greys shaded darker
  * underneath and toward the middle, for each tree's own colour to tint. Every part keeps its index, so smooth
- * normals run across each clump and frond. A lite model, for drawing without a graphics card, has fewer parts.
+ * normals run across each clump and frond. Each vertex of a palm's live fronds also says where on the frond it lies
+ * (aFrond: how far along it, and how far across the midrib), so the city's HD shader can cut it into leaflets. A lite
+ * model, for drawing without a graphics card, has fewer parts.
  */
 
 export type TreeShape = "round" | "cone" | "umbrella" | "palm";
@@ -109,18 +111,21 @@ function limb(a: V, b: V, r0: number, r1: number, sides: number): THREE.BufferGe
 /**
  * A palm frond from `origin`, heading out at `azimuth` and up at `elevation`, sagging under its own weight. Its
  * leaflets fan out either side of the midrib and droop, wide in the middle of the frond and narrow at each end.
- * Returns the frond and, for each vertex, how far along the frond it is.
+ * Returns the frond and, for each vertex, how far along the frond it is. Each vertex also carries its place on the
+ * frond in `aFrond` — how far along it and which side of the midrib — for the HD material's leaflet cut-out.
  */
 function frond(origin: V, azimuth: number, elevation: number, length: number, sag: number, segs: number, width: number): { g: THREE.BufferGeometry; along: number[] } {
   const dir = vec(Math.cos(azimuth) * Math.cos(elevation), Math.sin(elevation), Math.sin(azimuth) * Math.cos(elevation));
   const at = (s: number) => origin.clone().addScaledVector(dir, length * s).add(vec(0, -sag * s * s, 0));
   const pos: number[] = [];
   const along: number[] = [];
+  const coord: number[] = [];
   const index: number[] = [];
   for (let i = 0; i <= segs; i++) {
     const p = at(i / segs);
     pos.push(p.x, p.y, p.z);
     along.push(i / segs);
+    coord.push(i / segs, 0);
   }
   const up = new THREE.Vector3(0, 1, 0);
   for (let i = 1; i <= segs; i++) {
@@ -134,10 +139,12 @@ function frond(origin: V, azimuth: number, elevation: number, length: number, sa
       index.push(i - 1, i, pos.length / 3);
       pos.push(tip.x, tip.y, tip.z);
       along.push(s);
+      coord.push(s, sign);
     }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("aFrond", new THREE.Float32BufferAttribute(coord, 2));
   g.setIndex(index);
   return { g, along };
 }
@@ -177,6 +184,8 @@ function palm(variant: number, lite: boolean): TreeModel {
   const deadCount = lite ? 2 : 6;
   const dead = Array.from({ length: deadCount }, (_, k) => {
     const f = frond(crown.clone().add(vec(0, -0.02, 0)), (k / deadCount) * Math.PI * 2 + 0.4, -1.15, 0.2, 0.02, lite ? 3 : 8, 0.04);
+    // Dead fronds merge into the bark, which is drawn without the leaflet cut-out, so they drop its coordinates.
+    f.g.deleteAttribute("aFrond");
     return paint(f.g, (_, i) => hex(BARK.dead[i % 2]));
   });
   const fronds = lite ? 8 : 20;

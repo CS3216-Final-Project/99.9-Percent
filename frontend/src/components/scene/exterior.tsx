@@ -47,6 +47,7 @@ import {
   TREE_SPREAD,
   trees,
   vehicleAt,
+  vehicleSize,
   walkerAt,
   type Building,
   type LampStyle,
@@ -66,7 +67,7 @@ import { boxShadow, courtyardLight, drumShadow, shadowStep } from "./shadows";
 import { useCitySurfaces, type CitySurface } from "./cityTextures";
 import { useSurfaces, type Surface } from "./surfaces";
 import { TREE_VARIANTS, treeModel, type TreeModel, type TreeShape } from "./treeModels";
-import { vehicleBody, vehicleLights } from "./vehicleModels";
+import { vehicleBody, vehicleLights, vehicleSeams } from "./vehicleModels";
 import { HIP, HAIR, SHOULDER, SKIN, STATURE, stature, TROUSERS, walkerModel } from "./walkerModels";
 import { adsTexture, logoSign } from "./textures";
 import { shownFloor } from "./ride";
@@ -124,7 +125,7 @@ vec3 lineOfSight() {
  * and brighter at night; seen only at night, like the pools of lamplight; or shaded by its own shader, like the
  * facades.
  */
-type Lighting = "lit" | "textured" | "foliage" | "foliageTextured" | "shadow" | "sign" | "glow" | "night" | "own";
+type Lighting = "lit" | "textured" | "foliage" | "foliageTextured" | "barkTextured" | "frondTextured" | "shadow" | "sign" | "glow" | "night" | "own";
 
 const LIGHTING: Record<Lighting, string> = {
   lit: "diffuseColor.rgb *= cityLight(normalize(vCityNormal));",
@@ -134,7 +135,18 @@ const LIGHTING: Record<Lighting, string> = {
   // Leaves and fronds are thin, so each side is lit as if it faced the viewer, and light wraps round them a little.
   foliage: "diffuseColor.rgb *= foliageLight(normalize(vCityNormal) * (gl_FrontFacing ? 1.0 : -1.0));",
   foliageTextured:
-    "vec3 leafN = normalize(vCityNormal) * (gl_FrontFacing ? 1.0 : -1.0); diffuseColor.rgb *= leafDetail(leafN) * foliageLight(leafN);",
+    "vec3 leafN = normalize(vCityNormal) * (gl_FrontFacing ? 1.0 : -1.0); diffuseColor.rgb *= leafDetail(leafN) * foliageLight(triBumped(leafN));",
+  barkTextured:
+    "vec3 barkN = normalize(vCityNormal) * (gl_FrontFacing ? 1.0 : -1.0); diffuseColor.rgb *= leafDetail(barkN) * cityLight(triBumped(barkN));",
+  frondTextured: `float s = vFrond.x;
+    float a = abs(vFrond.y);
+    // Leaflets either side of the midrib, swept toward the tip and parting more the further from the rib; tips a little ragged.
+    float row = s * 24.0 + a * 0.45;
+    float u = abs(fract(row) - 0.5) * 2.0;
+    float gap = 0.6 * smoothstep(0.08, 1.0, a);
+    if ((u > 1.0 - gap && s > 0.1) || a > 1.0 - 0.1 * frondHash(floor(row))) discard;
+    vec3 leafN = normalize(vCityNormal) * (gl_FrontFacing ? 1.0 : -1.0);
+    diffuseColor.rgb *= leafDetail(leafN) * foliageLight(triBumped(leafN));`,
   // A soft shadow on the ground: darker by day, faint under the moon. Blended in linear light, the same alpha would
   // darken the ground much less than blended for display, so it is raised to look the same either way.
   shadow: "diffuseColor.a *= mix(0.72, 0.2, uDark); diffuseColor.a = mix(diffuseColor.a, 1.0 - pow(1.0 - diffuseColor.a, 2.2), uLinear);",
@@ -194,17 +206,20 @@ uniform sampler2D uDetailNormal;
 uniform float uTile;
 uniform float uContrast;
 uniform float uMottle;
+uniform vec3 uHue;
+uniform float uBump;
 
 vec2 detailUvA() { return vFadeWorld.xz / uTile; }
 vec2 detailUvB() { return mat2(0.8, -0.6, 0.6, 0.8) * vFadeWorld.xz / (uTile * 2.71) + 0.37; }
 float detailFlat(vec3 n) { return smoothstep(0.35, 0.8, abs(n.y)); }
 
-/** How much lighter or darker the photo is here than on average, with broad patches across the whole surface. */
-float cityDetail(vec3 n) {
+/** How much lighter or darker the photo is here than on average, the broad lighter patches tinted by uHue. */
+vec3 cityDetail(vec3 n) {
   float d = mix(texture2D(uDetail, detailUvA()).r, texture2D(uDetail, detailUvB()).r, 0.4) / ${GREY_MEAN.toFixed(2)};
   float broad = texture2D(uDetail, vFadeWorld.xz / (uTile * 31.0) + 0.61).r / ${GREY_MEAN.toFixed(2)};
   d = (1.0 + (d - 1.0) * uContrast) * (1.0 + (broad - 1.0) * uMottle);
-  return mix(1.0, d, detailFlat(n));
+  float huePatch = smoothstep(0.95, 1.35, broad);
+  return mix(vec3(1.0), vec3(d) * mix(vec3(1.0), uHue, huePatch), detailFlat(n));
 }
 
 /** A photo's light and dark laid round a crown from three sides at once, so leaves read on every face of it. */
@@ -220,6 +235,17 @@ vec3 cityBumped(vec3 n) {
   vec2 t = mix(texture2D(uDetailNormal, detailUvA()).xy, texture2D(uDetailNormal, detailUvB()).xy, 0.4) * 2.0 - 1.0;
   return normalize(n + vec3(t.x, 0.0, -t.y) * 0.8 * detailFlat(n));
 }
+
+/** The normal, tipped by the photo's bumps laid round the surface from three sides, like leafDetail. */
+vec3 triBumped(vec3 n) {
+  vec3 w = abs(n);
+  w /= w.x + w.y + w.z;
+  vec2 tx = texture2D(uDetailNormal, vFadeWorld.zy / uTile).xy * 2.0 - 1.0;
+  vec2 ty = texture2D(uDetailNormal, vFadeWorld.xz / uTile).xy * 2.0 - 1.0;
+  vec2 tz = texture2D(uDetailNormal, vFadeWorld.xy / uTile).xy * 2.0 - 1.0;
+  vec3 bump = vec3(0.0, tx.y, tx.x) * w.x + vec3(ty.x, 0.0, -ty.y) * w.y + vec3(tz.x, tz.y, 0.0) * w.z;
+  return normalize(n + bump * uBump);
+}
 `;
 
 /** A plain-coloured material laid with a photo-scanned surface. */
@@ -230,13 +256,15 @@ function texturedMaterial(surface: CitySurface): THREE.MeshBasicMaterial {
     shader.uniforms.uTile = { value: surface.tile };
     shader.uniforms.uContrast = { value: surface.contrast };
     shader.uniforms.uMottle = { value: surface.mottle };
+    shader.uniforms.uHue = { value: new THREE.Vector3(...surface.hue) };
+    shader.uniforms.uBump = { value: 0.8 };
     shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${DETAIL_GLSL}`);
   });
 }
 
 /**
- * Leaves and bark, lit through; at HD, the leaves carry a photo of foliage laid round them from three sides. Thin
- * fronds and bark are seen from both sides; closed clumps of leaves only from outside, which halves their cost.
+ * Clumps of leaves, lit through; at HD they carry a photo of foliage laid round them from three sides. Closed
+ * clumps are seen only from outside, which halves their cost.
  */
 function foliageMaterial(surface: CitySurface | null, side: THREE.Side): THREE.MeshBasicMaterial {
   if (!surface) return faded({ vertexColors: true, side }, "city-foliage", "foliage");
@@ -246,7 +274,86 @@ function foliageMaterial(surface: CitySurface | null, side: THREE.Side): THREE.M
     shader.uniforms.uTile = { value: 1.3 };
     shader.uniforms.uContrast = { value: 0.9 };
     shader.uniforms.uMottle = { value: 0 };
+    shader.uniforms.uHue = { value: new THREE.Vector3(...surface.hue) };
+    shader.uniforms.uBump = { value: 0.75 };
     shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${DETAIL_GLSL}`);
+  });
+}
+
+/**
+ * Trunks and branches, lit through; at HD they carry a photo of bark laid round them from three sides, its bumps
+ * tipping the normals. Seen from both sides, like the thin geometry it covers.
+ */
+function barkMaterial(surface: CitySurface | null): THREE.MeshBasicMaterial {
+  if (!surface) return faded({ vertexColors: true, side: THREE.DoubleSide }, "city-foliage", "foliage");
+  return faded({ vertexColors: true, side: THREE.DoubleSide }, "city-bark-textured", "barkTextured", (shader) => {
+    shader.uniforms.uDetail = { value: surface.map };
+    shader.uniforms.uDetailNormal = { value: surface.normalMap };
+    shader.uniforms.uTile = { value: 1.6 };
+    shader.uniforms.uContrast = { value: 1.3 };
+    shader.uniforms.uMottle = { value: 0 };
+    shader.uniforms.uHue = { value: new THREE.Vector3(...surface.hue) };
+    shader.uniforms.uBump = { value: 0.9 };
+    shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${DETAIL_GLSL}`);
+  });
+}
+
+/**
+ * Palm fronds, lit through; at HD they carry the leaves photo, cut into leaflets either side of each midrib by the
+ * aFrond coordinates the models carry.
+ */
+function frondMaterial(surface: CitySurface | null): THREE.MeshBasicMaterial {
+  if (!surface) return faded({ vertexColors: true, side: THREE.DoubleSide }, "city-foliage", "foliage");
+  return faded({ vertexColors: true, side: THREE.DoubleSide }, "city-frond-textured", "frondTextured", (shader) => {
+    shader.uniforms.uDetail = { value: surface.map };
+    shader.uniforms.uDetailNormal = { value: surface.normalMap };
+    shader.uniforms.uTile = { value: 1.1 };
+    shader.uniforms.uContrast = { value: 1.1 };
+    shader.uniforms.uMottle = { value: 0 };
+    shader.uniforms.uHue = { value: new THREE.Vector3(...surface.hue) };
+    shader.uniforms.uBump = { value: 0.75 };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute vec2 aFrond;\nvarying vec2 vFrond;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvFrond = aFrond;");
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <common>",
+      `#include <common>\nvarying vec2 vFrond;\nfloat frondHash(float p) { return fract(sin(p * 12.9898) * 43758.5453); }\n${DETAIL_GLSL}`,
+    );
+  });
+}
+
+/** The carriageways' own material at HD: the asphalt photo, with the two tracks tyres polish into every lane. */
+function asphaltMaterial(surface: CitySurface): THREE.MeshBasicMaterial {
+  return faded({ vertexColors: true }, "city-asphalt", "own", (shader) => {
+    shader.uniforms.uDetail = { value: surface.map };
+    shader.uniforms.uDetailNormal = { value: surface.normalMap };
+    shader.uniforms.uTile = { value: surface.tile };
+    shader.uniforms.uContrast = { value: surface.contrast };
+    shader.uniforms.uMottle = { value: surface.mottle };
+    shader.uniforms.uHue = { value: new THREE.Vector3(...surface.hue) };
+    shader.uniforms.uBump = { value: 0.8 };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute float aAcross;\nvarying float vAcross;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvAcross = aAcross;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+varying float vAcross;
+/** Tyres polish two tracks into every lane, darker where the traffic runs; a car park has no lanes. */
+float laneWear() {
+  float blur = fwidth(vAcross);
+  float across = abs(vAcross);
+  if (across > ${(CARRIAGEWAY / 2).toFixed(2)}) return 0.0;
+  float lane = across - ${(STREET.median / 2).toFixed(2)};
+  if (lane < 0.0) return 0.0;
+  float inLane = abs(mod(lane, ${LANE.toFixed(2)}) - ${(LANE / 2).toFixed(2)});
+  float track = exp(-pow((inLane - 0.8) / 0.3, 2.0));
+  return track * (1.0 - smoothstep(0.25, 0.8, blur));
+}
+${DETAIL_GLSL}`,
+      )
+      .replace("#include <color_fragment>", "#include <color_fragment>\nvec3 roadN = normalize(vCityNormal); diffuseColor.rgb *= cityDetail(roadN) * (1.0 - 0.14 * laneWear()) * cityLight(cityBumped(roadN));");
   });
 }
 
@@ -290,6 +397,31 @@ function treeShadowMaterial(map: THREE.Texture): THREE.MeshBasicMaterial {
   });
 }
 
+/** The soft shadow a vehicle casts straight down on the road, mostly the gloom under its own body, however the sun stands. */
+function contactShadowMaterial(map: THREE.Texture): THREE.MeshBasicMaterial {
+  return faded({ color: "#000000", map, transparent: true, depthWrite: false, ...KEEP_ALPHA }, "city-contact-shadow", "shadow");
+}
+
+interface Shade {
+  disc: THREE.BufferGeometry;
+  material: THREE.MeshBasicMaterial;
+}
+
+/** The shared quad and material for the vehicles' shadows, or null at Low quality, which draws no shadows. */
+function useShade(on: boolean): Shade | null {
+  const shade = useMemo<Shade | null>(() => (on ? { disc: flat(1, 1), material: contactShadowMaterial(shadowTexture()) } : null), [on]);
+  useEffect(
+    () => () => {
+      if (!shade) return;
+      shade.material.map?.dispose();
+      shade.disc.dispose();
+      shade.material.dispose();
+    },
+    [shade],
+  );
+  return shade;
+}
+
 /** What each part of the ground and the roofs is made of, for its photo at HD detail. */
 type Fabric = "pavement" | "lawn" | "gravel" | "asphalt" | "roofTiles" | "plain";
 const FABRICS: Fabric[] = ["pavement", "lawn", "gravel", "asphalt", "roofTiles", "plain"];
@@ -302,7 +434,7 @@ function useLooks(): Looks {
   const looks = useMemo(() => {
     const plain: Looks = { pavement: M.shaded, lawn: M.shaded, gravel: M.shaded, asphalt: M.shaded, roofTiles: M.shaded, plain: M.shaded };
     if (!surfaces) return plain;
-    return { ...plain, pavement: texturedMaterial(surfaces.pavement), lawn: texturedMaterial(surfaces.lawn), gravel: texturedMaterial(surfaces.gravel), asphalt: texturedMaterial(surfaces.asphalt), roofTiles: texturedMaterial(surfaces.roofTiles) };
+    return { ...plain, pavement: texturedMaterial(surfaces.pavement), lawn: texturedMaterial(surfaces.lawn), gravel: texturedMaterial(surfaces.gravel), asphalt: asphaltMaterial(surfaces.asphalt), roofTiles: texturedMaterial(surfaces.roofTiles) };
   }, [surfaces]);
   useEffect(
     () => () => {
@@ -334,6 +466,10 @@ const noParts = (): Record<Fabric, THREE.BufferGeometry[]> => Object.fromEntries
  */
 const VEHICLE_GLSL = `
 varying float vFinish;
+varying float vWheel;
+varying vec3 vLocal;
+varying vec3 vLocalN;
+uniform vec4 uSeams;
 
 vec3 vehicle(vec3 base, vec3 n) {
   vec3 V = lineOfSight();
@@ -341,24 +477,43 @@ vec3 vehicle(vec3 base, vec3 n) {
   vec3 env = r.y > 0.0 ? skyAt(r.y) : mix(vec3(0.12, 0.13, 0.11) * cityLight(vec3(0.0, 1.0, 0.0)), skyAt(0.0), smoothstep(-0.35, 0.0, r.y));
   float fresnel = pow(1.0 - max(-dot(V, n), 0.0), 5.0);
   vec3 shine = uKeyLight * pow(max(dot(n, normalize(uKeyDir - V)), 0.0), 90.0) * (1.0 - uDark);
-  vec3 lit = base * cityLight(n);
-  vec3 paint = lit + env * mix(0.05, 1.0, fresnel) + shine * 0.9;
+  // Little light reaches the sills and the underside, and the doors part along each side of the paintwork.
+  float ao = mix(0.55, 1.0, smoothstep(0.0, 0.6, vLocal.y));
+  float w = max(0.02, fwidth(vLocal.z) * 1.5);
+  float seam = 0.0;
+  for (int i = 0; i < 4; i++) seam = max(seam, 1.0 - smoothstep(w * 0.5, w, abs(vLocal.z - uSeams[i])));
+  seam *= step(0.45, abs(vLocalN.x)) * step(0.5, vFinish) * step(vFinish, 1.5);
+  vec3 lit = base * cityLight(n) * ao;
+  if (vWheel > 0.5) {
+    // A wheel from hub to rim: a metal cap round a dark centre, then the rubber of the sidewall, a shade lighter than the tread.
+    float d = vWheel - 1.0;
+    float cap = 1.0 - smoothstep(0.58, 0.62, d);
+    vec3 metal = vec3(0.6, 0.62, 0.66) * mix(0.35, 1.0, smoothstep(0.08, 0.14, d));
+    vec3 capLit = metal * cityLight(n) * ao + env * mix(0.1, 1.0, fresnel) * 0.6 + shine * 0.5;
+    vec3 rubber = lit * mix(1.0, 1.35, smoothstep(0.66, 0.74, d) * (1.0 - smoothstep(0.9, 1.0, d)));
+    return mix(rubber, capLit, cap);
+  }
+  vec3 paint = (lit + env * mix(0.05, 1.0, fresnel) + shine * 0.9) * (1.0 - 0.6 * seam);
   vec3 glass = lit * 0.6 + env * mix(0.18, 1.0, fresnel) + shine * 1.2;
   return vFinish < 0.5 ? lit : vFinish < 1.5 ? paint : glass;
 }
 `;
 
-function vehicleMaterial(): THREE.MeshBasicMaterial {
+function vehicleMaterial(seams: number[]): THREE.MeshBasicMaterial {
   return faded({ vertexColors: true }, "city-vehicle", "own", (shader) => {
-    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nattribute float aFinish;\nvarying float vFinish;").replace(
-      "#include <color_vertex>",
-      `vColor = vec4(1.0);
+    shader.uniforms.uSeams = { value: new THREE.Vector4(...([0, 1, 2, 3].map((i) => seams[i] ?? 1e3) as [number, number, number, number])) };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute float aFinish;\nattribute float aWheel;\nvarying float vFinish;\nvarying float vWheel;\nvarying vec3 vLocal;\nvarying vec3 vLocalN;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWheel = aWheel;\nvLocal = transformed;\nvLocalN = normal;")
+      .replace(
+        "#include <color_vertex>",
+        `vColor = vec4(1.0);
       vColor.rgb *= color;
       #ifdef USE_INSTANCING_COLOR
         vColor.rgb *= mix(vec3(1.0), instanceColor.rgb, 1.0 - step(0.5, abs(aFinish - 1.0)));
       #endif
       vFinish = aFinish;`,
-    );
+      );
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>\n${VEHICLE_GLSL}`)
       .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = vehicle(diffuseColor.rgb, normalize(vCityNormal));");
@@ -381,9 +536,13 @@ const M = {
   glow: faded({ vertexColors: true, toneMapped: false }, "city-glow", "glow"),
   white: faded({ color: "#e3e1da" }, "city-lit", "lit"),
   yellow: faded({ color: "#e0b53a" }, "city-lit", "lit"),
-  vehicle: vehicleMaterial(),
   lamps: lampMaterial(),
 };
+
+const KINDS: VehicleKind[] = ["sedan", "hatch", "suv", "taxi", "robotaxi", "van", "truck", "bus"];
+
+/** Each kind's own vehicle material, since its doors part at different places along its sides. */
+const VEHICLE_LOOKS = Object.fromEntries(KINDS.map((k) => [k, vehicleMaterial(vehicleSeams(k))])) as Record<VehicleKind, THREE.MeshBasicMaterial>;
 
 /* ------------------------------------------------------------------ */
 /* Facades                                                             */
@@ -828,6 +987,15 @@ const GROUND = { pavement: "#a9a59c", lawn: "#6c9150", park: "#5f8a48", path: "#
 
 const rectFlat = ([x0, z0, x1, z1]: Rect, y: number) => flat(x1 - x0, z1 - z0).translate((x0 + x1) / 2, y, (z0 + z1) / 2);
 
+/** How far each vertex of a stretch of road lies from its centre line, for the tyre tracks; a car park has no lanes. */
+function acrossRoad(g: THREE.BufferGeometry, r: Road | null): THREE.BufferGeometry {
+  const p = g.attributes.position;
+  const out = new Float32Array(p.count);
+  for (let i = 0; i < p.count; i++) out[i] = r ? (r.axis === "x" ? p.getZ(i) - r.at : p.getX(i) - r.at) : 1e3;
+  g.setAttribute("aAcross", new THREE.BufferAttribute(out, 1));
+  return g;
+}
+
 function Ground({ looks }: { looks: Looks }) {
   const parts = useMemo(() => {
     const out = noParts();
@@ -838,10 +1006,10 @@ function Ground({ looks }: { looks: Looks }) {
     for (const b of blocks()) add("lawn", rectFlat(b.rect, LAYER.block), GROUND.lawn);
     add("lawn", rectFlat(parkBlock().rect, LAYER.tarmac), GROUND.park);
     for (const p of parkPaths()) add("gravel", rectFlat(p, LAYER.paint), GROUND.path);
-    for (const cp of town().carParks) if (fadeAt((cp.rect[0] + cp.rect[2]) / 2, (cp.rect[1] + cp.rect[3]) / 2) < 1) add("asphalt", rectFlat(cp.rect, LAYER.tarmac), GROUND.lot);
+    for (const cp of town().carParks) if (fadeAt((cp.rect[0] + cp.rect[2]) / 2, (cp.rect[1] + cp.rect[3]) / 2) < 1) out.asphalt.push(acrossRoad(tint(rectFlat(cp.rect, LAYER.tarmac), GROUND.lot), null));
     // Carriageways, the kerbs either side of them, and the planted medians down the middle.
     for (const r of ROADS) {
-      add("asphalt", rectFlat(roadRect(r), LAYER.tarmac), GROUND.road);
+      out.asphalt.push(acrossRoad(tint(rectFlat(roadRect(r), LAYER.tarmac), GROUND.road), r));
       for (const [a, b] of between(r)) {
         if (Math.min(fadeAt(...roadPoint(r, a)), fadeAt(...roadPoint(r, b))) >= 1) continue;
         for (const side of [-1, 1]) add("plain", onRoad(r, (a + b) / 2, side * (CARRIAGEWAY / 2 + 0.15), b - a, 0.3, LAYER.paint), GROUND.kerb);
@@ -856,8 +1024,8 @@ function Ground({ looks }: { looks: Looks }) {
   return <Surfaces parts={parts} looks={looks} />;
 }
 
-/** The cars in the car parks, standing in their bays. */
-function Parked({ lite }: { lite: boolean }) {
+/** The cars in the car parks, standing in their bays, each on its own shadow at HD. */
+function Parked({ lite, shade }: { lite: boolean; shade: Shade | null }) {
   const fleets = useMemo(() => {
     const all = parkedCars().filter((c) => fadeAt(c.x, c.z) < 1);
     return KINDS.map((kind) => {
@@ -866,10 +1034,21 @@ function Parked({ lite }: { lite: boolean }) {
     }).filter((f) => f.matrices.length > 0);
   }, []);
   const geo = useMemo(() => new Map(KINDS.map((k) => [k, vehicleBody(k, lite)])), [lite]);
+  const shades = useMemo(
+    () =>
+      parkedCars()
+        .filter((c) => fadeAt(c.x, c.z) < 1)
+        .map((c) => {
+          const { length, width } = vehicleSize(c.kind);
+          return compose(c.x, LAYER.shade, c.z, c.rot, [width * 1.3, 1, length * 1.12]);
+        }),
+    [],
+  );
   return (
     <group>
+      {shade && <Instances geometry={shade.disc} material={shade.material} matrices={shades} />}
       {fleets.map(({ kind, matrices, colours }) => (
-        <Instances key={kind} geometry={geo.get(kind) as THREE.BufferGeometry} material={lite ? M.shaded : M.vehicle} matrices={matrices} colours={colours} />
+        <Instances key={kind} geometry={geo.get(kind) as THREE.BufferGeometry} material={lite ? M.shaded : VEHICLE_LOOKS[kind]} matrices={matrices} colours={colours} />
       ))}
     </group>
   );
@@ -1387,7 +1566,7 @@ function Trees({ basic, lite }: { basic: boolean; lite: boolean }) {
     [basic],
   );
   const looks = useMemo(
-    () => ({ bark: foliageMaterial(null, THREE.DoubleSide), fronds: foliageMaterial(surfaces?.lawn ?? null, THREE.DoubleSide), clumps: foliageMaterial(surfaces?.lawn ?? null, THREE.FrontSide) }),
+    () => ({ bark: barkMaterial(surfaces?.bark ?? null), fronds: frondMaterial(surfaces?.leaves ?? null), clumps: foliageMaterial(surfaces?.leaves ?? null, THREE.FrontSide) }),
     [surfaces],
   );
   const shade = useMemo(() => {
@@ -1517,10 +1696,11 @@ const UP = new THREE.Vector3(0, 1, 0);
 /** Which way a vehicle on a lane faces; at 0 it faces -z. */
 const heading = (axis: "x" | "z", dir: 1 | -1) => (axis === "x" ? -dir * (Math.PI / 2) : dir === 1 ? Math.PI : 0);
 
-/** One kind of vehicle on the move: bodies and their lights. */
-function Fleet({ vehicles, body, lights, material }: { vehicles: Vehicle[]; body: THREE.BufferGeometry; lights: THREE.BufferGeometry; material: THREE.Material }) {
+/** One kind of vehicle on the move: bodies and their lights, and at HD a shadow keeping pace under each. */
+function Fleet({ vehicles, body, lights, material, shade, size }: { vehicles: Vehicle[]; body: THREE.BufferGeometry; lights: THREE.BufferGeometry; material: THREE.Material; shade: Shade | null; size: { length: number; width: number } }) {
   const bodies = useRef<THREE.InstancedMesh>(null);
   const lamps = useRef<THREE.InstancedMesh>(null);
+  const shadows = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
     const mesh = bodies.current;
     if (!mesh) return;
@@ -1533,6 +1713,7 @@ function Fleet({ vehicles, body, lights, material }: { vehicles: Vehicle[]; body
     const b = bodies.current;
     const l = lamps.current;
     if (!b || !l) return;
+    const s = shadows.current;
     for (let k = 0; k < vehicles.length; k++) {
       const lane = LANES[vehicles[k].lane];
       const at = vehicleAt(lane, vehicles[k].slot, clock.elapsedTime);
@@ -1541,9 +1722,14 @@ function Fleet({ vehicles, body, lights, material }: { vehicles: Vehicle[]; body
       turned.compose(place, spin, unit);
       b.setMatrixAt(k, turned);
       l.setMatrixAt(k, turned);
+      if (s) {
+        turned.compose(place.set(at.x, LAYER.shade, at.z), spin, stretch.set(size.width * 1.3, 1, size.length * 1.12));
+        s.setMatrixAt(k, turned);
+      }
     }
     b.instanceMatrix.needsUpdate = true;
     l.instanceMatrix.needsUpdate = true;
+    if (s) s.instanceMatrix.needsUpdate = true;
   });
   useEffect(
     () => () => {
@@ -1557,14 +1743,13 @@ function Fleet({ vehicles, body, lights, material }: { vehicles: Vehicle[]; body
     <group>
       <instancedMesh key={`b${vehicles.length}`} ref={bodies} args={[body, material, vehicles.length]} frustumCulled={false} />
       <instancedMesh key={`l${vehicles.length}`} ref={lamps} args={[lights, M.lamps, vehicles.length]} frustumCulled={false} />
+      {shade && <instancedMesh key={`s${vehicles.length}`} ref={shadows} args={[shade.disc, shade.material, vehicles.length]} frustumCulled={false} />}
     </group>
   );
 }
 
-const KINDS: VehicleKind[] = ["sedan", "hatch", "suv", "taxi", "robotaxi", "van", "truck", "bus"];
-
 /** Cars, taxis, vans, trucks and buses on every road. `share` thins the traffic for a computer without a GPU. */
-function Traffic({ share, lite }: { share: number; lite: boolean }) {
+function Traffic({ share, lite, shade }: { share: number; lite: boolean; shade: Shade | null }) {
   const fleets = useMemo(() => {
     const all = traffic().filter((_, i) => (i * share) % 1 < share);
     return KINDS.map((kind) => ({ kind, vehicles: all.filter((v) => v.kind === kind) }));
@@ -1574,7 +1759,7 @@ function Traffic({ share, lite }: { share: number; lite: boolean }) {
     <group>
       {fleets.map(({ kind, vehicles }) => {
         const g = geo.get(kind) as { body: THREE.BufferGeometry; lights: THREE.BufferGeometry };
-        return <Fleet key={kind} vehicles={vehicles} body={g.body} lights={g.lights} material={lite ? M.shaded : M.vehicle} />;
+        return <Fleet key={kind} vehicles={vehicles} body={g.body} lights={g.lights} material={lite ? M.shaded : VEHICLE_LOOKS[kind]} shade={shade} size={vehicleSize(kind)} />;
       })}
     </group>
   );
@@ -1701,20 +1886,21 @@ export function Exterior() {
   // HD keeps the detailed silhouettes at every zoom; Low alone uses the lighter models.
   const lite = basic;
   const looks = useLooks();
+  const shade = useShade(!basic);
   return (
     <group>
       <Ground looks={looks} />
       <Markings />
       <Yards />
       <Billboards />
-      <Parked lite={lite} />
+      <Parked lite={lite} shade={shade} />
       <Buildings lite={basic} looks={looks} />
       {!basic && <BuildingShadows />}
       <Tower looks={looks} lite={basic} />
       <Trees basic={basic} lite={lite} />
       <Park basic={basic} />
       <Lamps pools={!basic} />
-      <Traffic share={basic ? 0.4 : 1} lite={lite} />
+      <Traffic share={basic ? 0.4 : 1} lite={lite} shade={shade} />
       <Crowd share={basic ? 0.4 : 1} lite={lite} />
     </group>
   );

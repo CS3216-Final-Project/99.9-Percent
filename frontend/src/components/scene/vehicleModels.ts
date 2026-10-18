@@ -7,8 +7,10 @@ import type { VehicleKind } from "./city";
  * for it (vehicleSize in city.ts), and comes as two meshes: its body, and its lamps, which glow. A body is lofted
  * through cross-sections along its length, so its bonnet, cabin and boot are rounded, the cabin narrows toward the
  * roof, and the sides rise in arches over the wheels. Every vertex says what it is finished in (aFinish): paint, pale
- * for each vehicle's own colour to tint; glass; or trim and tyres, which keep their own colours. A lite vehicle, for
- * drawing without a graphics card, has a few plain cross-sections and no wheels.
+ * for each vehicle's own colour to tint; glass; or trim and tyres, which keep their own colours. A wheel's vertices
+ * also say where on the wheel they lie (aWheel): 0 anywhere else, 1 at the middle of a hub and 2 at the rim, for the
+ * HD material's cap and sidewall. A lite vehicle, for drawing without a graphics card, has a few plain cross-sections
+ * and no wheels.
  */
 
 /** What a surface is finished in, for the city's vehicle material (see exterior.tsx). */
@@ -19,9 +21,8 @@ const PAINT = "#ffffff";
 const GLASS = "#1d242d";
 const TRIM = "#1c1d22";
 const TYRE = "#17171b";
-const HUB = "#a3a6ad";
 
-/** Give a part one colour and finish everywhere, with no texture coordinates, so all parts merge. */
+/** Give a part one colour and finish everywhere, off any wheel, with no texture coordinates, so all parts merge. */
 function part(g: THREE.BufferGeometry, colour: string, finish: Finish): THREE.BufferGeometry {
   g.deleteAttribute("uv");
   const n = g.attributes.position.count;
@@ -30,6 +31,7 @@ function part(g: THREE.BufferGeometry, colour: string, finish: Finish): THREE.Bu
   for (let i = 0; i < n; i++) cols.set([c.r, c.g, c.b], i * 3);
   g.setAttribute("color", new THREE.BufferAttribute(cols, 3));
   g.setAttribute("aFinish", new THREE.BufferAttribute(new Float32Array(n).fill(finish), 1));
+  g.setAttribute("aWheel", new THREE.BufferAttribute(new Float32Array(n), 1));
   return g;
 }
 
@@ -79,6 +81,8 @@ interface Shell {
   /** Where the windscreen and rear window are, glass right across, and where the side windows run. */
   screens: [number, number][];
   windows: [number, number][];
+  /** Where the doors part along each side, front to back; derived from the side windows when not given. */
+  seams?: number[];
   /** Wheels the sides arch over. */
   arches: Wheel[];
   /** The colour of the paint, before the vehicle's own colour tints it. */
@@ -199,6 +203,7 @@ function loft(s: Shell, lite: boolean): THREE.BufferGeometry {
   const nor: number[] = [];
   const col: number[] = [];
   const fin: number[] = [];
+  const whl: number[] = [];
   const index: number[] = [];
   const made = new Map<string, number>();
   const add = (p: [number, number, number], normal: [number, number, number], finish: Finish) => {
@@ -207,6 +212,7 @@ function loft(s: Shell, lite: boolean): THREE.BufferGeometry {
     const c = colours[finish];
     col.push(c.r, c.g, c.b);
     fin.push(finish);
+    whl.push(0);
     return pos.length / 3 - 1;
   };
   const vertex = (v: number, finish: Finish) => {
@@ -242,6 +248,7 @@ function loft(s: Shell, lite: boolean): THREE.BufferGeometry {
   g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
   g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
   g.setAttribute("aFinish", new THREE.Float32BufferAttribute(fin, 1));
+  g.setAttribute("aWheel", new THREE.Float32BufferAttribute(whl, 1));
   g.setIndex(index);
   return g;
 }
@@ -251,17 +258,21 @@ function loft(s: Shell, lite: boolean): THREE.BufferGeometry {
 /* ------------------------------------------------------------------ */
 
 /**
- * A tyre on its side at `x`, open on the inside where the body hides it, and its outer face pale at the hub and dark
- * toward the rim. It is turned so that a vertex rests on the ground.
+ * A tyre on its side at `x`, open on the inside where the body hides it, and its outer face marked from the middle
+ * of its hub out to its rim (aWheel), for the HD material's metal cap and sidewall. It is turned so that a vertex
+ * rests on the ground.
  */
 function tyre(x: number, { z, r }: Wheel, width: number, segments: number): THREE.BufferGeometry[] {
   const out = Math.sign(x);
   // A vertex at the bottom of the circle rests on the ground, whatever the segment count.
   const phase = -Math.PI / 2;
   const tread = part(new THREE.CylinderGeometry(r, r, width, segments, 1, true, phase).rotateZ(Math.PI / 2).translate(x, r, z), TYRE, FINISH.trim);
+  (tread.attributes.aWheel as THREE.BufferAttribute).array.fill(2);
   const face = part(new THREE.CircleGeometry(r, segments, phase).rotateY((out * Math.PI) / 2).translate(x + (out * width) / 2, r, z), TYRE, FINISH.trim);
-  const hub = new THREE.Color(HUB);
-  face.attributes.color.setXYZ(0, hub.r, hub.g, hub.b);
+  // A circle's first vertex is its middle — the hub's cap — and the rest lie on the rim.
+  const radial = face.attributes.aWheel as THREE.BufferAttribute;
+  radial.array.fill(2);
+  radial.setX(0, 1);
   return [tread, face];
 }
 
@@ -372,10 +383,19 @@ const BUS: Shell = {
   inset: [[-4.45, 0.08], [4.45, 0.08]],
   screens: [],
   windows: [[-4.0, 4.1]],
+  // A bus's doors are not modelled.
+  seams: [],
   arches: [{ z: -2.95, r: 0.47 }, { z: 2.8, r: 0.47 }],
 };
 
 const CARS: Partial<Record<VehicleKind, Shell>> = { sedan: SALOON, taxi: SALOON, robotaxi: SALOON, hatch: HATCH, suv: SUV, van: VAN };
+
+/** Where the doors part along each side, front to back: either edge of the side windows, and between two doors on a car. */
+export function vehicleSeams(kind: VehicleKind): number[] {
+  const s = kind === "truck" ? CAB : kind === "bus" ? BUS : (CARS[kind] as Shell);
+  if (s.seams) return s.seams;
+  return s.windows.flatMap(([a, b]) => (b - a > 0.8 ? [a - 0.12, (a + b) / 2 - 0.05, b + 0.12] : [a - 0.12, b + 0.12])).sort((x, y) => x - y);
+}
 
 /** Each kind of vehicle facing -z, its wheels on the ground. A lite one leaves the wheels to the imagination. */
 export function vehicleBody(kind: VehicleKind, lite = false): THREE.BufferGeometry {

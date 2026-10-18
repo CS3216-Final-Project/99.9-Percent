@@ -1,7 +1,7 @@
 import type { BufferGeometry } from 'three';
 import { describe, expect, it } from 'vitest';
 import { isLong, vehicleSize, type VehicleKind } from './city';
-import { FINISH, vehicleBody, vehicleLights } from './vehicleModels';
+import { FINISH, vehicleBody, vehicleLights, vehicleSeams } from './vehicleModels';
 
 const KINDS: VehicleKind[] = ['sedan', 'hatch', 'suv', 'taxi', 'robotaxi', 'van', 'truck', 'bus'];
 
@@ -49,7 +49,7 @@ describe('vehicle models', () => {
     for (const kind of KINDS) {
       for (const g of [vehicleBody(kind), vehicleBody(kind, true), vehicleLights(kind)]) {
         expect(g.index, kind).not.toBeNull();
-        for (const name of ['normal', 'color', 'aFinish']) expect(g.attributes[name].count, `${kind} ${name}`).toBe(g.attributes.position.count);
+        for (const name of ['normal', 'color', 'aFinish', 'aWheel']) expect(g.attributes[name].count, `${kind} ${name}`).toBe(g.attributes.position.count);
       }
     }
   });
@@ -74,6 +74,36 @@ describe('vehicle models', () => {
     // Beside the driver, above the doors: glass at the side, and none along the doors below it.
     expect(glass.some((i) => p.getZ(i) > -0.06 && p.getZ(i) < 0.86 && Math.abs(p.getX(i)) > 0.6 && p.getY(i) > 1.0)).toBe(true);
     expect(glass.some((i) => p.getY(i) < 0.85)).toBe(false);
+  });
+
+  it('marks only wheel vertices with their place from hub to rim, and only when not lite', () => {
+    for (const kind of KINDS) {
+      const full = vehicleBody(kind);
+      const w = full.attributes.aWheel;
+      const f = full.attributes.aFinish;
+      let wheels = 0;
+      for (let i = 0; i < w.count; i++) {
+        const v = w.getX(i);
+        expect(v === 0 || (v >= 1 && v <= 2), `${kind} aWheel ${v}`).toBe(true);
+        if (v > 0) {
+          expect(f.getX(i), `${kind} wheel finish`).toBe(FINISH.trim);
+          wheels++;
+        }
+      }
+      expect(wheels, `${kind} full wheels`).toBeGreaterThan(0);
+      const lite = vehicleBody(kind, true).attributes.aWheel;
+      expect(Math.max(...(lite.array as Float32Array)), `${kind} lite wheels`).toBe(0);
+    }
+  });
+
+  it('parts the doors along each side where the windows let it, inside the kind\'s own length', () => {
+    const expected: Record<VehicleKind, number> = { sedan: 3, taxi: 3, robotaxi: 3, hatch: 3, suv: 3, van: 2, truck: 2, bus: 0 };
+    for (const kind of KINDS) {
+      const seams = vehicleSeams(kind);
+      expect(seams.length, kind).toBe(expected[kind]);
+      expect([...seams].sort((a, b) => a - b), kind).toEqual(seams);
+      for (const z of seams) expect(Math.abs(z), `${kind} seam ${z}`).toBeLessThan(vehicleSize(kind).length / 2);
+    }
   });
 
   it('cost little to draw a thousand times over, and less still when lite', () => {
