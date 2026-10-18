@@ -131,7 +131,9 @@ export function HomeScreen() {
   };
   const exportCampaign = () => {
     const s = useGame.getState();
-    if (s.mode === "campaign" && s.hasRun) { download("campaign.json", exportGame(s.game, s.remainderMs, s.measurement)); return; }
+    // During a Chapter 0 replay the loaded game is practice; the company the restart replaces is set aside beside it.
+    const company = s.tutorialCompany ?? s;
+    if (s.mode === "campaign" && s.hasRun) { download("campaign.json", exportGame(company.game, company.remainderMs, company.measurement)); return; }
     const raw = rawSave("campaign");
     if (raw !== null) download("stored-campaign.json", raw);
     else s.notify("There is no stored Guided Mode company to export.", "error");

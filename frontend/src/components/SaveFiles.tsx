@@ -6,7 +6,9 @@ import { Icon } from "./icons";
 
 /** Shared file controls; importing validates first and asks before replacing a run. */
 export function SaveFiles() {
-  const { game, mode, remainderMs, measurement, importSave, resumeLegacySave, notify } = useGame();
+  const { mode, importSave, resumeLegacySave, notify } = useGame();
+  // A Chapter 0 replay plays a practice company; the player's own company is the one worth exporting.
+  const { game, remainderMs, measurement } = useGame((s) => s.tutorialCompany ?? s);
   const challengeUnlocked = useGame((s) => s.mode === "classic" || s.meta.challengeUnlocked || s.game.campaign?.reliabilityStage?.acknowledged === true);
   const [pending, setPending] = useState<{ name: string; text: string } | null>(null);
   const [confirmLegacy, setConfirmLegacy] = useState(false);

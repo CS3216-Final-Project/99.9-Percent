@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { advanceTurn, newGame, newLegacyGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
@@ -304,6 +304,19 @@ describe("restarting Guided Mode", () => {
       const exported = decodeSave(await files[0].blob.text());
       expect(exported.status === "ok" && exported.game.campaign).toMatchObject({ runId, step: 3 });
       expect(useGame.getState().started).toBe(false);
+    });
+
+    it("exports and replaces the player's company, not a Chapter 0 practice company it was left in", async () => {
+      const { runId, guided } = leftCompany("campaign");
+      act(() => useGame.getState().startTour("campaign", "home"));
+      expect(useGame.getState().tutorialCompany!.game.campaign!.runId).toBe(runId);
+      press(guided, "New company");
+      press(guided, "Export company");
+      const exported = decodeSave(await files[0].blob.text());
+      expect(exported.status === "ok" && exported.game.campaign).toMatchObject({ runId, step: 3 });
+      press(guided, ARMED);
+      expect(useGame.getState().tutorialCompany).toBeNull();
+      expect(readAnalytics().find((e) => e.name === "run_reset")).toMatchObject({ payload: { previousRunId: runId } });
     });
 
     it("says so when the stored company is gone by the time Export is pressed", () => {
