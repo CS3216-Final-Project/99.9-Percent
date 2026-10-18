@@ -20,6 +20,7 @@ it("exposes actual and detected health and surviving capacity",()=>{
 });
 it("uses effective routing for labels and selects an inspected application",()=>{
  show(tick(act(preparedReliability(),{type:"arm_reliability"}),9));
+ fireEvent.click(screen.getByRole("button",{name:"App Server",exact:true}));
  const instances=screen.getByRole("region",{name:"Application instances"});
  expect(within(instances).getByRole("button",{name:/App 2: Installed - not receiving traffic/})).toBeTruthy();
  fireEvent.click(screen.getByRole("button",{name:"Inspect App 2 health · free"}));

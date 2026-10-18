@@ -55,7 +55,8 @@ test("sounds the company starting, tutorial completion and the alarm, and stays 
   await mute.click();
   await expect.poll(voices).toBeGreaterThan(alarm);
   const unmuted = await voices();
-  await inspect.click();
+  // Inspect a different machine; clicking selected Monitoring again only dismisses its readings.
+  await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Database", exact: true }).click();
   await expect.poll(voices).toBeGreaterThan(unmuted);
   expect(problems).toEqual([]);
 });
