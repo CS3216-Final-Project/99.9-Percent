@@ -18,12 +18,41 @@ function renderCompany(game?: GameState) {
 }
 function perform(game:GameState, action:Parameters<typeof applyAction>[1]) { const r=applyAction(game,action); if(!r.ok) throw Error(r.message); return r.state; }
 
-it("makes Run/Pause primary and removes manual advancement", () => {
+it("makes Run/Pause primary, with secondary manual steps", () => {
   start(); renderCompany(); const run=screen.getByRole("button",{name:"Run"});
   expect(run.className).toContain("btn-primary");
   expect(screen.queryByRole("button",{name:/Advance (?:game second|step)/,hidden:true})).toBeNull();
   fireEvent.click(run); expect(useGame.getState().running).toBe(true);
   fireEvent.click(screen.getByRole("button",{name:"Pause"})); expect(useGame.getState().running).toBe(false);
+  const steps=within(screen.getByRole("group",{name:"Step time"}));
+  // Steps never compete with Run: they are not primary, and a step pauses a running clock.
+  expect(steps.getByRole("button",{name:"Step 1 game second"}).className).not.toContain("btn-primary");
+  fireEvent.click(run); fireEvent.click(steps.getByRole("button",{name:"Step 1 game second"}));
+  expect(useGame.getState().running).toBe(false); expect(screen.getByTestId("physical-step").textContent).toBe("1");
+  fireEvent.click(steps.getByRole("button",{name:"Step 5 game seconds"})); expect(screen.getByTestId("physical-step").textContent).toBe("6");
+  // The opening incident is live: stepping keeps working there.
+  fireEvent.click(steps.getByRole("button",{name:"Step 1 game second"})); expect(screen.getByTestId("physical-step").textContent).toBe("7");
+});
+it("disables manual steps while the walkthrough holds the clock", () => {
+  useGame.getState().boot(); useGame.getState().play(); renderCompany();
+  expect((screen.getByRole("button",{name:"Step 1 game second"}) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button",{name:"Step 5 game seconds"}) as HTMLButtonElement).disabled).toBe(true);
+});
+it("shows inspected evidence as labelled rows and a load bar", () => {
+  renderCompany(advanceSteps(newGame(1,"evidence"),6).state);
+  fireEvent.click(screen.getByRole("button",{name:/^Database$/}));
+  const db=screen.getByRole("region",{name:"Database readings"});
+  expect(within(db).getByRole("progressbar",{name:"Database load: 800 of 600 operations/s"})).toBeTruthy();
+  expect(within(db).getByText("Backlog").closest(".evidence-row")!.getAttribute("data-tone")).toBe("warn");
+  fireEvent.click(screen.getByRole("button",{name:/^Network$/}));
+  const net=screen.getByRole("region",{name:"Network readings"});
+  for (const [label,value] of [["Incoming","800 requests/s"],["Admitted","800 requests/s"],["Rejected","0 requests/s"]]) expect(within(net).getByText(label).closest(".evidence-row")!.querySelector("dd")!.textContent).toBe(value);
+});
+it("quotes a purchase as toned tiles", () => {
+  start(); renderCompany(); fireEvent.click(screen.getByRole("button",{name:/Add server/}));
+  const confirm=screen.getByRole("region",{name:"Confirm Add server"});
+  const tone=(label:string)=>within(confirm).getByText(label,{exact:true}).closest(".purchase-tile")!.getAttribute("data-tone");
+  expect([tone("Buy now"),tone("Money left"),tone("Extra running cost"),tone("Ready in")]).toEqual(["cost","ok","warn","info"]);
 });
 it("system evidence records a real free inspection without advancing the clock", () => {
   start(); renderCompany();
@@ -84,7 +113,7 @@ it("Scale Up describes the selected server rather than implying another installe
   render(<CampaignAction label="Scale up App 1" price={2000} note="3 game seconds" onClick={()=>{}}/>);
   fireEvent.click(screen.getByRole("button",{name:/Scale up App 1/}));
   expect(screen.queryByText(/Makes this App Server larger/)).toBeNull();
-  expect(screen.getByText("Equipment running costs").closest(".row")!.textContent).toContain("$1,100 / 60s (+$400)");
+  expect(screen.getByText("Equipment running costs").closest(".purchase-tile")!.textContent).toContain("$1,100 / 60s (+$400)");
 });
 it("postmortem keeps all actual causes and observations reachable while leading with a compact summary", () => {
   let game=advanceSteps(newGame(1,"report-info"),6).state;

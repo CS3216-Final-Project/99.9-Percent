@@ -8,7 +8,8 @@ import {
   Shuffle, Siren, Skull, SlidersHorizontal, Smile, Gauge, ArrowRightLeft,
   FlaskConical, Wrench, TrendingUp, Trophy, RotateCcw, Upload, UserRound,
   UserRoundPlus, Users, Volume2, VolumeX, TriangleAlert, Zap, Layers, Compass,
-  Footprints, Camera, type LucideIcon,
+  Footprints, Camera, Funnel, Ban, StepForward, FastForward, CreditCard,
+  PiggyBank, Repeat, ArrowDownToLine, type LucideIcon,
 } from "lucide-react";
 
 /** Stable concept names shared by the HUD, room, panels and reports. */
@@ -31,6 +32,8 @@ const ICONS = {
   info: Info, flag: Flag, party: PartyPopper, robot: Bot, user: UserRound,
   cloud: Cloud, mail: Mail, login: LogIn, logout: LogOut, eye: Eye, eyeOff: EyeOff,
   floor: Layers, explore: Compass, walk: Footprints, camera: Camera,
+  limit: Funnel, rejected: Ban, step: StepForward, stepMany: FastForward,
+  cost: CreditCard, cashLeft: PiggyBank, upkeep: Repeat, incoming: ArrowDownToLine,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

@@ -277,6 +277,8 @@ interface Store {
   act: (action: Action) => boolean;
   advance: () => void;
   tick: (dt: number) => void;
+  /** Guided Mode: pause the clock and advance exactly `count` game seconds, stopping early where running would. */
+  stepSeconds: (count: number) => void;
   select: (id: EquipmentId | null) => void;
   hover: (id: EquipmentId | null) => void;
   setAffected: (ids: EquipmentId[]) => void;
@@ -339,6 +341,12 @@ function requiredAcknowledgement(c: Campaign): Action["type"] | null {
   return c.openingMilestone && !c.openingMilestone.acknowledged ? "acknowledge_milestone" : null;
 }
 const awaitingAcknowledgement = (c: Campaign) => requiredAcknowledgement(c) !== null;
+/** Whether Guided Mode's clock may move now, by Run or by a manual step: never behind a guide, a pause-only view or an acknowledgement. */
+export function campaignClockAvailable(s: { game: GameState; started: boolean; tour: Tour | null; view: View }): boolean {
+  const c = s.game.campaign;
+  return !!c && s.started && !walkthroughHoldsClock(s) && !awaitingAcknowledgement(c) && !["menu", "tech", "scorecard"].includes(s.view ?? "")
+    && (s.game.phase === "management" || s.game.phase === "incident");
+}
 /** The run in a stored Campaign save, for naming its backup when that save is not the active game. */
 function storedRunId(raw: string): string {
   try { const runId = (JSON.parse(raw) as { runId?: unknown }).runId; return typeof runId === "string" ? runId : "unreadable"; }
@@ -936,6 +944,15 @@ export const useGame = create<Store>()((set, get) => {
       const due = now - lastIncidentSave > 2000;
       if (due) lastIncidentSave = now;
       commit(next, { save: ended || due });
+    },
+
+    stepSeconds: (count) => {
+      const s = get(), { game } = s;
+      if (!game.campaign || !campaignClockAvailable(s) || !Number.isSafeInteger(count) || count <= 0) return;
+      // A manual step replaces auto-run, and any part-second credit belongs to the run it came from.
+      if (s.running) set({ running: false });
+      set({ remainderMs: 0 });
+      commit(advanceSteps(game, count).state);
     },
 
     select: id => set({...(id ? {panelOpen:true} : {}),selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null,...(id?floorPatch(floorOf(id),"select"):{})}),

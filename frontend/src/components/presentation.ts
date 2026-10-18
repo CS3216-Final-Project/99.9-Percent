@@ -58,6 +58,9 @@ export function utilTone(util: number): "ok" | "warn" | "critical" {
   return util >= 1 ? "critical" : util >= 0.85 ? "warn" : "ok";
 }
 
+/** Demand as a share of capacity; any demand on zero capacity counts as over capacity. */
+export const ratioOf = (demand: number, capacity: number) => capacity > 0 ? demand / capacity : demand > 0 ? Infinity : 0;
+
 export const OUTCOME_LABEL: Record<Postmortem["outcome"], string> = {
   resolved: "Fixed",
   mitigated: "Contained",

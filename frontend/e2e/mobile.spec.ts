@@ -278,7 +278,8 @@ test("investigates and responds through the incident panel on touch", async ({ p
   expect(requirementBox.y + requirementBox.height).toBeLessThanOrEqual(latencyBox.y);
   await expect(panel.getByRole("region", { name: "Incident recovery" })).toContainText("Latency below 500 ms");
   await panel.getByRole("button", { name: "Database", exact: true }).tap();
-  await expect(panel.locator(".campaign-evidence .rows dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
+  await expect(panel.locator(".campaign-evidence .evidence-rows dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
+  await expect(panel.getByRole("progressbar", { name: "Database load: 800 of 600 operations/s" })).toBeVisible();
   expect((await savedGame(page)).campaign!.step).toBe(6);
   for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
     const button = panel.getByRole("button", { name });

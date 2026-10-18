@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalSto
 import { createPortal } from "react-dom";
 import type { Action, EquipmentId } from "@/sim";
 import { previewCampaignAction } from "@/game/campaignFinance";
-import { PurchaseFinance, PurchaseWarning } from "./PurchaseFinance";
+import { PurchaseFinance, PurchaseTile, PurchaseWarning } from "./PurchaseFinance";
 import { useGame } from "@/game/store";
 import { floorOf } from "@/game/floors";
 import { moneyFull as money } from "@/game/format";
@@ -12,7 +12,7 @@ import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { pendingStop } from "@/sim/step";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
-import { Act, Row } from "./ui";
+import { Act } from "./ui";
 import { confirmationRoomArea } from "./roomArea";
 import { confirmingAction, setConfirming, subscribeConfirming } from "./actionConfirmation";
 
@@ -145,11 +145,11 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   }, [highlight, affectedKey, props.label, open]);
   const cancel = () => { if (quoteLesson === 6) return; restoreFocus.current=true; setConfirming(null, true); };
   const costs = <>
-    {preview?.ok ? <PurchaseFinance preview={preview} /> : <dl className="rows">
-      {props.price !== undefined && <Row label="Buy now" value={money(props.price)} />}
-      {props.price !== undefined && <Row label="Money left" value={money((c.cashCents - props.price * 100) / 100)} />}
-      {upkeep !== null && <Row label={isScale || label === "Upgrade database" ? "Equipment running costs" : "Extra running cost"} value={`${money(upkeep / 100)} / ${Q.periodSteps}s${increase !== null && increase !== upkeep ? ` (${increase >= 0 ? "+" : ""}${money(increase / 100)})` : ""}`} />}
-      {props.note && <Row label="Ready in" value={props.note} />}
+    {preview?.ok ? <PurchaseFinance preview={preview} /> : <dl className="purchase-tiles">
+      {props.price !== undefined && <PurchaseTile icon="cost" label="Buy now" value={money(props.price)} tone={props.price > 0 ? "cost" : "ok"} />}
+      {props.price !== undefined && <PurchaseTile icon="cashLeft" label="Money left" value={money((c.cashCents - props.price * 100) / 100)} tone={c.cashCents > props.price * 100 ? "ok" : "warn"} />}
+      {upkeep !== null && <PurchaseTile icon="upkeep" label={isScale || label === "Upgrade database" ? "Equipment running costs" : "Extra running cost"} value={`${money(upkeep / 100)} / ${Q.periodSteps}s${increase !== null && increase !== upkeep ? ` (${increase >= 0 ? "+" : ""}${money(increase / 100)})` : ""}`} tone="warn" />}
+      {props.note && <PurchaseTile icon={props.noteIcon ?? "latency"} label={props.noteIcon === "bulb" ? "Needs" : "Ready in"} value={props.note} tone="info" />}
     </dl>}
   </>;
   const machine = MACHINES[affected[0]];

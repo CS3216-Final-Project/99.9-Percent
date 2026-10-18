@@ -49,6 +49,30 @@ describe("shared campaign runtime", () => {
     expect(useGame.getState().game.campaign!.cashCents).toBe(before.cashCents);
     expect(useGame.getState().game.campaign!.step).toBe(before.step);
   });
+  it("steps exact game seconds in management and incident, pausing a running clock", () => {
+    enter(); useGame.getState().setRunning(true); useGame.getState().tick(.4);
+    useGame.getState().stepSeconds(1);
+    expect(useGame.getState()).toMatchObject({ running: false, remainderMs: 0 });
+    expect(useGame.getState().game.campaign!.step).toBe(1);
+    // A batch stops where running would: at the opening incident's first pause (game second 6), not at 7.
+    useGame.getState().stepSeconds(1); useGame.getState().stepSeconds(5);
+    expect(useGame.getState().game.campaign!.step).toBe(6); expect(useGame.getState().game.phase).toBe("incident");
+    useGame.getState().stepSeconds(5); expect(useGame.getState().game.campaign!.step).toBe(11);
+    expect(useGame.getState().game.phase).toBe("incident");
+    const saved = loadGame(); expect(saved.status === "ok" && saved.game.campaign!.step).toBe(11);
+  });
+  it("refuses manual steps wherever the clock is held", () => {
+    // The Opening walkthrough holds the clock until it is done.
+    useGame.getState().boot(); useGame.getState().play();
+    useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(0);
+    useGame.setState(useGame.getInitialState(), true); localStorage.clear(); enter();
+    useGame.getState().openView("menu"); useGame.getState().stepSeconds(1);
+    expect(useGame.getState().game.campaign!.step).toBe(0);
+    useGame.getState().openView(null);
+    for (const count of [0, -1, 1.5, Number.NaN]) useGame.getState().stepSeconds(count);
+    expect(useGame.getState().game.campaign!.step).toBe(0);
+    useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(1);
+  });
   it("menu pauses, history does not, and later views are inaccessible", () => {
     enter(); useGame.getState().setRunning(true);
     useGame.getState().openView("history"); expect(useGame.getState().running).toBe(true);
