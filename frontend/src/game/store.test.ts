@@ -73,6 +73,14 @@ describe("shared campaign runtime", () => {
     expect(useGame.getState().game.campaign!.step).toBe(0);
     useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(1);
   });
+  it("lets a manual step reach Chapter 0's Run lesson limit and no further", () => {
+    enter(); const at = useGame.getState().game.campaign!.step;
+    useGame.setState({ tour: { track: "campaign", step: 4 } });
+    useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(at);
+    useGame.setState({ tour: { track: "campaign", step: 5, clockUntil: at + 1 } });
+    useGame.getState().stepSeconds(5); expect(useGame.getState().game.campaign!.step).toBe(at + 1);
+    useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(at + 1);
+  });
   it("menu pauses, history does not, and later views are inaccessible", () => {
     enter(); useGame.getState().setRunning(true);
     useGame.getState().openView("history"); expect(useGame.getState().running).toBe(true);

@@ -103,6 +103,9 @@ export function walkthroughHoldsClock(s: { game: GameState; tour: Tour | null })
     && !(s.tour.step === 5 && s.tour.clockUntil != null && s.game.campaign.step < s.tour.clockUntil);
 }
 
+/** The game second Chapter 0's Run lesson lets the clock reach, while that lesson is open. */
+const runLessonLimit = (tour: Tour | null) => tour?.track === "campaign" && tour.step === 5 ? tour.clockUntil : undefined;
+
 /** What started a walkthrough: the first visit, resuming a fresh run, a new company, the menu or the home screen. */
 export type TourStart = "first_visit" | "resume" | "new_company" | "menu" | "home";
 
@@ -931,7 +934,7 @@ export const useGame = create<Store>()((set, get) => {
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
         if(whole===0)return;
-        const until = get().tour?.track === "campaign" && get().tour?.step === 5 ? get().tour?.clockUntil : undefined;
+        const until = runLessonLimit(get().tour);
         const result=advanceSteps(game,until == null ? whole : Math.min(whole, Math.max(0, until - game.campaign.step)));
         if(result.stopReason || until != null && result.state.campaign!.step >= until)set({running:false});
         commit(result.state);
@@ -952,7 +955,9 @@ export const useGame = create<Store>()((set, get) => {
       // A manual step replaces auto-run, and any part-second credit belongs to the run it came from.
       if (s.running) set({ running: false });
       set({ remainderMs: 0 });
-      commit(advanceSteps(game, count).state);
+      // Chapter 0's Run lesson lets time reach its limit and no further, by Run or by a step.
+      const until = runLessonLimit(s.tour);
+      commit(advanceSteps(game, until == null ? count : Math.min(count, Math.max(0, until - game.campaign.step))).state);
     },
 
     select: id => set({...(id ? {panelOpen:true} : {}),selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null,...(id?floorPatch(floorOf(id),"select"):{})}),

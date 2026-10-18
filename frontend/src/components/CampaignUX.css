@@ -127,3 +127,12 @@
 .campaign-action-popover .purchase-tile dt .icon { flex: none; color: var(--tile); }
 .campaign-action-popover .purchase-tile dd { margin: 2px 0 0; color: var(--tile); font-family: var(--font-num); font-weight: 700; font-size: var(--text-md); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .campaign-action-popover .purchase-tile-sub { display: block; color: var(--on-night-soft); font-size: var(--text-xs); font-weight: 500; }
+
+/* At desktop the Opening's three responses must stay in view beside the selected readings: tighter rows, smaller tiles. */
+@media (min-width: 901px) {
+  .campaign-panel .evidence-row { padding-block: 1px; }
+  .campaign-panel .evidence-load { margin-top: 3px; }
+  .campaign-panel .evidence-load .meter { height: 8px; }
+  .campaign-panel .act:has(> .icon) { column-gap: 6px; }
+  .campaign-panel .act > .icon { width: 24px; height: 24px; padding: 3px; border-radius: 7px; }
+}
