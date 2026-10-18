@@ -10,7 +10,7 @@ export function campaignChapters(game: GameState, learning = false, tutorialDone
   const model = campaignGuidance(game);
   const chapters = [
     { id: "getting-started", name: "Getting started", shortName: "Getting started", description: "Chapter 0: learn the room, game seconds, weekly finances, controls, purchases, incidents and the route through the game. Replay without resetting your company.", completed: tutorialDone, available: true },
-    { id: "opening", name: "Opening", shortName: "Opening", description: "Inspect your first bottleneck and keep the company serving traffic.", completed: model.openingDone, available: false },
+    { id: "opening", name: "Opening", shortName: "Opening", description: "Inspect your first bottleneck and keep the company serving traffic.", completed: model.openingDone, available: tutorialDone },
     { id: "scaling", name: "Scaling & Routing", shortName: "Scaling & Routing", description: "Expand server capacity and make sure traffic reaches it.", completed: !!c.dataStage, available: model.openingDone },
     { id: "data", name: "Data Strategy", shortName: "Data Strategy", description: "Explore how caching and different workloads affect your database.", completed: !!c.spikeStage, available: model.dataAvailable },
     { id: "spikes", name: "Traffic Spikes & Autoscaling", shortName: "Traffic Spikes", description: "Handle changing demand and explore automatic scaling.", completed: !!c.spikeStage?.acknowledged, available: model.spikesAvailable },
@@ -19,7 +19,7 @@ export function campaignChapters(game: GameState, learning = false, tutorialDone
   ];
   return chapters.map((chapter, index) => {
     const current = chapter.id === "getting-started" ? learning : !learning && chapter.name === model.stage;
-    const status = chapter.completed ? "Completed" : current ? "Current" : chapter.available ? "Available next" : "Locked";
+    const status = chapter.id === "getting-started" && current && tutorialDone ? "Replaying" : chapter.completed ? "Completed" : current ? "Current" : chapter.available ? "Available next" : "Locked";
     return { ...chapter, number: index, current, status };
   });
 }

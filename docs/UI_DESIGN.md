@@ -2,6 +2,8 @@
 
 During Chapter 0, enable only the game controls relevant to the current lesson. Dim unrelated controls, mark them unavailable and remove them from keyboard navigation; pointer interactions and game shortcuts must obey the same boundary. Keep the guide's Back/Next, Save and exit, and sound available. Relevant read-only dashboards retain their Close controls. Purchase quotes cannot be confirmed during Chapter 0: hold the quote open while it is being explained, then enable its real Cancel button in the cancellation lesson. Escape and room clicks must not dismiss it. Resuming that lesson restores a real available quote on the correct floor. Remove all temporary restrictions when the guide ends or unmounts.
 
+Once Chapter 0 has been completed, its replay is optional. Show Exit Chapter 0 in the replay guide and chapter overview, including when an incident or review hides the guide. The overview labels an active completed-profile tutorial as Replaying and leaves Opening available. Exiting clears only the replay, returns to the existing chapter paused and preserves the company and prior completion. First-time players still finish Chapter 0 explicitly.
+
 This guide records the current playable game's design. It applies to both modes - presented to players as Guided Mode and Challenge Mode - including later phases. Gameplay rules may change; the shared visual language and interaction patterns should remain familiar. The proposal's future 2D direction is planning context and does not replace the current room or UI without a separate design decision.
 
 ## Visual language and reusable components

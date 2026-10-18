@@ -87,6 +87,33 @@ it("persists Back navigation and bounds it at the first lesson",()=>{
  useGame.setState(useGame.getInitialState(),true);enter();
  expect(useGame.getState().tour).toEqual({track:"campaign",step:1});
 });
+it.each([false,true])("exits an optional replay paused without changing the company or recording completion, incident=%s",incident=>{
+ const game=incident?advanceSteps(newGame(1,"exit-replay"),6).state:newGame(1,"exit-replay");
+ saveGame(game);saveMeta({...DEFAULT_META,tutorialDone:true});enter();
+ useGame.getState().startTour("campaign");
+ useGame.getState().endTour(false);
+ expect(useGame.getState()).toMatchObject({tour:null,running:false,meta:{tutorialDone:true,walkthroughStep:null,walkthroughFurthestStep:0}});
+ expect(useGame.getState().game.campaign).toEqual(game.campaign);
+ expect(tutorialEvents().map(e=>e.name)).toEqual(["tutorial_started","tutorial_skipped"]);
+ useGame.setState(useGame.getInitialState(),true);enter();
+ expect(useGame.getState().tour).toBeNull();
+});
+it("keeps first-time Chapter 0 mandatory even on the final lesson",()=>{
+ enter();
+ for(let step=0;step<WALKTHROUGH_STEPS.campaign;step++) {
+  useGame.getState().endTour(false);
+  expect(useGame.getState().tour?.step).toBe(step);
+  useGame.getState().tourNext();
+ }
+ expect(useGame.getState().meta.tutorialDone).toBe(false);
+});
+it("pauses when leaving the replay's bounded Run exercise",()=>{
+ saveMeta({...DEFAULT_META,tutorialDone:true});enter();useGame.getState().startTour("campaign");
+ for(let step=0;step<5;step++)useGame.getState().tourNext();
+ useGame.getState().setRunning(true);expect(useGame.getState().running).toBe(true);
+ useGame.getState().endTour(false);useGame.getState().tick(10);
+ expect(useGame.getState()).toMatchObject({tour:null,running:false,game:{campaign:{step:0}}});
+});
 it.each([false,true])("resumes an explicitly replayed walkthrough without clearing completion, later chapter=%s",later=>{
  const game=later?act(act(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"}):newGame(1,"replay-resume");
  saveGame(game);saveMeta({...DEFAULT_META,tutorialDone:true});enter();

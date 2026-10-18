@@ -4,6 +4,8 @@ Chapter 0 control restrictions have focused component and browser checks for unr
 
 Completed players' explicit Chapter 0 replays retain their lesson and completed exercises across Back, reload and Save and exit. Store regressions cover Opening and later chapters without clearing the profile's completion or recording another start on resume; desktop and narrow-browser journeys resume the real Cancel quote and finish on the same company.
 
+Completed players can also exit an optional replay through its guide or View chapters when an incident hides the guide. Regressions cover the misleading completed/current chapter state, preserved incident and company state, paused return to Opening, reload without reopening the replay, practice-quote cleanup and continued enforcement of every first-time lesson. Browser checks cover desktop and phone widths.
+
 Use Node 22 and install with `npm ci` separately in `frontend/` and `backend/`. Tests use browser-local saves, Supertest and an in-memory PGlite database; no production database or API key is needed.
 
 ## Commands
