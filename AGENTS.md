@@ -29,6 +29,10 @@ Secrets stay server-side. Never commit environment files, connection strings or 
 
 ## Validation and PRs
 
+At the start of each coding chat, before creating a branch, and immediately before pushing or creating/updating a PR, run `git fetch origin main` and compare the working branch with the freshly fetched `origin/main`. If the branch is behind, rebase it onto `origin/main` with `git rebase origin/main`; resolve any conflicts and rerun the relevant checks before pushing. Use rebase instead of merging `main` into the working branch, even when Git could merge without conflicts.
+
+Preserve uncommitted work before rebasing and never discard others' changes to resolve conflicts. If an authorized push requires updating a rebased remote branch, use `--force-with-lease`, never plain `--force`. If fetching or rebasing cannot be completed, report the blocker and do not claim the branch is current or conflict-free.
+
 Use Node 22 (see `.nvmrc`) and install separately with `npm ci` in `frontend/` and `backend/`. There is no root npm workspace.
 
 For changed packages run `npm run lint`, `npm run typecheck` and the relevant tests. Before a PR run both packages' `npm run test:coverage`, the frontend build, and the browser suite for gameplay changes. For simulation/balance changes include `npm run balance`. For schema changes include `npm run db:generate` and verify only intentional new migration files appear. See `docs/testing.md` for the browser installation and commands.
