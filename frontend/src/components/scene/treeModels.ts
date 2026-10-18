@@ -8,7 +8,9 @@ import { randRange, type RngHolder } from "@/sim/rng";
  * umbrella on spreading limbs; and a narrow flame of a cypress. Each is one unit tall, to be scaled by the tree's
  * height, and comes as two meshes: the bark, in its own colours, and the leaves, in pale greys shaded darker
  * underneath and toward the middle, for each tree's own colour to tint. Every part keeps its index, so smooth
- * normals run across each clump and frond. A lite model, for drawing without a graphics card, has fewer parts.
+ * normals run across each clump and frond. Each vertex of a palm's live fronds also says where on the frond it lies
+ * (aFrond: how far along it, and how far across the midrib), so the city's HD shader can cut it into leaflets. A lite
+ * model, for drawing without a graphics card, has fewer parts.
  */
 
 export type TreeShape = "round" | "cone" | "umbrella" | "palm";
@@ -109,18 +111,21 @@ function limb(a: V, b: V, r0: number, r1: number, sides: number): THREE.BufferGe
 /**
  * A palm frond from `origin`, heading out at `azimuth` and up at `elevation`, sagging under its own weight. Its
  * leaflets fan out either side of the midrib and droop, wide in the middle of the frond and narrow at each end.
- * Returns the frond and, for each vertex, how far along the frond it is.
+ * Returns the frond and, for each vertex, how far along the frond it is. Each vertex also carries its place on the
+ * frond in `aFrond` — how far along it and which side of the midrib — for the HD material's leaflet cut-out.
  */
 function frond(origin: V, azimuth: number, elevation: number, length: number, sag: number, segs: number, width: number): { g: THREE.BufferGeometry; along: number[] } {
   const dir = vec(Math.cos(azimuth) * Math.cos(elevation), Math.sin(elevation), Math.sin(azimuth) * Math.cos(elevation));
   const at = (s: number) => origin.clone().addScaledVector(dir, length * s).add(vec(0, -sag * s * s, 0));
   const pos: number[] = [];
   const along: number[] = [];
+  const coord: number[] = [];
   const index: number[] = [];
   for (let i = 0; i <= segs; i++) {
     const p = at(i / segs);
     pos.push(p.x, p.y, p.z);
     along.push(i / segs);
+    coord.push(i / segs, 0);
   }
   const up = new THREE.Vector3(0, 1, 0);
   for (let i = 1; i <= segs; i++) {
@@ -134,10 +139,12 @@ function frond(origin: V, azimuth: number, elevation: number, length: number, sa
       index.push(i - 1, i, pos.length / 3);
       pos.push(tip.x, tip.y, tip.z);
       along.push(s);
+      coord.push(s, sign);
     }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("aFrond", new THREE.Float32BufferAttribute(coord, 2));
   g.setIndex(index);
   return { g, along };
 }
@@ -158,7 +165,7 @@ function palm(variant: number, lite: boolean): TreeModel {
   const rng: RngHolder = { rngState: 101 + variant * 17 };
   const lean = variant === 0 ? 0.05 : 0.13;
   const top = 0.88;
-  const rings = lite ? 5 : 11;
+  const rings = lite ? 5 : 15;
   const trunkAt = (t: number) => vec(lean * t * t, top * t, 0);
   const points: V[] = [];
   const radii: number[] = [];
@@ -168,21 +175,24 @@ function palm(variant: number, lite: boolean): TreeModel {
     // Flared at the foot, then a slow taper to the crown.
     radii.push(0.024 * (1 - 0.3 * t) + 0.022 * Math.max(0, 1 - t * 7));
   }
-  const sides = lite ? 5 : 7;
+  const sides = lite ? 5 : 10;
   // Bands of old frond scars round the trunk, a ring at a time.
   const trunk = paint(tube(points, radii, sides), (_, i) => hex(BARK.palm[Math.floor(i / sides) % 2]));
   const crown = trunkAt(1);
   const knot = paint(clump(rng, 0.035, crown, lite ? 0 : 1, 1.3), () => hex("#6b5c45"));
   // A skirt of dead fronds hanging under the green ones.
-  const dead = Array.from({ length: lite ? 2 : 4 }, (_, k) => {
-    const f = frond(crown.clone().add(vec(0, -0.02, 0)), (k / 4) * Math.PI * 2 + 0.4, -1.15, 0.2, 0.02, lite ? 3 : 5, 0.04);
+  const deadCount = lite ? 2 : 6;
+  const dead = Array.from({ length: deadCount }, (_, k) => {
+    const f = frond(crown.clone().add(vec(0, -0.02, 0)), (k / deadCount) * Math.PI * 2 + 0.4, -1.15, 0.2, 0.02, lite ? 3 : 8, 0.04);
+    // Dead fronds merge into the bark, which is drawn without the leaflet cut-out, so they drop its coordinates.
+    f.g.deleteAttribute("aFrond");
     return paint(f.g, (_, i) => hex(BARK.dead[i % 2]));
   });
-  const fronds = lite ? 8 : 15;
+  const fronds = lite ? 8 : 20;
   const leaves = Array.from({ length: fronds }, (_, k) => {
     // Young fronds stand up in the middle, the oldest droop round the outside.
     const layer = (k % 3) / 2;
-    const f = frond(crown, (k / fronds) * Math.PI * 2 + randRange(rng, -0.2, 0.2), 0.75 - 1.05 * layer + randRange(rng, -0.1, 0.1), randRange(rng, 0.27, 0.33), 0.12 + 0.08 * layer, lite ? 4 : 9, 0.075);
+    const f = frond(crown, (k / fronds) * Math.PI * 2 + randRange(rng, -0.2, 0.2), 0.75 - 1.05 * layer + randRange(rng, -0.1, 0.1), randRange(rng, 0.27, 0.33), 0.12 + 0.08 * layer, lite ? 4 : 13, 0.075);
     const tone = randRange(rng, 0.85, 1.05);
     return paint(f.g, (_, i) => {
       const k2 = (0.55 + 0.45 * f.along[i]) * tone;
@@ -198,7 +208,7 @@ function broadleaf(variant: number, lite: boolean): TreeModel {
   const radius = vec(0.32, 0.27, 0.32);
   const detail = lite ? 0 : 1;
   const parts = [clump(rng, 0.2, centre, detail)];
-  const n = lite ? 5 : 11;
+  const n = lite ? 5 : 14;
   const ends: V[] = [];
   for (let k = 0; k < n; k++) {
     const a = (k / n) * Math.PI * 2 + randRange(rng, -0.3, 0.3);
@@ -209,8 +219,8 @@ function broadleaf(variant: number, lite: boolean): TreeModel {
     if (k % 3 === 0) ends.push(at);
   }
   const fork = vec(0, 0.4, 0);
-  const sides = lite ? 5 : 7;
-  const bark = [tube([vec(0, 0, 0), vec(0, 0.05, 0), fork], [0.05, 0.034, 0.028], sides), ...ends.map((e) => limb(fork, e.clone().lerp(centre, 0.35), 0.02, 0.008, lite ? 4 : 5))];
+  const sides = lite ? 5 : 10;
+  const bark = [tube([vec(0, 0, 0), vec(0, 0.05, 0), fork], [0.05, 0.034, 0.028], sides), ...ends.map((e) => limb(fork, e.clone().lerp(centre, 0.35), 0.02, 0.008, lite ? 4 : 8))];
   return { bark: paint(join(bark), () => hex(BARK.oak)), leaves: shadeCrown(join(parts), centre, radius, rng) };
 }
 
@@ -220,7 +230,7 @@ function umbrella(lite: boolean): TreeModel {
   const radius = vec(0.56, 0.16, 0.56);
   const detail = lite ? 0 : 1;
   const parts: THREE.BufferGeometry[] = [];
-  const n = lite ? 7 : 16;
+  const n = lite ? 7 : 20;
   for (let k = 0; k < n; k++) {
     const a = (k / n) * Math.PI * 2 + randRange(rng, -0.25, 0.25);
     const d = k % 4 === 0 ? randRange(rng, 0, 0.3) : randRange(rng, 0.45, 0.9);
@@ -228,10 +238,11 @@ function umbrella(lite: boolean): TreeModel {
     parts.push(clump(rng, randRange(rng, 0.16, 0.22), at, detail, 0.6));
   }
   const fork = vec(0, 0.36, 0);
-  const sides = lite ? 5 : 7;
-  const limbs = Array.from({ length: lite ? 3 : 5 }, (_, k) => {
-    const a = (k / (lite ? 3 : 5)) * Math.PI * 2 + 0.5;
-    return limb(fork, vec(Math.cos(a) * 0.36, 0.66, Math.sin(a) * 0.36), 0.026, 0.01, lite ? 4 : 5);
+  const sides = lite ? 5 : 10;
+  const limbCount = lite ? 3 : 7;
+  const limbs = Array.from({ length: limbCount }, (_, k) => {
+    const a = (k / limbCount) * Math.PI * 2 + 0.5;
+    return limb(fork, vec(Math.cos(a) * 0.36, 0.66, Math.sin(a) * 0.36), 0.026, 0.01, lite ? 4 : 8);
   });
   const bark = [tube([vec(0, 0, 0), vec(0, 0.06, 0), fork], [0.06, 0.04, 0.034], sides), ...limbs];
   return { bark: paint(join(bark), () => hex(BARK.pale)), leaves: shadeCrown(join(parts), centre, radius, rng) };
@@ -239,7 +250,7 @@ function umbrella(lite: boolean): TreeModel {
 
 function cypress(lite: boolean): TreeModel {
   const rng: RngHolder = { rngState: 401 };
-  const n = lite ? 5 : 10;
+  const n = lite ? 5 : 14;
   const centre = vec(0, 0.55, 0);
   const radius = vec(0.12, 0.45, 0.12);
   const parts: THREE.BufferGeometry[] = [];
@@ -250,7 +261,7 @@ function cypress(lite: boolean): TreeModel {
     const r = 0.11 * Math.pow(Math.sin(Math.PI * Math.min(1, 0.3 + 0.75 * t)), 0.8) + 0.02;
     parts.push(clump(rng, r, vec(randRange(rng, -0.015, 0.015), y, randRange(rng, -0.015, 0.015)), lite ? 0 : 1, 1.7));
   }
-  const bark = tube([vec(0, 0, 0), vec(0, 0.2, 0)], [0.03, 0.022], lite ? 4 : 6);
+  const bark = tube([vec(0, 0, 0), vec(0, 0.2, 0)], [0.03, 0.022], lite ? 4 : 8);
   return { bark: paint(join([bark]), () => hex(BARK.oak)), leaves: shadeCrown(join(parts), centre, radius, rng) };
 }
 

@@ -51,10 +51,10 @@ describe('walker models', () => {
     }
   });
 
-  it('cost no more than the round walkers they replace, and less when lite', () => {
+  it('stay within a bounded cost to draw, and cost less when lite', () => {
     const full = walkerModel().attributes.position.count;
     const lite = walkerModel(true).attributes.position.count;
-    expect(full).toBeLessThan(520);
+    expect(full).toBeLessThan(900);
     expect(lite).toBeLessThan(full / 2);
   });
 

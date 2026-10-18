@@ -4,23 +4,26 @@ import * as THREE from "three";
 import { useDetail } from "./detail";
 
 /*
- * Photo-scanned ground and roofs for the city at HD detail: CC0 sets from Poly Haven, credited in
+ * Photo-scanned ground, roofs and tree surfaces for the city at HD detail: seven CC0 sets from Poly Haven, credited in
  * public/textures/License.txt. Each was turned grey, so the city's own colours tint it, and keeps a colour map and a
- * normal map. The city's shaders map them by world position, so they need no texture coordinates.
+ * normal map. The city's shaders map them by world position, so they need no texture coordinates; the trees' bark and
+ * leaves are laid round the trunks and crowns from three sides.
  */
 
-export type CitySurfaceId = "asphalt" | "lawn" | "pavement" | "gravel" | "roofTiles";
+export type CitySurfaceId = "asphalt" | "lawn" | "pavement" | "gravel" | "roofTiles" | "bark" | "leaves";
 
 /**
- * Folder under /textures, the metres one copy of the texture covers on the ground, how strongly its light and dark
- * show, and how much broad patches of lighter and darker vary it across a lawn or a road.
+ * Folder under /textures, the metres one copy of the texture covers on the surface, how strongly its light and dark
+ * show, how much broad patches of lighter and darker vary it, and the colour those broad lighter patches drift toward.
  */
-const SURFACES: Record<CitySurfaceId, { dir: string; tile: number; contrast: number; mottle: number }> = {
-  asphalt: { dir: "asphalt", tile: 9, contrast: 1.2, mottle: 0.25 },
-  lawn: { dir: "lawn", tile: 3.5, contrast: 1.45, mottle: 0.6 },
-  pavement: { dir: "pavement", tile: 3.6, contrast: 1.2, mottle: 0.2 },
-  gravel: { dir: "gravel", tile: 2.4, contrast: 1.4, mottle: 0.3 },
-  roofTiles: { dir: "roof-tiles", tile: 2.5, contrast: 1.5, mottle: 0.25 },
+const SURFACES: Record<CitySurfaceId, { dir: string; tile: number; contrast: number; mottle: number; hue: [number, number, number] }> = {
+  asphalt: { dir: "asphalt", tile: 9, contrast: 1.2, mottle: 0.25, hue: [1, 1, 1] },
+  lawn: { dir: "lawn", tile: 3.5, contrast: 1.45, mottle: 0.6, hue: [1.1, 1.02, 0.78] }, // sun-dried patches
+  pavement: { dir: "pavement", tile: 3.6, contrast: 1.2, mottle: 0.2, hue: [1, 1, 1] },
+  gravel: { dir: "gravel", tile: 2.4, contrast: 1.4, mottle: 0.3, hue: [1, 1, 1] },
+  roofTiles: { dir: "roof-tiles", tile: 2.5, contrast: 1.5, mottle: 0.25, hue: [1, 1, 1] },
+  bark: { dir: "bark", tile: 1.6, contrast: 1.3, mottle: 0, hue: [1, 1, 1] },
+  leaves: { dir: "leaves", tile: 1.1, contrast: 1.1, mottle: 0, hue: [1, 1, 1] },
 };
 
 export interface CitySurface {
@@ -29,6 +32,7 @@ export interface CitySurface {
   tile: number;
   contrast: number;
   mottle: number;
+  hue: [number, number, number];
 }
 
 export type CitySurfaces = Record<CitySurfaceId, CitySurface>;
@@ -52,9 +56,9 @@ function loadCitySurfaces(anisotropy: number): Promise<CitySurfaces> {
   const ids = Object.keys(SURFACES) as CitySurfaceId[];
   const attempt = Promise.all(
     ids.map(async (id): Promise<[CitySurfaceId, CitySurface]> => {
-      const { dir, tile, contrast, mottle } = SURFACES[id];
+      const { dir, tile, contrast, mottle, hue } = SURFACES[id];
       const [map, normalMap] = await Promise.all([texture(`/textures/${dir}/color.jpg`, true, anisotropy), texture(`/textures/${dir}/normal.jpg`, false, anisotropy)]);
-      return [id, { map, normalMap, tile, contrast, mottle }];
+      return [id, { map, normalMap, tile, contrast, mottle, hue }];
     }),
   ).then((list) => Object.fromEntries(list) as CitySurfaces);
   pending = attempt;

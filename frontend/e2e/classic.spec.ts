@@ -89,7 +89,7 @@ test('draws the photo-scanned surfaces and furniture when HD detail is forced', 
   const city = new Set<string>();
   const furniture = new Set<string>();
   // The city's ground and roofs have photo sets of their own, apart from the office's.
-  const outside = /\/textures\/(asphalt|lawn|pavement|gravel|roof-tiles)\//;
+  const outside = /\/textures\/(asphalt|lawn|pavement|gravel|roof-tiles|bark|leaves)\//;
   page.on('response', response => {
     if (!response.ok()) return;
     const path = new URL(response.url()).pathname;
@@ -105,8 +105,8 @@ test('draws the photo-scanned surfaces and furniture when HD detail is forced', 
   // Five surfaces, each with a colour, a normal and a roughness map, and nine photo-scanned models.
   await expect.poll(() => textures.size).toBe(15);
   await expect.poll(() => furniture.size).toBe(9);
-  // Five surfaces outside, each with a colour and a normal map.
-  await expect.poll(() => city.size).toBe(10);
+  // Seven surfaces outside, each with a colour and a normal map.
+  await expect.poll(() => city.size).toBe(14);
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
   expect((await savedGame(page)).turn).toBe(2);
   await expectRoom(page);

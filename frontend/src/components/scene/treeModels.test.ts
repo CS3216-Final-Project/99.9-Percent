@@ -40,7 +40,7 @@ describe('tree models', () => {
       }
       const size = (x: typeof m) => x.bark.attributes.position.count + x.leaves.attributes.position.count;
       if (!lite) expect(size(treeModel(shape, variant, true))).toBeLessThan(size(m) / 2);
-      expect(size(m)).toBeLessThan(1000);
+      expect(size(m)).toBeLessThan(lite ? 1000 : 1800);
     }
   });
 
@@ -54,6 +54,28 @@ describe('tree models', () => {
       if (p.getY(i) > 0.85) { high += c.getX(i); nh++; }
     }
     expect(low / nl).toBeLessThan(high / nh);
+  });
+
+  it('marks each live palm frond vertex with its place on the frond, for the leaflet cut-out', () => {
+    for (const lite of [false, true]) {
+      for (const variant of Array.from({ length: TREE_VARIANTS.palm }, (_, v) => v)) {
+        const m = treeModel('palm', variant, lite);
+        const f = m.leaves.attributes.aFrond;
+        expect(f, `palm ${variant} ${lite}`).toBeDefined();
+        expect(f.count).toBe(m.leaves.attributes.position.count);
+        let edge = false;
+        for (let i = 0; i < f.count; i++) {
+          expect(f.getX(i)).toBeGreaterThanOrEqual(0);
+          expect(f.getX(i)).toBeLessThanOrEqual(1);
+          expect(Math.abs(f.getY(i))).toBeLessThanOrEqual(1);
+          if (Math.abs(f.getY(i)) > 0.999) edge = true;
+        }
+        expect(edge).toBe(true);
+        // The dead fronds merged into the bark do not carry it, nor do other trees' leaves.
+        expect(m.bark.attributes.aFrond).toBeUndefined();
+      }
+      expect(treeModel('round', 0, lite).leaves.attributes.aFrond).toBeUndefined();
+    }
   });
 
   it('is the same tree every time it is made', () => {
