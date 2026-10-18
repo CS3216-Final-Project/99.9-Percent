@@ -895,8 +895,9 @@ export const useGame = create<Store>()((set, get) => {
     boot: () => {
       if (get().ready) return;
       // Read once here, not on every mode switch: if storage fails, the in-memory settings are the ones to keep.
-      // The map starts folded away on a phone, where the room has little space to spare.
-      const narrow = typeof window !== "undefined" && (window.matchMedia?.("(max-width: 700px)").matches ?? false);
+      // The map starts folded away on a phone, upright or turned on its side, where the room has little space to
+      // spare: the same widths that lay the room out for a phone.
+      const narrow = typeof window !== "undefined" && (window.matchMedia?.("(max-width: 900px)").matches ?? false);
       set({ audio: loadAudio(), graphics: loadGraphics(), avatar: loadAvatar(), mapOpen: loadMapOpen() ?? !narrow });
       enter(loadMode(), false);
     },

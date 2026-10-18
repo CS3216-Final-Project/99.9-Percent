@@ -547,7 +547,8 @@ describe("exploration state", () => {
     expect(useGame.getState().mapOpen).toBe(false);
     localStorage.removeItem("nn.map.v1");
     useGame.setState(useGame.getInitialState(), true);
-    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("max-width"), media: q }) as MediaQueryList);
+    // A phone on its side, 844 px wide: still a phone's layout.
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(max-width: 900px)", media: q }) as MediaQueryList);
     try {
       useGame.getState().boot();
       expect(useGame.getState().mapOpen).toBe(false);
