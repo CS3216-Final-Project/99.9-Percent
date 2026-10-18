@@ -42,10 +42,12 @@ export interface Meta {
   runsFinished: number;
   firstIncidentStarted: boolean;
   firstIncidentCompleted: boolean;
-  /** The guided walkthrough (Challenge Mode's first week, Guided Mode's Opening) has reached its last step or been skipped. */
+  /** Chapter 0 was explicitly finished (or completed under the older rules); Challenge Mode may also skip its guide. */
   tutorialDone: boolean;
   /** The step Guided Mode's walkthrough is on while it is under way, so a reload or a new company carries on from it. */
   walkthroughStep: number | null;
+  /** Furthest lesson reached, so Back and reload do not repeat completed exercises. Absent in older profiles. */
+  walkthroughFurthestStep?: number;
   /** The short guide shown on the first incident has been seen. */
   incidentGuideDone: boolean;
   /** Guided Mode chapters whose guide has been shown, so it appears once. */
@@ -64,6 +66,7 @@ export const DEFAULT_META: Meta = {
   firstIncidentCompleted: false,
   tutorialDone: false,
   walkthroughStep: null,
+  walkthroughFurthestStep: 0,
   incidentGuideDone: false,
   chapterTours: [],
   chapterCompletions: null,
@@ -261,12 +264,13 @@ export function saveClassicGame(game: GameState): boolean {
  * Older metadata also held the music switch, which now lives in the sound settings, and the state of Guided Mode's
  * former three-prompt introduction, which the spotlight walkthrough replaced.
  */
-type StoredMeta = Omit<Partial<Meta>, "chapterTours" | "chapterCompletions" | "walkthroughStep"> & {
+type StoredMeta = Omit<Partial<Meta>, "chapterTours" | "chapterCompletions" | "walkthroughStep" | "walkthroughFurthestStep"> & {
   music?: unknown;
   openingOnboarding?: unknown;
   chapterTours?: unknown;
   chapterCompletions?: unknown;
   walkthroughStep?: unknown;
+  walkthroughFurthestStep?: unknown;
 };
 
 function parseMeta(raw: string | null): StoredMeta | null {
@@ -294,10 +298,11 @@ function decodeCompletions(raw: unknown): Meta["chapterCompletions"] {
 
 /** `campaign` reads Guided Mode's profile, where a player done with the former introduction is done with the walkthrough. */
 function decodeMeta(raw: string | null, campaign = false): Meta {
-  const { music: _music, openingOnboarding, chapterTours, chapterCompletions, walkthroughStep, ...stored } = parseMeta(raw) ?? {};
+  const { music: _music, openingOnboarding, chapterTours, chapterCompletions, walkthroughStep, walkthroughFurthestStep, ...stored } = parseMeta(raw) ?? {};
   const seen = Array.isArray(chapterTours) ? CHAPTER_TOURS.filter((id) => chapterTours.includes(id)) : [];
   const step = Number.isInteger(walkthroughStep) && (walkthroughStep as number) >= 0 ? (walkthroughStep as number) : null;
-  const meta: Meta = { ...DEFAULT_META, ...stored, chapterTours: seen, chapterCompletions: decodeCompletions(chapterCompletions), walkthroughStep: step };
+  const furthest = Number.isSafeInteger(walkthroughFurthestStep) && (walkthroughFurthestStep as number) >= 0 ? walkthroughFurthestStep as number : 0;
+  const meta: Meta = { ...DEFAULT_META, ...stored, chapterTours: seen, chapterCompletions: decodeCompletions(chapterCompletions), walkthroughStep: step, walkthroughFurthestStep: Math.max(step ?? 0, furthest) };
   if (campaign && introductionDone(openingOnboarding)) meta.tutorialDone = true;
   return meta;
 }

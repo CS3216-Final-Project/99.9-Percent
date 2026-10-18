@@ -1,6 +1,8 @@
 /* Campaign-only selectors: shared Classic typography, controls and modals are untouched. */
 .campaign-panel .campaign-guidance { margin-bottom: 12px; }
 .campaign-panel .campaign-requirements { justify-self: stretch; }
+.campaign-panel .campaign-requirements-heading { font-family: var(--font-display); font-size: var(--text-md); line-height: 1.4; margin: 0 0 8px; }
+.campaign-panel .campaign-requirements-heading span { color: var(--text-soft); font-variant-numeric: tabular-nums; }
 .campaign-panel .progression-requirements { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; font-size: var(--text-sm); line-height: 1.4; }
 .campaign-panel .progression-requirements li { display: flex; align-items: flex-start; gap: 6px; color: var(--text-soft); }
 .campaign-panel .progression-requirements li svg { flex: none; margin-top: 3px; color: var(--critical-ink); }
@@ -67,4 +69,10 @@
 @media (min-width: 901px) {
   .campaign-panel .incident-investigate .chip { font-size: var(--text-xs); min-height: 36px; padding-inline: 4px; white-space: nowrap; }
   .app.has-chapters .campaign-panel .step-head { margin-top: 6px; margin-bottom: 4px; }
+}
+
+/* Keep all Opening responses visible with the selected component's evidence. */
+@media (min-width: 901px) {
+  .campaign-panel .campaign-evidence .rows { margin: 4px 0 0; }
+  .campaign-panel .campaign-evidence .row { padding-block: 4px; }
 }

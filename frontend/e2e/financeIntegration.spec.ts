@@ -1,6 +1,6 @@
 import { test } from "./fixtures";
 import { financeDuringWalkthrough } from "./financeIntegration";
 
-test("Finance overlays the spotlight walkthrough and restores its step and focus",async({page})=>{
+test("Chapter 0 explains weekly finances in-card and preserves the real Finance dialog",async({page})=>{
     await financeDuringWalkthrough(page);
 });

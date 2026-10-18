@@ -8,14 +8,15 @@ import type { EquipmentId } from "@/sim";
 import { pendingStop } from "@/sim/step";
 import { installPending } from "@/sim/reliability";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
-import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { EDGE, openRoomArea } from "./roomArea";
+import ChapterZero from "./ChapterZeroGuide";
+import { CHAPTER_ZERO_LESSONS } from "./chapterZeroLessons";
 
 /**
  * Guided walkthroughs. Each step is a goal ("Add a server") plus one short
  * line saying what to click right now. The screen dims except for that one
- * thing. Nothing is blocked: the player can click elsewhere or skip.
+ * thing. Challenge Mode and later chapter guides can be skipped; Chapter 0 uses its own lesson book.
  */
 
 type Snapshot = ReturnType<typeof useGame.getState>;
@@ -109,146 +110,6 @@ const INCIDENT: Step[] = [
   },
 ];
 
-/*
- * Guided Mode's Opening: what the system is, how to read its evidence, what earns money, who controls the clock and
- * what an action costs. It stops at the first purchase without asking for it: the Opening is about finding the
- * bottleneck from evidence, so the walkthrough never names the fix.
- */
-const snapshot = (s: Snapshot) => s.game.campaign!.snapshot;
-const CAMPAIGN: Step[] = [
-  {
-    title: "Meet your system",
-    why: (s) => `Customers send ${num(snapshot(s).incoming)} requests a second. App Servers handle them.`,
-    hint: () => "Click Servers to inspect your app.",
-    target: () => label("app"),
-    done: (s) => s.selected === "app",
-  },
-  {
-    title: "Follow a request",
-    why: "App Servers read and write data in the Database.",
-    hint: () => "Click Database to inspect its workload.",
-    target: () => label("db"),
-    done: (s) => s.selected === "db",
-  },
-  {
-    title: "Read the evidence",
-    why: (s) =>
-      `Demand: ${num(snapshot(s).db.demand)} operations/s. Capacity: ${num(snapshot(s).db.capacity)} operations/s. Work above capacity waits. Inspection is free.`,
-    hint: () => "Compare Database demand with its capacity.",
-    target: () => ".campaign-panel .incident-investigate",
-  },
-  {
-    title: "Spot trouble",
-    why: `${num(Q.latencyThresholdMs)} ms or more means slow responses. Errors measure failed requests; ${Q.errorThreshold * 100}% is the game's error warning threshold.`,
-    hint: () => "Compare response time and failed requests.",
-    target: () => ".campaign-panel .incident-symptoms",
-  },
-  {
-    title: "Know what earns money",
-    why: `Each successful request earns $${(Q.revenueCents / 100).toFixed(2)}. Money and running costs settle every ${Q.periodSteps} game seconds. Rejected requests earn nothing.`,
-    hint: () => "Check Cash before buying. Purchases are paid immediately.",
-    target: () => ".topbar .stats-strip",
-  },
-  {
-    title: "You control the clock",
-    why: "Time is paused. A game second simulates one second of requests, queues and work. It passes only while Run is on.",
-    hint: () => "After this guide, Run to watch. Pause (P) to think.",
-    target: () => ".campaign-clock .campaign-play",
-  },
-  {
-    title: "Your actions",
-    why: "Check the price, activation delay and extra running costs before deciding.",
-    hint: () => "Select an action to preview its costs.",
-    target: () => ".campaign-panel .actions",
-    done: () => confirmingAction() !== null,
-  },
-  {
-    title: "Compare before buying",
-    why: "Nothing is bought until you press Confirm.",
-    hint: () => "Cancel the preview, then choose Next to keep learning.",
-    target: () => (confirmingAction() ? ".campaign-action-popover" : ".campaign-panel .actions"),
-  },
-  {
-    title: "Game time and operating weeks",
-    why: `The clock counts total game seconds. Every ${Q.periodSteps} game seconds is one operating week, the company's billing period. It is compressed game time, not a real calendar week.`,
-    hint: () => "For example: at game second 60, Week 1 settles and Week 2 begins. The total seconds keep counting.",
-    target: () => ".campaign-clock",
-  },
-  {
-    title: "What happens at week end?",
-    why: "Successful requests build pending revenue. At week end it is added to cash, equipment costs and salaries are deducted, and the result appears in History. The company keeps running into the next week.",
-    hint: () => "Select Cash or Pending revenue any time to see the financial breakdown.",
-    target: () => ".topbar .stats-strip",
-  },
-  {
-    title: "Cash is your spending budget",
-    why: "Pending revenue cannot pay for purchases yet. Setup costs are paid immediately; running costs continue each week, including for idle equipment. Cash at zero or below after settlement closes the company.",
-    hint: () => "Leave room in your budget for running costs before buying an upgrade.",
-    target: () => ".topbar .stats-strip",
-  },
-  {
-    title: "Pause, run and change speed",
-    why: "Pause stops requests, activation delays and recovery progress so you can inspect and decide. Speed changes how quickly game seconds pass in real time; it does not change prices or the amount of work per game second.",
-    hint: () => "After Chapter 0, use Run/Pause or P. Choose 0.5×, 1× or 2× to suit your pace.",
-    target: () => ".campaign-clock",
-  },
-  {
-    title: "Find your way around",
-    why: "The server floor holds your machines; the office holds the crew. Floor changes floors. View mode chooses Overview or optional Walk mode. Camera contains zoom, rotation and Reset view. On phones, all three are inside Navigation. Equipment can always be selected directly.",
-    hint: () => "Use the room controls to explore. On a keyboard, Q/E rotate and Page Up/Page Down switch floors.",
-    target: () => ".room-controls",
-  },
-  {
-    title: "Technology and deployment",
-    why: "Tech shows the nine capabilities and their prerequisites. Later chapters award research points to unlock capabilities. Owning a technology does not deploy it, create a server or send traffic to it.",
-    hint: () => "Use Tech to see what is owned; use the chapter's actions to deploy and configure it.",
-    target: () => TECH_TAB,
-  },
-  {
-    title: "Check what changed in History",
-    why: "History has Charts for trends, Events for decisions and activations, and Incidents for reports. Traffic and response charts use game seconds; revenue and cost charts use operating weeks.",
-    hint: () => "After running the company, compare changes over time instead of judging a single reading.",
-    target: () => '.view-tabs button[data-view="history"]',
-  },
-  {
-    title: "Save and come back",
-    why: "Your company autosaves in this browser when storage is available. Menu has Save now, backups and Save and exit. Optional Account sign-in enables explicit cloud saves. Changing device or clearing browser data needs a cloud save or backup.",
-    hint: () => "Menu also holds sound, graphics, your avatar, game modes and a replay of Chapter 0 under How to play.",
-    target: () => ".topbar .menu-btn",
-  },
-  {
-    title: "Capacity, routing and data",
-    why: "More app capacity helps only when traffic is routed to it. A database can still be the bottleneck. Later, caching answers eligible repeated reads; misses and writes still reach the Database.",
-    hint: () => "Inspect each component's demand, capacity and queue before choosing where to invest.",
-    target: () => ".campaign-panel .incident-investigate",
-  },
-  {
-    title: "Respond to incidents with evidence",
-    why: "An incident means service is struggling. Inspect equipment for free, compare the evidence and choose a response. Some actions take game seconds to activate. Traffic limits can relieve pressure but rejected requests earn nothing.",
-    hint: () => "Run to observe your response. Recovery requires five consecutive healthy game seconds; a failing second resets that streak.",
-    target: () => ".campaign-panel .incident-symptoms",
-  },
-  {
-    title: "Later challenges build on this",
-    why: "Later chapters introduce changing demand, autoscaling, health checks, spare servers, failover and growth. Automation still needs installed capacity, configuration and activation time. Each chapter introduces its new controls when you reach it.",
-    hint: () => "You do not need to buy everything. Compare service, cost and rejected demand, then review the outcome.",
-    target: () => ".chapter-bar",
-  },
-  {
-    title: "Chapters advance through goals",
-    why: "A week ending does not complete a chapter. Follow its Goal, meet the requirements, review the outcome and choose Next when available. The same company, investments and finances carry forward through six gameplay chapters.",
-    hint: () => "View chapters shows the route. You can replay Chapter 0 there or from Menu → How to play without resetting your company.",
-    target: () => ".chapter-bar",
-  },
-  {
-    title: "Ready to run your company",
-    why: "Your company is still paused and this introduction has bought nothing. Chapter 1: Opening asks you to observe changing demand and find a bottleneck from evidence. A replay returns to your existing chapter.",
-    hint: () => "Choose Finish Chapter 0, then Run company when you are ready. You can pause whenever you need to think.",
-    target: () => ".campaign-clock .campaign-play",
-    nextLabel: "Finish Chapter 0",
-  },
-];
-
 /** Each later chapter gets one step on the controls it adds, the first time the company enters it. */
 const chapter = (title: string, why: string, hint: string, target: string): Step[] => [{ title, why, hint: () => hint, target: () => target, nextLabel: "Got it" }];
 const CHAPTERS = {
@@ -314,14 +175,14 @@ const CHAPTERS = {
   ),
 } satisfies Record<string, Step[]>;
 
-const TRACKS: Record<TourTrack, Step[]> = { basics: BASICS, incident: INCIDENT, campaign: CAMPAIGN, ...CHAPTERS };
+const TRACKS: Partial<Record<TourTrack, Step[]>> = { basics: BASICS, incident: INCIDENT, ...CHAPTERS };
 export const BASICS_STEPS = BASICS.length;
-export const CAMPAIGN_STEPS = CAMPAIGN.length;
+export const CAMPAIGN_STEPS = CHAPTER_ZERO_LESSONS.length;
 
 const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", campaign: "Tutorial", incident: "Incident guide" };
 
 /** Where a track's steps make sense: Guided Mode's also wait for any review or milestone and for open views. */
-function fits(track: TourTrack, s: Snapshot, step: Step): boolean {
+function fits(track: TourTrack, s: Snapshot, step: Pick<Step, "inTech">): boolean {
   if (track === "basics") return s.game.phase === "management";
   if (track === "incident") return s.game.phase === "incident";
   const c = s.game.campaign;
@@ -385,6 +246,15 @@ function cardStyle(box: Box | null, place: Place, vw: number, vh: number, edge =
 
 export default function Tutorial() {
   const s = useGame();
+  if (s.tour?.track === "campaign") {
+    if (!fits("campaign", { ...s, view: null }, {}) || s.onboarding) return null;
+    return <ChapterZero key={`${s.generation}:${s.tutorialAttempt}`} lessons={CHAPTER_ZERO_LESSONS} />;
+  }
+  return <SpotlightTutorial />;
+}
+
+function SpotlightTutorial() {
+  const s = useGame();
   const { tour } = s;
   const [box, setBox] = useState<Box | null>(null);
   const [selector, setSelector] = useState("");
@@ -397,7 +267,7 @@ export default function Tutorial() {
   // Steps can wait on an action's confirmation, which lives outside the store.
   useSyncExternalStore(subscribeConfirming, confirmingAction);
 
-  const steps = tour ? TRACKS[tour.track] : [];
+  const steps = tour ? TRACKS[tour.track] ?? [] : [];
   const step = tour ? steps[tour.step] : undefined;
   const track = tour?.track;
   const index = tour?.step ?? -1;
@@ -405,8 +275,8 @@ export default function Tutorial() {
 
   const advance = () => {
     const now = useGame.getState();
-    if (!now.tour) return;
-    if (now.tour.step >= TRACKS[now.tour.track].length - 1) now.endTour(true);
+    if (!now.tour || !TRACKS[now.tour.track]) return;
+    if (now.tour.step >= TRACKS[now.tour.track]!.length - 1) now.endTour(true);
     else now.tourNext();
   };
 
@@ -525,7 +395,6 @@ export default function Tutorial() {
             <i key={i} className={i < tour.step ? "is-done" : i === tour.step ? "is-now" : ""} />
           ))}
         </div>
-        {tour.track === "campaign" && <p className="tour-chapter">Chapter 0 · Getting started <span>Lesson {tour.step + 1} of {steps.length}</span></p>}
         <h3>{step.title}</h3>
         {!campaign && why && <p className="muted">{why}</p>}
         <p className="tour-prompt">{step.hint(s)}</p>

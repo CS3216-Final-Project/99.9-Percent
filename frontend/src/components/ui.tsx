@@ -441,6 +441,7 @@ export function Modal({
         if(e.key==="Escape"){e.stopPropagation();onClose?.();}
         if(e.key==="Tab"){
           const nodes=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,select,textarea,summary,[tabindex="0"]')??[]).filter(node=>{
+            if(node.getAttribute("aria-disabled")==="true")return false;
             for(let parent=node.parentElement;parent && parent!==dialog.current;parent=parent.parentElement){
               if(parent.hidden || parent instanceof HTMLDetailsElement && !parent.open && !parent.querySelector(":scope > summary")?.contains(node))return false;
             }

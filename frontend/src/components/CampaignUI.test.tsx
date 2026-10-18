@@ -6,10 +6,17 @@ import {inspectOrSelect,useGame} from "../game/store";
 import {dataCompany} from "../sim/__tests__/dataFixture";
 import {protectedCombined} from "../sim/__tests__/combinedFixture";
 import {advanceSteps} from "../sim/step";
-import {applyAction,type GameState} from "../sim";
+import {applyAction,newGame,type GameState} from "../sim";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});
 afterEach(cleanup);
 function show(game:GameState){useGame.setState({game,ready:true,started:true,onboarding:false});render(<><CampaignChapters/><CampaignPanel/></>);}
+it("shows all Opening requirements without a disclosure or generic growth-waiting message",()=>{
+ show(newGame());const requirements=screen.getByRole("region",{name:"Guided Mode requirements"});
+ expect(within(requirements).getByRole("heading",{name:/Chapter requirements/})).toBeTruthy();
+ expect(within(requirements).getAllByRole("listitem")).toHaveLength(3);
+ expect(requirements.querySelector("summary")).toBeNull();
+ expect(screen.queryByText(/Waiting for the next company growth event/)).toBeNull();
+});
 it("keeps the selected workload hidden until actual growth and enters through the paused store",()=>{
  show(dataCompany("read-heavy",false));const guide=screen.getByRole("region",{name:"Guided Mode guidance"});
  expect(screen.getByLabelText("Current objective").textContent).toContain("Prepare the system for the next growth wave.");

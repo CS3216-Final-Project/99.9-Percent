@@ -158,13 +158,68 @@ export async function setGameSpeed(page: Page, speed: number) {
   await menu.locator(":scope > summary").click();
 }
 
-/** Finish Chapter 0's explanations after the free inspection and purchase-preview lessons. */
-export async function finishChapterZero(page: Page) {
+/** Perform a required exercise and advance through the visible lesson controls. */
+export async function nextChapterZero(page: Page, touch = false) {
+  const card = tutorial(page);
+  const click = async (control: ReturnType<Page["getByRole"]>) => touch ? control.tap() : control.click();
+  const next = card.getByRole("button", { name: "Next", exact: true });
+  if (!(await next.isEnabled())) {
+    const step = Number((await card.getAttribute("aria-label"))!.match(/step (\d+) of/)![1]);
+    const panel = page.getByRole("complementary", { name: "System metrics" });
+    if (step === 1) await click(panel.getByRole("button", { name: "App Server", exact: true }));
+    else if (step === 2) await click(panel.getByRole("button", { name: "Database", exact: true }));
+    else if (step === 3) {
+      await click(panel.getByRole("button", { name: "App Server", exact: true }));
+      await expect(next).toBeDisabled();
+      await click(panel.getByRole("button", { name: "Database", exact: true }));
+    }
+    else if (step === 6) {
+      await click(page.getByRole("button", { name: "Run", exact: true }));
+      await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+    } else if (step === 7) await click(panel.locator(".act:not(:disabled)").first());
+    else if (step === 8) {
+      if (!(await page.getByRole("button", { name: "Cancel", exact: true }).count())) await click(panel.locator(".act:not(:disabled)").first());
+      await click(page.getByRole("button", { name: "Cancel", exact: true }));
+    } else if (step === 12) {
+      const menu = page.locator(".time-menu");
+      if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await click(menu.locator(":scope > summary"));
+      const speed = page.getByRole("group", { name: "Game speed", exact: true });
+      await click(speed.locator('button:not([aria-pressed="true"])').first());
+      await click(menu.locator(":scope > summary"));
+    } else if (step === 14 || step === 15) {
+      await click(page.getByRole("button", { name: step === 14 ? "Tech" : "History", exact: true }));
+      await click(page.locator(".sheet-head").getByRole("button", { name: "Close", exact: true }));
+    } else if (step === 16) {
+      await click(page.getByRole("button", { name: "Menu", exact: true }));
+      await click(page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: /Save now/ }));
+      await click(page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: "Resume", exact: true }));
+    } else throw new Error(`Unexpected required interaction in lesson ${step}`);
+    await expect(next).toBeEnabled();
+  }
+  await click(next);
+}
+
+/** Complete Chapter 0 through the real UI, from whichever lesson is currently open. */
+export async function finishChapterZero(page: Page, touch = false) {
   const card = tutorial(page);
   for (let lesson = 0; lesson < 21; lesson++) {
     const finish = card.getByRole("button", { name: "Finish Chapter 0", exact: true });
-    if (await finish.count()) { await finish.click(); return; }
-    await card.getByRole("button", { name: "Next", exact: true }).click();
+    if (await finish.count()) { if (touch) await finish.tap(); else await finish.click(); return; }
+    await nextChapterZero(page, touch);
   }
   throw new Error("Chapter 0 did not reach its explicit finish action");
+}
+
+/** Unrelated journeys complete mandatory Chapter 0; optional spotlight guides retain their Skip action. */
+export async function completeTutorial(page: Page) {
+  if (await page.locator(".chapter-zero-modal").count()) {
+    // Completing 21 real lessons is setup for these journeys. Bound that setup
+    // separately, then preserve the journey's original budget and assertion timeouts.
+    const journeyBudget = test.info().timeout;
+    const started = performance.now();
+    test.setTimeout(journeyBudget + 180_000);
+    await test.step("Complete mandatory Chapter 0 setup", () => finishChapterZero(page), { timeout: 180_000 });
+    test.setTimeout(journeyBudget + Math.ceil(performance.now() - started));
+  }
+  else await page.getByRole("button", { name: "Skip", exact: true }).click();
 }

@@ -1,3 +1,4 @@
+import { completeTutorialFixture } from "@/testing/tutorial";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 import { act as reactAct, cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -45,13 +46,13 @@ it("counts actual Campaign play once under StrictMode, never the title screen", 
 const tutorial = () => events.filter(e => e.name.startsWith("gameplay_tutorial_")).map(({ name, properties: p }) =>
   [name, p.tutorial_track, p.tutorial_step, p.tutorial_from ?? p.reason ?? null]);
 
-it("reports Guided Mode's walkthrough starting, skipped at its step and finished once each, under StrictMode and across a reload", () => {
+it("reports Guided Mode's walkthrough starting and finishing once each, with no skip path, under StrictMode and across a reload", () => {
   watch();
   render(<StrictMode><App /></StrictMode>);
   fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   useGame.getState().play();
   reactAct(() => { useGame.getState().tourNext(); useGame.getState().tourNext(); useGame.getState().endTour(false); });
-  reactAct(() => { useGame.getState().startTour("campaign", "home"); useGame.getState().endTour(true); });
+  reactAct(() => { completeTutorialFixture(); useGame.getState().startTour("campaign", "home"); completeTutorialFixture(); });
   // A chapter's one-card guide is not the walkthrough.
   reactAct(() => { useGame.getState().startTour("scaling"); useGame.getState().endTour(true); });
   cleanup(); stop();
@@ -59,9 +60,9 @@ it("reports Guided Mode's walkthrough starting, skipped at its step and finished
   watch(); play();
   expect(tutorial()).toEqual([
     ["gameplay_tutorial_started", "campaign", 0, "first_visit"],
-    ["gameplay_tutorial_skipped", "campaign", 2, "player"],
+    ["gameplay_tutorial_completed", "campaign", 20, null],
     ["gameplay_tutorial_started", "campaign", 0, "home"],
-    ["gameplay_tutorial_completed", "campaign", 0, null],
+    ["gameplay_tutorial_completed", "campaign", 20, null],
   ]);
   expect(named("gameplay_tutorial_started")[0].properties).toMatchObject({ mode: "campaign", chapter_id: "opening", progress_step: 0 });
 });
@@ -82,8 +83,8 @@ it("reports Challenge Mode's walkthrough, offered behind the title screen, once 
 
 it("does not report a walkthrough already under way when it starts observing, only how it ends", () => {
   play(); watch();
-  useGame.getState().endTour(true);
-  expect(tutorial()).toEqual([["gameplay_tutorial_completed", "campaign", 0, null]]);
+  completeTutorialFixture();
+  expect(tutorial()).toEqual([["gameplay_tutorial_completed", "campaign", 20, null]]);
 });
 
 it("includes paused planning time, caps idle time, and resumes timing on input", () => {

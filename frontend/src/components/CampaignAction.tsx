@@ -44,6 +44,8 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   const { game, selectedAppId } = useGame();
   const c = game.campaign!, id = useId(), card = useRef<HTMLDivElement>(null);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
+  const quoteLesson = useGame(s => s.started && !s.onboarding && s.game.phase === "management" && s.tour?.track === "campaign" ? s.tour.step : -1);
+  const practiceQuote = quoteLesson === 6 || quoteLesson === 7;
   const open = confirming === props.label;
   const restoreFocus = useRef(false);
   useLayoutEffect(()=>{
@@ -124,10 +126,11 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   const floor = useGame(s=>s.floor), home = floorOf(affected[0]);
   useEffect(()=>{
     if (!open || floor === home) return;
+    if (practiceQuote) { useGame.getState().goToFloor(home, "action"); return; }
     // Focus inside the closing card goes back to its action, as Cancel does; focus elsewhere stays put.
     restoreFocus.current = !!document.activeElement?.closest(".campaign-action-popover");
     setConfirming(null);
-  },[open, floor, home]);
+  },[open, floor, home, practiceQuote]);
   if (props.decision && preview && !preview.ok && !introductionActive) reason = preview.reason;
   const highlight = open || pointing && confirming === null, affectedKey = affected.join();
   useEffect(() => {
@@ -140,7 +143,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     };
   // Reapply on opening even if this action was already highlighted by hover before the click.
   }, [highlight, affectedKey, props.label, open]);
-  const cancel = () => { restoreFocus.current=true; setConfirming(null); };
+  const cancel = () => { if (quoteLesson === 6) return; restoreFocus.current=true; setConfirming(null, true); };
   const costs = <>
     {preview?.ok ? <PurchaseFinance preview={preview} /> : <dl className="rows">
       {props.price !== undefined && <Row label="Buy now" value={money(props.price)} />}
@@ -157,7 +160,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   // A per-app action sits next to that app's marker; anything else next to the machine's own.
   const anchor = isScale ? c.apps.find(a => `Scale up App ${a.id.slice(4)}` === label)?.id ?? "app" : affected[0];
   const toggle = () => {
-    if (open) { setConfirming(null); return; }
+    if (open) { if (!practiceQuote) setConfirming(null); return; }
     setConfirming(label);
     reviewed.current = signature(preview);
     dispatched.current = false;
@@ -166,13 +169,13 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     if (s.floor !== floor) s.goToFloor(floor, "action");
     s.focusCamera(anchor);
   };
-  return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey}
+  return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey} data-campaign-action={label}
     onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)}
     onFocus={() => setPointing(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPointing(false); }}>
     <Act {...props} disabled={props.disabled || preview?.ok === false} onClick={toggle} />
     {!open && (props.disabled || preview?.ok === false) && <p className="campaign-action-reason" id={id} tabIndex={0}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
     {open && <ActionPopover anchor={anchor}>
-      <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); cancel(); } }}>
+      <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); if (!practiceQuote) cancel(); } }}>
         <div className="campaign-purchase-body" role="region" aria-label="Purchase preview" tabIndex={0}>
           <div className="campaign-purchase-essential">
             <p className="campaign-action-confirm-title">{isAdd ? "Add App Server" : label}?</p>
@@ -208,8 +211,8 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
         {(props.disabled || preview?.ok===false) && <p role="status">{reason}</p>}
         {changed && <p role="status">The purchase preview changed. Review the current figures, then confirm again.</p>}
         <div className="btn-row">
-          <button type="button" className="btn btn-primary btn-small" autoFocus disabled={props.disabled || preview?.ok === false} onClick={() => {
-            if (!open || dispatched.current) return;
+          <button type="button" className="btn btn-primary btn-small" autoFocus={!practiceQuote} disabled={practiceQuote || props.disabled || preview?.ok === false} onClick={() => {
+            if (practiceQuote || !open || dispatched.current) return;
             if (props.decision) {
               const latest = previewCampaignAction(useGame.getState().game,props.decision);
               if (!latest.ok) { useGame.getState().notify(latest.reason,"error"); return; }
@@ -218,7 +221,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
             dispatched.current = true;
             setConfirming(null); props.onClick();
           }}>Confirm</button>
-          <button type="button" className="btn btn-small" onClick={cancel}>Cancel</button>
+          <button type="button" className="btn btn-small" disabled={quoteLesson === 6} onClick={cancel}>Cancel</button>
         </div>
         </footer>
       </section>

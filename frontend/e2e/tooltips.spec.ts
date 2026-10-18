@@ -1,8 +1,8 @@
 import { openCameraControls } from "./fixtures";
-import { test, expect, expectRoom } from "./fixtures";
+import { completeTutorial, test, expect, expectRoom } from "./fixtures";
 
 test("explains controls in the shared tooltip, never the browser's own", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await completeTutorial(page);
   await expectRoom(page);
   await expect(page.locator("[title]")).toHaveCount(0);
 
@@ -38,7 +38,7 @@ test("explains a locked control, which is where the reason for being locked is s
   await expect(run).toBeDisabled();
   await run.hover();
   const tip = page.getByRole("tooltip");
-  await expect(tip).toContainText("Finish or skip the tutorial to run the company");
+  await expect(tip).toContainText("Finish Chapter 0 to run the company");
   await expect(tip).toHaveCSS("opacity", "1");
   const box = (await tip.boundingBox())!, view = page.viewportSize()!;
   expect(box.x + box.width).toBeLessThanOrEqual(view.width);

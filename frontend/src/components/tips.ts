@@ -57,8 +57,10 @@ export function placeTip(anchor: Box, tip: { width: number; height: number }, vi
   return { left, top, side, arrow: clamp(centre - left, ARROW_INSET, Math.max(ARROW_INSET, tip.width - ARROW_INSET)) };
 }
 
-/** "Rotate left (Q)" becomes the words plus a key, so shortcuts read as keys. */
+/** Trailing shortcuts become keycaps; keep full key names in the accessible description. */
 export function splitShortcut(text: string): { label: string; key?: string } {
-  const m = /^(.*\S)\s+\(([A-Z])\)$/.exec(text);
-  return m ? { label: m[1], key: m[2] } : { label: text };
+  const m = /^(.*\S)\s+\(([A-Z]|Page Up|Page Down)\)$/.exec(text);
+  if (!m) return { label: text };
+  const key = m[2] === "Page Up" ? "PgUp" : m[2] === "Page Down" ? "PgDn" : m[2];
+  return { label: m[1], key };
 }

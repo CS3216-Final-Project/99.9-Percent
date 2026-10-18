@@ -1,6 +1,6 @@
 import { advanceCampaignStep } from "./fixtures";
 import type { Page } from "@playwright/test";
-import { test, expect, tutorial } from "./fixtures";
+import { completeTutorial, test, expect, tutorial, savedGame } from "./fixtures";
 
 /** Count the voices the sound effects start. The music synthesises offline and only plays buffers in real time. */
 async function countEffects(page: Page) {
@@ -16,8 +16,8 @@ async function countEffects(page: Page) {
   return () => page.evaluate(() => (window as unknown as { effectVoices: number }).effectVoices);
 }
 
-test("sounds the company starting and the alarm, and nothing for a skipped walkthrough or while muted", async ({ page, withoutRoom , installClock}) => {
- await installClock();
+test("sounds the company starting, tutorial completion and the alarm, and stays silent while muted", async ({ page, withoutRoom, installClock }) => {
+  await installClock();
   // The effects need no room; skipping its software WebGL keeps this journey fast.
   await withoutRoom();
   const problems: string[] = [];
@@ -31,13 +31,13 @@ test("sounds the company starting and the alarm, and nothing for a skipped walkt
   await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
   await expect.poll(voices).toBeGreaterThanOrEqual(5);
   const launch = await voices();
-  // Only finishing the walkthrough is marked; skipping it is silent.
-  await tutorial(page).getByRole("button", { name: "Skip", exact: true }).click();
+  // Finishing the mandatory walkthrough marks the end of the introduction.
+  await completeTutorial(page);
   await expect(tutorial(page)).toBeHidden();
   await page.waitForTimeout(300);
-  expect(await voices()).toBe(launch);
-  const introduced = launch;
-  await advanceCampaignStep(page,{seconds:5});
+  await expect.poll(voices).toBeGreaterThan(launch);
+  const introduced = await voices();
+  await advanceCampaignStep(page,{seconds:5-(await savedGame(page)).campaign!.step});
   // Quiet steps make no sound.
   expect(await voices()).toBe(introduced);
   await advanceCampaignStep(page);
@@ -63,7 +63,7 @@ test("sounds the company starting and the alarm, and nothing for a skipped walkt
 test("the header sound button follows the menu sliders and turns sound back on from silence", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
-  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await completeTutorial(page);
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
@@ -87,7 +87,7 @@ test("starts a new company with the same sound, and lets a saved one continue qu
   await page.goto("/");
   await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
   await expect.poll(voices).toBeGreaterThanOrEqual(5);
-  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await completeTutorial(page);
   await expect(tutorial(page)).toBeHidden();
   // Reloading counts from zero again: the saved company continues without its start-up sound.
   await page.reload();

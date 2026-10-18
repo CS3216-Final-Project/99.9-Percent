@@ -1,3 +1,4 @@
+import { completeTutorialFixture } from "@/testing/tutorial";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { advanceTurn, applyAction, incidentTick, newGame, newLegacyGame, type Action, type ActionAttempt, type GameState } from "../sim";
 import { advanceSteps, applyCampaignInput } from "../sim/step";
@@ -459,7 +460,7 @@ describe("watching the store", () => {
     expect(heard).toEqual(["launch"]);
   });
 
-  it("marks the end of the campaign walkthrough, but not its steps, a skip or a replay starting", async () => {
+  it("marks the end of the campaign walkthrough, but not its steps, an attempted skip or a replay starting", async () => {
     const s = () => useGame.getState();
     s().boot();
     s().play();
@@ -475,7 +476,7 @@ describe("watching the store", () => {
     s().startTour("campaign");
     await settle();
     expect(heard).toEqual([]);
-    s().endTour(true);
+    completeTutorialFixture();
     await settle();
     expect(heard).toEqual(["unlock"]);
   });
