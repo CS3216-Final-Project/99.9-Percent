@@ -60,6 +60,12 @@ jobs:
 
   frontend-browser:
     runs-on: ubuntu-latest
+    # Match the locked @playwright/test version; browsers and Linux dependencies are preinstalled.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    env:
+      PLAYWRIGHT_IMAGE_VERSION: 1.63.0
     strategy:
       # Collect failures from every shard instead of cancelling the others.
       fail-fast: false
@@ -77,12 +83,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
-      - name: Cache Chromium
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/package-lock.json') }}
-      - run: npx playwright install --with-deps chromium
+      - name: Verify the browser image matches Playwright
+        run: node -e "if (require('@playwright/test/package.json').version !== process.env.PLAYWRIGHT_IMAGE_VERSION) throw Error('Update the CI browser image to match package-lock.json')"
       # Each runner keeps one worker: software WebGL needs its CPU to itself.
       - name: Browser journeys against the production build
         run: node scripts/browser-shards.mjs ${{ matrix.shard }}/${{ strategy.job-total }}

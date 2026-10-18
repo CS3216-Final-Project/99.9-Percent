@@ -37,7 +37,8 @@ async function expectCashFits(page:Page) {
  return {width:page.viewportSize()!.width,cashBox,amount,clearance:cashBox.x+cashBox.width-amount.x-amount.width};
 }
 
-test("touch Chapter 0 explains weekly finances in-card and preserves the real Finance dialog",async({page})=>{
+test("touch Chapter 0 explains weekly finances in-card and preserves the real Finance dialog",async({page,withoutRoom})=>{
+ await withoutRoom();
  await page.setViewportSize({width:390,height:844});await page.emulateMedia({reducedMotion:"reduce"});
  await financeDuringWalkthrough(page,true);
 });
@@ -275,7 +276,8 @@ test("investigates and responds through the incident panel on touch", async ({ p
 
 test("a tap explains a term, and tapping a button does not leave a tooltip over it", async ({ page, withoutRoom }) => {
  await withoutRoom();
- await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).tap(); await completeTutorial(page);
+ await seedSave(page,newGame(1,"touch-tooltip"));
+ await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).tap();
   const tip = page.getByRole("tooltip");
   await page.getByRole("complementary", { name: "System metrics" }).getByText("System evidence", { exact: true }).tap();
   await expect(tip).toHaveText("Inspect equipment for free. Inspection does not advance time.");
@@ -359,7 +361,7 @@ test("traffic spikes: touch selects an instance after retirement leaves an ID ga
  await page.getByRole("button",{name:"Menu",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Menu",exact:true})).toBeVisible();
 });
 
-test("combined: touch scorecard, completed guidance, technology inspection and paused reload",async({page})=>{const {finishedCompany}=await import("../src/sim/__tests__/combinedFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,finishedCompany());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Grow the Company");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Grow the Company"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("50,000");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
+test("combined: touch scorecard, completed guidance, technology inspection and paused reload",async({page,withoutRoom})=>{await withoutRoom();const {finishedCompany}=await import("../src/sim/__tests__/combinedFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,finishedCompany());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Grow the Company");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Grow the Company"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("50,000");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
 
 for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secondary controls fit at ${width}px`,async({page})=>{
  // The room is drawn in software, and its labels settle only as the camera brings each machine above the panel.

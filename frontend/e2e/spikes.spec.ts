@@ -3,9 +3,9 @@ import { advanceCampaignStep } from "./fixtures";
 import {test,expect,expectRoom,seedSave,savedGame} from "./fixtures";
 import {act,tick,dataCompany,spikeCompany,untilOffset} from "../src/sim/__tests__/spikeFixtures";
 import type {Page} from "@playwright/test";
-async function blockedGuest(page:Page,g:ReturnType<typeof dataCompany>){
+async function blockedGuest(page:Page,g:ReturnType<typeof dataCompany>,room=true){
  const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
- await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);return api;
+ await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();if(room)await expectRoom(page);return api;
 }
 async function runTo(page:Page,step:number){
  await page.getByRole("button",{name:"Run",exact:true}).click();
@@ -86,10 +86,11 @@ function manualSpikePlan(){
  return tick(act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}),1);
 }
 
-test("spikes: manually planned capacity survives the announced wave without an autoscaler",async({page,installClock})=>{
+test("spikes: manually planned capacity survives the announced wave without an autoscaler",async({page,installClock,withoutRoom})=>{
+ await withoutRoom();
  await installClock();
  test.setTimeout(90000);
- const api=await blockedGuest(page,manualSpikePlan());
+ const api=await blockedGuest(page,manualSpikePlan(),false);
  await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
  await setGameSpeed(page,2);
  const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
@@ -99,8 +100,9 @@ test("spikes: manually planned capacity survives the announced wave without an a
  expect(c.incident).toBeNull();expect(c.snapshot.app.capacity).toBe(4800);expect(c.investedCents).toBeGreaterThan(0);
  expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
-test("spikes: write-heavy DB constraint remains after automatic app routing",async({page})=>{
- test.setTimeout(90000);const api=await blockedGuest(page,untilOffset(spikeCompany(true,"write-heavy"),24));
+test("spikes: write-heavy DB constraint remains after automatic app routing",async({page,withoutRoom})=>{
+ await withoutRoom();
+ test.setTimeout(90000);const api=await blockedGuest(page,untilOffset(spikeCompany(true,"write-heavy"),24),false);
  const control=page.getByRole("region",{name:"Traffic spikes and autoscaling"});await expect(control).toContainText("cannot increase DB capacity");
  expect((await savedGame(page)).campaign!.snapshot.db.demand).toBeGreaterThan(3000);
  await page.getByRole("button",{name:"Limit to 500 requests/s"}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await setGameSpeed(page,2);await page.getByRole("button",{name:"Run",exact:true}).click();

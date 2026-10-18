@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
-import { completeTutorial, test, expect, expectRoom } from "./fixtures";
+import { test, expect, expectRoom, seedSave } from "./fixtures";
+import { newGame } from "../src/sim";
 
 /** Pixels drawn per CSS pixel of the room's canvas. */
 const pixelRatio = (page: Page) =>
@@ -7,9 +8,9 @@ const pixelRatio = (page: Page) =>
 
 // The room is drawn for real here: the point is that the menu's choice reaches the renderer.
 test("changes the graphics quality from the menu, redraws the room and remembers the choice", async ({ page }) => {
+  await seedSave(page, newGame(1, "graphics"));
   await page.goto("/");
-  await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
-  await completeTutorial(page);
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
   // The test browser draws in software, so Auto means half the pixels.
   await expect.poll(() => pixelRatio(page)).toBeCloseTo(0.5, 1);
