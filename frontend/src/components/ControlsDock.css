@@ -111,3 +111,15 @@
   .dock-panel { right: 8px; max-width: calc(100vw - 16px); }
   .room-menu .dock-panel { right: 8px; }
 }
+/* Keep navigation inside the game area below the portrait walkthrough. */
+@media (max-width: 640px) {
+  .app:has(> .chapter-zero-guide) .dock-panel {
+    max-height: min(440px, calc(100dvh - var(--guide-top) - 180px));
+  }
+}
+@media (max-width: 360px) {
+  .campaign-clock.controls-dock .time-controls { gap: 4px; }
+  .campaign-clock.controls-dock .dock-primary { width: 80px; }
+  .campaign-clock.controls-dock .time-menu > summary { width: 54px; }
+  .campaign-clock.controls-dock .dock-second { white-space: nowrap; }
+}
