@@ -1,10 +1,13 @@
 import { advanceCampaignStep, setGameSpeed } from "./fixtures";
-import {test,expect,expectRoom,savedGame} from "./fixtures";
+import {test,expect,savedGame} from "./fixtures";
+
+// These journeys exercise panels and persistence; room interaction has dedicated browser coverage.
+test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
 
 test("Opening prevention: fresh player, new observations and reloads keep Scaling locked without API",async({page, installClock})=>{
  await installClock();
  test.setTimeout(90000);await page.route("**/api/**",r=>r.abort());await page.goto("/");
- await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await page.getByRole("button", { name: "Skip", exact: true }).click();await expectRoom(page);
+ await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await page.getByRole("button", { name: "Skip", exact: true }).click();
  const id=(await savedGame(page)).campaign!.runId;
  await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
  await setGameSpeed(page,2);

@@ -10,11 +10,11 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: !!process.env.CI,
   // Software WebGL rendering competes for the small CI runner's CPU.
-  // CI splits tests across ten runners with --shard; each still uses one worker.
+  // CI balances tests across ten runners by duration; each still uses one worker.
   workers: 1,
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  reporter: [['list'], ['html', { open: 'never' }]],
+  reporter: [['list'], ['html', { open: 'never' }], ['json', { outputFile: 'test-results/browser-timings.json' }]],
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     trace: 'retain-on-failure',

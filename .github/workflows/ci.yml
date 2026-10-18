@@ -32,7 +32,9 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm run test:coverage
+      - run: node --test scripts/browser-shards.test.mjs
+      # Exhaustive bounds run in the required balance job, without coverage instrumentation.
+      - run: npm run test:coverage -- --exclude='src/sim/__tests__/balanceBounds*.test.ts'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -40,6 +42,21 @@ jobs:
           path: frontend/coverage/
           if-no-files-found: ignore
           retention-days: 14
+
+  frontend-balance:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run balance
 
   frontend-browser:
     runs-on: ubuntu-latest
@@ -60,10 +77,15 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/package-lock.json') }}
       - run: npx playwright install --with-deps chromium
       # Each runner keeps one worker: software WebGL needs its CPU to itself.
       - name: Browser journeys against the production build
-        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: node scripts/browser-shards.mjs ${{ matrix.shard }}/${{ strategy.job-total }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -77,17 +99,18 @@ jobs:
   # Keep the existing branch-protection check, including every browser shard.
   # always() makes a failed/skipped dependency fail this gate instead of skipping it.
   frontend:
-    needs: [frontend-checks, frontend-browser]
+    needs: [frontend-checks, frontend-balance, frontend-browser]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Require static checks, coverage and all browser shards
+      - name: Require static checks, coverage, balance and all browser shards
         env:
           CHECKS_RESULT: ${{ needs.frontend-checks.result }}
+          BALANCE_RESULT: ${{ needs.frontend-balance.result }}
           BROWSER_RESULT: ${{ needs.frontend-browser.result }}
         run: |
-          if [ "$CHECKS_RESULT" != "success" ] || [ "$BROWSER_RESULT" != "success" ]; then
-            echo "::error::Frontend checks: $CHECKS_RESULT; browser journeys: $BROWSER_RESULT"
+          if [ "$CHECKS_RESULT" != "success" ] || [ "$BALANCE_RESULT" != "success" ] || [ "$BROWSER_RESULT" != "success" ]; then
+            echo "::error::Frontend checks: $CHECKS_RESULT; balance: $BALANCE_RESULT; browser journeys: $BROWSER_RESULT"
             exit 1
           fi
 

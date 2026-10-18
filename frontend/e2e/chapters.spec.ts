@@ -1,9 +1,12 @@
-import { test, expect, expectRoom, seedSave, savedGame, chapterComplete, advanceCampaignStep } from "./fixtures";
+import { test, expect, seedSave, savedGame, chapterComplete, advanceCampaignStep } from "./fixtures";
 import { dataCompany, finishingScaling } from "../src/sim/__tests__/dataFixture";
 import { completedReliability } from "../src/sim/__tests__/combinedFixture";
 import { newGame } from "../src/sim";
 import { readyReliability, act, tick } from "../src/sim/__tests__/reliabilityFixture";
 import { canEnterReliability } from "../src/sim/reliability";
+
+// These journeys exercise panels and persistence; room interaction has dedicated browser coverage.
+test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
 
 test("chapter bar stays visible and follows the same company into Data Strategy", async ({ page }) => {
   await page.route("**/api/**", route => route.abort());
@@ -11,7 +14,7 @@ test("chapter bar stays visible and follows the same company into Data Strategy"
   await page.goto("/");
   await expect(page.getByRole("region", { name: "Guided Mode chapters" })).toHaveCount(0);
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expectRoom(page);
+  
   const bar = page.getByRole("region", { name: "Guided Mode chapters" });
   await expect(bar).toContainText("Chapter 2 of 6");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Scaling & Routing");
@@ -45,7 +48,7 @@ test("disabled Next explains its actual readiness gate to keyboard users",async(
   await seedSave(page,game);
   await page.goto("/");
   await page.getByRole("button",{name:"Continue company",exact:true}).click();
-  await expectRoom(page);
+  
   const bar=page.getByRole("region",{name:"Guided Mode chapters"});
   const next=bar.getByRole("button",{name:"Next: Continue to reliability"});
   await expect(next).toBeDisabled();
@@ -61,7 +64,7 @@ test("compact chapter summary, objective and Next stay clear at desktop and lapt
   await seedSave(page, completedReliability());
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expectRoom(page);
+  
   const bar = page.getByRole("region", { name: "Guided Mode chapters" });
   await expect(bar.getByRole("button", { name: "Next: Continue to Grow the Company", exact: true })).toHaveText("Next");
   for (const [width,height] of [[1101,900],[1366,768],[1440,900]]) {
@@ -85,7 +88,7 @@ test("compact Opening bar leaves its goal and overview available without Next", 
   await seedSave(page,newGame());
   await page.goto("/");
   await page.getByRole("button",{name:"Continue company",exact:true}).click();
-  await expectRoom(page);
+  
   const bar=page.getByRole("region",{name:"Guided Mode chapters"});
   for(const [width,height] of [[1440,900],[1366,768]]) {
     await page.setViewportSize({width,height});
@@ -96,9 +99,8 @@ test("compact Opening bar leaves its goal and overview available without Next", 
   }
 });
 
-test("finishing Scaling & Routing stops once to announce it and continues from the dialog", async ({ page, withoutRoom , installClock}) => {
+test("finishing Scaling & Routing stops once to announce it and continues from the dialog", async ({ page, installClock}) => {
  await installClock();
-  await withoutRoom();
   await page.removeLocatorHandler(chapterComplete(page));
   await page.route("**/api/**", route => route.abort());
   await seedSave(page, finishingScaling());
