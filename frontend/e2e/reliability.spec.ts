@@ -46,6 +46,8 @@ test("reliability: manual restoration, measured report, outcome and paused reloa
  expect((await savedGame(page)).campaign!.reliabilityStage!.acknowledged).toBe(true);
 });
 test("reliability: one-step detection and delayed real spare promotion",async({page, installClock})=>{
+ // Exact clock ticks render the live room; allow both boots and the final promotion on CI.
+ test.setTimeout(120_000);
  await installClock();
  await boot(page,preparedReliability());await page.getByRole("button",{name:"Start reliability test",exact:true}).click();await advance(page,8);let c=(await savedGame(page)).campaign!;expect(c.apps[1].health).toBe("failed");expect(c.apps[1].detectedHealth).toBe("healthy");await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.apps[1].detectedHealth).toBe("unhealthy");expect(c.pending.some(a=>a.type==="promote-spare")).toBe(true);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.routing.targets).toEqual(["app-1","app-3"]);expect(c.apps).toHaveLength(3);await expect(page.getByRole("region",{name:"Stay Online"})).toContainText("3,200 /");
 });

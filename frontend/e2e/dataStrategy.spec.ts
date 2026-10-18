@@ -14,7 +14,9 @@ function prepared(){
 }
 for(const strategy of ["cache","database"] as const)test(`data strategy: ${strategy}, continuity and reload`,async({page, installClock})=>{
  await installClock();
- test.setTimeout(150000);const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
+ // The cache path renders two recoveries and reloads the room, taking over 150s on CI.
+ // Keep the existing per-outcome assertion timeouts.
+ test.setTimeout(240_000);const api:string[]=[];page.on("request",r=>{if(new URL(r.url()).pathname.startsWith("/api/"))api.push(r.url());});await page.route("**/api/**",r=>r.abort());
  await seedSave(page,prepared());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
  const guidance=page.getByRole("region",{name:"Guided Mode guidance"});
  const chapters=page.getByRole("region",{name:"Guided Mode chapters"});
