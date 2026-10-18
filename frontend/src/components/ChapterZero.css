@@ -262,11 +262,11 @@
 body:has(.chapter-zero-guide) [aria-disabled="true"]:not(canvas) { opacity: .45; cursor: not-allowed; }
 .app:has(> .chapter-zero-guide) .modal-backdrop { inset-inline-start: var(--guide-width); }
 .app:has(> .chapter-zero-guide) .campaign-action-popover {
-  position: fixed;
-  left: calc(var(--guide-width) + 12px);
-  top: calc(var(--guide-top) + 12px);
+  position: absolute;
+  left: 12px;
+  top: 12px;
   width: min(380px, calc(100vw - var(--guide-width) - 24px)) !important;
-  max-height: calc(100dvh - var(--guide-top) - 24px) !important;
+  max-height: calc(100% - 24px) !important;
   transform: none !important;
   z-index: 31;
 }
