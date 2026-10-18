@@ -59,11 +59,12 @@ it("offers the Opening walkthrough once, on a fresh company, holding its clock u
  expect(useGame.getState().tour).toBeNull();
  useGame.getState().newRun();
  expect(useGame.getState().tour).toBeNull();
- // The menu replays it on the same company, which it leaves untouched.
+ // The menu starts fresh practice and retains the original company.
  const before=structuredClone(useGame.getState().game);
  useGame.getState().showOnboarding();
  expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
- expect(useGame.getState().game).toEqual(before);
+ expect(useGame.getState().tutorialCompany!.game).toEqual(before);
+ expect(useGame.getState().game.campaign!.step).toBe(0);
 });
 it("keeps the final lesson unfinished and resumable until Finish is explicitly pressed",()=>{
  enter();
@@ -123,7 +124,8 @@ it.each([false,true])("resumes an explicitly replayed walkthrough without cleari
  useGame.getState().tourBack();useGame.getState().endSession();
  useGame.setState(useGame.getInitialState(),true);enter();
  expect(useGame.getState()).toMatchObject({tour:{track:"campaign",step:7},running:false,meta:{tutorialDone:true,walkthroughStep:7,walkthroughFurthestStep:8}});
- expect(useGame.getState().game.campaign).toEqual(game.campaign);
+ expect(useGame.getState().tutorialCompany!.game.campaign).toEqual(game.campaign);
+ expect(useGame.getState().game.campaign!.step).toBe(0);
  expect(tutorialEvents().filter(e=>e.name==="tutorial_started")).toHaveLength(1);
  completeTutorialFixture();
  useGame.setState(useGame.getInitialState(),true);enter();

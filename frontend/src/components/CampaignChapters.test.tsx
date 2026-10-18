@@ -86,14 +86,17 @@ it("integrates How to play into Chapter 0 and replays it on the same company", (
   expect(useGame.getState().running).toBe(false);
 });
 
-it("lets a completed player exit a Chapter 0 replay hidden behind an incident", () => {
+it("marks practice in progress without a completed checkmark and restores the saved incident", () => {
   const game = advanceSteps(newGame(1, "hidden-replay"), 6).state;
   saveGame(game); saveMeta({ ...DEFAULT_META, tutorialDone: true });
   useGame.getState().boot(); useGame.getState().play(); useGame.getState().startTour("campaign");
   render(<CampaignChapters />);
   fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
   const dialog = screen.getByRole("dialog", { name: "Guided Mode chapters" });
-  expect(within(dialog).getByRole("heading", { name: "Getting started" }).closest("li")!.textContent).toContain("Replaying");
+  const chapter = within(dialog).getByRole("heading", { name: "Getting started" }).closest("li")!;
+  expect(chapter.textContent).toContain("In progress");
+  expect(chapter.textContent).not.toContain("Completed");
+  expect(chapter.querySelector(".chapter-number")!.textContent).toBe("0");
   expect(within(dialog).getByRole("heading", { name: "Opening" }).closest("li")!.textContent).toContain("Available next");
   fireEvent.click(within(dialog).getByRole("button", { name: "Exit Chapter 0" }));
   expect(screen.getByLabelText("Current chapter").textContent).toBe("Opening");

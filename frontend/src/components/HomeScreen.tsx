@@ -105,7 +105,7 @@ export function HomeScreen() {
     if (m !== useGame.getState().mode) { inMode(m); return; }
     useGame.getState().play();
   };
-  // Challenge Mode's walkthrough is its first week, so it restarts the run; Guided Mode's runs on the company as it is.
+  // Challenge Mode restarts its first week; Guided Mode starts separate practice and keeps the saved company.
   const replayTutorial = (m: GameMode) => inMode(m, () => {
     if (m === "classic") { useGame.getState().startTutorialRun("home"); return; }
     useGame.getState().play();
