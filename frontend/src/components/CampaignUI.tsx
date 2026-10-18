@@ -271,7 +271,7 @@ export function CampaignControls() {
       { id: "history", label: "History", icon: "history", badge: game.campaign!.reports.length > 0 ? String(game.campaign!.reports.length) : null },
     ]} />
     <RoomControlsSlot />
-    <div className="time-controls">
+    <div className="time-controls" role="group" aria-label="Time" data-label="Time">
       <div className={`week${game.phase === "incident" ? " is-incident" : ""}`}><span className="brand-week"><Icon name={game.phase === "incident" ? "incident" : "week"} size={16} />
         <span>Week <strong>{game.turn}</strong><span className="dock-second">Game second <strong data-testid="physical-step">{game.campaign!.step}</strong></span></span>
       </span></div>

@@ -15,7 +15,7 @@ function HealthEntry() {
     const [open, setOpen] = useState(false);
     const game = useGame(s => s.game);
     const health = campaignAppHealth(game);
-    return <><Stat icon={health.icon} kind={health.tone} label="App Health" actionLabel="View app health"
+    return <><Stat icon="health" kind={health.tone} label="App Health" actionLabel="View app health"
         tip={`${health.word}. See estimated response time, failed requests and requests waiting.`}
         onClick={() => { useGame.getState().setRunning(false); setOpen(true); }}>
         <strong>{health.word}</strong>

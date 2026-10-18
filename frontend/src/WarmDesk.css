@@ -1,0 +1,99 @@
+/* Approved Warm Desk direction. Shared surfaces and controls keep both modes in the same visual language. */
+.btn, .act, .action, .icon-btn, .chip, .account-chip { border-radius: var(--radius); }
+.btn { min-height: 44px; border-width: 1px; border-color: var(--control-edge); }
+.btn.btn-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn.btn-primary:hover:not(:disabled) { background: #40334f; }
+.btn.btn-primary > .icon { color: var(--go); }
+.btn:active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 1px 3px #241a3420; }
+.btn.btn-danger { border-color: var(--critical-ink); }
+.feedback-form button[type="submit"] { width: 11rem; max-width: 100%; height: 44px; }
+.act, .action { border-width: 1px; }
+.concept, .tab-icon { border-radius: 11px; box-shadow: inset 0 1px 0 #ffffff80; }
+.concept-tech { background: var(--tech-tile); color: var(--tech-ink); }
+.modal, .tour, .sheet { border: 1px solid var(--control-edge); border-radius: var(--radius-panel); box-shadow: var(--lift); }
+.side { border: 1px solid var(--control-edge); border-radius: var(--radius-panel); }
+.panel-head { border-bottom: 1px solid var(--control-edge); }
+.topbar .icon-btn, .account-chip { border-color: #584866; background: #352c48; color: var(--paper); }
+.topbar .icon-btn:hover:not(:disabled), .account-chip:hover { background: #453856; }
+.topbar .stat { border-radius: var(--radius); }
+.topbar .stat .stat-icon { display: flex; }
+
+/* Cream dock, three quiet labels, and distinct primary/secondary/selected controls. */
+.app .controls-dock { background: var(--paper); color: var(--ink); border-top: 3px solid #d4c098; box-shadow: inset 0 1px 0 #fffdf7; }
+.controls-dock [data-label] { padding-top: 19px; }
+.controls-dock [data-label]::before { content: attr(data-label); position: absolute; top: 8px; margin-left: 6px; font: 500 var(--text-xs)/1.2 var(--font-display); color: var(--text-soft); letter-spacing: .07em; text-transform: uppercase; }
+.app .controls-dock .view-tabs button { background: transparent; color: var(--ink); border-color: transparent; border-width: 1px; box-shadow: none; }
+.app .controls-dock .view-tabs button:hover:not(:disabled) { background: var(--control-inset); }
+.app .controls-dock .view-tabs button.is-active { background: var(--selection); box-shadow: inset 0 -2px 0 #b7a1c7; }
+.app .controls-dock .view-tabs button[data-view="tech"] .tab-icon { background: var(--tech-tile); color: var(--tech-ink); }
+.app .controls-dock .view-tabs button[data-view="history"] .tab-icon { background: #dce6f3; color: #3e5a77; }
+.app .controls-dock .view-tabs .badge { background: transparent; color: var(--text-soft); border-color: transparent; }
+.app .controls-dock .room-controls { border-color: var(--control-edge); }
+.app .controls-dock .dock-menu > summary { background: #faf0de; color: var(--ink); border: 1px solid var(--control-edge); box-shadow: inset 0 1px 0 #fffdf7, 0 2px 0 #e3d4bb; }
+.app .controls-dock .dock-menu > summary:hover { background: #ecdfc9; }
+.app .controls-dock .dock-menu[open] > summary { background: var(--selection); }
+.controls-dock .dock-menu > summary > .icon:last-child { margin-left: auto; flex: none; }
+.app .controls-dock .room-menu > summary { width: 148px; }
+.app .controls-dock .view-mode-menu > summary { width: 148px; }
+.app .controls-dock .view-mode-menu.is-walking > summary { background: #d7eee0; color: #315845; }
+.app .controls-dock .floor-number { border-radius: 8px; background: #e6d8c0; color: #594766; font-variant-numeric: tabular-nums; }
+.app .controls-dock .dock-panel { border: 1px solid var(--control-edge); border-radius: 20px; box-shadow: var(--lift); }
+.controls-dock .view-mode-options { display: grid; gap: 6px; }
+.controls-dock .view-mode-options button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 60px; padding: 10px; text-align: left; color: var(--ink); background: var(--control-inset); border: 1px solid var(--control-edge); border-radius: var(--radius); }
+.controls-dock .view-mode-options button > span { display: grid; gap: 3px; }
+.controls-dock .view-mode-options small { font-family: var(--font-body); font-size: var(--text-sm); }
+.controls-dock .view-mode-options button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.controls-dock .mobile-room-tools h3 { margin-top: 16px; }
+.app .controls-dock .camera-buttons button, .app .controls-dock .speed button, .app .controls-dock .floor-button { background: var(--control-inset); border: 1px solid var(--control-edge); border-radius: var(--radius); color: var(--ink); box-shadow: 0 2px 0 #e3d4bb; }
+.app .controls-dock .floor-button.is-here, .app .controls-dock .speed button.is-active { background: var(--ink); color: var(--paper); }
+.app .controls-dock .floor-button.is-here .floor-number { background: var(--go); color: var(--ink); }
+.app .controls-dock .brand-week, .app .controls-dock .week { color: var(--ink); }
+.app .controls-dock .brand-week strong { color: var(--ink); }
+.app .controls-dock .dock-second { color: var(--text-soft); }
+.app .controls-dock .dock-primary { background: var(--ink); color: var(--paper); border: 1px solid var(--ink); }
+.app .controls-dock .dock-primary:hover:not(:disabled) { background: #40334f; }
+.app .controls-dock .dock-primary > .icon { width: 30px; height: 30px; padding: 5px; border-radius: 9px; color: var(--ink); background: var(--go); }
+
+/* The purchase card uses the same paper and primary action as other dialogs. Its measured layout is preserved. */
+.campaign-action-popover { background: var(--paper); color: var(--ink); border: 1px solid var(--control-edge); border-radius: var(--radius-panel); font-size: var(--text-sm); }
+.campaign-action-popover .muted, .campaign-action-popover .row dt, .campaign-action-popover .campaign-purchase-details > summary { color: var(--text-soft); }
+.campaign-action-popover .campaign-action-machine { color: var(--text-soft); border-bottom-color: var(--control-edge); }
+.campaign-action-popover .campaign-action-machine b { color: #315845; }
+.campaign-action-popover .campaign-action-confirm-title { color: var(--ink); }
+.campaign-action-popover .row, .campaign-action-popover .campaign-purchase-footer { border-color: var(--control-edge); }
+.campaign-action-popover .btn-row { background: var(--paper); }
+.campaign-action-popover .campaign-purchase-note { color: var(--text-soft); }
+.campaign-action-popover[data-side]::before { background: var(--control-edge); }
+
+@media (max-width: 1250px) {
+  .controls-dock .room-controls[data-label] { padding-top: 0; }
+  .controls-dock .room-controls[data-label]::before { position: static; margin-right: auto; }
+}
+@media (max-width: 900px) {
+  /* Keep Healthy on one line; longer statuses wrap inside their card. */
+  .topbar .stat-action[aria-label="View app health"] { gap: 3px; }
+  .topbar .stat-action[aria-label="View app health"] .stat-body { flex: none; width: max-content; max-width: calc(100% - 15px); }
+  .topbar .stat-action[aria-label="View app health"] .stat-body > strong { white-space: normal; overflow-wrap: anywhere; }
+  .topbar .stat-action[aria-label="View app health"] .stat-icon { min-width: 12px; flex: 0 1 22px; }
+  .topbar .stat-action[aria-label="View app health"] .stat-icon .concept { width: 100%; height: auto; aspect-ratio: 1; }
+  .topbar .stat-action[aria-label="View app health"] .stat-icon .icon { max-width: 100%; max-height: 100%; }
+  .topbar .stat .stat-icon .concept { width: 22px; height: 22px; }
+  .topbar .stat .stat-icon .icon { width: 16px; height: 16px; }
+}
+@media (max-width: 640px) {
+  .topbar .stat-action[aria-label="View app health"] { padding-inline: 1px; }
+  .topbar .stat-action[aria-label="View app health"] .stat-icon { flex-basis: 18px; }
+  .controls-dock [data-label] { padding-top: 0; }
+  .controls-dock [data-label]::before { display: none; }
+  .app .controls-dock .room-controls { width: 148px; }
+  .app .controls-dock .room-menu > summary { width: 148px; }
+  .controls-dock .summary-floor-number { display: none; }
+  .topbar .stat .stat-icon .concept { width: 18px; height: 18px; }
+}
+@media (max-width: 360px) {
+  .topbar .stat { padding: 3px; gap: 3px; min-width: 0; }
+  .topbar .stat .stat-icon { flex: none; }
+  .topbar .stat .stat-body { min-width: 0; flex: 1; }
+  .topbar .stat .stat-body > strong { font-size: var(--text-xs); white-space: nowrap; }
+}
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } }

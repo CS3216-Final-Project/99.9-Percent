@@ -11,6 +11,7 @@ import '@fontsource/source-sans-3/latin-600.css'
 import '@fontsource/source-sans-3/latin-700.css'
 import './index.css'
 import App from './App.tsx'
+import './WarmDesk.css'
 import { useGame } from './game/store'
 import { startProductAnalyticsUnlessOptedOut } from './lib/analytics'
 

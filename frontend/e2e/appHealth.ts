@@ -1,7 +1,17 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, expectRoom, savedGame, seedSave, tutorial } from "./fixtures";
 import { newGame } from "../src/sim";
 import { step } from "../src/sim/step";
+
+async function healthWordFits(entry: Locator) {
+    const entryBox = (await entry.boundingBox())!, textBox = (await entry.locator("strong").boundingBox())!;
+    const textLines = await entry.locator("strong").evaluate(el => {
+        const range = document.createRange(); range.selectNodeContents(el); return range.getClientRects().length;
+    });
+    expect(textLines).toBe(1); // Short status words stay whole, including on narrow phones.
+    expect(textBox.x).toBeGreaterThanOrEqual(entryBox.x);
+    expect(textBox.x + textBox.width).toBeLessThanOrEqual(entryBox.x + entryBox.width);
+}
 
 export async function appHealthJourney(page: Page, width: number, height: number, touch = false) {
     await page.setViewportSize({ width, height });
@@ -12,13 +22,7 @@ export async function appHealthJourney(page: Page, width: number, height: number
     await expectRoom(page);
     const before = (await savedGame(page)).campaign;
     const entry = page.getByRole("button", { name: "View app health", exact: true });
-    const entryBox = (await entry.boundingBox())!, textBox = (await entry.locator("strong").boundingBox())!;
-    const textLines = await entry.locator("strong").evaluate(el => {
-        const range = document.createRange(); range.selectNodeContents(el); return range.getClientRects().length;
-    });
-    expect(textLines).toBe(1); // Healthy remains one readable word, including at 320px.
-    expect(textBox.x).toBeGreaterThanOrEqual(entryBox.x);
-    expect(textBox.x + textBox.width).toBeLessThanOrEqual(entryBox.x + entryBox.width);
+    await healthWordFits(entry);
     if (touch) await entry.tap();
     else {
         await entry.focus(); await expect(page.getByRole("tooltip")).toContainText("estimated response time");
@@ -92,6 +96,7 @@ export async function appHealthProblem(page: Page, touch = false) {
     await seedSave(page, game); await page.goto("/");
     await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
     const entry = page.getByRole("button", { name: "View app health", exact: true });
+    await healthWordFits(entry);
     if (touch) await entry.tap(); else { await entry.hover(); await expect(page.getByRole("tooltip")).toContainText("Incident"); await entry.click(); }
     const dialog = page.getByRole("dialog", { name: "App Health", exact: true });
     await expect(dialog.getByRole("heading", { name: "Incident", exact: true })).toBeVisible();
