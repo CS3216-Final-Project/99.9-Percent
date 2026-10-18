@@ -1,5 +1,6 @@
 import { completeTutorial, advanceCampaignStep, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
+import { advanceSteps } from "../src/sim/step";
 
 test("new players see Guided Mode first with Challenge Mode locked", async ({ page }) => {
   await page.goto("/");
@@ -24,8 +25,8 @@ test("new players see Guided Mode first with Challenge Mode locked", async ({ pa
 // The room stays mounted while the game underneath it is swapped, so this journey keeps drawing it.
 test("switches between Guided Mode and unlocked Challenge Mode from the menu, keeping each run", async ({ page , installClock}) => {
  await installClock();
-  await unlockChallenge(page);
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await completeTutorial(page);
+  await seedSave(page, advanceSteps(newGame(1, "mode-switch"), 1).state, { challengeUnlocked: true });
+  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
   await advanceCampaignStep(page);
   const campaign = await savedGame(page);
@@ -53,7 +54,8 @@ test("switches between Guided Mode and unlocked Challenge Mode from the menu, ke
 
 test("the menu offers a disabled unlock instead of a switch while Challenge Mode is locked", async ({ page, withoutRoom }) => {
   await withoutRoom();
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await completeTutorial(page);
+  await seedSave(page, newGame(1, "locked-mode"));
+  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
   await expect(menu.getByRole("region", { name: "Game mode" })).toContainText("Complete the first five Guided Mode chapters to unlock Challenge Mode.");

@@ -1,12 +1,13 @@
 import type { Page } from "@playwright/test";
-import { expect, expectRoom, savedGame, tutorial, nextChapterZero, finishChapterZero } from "./fixtures";
+import { expect, savedGame, seedSave, tutorial, finishChapterZero } from "./fixtures";
+import { newGame } from "../src/sim";
 
 /** Chapter 0 explains finances in the card; the real Finance dialog remains available after completion. */
 export async function financeDuringWalkthrough(page: Page, touch = false) {
+  await seedSave(page, newGame(1, "finance-lesson"), { tutorialDone: false, walkthroughStep: 9, walkthroughFurthestStep: 9 });
   await page.route("**/api/**", route => route.abort()); await page.goto("/");
-  await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await expectRoom(page);
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
   const card = tutorial(page);
-  for (let lesson = 1; lesson < 10; lesson++) await nextChapterZero(page, touch);
   await expect(card).toHaveAccessibleName("Tutorial, step 10 of 21");
   await expect(card).toContainText("Example · Week 1 settlement");
   await expect(page.getByRole("dialog")).toHaveCount(1);

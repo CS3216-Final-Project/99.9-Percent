@@ -77,12 +77,16 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
-      - name: Cache Chromium
+      - name: Read the locked Playwright version
+        id: playwright
+        run: node -e "process.stdout.write('version=' + require('@playwright/test/package.json').version + '\n')" >> "$GITHUB_OUTPUT"
+      - name: Cache Chromium headless shell
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/package-lock.json') }}
-      - run: npx playwright install --with-deps chromium
+          # Unrelated npm dependency updates do not invalidate the browser download.
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-shell-${{ steps.playwright.outputs.version }}
+      - run: npx playwright install --with-deps --only-shell chromium
       # Each runner keeps one worker: software WebGL needs its CPU to itself.
       - name: Browser journeys against the production build
         run: node scripts/browser-shards.mjs ${{ matrix.shard }}/${{ strategy.job-total }}

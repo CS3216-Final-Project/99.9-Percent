@@ -9,7 +9,8 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     // Only the upgrade path inspects a machine by clicking it in the room.
     const room = path === "upgrade";
     if (!room) await withoutRoom();
-    await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await completeTutorial(page);
+    await seedSave(page, newGame(1, `opening-${path}`));
+    await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
     if (room) await expectRoom(page);
     if (room) {
       // The Opening pauses itself at the first incident. Keep native scene frames
@@ -108,7 +109,8 @@ test("resumes an incident paused", async ({ page, withoutRoom }) => {
 test("keeps the room playable without downloaded furniture", async ({ page , installClock}) => {
  await installClock();
   await page.route("**/models/**", route => route.abort());
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await completeTutorial(page);
+  await seedSave(page, newGame(1, "missing-furniture"));
+  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page); const before=(await savedGame(page)).campaign!.step; await advanceCampaignStep(page);
   expect((await savedGame(page)).campaign!.step).toBe(before+1);
 });

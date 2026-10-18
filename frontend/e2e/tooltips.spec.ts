@@ -1,8 +1,10 @@
 import { openCameraControls } from "./fixtures";
-import { completeTutorial, test, expect, expectRoom } from "./fixtures";
+import { test, expect, expectRoom, seedSave } from "./fixtures";
+import { newGame } from "../src/sim";
 
 test("explains controls in the shared tooltip, never the browser's own", async ({ page }) => {
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await completeTutorial(page);
+  await seedSave(page, newGame(1, "tooltips"));
+  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
   await expect(page.locator("[title]")).toHaveCount(0);
 
@@ -31,9 +33,9 @@ test("explains controls in the shared tooltip, never the browser's own", async (
   await expect(tip).toBeHidden();
 });
 
-test("explains a locked control, which is where the reason for being locked is shown", async ({ page }) => {
+test("explains a locked control, which is where the reason for being locked is shown", async ({ page, withoutRoom }) => {
+  await withoutRoom();
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
-  await expectRoom(page);
   const run = page.getByRole("button", { name: "Run", exact: true });
   await expect(run).toBeDisabled();
   await run.hover();

@@ -12,13 +12,23 @@ export function collectTests(report) {
     for (const spec of suite.specs ?? []) for (const test of spec.tests) {
       const file = spec.file.replaceAll('\\', '/');
       const title = [test.projectName, file, ...parents, spec.title];
-      tests.push({ key: '[' + title[0] + '] › ' + title.slice(1).join(' › '), duration: Math.max(0, ...(test.results ?? []).map(result => result.duration)) });
+      tests.push({ key: '[' + title[0] + '] › ' + title.slice(1).join(' › '), duration: Math.max(0, ...(test.results ?? []).map(result => result.duration)), cleanRun: test.status === 'expected' && test.results?.length === 1 && test.results[0].status === 'passed' });
     }
     for (const child of suite.suites ?? []) visit(child, [...parents, child.title]);
   }
   // Top-level suites name files; the list format already supplies that file separately.
   for (const suite of report.suites) visit(suite);
   return tests;
+}
+
+/** Failed, skipped and retried cases keep the conservative fallback until cleanly measured. */
+export function recordDurations(reports) {
+  const durations = {};
+  for (const report of reports) for (const test of collectTests(report)) {
+    if (test.cleanRun && test.duration > 0) durations[test.key] = Math.max(durations[test.key] ?? 0, test.duration);
+  }
+  if (!Object.keys(durations).length) throw Error('Reports contain no clean passing measurements');
+  return Object.fromEntries(Object.entries(durations).sort());
 }
 
 export function balanceTests(tests, durations, count) {
@@ -39,12 +49,8 @@ function main() {
   const [selection, ...extra] = process.argv.slice(2);
   if (selection === '--record') {
     if (!extra.length) throw Error('Provide browser-timings.json reports from a complete CI run');
-    const durations = {};
-    for (const path of extra) for (const test of collectTests(JSON.parse(readFileSync(path, 'utf8')))) {
-      if (test.duration > 0) durations[test.key] = Math.max(durations[test.key] ?? 0, test.duration);
-    }
-    if (!Object.keys(durations).length) throw Error('Reports contain no measured tests');
-    writeFileSync(join(root, 'e2e/browser-durations.json'), JSON.stringify(Object.fromEntries(Object.entries(durations).sort()), null, 2) + '\n');
+    const durations = recordDurations(extra.map(path => JSON.parse(readFileSync(path, 'utf8'))));
+    writeFileSync(join(root, 'e2e/browser-durations.json'), JSON.stringify(durations, null, 2) + '\n');
     console.log('Recorded ' + Object.keys(durations).length + ' test durations');
     return;
   }
