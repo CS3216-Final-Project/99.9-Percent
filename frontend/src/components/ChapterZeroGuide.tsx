@@ -149,7 +149,9 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
     : null;
   const last = index === lessons.length - 1;
   // A real dialog over the game (Menu, Finance) has the player's attention; the guide waits behind it.
-  const position = cardStyle(target ? box : null, placeFor(lit ?? ""), viewport.w, viewport.h, viewport.w, cardHeight, CARD_WIDTH);
+  // Menu and sound stay reachable above a card docked to the top of a phone.
+  const topbar = typeof document === "undefined" ? undefined : document.querySelector(".topbar")?.getBoundingClientRect().bottom;
+  const position = cardStyle(target ? box : null, placeFor(lit ?? ""), viewport.w, viewport.h, viewport.w, cardHeight, CARD_WIDTH, topbar ? Math.round(topbar) + 8 : 12);
   return <>
     {!covered && <div className={`cz-spotlight${box && target ? "" : " is-full"}`} aria-hidden="true"
       style={box && target ? { left: box.x, top: box.y, width: box.w, height: box.h } : undefined}>

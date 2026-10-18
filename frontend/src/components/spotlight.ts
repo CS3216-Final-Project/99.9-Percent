@@ -24,15 +24,16 @@ export function placeFor(selector: string): Place {
 
 /**
  * `edge` is where the open room ends on the right: a panel there is left uncovered when the target is in the room.
- * `width` is the card's width on wide screens.
+ * `width` is the card's width on wide screens. `topInset` keeps a card docked to the top of a small screen below
+ * controls that must stay reachable, such as Menu.
  */
-export function cardStyle(box: Box | null, place: Place, vw: number, vh: number, edge = vw, height = 240, width = 280): CSSProperties {
+export function cardStyle(box: Box | null, place: Place, vw: number, vh: number, edge = vw, height = 240, width = 280, topInset = 12): CSSProperties {
   const W = Math.min(width, vw - 24);
   if (!box) return { left: (vw - W) / 2, top: "50%", transform: "translateY(-50%)", width: W };
   // On small screens the card docks to the edge with more room beside the target, and never grows into it.
   if (vw < 900) {
-    const gap = 10, above = box.y - gap - 12, below = vh - (box.y + box.h) - gap - 12;
-    return below >= above ? { left: 12, right: 12, bottom: 12, maxHeight: Math.max(120, below) } : { left: 12, right: 12, top: 12, maxHeight: Math.max(120, above) };
+    const gap = 10, above = box.y - gap - topInset, below = vh - (box.y + box.h) - gap - 12;
+    return below >= above ? { left: 12, right: 12, bottom: 12, maxHeight: Math.max(120, below) } : { left: 12, right: 12, top: topInset, maxHeight: Math.max(120, above) };
   }
   const gap = 14;
   const x = (v: number) => clamp(v, 12, vw - W - 12);
