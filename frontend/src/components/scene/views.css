@@ -203,6 +203,20 @@
   pointer-events: none;
 }
 
+.map-names text.is-entered {
+  animation: map-entered 1.6s ease-out;
+}
+
+@keyframes map-entered {
+  0%,
+  35% {
+    fill: var(--ink);
+    stroke: var(--go);
+    stroke-width: 0.5px;
+    paint-order: stroke;
+  }
+}
+
 .map-crew circle {
   fill: var(--c-tech);
   stroke: var(--ink);

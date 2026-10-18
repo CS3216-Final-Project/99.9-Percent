@@ -25,6 +25,7 @@ import {
 } from "./views";
 import { wallUp, type WallId } from "./wallState";
 import { cameras, lookApi, resetRig, rig, setViewFade, viewNow } from "./viewState";
+import { sceneSound } from "./sceneSounds";
 
 /*
  * The views from the avatar (see views.ts): a perspective camera that follows a few metres behind it or looks through
@@ -34,6 +35,8 @@ import { cameras, lookApi, resetRig, rig, setViewFade, viewNow } from "./viewSta
 
 /** Q, E and the rotate buttons swing the view by an eighth of a circle, as in the overview. */
 const SWING = Math.PI / 4;
+/** How loud the whoosh of a change of view is, as a share of the effects volume. */
+const WHOOSH = 0.5;
 
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 /** A mouse or trackpad, where clicking the room in first person takes the pointer for looking round. */
@@ -251,9 +254,12 @@ export function ViewRig() {
         rig.trailing = null;
       }
       if (want !== "first") letGoOfPointer();
+      // The room was only just drawn: the view it opens in is not a change worth hearing.
+      if (rig.started) sceneSound("whoosh", WHOOSH);
       rig.move = { from, to: want, at: t, pose: viewNow.perspective ? rig.drawn : null, cut: false };
       viewNow.want = want;
     }
+    rig.started = true;
 
     const m = rig.move;
     const crossing = !!m && (m.from === "overview" || m.to === "overview");

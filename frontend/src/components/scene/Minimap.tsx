@@ -22,7 +22,7 @@ import {
 } from "./floorplan";
 import { ROOM } from "./layout";
 import { FLOOR_NUMBER } from "./levels";
-import { whereLine } from "./places";
+import { placeAt, whereLine } from "./places";
 import "./views.css";
 import { ride, riding } from "./ride";
 import { buildModel, racksOf } from "./sceneModel";
@@ -70,8 +70,14 @@ const shape = (o: Obstacle, key: string) =>
     <circle key={key} cx={o.disc[0]} cy={o.disc[1]} r={o.disc[2]} />
   );
 
+/** A zone just entered, glowing on the plan for a moment; `n` counts entries, so entering again glows again. */
+interface Entered {
+  name: string;
+  n: number;
+}
+
 /** The still part of a floor's plan: walls, glass, the shaft, furniture and the zones' names. */
-function Plan({ floor, racks }: { floor: Floor; racks: Racks }) {
+function Plan({ floor, racks, entered }: { floor: Floor; racks: Racks; entered: Entered | null }) {
   const furniture = floor === "office" ? [...OBSTACLES, ...ROOM_OBSTACLES] : serverObstacles(racks);
   const glass = floor === "office" ? GLASS : SERVER_GLASS;
   const names: [string, number, number][] =
@@ -92,11 +98,17 @@ function Plan({ floor, racks }: { floor: Floor; racks: Racks }) {
       </g>
       <rect className="map-walls" x={ROOM.x0} y={ROOM.z0} width={ROOM.w} height={ROOM.d} />
       <g className="map-names">
-        {names.map(([name, x, z]) => (
-          <text key={name} x={x} y={z}>
-            {name}
-          </text>
-        ))}
+        {names.map(([name, x, z]) =>
+          entered?.name === name ? (
+            <text key={`${name}-${entered.n}`} className="is-entered" x={x} y={z}>
+              {name}
+            </text>
+          ) : (
+            <text key={name} x={x} y={z}>
+              {name}
+            </text>
+          ),
+        )}
       </g>
     </>
   );
@@ -120,6 +132,9 @@ export function Minimap({ onFloor }: { onFloor: (floor: Floor) => void }) {
     const a = avatarSpot(walking);
     return whereLine(a.floor, a.x, a.z, a.to);
   });
+  const [entered, setEntered] = useState<Entered | null>(null);
+  /** The place the avatar was last in on foot, to tell when it walks into another. */
+  const place = useRef<string | null>(null);
 
   // Follow the avatar and the crew a few times a second while the map is open, and the line whenever it changes.
   useEffect(() => {
@@ -128,6 +143,10 @@ export function Minimap({ onFloor }: { onFloor: (floor: Floor) => void }) {
       const a = avatarSpot(walking);
       const line = whereLine(a.floor, a.x, a.z, a.to);
       setWhere((was) => (was === line ? was : line));
+      // A zone walked into glows on the plan for a moment.
+      const now = walking && !a.to ? placeAt(a.floor, a.x, a.z) : null;
+      if (now && place.current && now !== place.current) setEntered((was) => ({ name: now, n: (was?.n ?? 0) + 1 }));
+      place.current = now;
       if (open) redraw((n) => (n + 1) % 1e6);
     };
     tick();
@@ -184,7 +203,7 @@ export function Minimap({ onFloor }: { onFloor: (floor: Floor) => void }) {
         </button>
       </div>
       <svg ref={svg} className="map-plan" viewBox={`${BOX.x} ${BOX.z} ${BOX.w} ${BOX.d}`} aria-hidden="true" onClick={click}>
-        <Plan floor={floor} racks={model.racks} />
+        <Plan floor={floor} racks={model.racks} entered={entered} />
         <g className="map-crew">
           {crew.map(([x, z], i) => (
             <circle key={i} cx={x} cy={z} r={0.42} />

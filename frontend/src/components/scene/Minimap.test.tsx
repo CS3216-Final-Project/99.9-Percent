@@ -62,6 +62,8 @@ describe("the map", () => {
     });
     expect(where()).toBe("Games room, office floor");
     expect(document.querySelector(".map-avatar")).not.toBeNull();
+    // The zone walked into glows on the plan; the one it started in never did.
+    expect([...document.querySelectorAll(".map-names text.is-entered")].map((t) => t.textContent)).toEqual(["Games room"]);
   });
 
   it("marks the equipment that needs looking at on its own floor, and tells screen readers in words", () => {

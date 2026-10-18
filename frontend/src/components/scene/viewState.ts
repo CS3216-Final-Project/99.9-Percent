@@ -45,10 +45,12 @@ export const rig = {
   drawn: null as Pose | null,
   /** Where the avatar stood when last seen from, for the overview to pick up. */
   lastSeen: { x: 0, y: 0, z: 0 },
+  /** A frame has been drawn, so a change of view from now on is the player's, and is heard. */
+  started: false,
 };
 
 export function resetRig(): void {
-  Object.assign(rig, { settled: "overview", move: null, trailing: null, drawn: null });
+  Object.assign(rig, { settled: "overview", move: null, trailing: null, drawn: null, started: false });
   Object.assign(viewNow, { want: "overview", perspective: false, inHead: false, spin: 0 });
 }
 

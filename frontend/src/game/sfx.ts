@@ -359,6 +359,15 @@ const SCENE_VOICES = {
     burst(ctx, out, at, hiss, 650, 0.05, hit(ctx, at, 0.12, 0.05));
   },
   hiss: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 2600, 0.38, envelope(ctx, at, 0.38, 0.14, 0.03, 0.3)),
+  /** The view changing: air swept up and back down through a band, soft and quick. */
+  whoosh: (ctx, out, at, hiss) => {
+    const band = filter(ctx, "bandpass", 300);
+    band.Q.value = 0.8;
+    band.frequency.setValueAtTime(300, at);
+    band.frequency.exponentialRampToValueAtTime(1500, at + 0.24);
+    band.frequency.exponentialRampToValueAtTime(400, at + 0.5);
+    noise(ctx, at, at + 0.5, hiss).connect(band).connect(envelope(ctx, at, 0.5, 0.22, 0.2, 0.26)).connect(out);
+  },
   pop: (ctx, out, at) => {
     const o = osc(ctx, "sine", 880, at, at + 0.16);
     o.frequency.setValueAtTime(880, at);
