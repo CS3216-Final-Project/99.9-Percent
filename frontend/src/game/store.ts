@@ -1,6 +1,7 @@
 "use client";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
+import { RUN_LESSON, WALKTHROUGH_LESSONS } from "./walkthrough";
 import { finishedChapter } from "./campaignChapters";
 import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
@@ -52,6 +53,7 @@ import {
   type AudioSettings,
   type ChapterCompletion,
   type ChapterTour,
+  type GuidedTip,
   type GameMode,
   type GraphicsSettings,
   type Meta,
@@ -72,7 +74,9 @@ export type Speed = 0.5 | 1 | 2;
  * Challenge Mode's first-week walkthrough ("basics") and first-incident guide ("incident"); Guided Mode's Opening
  * walkthrough ("campaign") and the short guide for each later chapter, named after it.
  */
-export type TourTrack = "basics" | "incident" | "campaign" | ChapterTour;
+/** A one-card Guided Mode tip shown the first time something happens; see Meta.tipsSeen. */
+export type TipTour = GuidedTip;
+export type TourTrack = "basics" | "incident" | "campaign" | ChapterTour | TipTour;
 
 /** The chapter a Guided Mode company has entered, if it is past the Opening. */
 function chapterTourOf(c: Campaign): ChapterTour | null {
@@ -90,7 +94,7 @@ export interface Tour {
 export type Walkthrough = "basics" | "campaign";
 const isWalkthrough = (track: TourTrack): track is Walkthrough => track === "basics" || track === "campaign";
 /** How many lessons each walkthrough has. Chapter 0 finishes only on its explicit Finish action. */
-export const WALKTHROUGH_STEPS: Record<Walkthrough, number> = { basics: 5, campaign: 21 };
+export const WALKTHROUGH_STEPS: Record<Walkthrough, number> = { basics: 5, campaign: WALKTHROUGH_LESSONS };
 const lastStep = (track: Walkthrough) => WALKTHROUGH_STEPS[track] - 1;
 /**
  * Guided Mode's Opening walkthrough holds the clock until Finish, except for its bounded real Run exercise,
@@ -100,11 +104,11 @@ const lastStep = (track: Walkthrough) => WALKTHROUGH_STEPS[track] - 1;
  */
 export function walkthroughHoldsClock(s: { game: GameState; tour: Tour | null }): boolean {
   return !!s.game.campaign && s.game.phase === "management" && s.tour?.track === "campaign"
-    && !(s.tour.step === 5 && s.tour.clockUntil != null && s.game.campaign.step < s.tour.clockUntil);
+    && !(s.tour.step === RUN_LESSON && s.tour.clockUntil != null && s.game.campaign.step < s.tour.clockUntil);
 }
 
 /** The game second Chapter 0's Run lesson lets the clock reach, while that lesson is open. */
-const runLessonLimit = (tour: Tour | null) => tour?.track === "campaign" && tour.step === 5 ? tour.clockUntil : undefined;
+const runLessonLimit = (tour: Tour | null) => tour?.track === "campaign" && tour.step === RUN_LESSON ? tour.clockUntil : undefined;
 
 /** What started a walkthrough: the first visit, resuming a fresh run, a new company, the menu or the home screen. */
 export type TourStart = "first_visit" | "resume" | "new_company" | "menu" | "home";
@@ -433,7 +437,7 @@ export const useGame = create<Store>()((set, get) => {
     const replaying = meta.tutorialDone && meta.walkthroughStep !== null;
     if (!replaying && (meta.tutorialDone || chapterTourOf(game.campaign!))) return null;
     const step = Math.min(meta.walkthroughStep ?? 0, lastStep("campaign"));
-    return { track: "campaign", step, ...(step === 5 ? { clockUntil: get().tutorialCompany ? 1 : game.campaign!.step + 1 } : {}) };
+    return { track: "campaign", step, ...(step === RUN_LESSON ? { clockUntil: get().tutorialCompany ? 1 : game.campaign!.step + 1 } : {}) };
   }
   /** The change that takes the view to `floor`, recorded for the analytics; nothing if it is there already. */
   function floorPatch(floor: Floor, how: FloorSwitch): Partial<Store> {
@@ -507,6 +511,15 @@ export const useGame = create<Store>()((set, get) => {
           saveMeta(meta);
           Object.assign(patch,{meta,tour:{track:chapter,step:0},running:false});
         }
+      }
+      // The first settled operating week explains itself once, paused, at the first calm moment in the Opening
+      // (its incident can still be running when the week settles), unless another guide is already showing.
+      const tips=(patch.meta??get().meta).tipsSeen??[];
+      if(was?.runId===c.runId&&c.settlements.length>0&&!tips.includes("settlement")&&!chapterTourOf(c)&&!get().tutorialCompany
+        &&!get().tour&&!patch.tour&&next.phase==="management"&&!awaitingAcknowledgement(c)) {
+        const meta={...(patch.meta??get().meta),tipsSeen:[...tips,"settlement" as const]};
+        saveMeta(meta);
+        Object.assign(patch,{meta,tour:{track:"settlement",step:0},running:false});
       }
       get().measureTime();
       patch.measurement=projectEvents(get().measurement,next,new Date().toISOString());
@@ -1166,7 +1179,7 @@ export const useGame = create<Store>()((set, get) => {
       if (!tour) return;
       if (tour.track === "campaign" && tour.step >= lastStep("campaign")) return;
       const step = tour.step + 1;
-      const next: Tour = { track: tour.track, step, ...(tour.track === "campaign" && step === 5 ? { clockUntil: get().tutorialCompany ? 1 : get().game.campaign!.step + 1 } : {}) };
+      const next: Tour = { track: tour.track, step, ...(tour.track === "campaign" && step === RUN_LESSON ? { clockUntil: get().tutorialCompany ? 1 : get().game.campaign!.step + 1 } : {}) };
       set({ tour: next });
       if (!isWalkthrough(tour.track)) return;
       // Challenge Mode retains its short spotlight guide; Chapter 0 requires explicit completion.
@@ -1180,7 +1193,7 @@ export const useGame = create<Store>()((set, get) => {
       const { tour, meta } = get();
       if (tour?.track !== "campaign" || tour.step <= 0) return;
       const step = tour.step - 1;
-      set({ tour: { track: tour.track, step, ...(step === 5 ? { clockUntil: get().tutorialCompany ? 1 : get().game.campaign!.step + 1 } : {}) }, running: false, meta: walkthroughAt(meta, step) });
+      set({ tour: { track: tour.track, step, ...(step === RUN_LESSON ? { clockUntil: get().tutorialCompany ? 1 : get().game.campaign!.step + 1 } : {}) }, running: false, meta: walkthroughAt(meta, step) });
       persist();
     },
     dismissChapterComplete: () => set({ chapterComplete: null }),

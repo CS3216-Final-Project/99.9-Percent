@@ -6,7 +6,8 @@ type GameStore = Pick<typeof useGame, "getState" | "subscribe">;
 export type AnalyticsProperties = Record<string, string | number | boolean | null>;
 export type AnalyticsSink = (name: string, properties: AnalyticsProperties) => void;
 export const ANALYTICS_STORAGE_KEY = "nn.product-analytics.v1";
-export const CAMPAIGN_CONTENT_VERSION = "chapters-v1";
+/** v2: the 10-lesson Chapter 0 walkthrough; tutorial steps from v1 count a different lesson list. */
+export const CAMPAIGN_CONTENT_VERSION = "chapters-v2";
 export const HEARTBEAT_MS = 15_000;
 export const IDLE_MS = 120_000;
 

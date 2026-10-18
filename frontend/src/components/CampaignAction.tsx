@@ -5,6 +5,7 @@ import { previewCampaignAction } from "@/game/campaignFinance";
 import { PurchaseFinance, PurchaseTile, PurchaseWarning } from "./PurchaseFinance";
 import { useGame } from "@/game/store";
 import { floorOf } from "@/game/floors";
+import { lessonAt } from "@/game/walkthrough";
 import { moneyFull as money } from "@/game/format";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
@@ -45,8 +46,8 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   const { game, selectedAppId } = useGame();
   const c = game.campaign!, id = useId(), card = useRef<HTMLDivElement>(null);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
-  const quoteLesson = useGame(s => s.started && !s.onboarding && s.game.phase === "management" && s.tour?.track === "campaign" ? s.tour.step : -1);
-  const practiceQuote = quoteLesson === 6 || quoteLesson === 7;
+  const quoteLesson = useGame(s => s.started && !s.onboarding && s.game.phase === "management" && s.tour?.track === "campaign" ? lessonAt(s.tour.step) : undefined);
+  const practiceQuote = quoteLesson === "quote" || quoteLesson === "cancel";
   const open = confirming === props.label;
   const restoreFocus = useRef(false);
   useLayoutEffect(()=>{
@@ -144,7 +145,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     };
   // Reapply on opening even if this action was already highlighted by hover before the click.
   }, [highlight, affectedKey, props.label, open]);
-  const cancel = () => { if (quoteLesson === 6) return; restoreFocus.current=true; setConfirming(null, true); };
+  const cancel = () => { if (quoteLesson === "quote") return; restoreFocus.current=true; setConfirming(null, true); };
   const costs = <>
     {preview?.ok ? <PurchaseFinance preview={preview} /> : <dl className="purchase-tiles">
       {props.price !== undefined && <PurchaseTile icon="cost" label="Setup" value={money(props.price)} tone={props.price > 0 ? "cost" : "ok"} />}
@@ -222,7 +223,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
             dispatched.current = true;
             setConfirming(null); props.onClick();
           }}>Confirm</button>
-          <button type="button" className="btn btn-small" disabled={quoteLesson === 6} onClick={cancel}>Cancel</button>
+          <button type="button" className="btn btn-small" disabled={quoteLesson === "quote"} onClick={cancel}>Cancel</button>
         </div>
         </footer>
       </section>

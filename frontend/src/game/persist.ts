@@ -1,3 +1,4 @@
+import { currentStep, WALKTHROUGH_VERSION } from "./walkthrough";
 import { emptyMeasurement, type Measurement, type PlaytestEvent } from "./telemetry";
 import { DEFAULT_AVATAR, isAvatar, type AvatarId } from "./avatars";
 import { decodeSave, makeEnvelope, replaceable } from "./saveEnvelope";
@@ -48,6 +49,10 @@ export interface Meta {
   walkthroughStep: number | null;
   /** Furthest lesson reached, so Back and reload do not repeat completed exercises. Absent in older profiles. */
   walkthroughFurthestStep?: number;
+  /** The lesson list the two steps above index; absent before the 10-lesson walkthrough. */
+  walkthroughVersion?: number;
+  /** One-time Guided Mode tips already shown, such as the first weekly settlement. */
+  tipsSeen?: GuidedTip[];
   /** The short guide shown on the first incident has been seen. */
   incidentGuideDone: boolean;
   /** Guided Mode chapters whose guide has been shown, so it appears once. */
@@ -58,6 +63,9 @@ export interface Meta {
   challengeUnlocked: boolean;
 }
 
+export const GUIDED_TIPS = ["settlement"] as const;
+export type GuidedTip = (typeof GUIDED_TIPS)[number];
+
 export const DEFAULT_META: Meta = {
   onboarded: false,
   runsStarted: 0,
@@ -67,6 +75,8 @@ export const DEFAULT_META: Meta = {
   tutorialDone: false,
   walkthroughStep: null,
   walkthroughFurthestStep: 0,
+  walkthroughVersion: WALKTHROUGH_VERSION,
+  tipsSeen: [],
   incidentGuideDone: false,
   chapterTours: [],
   chapterCompletions: null,
@@ -264,13 +274,15 @@ export function saveClassicGame(game: GameState): boolean {
  * Older metadata also held the music switch, which now lives in the sound settings, and the state of Guided Mode's
  * former three-prompt introduction, which the spotlight walkthrough replaced.
  */
-type StoredMeta = Omit<Partial<Meta>, "chapterTours" | "chapterCompletions" | "walkthroughStep" | "walkthroughFurthestStep"> & {
+type StoredMeta = Omit<Partial<Meta>, "chapterTours" | "chapterCompletions" | "walkthroughStep" | "walkthroughFurthestStep" | "walkthroughVersion" | "tipsSeen"> & {
   music?: unknown;
   openingOnboarding?: unknown;
   chapterTours?: unknown;
   chapterCompletions?: unknown;
   walkthroughStep?: unknown;
   walkthroughFurthestStep?: unknown;
+  walkthroughVersion?: unknown;
+  tipsSeen?: unknown;
 };
 
 function parseMeta(raw: string | null): StoredMeta | null {
@@ -298,11 +310,18 @@ function decodeCompletions(raw: unknown): Meta["chapterCompletions"] {
 
 /** `campaign` reads Guided Mode's profile, where a player done with the former introduction is done with the walkthrough. */
 function decodeMeta(raw: string | null, campaign = false): Meta {
-  const { music: _music, openingOnboarding, chapterTours, chapterCompletions, walkthroughStep, walkthroughFurthestStep, ...stored } = parseMeta(raw) ?? {};
+  const { music: _music, openingOnboarding, chapterTours, chapterCompletions, walkthroughStep, walkthroughFurthestStep, walkthroughVersion, tipsSeen, ...stored } = parseMeta(raw) ?? {};
   const seen = Array.isArray(chapterTours) ? CHAPTER_TOURS.filter((id) => chapterTours.includes(id)) : [];
-  const step = Number.isInteger(walkthroughStep) && (walkthroughStep as number) >= 0 ? (walkthroughStep as number) : null;
-  const furthest = Number.isSafeInteger(walkthroughFurthestStep) && (walkthroughFurthestStep as number) >= 0 ? walkthroughFurthestStep as number : 0;
-  const meta: Meta = { ...DEFAULT_META, ...stored, chapterTours: seen, chapterCompletions: decodeCompletions(chapterCompletions), walkthroughStep: step, walkthroughFurthestStep: Math.max(step ?? 0, furthest) };
+  const tips = Array.isArray(tipsSeen) ? GUIDED_TIPS.filter((id) => tipsSeen.includes(id)) : [];
+  let step = Number.isInteger(walkthroughStep) && (walkthroughStep as number) >= 0 ? (walkthroughStep as number) : null;
+  let furthest = Number.isSafeInteger(walkthroughFurthestStep) && (walkthroughFurthestStep as number) >= 0 ? walkthroughFurthestStep as number : 0;
+  // Guided Mode's lesson indices from an earlier walkthrough are mapped to the lesson now teaching the same thing.
+  if (campaign) {
+    step = step === null ? null : currentStep(step, walkthroughVersion);
+    furthest = currentStep(furthest, walkthroughVersion);
+  }
+  const meta: Meta = { ...DEFAULT_META, ...stored, chapterTours: seen, chapterCompletions: decodeCompletions(chapterCompletions), walkthroughStep: step, walkthroughFurthestStep: Math.max(step ?? 0, furthest),
+    walkthroughVersion: WALKTHROUGH_VERSION, tipsSeen: tips };
   if (campaign && introductionDone(openingOnboarding)) meta.tutorialDone = true;
   return meta;
 }

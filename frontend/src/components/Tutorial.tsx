@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useGame, type TourTrack } from "@/game/store";
 import { floorOf, selectedInView } from "@/game/floors";
 import { num } from "@/game/format";
@@ -8,10 +8,12 @@ import type { EquipmentId } from "@/sim";
 import { pendingStop } from "@/sim/step";
 import { installPending } from "@/sim/reliability";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
+import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { EDGE, openRoomArea } from "./roomArea";
 import ChapterZero from "./ChapterZeroGuide";
 import { CHAPTER_ZERO_LESSONS } from "./chapterZeroLessons";
+import { cardStyle, placeFor, type Box } from "./spotlight";
 
 /**
  * Guided walkthroughs. Each step is a goal ("Add a server") plus one short
@@ -20,7 +22,6 @@ import { CHAPTER_ZERO_LESSONS } from "./chapterZeroLessons";
  */
 
 type Snapshot = ReturnType<typeof useGame.getState>;
-type Place = "top" | "bottom" | "left" | "right";
 
 interface Step {
   title: string;
@@ -175,11 +176,21 @@ const CHAPTERS = {
   ),
 } satisfies Record<string, Step[]>;
 
-const TRACKS: Partial<Record<TourTrack, Step[]>> = { basics: BASICS, incident: INCIDENT, ...CHAPTERS };
+/** One-card Guided Mode tips, shown the first time something happens instead of being taught up front. */
+const TIPS = {
+  settlement: chapter(
+    "Your first week settled",
+    `Every ${Q.periodSteps} game seconds the week settles: pending revenue becomes cash, then equipment and salaries are paid.`,
+    "Keep enough cash for next week's bill before you buy.",
+    ".stat-cash",
+  ),
+} satisfies Record<string, Step[]>;
+
+const TRACKS: Partial<Record<TourTrack, Step[]>> = { basics: BASICS, incident: INCIDENT, ...CHAPTERS, ...TIPS };
 export const BASICS_STEPS = BASICS.length;
 export const CAMPAIGN_STEPS = CHAPTER_ZERO_LESSONS.length;
 
-const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", campaign: "Tutorial", incident: "Incident guide" };
+const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", campaign: "Tutorial", incident: "Incident guide", settlement: "Tip" };
 
 /** Where a track's steps make sense: Guided Mode's also wait for any review or milestone and for open views. */
 function fits(track: TourTrack, s: Snapshot, step: Pick<Step, "inTech">): boolean {
@@ -189,59 +200,10 @@ function fits(track: TourTrack, s: Snapshot, step: Pick<Step, "inTech">): boolea
   return !!c && s.game.phase === "management" && pendingStop(c) === null && !(c.openingMilestone && !c.openingMilestone.acknowledged) && (s.view === null || (!!step.inTech && s.view === "tech"));
 }
 
-interface Box {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
-}
-
 /** Whether a box on screen lies in the part of the room the panel leaves open. */
 function inOpenRoom(r: DOMRect, stage: DOMRect): boolean {
   const { right, bottom } = openRoomArea(stage);
   return r.left >= stage.left + EDGE && r.top >= stage.top + EDGE && r.right <= stage.left + right && r.bottom <= stage.top + bottom;
-}
-
-/** Where the card sits relative to what it points at. */
-function placeFor(selector: string): Place {
-  if (selector.startsWith(".eq-label") || selector.startsWith(".node")) return "right";
-  if (selector.startsWith(".view-tabs") || selector.startsWith(".advance") || selector.startsWith(".campaign-clock") || selector.startsWith(".room-controls")) return "top";
-  if (selector.startsWith(".next-chip") || selector.startsWith(".topbar")) return "bottom";
-  return "left";
-}
-
-/** `edge` is where the open room ends on the right: a panel there is left uncovered when the target is in the room. */
-function cardStyle(box: Box | null, place: Place, vw: number, vh: number, edge = vw, height = 240): CSSProperties {
-  const W = Math.min(280, vw - 24);
-  if (!box) return { left: (vw - W) / 2, top: "50%", transform: "translateY(-50%)", width: W };
-  // On small screens the card docks to whichever edge is away from the target.
-  if (vw < 900) {
-    return box.y + box.h / 2 < vh / 2 ? { left: 12, right: 12, bottom: 12 } : { left: 12, right: 12, top: 12 };
-  }
-  const gap = 14;
-  const x = (v: number) => clamp(v, 12, vw - W - 12);
-  const y = (v: number) => clamp(v, 12, Math.max(12, vh - height - 12));
-  // Never cover the thing being pointed at: flip sides when there is no room.
-  if (place === "left" && box.x - gap - W < 12) place = "right";
-  else if (place === "right" && box.x + box.w + gap + W > edge - 12 && box.x - gap - W >= 12) place = "left";
-  switch (place) {
-    case "bottom":
-      return { left: x(box.x), top: y(box.y + box.h + gap), width: W };
-    case "top":
-      return {
-        left: x(box.x + box.w / 2 < vw / 2 ? box.x : box.x + box.w - W),
-        top: y(box.y - gap - height),
-        width: W,
-      };
-    case "left":
-      return { left: Math.max(12, box.x - gap - W), top: y(box.y - 10), width: W };
-    case "right":
-      return { left: x(box.x + box.w + gap), top: y(box.y), width: W };
-  }
 }
 
 export default function Tutorial() {

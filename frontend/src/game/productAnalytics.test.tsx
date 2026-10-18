@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { act as reactAct, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import App from "@/App";
 import { useGame } from "./store";
+import { WALKTHROUGH_LESSONS } from "./walkthrough";
 import { newGame, newLegacyGame } from "@/sim";
 import { DEFAULT_META, saveClassicGame, saveMeta, saveMode } from "./persist";
 import { preparedReliability, act, tick } from "@/sim/__tests__/reliabilityFixture";
@@ -39,7 +40,7 @@ it("counts actual Campaign play once under StrictMode, never the title screen", 
   expect(named("gameplay_session_started")).toHaveLength(1);
   expect(named("gameplay_chapter_started")[0].properties.chapter_id).toBe("opening");
   expect(named("gameplay_run_started")[0].properties).toMatchObject({
-    mode: "campaign", build_id: "test-build", content_version: "chapters-v1", eligible_started_run: true,
+    mode: "campaign", build_id: "test-build", content_version: "chapters-v2", eligible_started_run: true,
   });
 });
 
@@ -60,9 +61,9 @@ it("reports Guided Mode's walkthrough starting and finishing once each, with no 
   watch(); play();
   expect(tutorial()).toEqual([
     ["gameplay_tutorial_started", "campaign", 0, "first_visit"],
-    ["gameplay_tutorial_completed", "campaign", 20, null],
+    ["gameplay_tutorial_completed", "campaign", WALKTHROUGH_LESSONS - 1, null],
     ["gameplay_tutorial_started", "campaign", 0, "home"],
-    ["gameplay_tutorial_completed", "campaign", 20, null],
+    ["gameplay_tutorial_completed", "campaign", WALKTHROUGH_LESSONS - 1, null],
   ]);
   expect(named("gameplay_tutorial_started")[0].properties).toMatchObject({ mode: "campaign", chapter_id: "opening", progress_step: 0 });
 });
@@ -84,7 +85,7 @@ it("reports Challenge Mode's walkthrough, offered behind the title screen, once 
 it("does not report a walkthrough already under way when it starts observing, only how it ends", () => {
   play(); watch();
   completeTutorialFixture();
-  expect(tutorial()).toEqual([["gameplay_tutorial_completed", "campaign", 20, null]]);
+  expect(tutorial()).toEqual([["gameplay_tutorial_completed", "campaign", WALKTHROUGH_LESSONS - 1, null]]);
 });
 
 it("includes paused planning time, caps idle time, and resumes timing on input", () => {

@@ -7,6 +7,7 @@ import { decodeClassicSave, rawLegacySave, exportGame } from "./persist";
 import { DEFAULT_AUDIO, DEFAULT_GRAPHICS, challengeUnlocked, isSilent, legacyMusicOff, loadAudio, loadGraphics, loadMode, saveAudio, saveGraphics, saveMode } from "./persist";
 import { preparedReliability, act, tick } from "../sim/__tests__/reliabilityFixture";
 import { pendingReliability } from "../sim/reliability";
+import { WALKTHROUGH_LESSON_IDS, WALKTHROUGH_LESSONS, WALKTHROUGH_VERSION, type LessonId } from "./walkthrough";
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 describe("campaign data preservation", () => {
@@ -306,10 +307,34 @@ describe("graphics settings", () => {
 });
 
 it("keeps the furthest completed lessons when revisiting and migrates absent or corrupt progress", () => {
-  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 1, walkthroughFurthestStep: 8 }));
+  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 1, walkthroughFurthestStep: 8, walkthroughVersion: WALKTHROUGH_VERSION }));
   expect(loadMeta()).toMatchObject({ walkthroughStep: 1, walkthroughFurthestStep: 8 });
   for (const invalid of [undefined, null, -1, 2.5, "eight", {}]) {
     localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 3, walkthroughFurthestStep: invalid }));
     expect(loadMeta()).toMatchObject({ walkthroughStep: 3, walkthroughFurthestStep: 3 });
   }
  });
+
+it("maps progress saved by the 21-lesson walkthrough to the lesson now teaching the same thing", () => {
+  const at = (id: LessonId) => WALKTHROUGH_LESSON_IDS.indexOf(id);
+  // Old lessons: 0 inspect App, 7 cancel the quote, 15 save (now a tip), 20 ready.
+  for (const [old, now] of [[0, at("goal")], [1, at("inspect-db")], [5, at("run")], [7, at("cancel")], [11, at("speed")], [15, at("ready")], [20, at("ready")], [400, at("ready")]]) {
+    localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: old, walkthroughFurthestStep: old }));
+    expect(loadMeta()).toMatchObject({ walkthroughStep: now, walkthroughFurthestStep: now, walkthroughVersion: WALKTHROUGH_VERSION });
+  }
+  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 7, walkthroughFurthestStep: 12 }));
+  expect(loadMeta()).toMatchObject({ walkthroughStep: at("cancel"), walkthroughFurthestStep: at("speed") });
+  // A current index out of range is clamped rather than trusted.
+  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 50, walkthroughVersion: WALKTHROUGH_VERSION }));
+  expect(loadMeta().walkthroughStep).toBe(WALKTHROUGH_LESSONS - 1);
+  // Challenge Mode never had the Guided Mode walkthrough; its profile is left as stored.
+  localStorage.setItem("nn.classic.meta.v1", JSON.stringify({ walkthroughStep: null, tutorialDone: true }));
+  expect(loadMeta("classic")).toMatchObject({ walkthroughStep: null, tutorialDone: true });
+});
+
+it("remembers each one-time Guided Mode tip and ignores unknown or corrupt entries", () => {
+  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ tipsSeen: ["settlement", "bogus", 3] }));
+  expect(loadMeta().tipsSeen).toEqual(["settlement"]);
+  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ tipsSeen: "settlement" }));
+  expect(loadMeta().tipsSeen).toEqual([]);
+});

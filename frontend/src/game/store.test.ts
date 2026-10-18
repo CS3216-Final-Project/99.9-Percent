@@ -6,6 +6,7 @@ import { pendingReliability } from "../sim/reliability";
 import { DEFAULT_AUDIO, DEFAULT_META, isSilent, loadAudio, loadClassicGame, loadGame, loadMeta, loadMode, saveGame, saveMeta, saveMode, readAnalytics } from "./persist";
 import { makeEnvelope } from "./saveEnvelope";
 import { useGame } from "./store";
+import { RUN_LESSON } from "./walkthrough";
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => vi.restoreAllMocks());
 function enter() {
@@ -75,9 +76,9 @@ describe("shared campaign runtime", () => {
   });
   it("lets a manual step reach Chapter 0's Run lesson limit and no further", () => {
     enter(); const at = useGame.getState().game.campaign!.step;
-    useGame.setState({ tour: { track: "campaign", step: 4 } });
+    useGame.setState({ tour: { track: "campaign", step: RUN_LESSON - 1 } });
     useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(at);
-    useGame.setState({ tour: { track: "campaign", step: 5, clockUntil: at + 1 } });
+    useGame.setState({ tour: { track: "campaign", step: RUN_LESSON, clockUntil: at + 1 } });
     useGame.getState().stepSeconds(5); expect(useGame.getState().game.campaign!.step).toBe(at + 1);
     useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(at + 1);
   });
@@ -487,5 +488,36 @@ describe("exploration state", () => {
     useGame.getState().setWalking(false);
     expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: false });
     expect(useGame.getState().toast).toBeNull();
+  });
+});
+
+describe("one-time Guided Mode tips", () => {
+  /** A company kept below its first incident by a traffic limit, so its first operating week can settle calmly. */
+  function settleFirstWeek() {
+    enter();
+    expect(useGame.getState().act({ type: "set_traffic_limit", enabled: true })).toBe(true);
+    for (let i = 0; i < 70 && useGame.getState().game.campaign!.settlements.length === 0; i++) useGame.getState().stepSeconds(1);
+  }
+  it("explains the first settled week once, paused, and never again for that profile", () => {
+    settleFirstWeek();
+    const s = useGame.getState();
+    expect(s.game.phase).toBe("management");
+    expect(s.game.campaign!.settlements.length).toBe(1);
+    expect(s).toMatchObject({ tour: { track: "settlement", step: 0 }, running: false, meta: { tipsSeen: ["settlement"] } });
+    expect(loadMeta().tipsSeen).toEqual(["settlement"]);
+    useGame.getState().endTour(true);
+    for (let i = 0; i < 61; i++) useGame.getState().stepSeconds(1);
+    expect(useGame.getState().game.campaign!.settlements.length).toBe(2);
+    expect(useGame.getState().tour).toBeNull();
+  });
+  it("is not shown in a walkthrough practice company", () => {
+    enter();
+    useGame.getState().startTour("campaign");
+    useGame.getState().endTour(false);
+    saveMeta({ ...loadMeta(), tipsSeen: [] });
+    useGame.setState({ meta: { ...useGame.getState().meta, tipsSeen: [] }, tutorialCompany: { game: newGame(1, "kept"), remainderMs: 0, measurement: useGame.getState().measurement } });
+    expect(useGame.getState().act({ type: "set_traffic_limit", enabled: true })).toBe(true);
+    for (let i = 0; i < 70; i++) useGame.getState().stepSeconds(1);
+    expect(useGame.getState().tour).toBeNull();
   });
 });

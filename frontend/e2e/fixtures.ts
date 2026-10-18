@@ -2,6 +2,10 @@ import { test as base, expect, type BrowserContext, type Page } from '@playwrigh
 import type { GameState } from '../src/sim';
 import { CHAPTER_TOURS, DEFAULT_META, type Meta } from '../src/game/persist';
 import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
+import { WALKTHROUGH_LESSON_IDS, WALKTHROUGH_LESSONS as CHAPTER_ZERO_LESSONS } from '../src/game/walkthrough';
+export { CHAPTER_ZERO_LESSONS };
+/** A Chapter 0 lesson's 1-based position, as its card announces it. */
+export const lessonNumber = (id: (typeof WALKTHROUGH_LESSON_IDS)[number]) => WALKTHROUGH_LESSON_IDS.indexOf(id) + 1;
 
 const controlledPages = new WeakSet<Page>();
 type ClockOptions = Parameters<Page["clock"]["install"]>[0];
@@ -158,51 +162,39 @@ export async function setGameSpeed(page: Page, speed: number) {
   await menu.locator(":scope > summary").click();
 }
 
-/** Perform a required exercise and advance through the visible lesson controls. */
+/** Perform the open lesson's required exercise, which moves on by itself, or press Next on a reading lesson. */
 export async function nextChapterZero(page: Page, touch = false) {
   const card = tutorial(page);
   const click = async (control: ReturnType<Page["getByRole"]>) => touch ? control.tap() : control.click();
   const next = card.getByRole("button", { name: "Next", exact: true });
-  if (!(await next.isEnabled())) {
-    const step = Number((await card.getAttribute("aria-label"))!.match(/step (\d+) of/)![1]);
-    const panel = page.getByRole("complementary", { name: "System metrics" });
-    if (step === 1) await click(panel.getByRole("button", { name: "App Server", exact: true }));
-    else if (step === 2) await click(panel.getByRole("button", { name: "Database", exact: true }));
-    else if (step === 3) {
-      await click(panel.getByRole("button", { name: "App Server", exact: true }));
-      await expect(next).toBeDisabled();
-      await click(panel.getByRole("button", { name: "Database", exact: true }));
-    }
-    else if (step === 6) {
-      await click(page.getByRole("button", { name: "Run", exact: true }));
-      await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
-    } else if (step === 7) await click(panel.locator(".act:not(:disabled)").first());
-    else if (step === 8) {
-      if (!(await page.getByRole("button", { name: "Cancel", exact: true }).count())) await click(panel.locator(".act:not(:disabled)").first());
-      await click(page.getByRole("button", { name: "Cancel", exact: true }));
-    } else if (step === 12) {
-      const menu = page.locator(".time-menu");
-      if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await click(menu.locator(":scope > summary"));
-      const speed = page.getByRole("group", { name: "Game speed", exact: true });
-      await click(speed.locator('button:not([aria-pressed="true"])').first());
-      await click(menu.locator(":scope > summary"));
-    } else if (step === 14 || step === 15) {
-      await click(page.getByRole("button", { name: step === 14 ? "Tech" : "History", exact: true }));
-      await click(page.locator(".sheet-head").getByRole("button", { name: "Close", exact: true }));
-    } else if (step === 16) {
-      await click(page.getByRole("button", { name: "Menu", exact: true }));
-      await click(page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: /Save now/ }));
-      await click(page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: "Resume", exact: true }));
-    } else throw new Error(`Unexpected required interaction in lesson ${step}`);
-    await expect(next).toBeEnabled();
-  }
-  await click(next);
+  const lesson = (await card.getAttribute("data-lesson-id"))!;
+  const step = (await card.getAttribute("data-lesson"))!;
+  if (await next.isEnabled()) { await click(next); return; }
+  const panel = page.getByRole("complementary", { name: "System metrics" });
+  if (lesson === "inspect-app") await click(panel.getByRole("button", { name: "App Server", exact: true }));
+  else if (lesson === "inspect-db") await click(panel.getByRole("button", { name: "Database", exact: true }));
+  else if (lesson === "run") {
+    await click(page.getByRole("button", { name: "Run", exact: true }));
+    await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+  } else if (lesson === "quote") await click(panel.locator(".act:not(:disabled)").first());
+  else if (lesson === "cancel") {
+    if (!(await page.getByRole("button", { name: "Cancel", exact: true }).count())) await click(panel.locator(".act:not(:disabled)").first());
+    await click(page.getByRole("button", { name: "Cancel", exact: true }));
+  } else if (lesson === "speed") {
+    const menu = page.locator(".time-menu");
+    if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await click(menu.locator(":scope > summary"));
+    const speed = page.getByRole("group", { name: "Game speed", exact: true });
+    // Choosing a speed finishes the lesson; the next card may already sit over the menu's trigger.
+    await click(speed.locator('button:not([aria-pressed="true"])').first());
+  } else throw new Error(`Unexpected required interaction in lesson ${lesson}`);
+  // A finished exercise acknowledges itself, then the guide opens the next lesson.
+  await expect(card).not.toHaveAttribute("data-lesson", step);
 }
 
 /** Complete Chapter 0 through the real UI, from whichever lesson is currently open. */
 export async function finishChapterZero(page: Page, touch = false) {
   const card = tutorial(page);
-  for (let lesson = 0; lesson < 21; lesson++) {
+  for (let lesson = 0; lesson < CHAPTER_ZERO_LESSONS; lesson++) {
     const finish = card.getByRole("button", { name: "Finish walkthrough", exact: true });
     if (await finish.count()) { if (touch) await finish.tap(); else await finish.click(); return; }
     await nextChapterZero(page, touch);
@@ -212,8 +204,8 @@ export async function finishChapterZero(page: Page, touch = false) {
 
 /** Unrelated journeys complete mandatory Chapter 0; optional spotlight guides retain their Skip action. */
 export async function completeTutorial(page: Page) {
-  if (await page.locator(".chapter-zero-modal").count()) {
-    // Completing 21 real lessons is setup for these journeys. Bound that setup
+  if (await page.locator(".chapter-zero-guide").count()) {
+    // Completing the real lessons is setup for these journeys. Bound that setup
     // separately, then preserve the journey's original budget and assertion timeouts.
     const journeyBudget = test.info().timeout;
     const started = performance.now();

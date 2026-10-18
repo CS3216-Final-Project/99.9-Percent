@@ -57,8 +57,9 @@ Completion reuses the same chapter-status function as the visible chapter list.
 All five must be complete, including acknowledgement of the final chapter's outcome.
 Recognising the opening milestone alone is not Campaign completion. Completion stops the
 duration measurement for that run; continuing to operate the finished company does not inflate
-time to completion. Campaign's content definition is versioned as `chapters-v1`;
-increment it when the set/meaning of required chapters changes. Classic is `classic-v1`.
+time to completion. Campaign's content definition is versioned as `chapters-v2` (v2 shortened the Chapter 0
+walkthrough to ten lessons, so `tutorial_step` counts a different list than in `chapters-v1`);
+increment it when the set/meaning of required chapters or walkthrough steps changes. Classic is `classic-v1`.
 Build IDs distinguish releases within a content version.
 
 Tutorial events describe the two walkthroughs only; Guided Mode's one-card chapter guides and Challenge Mode's incident guide are not reported.

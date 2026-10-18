@@ -9,7 +9,7 @@ export function campaignChapters(game: GameState, learning = false, tutorialDone
   const c = game.campaign!;
   const model = campaignGuidance(game);
   const chapters = [
-    { id: "getting-started", name: "Walkthrough", shortName: "Walkthrough", description: "Learn the room, game seconds, weekly finances, controls, purchases, incidents and the route through the game. Replay without resetting your company.", completed: tutorialDone && !learning, available: true },
+    { id: "getting-started", name: "Walkthrough", shortName: "Walkthrough", description: "Ten short lessons: read the evidence, run the clock, preview a purchase and manage weekly cash. Replay without resetting your company.", completed: tutorialDone && !learning, available: true },
     { id: "opening", name: "Opening", shortName: "Opening", description: "Inspect your first bottleneck and keep the company serving traffic.", completed: model.openingDone, available: tutorialDone },
     { id: "scaling", name: "Scaling & Routing", shortName: "Scaling & Routing", description: "Expand server capacity and make sure traffic reaches it.", completed: !!c.dataStage, available: model.openingDone },
     { id: "data", name: "Data Strategy", shortName: "Data Strategy", description: "Explore how caching and different workloads affect your database.", completed: !!c.spikeStage, available: model.dataAvailable },
