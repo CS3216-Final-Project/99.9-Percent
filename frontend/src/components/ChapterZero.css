@@ -270,7 +270,7 @@ body:has(.chapter-zero-guide) [aria-disabled="true"]:not(canvas) { opacity: .45;
   z-index: 31;
 }
 .app:has(> .chapter-zero-guide) .campaign-action-confirm { overflow-y: auto; }
-.app:has(> .chapter-zero-guide) .campaign-purchase-footer { position: sticky; bottom: -10px; background: var(--night); }
+.app:has(> .chapter-zero-guide) .campaign-purchase-footer { position: sticky; bottom: -10px; background: var(--paper); }
 @media (min-width: 901px) and (max-width: 1199px) {
   .app:has(> .chapter-zero-guide) .campaign-panel { width: min(360px, 46%); }
 }

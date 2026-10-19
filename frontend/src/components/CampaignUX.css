@@ -32,8 +32,6 @@
 }
 .campaign-action-popover p { margin: 0 0 6px; }
 .campaign-action-popover .muted { color: var(--on-night-soft); }
-.campaign-action-popover .campaign-action-machine { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--night-4); color: var(--on-night-soft); }
-.campaign-action-popover .campaign-action-machine b { display: block; margin-bottom: 2px; color: var(--focus); font-family: var(--font-display); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; }
 .campaign-action-popover .campaign-action-confirm-title { font-family: var(--font-display); font-size: var(--text-md); margin-bottom: 4px; color: var(--go); }
 .campaign-action-popover .rows { margin: 0 0 6px; }
 .campaign-action-popover .row { padding: 4px 0; font-size: var(--text-xs); border-bottom-color: var(--night-4); }
@@ -136,3 +134,13 @@
   .campaign-panel .act:has(> .icon) { column-gap: 6px; }
   .campaign-panel .act > .icon { width: 24px; height: 24px; padding: 3px; border-radius: 7px; }
 }
+
+/* A compact quote: one routing notice, then short supporting facts. */
+.campaign-action-popover .campaign-purchase-note { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: var(--radius); background: var(--tile-blue); color: var(--tile-blue-ink); }
+.campaign-purchase-note > .icon { flex: none; margin-top: 2px; }
+.campaign-purchase-note strong { display: block; font-family: var(--font-display); font-weight: 600; }
+.campaign-action-popover .purchase-facts { display: grid; gap: 10px; margin: 4px 0 8px; }
+.purchase-facts > div { display: grid; gap: 2px; }
+.purchase-facts dt { color: var(--text-soft); font-size: var(--text-xs); font-weight: 600; }
+.purchase-facts dd { margin: 0; color: var(--ink); line-height: 1.4; }
+.campaign-action-popover .campaign-purchase-refund { color: var(--text-soft); font-size: var(--text-xs); margin-bottom: 6px; }

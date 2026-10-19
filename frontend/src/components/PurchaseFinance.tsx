@@ -15,9 +15,9 @@ export function PurchaseTile({icon,label,value,sub,tone}:{icon:IconName;label:st
 /** The same authoritative quote, kept short enough to review beside the machine. */
 export function PurchaseFinance({preview:p}:{preview:Preview}) {
     return <dl className="purchase-tiles">
-        <PurchaseTile icon="cost" label="Buy now" value={money(p.spentCents)} tone={p.spentCents>0?"cost":"ok"} />
-        <PurchaseTile icon="cashLeft" label="Money left" value={money(p.cashAfterCents)} tone={p.warning?"warn":"ok"} />
-        <PurchaseTile icon="upkeep" label="Extra running cost" value={p.upkeepDelta===0 ? "None" : `${p.upkeepDelta>0?"+":""}${money(p.upkeepDelta)}`}
+        <PurchaseTile icon="cost" label="Setup" value={money(p.spentCents)} tone={p.spentCents>0?"cost":"ok"} />
+        <PurchaseTile icon="cashLeft" label="Cash after" value={money(p.cashAfterCents)} tone={p.warning?"warn":"ok"} />
+        <PurchaseTile icon="upkeep" label="Upkeep" value={p.upkeepDelta===0 ? "None" : `${p.upkeepDelta>0?"+":""}${money(p.upkeepDelta)}`}
             sub={p.upkeepDelta===0 ? undefined : `per ${Q.periodSteps*Q.stepSeconds} game seconds`} tone={p.upkeepDelta>0?"warn":"ok"} />
         <PurchaseTile icon="latency" label="Ready in" value={`${p.delay} game ${p.delay===1?"second":"seconds"}`} tone="info" />
     </dl>;
@@ -26,7 +26,7 @@ export function PurchaseFinance({preview:p}:{preview:Preview}) {
 /** Outside the optional scrolling details, immediately before Confirm/Cancel. */
 export function PurchaseWarning({preview:p}:{preview:Preview}) {
     const warning = !p.warning ? null : p.forecast && p.forecast.burnCents>0
-        ? p.forecast.runwayPeriods!<=3 ? "This purchase may leave your company short of cash. Running costs may exceed recent earnings." : "Running costs may exceed recent earnings after this purchase."
-        : "Money left does not cover costs waiting to be paid. Earnings awaiting the cash update may help.";
+        ? p.forecast.runwayPeriods!<=3 ? "Cash may run short: upkeep exceeds recent earnings." : "Upkeep exceeds recent earnings."
+        : "Cash after purchase is below unpaid costs. Pending earnings may help.";
     return warning && <p role="note" className="finance-warning">Warning: {warning}</p>;
 }

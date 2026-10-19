@@ -52,7 +52,7 @@ it("quotes a purchase as toned tiles", () => {
   start(); renderCompany(); fireEvent.click(screen.getByRole("button",{name:/Add server/}));
   const confirm=screen.getByRole("region",{name:"Confirm Add server"});
   const tone=(label:string)=>within(confirm).getByText(label,{exact:true}).closest(".purchase-tile")!.getAttribute("data-tone");
-  expect([tone("Buy now"),tone("Money left"),tone("Extra running cost"),tone("Ready in")]).toEqual(["cost","ok","warn","info"]);
+  expect([tone("Setup"),tone("Cash after"),tone("Upkeep"),tone("Ready in")]).toEqual(["cost","ok","warn","info"]);
 });
 it("system evidence records a real free inspection without advancing the clock", () => {
   start(); renderCompany();
@@ -72,9 +72,9 @@ it("shows what the machine does, paid-now cash, delayed upkeep and routing limit
   expect(card.textContent).not.toContain("+$700 per 60 game seconds"); expect(screen.queryByText("Effect & costs")).toBeNull();
   fireEvent.click(screen.getByRole("button",{name:/Add server/}));
   const confirm=screen.getByRole("region",{name:"Confirm Add server"});
-  expect(confirm.textContent).toContain("App Servers run the product"); expect(confirm.textContent).toContain("does not receive traffic");
+  expect(confirm.textContent).toContain("Processes requests"); expect(confirm.textContent).toContain("Route traffic to this server after activation.");
   expect(confirm.textContent).toContain("$19,000"); expect(confirm.textContent).toContain("+$700 per 60 game seconds");
-  expect(confirm.textContent).toContain("Purchases cannot be undone");
+  expect(confirm.textContent).toContain("No refunds.");
   expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
 });
 it("asks for confirmation before an action is dispatched, and Cancel or Escape leaves the company unchanged", () => {
@@ -82,7 +82,7 @@ it("asks for confirmation before an action is dispatched, and Cancel or Escape l
   const add=screen.getByRole("button",{name:/Add server/}), before=useGame.getState().game;
   fireEvent.click(add);
   const confirm=screen.getByRole("region",{name:"Confirm Add server"});
-  expect(confirm.textContent).toContain("Add App Server?"); expect(confirm.textContent).toContain("$19,000");
+  expect(confirm.textContent).toContain("Add App Server"); expect(confirm.textContent).toContain("$19,000");
   expect(useGame.getState().game).toBe(before);
   fireEvent.click(within(confirm).getByRole("button",{name:"Cancel"}));
   expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull(); expect(document.activeElement).toBe(add);
@@ -113,7 +113,7 @@ it("Scale Up describes the selected server rather than implying another installe
   render(<CampaignAction label="Scale up App 1" price={2000} note="3 game seconds" onClick={()=>{}}/>);
   fireEvent.click(screen.getByRole("button",{name:/Scale up App 1/}));
   expect(screen.queryByText(/Makes this App Server larger/)).toBeNull();
-  expect(screen.getByText("Equipment running costs").closest(".purchase-tile")!.textContent).toContain("$1,100 / 60s (+$400)");
+  expect(screen.getByText("Total upkeep").closest(".purchase-tile")!.textContent).toContain("$1,100 / 60s (+$400)");
 });
 it("postmortem keeps all actual causes and observations reachable while leading with a compact summary", () => {
   let game=advanceSteps(newGame(1,"report-info"),6).state;
@@ -143,5 +143,5 @@ it("opening an action's confirmation from the office floor rides to the floor of
   start(); renderCompany(); useGame.setState({floor:"office"});
   fireEvent.click(screen.getByRole("button",{name:/Upgrade database/}));
   expect(useGame.getState().floor).toBe("servers");
-  expect(screen.getByRole("region",{name:"Confirm Upgrade database"}).textContent).toContain("The database stores");
+  expect(screen.getByRole("region",{name:"Confirm Upgrade database"}).textContent).toContain("Stores data");
 });

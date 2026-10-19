@@ -90,6 +90,13 @@ for (const [width, height] of [[1440, 900], [390, 844], [320, 568], [844, 390]])
         const control = (await actual.boundingBox())!;
         expect(control.x >= box.x + box.width || control.y >= box.y + box.height || control.x + control.width <= box.x || control.y + control.height <= box.y).toBe(true);
       }
+      if (lesson === 12) {
+        const speed = page.locator(".time-menu > summary");
+        expect(await speed.evaluate(el => {
+          const r = el.getBoundingClientRect();
+          return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+        }), "Navigation must not cover the walkthrough's speed selector").toBe(true);
+      }
       if (lesson === 1 || lesson === 8) await page.screenshot({ path: `test-results/chapter-zero-real-${lesson}-${width}x${height}.png` });
       if (lesson === 21) await card.getByRole("button", { name: "Finish walkthrough", exact: true }).click();
       else await nextChapterZero(page);

@@ -13,20 +13,21 @@ import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { pendingStop } from "@/sim/step";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { Act } from "./ui";
+import { Icon } from "./icons";
 import { confirmationRoomArea } from "./roomArea";
 import { confirmingAction, setConfirming, subscribeConfirming } from "./actionConfirmation";
 
-/** What each machine an action can change does, shown above the action's effect and costs. */
+/** Equipment roles shown in the quote's supporting facts. */
 const MACHINES: Partial<Record<EquipmentId, { name: string; does: string }>> = {
-  gateway: { name: "Network", does: "The network gateway takes in every user request and passes the admitted ones on to the App Servers." },
-  app: { name: "App Servers", does: "App Servers run the product and handle each admitted request, calling the database for its data." },
-  db: { name: "Database", does: "The database stores the company's data and serves every read and write the App Servers make." },
-  cache: { name: "Read Cache", does: "The Read Cache answers repeated reads from memory, so they never reach the database." },
-  monitoring: { name: "Monitoring", does: "Monitoring watches each machine's health and reports failures it detects." },
+  gateway: { name: "Network", does: "Admits requests and sends them to App Servers." },
+  app: { name: "App Servers", does: "Processes requests and accesses the Database." },
+  db: { name: "Database", does: "Stores data and handles application reads and writes." },
+  cache: { name: "Read Cache", does: "Serves repeated reads from memory." },
+  monitoring: { name: "Monitoring", does: "Detects and reports equipment failures." },
 };
 
 const PURCHASE_DESCRIPTIONS: Record<string,string> = {
-  "Add server":"Adds another server to help your app handle more customers.",
+  "Add server":"Handle more traffic with another server.",
   "Upgrade database":"Lets your database handle more requests at the same time.",
   "Deploy load balancing":"Adds a load balancer to share traffic between your servers.",
   "Deploy Read Cache":"Remembers repeated reads to reduce work for your database.",
@@ -146,9 +147,9 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   const cancel = () => { if (quoteLesson === 6) return; restoreFocus.current=true; setConfirming(null, true); };
   const costs = <>
     {preview?.ok ? <PurchaseFinance preview={preview} /> : <dl className="purchase-tiles">
-      {props.price !== undefined && <PurchaseTile icon="cost" label="Buy now" value={money(props.price)} tone={props.price > 0 ? "cost" : "ok"} />}
-      {props.price !== undefined && <PurchaseTile icon="cashLeft" label="Money left" value={money((c.cashCents - props.price * 100) / 100)} tone={c.cashCents > props.price * 100 ? "ok" : "warn"} />}
-      {upkeep !== null && <PurchaseTile icon="upkeep" label={isScale || label === "Upgrade database" ? "Equipment running costs" : "Extra running cost"} value={`${money(upkeep / 100)} / ${Q.periodSteps}s${increase !== null && increase !== upkeep ? ` (${increase >= 0 ? "+" : ""}${money(increase / 100)})` : ""}`} tone="warn" />}
+      {props.price !== undefined && <PurchaseTile icon="cost" label="Setup" value={money(props.price)} tone={props.price > 0 ? "cost" : "ok"} />}
+      {props.price !== undefined && <PurchaseTile icon="cashLeft" label="Cash after" value={money((c.cashCents - props.price * 100) / 100)} tone={c.cashCents > props.price * 100 ? "ok" : "warn"} />}
+      {upkeep !== null && <PurchaseTile icon="upkeep" label={isScale || label === "Upgrade database" ? "Total upkeep" : "Upkeep"} value={`${money(upkeep / 100)} / ${Q.periodSteps}s${increase !== null && increase !== upkeep ? ` (${increase >= 0 ? "+" : ""}${money(increase / 100)})` : ""}`} tone="warn" />}
       {props.note && <PurchaseTile icon={props.noteIcon ?? "latency"} label={props.noteIcon === "bulb" ? "Needs" : "Ready in"} value={props.note} tone="info" />}
     </dl>}
   </>;
@@ -178,17 +179,16 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
       <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); if (!practiceQuote) cancel(); } }}>
         <div className="campaign-purchase-body" role="region" aria-label="Purchase preview" tabIndex={0}>
           <div className="campaign-purchase-essential">
-            <p className="campaign-action-confirm-title">{isAdd ? "Add App Server" : label}?</p>
+            <p className="campaign-action-confirm-title">{isAdd ? "Add App Server" : label}</p>
             {description && <p>{description}</p>}
             {costs}
-            {isAdd && <p className="campaign-purchase-note">New servers need traffic directed to them before they can help.</p>}
-            {label==="Unlock autoscaling" && props.note && <p className="campaign-purchase-note">{props.note}</p>}
+            {isAdd && <p className="campaign-purchase-note"><Icon name="shuffle" size={16}/><span><strong>Routing required</strong><span>Route traffic to this server after activation.</span></span></p>}
             {label==="Deploy load balancing" && <p className="campaign-purchase-note">Choose which servers receive traffic after installation.</p>}
           </div>
           <details className="campaign-purchase-details" onToggle={e => {
             if (e.currentTarget.open) e.currentTarget.querySelector<HTMLElement>(".campaign-purchase-details-content")?.scrollIntoView?.({ block: "nearest" });
           }}>
-            <summary>More details</summary>
+            <summary>How it works</summary>
             <div className="campaign-purchase-details-content" tabIndex={0} role="region" aria-label="Purchase details" onKeyDown={e => {
               if (e.target !== e.currentTarget || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
               if (e.key === "End" || e.key === "Home") {
@@ -197,17 +197,18 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
                 e.currentTarget.scrollTop = e.key === "End" ? e.currentTarget.scrollHeight : 0;
               }
             }}>
-              {machine && <p className="campaign-action-machine"><b>{machine.name}</b> {machine.does}</p>}
-              {props.tip && <p>{props.tip}</p>}
-              {props.note && <p>{props.note}</p>}
-              <p>Game seconds advance only while the company is running. Running costs start when the upgrade becomes active.</p>
-              {props.price!==undefined && props.price>0 && <p>Purchases cannot be undone.</p>}
-              <p>Financial estimates assume recent earnings continue. Cash update timing, traffic and future decisions can change the outcome.</p>
+              <dl className="purchase-facts">
+                {machine && <div className="campaign-action-machine"><dt>{machine.name}</dt><dd>{machine.does}</dd></div>}
+                {!isAdd && props.tip && props.tip !== description && <div><dt>Effect</dt><dd>{props.tip}</dd></div>}
+                <div><dt>Timing</dt><dd>Time advances while running. Upkeep starts on activation.</dd></div>
+                {preview?.ok && preview.forecast && <div><dt>Forecast</dt><dd>Based on recent earnings; future traffic and costs may change.</dd></div>}
+              </dl>
             </div>
           </details>
         </div>
         <footer className="campaign-purchase-footer">
         {preview?.ok && <PurchaseWarning preview={preview}/>}
+        {props.price !== undefined && props.price > 0 && <p className="campaign-purchase-refund">No refunds.</p>}
         {(props.disabled || preview?.ok===false) && <p role="status">{reason}</p>}
         {changed && <p role="status">The purchase preview changed. Review the current figures, then confirm again.</p>}
         <div className="btn-row">
@@ -238,7 +239,6 @@ function ActionPopover({ anchor, children }: { anchor: string; children: ReactNo
     if (!el || !stage) return;
     let frame = 0;
     const place = () => {
-      frame = requestAnimationFrame(place);
       const s = stage.getBoundingClientRect();
       const sheet = window.innerWidth <= 900;
       el.dataset.layout = sheet ? "sheet" : "anchored";
@@ -276,8 +276,23 @@ function ActionPopover({ anchor, children }: { anchor: string; children: ReactNo
       el.dataset.side = side;
       el.classList.add("is-placed");
     };
+    const animate = () => { place(); frame = requestAnimationFrame(animate); };
     place();
-    return () => cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(animate);
+    // Resizing can suspend WebGL frames; keep the quote inside the new room immediately.
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(place);
+    resize?.observe(stage);
+    const dock = document.querySelector(".bottombar");
+    if (dock) resize?.observe(dock);
+    window.addEventListener("resize", place);
+    const viewport = window.visualViewport;
+    viewport?.addEventListener("resize", place);
+    return () => {
+      cancelAnimationFrame(frame);
+      resize?.disconnect();
+      window.removeEventListener("resize", place);
+      viewport?.removeEventListener("resize", place);
+    };
   }, [anchor, stage]);
   const body = <div className="campaign-action-popover" ref={pop}>{children}</div>;
   return stage ? createPortal(body, stage) : body;

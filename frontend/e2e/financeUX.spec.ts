@@ -23,7 +23,7 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
     expect((await savedGame(page)).campaign).toEqual(before.campaign);
     await page.getByRole("button",{name:/Add server/}).click();
     const confirmation=page.getByRole("region",{name:"Confirm Add server"});
-    await expect(confirmation).toContainText("Extra running cost");await expect(confirmation).toContainText("Warning:");
+    await expect(confirmation).toContainText("Upkeep");await expect(confirmation).toContainText("Warning:");
     await confirmation.getByRole("button",{name:"Cancel"}).click();expect((await savedGame(page)).campaign).toEqual(before.campaign);
     await page.getByRole("button",{name:/Add server/}).click();await page.getByRole("button",{name:"Confirm",exact:true}).click();
     expect((await savedGame(page)).campaign!.cashCents).toBe(before.campaign!.cashCents-100000);
