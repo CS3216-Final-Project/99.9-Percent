@@ -285,12 +285,12 @@ describe("sound settings", () => {
 
 describe("graphics settings", () => {
   it("start at Auto and round trip, shared by both modes", () => {
-    expect(DEFAULT_GRAPHICS).toEqual({ quality: "auto" });
+    expect(DEFAULT_GRAPHICS).toEqual({ quality: "auto", fov: 75 });
     expect(loadGraphics()).toEqual(DEFAULT_GRAPHICS);
-    expect(saveGraphics({ quality: "low" })).toBe(true);
-    expect(loadGraphics()).toEqual({ quality: "low" });
+    expect(saveGraphics({ quality: "low", fov: 75 })).toBe(true);
+    expect(loadGraphics()).toEqual({ quality: "low", fov: 75 });
     saveMode("classic");
-    expect(loadGraphics()).toEqual({ quality: "low" });
+    expect(loadGraphics()).toEqual({ quality: "low", fov: 75 });
   });
 
   it.each(["{", "null", "42", JSON.stringify({}), JSON.stringify({ quality: "ultra" }), JSON.stringify({ quality: 3 })])("fall back to Auto for a corrupt value %s", (raw) => {
@@ -298,11 +298,21 @@ describe("graphics settings", () => {
     expect(loadGraphics()).toEqual(DEFAULT_GRAPHICS);
   });
 
+  it.each([
+    [JSON.stringify({ quality: "high" }), { quality: "high", fov: 75 }],
+    [JSON.stringify({ quality: "high", fov: 82 }), { quality: "high", fov: 82 }],
+    [JSON.stringify({ quality: "low", fov: 140 }), { quality: "low", fov: 90 }],
+    [JSON.stringify({ quality: "low", fov: "wide" }), { quality: "low", fov: 75 }],
+    [JSON.stringify({ quality: "ultra", fov: 72 }), { quality: "auto", fov: 72 }],
+  ])("read a field of view from %s, missing or out of range as the nearest allowed", (raw, settings) => {
+    localStorage.setItem("nn.graphics.v1", raw);
+    expect(loadGraphics()).toEqual(settings);
+  });
   it("fall back to Auto when storage is unavailable, and report a save that did not stick", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("blocked"); });
     expect(loadGraphics()).toEqual(DEFAULT_GRAPHICS);
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
-    expect(saveGraphics({ quality: "medium" })).toBe(false);
+    expect(saveGraphics({ quality: "medium", fov: 75 })).toBe(false);
   });
 });
 

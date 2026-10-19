@@ -3,7 +3,7 @@
 import { Line, MapControls, PerformanceMonitor } from "@react-three/drei";
 import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
-import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { Canvas, events as pointerEvents, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { createPortal } from "react-dom";
@@ -22,6 +22,7 @@ import type { GameMode, GraphicsQuality } from "@/game/persist";
 import { loadExploration, saveExploration, type SavedCameraView } from "@/game/exploration";
 import { canInspectEquipment, inspectInRoom, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
+import { nextViewpoint } from "@/game/viewpoints";
 import {
   AISLE_Z,
   appSlot,
@@ -60,6 +61,12 @@ import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
 import { buildModel, racksOf, type SceneModel } from "./sceneModel";
 import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
+import { headingFromOffset } from "./views";
+import { ViewRig } from "./ViewRig";
+import { bindViewFade, cameras, lookApi, lookingFromAvatar, viewNow } from "./viewState";
+import { Ceiling } from "./Ceiling";
+import { ViewOverlay } from "./ViewOverlay";
+import { Minimap } from "./Minimap";
 import { screenPoint } from "./labels";
 import { EQUIPMENT, ROOM_PALETTE } from "./palette";
 
@@ -151,7 +158,15 @@ function viewOf(target: THREE.Vector3, camera: THREE.Camera): SavedCameraView {
 
 function CameraRig({ footprints, built, floor, mode }: { footprints: Record<EquipmentId, Footprint>; built: Record<EquipmentId, boolean>; floor: Floor; mode: GameMode }) {
   const controls = useRef<MapControlsImpl>(null);
-  const camera = useThree((s) => s.camera) as THREE.OrthographicCamera;
+  // Always the overview's orthographic camera, even while a view from the avatar draws with another: the canvas's
+  // own while it draws (a new canvas, after a change of quality, has a new one), else the one kept for it.
+  const get = useThree((s) => s.get);
+  const [camera] = useState(() => {
+    const drawing = get().camera as THREE.OrthographicCamera;
+    return drawing.isOrthographicCamera ? drawing : (cameras.overview ?? drawing);
+  });
+  // The overview's controls rest while a view from the avatar is on.
+  const resting = useGame((s) => s.walking && s.viewpoint !== "overview");
   /** The player has panned, zoomed or dragged the view, so it no longer follows the facility. */
   const touched = useRef(false);
   /** Turning back to the starting angle after Reset view. */
@@ -188,6 +203,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
 
   useEffect(() => {
     cameraApi.zoomBy = (factor) => {
+      if (lookingFromAvatar()) return lookApi.dolly(factor);
       touched.current = true;
       focusing.current = null;
       camera.zoom = THREE.MathUtils.clamp(camera.zoom * factor, 10, 140);
@@ -195,12 +211,15 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       controls.current?.update();
     };
     cameraApi.reset = () => {
+      if (lookingFromAvatar()) return lookApi.reset();
       touched.current = false;
       focusing.current = null;
       homing.current = true;
       spin.current = 0;
     };
     cameraApi.rotateBy = (radians) => {
+      // Turning the overview by an angle turns its heading by the same, so the views from the avatar swing alike.
+      if (lookingFromAvatar()) return lookApi.swing(radians);
       homing.current = false;
       spin.current += radians;
     };
@@ -261,7 +280,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
-      if (e.ctrlKey || e.metaKey || e.altKey || !useGame.getState().started) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || !useGame.getState().started || lookingFromAvatar()) return;
       if (e.key === "q" || e.key === "Q") cameraApi.rotateBy(-TURN);
       else if (e.key === "e" || e.key === "E") cameraApi.rotateBy(TURN);
     };
@@ -271,13 +290,13 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
 
   // Tell the office's sounds where they are heard: the camera's target, or in walk mode on the office floor the
   // avatar's own spot, independent of the camera, and whether the office floor is on screen.
-  useFrame((state) => {
+  useFrame(() => {
     const c = controls.current;
     if (!c) return;
     const walking = useGame.getState().walking && avatar.floor === "office" && !riding();
     viewFocus.x = walking ? avatar.x : c.target.x;
     viewFocus.z = walking ? avatar.z : c.target.z;
-    viewFocus.zoom = (state.camera as THREE.OrthographicCamera).zoom;
+    viewFocus.zoom = camera.zoom;
     viewFocus.walking = walking;
     viewFocus.live = shownFloor() === "office";
   });
@@ -293,7 +312,6 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
   useFrame((state) => {
     const c = controls.current;
     if (!c) return;
-    const camera = state.camera as THREE.OrthographicCamera;
     const { size } = state;
     const { offset, dir, before, from, centre } = v;
     // Entering walk mode takes the camera over, so it no longer frames the equipment.
@@ -358,7 +376,8 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
     c.target.y = y;
     ride.y = y;
     if (dipEl) {
-      const moving = riding();
+      // The ride's cutscene is the overview's: seen from the avatar, the view simply rides with the car.
+      const moving = riding() && !lookingFromAvatar();
       const f = rideAt(rideClock());
       dipEl.style.opacity = moving ? f.dip.toFixed(3) : "0";
       const down = FLOOR_Y[ride.to] < FLOOR_Y[ride.from];
@@ -377,10 +396,14 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       t.x = cx;
       t.z = cz;
     }
-    // Lower whichever walls now stand between the camera and the room.
-    updateWalls(dir.copy(c.target).sub(camera.position).normalize());
-    // Last, so the labels follow the camera as it ends up this frame.
-    placeLabels(camera, size);
+    // The map turns with the view and centres on what the overview looks at.
+    viewNow.overview.x = c.target.x;
+    viewNow.overview.z = c.target.z;
+    viewNow.overview.heading = headingFromOffset(camera.position.x - c.target.x, camera.position.z - c.target.z);
+    // Lower whichever walls now stand between the camera and the room. A view from the avatar raises them all.
+    if (!viewNow.perspective) updateWalls(dir.copy(c.target).sub(camera.position).normalize());
+    // Last, so the labels follow the camera drawing as it ends up this frame.
+    placeLabels(state.camera, size);
     // And the view as it ended up is worth remembering — but only the player's own, never while the title
     // screen is up or the elevator is between floors.
     const p = persisting.current;
@@ -400,6 +423,8 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
   return (
     <MapControls
       ref={controls}
+      camera={camera}
+      enabled={!resting}
       makeDefault
       enableDamping
       dampingFactor={0.14}
@@ -647,8 +672,17 @@ const anchors = new Map<string, THREE.Vector3>();
 const labelEls = new Map<string, HTMLElement>();
 const INTERNET = "internet";
 const labelAt = new THREE.Vector2();
-/** Where each label goes this frame, kept until overlapping ones are moved apart. */
-const placed = new Map<string, { x: number; y: number }>();
+/** Where each label goes this frame, and how large, kept until overlapping ones are moved apart. */
+const placed = new Map<string, { x: number; y: number; scale: number }>();
+/** Labels behind a view from the avatar, hidden this frame. */
+const behind = new Set<string>();
+const inView = new THREE.Vector3();
+/**
+ * Seen from the avatar, a label at this distance in metres is full size, and it shrinks farther off down to the
+ * smallest share, so the near ones read like signs on their machines.
+ */
+const SIGN_NEAR = 6;
+const SIGN_SMALLEST = 0.55;
 /** A campaign run is on screen, which lays its labels out differently. */
 let inCampaign = false;
 let inSpikes = false;
@@ -683,9 +717,20 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
  * the camera for the frame, so a label is placed for the view the renderer is about to draw rather than the last one.
  */
 function placeLabels(camera: THREE.Camera, size: { width: number; height: number }) {
+  const deep = (camera as THREE.PerspectiveCamera).isPerspectiveCamera === true;
   anchors.forEach((pos, key) => {
     const el = labelEls.get(key);
     if (!el) return;
+    let scale = 1;
+    if (deep) {
+      // In perspective a point behind the camera projects to a mirrored place on screen, so its label is hidden.
+      camera.updateMatrixWorld();
+      if (inView.copy(pos).applyMatrix4(camera.matrixWorldInverse).z > -0.2) {
+        behind.add(key);
+        return;
+      }
+      scale = THREE.MathUtils.clamp(SIGN_NEAR / Math.max(0.1, -inView.z), SIGN_SMALLEST, 1);
+    }
     screenPoint(pos, camera, size.width, size.height, labelAt);
     let { x, y } = labelAt;
     // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
@@ -701,7 +746,7 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
       y = Math.min(y, size.height * 0.32);
       x = Math.max(65, Math.min(size.width - 65, x));
     }
-    placed.set(key, { x, y });
+    placed.set(key, { x, y, scale });
   });
   // The Read Cache stands beside the database, so from some views their markers meet: stack the cache's above.
   const cache = placed.get("cache"), db = placed.get("db"), cacheEl = labelEls.get("cache"), dbEl = labelEls.get("db");
@@ -709,12 +754,17 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
     const h = Math.max(cacheEl.offsetHeight, dbEl.offsetHeight) + 12;
     if (Math.abs(cache.x - db.x) < (cacheEl.offsetWidth + dbEl.offsetWidth) / 2 && Math.abs(cache.y - db.y) < h) cache.y = Math.min(cache.y, db.y - h);
   }
-  placed.forEach(({ x, y }, key) => {
+  placed.forEach(({ x, y, scale }, key) => {
     const el = labelEls.get(key)!;
-    el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+    el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)${scale < 1 ? ` scale(${scale.toFixed(3)})` : ""}`;
     el.style.visibility = "visible";
   });
+  behind.forEach((key) => {
+    const el = labelEls.get(key);
+    if (el) el.style.visibility = "hidden";
+  });
   placed.clear();
+  behind.clear();
 }
 
 function bindLabel(key: string) {
@@ -1037,12 +1087,15 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
   const walking = useGame((s) => s.walking && s.started);
   const office = useRef<THREE.Group>(null);
   const servers = useRef<THREE.Group>(null);
+  const outside = useRef<THREE.Group>(null);
   const lights = useRef<(THREE.PointLight | null)[]>([]);
   // Draw one floor at a time, and light whichever it is: the lights move rather than switch, so no material is rebuilt.
   useFrame(() => {
     const shown = shownFloor();
     if (office.current) office.current.visible = shown === "office";
     if (servers.current) servers.current.visible = shown === "servers";
+    // Seen from the avatar, under the ceiling and inside the walls, the city cannot be seen, so it is not drawn.
+    if (outside.current) outside.current.visible = !viewNow.perspective;
     const y = FLOOR_Y[shown] + 3.4;
     for (const l of lights.current) if (l) l.position.y = y;
   });
@@ -1089,7 +1142,9 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
       <pointLight ref={(l) => { lights.current[0] = l; }} position={[-3, 3.4, -3.5]} intensity={24} distance={13} color="#8fc3ff" />
       <pointLight ref={(l) => { lights.current[1] = l; }} position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
 
-      <Exterior />
+      <group ref={outside}>
+        <Exterior />
+      </group>
       <ElevatorCar />
       <Avatar walking={walking} />
       <WalkDriver walking={walking} footprints={inspectableFootprints} names={m.names} racks={racks} />
@@ -1097,6 +1152,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
       {/* The office floor, on top */}
       <group ref={office}>
         <Room />
+        <Ceiling floor="office" />
         <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
         <Landing floor="office" interactive={landed === "office"} />
         <GlassDoors floor="office" />
@@ -1109,6 +1165,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
       {/* The server floor, a storey below */}
       <group ref={servers} position={[0, FLOOR_Y.servers, 0]}>
         <Room servers />
+        <Ceiling floor="servers" />
         <ServerFloor incident={m.incident} engineers={m.engineers} />
         <Landing floor="servers" interactive={landed === "servers"} />
         <GlassDoors floor="servers" />
@@ -1172,6 +1229,8 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
       </group>
       <LabelAnchors footprints={m.footprints} />
 
+      {/* First, so the camera drawing has moved before the overview's rig places the labels for it. */}
+      <ViewRig />
       {/* Each mode remembers its own view, so the rig remounts on a switch and restores that mode's camera. */}
       <CameraRig key={mode} footprints={m.footprints} built={m.built} floor={floor} mode={mode} />
       {effects && <Effects />}
@@ -1363,11 +1422,11 @@ function CameraHint() {
   const walking = useGame((s) => s.walking);
   return walking ? (
     <>
-      <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> to walk · <kbd>Shift</kbd> to run · click the floor to go there · <kbd>Space</kbd> to use · <kbd>Esc</kbd> to stop
+      <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> to walk · <kbd>Shift</kbd> to run · click the floor to go there · <kbd>Space</kbd> to use · <kbd>V</kbd> to change view · <kbd>Esc</kbd> to stop
     </>
   ) : (
     <>
-      <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn · <kbd>PgUp</kbd> <kbd>PgDn</kbd> to change floor
+      <kbd>Shift</kbd> + drag to rotate and tilt · <kbd>Q</kbd> <kbd>E</kbd> to turn · <kbd>PgUp</kbd> <kbd>PgDn</kbd> to change floor · <kbd>V</kbd> to walk and see from your avatar
     </>
   );
 }
@@ -1396,7 +1455,7 @@ function useLanded(): Floor | null {
 }
 
 /** Take the view to a floor, or, pressed again for the floor already on its way, arrive there at once. */
-function pressFloor(floor: Floor, how: "menu" | "key"): void {
+function pressFloor(floor: Floor, how: "menu" | "key" | "map"): void {
   const s = useGame.getState();
   if (s.floor === floor) arrive();
   else s.goToFloor(floor, how);
@@ -1477,17 +1536,40 @@ function CameraTools() {
   </>;
 }
 
+/**
+ * The canvas's pointer events, with one change: while the pointer is locked for looking round, clicks and hovers
+ * aim at the dot in the middle of the view rather than where the pointer was when it was locked.
+ */
+function roomEvents(store: Parameters<typeof pointerEvents>[0]) {
+  const base = pointerEvents(store);
+  return {
+    ...base,
+    compute(event: { offsetX: number; offsetY: number }, state: { pointer: THREE.Vector2; size: { width: number; height: number }; raycaster: THREE.Raycaster; camera: THREE.Camera }) {
+      if (viewNow.locked) state.pointer.set(0, 0);
+      else state.pointer.set((event.offsetX / state.size.width) * 2 - 1, -(event.offsetY / state.size.height) * 2 + 1);
+      state.raycaster.setFromCamera(state.pointer, state.camera);
+    },
+  };
+}
+
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
   const landed = useLanded();
-  // Page Up and Page Down ride between the floors, unless the player is typing or in a dialog or a menu.
+  // Page Up and Page Down ride between the floors, and V changes the view, unless the player is typing or in a
+  // dialog or a menu.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "PageUp" && e.key !== "PageDown") return;
+      const view = e.key === "v" || e.key === "V";
+      if (e.key !== "PageUp" && e.key !== "PageDown" && !view) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable || el.closest('[role="dialog"], [role="menu"], [role="listbox"]'))) return;
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !useGame.getState().started) return;
       e.preventDefault();
+      if (view) {
+        const s = useGame.getState();
+        s.setViewpoint(nextViewpoint(s.walking ? s.viewpoint : "overview"), "key");
+        return;
+      }
       pressFloor(e.key === "PageUp" ? "office" : "servers", "key");
     };
     window.addEventListener("keydown", onKey);
@@ -1519,7 +1601,9 @@ export default function Facility() {
         frameloop={capped ? "demand" : "always"}
         // How strongly the HD environment lights materials; without one it has no effect.
         scene={{ environmentIntensity: HD_REFLECTIONS }}
-        onCreated={({ gl }) => {
+        events={roomEvents}
+        onCreated={({ gl, camera }) => {
+          cameras.overview = camera as THREE.OrthographicCamera;
           const software = isSoftwareRenderer(gl);
           // Before the first frame, so no material is ever compiled with shadows that are not wanted.
           if (!resolveQuality(chosen, software ? "software" : "gpu", override).shadows) gl.shadowMap.enabled = false;
@@ -1553,6 +1637,9 @@ export default function Facility() {
           dipEl = el;
         }}
       />
+      <div className="view-fade" aria-hidden="true" ref={bindViewFade} />
+      <ViewOverlay />
+      <Minimap onFloor={(f) => pressFloor(f, "map")} />
       <Labels landed={landed} />
       <HoverTip container={container} />
       <WalkControls />

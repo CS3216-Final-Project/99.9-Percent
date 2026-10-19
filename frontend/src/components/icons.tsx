@@ -9,7 +9,7 @@ import {
   FlaskConical, Wrench, TrendingUp, Trophy, RotateCcw, Upload, UserRound,
   UserRoundPlus, Users, Volume2, VolumeX, TriangleAlert, Zap, Layers, Compass,
   Footprints, Camera, Funnel, Ban, StepForward, FastForward, CreditCard,
-  PiggyBank, Repeat, ArrowDownToLine, type LucideIcon,
+  PiggyBank, Repeat, ArrowDownToLine, Video, ScanEye, Map as MapIcon, Mouse, MouseLeft, type LucideIcon,
 } from "lucide-react";
 
 /** Stable concept names shared by the HUD, room, panels and reports. */
@@ -34,6 +34,7 @@ const ICONS = {
   floor: Layers, explore: Compass, walk: Footprints, camera: Camera,
   limit: Funnel, rejected: Ban, step: StepForward, stepMany: FastForward,
   cost: CreditCard, cashLeft: PiggyBank, upkeep: Repeat, incoming: ArrowDownToLine,
+  follow: Video, eyes: ScanEye, map: MapIcon, mouse: Mouse, mouseLeft: MouseLeft,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

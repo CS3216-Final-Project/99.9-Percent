@@ -64,7 +64,7 @@ describe("menu tabs", () => {
   it("puts Account between Saves and Playtest, and mounts it on click", () => {
     render(<Harness />);
     const names = screen.getAllByRole("tab").map((t) => t.textContent);
-    expect(names).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]);
+    expect(names).toEqual(["Run", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]);
     fireEvent.click(tab("Account"));
     expect(screen.getByText("Showing account")).toBeTruthy();
   });

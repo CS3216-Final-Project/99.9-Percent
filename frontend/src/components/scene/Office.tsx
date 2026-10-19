@@ -756,6 +756,8 @@ function FoosballRods() {
 const ZONE_NAME_PX = 20;
 /** Zoom, in pixels a metre, over which zone names fade out as the camera pulls back: they are too small to read. */
 const ZONE_NAME_FADE: [number, number] = [14, 20];
+/** Metres tall a zone's sign hangs, seen from the avatar. */
+const ZONE_SIGN_TALL = 0.26;
 
 /**
  * Each zone's name floating over it, always facing the camera so it reads at any turn, the same size on screen at
@@ -792,13 +794,15 @@ export function ZoneNames({ names }: { names: [string, number, number][] }) {
   );
   const sprites = useRef<(THREE.Sprite | null)[]>([]);
   useFrame(({ camera }) => {
-    const zoom = (camera as THREE.OrthographicCamera).zoom;
+    // Seen from the avatar there is no zoom: the signs hang at a size of their own, always lettered.
+    const flat = (camera as THREE.OrthographicCamera).isOrthographicCamera;
+    const zoom = flat ? (camera as THREE.OrthographicCamera).zoom : ZONE_NAME_FADE[1];
     const t = Math.min(1, Math.max(0, (zoom - ZONE_NAME_FADE[0]) / (ZONE_NAME_FADE[1] - ZONE_NAME_FADE[0])));
     const fade = t * t * (3 - 2 * t);
     // Past 1 the lettering outshines the room, so the glow pass picks it up at night.
     const glow = 1 + 0.4 * daylightNow().dark;
     // The orthographic camera shows `zoom` CSS pixels a metre, so this many metres is always ZONE_NAME_PX tall.
-    const tall = ZONE_NAME_PX / zoom;
+    const tall = flat ? ZONE_NAME_PX / zoom : ZONE_SIGN_TALL;
     sprites.current.forEach((sprite, i) => {
       if (!sprite) return;
       const material = sprite.material;

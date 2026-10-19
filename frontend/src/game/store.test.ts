@@ -299,23 +299,33 @@ describe("old saves and imports across modes", () => {
   });
   it("keeps the graphics quality across mode switches and reloads", () => {
     useGame.getState().boot();
-    expect(useGame.getState().graphics).toEqual({ quality: "auto" });
+    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 75 });
     useGame.getState().setGraphics({ quality: "low" });
-    useGame.getState().switchMode("classic"); expect(useGame.getState().graphics).toEqual({ quality: "low" });
-    useGame.getState().switchMode("campaign"); expect(useGame.getState().graphics).toEqual({ quality: "low" });
+    useGame.getState().switchMode("classic"); expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75 });
+    useGame.getState().switchMode("campaign"); expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75 });
     useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
-    expect(useGame.getState().graphics).toEqual({ quality: "low" });
+    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75 });
   });
   it("applies a graphics quality for this visit even when storage fails, and ignores an unknown one", () => {
     useGame.getState().boot();
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
     useGame.getState().setGraphics({ quality: "medium" });
-    expect(useGame.getState().graphics).toEqual({ quality: "medium" });
+    expect(useGame.getState().graphics).toEqual({ quality: "medium", fov: 75 });
     const before = useGame.getState().graphics;
     useGame.getState().setGraphics({ quality: "ultra" as never });
     useGame.getState().setGraphics({});
     useGame.getState().setGraphics({ quality: "medium" });
     expect(useGame.getState().graphics).toBe(before);
+  });
+  it("keeps the first-person field of view in range, and the quality and field of view apart", () => {
+    useGame.getState().boot();
+    useGame.getState().setGraphics({ fov: 120 });
+    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 90 });
+    useGame.getState().setGraphics({ quality: "low" });
+    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 90 });
+    useGame.getState().setGraphics({ fov: 70.4 });
+    useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
+    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 70 });
   });
   it("toggles mute at the saved volumes, and only unmutes a channel that has volume", () => {
     useGame.getState().boot();
@@ -479,8 +489,140 @@ describe("exploration state", () => {
     expect(useGame.getState().walking).toBe(true);
   });
 
+  it("picks the view back up with walk mode, and never without it", () => {
+    seed("campaign", { floor: "office", walking: true, viewpoint: "first" });
+    useGame.getState().boot();
+    expect(useGame.getState().viewpoint).toBe("overview");
+    useGame.getState().play();
+    expect(useGame.getState()).toMatchObject({ walking: true, viewpoint: "first" });
+    useGame.getState().endSession();
+    // The title screen's stop leaves the remembered view for next time.
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true, viewpoint: "first" });
+    localStorage.clear();
+    useGame.setState(useGame.getInitialState(), true);
+    seed("campaign", { floor: "office", walking: false, viewpoint: "follow" });
+    useGame.getState().boot();
+    useGame.getState().play();
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+  });
+
+  it("turns walk mode on for a view from the avatar, and back to the overview when the walk ends", () => {
+    seed("campaign", { floor: "servers", walking: false, viewChosen: true });
+    enter();
+    const s = () => useGame.getState();
+    s().setViewpoint("follow", "key");
+    expect(s()).toMatchObject({ walking: true, viewpoint: "follow" });
+    s().setViewpoint("first", "menu");
+    expect(s().viewpoint).toBe("first");
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true, viewpoint: "first" });
+    s().setWalking(false);
+    expect(s()).toMatchObject({ walking: false, viewpoint: "overview" });
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: false, viewpoint: "overview" });
+    const views = s().measurement.pending.filter((e) => e.name === "view_changed").map((e) => e.payload);
+    expect(views).toEqual([
+      expect.objectContaining({ from: "overview", to: "follow", how: "key" }),
+      expect.objectContaining({ from: "follow", to: "first", how: "menu" }),
+      expect.objectContaining({ from: "first", to: "overview", how: "walk_ended" }),
+    ]);
+  });
+
+  it("opens in first person until the player chooses how to see the room, and then as chosen", () => {
+    enter();
+    const s = () => useGame.getState();
+    expect(s()).toMatchObject({ walking: true, viewpoint: "first" });
+    // Opening there is not a choice, so nothing about it is stored.
+    expect(localStorage.getItem("nn.campaign.exploration.v1")).toBeNull();
+    s().setViewpoint("follow", "key");
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true, viewpoint: "follow", viewChosen: true });
+    useGame.setState(useGame.getInitialState(), true);
+    enter();
+    expect(s()).toMatchObject({ walking: true, viewpoint: "follow" });
+    s().setWalking(false);
+    useGame.setState(useGame.getInitialState(), true);
+    enter();
+    // Leaving the walk was a choice too: the overview it chose is kept.
+    expect(s()).toMatchObject({ walking: false, viewpoint: "overview" });
+  });
+
+  it("times a walk the run opens in from the opening", () => {
+    const now = vi.spyOn(performance, "now").mockReturnValue(100_000);
+    enter();
+    now.mockReturnValue(105_000);
+    useGame.getState().setWalking(false);
+    expect(useGame.getState().measurement.pending.filter((e) => e.name === "walk_ended").map((e) => e.payload)).toEqual([expect.objectContaining({ seconds: 5 })]);
+  });
+
+  it("opens in the overview for a guide or a ?floor= address, and a walk an older record chose as it was", () => {
+    // The Opening walkthrough points things out from above.
+    useGame.getState().boot();
+    useGame.getState().play();
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+    expect(useGame.getState().tour).not.toBeNull();
+    useGame.setState(useGame.getInitialState(), true);
+    window.history.pushState({}, "", "/?floor=office");
+    try {
+      enter();
+      expect(useGame.getState()).toMatchObject({ floor: "office", walking: false, viewpoint: "overview" });
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+    // Left following before there was a default: the player chose it.
+    localStorage.removeItem("nn.campaign.exploration.v1");
+    useGame.setState(useGame.getInitialState(), true);
+    seed("campaign", { floor: "servers", walking: true, viewpoint: "follow" });
+    enter();
+    expect(useGame.getState()).toMatchObject({ walking: true, viewpoint: "follow" });
+  });
+
+  it("gives way to a guide from a walk it opened in, but not from one the player chose", () => {
+    enter();
+    const s = () => useGame.getState();
+    expect(s().walking).toBe(true);
+    s().startTour("campaign");
+    expect(s()).toMatchObject({ walking: false, viewpoint: "overview", tour: { track: "campaign", step: 0 } });
+    // Not remembered as left: the next run opens in first person again.
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1") ?? "{}").viewChosen).not.toBe(true);
+    useGame.setState(useGame.getInitialState(), true);
+    seed("campaign", { floor: "servers", walking: true, viewpoint: "first", viewChosen: true });
+    enter();
+    s().startTour("campaign");
+    expect(s()).toMatchObject({ walking: true, viewpoint: "first" });
+  });
+
+  it("ignores a view chosen before the run is on screen, and the same view twice", () => {
+    useGame.getState().boot();
+    useGame.getState().setViewpoint("first", "key");
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+    enter();
+    useGame.getState().setViewpoint("follow", "key");
+    useGame.getState().setViewpoint("follow", "key");
+    expect(useGame.getState().measurement.pending.filter((e) => e.name === "view_changed")).toHaveLength(1);
+  });
+
+  it("remembers whether the map is open, starts it folded on a phone, and records each change", () => {
+    enter();
+    expect(useGame.getState().mapOpen).toBe(true);
+    useGame.getState().setMapOpen(false);
+    expect(localStorage.getItem("nn.map.v1")).toBe("closed");
+    expect(useGame.getState().measurement.pending.filter((e) => e.name === "map_toggled").map((e) => e.payload)).toEqual([expect.objectContaining({ open: false })]);
+    useGame.setState(useGame.getInitialState(), true);
+    useGame.getState().boot();
+    expect(useGame.getState().mapOpen).toBe(false);
+    localStorage.removeItem("nn.map.v1");
+    useGame.setState(useGame.getInitialState(), true);
+    // A phone on its side, 844 px wide: still a phone's layout.
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(max-width: 900px)", media: q }) as MediaQueryList);
+    try {
+      useGame.getState().boot();
+      expect(useGame.getState().mapOpen).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("persists an explicit Walk or floor choice, without toasting on failure", () => {
-    seed("campaign", { floor: "servers", walking: false });
+    seed("campaign", { floor: "servers", walking: false, viewChosen: true });
     enter();
     useGame.getState().goToFloor("office", "menu");
     useGame.getState().setWalking(true);

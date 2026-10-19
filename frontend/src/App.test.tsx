@@ -168,10 +168,10 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
   const campaignMenu = openMenu();
   const labels = (menu: HTMLElement) => within(within(menu).getByRole("tablist", { name: "Menu sections" })).getAllByRole("tab").map((t) => t.textContent);
-  expect(labels(campaignMenu)).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]);
+  expect(labels(campaignMenu)).toEqual(["Run", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]);
   // The summary stays above the tabs; matching action buttons live in Run.
   expect(within(campaignMenu).getByRole("tab", { name: "Run" }).getAttribute("aria-selected")).toBe("true");
-  for (const tab of ["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]) {
+  for (const tab of ["Run", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]) {
     openTab(campaignMenu, tab);
     expect(within(campaignMenu).getByRole("region", { name: "At a glance" })).toBeTruthy();
     expect(within(campaignMenu).queryByText(/Time is paused/)).toBeNull();
@@ -186,6 +186,9 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   openTab(campaignMenu, "Graphics");
   fireEvent.click(within(campaignMenu).getByRole("radio", { name: "Low" }));
   expect(useGame.getState().graphics.quality).toBe("low");
+  openTab(campaignMenu, "Controls");
+  fireEvent.change(within(campaignMenu).getByRole("slider", { name: "Look speed" }), { target: { value: "0.6" } });
+  expect(useGame.getState().controls.lookSpeed).toBe(0.6);
   openTab(campaignMenu, "Saves");
   expectButtons(campaignMenu, ["New company", "Export current company", "Export original stored save", "Import save"]);
   // Cloud saves live in Saves; the Account tab keeps only sign-in and profile.
@@ -199,9 +202,9 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   fireEvent.click(within(campaignMenu).getByRole("button", { name: "Switch to Challenge Mode" }));
 
   const classicMenu = openMenu();
-  expect(labels(classicMenu)).toEqual(["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]);
+  expect(labels(classicMenu)).toEqual(["Run", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]);
   // The run summary stays above the tabs whichever one is open.
-  for (const tab of ["Run", "Sound", "Graphics", "Avatar", "Saves", "Account", "Playtest"]) {
+  for (const tab of ["Run", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]) {
     openTab(classicMenu, tab);
     expect(within(classicMenu).getByRole("region", { name: "At a glance" })).toBeTruthy();
     expect(within(classicMenu).queryByRole("button", { name: "Resume" }) !== null).toBe(tab === "Run");
@@ -214,6 +217,9 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   openTab(classicMenu, "Sound");
   expect(within(classicMenu).getByRole("slider", { name: "Music" }).getAttribute("aria-valuetext")).toBe("25%");
   expect(within(classicMenu).getByRole("region", { name: "Sound" })).toBeTruthy();
+  // The look controls are shared between modes, like the sound.
+  openTab(classicMenu, "Controls");
+  expect(within(classicMenu).getByRole("slider", { name: "Look speed" }).getAttribute("aria-valuetext")).toBe("60 per cent");
   // Graphics is shared between modes too.
   openTab(classicMenu, "Graphics");
   expect(within(classicMenu).getByRole("radio", { name: "Low" })).toHaveProperty("checked", true);

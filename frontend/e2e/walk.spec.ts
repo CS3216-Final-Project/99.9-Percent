@@ -313,5 +313,6 @@ test("restores the mode, floor, walk position and camera view after a reload", a
     .toBeLessThan(4);
   // Challenge Mode stays the last mode played, and the view record is its own, not the campaign's.
   expect(await page.evaluate(() => localStorage.getItem("nn.mode.v1"))).toBe("classic");
-  expect(await page.evaluate(() => localStorage.getItem("nn.campaign.exploration.v1"))).toBeNull();
+  // The campaign's record is still the one it started with: no walk, no spot, no camera.
+  expect(JSON.parse((await page.evaluate(() => localStorage.getItem("nn.campaign.exploration.v1"))) ?? "null")).toMatchObject({ walking: false, avatar: null, camera: null });
 });

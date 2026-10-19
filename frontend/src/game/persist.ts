@@ -1,6 +1,8 @@
 import { currentStep, WALKTHROUGH_VERSION } from "./walkthrough";
 import { emptyMeasurement, type Measurement, type PlaytestEvent } from "./telemetry";
 import { DEFAULT_AVATAR, isAvatar, type AvatarId } from "./avatars";
+import { clampFov, FOV } from "./viewpoints";
+import { controlsOf, DEFAULT_CONTROLS, type ControlSettings } from "./controls";
 import { decodeSave, makeEnvelope, replaceable } from "./saveEnvelope";
 import { BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
 
@@ -20,6 +22,8 @@ const AUDIO_KEY = "nn.audio.v1";
 const GRAPHICS_KEY = "nn.graphics.v1";
 const TIME_OF_DAY_KEY = "nn.timeOfDay.v1";
 const AVATAR_KEY = "nn.avatar.v1";
+const MAP_KEY = "nn.map.v1";
+const CONTROLS_KEY = "nn.controls.v1";
 /** Music on or off, from before the volume settings. Still written, so an older build keeps the player's choice. */
 const MUSIC_KEY = "nn.music.v1";
 const LEGACY_SAVE_KEY = "nn.save.v1";
@@ -104,9 +108,11 @@ export type GraphicsQuality = (typeof GRAPHICS_QUALITIES)[number];
 /** Graphics settings, shared by both modes. */
 export interface GraphicsSettings {
   quality: GraphicsQuality;
+  /** The first-person view's field of view, in degrees (see game/viewpoints.ts). */
+  fov: number;
 }
 
-export const DEFAULT_GRAPHICS: GraphicsSettings = { quality: "auto" };
+export const DEFAULT_GRAPHICS: GraphicsSettings = { quality: "auto", fov: FOV.initial };
 
 function read(key: string): string | null {
   try {
@@ -378,14 +384,17 @@ export function saveAudio(settings: AudioSettings): boolean {
   return write(AUDIO_KEY, JSON.stringify(settings));
 }
 
-/** The graphics settings. Missing, corrupt or unknown values fall back to Auto. */
+/**
+ * The graphics settings. Missing, corrupt or unknown values fall back to Auto, and a field of view that is missing,
+ * as in settings from before it could be chosen, or out of range to the default or the nearest allowed.
+ */
 export function loadGraphics(): GraphicsSettings {
   const stored = read(GRAPHICS_KEY);
   if (stored !== null) {
     try {
-      const s = JSON.parse(stored) as { quality?: unknown } | null;
-      const quality = GRAPHICS_QUALITIES.find((q) => q === s?.quality);
-      if (quality) return { quality };
+      const s = JSON.parse(stored) as { quality?: unknown; fov?: unknown } | null;
+      const quality = GRAPHICS_QUALITIES.find((q) => q === s?.quality) ?? DEFAULT_GRAPHICS.quality;
+      return { quality, fov: clampFov(s?.fov) };
     } catch {
       /* unreadable: use the default */
     }
@@ -422,6 +431,31 @@ export function saveAvatar(id: AvatarId): boolean {
   return write(AVATAR_KEY, id);
 }
 
+/** The look controls, or their defaults when none were stored, storage fails or what is stored is unreadable. */
+export function loadControls(): ControlSettings {
+  const stored = read(CONTROLS_KEY);
+  if (stored === null) return { ...DEFAULT_CONTROLS };
+  try {
+    return controlsOf(JSON.parse(stored));
+  } catch {
+    return { ...DEFAULT_CONTROLS };
+  }
+}
+
+export function saveControls(settings: ControlSettings): boolean {
+  return write(CONTROLS_KEY, JSON.stringify(settings));
+}
+
+/** Whether the map was left open, or null when it never was chosen or storage cannot say. */
+export function loadMapOpen(): boolean | null {
+  const stored = read(MAP_KEY);
+  return stored === "open" ? true : stored === "closed" ? false : null;
+}
+
+export function saveMapOpen(open: boolean): boolean {
+  return write(MAP_KEY, open ? "open" : "closed");
+}
+
 export function saveMeta(meta: Meta, mode: GameMode = "campaign"): boolean {
   return write(mode === "classic" ? CLASSIC_META_KEY : META_KEY, JSON.stringify(meta));
 }
@@ -451,7 +485,10 @@ export type AnalyticsName =
   | "floor_switched"
   | "walk_started"
   | "walk_ended"
-  | "avatar_changed";
+  | "avatar_changed"
+  | "view_changed"
+  | "map_toggled"
+  | "map_walked";
 
 export interface AnalyticsEvent {
   t: string;

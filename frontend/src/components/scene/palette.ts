@@ -97,6 +97,20 @@ export const WALK_MARKER = {
   contrast: "#3a3218",
 } as const;
 
+/**
+ * The suspended ceilings, seen only from the avatar: pale tiles with darker seams, light panels warm upstairs and
+ * cool among the machines, and air vents.
+ */
+export const CEILING = {
+  tile: "#ece7de",
+  speck: "#e2ddd3",
+  seam: "#c3bcb0",
+  office: { tint: "#f4efe6", light: "#fff3d6" },
+  servers: { tint: "#c9ccd2", light: "#e3efff" },
+  vent: "#8f8b84",
+  slot: "#4f4c48",
+} as const;
+
 /** The low-quality look's pixel floors: each a base, a lighter and a darker speck, and its grout or seams. */
 export const PIXEL_FLOORS = {
   concrete: { base: "#9a968d", light: "#a29e95", dark: "#928e86", seam: "#86827a" },

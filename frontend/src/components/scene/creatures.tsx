@@ -10,6 +10,7 @@ import { useDetail, type Detail } from "./detail";
 import { loadCrew, type Crew } from "./creatureCatalog";
 import { poseAt, type Plan } from "./routes";
 import { avatar } from "./walk";
+import { standing } from "./crewSpots";
 import { useGame } from "@/game/store";
 
 /*
@@ -194,6 +195,9 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
       current.current = action;
     }
   }, [model, gltf, motion.clip, motion.speed, pace, activity, info.kind, phase, beat]);
+
+  // The map shows where every creature stands.
+  useEffect(() => standing(model.object), [model]);
 
   // Between beats the creature idles, so it does not freeze in the clip's last pose.
   const rest = useRef<THREE.AnimationAction | null>(null);

@@ -123,11 +123,20 @@ export type Prompt =
   | { kind: "elevator"; to: Floor; label: string }
   | { kind: "prop"; prop: FunProp; label: string };
 
+/** The floor in front of the elevator's doors that counts as at the elevator, as [x0, z0, x1, z1]. */
+export const ELEVATOR_APRON: [number, number, number, number] = [
+  ELEVATOR_SPOT[2],
+  ELEVATOR_DOOR.z - ELEVATOR_DOOR.w / 2 - 0.35,
+  ELEVATOR_SPOT[2] + 1.3,
+  ELEVATOR_DOOR.z + ELEVATOR_DOOR.w / 2 + 0.35,
+];
+
 /** Inside the elevator's car, or in front of its doors. */
 export function atElevator(x: number, z: number): boolean {
   const [x0, z0, x1, z1] = ELEVATOR_SPOT;
   const inside = x > x0 && x < x1 && z > z0 && z < z1;
-  const before = x >= x1 && x < x1 + 1.3 && Math.abs(z - ELEVATOR_DOOR.z) < ELEVATOR_DOOR.w / 2 + 0.35;
+  const [ax0, az0, ax1, az1] = ELEVATOR_APRON;
+  const before = x >= ax0 && x < ax1 && z > az0 && z < az1;
   return inside || before;
 }
 

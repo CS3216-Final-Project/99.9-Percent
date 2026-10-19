@@ -9,6 +9,13 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("nn.mode.v1", "classic"));
 });
 
+/**
+ * How long a ride's labels may take to appear. A ride lasts five seconds on the wall clock, but CI's software
+ * renderer can hold the page for several more seconds while it draws the floor arriving, and only then do the labels
+ * show. A trace from CI showed one ride's labels arriving after more than ten.
+ */
+const AFTER_RIDE = { timeout: 20_000 };
+
 /** An equipment label in the room, as opposed to the panels' buttons of the same name. */
 const label = (page: Page, name: string) => page.getByRole("main").locator(".eq-labels").getByRole("button", { name, exact: true });
 const floor = (page: Page, name: "Office floor" | "Server floor") => page.locator(`.floor-menu button[data-floor="${name === "Office floor" ? "office" : "servers"}"]`);
@@ -73,16 +80,16 @@ test("an incident downstairs badges the server floor from the office, and the in
   await expect(floor(page, "Server floor")).toHaveAccessibleName(/incident here/);
   await page.getByRole("button", { name: "Go to the server floor" }).click();
   await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");
-  await expect(label(page, "Database")).toBeVisible();
+  await expect(label(page, "Database")).toBeVisible(AFTER_RIDE);
   await expect(floor(page, "Server floor")).not.toHaveAccessibleName(/incident here/);
   await expect(page.getByRole("button", { name: "Go to the server floor" })).toHaveCount(0);
 
   // Back upstairs, investigating from the panel rides down to what is being looked at.
   await page.keyboard.press("PageUp");
-  await expect(label(page, "Growth")).toBeVisible();
+  await expect(label(page, "Growth")).toBeVisible(AFTER_RIDE);
   await page.locator(".incident-investigate").getByRole("button", { name: "Database", exact: true }).click();
   await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");
-  await expect(label(page, "Database")).toBeVisible();
+  await expect(label(page, "Database")).toBeVisible(AFTER_RIDE);
 });
 
 test("the tutorial takes the view to its step's floor once, and never pulls the player back", async ({ page }) => {

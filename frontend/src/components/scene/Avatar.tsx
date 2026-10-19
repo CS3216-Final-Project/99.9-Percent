@@ -23,6 +23,8 @@ import { puffTexture } from "./textures";
 import { avatar, CAR, gridHere, LOBBY, placeAvatar, setRacks, stepAvatar, walkTo } from "./walk";
 import { footingAt, STRIDE } from "./footing";
 import { sceneSound } from "./sceneSounds";
+import { FIRST } from "./views";
+import { viewNow } from "./viewState";
 
 /*
  * The player's avatar: one of Kenney's cube animals (see game/avatars.ts), drawn only once chosen. In walk mode it
@@ -126,7 +128,8 @@ export function Avatar({ walking }: { walking: boolean }) {
     const at = placeNow(walking);
     g.position.set(at.x, at.y, at.z);
     g.rotation.y = at.yaw;
-    g.visible = at.floor === "car" || at.floor === shownFloor();
+    // Seen through its own eyes, the avatar is not drawn: the camera is in its head.
+    g.visible = (at.floor === "car" || at.floor === shownFloor()) && !(walking && viewNow.inHead);
     // The animation for what it is doing, blended from the last.
     const want = !walking ? "idle" : avatar.busy ? avatar.busy.clip : avatar.moving ? (avatar.running ? "run" : "walk") : "idle";
     if (current.current?.name !== want) {
@@ -254,7 +257,9 @@ export function WalkDriver({ walking, footprints, names, racks }: { walking: boo
     const x = avatar.x;
     const z = avatar.z;
     // Movement is checked in small steps whatever the frame's length, so a slow renderer only walks it in bigger strides.
-    stepAvatar(Math.min(dt, 0.25), [forward.x, forward.z], footprints, names, now());
+    // Seen through its eyes, it walks where the view looks, a little slower.
+    const eyes = viewNow.want === "first" && viewNow.perspective ? { heading: viewNow.heading, pace: FIRST.pace } : undefined;
+    stepAvatar(Math.min(dt, 0.25), [forward.x, forward.z], footprints, names, now(), eyes);
     // The spot is written down as it moves, but never every frame and never mid-ride.
     const p = persisting.current;
     const t = now();

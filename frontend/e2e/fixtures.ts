@@ -1,4 +1,4 @@
-import { test as base, expect, type BrowserContext, type Page } from '@playwright/test';
+import { test as base, expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import type { GameState } from '../src/sim';
 import { CHAPTER_TOURS, DEFAULT_META, type Meta } from '../src/game/persist';
 import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
@@ -11,7 +11,7 @@ const controlledPages = new WeakSet<Page>();
 type ClockOptions = Parameters<Page["clock"]["install"]>[0];
 
 // Unhandled browser errors fail each case. Journeys that call withoutRoom() skip the WebGL scene; the rest draw it.
-export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
+export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; overviewChosen: boolean; chosenView: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
   // Opt in before navigation. Scene-only journeys keep the browser's native animation/audio clocks.
   installClock: async ({ page }, provide) => { await provide(async (options) => { await page.clock.install(options); controlledPages.add(page); }); },
   /**
@@ -21,6 +21,21 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
    */
   chapterCompletions: [async ({ page }, use) => {
     await page.addLocatorHandler(chapterComplete(page), dialog => dialog.getByRole('button', { name: 'Stay in this chapter', exact: true }).click());
+    await use();
+  }, { auto: true }],
+  /**
+   * A run opens in first person until the player chooses a view. Journeys play as someone who chose the overview, in
+   * both modes, unless they say otherwise with test.use({ overviewChosen: false }); a record a journey seeds itself wins.
+   */
+  overviewChosen: [true, { option: true }],
+  chosenView: [async ({ context, overviewChosen }, use) => {
+    if (overviewChosen) {
+      await context.addInitScript(() => {
+        for (const key of ['nn.campaign.exploration.v1', 'nn.classic.exploration.v1']) {
+          if (localStorage.getItem(key) === null) localStorage.setItem(key, JSON.stringify({ version: 1, floor: 'servers', walking: false, viewpoint: 'overview', viewChosen: true, avatar: null, camera: null }));
+        }
+      });
+    }
     await use();
   }, { auto: true }],
   healthyBrowser: [async ({ page }, use) => {
@@ -162,20 +177,35 @@ export async function setGameSpeed(page: Page, speed: number) {
   await menu.locator(":scope > summary").click();
 }
 
+/**
+ * Press Next until the lesson moves on. The card can move as Next becomes ready (an inspection's spotlight jumps to
+ * its readings), so a click may land where the card was and miss; a player would simply press again. The lesson on
+ * the card is read afresh before each press, so a press that did land is never repeated on the next lesson.
+ */
+async function pressNext(card: Locator, step: string, touch: boolean) {
+  const next = card.getByRole("button", { name: "Next", exact: true });
+  await expect(async () => {
+    // Bounded, so a press that cannot happen fails this try instead of waiting out the whole journey.
+    if ((await card.getAttribute("data-lesson")) === step) await (touch ? next.tap({ timeout: 5_000 }) : next.click({ timeout: 5_000 }));
+    await expect(card).not.toHaveAttribute("data-lesson", step, { timeout: 2_000 });
+  }, `Chapter 0 lesson ${step} did not move on after Next`).toPass({ timeout: 20_000 });
+}
+
 /** Perform the open lesson's required exercise, which moves on by itself (inspections then press Next), or press Next on a reading lesson. */
 export async function nextChapterZero(page: Page, touch = false) {
   const card = tutorial(page);
-  const click = async (control: ReturnType<Page["getByRole"]>) => touch ? control.tap() : control.click();
+  const click = async (control: Locator) => touch ? control.tap() : control.click();
   const next = card.getByRole("button", { name: "Next", exact: true });
   const lesson = (await card.getAttribute("data-lesson-id"))!;
   const step = (await card.getAttribute("data-lesson"))!;
-  if (await next.isEnabled()) { await click(next); return; }
+  if (await next.isEnabled()) { await pressNext(card, step, touch); return; }
   const panel = page.getByRole("complementary", { name: "System metrics" });
   if (lesson === "inspect-app" || lesson === "inspect-db") {
     // An inspection waits on its readings until the player presses Next.
     await click(panel.getByRole("button", { name: lesson === "inspect-app" ? "App Server" : "Database", exact: true }));
     await expect(next).toBeEnabled();
-    await click(next);
+    await pressNext(card, step, touch);
+    return;
   } else if (lesson === "run") {
     await click(page.getByRole("button", { name: "Run", exact: true }));
     await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();

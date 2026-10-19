@@ -2,12 +2,13 @@ import type { ReactNode } from "react";
 import { Tabs, type TabItem } from "./ui";
 
 /** The menu's sections, the same labels in the same order in Classic and Campaign: run, preferences, avatar, save files, account, then playtest data. */
-export type MenuTab = "run" | "sound" | "graphics" | "avatar" | "saves" | "account" | "playtest";
+export type MenuTab = "run" | "sound" | "graphics" | "controls" | "avatar" | "saves" | "account" | "playtest";
 
 const MENU_TABS: TabItem<MenuTab>[] = [
   { id: "run", label: "Run", icon: "play" },
   { id: "sound", label: "Sound", icon: "music" },
   { id: "graphics", label: "Graphics", icon: "monitor" },
+  { id: "controls", label: "Controls", icon: "sliders" },
   { id: "avatar", label: "Avatar", icon: "user" },
   { id: "saves", label: "Saves", icon: "save" },
   { id: "account", label: "Account", icon: "cloud" },

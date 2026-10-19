@@ -10,6 +10,7 @@ import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
 import { GraphicsSettings } from "./GraphicsSettings";
+import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
 import { MenuActions, MenuRun, MenuTile } from "./MenuRun";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
@@ -354,6 +355,8 @@ export function Menu() {
         {tab === "sound" && <SoundSettings />}
 
         {tab === "graphics" && <GraphicsSettings />}
+
+        {tab === "controls" && <ControlSettings />}
 
         {tab === "avatar" && <AvatarSettings />}
 

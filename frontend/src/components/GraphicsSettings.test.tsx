@@ -33,7 +33,7 @@ describe("the Graphics section", () => {
     expect(useGame.getState().graphics.quality).toBe("medium");
     expect(screen.getByRole("radio", { name: "Medium" })).toHaveProperty("checked", true);
     expect(screen.getByRole("radio", { name: "Auto" })).toHaveProperty("checked", false);
-    expect(loadGraphics()).toEqual({ quality: "medium" });
+    expect(loadGraphics()).toEqual({ quality: "medium", fov: 75 });
   });
 
   it("starts at the saved choice", () => {
