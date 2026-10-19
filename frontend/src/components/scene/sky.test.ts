@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { DAY_SECONDS, daylight, OFFICE_MIN_ELEVATION, START, sunAt, timeOfDay, timeOverride, type Daylight } from './sky';
+import { DAY_SECONDS, daylight, OFFICE_MIN_ELEVATION, START, SUN_REST, SUN_STEP, sunAt, sunSteps, timeOfDay, timeOverride, type Daylight, type Vec3 } from './sky';
 
 const samples = Array.from({ length: 1001 }, (_, i) => i / 1000);
 const brightness = (d: Daylight) => d.keyLight.reduce((a, b) => a + b, 0) + d.skyLight.reduce((a, b) => a + b, 0);
 const elevation = (v: number[]) => Math.asin(v[1]);
+const angle = (a: Vec3, b: Vec3) => Math.acos(Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+const blend = ({ from, to, fade }: ReturnType<typeof sunSteps>): Vec3 => {
+  const v: Vec3 = [from[0] + (to[0] - from[0]) * fade, from[1] + (to[1] - from[1]) * fade, from[2] + (to[2] - from[2]) * fade];
+  const l = Math.hypot(...v);
+  return [v[0] / l, v[1] / l, v[2] / l];
+};
 
 describe('the time of day', () => {
   it('raises the sun in the east, carries it through the south at noon and sets it in the west', () => {
@@ -50,6 +56,48 @@ describe('the time of day', () => {
 
   it('never lights the city from below the horizon', () => {
     for (const t of samples) expect(daylight(t).key[1], `at ${t}`).toBeGreaterThan(0.1);
+  });
+
+  describe("the office's sun's steps", () => {
+    it('stand a small, bounded step apart along its path, so a fade between them is never a double shadow', () => {
+      for (const t of samples) {
+        const s = sunSteps(t);
+        expect(s.fade, `fade at ${t}`).toBeGreaterThanOrEqual(0);
+        expect(s.fade, `fade at ${t}`).toBeLessThan(1);
+        // The day is walked a twentieth of a second at a time, so a step can overshoot by at most that much of the path
+        // (the sun swings fastest, about 0.04 radians a second, as it takes over from the moon at dawn).
+        expect(angle(s.from, s.to), `step at ${t}`).toBeLessThanOrEqual(SUN_STEP + 0.0025);
+      }
+    });
+
+    it('fade through where the sun really is, all day and through the dawn and dusk swing', () => {
+      for (let i = 0; i < 20000; i++) {
+        const t = i / 20000;
+        expect(angle(blend(sunSteps(t)), daylight(t).office.dir), `at ${t}`).toBeLessThan(SUN_STEP / 2);
+      }
+    });
+
+    it('draw a sun standing still at night from one direction, and never rest longer than SUN_REST', () => {
+      const night = sunSteps(0.05);
+      expect(night.from).toEqual(night.to);
+      // How long a step lasts follows from how fast the fade runs through it; the day is walked in twentieths of a second.
+      const tick = 1e-6;
+      for (const t of samples) {
+        const run = sunSteps(t + tick).fade - sunSteps(t).fade;
+        if (run > 0) expect(tick / run, `step at ${t}`).toBeLessThanOrEqual(SUN_REST + 0.05 / DAY_SECONDS + 1e-9);
+      }
+    });
+
+    it('join up: one step ends where the next begins', () => {
+      let t = 0.3;
+      let s = sunSteps(t);
+      while (t < 0.5) {
+        t += 0.00005;
+        const next = sunSteps(t);
+        if (next.from.some((v, k) => v !== s.from[k])) expect(next.from, `at ${t}`).toEqual(s.to);
+        s = next;
+      }
+    });
   });
 
   it('starts mid-morning, passes a whole day in DAY_SECONDS, and can be fixed from the address', () => {
