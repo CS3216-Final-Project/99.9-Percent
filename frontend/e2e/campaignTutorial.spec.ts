@@ -202,14 +202,19 @@ test("entering Scaling & Routing shows its guide once, on the controls the chapt
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await page.getByRole("dialog", { name: "First growth challenge handled" }).getByRole("button", { name: "Continue operating" }).click();
 
-  const guide = page.getByRole("dialog", { name: "Chapter guide, step 1 of 1" });
-  await expect(guide).toContainText("Scale and route");
-  await expect(guide).toContainText("The next growth wave brings 1,400 requests a second.");
+  const guide = page.getByRole("dialog", { name: "Chapter guide, step 1 of 7" });
+  await expect(guide).toContainText("Chapter 2: Scaling & Routing");
+  await expect(guide).toContainText("The next wave brings 1,400 requests a second.");
   await expect(page.getByRole("region", { name: "Scaling controls" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/campaign-tutorial-chapter.png" });
   await guide.getByRole("button", { name: "Got it", exact: true }).click();
   await expect(guide).toBeHidden();
+  // No traffic limit is on, so the mission moves straight to App Server capacity.
+  const room = page.getByRole("dialog", { name: "Chapter guide, step 3 of 7" });
+  await expect(room).toContainText("Add App Server capacity");
+  await room.getByRole("button", { name: "Skip", exact: true }).click();
+  await expect(room).toBeHidden();
 
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();

@@ -477,7 +477,8 @@ export type Action =
   | { type: "incident_hint" }
   | { type: "acknowledge_review" }
   | { type: "acknowledge_milestone"; enterScaling?: boolean }
-  | { type: "acknowledge_prevention_review" };
+  | { type: "acknowledge_prevention_review" }
+  | { type: "claim_prevention_milestone" };
 
 export type FailureReason =
   | "wrong_phase"

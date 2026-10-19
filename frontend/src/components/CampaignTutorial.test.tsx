@@ -310,7 +310,7 @@ it("waits through an incident on a resumed company without holding its clock", (
 it("walks Stay Online through unlocking Health Checks in Tech and deploying it", () => {
   useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 0 } });
   renderCompany();
-  const guide = (step: number) => screen.getByRole("dialog", { name: `Chapter guide, step ${step} of 3` });
+  const guide = (step: number) => screen.getByRole("dialog", { name: `Chapter guide, step ${step} of 7` });
   fireEvent.click(within(guide(1)).getByRole("button", { name: "Got it" }));
   expect(guide(2).textContent).toContain("Unlock Health Checks");
   expect(guide(2).textContent).toContain("Open Tech.");
@@ -328,14 +328,16 @@ it("walks Stay Online through unlocking Health Checks in Tech and deploying it",
   fireEvent.click(screen.getByRole("button", { name: /^Deploy Health Checks/ }));
   expect(guide(3).textContent).toContain("Press Confirm.");
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
-  expect(useGame.getState().tour).toBeNull();
+  // The mission carries on into the test itself.
+  expect(guide(4).textContent).toContain("Start the test");
+  expect(guide(4).textContent).toContain("Press Start reliability test.");
 });
 
 it("keeps the Deploy Health Checks step on its own action when the player buys something else first", () => {
   useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 1 } });
   renderCompany();
   act(() => useGame.getState().act({ type: "unlock_reliability", tech: "health_checks" }));
-  const guide = () => screen.getByRole("dialog", { name: "Chapter guide, step 3 of 3" });
+  const guide = () => screen.getByRole("dialog", { name: "Chapter guide, step 3 of 7" });
   expect(guide().textContent).toContain("Press Deploy Health Checks.");
   fireEvent.click(screen.getByRole("button", { name: /^Add server/ }));
   expect(guide().textContent).not.toContain("Press Confirm.");
@@ -348,10 +350,11 @@ it("shows a chapter's guide on the controls the chapter adds", () => {
   start(); renderCompany();
   act(() => useGame.getState().endTour(false));
   act(() => useGame.setState({ tour: { track: "scaling", step: 0 } }));
-  const guide = screen.getByRole("dialog", { name: "Chapter guide, step 1 of 1" });
-  expect(guide.textContent).toContain("Scale and route");
+  const guide = screen.getByRole("dialog", { name: "Chapter guide, step 1 of 7" });
+  expect(guide.textContent).toContain("Chapter 2: Scaling & Routing");
   fireEvent.click(within(guide).getByRole("button", { name: "Got it" }));
-  expect(useGame.getState().tour).toBeNull();
+  // No traffic limit is on, so that step is passed.
+  expect(screen.getByRole("dialog", { name: "Chapter guide, step 3 of 7" }).textContent).toContain("Add App Server capacity");
 });
 
 it("reaches the speed lesson through the real dock menu with keyboard focus", () => {

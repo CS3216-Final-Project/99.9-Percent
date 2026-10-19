@@ -88,10 +88,16 @@ export type TourTrack = "basics" | "incident" | "campaign" | ChapterTour | TipTo
 function chapterTourOf(c: Campaign): ChapterTour | null {
   return c.combinedStage ? "combined" : c.reliabilityStage ? "reliability" : c.spikeStage ? "spikes" : c.dataStage ? "data" : c.scaling ? "scaling" : null;
 }
+/** The guide for the chapter the company is in now, which View chapters can replay. */
+export function chapterGuideOf(c: Campaign): ChapterTour | null {
+  return chapterTourOf(c) ?? (c.openingMilestone?.acknowledged ? null : "opening");
+}
 
 export interface Tour {
   track: TourTrack;
   step: number;
+  /** A chapter guide a tip interrupted, such as the first slowdown; it carries on when the tip ends. */
+  resume?: Tour;
   /** A bounded run of the real company for Chapter 0's Run lesson. Recreated on resume. */
   clockUntil?: number;
 }
@@ -332,6 +338,8 @@ interface Store {
   startTour: (track: TourTrack, from?: TourStart) => void;
   tourNext: () => void;
   tourBack: () => void;
+  /** Move a spotlight guide (not a walkthrough) to a step, for Back and for passing steps that no longer apply. */
+  tourGo: (step: number) => void;
   endTour: (completed: boolean) => void;
   dismissChapterComplete: () => void;
   /** Begin the walkthrough, restarting the intro run first if this one is already under way. */
@@ -550,6 +558,26 @@ export const useGame = create<Store>()((set, get) => {
           saveMeta(meta);
           Object.assign(patch,{meta,tour:{track:chapter,step:0},running:false});
         }
+      }
+      // The first slowdown in Guided Mode walks through recovering from it, paused (the engine pauses it too). A chapter
+      // guide it interrupts carries on afterwards.
+      const sameCompany=was?.runId===c.runId&&!get().tutorialCompany;
+      const tipsNow=(patch.meta??get().meta).tipsSeen??[];
+      const openTour=patch.tour!==undefined?patch.tour:get().tour;
+      if(sameCompany&&!was?.incident&&c.incident&&!tipsNow.includes("slowdown")&&openTour?.track!=="campaign") {
+        const meta={...(patch.meta??get().meta),tipsSeen:[...tipsNow,"slowdown" as const]};
+        saveMeta(meta);
+        Object.assign(patch,{meta,tour:{track:"slowdown",step:0,...(openTour?{resume:openTour}:{})},running:false});
+      }
+      // A traffic limit left on once the company is calm again quietly turns customers away; say so once.
+      const queuesEmpty=c.dbBacklog===0&&c.apps.every(a=>a.backlog===0);
+      const reviewed=c.reports.length>0&&c.reports.every(r=>c.trace.some(t=>t.type==="review-acknowledged"&&t.data.incidentId===r.id));
+      const tipsLimit=(patch.meta??get().meta).tipsSeen??[];
+      if(sameCompany&&c.limit!==null&&!c.incident&&next.phase==="management"&&queuesEmpty&&reviewed&&!c.pending.length&&!awaitingAcknowledgement(c)
+        &&!tipsLimit.includes("limit")&&!get().tour&&!patch.tour) {
+        const meta={...(patch.meta??get().meta),tipsSeen:[...tipsLimit,"limit" as const]};
+        saveMeta(meta);
+        Object.assign(patch,{meta,tour:{track:"limit",step:0},running:false});
       }
       // The first settled operating week explains itself once, paused, at the first calm moment in the Opening
       // (its incident can still be running when the week settles), unless another guide is already showing.
@@ -1277,6 +1305,11 @@ export const useGame = create<Store>()((set, get) => {
       set({ tour: { track: tour.track, step, ...(step === RUN_LESSON ? { clockUntil: get().tutorialCompany ? 1 : get().game.campaign!.step + 1 } : {}) }, running: false, meta: walkthroughAt(meta, step) });
       persist();
     },
+    tourGo: (step) => {
+      const tour = get().tour;
+      if (!tour || isWalkthrough(tour.track) || step < 0) return;
+      set({ tour: { ...tour, step } });
+    },
     dismissChapterComplete: () => set({ chapterComplete: null }),
     endTour: (completed) => {
       const { tour, meta, game } = get();
@@ -1299,9 +1332,17 @@ export const useGame = create<Store>()((set, get) => {
       // Only finishing a walkthrough is marked; skipping it, like its steps, stays quiet (the steps' own decisions already sound).
       const company = tour.track === "campaign" ? get().tutorialCompany : null;
       if (company) { persist(); clearTutorialPractice(); }
+      // Finishing Chapter 0 on the real company hands over to the Opening's own guide, once.
+      let after: Tour | null = tour.resume ?? null;
+      const c = game.campaign;
+      if (completed && tour.track === "campaign" && !company && c && !chapterTourOf(c) && !c.openingMilestone?.acknowledged && !next.chapterTours.includes("opening")) {
+        next = { ...next, chapterTours: [...next.chapterTours, "opening"] };
+        saveMeta(next);
+        after = { track: "opening", step: 0 };
+      }
       set({ ...(company ? { ...company, tutorialCompany: null, generation: get().generation + 1, selected: null, selectedAppId: null,
         roomInspection: null, affected: [], hovered: null, cameraFocus: null, view: null, techFocus: null, lastAction: null, toast: null, activeMark: document.hidden ? null : performance.now() } : {}),
-        tour: null, meta: next, running: tour.track === "campaign" ? false : tour.track === "incident" && game.phase === "incident" ? true : get().running, ...(completed && walkthrough ? { lastIntro: intro("finish") } : {}) });
+        tour: after, meta: next, running: tour.track === "campaign" || after ? false : tour.track === "incident" && game.phase === "incident" ? true : get().running, ...(completed && walkthrough ? { lastIntro: intro("finish") } : {}) });
       if (game.campaign && walkthrough) persist();
     },
     startTutorialRun: (from) => {

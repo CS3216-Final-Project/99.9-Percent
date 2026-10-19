@@ -235,7 +235,8 @@ export interface Campaign {
     overloadSteps: number;
     incident: CampaignIncident | null;
     reports: CampaignPostmortem[];
-    openingMilestone: null | {id:"opening-stability";incidentId:string|null;outcomeId?:"opening-prevention";awardedStep:number;acknowledged:boolean};
+    /** `claimedStep` marks a prevention milestone the player claimed under schema 8; it completes the Opening like a recovery. */
+    openingMilestone: null | {id:"opening-stability";incidentId:string|null;outcomeId?:"opening-prevention";claimedStep?:number;awardedStep:number;acknowledged:boolean};
     openingPrevention?: OpeningPrevention;
     /** Input prefix recorded under schema 6's former prevention progression rule. */
     legacyPreventionInputs?: number;

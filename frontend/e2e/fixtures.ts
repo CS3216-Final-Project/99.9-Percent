@@ -1,6 +1,6 @@
 import { test as base, expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import type { GameState } from '../src/sim';
-import { CHAPTER_TOURS, DEFAULT_META, type Meta } from '../src/game/persist';
+import { CHAPTER_TOURS, DEFAULT_META, GUIDED_TIPS, type Meta } from '../src/game/persist';
 import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
 import { WALKTHROUGH_LESSON_IDS, WALKTHROUGH_LESSONS as CHAPTER_ZERO_LESSONS } from '../src/game/walkthrough';
 export { CHAPTER_ZERO_LESSONS };
@@ -70,7 +70,7 @@ export const chapterComplete = (page: Page) => page.getByRole('dialog', { name: 
 /** The Guided Mode walkthrough's card, whichever step it shows. */
 export const tutorial = (page: Page) => page.getByRole('dialog', { name: /^(?:Walkthrough|Tutorial), step/ });
 
-/** Seeds a company whose player has finished the walkthrough and seen every chapter's guide, unless `meta` says otherwise. */
+/** Seeds a company whose player has finished the walkthrough and seen every chapter's guide and tip, unless `meta` says otherwise. */
 export async function seedSave(page: Page, game: GameState, extraMeta: Partial<Meta> = {}) {
   await page.addInitScript(({ save, meta }) => {
     // Only create the fixture once; a reload must exercise the real saved state.
@@ -81,7 +81,14 @@ export async function seedSave(page: Page, game: GameState, extraMeta: Partial<M
       try { const parsed = JSON.parse(localStorage.getItem('nn.campaign.meta.v1') ?? '{}'); if (parsed && typeof parsed === 'object') earlier = parsed; } catch { /* defaults below */ }
       localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ ...earlier, ...meta }));
     }
-  }, { save: JSON.stringify(makeEnvelope(game)), meta: { ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, chapterTours: [...CHAPTER_TOURS], runsStarted: 1, ...extraMeta } });
+  }, { save: JSON.stringify(makeEnvelope(game)), meta: { ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, chapterTours: [...CHAPTER_TOURS], tipsSeen: [...GUIDED_TIPS], runsStarted: 1, ...extraMeta } });
+}
+
+/** Seeds only the Guided Mode profile, before navigation and once, for a fresh company with some guides already seen. */
+export async function seedMeta(page: Page, meta: Partial<Meta>) {
+  await page.addInitScript((meta) => {
+    if (localStorage.getItem('nn.campaign.meta.v1') === null) localStorage.setItem('nn.campaign.meta.v1', JSON.stringify(meta));
+  }, { ...DEFAULT_META, ...meta });
 }
 
 /**
@@ -235,7 +242,13 @@ export async function finishChapterZero(page: Page, touch = false) {
   throw new Error("Chapter 0 did not reach its explicit finish action");
 }
 
-/** Unrelated journeys complete mandatory Chapter 0; optional spotlight guides retain their Skip action. */
+/** The spotlight guide of the chapter the company is in, whichever step it shows. */
+export const chapterGuide = (page: Page) => page.getByRole('dialog', { name: /^Chapter guide, step/ });
+
+/**
+ * Unrelated journeys complete mandatory Chapter 0, then skip the Opening guide that follows it; optional spotlight
+ * guides retain their Skip action.
+ */
 export async function completeTutorial(page: Page) {
   if (await page.locator(".chapter-zero-guide").count()) {
     // Completing the real lessons is setup for these journeys. Bound that setup
@@ -245,6 +258,10 @@ export async function completeTutorial(page: Page) {
     test.setTimeout(journeyBudget + 180_000);
     await test.step("Complete mandatory Chapter 0 setup", () => finishChapterZero(page), { timeout: 180_000 });
     test.setTimeout(journeyBudget + Math.ceil(performance.now() - started));
+    const opening = chapterGuide(page);
+    await expect(opening).toContainText("Chapter 1: Opening");
+    await opening.getByRole("button", { name: "Skip", exact: true }).click();
+    await expect(opening).toBeHidden();
   }
   else await page.getByRole("button", { name: "Skip", exact: true }).click();
 }

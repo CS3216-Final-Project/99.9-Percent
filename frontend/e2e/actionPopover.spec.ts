@@ -85,7 +85,7 @@ test("Stay Online guide unlocks Health Checks in Tech and confirms its left-side
   await seedSave(page,readyReliability(),{chapterTours:["scaling","data","spikes"]});
   await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
   await page.getByRole("button",{name:"Next: Continue to reliability",exact:true}).click();
-  const guide=(step:number)=>page.getByRole("dialog",{name:`Chapter guide, step ${step} of 3`,exact:true});
+  const guide=(step:number)=>page.getByRole("dialog",{name:`Chapter guide, step ${step} of 7`,exact:true});
   await guide(1).getByRole("button",{name:"Got it",exact:true}).click();
   await expect(guide(2)).toContainText("Open Tech.");
   await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Tech",exact:true}).click();

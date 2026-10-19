@@ -90,3 +90,16 @@ it("does not let an old pending prevention milestone grant a new Scaling entry",
 it.each([-1,1.5,1000001])("rejects an invalid historical input prefix %s",legacyPreventionInputs=>{
  expect(decodeSave(JSON.stringify({...makeEnvelope(qualified()),legacyPreventionInputs})).status).toBe("corrupt");
 });
+
+it("replays a schema-8 prevention claim exactly, and a stuck schema-7 company can claim after loading",()=>{
+ const reviewed=act(qualified(4),{type:"acknowledge_prevention_review"});
+ const stuck=decodeSave(JSON.stringify({...makeEnvelope(reviewed),schemaVersion:7}));
+ if(stuck.status!=="ok")throw Error("load");expect(stuck.game).toEqual(reviewed);expect(stuck.envelope.schemaVersion).toBe(8);
+ const claimed=act(stuck.game,{type:"claim_prevention_milestone"}),entered=act(claimed,{type:"acknowledge_milestone"});
+ for(const g of [claimed,entered]){const again=decodeSave(JSON.stringify(makeEnvelope(g)));if(again.status!=="ok")throw Error("replay");expect(again.game).toEqual(g);}
+ expect(entered.campaign!.scaling).not.toBeNull();
+});
+it("rejects a prevention claim disguised as an older schema",()=>{
+ const claimed=act(act(qualified(4),{type:"acknowledge_prevention_review"}),{type:"claim_prevention_milestone"});
+ for(const schemaVersion of [6,7])expect(decodeSave(JSON.stringify({...makeEnvelope(claimed),schemaVersion})).status).toBe("corrupt");
+});

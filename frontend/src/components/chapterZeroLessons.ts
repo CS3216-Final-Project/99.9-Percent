@@ -84,7 +84,7 @@ const LESSONS: Record<LessonId, Omit<ChapterZeroLesson, "id">> = {
   ready: {
     title: "Ready for Chapter 1",
     section: "Go",
-    why: "In Chapter 1: Opening, demand grows. Watch the evidence, find the bottleneck and decide where to spend.",
+    why: "In Chapter 1: Opening, demand grows. A short guide walks you through finding the bottleneck and fixing it.",
     more: "Tech, in the bottom bar, unlocks new capabilities with research points; History shows charts, your decisions and incident reports. Each later chapter introduces its own controls when you reach it.",
   },
 };

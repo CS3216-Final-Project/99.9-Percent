@@ -3,47 +3,26 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useGame, type TourTrack } from "@/game/store";
 import { floorOf, selectedInView } from "@/game/floors";
-import { num } from "@/game/format";
 import type { EquipmentId } from "@/sim";
 import { pendingStop } from "@/sim/step";
-import { installPending } from "@/sim/reliability";
-import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
-import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { EDGE, openRoomArea } from "./roomArea";
 import ChapterZero from "./ChapterZeroGuide";
 import { CHAPTER_ZERO_LESSONS } from "./chapterZeroLessons";
+import { CHAPTER_MISSIONS, GUIDED_TIP_STEPS, text, type Snapshot, type Step } from "./chapterMissions";
 import { cardStyle, placeFor, type Box } from "./spotlight";
 
 /**
  * Guided walkthroughs. Each step is a goal ("Add a server") plus one short
  * line saying what to click right now. The screen dims except for that one
  * thing. Challenge Mode and later chapter guides can be skipped; Chapter 0 uses its own lesson book.
+ * Guided Mode's chapter missions and tips live in chapterMissions.ts.
  */
-
-type Snapshot = ReturnType<typeof useGame.getState>;
-
-interface Step {
-  title: string;
-  /** One short reason, if the goal needs one. */
-  why?: string | ((s: Snapshot) => string);
-  /** What to click right now. It changes as the player moves through the step. */
-  hint: (s: Snapshot) => string;
-  /** CSS selector of the thing to spotlight right now. */
-  target: (s: Snapshot) => string;
-  /** When present, the step completes by itself once this is true. */
-  done?: (s: Snapshot) => boolean;
-  enter?: (s: Snapshot) => void;
-  nextLabel?: string;
-  /** The step leads through the Tech tree, so an open tree does not hide it. */
-  inTech?: boolean;
-}
 
 const label = (id: string) => `.eq-label[data-eq="${id}"]`;
 const PRIMARY = '[data-tour="primary"]';
 const TECH_TAB = '.view-tabs button[data-view="tech"]';
-/** Only Deploy Health Checks' own confirmation belongs to its step; another action's is the player's detour. */
-const confirmingChecks = () => confirmingAction() === "Deploy Health Checks";
+const CONFIRMATION = ".campaign-action-popover";
 const clear = (s: Snapshot) => {
   s.openView(null);
   s.select(null);
@@ -111,93 +90,18 @@ const INCIDENT: Step[] = [
   },
 ];
 
-/** Each later chapter gets one step on the controls it adds, the first time the company enters it. */
-const chapter = (title: string, why: string, hint: string, target: string): Step[] => [{ title, why, hint: () => hint, target: () => target, nextLabel: "Got it" }];
-const CHAPTERS = {
-  scaling: chapter(
-    "Scale and route",
-    `The next growth wave brings ${num(P.traffic)} requests a second.`,
-    "Compare scaling and routing options. Extra servers help only when traffic reaches them.",
-    '[aria-label="Scaling controls"]',
-  ),
-  data: chapter(
-    "Data strategy",
-    "Cache hits answer repeated reads; misses and writes still reach the Database.",
-    "Inspect the workload and compare your options.",
-    '[aria-label="Data strategy"]',
-  ),
-  spikes: chapter(
-    "Traffic spikes",
-    "Two short bursts of traffic are coming.",
-    "Inspect demand and compare manual capacity with autoscaling.",
-    '[aria-label="Traffic spikes and autoscaling"]',
-  ),
-  reliability: [
-    ...chapter(
-      "Stay online",
-      "The test makes one App Server fail. Manual and automatic responses are available.",
-      "Explore the reliability controls before starting the test.",
-      '[aria-label="Stay Online"]',
-    ),
-    {
-      title: "Unlock Health Checks",
-      why: "This chapter's capabilities are unlocked in Tech with research points.",
-      hint: (s) => (s.view !== "tech" ? "Open Tech." : s.techFocus !== "health_checks" ? "Click Health Checks." : "Press Unlock Health Checks."),
-      target: (s) =>
-        s.view !== "tech" ? TECH_TAB : s.techFocus !== "health_checks" ? '.node[data-tech="health_checks"]' : `.tree-detail ${PRIMARY}`,
-      inTech: true,
-      done: (s) => !!s.game.campaign?.reliabilityStage?.owned.includes("health_checks"),
-    },
-    {
-      title: "Deploy Health Checks",
-      why: "Unlocking does not deploy it.",
-      hint: (s) =>
-        s.view === "tech"
-          ? "Close Tech."
-          : confirmingChecks()
-            ? "Press Confirm."
-            : s.game.campaign && installPending(s.game.campaign)
-              ? "Run until the current install finishes, then press Deploy Health Checks."
-              : "Press Deploy Health Checks.",
-      // The confirmation opens beside the panel; light it up rather than leaving it under the dim.
-      target: (s) => (s.view === "tech" ? TECH_TAB : confirmingChecks() ? ".campaign-action-popover" : '[data-tour="deploy-checks"]'),
-      inTech: true,
-      done: (s) => {
-        const c = s.game.campaign;
-        return !!c && (c.reliabilityStage?.checksStep != null || c.pending.some((a) => a.type === "health-checks"));
-      },
-    },
-  ],
-  combined: chapter(
-    "Grow the company",
-    "Three growth waves use everything you have built.",
-    "Start each wave when you are ready, then review how it went.",
-    ".campaign-guidance",
-  ),
-} satisfies Record<string, Step[]>;
-
-/** One-card Guided Mode tips, shown the first time something happens instead of being taught up front. */
-const TIPS = {
-  settlement: chapter(
-    "Your first week settled",
-    `Every ${Q.periodSteps} game seconds the week settles: pending revenue becomes cash, then equipment and salaries are paid.`,
-    "Keep enough cash for next week's bill before you buy.",
-    ".stat-cash",
-  ),
-} satisfies Record<string, Step[]>;
-
-const TRACKS: Partial<Record<TourTrack, Step[]>> = { basics: BASICS, incident: INCIDENT, ...CHAPTERS, ...TIPS };
+const TRACKS: Partial<Record<TourTrack, Step[]>> = { basics: BASICS, incident: INCIDENT, ...CHAPTER_MISSIONS, ...GUIDED_TIP_STEPS };
 export const BASICS_STEPS = BASICS.length;
 export const CAMPAIGN_STEPS = CHAPTER_ZERO_LESSONS.length;
 
-const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", campaign: "Tutorial", incident: "Incident guide", settlement: "Tip" };
+const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", campaign: "Tutorial", incident: "Incident guide", settlement: "Tip", limit: "Tip", slowdown: "Slowdown guide" };
 
 /** Where a track's steps make sense: Guided Mode's also wait for any review or milestone and for open views. */
-function fits(track: TourTrack, s: Snapshot, step: Pick<Step, "inTech">): boolean {
+function fits(track: TourTrack, s: Snapshot, step: Pick<Step, "inTech" | "phases">): boolean {
   if (track === "basics") return s.game.phase === "management";
   if (track === "incident") return s.game.phase === "incident";
   const c = s.game.campaign;
-  return !!c && s.game.phase === "management" && pendingStop(c) === null && !(c.openingMilestone && !c.openingMilestone.acknowledged) && (s.view === null || (!!step.inTech && s.view === "tech"));
+  return !!c && (step.phases ?? ["management"]).includes(s.game.phase) && pendingStop(c) === null && !(c.openingMilestone && !c.openingMilestone.acknowledged) && (s.view === null || (!!step.inTech && s.view === "tech"));
 }
 
 /** Whether a box on screen lies in the part of the room the panel leaves open. */
@@ -235,24 +139,42 @@ function SpotlightTutorial() {
   const index = tour?.step ?? -1;
   const visible = !!step && !!track && fits(track, s, step) && !covered && !s.onboarding && s.view !== "menu";
 
+  // A step revisited with Back keeps its Next button instead of moving on by itself again.
+  const [revisit, setRevisit] = useState<{ track: TourTrack; step: number } | null>(null);
+  const revisited = !!tour && revisit?.track === tour.track && revisit.step === tour.step;
+  const applies = (i: number) => !steps[i]?.skipIf?.(useGame.getState());
+  const previous = (() => {
+    for (let i = index - 1; i >= 0; i--) if (applies(i)) return i;
+    return -1;
+  })();
+
   const advance = () => {
     const now = useGame.getState();
-    if (!now.tour || !TRACKS[now.tour.track]) return;
-    if (now.tour.step >= TRACKS[now.tour.track]!.length - 1) now.endTour(true);
-    else now.tourNext();
+    const list = now.tour ? TRACKS[now.tour.track] : undefined;
+    if (!now.tour || !list) return;
+    let next = now.tour.step + 1;
+    while (next < list.length && list[next].skipIf?.(now)) next++;
+    if (next >= list.length) now.endTour(true);
+    else now.tourGo(next);
   };
 
   // Run a step's setup once, then move focus to the card for keyboard and screen-reader users.
   useEffect(() => {
     if (!step) return;
-    step.enter?.(useGame.getState());
+    const now = useGame.getState();
+    if (step.skipIf?.(now)) return;
+    if (step.pause) now.setRunning(false);
+    step.enter?.(now);
     card.current?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track, index]);
 
-  // Steps that wait for an action finish as soon as the player has done it.
+  // Steps that wait for an action finish as soon as the player has done it; steps that no longer apply are passed.
+  // Guided Mode's steps also finish behind a dialog, such as the postmortem that ends a slowdown.
   useEffect(() => {
-    if (step?.done && visible && step.done(useGame.getState())) advance();
+    if (!step || revisited) return;
+    const now = useGame.getState();
+    if (step.skipIf?.(now) || (step.done && (visible || !!now.game.campaign) && step.done(now))) advance();
   });
 
   // Follow the spotlighted element as the layout, camera or panel contents change.
@@ -269,7 +191,9 @@ function SpotlightTutorial() {
       const hiddenByModal = !!document.querySelector(".modal-backdrop");
       setCovered(hiddenByModal);
       if (hiddenByModal) focusedFor = "";
-      const sel = step.target(useGame.getState());
+      // An open purchase confirmation is what the player is deciding on now, so a Guided Mode guide lights it rather
+      // than covering its Confirm and Cancel buttons.
+      const sel = useGame.getState().game.campaign && confirmingAction() ? CONFIRMATION : step.target(useGame.getState());
       setSelector(sel);
       // A step pointing at equipment on the other floor takes the view there first; its label appears as the car
       // arrives. Once only: a player who then rides elsewhere is not pulled back.
@@ -337,10 +261,14 @@ function SpotlightTutorial() {
 
   if (!visible || !step || !tour) return null;
 
-  const waiting = !!step.done;
+  const waiting = !!step.done && !revisited;
   const name = TRACK_NAMES[tour.track] ?? "Chapter guide";
-  const why = typeof step.why === "function" ? step.why(s) : step.why;
+  const why = text(step.why, s);
+  const more = text(step.more, s);
   const campaign = !!s.game.campaign;
+  // Docked to the top of a small screen, a Guided Mode card stays below the header so Cash, App Health and Menu remain usable.
+  const topbar = campaign ? document.querySelector(".topbar")?.getBoundingClientRect().bottom : undefined;
+  const topInset = topbar ? Math.round(topbar) + 8 : undefined;
   return (
     <div className="tour" data-track={tour.track}>
       {box ? <div className="tour-hole" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} /> : <div className="tour-dim" />}
@@ -350,7 +278,7 @@ function SpotlightTutorial() {
         role="dialog"
         aria-label={`${name}, step ${tour.step + 1} of ${steps.length}`}
         tabIndex={-1}
-        style={cardStyle(box, placeFor(selector), viewport.w, viewport.h, edge, cardHeight)}
+        style={cardStyle(box, placeFor(selector), viewport.w, viewport.h, edge, cardHeight, undefined, topInset)}
       >
         <div className="tour-dots" aria-hidden="true">
           {steps.map((_, i) => (
@@ -361,15 +289,23 @@ function SpotlightTutorial() {
         {!campaign && why && <p className="muted">{why}</p>}
         <p className="tour-prompt">{step.hint(s)}</p>
         {campaign && why && <p className="muted tour-explanation">{why}</p>}
+        {more && <details className="lesson-more tour-more"><summary>Learn more</summary><p>{more}</p></details>}
         <div className="tour-foot">
           <button type="button" className="tour-skip" onClick={() => s.endTour(false)}>
             Skip
           </button>
-          {!waiting && (
-            <button type="button" className="btn btn-primary btn-small" onClick={advance}>
-              {step.nextLabel ?? "Next"}
-            </button>
-          )}
+          <span className="tour-nav">
+            {campaign && previous >= 0 && (
+              <button type="button" className="btn btn-small" onClick={() => { setRevisit({ track: tour.track, step: previous }); s.tourGo(previous); }}>
+                Back
+              </button>
+            )}
+            {!waiting && (
+              <button type="button" className="btn btn-primary btn-small" onClick={advance}>
+                {revisited ? "Next" : step.nextLabel ?? "Next"}
+              </button>
+            )}
+          </span>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { campaignChapters, chapterAdvance } from "@/game/campaignChapters";
 import { campaignGuidance, campaignObjective } from "@/game/campaignGuidance";
-import { useGame } from "@/game/store";
+import { chapterGuideOf, useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { Modal } from "./ui";
 import { tipProps } from "./tips";
@@ -19,6 +19,7 @@ export function CampaignChapters() {
   const reasonId = useId();
   const guidance = campaignGuidance(game);
   const reason = advance && !advance.ready ? guidance.notice ?? guidance.lockReason : null;
+  const guide = !learning && tutorialDone && game.phase !== "ended" ? chapterGuideOf(game.campaign!) : null;
 
   return <>
     <section className="chapter-bar" aria-label="Guided Mode chapters">
@@ -44,7 +45,8 @@ export function CampaignChapters() {
           <div><h3>{chapter.name}</h3><span className="chapter-status">{chapter.status}{chapter.current && chapter.completed ? " · You are here" : ""}</span><p>{chapter.description}</p>{chapter.number === 0 && (replaying ? <>
             <p>Practice is in progress. Finish or exit the walkthrough to return to your paused company.</p>
             <button className="btn btn-primary" onClick={() => { useGame.getState().endTour(false); setOpen(false); }}>Exit walkthrough</button>
-          </> : <button className="btn" disabled={!tutorialDone && game.phase !== "management"} onClick={() => { setOpen(false); useGame.getState().startTour("campaign"); }}>Replay walkthrough</button>)}</div>
+          </> : <button className="btn" disabled={!tutorialDone && game.phase !== "management"} onClick={() => { setOpen(false); useGame.getState().startTour("campaign"); }}>Replay walkthrough</button>)}
+            {chapter.current && chapter.number > 0 && guide && <button className="btn" onClick={() => { setOpen(false); useGame.getState().startTour(guide); }}>Replay chapter guide</button>}</div>
         </li>)}
       </ol>
       <p className="muted">Complete each chapter’s requirements and choose Next when it becomes available. Time is paused while you look around.</p>

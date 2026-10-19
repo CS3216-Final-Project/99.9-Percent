@@ -4,7 +4,7 @@ import {test,expect,savedGame} from "./fixtures";
 // These journeys exercise panels and persistence; room interaction has dedicated browser coverage.
 test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
 
-test("Opening prevention: fresh player, new observations and reloads keep Scaling locked without API",async({page, installClock})=>{
+test("Opening prevention: fresh player, new observations and reloads, then prevention completes the Opening without API",async({page, installClock})=>{
  await installClock();
  test.setTimeout(90000);await page.route("**/api/**",r=>r.abort());await page.goto("/");
  await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await completeTutorial(page);
@@ -27,10 +27,16 @@ test("Opening prevention: fresh player, new observations and reloads keep Scalin
  c=(await savedGame(page)).campaign!;expect(c.openingRecovered).toBe(false);expect(c.reports).toEqual([]);expect(c.openingMilestone).toBeNull();
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(outcome).toBeVisible();expect((await savedGame(page)).campaign).toEqual(c);
  await outcome.getByRole("button",{name:"Continue company",exact:true}).click();
- await expect(page.getByRole("dialog",{name:"First growth challenge handled"})).toHaveCount(0);
- await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Opening");
- await expect(guidance).toContainText("prevention does not unlock Scaling");
- await expect(page.getByRole("region",{name:"Scaling controls"})).toHaveCount(0);
- c=(await savedGame(page)).campaign!;expect(c.runId).toBe(id);expect(c.step).toBe(9);expect(c.openingRecovered).toBe(false);expect(c.scaling).toBeNull();expect(c.openingMilestone).toBeNull();expect(c.openingPrevention!.outcome!.acknowledged).toBe(true);
+ // Preparing in time completes the Opening, as recovering from a slowdown does.
+ const milestone=page.getByRole("dialog",{name:"First growth challenge handled"});
+ await expect(milestone).toContainText("You handled Opening growth without an incident.");
+ c=(await savedGame(page)).campaign!;expect(c.runId).toBe(id);expect(c.step).toBe(9);expect(c.openingRecovered).toBe(false);expect(c.reports).toEqual([]);
+ expect(c.openingMilestone).toMatchObject({outcomeId:"opening-prevention",claimedStep:9,acknowledged:false});expect(c.openingPrevention!.outcome!.acknowledged).toBe(true);
+ await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);
+ await milestone.getByRole("button",{name:"Continue operating",exact:true}).click();
+ await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Scaling & Routing");
+ await expect(page.getByRole("region",{name:"Scaling controls"})).toBeVisible();
+ await expect(page.getByRole("dialog",{name:/^Chapter guide, step 1 of/})).toContainText("Chapter 2: Scaling & Routing");
+ c=(await savedGame(page)).campaign!;expect(c.scaling).not.toBeNull();
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);
 });

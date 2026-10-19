@@ -128,7 +128,7 @@ test("purchase details keyboard navigation handles overflow and fitting content"
 });
 
 
-test("Opening prevention recognition keeps Scaling locked after touch review and reload",async({ page, withoutRoom })=>{
+test("Opening prevention completes the Opening after touch review and reload",async({ page, withoutRoom })=>{
  await withoutRoom();
  let g=newGame(0,"touch-prevention");
  g=act(g,{type:"set_traffic_limit",enabled:true});g=act(g,{type:"start_db_upgrade"});g=advanceSteps(g,4).state;
@@ -137,14 +137,16 @@ test("Opening prevention recognition keeps Scaling locked after touch review and
  await page.route("**/api/**",r=>r.abort());await page.setViewportSize({width:390,height:844});
  await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  const review=page.getByRole("dialog",{name:"Prevention review"});
- await expect(review).toContainText("Scaling unlocks only after a real Opening incident");
+ await expect(review).toContainText("completes the Opening");
  await review.getByRole("button",{name:"Continue company",exact:true}).tap();
- await expect(page.getByRole("dialog",{name:"First growth challenge handled"})).toHaveCount(0);
- await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Opening");
- await expect(page.getByRole("region",{name:"Scaling controls"})).toHaveCount(0);
- const before=(await savedGame(page)).campaign!;expect(before.openingMilestone).toBeNull();expect(before.scaling).toBeNull();
+ const milestone=page.getByRole("dialog",{name:"First growth challenge handled"});
+ await expect(milestone).toContainText("You handled Opening growth without an incident.");
+ const before=(await savedGame(page)).campaign!;expect(before.openingMilestone).toMatchObject({outcomeId:"opening-prevention",acknowledged:false});expect(before.scaling).toBeNull();
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
- expect((await savedGame(page)).campaign).toEqual(before);await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Opening");
+ expect((await savedGame(page)).campaign).toEqual(before);
+ await milestone.getByRole("button",{name:"Continue operating",exact:true}).tap();
+ await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Scaling & Routing");
+ expect((await savedGame(page)).campaign!.scaling).not.toBeNull();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 test("current chapter is prominent and the full journey opens on touch", async ({ page, withoutRoom }) => {
@@ -440,6 +442,8 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  await expect(officeFloor).toHaveAttribute("aria-pressed","true");
  await navigation.locator(":scope > summary").tap();
  await finishChapterZero(page,true);await expect(card).toBeHidden();
+ // The Opening's own guide follows; its journeys are separate.
+ const opening=page.getByRole("dialog",{name:/^Chapter guide, step 1 of/});await opening.getByRole("button",{name:"Skip",exact:true}).tap();await expect(opening).toBeHidden();
  expect((await savedGame(page)).campaign!.actions).toEqual([]);
  await expect(page.getByRole("button",{name:"Run",exact:true})).toBeInViewport();await expect(page.getByRole("button",{name:"Advance game second",exact:true})).toBeHidden();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);

@@ -77,6 +77,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
 
   switch (action.type) {
     case "acknowledge_prevention_review":
+    case "claim_prevention_milestone":
     case "acknowledge_milestone":
     case "set_traffic_limit": return fail("invalid", "Guided Mode action only.");
     case "launch_promotion": {

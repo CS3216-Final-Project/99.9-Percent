@@ -48,10 +48,10 @@ export function replayCampaign(seed: number, runId: string, inputs: readonly Cam
     return projectCampaign(s);
 }
 
-/** Keep already-entered companies intact; prevention alone cannot grant a new continuation. */
+/** Keep already-entered companies intact; only an explicit schema-8 claim grants a new continuation from prevention. */
 function clearUnenteredPreventionMilestone(s: GameState): void {
     const c=s.campaign!;
-    if(!c.scaling && c.openingMilestone?.outcomeId==="opening-prevention")c.openingMilestone=null;
+    if(!c.scaling && c.openingMilestone?.outcomeId==="opening-prevention" && c.openingMilestone.claimedStep===undefined)c.openingMilestone=null;
 }
 
 function advanceTo(s: GameState, target: number, legacyPrevention: boolean): void {

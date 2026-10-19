@@ -1,7 +1,7 @@
 import { canEnterCombined, canStartGrowth, pendingCombined } from "@/sim/combinedCampaign";
 import { canEnterReliability, pendingReliability } from "@/sim/reliability";
 import type { GameState, Action } from "@/sim";
-import { canEnterData, qualifiesForRecovery } from "@/sim/step";
+import { canClaimPrevention, canEnterData, qualifiesForRecovery } from "@/sim/step";
 import { canEnterSpikes, pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { pendingPreventionReview, preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
@@ -103,13 +103,12 @@ export function campaignGuidance(g: GameState) {
   add("db-inspection","Database inspected after growth",r.databaseInspected);
   add("observations",`Stable observations: ${c.openingPrevention?.stableSteps??0} / 5`,!!c.openingPrevention?.outcome);
   add("review","Prevention outcome acknowledged",!!c.openingPrevention?.outcome?.acknowledged);
-  add("recovery","Real Opening incident recovered and postmortem acknowledged",false);
   add("milestone","Opening milestone acknowledged",openingDone);
-  optional="Prevention is recorded separately. Scaling requires a real recovered Opening incident, its acknowledged postmortem and the Opening milestone. No incident is forced.";
+  optional="Preventing the slowdown completes the Opening, just as recovering from one does. No incident is forced.";
   if(c.limit!==null)notice="Traffic limiting prevents full-demand qualification. Remove the limit and serve the full 800 req/s to continue the prevention path.";
   else if(Object.values(r).every(Boolean)&&!c.openingPrevention?.outcome)waiting="Observe five consecutive new game seconds. Pausing adds no observations; a failing game second resets the streak.";
   if(pendingPreventionReview(c))pendingAction={label:"Review outcome"};
-  else if(c.openingPrevention?.outcome?.acknowledged)waiting="Prevention recorded. This company remains in Opening; prevention does not unlock Scaling.";
+  else if(canClaimPrevention(g))pendingAction={label:"Complete Opening",action:{type:"claim_prevention_milestone"}};
  } else if(c.incident||c.openingRecovered||c.reports.length||pendingMilestone) {
   add("recovery",c.openingMilestone?.outcomeId?"Opening prevention qualified":"Incident recovered",c.openingMilestone?.outcomeId?!!c.openingPrevention?.outcome:c.openingRecovered);
   add("review",c.openingMilestone?.outcomeId?"Prevention outcome acknowledged":"Postmortem reviewed",c.openingMilestone?.outcomeId?!!c.openingPrevention?.outcome?.acknowledged:reportsAcknowledged&&c.reports.length>0);

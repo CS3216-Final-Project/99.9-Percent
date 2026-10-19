@@ -22,18 +22,19 @@ it("lists outstanding prevention requirements and inspects components without ad
  fireEvent.click(screen.getByRole("button",{name:"Inspect Database"}));expect(requirement("db-inspection").getAttribute("data-met")).toBe("true");
  expect(useGame.getState().game.campaign!.step).toBe(4);
 });
-it("records prevention and explains why Scaling remains locked",()=>{
+it("records prevention and completes the Opening into Scaling",()=>{
  const g=qualified();show(g);const step=g.campaign!.step,cash=g.campaign!.cashCents;
  expect(screen.queryByRole("dialog",{name:"Incident postmortem"})).toBeNull();
  const review=screen.getByRole("dialog",{name:"Prevention review"});
  expect(review.textContent).toContain("Database upgrade: active before completion · setup $3,000.00");expect(review.textContent).toContain("Traffic limit removal: active before completion");
+ expect(review.textContent).toContain("completes the Opening");
  fireEvent.click(within(review).getByRole("button",{name:/Continue company/}));
- expect(review.textContent).toContain("Scaling unlocks only after a real Opening incident");
- expect(screen.queryByRole("dialog",{name:"First growth challenge handled"})).toBeNull();
- expect(useGame.getState().game.campaign!.scaling).toBeNull();
- expect(requirement("recovery").getAttribute("data-met")).toBe("false");
- expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe("Opening");
+ const milestone=screen.getByRole("dialog",{name:"First growth challenge handled"});
+ expect(milestone.textContent).toContain("You handled Opening growth without an incident.");
+ expect(useGame.getState().game.campaign!.openingMilestone).toMatchObject({outcomeId:"opening-prevention",claimedStep:step,acknowledged:false});
  expect(useGame.getState().game.campaign!.cashCents).toBe(cash);expect(useGame.getState().game.campaign!.step).toBe(step);
+ fireEvent.click(within(milestone).getByRole("button",{name:/Continue operating/}));
+ expect(useGame.getState().game.campaign!.scaling).not.toBeNull();
 });
 it.each(["streak","outcome","acknowledged"])("reload preserves prevention %s with paused time",kind=>{
  let g=kind==="streak"?advanceSteps(inspected(),2).state:qualified();

@@ -4793,3 +4793,7 @@ button:disabled {
 .route-choice:disabled button { opacity: .55; box-shadow: none; }
 .scaling-controls legend { font-size: var(--text-xs); }
 .scaling-controls .btn { white-space: normal; }
+
+/* Chapter guides: Back sits beside Next, and the longer explanation folds away. */
+.tour-nav { display: flex; gap: 8px; margin-left: auto; }
+.tour-card .tour-more { margin-top: 8px; }

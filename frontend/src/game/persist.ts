@@ -35,8 +35,8 @@ let lastWrittenCampaign: string | null = null;
 /** Campaign is the step-based simulation; classic is the original week-by-week game. */
 export type GameMode = "campaign" | "classic";
 
-/** The Guided Mode chapters after the Opening, each with a short guide shown when the company first enters it. */
-export const CHAPTER_TOURS = ["scaling", "data", "spikes", "reliability", "combined"] as const;
+/** The Guided Mode chapters, each with a guide shown when the company first enters it (the Opening's follows Chapter 0). */
+export const CHAPTER_TOURS = ["opening", "scaling", "data", "spikes", "reliability", "combined"] as const;
 export type ChapterTour = (typeof CHAPTER_TOURS)[number];
 /** Chapters that end without a recognition of their own, so the company stops once to say so. */
 export const CHAPTER_COMPLETIONS = ["scaling", "data"] as const;
@@ -56,7 +56,7 @@ export interface Meta {
   walkthroughFurthestStep?: number;
   /** The lesson list the two steps above index; absent before the 10-lesson walkthrough. */
   walkthroughVersion?: number;
-  /** One-time Guided Mode tips already shown, such as the first weekly settlement. */
+  /** One-time Guided Mode tips already shown: the first weekly settlement, the first slowdown, a traffic limit left on. */
   tipsSeen?: GuidedTip[];
   /** The short guide shown on the first incident has been seen. */
   incidentGuideDone: boolean;
@@ -68,7 +68,7 @@ export interface Meta {
   challengeUnlocked: boolean;
 }
 
-export const GUIDED_TIPS = ["settlement"] as const;
+export const GUIDED_TIPS = ["settlement", "slowdown", "limit"] as const;
 export type GuidedTip = (typeof GUIDED_TIPS)[number];
 
 export const DEFAULT_META: Meta = {
@@ -166,7 +166,7 @@ export function saveGame(game:GameState,remainderMs=0,explicitReset=false,measur
     let source;
     try {source=JSON.parse(current);} catch {if(!explicitReset)return false;}
     try {
-      if(([1,2,3,4,5,6].includes(source?.schemaVersion) || (source?.schemaVersion === 7 && !source.serviceMeasurementStart)) && Array.isArray(source.inputs)) {
+      if([1,2,3,4,5,6,7].includes(source?.schemaVersion) && Array.isArray(source.inputs)) {
         const backup=SAVE_KEY+".backup.v"+source.schemaVersion+"."+source.runId+"."+source.savedAt;
         const prior=window.localStorage.getItem(backup);
         if(prior!==null && prior!==current)return false;

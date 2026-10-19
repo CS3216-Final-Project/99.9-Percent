@@ -45,6 +45,29 @@ describe("Opening prevention",()=>{
   expect(done.campaign!.cashCents).toBe(c.cashCents);expect(done.campaign!.step).toBe(c.step);expect(done.campaign!.runId).toBe(c.runId);expect(done.campaign!.openingRecovered).toBe(false);expect(done.campaign!.reports).toEqual([]);
   expect(done.campaign!.trace.filter(t=>t.type==="milestone-awarded")).toHaveLength(0);expect(applyAction(done,{type:"acknowledge_milestone"}).ok).toBe(false);
  });
+ it("an acknowledged prevention outcome can be claimed to complete the Opening and enter Scaling",()=>{
+  const g=act(tick(prepared(),5),{type:"acknowledge_prevention_review"}),before=structuredClone(g);
+  const claimed=act(g,{type:"claim_prevention_milestone"});expect(g).toEqual(before);
+  const c=claimed.campaign!;
+  expect(c.openingMilestone).toEqual({id:"opening-stability",incidentId:null,outcomeId:"opening-prevention",claimedStep:c.step,awardedStep:c.step,acknowledged:false});
+  expect(c.cashCents).toBe(g.campaign!.cashCents);expect(c.step).toBe(g.campaign!.step);expect(c.reports).toEqual([]);expect(c.openingRecovered).toBe(false);
+  expect(c.trace.filter(t=>t.type==="milestone-awarded").map(t=>t.data.outcome)).toEqual(["prevention"]);
+  expect(applyAction(claimed,{type:"claim_prevention_milestone"}).ok).toBe(false);
+  const entered=act(claimed,{type:"acknowledge_milestone"});expect(entered.campaign!.scaling).not.toBeNull();
+ });
+ it("rejects a prevention claim before acknowledgement, after a reactive incident or once Scaling is entered",()=>{
+  expect(applyAction(tick(prepared(),5),{type:"claim_prevention_milestone"}).ok).toBe(false);
+  expect(applyAction(prepared(),{type:"claim_prevention_milestone"}).ok).toBe(false);
+  const incident=tick(newGame(),6);expect(incident.phase).toBe("incident");
+  expect(applyAction(incident,{type:"claim_prevention_milestone"}).ok).toBe(false);
+  const entered=act(act(act(tick(prepared(),5),{type:"acknowledge_prevention_review"}),{type:"claim_prevention_milestone"}),{type:"acknowledge_milestone"});
+  expect(applyAction(entered,{type:"claim_prevention_milestone"}).ok).toBe(false);
+ });
+ it("an unclaimed prevention milestone flag still cannot enter Scaling",()=>{
+  const g=act(tick(prepared(),5),{type:"acknowledge_prevention_review"}),c=g.campaign!;
+  c.openingMilestone={id:"opening-stability",incidentId:null,outcomeId:"opening-prevention",awardedStep:c.step,acknowledged:false};
+  expect(applyAction(g,{type:"acknowledge_milestone"}).ok).toBe(false);
+ });
  it("requires real report evidence even if a milestone flag is present",()=>{
   const g=tick(prepared(),5),c=g.campaign!;c.openingPrevention!.outcome!.acknowledged=true;
   c.openingMilestone={id:"opening-stability",incidentId:"missing-report",awardedStep:c.step,acknowledged:false};

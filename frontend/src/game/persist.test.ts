@@ -101,8 +101,8 @@ describe('browser metadata and analytics', () => {
   it('keeps only known chapter guides as seen, once each and in chapter order', () => {
     saveMeta({ ...DEFAULT_META, chapterTours: ['data', 'scaling'] });
     expect(loadMeta().chapterTours).toEqual(['scaling', 'data']);
-    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ chapterTours: ['spikes', 'opening', 7, 'spikes'] }));
-    expect(loadMeta().chapterTours).toEqual(['spikes']);
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ chapterTours: ['spikes', 'warmup', 7, 'spikes', 'opening'] }));
+    expect(loadMeta().chapterTours).toEqual(['opening', 'spikes']);
     localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ chapterTours: 'scaling' }));
     expect(loadMeta().chapterTours).toEqual([]);
   });
