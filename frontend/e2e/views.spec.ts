@@ -173,10 +173,19 @@ test("where the browser will not hand over the mouse, first person turns towards
   const canvas = (await stage(page).locator("canvas").boundingBox())!;
   const arrow = map(page).locator(".map-avatar");
   await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
-  await page.waitForTimeout(600);
-  const still = await arrow.getAttribute("transform");
-  await page.waitForTimeout(600);
-  expect(await arrow.getAttribute("transform")).toBe(still);
+  // The avatar may first finish turning to face the way the view looks; after that the view rests.
+  let still: string | null = null;
+  await expect
+    .poll(
+      async () => {
+        const before = await arrow.getAttribute("transform");
+        await page.waitForTimeout(600);
+        still = await arrow.getAttribute("transform");
+        return still === before;
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
   await page.mouse.move(canvas.x + canvas.width - 4, canvas.y + canvas.height / 2);
   await expect.poll(() => arrow.getAttribute("transform"), { timeout: 10_000 }).not.toBe(still);
   // The hint's Exit leaves first person.
