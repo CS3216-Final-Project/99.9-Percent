@@ -30,11 +30,11 @@ import {
 } from "./lift";
 import { FURNITURE } from "./palette";
 import { PrimBatch } from "./prims";
-import { shownFloor } from "./ride";
+import { riding, shownFloor } from "./ride";
 import { bx, cy, type Prim } from "./shapes";
 import { brushedSteel, liftDisplay, liftFloor, liftPanel, shaftBand } from "./textures";
 import { carBound, carDoors, carIndicator, carMoving, carY } from "./trips";
-import { bothFloors, clipShaft, SHAFT_CLIP, viewNow } from "./viewState";
+import { clipShaft, SHAFT_CLIP, viewNow } from "./viewState";
 
 /*
  * The elevator between the floors, in the east corridor beside the monitoring room's door. Each floor has a glass
@@ -68,7 +68,7 @@ const CONCRETE = "#7c7e80";
 const SAFETY = "#d4a72c";
 
 /** The heights of the shaft that can be seen now. */
-const bandNow = () => visibleBand(bothFloors() ? "both" : shownFloor());
+const bandNow = () => visibleBand(riding() ? "both" : shownFloor());
 
 function shaft(): Prim[] {
   const out: Prim[] = [];
@@ -185,7 +185,7 @@ export function Landing({ floor, interactive }: { floor: Floor; interactive: boo
     if (button.current) button.current.emissiveIntensity = carMoving() ? 2.2 : 0.25;
     // Seen alone, a floor's stretch of shaft is closed off where it ends: under the office's slab, and over the
     // servers' ceiling when looking up from the avatar. Riding between, the whole shaft is open.
-    if (end.current) end.current.visible = !bothFloors() && (floor === "office" || viewNow.perspective);
+    if (end.current) end.current.visible = !riding() && (floor === "office" || viewNow.perspective);
   });
   const onOver = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
