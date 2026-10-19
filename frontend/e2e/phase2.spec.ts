@@ -14,10 +14,15 @@ test("the mandatory walkthrough works from the keyboard across the guide and rea
   await page.keyboard.press("Tab");
   await expect(panel.getByRole("button", { name: "App Server", exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
-  // A finished exercise moves on by itself and puts focus on the next lesson.
+  // An inspection waits on its readings; Next opens the next lesson and puts focus on it.
+  await expect(card).toHaveAccessibleName(lesson("inspect-app"));
+  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+  await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
   await expect(card).toHaveAccessibleName(lesson("inspect-db"));
   await expect(card.getByRole("heading", { name: "Compare with the Database" })).toBeFocused();
   await panel.getByRole("button", { name: "Database", exact: true }).press("Enter");
+  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+  await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
   await expect(card).toHaveAccessibleName(lesson("warnings"));
   await card.getByRole("button", { name: "Back", exact: true }).press("Enter");
   await expect(card).toHaveAccessibleName(lesson("inspect-db"));

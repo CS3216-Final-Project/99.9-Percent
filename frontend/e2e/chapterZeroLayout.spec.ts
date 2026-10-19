@@ -71,6 +71,23 @@ for (const [width, height] of [[1440, 900], [1366, 768], [390, 844], [320, 568],
         // The card settles beside the control once the layout has been measured.
         if (roomy) await expect.poll(async () => overlaps(await box(card), await box(target))).toBe(false);
       }
+      if (id === "inspect-app" || id === "inspect-db") {
+        // The selected component's readings join the lit window and stay readable beside the card.
+        await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: id === "inspect-app" ? "App Server" : "Database", exact: true }).click();
+        // Demand, Capacity and Backlog are visible, uncovered by the card or the dock, and inside the lit window.
+        // A phone on its side has room above its dock for Demand and Capacity only.
+        const roomy = height >= 500;
+        const numbers = page.locator(".campaign-evidence .evidence-rows");
+        await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+        await expect(numbers).toBeInViewport({ ratio: roomy ? 1 : 0.6 });
+        if (roomy) await expect.poll(async () => overlaps(await box(card), await box(numbers))).toBe(false);
+        await expect.poll(() => numbers.evaluate((el, fractions) => {
+          const r = el.getBoundingClientRect();
+          return fractions.every(f => el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height * f)));
+        }, roomy ? [0.15, 0.5, 0.85] : [0.15, 0.5])).toBe(true);
+        await expect.poll(async () => { const lit = await box(spotlight), n = await box(numbers); return n.y >= lit.y - 1 && (!roomy || n.y + n.height <= lit.y + lit.height + 1); }).toBe(true);
+        await page.screenshot({ path: `test-results/chapter-zero-readings-${id}-${width}x${height}.png` });
+      }
       if (id === "speed") {
         const speed = page.locator(".time-menu > summary");
         expect(await speed.evaluate(el => {

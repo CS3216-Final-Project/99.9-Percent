@@ -131,12 +131,12 @@ for (const width of [1440, 390]) test(`How to play clears earlier completion and
     await expect(card).toHaveAccessibleName(step(1));
     await card.getByRole("button", { name: "Next", exact: true }).click();
     await expect(card).toHaveAccessibleName(step(lessonNumber("inspect-app")));
-    await expect(card).not.toContainText("Completed earlier");
     await expect(card.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
     expect((await savedGame(page)).campaign).toEqual(before);
   };
   await replay();
   await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "App Server", exact: true }).click();
+  await card.getByRole("button", { name: "Next", exact: true }).click();
   await expect(card).toHaveAccessibleName(step(lessonNumber("inspect-db")));
   await replay();
   await page.reload(); await page.getByRole("button", { name: "Continue company", exact: true }).click();

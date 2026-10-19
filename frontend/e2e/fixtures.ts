@@ -162,7 +162,7 @@ export async function setGameSpeed(page: Page, speed: number) {
   await menu.locator(":scope > summary").click();
 }
 
-/** Perform the open lesson's required exercise, which moves on by itself, or press Next on a reading lesson. */
+/** Perform the open lesson's required exercise, which moves on by itself (inspections then press Next), or press Next on a reading lesson. */
 export async function nextChapterZero(page: Page, touch = false) {
   const card = tutorial(page);
   const click = async (control: ReturnType<Page["getByRole"]>) => touch ? control.tap() : control.click();
@@ -171,9 +171,12 @@ export async function nextChapterZero(page: Page, touch = false) {
   const step = (await card.getAttribute("data-lesson"))!;
   if (await next.isEnabled()) { await click(next); return; }
   const panel = page.getByRole("complementary", { name: "System metrics" });
-  if (lesson === "inspect-app") await click(panel.getByRole("button", { name: "App Server", exact: true }));
-  else if (lesson === "inspect-db") await click(panel.getByRole("button", { name: "Database", exact: true }));
-  else if (lesson === "run") {
+  if (lesson === "inspect-app" || lesson === "inspect-db") {
+    // An inspection waits on its readings until the player presses Next.
+    await click(panel.getByRole("button", { name: lesson === "inspect-app" ? "App Server" : "Database", exact: true }));
+    await expect(next).toBeEnabled();
+    await click(next);
+  } else if (lesson === "run") {
     await click(page.getByRole("button", { name: "Run", exact: true }));
     await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
   } else if (lesson === "quote") await click(panel.locator(".act:not(:disabled)").first());
@@ -187,7 +190,7 @@ export async function nextChapterZero(page: Page, touch = false) {
     // Choosing a speed finishes the lesson; the next card may already sit over the menu's trigger.
     await click(speed.locator('button:not([aria-pressed="true"])').first());
   } else throw new Error(`Unexpected required interaction in lesson ${lesson}`);
-  // A finished exercise acknowledges itself, then the guide opens the next lesson.
+  // A finished exercise opens the next lesson.
   await expect(card).not.toHaveAttribute("data-lesson", step);
 }
 

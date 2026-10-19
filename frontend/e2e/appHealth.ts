@@ -74,8 +74,9 @@ export async function appHealthDuringTutorial(page: Page) {
     const card = tutorial(page), entry = page.getByRole("button", { name: "View app health", exact: true });
     await nextChapterZero(page);
     await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "App Server", exact: true }).click();
-    await expect(card).toHaveAttribute("data-lesson-id", "inspect-db");
     await expect(page.getByRole("dialog")).toHaveCount(1);
+    await card.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(card).toHaveAttribute("data-lesson-id", "inspect-db");
     await nextChapterZero(page);
     await card.getByRole("button", { name: "Back", exact: true }).click();
     await expect(card).toHaveAttribute("data-lesson-id", "inspect-db");

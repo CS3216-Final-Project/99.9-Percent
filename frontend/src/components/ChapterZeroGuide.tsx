@@ -17,8 +17,8 @@ const KEYS: Partial<Record<LessonId, ReactNode>> = {
   run: <><kbd className="lesson-keycap">P</kbd> also runs and pauses.</>,
   speed: <><kbd className="lesson-keycap">Q</kbd> / <kbd className="lesson-keycap">E</kbd> rotate the view; <kbd className="lesson-keycap" aria-label="Page Up">PgUp</kbd> / <kbd className="lesson-keycap" aria-label="Page Down">PgDn</kbd> switch floors.</>,
 };
-/** How long a finished exercise shows its tick before the next lesson opens. */
-const CELEBRATE_MS = 900;
+/** Exercises that open the next lesson as soon as they are done. Inspections wait for Next, so the readings can be read. */
+const AUTO = new Set<LessonId>(["run", "quote", "cancel", "speed"]);
 const CARD_WIDTH = 360;
 
 function LessonText({ text, terms = [] }: { text?: string; terms?: readonly string[] }) {
@@ -27,8 +27,6 @@ function LessonText({ text, terms = [] }: { text?: string; terms?: readonly stri
   const parts = text.split(new RegExp(`\\b(${phrases.join("|")})\\b`, "gi"));
   return parts.map((part, i) => i % 2 ? <strong className="lesson-key" key={i}>{part}</strong> : part);
 }
-
-const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * Nonmodal guidance beside the real, playable game: everything but the current lesson's control is dimmed, and a
@@ -48,7 +46,7 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
   const required = !!id && REQUIRED.has(id);
   const ready = !required || reviewed || readyFor === index;
   // A lesson finished just now moves on by itself; one revisited with Back waits for Next. An open Menu holds it.
-  const celebrating = required && !reviewed && readyFor === index && s.view !== "menu";
+  const moving = !!id && AUTO.has(id) && !reviewed && readyFor === index && s.view !== "menu";
   useChapterZeroControls(id, confirming);
 
   useEffect(() => {
@@ -88,13 +86,12 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
   };
   const advance = useRef(next);
   useEffect(() => { advance.current = next; });
-  useEffect(() => {
-    if (!celebrating) return;
-    const timer = window.setTimeout(() => advance.current(), reducedMotion() ? 0 : CELEBRATE_MS);
-    return () => window.clearTimeout(timer);
-  }, [celebrating]);
+  useEffect(() => { if (moving) advance.current(); }, [moving]);
 
-  const target = id === "inspect-app" ? '[data-tutorial="inspect-app"]'
+  // Once a component is inspected, its readings are what the player should look at.
+  const inspected = id === "inspect-app" && s.selected === "app" || id === "inspect-db" && s.selected === "db";
+  const target = inspected ? '.campaign-evidence'
+    : id === "inspect-app" ? '[data-tutorial="inspect-app"]'
     : id === "inspect-db" ? '[data-tutorial="inspect-db"]'
     : id === "warnings" ? '.incident-symptoms'
     : id === "run" ? '.campaign-play'
@@ -105,24 +102,29 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
     : null;
   // The whole quote is lit while it is being read; its Cancel is what the ring points at.
   const lit = id === "quote" || id === "cancel" ? confirming ? '.campaign-action-popover' : target : target;
-  const { box, covered, viewport } = useTargetBox(lit);
+  // Floors are optional in the speed lesson: an open Navigation menu is lit instead, so the card stays clear of it.
+  const { box, covered, viewport } = useTargetBox(id === "speed" ? ['.room-controls:has(details[open])', lit!] : lit);
 
   useEffect(() => {
     if (!target) return;
     const el = document.querySelector<HTMLElement>(target);
     if (!el) return;
     el.classList.add("chapter-zero-target");
+    // A short screen shows little of the panel: the numbers themselves go to its top.
+    const shown = (inspected && window.innerHeight < 500 && el.querySelector<HTMLElement>(".evidence-rows")) || (lit && document.querySelector<HTMLElement>(lit)) || el;
     let frame = 0;
+    // Readings start at the top of the panel, leaving the most room for the numbers.
+    const block = inspected ? "start" : shown === el && el.closest(".campaign-panel") ? "center" : "nearest";
     const reveal = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => el.scrollIntoView?.({ block: el.closest(".campaign-panel") ? "center" : "nearest", inline: "nearest" }));
+      frame = requestAnimationFrame(() => shown.scrollIntoView?.({ block, inline: "nearest" }));
     };
     // The room, responsive panel and local fonts can finish sizing after the first render.
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(reveal);
     for (const node of [el, document.querySelector(".stage"), document.querySelector(".campaign-panel")]) if (node) observer?.observe(node);
     reveal();
     return () => { observer?.disconnect(); cancelAnimationFrame(frame); el.classList.remove("chapter-zero-target"); };
-  }, [target, index]);
+  }, [target, lit, inspected, index]);
   useEffect(() => () => setConfirming(null), []);
   // The card's height decides whether it fits above or below the lit control.
   useLayoutEffect(() => {
@@ -138,8 +140,8 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
   if (!s.started || !lesson) return null;
   const why = typeof lesson.why === "function" ? lesson.why(s) : lesson.why;
   const more = typeof lesson.more === "function" ? lesson.more(s) : lesson.more;
-  const task = id === "inspect-app" ? "Click App Server under Inspect equipment."
-    : id === "inspect-db" ? "Now click Database and compare."
+  const task = id === "inspect-app" ? ready ? "Read its demand and capacity, then press Next." : "Click App Server under Inspect equipment."
+    : id === "inspect-db" ? ready ? "Compare its numbers with the App Server's, then press Next." : "Now click Database and compare."
     : id === "warnings" ? "Find Latency, Errors and Backlog in the panel."
     : id === "run" ? "Press Run. Time stops again after one game second."
     : id === "quote" ? "Open any action under Actions to see its quote."
@@ -151,7 +153,8 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
   // A real dialog over the game (Menu, Finance) has the player's attention; the guide waits behind it.
   // Menu and sound stay reachable above a card docked to the top of a phone.
   const topbar = typeof document === "undefined" ? undefined : document.querySelector(".topbar")?.getBoundingClientRect().bottom;
-  const position = cardStyle(target ? box : null, placeFor(lit ?? ""), viewport.w, viewport.h, viewport.w, cardHeight, CARD_WIDTH, topbar ? Math.round(topbar) + 8 : 12);
+  // A phone on its side leaves the readings only the top of the panel; the card then sits over the locked bottom bar.
+  const position = inspected && viewport.w < 900 && viewport.h < 500 ? { left: 12, right: 12, bottom: 12, maxHeight: 120 } : cardStyle(target ? box : null, placeFor(inspected ? ".campaign-panel" : lit ?? ""), viewport.w, viewport.h, viewport.w, cardHeight, CARD_WIDTH, topbar ? Math.round(topbar) + 8 : 12);
   return <>
     {!covered && <div className={`cz-spotlight${box && target ? "" : " is-full"}`} aria-hidden="true"
       style={box && target ? { left: box.x, top: box.y, width: box.w, height: box.h } : undefined}>
@@ -175,15 +178,14 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
       </header>
       {s.meta.tutorialDone && <button className="btn btn-small lesson-return" onClick={() => { s.openView(null); s.endTour(false); }}><Icon name="next" size={16} />Return to game</button>}
       <h3 ref={heading} tabIndex={-1}>{lesson.title}</h3>
-      {task && <p className="lesson-task"><Icon name={celebrating || (ready && required) ? "check" : "eye"} size={20} /><span><LessonText text={task} terms={lesson.emphasis} /></span></p>}
-      {required && ready && <p className="lesson-result" role="status">{celebrating ? "Nice. Moving on…" : reviewed ? "Completed earlier. You can try it again." : "Done."}</p>}
+      {task && <p className="lesson-task" aria-live="polite"><Icon name={ready && required ? "check" : "eye"} size={20} /><span><LessonText text={task} terms={lesson.emphasis} /></span></p>}
       <p className="lesson-why">{why}</p>
       {s.tutorialCompany && index === 0 && <p className="lesson-note">This is a practice company. Your saved company is paused and comes back when you finish or exit.</p>}
       <LessonVisual id={id!} />
       {(more || KEYS[id!]) && <details className="lesson-more"><summary>Learn more</summary>{more && <p>{more}</p>}{KEYS[id!] && <p>{KEYS[id!]}</p>}</details>}
       <footer className="lesson-footer">
         <button className="btn" disabled={index === 0} onClick={() => { s.openView(null); s.tourBack(); }}><Icon className="lesson-back-arrow" name="next" size={16} />Back</button>
-        <button className="btn btn-primary" disabled={!ready || celebrating || s.running} onClick={next}>{last ? "Finish walkthrough" : "Next"}<Icon name={last ? "check" : "next"} size={16} /></button>
+        <button className="btn btn-primary" disabled={!ready || moving || s.running} onClick={next}>{last ? "Finish walkthrough" : "Next"}<Icon name={last ? "check" : "next"} size={16} /></button>
       </footer>
     </section>
   </>;

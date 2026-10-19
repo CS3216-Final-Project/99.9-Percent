@@ -408,7 +408,10 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  await nextChapterZero(page,true);
  await expect(card.getByRole("button",{name:"Next",exact:true})).toBeDisabled();
  await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"App Server",exact:true}).tap();
- await expect(page.locator(".campaign-evidence")).toBeVisible();
+ // The readings stay in view beside the card until the player presses Next.
+ await expect(page.locator(".campaign-evidence")).toBeInViewport();
+ await expect(card).toHaveAttribute("data-lesson-id","inspect-app");
+ await card.getByRole("button",{name:"Next",exact:true}).tap();
  await expect(card).toHaveAttribute("data-lesson-id","inspect-db");
  await expect(page.getByRole("dialog")).toHaveCount(1);
  await page.screenshot({path:`test-results/clarity-tutorial-${width}-first.png`});
@@ -421,6 +424,7 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  await expect(card).toBeInViewport({ratio:1});
  await page.screenshot({path:`test-results/clarity-tutorial-${width}-purchase.png`});
  await page.getByRole("button",{name:"Cancel",exact:true}).tap();
+ await expect(card).toHaveAttribute("data-lesson-id","money");
  while(await card.getAttribute("data-lesson-id")!=="speed")await nextChapterZero(page,true);
  const navigation = page.locator(".room-menu");
  await navigation.locator(":scope > summary").tap();

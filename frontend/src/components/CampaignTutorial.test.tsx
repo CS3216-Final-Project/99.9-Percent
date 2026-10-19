@@ -9,7 +9,7 @@ import { saveGame, saveMeta, DEFAULT_META } from "@/game/persist";
 import { newGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
 
-// Only the guide's auto-advance timer is faked; the spotlight keeps measuring with real intervals.
+// Only timeouts are faked; the spotlight keeps measuring with real intervals.
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 function start() { useGame.getState().boot(); useGame.getState().play(); }
@@ -19,7 +19,7 @@ const at = (id: LessonId) => WALKTHROUGH_LESSON_IDS.indexOf(id) + 1;
 const card = (step: number) => screen.getByRole("dialog", { name: `Walkthrough, step ${step} of ${CAMPAIGN_STEPS}` });
 const current = () => within(screen.getByRole("dialog", { name: /^Walkthrough/ }));
 const next = () => fireEvent.click(current().getByRole("button", { name: "Next" }));
-/** Let a finished exercise's tick play out, so the guide moves on by itself. */
+/** Let pending timeouts play out. */
 const settle = () => act(() => { vi.advanceTimersByTime(1000); });
 const lessonId = () => WALKTHROUGH_LESSON_IDS[useGame.getState().tour!.step];
 const EXERCISES = new Set<LessonId>(["inspect-app", "inspect-db", "run", "quote", "cancel", "speed"]);
@@ -37,12 +37,13 @@ function exercise() {
     fireEvent.click(document.querySelector(".time-menu > summary")!);
   }
 }
-/** Walk forward to the 1-based lesson `step`: exercises move on by themselves, reading lessons with Next. */
+/** Walk forward to the 1-based lesson `step`: most exercises move on by themselves; inspections and reading lessons use Next. */
 function reach(step: number) {
   let attempts = 0;
   while (useGame.getState().tour!.step < step - 1) {
     if (++attempts > 30) throw new Error("Tutorial did not advance");
-    if (EXERCISES.has(lessonId())) { exercise(); settle(); } else next();
+    const id = lessonId();
+    if (EXERCISES.has(id)) { exercise(); settle(); if (lessonId() === id) next(); } else next();
   }
 }
 
@@ -60,13 +61,22 @@ it("starts with the goal, then requires inspection through real game controls an
   expect(document.activeElement).toBe(within(screen.getByRole("complementary", { name: "System metrics" })).getByRole("button", { name: "App Server" }));
   exercise();
   expect(useGame.getState().selected).toBe("app");
-  // The finished exercise is acknowledged, then the next lesson opens without another click.
-  expect(current().getByRole("status").textContent).toContain("Nice");
-  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  // An inspection stays open so its readings can be read; Next continues.
   settle();
+  expect(card(at("inspect-app")).textContent).toContain("Read its demand and capacity, then press Next.");
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+  next();
   expect(card(at("inspect-db"))).toBeTruthy();
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
   exercise(); expect(useGame.getState().selected).toBe("db");
+  expect(card(at("inspect-db"))).toBeTruthy();
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
+});
+
+it("opens the next lesson as soon as an action exercise is done", () => {
+  start(); renderCompany(); reach(at("quote")); exercise();
+  expect(card(at("cancel"))).toBeTruthy();
+  expect(screen.queryByText(/Moving on|Completed earlier/)).toBeNull();
 });
 
 it("compares both live components without advancing time", () => {
@@ -82,22 +92,24 @@ it("compares both live components without advancing time", () => {
 });
 
 it("does not auto-advance a lesson revisited with Back, which keeps its Next", () => {
-  start(); renderCompany(); reach(at("inspect-db"));
+  start(); renderCompany(); reach(at("ready"));
   fireEvent.click(current().getByRole("button", { name: "Back" }));
-  expect(card(at("inspect-app")).textContent).toContain("Completed earlier");
+  expect(card(at("speed"))).toBeTruthy();
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
   exercise(); settle();
-  expect(card(at("inspect-app"))).toBeTruthy();
-  next(); expect(card(at("inspect-db"))).toBeTruthy();
+  expect(card(at("speed"))).toBeTruthy();
+  next(); expect(card(at("ready"))).toBeTruthy();
 });
 
 it("waits behind an open Menu instead of advancing and closing it", () => {
-  start(); renderCompany(); reach(at("inspect-app")); exercise();
+  start(); renderCompany(); reach(at("speed"));
   fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+  act(() => useGame.getState().setSpeed(useGame.getState().speed === 2 ? 1 : 2));
   settle();
-  expect(useGame.getState()).toMatchObject({ view: "menu", tour: { step: at("inspect-app") - 1 } });
+  expect(useGame.getState()).toMatchObject({ view: "menu", tour: { step: at("speed") - 1 } });
   fireEvent.click(within(screen.getByRole("dialog", { name: "Menu" })).getByRole("button", { name: "Resume" }));
   settle();
-  expect(card(at("inspect-db"))).toBeTruthy();
+  expect(card(at("ready"))).toBeTruthy();
 });
 
 it("runs exactly one real second even with a large tick, and cancels the real company's quote without spending", () => {
@@ -118,8 +130,9 @@ it("runs exactly one real second even with a large tick, and cancels the real co
 it("keeps the quote open until the Cancel lesson and never permits a tutorial purchase", () => {
   start(); renderCompany(); reach(at("quote")); exercise();
   const cash = useGame.getState().game.campaign!.cashCents;
+  // Opening the quote is the exercise: the Cancel lesson opens at once over the same quote.
+  expect(card(at("cancel"))).toBeTruthy();
   expect(screen.getByRole("button", { name: "Confirm" })).toHaveProperty("disabled", true);
-  expect(screen.getByRole("button", { name: "Cancel" })).toHaveProperty("disabled", true);
   fireEvent.keyDown(screen.getByRole("region", { name: "Confirm Add server" }), { key: "Escape" });
   fireEvent.click(screen.getByRole("button", { name: "Menu" }));
   expect(screen.getByRole("region", { name: "Confirm Add server" })).toBeTruthy();
@@ -132,8 +145,7 @@ it("keeps the quote open until the Cancel lesson and never permits a tutorial pu
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
   fireEvent.click(screen.getByRole("button", { name: /^Limit to 500/ }));
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  expect(current().getByRole("status").textContent).toContain("Nice");
-  settle(); expect(card(at("money"))).toBeTruthy();
+  expect(card(at("money"))).toBeTruthy();
   expect(useGame.getState().game.campaign!.cashCents).toBe(cash);
 });
 
@@ -195,7 +207,6 @@ it("How to play clears previous exercise completion", () => {
   expect(useGame.getState().meta.walkthroughFurthestStep).toBe(0);
   expect(useGame.getState().game.campaign).toEqual(before);
   next();
-  expect(card(at("inspect-app")).textContent).not.toContain("Completed earlier");
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
   cleanup(); useGame.setState(useGame.getInitialState(), true); start(); renderCompany();
   expect(card(at("inspect-app"))).toBeTruthy();
@@ -275,7 +286,6 @@ it("restores completed replay exercises after Back and reload, and resets them o
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
   act(() => useGame.getState().startTour("campaign"));
   next();
-  expect(card(at("inspect-app")).textContent).not.toContain("Completed earlier");
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
   expect(useGame.getState().meta.tutorialDone).toBe(true);
 });

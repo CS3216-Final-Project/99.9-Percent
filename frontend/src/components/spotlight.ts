@@ -64,9 +64,11 @@ const sameBox = (a: Box | null, b: Box | null) =>
 
 /**
  * The on-screen box of the element `selector` names, padded, kept current as the layout, room and panels move.
+ * A list of selectors names alternatives in order of preference: the first one present is used.
  * `covered` reports a real modal dialog over the game, which the guide steps aside for.
  */
-export function useTargetBox(selector: string | null, pad = 6): { box: Box | null; covered: boolean; viewport: { w: number; h: number } } {
+export function useTargetBox(selector: string | readonly string[] | null, pad = 6): { box: Box | null; covered: boolean; viewport: { w: number; h: number } } {
+  const key = selector === null ? null : typeof selector === "string" ? selector : selector.join("|");
   const [box, setBox] = useState<Box | null>(null);
   const [covered, setCovered] = useState(false);
   const [viewport, setViewport] = useState(() => ({ w: typeof window === "undefined" ? 1280 : window.innerWidth, h: typeof window === "undefined" ? 800 : window.innerHeight }));
@@ -74,7 +76,7 @@ export function useTargetBox(selector: string | null, pad = 6): { box: Box | nul
     const read = () => {
       setViewport(v => (v.w === window.innerWidth && v.h === window.innerHeight ? v : { w: window.innerWidth, h: window.innerHeight }));
       setCovered(!!document.querySelector(".modal-backdrop"));
-      const el = selector ? document.querySelector<HTMLElement>(selector) : null;
+      const el = key === null ? null : key.split("|").reduce<HTMLElement | null>((found, one) => found ?? document.querySelector<HTMLElement>(one), null);
       // Something without a box of its own (hidden, or laid out with display: contents) cannot be pointed at.
       if (!el || el.getClientRects().length === 0) { setBox(b => (b === null ? b : null)); return; }
       // An open dock menu hangs outside its trigger's box; it is part of what the step points at.
@@ -92,6 +94,6 @@ export function useTargetBox(selector: string | null, pad = 6): { box: Box | nul
     const id = window.setInterval(read, 120);
     window.addEventListener("resize", read);
     return () => { window.clearInterval(id); window.removeEventListener("resize", read); };
-  }, [selector, pad]);
+  }, [key, pad]);
   return { box, covered, viewport };
 }
