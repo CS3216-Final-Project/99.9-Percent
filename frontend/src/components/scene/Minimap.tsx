@@ -23,7 +23,7 @@ import {
 import { ROOM } from "./layout";
 import { DIAL_RADIUS, dialTurn, halfWidthAngle, northOnDial, onRim, toDial, viewWedge } from "./mapDial";
 import { FLOOR_NUMBER } from "./levels";
-import { placeAt, whereLine } from "./places";
+import { placeAt, whereLine, zoneAreas } from "./places";
 import "./views.css";
 import { ride, riding } from "./ride";
 import { buildModel, racksOf } from "./sceneModel";
@@ -81,8 +81,9 @@ interface Entered {
 }
 
 /**
- * The still part of a floor's plan: walls, glass, the shaft and furniture. Drawn again only when the floor or the
- * machines change, not each time the dial turns or the avatar and the crew are redrawn.
+ * The still part of a floor's plan: its zones, each tinted apart from the ones it meets, then walls, glass, the shaft
+ * and furniture. Drawn again only when the floor or the machines change, not each time the dial turns or the avatar
+ * and the crew are redrawn.
  */
 const Plan = memo(function Plan({ floor, racks }: { floor: Floor; racks: Racks }) {
   const furniture = floor === "office" ? [...OBSTACLES, ...ROOM_OBSTACLES] : serverObstacles(racks);
@@ -90,6 +91,16 @@ const Plan = memo(function Plan({ floor, racks }: { floor: Floor; racks: Racks }
   return (
     <>
       <rect className="map-floor" x={ROOM.x0} y={ROOM.z0} width={ROOM.w} height={ROOM.d} />
+      <g className="map-zones">
+        {zoneAreas(floor).map((zone, i) => (
+          <polygon
+            key={`${zone.name}-${i}`}
+            className={zone.tone === null ? "is-elevator" : `tone-${zone.tone}`}
+            data-zone={zone.name}
+            points={zone.points.map(([x, z]) => `${x.toFixed(2)},${z.toFixed(2)}`).join(" ")}
+          />
+        ))}
+      </g>
       <g className="map-furniture">{furniture.map((o, i) => shape(o, `${o.name}-${i}`))}</g>
       <g className="map-glass">
         {glass.map(([x1, z1, x2, z2], i) => (
