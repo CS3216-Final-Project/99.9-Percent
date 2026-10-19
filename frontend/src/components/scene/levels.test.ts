@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STOREY } from "./city";
-import { DIP, DOORS, doorsAt, FLOOR_NUMBER, FLOOR_Y, RIDE_SECONDS, rideAt } from "./levels";
+import { backAt, CUT, DIP, DOORS, doorsAt, FLOOR_NUMBER, FLOOR_Y, glideAt, RIDE_SECONDS, rideAt, WASH, washAt } from "./levels";
 
 describe("the floors' heights", () => {
   it("stand the server floor one storey below the office, a floor lower on the indicator", () => {
@@ -35,9 +35,47 @@ describe("an elevator ride", () => {
     expect(rideAt(RIDE_SECONDS * 0.5).arrived).toBe(true);
   });
 
+  it("passes the slab between the storeys in the dark, so the floors change places unseen", () => {
+    expect(rideAt(RIDE_SECONDS / 2).slab).toBe(1);
+    // The frame before the floors change places is as good as dark; the ends of the ride are clear.
+    expect(rideAt(RIDE_SECONDS * 0.49).slab).toBeGreaterThan(0.95);
+    expect(rideAt(RIDE_SECONDS * (0.5 - DIP.slab)).slab).toBeCloseTo(0, 6);
+    expect(rideAt(RIDE_SECONDS * (0.5 + DIP.slab)).slab).toBeCloseTo(0, 6);
+    expect(rideAt(0).slab).toBe(0);
+    expect(rideAt(RIDE_SECONDS).slab).toBe(0);
+  });
+
+  it("starts and stops without a jolt", () => {
+    // The car's speed builds from nothing and dies away to nothing, so the first and last moments barely move it.
+    expect(rideAt(RIDE_SECONDS * 0.05).car).toBeLessThan(0.002);
+    expect(1 - rideAt(RIDE_SECONDS * 0.95).car).toBeLessThan(0.002);
+  });
+
   it("stays put before it starts and after it ends", () => {
     expect(rideAt(-1)).toEqual(rideAt(0));
     expect(rideAt(RIDE_SECONDS * 5)).toEqual(rideAt(RIDE_SECONDS));
+  });
+});
+
+describe("the ride's cutscene", () => {
+  it("glides in to the car as it sets off and back out once it arrives, settling at each end", () => {
+    expect(glideAt(0)).toBe(0);
+    expect(glideAt(CUT.glide)).toBe(1);
+    expect(glideAt(CUT.glide * 3)).toBe(1);
+    expect(backAt(0)).toBe(0);
+    expect(backAt(CUT.back)).toBe(1);
+    const steps = Array.from({ length: 21 }, (_, i) => glideAt((i / 20) * CUT.glide));
+    for (let i = 1; i < steps.length; i++) expect(steps[i]).toBeGreaterThanOrEqual(steps[i - 1]);
+  });
+
+  it("floods the view with light as the doors part, then fades, and never before the car arrives", () => {
+    expect(washAt(0)).toBe(WASH.most);
+    expect(washAt(WASH.seconds / 2)).toBeLessThan(WASH.most);
+    expect(washAt(WASH.seconds / 2)).toBeGreaterThan(0);
+    expect(washAt(WASH.seconds)).toBe(0);
+    expect(washAt(-0.1)).toBe(0);
+    expect(washAt(Number.NaN)).toBe(0);
+    expect(washAt(Infinity)).toBe(0);
   });
 });
 

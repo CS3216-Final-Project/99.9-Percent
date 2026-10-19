@@ -826,43 +826,62 @@ button:disabled {
   }
 }
 
-/* The moving room remains visible through smoked elevator glass while shaft ribs and landing lights pass by. */
+/* A soft vignette over the room while the car rides, deepest as it passes between the floors. */
 .ride-dip {
-  --ride-shift: -18%;
-  --ride-glow-y: 12%;
   position: absolute;
   inset: 0;
   z-index: 4;
   pointer-events: none;
   overflow: hidden;
   opacity: 0;
-  background:
-    linear-gradient(90deg, rgb(6 8 18 / 0.62), transparent 18%, transparent 82%, rgb(6 8 18 / 0.62)),
-    linear-gradient(180deg, rgb(10 8 22 / 0.52), rgb(24 27 43 / 0.28) 48%, rgb(10 8 22 / 0.52));
+  background: radial-gradient(ellipse 72% 68% at 50% 50%, transparent 52%, rgb(6 8 18 / 0.72) 100%);
 }
 
-.ride-dip::before {
-  content: "";
-  position: absolute;
-  inset: -70% 0;
-  transform: translateY(var(--ride-shift));
-  background: repeating-linear-gradient(
-    180deg,
-    transparent 0 9%,
-    rgb(8 10 20 / 0.72) 9.5% 11%,
-    rgb(135 145 166 / 0.2) 11% 11.6%,
-    transparent 12% 20%
-  );
-  will-change: transform;
-}
-
-.ride-dip::after {
-  content: "";
+/* The floor slab between the storeys: the shaft goes dark as the car passes it, so the floors change places unseen. */
+.ride-slab {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse 72% 13% at 50% var(--ride-glow-y), rgb(255 240 193 / 0.34), transparent 68%),
-    linear-gradient(90deg, rgb(158 173 199 / 0.1), transparent 22% 78%, rgb(158 173 199 / 0.1));
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  background: rgb(6 8 18);
+}
+
+/* The light that floods in as the doors part on arrival. */
+.ride-wash {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse 60% 55% at 50% 50%, rgb(255 236 190 / 0.9), transparent 70%);
+}
+
+/* The ride's letterbox: bars slide over the top and bottom of the room as the car sets off and away as it arrives. */
+.ride-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8%;
+  z-index: 4;
+  pointer-events: none;
+  background: rgb(6 8 18);
+  transform: scaleY(0);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ride-bar.is-top {
+  top: 0;
+  transform-origin: top;
+}
+
+.ride-bar.is-bottom {
+  bottom: 0;
+  transform-origin: bottom;
+}
+
+.stage-canvas.is-riding .ride-bar {
+  transform: scaleY(1);
 }
 
 /* Walk mode: the Walk button among the camera's, lit while walking, and what the avatar can reach, over the room. */
@@ -965,6 +984,13 @@ button:disabled {
   top: 0;
   visibility: hidden;
   will-change: transform;
+  animation: label-arrive 0.3s ease-out both;
+}
+
+@keyframes label-arrive {
+  from {
+    opacity: 0;
+  }
 }
 
 .eq-label {

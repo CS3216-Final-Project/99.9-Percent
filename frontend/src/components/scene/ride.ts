@@ -1,5 +1,5 @@
 import type { Floor } from "@/game/floors";
-import { DOORS, doorsAt, FLOOR_Y, RIDE_SECONDS, rideAt } from "./levels";
+import { DOORS, doorsAt, FLOOR_Y, HURRY_SECONDS, RIDE_SECONDS, rideAt } from "./levels";
 
 /*
  * The elevator's ride between the floors, shared by the room that draws it, the labels that wait for it and the
@@ -20,11 +20,13 @@ export interface Ride {
   y: number;
   /** How far open the doors were when the car set off; they close as it leaves. */
   closing: number;
+  /** How fast the ride's clock runs against the page's: 1, or more once the player has hurried it. */
+  rate: number;
 }
 
 export type RideEvent = "depart" | "arrive";
 
-export const ride: Ride = { from: "servers", to: "servers", start: -Infinity, arrived: -Infinity, fromY: 0, y: 0, closing: 0 };
+export const ride: Ride = { from: "servers", to: "servers", start: -Infinity, arrived: -Infinity, fromY: 0, y: 0, closing: 0, rate: 1 };
 
 const listeners = new Set<(event: RideEvent) => void>();
 let timer = 0;
@@ -46,28 +48,28 @@ export function onRide(listener: (event: RideEvent) => void): () => void {
 export function placeCar(floor: Floor): void {
   window.clearTimeout(timer);
   stopSkipping?.();
-  Object.assign(ride, { from: floor, to: floor, start: -Infinity, arrived: -Infinity, fromY: FLOOR_Y[floor], y: FLOOR_Y[floor], closing: 0 });
+  Object.assign(ride, { from: floor, to: floor, start: -Infinity, arrived: -Infinity, fromY: FLOOR_Y[floor], y: FLOOR_Y[floor], closing: 0, rate: 1 });
 }
 
 /**
  * Ride to `to`. With `instant` (reduced motion) the view cuts straight there. Otherwise any click or key press
- * during the ride skips the rest of it, though not the press that started it.
+ * during the ride hurries the rest of it along, though not the press that started it.
  */
 export function depart(to: Floor, instant: boolean): void {
   window.clearTimeout(timer);
   stopSkipping?.();
   const t = now();
-  Object.assign(ride, { from: ride.to, to, start: t, arrived: -Infinity, fromY: ride.y, closing: riding() ? 0 : doorsAt(t - ride.arrived) });
+  Object.assign(ride, { from: ride.to, to, start: t, arrived: -Infinity, fromY: ride.y, closing: riding() ? 0 : doorsAt(t - ride.arrived), rate: 1 });
   for (const l of listeners) l("depart");
   if (instant) {
     arrive();
     return;
   }
   timer = window.setTimeout(arrive, RIDE_SECONDS * 1000);
-  // Listen from the next turn, so the click or key press that set off the ride is not taken as a skip.
+  // Listen from the next turn, so the click or key press that set off the ride is not taken as a hurry.
   const skip = (e: Event) => {
     if (e instanceof KeyboardEvent && e.repeat) return;
-    arrive();
+    hurry();
   };
   const start = window.setTimeout(() => {
     window.addEventListener("pointerdown", skip, true);
@@ -79,6 +81,25 @@ export function depart(to: Floor, instant: boolean): void {
     window.removeEventListener("keydown", skip, true);
     stopSkipping = null;
   };
+}
+
+/** Hurry the rest of the ride into HURRY_SECONDS at most, carrying on from where the car is, so the view never jumps. */
+export function hurry(): void {
+  if (!riding()) return;
+  stopSkipping?.();
+  const t = now();
+  const elapsed = rideClock(t);
+  const left = RIDE_SECONDS - elapsed;
+  if (left <= 0) {
+    arrive();
+    return;
+  }
+  // Never slower than the car already goes: late in the ride, or hurried twice, it keeps its pace.
+  const rate = Math.max(ride.rate, left / HURRY_SECONDS);
+  ride.start = t - elapsed / rate;
+  ride.rate = rate;
+  window.clearTimeout(timer);
+  timer = window.setTimeout(arrive, (left / rate) * 1000);
 }
 
 /** The car arrives now, if it has not already. */
@@ -97,13 +118,13 @@ const smooth = (t: number) => {
 
 /** How far open a floor's elevator doors are now, 0 to 1: they part when the car arrives and close as it leaves. */
 export function doorsNow(floor: Floor, at = now()): number {
-  if (riding()) return floor === ride.from ? ride.closing * (1 - smooth((at - ride.start) / DOORS.move)) : 0;
+  if (riding()) return floor === ride.from ? ride.closing * (1 - smooth(rideClock(at) / DOORS.move)) : 0;
   return floor === ride.to ? doorsAt(at - ride.arrived) : 0;
 }
 
-/** Seconds into the ride now; past RIDE_SECONDS once the car has arrived, even if it was skipped early. */
+/** Seconds into the ride now; past RIDE_SECONDS once the car has arrived, even if it was hurried along early. */
 export function rideClock(at = now()): number {
-  return riding() ? at - ride.start : RIDE_SECONDS + Math.max(0, at - ride.arrived);
+  return riding() ? (at - ride.start) * ride.rate : RIDE_SECONDS + Math.max(0, at - ride.arrived);
 }
 
 /** The floor drawn now: the one being left until halfway through a ride, when the view is darkest, then the other. */

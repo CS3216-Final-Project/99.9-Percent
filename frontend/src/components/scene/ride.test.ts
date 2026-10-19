@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DOORS, FLOOR_Y, RIDE_SECONDS } from "./levels";
-import { arrive, depart, doorsNow, onRide, placeCar, ride, riding, shownFloor, viewHeight, type RideEvent } from "./ride";
+import { DOORS, FLOOR_Y, HURRY_SECONDS, RIDE_SECONDS } from "./levels";
+import { arrive, depart, doorsNow, hurry, onRide, placeCar, ride, riding, shownFloor, viewHeight, type RideEvent } from "./ride";
 
 describe("the elevator's ride", () => {
   let heard: RideEvent[];
@@ -46,20 +46,48 @@ describe("the elevator's ride", () => {
     expect(doorsNow("office")).toBe(0);
   });
 
-  it("is skipped by a later click or key, but not by the press that set it off", () => {
+  it("is hurried along by a later click or key, but not by the press that set it off", () => {
     depart("office", false);
     window.dispatchEvent(new Event("pointerdown"));
-    expect(riding()).toBe(true);
+    expect(ride.rate).toBe(1);
     vi.advanceTimersByTime(1);
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp", repeat: true }));
-    expect(riding()).toBe(true);
+    expect(ride.rate).toBe(1);
+    // A second in, the player clicks: the car carries on from where it is, faster, and arrives within HURRY_SECONDS.
+    vi.advanceTimersByTime(1000);
+    const before = viewHeight();
     window.dispatchEvent(new Event("pointerdown"));
+    expect(riding()).toBe(true);
+    expect(viewHeight()).toBeCloseTo(before, 5);
+    expect(ride.rate).toBeGreaterThan(1);
+    vi.advanceTimersByTime(HURRY_SECONDS * 1000 + 10);
     expect(riding()).toBe(false);
     expect(heard).toEqual(["depart", "arrive"]);
     // Arriving twice is still arriving once.
     arrive();
     vi.advanceTimersByTime(RIDE_SECONDS * 1000);
     expect(heard).toEqual(["depart", "arrive"]);
+  });
+
+  it("never slows the car by hurrying it: hurried twice it keeps its pace, and with little left it needs none", () => {
+    depart("office", false);
+    vi.advanceTimersByTime(1000);
+    hurry();
+    const rate = ride.rate;
+    expect(rate).toBeCloseTo((RIDE_SECONDS - 1) / HURRY_SECONDS, 5);
+    vi.advanceTimersByTime(HURRY_SECONDS * 500);
+    hurry();
+    expect(ride.rate).toBe(rate);
+    vi.advanceTimersByTime(HURRY_SECONDS * 500 + 10);
+    expect(riding()).toBe(false);
+    // Only 0.2 s left: already quicker than a hurry, so nothing changes.
+    placeCar("servers");
+    depart("office", false);
+    vi.advanceTimersByTime(RIDE_SECONDS * 1000 - 200);
+    hurry();
+    expect(ride.rate).toBe(1);
+    vi.advanceTimersByTime(210);
+    expect(riding()).toBe(false);
   });
 
   it("cuts straight to the floor with reduced motion", () => {
