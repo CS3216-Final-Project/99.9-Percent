@@ -19,12 +19,13 @@ import {
   followPose,
   headingFromOffset,
   LOOK_PER_PIXEL,
+  MOUSE_LOOK_PER_PIXEL,
   overviewOffset,
   VIEW_EASE,
   type Pose,
 } from "./views";
 import { wallUp, type WallId } from "./wallState";
-import { cameras, lookApi, resetRig, rig, setViewFade, viewNow } from "./viewState";
+import { cameras, lookApi, mouse, resetRig, rig, setViewFade, viewNow } from "./viewState";
 import { sceneSound } from "./sceneSounds";
 
 /*
@@ -154,8 +155,9 @@ export function ViewRig() {
     };
   }, [set, get, gl]);
 
-  // Looking round: drag on the room, or with the pointer locked, move the mouse. A click in first person takes the
-  // pointer, and that click does nothing else; Escape lets go without ending walk mode.
+  // Looking round: drag on the room, or in first person with a mouse, simply move it. First person takes the mouse
+  // as it opens, as a game would; Escape gives the cursor back without ending walk mode, and a click on the room
+  // takes the mouse again, that click doing nothing else.
   useEffect(() => {
     const canvas = gl.domElement;
     const host = canvas.parentElement ?? canvas;
@@ -163,10 +165,21 @@ export function ViewRig() {
     let unlockedAt = -Infinity;
     const looking = () => viewNow.want !== "overview" && viewNow.perspective;
     const turn = (dx: number, dy: number) => {
-      viewNow.heading -= dx * LOOK_PER_PIXEL;
-      if (viewNow.want === "first") viewNow.eyesPitch = THREE.MathUtils.clamp(viewNow.eyesPitch + dy * LOOK_PER_PIXEL, -FIRST.pitch, FIRST.pitch);
-      else viewNow.pitch = THREE.MathUtils.clamp(viewNow.pitch + dy * LOOK_PER_PIXEL, FOLLOW.lowest, FOLLOW.highest);
+      const k = viewNow.locked ? MOUSE_LOOK_PER_PIXEL : LOOK_PER_PIXEL;
+      viewNow.heading -= dx * k;
+      if (viewNow.want === "first") viewNow.eyesPitch = THREE.MathUtils.clamp(viewNow.eyesPitch + dy * k, -FIRST.pitch, FIRST.pitch);
+      else viewNow.pitch = THREE.MathUtils.clamp(viewNow.pitch + dy * k, FOLLOW.lowest, FOLLOW.highest);
     };
+    mouse.take = () => {
+      if (finePointer()) lockPointer(canvas);
+    };
+    // Choosing first person, by V or the View mode menu, takes the mouse there and then, while the key or click that
+    // chose it still lets the page lock the pointer.
+    const stopTaking = useGame.subscribe((s, prev) => {
+      const first = s.started && s.walking && s.viewpoint === "first";
+      const was = prev.started && prev.walking && prev.viewpoint === "first";
+      if (first && !was) mouse.take();
+    });
     const down = (e: PointerEvent) => {
       if (!looking() || viewNow.locked || (e.pointerType === "mouse" && e.button !== 0)) return;
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
@@ -189,7 +202,8 @@ export function ViewRig() {
       if (drag?.id === e.pointerId) drag = null;
     };
     const click = (e: MouseEvent) => {
-      if (viewNow.want !== "first" || !viewNow.perspective || viewNow.locked || !finePointer()) return;
+      // First person is asked for, even while the view is still easing in: the click is for the mouse, not the room.
+      if (viewNow.want !== "first" || viewNow.locked || !finePointer()) return;
       // The click that takes the pointer is only that: it neither walks nor picks anything.
       e.stopPropagation();
       lockPointer(canvas);
@@ -231,6 +245,8 @@ export function ViewRig() {
     window.addEventListener("keydown", escape, { capture: true });
     window.addEventListener("keydown", keys);
     return () => {
+      stopTaking();
+      mouse.take = () => {};
       canvas.removeEventListener("pointerdown", down);
       window.removeEventListener("pointermove", moveBy);
       window.removeEventListener("pointerup", up);

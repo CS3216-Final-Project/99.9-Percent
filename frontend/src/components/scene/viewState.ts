@@ -72,6 +72,12 @@ export const lookApi = {
   },
 };
 
+/**
+ * Take the mouse for looking round through the avatar's eyes, as a click on the room or the pause card's Look
+ * around does. The view rig fills this in; until then it does nothing.
+ */
+export const mouse = { take: () => {} };
+
 /** Whether a view from the avatar is asked for now, so the camera buttons and keys answer to it. */
 export const lookingFromAvatar = () => fromAvatar(viewNow.want);
 

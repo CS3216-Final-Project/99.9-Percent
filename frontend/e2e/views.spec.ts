@@ -61,28 +61,49 @@ test("V goes from the overview to follow and first person and back, and Escape e
   ]);
 });
 
-test("in first person a click takes the mouse and does nothing else, and Escape lets go before it ends the walk", async ({ page }) => {
+test("first person looks round with the mouse as it opens, Escape gives the cursor back with a way out, and a click takes the mouse again without walking", async ({ page }) => {
   await open(page);
   await stage(page).focus();
   await page.keyboard.press("v");
   await page.keyboard.press("v");
   await expect(page.locator(".view-dot")).toBeVisible();
-  await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
-  const canvas = (await stage(page).locator("canvas").boundingBox())!;
-  // Low in the view, where a click would otherwise walk the avatar across the floor.
-  await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height * 0.8);
+  // V took the mouse there and then: no click is needed to look round.
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName ?? null)).toBe("CANVAS");
-  await expect(page.locator(".view-hint")).toContainText("to let go of the mouse");
-  await expect(map(page).locator(".map-destination")).toHaveCount(0);
+  await expect(page.locator(".view-hint")).toContainText("Move the mouse to look round");
   await page.keyboard.press("Escape");
   await expect.poll(() => page.evaluate(() => document.pointerLockElement)).toBeNull();
-  await expect(page.locator(".view-dot")).toBeVisible();
+  const paused = page.getByRole("group", { name: "Mouse look paused" });
+  await expect(paused).toBeVisible();
   expect(await exploration(page)).toMatchObject({ walking: true, viewpoint: "first" });
-  // Once the mouse is free, Escape ends the walk as it always has.
-  await page.waitForTimeout(300);
+  // A click low in the room, where it would otherwise walk the avatar across the floor, only takes the mouse back.
+  const canvas = (await stage(page).locator("canvas").boundingBox())!;
+  await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height * 0.8);
+  await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName ?? null)).toBe("CANVAS");
+  await expect(paused).toHaveCount(0);
+  await expect(map(page).locator(".map-destination")).toHaveCount(0);
+  // The card's Exit leaves first person for the overview.
   await page.keyboard.press("Escape");
+  await expect(paused).toBeVisible();
+  await paused.getByRole("button", { name: /^Exit first person/ }).click();
   await expect(page.locator(".view-dot")).toHaveCount(0);
   await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
+  expect(await exploration(page)).toMatchObject({ walking: false, viewpoint: "overview" });
+});
+
+test("seen from the avatar the elevator simply rides, without the overview's cutscene", async ({ page }) => {
+  await open(page);
+  await stage(page).focus();
+  await page.keyboard.press("v");
+  await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
+  await page.keyboard.press("PageUp");
+  // Through the whole ride the dimming and passing shaft stay away.
+  const dims: number[] = [];
+  for (let i = 0; i < 8; i++) {
+    dims.push(await page.locator(".ride-dip").evaluate((el) => Number(getComputedStyle(el).opacity)));
+    await page.waitForTimeout(500);
+  }
+  expect(Math.max(...dims)).toBe(0);
+  await expect(where(page)).toHaveText(/office floor/, { timeout: 20_000 });
 });
 
 test("a new graphics quality in follow redraws the room and leaves the overview turning as before", async ({ page }) => {

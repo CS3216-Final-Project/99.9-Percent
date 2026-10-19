@@ -375,7 +375,8 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
     c.target.y = y;
     ride.y = y;
     if (dipEl) {
-      const moving = riding();
+      // The ride's cutscene is the overview's: seen from the avatar, the view simply rides with the car.
+      const moving = riding() && !lookingFromAvatar();
       const f = rideAt(rideClock());
       dipEl.style.opacity = moving ? f.dip.toFixed(3) : "0";
       const down = FLOOR_Y[ride.to] < FLOOR_Y[ride.from];

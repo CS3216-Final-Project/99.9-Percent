@@ -56,8 +56,10 @@ export const FIRST = {
   pace: 0.7,
 };
 
-/** Radians of look for each pixel the pointer moves. */
+/** Radians of look for each pixel the pointer is dragged. */
 export const LOOK_PER_PIXEL = 0.0045;
+/** Radians of look for each pixel the mouse moves while it looks round, gentler than a drag, as in most games. */
+export const MOUSE_LOOK_PER_PIXEL = 0.0028;
 
 /** Ease in and out over 0..1. */
 export const ease = (t: number) => {

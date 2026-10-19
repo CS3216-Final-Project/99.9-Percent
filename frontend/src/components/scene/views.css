@@ -66,9 +66,59 @@
   display: none;
 }
 
-/* A touch screen has no keys or mouse to tell of, only dragging. */
+.view-exit {
+  margin-left: 8px;
+  padding: 2px 8px;
+  pointer-events: auto;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--control-edge);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+}
+
+/* With the cursor given back, a card in the middle of the view offers to look round again or to leave. */
+.view-paused {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(340px, calc(100% - 32px));
+  padding: 14px 16px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--lift);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.view-paused p {
+  margin: 0 0 12px;
+}
+
+.view-paused-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.view-paused kbd {
+  margin-left: 4px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-family: var(--font-num);
+  font-size: var(--text-xs);
+}
+
+/* A touch screen has no keys or mouse to tell of: it drags to look round, and its line has the way out. */
 @media (hover: none) {
-  .view-hint-keys {
+  .view-hint-keys,
+  .view-paused {
     display: none;
   }
 
