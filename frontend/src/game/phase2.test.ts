@@ -3,6 +3,8 @@ import {beforeEach,afterEach,it,expect,vi} from "vitest";
 import {newGame,applyAction,type GameState} from "../sim";
 import {advanceSteps} from "../sim/step";
 import {useGame,inspectOrSelect,WALKTHROUGH_STEPS} from "./store";
+import {RUN_LESSON} from "./walkthrough";
+const LAST=WALKTHROUGH_STEPS.campaign-1;
 import {makeEnvelope,decodeSave,CAMPAIGN_SAVE_KEY} from "./saveEnvelope";
 import {loadGame,saveGame,readAnalytics,archiveEvents,exportPlaytest,DEFAULT_META,saveMeta} from "./persist";
 import {emptyMeasurement,beginSession,projectEvents} from "./telemetry";
@@ -70,11 +72,11 @@ it("keeps the final lesson unfinished and resumable until Finish is explicitly p
  enter();
  for(let i=0;i<WALKTHROUGH_STEPS.campaign-1;i++)useGame.getState().tourNext();
  expect(useGame.getState().meta.tutorialDone).toBe(false);
- expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!)).toMatchObject({tutorialDone:false,walkthroughStep:20});
+ expect(JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!)).toMatchObject({tutorialDone:false,walkthroughStep:LAST});
  useGame.getState().tourNext();useGame.getState().setRunning(true);
- expect(useGame.getState()).toMatchObject({running:false,tour:{step:20}});
+ expect(useGame.getState()).toMatchObject({running:false,tour:{step:LAST}});
  useGame.setState(useGame.getInitialState(),true);enter();
- expect(useGame.getState().tour).toEqual({track:"campaign",step:20});
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:LAST});
  useGame.getState().endTour(true);
  expect(useGame.getState().meta.tutorialDone).toBe(true);
  useGame.setState(useGame.getInitialState(),true);enter();
@@ -110,7 +112,7 @@ it("keeps first-time Chapter 0 mandatory even on the final lesson",()=>{
 });
 it("pauses when leaving the replay's bounded Run exercise",()=>{
  saveMeta({...DEFAULT_META,tutorialDone:true});enter();useGame.getState().startTour("campaign");
- for(let step=0;step<5;step++)useGame.getState().tourNext();
+ for(let step=0;step<RUN_LESSON;step++)useGame.getState().tourNext();
  useGame.getState().setRunning(true);expect(useGame.getState().running).toBe(true);
  useGame.getState().endTour(false);useGame.getState().tick(10);
  expect(useGame.getState()).toMatchObject({tour:null,running:false,game:{campaign:{step:0}}});
@@ -134,16 +136,16 @@ it.each([false,true])("resumes an explicitly replayed walkthrough without cleari
 });
 it("carries an unfinished walkthrough on where it was left, into a new company, as one start",()=>{
  enter();
- for(let i=0;i<5;i++)useGame.getState().tourNext();
+ for(let i=0;i<RUN_LESSON;i++)useGame.getState().tourNext();
  useGame.getState().endSession();useGame.getState().play();
- expect(useGame.getState().tour).toEqual({track:"campaign",step:5,clockUntil:1});
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:RUN_LESSON,clockUntil:1});
  useGame.setState(useGame.getInitialState(),true);enter();
  // The resumed Run lesson permits exactly one real second, then holds again.
  useGame.getState().setRunning(true);useGame.getState().tick(3);
  expect(useGame.getState().game.campaign!.step).toBe(1);
- expect(useGame.getState().tour).toEqual({track:"campaign",step:5,clockUntil:1});
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:RUN_LESSON,clockUntil:1});
  useGame.getState().newRun();
- expect(useGame.getState().tour).toEqual({track:"campaign",step:5,clockUntil:1});
+ expect(useGame.getState().tour).toEqual({track:"campaign",step:RUN_LESSON,clockUntil:1});
  // Showing it again from the menu goes back to its start without starting another.
  useGame.getState().showOnboarding();
  expect(useGame.getState().tour).toEqual({track:"campaign",step:0});
@@ -211,9 +213,9 @@ it("records each completed walkthrough once and rejects a player skip in the pla
  useGame.setState(useGame.getInitialState(),true);enter();
  expect(tutorialEvents()).toEqual([
   {name:"tutorial_started",track:"campaign",step:0,from:"first_visit"},
-  {name:"tutorial_completed",track:"campaign",step:20},
+  {name:"tutorial_completed",track:"campaign",step:LAST},
   {name:"tutorial_started",track:"campaign",step:0,from:"menu"},
-  {name:"tutorial_completed",track:"campaign",step:20},
+  {name:"tutorial_completed",track:"campaign",step:LAST},
  ]);
 });
 it("does not offer the walkthrough to a player who finished or skipped the former introduction, but replays it on request",()=>{

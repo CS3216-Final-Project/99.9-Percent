@@ -72,12 +72,14 @@ export async function appHealthDuringTutorial(page: Page) {
     await page.route("**/api/**", r => r.abort()); await page.goto("/");
     await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await expectRoom(page);
     const card = tutorial(page), entry = page.getByRole("button", { name: "View app health", exact: true });
+    await nextChapterZero(page);
     await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "App Server", exact: true }).click();
-    await expect(card).toContainText("Done in your game");
     await expect(page.getByRole("dialog")).toHaveCount(1);
-    await nextChapterZero(page); await nextChapterZero(page);
+    await card.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(card).toHaveAttribute("data-lesson-id", "inspect-db");
+    await nextChapterZero(page);
     await card.getByRole("button", { name: "Back", exact: true }).click();
-    await expect(card).toHaveAccessibleName("Walkthrough, step 2 of 21");
+    await expect(card).toHaveAttribute("data-lesson-id", "inspect-db");
     await finishChapterZero(page);
     const before = (await savedGame(page)).campaign;
     await entry.click(); const dialog = page.getByRole("dialog", { name: "App Health", exact: true });

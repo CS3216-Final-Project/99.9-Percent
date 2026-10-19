@@ -1,4 +1,5 @@
-import { test, expect, expectRoom, savedGame, seedSave, tutorial, finishChapterZero, nextChapterZero } from "./fixtures";
+import { test, expect, expectRoom, savedGame, seedSave, tutorial, finishChapterZero, nextChapterZero, CHAPTER_ZERO_LESSONS as N, lessonNumber } from "./fixtures";
+const step = (n: number) => `Walkthrough, step ${n} of ${N}`;
 import { applyAction, newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 function act(g: GameState, action: Parameters<typeof applyAction>[1]) { const r = applyAction(g, action); if (!r.ok) throw Error(r.message); return r.state; }
@@ -12,14 +13,14 @@ for (const width of [1440, 390]) test(`A saved Chapter 0 replay resumes as visib
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
-  await expect(tutorial(page)).toHaveAccessibleName("Walkthrough, step 1 of 21");
-  await expect(tutorial(page)).toContainText("Practice · In progress · Lesson 1 of 21");
-  await expect(tutorial(page).getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+  await expect(tutorial(page)).toHaveAccessibleName(step(1));
+  await expect(tutorial(page)).toContainText(`Practice · Look1 / ${N}`);
+  await expect(page.locator(".cz-spotlight")).toBeVisible();
   await page.screenshot({ path: `test-results/chapter-zero-practice-${width}.png` });
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
-  await expect(tutorial(page)).toHaveAccessibleName("Walkthrough, step 1 of 21");
+  await expect(tutorial(page)).toHaveAccessibleName(step(1));
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu", exact: true });
   await menu.getByRole("tab", { name: "Sound", exact: true }).click();
@@ -45,7 +46,7 @@ for (const width of [1440, 390]) test(`A visible Chapter 0 replay can be closed 
   await page.goto("/");
   await page.getByRole("button", { name: "Replay walkthrough", exact: true }).click();
   const card = tutorial(page);
-  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+  await expect(card).toHaveAttribute("data-lesson-id", "goal");
   const exit = card.getByRole("button", { name: "Return to game", exact: true });
   await expect(exit).toBeInViewport();
   await page.screenshot({ path: `test-results/chapter-zero-visible-exit-${width}.png` });
@@ -65,23 +66,24 @@ for (const width of [1440, 390]) test(`A completed player's Chapter 0 replay res
   await page.getByRole("button", { name: "Replay walkthrough", exact: true }).click();
   await expectRoom(page);
   const card = tutorial(page);
-  for (let lesson = 1; lesson < 8; lesson++) await nextChapterZero(page);
+  for (let lesson = 1; lesson < lessonNumber("cancel"); lesson++) await nextChapterZero(page);
   const before = (await savedGame(page)).campaign!;
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expect(card).toHaveAccessibleName("Walkthrough, step 8 of 21");
+  await expect(card).toHaveAccessibleName(step(lessonNumber("cancel")));
   const quote = page.getByRole("region", { name: "Confirm Add server", exact: true });
   await expect(quote).toBeVisible();
   await expect(quote.getByRole("button", { name: "Confirm", exact: true })).toBeDisabled();
   await quote.getByRole("button", { name: "Cancel", exact: true }).click();
-  await nextChapterZero(page);
+  // The finished exercise moves on by itself.
+  await expect(card).toHaveAccessibleName(step(lessonNumber("money")));
   await card.getByRole("button", { name: "Back", exact: true }).click();
   await expect(card.getByRole("button", { name: "Save and exit", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: "Exit", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expect(card).toHaveAccessibleName("Walkthrough, step 8 of 21");
+  await expect(card).toHaveAccessibleName(step(lessonNumber("cancel")));
   await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
   await finishChapterZero(page);
   expect((await savedGame(page)).campaign).toEqual(before);
@@ -94,7 +96,7 @@ for (const width of [1440, 390]) test(`Cancel lesson restores its quote after re
   test.setTimeout(120_000); // This journey initializes the real WebGL room twice.
   await page.setViewportSize({ width, height: 900 });
   await page.route("**/api/**", route => route.abort());
-  await seedSave(page, newGame(1, "resume-quote"), { tutorialDone: false, walkthroughStep: 7, walkthroughFurthestStep: 7 });
+  await seedSave(page, newGame(1, "resume-quote"), { tutorialDone: false, walkthroughStep: lessonNumber("cancel") - 1, walkthroughFurthestStep: lessonNumber("cancel") - 1 });
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
@@ -109,7 +111,7 @@ for (const width of [1440, 390]) test(`Cancel lesson restores its quote after re
   await expect(quote).toBeVisible();
   await quote.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(quote).toBeHidden();
-  await expect(tutorial(page).getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+  await expect(tutorial(page)).toHaveAccessibleName(step(lessonNumber("money")));
   expect((await savedGame(page)).campaign!.cashCents).toBe(2_000_000);
 });
 
@@ -117,26 +119,28 @@ for (const width of [1440, 390]) test(`How to play clears earlier completion and
   test.setTimeout(150_000);
   await page.setViewportSize({ width, height: 900 });
   await page.route("**/api/**", route => route.abort());
-  await seedSave(page, newGame(1, "restart-tutorial"), { tutorialDone: false, walkthroughStep: 15, walkthroughFurthestStep: 16 });
+  await seedSave(page, newGame(1, "restart-tutorial"), { tutorialDone: false, walkthroughStep: lessonNumber("speed") - 1, walkthroughFurthestStep: N - 1 });
   await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
   const card = tutorial(page);
   const replay = async () => {
-    while ((await card.getAttribute("aria-label")) !== "Walkthrough, step 16 of 21") await nextChapterZero(page);
+    while ((await card.getAttribute("aria-label")) !== step(N)) await nextChapterZero(page);
     const before = (await savedGame(page)).campaign;
     await page.getByRole("button", { name: "Menu", exact: true }).click();
     await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: /How to play/ }).click();
-    await expect(card).toHaveAccessibleName("Walkthrough, step 1 of 21");
-    await expect(card).not.toContainText("Completed earlier");
+    await expect(card).toHaveAccessibleName(step(1));
+    await card.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(card).toHaveAccessibleName(step(lessonNumber("inspect-app")));
     await expect(card.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
     expect((await savedGame(page)).campaign).toEqual(before);
   };
   await replay();
   await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "App Server", exact: true }).click();
-  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
+  await card.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(card).toHaveAccessibleName(step(lessonNumber("inspect-db")));
   await replay();
   await page.reload(); await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expect(card).toHaveAccessibleName("Walkthrough, step 1 of 21");
+  await expect(card).toHaveAccessibleName(step(lessonNumber("inspect-app")));
   await expect(card.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
 });
 
@@ -146,8 +150,7 @@ test("Chapter 0 requires real game interactions, previews without spending, and 
   await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
   await expectRoom(page); const card = tutorial(page);
   await expect(card.getByRole("button", { name: "Skip", exact: true })).toHaveCount(0);
-  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
-  for (let i = 1; i < 8; i++) await nextChapterZero(page);
+  for (let i = 1; i < lessonNumber("cancel"); i++) await nextChapterZero(page);
   await expect(page.getByRole("region", { name: "Confirm Add server" })).toBeVisible();
   await expect(card).toBeVisible();
   await expect(card.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
@@ -165,27 +168,26 @@ test("Chapter 0 requires real game interactions, previews without spending, and 
 test("Back and Save and exit resume the same lesson, and the final card still holds the clock until Finish", async ({ page }) => {
   test.setTimeout(120_000);
   await page.route("**/api/**", route => route.abort());
-  await seedSave(page, newGame(1, "mandatory-intro"), { tutorialDone: false, walkthroughStep: 16 });
+  await seedSave(page, newGame(1, "mandatory-intro"), { tutorialDone: false, walkthroughStep: lessonNumber("speed") - 1 });
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
   const card = tutorial(page);
-  await expect(card).toHaveAccessibleName("Walkthrough, step 17 of 21");
+  await expect(card).toHaveAccessibleName(step(lessonNumber("speed")));
   await card.getByRole("button", { name: "Back", exact: true }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: "Exit", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expect(card).toHaveAccessibleName("Walkthrough, step 16 of 21");
-  for (let lesson = 16; lesson < 21; lesson++) await nextChapterZero(page);
-  await expect(card).toHaveAccessibleName("Walkthrough, step 21 of 21");
+  await expect(card).toHaveAccessibleName(step(lessonNumber("money")));
+  while ((await card.getAttribute("aria-label")) !== step(N)) await nextChapterZero(page);
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeDisabled();
   await page.keyboard.press("p"); await page.keyboard.press("Escape");
   await expect(card).toBeVisible();
   expect((await savedGame(page)).campaign!.step).toBe(0);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("nn.campaign.meta.v1")!).tutorialDone)).toBe(false);
   await page.reload(); await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expect(card).toHaveAccessibleName("Walkthrough, step 21 of 21");
+  await expect(card).toHaveAccessibleName(step(N));
   await card.getByRole("button", { name: "Finish walkthrough", exact: true }).click();
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect.poll(async () => (await savedGame(page)).campaign!.step).toBeGreaterThan(0);
@@ -215,7 +217,7 @@ test("entering Scaling & Routing shows its guide once, on the controls the chapt
   await expect(guide).toHaveCount(0);
 });
 
-for (const width of [1440, 390]) test(`How to play restarts all 21 lessons during an incident and returns to the saved company at ${width}px`, async ({ page }) => {
+for (const width of [1440, 390]) test(`How to play restarts every lesson during an incident and returns to the saved company at ${width}px`, async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width, height: 900 });
   await page.route("**/api/**", route => route.abort());
@@ -227,19 +229,18 @@ for (const width of [1440, 390]) test(`How to play restarts all 21 lessons durin
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("button", { name: "How to play", exact: true }).click();
   const card = tutorial(page);
-  await expect(card).toHaveAccessibleName("Walkthrough, step 1 of 21");
-  await expect(card).toContainText("Practice · In progress · Lesson 1 of 21");
-  await expect(card.getByRole("heading", { name: "Walkthrough", exact: true })).toBeVisible();
-  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+  await expect(card).toHaveAccessibleName(step(1));
+  await expect(card).toContainText(`Practice · Look1 / ${N}`);
+  await expect(card.getByRole("heading", { name: "Your job", exact: true })).toBeVisible();
   await expect(page.getByTestId("physical-step")).toHaveText("0");
   expect((await savedGame(page)).campaign).toEqual(company.campaign);
   await page.screenshot({ path: `test-results/how-to-play-practice-${width}.png` });
-  for (let lesson = 1; lesson < 8; lesson++) await nextChapterZero(page);
+  for (let lesson = 1; lesson < lessonNumber("cancel"); lesson++) await nextChapterZero(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: "Exit", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expect(card).toHaveAccessibleName("Walkthrough, step 8 of 21");
+  await expect(card).toHaveAccessibleName(step(lessonNumber("cancel")));
   await expectRoom(page);
   await finishChapterZero(page);
   await expect(card).toHaveCount(0);

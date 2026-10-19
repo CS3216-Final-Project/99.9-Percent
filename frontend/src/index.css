@@ -4367,6 +4367,7 @@ button:disabled {
 .tour-card {
   position: absolute;
   pointer-events: auto;
+  overflow-y: auto;
   padding: 12px 14px 12px;
   background: var(--paper);
   border: 1px solid var(--control-edge);

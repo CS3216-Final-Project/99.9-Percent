@@ -378,7 +378,7 @@ export function CampaignOverlays() {
   // Tech and History open over the room from the bottom bar, as in Classic; dialogs that need an answer sit above them.
   return <>
     {view === "tech" && <ViewSheet view="tech"><p className="campaign-tech-intro"><Icon name="tree" size={16} /> Technologies are capabilities. Select an icon to see its effect. <strong>Owned does not mean deployed.</strong> Deployments and their running costs appear in Actions.</p><TechTree /></ViewSheet>}
-    {view === "history" && <ViewSheet view="history"><CampaignHistory /></ViewSheet>}
+    {view === "history" && <ViewSheet view="history"><p className="campaign-tech-intro"><Icon name="history" size={16} /> Check what changed after a decision. <strong>Charts</strong> show trends, <strong>Events</strong> list your decisions and <strong>Incidents</strong> hold the reports.</p><CampaignHistory /></ViewSheet>}
     <CampaignDialog />
   </>;
 }
