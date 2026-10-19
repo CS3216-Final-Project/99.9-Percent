@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useGame } from "@/game/store";
 import { exportCloudCopies, localCloudCopy } from "@/game/cloud";
+import { saveTextFile } from "@/lib/download";
 import type { RunSummary } from "../../../shared/campaign.ts";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { Icon } from "./icons";
@@ -263,8 +264,7 @@ function CloudSaves({ onLoaded, Heading }: { onLoaded?: () => void; Heading: Hea
   const download = () => {
     try {
       const bytes = JSON.stringify({ copies: JSON.parse(exportCloudCopies()), pendingConflict: s.cloudConflict, localCompany: s.game });
-      const url = URL.createObjectURL(new Blob([bytes], { type: "application/json" }));
-      const a = document.createElement("a"); a.href = url; a.download = "99.99-save-backup.json"; a.click(); URL.revokeObjectURL(url);
+      saveTextFile("99.99-save-backup.json", bytes);
     } catch { s.notify("Browser storage could not be read for the backup. Keep this tab open.", "error"); }
   };
 
