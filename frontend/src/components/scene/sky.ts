@@ -142,11 +142,21 @@ export function daylight(time: number): Daylight {
 /**
  * A shadow map is drawn in whole texels, so a sun that crept across the sky would move every shadow in jolts, a
  * texel at a time. Instead the office is lit from the two steps of the sun's path either side of the time, fading
- * from one to the next, so the shadows slide. Steps are SUN_STEP radians of the path apart (about two texels of a
- * rack's shadow at Medium) and never more than SUN_REST of the day, so a sun standing still is drawn from one place.
+ * from one to the next, so the shadows slide. A step is small enough that even the longest shadow in the room (a
+ * wall's, with the sun at its lowest) moves only SUN_STEP_TEXELS of the shadow map, well inside the softness of an
+ * edge, so the fade never shows as two edges; see sunStep. Steps are never more than SUN_REST of the day apart, so a
+ * sun standing still is drawn from one place.
  */
-export const SUN_STEP = 0.01;
+export const SUN_STEP_TEXELS = 2;
 export const SUN_REST = 2 / DAY_SECONDS;
+/** The walls' height, the tallest thing in the room to cast a shadow (see ROOM.wallH in layout.ts). */
+const TALLEST_CASTER = 3.4;
+
+/** The angle, in radians, between the office's sun's steps, for a shadow map whose texels are `texel` metres across. */
+export function sunStep(texel: number): number {
+  // A caster of height h throws a shadow h / tan(elevation) long, which lengthens by h / sin²(elevation) per radian.
+  return (SUN_STEP_TEXELS * texel * Math.sin(OFFICE_MIN_ELEVATION) ** 2) / TALLEST_CASTER;
+}
 
 export interface SunSteps {
   from: Vec3;
@@ -157,29 +167,42 @@ export interface SunSteps {
 
 const angleBetween = (a: Vec3, b: Vec3) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])));
 
-let stepTimes: number[] | null = null;
+const stepTimes = new Map<number, number[]>();
 
-/** The times of day the office's sun steps at, from midnight to midnight, worked out once by walking the day. */
-function sunStepTimes(): number[] {
-  if (stepTimes) return stepTimes;
+/**
+ * The times of day the office's sun steps at, from midnight to midnight, worked out once per step by walking the day
+ * a twentieth of a second at a time and placing each step where the path crosses the angle between the samples.
+ */
+function sunStepTimes(step: number): number[] {
+  const known = stepTimes.get(step);
+  if (known) return known;
   const samples = DAY_SECONDS * 20;
   const times = [0];
   let last = daylight(0).office.dir;
   for (let i = 1; i <= samples; i++) {
     const t = i / samples;
     const dir = daylight(t).office.dir;
-    if (i === samples || angleBetween(last, dir) >= SUN_STEP || t - times[times.length - 1] >= SUN_REST) {
+    // At dawn the sun swings several steps in one sample: each is placed where the turn, taken as even since the
+    // last step, reaches the step angle.
+    for (let turned = angleBetween(last, dir); turned >= step; turned = angleBetween(last, dir)) {
+      const lastT = times[times.length - 1];
+      const at = Math.min(t, lastT + ((t - lastT) * step) / turned);
+      times.push(at);
+      last = at === t ? dir : daylight(at).office.dir;
+    }
+    if (i === samples || t - times[times.length - 1] >= SUN_REST) {
       times.push(t);
       last = dir;
     }
   }
-  return (stepTimes = times);
+  stepTimes.set(step, times);
+  return times;
 }
 
 /** The two directions the office's sun is drawn from at a time of day, and how far it has faded between them. */
-export function sunSteps(time: number): SunSteps {
+export function sunSteps(time: number, step: number): SunSteps {
   const t = wrap(time);
-  const times = sunStepTimes();
+  const times = sunStepTimes(step);
   let lo = 0;
   let hi = times.length - 1;
   while (hi - lo > 1) {
