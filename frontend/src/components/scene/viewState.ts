@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { fromAvatar, type Viewpoint } from "@/game/viewpoints";
+import { riding } from "./ride";
 import { avatar } from "./walk";
 import { FOLLOW, type Pose } from "./views";
 
@@ -88,6 +89,9 @@ export const mouse = { take: () => {} };
 
 /** Whether a view from the avatar is asked for now, so the camera buttons and keys answer to it. */
 export const lookingFromAvatar = () => fromAvatar(viewNow.want);
+
+/** Riding from the avatar, the whole shaft can be seen as the car passes between the floors, so both are drawn. */
+export const bothFloors = () => riding() && lookingFromAvatar();
 
 let fadeEl: HTMLDivElement | null = null;
 /** What the dimming was last set to, so a frame with nothing to change writes nothing to the page. */

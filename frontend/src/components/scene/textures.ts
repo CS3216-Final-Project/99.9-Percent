@@ -837,3 +837,208 @@ export function poster(kind: PosterKind): THREE.CanvasTexture {
   }
   return finish(c);
 }
+
+/* ------------------------------------------------------------------ */
+/* The elevator                                                        */
+/* ------------------------------------------------------------------ */
+
+const liftTextures = new Map<string, THREE.CanvasTexture>();
+
+/** A smooth (not pixel-blocky) texture for the elevator, made once per key. */
+function liftTexture(key: string, w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void, repeat = false): THREE.CanvasTexture {
+  const hit = liftTextures.get(key);
+  if (hit) return hit;
+  const [c, g] = canvas(w, h);
+  draw(g, w, h);
+  const t = finish(c);
+  t.magFilter = THREE.LinearFilter;
+  if (repeat) repeating(t);
+  liftTextures.set(key, t);
+  return t;
+}
+
+/** The car's floor: polished dark granite laid in four big tiles, flecked, with fine grout and a soft sheen. */
+export function liftFloor(): THREE.CanvasTexture {
+  return liftTexture("floor", 256, 256, (g, w, h) => {
+    g.fillStyle = "#2c2e34";
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 3200; i++) {
+      const n = noise(i + 1200);
+      g.fillStyle = n > 0.95 ? "#787b84" : n > 0.6 ? "#44474f" : n > 0.32 ? "#1c1e23" : "#383b43";
+      g.fillRect(Math.floor(noise(i + 4100) * w), Math.floor(noise(i + 7300) * h), 1, 1);
+    }
+    for (const [x, y] of [
+      [0, 0],
+      [w / 2, 0],
+      [0, h / 2],
+      [w / 2, h / 2],
+    ]) {
+      const sheen = g.createLinearGradient(x, y, x + w / 2, y + h / 2);
+      sheen.addColorStop(0, "rgba(255,255,255,0.07)");
+      sheen.addColorStop(0.5, "rgba(255,255,255,0)");
+      sheen.addColorStop(1, "rgba(255,255,255,0.05)");
+      g.fillStyle = sheen;
+      g.fillRect(x, y, w / 2, h / 2);
+    }
+    g.fillStyle = "#121318";
+    g.fillRect(w / 2 - 1, 0, 2, h);
+    g.fillRect(0, h / 2 - 1, w, 2);
+    g.fillRect(0, 0, w, 1);
+    g.fillRect(0, 0, 1, h);
+  });
+}
+
+/** Brushed stainless steel, its grain running up and down. It repeats. */
+export function brushedSteel(): THREE.CanvasTexture {
+  return liftTexture(
+    "steel",
+    64,
+    256,
+    (g, w, h) => {
+      g.fillStyle = "#bcc1c8";
+      g.fillRect(0, 0, w, h);
+      for (let x = 0; x < w; x++) {
+        g.fillStyle = noise(x + 2200) > 0.5 ? `rgba(255,255,255,${0.05 + 0.12 * noise(x + 2900)})` : `rgba(40,44,52,${0.04 + 0.1 * noise(x + 2900)})`;
+        g.fillRect(x, 0, 1, h);
+      }
+      for (let i = 0; i < 140; i++) {
+        g.fillStyle = "rgba(255,255,255,0.1)";
+        g.fillRect(Math.floor(noise(i + 3300) * w), Math.floor(noise(i + 3600) * h), 1, 6 + noise(i + 3900) * 30);
+      }
+    },
+    true,
+  );
+}
+
+/**
+ * The car's operating panel: a brushed plate with a button for each floor, the one the car is going to lit amber,
+ * the door open and close buttons, the alarm, a key switch and the maker's plate.
+ */
+export function liftPanel(floors: number[], lit: number | null): THREE.CanvasTexture {
+  return letteredTexture(`lift-panel|${floors.join(",")}|${lit}`, 128, 384, (g, w, h) => {
+    const plate = g.createLinearGradient(0, 0, w, 0);
+    plate.addColorStop(0, "#aab0b8");
+    plate.addColorStop(0.5, "#d3d7dd");
+    plate.addColorStop(1, "#a6acb4");
+    g.fillStyle = plate;
+    g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 2) {
+      g.fillStyle = `rgba(255,255,255,${0.05 * noise(x + 5100)})`;
+      g.fillRect(x, 0, 1, h);
+    }
+    g.strokeStyle = "#7d838c";
+    g.lineWidth = 3;
+    g.strokeRect(2, 2, w - 4, h - 4);
+    const button = (cx: number, cy: number, r: number, label: string, glow: boolean, face = "#1b1d22") => {
+      g.beginPath();
+      g.arc(cx, cy, r + 4, 0, Math.PI * 2);
+      g.fillStyle = glow ? "#ffb43d" : "#8a9099";
+      if (glow) {
+        g.shadowColor = "#ffb43d";
+        g.shadowBlur = 14;
+      }
+      g.fill();
+      g.shadowBlur = 0;
+      g.beginPath();
+      g.arc(cx, cy, r, 0, Math.PI * 2);
+      g.fillStyle = face;
+      g.fill();
+      g.fillStyle = glow ? "#ffd27a" : "#e9ecef";
+      g.font = `700 ${Math.round(r * 1.05)}px "Space Grotesk", sans-serif`;
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.fillText(label, cx, cy + 1);
+      // Braille beside it.
+      g.fillStyle = "#5e646d";
+      for (const [dx, dy] of [
+        [0, -6],
+        [0, 0],
+        [5, -6],
+      ])
+        g.fillRect(cx + r + 9 + dx, cy + dy, 2, 2);
+    };
+    let y = 78;
+    for (const f of floors) {
+      button(w / 2 - 6, y, 18, String(f), f === lit);
+      y += 54;
+    }
+    // Door open and close: arrows apart and together.
+    const doorButton = (cx: number, cy: number, open: boolean) => {
+      button(cx, cy, 14, "", false);
+      g.fillStyle = "#e9ecef";
+      for (const s of [-1, 1]) {
+        g.beginPath();
+        const tip = cx + s * (open ? 9 : 2);
+        const base = cx + s * (open ? 3 : 8);
+        g.moveTo(tip, cy);
+        g.lineTo(base, cy - 5);
+        g.lineTo(base, cy + 5);
+        g.closePath();
+        g.fill();
+      }
+      g.fillRect(cx - 0.75, cy - 7, 1.5, 14);
+    };
+    doorButton(w / 2 - 22, y + 6, true);
+    doorButton(w / 2 + 18, y + 6, false);
+    // The alarm: a bell on yellow.
+    button(w / 2 - 2, y + 62, 16, "", false, "#f2c230");
+    g.fillStyle = "#1b1d22";
+    g.beginPath();
+    g.arc(w / 2 - 2, y + 60, 7, Math.PI, 0);
+    g.lineTo(w / 2 + 7, y + 66);
+    g.lineTo(w / 2 - 11, y + 66);
+    g.closePath();
+    g.fill();
+    g.fillRect(w / 2 - 4, y + 67, 4, 3);
+    // A key switch, and the maker's plate.
+    g.fillStyle = "#6d737c";
+    g.beginPath();
+    g.arc(w / 2 - 2, h - 58, 9, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#2a2d33";
+    g.fillRect(w / 2 - 3, h - 64, 2, 12);
+    g.fillStyle = "#2a2d33";
+    g.fillRect(14, h - 36, w - 28, 22);
+    g.fillStyle = "#d9dde2";
+    g.font = '600 10px "Space Grotesk", sans-serif';
+    g.textAlign = "center";
+    g.fillText("8 PERSONS · 630 kg", w / 2, h - 25);
+  });
+}
+
+/**
+ * The concrete lining the shaft between two floors, as the car passes it: a band of hazard stripes along the slab's
+ * edge, and the upper floor's number stencilled in white paint.
+ */
+export function shaftBand(floor: number): THREE.CanvasTexture {
+  return letteredTexture(`shaft-band|${floor}`, 512, 128, (g, w, h) => {
+    g.fillStyle = "#7c7e80";
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 2200; i++) {
+      const n = noise(i + 8100);
+      g.fillStyle = n > 0.6 ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.12)";
+      g.fillRect(Math.floor(noise(i + 8400) * w), Math.floor(noise(i + 8700) * h), 2, 2);
+    }
+    // Hazard stripes along the top edge, where a landing's sill meets the shaft.
+    for (let x = -24; x < w + 24; x += 24) {
+      g.fillStyle = "#f2c230";
+      g.beginPath();
+      g.moveTo(x, 0);
+      g.lineTo(x + 12, 0);
+      g.lineTo(x + 24, 16);
+      g.lineTo(x + 12, 16);
+      g.closePath();
+      g.fill();
+    }
+    g.fillStyle = "#1b1d22";
+    g.fillRect(0, 16, w, 2);
+    g.fillStyle = "rgba(245,245,240,0.9)";
+    g.font = '700 70px "Space Grotesk", sans-serif';
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(`${floor}`, w * 0.2, h / 2 + 18);
+    g.fillText(`${floor}`, w * 0.8, h / 2 + 18);
+    g.font = '700 26px "Space Grotesk", sans-serif';
+    g.fillText(`FLOOR ${floor}`, w / 2, h / 2 + 22);
+  });
+}

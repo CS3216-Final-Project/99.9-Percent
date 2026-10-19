@@ -54,8 +54,9 @@ export function placeCar(floor: Floor): void {
 /**
  * Ride to `to`. With `instant` (reduced motion) the view cuts straight there. Otherwise any click or key press
  * during the ride hurries the rest of it along, though not the press that started it.
+ * With the avatar aboard, the ride runs its course without responding to those presses.
  */
-export function depart(to: Floor, instant: boolean): void {
+export function depart(to: Floor, instant: boolean, skippable = true): void {
   window.clearTimeout(timer);
   stopSkipping?.();
   const t = now();
@@ -66,6 +67,7 @@ export function depart(to: Floor, instant: boolean): void {
     return;
   }
   timer = window.setTimeout(arrive, RIDE_SECONDS * 1000);
+  if (!skippable) return;
   // Listen from the next turn, so the click or key press that set off the ride is not taken as a hurry.
   const skip = (e: Event) => {
     if (e instanceof KeyboardEvent && e.repeat) return;

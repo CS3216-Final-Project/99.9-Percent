@@ -90,6 +90,18 @@ describe("the elevator's ride", () => {
     expect(riding()).toBe(false);
   });
 
+  it("runs its whole course with the avatar aboard, whatever is pressed on the way", () => {
+    depart("office", false, false);
+    vi.advanceTimersByTime(1000);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space" }));
+    window.dispatchEvent(new Event("pointerdown"));
+    vi.advanceTimersByTime(1000);
+    expect(riding()).toBe(true);
+    vi.advanceTimersByTime(RIDE_SECONDS * 1000 - 2000);
+    expect(riding()).toBe(false);
+    expect(heard).toEqual(["depart", "arrive"]);
+  });
+
   it("cuts straight to the floor with reduced motion", () => {
     depart("office", true);
     expect(heard).toEqual(["depart", "arrive"]);
