@@ -111,6 +111,10 @@
   .controls-dock .mobile-room-tools .walk-button { width: 100%; margin-bottom: 12px; }
   .dock-panel { right: 8px; max-width: calc(100vw - 16px); }
   .room-menu .dock-panel { right: 8px; }
+  /* The four views fit two by two, named only, so the camera tools below them stay in sight. */
+  .controls-dock .mobile-room-tools .view-mode-options { grid-template-columns: 1fr 1fr; }
+  .controls-dock .mobile-room-tools .view-mode-options button { min-height: 44px; padding: 8px; gap: 8px; }
+  .controls-dock .mobile-room-tools .view-mode-options small { display: none; }
 }
 @media (max-width: 360px) {
   .campaign-clock.controls-dock .time-controls { gap: 4px; }

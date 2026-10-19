@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { EQUIPMENT_ORDER } from "@/sim";
 import { FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { useGame } from "@/game/store";
@@ -76,8 +76,11 @@ interface Entered {
   n: number;
 }
 
-/** The still part of a floor's plan: walls, glass, the shaft, furniture and the zones' names. */
-function Plan({ floor, racks, entered }: { floor: Floor; racks: Racks; entered: Entered | null }) {
+/**
+ * The still part of a floor's plan: walls, glass, the shaft, furniture and the zones' names. Drawn again only when
+ * the floor, the machines or the zone just entered change, not each time the avatar and the crew are redrawn.
+ */
+const Plan = memo(function Plan({ floor, racks, entered }: { floor: Floor; racks: Racks; entered: Entered | null }) {
   const furniture = floor === "office" ? [...OBSTACLES, ...ROOM_OBSTACLES] : serverObstacles(racks);
   const glass = floor === "office" ? GLASS : SERVER_GLASS;
   const names: [string, number, number][] =
@@ -112,7 +115,7 @@ function Plan({ floor, racks, entered }: { floor: Floor; racks: Racks; entered: 
       </g>
     </>
   );
-}
+});
 
 /** Where the avatar is drawn and said to be: walking, where it walks; otherwise in the founder's chair upstairs. */
 function avatarSpot(walking: boolean) {
