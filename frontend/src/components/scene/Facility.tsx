@@ -55,7 +55,7 @@ import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
 import { Exterior } from "./exterior";
 import { daylightNow } from "./dayClock";
-import { sunSteps, type Vec3 } from "./sky";
+import { sunStep, sunSteps, type Vec3 } from "./sky";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
 import { buildModel, racksOf, type SceneModel } from "./sceneModel";
@@ -930,6 +930,8 @@ const HD_REFLECTIONS = 0.3;
 
 /** How far the office's sun stands from the room, along the direction its light comes from. */
 const SUN_DISTANCE = 21.4;
+/** The width of the room the sun's shadow map covers, in metres: the shadow camera spans half this either side. */
+const SHADOW_SPAN = 60;
 
 /**
  * The time of day (see sky.ts), moved on every frame: the sky behind the city, the city's own light, and the
@@ -946,12 +948,13 @@ function Daylight({ quality, hd }: { quality: QualityProfile; hd: boolean }) {
   const background = useRef<THREE.Color>(null);
   // Reflections light the HD materials too, so the sky light is turned down to keep the same brightness.
   const skyStrength = hd ? HD_SKY : 1.7;
+  const step = sunStep(SHADOW_SPAN / quality.shadowMapSize);
   useFrame(() => {
     const d = daylightNow();
     applyDaylight(d, quality.effects);
     background.current?.setRGB(d.horizon[0], d.horizon[1], d.horizon[2], THREE.SRGBColorSpace);
     if (sky.current) sky.current.intensity = skyStrength * d.office.sky;
-    const steps = quality.shadows ? sunSteps(d.time) : null;
+    const steps = quality.shadows ? sunSteps(d.time, step) : null;
     const place = (light: THREE.DirectionalLight | null, dir: Vec3, share: number) => {
       if (!light) return;
       light.intensity = d.office.sun * share;
@@ -971,10 +974,10 @@ function Daylight({ quality, hd }: { quality: QualityProfile; hd: boolean }) {
     "shadow-mapSize": [quality.shadowMapSize, quality.shadowMapSize] as [number, number],
     "shadow-radius": quality.shadowRadius,
     "shadow-bias": -0.0005,
-    "shadow-camera-left": -30,
-    "shadow-camera-right": 30,
-    "shadow-camera-top": 30,
-    "shadow-camera-bottom": -30,
+    "shadow-camera-left": -SHADOW_SPAN / 2,
+    "shadow-camera-right": SHADOW_SPAN / 2,
+    "shadow-camera-top": SHADOW_SPAN / 2,
+    "shadow-camera-bottom": -SHADOW_SPAN / 2,
     "shadow-camera-near": 1,
     "shadow-camera-far": 60,
   };
