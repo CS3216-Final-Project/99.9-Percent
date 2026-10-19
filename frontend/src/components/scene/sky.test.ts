@@ -119,7 +119,9 @@ describe('the time of day', () => {
     expect(timeOfDay(0)).toBeCloseTo(START, 9);
     expect(timeOfDay(DAY_SECONDS)).toBeCloseTo(START, 9);
     expect(timeOfDay(DAY_SECONDS / 2)).toBeCloseTo((START + 0.5) % 1, 9);
-    expect(timeOfDay(123, 0.5)).toBe(0.5);
+    expect(timeOfDay(0, null, 0.8)).toBe(0.8);
+    expect(timeOfDay(DAY_SECONDS * 0.3, null, 0.8)).toBeCloseTo(0.1, 9);
+    expect(timeOfDay(123, 0.5, 0.8)).toBe(0.5);
     expect(daylight(START).dark).toBeLessThan(0.05);
     expect(timeOverride('?time=0.5')).toBe(0.5);
     expect(timeOverride('?graphics=hd&time=0.8')).toBe(0.8);
