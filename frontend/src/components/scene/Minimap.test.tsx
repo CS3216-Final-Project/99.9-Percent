@@ -46,7 +46,8 @@ describe("the map", () => {
     useGame.setState({ walking: true, floor: "office" });
     placeAvatar("office", [18.25, 6.2]);
     render(<Minimap onFloor={() => {}} />);
-    expect(where()).toBe("Lounge, office floor");
+    // The tabs say which floor the map shows, so the line does not.
+    expect(where()).toBe("Lounge");
     const line = document.querySelector(".map-where")!;
     const before = line.firstChild;
     act(() => {
@@ -60,10 +61,27 @@ describe("the map", () => {
       avatar.z = 11.9;
       vi.advanceTimersByTime(400);
     });
-    expect(where()).toBe("Games room, office floor");
+    expect(where()).toBe("Games room");
     expect(document.querySelector(".map-avatar")).not.toBeNull();
     // The zone walked into glows on the plan; the one it started in never did.
     expect([...document.querySelectorAll(".map-names text.is-entered")].map((t) => t.textContent)).toEqual(["Games room"]);
+  });
+
+  it("moves with the avatar every frame, without drawing the map again", () => {
+    useGame.setState({ walking: true, floor: "office" });
+    placeAvatar("office", [18.25, 6.2]);
+    render(<Minimap onFloor={() => {}} />);
+    const dial = document.querySelector(".map-world")!;
+    const before = dial.getAttribute("transform");
+    const line = document.querySelector(".map-where")!.firstChild;
+    act(() => {
+      avatar.x = 18.6;
+      vi.advanceTimersToNextFrame();
+    });
+    // The dial slid under the avatar on the very next frame: the map is centred on it.
+    expect(dial.getAttribute("transform")).not.toBe(before);
+    expect(dial.getAttribute("transform")).toContain("translate(-18.60 -6.20)");
+    expect(document.querySelector(".map-where")!.firstChild).toBe(line);
   });
 
   it("marks the equipment that needs looking at on its own floor, and tells screen readers in words", () => {

@@ -42,4 +42,10 @@ describe("the map's line", () => {
     expect(whereLine("servers", 10, -2, "office")).toBe("In the elevator, going up to the office floor");
     expect(whereLine("office", 10, -2, "servers")).toBe("In the elevator, going down to the server floor");
   });
+
+  it("leaves the floor unsaid when it is the one the map shows", () => {
+    expect(whereLine("office", 18.25, 6.2, null, "office")).toBe("Lounge");
+    expect(whereLine("office", 18.25, 6.2, null, "servers")).toBe("Lounge, office floor");
+    expect(whereLine("servers", 10, -2, "office", "servers")).toBe("In the elevator, going up to the office floor");
+  });
 });

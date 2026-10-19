@@ -17,7 +17,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("exploration persistence", () => {
   it("round-trips a full state", () => {
-    const full = { floor: "office", walking: true, viewpoint: "follow", avatar: AVATAR, camera: CAMERA } as const;
+    const full = { floor: "office", walking: true, viewpoint: "follow", viewChosen: true, avatar: AVATAR, camera: CAMERA } as const;
     expect(saveExploration("campaign", full)).toBe(true);
     expect(loadExploration("campaign")).toEqual({ version: 1, ...full });
     expect(JSON.parse(localStorage.getItem(CAMPAIGN)!)).toMatchObject(full);
@@ -32,7 +32,7 @@ describe("exploration persistence", () => {
   });
 
   it("starts from defaults and merges patches", () => {
-    expect(loadExploration("campaign")).toEqual({ version: 1, floor: "servers", walking: false, viewpoint: "overview", avatar: null, camera: null });
+    expect(loadExploration("campaign")).toEqual({ version: 1, floor: "servers", walking: false, viewpoint: "overview", viewChosen: false, avatar: null, camera: null });
     saveExploration("campaign", { walking: true });
     saveExploration("campaign", { avatar: AVATAR });
     expect(loadExploration("campaign")).toMatchObject({ floor: "servers", walking: true, avatar: AVATAR, camera: null });
@@ -45,7 +45,7 @@ describe("exploration persistence", () => {
   ])("falls back to defaults for %s", (_name, raw) => {
     localStorage.setItem(CAMPAIGN, raw);
     const state = loadExploration("campaign");
-    expect(state).toEqual({ version: 1, floor: "servers", walking: false, viewpoint: "overview", avatar: null, camera: null });
+    expect(state).toEqual({ version: 1, floor: "servers", walking: false, viewpoint: "overview", viewChosen: false, avatar: null, camera: null });
     // A corrupt read also clears the visit's memory: a later write does not resurrect it.
     saveExploration("campaign", { walking: true });
     expect(loadExploration("campaign")).toMatchObject({ floor: "servers", walking: true });
@@ -59,6 +59,21 @@ describe("exploration persistence", () => {
     saveExploration("campaign", { viewpoint: "first" });
     saveExploration("campaign", { viewpoint: "sideways" as never });
     expect(loadExploration("campaign").viewpoint).toBe("first");
+  });
+
+  it("reads a record from before the default view as chosen only when it was left walking", () => {
+    localStorage.setItem(CAMPAIGN, JSON.stringify({ version: 1, floor: "office", walking: true, viewpoint: "follow" }));
+    expect(loadExploration("campaign")).toMatchObject({ walking: true, viewpoint: "follow", viewChosen: true });
+    localStorage.setItem(CAMPAIGN, JSON.stringify({ version: 1, floor: "office", walking: false }));
+    expect(loadExploration("campaign").viewChosen).toBe(false);
+    // A stored answer wins, and one of the wrong type is read as if it were missing.
+    localStorage.setItem(CAMPAIGN, JSON.stringify({ version: 1, floor: "office", walking: false, viewChosen: true }));
+    expect(loadExploration("campaign").viewChosen).toBe(true);
+    localStorage.setItem(CAMPAIGN, JSON.stringify({ version: 1, floor: "office", walking: true, viewChosen: "yes" }));
+    expect(loadExploration("campaign").viewChosen).toBe(true);
+    saveExploration("campaign", { viewChosen: false });
+    saveExploration("campaign", { viewChosen: 1 as never });
+    expect(loadExploration("campaign").viewChosen).toBe(false);
   });
 
   it("drops invalid fields without losing the valid ones", () => {
@@ -90,7 +105,7 @@ describe("exploration persistence", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("blocked");
     });
-    expect(loadExploration("campaign")).toEqual({ version: 1, floor: "servers", walking: false, viewpoint: "overview", avatar: null, camera: null });
+    expect(loadExploration("campaign")).toEqual({ version: 1, floor: "servers", walking: false, viewpoint: "overview", viewChosen: false, avatar: null, camera: null });
     vi.restoreAllMocks();
 
     // Storage already holds an older record; a failed write still leaves memory ahead of it.

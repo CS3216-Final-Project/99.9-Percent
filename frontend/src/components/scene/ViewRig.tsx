@@ -62,6 +62,12 @@ const LOCK_WAIT_MS = 1500;
 /** Tell the page the pointer's state changed: locked, given back, or never to be had here. */
 const lockNews = () => window.dispatchEvent(new Event("nn:look-lock"));
 
+/**
+ * What asks for the cursor when it opens over the room. An inspection's reading is the room answering a click, so
+ * looking round carries on through it, and the next click puts it away.
+ */
+const DIALOG = '[role="dialog"]:not(.inspection-reveal), [role="alertdialog"]';
+
 function letGoOfPointer(): void {
   if (document.pointerLockElement) document.exitPointerLock?.();
 }
@@ -251,6 +257,13 @@ export function ViewRig() {
       viewNow.dragging = false;
     };
     const click = (e: MouseEvent) => {
+      // With the mouse taken, the reading an inspection opened cannot be clicked, so a click puts it away, and only that.
+      const s = useGame.getState();
+      if (viewNow.locked && s.roomInspection) {
+        e.stopPropagation();
+        s.dismissRoomInspection();
+        return;
+      }
       // Behind the avatar with the mouse taken there is no dot to aim with, so a click does nothing.
       if (viewNow.locked && viewNow.want === "follow") {
         e.stopPropagation();
@@ -295,6 +308,17 @@ export function ViewRig() {
       if (e.key === "q" || e.key === "Q") lookApi.swing(-SWING);
       else if (e.key === "e" || e.key === "E") lookApi.swing(SWING);
     };
+    // A dialog or a guide's card opening over the room needs the cursor, so the mouse is let go to reach it.
+    const dialogs = new MutationObserver((records) => {
+      if (!viewNow.locked) return;
+      for (const r of records)
+        for (const n of r.addedNodes)
+          if (n instanceof Element && (n.matches(DIALOG) || n.querySelector(DIALOG))) {
+            letGoOfPointer();
+            return;
+          }
+    });
+    dialogs.observe(document.body, { childList: true, subtree: true });
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointermove", point);
     canvas.addEventListener("pointerleave", away);
@@ -309,6 +333,7 @@ export function ViewRig() {
     window.addEventListener("keydown", keys);
     return () => {
       stopTaking();
+      dialogs.disconnect();
       mouse.take = () => {};
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", point);

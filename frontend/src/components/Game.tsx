@@ -12,6 +12,7 @@ import { createMusic, type Music } from "@/game/music";
 import type { AudioSettings } from "@/game/persist";
 import { createSfx } from "@/game/sfx";
 import { useGame } from "@/game/store";
+import { fromAvatar } from "@/game/viewpoints";
 import { Icon, type IconName } from "./icons";
 import { daylightNow } from "./scene/dayClock";
 import { entryGap, nextGap, viewFocus, ZONE_SOUNDS, zoneLevel, type ZoneSound } from "./scene/zoneSounds";
@@ -382,9 +383,11 @@ export default function Game() {
       // The guide's card is labelled a dialog for assistive technology, but it is not modal: shortcuts still apply.
       if (!s.started || target?.closest('[role="dialog"]:not([aria-modal="false"]):not(.tour-card)')) return;
       if (e.key === "Escape") {
-        // In a fixed order: a view sheet, then walk mode, then the selection. Dialogs close themselves first.
+        // In a fixed order: a view sheet, then walk mode seen from above, then the selection. Dialogs close themselves
+        // first. A view from the avatar is left by its Exit button: there Escape only ever gives the cursor back.
         if (s.view) s.openView(null);
-        else if (s.walking) s.setWalking(false);
+        else if (s.walking && !fromAvatar(s.viewpoint)) s.setWalking(false);
+        else if (s.walking) return;
         else if (s.selected && s.game.phase !== "incident") s.select(null);
       } else if (e.key === "p" || e.key === "P") {
         if (s.game.phase === "incident" || s.game.phase === "management") s.setRunning(!s.running);

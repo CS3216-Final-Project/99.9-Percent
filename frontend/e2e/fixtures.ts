@@ -11,7 +11,7 @@ const controlledPages = new WeakSet<Page>();
 type ClockOptions = Parameters<Page["clock"]["install"]>[0];
 
 // Unhandled browser errors fail each case. Journeys that call withoutRoom() skip the WebGL scene; the rest draw it.
-export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
+export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; overviewChosen: boolean; chosenView: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
   // Opt in before navigation. Scene-only journeys keep the browser's native animation/audio clocks.
   installClock: async ({ page }, provide) => { await provide(async (options) => { await page.clock.install(options); controlledPages.add(page); }); },
   /**
@@ -21,6 +21,21 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
    */
   chapterCompletions: [async ({ page }, use) => {
     await page.addLocatorHandler(chapterComplete(page), dialog => dialog.getByRole('button', { name: 'Stay in this chapter', exact: true }).click());
+    await use();
+  }, { auto: true }],
+  /**
+   * A run opens in first person until the player chooses a view. Journeys play as someone who chose the overview, in
+   * both modes, unless they say otherwise with test.use({ overviewChosen: false }); a record a journey seeds itself wins.
+   */
+  overviewChosen: [true, { option: true }],
+  chosenView: [async ({ context, overviewChosen }, use) => {
+    if (overviewChosen) {
+      await context.addInitScript(() => {
+        for (const key of ['nn.campaign.exploration.v1', 'nn.classic.exploration.v1']) {
+          if (localStorage.getItem(key) === null) localStorage.setItem(key, JSON.stringify({ version: 1, floor: 'servers', walking: false, viewpoint: 'overview', viewChosen: true, avatar: null, camera: null }));
+        }
+      });
+    }
     await use();
   }, { auto: true }],
   healthyBrowser: [async ({ page }, use) => {

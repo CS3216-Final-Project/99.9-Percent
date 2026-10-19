@@ -28,7 +28,9 @@ describe("the overlay of the views from the avatar", () => {
     render(<ViewOverlay />);
     lockChanged(true);
     expect(document.querySelector(".view-dot")).not.toBeNull();
-    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Move the mouse to look round/);
+    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Move the mouse to look around ·\s+Left click to walk or inspect/);
+    // The mouse is drawn as a key, moved and clicked, beside the words.
+    expect(document.querySelectorAll(".view-hint kbd.view-mouse")).toHaveLength(2);
     expect(screen.queryByRole("group", { name: "Mouse look paused" })).toBeNull();
   });
 
@@ -41,11 +43,20 @@ describe("the overlay of the views from the avatar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Look around" }));
     expect(take).toHaveBeenCalledOnce();
     expect(card).not.toBeNull();
+    // Exit is the way out: Escape only gives the cursor back, so the card does not offer it as a key.
+    expect(card.querySelector("kbd")).toBeNull();
     fireEvent.click(screen.getAllByRole("button", { name: /^Exit first person/ })[0]);
     expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
   });
 
-  it("shows no card where the browser will not hand over the mouse, and says to point instead", () => {
+  it("says a left click puts an inspection's reading away while the mouse looks", () => {
+    useGame.setState({ roomInspection: { equipment: "db" } as never });
+    render(<ViewOverlay />);
+    lockChanged(true);
+    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Left click to put the reading away/);
+  });
+
+  it("shows no card where the browser will not hand over the mouse, and says to move it instead, with the way out", () => {
     render(<ViewOverlay />);
     act(() => {
       viewNow.locked = false;
@@ -53,8 +64,10 @@ describe("the overlay of the views from the avatar", () => {
       window.dispatchEvent(new Event("nn:look-lock"));
     });
     expect(screen.queryByRole("group", { name: "Mouse look paused" })).toBeNull();
-    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Point towards an edge to look round/);
+    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Move the mouse to look around ·\s+Left click to walk or inspect/);
     expect(document.querySelector(".view-dot")).not.toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "Exit first person" })[0]);
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
   });
 
   it("shows nothing over the overview, and in follow the same mouse look without the dot", () => {
@@ -64,7 +77,7 @@ describe("the overlay of the views from the avatar", () => {
     act(() => useGame.setState({ viewpoint: "follow" }));
     rerender(<ViewOverlay />);
     lockChanged(true);
-    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Move the mouse to swing round/);
+    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Move the mouse to swing around/);
     expect(document.querySelector(".view-dot")).toBeNull();
     lockChanged(false);
     expect(screen.getByRole("group", { name: "Mouse look paused" })).not.toBeNull();

@@ -508,6 +508,7 @@ describe("exploration state", () => {
   });
 
   it("turns walk mode on for a view from the avatar, and back to the overview when the walk ends", () => {
+    seed("campaign", { floor: "servers", walking: false, viewChosen: true });
     enter();
     const s = () => useGame.getState();
     s().setViewpoint("follow", "key");
@@ -524,6 +525,69 @@ describe("exploration state", () => {
       expect.objectContaining({ from: "follow", to: "first", how: "menu" }),
       expect.objectContaining({ from: "first", to: "overview", how: "walk_ended" }),
     ]);
+  });
+
+  it("opens in first person until the player chooses how to see the room, and then as chosen", () => {
+    enter();
+    const s = () => useGame.getState();
+    expect(s()).toMatchObject({ walking: true, viewpoint: "first" });
+    // Opening there is not a choice, so nothing about it is stored.
+    expect(localStorage.getItem("nn.campaign.exploration.v1")).toBeNull();
+    s().setViewpoint("follow", "key");
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true, viewpoint: "follow", viewChosen: true });
+    useGame.setState(useGame.getInitialState(), true);
+    enter();
+    expect(s()).toMatchObject({ walking: true, viewpoint: "follow" });
+    s().setWalking(false);
+    useGame.setState(useGame.getInitialState(), true);
+    enter();
+    // Leaving the walk was a choice too: the overview it chose is kept.
+    expect(s()).toMatchObject({ walking: false, viewpoint: "overview" });
+  });
+
+  it("times a walk the run opens in from the opening", () => {
+    const now = vi.spyOn(performance, "now").mockReturnValue(100_000);
+    enter();
+    now.mockReturnValue(105_000);
+    useGame.getState().setWalking(false);
+    expect(useGame.getState().measurement.pending.filter((e) => e.name === "walk_ended").map((e) => e.payload)).toEqual([expect.objectContaining({ seconds: 5 })]);
+  });
+
+  it("opens in the overview for a guide or a ?floor= address, and a walk an older record chose as it was", () => {
+    // The Opening walkthrough points things out from above.
+    useGame.getState().boot();
+    useGame.getState().play();
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+    expect(useGame.getState().tour).not.toBeNull();
+    useGame.setState(useGame.getInitialState(), true);
+    window.history.pushState({}, "", "/?floor=office");
+    try {
+      enter();
+      expect(useGame.getState()).toMatchObject({ floor: "office", walking: false, viewpoint: "overview" });
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+    // Left following before there was a default: the player chose it.
+    localStorage.removeItem("nn.campaign.exploration.v1");
+    useGame.setState(useGame.getInitialState(), true);
+    seed("campaign", { floor: "servers", walking: true, viewpoint: "follow" });
+    enter();
+    expect(useGame.getState()).toMatchObject({ walking: true, viewpoint: "follow" });
+  });
+
+  it("gives way to a guide from a walk it opened in, but not from one the player chose", () => {
+    enter();
+    const s = () => useGame.getState();
+    expect(s().walking).toBe(true);
+    s().startTour("campaign");
+    expect(s()).toMatchObject({ walking: false, viewpoint: "overview", tour: { track: "campaign", step: 0 } });
+    // Not remembered as left: the next run opens in first person again.
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1") ?? "{}").viewChosen).not.toBe(true);
+    useGame.setState(useGame.getInitialState(), true);
+    seed("campaign", { floor: "servers", walking: true, viewpoint: "first", viewChosen: true });
+    enter();
+    s().startTour("campaign");
+    expect(s()).toMatchObject({ walking: true, viewpoint: "first" });
   });
 
   it("ignores a view chosen before the run is on screen, and the same view twice", () => {
@@ -558,7 +622,7 @@ describe("exploration state", () => {
   });
 
   it("persists an explicit Walk or floor choice, without toasting on failure", () => {
-    seed("campaign", { floor: "servers", walking: false });
+    seed("campaign", { floor: "servers", walking: false, viewChosen: true });
     enter();
     useGame.getState().goToFloor("office", "menu");
     useGame.getState().setWalking(true);

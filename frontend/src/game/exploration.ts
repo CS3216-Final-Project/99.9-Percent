@@ -29,6 +29,12 @@ export interface ExplorationState {
   walking: boolean;
   /** The view walk mode was seen from; records from before there was a choice have none, and mean the overview. */
   viewpoint: Viewpoint;
+  /**
+   * The player has chosen how to see the room: a view, or walk mode on or off. Until then a run opens in first
+   * person. Records from before there was a default have none: one left walking was the player's choice, any other
+   * not yet.
+   */
+  viewChosen: boolean;
   avatar: SavedAvatarPosition | null;
   camera: SavedCameraView | null;
 }
@@ -38,7 +44,7 @@ const KEYS: Record<GameMode, string> = {
   classic: "nn.classic.exploration.v1",
 };
 
-const DEFAULTS: ExplorationState = { version: 1, floor: "servers", walking: false, viewpoint: "overview", avatar: null, camera: null };
+const DEFAULTS: ExplorationState = { version: 1, floor: "servers", walking: false, viewpoint: "overview", viewChosen: false, avatar: null, camera: null };
 
 /** Bounds a stored number can be trusted inside: the building spans a few tens of metres, the camera's stand-off a few hundred. */
 const NEAR = 100;
@@ -90,6 +96,7 @@ function parse(raw: string): ExplorationState | null {
       floor: isFloor(s.floor) ? s.floor : DEFAULTS.floor,
       walking: typeof s.walking === "boolean" ? s.walking : DEFAULTS.walking,
       viewpoint: isViewpoint(s.viewpoint) ? s.viewpoint : DEFAULTS.viewpoint,
+      viewChosen: typeof s.viewChosen === "boolean" ? s.viewChosen : s.walking === true,
       avatar: avatarOf(s.avatar),
       camera: cameraOf(s.camera),
     };
@@ -105,6 +112,7 @@ function copyOf(s: ExplorationState): ExplorationState {
     floor: s.floor,
     walking: s.walking,
     viewpoint: s.viewpoint,
+    viewChosen: s.viewChosen,
     avatar: s.avatar ? { ...s.avatar } : null,
     camera: s.camera ? { target: { ...s.camera.target }, offset: { ...s.camera.offset }, zoom: s.camera.zoom } : null,
   };
@@ -156,6 +164,7 @@ export function saveExploration(mode: GameMode, patch: Partial<Omit<ExplorationS
     floor: patch.floor === undefined ? base.floor : isFloor(patch.floor) ? patch.floor : base.floor,
     walking: patch.walking === undefined ? base.walking : typeof patch.walking === "boolean" ? patch.walking : base.walking,
     viewpoint: patch.viewpoint === undefined ? base.viewpoint : isViewpoint(patch.viewpoint) ? patch.viewpoint : base.viewpoint,
+    viewChosen: patch.viewChosen === undefined ? base.viewChosen : typeof patch.viewChosen === "boolean" ? patch.viewChosen : base.viewChosen,
     avatar: patch.avatar === undefined ? base.avatar : avatarOf(patch.avatar),
     camera: patch.camera === undefined ? base.camera : cameraOf(patch.camera),
   };

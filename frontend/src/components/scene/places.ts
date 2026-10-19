@@ -41,7 +41,8 @@ export function placeAt(floor: Floor, x: number, z: number): string {
 }
 
 /** The map's line saying where the avatar is, such as "Lounge, office floor", or that it is riding between them. */
-export function whereLine(floor: Floor, x: number, z: number, ridingTo: Floor | null = null): string {
+export function whereLine(floor: Floor, x: number, z: number, ridingTo: Floor | null = null, shown: Floor | null = null): string {
   if (ridingTo) return `In the elevator, going ${ridingTo === "office" ? "up" : "down"} to the ${FLOOR_NAME[ridingTo].toLowerCase()}`;
-  return `${placeAt(floor, x, z)}, ${FLOOR_NAME[floor].toLowerCase()}`;
+  const place = placeAt(floor, x, z);
+  return floor === shown ? place : `${place}, ${FLOOR_NAME[floor].toLowerCase()}`;
 }

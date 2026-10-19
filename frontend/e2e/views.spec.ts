@@ -18,6 +18,8 @@ const events = (page: Page, name: string) =>
 
 async function open(page: Page) {
   await page.goto("/");
+  // The room is ready behind the title screen, so Continue's click can hand it the mouse.
+  await expect(stage(page)).toHaveAttribute("data-camera", "overview");
   await page.getByRole("button", { name: "Continue week 2" }).click();
   await expectRoom(page);
 }
@@ -36,11 +38,56 @@ async function onMap(page: Page, x: number, z: number) {
 async function freeCursor(page: Page) {
   await page.keyboard.press("Escape");
   await expect.poll(() => page.evaluate(() => document.pointerLockElement)).toBeNull();
-  // Escape so soon after letting go is still taken as letting go; past that it ends the walk.
+  // Escape so soon after letting go is still taken as letting go.
   await page.waitForTimeout(300);
 }
 
-test("V goes from the overview to follow and first person and back, and Escape ends the walk from any of them", async ({ page }) => {
+const lockedTo = (page: Page) => page.evaluate(() => document.pointerLockElement?.tagName ?? null);
+
+test.describe("a player who has not chosen a view", () => {
+  test.use({ overviewChosen: false });
+
+  test("opens in first person with the mouse, keeps it through a reading but not a dialog, and opens as chosen once a view is chosen", async ({ page }) => {
+    await open(page);
+    await expect(page.locator(".view-overlay")).toHaveAttribute("data-viewpoint", "first");
+    await expect(option(page, "First person")).toHaveAttribute("aria-pressed", "true");
+    // Continue's click took the mouse there and then. Opening there was not a choice, so none is remembered.
+    await expect.poll(() => lockedTo(page)).toBe("CANVAS");
+    expect((await exploration(page))?.viewChosen ?? false).toBe(false);
+    // An inspection's reading is the room answering a click: looking round carries on through it.
+    await page.evaluate(() => {
+      const reading = document.createElement("section");
+      reading.setAttribute("role", "dialog");
+      reading.className = "inspection-reveal";
+      reading.id = "reading";
+      document.body.append(reading);
+    });
+    await page.waitForTimeout(300);
+    expect(await lockedTo(page)).toBe("CANVAS");
+    await page.evaluate(() => document.getElementById("reading")?.remove());
+    // A dialog arriving over the room, as a guide's card or a confirmation would, gets the cursor to reach it.
+    await page.evaluate(() => {
+      const card = document.createElement("section");
+      card.setAttribute("role", "dialog");
+      card.id = "arrived";
+      document.body.append(card);
+    });
+    await expect.poll(() => lockedTo(page)).toBeNull();
+    await expect(page.getByRole("group", { name: "Mouse look paused" })).toBeVisible();
+    await page.evaluate(() => document.getElementById("arrived")?.remove());
+    // Ending the walk is a choice, so the next visit opens in the overview.
+    await page.getByRole("group", { name: "Mouse look paused" }).getByRole("button", { name: "Exit first person" }).click();
+    await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
+    expect(await exploration(page)).toMatchObject({ walking: false, viewpoint: "overview", viewChosen: true });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue week 2" }).click();
+    await expectRoom(page);
+    await expect(stage(page)).toHaveAttribute("data-camera", "overview");
+    await expect(page.locator(".view-overlay")).toHaveCount(0);
+  });
+});
+
+test("V goes from the overview to follow and first person and back, and Escape only gives the cursor back, leaving Exit to end the walk", async ({ page }) => {
   await open(page);
   await stage(page).focus();
   await page.keyboard.press("v");
@@ -56,12 +103,17 @@ test("V goes from the overview to follow and first person and back, and Escape e
   await expect(page.locator(".view-overlay")).toHaveCount(0);
   await expect(stage(page)).toHaveAttribute("data-camera", "overview");
   await expect(option(page, "Walk mode")).toHaveAttribute("aria-pressed", "true");
-  // Into follow again: Escape gives the cursor back, and Escape again ends the walk and the view with it.
+  // Into follow again: Escape gives the cursor back, and Escape again changes nothing. Exit ends the walk and the view.
   await page.keyboard.press("v");
   await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
   await freeCursor(page);
-  await expect(page.getByRole("group", { name: "Mouse look paused" })).toBeVisible();
+  const paused = page.getByRole("group", { name: "Mouse look paused" });
+  await expect(paused).toBeVisible();
   await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
+  await expect(option(page, "Follow")).toHaveAttribute("aria-pressed", "true");
+  await paused.getByRole("button", { name: "Exit follow" }).click();
   await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
   await expect(stage(page)).toHaveAttribute("data-camera", "overview");
   expect(await exploration(page)).toMatchObject({ walking: false, viewpoint: "overview" });
@@ -82,7 +134,7 @@ test("first person looks round with the mouse as it opens, Escape gives the curs
   await expect(page.locator(".view-dot")).toBeVisible();
   // V took the mouse there and then: no click is needed to look round.
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName ?? null)).toBe("CANVAS");
-  await expect(page.locator(".view-hint")).toContainText("Move the mouse to look round");
+  await expect(page.locator(".view-hint")).toContainText("Move the mouse to look around");
   await page.keyboard.press("Escape");
   await expect.poll(() => page.evaluate(() => document.pointerLockElement)).toBeNull();
   const paused = page.getByRole("group", { name: "Mouse look paused" });
@@ -115,7 +167,7 @@ test("where the browser will not hand over the mouse, first person turns towards
   await page.keyboard.press("v");
   await page.keyboard.press("v");
   await expect(page.locator(".view-dot")).toBeVisible();
-  await expect(page.locator(".view-hint")).toContainText("Point towards an edge to look round");
+  await expect(page.locator(".view-hint")).toContainText("Move the mouse to look around");
   await expect(page.getByRole("group", { name: "Mouse look paused" })).toHaveCount(0);
   // Resting in the middle of the view keeps it still; pointing near the right edge turns it, as the map's arrow shows.
   const canvas = (await stage(page).locator("canvas").boundingBox())!;
@@ -127,9 +179,9 @@ test("where the browser will not hand over the mouse, first person turns towards
   expect(await arrow.getAttribute("transform")).toBe(still);
   await page.mouse.move(canvas.x + canvas.width - 4, canvas.y + canvas.height / 2);
   await expect.poll(() => arrow.getAttribute("transform"), { timeout: 10_000 }).not.toBe(still);
-  // Escape leaves first person at once.
+  // The hint's Exit leaves first person.
   await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
-  await page.keyboard.press("Escape");
+  await page.locator(".view-hint").getByRole("button", { name: "Exit first person" }).click();
   await expect(page.locator(".view-dot")).toHaveCount(0);
   await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
 });
@@ -147,7 +199,8 @@ test("seen from the avatar the elevator simply rides, without the overview's cut
     await page.waitForTimeout(500);
   }
   expect(Math.max(...dims)).toBe(0);
-  await expect(where(page)).toHaveText(/office floor/, { timeout: 20_000 });
+  await expect(map(page).getByRole("button", { name: /^Office/ })).toHaveAttribute("aria-pressed", "true", { timeout: 20_000 });
+  await expect(where(page)).toHaveText("Elevator", { timeout: 20_000 });
 });
 
 test("a new graphics quality in follow redraws the room and leaves the overview turning as before", async ({ page }) => {
@@ -163,9 +216,9 @@ test("a new graphics quality in follow redraws the room and leaves the overview 
   await menu.getByRole("button", { name: "Close" }).click();
   // The new canvas picks up the view from the avatar it was in.
   await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
-  await stage(page).focus();
-  await page.keyboard.press("Escape");
+  await page.getByRole("group", { name: "Mouse look paused" }).getByRole("button", { name: "Exit follow" }).click();
   await expect(stage(page)).toHaveAttribute("data-camera", "overview");
+  await stage(page).focus();
   // The overview's own controls still turn the new canvas's camera.
   const label = page.locator('.eq-label[data-eq="db"]');
   await expect(label).toBeVisible();
@@ -193,16 +246,19 @@ test("the map says where the avatar is, changes floor from its tabs, and walks t
   await expect(map(page).getByRole("button", { name: /^Servers/ })).toHaveAttribute("aria-pressed", "true");
   await stage(page).focus();
   await page.keyboard.press("v");
-  await expect(where(page)).toHaveText("Elevator, server floor");
+  await expect(where(page)).toHaveText("Elevator");
   // Follow takes the mouse as it opens; the map is clicked with the cursor back.
   await freeCursor(page);
   await map(page).getByRole("button", { name: /^Office/ }).click();
-  await expect(where(page)).toHaveText("Elevator, office floor", { timeout: 20_000 });
+  await expect(map(page).getByRole("button", { name: /^Office/ })).toHaveAttribute("aria-pressed", "true");
+  // The map only walks the avatar once the elevator has arrived.
+  await expect(where(page)).toHaveText(/^In the elevator/);
+  await expect(where(page)).toHaveText("Elevator", { timeout: 20_000 });
   await expect(page.locator(".room-menu > summary .floor-number")).toHaveText("7");
   const lounge = await onMap(page, 18.25, 6.2);
   await page.mouse.click(lounge.x, lounge.y);
   await expect(map(page).locator(".map-destination")).toHaveCount(1);
-  await expect(where(page)).toHaveText("Lounge, office floor", { timeout: 20_000 });
+  await expect(where(page)).toHaveText("Lounge", { timeout: 20_000 });
   expect(await events(page, "map_walked")).toHaveLength(1);
   expect((await events(page, "floor_switched")).map((d) => d?.how)).toContain("map");
   // Folded away, it stays folded after a reload.
