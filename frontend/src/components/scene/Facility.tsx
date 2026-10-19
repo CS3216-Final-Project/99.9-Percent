@@ -55,6 +55,7 @@ import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
 import { Exterior } from "./exterior";
 import { daylightNow } from "./dayClock";
+import { sunSteps, type Vec3 } from "./sky";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
 import { buildModel, racksOf, type SceneModel } from "./sceneModel";
@@ -934,10 +935,14 @@ const SUN_DISTANCE = 21.4;
  * The time of day (see sky.ts), moved on every frame: the sky behind the city, the city's own light, and the
  * office's sun and sky light. The office's lights follow the day's colour and the sun across the sky, but never
  * drop low or dim far, so the room reads the same at noon and at three in the morning.
+ *
+ * With shadows on, the sun is two lights, standing at the steps of its path either side of the time and fading from
+ * one to the next (see sunSteps), so the shadows slide across the room rather than jolting a texel at a time.
  */
 function Daylight({ quality, hd }: { quality: QualityProfile; hd: boolean }) {
   const sky = useRef<THREE.HemisphereLight>(null);
   const sun = useRef<THREE.DirectionalLight>(null);
+  const nextSun = useRef<THREE.DirectionalLight>(null);
   const background = useRef<THREE.Color>(null);
   // Reflections light the HD materials too, so the sky light is turned down to keep the same brightness.
   const skyStrength = hd ? HD_SKY : 1.7;
@@ -946,34 +951,39 @@ function Daylight({ quality, hd }: { quality: QualityProfile; hd: boolean }) {
     applyDaylight(d, quality.effects);
     background.current?.setRGB(d.horizon[0], d.horizon[1], d.horizon[2], THREE.SRGBColorSpace);
     if (sky.current) sky.current.intensity = skyStrength * d.office.sky;
-    const light = sun.current;
-    if (light) {
-      light.intensity = d.office.sun;
+    const steps = quality.shadows ? sunSteps(d.time) : null;
+    const place = (light: THREE.DirectionalLight | null, dir: Vec3, share: number) => {
+      if (!light) return;
+      light.intensity = d.office.sun * share;
       light.color.setRGB(d.office.colour[0], d.office.colour[1], d.office.colour[2], THREE.SRGBColorSpace);
-      light.position.set(d.office.dir[0] * SUN_DISTANCE, d.office.dir[1] * SUN_DISTANCE, d.office.dir[2] * SUN_DISTANCE);
-    }
+      light.position.set(dir[0] * SUN_DISTANCE, dir[1] * SUN_DISTANCE, dir[2] * SUN_DISTANCE);
+    };
+    if (steps) {
+      place(sun.current, steps.from, 1 - steps.fade);
+      place(nextSun.current, steps.to, steps.fade);
+    } else place(sun.current, d.office.dir, 1);
   });
+  const sunProps = {
+    position: [11, 17, 7] as [number, number, number],
+    color: "#fff1de",
+    castShadow: quality.shadows,
+    // The shadow map's sharpness and edge softness come from the quality setting.
+    "shadow-mapSize": [quality.shadowMapSize, quality.shadowMapSize] as [number, number],
+    "shadow-radius": quality.shadowRadius,
+    "shadow-bias": -0.0005,
+    "shadow-camera-left": -30,
+    "shadow-camera-right": 30,
+    "shadow-camera-top": 30,
+    "shadow-camera-bottom": -30,
+    "shadow-camera-near": 1,
+    "shadow-camera-far": 60,
+  };
   return (
     <>
       <color ref={background} attach="background" args={["#1a1633"]} />
       <hemisphereLight ref={sky} args={["#fff0dd", ROOM_PALETTE.bounce, skyStrength]} />
-      <directionalLight
-        ref={sun}
-        position={[11, 17, 7]}
-        intensity={2.3}
-        color="#fff1de"
-        castShadow={quality.shadows}
-        // The shadow map's sharpness and edge softness come from the quality setting.
-        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
-        shadow-radius={quality.shadowRadius}
-        shadow-bias={-0.0005}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
-        shadow-camera-near={1}
-        shadow-camera-far={60}
-      />
+      <directionalLight ref={sun} intensity={2.3} {...sunProps} />
+      {quality.shadows && <directionalLight ref={nextSun} intensity={0} {...sunProps} />}
     </>
   );
 }

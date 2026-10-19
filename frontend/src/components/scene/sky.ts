@@ -139,6 +139,59 @@ export function daylight(time: number): Daylight {
   };
 }
 
+/**
+ * A shadow map is drawn in whole texels, so a sun that crept across the sky would move every shadow in jolts, a
+ * texel at a time. Instead the office is lit from the two steps of the sun's path either side of the time, fading
+ * from one to the next, so the shadows slide. Steps are SUN_STEP radians of the path apart (about two texels of a
+ * rack's shadow at Medium) and never more than SUN_REST of the day, so a sun standing still is drawn from one place.
+ */
+export const SUN_STEP = 0.01;
+export const SUN_REST = 2 / DAY_SECONDS;
+
+export interface SunSteps {
+  from: Vec3;
+  to: Vec3;
+  /** How far, 0 to 1, the light has faded from `from` to `to`. */
+  fade: number;
+}
+
+const angleBetween = (a: Vec3, b: Vec3) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])));
+
+let stepTimes: number[] | null = null;
+
+/** The times of day the office's sun steps at, from midnight to midnight, worked out once by walking the day. */
+function sunStepTimes(): number[] {
+  if (stepTimes) return stepTimes;
+  const samples = DAY_SECONDS * 20;
+  const times = [0];
+  let last = daylight(0).office.dir;
+  for (let i = 1; i <= samples; i++) {
+    const t = i / samples;
+    const dir = daylight(t).office.dir;
+    if (i === samples || angleBetween(last, dir) >= SUN_STEP || t - times[times.length - 1] >= SUN_REST) {
+      times.push(t);
+      last = dir;
+    }
+  }
+  return (stepTimes = times);
+}
+
+/** The two directions the office's sun is drawn from at a time of day, and how far it has faded between them. */
+export function sunSteps(time: number): SunSteps {
+  const t = wrap(time);
+  const times = sunStepTimes();
+  let lo = 0;
+  let hi = times.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (times[mid] <= t) lo = mid;
+    else hi = mid;
+  }
+  const a = times[lo];
+  const b = times[hi];
+  return { from: daylight(a).office.dir, to: daylight(b).office.dir, fade: (t - a) / (b - a) };
+}
+
 /** A light's colour with its strength taken out, so the brightest channel is 1. */
 function whitest(c: RGB): RGB {
   const m = Math.max(...c) || 1;
