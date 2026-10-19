@@ -17,8 +17,8 @@ const NAME: Record<GameMode, string> = { campaign: "Guided Mode", classic: "Chal
  * Another edition can pass its own lock and wording; by default Challenge Mode stays locked until the Guided Mode
  * company acknowledges its final chapter.
  */
-export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Complete the first five Guided Mode chapters to unlock Challenge Mode.", about = ABOUT[to] }: {
-  to: GameMode; locked?: boolean; lockedText?: string; about?: string;
+export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Complete the first five Guided Mode chapters to unlock Challenge Mode.", lockedLabel = "Complete Guided Mode to unlock", about = ABOUT[to] }: {
+  to: GameMode; locked?: boolean; lockedText?: string; lockedLabel?: string; about?: string;
 }) {
   const switchMode = useGame((s) => s.switchMode);
   const defaultLocked = useGame((s) => to === "classic" && s.mode !== "classic" && !s.meta.challengeUnlocked && s.game.campaign?.reliabilityStage?.acknowledged !== true);
@@ -40,7 +40,7 @@ export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Complete 
           <div className="menu-actions">
             <button type="button" className="btn" disabled>
               <Icon name="lock" size={20} />
-              Complete Guided Mode to unlock
+              {lockedLabel}
             </button>
           </div>
         </>

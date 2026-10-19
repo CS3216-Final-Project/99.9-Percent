@@ -160,6 +160,30 @@ The technology tree opens from the Tech view tab into the shared view sheet, wit
 
 Reliability reports explain failure, detection, rerouting, surviving capacity, admitted demand and restoration in player-facing language. Detailed snapshots retain exact evidence. The completion outcome distinguishes an actual incident from a test that opened none, records the admission/cost trade-offs at completion, and remains available in History after acknowledgement.
 
+## Phone edition
+
+Phones get their own edition, isolated from the desktop interface (`frontend/src/phone/`).
+A device is a phone when its primary pointer is coarse and its screen is at most 500 CSS px on the short side; the choice is made once per page and never swaps the shell during a game.
+Tablets, touch laptops and narrow desktop windows keep the desktop edition, and `?edition=phone` or `?edition=desktop` overrides the choice.
+Phone styles are scoped under `[data-edition="phone"]` and the phone code loads only on phones, so the desktop interface never changes because of them.
+
+The phone edition is gameplay only.
+Guided Mode covers Chapter 0 and the first two chapters, Opening and Scaling & Routing, and then shows a phone campaign complete dialog while the company keeps running.
+Finishing those chapters unlocks Challenge Mode, which plays in full.
+The home screen holds the two mode cards and the analytics notice; there is no account, avatar, feedback, save files or playtest export.
+The Menu holds the run card, Resume, the mode switch and only the Run, Sound and Graphics tabs, and the game autosaves silently.
+
+The room gets most of the screen.
+A 52 px top strip shows Cash and App Health with their icons, sound and Menu; Users and pending revenue sit behind one tap, with pending revenue still marked as not cash yet.
+Guided Mode adds a one-line chapter row with the chapter, goal and Next.
+System metrics is a bottom sheet over the room with peek, half and full states, changed by its handle button, a swipe or the arrow keys; selecting equipment opens it to half and an incident keeps it at least half open.
+The canvas never resizes when the sheet moves.
+The dock is one 56 px row: views, Navigation, the clock, the speed menu (which also holds the time steps) and the primary time action, with every target at least 44 px.
+
+Chapter 0 and the later guides use a fixed coach strip directly above the dock, with the same box and Back/Next positions in every lesson.
+It shows the progress, the title and the one-line task; Learn more opens the longer explanation and labelled examples in a non-modal reading layer that never covers the lesson's real control.
+Each lesson sets the sheet state it needs, and the room keeps at least 40% of a 390 x 844 screen in every lesson.
+
 ## Responsive and accessible behaviour
 
 Use the existing desktop side panel and mobile bottom panel. At 900 px and below, the header wraps and metric tiles retain their icons with compact values. App Health keeps Healthy on one line and wraps longer statuses within its card; its icon yields width before the text. At 360px and below, all four headline metrics share the compact `xs` text token. Purchase preview bodies scroll on short phones, with a readable expanded details area above the fixed warning and decision footer. At 640 px and below, the dock uses two rows: Time above, labeled view tabs and Navigation below. The speed selector remains available. The room stays usable above the mobile panel. Evidence tables may scroll inside their disclosure; the page must not overflow horizontally. Never show scrollbars anywhere in the game: `index.css` hides them globally (`scrollbar-width: none` and `::-webkit-scrollbar`) while wheel, touch, keyboard and trackpad scrolling keep working. Do not restore them with `scrollbar-width`, `scrollbar-color`, `scrollbar-gutter` or `::-webkit-scrollbar` styles on individual panels; indicate more content with layout, such as a clipped next row or a pinned footer. Do not make tables or explanatory paragraphs push every decision far below the initial viewport.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType } from "react";
 import { isPhoneEdition } from "@/phone/edition";
 import { useGame, type TourTrack } from "@/game/store";
 import { floorOf, selectedInView } from "@/game/floors";
@@ -13,7 +13,7 @@ import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { EDGE, openRoomArea } from "./roomArea";
 import ChapterZero from "./ChapterZeroGuide";
-import { CHAPTER_ZERO_LESSONS } from "./chapterZeroLessons";
+import { CHAPTER_ZERO_LESSONS, type ChapterZeroLesson } from "./chapterZeroLessons";
 import { cardStyle, placeFor, type Box } from "./spotlight";
 
 /**
@@ -207,11 +207,12 @@ function inOpenRoom(r: DOMRect, stage: DOMRect): boolean {
   return r.left >= stage.left + EDGE && r.top >= stage.top + EDGE && r.right <= stage.left + right && r.bottom <= stage.top + bottom;
 }
 
-export default function Tutorial() {
+/** `chapterZero` presents Chapter 0's lessons; an edition can bring its own, as the phone's coach strip does. */
+export default function Tutorial({ chapterZero: Guide = ChapterZero }: { chapterZero?: ComponentType<{ lessons: readonly ChapterZeroLesson[] }> } = {}) {
   const s = useGame();
   if (s.tour?.track === "campaign") {
     if (!fits("campaign", { ...s, view: null }, {}) || s.onboarding) return null;
-    return <ChapterZero key={`${s.generation}:${s.tutorialAttempt}`} lessons={CHAPTER_ZERO_LESSONS} />;
+    return <Guide key={`${s.generation}:${s.tutorialAttempt}`} lessons={CHAPTER_ZERO_LESSONS} />;
   }
   return <SpotlightTutorial />;
 }
@@ -315,11 +316,13 @@ function SpotlightTutorial() {
       const [pt, pr, pb, pl] = sel.startsWith(".eq-label") ? [10 * k, 46 * k, 120 * k, 46 * k] : [5, 5, 5, 5];
       const x = Math.max(4, r.left - pl);
       const y = Math.max(4, r.top - pt);
+      // A phone's guide is docked above the dock; the lit window ends where the strip starts.
+      const bottom = isPhoneEdition() && card.current ? Math.max(y, card.current.getBoundingClientRect().top - 6) : window.innerHeight - 4;
       const next = {
         x,
         y,
         w: Math.min(window.innerWidth - 4, r.right + pr) - x,
-        h: Math.min(window.innerHeight - 4, r.bottom + pb) - y,
+        h: Math.min(bottom, r.bottom + pb) - y,
       };
       const key = `${Math.round(next.x)},${Math.round(next.y)},${Math.round(next.w)},${Math.round(next.h)}`;
       if (key !== last) {
@@ -343,8 +346,10 @@ function SpotlightTutorial() {
   const name = TRACK_NAMES[tour.track] ?? "Chapter guide";
   const why = typeof step.why === "function" ? step.why(s) : step.why;
   const campaign = !!s.game.campaign;
+  // A phone docks every guide in its coach strip above the dock (see the phone's tutorial styles).
+  const docked = isPhoneEdition();
   return (
-    <div className="tour" data-track={tour.track}>
+    <div className="tour" data-track={tour.track} data-docked={docked || undefined}>
       {box ? <div className="tour-hole" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} /> : <div className="tour-dim" />}
       <div
         ref={card}
@@ -352,7 +357,7 @@ function SpotlightTutorial() {
         role="dialog"
         aria-label={`${name}, step ${tour.step + 1} of ${steps.length}`}
         tabIndex={-1}
-        style={cardStyle(box, placeFor(selector), viewport.w, viewport.h, edge, cardHeight)}
+        style={docked ? undefined : cardStyle(box, placeFor(selector), viewport.w, viewport.h, edge, cardHeight)}
       >
         <div className="tour-dots" aria-hidden="true">
           {steps.map((_, i) => (

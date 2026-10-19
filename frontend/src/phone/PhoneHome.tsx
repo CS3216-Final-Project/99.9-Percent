@@ -37,7 +37,7 @@ export function PhoneHome() {
         <h2 id="mode-heading">Choose how you want to play</h2>
         <div className="mode-options">
           {(["campaign", "classic"] as const).map((m) => <ModeCard key={m} mode={m} info={PHONE_MODES[m]} summary={summary(m)} lastPlayed={m === mode && !!active.progress}
-            locked={m === "classic" && !unlocked} lockedText={lockedText}
+            locked={m === "classic" && !unlocked} lockedText={lockedText} lockedLabel="Finish both guided chapters to unlock"
             unsaved={unsaved === m} busy={busy} autoFocus={m === mode && !!active.progress}
             onPlay={() => playMode(m)} onNew={() => newGame(m)} onTutorial={() => replayTutorial(m)} />)}
         </div>

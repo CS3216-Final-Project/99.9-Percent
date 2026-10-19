@@ -1,0 +1,656 @@
+/*
+ * The phone edition's in-game layout: top strip, room, sheet and dock. Every rule is scoped to the phone shell's root
+ * (`.phone-app[data-edition="phone"]`) or to `[data-edition="phone"]` on <html>, so the desktop never sees it.
+ *
+ * Layout tokens, set on the phone app root for every region and guide to read:
+ *
+ * - --phone-top: the top strip's height, chapter row and safe-area inset included
+ * - --phone-dock: the dock's height, safe-area inset included
+ * - --phone-safe-bottom: the bottom safe-area inset
+ * - --phone-sheet: the System metrics sheet's current height (peek, half or full)
+ * - --phone-sheet-peek: the sheet's height when only its handle shows
+ * - --phone-room: the height between the top strip and the dock (or the coach strip, while it shows)
+ *
+ * A guide sets --phone-coach on the root to the height its strip takes above the dock; the sheet stands above it.
+ * The room's canvas fills the space between the top strip and the dock and never resizes with the sheet.
+ */
+
+.app.phone-app[data-edition="phone"] {
+  --phone-safe-top: env(safe-area-inset-top, 0px);
+  --phone-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --phone-safe-left: env(safe-area-inset-left, 0px);
+  --phone-safe-right: env(safe-area-inset-right, 0px);
+  --phone-gutter-left: max(6px, var(--phone-safe-left));
+  --phone-gutter-right: max(6px, var(--phone-safe-right));
+  --phone-strip: 52px;
+  --phone-chapter: 0px;
+  --phone-top: calc(var(--phone-safe-top) + var(--phone-strip) + var(--phone-chapter));
+  --phone-dock: calc(56px + var(--phone-safe-bottom));
+  --phone-room: calc(100dvh - var(--phone-top) - var(--phone-dock) - var(--phone-coach, 0px));
+  --phone-sheet-peek: 56px;
+  --phone-sheet: var(--phone-sheet-peek);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: var(--phone-top) minmax(0, 1fr) var(--phone-dock);
+  grid-template-areas: "top" "stage" "bottom";
+}
+.app.phone-app[data-edition="phone"][data-chapters] { --phone-chapter: 44px; }
+.app.phone-app[data-edition="phone"][data-sheet="half"] { --phone-sheet: max(var(--phone-sheet-peek), calc(var(--phone-room) * 0.5)); }
+.app.phone-app[data-edition="phone"][data-sheet="full"] { --phone-sheet: max(var(--phone-sheet-peek), calc(var(--phone-room) - 8px)); }
+
+/* ------------------------------------------------------------------ */
+/* Top strip                                                           */
+/* ------------------------------------------------------------------ */
+
+.phone-app[data-edition="phone"] .phone-top {
+  grid-area: top;
+  position: relative;
+  z-index: 34;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  box-sizing: border-box;
+  height: var(--phone-top);
+  padding: var(--phone-safe-top) var(--phone-gutter-right) 0 var(--phone-gutter-left);
+  border-bottom: 1px solid var(--night-line);
+}
+.phone-app[data-edition="phone"] .phone-top-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  height: var(--phone-strip);
+  min-width: 0;
+}
+.phone-app[data-edition="phone"] .phone-logo {
+  flex: none;
+  margin: 0 2px 0 2px;
+  font-size: var(--text-md);
+  text-shadow: 1px 1px 0 var(--ink);
+}
+.phone-app[data-edition="phone"] .phone-top .phone-headline {
+  order: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 0;
+  padding: 2px;
+  border-radius: var(--radius);
+}
+/* Each card starts from its own content's width, so the cash figure is never cut while Health has room to spare. */
+.phone-app[data-edition="phone"] .phone-top .phone-headline .stat {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  padding: 2px 6px;
+  gap: 6px;
+  border-radius: 11px;
+}
+.phone-app[data-edition="phone"] .phone-top .phone-headline .stat + .stat::before { inset-block: 8px; }
+.phone-app[data-edition="phone"] .phone-top .stat .stat-icon { display: grid; flex: none; min-width: 0; }
+.phone-app[data-edition="phone"] .phone-top .stat .stat-icon .concept { width: 22px; height: 22px; border-width: 0; box-shadow: none; aspect-ratio: auto; }
+.phone-app[data-edition="phone"] .phone-top .stat .stat-icon .icon { width: 16px; height: 16px; }
+.phone-app[data-edition="phone"] .phone-top .phone-headline .stat-body { display: block; flex: 1 1 auto; width: auto; min-width: 0; max-width: none; }
+.phone-app[data-edition="phone"] .phone-top .phone-headline .stat-body > .tip,
+.phone-app[data-edition="phone"] .phone-top .phone-headline .stat-body > span { display: none; }
+.phone-app[data-edition="phone"] .phone-top .phone-headline .stat-body > strong {
+  display: block;
+  overflow: hidden;
+  font-size: var(--text-md);
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Cash and App Health open their dialogs: the arrow says so without taking a line. */
+.phone-app[data-edition="phone"] .phone-top .stat-action::after { top: 1px; right: 3px; font-size: 0.7rem; line-height: 1; }
+.phone-app[data-edition="phone"] .phone-top .finance-cash-full { display: none; }
+.phone-app[data-edition="phone"] .phone-top .finance-cash-compact { display: inline; }
+/* A longer health word (Traffic limited) wraps inside its card rather than pushing the buttons off. */
+.phone-app[data-edition="phone"] .phone-top .stat-action[aria-label="View app health"] .stat-body > strong { white-space: normal; overflow-wrap: normal; word-break: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: var(--text-sm); line-height: 1.1; }
+
+.phone-app[data-edition="phone"] .phone-top .icon-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.phone-app[data-edition="phone"] .phone-stats-area { position: static; flex: none; }
+.phone-app[data-edition="phone"] .phone-top .phone-stats-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+.phone-app[data-edition="phone"] .phone-stats-toggle > .icon:last-child { transition: transform .18s ease-out; }
+.phone-app[data-edition="phone"] .phone-stats-toggle[aria-expanded="true"] { background: var(--selection); color: var(--ink); border-color: var(--selection-edge); }
+.phone-app[data-edition="phone"] .phone-stats-toggle[aria-expanded="true"] > .icon:last-child { transform: rotate(180deg); }
+
+/* The company's other numbers drop over the room under the strip, never pushing it down. */
+.phone-app[data-edition="phone"] .phone-stats {
+  position: absolute;
+  top: calc(var(--phone-safe-top) + var(--phone-strip) - 2px);
+  left: var(--phone-gutter-left);
+  right: var(--phone-gutter-right);
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 4px;
+  padding: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--control-edge);
+  border-radius: 18px;
+  box-shadow: var(--lift);
+}
+.phone-app[data-edition="phone"] .phone-stats[hidden] { display: none; }
+.phone-app[data-edition="phone"] .phone-stats .stat { min-height: 52px; padding: 6px 8px; gap: 8px; align-items: center; background: var(--paper-2); border-radius: 12px; }
+.phone-app[data-edition="phone"] .phone-stats .stat + .stat::before { display: none; }
+.phone-app[data-edition="phone"] .phone-stats .stat-body { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 1px; font-size: var(--text-xs); }
+.phone-app[data-edition="phone"] .phone-stats .stat-body > .tip { display: block; font-size: var(--text-xs); color: var(--text-soft); }
+.phone-app[data-edition="phone"] .phone-stats .stat-body > strong { font-size: var(--text-md); white-space: nowrap; }
+.phone-app[data-edition="phone"] .phone-stats .stat-body > span { display: block; color: var(--text-soft); line-height: 1.3; }
+.phone-app[data-edition="phone"] .phone-stats .stat-goal { display: flex; align-items: center; gap: 6px; }
+.phone-app[data-edition="phone"] .phone-stats .stat-goal .meter { flex: 1; }
+.phone-app[data-edition="phone"] .phone-stats .phone-stat-note { color: var(--warn-ink); }
+
+/* Guided Mode's chapter: number, name and goal on one row, Next when offered, then the overview. */
+.phone-app[data-edition="phone"] .phone-chapter-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: var(--phone-chapter);
+  min-width: 0;
+  border-top: 1px solid var(--night-line);
+  color: var(--on-night);
+}
+.phone-app[data-edition="phone"] .phone-chapter-count {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  line-height: 26px;
+  min-width: 34px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--go);
+  color: var(--ink);
+  font-family: var(--font-num);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.phone-app[data-edition="phone"] .phone-chapter-count small { font-size: var(--text-xs); opacity: .75; }
+.phone-app[data-edition="phone"] .phone-chapter-text { flex: 1 1 auto; min-width: 0; display: grid; gap: 1px; }
+.phone-app[data-edition="phone"] .phone-chapter-text h2 {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.phone-app[data-edition="phone"] .phone-chapter-goal {
+  overflow: hidden;
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.25;
+  color: var(--on-night-soft);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.phone-app[data-edition="phone"] .phone-chapter-goal b { color: var(--go); font-weight: 600; }
+/* The whole row opens the overview; Next stays its own target above it. */
+.phone-app[data-edition="phone"] .phone-top .phone-chapter-open { position: static; width: 40px; height: 40px; background: transparent; color: var(--on-night); border-color: transparent; }
+.phone-app[data-edition="phone"] .phone-chapter-open::after { content: ""; position: absolute; inset: 0; }
+.phone-app[data-edition="phone"] .phone-chapter-open:focus-visible::after { outline: 3px solid var(--focus); outline-offset: -3px; border-radius: 8px; }
+.phone-app[data-edition="phone"] .phone-chapter-row .chapter-advance {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 76px;
+  min-height: 34px;
+  height: 34px;
+  padding: 0 10px;
+  justify-content: center;
+  gap: 4px;
+  font-size: var(--text-sm);
+}
+.phone-app[data-edition="phone"] .phone-chapter-row .chapter-advance.is-waiting { background: var(--night-3); color: var(--on-night-soft); border-color: var(--night-line); }
+.phone-app[data-edition="phone"] .phone-chapter-reason {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--lift);
+  font-size: var(--text-sm);
+}
+.phone-app[data-edition="phone"] .phone-chapter-reason[hidden] { display: none; }
+
+/* Below 400 px the logo steps aside for the numbers; at 340 px and below they use the compact text size, so every
+ * button keeps 44 px. */
+@media (max-width: 399px) {
+  .phone-app[data-edition="phone"] .phone-logo { display: none; }
+}
+@media (max-width: 340px) {
+  .phone-app[data-edition="phone"] .phone-top .phone-headline .stat { padding-inline: 4px; gap: 3px; }
+  .phone-app[data-edition="phone"] .phone-top .phone-headline .stat-body > strong { font-size: var(--text-xs); }
+  .phone-app[data-edition="phone"] .phone-top .stat .stat-icon .concept { width: 18px; height: 18px; }
+  .phone-app[data-edition="phone"] .phone-top .phone-stats-toggle > .icon:last-child { display: none; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Room                                                                */
+/* ------------------------------------------------------------------ */
+
+/* The room's own controls in its bottom corner stand clear of the sheet's handle and any guide's strip. */
+.phone-app[data-edition="phone"] .stage .room-map { bottom: calc(var(--phone-sheet-peek) + var(--phone-coach, 0px) + 10px); left: max(10px, var(--phone-safe-left)); }
+
+/* ------------------------------------------------------------------ */
+/* Sheet                                                               */
+/* ------------------------------------------------------------------ */
+
+.phone-app[data-edition="phone"] .phone-sheet {
+  position: absolute;
+  left: var(--phone-safe-left);
+  right: var(--phone-safe-right);
+  bottom: calc(var(--phone-dock) + var(--phone-coach, 0px));
+  z-index: 29;
+  display: flex;
+  flex-direction: column;
+  height: var(--phone-sheet);
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--control-edge);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -6px 20px rgb(20 17 40 / 0.18);
+  transition: height .24s cubic-bezier(.2, .8, .2, 1);
+}
+/* A purchase confirmation takes the sheet's place until it is confirmed or cancelled. */
+.phone-app[data-edition="phone"]:has(.campaign-action-popover[data-layout="sheet"]) .phone-sheet { visibility: hidden; }
+
+.phone-app[data-edition="phone"] .phone-sheet-head {
+  position: relative;
+  flex: none;
+  height: var(--phone-sheet-peek);
+  border-bottom: 1px solid transparent;
+}
+.phone-app[data-edition="phone"] .phone-sheet:not([data-state="peek"]) .phone-sheet-head { border-bottom-color: var(--paper-3); }
+.phone-app[data-edition="phone"] .phone-sheet-handle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 20px 20px 0 0;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) {
+  .phone-app[data-edition="phone"] .phone-sheet-handle:hover { background: var(--paper-2); }
+}
+.phone-app[data-edition="phone"] .phone-sheet-handle:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.phone-app[data-edition="phone"] .phone-sheet-grabber {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: var(--control-edge);
+}
+.phone-app[data-edition="phone"] .phone-sheet-summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 10px 12px 2px 14px;
+  pointer-events: none;
+  min-width: 0;
+}
+.phone-app[data-edition="phone"] .phone-peek-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.phone-app[data-edition="phone"] .phone-peek-title > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.phone-app[data-edition="phone"] .phone-peek-short { display: none; }
+@media (max-width: 399px) {
+  .phone-app[data-edition="phone"] .phone-peek-title.has-short > .phone-peek-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .phone-app[data-edition="phone"] .phone-peek-title.has-short > .phone-peek-short { display: inline; }
+}
+.phone-app[data-edition="phone"] .phone-peek-title > .icon { flex: none; color: var(--text-soft); }
+.phone-app[data-edition="phone"] .phone-peek-title.tone-critical { color: var(--critical-ink); }
+.phone-app[data-edition="phone"] .phone-peek-title.tone-critical > .icon { color: var(--critical-ink); }
+.phone-app[data-edition="phone"] .phone-peek-readings { flex: none; display: flex; gap: 8px; }
+.phone-app[data-edition="phone"] .phone-peek-reading {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: var(--font-num);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.phone-app[data-edition="phone"] .phone-peek-reading > .icon { align-self: center; margin-right: 2px; color: var(--text-soft); }
+.phone-app[data-edition="phone"] .phone-peek-reading small { font-size: var(--text-xs); color: var(--text-soft); }
+.phone-app[data-edition="phone"] .phone-peek-reading.is-alert,
+.phone-app[data-edition="phone"] .phone-peek-reading.is-alert > .icon,
+.phone-app[data-edition="phone"] .phone-peek-reading.is-alert small { color: var(--critical-ink); }
+.phone-app[data-edition="phone"] .phone-sheet-chevron { flex: none; color: var(--text-soft); transform: rotate(180deg); transition: transform .2s ease-out; }
+.phone-app[data-edition="phone"] .phone-sheet[data-state="full"] .phone-sheet-chevron { transform: none; }
+
+.phone-app[data-edition="phone"] .phone-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Closed to its handle, the sheet's contents leave the page's focus order and accessibility tree. */
+.phone-app[data-edition="phone"] .phone-sheet[data-state="peek"] .phone-sheet-body { visibility: hidden; }
+
+/* The desktop panel becomes the sheet's plain contents: no floating card, no hide and show of its own. */
+.phone-app[data-edition="phone"] .phone-sheet .equipment-shell {
+  position: static;
+  display: block;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  pointer-events: auto;
+}
+.phone-app[data-edition="phone"] .phone-sheet .panel-toggle,
+.phone-app[data-edition="phone"] .phone-sheet .panel-reopen { display: none; }
+.phone-app[data-edition="phone"] .phone-sheet .equipment-shell > .side {
+  width: auto;
+  max-height: none;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.phone-app[data-edition="phone"] .phone-sheet .side .panel-section { padding: 12px 14px 16px; }
+.phone-app[data-edition="phone"] .phone-sheet .campaign-panel .incident-investigate > .chips { gap: 6px; }
+.phone-app[data-edition="phone"] .phone-sheet .campaign-panel .incident-investigate .chip { min-height: 44px; }
+
+/* Challenge Mode's weekly operations follow the equipment in the same sheet, always expanded. */
+.phone-app[data-edition="phone"] .phone-sheet .operations-rail {
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--paper-3);
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
+}
+.phone-app[data-edition="phone"] .phone-sheet .operations-toggle { display: none; }
+.phone-app[data-edition="phone"] .phone-sheet .operations-title { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 14px 0; font-size: var(--text-md); }
+.phone-app[data-edition="phone"] .phone-sheet .operations-body { display: block; max-height: none; }
+
+/* ------------------------------------------------------------------ */
+/* Views over the room (Tech, Team, History)                           */
+/* ------------------------------------------------------------------ */
+
+/* They leave the top strip and the dock in place, with the shared 8 px gap. */
+.phone-app[data-edition="phone"] .sheet {
+  position: fixed;
+  inset: var(--phone-top) var(--phone-safe-right) var(--phone-dock) var(--phone-safe-left);
+  z-index: 33;
+  margin: 8px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Dock                                                                */
+/* ------------------------------------------------------------------ */
+
+.phone-app[data-edition="phone"] .bottombar.phone-dock {
+  grid-area: bottom;
+  position: relative;
+  z-index: 36;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: var(--phone-dock);
+  padding: 4px var(--phone-gutter-right) calc(4px + var(--phone-safe-bottom)) var(--phone-gutter-left);
+  flex-wrap: nowrap;
+}
+.phone-app[data-edition="phone"] .phone-dock [data-label] { padding-top: 0; }
+.phone-app[data-edition="phone"] .phone-dock [data-label]::before { display: none; }
+
+/* Views: icon above a short label, each a full 48 px target. */
+.phone-app[data-edition="phone"] .phone-dock > .view-tabs { display: flex; flex: none; gap: 2px; grid-row: auto; }
+.phone-app[data-edition="phone"] .phone-dock .view-tabs button,
+.phone-app[data-edition="phone"] .phone-dock .view-tabs button.is-active {
+  flex-direction: column;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 3px 0 2px;
+  gap: 1px;
+  font-size: var(--text-xs);
+  line-height: 1.1;
+}
+.phone-app[data-edition="phone"] .phone-dock .view-tabs .tab-icon { width: 26px; height: 26px; }
+.phone-app[data-edition="phone"] .phone-dock .view-tabs .tab-icon .icon { width: 17px; height: 17px; }
+.phone-app[data-edition="phone"] .phone-dock .view-tabs .tab-label { display: inline; }
+.phone-app[data-edition="phone"] .phone-dock .view-tabs .badge { display: none; }
+
+/* Navigation: the floor icon with the floor in view; floors, view mode and camera open above the dock. */
+.phone-app[data-edition="phone"] .phone-dock > .room-controls {
+  flex: none;
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  grid-row: auto;
+  grid-column: auto;
+}
+.phone-app[data-edition="phone"] .phone-dock .desktop-room-name,
+.phone-app[data-edition="phone"] .phone-dock .desktop-walk,
+.phone-app[data-edition="phone"] .phone-dock .camera-menu { display: none; }
+.phone-app[data-edition="phone"] .phone-dock .mobile-room-tools { display: block; }
+.phone-app[data-edition="phone"] .phone-dock .mobile-room-tools .walk-button { width: 100%; margin-bottom: 12px; }
+.phone-app[data-edition="phone"] .phone-dock .mobile-room-tools .view-mode-options { grid-template-columns: 1fr 1fr; }
+.phone-app[data-edition="phone"] .phone-dock .mobile-room-tools .view-mode-options button { min-height: 44px; padding: 8px; gap: 8px; }
+.phone-app[data-edition="phone"] .phone-dock .mobile-room-tools .view-mode-options small { display: none; }
+.phone-app[data-edition="phone"] .phone-dock .mobile-room-name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.phone-app[data-edition="phone"] .phone-dock .room-menu > summary,
+.phone-app[data-edition="phone"] .phone-dock .phone-views-menu > summary {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  gap: 0;
+}
+.phone-app[data-edition="phone"] .phone-dock .room-menu > summary > .icon:last-child,
+.phone-app[data-edition="phone"] .phone-dock .phone-views-menu > summary > .icon:last-child { display: none; }
+.phone-app[data-edition="phone"] .phone-dock .room-menu .summary-floor-number {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 6px;
+  font-family: var(--font-num);
+  font-size: 0.7rem;
+  line-height: 1;
+}
+.phone-app[data-edition="phone"] .phone-dock .room-menu .floor-badge { position: absolute; top: 4px; right: 4px; }
+/* Folded views are a menu like Navigation and the speeds: the same paper button, with an icon over a short label. */
+.phone-app[data-edition="phone"] .phone-dock .phone-views-menu > summary { flex-direction: column; gap: 0; font-size: var(--text-xs); line-height: 1.1; }
+.phone-app[data-edition="phone"] .phone-dock .phone-views-menu > summary .tab-icon { display: grid; place-items: center; }
+.phone-app[data-edition="phone"] .phone-dock .phone-views-menu.is-active > summary { background: var(--selection); border-color: var(--selection-edge); }
+.phone-app[data-edition="phone"] .phone-dock .phone-views-menu .view-tabs { display: grid; gap: 6px; }
+.phone-app[data-edition="phone"] .phone-dock .phone-views-menu .view-tabs button,
+.phone-app[data-edition="phone"] .phone-dock .phone-views-menu .view-tabs button.is-active {
+  flex-direction: row;
+  justify-content: flex-start;
+  width: 100%;
+  height: 52px;
+  padding: 6px 10px;
+  gap: 10px;
+  font-size: var(--text-md);
+  color: var(--ink);
+  background: var(--control-inset);
+  border: 1px solid var(--control-edge);
+}
+.phone-app[data-edition="phone"] .phone-dock .phone-views-menu .view-tabs button.is-active { background: var(--selection); border-color: var(--selection-edge); }
+.phone-app[data-edition="phone"] .phone-dock .phone-views-menu .view-tabs .badge { display: inline-block; width: auto; margin-left: auto; color: var(--text-soft); }
+
+/* Time: the clock, the speed menu and the primary action, pushed to the right edge. */
+.phone-app[data-edition="phone"] .phone-dock .time-controls,
+.phone-app[data-edition="phone"] .campaign-clock.phone-dock .time-controls {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+  width: auto;
+  padding: 0;
+  grid-column: auto;
+  grid-row: auto;
+}
+.phone-app[data-edition="phone"] .phone-dock .time-controls::before { display: none; }
+.phone-app[data-edition="phone"] .phone-dock .phone-clock,
+.phone-app[data-edition="phone"] .campaign-clock.phone-dock .time-controls .phone-clock {
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 1px;
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  margin: 0 2px 0 0;
+}
+.phone-app[data-edition="phone"] .phone-dock .phone-clock .brand-week { display: flex; align-items: center; gap: 4px; font-size: var(--text-sm); line-height: 1.15; white-space: nowrap; }
+/* The words say what the clock is; its calendar icon would only cost width. */
+.phone-app[data-edition="phone"] .phone-dock .phone-clock .brand-week > .icon { display: none; }
+.phone-app[data-edition="phone"] .phone-dock .phone-clock .dock-second {
+  display: block;
+  margin: 0;
+  font-family: var(--font-num);
+  font-size: var(--text-xs);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.phone-app[data-edition="phone"] .phone-dock .phone-clock .dock-second > span { display: inline-block; min-width: 2ch; text-align: right; }
+.phone-app[data-edition="phone"] .phone-dock .phone-clock > .meter { display: block; width: 100%; max-width: none; height: 3px; margin-top: 2px; }
+.phone-app[data-edition="phone"] .phone-dock .phone-clock.is-incident .brand-week { color: var(--paper); }
+
+.phone-app[data-edition="phone"] .phone-dock .time-menu > summary { width: 52px; height: 48px; padding-inline: 4px; }
+.phone-app[data-edition="phone"] .phone-dock .dock-primary,
+.phone-app[data-edition="phone"] .campaign-clock.phone-dock .dock-primary {
+  flex: none;
+  width: 80px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 8px;
+  gap: 6px;
+  font-size: var(--text-md);
+}
+.phone-app[data-edition="phone"] .phone-dock:not(.campaign-clock) .dock-primary { width: 116px; }
+
+/* Guided Mode's steps, under the speeds in the speed menu. */
+.phone-app[data-edition="phone"] .phone-dock .phone-steps-title { margin: 14px 0 8px; }
+.phone-app[data-edition="phone"] .phone-dock .time-menu .dock-steps { display: flex; gap: 8px; }
+.phone-app[data-edition="phone"] .phone-dock .time-menu .dock-step {
+  flex: 1;
+  flex-direction: row;
+  gap: 6px;
+  width: auto;
+  height: 44px;
+  font-size: var(--text-sm);
+  background: var(--control-inset);
+}
+
+/* The dock's menus open above it, inside the screen. */
+.phone-app[data-edition="phone"] .phone-dock .dock-panel { max-height: min(440px, calc(100dvh - var(--phone-top) - var(--phone-dock) - 16px)); }
+
+@media (max-width: 340px) {
+  .phone-app[data-edition="phone"] .bottombar.phone-dock,
+  .phone-app[data-edition="phone"] .phone-dock .time-controls,
+  .phone-app[data-edition="phone"] .campaign-clock.phone-dock .time-controls { gap: 3px; }
+  .phone-app[data-edition="phone"] .phone-dock .time-menu > summary { width: 48px; }
+  .phone-app[data-edition="phone"] .campaign-clock.phone-dock .dock-primary { width: 76px; }
+  .phone-app[data-edition="phone"] .phone-dock:not(.campaign-clock) .dock-primary { width: 92px; }
+  .phone-app[data-edition="phone"] .phone-dock:not(.campaign-clock) .dock-primary > .icon { display: none; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion: the sheet and toggles snap                          */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .phone-app[data-edition="phone"] .phone-sheet,
+  .phone-app[data-edition="phone"] .phone-sheet-chevron,
+  .phone-app[data-edition="phone"] .phone-stats-toggle > .icon:last-child { transition: none; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Menu                                                                */
+/* ------------------------------------------------------------------ */
+
+/* The run card's three tiles stack icon, label and value, so no label runs into its tile's edge on a phone. */
+[data-edition="phone"] .phone-menu .menu-run-stats > div {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+  row-gap: 4px;
+  padding: 10px;
+}
+[data-edition="phone"] .phone-menu .menu-run-stats .concept { grid-row: auto; width: 30px; height: 30px; }
+[data-edition="phone"] .phone-menu .menu-run-stats .concept .icon { width: 18px; height: 18px; }
+[data-edition="phone"] .phone-menu .menu-run-stats dt,
+[data-edition="phone"] .phone-menu .menu-run-stats dd { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+[data-edition="phone"] .phone-menu .menu-run-stats dd { font-size: var(--text-lg); }
+@media (max-width: 360px) {
+  [data-edition="phone"] .phone-menu .menu-run-stats { gap: 6px; }
+  [data-edition="phone"] .phone-menu .menu-run-stats > div { padding: 8px 6px; }
+  [data-edition="phone"] .phone-menu .menu-run-stats dd { font-size: var(--text-md); }
+}
+@media (max-width: 340px) {
+  [data-edition="phone"] .phone-menu .menu-run-stats dd { font-size: var(--text-sm); }
+}

@@ -112,5 +112,5 @@ function ChallengeActions({ onResume }: { onResume: () => void }) {
 function PhoneModeSwitch({ to }: { to: "campaign" | "classic" }) {
   const available = useGame(challengeAvailable);
   const scope = useGame((s) => s.scope);
-  return <ModeSwitch to={to} locked={to === "classic" && !available} lockedText={scope.challengeLocked} about={PHONE_ABOUT[to]} />;
+  return <ModeSwitch to={to} locked={to === "classic" && !available} lockedText={scope.challengeLocked} lockedLabel="Finish both guided chapters to unlock" about={PHONE_ABOUT[to]} />;
 }

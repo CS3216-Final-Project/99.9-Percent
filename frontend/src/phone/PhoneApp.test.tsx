@@ -44,7 +44,7 @@ describe("phone edition", () => {
     expect(guided.textContent).toContain("Walkthrough and 2 guided chapters");
     const challenge = within(choices).getByRole("region", { name: "Challenge Mode" });
     expect(challenge.textContent).toContain("Complete Scaling & Routing in Guided Mode to unlock.");
-    expect(within(challenge).getByRole("button", { name: "Complete Guided Mode to unlock" })).toHaveProperty("disabled", true);
+    expect(within(challenge).getByRole("button", { name: "Finish both guided chapters to unlock" })).toHaveProperty("disabled", true);
 
     const consent = screen.getByRole("region", { name: /Help improve/ });
     expect(within(consent).getByRole("button", { name: "OK" })).toBeTruthy();

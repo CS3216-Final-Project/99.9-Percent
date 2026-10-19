@@ -71,9 +71,9 @@ export function HomeScreen() {
 
 /** One mode's card: its description, its saved game and its controls. Another edition can pass its own wording. */
 export function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, autoFocus, onPlay, onNew, onTutorial, info = MODES[mode],
-  lockedText = "Complete the first five Guided Mode chapters to unlock." }: {
+  lockedText = "Complete the first five Guided Mode chapters to unlock.", lockedLabel = "Complete Guided Mode to unlock" }: {
   mode: GameMode; summary: Summary; lastPlayed: boolean; locked: boolean; unsaved: boolean; busy: boolean; autoFocus: boolean;
-  onPlay: () => void; onNew: () => void; onTutorial: () => void; info?: ModeInfo; lockedText?: string;
+  onPlay: () => void; onNew: () => void; onTutorial: () => void; info?: ModeInfo; lockedText?: string; lockedLabel?: string;
 }) {
   const heading = `${mode}-heading`;
   const label = unsaved ? "Switch and lose this run" : summary.continueLabel;
@@ -90,7 +90,7 @@ export function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, aut
         <span><span className="mode-progress-label">Locked</span>{lockedText}</span>
       </div>
       <div className="mode-actions">
-        <button type="button" className="btn" disabled><Icon name="lock" />Complete Guided Mode to unlock</button>
+        <button type="button" className="btn" disabled><Icon name="lock" />{lockedLabel}</button>
       </div>
     </> : <>
       <div className={`mode-progress${summary.progress ? "" : " is-empty"}`}>

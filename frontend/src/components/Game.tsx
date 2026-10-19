@@ -5,10 +5,11 @@ import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } fro
 import "./ControlsDock.css";
 
 import { lazy, Suspense, useEffect } from "react";
-import { BALANCE, completedTechIds, metrics, TECH_ORDER, type GameState } from "@/sim";
+import { BALANCE, completedTechIds, metrics, TECH_ORDER } from "@/sim";
 import { clock, compact, money, num, signedMoney, uptimePct } from "@/game/format";
 import { useGame } from "@/game/store";
-import { Icon, type IconName } from "./icons";
+import { Icon } from "./icons";
+import { healthOf } from "./health";
 import { SoundButton } from "./SoundButton";
 import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
@@ -39,16 +40,6 @@ export function Room() {
 /* ------------------------------------------------------------------ */
 /* Top bar: four numbers                                               */
 /* ------------------------------------------------------------------ */
-
-function healthOf(game: GameState): { word: string; tone: "ok" | "warn" | "critical"; icon: IconName } {
-  if (game.phase === "incident") return { word: "Incident", tone: "critical", icon: "incident" };
-  const m = metrics(game);
-  const worst = Math.max(m.appUtil, m.dbUtil);
-  const faults = game.infra.dbHost.status !== "healthy" || game.infra.appHosts.some((h) => h.status !== "healthy");
-  if (worst >= 1 || game.live.shed > 0) return { word: "Degraded", tone: "critical", icon: "fire" };
-  if (worst >= 0.85 || faults) return { word: "At risk", tone: "warn", icon: "alert" };
-  return { word: "Healthy", tone: "ok", icon: "health" };
-}
 
 export function TopBar() {
   const game = useGame((s) => s.game);
