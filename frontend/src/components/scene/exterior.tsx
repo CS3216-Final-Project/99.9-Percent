@@ -965,7 +965,7 @@ function poolTexture(): THREE.CanvasTexture {
 /* The ground: pavements, roads, the plaza and the park                */
 /* ------------------------------------------------------------------ */
 
-const LAYER = { ground: GROUND_Y, block: GROUND_Y + 0.005, tarmac: GROUND_Y + 0.01, paint: GROUND_Y + 0.02, shade: GROUND_Y + 0.025, glow: GROUND_Y + 0.03 };
+const LAYER = { ground: GROUND_Y, block: GROUND_Y + 0.005, tarmac: GROUND_Y + 0.01, paint: GROUND_Y + 0.02, shade: GROUND_Y + 0.025, glow: GROUND_Y + 0.05 };
 
 /** A strip on a road: `along` it, `across` from its centre line, so long and so wide. */
 function onRoad(r: Road, along: number, across: number, length: number, width: number, y: number): THREE.BufferGeometry {
@@ -1317,13 +1317,19 @@ function Billboards() {
 /** A box or a drum that casts a shadow, its heights above the ground; a drum may stand round an open courtyard. */
 type Caster = { rect: Rect; from: number; to: number } | { drum: [number, number, number]; court?: number; from: number; to: number };
 
-/** Turn the light this many degrees before the shadows are worked out again. */
-const SHADOW_TURN = Math.cos(THREE.MathUtils.degToRad(0.75));
+/** Room in the shadows' vertex buffer for each box (a hull of up to 8 corners) and for the ring and its courtyard. */
+const BOX_SHADOW_VERTICES = 6 * 3;
+const RING_SHADOW_VERTICES = 160 * 3;
+/** How far above the next caster's shadow each is drawn: enough to tell them apart in the depth buffer out to the city's far plane. */
+const SHADOW_STAGGER = 1.5e-4;
 
 /**
  * The shadows every building casts on the ground, away from the sun or the moon (see shadows.ts), worked out again
- * as the light turns. They are drawn with depth, and a shadow's later pixels at the same depth are turned away, so
- * where two overlap the ground is no darker than under one. Low quality draws none.
+ * on every frame the light has turned, however little, so they creep across the ground with it rather than jumping
+ * every degree or so. The vertices are written into one buffer kept for the purpose. They are drawn with depth, each
+ * caster's shadow a hair above the next and the highest first, so where two overlap the later one is turned away and
+ * the ground is no darker than under one. (Drawn at exactly one height, overlapping shadows redrawn every frame came
+ * and went from frame to frame on a graphics card.) The stagger stays below LAYER.glow. Low quality draws none.
  */
 function BuildingShadows() {
   const casters = useMemo(() => {
@@ -1341,7 +1347,14 @@ function BuildingShadows() {
     if (ring) out.push({ drum: [ring.x, ring.z, ring.outer], court: ring.inner, from: 0, to: ring.storeys * STOREY + PARAPET });
     return out;
   }, []);
-  const geometry = useMemo(() => new THREE.BufferGeometry(), []);
+  const geometry = useMemo(() => {
+    const vertices = casters.reduce((n, c) => n + ("rect" in c ? BOX_SHADOW_VERTICES : RING_SHADOW_VERTICES), 0);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(vertices * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(vertices * 3).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+    g.setDrawRange(0, 0);
+    return g;
+  }, [casters]);
   const material = useMemo(
     () => faded({ color: "#000000", opacity: 0.7, transparent: true, depthWrite: true, depthFunc: THREE.LessDepth, ...KEEP_ALPHA }, "city-building-shadow", "shadow"),
     [],
@@ -1349,24 +1362,32 @@ function BuildingShadows() {
   const light = useMemo(() => new THREE.Vector3(0, -1, 0), []);
   useFrame(() => {
     const key = world.uKeyDir.value;
-    if (key.dot(light) > SHADOW_TURN) return;
+    if (key.equals(light)) return;
     light.copy(key);
     const step = shadowStep([key.x, key.y, key.z]);
-    const pos: number[] = [];
-    const y = LAYER.shade;
-    for (const c of casters) {
+    const position = geometry.getAttribute("position") as THREE.BufferAttribute;
+    const pos = position.array as Float32Array;
+    const stagger = Math.min(SHADOW_STAGGER, ((LAYER.glow - LAYER.shade) * 0.8) / casters.length);
+    let n = 0;
+    for (const [k, c] of casters.entries()) {
+      const y = LAYER.shade + (casters.length - k) * stagger;
       const outline = "rect" in c ? boxShadow(c.rect, c.from, c.to, step) : drumShadow(c.drum[0], c.drum[1], c.drum[2], c.from, c.to, step);
       const lit = "drum" in c && c.court ? courtyardLight(c.drum[0], c.drum[1], c.court, c.to, step) : [];
       const points = [...outline, ...lit].map(([x, z]) => new THREE.Vector2(x, z));
       for (const [a, b, d] of THREE.ShapeUtils.triangulateShape(points.slice(0, outline.length), lit.length ? [points.slice(outline.length)] : [])) {
+        if (n + 9 > pos.length) break;
         // Each triangle wound to face up.
         const [p, q, r] = [points[a], points[b], points[d]];
         const up = (q.y - p.y) * (r.x - p.x) - (q.x - p.x) * (r.y - p.y) > 0;
-        for (const v of up ? [p, q, r] : [p, r, q]) pos.push(v.x, y, v.y);
+        for (const v of up ? [p, q, r] : [p, r, q]) {
+          pos[n++] = v.x;
+          pos[n++] = y;
+          pos[n++] = v.y;
+        }
       }
     }
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(new Float32Array(pos.length).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+    position.needsUpdate = true;
+    geometry.setDrawRange(0, n / 3);
   });
   useEffect(
     () => () => {
