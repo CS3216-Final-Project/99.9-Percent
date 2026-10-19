@@ -18,6 +18,7 @@ const CLASSIC_META_KEY = "nn.classic.meta.v1";
 const MODE_KEY = "nn.mode.v1";
 const AUDIO_KEY = "nn.audio.v1";
 const GRAPHICS_KEY = "nn.graphics.v1";
+const TIME_OF_DAY_KEY = "nn.timeOfDay.v1";
 const AVATAR_KEY = "nn.avatar.v1";
 /** Music on or off, from before the volume settings. Still written, so an older build keeps the player's choice. */
 const MUSIC_KEY = "nn.music.v1";
@@ -394,6 +395,21 @@ export function loadGraphics(): GraphicsSettings {
 
 export function saveGraphics(settings: GraphicsSettings): boolean {
   return write(GRAPHICS_KEY, JSON.stringify(settings));
+}
+
+export function loadTimeOfDay(): number | null {
+  const stored = read(TIME_OF_DAY_KEY);
+  if (stored === null) return null;
+  try {
+    const time = (JSON.parse(stored) as { time?: unknown } | null)?.time;
+    return typeof time === "number" && Number.isFinite(time) && time >= 0 && time < 1 ? time : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveTimeOfDay(time: number): boolean {
+  return write(TIME_OF_DAY_KEY, JSON.stringify({ time }));
 }
 
 /** The player's avatar, or the default when none was chosen, storage fails or what is stored is not an avatar. */

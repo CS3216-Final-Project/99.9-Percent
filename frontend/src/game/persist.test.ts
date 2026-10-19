@@ -4,7 +4,7 @@ import { step, advanceSteps } from "../sim/step";
 import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics, saveClassicGame, loadClassicGame } from "./persist";
 import { CAMPAIGN_SAVE_KEY as KEY, makeEnvelope } from "./saveEnvelope";
 import { decodeClassicSave, rawLegacySave, exportGame } from "./persist";
-import { DEFAULT_AUDIO, DEFAULT_GRAPHICS, challengeUnlocked, isSilent, legacyMusicOff, loadAudio, loadGraphics, loadMode, saveAudio, saveGraphics, saveMode } from "./persist";
+import { DEFAULT_AUDIO, DEFAULT_GRAPHICS, challengeUnlocked, isSilent, legacyMusicOff, loadAudio, loadGraphics, loadMode, loadTimeOfDay, saveAudio, saveGraphics, saveMode, saveTimeOfDay } from "./persist";
 import { preparedReliability, act, tick } from "../sim/__tests__/reliabilityFixture";
 import { pendingReliability } from "../sim/reliability";
 import { WALKTHROUGH_LESSON_IDS, WALKTHROUGH_LESSONS, WALKTHROUGH_VERSION, type LessonId } from "./walkthrough";
@@ -303,6 +303,29 @@ describe("graphics settings", () => {
     expect(loadGraphics()).toEqual(DEFAULT_GRAPHICS);
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
     expect(saveGraphics({ quality: "medium" })).toBe(false);
+  });
+});
+
+describe("time of day", () => {
+  it("round trips independently", () => {
+    expect(saveTimeOfDay(0.8)).toBe(true);
+    expect(loadTimeOfDay()).toBe(0.8);
+  });
+
+  it("returns null when no time is stored", () => {
+    expect(loadTimeOfDay()).toBeNull();
+  });
+
+  it.each(["abc", '{"time":1}', '{"time":-0.1}', '{"time":"0.5"}'])("returns null for invalid stored value %s", raw => {
+    localStorage.setItem("nn.timeOfDay.v1", raw);
+    expect(loadTimeOfDay()).toBeNull();
+  });
+
+  it("handles storage failures", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("unavailable"); });
+    expect(loadTimeOfDay()).toBeNull();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
+    expect(saveTimeOfDay(0.5)).toBe(false);
   });
 });
 

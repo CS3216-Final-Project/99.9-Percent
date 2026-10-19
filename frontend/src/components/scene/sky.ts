@@ -221,9 +221,9 @@ function whitest(c: RGB): RGB {
   return [c[0] / m, c[1] / m, c[2] / m];
 }
 
-/** The time of day after `seconds` of play, unless the page address fixes one. */
-export function timeOfDay(seconds: number, fixed: number | null = null): number {
-  return fixed ?? wrap(START + seconds / DAY_SECONDS);
+/** The time of day after `seconds` of play from `start`, unless the page address fixes one. */
+export function timeOfDay(seconds: number, fixed: number | null = null, start = START): number {
+  return fixed ?? wrap(start + seconds / DAY_SECONDS);
 }
 
 /** A fixed time of day from the page address (`?time=0.5` is noon), if any. */
