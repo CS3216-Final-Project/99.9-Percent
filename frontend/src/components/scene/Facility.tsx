@@ -45,9 +45,10 @@ import { openRoomArea } from "../roomArea";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
 import { ServerFloor } from "./ServerFloor";
-import { ElevatorCar, Landing } from "./Elevator";
-import { FLOOR_NUMBER, FLOOR_Y, rideAt } from "./levels";
-import { arrive, depart, now, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
+import { Counterweight, ElevatorCar, Landing, ShaftCollar } from "./Elevator";
+import { ELEVATOR_SPOT } from "./floorplan";
+import { backAt, FLOOR_NUMBER, FLOOR_Y, glideAt, rideAt, washAt } from "./levels";
+import { depart, hurry, now, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
 import { Avatar, WalkDriver, WalkFloor } from "./Avatar";
 import { GlassDoors } from "./Doors";
 import { avatar, clearPrompt, held, movesAvatar, onPrompt, play, walkTo } from "./walk";
@@ -124,13 +125,18 @@ function frameBox(box: THREE.Box3, dir: THREE.Vector3, width: number, height: nu
   return { zoom, target: center.add(dir.clone().multiplyScalar((floorY - center.y) / dir.y)) };
 }
 
+/** The part of the canvas the panels leave open, in pixels from its top left. */
+function openArea(width: number, height: number): { right: number; bottom: number } {
+  const stage = document.querySelector("main.stage")?.getBoundingClientRect();
+  return stage ? openRoomArea(stage) : { right: width, bottom: height };
+}
+
 /**
  * The point on the floor at height `floorY` to look at so that `p` shows at the centre of the room the panel leaves
  * open, at `zoom`, when looking along `dir`. The view is orthographic, so a pixel spans 1 / zoom world units.
  */
 function centreOn(p: THREE.Vector3, dir: THREE.Vector3, zoom: number, width: number, height: number, floorY: number): THREE.Vector3 {
-  const stage = document.querySelector("main.stage")?.getBoundingClientRect();
-  const open = stage ? openRoomArea(stage) : { right: width, bottom: height };
+  const open = openArea(width, height);
   const ox = open.right / 2 - width / 2;
   const oy = open.bottom / 2 - height / 2;
   const right = new THREE.Vector3().crossVectors(dir, UP).normalize();
@@ -139,8 +145,52 @@ function centreOn(p: THREE.Vector3, dir: THREE.Vector3, zoom: number, width: num
   return c.addScaledVector(dir, (floorY - c.y) / dir.y);
 }
 
-/** The darkening laid over the room as the elevator passes between floors, moved by the camera each frame. */
+/** The middle of the elevator shaft, and how high above the car's floor the cutscene looks. */
+const SHAFT_X = (ELEVATOR_SPOT[0] + ELEVATOR_SPOT[2]) / 2;
+const SHAFT_Z = (ELEVATOR_SPOT[1] + ELEVATOR_SPOT[3]) / 2;
+const CAR_EYE = 1.2;
+/** How many metres of shaft fill the open view's shorter side in the cutscene's shot, and how far the view pushes in over the ride. */
+const SHOT_FIT = 7.5;
+const SHOT_PUSH = 0.08;
+/** The shot's tilt from straight down, in radians: lower than the usual view, to look along the glass car rather than down into it. */
+const SHOT_TILT = 1.15;
+const shotPoint = new THREE.Vector3();
+
+/** The cutscene's shot of the car with the view at height `y`: the zoom that fits the shaft and the floor point that centres the cabin. */
+function shotOf(dir: THREE.Vector3, width: number, height: number, y: number): { zoom: number; target: THREE.Vector3 } {
+  const open = openArea(width, height);
+  const zoom = THREE.MathUtils.clamp(Math.min(open.right, open.bottom) / SHOT_FIT, 40, 90);
+  shotPoint.set(SHAFT_X, y + CAR_EYE, SHAFT_Z);
+  return { zoom, target: centreOn(shotPoint, dir, zoom, width, height, y) };
+}
+
+/** The camera's view as a point to glide between: the floor point it looks at, its zoom and its tilt from straight down. */
+interface ViewPoint { x: number; z: number; zoom: number; polar: number }
+/**
+ * A ride's cutscene: the view the player had before the first of its rides (`from`, kept across a turn round
+ * mid-ride, so the way back is still to the player's own), the view as the latest ride set off (`start`, where the
+ * glide in begins), and the view as the car arrived (`held`, where the way back begins).
+ */
+interface Cutscene { from: ViewPoint & { touched: boolean }; start: ViewPoint; held: ViewPoint | null }
+
+/** The view now: what the controls look at, the zoom and the tilt of the camera's stand-off. */
+function viewPoint(target: THREE.Vector3, camera: THREE.OrthographicCamera): ViewPoint {
+  const o = camera.position.clone().sub(target);
+  return { x: target.x, z: target.z, zoom: camera.zoom, polar: Math.acos(THREE.MathUtils.clamp(o.y / o.length(), -1, 1)) };
+}
+/** Point `offset` the same way round the room, at `polar` from straight down, keeping its length. */
+function tiltTo(offset: THREE.Vector3, polar: number): void {
+  const len = offset.length();
+  const yaw = Math.atan2(offset.x, offset.z);
+  offset.set(Math.sin(yaw) * Math.sin(polar), Math.cos(polar), Math.cos(yaw) * Math.sin(polar)).multiplyScalar(len);
+}
+
+/** The vignette laid over the room as the elevator rides, set each frame. */
 let dipEl: HTMLDivElement | null = null;
+/** The blackout as the car passes the slab between the storeys, moved with the dip each frame. */
+let slabEl: HTMLDivElement | null = null;
+/** The wash of light as the doors part on arrival, set each frame like the dip. */
+let washEl: HTMLDivElement | null = null;
 
 /** How often the camera's view may be written to storage while it is on the move. */
 const VIEW_SAVE_EVERY = 0.5;
@@ -175,6 +225,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
   const spin = useRef(0);
   /** The marker a campaign action asked the view to centre on, until the camera arrives or the player takes it. */
   const focusing = useRef<string | null>(null);
+  const cutscene = useRef<Cutscene | null>(null);
   const box = useRef<THREE.Box3 | null>(null);
   /** The last view written down or seen, and the latest view worth writing on leaving. */
   const persisting = useRef<{ last: number; json: string; view: SavedCameraView | null }>({ last: -Infinity, json: "", view: null });
@@ -216,6 +267,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       focusing.current = null;
       homing.current = true;
       spin.current = 0;
+      cutscene.current = null;
     };
     cameraApi.rotateBy = (radians) => {
       // Turning the overview by an angle turns its heading by the same, so the views from the avatar swing alike.
@@ -275,6 +327,25 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
     [],
   );
 
+  // The ride's cutscene begins as the car sets off, from the view the player has then. Turning round mid-ride keeps
+  // the view first left, so the way back is still to the player's own. A ride already under way when the rig
+  // mounts is joined from here.
+  useEffect(() => {
+    const onDepart = () => {
+      // The cutscene is the overview's: seen from the avatar, the view simply rides with the car.
+      if (lookingFromAvatar()) return;
+      const c = controls.current;
+      if (!c) return;
+      const start = viewPoint(c.target, camera);
+      if (cutscene.current) Object.assign(cutscene.current, { start, held: null });
+      else cutscene.current = { from: { ...start, touched: touched.current }, start, held: null };
+    };
+    if (riding()) onDepart();
+    return onRide((event) => {
+      if (event === "depart") onDepart();
+    });
+  }, [camera]);
+
   // Q and E turn the room. Ignored while typing and before a run starts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -320,6 +391,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
     offset.copy(camera.position).sub(c.target);
     const distance = offset.length();
     from.copy(offset).normalize().negate();
+    const cut = cutscene.current;
     let turned = false;
     if (Math.abs(spin.current) > 1e-4) {
       const step = Math.abs(spin.current) < 0.004 ? spin.current : spin.current * 0.16;
@@ -345,7 +417,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
     }
 
     // Until the player takes the camera, ease toward a framing of the floor's built equipment from the current angle.
-    if (!touched.current && box.current) {
+    if (!touched.current && box.current && !(cut && riding())) {
       dir.copy(offset).normalize().negate();
       const want = frameBox(box.current, dir, size.width, size.height, FLOOR_Y[floor]);
       const k = 0.1;
@@ -356,7 +428,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       camera.position.add(c.target).sub(before);
       camera.updateProjectionMatrix();
     }
-    const aim = focusing.current ? anchors.get(focusing.current) : undefined;
+    const aim = focusing.current && !(cut && riding()) ? anchors.get(focusing.current) : undefined;
     if (aim) {
       dir.copy(camera.position).sub(c.target).normalize().negate();
       const zoom = box.current ? frameBox(box.current, dir, size.width, size.height, FLOOR_Y[floor]).zoom : camera.zoom;
@@ -370,6 +442,41 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       camera.updateProjectionMatrix();
       if (Math.abs(zoom - camera.zoom) < 0.05 && Math.hypot(goal.x - c.target.x, goal.z - c.target.z) < 0.01) focusing.current = null;
     }
+    // The ride's cutscene (timings in levels.ts): the view glides in to the elevator as the car sets off, tilting
+    // down to look along the glass car, and holds on the cabin, pushing in a little as it rides. Once the car
+    // arrives it eases back to the view the player had; a view that was following the facility goes back to
+    // framing the new floor's machines (see above) while only its tilt eases back here, and a machine asked for
+    // mid-ride takes the view from here the same way.
+    if (cut) {
+      if (riding()) {
+        const t = rideClock();
+        const a = glideAt(t);
+        tiltTo(offset, cut.start.polar + (SHOT_TILT - cut.start.polar) * a);
+        dir.copy(offset).normalize().negate();
+        const shot = shotOf(dir, size.width, size.height, viewHeight());
+        const zoom = shot.zoom * (1 - SHOT_PUSH + SHOT_PUSH * rideAt(t).car);
+        c.target.x = cut.start.x + (shot.target.x - cut.start.x) * a;
+        c.target.z = cut.start.z + (shot.target.z - cut.start.z) * a;
+        camera.zoom = cut.start.zoom + (zoom - cut.start.zoom) * a;
+      } else {
+        if (!cut.held) {
+          cut.held = viewPoint(c.target, camera);
+          touched.current = cut.from.touched || !!focusing.current;
+        }
+        const a = reducedMotion() ? 1 : backAt(now() - ride.arrived);
+        tiltTo(offset, cut.held.polar + (cut.from.polar - cut.held.polar) * a);
+        // A view the player made their own mid-ride (walk mode taken while the car ran) is still their own: back to it.
+        if ((cut.from.touched || touched.current) && !focusing.current) {
+          c.target.x = cut.held.x + (cut.from.x - cut.held.x) * a;
+          c.target.z = cut.held.z + (cut.from.z - cut.held.z) * a;
+          camera.zoom = cut.held.zoom + (cut.from.zoom - cut.held.zoom) * a;
+        }
+        if (a >= 1) cutscene.current = null;
+      }
+      camera.position.copy(c.target).add(offset);
+      camera.lookAt(c.target);
+      camera.updateProjectionMatrix();
+    }
     // Ride with the elevator: the view's height follows the car on the clock, however few frames are drawn.
     const y = viewHeight();
     camera.position.y += y - c.target.y;
@@ -380,11 +487,9 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       const moving = riding() && !lookingFromAvatar();
       const f = rideAt(rideClock());
       dipEl.style.opacity = moving ? f.dip.toFixed(3) : "0";
-      const down = FLOOR_Y[ride.to] < FLOOR_Y[ride.from];
-      const progress = down ? f.car : 1 - f.car;
-      dipEl.style.setProperty("--ride-shift", `${(-18 + progress * 36).toFixed(1)}%`);
-      dipEl.style.setProperty("--ride-glow-y", `${(12 + progress * 76).toFixed(1)}%`);
-      dipEl.style.backgroundPosition = `0 ${(progress * 100).toFixed(1)}%`;
+      // The slab stays on the ride whatever the view: it is what hides the floors changing places from the car too.
+      if (slabEl) slabEl.style.opacity = riding() ? f.slab.toFixed(3) : "0";
+      if (washEl) washEl.style.opacity = riding() || lookingFromAvatar() ? "0" : washAt(now() - ride.arrived).toFixed(3);
     }
     // Keep the view over the building while panning.
     const t = c.target;
@@ -405,9 +510,9 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
     // Last, so the labels follow the camera drawing as it ends up this frame.
     placeLabels(state.camera, size);
     // And the view as it ended up is worth remembering — but only the player's own, never while the title
-    // screen is up or the elevator is between floors.
+    // screen is up, the elevator is between floors or the cutscene has the camera.
     const p = persisting.current;
-    if (useGame.getState().started && !riding()) {
+    if (useGame.getState().started && !riding() && !cutscene.current) {
       const view = viewOf(c.target, camera);
       p.view = view;
       const json = JSON.stringify(view);
@@ -437,6 +542,8 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       maxPolarAngle={MAX_TILT}
       target={TARGET}
       onStart={() => {
+        // The camera is the cutscene's while the car rides, so a drag then is ignored; on the way back it takes over.
+        if (!riding()) cutscene.current = null;
         touched.current = true;
         homing.current = false;
         focusing.current = null;
@@ -1146,6 +1253,8 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
         <Exterior />
       </group>
       <ElevatorCar />
+      <ShaftCollar />
+      <Counterweight />
       <Avatar walking={walking} />
       <WalkDriver walking={walking} footprints={inspectableFootprints} names={m.names} racks={racks} />
 
@@ -1454,10 +1563,10 @@ function useLanded(): Floor | null {
   return landed;
 }
 
-/** Take the view to a floor, or, pressed again for the floor already on its way, arrive there at once. */
+/** Take the view to a floor, or, pressed again for the floor already on its way, hurry the car there. */
 function pressFloor(floor: Floor, how: "menu" | "key" | "map"): void {
   const s = useGame.getState();
-  if (s.floor === floor) arrive();
+  if (s.floor === floor) hurry();
   else s.goToFloor(floor, how);
 }
 
@@ -1590,8 +1699,10 @@ export default function Facility() {
   const factor = load.quality === chosen ? load.factor : 1;
   const adaptive = adapts(chosen, renderer, profile);
   const quality: QualityProfile = adaptive ? { ...profile, dpr: adapt(profile, factor, window.devicePixelRatio || 1) } : profile;
+  // The letterbox and vignette belong to the overview's cutscene; a view from the avatar rides without them.
+  const fromAvatar = useGame((s) => s.walking && s.viewpoint !== "overview");
   return (
-    <div className="stage-canvas" ref={container} tabIndex={-1}>
+    <div className={`stage-canvas${landed === null && !fromAvatar ? " is-riding" : ""}`} ref={container} tabIndex={-1}>
       {/* Shadow maps cannot be resized or switched on and off once materials are compiled, so a new quality starts a new canvas. */}
       <Canvas
         key={chosen}
@@ -1637,6 +1748,22 @@ export default function Facility() {
           dipEl = el;
         }}
       />
+      <div
+        className="ride-slab"
+        aria-hidden="true"
+        ref={(el) => {
+          slabEl = el;
+        }}
+      />
+      <div
+        className="ride-wash"
+        aria-hidden="true"
+        ref={(el) => {
+          washEl = el;
+        }}
+      />
+      <div className="ride-bar is-top" aria-hidden="true" />
+      <div className="ride-bar is-bottom" aria-hidden="true" />
       <div className="view-fade" aria-hidden="true" ref={bindViewFade} />
       <ViewOverlay />
       <Minimap onFloor={(f) => pressFloor(f, "map")} />
