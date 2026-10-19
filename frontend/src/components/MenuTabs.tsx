@@ -16,10 +16,13 @@ const MENU_TABS: TabItem<MenuTab>[] = [
   { id: "playtest", label: "Playtest", icon: "analytics" },
 ];
 
-/** The menu's tab navigation. Pass only the selected tab's content, so other tabs' sections are not mounted. */
-export function MenuTabs({ value, onChange, children }: { value: MenuTab; onChange: (tab: MenuTab) => void; children: ReactNode }) {
+/**
+ * The menu's tab navigation. Pass only the selected tab's content, so other tabs' sections are not mounted.
+ * `only` keeps a subset of the tabs, in their usual order, for an edition with a smaller menu.
+ */
+export function MenuTabs({ value, onChange, children, only }: { value: MenuTab; onChange: (tab: MenuTab) => void; children: ReactNode; only?: readonly MenuTab[] }) {
   return (
-    <Tabs label="Menu sections" tabs={MENU_TABS} value={value} onChange={onChange}>
+    <Tabs label="Menu sections" tabs={only ? MENU_TABS.filter((t) => only.includes(t.id)) : MENU_TABS} value={value} onChange={onChange}>
       {children}
     </Tabs>
   );

@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import { campaignChapters, chapterAdvance } from "@/game/campaignChapters";
 import { campaignGuidance, campaignObjective } from "@/game/campaignGuidance";
 import { useGame } from "@/game/store";
+import { scopeAllows } from "@/game/scope";
 import { Icon } from "./icons";
 import { Modal } from "./ui";
 import { tipProps } from "./tips";
@@ -15,7 +16,10 @@ export function CampaignChapters() {
   const [open, setOpen] = useState(false);
   const chapters = campaignChapters(game, learning, tutorialDone);
   const current = chapters.find((chapter) => chapter.current)!;
-  const advance = learning ? null : chapterAdvance(game);
+  const scope = useGame(s => s.scope);
+  // A chapter beyond this edition's Guided Mode is never offered as Next.
+  const offered = learning ? null : chapterAdvance(game);
+  const advance = offered && scopeAllows(scope, offered.action) ? offered : null;
   const reasonId = useId();
   const guidance = campaignGuidance(game);
   const reason = advance && !advance.ready ? guidance.notice ?? guidance.lockReason : null;

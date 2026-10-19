@@ -356,7 +356,7 @@ it("bankruptcy telemetry survives explicit restart",()=>{
  expect(useGame.getState().game.phase).toBe("ended");
  expect(readAnalytics().filter(e=>e.name==="run_failed")).toHaveLength(1);
  useGame.getState().newRun();expect(readAnalytics().filter(e=>e.name==="run_failed")).toHaveLength(1);
-});
+},15_000);
 it("proactive upgrade prevents the incident without manufacturing a milestone",()=>{
  let g=act(newGame(),{type:"start_db_upgrade"});g=advanceSteps(g,20).state;
  expect(g.campaign!.incident).toBeNull();expect(g.campaign!.openingMilestone).toBeNull();

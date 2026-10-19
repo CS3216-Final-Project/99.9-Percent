@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { isPhoneEdition } from "@/phone/edition";
 import { useGame, type TourTrack } from "@/game/store";
 import { floorOf, selectedInView } from "@/game/floors";
 import { num } from "@/game/format";
@@ -309,7 +310,8 @@ function SpotlightTutorial() {
       const side = document.querySelector(".side")?.getBoundingClientRect();
       setEdge(side && side.width > 0 && side.left > window.innerWidth / 2 && !el.closest(".side") ? side.left : undefined);
       // Equipment labels sit above their racks, so the spotlight reaches down to include them.
-      const k = window.innerWidth < 900 ? 0.45 : 1;
+      // A phone keeps the compact reach when turned on its side, wider than the desktop's narrow layout.
+      const k = isPhoneEdition() || window.innerWidth < 900 ? 0.45 : 1;
       const [pt, pr, pb, pl] = sel.startsWith(".eq-label") ? [10 * k, 46 * k, 120 * k, 46 * k] : [5, 5, 5, 5];
       const x = Math.max(4, r.left - pl);
       const y = Math.max(4, r.top - pt);
