@@ -94,3 +94,5 @@ Google OIDC, email and password accounts and optional account-owned snapshots ar
 ## Agent guidance
 
 `AGENTS.md` establishes project boundaries and validation rules. Six focused skills under `.agents/skills/` cover simulation, browser tests, gameplay UI, API tests, migrations and release checks. Their instructions support this runnable toolkit; they do not replace tests or authorize deployment.
+
+Lift geometry tests cover cabin clearance, rider spacing, ropes, counterweight travel and clipping. Errand tests cover calls, stops, return trips, player interruption and completion timestamps. The visitor lifecycle regression mounts the real errand-end subscription under StrictMode and checks that a passenger reaches the destination, a second errand starts only after the four-second rest, interrupted errands restart that rest, and the avatar at the doors keeps the car home. Browser floor/view/walking journeys retain real WebGL; these arithmetic and lifecycle checks do not establish visual fidelity.

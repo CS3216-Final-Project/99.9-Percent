@@ -9,7 +9,7 @@ import { useDetail } from "./detail";
 import { ELEVATOR_SPOT } from "./floorplan";
 import { GLASS_MATERIAL, ignoreRay } from "./furniture";
 import { ROOM } from "./layout";
-import { FLOOR_NUMBER, FLOOR_Y, rideAt } from "./levels";
+import { FLOOR_NUMBER, FLOOR_Y } from "./levels";
 import {
   CABIN,
   CABIN_CX,
@@ -30,10 +30,11 @@ import {
 } from "./lift";
 import { FURNITURE } from "./palette";
 import { PrimBatch } from "./prims";
-import { doorsNow, ride, rideClock, riding, shownFloor } from "./ride";
+import { shownFloor } from "./ride";
 import { bx, cy, type Prim } from "./shapes";
 import { brushedSteel, liftDisplay, liftFloor, liftPanel, shaftBand } from "./textures";
-import { bothFloors, viewNow } from "./viewState";
+import { carBound, carDoors, carIndicator, carMoving, carY } from "./trips";
+import { bothFloors, clipShaft, SHAFT_CLIP, viewNow } from "./viewState";
 
 /*
  * The elevator between the floors, in the east corridor beside the monitoring room's door. Each floor has a glass
@@ -168,22 +169,20 @@ export function Landing({ floor, interactive }: { floor: Floor; interactive: boo
   const end = useRef<THREE.Mesh>(null);
   const shown = useRef("");
   useFrame(() => {
-    // The doors open only where the car stands, once it has arrived.
-    const open = doorsNow(floor);
+    // The doors open only where the car stands, once it has arrived, for the player or anyone else.
+    const open = carDoors(floor);
     const slide = DOOR.w / 4 + open * (DOOR.w / 2) * 0.96;
     if (left.current) left.current.position.z = CZ - slide;
     if (right.current) right.current.position.z = CZ + slide;
     // The indicator counts towards the floor the car is going to, with an arrow while it moves.
-    const moving = riding();
-    const at = moving && !rideAt(rideClock()).arrived ? ride.from : ride.to;
-    const arrow = moving ? (FLOOR_Y[ride.to] > FLOOR_Y[ride.from] ? "up" : "down") : null;
+    const { floor: at, arrow } = carIndicator();
     const key = `${at}|${arrow}`;
     if (display.current && key !== shown.current) {
       shown.current = key;
       display.current.map = liftDisplay(FLOOR_NUMBER[at], arrow);
       display.current.needsUpdate = true;
     }
-    if (button.current) button.current.emissiveIntensity = moving ? 2.2 : 0.25;
+    if (button.current) button.current.emissiveIntensity = carMoving() ? 2.2 : 0.25;
     // Seen alone, a floor's stretch of shaft is closed off where it ends: under the office's slab, and over the
     // servers' ceiling when looking up from the avatar. Riding between, the whole shaft is open.
     if (end.current) end.current.visible = !bothFloors() && (floor === "office" || viewNow.perspective);
@@ -327,8 +326,20 @@ function carFrame(): Prim[] {
 }
 
 /** The car's light, and one of its door panels. */
-const CAR_LIGHT = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 1.46, 1.36), toneMapped: false });
+const CAR_LIGHT = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 1.46, 1.36), toneMapped: false, clippingPlanes: SHAFT_CLIP });
+/** The car's glass: the room's own, cut to the part of the shaft in view like the rest of the car. */
+const CAR_GLASS = (() => {
+  const m = GLASS_MATERIAL.clone();
+  m.clippingPlanes = SHAFT_CLIP;
+  return m;
+})();
 const CAR_DOOR_PANEL = new THREE.BoxGeometry(0.035, CAR_DOOR.h, CAR_DOOR.w / 2 - 0.01);
+
+/** The number lit on the car's panel: the floor it is going to, or none while it stands. */
+function litFloor(): number | null {
+  const bound = carBound();
+  return bound === null ? null : FLOOR_NUMBER[bound];
+}
 
 /** The steel the car's walls and doors are panelled in and its granite floor: shaded simply in basic detail, polished in HD. */
 function useCarFinish(): { wall: THREE.Material; door: THREE.Material; floor: THREE.Material } {
@@ -336,22 +347,20 @@ function useCarFinish(): { wall: THREE.Material; door: THREE.Material; floor: TH
   return useMemo(() => {
     const steel = brushedSteel();
     const floor = liftFloor();
+    const clippingPlanes = SHAFT_CLIP;
     return hd
       ? {
-          wall: new THREE.MeshStandardMaterial({ map: steel, color: "#e7eaee", metalness: 0.6, roughness: 0.38 }),
-          door: new THREE.MeshStandardMaterial({ map: steel, color: "#f0f2f5", metalness: 0.65, roughness: 0.3 }),
-          floor: new THREE.MeshStandardMaterial({ map: floor, metalness: 0.05, roughness: 0.28 }),
+          wall: new THREE.MeshStandardMaterial({ map: steel, color: "#e7eaee", metalness: 0.6, roughness: 0.38, clippingPlanes }),
+          door: new THREE.MeshStandardMaterial({ map: steel, color: "#f0f2f5", metalness: 0.65, roughness: 0.3, clippingPlanes }),
+          floor: new THREE.MeshStandardMaterial({ map: floor, metalness: 0.05, roughness: 0.28, clippingPlanes }),
         }
       : {
-          wall: new THREE.MeshLambertMaterial({ map: steel, color: "#e7eaee" }),
-          door: new THREE.MeshLambertMaterial({ map: steel, color: "#f4f6f8" }),
-          floor: new THREE.MeshLambertMaterial({ map: floor }),
+          wall: new THREE.MeshLambertMaterial({ map: steel, color: "#e7eaee", clippingPlanes }),
+          door: new THREE.MeshLambertMaterial({ map: steel, color: "#f4f6f8", clippingPlanes }),
+          floor: new THREE.MeshLambertMaterial({ map: floor, clippingPlanes }),
         };
   }, [hd]);
 }
-
-/** The floor the car stands at, or is leaving, whose doors it opens and closes with. */
-const carFloor = (): Floor => (riding() ? ride.from : ride.to);
 
 export function ElevatorCar() {
   const group = useRef<THREE.Group>(null);
@@ -364,22 +373,21 @@ export function ElevatorCar() {
   const small = useRef<THREE.MeshBasicMaterial>(null);
   const shown = useRef({ lit: "", at: "" });
   useFrame(() => {
-    if (group.current) group.current.position.y = ride.y;
-    // The car's doors move with the landing's.
-    const open = doorsNow(carFloor());
+    if (group.current) group.current.position.y = carY();
+    // The car's doors move with the landing's, wherever it stands.
+    const open = Math.max(carDoors("office"), carDoors("servers"));
     const slide = CAR_DOOR.w / 4 + open * (CAR_DOOR.w / 2) * 0.95;
     if (left.current) left.current.position.z = CAR_DOOR.z - slide;
     if (right.current) right.current.position.z = CAR_DOOR.z + slide;
-    // The floor it is going to lights up on the panel while it rides; the displays count as the landings' do.
-    const moving = riding();
-    const lit = moving ? String(FLOOR_NUMBER[ride.to]) : "";
+    // The floor it is going to lights up on the panel while it moves; the displays count as the landings' do.
+    const target = litFloor();
+    const lit = target === null ? "" : String(target);
     if (panel.current && lit !== shown.current.lit) {
       shown.current.lit = lit;
-      panel.current.map = liftPanel([FLOOR_NUMBER.office, FLOOR_NUMBER.servers], moving ? FLOOR_NUMBER[ride.to] : null);
+      panel.current.map = liftPanel([FLOOR_NUMBER.office, FLOOR_NUMBER.servers], target);
       panel.current.needsUpdate = true;
     }
-    const at = moving && !rideAt(rideClock()).arrived ? ride.from : ride.to;
-    const arrow = moving ? (FLOOR_Y[ride.to] > FLOOR_Y[ride.from] ? "up" : "down") : null;
+    const { floor: at, arrow } = carIndicator();
     const key = `${at}|${arrow}`;
     if (key !== shown.current.at) {
       shown.current.at = key;
@@ -393,7 +401,7 @@ export function ElevatorCar() {
   const inward = -Math.PI / 2;
   return (
     <group ref={group}>
-      <PrimBatch prims={prims} />
+      <PrimBatch prims={prims} clip={SHAFT_CLIP} />
       {/* The floor, and the steel up to the handrails, the doorway's returns and the panel over the doors. */}
       <mesh position={[CABIN_CX, 0.002, CABIN_CZ]} rotation={[-Math.PI / 2, 0, 0]} material={finish.floor} receiveShadow raycast={noRay}>
         <planeGeometry args={[KW, KD]} />
@@ -415,18 +423,18 @@ export function ElevatorCar() {
         <boxGeometry args={[0.04, KH - CAR_DOOR.h, CAR_DOOR.w]} />
       </mesh>
       {/* Glass above the steel, so the shaft and the floors can be seen going by. */}
-      <mesh position={[KX0 + 0.01, (DADO + KH) / 2, CABIN_CZ]} rotation={[0, Math.PI / 2, 0]} material={GLASS_MATERIAL} raycast={noRay}>
+      <mesh position={[KX0 + 0.01, (DADO + KH) / 2, CABIN_CZ]} rotation={[0, Math.PI / 2, 0]} material={CAR_GLASS} raycast={noRay}>
         <planeGeometry args={[KD, KH - DADO]} />
       </mesh>
       {[KZ0 + 0.01, KZ1 - 0.01].map((z) => (
-        <mesh key={z} position={[CABIN_CX, (DADO + KH) / 2, z]} material={GLASS_MATERIAL} raycast={noRay}>
+        <mesh key={z} position={[CABIN_CX, (DADO + KH) / 2, z]} material={CAR_GLASS} raycast={noRay}>
           <planeGeometry args={[KW, KH - DADO]} />
         </mesh>
       ))}
       {/* The ceiling: the roof's underside, and its light. */}
       <mesh position={[CABIN_CX, KH, CABIN_CZ]} rotation={[Math.PI / 2, 0, 0]} raycast={noRay}>
         <planeGeometry args={[KW, KD]} />
-        <meshLambertMaterial color="#c9cdd3" />
+        <meshLambertMaterial color="#c9cdd3" clippingPlanes={SHAFT_CLIP} />
       </mesh>
       <mesh position={[CABIN_CX, KH - 0.04, CABIN_CZ]} rotation={[Math.PI / 2, 0, 0]} material={CAR_LIGHT} raycast={noRay}>
         <planeGeometry args={[KW - 0.3, KD - 0.5]} />
@@ -436,15 +444,15 @@ export function ElevatorCar() {
       <mesh ref={right} position={[KX1 - 0.075, CAR_DOOR.h / 2, CAR_DOOR.z + CAR_DOOR.w / 4]} geometry={CAR_DOOR_PANEL} material={finish.door} raycast={noRay} />
       <mesh position={[KX1 - 0.064, 1.12, RETURN.hi]} rotation={[0, inward, 0]} raycast={noRay}>
         <planeGeometry args={[Math.min(0.22, RETURN.w - 0.08), 0.66]} />
-        <meshBasicMaterial ref={panel} map={liftPanel([FLOOR_NUMBER.office, FLOOR_NUMBER.servers], null)} toneMapped={false} />
+        <meshBasicMaterial ref={panel} map={liftPanel([FLOOR_NUMBER.office, FLOOR_NUMBER.servers], null)} toneMapped={false} clippingPlanes={SHAFT_CLIP} />
       </mesh>
       <mesh position={[KX1 - 0.064, 1.52, RETURN.hi]} rotation={[0, inward, 0]} raycast={noRay}>
         <planeGeometry args={[0.16, 0.08]} />
-        <meshBasicMaterial ref={small} map={liftDisplay(FLOOR_NUMBER.servers, null)} toneMapped={false} />
+        <meshBasicMaterial ref={small} map={liftDisplay(FLOOR_NUMBER.servers, null)} toneMapped={false} clippingPlanes={SHAFT_CLIP} />
       </mesh>
       <mesh position={[KX1 - 0.064, CAR_DOOR.h + 0.13, CAR_DOOR.z]} rotation={[0, inward, 0]} raycast={noRay}>
         <planeGeometry args={[0.32, 0.15]} />
-        <meshBasicMaterial ref={display} map={liftDisplay(FLOOR_NUMBER.servers, null)} toneMapped={false} />
+        <meshBasicMaterial ref={display} map={liftDisplay(FLOOR_NUMBER.servers, null)} toneMapped={false} clippingPlanes={SHAFT_CLIP} />
       </mesh>
     </group>
   );
@@ -484,7 +492,9 @@ export function ShaftRun() {
   const loop = useRef<THREE.Mesh>(null);
   useFrame(() => {
     const band = bandNow();
-    const car = ride.y;
+    // The car and its riders are cut to the same heights.
+    clipShaft(band[0], band[1]);
+    const car = carY();
     const foot = counterweightFoot(car);
     const head = foot + COUNTERWEIGHT.h;
     ROPE_LINES.z.forEach((z, i) => {

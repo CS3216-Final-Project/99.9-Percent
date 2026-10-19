@@ -46,6 +46,9 @@ import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
 import { ServerFloor } from "./ServerFloor";
 import { ElevatorCar, Landing, ShaftRun } from "./Elevator";
+import { carDoors, resetErrands, settleErrand } from "./trips";
+import { Visitors } from "./Visitors";
+import { playerDeparts } from "./crowd";
 import { aroundShaft } from "./lift";
 import { ELEVATOR_SPOT } from "./floorplan";
 import { backAt, FLOOR_NUMBER, FLOOR_Y, glideAt, rideAt, washAt } from "./levels";
@@ -958,6 +961,15 @@ function Labels({ landed }: { landed: Floor | null }) {
 /** Tint of the polished concrete under the corridors in HD. */
 const CONCRETE_TINT = ROOM_PALETTE.floor.concrete;
 
+/**
+ * How many people walk about the building: fewer when drawing without a graphics card or at Low quality, where every
+ * animated creature costs, but never none.
+ */
+function visitorCount(q: QualityProfile): number {
+  if (q.fps !== null && q.fps <= 20) return 4;
+  return q.detail === "basic" ? 6 : 10;
+}
+
 /** Metres each tile of the basic concrete floor spans. */
 const BASIC_TILE = 1.6;
 
@@ -1279,6 +1291,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
       </group>
       <ElevatorCar />
       <ShaftRun />
+      <Visitors count={visitorCount(quality)} />
       <Avatar walking={walking} />
       <WalkDriver walking={walking} footprints={inspectableFootprints} names={m.names} racks={racks} />
 
@@ -1578,10 +1591,16 @@ function useLanded(): Floor | null {
   const [landed, setLanded] = useState<Floor | null>(() => useGame.getState().floor);
   useEffect(() => {
     placeCar(useGame.getState().floor);
+    resetErrands();
     const stopRide = onRide((event) => setLanded(event === "arrive" ? ride.to : null));
     const stopFloor = useGame.subscribe((s, prev) => {
-      // Riding with the avatar the ride runs its course; seen from above, a click or a key cuts it short.
-      if (s.floor !== prev.floor) depart(s.floor, reducedMotion(), !(s.walking && s.started));
+      if (s.floor === prev.floor) return;
+      // The player's ride comes first: an errand ends where it is, and whoever was on it is set down where they were
+      // going. Riding with the avatar the ride runs its course; seen from above, a click or a key cuts it short.
+      const open = carDoors(ride.to);
+      settleErrand();
+      depart(s.floor, reducedMotion(), !(s.walking && s.started), open);
+      playerDeparts(ride.from, ride.to);
     });
     return () => {
       stopFloor();
@@ -1743,6 +1762,8 @@ export default function Facility() {
         events={roomEvents}
         onCreated={({ gl, camera }) => {
           cameras.overview = camera as THREE.OrthographicCamera;
+          // The elevator's car and its riders are cut to the part of the shaft in view (see viewState.ts).
+          gl.localClippingEnabled = true;
           const software = isSoftwareRenderer(gl);
           // Before the first frame, so no material is ever compiled with shadows that are not wanted.
           if (!resolveQuality(chosen, software ? "software" : "gpu", override).shadows) gl.shadowMap.enabled = false;
