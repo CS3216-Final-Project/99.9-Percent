@@ -2,6 +2,7 @@ import { currentStep, WALKTHROUGH_VERSION } from "./walkthrough";
 import { emptyMeasurement, type Measurement, type PlaytestEvent } from "./telemetry";
 import { DEFAULT_AVATAR, isAvatar, type AvatarId } from "./avatars";
 import { clampFov, FOV } from "./viewpoints";
+import { controlsOf, DEFAULT_CONTROLS, type ControlSettings } from "./controls";
 import { decodeSave, makeEnvelope, replaceable } from "./saveEnvelope";
 import { BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
 
@@ -22,6 +23,7 @@ const GRAPHICS_KEY = "nn.graphics.v1";
 const TIME_OF_DAY_KEY = "nn.timeOfDay.v1";
 const AVATAR_KEY = "nn.avatar.v1";
 const MAP_KEY = "nn.map.v1";
+const CONTROLS_KEY = "nn.controls.v1";
 /** Music on or off, from before the volume settings. Still written, so an older build keeps the player's choice. */
 const MUSIC_KEY = "nn.music.v1";
 const LEGACY_SAVE_KEY = "nn.save.v1";
@@ -427,6 +429,21 @@ export function loadAvatar(): AvatarId {
 
 export function saveAvatar(id: AvatarId): boolean {
   return write(AVATAR_KEY, id);
+}
+
+/** The look controls, or their defaults when none were stored, storage fails or what is stored is unreadable. */
+export function loadControls(): ControlSettings {
+  const stored = read(CONTROLS_KEY);
+  if (stored === null) return { ...DEFAULT_CONTROLS };
+  try {
+    return controlsOf(JSON.parse(stored));
+  } catch {
+    return { ...DEFAULT_CONTROLS };
+  }
+}
+
+export function saveControls(settings: ControlSettings): boolean {
+  return write(CONTROLS_KEY, JSON.stringify(settings));
 }
 
 /** Whether the map was left open, or null when it never was chosen or storage cannot say. */

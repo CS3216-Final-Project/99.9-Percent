@@ -23,7 +23,7 @@ afterEach(() => {
   viewNow.lockRefused = false;
 });
 
-describe("first person's overlay", () => {
+describe("the overlay of the views from the avatar", () => {
   it("tells how to look round while the mouse looks, and shows no card", () => {
     render(<ViewOverlay />);
     lockChanged(true);
@@ -57,14 +57,18 @@ describe("first person's overlay", () => {
     expect(document.querySelector(".view-dot")).not.toBeNull();
   });
 
-  it("shows nothing over the overview, and in follow only a line on swinging round", () => {
+  it("shows nothing over the overview, and in follow the same mouse look without the dot", () => {
     useGame.setState({ viewpoint: "overview" });
     const { rerender } = render(<ViewOverlay />);
     expect(document.querySelector(".view-overlay")).toBeNull();
     act(() => useGame.setState({ viewpoint: "follow" }));
     rerender(<ViewOverlay />);
-    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Drag to swing round/);
+    lockChanged(true);
+    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Move the mouse to swing round/);
     expect(document.querySelector(".view-dot")).toBeNull();
-    expect(screen.queryByRole("group", { name: "Mouse look paused" })).toBeNull();
+    lockChanged(false);
+    expect(screen.getByRole("group", { name: "Mouse look paused" })).not.toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: /^Exit follow/ })[0]);
+    expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
   });
 });

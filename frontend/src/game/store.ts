@@ -49,6 +49,8 @@ import {
   saveMode,
   loadMapOpen,
   saveMapOpen,
+  loadControls,
+  saveControls,
   retrack,
   track,
   GRAPHICS_QUALITIES,
@@ -69,6 +71,7 @@ import { loadExploration, saveExploration } from "./exploration";
 import { floorFromSearch, floorOf, type Floor, type FloorSwitch } from "./floors";
 import { DEFAULT_AVATAR, type AvatarId } from "./avatars";
 import { clampFov, fromAvatar, type Viewpoint, type ViewSwitch } from "./viewpoints";
+import { clampLookSpeed, DEFAULT_CONTROLS, type ControlSettings } from "./controls";
 
 export type View = "tech" | "engineers" | "history" | "menu" | "guidance" | "scorecard" | null;
 export type Speed = 0.5 | 1 | 2;
@@ -270,6 +273,10 @@ interface Store {
   setMapOpen: (open: boolean) => void;
   /** Record, for the analytics, that a click on the map sent the avatar walking. */
   noteMapWalk: () => void;
+  /** How the views from the avatar answer the mouse, a browser setting kept across runs and modes. */
+  controls: ControlSettings;
+  /** Change the look controls, remembered for next time. The look speed is kept in range. */
+  setControls: (patch: Partial<ControlSettings>) => void;
   /** The player's avatar, a browser setting kept across runs and modes. */
   avatar: AvatarId;
   setAvatar: (id: AvatarId) => void;
@@ -869,6 +876,18 @@ export const useGame = create<Store>()((set, get) => {
       saveMapOpen(open);
     },
     noteMapWalk: () => record("map_walked", { floor: get().floor }),
+    controls: { ...DEFAULT_CONTROLS },
+    setControls: (patch) => {
+      const now = get().controls;
+      const controls: ControlSettings = {
+        lookSpeed: patch.lookSpeed === undefined ? now.lookSpeed : clampLookSpeed(patch.lookSpeed),
+        invertY: typeof patch.invertY === "boolean" ? patch.invertY : now.invertY,
+      };
+      if (controls.lookSpeed === now.lookSpeed && controls.invertY === now.invertY) return;
+      set({ controls });
+      // Unsaved settings still apply for this visit.
+      saveControls(controls);
+    },
     avatar: DEFAULT_AVATAR,
     setAvatar: (id) => {
       if (id === get().avatar) return;
@@ -898,7 +917,7 @@ export const useGame = create<Store>()((set, get) => {
       // The map starts folded away on a phone, upright or turned on its side, where the room has little space to
       // spare: the same widths that lay the room out for a phone.
       const narrow = typeof window !== "undefined" && (window.matchMedia?.("(max-width: 900px)").matches ?? false);
-      set({ audio: loadAudio(), graphics: loadGraphics(), avatar: loadAvatar(), mapOpen: loadMapOpen() ?? !narrow });
+      set({ audio: loadAudio(), graphics: loadGraphics(), avatar: loadAvatar(), controls: loadControls(), mapOpen: loadMapOpen() ?? !narrow });
       enter(loadMode(), false);
     },
 

@@ -1,6 +1,5 @@
-import { useId, type CSSProperties } from "react";
+import { useId } from "react";
 import { useGame } from "@/game/store";
-import { FOV } from "@/game/viewpoints";
 import { Icon } from "./icons";
 import { QUALITY_OPTIONS } from "./scene/quality";
 
@@ -10,10 +9,8 @@ import { QUALITY_OPTIONS } from "./scene/quality";
  */
 export function GraphicsSettings() {
   const quality = useGame((s) => s.graphics.quality);
-  const fov = useGame((s) => s.graphics.fov);
   const setGraphics = useGame((s) => s.setGraphics);
   const group = useId();
-  const fovId = useId();
   return (
     <section className="menu-section menu-graphics" aria-label="Graphics">
       <h4>
@@ -46,24 +43,6 @@ export function GraphicsSettings() {
         ))}
       </div>
       <p className="menu-note">Changing this redraws the room, so the camera returns to its starting view.</p>
-      <div className="volume fov-setting">
-        <label htmlFor={fovId}>First-person field of view</label>
-        <input
-          id={fovId}
-          type="range"
-          min={FOV.min}
-          max={FOV.max}
-          step={1}
-          value={fov}
-          aria-valuetext={`${fov} degrees`}
-          style={{ "--fill": `${((fov - FOV.min) / (FOV.max - FOV.min)) * 100}%` } as CSSProperties}
-          onChange={(e) => setGraphics({ fov: Number(e.target.value) })}
-        />
-        <output htmlFor={fovId} aria-hidden="true">
-          {fov}°
-        </output>
-      </div>
-      <p className="menu-note">A wider view shows more of the room at once; a narrower one can feel calmer.</p>
     </section>
   );
 }

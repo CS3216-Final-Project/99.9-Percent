@@ -37,6 +37,8 @@ export const viewNow = {
   pointing: null as { x: number; y: number } | null,
   /** The room is being dragged to look round, which pointing gives way to. */
   dragging: false,
+  /** Where the overview's camera looks on the floor and the way it faces, for the map to turn with the view. */
+  overview: { x: 0, z: 0, heading: 0 },
 };
 
 /** The rig's own state between frames: reset whenever a room mounts it. */

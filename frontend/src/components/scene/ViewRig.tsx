@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import * as THREE from "three";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
 import { useGame } from "@/game/store";
-import type { Viewpoint } from "@/game/viewpoints";
+import { fromAvatar, type Viewpoint } from "@/game/viewpoints";
 import { SHAFT } from "./floorplan";
 import { FLOOR_Y } from "./levels";
 import { now, riding, viewHeight } from "./ride";
@@ -131,21 +131,28 @@ function markCamera(canvas: HTMLCanvasElement, perspective: boolean): void {
   canvas.closest(".stage-canvas")?.setAttribute("data-camera", perspective ? "perspective" : "overview");
 }
 
-/** Turning: Q and E swing, and through the eyes the left and right arrows turn. */
+/** Turning: Q and E swing, through the eyes the left and right arrows turn, and pointing turns where nothing locks. */
 function turnFor(dt: number, instant: boolean): void {
+  const { lookSpeed, invertY } = useGame.getState().controls;
   const spin = viewNow.spin;
   if (Math.abs(spin) > 1e-4) {
     const step = instant || Math.abs(spin) < 0.004 ? spin : spin * Math.min(1, dt * 10);
     viewNow.heading += step;
     viewNow.spin -= step;
   }
-  if (viewNow.want === "first") viewNow.heading += ((held.has(TURN_KEYS.left) ? 1 : 0) - (held.has(TURN_KEYS.right) ? 1 : 0)) * FIRST.turnRate * dt;
+  if (viewNow.want === "first") viewNow.heading += ((held.has(TURN_KEYS.left) ? 1 : 0) - (held.has(TURN_KEYS.right) ? 1 : 0)) * FIRST.turnRate * lookSpeed * dt;
   // Where the pointer cannot be locked, the view turns towards where the mouse points, unless the room is dragged.
   const p = viewNow.pointing;
-  if (viewNow.want === "first" && viewNow.lockRefused && !viewNow.locked && !viewNow.dragging && p) {
-    viewNow.heading -= pointTurn(p.x) * POINT.yaw * dt;
-    viewNow.eyesPitch = THREE.MathUtils.clamp(viewNow.eyesPitch + pointTurn(p.y) * POINT.pitch * dt, -FIRST.pitch, FIRST.pitch);
+  if (fromAvatar(viewNow.want) && viewNow.lockRefused && !viewNow.locked && !viewNow.dragging && p) {
+    viewNow.heading -= pointTurn(p.x) * POINT.yaw * lookSpeed * dt;
+    tilt(pointTurn(invertY ? -p.y : p.y) * POINT.pitch * lookSpeed * dt);
   }
+}
+
+/** Look further down by `by` radians, or up for less than nothing: the eyes in first person, the camera's height in follow. */
+function tilt(by: number): void {
+  if (viewNow.want === "first") viewNow.eyesPitch = THREE.MathUtils.clamp(viewNow.eyesPitch + by, -FIRST.pitch, FIRST.pitch);
+  else viewNow.pitch = THREE.MathUtils.clamp(viewNow.pitch + by, FOLLOW.lowest, FOLLOW.highest);
 }
 
 export function ViewRig() {
@@ -180,10 +187,10 @@ export function ViewRig() {
     let unlockedAt = -Infinity;
     const looking = () => viewNow.want !== "overview" && viewNow.perspective;
     const turn = (dx: number, dy: number) => {
-      const k = viewNow.locked ? MOUSE_LOOK_PER_PIXEL : LOOK_PER_PIXEL;
+      const { lookSpeed, invertY } = useGame.getState().controls;
+      const k = (viewNow.locked ? MOUSE_LOOK_PER_PIXEL : LOOK_PER_PIXEL) * lookSpeed;
       viewNow.heading -= dx * k;
-      if (viewNow.want === "first") viewNow.eyesPitch = THREE.MathUtils.clamp(viewNow.eyesPitch + dy * k, -FIRST.pitch, FIRST.pitch);
-      else viewNow.pitch = THREE.MathUtils.clamp(viewNow.pitch + dy * k, FOLLOW.lowest, FOLLOW.highest);
+      tilt((invertY ? -dy : dy) * k);
     };
     // A browser that will not lock the pointer, as an embedded one may not, looks round by pointing instead.
     const refuse = () => {
@@ -203,12 +210,12 @@ export function ViewRig() {
     mouse.take = () => {
       if (finePointer()) tryLock();
     };
-    // Choosing first person, by V or the View mode menu, takes the mouse there and then, while the key or click that
-    // chose it still lets the page lock the pointer.
+    // Choosing a view from the avatar, by V or the View mode menu, takes the mouse there and then, while the key or
+    // click that chose it still lets the page lock the pointer. Going from one such view to the other keeps it.
     const stopTaking = useGame.subscribe((s, prev) => {
-      const first = s.started && s.walking && s.viewpoint === "first";
-      const was = prev.started && prev.walking && prev.viewpoint === "first";
-      if (first && !was) mouse.take();
+      const now = s.started && s.walking && fromAvatar(s.viewpoint);
+      const was = prev.started && prev.walking && fromAvatar(prev.viewpoint);
+      if (now && !was) mouse.take();
     });
     const down = (e: PointerEvent) => {
       if (!looking() || viewNow.locked || (e.pointerType === "mouse" && e.button !== 0)) return;
@@ -244,9 +251,14 @@ export function ViewRig() {
       viewNow.dragging = false;
     };
     const click = (e: MouseEvent) => {
-      // First person is asked for, even while the view is still easing in: the click is for the mouse, not the room.
-      // Where the pointer cannot be locked, a click walks and picks as everywhere else.
-      if (viewNow.want !== "first" || viewNow.locked || viewNow.lockRefused || !finePointer()) return;
+      // Behind the avatar with the mouse taken there is no dot to aim with, so a click does nothing.
+      if (viewNow.locked && viewNow.want === "follow") {
+        e.stopPropagation();
+        return;
+      }
+      // A view from the avatar is asked for, even while it is still easing in: the click is for the mouse, not the
+      // room. Where the pointer cannot be locked, a click walks and picks as everywhere else.
+      if (!fromAvatar(viewNow.want) || viewNow.locked || viewNow.lockRefused || !finePointer()) return;
       // The click that takes the pointer is only that: it neither walks nor picks anything.
       e.stopPropagation();
       tryLock();
@@ -260,7 +272,11 @@ export function ViewRig() {
       const locked = document.pointerLockElement === canvas;
       if (viewNow.locked && !locked) unlockedAt = performance.now();
       viewNow.locked = locked;
-      if (locked) viewNow.lockRefused = false;
+      if (locked) {
+        // The browser said yes: whatever happens to the lock later, it was not refused.
+        window.clearTimeout(waiting);
+        viewNow.lockRefused = false;
+      }
       lockNews();
     };
     const escape = (e: KeyboardEvent) => {
@@ -333,7 +349,7 @@ export function ViewRig() {
         viewNow.eyesPitch = 0.12;
         rig.trailing = null;
       }
-      if (want !== "first") letGoOfPointer();
+      if (want === "overview") letGoOfPointer();
       // The room was only just drawn: the view it opens in is not a change worth hearing.
       if (rig.started) sceneSound("whoosh", WHOOSH);
       rig.move = { from, to: want, at: t, pose: viewNow.perspective ? rig.drawn : null, cut: false };

@@ -50,23 +50,23 @@ export const FIRST = {
   eye: 1.0,
   /** How far it can look up or down. */
   pitch: 1.25,
-  /** Radians a second the arrow keys turn it. */
-  turnRate: 2.2,
+  /** Radians a second the arrow keys turn it, at the usual look speed. */
+  turnRate: 1.6,
   /** Walking speed as a share of walk mode's, gentler indoors. */
   pace: 0.7,
 };
 
-/** Radians of look for each pixel the pointer is dragged. */
-export const LOOK_PER_PIXEL = 0.0045;
+/** Radians of look for each pixel the pointer is dragged, at the usual look speed (see game/controls.ts). */
+export const LOOK_PER_PIXEL = 0.003;
 /** Radians of look for each pixel the mouse moves while it looks round, gentler than a drag, as in most games. */
-export const MOUSE_LOOK_PER_PIXEL = 0.0028;
+export const MOUSE_LOOK_PER_PIXEL = 0.0016;
 
 /**
  * Looking round by pointing, where the browser will not hand over the mouse: the view turns towards where the cursor
  * is, not at all in the middle `dead` share of the view, then faster towards its edges, up to `yaw` and `pitch`
  * radians a second.
  */
-export const POINT = { dead: 0.35, yaw: 1.8, pitch: 1.1 };
+export const POINT = { dead: 0.35, yaw: 1.1, pitch: 0.6 };
 
 /**
  * How hard to turn, from -1 to 1, for a cursor `offset` from the middle of the view (-1 at one edge, 1 at the other):

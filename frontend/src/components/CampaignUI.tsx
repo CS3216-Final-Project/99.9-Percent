@@ -31,6 +31,7 @@ import { money, num } from "@/game/format";
 import { useState } from "react";
 import { campaignClockAvailable, inspectOrSelect, useGame, walkthroughHoldsClock } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
+import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { MenuActions, MenuRun, MenuTile } from "./MenuRun";
@@ -345,6 +346,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
       </>}
       {tab === "sound" && <SoundSettings />}
       {tab === "graphics" && <GraphicsSettings />}
+      {tab === "controls" && <ControlSettings />}
       {tab === "avatar" && <AvatarSettings />}
       {tab === "saves" && <>
         <div className="menu-columns">

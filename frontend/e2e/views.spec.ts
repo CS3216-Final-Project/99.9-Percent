@@ -22,11 +22,22 @@ async function open(page: Page) {
   await expectRoom(page);
 }
 
-/** The point on the map's plan for a spot on the floor, in page pixels. */
+/** Where a spot on the floor shows on the round map, which turns with the view, in page pixels. */
 async function onMap(page: Page, x: number, z: number) {
-  const box = (await map(page).locator(".map-plan").boundingBox())!;
-  // The plan shows the building with 0.8 m round it: x from -22.8 to 22.8, z from -10.3 to 15.3.
-  return { x: box.x + ((x + 22.8) / 45.6) * box.width, y: box.y + ((z + 10.3) / 25.6) * box.height };
+  return map(page)
+    .locator(".map-world")
+    .evaluate((g, [px, pz]) => {
+      const p = new DOMPoint(px, pz).matrixTransform((g as SVGGraphicsElement).getScreenCTM()!);
+      return { x: p.x, y: p.y };
+    }, [x, z] as const);
+}
+
+/** A view from the avatar has the mouse: Escape gives the cursor back, so the page's controls can be clicked. */
+async function freeCursor(page: Page) {
+  await page.keyboard.press("Escape");
+  await expect.poll(() => page.evaluate(() => document.pointerLockElement)).toBeNull();
+  // Escape so soon after letting go is still taken as letting go; past that it ends the walk.
+  await page.waitForTimeout(300);
 }
 
 test("V goes from the overview to follow and first person and back, and Escape ends the walk from any of them", async ({ page }) => {
@@ -45,9 +56,11 @@ test("V goes from the overview to follow and first person and back, and Escape e
   await expect(page.locator(".view-overlay")).toHaveCount(0);
   await expect(stage(page)).toHaveAttribute("data-camera", "overview");
   await expect(option(page, "Walk mode")).toHaveAttribute("aria-pressed", "true");
-  // Into follow again, and Escape ends the walk and the view with it.
+  // Into follow again: Escape gives the cursor back, and Escape again ends the walk and the view with it.
   await page.keyboard.press("v");
   await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
+  await freeCursor(page);
+  await expect(page.getByRole("group", { name: "Mouse look paused" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
   await expect(stage(page)).toHaveAttribute("data-camera", "overview");
@@ -142,6 +155,7 @@ test("a new graphics quality in follow redraws the room and leaves the overview 
   await stage(page).focus();
   await page.keyboard.press("v");
   await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
+  await freeCursor(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
   await menu.getByRole("tab", { name: "Graphics" }).click();
@@ -180,6 +194,8 @@ test("the map says where the avatar is, changes floor from its tabs, and walks t
   await stage(page).focus();
   await page.keyboard.press("v");
   await expect(where(page)).toHaveText("Elevator, server floor");
+  // Follow takes the mouse as it opens; the map is clicked with the cursor back.
+  await freeCursor(page);
   await map(page).getByRole("button", { name: /^Office/ }).click();
   await expect(where(page)).toHaveText("Elevator, office floor", { timeout: 20_000 });
   await expect(page.locator(".room-menu > summary .floor-number")).toHaveText("7");

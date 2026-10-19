@@ -61,6 +61,7 @@ import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
 import { buildModel, racksOf, type SceneModel } from "./sceneModel";
 import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
+import { headingFromOffset } from "./views";
 import { ViewRig } from "./ViewRig";
 import { bindViewFade, cameras, lookApi, lookingFromAvatar, viewNow } from "./viewState";
 import { Ceiling } from "./Ceiling";
@@ -395,6 +396,10 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       t.x = cx;
       t.z = cz;
     }
+    // The map turns with the view and centres on what the overview looks at.
+    viewNow.overview.x = c.target.x;
+    viewNow.overview.z = c.target.z;
+    viewNow.overview.heading = headingFromOffset(camera.position.x - c.target.x, camera.position.z - c.target.z);
     // Lower whichever walls now stand between the camera and the room. A view from the avatar raises them all.
     if (!viewNow.perspective) updateWalls(dir.copy(c.target).sub(camera.position).normalize());
     // Last, so the labels follow the camera drawing as it ends up this frame.
