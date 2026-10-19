@@ -76,10 +76,16 @@ export const lookApi = {
 export const lookingFromAvatar = () => fromAvatar(viewNow.want);
 
 let fadeEl: HTMLDivElement | null = null;
+/** What the dimming was last set to, so a frame with nothing to change writes nothing to the page. */
+let fadeShown = "";
 /** The dimming laid over the room as the view cuts between the overview and a view from the avatar. */
 export const bindViewFade = (el: HTMLDivElement | null) => {
   fadeEl = el;
+  fadeShown = "";
 };
 export function setViewFade(dark: number): void {
-  if (fadeEl) fadeEl.style.opacity = dark > 0.001 ? dark.toFixed(3) : "0";
+  const next = dark > 0.001 ? dark.toFixed(3) : "0";
+  if (!fadeEl || next === fadeShown) return;
+  fadeEl.style.opacity = next;
+  fadeShown = next;
 }

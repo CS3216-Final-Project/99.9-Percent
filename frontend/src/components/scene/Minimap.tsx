@@ -38,8 +38,11 @@ import { avatar, walkTo } from "./walk";
 /** Metres of margin round the building on the plan. */
 const PAD = 0.8;
 const BOX = { x: ROOM.x0 - PAD, z: ROOM.z0 - PAD, w: ROOM.w + 2 * PAD, d: ROOM.d + 2 * PAD };
-/** How often the avatar and the crew are redrawn, in milliseconds: often enough to follow, cheap enough to forget. */
-const REDRAW_MS = 200;
+/**
+ * How often the plan is redrawn, in milliseconds: often enough to follow the avatar on the move, and less often while
+ * only the crew wander, so the map costs little while the room is busy drawing.
+ */
+const REDRAW_MS = { walking: 200, still: 500 };
 
 /** The parts of the game the plan shows: the machines standing, and the equipment that needs looking at. */
 interface MapModel {
@@ -153,7 +156,7 @@ export function Minimap({ onFloor }: { onFloor: (floor: Floor) => void }) {
       if (open) redraw((n) => (n + 1) % 1e6);
     };
     tick();
-    const id = window.setInterval(tick, REDRAW_MS);
+    const id = window.setInterval(tick, walking ? REDRAW_MS.walking : REDRAW_MS.still);
     return () => window.clearInterval(id);
   }, [started, open, walking]);
 
