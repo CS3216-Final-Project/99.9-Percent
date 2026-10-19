@@ -61,6 +61,24 @@ export const LOOK_PER_PIXEL = 0.0045;
 /** Radians of look for each pixel the mouse moves while it looks round, gentler than a drag, as in most games. */
 export const MOUSE_LOOK_PER_PIXEL = 0.0028;
 
+/**
+ * Looking round by pointing, where the browser will not hand over the mouse: the view turns towards where the cursor
+ * is, not at all in the middle `dead` share of the view, then faster towards its edges, up to `yaw` and `pitch`
+ * radians a second.
+ */
+export const POINT = { dead: 0.35, yaw: 1.8, pitch: 1.1 };
+
+/**
+ * How hard to turn, from -1 to 1, for a cursor `offset` from the middle of the view (-1 at one edge, 1 at the other):
+ * nothing inside the dead zone, so things there can be clicked, then easing up to full at the edge.
+ */
+export function pointTurn(offset: number, dead = POINT.dead): number {
+  const a = Math.min(1, Math.abs(offset));
+  if (a <= dead) return 0;
+  const k = (a - dead) / (1 - dead);
+  return Math.sign(offset) * k * k;
+}
+
 /** Ease in and out over 0..1. */
 export const ease = (t: number) => {
   const c = Math.min(1, Math.max(0, t));

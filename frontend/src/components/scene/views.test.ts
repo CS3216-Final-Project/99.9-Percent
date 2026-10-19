@@ -16,6 +16,8 @@ import {
   headingFromOffset,
   headingOf,
   overviewOffset,
+  POINT,
+  pointTurn,
   reachInside,
   VIEW_EASE,
   type Pose,
@@ -135,6 +137,19 @@ describe("the view through the avatar's eyes", () => {
   it("cannot look further up or down than its limit", () => {
     const up = firstPose(0, 0, 0, 0, -9, 75);
     near(Math.atan2(up.ly - up.y, Math.hypot(up.lx - up.x, up.lz - up.z)), FIRST.pitch);
+  });
+});
+
+describe("looking round by pointing", () => {
+  it("leaves the middle of the view still, so things there can be clicked, and turns harder towards the edges", () => {
+    for (const offset of [0, 0.2, -0.3, POINT.dead, -POINT.dead]) expect(pointTurn(offset)).toBeCloseTo(0);
+    expect(pointTurn(1)).toBe(1);
+    expect(pointTurn(-1)).toBe(-1);
+    expect(pointTurn(0.9)).toBeGreaterThan(pointTurn(0.6));
+    expect(pointTurn(0.6)).toBeGreaterThan(0);
+    expect(pointTurn(-0.6)).toBeCloseTo(-pointTurn(0.6));
+    // Past the edge, as a cursor a pixel outside the view reads, is no faster than at it.
+    expect(pointTurn(1.4)).toBe(1);
   });
 });
 

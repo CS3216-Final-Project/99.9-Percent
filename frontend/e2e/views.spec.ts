@@ -90,6 +90,37 @@ test("first person looks round with the mouse as it opens, Escape gives the curs
   expect(await exploration(page)).toMatchObject({ walking: false, viewpoint: "overview" });
 });
 
+test("where the browser will not hand over the mouse, first person turns towards where it points, with no card", async ({ page }) => {
+  // As an embedded browser may: every request to lock the pointer is refused.
+  await page.addInitScript(() => {
+    HTMLElement.prototype.requestPointerLock = function () {
+      return Promise.reject(new DOMException("Pointer lock is not allowed here", "NotAllowedError"));
+    } as typeof HTMLElement.prototype.requestPointerLock;
+  });
+  await open(page);
+  await stage(page).focus();
+  await page.keyboard.press("v");
+  await page.keyboard.press("v");
+  await expect(page.locator(".view-dot")).toBeVisible();
+  await expect(page.locator(".view-hint")).toContainText("Point towards an edge to look round");
+  await expect(page.getByRole("group", { name: "Mouse look paused" })).toHaveCount(0);
+  // Resting in the middle of the view keeps it still; pointing near the right edge turns it, as the map's arrow shows.
+  const canvas = (await stage(page).locator("canvas").boundingBox())!;
+  const arrow = map(page).locator(".map-avatar");
+  await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+  await page.waitForTimeout(600);
+  const still = await arrow.getAttribute("transform");
+  await page.waitForTimeout(600);
+  expect(await arrow.getAttribute("transform")).toBe(still);
+  await page.mouse.move(canvas.x + canvas.width - 4, canvas.y + canvas.height / 2);
+  await expect.poll(() => arrow.getAttribute("transform"), { timeout: 10_000 }).not.toBe(still);
+  // Escape leaves first person at once.
+  await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".view-dot")).toHaveCount(0);
+  await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
+});
+
 test("seen from the avatar the elevator simply rides, without the overview's cutscene", async ({ page }) => {
   await open(page);
   await stage(page).focus();

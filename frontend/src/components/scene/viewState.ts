@@ -31,6 +31,12 @@ export const viewNow = {
   spin: 0,
   /** The pointer is locked to the room for looking round. */
   locked: false,
+  /** The browser would not lock the pointer, so first person looks round by pointing instead (see POINT). */
+  lockRefused: false,
+  /** Where the mouse is over the room, from -1 to 1 across and down from the middle; null when it is elsewhere. */
+  pointing: null as { x: number; y: number } | null,
+  /** The room is being dragged to look round, which pointing gives way to. */
+  dragging: false,
 };
 
 /** The rig's own state between frames: reset whenever a room mounts it. */
@@ -51,7 +57,7 @@ export const rig = {
 
 export function resetRig(): void {
   Object.assign(rig, { settled: "overview", move: null, trailing: null, drawn: null, started: false });
-  Object.assign(viewNow, { want: "overview", perspective: false, inHead: false, spin: 0 });
+  Object.assign(viewNow, { want: "overview", perspective: false, inHead: false, spin: 0, lockRefused: false, pointing: null, dragging: false });
 }
 
 /** What the camera buttons do in a view from the avatar. */

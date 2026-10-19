@@ -20,6 +20,7 @@ afterEach(() => {
   cleanup();
   mouse.take = () => {};
   viewNow.locked = false;
+  viewNow.lockRefused = false;
 });
 
 describe("first person's overlay", () => {
@@ -42,6 +43,18 @@ describe("first person's overlay", () => {
     expect(card).not.toBeNull();
     fireEvent.click(screen.getAllByRole("button", { name: /^Exit first person/ })[0]);
     expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
+  });
+
+  it("shows no card where the browser will not hand over the mouse, and says to point instead", () => {
+    render(<ViewOverlay />);
+    act(() => {
+      viewNow.locked = false;
+      viewNow.lockRefused = true;
+      window.dispatchEvent(new Event("nn:look-lock"));
+    });
+    expect(screen.queryByRole("group", { name: "Mouse look paused" })).toBeNull();
+    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Point towards an edge to look round/);
+    expect(document.querySelector(".view-dot")).not.toBeNull();
   });
 
   it("shows nothing over the overview, and in follow only a line on swinging round", () => {

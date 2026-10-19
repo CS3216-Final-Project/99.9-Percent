@@ -20,6 +20,8 @@ import {
   headingFromOffset,
   LOOK_PER_PIXEL,
   MOUSE_LOOK_PER_PIXEL,
+  POINT,
+  pointTurn,
   overviewOffset,
   VIEW_EASE,
   type Pose,
@@ -43,15 +45,22 @@ const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce
 /** A mouse or trackpad, where clicking the room in first person takes the pointer for looking round. */
 const finePointer = () => window.matchMedia?.("(pointer: fine)").matches ?? false;
 
-/** Lock the pointer to the room, quietly giving up where the browser will not. */
-function lockPointer(el: HTMLElement): void {
+/** Lock the pointer to the room, or say so if the browser will not, as an embedded browser may not. */
+function lockPointer(el: HTMLElement, refused: () => void): void {
+  if (!el.requestPointerLock) return refused();
   try {
-    const p = el.requestPointerLock?.() as unknown;
-    if (p && typeof (p as Promise<void>).catch === "function") (p as Promise<void>).catch(() => {});
+    const p = el.requestPointerLock() as unknown;
+    if (p && typeof (p as Promise<void>).catch === "function") (p as Promise<void>).catch(refused);
   } catch {
-    /* not allowed here: drag to look instead */
+    refused();
   }
 }
+
+/** How long to wait for the pointer to lock before taking the browser's silence as a no. */
+const LOCK_WAIT_MS = 1500;
+
+/** Tell the page the pointer's state changed: locked, given back, or never to be had here. */
+const lockNews = () => window.dispatchEvent(new Event("nn:look-lock"));
 
 function letGoOfPointer(): void {
   if (document.pointerLockElement) document.exitPointerLock?.();
@@ -131,6 +140,12 @@ function turnFor(dt: number, instant: boolean): void {
     viewNow.spin -= step;
   }
   if (viewNow.want === "first") viewNow.heading += ((held.has(TURN_KEYS.left) ? 1 : 0) - (held.has(TURN_KEYS.right) ? 1 : 0)) * FIRST.turnRate * dt;
+  // Where the pointer cannot be locked, the view turns towards where the mouse points, unless the room is dragged.
+  const p = viewNow.pointing;
+  if (viewNow.want === "first" && viewNow.lockRefused && !viewNow.locked && !viewNow.dragging && p) {
+    viewNow.heading -= pointTurn(p.x) * POINT.yaw * dt;
+    viewNow.eyesPitch = THREE.MathUtils.clamp(viewNow.eyesPitch + pointTurn(p.y) * POINT.pitch * dt, -FIRST.pitch, FIRST.pitch);
+  }
 }
 
 export function ViewRig() {
@@ -170,8 +185,23 @@ export function ViewRig() {
       if (viewNow.want === "first") viewNow.eyesPitch = THREE.MathUtils.clamp(viewNow.eyesPitch + dy * k, -FIRST.pitch, FIRST.pitch);
       else viewNow.pitch = THREE.MathUtils.clamp(viewNow.pitch + dy * k, FOLLOW.lowest, FOLLOW.highest);
     };
+    // A browser that will not lock the pointer, as an embedded one may not, looks round by pointing instead.
+    const refuse = () => {
+      if (viewNow.lockRefused) return;
+      viewNow.lockRefused = true;
+      lockNews();
+    };
+    // Some browsers neither lock nor say no: no lock soon after asking counts as no, until a lock does arrive.
+    let waiting = 0;
+    const tryLock = () => {
+      lockPointer(canvas, refuse);
+      window.clearTimeout(waiting);
+      waiting = window.setTimeout(() => {
+        if (document.pointerLockElement !== canvas) refuse();
+      }, LOCK_WAIT_MS);
+    };
     mouse.take = () => {
-      if (finePointer()) lockPointer(canvas);
+      if (finePointer()) tryLock();
     };
     // Choosing first person, by V or the View mode menu, takes the mouse there and then, while the key or click that
     // chose it still lets the page lock the pointer.
@@ -184,6 +214,15 @@ export function ViewRig() {
       if (!looking() || viewNow.locked || (e.pointerType === "mouse" && e.button !== 0)) return;
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
     };
+    // Where the mouse is over the room, for looking round by pointing.
+    const point = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse" || viewNow.locked) return;
+      const r = canvas.getBoundingClientRect();
+      viewNow.pointing = { x: ((e.clientX - r.left) / r.width) * 2 - 1, y: ((e.clientY - r.top) / r.height) * 2 - 1 };
+    };
+    const away = () => {
+      viewNow.pointing = null;
+    };
     const moveBy = (e: PointerEvent) => {
       if (viewNow.locked) {
         if (looking()) turn(e.movementX, e.movementY);
@@ -194,19 +233,23 @@ export function ViewRig() {
       const dy = e.clientY - drag.y;
       if (!drag.moved && Math.hypot(dx, dy) < 6) return;
       drag.moved = true;
+      viewNow.dragging = true;
       drag.x = e.clientX;
       drag.y = e.clientY;
       turn(dx, dy);
     };
     const up = (e: PointerEvent) => {
-      if (drag?.id === e.pointerId) drag = null;
+      if (drag?.id !== e.pointerId) return;
+      drag = null;
+      viewNow.dragging = false;
     };
     const click = (e: MouseEvent) => {
       // First person is asked for, even while the view is still easing in: the click is for the mouse, not the room.
-      if (viewNow.want !== "first" || viewNow.locked || !finePointer()) return;
+      // Where the pointer cannot be locked, a click walks and picks as everywhere else.
+      if (viewNow.want !== "first" || viewNow.locked || viewNow.lockRefused || !finePointer()) return;
       // The click that takes the pointer is only that: it neither walks nor picks anything.
       e.stopPropagation();
-      lockPointer(canvas);
+      tryLock();
     };
     const wheel = (e: WheelEvent) => {
       if (viewNow.want !== "follow" || !viewNow.perspective) return;
@@ -217,7 +260,8 @@ export function ViewRig() {
       const locked = document.pointerLockElement === canvas;
       if (viewNow.locked && !locked) unlockedAt = performance.now();
       viewNow.locked = locked;
-      window.dispatchEvent(new Event("nn:look-lock"));
+      if (locked) viewNow.lockRefused = false;
+      lockNews();
     };
     const escape = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -236,6 +280,9 @@ export function ViewRig() {
       else if (e.key === "e" || e.key === "E") lookApi.swing(SWING);
     };
     canvas.addEventListener("pointerdown", down);
+    canvas.addEventListener("pointermove", point);
+    canvas.addEventListener("pointerleave", away);
+    document.addEventListener("pointerlockerror", refuse);
     window.addEventListener("pointermove", moveBy);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
@@ -248,6 +295,12 @@ export function ViewRig() {
       stopTaking();
       mouse.take = () => {};
       canvas.removeEventListener("pointerdown", down);
+      canvas.removeEventListener("pointermove", point);
+      canvas.removeEventListener("pointerleave", away);
+      document.removeEventListener("pointerlockerror", refuse);
+      window.clearTimeout(waiting);
+      viewNow.pointing = null;
+      viewNow.dragging = false;
       window.removeEventListener("pointermove", moveBy);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);

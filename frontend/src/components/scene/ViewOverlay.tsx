@@ -13,14 +13,19 @@ function leave() {
 /**
  * What a view from the avatar lays over the room: in first person a dot marking the middle of the view, where a
  * click lands, and a line on how to look round. With a mouse, first person looks round as the mouse moves; when
- * Escape gives the cursor back, a card offers to look round again or to leave. A touch screen drags to look round,
+ * Escape gives the cursor back, a card offers to look round again or to leave. Where the browser will not hand over
+ * the mouse, there is no card: the view turns towards where the mouse points. A touch screen drags to look round,
  * and its line has a way out. Keys are left out on a touch screen.
  */
 export function ViewOverlay() {
   const viewpoint = useGame((s) => (s.started && s.walking ? s.viewpoint : "overview"));
   const [locked, setLocked] = useState(false);
+  const [refused, setRefused] = useState(false);
   useEffect(() => {
-    const changed = () => setLocked(viewNow.locked);
+    const changed = () => {
+      setLocked(viewNow.locked);
+      setRefused(viewNow.lockRefused);
+    };
     window.addEventListener("nn:look-lock", changed);
     return () => window.removeEventListener("nn:look-lock", changed);
   }, []);
@@ -33,6 +38,18 @@ export function ViewOverlay() {
         {first && locked ? (
           <>
             Move the mouse to look round · click to walk or inspect · <kbd>Esc</kbd> for the cursor
+          </>
+        ) : first && refused ? (
+          <>
+            <span className="view-hint-keys">
+              Point towards an edge to look round · click to walk or inspect · <kbd>Esc</kbd> to exit
+            </span>
+            <span className="view-hint-touch">
+              Drag to look round
+              <button type="button" className="view-exit" onClick={leave}>
+                Exit first person
+              </button>
+            </span>
           </>
         ) : first ? (
           <>
@@ -56,7 +73,7 @@ export function ViewOverlay() {
           </>
         )}
       </p>
-      {first && !locked && (
+      {first && !locked && !refused && (
         <div className="view-paused" role="group" aria-label="Mouse look paused">
           <p>
             <strong>Mouse look is paused.</strong> Look round with the mouse again, or leave first person.
