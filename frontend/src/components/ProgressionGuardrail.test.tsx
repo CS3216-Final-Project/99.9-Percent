@@ -31,6 +31,8 @@ it("counts stable spike observations and waits for an explicit acknowledgement",
 });
 it("keeps a pending postmortem in front of the guidance",()=>{
  show(recovered());
+ expect(screen.getByRole("dialog",{name:"System Recovered!"})).toBeTruthy();
+ fireEvent.click(screen.getByRole("button",{name:"View Incident Report"}));
  expect(screen.getByRole("dialog",{name:"Incident postmortem"})).toBeTruthy();
  expect(met("recovery")).toBe("true");expect(met("review")).toBe("false");
 });

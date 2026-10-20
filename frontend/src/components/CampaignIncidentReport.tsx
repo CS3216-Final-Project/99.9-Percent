@@ -1,0 +1,66 @@
+import { useEffect, useState } from "react";
+import type { CampaignPostmortem } from "@/sim/campaignTypes";
+import { incidentLesson } from "@/game/campaignPostmortem";
+import { Modal, Row } from "./ui";
+import "./CampaignIncidentReport.css";
+
+const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(c / 100);
+
+export function CampaignIncidentReport({ report }: { report: CampaignPostmortem }) {
+  const [technicalOpen, setTechnicalOpen] = useState(false);
+  const lesson = incidentLesson(report);
+  const workload = report.snapshots.filter(s => s.data);
+  return <div className="campaign-incident-report">
+    <dl className="rows report-metrics" aria-label="Recovery summary">
+      <Row label="Episode setup spending" value={dollars(report.setupCents)} />
+      {lesson.latencyMs !== undefined && <Row label="Final response time" value={`${Math.round(lesson.latencyMs)} ms`} />}
+      <Row label="Traffic status" value={lesson.traffic} />
+    </dl>
+    {([ ["What went wrong?", lesson.wrong], ["What changed?", lesson.changed],
+      ["What did you learn?", lesson.learned], ["Remember for next time", lesson.remember] ] as const).map(([title, text]) =>
+      <section key={title}><h3>{title}</h3><p>{text}</p></section>)}
+    <details className="more report-technical" onToggle={e => { if (e.target === e.currentTarget) setTechnicalOpen(e.currentTarget.open); }}><summary>View technical details</summary>
+      <p>Game seconds {report.openedStep}–{report.recoveredStep}. Episode setup spending includes recorded purchases since the preceding report (or company start), including preparation; it is not total running cost.</p>
+      <h4>Recorded causes, actions and trade-offs</h4>
+      {report.explanations.map((text, i) => <p key={i}>{text}</p>)}
+      <h4>Workload and cache evidence</h4>
+      {workload.length < report.snapshots.length && <p>Some historical observations retain aggregate evidence only; workload and cache details were not recorded.</p>}
+      {!report.snapshots.length && <p>No historical observations were retained.</p>}
+      {workload.map(m => <p key={m.step}>Game second {m.step}: {m.data!.profile}; logical work {m.data!.logical}; hits {m.data!.hits}; eligible misses {m.data!.eligibleMisses}; writes {m.data!.writes}; non-cacheable reads {m.data!.nonCacheableReads}; used rate {m.data!.effectiveHitRateUsed / 100}%; warmth used/after {m.data!.warmthUsed / 100}%/{m.data!.warmthAfterStep / 100}%; target {m.data!.target / 100}%; DB demand {m.db.demand}/{m.db.capacity}; backlog {m.db.backlog}</p>)}
+      {report.snapshots.length > 0 && <div className="report-table-scroll" tabIndex={technicalOpen ? 0 : undefined} role="region" aria-label="Recorded incident evidence">
+        <table className="campaign-table"><caption>Recorded incident evidence · game seconds</caption><thead><tr><th>Game second</th><th>Applications: demand/capacity · backlog</th><th>Routing</th><th>DB demand/capacity · backlog</th><th>Latency</th><th>Service errors</th></tr></thead>
+          <tbody>{report.snapshots.map(m => <tr key={m.step}><td>{m.step}</td><td>{m.instances ? m.instances.map(a => <div key={a.id}>{a.id.replace("app-", "App ")}: {a.demand}/{a.capacity} · {a.backlog}</div>) : `${m.app.demand}/${m.app.capacity} · ${m.app.backlog} (aggregate)`}</td><td>{m.routing ? `${m.routing.mode}: ${m.routing.targets.join(", ")}` : "—"}</td><td>{m.db.demand}/{m.db.capacity} · {m.db.backlog}</td><td>{Math.round(m.latencyMs)} ms</td><td>{m.serviceErrorRate === null ? "No completed requests" : `${(m.serviceErrorRate * 100).toFixed(2)}%`}</td></tr>)}</tbody></table>
+      </div>}
+      <h4>Action and recovery observation history</h4>
+      {report.events.length ? <ol className="report-events">{report.events.map(e => <li key={e.id}>Game second {e.step} · {e.type}<pre>{JSON.stringify(e.data, null, 2)}</pre></li>)}</ol> : <p>No event history was retained.</p>}
+      {report.snapshots.length > 0 && <details><summary>Complete recorded observations</summary><pre>{JSON.stringify(report.snapshots, null, 2)}</pre></details>}
+    </details>
+  </div>;
+}
+
+// Presentation-only receipt, separate from saves and the engine's review acknowledgement.
+// Remember only the latest report per company; review cannot return to a preceding incident.
+const receipts = new Map<string, string>();
+const receiptKey = (runId: string) => `99.99.recovery-notice:${runId}`;
+function wasPresented(runId: string, token: string) {
+  try { return localStorage.getItem(receiptKey(runId)) === token || receipts.get(runId) === token; }
+  catch { return receipts.get(runId) === token; }
+}
+export function CampaignRecoveryReview({ report, runId, onContinue }: { report: CampaignPostmortem; runId: string; onContinue: () => void }) {
+  const token = `${report.id}:${report.recoveredStep}`;
+  const [notice, setNotice] = useState(() => !wasPresented(runId, token));
+  useEffect(() => {
+    if (!notice) return;
+    receipts.set(runId, token);
+    try { localStorage.setItem(receiptKey(runId), token); } catch { /* In-memory receipt still prevents repeats during this visit. */ }
+  }, [notice, runId, token]);
+  if (notice) return <Modal title="System Recovered!" className="campaign-recovery-notice" icon={{ kind: "ok", name: "health" }}>
+    <p>Great work! Your app is running smoothly again.</p>
+    {report.limited && <p className="muted">Your traffic limit is still active; some incoming requests are rejected.</p>}
+    <div className="modal-foot"><button className="btn btn-primary" onClick={() => setNotice(false)}>View Incident Report</button></div>
+  </Modal>;
+  return <Modal title="Incident postmortem" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "incident" }}>
+    <CampaignIncidentReport report={report} />
+    <div className="modal-foot"><button className="btn btn-primary" onClick={onContinue}>Continue company</button></div>
+  </Modal>;
+}

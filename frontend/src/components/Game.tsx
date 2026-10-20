@@ -1,4 +1,5 @@
 "use client";
+import { CampaignAttentionHost } from "./CampaignAttention";
 import { RoomControlsHost, RoomControlsSlot } from "./RoomControlsHost";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 import "./ControlsDock.css";
@@ -424,7 +425,7 @@ export default function Game() {
   }
 
   return (
-    <RoomControlsHost><div className={`app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`}>
+    <RoomControlsHost><CampaignAttentionHost><div className={`app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`}>
       {campaign ? <CampaignHeader /> : <TopBar />}
       {started && !campaign && <OperationsRail />}
       <main className="stage">
@@ -441,6 +442,6 @@ export default function Game() {
       {started && <InspectionReveal />}
       {!campaign && started && phase === "review" && <PostmortemModal />}
       {!campaign && started && phase === "ended" && <EndReport />}
-    </div></RoomControlsHost>
+    </div></CampaignAttentionHost></RoomControlsHost>
   );
 }

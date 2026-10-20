@@ -5,9 +5,55 @@ import { completeTutorial, advanceCampaignStep, finishChapterZero, nextChapterZe
 import { financeDuringWalkthrough } from "./financeIntegration";
 import { test, expect, expectRoom, savedGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
+import { recoveryJourney } from "./incidentRecovery";
+import { pauseArrival } from "./incidentPause";
 import { advanceSteps } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
 import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
+
+for (const width of [390, 320]) test(`Phase 1 Hint and accepted control remain usable by touch at ${width}px`, async ({ page, installClock }, info) => {
+  await installClock(); await page.setViewportSize({ width, height: width === 320 ? 568 : 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("**/api/**", route => route.abort());
+  const game = advanceSteps(newGame(), 6).state;
+  await seedSave(page, game); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).tap(); await expectRoom(page);
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
+  await page.getByRole("button", {name:"Hide equipment and actions",exact:true}).tap();
+  // A real tap resets inactivity without changing the company.
+  await page.getByRole("button", { name: "Hint", exact: true }).tap();
+  const card = page.getByRole("dialog", { name: "Hint", exact: true });
+  await expect(card).toBeInViewport({ ratio: 1 }); await expect(card).toContainText("Your database is overloaded");
+  await expect(card.locator("p")).toHaveCount(1); await expect(card.locator("input,fieldset,select")).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath(`hint-card-touch-${width}.png`) });
+
+  await card.getByRole("button", { name: "Got it" }).tap();
+  const target = page.locator(".campaign-gold-attention");
+  await expect(target).toHaveCount(1); await expect(target).toHaveAccessibleName("Equipment & actions");
+  await target.tap();
+  await expect(target).toHaveCount(1); await expect(target).toHaveAccessibleName(/^Upgrade database/);
+  await expect(target).toBeInViewport({ ratio: 1 });
+  expect(await target.evaluate(node => getComputedStyle(node).animationName)).toBe("none");
+  expect((await savedGame(page)).campaign!.inputs).toEqual(game.campaign!.inputs);
+  await page.screenshot({ path: info.outputPath(`hint-target-touch-${width}.png`) });
+  await target.tap(); await expect(target).toHaveCount(1); await expect(target).toHaveAccessibleName("Confirm");
+  await expect(target).toBeInViewport({ratio:1});
+  expect(await target.evaluate(node => getComputedStyle(node).animationName)).toBe("none");
+  await page.screenshot({path:info.outputPath(`confirm-touch-${width}.png`)});
+  const values = page.getByRole("region",{name:"Purchase preview"}).locator(".purchase-tile dd");
+  await expect(values).toHaveCount(4);
+  for (const value of await values.all()) {
+    await value.scrollIntoViewIfNeeded();
+    await expect(value).toBeInViewport({ratio:1});
+  }
+  await expect(target).toHaveCount(1); await expect(target).toHaveAccessibleName("Confirm");
+  await expect(target).toBeInViewport({ratio:1});
+  await page.getByRole("button",{name:"Cancel",exact:true}).tap(); await expect(target).toHaveCount(0);
+  await page.getByRole("button",{name:/^Upgrade database/}).tap(); await expect(target).toHaveAccessibleName("Confirm");
+  await target.tap(); await expect(target).toHaveCount(0);
+  expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="upgrade-db")).toBe(true);
+  await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeInViewport({ ratio: 1 });
+});
 
 test("Walkthrough practice stays visible and can be exited by touch during a saved incident", async ({ page, withoutRoom }) => {
   await withoutRoom();
@@ -518,4 +564,45 @@ test("menu actions and unsaved exit confirmation are reachable by touch", async 
   await confirm.getByRole("button", { name: "Exit without saving", exact: true }).tap();
   await expect(page.getByRole("region", { name: "Choose how you want to play" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test.describe('Campaign recovery feedback on touch', () => {
+  test.use({ reviewRecoveryNotice: false });
+  for (const width of [390, 320]) test(`recovery report: touch acknowledgement, evidence and reload at ${width}px`, async ({ page, installClock }, info) => {
+    await page.setViewportSize({ width, height: width === 320 ? 568 : 844 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await installClock(); await recoveryJourney(page, info, true, width === 320);
+  });
+});
+
+for (const width of [390, 320]) test(`progression choice: visible growth explanation on touch at ${width}px`, async ({ page, installClock }, info) => {
+  await installClock(); await page.setViewportSize({ width, height: width === 320 ? 568 : 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.route('**/api/**', r => r.abort());
+  const game = act(act(tick(act(tick(newGame(), 6), { type: 'start_db_upgrade' }), 30), { type: 'acknowledge_review' }), { type: 'acknowledge_milestone' });
+  await seedSave(page, game); await page.goto('/');
+  await page.getByRole('button', { name: 'Continue company', exact: true }).tap(); await expectRoom(page);
+  const choice = page.getByRole('button', { name: 'Consider growth with current capacity', exact: true });
+  await choice.scrollIntoViewIfNeeded();
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
+  await page.keyboard.press('Shift'); await page.clock.runFor(9999);
+  const gold = page.locator('.campaign-gold-attention'); await expect(gold).toHaveCount(0);
+  await page.clock.runFor(1); await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName('Hint');
+  await gold.tap();
+  const hint = page.getByRole('dialog', { name: 'Hint', exact: true });
+  await expect(hint.getByRole('button', { name: 'Upgrade database', exact: true })).toBeVisible();
+  await hint.getByRole('button', { name: 'Accept risk', exact: true }).tap();
+  await expect(gold).toHaveAccessibleName('Consider growth with current capacity');
+  await expect(choice).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: info.outputPath('growth-choice-touch.png') });
+  await choice.tap(); await expect(gold).toHaveCount(1);
+  await expect(gold).toHaveAccessibleName("Accept growth risk"); await expect(gold).toBeInViewport({ ratio: 1 });
+  await page.getByRole('button', { name: 'Keep preparing', exact: true }).tap();
+  expect((await savedGame(page)).campaign!.inputs).toEqual(game.campaign!.inputs);
+});
+
+for (const width of [390, 320]) test(`incident Pause: immediate touch attention at ${width}px`, async ({ page, installClock }, info) => {
+  await installClock(); await page.setViewportSize({ width, height: width === 320 ? 568 : 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await pauseArrival(page, info, width === 320 ? 5 : 2, true);
 });

@@ -159,7 +159,7 @@ export function TooltipLayer() {
   const { label, key } = splitShortcut(active.text);
   return createPortal(
     <div ref={box} id={id} role="tooltip" className="tooltip">
-      <span className="tooltip-text">{label}</span>
+      <span className="tooltip-text">{active.el.getAttribute("data-tip-title") && <strong className="tooltip-title">{active.el.getAttribute("data-tip-title")}</strong>}{label}</span>
       {key && <kbd className="tooltip-key">{key}</kbd>}
       <span className="tooltip-arrow" aria-hidden="true" />
     </div>,

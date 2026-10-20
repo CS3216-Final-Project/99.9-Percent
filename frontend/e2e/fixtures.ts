@@ -11,7 +11,14 @@ const controlledPages = new WeakSet<Page>();
 type ClockOptions = Parameters<Page["clock"]["install"]>[0];
 
 // Unhandled browser errors fail each case. Journeys that call withoutRoom() skip the WebGL scene; the rest draw it.
-export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; overviewChosen: boolean; chosenView: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
+export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; recoveryNotices: void; reviewRecoveryNotice: boolean; overviewChosen: boolean; chosenView: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
+  // Existing journeys still review and acknowledge the actual report themselves. Only the new
+  // presentation step is handled here; dedicated two-stage/reload/focus journeys opt out.
+  reviewRecoveryNotice: [true, { option: true }],
+  recoveryNotices: [async ({ page, reviewRecoveryNotice }, use) => {
+    if (reviewRecoveryNotice) await page.addLocatorHandler(page.getByRole('dialog', { name: 'System Recovered!', exact: true }), dialog => dialog.getByRole('button', { name: 'View Incident Report', exact: true }).click());
+    await use();
+  }, { auto: true }],
   // Opt in before navigation. Scene-only journeys keep the browser's native animation/audio clocks.
   installClock: async ({ page }, provide) => { await provide(async (options) => { await page.clock.install(options); controlledPages.add(page); }); },
   /**
