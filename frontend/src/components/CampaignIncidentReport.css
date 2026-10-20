@@ -1,0 +1,17 @@
+.campaign-recovery-notice .modal-body { text-align: center; }
+.campaign-recovery-notice .modal-foot { justify-content: center; }
+/* Keep the acknowledgement reachable without scrolling the learning summary past its start. */
+.campaign-recovery-report > .modal-body { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.campaign-recovery-report .campaign-incident-report { min-height: 0; overflow-y: auto; }
+.campaign-recovery-report .modal-foot { flex: none; }
+.campaign-incident-report > section { margin-block: 16px; }
+.campaign-incident-report > section h3 { margin-bottom: 4px; }
+.campaign-incident-report > section p { margin-block: 0; line-height: 1.5; }
+.campaign-incident-report .report-metrics .row { flex-wrap: wrap; gap: 4px 12px; }
+.campaign-incident-report .report-metrics dd { max-width: 100%; }
+.report-technical { overflow-wrap: anywhere; }
+.report-technical > summary { min-height: 44px; align-content: center; }
+.report-table-scroll { max-width: 100%; overflow-x: auto; }
+.report-table-scroll table { min-width: 640px; }
+.report-technical pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-xs); }
+.report-events { padding-inline-start: 20px; }

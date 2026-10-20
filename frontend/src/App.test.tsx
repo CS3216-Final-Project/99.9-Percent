@@ -118,6 +118,8 @@ describe("opening UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(8000));
+    expect(screen.getByRole("dialog", { name: "System Recovered!" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "View Incident Report" }));
     expect(screen.getByRole("dialog", { name: "Incident postmortem" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Continue company" })); fireEvent.click(screen.getByRole("button", { name: "Continue operating" }));
     expect(useGame.getState().game.phase).toBe("management"); expect(useGame.getState().running).toBe(false);

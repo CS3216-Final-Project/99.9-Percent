@@ -118,9 +118,10 @@ it("Scale Up describes the selected server rather than implying another installe
 it("postmortem keeps all actual causes and observations reachable while leading with a compact summary", () => {
   let game=advanceSteps(newGame(1,"report-info"),6).state;
   game=advanceSteps(perform(game,{type:"start_db_upgrade"}),30).state; renderCompany(game);
+  fireEvent.click(screen.getByRole("button",{name:"View Incident Report"}));
   const report=screen.getByRole("dialog",{name:"Incident postmortem"});
-  for(const explanation of game.campaign!.reports[0].explanations) expect(report.textContent).toContain(explanation.replace(/\b\d+\.\d{3,}\b/g,v=>Number(v).toFixed(2)));
-  fireEvent.click(within(report).getByText("Causes, actions and trade-offs"));
+  for(const explanation of game.campaign!.reports[0].explanations) expect(report.textContent).toContain(explanation);
+  fireEvent.click(within(report).getByText("View technical details"));
   expect(within(report).getByRole("button",{name:"Continue company"})).toBeTruthy();
 });
 it.each([

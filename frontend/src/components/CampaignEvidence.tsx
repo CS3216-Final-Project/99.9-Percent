@@ -39,7 +39,7 @@ export function ApplicationInstances({ campaign: c, recipients, selectedAppId, o
       const x = m.instances?.find(i => i.id === a.id), receiving = recipients.includes(a.id), pressed = selectedAppId === a.id;
       const status = receiving ? "Receiving traffic" : "Installed - not receiving traffic";
       const tone = x ? utilTone(ratioOf(x.demand, x.capacity)) : "ok";
-      return <button type="button" key={a.id} className={`instance-card${pressed ? " is-selected" : ""}`} aria-pressed={pressed}
+      return <button type="button" key={a.id} data-guidance-app={a.id} className={`instance-card${pressed ? " is-selected" : ""}`} aria-pressed={pressed}
         aria-label={`${appName(a.id)}: ${status}${x ? `. ${x.demand} of ${x.capacity} req/s, processed ${x.processed}, backlog ${x.backlog}` : ""}`}
         {...tipProps(`Capacity ${a.capacity} req/s; backlog ${a.backlog}. ${status}`)} onClick={() => onSelect(a.id)}>
         <span className="instance-head"><Icon name="server" size={14} /><strong>{appName(a.id)}</strong>

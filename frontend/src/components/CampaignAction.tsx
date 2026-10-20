@@ -17,6 +17,8 @@ import { Act } from "./ui";
 import { Icon } from "./icons";
 import { confirmationRoomArea } from "./roomArea";
 import { confirmingAction, setConfirming, subscribeConfirming } from "./actionConfirmation";
+import { guidanceActionId } from "@/game/campaignAttention";
+import { useCampaignAttention } from "./useCampaignAttention";
 
 /** Equipment roles shown in the quote's supporting facts. */
 const MACHINES: Partial<Record<EquipmentId, { name: string; does: string }>> = {
@@ -46,6 +48,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   const { game, selectedAppId } = useGame();
   const c = game.campaign!, id = useId(), card = useRef<HTMLDivElement>(null);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
+  const { confirmationGold } = useCampaignAttention();
   const quoteLesson = useGame(s => s.started && !s.onboarding && s.game.phase === "management" && s.tour?.track === "campaign" ? lessonAt(s.tour.step) : undefined);
   const practiceQuote = quoteLesson === "quote" || quoteLesson === "cancel";
   const open = confirming === props.label;
@@ -118,6 +121,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   else if (label === "Deploy Automatic Failover" && !c.apps.some(a => a.id === c.reliabilityStage?.spareId && a.health !== "failed")) reason = "Reserve a healthy spare first.";
   else if (busy) reason = "An infrastructure deployment is pending. Wait for activation.";
   const reviewed = useRef("");
+  const [reviewedQuote, setReviewedQuote] = useState("");
   const dispatched = useRef(false);
   const [changed,setChanged] = useState(false);
   const introductionActive = useGame(s=>s.onboarding);
@@ -165,13 +169,14 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     if (open) { if (!practiceQuote) setConfirming(null); return; }
     setConfirming(label);
     reviewed.current = signature(preview);
+    setReviewedQuote(signature(preview));
     dispatched.current = false;
     setChanged(false);
     const s = useGame.getState(), floor = floorOf(affected[0]);
     if (s.floor !== floor) s.goToFloor(floor, "action");
     s.focusCamera(anchor);
   };
-  return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey} data-campaign-action={label}
+  return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey} data-campaign-action={label} data-guidance-action={props.decision ? guidanceActionId(props.decision) : undefined}
     onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)}
     onFocus={() => setPointing(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPointing(false); }}>
     <Act {...props} disabled={props.disabled || preview?.ok === false} onClick={toggle} />
@@ -213,12 +218,12 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
         {(props.disabled || preview?.ok===false) && <p role="status">{reason}</p>}
         {changed && <p role="status">The purchase preview changed. Review the current figures, then confirm again.</p>}
         <div className="btn-row">
-          <button type="button" className="btn btn-primary btn-small" autoFocus={!practiceQuote} disabled={practiceQuote || props.disabled || preview?.ok === false} onClick={() => {
+          <button type="button" className={`btn btn-primary btn-small${confirmationGold && preview?.ok && !props.disabled && !practiceQuote && signature(preview) === reviewedQuote ? " campaign-gold-attention" : ""}`} autoFocus={!practiceQuote} disabled={practiceQuote || props.disabled || preview?.ok === false} onClick={() => {
             if (practiceQuote || !open || dispatched.current) return;
             if (props.decision) {
               const latest = previewCampaignAction(useGame.getState().game,props.decision);
               if (!latest.ok) { useGame.getState().notify(latest.reason,"error"); return; }
-              if (signature(latest) !== reviewed.current) { reviewed.current=signature(latest);setChanged(true);return; }
+              if (signature(latest) !== reviewed.current) { reviewed.current=signature(latest);setReviewedQuote(signature(latest));setChanged(true);return; }
             }
             dispatched.current = true;
             setConfirming(null); props.onClick();

@@ -1,0 +1,21 @@
+/* Spend empty header space, preserving every existing indicator's width and typography. */
+.topbar.has-global-hint { gap: 6px; }
+.topbar.has-global-hint > .brand { min-width: 106px; }
+@media (min-width: 901px) and (max-width: 1250px) { .topbar.has-global-hint > .brand { min-width: 86px; } }
+@media (max-width: 900px) {
+  .topbar.has-global-hint { gap: 6px 10px; }
+  .topbar.has-global-hint > .brand { min-width: 0; }
+}
+.campaign-gold-attention { outline: 3px solid var(--go) !important; outline-offset: 2px; box-shadow: 0 0 9px 3px #ffd84a99 !important; }
+.campaign-gold-attention:focus-visible { outline-color: var(--focus) !important; box-shadow: 0 0 0 3px var(--go), 0 0 12px 5px #ffd84a99 !important; }
+@media (prefers-reduced-motion: no-preference) {
+  .campaign-gold-attention { animation: campaign-attention-pulse 1.8s ease-in-out infinite; }
+}
+@keyframes campaign-attention-pulse { 50% { filter: drop-shadow(0 0 5px #ffd84acc); } }
+.campaign-hint-card { position: fixed; z-index: 40; display: flex; flex-direction: column; padding: 14px; overflow: hidden; border: 1px solid var(--control-edge); border-radius: var(--radius-panel); background: var(--paper); color: var(--ink); box-shadow: var(--lift); }
+.campaign-hint-copy { min-height: 0; overflow-y: auto; }
+.campaign-hint-card > .btn, .campaign-hint-heading { flex: none; }
+.campaign-hint-heading, .campaign-hint-heading h3 { display: flex; align-items: center; gap: 8px; }
+.campaign-hint-heading { justify-content: space-between; }
+.campaign-hint-card p { margin: 10px 0; }
+.tooltip-title { display: block; margin-bottom: 3px; }
