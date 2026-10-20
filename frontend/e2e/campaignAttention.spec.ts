@@ -20,6 +20,21 @@ async function idle(page: Page, milliseconds = 10_000) {
 }
 const gold = (page: Page) => page.locator(".campaign-gold-attention");
 
+async function expectFullyVisibleGold(page: Page) {
+  // IntersectionObserver rounds a fully-contained fractional popover to 0.999999344.
+  // Check exact full-button bounds, every clipping ancestor and five hit-test points instead.
+  await expect.poll(() => gold(page).evaluate(node => {
+    const box=node.getBoundingClientRect();
+    if (box.left < 5 || box.top < 5 || box.right > innerWidth-5 || box.bottom > innerHeight-5) return false;
+    for(let parent=node.parentElement;parent;parent=parent.parentElement){
+      const clip=getComputedStyle(parent),bounds=parent.getBoundingClientRect();
+      if(/auto|scroll|hidden|clip/.test(clip.overflowY) && (box.top<bounds.top || box.bottom>bounds.bottom)) return false;
+      if(/auto|scroll|hidden|clip/.test(clip.overflowX) && (box.left<bounds.left || box.right>bounds.right)) return false;
+    }
+    return [[box.left+8,box.top+8],[box.right-8,box.top+8],[box.left+8,box.bottom-8],[box.right-8,box.bottom-8],[(box.left+box.right)/2,(box.top+box.bottom)/2]].every(([x,y])=>node.contains(document.elementFromPoint(x,y)));
+  })).toBe(true);
+}
+
 const scaling = () => act(act(tick(act(tick(newGame(), 6), { type: "start_db_upgrade" }), 30), { type: "acknowledge_review" }), { type: "acknowledge_milestone" });
 for (const [chapter, company, expected] of [
   [1, newGame, "Run"], [2, scaling, "Hint"], [3, dataCompany, /^Next:/],
@@ -35,12 +50,17 @@ for (const [chapter, company, expected] of [
   else await expect(gold(page)).toHaveCount(0);
 });
 
+test("guidance incident: ten idle seconds offer Hint without changing company state", async ({ page, installClock }, info) => {
+  await installClock(); const game = advanceSteps(newGame(), 6).state; await boot(page, game);
+  await idle(page); await expect(gold(page)).toHaveAccessibleName("Hint");
+  await page.screenshot({ path: info.outputPath("hint-gold.png") });
+  expect((await savedGame(page)).campaign!.inputs).toEqual(game.campaign!.inputs);
+  expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step);
+});
+
 test("guidance incident: short help targets the upgrade and preserves readings", async ({ page, installClock }, info) => {
   await installClock(); await boot(page, advanceSteps(newGame(), 6).state);
   const before = (await savedGame(page)).campaign!;
-  await idle(page);
-  await expect(gold(page)).toHaveAccessibleName("Hint");
-  await page.screenshot({ path: info.outputPath("hint-gold.png") });
   await page.getByRole("button", { name: "Hint", exact: true }).click();
   const card = page.getByRole("dialog", { name: "Hint", exact: true });
   await expect(card).toContainText("Your database is overloaded"); await expect(card).toHaveAttribute("aria-modal", "false");
@@ -66,11 +86,21 @@ test("guidance incident: short help targets the upgrade and preserves readings",
   await page.getByRole("button",{name:"Cancel",exact:true}).click(); await expect(gold(page)).toHaveCount(0);
 });
 
-test("guidance accepted installation justifies Run and activates through the public clock", async ({ page, installClock }, info) => {
+test("guidance accepted installation justifies Run after ten idle seconds", async ({ page, installClock }, info) => {
   await installClock();
   const pending = act(advanceSteps(newGame(), 6).state, { type: "start_db_upgrade" });
   await boot(page, pending); await idle(page); await expect(gold(page)).toHaveAccessibleName("Run");
   await page.screenshot({ path: info.outputPath("run-gold.png") });
+  expect((await savedGame(page)).campaign!.inputs).toEqual(pending.campaign!.inputs);
+  expect((await savedGame(page)).campaign!.step).toBe(pending.campaign!.step);
+});
+
+test("guidance accepted installation activates through the public clock", async ({ page, installClock }) => {
+  await installClock(); const pending = act(advanceSteps(newGame(), 6).state, { type: "start_db_upgrade" });
+  await boot(page, pending); await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
+  await page.getByRole("button", { name: "Hint", exact: true }).click();
+  await page.getByRole("dialog", { name: "Hint", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
+  await expect(gold(page)).toHaveAccessibleName("Run");
   await page.getByRole("button", { name: "Run", exact: true }).click(); await expect(gold(page)).toHaveCount(0);
   await page.clock.runFor(3000);
   expect((await savedGame(page)).campaign!.pending).toHaveLength(0);
@@ -78,17 +108,32 @@ test("guidance accepted installation justifies Run and activates through the pub
   await page.getByRole("button", { name: "Pause", exact: true }).click();
 });
 
-test("guidance measured incident recovery justifies Run, then yields to postmortem", async ({ page, installClock }) => {
-  await installClock();
+function measuredRecoveryCompany() {
   let game = act(advanceSteps(newGame(), 6).state, { type: "start_db_upgrade" });
   for (let i = 0; i < 30 && !game.campaign!.incident?.stableSteps; i++) game = tick(game);
   expect(game.campaign!.incident!.stableSteps).toBeGreaterThan(0);
-  await boot(page, game); await setGameSpeed(page, 2);
-  // Idle is still ten real seconds at 2×; five physical seconds need only 2.5 seconds of rendered ticks.
+  return game;
+}
+test("guidance measured incident recovery justifies Run after ten idle seconds", async ({ page, installClock }) => {
+  await installClock(); const game = measuredRecoveryCompany(); await boot(page, game); await setGameSpeed(page, 2);
   await idle(page); await expect(gold(page)).toHaveAccessibleName("Run");
-  await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(2500);
-  await expect(page.getByRole("dialog", { name: "Incident postmortem" })).toBeVisible();
-  await expect(gold(page)).toHaveCount(0);
+  expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step);
+});
+test.describe("guidance measured recovery review", () => {
+  test.use({ reviewRecoveryNotice: false });
+  test("guidance measured incident recovery yields to the recovery notice and postmortem", async ({ page, installClock }) => {
+    await installClock(); await boot(page, measuredRecoveryCompany()); await setGameSpeed(page, 2);
+    await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
+    await page.getByRole("button", { name: "Hint", exact: true }).click();
+    await page.getByRole("dialog", { name: "Hint", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
+    await expect(gold(page)).toHaveAccessibleName("Run");
+    await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(2500);
+    const notice = page.getByRole("dialog", { name: "System Recovered!", exact: true });
+    await expect(notice).toBeVisible(); await expect(gold(page)).toHaveCount(0);
+    await notice.getByRole("button", { name: "View Incident Report", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Incident postmortem", exact: true })).toBeVisible();
+    await expect(gold(page)).toHaveCount(0);
+  });
 });
 
 test("guidance pending postmortem retains priority through ten idle seconds", async ({ page, installClock }) => {
@@ -203,7 +248,7 @@ for (const width of [1440, 1366]) test(`action guidance nested DB purchase and i
   await page.screenshot({path:info.outputPath("upgrade-target.png")});
   await gold(page).focus(); await page.keyboard.press("Enter");
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Confirm");
-  await expect(gold(page)).toBeInViewport({ratio:1});
+  await expectFullyVisibleGold(page);
   await expect(page.getByRole("region",{name:"Purchase preview"})).toContainText("Cash after");
   await page.screenshot({path:info.outputPath("confirm-target.png")});
   await page.getByRole("button",{name:"Cancel",exact:true}).click(); await expect(gold(page)).toHaveCount(0);
@@ -254,18 +299,7 @@ for (const [label,company] of [
   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
   const control=page.getByRole("button",{name:new RegExp(`^${label}`)}); await control.click();
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Confirm");
-  // IntersectionObserver rounds a fully-contained fractional popover to 0.999999344.
-  // Check exact full-button bounds, every clipping ancestor and five hit-test points instead.
-  await expect.poll(() => gold(page).evaluate(node => {
-    const box=node.getBoundingClientRect();
-    if (box.left < 5 || box.top < 5 || box.right > innerWidth-5 || box.bottom > innerHeight-5) return false;
-    for(let parent=node.parentElement;parent;parent=parent.parentElement){
-      const clip=getComputedStyle(parent),bounds=parent.getBoundingClientRect();
-      if(/auto|scroll|hidden|clip/.test(clip.overflowY) && (box.top<bounds.top || box.bottom>bounds.bottom)) return false;
-      if(/auto|scroll|hidden|clip/.test(clip.overflowX) && (box.left<bounds.left || box.right>bounds.right)) return false;
-    }
-    return [[box.left+8,box.top+8],[box.right-8,box.top+8],[box.left+8,box.bottom-8],[box.right-8,box.bottom-8],[(box.left+box.right)/2,(box.top+box.bottom)/2]].every(([x,y])=>node.contains(document.elementFromPoint(x,y)));
-  })).toBe(true);
+  await expectFullyVisibleGold(page);
   await page.getByRole("button",{name:"Cancel",exact:true}).click(); await expect(gold(page)).toHaveCount(0);
 });
 

@@ -20,7 +20,7 @@ test("incident Pause: preserves the first-incident stop and paused-save resume",
   await expect(page.locator(".campaign-gold-attention")).toHaveCount(0);
 });
 
-test("incident Pause: pause to ten-second Hint, accepted action and immediate Confirm", async ({ page, installClock }) => {
+test("incident Pause: pause to ten-second Hint", async ({ page, installClock }) => {
   await installClock(); await bootPause(page, pauseTransition(3).before);
   const gold = page.locator(".campaign-gold-attention");
   await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
@@ -28,7 +28,15 @@ test("incident Pause: pause to ten-second Hint, accepted action and immediate Co
   const paused = (await savedGame(page)).campaign!;
   await page.clock.runFor(9999); await expect(gold).toHaveCount(0);
   await page.clock.runFor(1); await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("Hint");
-  await gold.click(); const hint = page.getByRole("dialog", { name: "Hint", exact: true });
+  expect((await savedGame(page)).campaign!.inputs).toEqual(paused.inputs);
+  expect((await savedGame(page)).campaign!.step).toBe(paused.step);
+});
+
+test("incident Pause: paused incident Hint targets the accepted action and immediate Confirm", async ({ page, installClock }) => {
+  await installClock(); await bootPause(page, pauseTransition(3).incident);
+  const gold = page.locator(".campaign-gold-attention"), paused = (await savedGame(page)).campaign!;
+  await page.getByRole("button", { name: "Hint", exact: true }).click();
+  const hint = page.getByRole("dialog", { name: "Hint", exact: true });
   await expect(hint.locator("p")).toHaveCount(1); expect((await hint.locator("p").innerText()).split(/\s+/).length).toBeLessThan(25);
   await hint.getByRole("button", { name: "Got it", exact: true }).click();
   await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(/^Upgrade database/);

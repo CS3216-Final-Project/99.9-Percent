@@ -169,6 +169,12 @@ test("where the browser will not hand over the mouse, first person turns towards
   await expect(page.locator(".view-dot")).toBeVisible();
   await expect(page.locator(".view-hint")).toContainText("Move the mouse to look around");
   await expect(page.getByRole("group", { name: "Mouse look paused" })).toHaveCount(0);
+  // Wait for ResizeObserver to fit the canvas after Classic's sidebar appears.
+  // CI captured the old 1440px width at x=280, sending the edge pointer to x=1716 outside the viewport.
+  await expect.poll(() => stage(page).locator("canvas").evaluate(node => {
+    const box = node.getBoundingClientRect(), host = node.closest(".stage-canvas")!.getBoundingClientRect();
+    return box.width > 0 && Math.abs(box.width - host.width) < 1 && Math.abs(box.height - host.height) < 1 && box.right <= Math.min(innerWidth, host.right) && box.bottom <= Math.min(innerHeight, host.bottom);
+  })).toBe(true);
   // Resting in the middle of the view keeps it still; pointing near the right edge turns it, as the map's arrow shows.
   const canvas = (await stage(page).locator("canvas").boundingBox())!;
   const arrow = map(page).locator(".map-avatar");
@@ -186,7 +192,9 @@ test("where the browser will not hand over the mouse, first person turns towards
       { timeout: 15_000 },
     )
     .toBe(true);
-  await page.mouse.move(canvas.x + canvas.width - 4, canvas.y + canvas.height / 2);
+  const edge = { x: canvas.x + canvas.width - 4, y: canvas.y + canvas.height / 2 };
+  await expect.poll(() => stage(page).locator("canvas").evaluate((node, point) => document.elementFromPoint(point.x, point.y) === node, edge)).toBe(true);
+  await page.mouse.move(edge.x, edge.y);
   await expect.poll(() => arrow.getAttribute("transform"), { timeout: 10_000 }).not.toBe(still);
   // The hint's Exit leaves first person.
   await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);

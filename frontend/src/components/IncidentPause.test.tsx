@@ -8,6 +8,11 @@ import { pauseTransition } from "@/sim/__tests__/pauseFixture";
 import { CampaignAttentionHost } from "./CampaignAttention";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 
+// Construct engine-heavy companies once outside each UI interaction deadline.
+// Every test still receives isolated snapshots and exercises the real store/host.
+const transitions = new Map([1, 2, 3, 4, 5, 6].map(chapter => [chapter, pauseTransition(chapter)]));
+const transition = (chapter: number) => structuredClone(transitions.get(chapter)!);
+
 beforeEach(() => {
   localStorage.clear(); useGame.setState(useGame.getInitialState(), true);
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
@@ -15,7 +20,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
-function show(game = pauseTransition(3).before) {
+function show(game = transition(3).before) {
   useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null });
   render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /><CampaignOverlays /></CampaignAttentionHost></StrictMode>);
 }
@@ -25,7 +30,7 @@ function startIncident() {
   act(() => useGame.getState().tick(1));
 }
 it.each([1, 2, 3, 4, 5, 6])("gives the running Chapter %i transition immediate sole Pause attention without stopping time", chapter => {
-  const { before, incident } = pauseTransition(chapter); show(before); startIncident();
+  const { before, incident } = transition(chapter); show(before); startIncident();
   expect(useGame.getState().game.campaign!.incident!.id).toBe(incident.campaign!.incident!.id);
   expect(useGame.getState().running).toBe(true); expect(gold()).toHaveLength(1);
   expect(gold()[0].getAttribute("aria-label")).toBe("Pause");
@@ -39,7 +44,7 @@ it("preserves the actual first-incident automatic stop and does not nag on resum
   fireEvent.click(screen.getByRole("button", { name: "Run" })); expect(gold()).toHaveLength(0);
 });
 it("Pause leads to a fresh ten-second Hint, accepted action, immediate Confirm and eventual Run", () => {
-  show(pauseTransition(1).before); startIncident();
+  show(transition(1).before); startIncident();
   fireEvent.click(screen.getByRole("button", { name: "Pause" })); expect(gold()).toHaveLength(0);
   expect(useGame.getState().running).toBe(false);
   act(() => vi.advanceTimersByTime(9999)); expect(gold()).toHaveLength(0);
@@ -63,19 +68,19 @@ it("dismisses on deliberate activity, never rearming the same incident on ticks 
   act(() => vi.advanceTimersByTime(10000)); expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
 });
 it("does not arm on paused arrival or initial mount into a saved incident", () => {
-  const { before, incident } = pauseTransition(3); show(before);
+  const { before, incident } = transition(3); show(before);
   act(() => useGame.setState({ game: incident })); expect(gold()).toHaveLength(0);
   fireEvent.click(screen.getByRole("button", { name: "Run" })); expect(gold()).toHaveLength(0);
 });
 it("does not nag while a relevant accepted change and qualifying observations require time", () => {
-  const pair = pauseTransition(1); show(decide(pair.before, { type: "start_db_upgrade" }));
+  const pair = transition(1); show(decide(pair.before, { type: "start_db_upgrade" }));
   startIncident(); expect(useGame.getState().running).toBe(true); expect(gold()).toHaveLength(0);
   for (let i = 0; i < 30 && useGame.getState().game.phase !== "review"; i++) {
     act(() => useGame.getState().tick(1)); expect(gold()).toHaveLength(0);
   }
 });
 it("preserves a still-valid accepted investigation when its new incident opens", () => {
-  show(pauseTransition(3).before);
+  show(transition(3).before);
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   // The observed overload already exists before the third qualifying overloaded second opens the incident.
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
@@ -89,18 +94,18 @@ it("a modal consumes the one-time offer rather than deferring it until the modal
   await act(async () => { modal.remove(); }); act(() => useGame.getState().tick(1)); expect(gold()).toHaveLength(0);
 });
 it("chapter tutorial ownership suppresses the new offer", () => {
-  const { before } = pauseTransition(3); show(before);
+  const { before } = transition(3); show(before);
   act(() => useGame.setState({ tour: { track: "data", step: 0 } })); startIncident(); expect(gold()).toHaveLength(0);
 });
 it("a valid purchase Confirm wins immediately and consumes the Pause invitation", () => {
-  show(pauseTransition(1).before); startIncident(); expect(gold()).toHaveLength(1);
+  show(transition(1).before); startIncident(); expect(gold()).toHaveLength(1);
   fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(screen.getByRole("button", { name: "Cancel" })); expect(gold()).toHaveLength(0);
   act(() => useGame.getState().tick(1)); expect(gold()).toHaveLength(0);
 });
 it.each(["walkthrough", "practice"])("leaves %s incident controls alone", owner => {
-  const { before, incident } = pauseTransition(3); show(before);
+  const { before, incident } = transition(3); show(before);
   act(() => useGame.setState({ game: incident, running: true, tour: { track: "campaign", step: 0 },
     tutorialCompany: owner === "practice" ? { game: before, remainderMs: 0, measurement: useGame.getState().measurement } : null }));
   expect(gold()).toHaveLength(0); expect(screen.queryByRole("button", { name: "Hint" })).toBeNull();
