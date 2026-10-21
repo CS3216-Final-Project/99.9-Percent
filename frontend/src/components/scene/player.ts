@@ -13,7 +13,7 @@ import { AVATAR_RADIUS, blocked, type World } from "./navgrid";
  */
 
 /** Metres a second: a brisk walk, and a run with Shift held. */
-export const SPEED = { walk: 2.2, run: 4.4 };
+export const SPEED = { walk: 3, run: 6 };
 
 /** Radians a second the avatar turns to face where it goes. */
 export const TURN_RATE = 10;

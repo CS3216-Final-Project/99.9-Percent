@@ -39,7 +39,7 @@ describe("moving", () => {
     const [x, z] = slide(office, 13.2, 0, 0, SPEED.walk);
     expect(z).toBeCloseTo(SPEED.walk);
     expect(x).toBe(13.2);
-    expect(SPEED).toEqual({ walk: 2.2, run: 4.4 });
+    expect(SPEED).toEqual({ walk: 3, run: 6 });
     expect(SPEED.run).toBe(2 * SPEED.walk);
   });
 
