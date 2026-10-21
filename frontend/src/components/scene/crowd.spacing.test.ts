@@ -98,4 +98,9 @@ describe("visitor spacing", () => {
       expect(target.doing).toBe("linger");
     }
   });
+
+  it("keeps the requested population when clear spawn spots run out", () => {
+    populate(1000, 2024);
+    expect(visitors()).toHaveLength(1000);
+  });
 });

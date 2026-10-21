@@ -6,7 +6,7 @@ import { inCabin, RIDER_SPOTS } from "./lift";
 import { findPath, nearestFree } from "./navgrid";
 import { atElevator, facing, followPath, turnTowards } from "./player";
 import { now, ride, riding } from "./ride";
-import { apart, clearOf, intrudes, radiusOf, sidestep, type Body } from "./spacing";
+import { apart, clearOf, radiusOf, sidestep, sweptIntrudes, type Body } from "./spacing";
 import { carDoors, carStandsAt, errandNow, holdDoors, sendCar, stepErrand, type Errand } from "./trips";
 import { avatar, gridHere, LOBBY } from "./walk";
 
@@ -155,7 +155,7 @@ export function populate(count: number, seed: number, t = now()): void {
       const candidate = near(floor, place.at, 1.4);
       if (candidate && clearOf(bodies, radius, candidate[0], candidate[1])) at = candidate;
     }
-    if (!at) continue;
+    if (!at) at = near(floor, place.at, 1.4) ?? place.at;
     crowd.visitors.push({
       id: i,
       species,
@@ -194,7 +194,7 @@ function walk(v: Visitor, dt: number, pace: number, walking: boolean, bodies?: B
     return false;
   }
   const next = followPath(gridHere(v.floor).world, v.x, v.z, v.path, pace, dt);
-  if (bodies && intrudes(bodies, radiusOf(v.species), v.x, v.z, next.x, next.z)) {
+  if (bodies && sweptIntrudes(bodies, radiusOf(v.species), v.x, v.z, next.x, next.z)) {
     v.stuck += dt;
     const heading = next.dx || next.dz ? facing(next.dx, next.dz) : v.yaw;
     const side = sidestep(gridHere(v.floor).world, bodies, radiusOf(v.species), v.x, v.z, heading, PACE.walk * dt * 0.7);

@@ -6,13 +6,12 @@ import * as THREE from "three";
 import { useGame } from "@/game/store";
 import type { Activity } from "./cast";
 import { Creature } from "./creatures";
-import { standing } from "./crewSpots";
+import { bodiesOn, standing } from "./crewSpots";
 import { FLOOR_Y } from "./levels";
 import { now, shownFloor } from "./ride";
 import { carY, onErrandEnd } from "./trips";
 import { bothFloors, SHAFT_CLIP } from "./viewState";
 import { errandEnded, PACE, populate, stepVisitors, visitors, type Visitor } from "./crowd";
-import { bodiesOn } from "./crewSpots";
 
 /*
  * The people about the building (crowd.ts): stepped once a frame here and each drawn as a creature, on the floor

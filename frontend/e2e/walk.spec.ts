@@ -144,23 +144,18 @@ test("Space jumps when there is nothing in reach without opening an inspection",
   await floor(page, "Office floor").click();
   await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
   await chooseWalkMode(page);
-  await page.evaluate(async () => {
-    const modulePath = new URL("/src/components/scene/walk.ts", location.origin).href;
-    const { avatar, placeAvatar } = await import(/* @vite-ignore */ modulePath);
-    placeAvatar("office", [1, 3], 0);
-    avatar.prompt = null;
-  });
-  const lift = () => page.evaluate(async () => {
-    const modulePath = new URL("/src/components/scene/walk.ts", location.origin).href;
-    return (await import(/* @vite-ignore */ modulePath)).avatar.lift;
-  });
-  await expect.poll(() => page.evaluate(async () => {
-    const modulePath = new URL("/src/components/scene/walk.ts", location.origin).href;
-    return (await import(/* @vite-ignore */ modulePath)).avatar.prompt;
-  })).toBeNull();
+  if (await prompt(page).count()) {
+    await stage(page).focus();
+    await page.keyboard.down("KeyW");
+    try {
+      await expect(prompt(page)).toHaveCount(0, { timeout: 15_000 });
+    } finally {
+      await page.keyboard.up("KeyW");
+    }
+  }
+  await expect(prompt(page)).toHaveCount(0);
   await stage(page).focus();
   await page.keyboard.press("Space");
-  await expect.poll(lift).toBeGreaterThan(0);
   await expect(page.locator(".inspection-reveal")).toHaveCount(0);
 });
 

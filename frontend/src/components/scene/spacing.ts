@@ -21,6 +21,18 @@ export function intrudes(bodies: Body[], r: number, x: number, z: number, nx: nu
   });
 }
 
+export function sweptIntrudes(bodies: Body[], r: number, x: number, z: number, nx: number, nz: number): boolean {
+  const dx = nx - x;
+  const dz = nz - z;
+  const length = dx * dx + dz * dz;
+  return bodies.some((b) => {
+    const before = Math.hypot(x - b.x, z - b.z);
+    const along = length ? Math.max(0, Math.min(1, ((b.x - x) * dx + (b.z - z) * dz) / length)) : 0;
+    const closest = Math.hypot(x + along * dx - b.x, z + along * dz - b.z);
+    return closest < r + b.r + GAP && closest < before;
+  });
+}
+
 export function clearOf(bodies: Body[], r: number, x: number, z: number): boolean {
   return bodies.every((b) => Math.hypot(x - b.x, z - b.z) >= r + b.r + GAP);
 }
@@ -31,7 +43,7 @@ export function sidestep(world: World, bodies: Body[], r: number, x: number, z: 
   for (const sign of [1, -1]) {
     const nx = x + rx * dist * sign;
     const nz = z + rz * dist * sign;
-    if (!blocked(world, nx, nz) && !intrudes(bodies, r, x, z, nx, nz)) return [nx, nz];
+    if (!blocked(world, nx, nz) && !sweptIntrudes(bodies, r, x, z, nx, nz)) return [nx, nz];
   }
   return null;
 }

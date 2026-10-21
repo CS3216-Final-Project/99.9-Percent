@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeWorld } from "./navgrid";
-import { apart, clearOf, intrudes, sidestep } from "./spacing";
+import { apart, clearOf, intrudes, sidestep, sweptIntrudes } from "./spacing";
 
 describe("body spacing", () => {
   it("allows retreat from contact but not an approach", () => {
@@ -17,6 +17,12 @@ describe("body spacing", () => {
     expect(clearOf(bodies, 0.3, 0.72, 0)).toBe(true);
     expect(clearOf(bodies, 0.3, 0.721, 0)).toBe(true);
     expect(clearOf([], 0.4, 0, 0)).toBe(true);
+  });
+
+  it("blocks a step that sweeps through a body while allowing retreat", () => {
+    const bodies = [{ x: 0, z: 0, r: 0.3 }];
+    expect(sweptIntrudes(bodies, 0.3, -1, 0, 1, 0)).toBe(true);
+    expect(sweptIntrudes(bodies, 0.3, 0.5, 0, 1, 0)).toBe(false);
   });
 
   it("tries the right side first, then the left, and respects walls", () => {
