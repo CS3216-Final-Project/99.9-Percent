@@ -33,10 +33,12 @@ export function ViewOverlay() {
   const reading = useGame((s) => s.roomInspection !== null);
   const [locked, setLocked] = useState(false);
   const [refused, setRefused] = useState(false);
+  const [quietPause, setQuietPause] = useState(viewNow.quietPause);
   useEffect(() => {
     const changed = () => {
       setLocked(viewNow.locked);
       setRefused(viewNow.lockRefused);
+      setQuietPause(viewNow.quietPause);
     };
     window.addEventListener("nn:look-lock", changed);
     return () => window.removeEventListener("nn:look-lock", changed);
@@ -74,6 +76,21 @@ export function ViewOverlay() {
             </span>
             <span className="view-hint-touch">Drag to look around {exit}</span>
           </>
+        ) : quietPause ? (
+          <>
+            <span className="view-hint-keys">
+              <MouseKey click /> Left click to look around ·{" "}
+              {first ? (
+                <>
+                  <Key>←</Key> <Key>→</Key> to turn
+                </>
+              ) : (
+                <>Scroll to come closer</>
+              )}{" "}
+              · <Key>V</Key> to change view
+            </span>
+            <span className="view-hint-touch">Drag to look around {exit}</span>
+          </>
         ) : (
           <>
             <span className="view-hint-keys">
@@ -90,7 +107,7 @@ export function ViewOverlay() {
           </>
         )}
       </p>
-      {!locked && !refused && (
+      {!locked && !refused && !quietPause && (
         <div className="view-paused" role="group" aria-label="Mouse look paused">
           <p>
             <strong>Mouse look is paused.</strong> Look around with the mouse again, or leave {name}.

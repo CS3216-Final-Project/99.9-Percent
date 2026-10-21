@@ -55,7 +55,7 @@ import { backAt, FLOOR_NUMBER, FLOOR_Y, glideAt, rideAt, washAt } from "./levels
 import { depart, hurry, now, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
 import { Avatar, WalkDriver, WalkFloor } from "./Avatar";
 import { GlassDoors } from "./Doors";
-import { avatar, clearPrompt, held, movesAvatar, onPrompt, play, walkTo } from "./walk";
+import { avatar, clearPrompt, held, jump, movesAvatar, onPrompt, play, resetJump, walkTo } from "./walk";
 import type { Prompt } from "./player";
 import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
@@ -1504,6 +1504,7 @@ function WalkControls() {
   useEffect(() => {
     if (!walking) {
       clearPrompt();
+      resetJump();
       if (activityTimer.current !== null) {
         window.clearTimeout(activityTimer.current);
         activityTimer.current = null;
@@ -1526,6 +1527,7 @@ function WalkControls() {
         if (arrow) e.preventDefault();
       } else if (e.code === "Space") {
         e.preventDefault();
+        if (!e.repeat && !riding() && !useGame.getState().roomInspection) jump();
       }
     };
     const up = (e: KeyboardEvent) => held.delete(e.code);

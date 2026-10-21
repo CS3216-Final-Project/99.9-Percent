@@ -9,6 +9,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 const stage = (page: Page) => page.locator(".stage-canvas");
+const equipmentLabel = (page: Page, name: string) => page.getByRole("main").locator(".eq-labels").getByRole("button", { name, exact: true });
 const option = (page: Page, name: string) => page.locator(".desktop-walk").getByRole("button", { name, exact: true, includeHidden: true });
 const map = (page: Page) => page.getByRole("region", { name: "Map" });
 const where = (page: Page) => map(page).locator(".map-where");
@@ -153,6 +154,25 @@ test("first person looks round with the mouse as it opens, Escape gives the curs
   await expect(page.locator(".view-dot")).toHaveCount(0);
   await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
   expect(await exploration(page)).toMatchObject({ walking: false, viewpoint: "overview" });
+});
+
+test("Escape closes an inspection quietly before Escape shows the paused mouse card", async ({ page }) => {
+  test.slow();
+  await open(page);
+  await stage(page).focus();
+  await page.keyboard.press("v");
+  await page.keyboard.press("v");
+  await expect.poll(() => lockedTo(page)).toBe("CANVAS");
+  await equipmentLabel(page, "Monitoring").evaluate((button) => (button as HTMLButtonElement).click());
+  const reveal = page.getByRole("dialog", { name: "Monitoring inspected" });
+  await expect(reveal).toBeVisible({ timeout: 40_000 });
+  await page.keyboard.press("Escape");
+  await expect(reveal).toHaveCount(0);
+  const paused = page.getByRole("group", { name: "Mouse look paused" });
+  await expect(paused).toHaveCount(0);
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Escape");
+  await expect(paused).toBeVisible();
 });
 
 test("where the browser will not hand over the mouse, first person turns towards where it points, with no card", async ({ page }) => {

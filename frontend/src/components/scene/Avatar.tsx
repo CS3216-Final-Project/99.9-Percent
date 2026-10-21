@@ -77,7 +77,7 @@ function useAvatarModel(id: AvatarId): { id: AvatarId; gltf: GLTF } | null {
 function placeNow(walking: boolean): { floor: Floor | "car"; x: number; y: number; z: number; yaw: number } {
   if (!walking) return { floor: "office", x: SPOTS.founder.x, y: FLOOR_Y.office + SEAT, z: SPOTS.founder.z, yaw: SPOTS.founder.rot };
   if (riding()) return { floor: "car", x: avatar.x, y: ride.y, z: avatar.z, yaw: avatar.yaw };
-  return { floor: avatar.floor, x: avatar.x, y: FLOOR_Y[avatar.floor], z: avatar.z, yaw: avatar.yaw };
+  return { floor: avatar.floor, x: avatar.x, y: FLOOR_Y[avatar.floor] + avatar.lift, z: avatar.z, yaw: avatar.yaw };
 }
 
 export function Avatar({ walking }: { walking: boolean }) {
@@ -131,7 +131,9 @@ export function Avatar({ walking }: { walking: boolean }) {
     // Seen through its own eyes, the avatar is not drawn: the camera is in its head.
     g.visible = (at.floor === "car" || at.floor === shownFloor()) && !(walking && viewNow.inHead);
     // The animation for what it is doing, blended from the last.
-    const want = !walking ? "idle" : avatar.busy ? avatar.busy.clip : avatar.moving ? (avatar.running ? "run" : "walk") : "idle";
+    const jump = [...model.clips.keys()].find((name) => name.toLowerCase().includes("jump"));
+    const airborne = walking && !riding() && avatar.lift > 0;
+    const want = airborne && jump ? jump : !walking ? "idle" : avatar.busy ? avatar.busy.clip : avatar.moving ? (avatar.running ? "run" : "walk") : "idle";
     if (current.current?.name !== want) {
       const clip = model.clips.get(want) ?? model.clips.get("idle");
       if (clip) {

@@ -15,12 +15,14 @@ beforeEach(() => {
   useGame.setState(useGame.getInitialState(), true);
   useGame.setState({ started: true, walking: true, viewpoint: "first" });
   viewNow.locked = false;
+  viewNow.quietPause = false;
 });
 afterEach(() => {
   cleanup();
   mouse.take = () => {};
   viewNow.locked = false;
   viewNow.lockRefused = false;
+  viewNow.quietPause = false;
 });
 
 describe("the overlay of the views from the avatar", () => {
@@ -54,6 +56,16 @@ describe("the overlay of the views from the avatar", () => {
     render(<ViewOverlay />);
     lockChanged(true);
     expect(document.querySelector(".view-hint")?.textContent).toMatch(/Left click to put the reading away/);
+  });
+
+  it("keeps the paused card hidden until Escape is pressed again after an inspection closes", () => {
+    render(<ViewOverlay />);
+    act(() => {
+      viewNow.quietPause = true;
+      window.dispatchEvent(new Event("nn:look-lock"));
+    });
+    expect(screen.queryByRole("group", { name: "Mouse look paused" })).toBeNull();
+    expect(document.querySelector(".view-hint")?.textContent).toMatch(/Left click to look around ·\s+←\s+→ to turn ·\s+V to change view/);
   });
 
   it("shows no card where the browser will not hand over the mouse, and says to move it instead, with the way out", () => {

@@ -9,9 +9,11 @@ import { motionFor, SPECIES, type Activity, type Species } from "./cast";
 import { useDetail, type Detail } from "./detail";
 import { loadCrew, type Crew } from "./creatureCatalog";
 import { poseAt, type Plan } from "./routes";
-import { avatar } from "./walk";
-import { standing } from "./crewSpots";
+import { avatar, gridHere } from "./walk";
+import { bodiesOn, standing, within } from "./crewSpots";
 import { useGame } from "@/game/store";
+import { apart, intrudes, radiusOf, sidestep, sweptIntrudes } from "./spacing";
+import { blocked } from "./navgrid";
 
 /*
  * The office crew: animated monsters (see cast.ts). Every creature is a copy of
@@ -200,7 +202,7 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
   }, [model, gltf, motion.clip, motion.speed, pace, activity, info.kind, phase, beat]);
 
   // The map shows where every creature stands.
-  useEffect(() => standing(model.object), [model]);
+  useEffect(() => standing(model.object, radiusOf(species)), [model, species]);
 
   // Between beats the creature idles, so it does not freeze in the clip's last pose.
   const rest = useRef<THREE.AnimationAction | null>(null);
@@ -329,20 +331,119 @@ export function Wanderer({ plan, species, offset = 0 }: { plan: Plan; species: S
   const [activity, setActivity] = useState<Activity>(() => poseAt(plan, offset).activity);
   const shown = useRef(activity);
   const lag = useRef(0);
+  const spacing = useRef({ x: 0, z: 0 });
+  const stuck = useRef(0);
+  const radius = radiusOf(species);
   useFrame(({ clock }, dt) => {
-    let pose = poseAt(plan, clock.elapsedTime + offset - lag.current);
-    if (pose.activity === "walk" && avatarAhead(pose.x, pose.z, pose.yaw)) {
-      lag.current += Math.min(dt, 0.1);
-      pose = { ...poseAt(plan, clock.elapsedTime + offset - lag.current), activity: "idle" };
+    const step = Math.min(dt, 0.1);
+    const pose = poseAt(plan, clock.elapsedTime + offset - lag.current);
+    const target = { x: pose.x + spacing.current.x, z: pose.z + spacing.current.z };
+    const previous = g.current ? [g.current.position.x, g.current.position.z] as [number, number] : [target.x, target.z] as [number, number];
+    const world = gridHere("office").world;
+    const bodies = g.current ? bodiesOn("office", (o) => within(o, g.current!)) : [];
+    const overlap = bodies
+      .map((body) => ({ body, distance: Math.hypot(previous[0] - body.x, previous[1] - body.z) }))
+      .filter(({ body, distance }) => distance < radius + body.r)
+      .sort((a, b) => a.distance - b.distance)[0];
+    let activityNow = pose.activity;
+    const ahead = pose.activity === "walk" && avatarAhead(pose.x, pose.z, pose.yaw);
+    const moving = Math.hypot(target.x - previous[0], target.z - previous[1]) > 1e-4;
+    const blockedByBody = moving && sweptIntrudes(bodies, radius, previous[0], previous[1], target.x, target.z);
+    if (ahead || blockedByBody) {
+      lag.current += dt;
+      if (!blockedByBody) stuck.current = 0;
+      if (blockedByBody) {
+        stuck.current += dt;
+        const escape = overlap && apart(
+          world,
+          bodies,
+          radius,
+          previous[0],
+          previous[1],
+          radius + overlap.body.r - overlap.distance + 0.05,
+        );
+        const clear = escape && Math.hypot(escape[0] - previous[0], escape[1] - previous[1]) > 1e-4
+          && !intrudes(bodies, radius, previous[0], previous[1], escape[0], escape[1])
+          && !blocked(world, escape[0], escape[1]);
+        const side = clear ? escape : sidestep(world, bodies, radius, previous[0], previous[1], pose.yaw, plan.speed * step * 0.7);
+        if (side) {
+          spacing.current = { x: side[0] - pose.x, z: side[1] - pose.z };
+          const length = Math.hypot(spacing.current.x, spacing.current.z);
+          if (length > 0.8) {
+            spacing.current.x *= 0.8 / length;
+            spacing.current.z *= 0.8 / length;
+          }
+        } else {
+          spacing.current = { x: previous[0] - pose.x, z: previous[1] - pose.z };
+          activityNow = "idle";
+        }
+        if (pose.activity !== "walk") activityNow = "idle";
+        if (stuck.current > 8) {
+          const side = sidestep(world, bodies, radius, previous[0], previous[1], pose.yaw, 0.8);
+          if (side) {
+            spacing.current = { x: side[0] - pose.x, z: side[1] - pose.z };
+            stuck.current = 0;
+          }
+        }
+      } else {
+        spacing.current = { x: previous[0] - pose.x, z: previous[1] - pose.z };
+        activityNow = "idle";
+      }
+    } else {
+      stuck.current = 0;
+      const distance = overlap ? radius + overlap.body.r - overlap.distance + 0.05 : 0.4 * step;
+      const separated = pose.activity === "walk" ? null : apart(world, bodies, radius, previous[0], previous[1], distance);
+      if (separated && Math.hypot(separated[0] - previous[0], separated[1] - previous[1]) > 1e-4
+        && !intrudes(bodies, radius, previous[0], previous[1], separated[0], separated[1])
+        && !blocked(world, separated[0], separated[1])) {
+        spacing.current = { x: separated[0] - pose.x, z: separated[1] - pose.z };
+        const length = Math.hypot(spacing.current.x, spacing.current.z);
+        if (length > 0.8) {
+          spacing.current.x *= 0.8 / length;
+          spacing.current.z *= 0.8 / length;
+        }
+      } else {
+        const ease = 1.5 * step;
+        const ox = spacing.current.x;
+        const oz = spacing.current.z;
+        const length = Math.hypot(ox, oz);
+        const factor = length > 0 ? Math.max(0, (length - ease) / length) : 0;
+        const eased = { x: ox * factor, z: oz * factor };
+        const next = { x: pose.x + eased.x, z: pose.z + eased.z };
+        if (!intrudes(bodies, radius, previous[0], previous[1], next.x, next.z) && !blocked(world, next.x, next.z)) spacing.current = eased;
+        else activityNow = "idle";
+      }
     }
+    let next = { x: pose.x + spacing.current.x, z: pose.z + spacing.current.z };
+    if (overlap) {
+      const escape = apart(
+        world,
+        bodies,
+        radius,
+        previous[0],
+        previous[1],
+        radius + overlap.body.r - overlap.distance + 0.05,
+      );
+      if (Math.hypot(escape[0] - previous[0], escape[1] - previous[1]) > 1e-4
+        && !intrudes(bodies, radius, previous[0], previous[1], escape[0], escape[1])
+        && !blocked(world, escape[0], escape[1])) {
+        next = { x: escape[0], z: escape[1] };
+      }
+    }
+    if (sweptIntrudes(bodies, radius, previous[0], previous[1], next.x, next.z)) {
+      next = { x: previous[0], z: previous[1] };
+      activityNow = "idle";
+    }
+    spacing.current = { x: next.x - pose.x, z: next.z - pose.z };
     if (g.current) {
-      g.current.position.set(pose.x, 0, pose.z);
+      g.current.position.set(next.x, 0, next.z);
       g.current.rotation.y = pose.yaw;
     }
+    if (!g.current) return;
     // Only a change of what it is doing needs React; moving does not.
-    if (pose.activity !== shown.current) {
-      shown.current = pose.activity;
-      setActivity(pose.activity);
+    if (activityNow !== shown.current) {
+      shown.current = activityNow;
+      setActivity(activityNow);
     }
   });
   return (

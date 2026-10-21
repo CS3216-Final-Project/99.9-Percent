@@ -4,6 +4,7 @@ import { ALL_RACKS, ELEVATOR_DOOR, ELEVATOR_SPOT, type FunProp, type Racks } fro
 import type { Footprint } from "./layout";
 import { blocked, findPath, gridOf, nearestFree, type Grid } from "./navgrid";
 import { facing, followPath, promptAt, slide, SPEED, steer, turnTowards, type Keys, type Prompt } from "./player";
+import { riding } from "./ride";
 
 /*
  * The player's avatar in walk mode, shared by the room that draws it and the controls on the page: where it stands,
@@ -25,9 +26,13 @@ export interface AvatarState {
   busy: { clip: FunProp["clip"]; until: number } | null;
   /** Within reach now. */
   prompt: Prompt | null;
+  /** Height above the floor while jumping. */
+  lift: number;
+  /** Vertical speed while jumping. */
+  vy: number;
 }
 
-export const avatar: AvatarState = { floor: "office", x: 0, z: 0, yaw: 0, moving: false, running: false, path: [], busy: null, prompt: null };
+export const avatar: AvatarState = { floor: "office", x: 0, z: 0, yaw: 0, moving: false, running: false, path: [], busy: null, prompt: null, lift: 0, vy: 0 };
 
 /** Others on the move who open doors as they come near, by name: the engineers called down to the racks. */
 export const others = new Map<string, { floor: Floor; x: number; z: number }>();
@@ -78,8 +83,19 @@ export function startAt(floor: Floor): [number, number] {
 
 /** Stand the avatar on a floor, still, facing away from the camera's usual view. */
 export function placeAvatar(floor: Floor, at: [number, number] = startAt(floor), yaw = Math.PI * 0.75): void {
-  Object.assign(avatar, { floor, x: at[0], z: at[1], yaw, moving: false, running: false, path: [], busy: null });
+  Object.assign(avatar, { floor, x: at[0], z: at[1], yaw, moving: false, running: false, path: [], busy: null, lift: 0, vy: 0 });
   held.clear();
+}
+
+export function jump(): boolean {
+  if (avatar.lift !== 0 || riding() || avatar.busy) return false;
+  avatar.vy = 3.2;
+  return true;
+}
+
+export function resetJump(): void {
+  avatar.lift = 0;
+  avatar.vy = 0;
 }
 
 /** Walk to (x, z) by the shortest way, or to the nearest free place to it; false if there is no way there. */
@@ -165,6 +181,11 @@ export function stepAvatar(dt: number, forward: [number, number], footprints: Re
   if (avatar.busy && now > avatar.busy.until) avatar.busy = null;
   avatar.moving = moved;
   avatar.running = moved && run;
+  if (avatar.lift > 0 || avatar.vy > 0) {
+    avatar.vy -= 9.8 * dt;
+    avatar.lift = Math.max(0, avatar.lift + avatar.vy * dt);
+    if (avatar.lift === 0) avatar.vy = 0;
+  }
   const prompt = promptAt(avatar.floor, avatar.x, avatar.z, footprints, names);
   if (!samePrompt(prompt, avatar.prompt)) {
     avatar.prompt = prompt;

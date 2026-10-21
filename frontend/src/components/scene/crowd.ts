@@ -6,6 +6,7 @@ import { inCabin, RIDER_SPOTS } from "./lift";
 import { findPath, nearestFree } from "./navgrid";
 import { atElevator, facing, followPath, turnTowards } from "./player";
 import { now, ride, riding } from "./ride";
+import { apart, clearOf, radiusOf, sidestep, sweptIntrudes, type Body } from "./spacing";
 import { carDoors, carStandsAt, errandNow, holdDoors, sendCar, stepErrand, type Errand } from "./trips";
 import { avatar, gridHere, LOBBY } from "./walk";
 
@@ -40,6 +41,7 @@ export interface Visitor {
   seat: number | null;
   moving: boolean;
   activity: Activity;
+  stuck: number;
 }
 
 /** Metres a second they walk, and a little brisker getting in and out of the car. */
@@ -50,6 +52,8 @@ const LINGER: [number, number] = [5, 14];
 const TRAVEL = 0.3;
 /** How near ahead the avatar must be for them to wait for it to pass. */
 const MAKE_WAY = 0.9;
+/** Seconds a visitor waits before abandoning a blocked walk. */
+const PATIENCE = 2.5;
 /** Seconds the car rests between errands, so the doors are not forever opening and closing. */
 const REST = 4;
 
@@ -87,6 +91,21 @@ function near(floor: Floor, [x, z]: [number, number], spread: number): [number, 
   return nearestFree(gridHere(floor), x + randRange(r, -spread, spread), z + randRange(r, -spread, spread), 2.5);
 }
 
+function bodiesFor(v: Visitor, around: (floor: Floor) => Body[]): Body[] {
+  return [
+    ...crowd.visitors
+      .filter((other) => other !== v && other.floor === v.floor && other.doing !== "aboard" && other.doing !== "board")
+      .map((other) => ({ x: other.x, z: other.z, r: radiusOf(other.species) })),
+    ...around(v.floor),
+  ];
+}
+
+function driftApart(v: Visitor, dt: number, around: (floor: Floor) => Body[]): void {
+  const [x, z] = apart(gridHere(v.floor).world, bodiesFor(v, around), radiusOf(v.species), v.x, v.z, dt * 0.4);
+  v.x = x;
+  v.z = z;
+}
+
 /** Walk `v` to (x, z) on its floor; false if there is no way there. */
 function head(v: Visitor, to: [number, number], doing: Doing): boolean {
   const path = findPath(gridHere(v.floor), [v.x, v.z], to);
@@ -96,18 +115,22 @@ function head(v: Visitor, to: [number, number], doing: Doing): boolean {
 }
 
 /** Decide where `v` goes next: somewhere on its floor, or, now and then, to the lobby for the other floor. */
-function nextGoal(v: Visitor, t: number): void {
+function nextGoal(v: Visitor, t: number, around: (floor: Floor) => Body[]): void {
   const r = crowd.rng;
+  const bodies = bodiesFor(v, around);
+  const radius = radiusOf(v.species);
   if (randRange(r, 0, 1) < TRAVEL) {
     v.bound = otherFloor(v.floor);
-    const spot = near(v.floor, pick(r, WAITING), 0.15);
-    if (spot && head(v, spot, "roam")) return;
+    for (let tries = 0; tries < 4; tries++) {
+      const spot = near(v.floor, pick(r, WAITING), 0.15);
+      if (spot && clearOf(bodies, radius, spot[0], spot[1]) && head(v, spot, "roam")) return;
+    }
     v.bound = v.floor;
   }
   for (let tries = 0; tries < 4; tries++) {
     const place = pick(r, PLACES[v.floor]);
     const spot = near(v.floor, place.at, 1.4);
-    if (spot && head(v, spot, "roam")) {
+    if (spot && clearOf(bodies, radius, spot[0], spot[1]) && head(v, spot, "roam")) {
       v.activity = place.activity;
       return;
     }
@@ -122,11 +145,20 @@ export function populate(count: number, seed: number, t = now()): void {
   const r = crowd.rng;
   for (let i = 0; i < count; i++) {
     const floor: Floor = i % 2 === 0 ? "office" : "servers";
-    const place = pick(r, PLACES[floor]);
-    const at = near(floor, place.at, 1.4) ?? place.at;
+    const species = creature(Math.floor(randRange(r, 0, 60)), pick(r, ALL_ROLES));
+    const radius = radiusOf(species);
+    const bodies = crowd.visitors.filter((v) => v.floor === floor).map((v) => ({ x: v.x, z: v.z, r: radiusOf(v.species) }));
+    let place = pick(r, PLACES[floor]);
+    let at: [number, number] | null = null;
+    for (let tries = 0; tries < 12 && !at; tries++) {
+      place = pick(r, PLACES[floor]);
+      const candidate = near(floor, place.at, 1.4);
+      if (candidate && clearOf(bodies, radius, candidate[0], candidate[1])) at = candidate;
+    }
+    if (!at) at = near(floor, place.at, 1.4) ?? place.at;
     crowd.visitors.push({
       id: i,
-      species: creature(Math.floor(randRange(r, 0, 60)), pick(r, ALL_ROLES)),
+      species,
       floor,
       x: at[0],
       z: at[1],
@@ -138,6 +170,7 @@ export function populate(count: number, seed: number, t = now()): void {
       seat: null,
       moving: false,
       activity: place.activity,
+      stuck: 0,
     });
   }
 }
@@ -151,7 +184,7 @@ function avatarAhead(v: Visitor, walking: boolean): boolean {
 }
 
 /** Walk `v` along its path for `dt` seconds; true once it has arrived. */
-function walk(v: Visitor, dt: number, pace: number, walking: boolean): boolean {
+function walk(v: Visitor, dt: number, pace: number, walking: boolean, bodies?: Body[], t = 0): boolean {
   if (!v.path.length) {
     v.moving = false;
     return true;
@@ -161,8 +194,21 @@ function walk(v: Visitor, dt: number, pace: number, walking: boolean): boolean {
     return false;
   }
   const next = followPath(gridHere(v.floor).world, v.x, v.z, v.path, pace, dt);
+  if (bodies && sweptIntrudes(bodies, radiusOf(v.species), v.x, v.z, next.x, next.z)) {
+    v.stuck += dt;
+    const heading = next.dx || next.dz ? facing(next.dx, next.dz) : v.yaw;
+    const side = sidestep(gridHere(v.floor).world, bodies, radiusOf(v.species), v.x, v.z, heading, PACE.walk * dt * 0.7);
+    if (side) Object.assign(v, { x: side[0], z: side[1], moving: true });
+    else v.moving = false;
+    v.yaw = turnTowards(v.yaw, heading, dt, 6);
+    if (v.stuck > PATIENCE) {
+      Object.assign(v, { bound: v.floor, doing: "linger", until: t + 1, path: [], moving: false, stuck: 0 });
+    }
+    return false;
+  }
   v.moving = Math.hypot(next.x - v.x, next.z - v.z) > 1e-4;
   Object.assign(v, { x: next.x, z: next.z, path: next.path });
+  if (v.moving) v.stuck = 0;
   if (next.dx || next.dz) v.yaw = turnTowards(v.yaw, facing(next.dx, next.dz), dt, 6);
   return v.path.length === 0;
 }
@@ -233,7 +279,7 @@ function settled(floor: Floor): boolean {
  * off; and the car's errands, sent off and moved along. `walking` says whether the player's avatar is out on foot,
  * so they make way for it and the car is never sent off with it inside or at its doors.
  */
-export function stepVisitors(dt: number, t: number, walking: boolean): void {
+export function stepVisitors(dt: number, t: number, walking: boolean, around: (floor: Floor) => Body[] = () => []): void {
   if (t <= crowd.last) return;
   crowd.last = t;
   dt = Math.min(dt, 0.1);
@@ -243,16 +289,18 @@ export function stepVisitors(dt: number, t: number, walking: boolean): void {
     switch (v.doing) {
       case "linger":
         v.moving = false;
-        if (t >= v.until) nextGoal(v, t);
+        driftApart(v, dt, around);
+        if (t >= v.until) nextGoal(v, t, around);
         break;
       case "roam":
-        if (walk(v, dt, PACE.walk, walking)) {
+        if (walk(v, dt, PACE.walk, walking, bodiesFor(v, around), t)) {
           if (v.bound !== v.floor) Object.assign(v, { doing: "wait", activity: "idle" });
           else Object.assign(v, { doing: "linger", until: t + randRange(crowd.rng, ...LINGER) });
         }
         break;
       case "wait":
         v.moving = false;
+        driftApart(v, dt, around);
         // Facing the doors, until they open and there is room.
         v.yaw = turnTowards(v.yaw, facing(LOBBY[0] - 1 - v.x, LOBBY[1] - v.z), dt, 4);
         if (open) getOn(v);
@@ -269,7 +317,7 @@ export function stepVisitors(dt: number, t: number, walking: boolean): void {
         if (stands === v.bound && carDoors(v.bound, t) > 0.6) getOff(v, v.bound);
         break;
       case "alight":
-        if (walk(v, dt, PACE.lift, walking)) nextGoal(v, t);
+        if (walk(v, dt, PACE.lift, walking)) nextGoal(v, t, around);
         break;
     }
   }

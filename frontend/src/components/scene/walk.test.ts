@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EQUIPMENT_ORDER, newLegacyGame, type EquipmentId } from "@/sim";
 import { FUN_PROPS } from "./floorplan";
 import { footprint, type Footprint } from "./layout";
 import { facing, promptAt } from "./player";
-import { avatar, held, placeAvatar, play, stepAvatar } from "./walk";
+import { avatar, held, jump, placeAvatar, play, stepAvatar } from "./walk";
+import { ride } from "./ride";
 import { FIRST } from "./views";
 
 const s = newLegacyGame(1);
@@ -65,5 +66,47 @@ describe("walking seen through the avatar's eyes", () => {
     held.add("KeyD");
     stepAvatar(0.5, [0, -1], footprints, names, 0, { heading: 0, pace: FIRST.pace });
     expect(avatar.x).toBeGreaterThan(START[0] + 0.3);
+  });
+});
+
+describe("jumping in walk mode", () => {
+  const rideBefore = { ...ride };
+
+  beforeEach(() => {
+    placeAvatar("office", [1, 3], 0);
+    held.clear();
+    Object.assign(ride, { start: -Infinity, arrived: -Infinity });
+  });
+
+  afterEach(() => Object.assign(ride, rideBefore));
+
+  it("rises, keeps steering in the air, and lands within seven tenths of a second", () => {
+    const x = avatar.x;
+    expect(jump()).toBe(true);
+    held.add("KeyD");
+    let peak = 0;
+    for (let i = 0; i < 7; i++) {
+      stepAvatar(0.1, [0, -1], footprints, names, i / 10);
+      peak = Math.max(peak, avatar.lift);
+      if (i === 0) expect(avatar.x).toBeGreaterThan(x);
+    }
+    expect(peak).toBeGreaterThan(0.3);
+    expect(avatar.lift).toBe(0);
+    expect(avatar.vy).toBe(0);
+  });
+
+  it("cannot double-jump while airborne or jump while riding or busy", () => {
+    expect(jump()).toBe(true);
+    stepAvatar(0.1, [0, -1], footprints, names, 0);
+    const lift = avatar.lift;
+    expect(jump()).toBe(false);
+    expect(avatar.lift).toBe(lift);
+
+    Object.assign(ride, { start: 2, arrived: 1 });
+    placeAvatar("office", [1, 3]);
+    expect(jump()).toBe(false);
+    Object.assign(ride, { start: -Infinity, arrived: -Infinity });
+    avatar.busy = { clip: FUN_PROPS[0].clip, until: 10 };
+    expect(jump()).toBe(false);
   });
 });
