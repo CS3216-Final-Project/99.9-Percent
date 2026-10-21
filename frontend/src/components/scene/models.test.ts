@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { atop, mdl, placeModels } from "./furniture";
-import { bake } from "./models";
+import { bake } from "./bakeModels";
 import { type HdId, type ModelId } from "./modelCatalog";
 
 function box(size: [number, number, number], color: string): THREE.Group {
