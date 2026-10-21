@@ -26,13 +26,16 @@ export function Wall({ wall, x, z, size, color }: { wall: WallId; x: number; z: 
     m.scale.y += (want - m.scale.y) * Math.min(1, dt * 9);
     m.position.y = (h * m.scale.y) / 2;
   });
-  // At HD detail the walls are painted plaster in the same colour.
+  // Walls keep plaster relief, but not its blotchy colour photo that reads as noise up close.
   const surfaces = useSurfaces();
   const [w, , d] = size;
   const plaster = useMemo(() => {
     if (!surfaces) return null;
     const s = surfaces.plaster;
-    return { geometry: projectUV(new THREE.BoxGeometry(w, h, d), s.size, [x, 0, z]), material: surfaceMaterial(s, color) };
+    const material = surfaceMaterial(s, color);
+    material.map = null;
+    material.color.set(color);
+    return { geometry: projectUV(new THREE.BoxGeometry(w, h, d), s.size, [x, 0, z]), material };
   }, [surfaces, w, h, d, x, z, color]);
   useEffect(
     () => () => {
