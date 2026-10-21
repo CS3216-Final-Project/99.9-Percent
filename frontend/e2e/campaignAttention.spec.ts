@@ -14,6 +14,7 @@ async function boot(page: Page, game: GameState) {
   await expectRoom(page); await page.evaluate(() => document.fonts.ready);
 }
 async function idle(page: Page, milliseconds = 10_000) {
+  test.slow(); // Ten virtual seconds render every animation frame on software WebGL.
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
   await page.keyboard.press("Shift");
   await page.clock.runFor(milliseconds);

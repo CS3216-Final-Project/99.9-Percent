@@ -136,11 +136,21 @@ export function reachInside(x: number, z: number, dx: number, dz: number, margin
  * `walls`, so no wall is ever between it and the avatar. Short of room behind, it rises and looks down more steeply
  * rather than come right up to the avatar's face, and only then comes in closer.
  */
-export function followPose(x: number, floorY: number, z: number, heading: number, pitch: number, distance: number, walls: readonly Wall[] = [], fov = FOLLOW.fov): Pose {
+export function followPose(
+  x: number,
+  floorY: number,
+  z: number,
+  heading: number,
+  pitch: number,
+  distance: number,
+  walls: readonly Wall[] = [],
+  fov = FOLLOW.fov,
+  ceiling = ROOM.wallH,
+): Pose {
   let p = clamp(pitch, FOLLOW.lowest, FOLLOW.highest);
   let d = clamp(distance, FOLLOW.nearest, FOLLOW.farthest);
   const ly = floorY + FOLLOW.aim;
-  const top = floorY + ROOM.wallH - FOLLOW.margin;
+  const top = floorY + ceiling - FOLLOW.margin;
   // How far behind the avatar there is floor to stand on, before the outer walls or one of `walls`.
   const [fx, fz] = headingDir(heading);
   let room = Math.min(FOLLOW.farthest, reachInside(x, z, -fx, -fz));

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { fromAvatar, type Viewpoint } from "@/game/viewpoints";
+import { riding } from "./ride";
 import { avatar } from "./walk";
 import { FOLLOW, type Pose } from "./views";
 
@@ -88,6 +89,22 @@ export const mouse = { take: () => {} };
 
 /** Whether a view from the avatar is asked for now, so the camera buttons and keys answer to it. */
 export const lookingFromAvatar = () => fromAvatar(viewNow.want);
+
+/** Riding from the avatar, the whole shaft can be seen as the car passes between the floors, so both are drawn. */
+export const bothFloors = () => riding() && lookingFromAvatar();
+
+/**
+ * The heights of the shaft that can be seen now, as two clipping planes the car and whoever rides in it are cut by,
+ * so a car off on an errand is never seen above or below the floor on screen. The shaft's frame owner keeps them up
+ * to date (see Elevator.tsx).
+ */
+export const SHAFT_CLIP: THREE.Plane[] = [new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6), new THREE.Plane(new THREE.Vector3(0, 1, 0), 1e6)];
+
+/** Cut the car and its riders to heights from `lo` to `hi`. */
+export function clipShaft(lo: number, hi: number): void {
+  SHAFT_CLIP[0].constant = hi;
+  SHAFT_CLIP[1].constant = -lo;
+}
 
 let fadeEl: HTMLDivElement | null = null;
 /** What the dimming was last set to, so a frame with nothing to change writes nothing to the page. */
