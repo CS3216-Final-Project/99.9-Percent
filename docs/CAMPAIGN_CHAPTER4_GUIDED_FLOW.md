@@ -20,6 +20,8 @@ Integration validation used Node 22.23.3:
 
 The initial implementation's 14-case browser batch below remains historical evidence on `e8c4238`. Final GitHub CI results are reported on the draft PR and in the submission response; no merge, manual deployment, force push or backup/stash deletion is authorized.
 
+Initial publication CI (`8504244`, run `39607134768`) passed frontend checks/coverage, balance and backend. Browser shard 5 exposed an incorrect test expectation: the simple Chapter 4 Hint case expected Hint again after Got it, although accepted Prepare guidance correctly marks App Server. The expected destination is corrected to App Server; the automatic idle expectation remains Hint. Every single-spotlight, concise-copy, enabled-choice and unchanged-input assertion is retained. The exact corrected browser case passed locally with retries 0 (9.3 seconds overall). No runtime or gameplay change was needed for this correction.
+
 This report supplements the earlier Chapter 4 attention audit. Prepare now deliberately offers inspection Hint first; scheduled Run remains available after that inspection. Earlier pre-stage-cue test counts and descriptions are historical.
 
 ## Stage cues

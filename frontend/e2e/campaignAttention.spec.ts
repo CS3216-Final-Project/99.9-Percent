@@ -379,7 +379,7 @@ test("action guidance preparation: required risk choice retains ownership and ne
 
 for(const [chapter,company,target] of [
   [1,newGame,"Run"],[2,scaling,"Upgrade database"],
-  [3,enteredDataCompany,"Run"],[4,()=>spikeCompany(false),"Hint"],
+  [3,enteredDataCompany,"Run"],[4,()=>spikeCompany(false),"App Server"],
   [5,reliabilityCompany,"Start reliability test"],[6,combinedCompany,"Run"],
 ] as const) test(`simple Hint Chapter ${chapter}: one explanation and valid next choices`,async ({page,installClock},info)=>{
   await installClock(); await boot(page,company());
