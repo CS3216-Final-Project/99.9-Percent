@@ -1212,7 +1212,7 @@ function Reflections() {
 function Effects() {
   return (
     <EffectComposer multisampling={4}>
-      <N8AO aoRadius={1.5} distanceFalloff={1} intensity={5} quality="medium" halfRes />
+      <N8AO aoRadius={0.8} distanceFalloff={1} intensity={2.5} quality="medium" halfRes />
       <Bloom mipmapBlur luminanceThreshold={0.9} luminanceSmoothing={0.25} intensity={0.6} />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
     </EffectComposer>
