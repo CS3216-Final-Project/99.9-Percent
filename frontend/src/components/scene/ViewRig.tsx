@@ -76,7 +76,7 @@ function letGoOfPointer(): void {
 }
 
 /** The floor the avatar's feet are on, riding included. */
-const footing = () => (riding() ? viewHeight() : FLOOR_Y[avatar.floor]);
+const footing = () => (riding() ? viewHeight() : FLOOR_Y[avatar.floor] + avatar.lift);
 
 /**
  * What the follow view keeps within: with the avatar in the elevator's car, the car's walls and under its ceiling,
@@ -292,17 +292,43 @@ export function ViewRig() {
     };
     const lockChanged = () => {
       const locked = document.pointerLockElement === canvas;
-      if (viewNow.locked && !locked) unlockedAt = performance.now();
+      if (viewNow.locked && !locked) {
+        unlockedAt = performance.now();
+        const state = useGame.getState();
+        if (state.roomInspection) {
+          state.dismissRoomInspection();
+          viewNow.quietPause = true;
+        }
+      }
       viewNow.locked = locked;
       if (locked) {
         // The browser said yes: whatever happens to the lock later, it was not refused.
         window.clearTimeout(waiting);
         viewNow.lockRefused = false;
+        viewNow.quietPause = false;
       }
       lockNews();
     };
     const escape = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      const state = useGame.getState();
+      if (state.roomInspection) {
+        e.stopImmediatePropagation();
+        state.dismissRoomInspection();
+        if (document.pointerLockElement === canvas || viewNow.locked) {
+          viewNow.quietPause = true;
+          lockNews();
+          letGoOfPointer();
+        }
+        return;
+      }
+      if (viewNow.quietPause) {
+        e.stopImmediatePropagation();
+        if (performance.now() - unlockedAt < 250) return;
+        viewNow.quietPause = false;
+        lockNews();
+        return;
+      }
       // Escape lets go of the pointer, and that is all it does.
       if (document.pointerLockElement === canvas || performance.now() - unlockedAt < 250) {
         e.stopImmediatePropagation();
@@ -383,7 +409,13 @@ export function ViewRig() {
         viewNow.eyesPitch = 0.12;
         rig.trailing = null;
       }
-      if (want === "overview") letGoOfPointer();
+      if (want === "overview") {
+        if (viewNow.quietPause) {
+          viewNow.quietPause = false;
+          lockNews();
+        }
+        letGoOfPointer();
+      }
       // The room was only just drawn: the view it opens in is not a change worth hearing.
       if (rig.started) sceneSound("whoosh", WHOOSH);
       rig.move = { from, to: want, at: t, pose: viewNow.perspective ? rig.drawn : null, cut: false };

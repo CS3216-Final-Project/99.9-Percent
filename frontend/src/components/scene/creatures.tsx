@@ -9,9 +9,11 @@ import { motionFor, SPECIES, type Activity, type Species } from "./cast";
 import { useDetail, type Detail } from "./detail";
 import { loadCrew, type Crew } from "./creatureCatalog";
 import { poseAt, type Plan } from "./routes";
-import { avatar } from "./walk";
-import { standing } from "./crewSpots";
+import { avatar, gridHere } from "./walk";
+import { bodiesOn, standing, within } from "./crewSpots";
 import { useGame } from "@/game/store";
+import { intrudes, radiusOf, sidestep } from "./spacing";
+import { blocked } from "./navgrid";
 
 /*
  * The office crew: animated monsters (see cast.ts). Every creature is a copy of
@@ -200,7 +202,7 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
   }, [model, gltf, motion.clip, motion.speed, pace, activity, info.kind, phase, beat]);
 
   // The map shows where every creature stands.
-  useEffect(() => standing(model.object), [model]);
+  useEffect(() => standing(model.object, radiusOf(species)), [model, species]);
 
   // Between beats the creature idles, so it does not freeze in the clip's last pose.
   const rest = useRef<THREE.AnimationAction | null>(null);
@@ -329,20 +331,63 @@ export function Wanderer({ plan, species, offset = 0 }: { plan: Plan; species: S
   const [activity, setActivity] = useState<Activity>(() => poseAt(plan, offset).activity);
   const shown = useRef(activity);
   const lag = useRef(0);
+  const spacing = useRef({ x: 0, z: 0 });
+  const stuck = useRef(0);
+  const ignored = useRef(0);
+  const radius = radiusOf(species);
   useFrame(({ clock }, dt) => {
-    let pose = poseAt(plan, clock.elapsedTime + offset - lag.current);
-    if (pose.activity === "walk" && avatarAhead(pose.x, pose.z, pose.yaw)) {
-      lag.current += Math.min(dt, 0.1);
-      pose = { ...poseAt(plan, clock.elapsedTime + offset - lag.current), activity: "idle" };
+    const step = Math.min(dt, 0.1);
+    const pose = poseAt(plan, clock.elapsedTime + offset - lag.current);
+    const target = { x: pose.x + spacing.current.x, z: pose.z + spacing.current.z };
+    const previous = g.current ? [g.current.position.x, g.current.position.z] as [number, number] : [target.x, target.z] as [number, number];
+    const world = gridHere("office").world;
+    const bodies = g.current ? bodiesOn("office", (o) => within(o, g.current!)) : [];
+    let activityNow = pose.activity;
+    const ahead = pose.activity === "walk" && avatarAhead(pose.x, pose.z, pose.yaw);
+    const moving = Math.hypot(target.x - previous[0], target.z - previous[1]) > 1e-4;
+    const blockedByBody = moving && ignored.current <= 0 && intrudes(bodies, radius, previous[0], previous[1], target.x, target.z);
+    if (ahead || blockedByBody) {
+      lag.current += step;
+      if (blockedByBody) {
+        stuck.current += step;
+        const side = sidestep(world, bodies, radius, previous[0], previous[1], pose.yaw, plan.speed * step * 0.7);
+        if (side) {
+          spacing.current = { x: side[0] - pose.x, z: side[1] - pose.z };
+          const length = Math.hypot(spacing.current.x, spacing.current.z);
+          if (length > 0.8) {
+            spacing.current.x *= 0.8 / length;
+            spacing.current.z *= 0.8 / length;
+          }
+        } else activityNow = "idle";
+        if (pose.activity !== "walk") activityNow = "idle";
+        if (stuck.current > 8) {
+          // Last resort: let a wanderer through so it can never freeze forever.
+          ignored.current = 2;
+          stuck.current = 0;
+        }
+      } else activityNow = "idle";
+    } else {
+      stuck.current = 0;
+      ignored.current = Math.max(0, ignored.current - step);
+      const ease = 1.5 * step;
+      const ox = spacing.current.x;
+      const oz = spacing.current.z;
+      const length = Math.hypot(ox, oz);
+      const factor = length > 0 ? Math.max(0, (length - ease) / length) : 0;
+      const eased = { x: ox * factor, z: oz * factor };
+      const next = { x: pose.x + eased.x, z: pose.z + eased.z };
+      if (!intrudes(bodies, radius, previous[0], previous[1], next.x, next.z) && !blocked(world, next.x, next.z)) spacing.current = eased;
+      else activityNow = "idle";
     }
     if (g.current) {
-      g.current.position.set(pose.x, 0, pose.z);
+      g.current.position.set(pose.x + spacing.current.x, 0, pose.z + spacing.current.z);
       g.current.rotation.y = pose.yaw;
     }
+    if (!g.current) return;
     // Only a change of what it is doing needs React; moving does not.
-    if (pose.activity !== shown.current) {
-      shown.current = pose.activity;
-      setActivity(pose.activity);
+    if (activityNow !== shown.current) {
+      shown.current = activityNow;
+      setActivity(activityNow);
     }
   });
   return (

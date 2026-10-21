@@ -11,6 +11,7 @@ test.beforeEach(async ({ page }) => {
 
 const label = (page: Page, name: string) => page.getByRole("main").locator(".eq-labels").getByRole("button", { name, exact: true });
 const floor = (page: Page, name: "Office floor" | "Server floor") => page.locator(`.floor-menu button[data-floor="${name === "Office floor" ? "office" : "servers"}"]`);
+const stage = (page: Page) => page.locator(".stage-canvas");
 const walk = (page: Page) => page.locator(".desktop-walk").getByRole("button", { name: "Walk mode", exact: true, includeHidden: true });
 const prompt = (page: Page) => page.locator(".walk-prompt");
 const exploration = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem("nn.classic.exploration.v1") ?? "null"));
@@ -134,6 +135,33 @@ test("in walk mode, clicking equipment walks the avatar to it, and Space then in
   await prompt(page).click();
   await expect(reveal).toBeVisible();
   await reveal.getByRole("button", { name: "Return to room" }).click();
+});
+
+test("Space jumps when there is nothing in reach without opening an inspection", async ({ page }) => {
+  test.slow();
+  await open(page);
+  await openRoomControls(page);
+  await floor(page, "Office floor").click();
+  await expect(floor(page, "Office floor")).toHaveAttribute("aria-pressed", "true");
+  await chooseWalkMode(page);
+  await page.evaluate(async () => {
+    const modulePath = new URL("/src/components/scene/walk.ts", location.origin).href;
+    const { avatar, placeAvatar } = await import(/* @vite-ignore */ modulePath);
+    placeAvatar("office", [1, 3], 0);
+    avatar.prompt = null;
+  });
+  const lift = () => page.evaluate(async () => {
+    const modulePath = new URL("/src/components/scene/walk.ts", location.origin).href;
+    return (await import(/* @vite-ignore */ modulePath)).avatar.lift;
+  });
+  await expect.poll(() => page.evaluate(async () => {
+    const modulePath = new URL("/src/components/scene/walk.ts", location.origin).href;
+    return (await import(/* @vite-ignore */ modulePath)).avatar.prompt;
+  })).toBeNull();
+  await stage(page).focus();
+  await page.keyboard.press("Space");
+  await expect.poll(lift).toBeGreaterThan(0);
+  await expect(page.locator(".inspection-reveal")).toHaveCount(0);
 });
 
 test("Guided Mode: the avatar inspects the Deploy office and the panel reports company operations", async ({ page }) => {

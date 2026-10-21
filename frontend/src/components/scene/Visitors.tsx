@@ -12,6 +12,7 @@ import { now, shownFloor } from "./ride";
 import { carY, onErrandEnd } from "./trips";
 import { bothFloors, SHAFT_CLIP } from "./viewState";
 import { errandEnded, PACE, populate, stepVisitors, visitors, type Visitor } from "./crowd";
+import { bodiesOn } from "./crewSpots";
 
 /*
  * The people about the building (crowd.ts): stepped once a frame here and each drawn as a creature, on the floor
@@ -22,6 +23,11 @@ import { errandEnded, PACE, populate, stepVisitors, visitors, type Visitor } fro
 /** The same people on every visit, so a reload does not reshuffle the building. */
 const SEED = 9_999;
 
+function taggedVisitor(o: THREE.Object3D): boolean {
+  for (let parent: THREE.Object3D | null = o; parent; parent = parent.parent) if (parent.userData.visitor) return true;
+  return false;
+}
+
 export function Visitors({ count }: { count: number }) {
   // The same crowd carries on through a remount; only a new number of people starts afresh.
   const people = useMemo(() => {
@@ -31,7 +37,7 @@ export function Visitors({ count }: { count: number }) {
   useEffect(() => onErrandEnd(errandEnded), []);
   useFrame((_, dt) => {
     const s = useGame.getState();
-    stepVisitors(dt, now(), s.walking && s.started);
+    stepVisitors(dt, now(), s.walking && s.started, (floor) => bodiesOn(floor, taggedVisitor));
   });
   return (
     <>
@@ -62,7 +68,7 @@ function Person({ visitor: v }: { visitor: Visitor }) {
     }
   });
   return (
-    <group ref={g}>
+    <group ref={g} userData={{ visitor: true }}>
       <Creature species={v.species} activity={activity} position={[0, 0, 0]} phase={v.id * 1.7} pace={PACE.walk} clip={SHAFT_CLIP} />
     </group>
   );
