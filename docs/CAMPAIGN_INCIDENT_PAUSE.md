@@ -1,5 +1,37 @@
 # Intelligent incident Pause guidance
 
+
+## Phase 2 correction - pointer capture (October 20)
+
+Initial local work on `fe/campaign-guidance-phase-2`, based on merged main `f5848e0`; the required initial fetch confirmed 0 ahead / 0 behind. This section supersedes the historical pointer-lock exclusions below. Publication validation is recorded in `CAMPAIGN_CHAPTER4_GUIDED_FLOW.md`; the local status and results below describe the development checkpoint.
+
+A real first-person Chapter 3 browser reproduction confirmed the failure before the correction: the engine opened its expected new incident, the company remained running and Pause was enabled, but no button glowed. The host classified `document.pointerLockElement` as a blocker, both when observing the incident transition and when rendering Pause. Its pointer-lock listener also discarded the incident token. Earlier browser cases always used the overview and therefore missed normal captured-mouse play. Chapter 1's first-incident engine/store stop is separate and correct; it remains unchanged.
+
+The existing host now distinguishes mandatory/focus blockers from ordinary mouse capture. New running unresolved incidents can immediately mark the existing Pause button while the camera owns the mouse. Escape can release that mouse without consuming the offer; held movement-key repeats are also not treated as a fresh acknowledgement. A new deliberate interaction still dismisses once, as before. Pausing removes gold and starts the existing ten-second eligible Hint interval when diagnosis is still needed. No camera is moved or unlocked automatically.
+
+Optional help remains blocked while the mouse is captured. Tutorials/practice, actual modals, confirmations, hidden/unfocused state, blocking views, paused companies and valid recovery paths retain their previous precedence. Existing manual accepted investigation ownership remains unchanged. The same resolver, ephemeral incident token, single spotlight owner and shared gold class are reused. Simulation, store clock/automatic-stop rules, chapter progression, header, controls, styling and saves are untouched.
+
+New tests cover captured-mouse arrivals across all six chapters at the real-store boundary, real pointer capture and Escape in browser Chapters 2-6, held-key repeats, modal priority and accepted recovery. The browser Chapter 1 case retains its actual first-incident automatic stop; a real subsequent Chapter 1 incident remains a store-boundary case because loading acknowledged Opening normally enters Scaling.
+
+Final focused unit validation: **95 passed in five files** (73.69 seconds), including nine new captured-input/priority cases. Frontend lint, typecheck and production build passed; the existing large Facility-chunk advisory remains. The initial unit attempt exposed a missing jsdom pointer-lock API in the new test setup (now explicitly defined/restored) and one pre-existing fixture-heavy resolver test hit its unchanged five-second limit. That resolver case passed in the final batch without changing its timeout or assertions.
+
+The final browser selection passed **23 desktop cases**: native captured-mouse incident arrivals in Chapters 2-6, overview arrivals, Chapter 1's automatic stop/resume, Pause-to-Hint timing, accepted action/immediate Confirm, recovery exclusions, deliberate dismissal, four shared confirmation flows, complete interactive Chapter 0 and Classic layouts at 1440/320px. The same run had **two touch failures**, retained for diagnosis: 390px completed every gameplay assertion before browser-context teardown stalled for about 659 seconds; 320px stalled during WebGL initialization before incident assertions, with a roughly 695-second trace wait despite the unchanged ten-second expectation. These indicate browser/host stalls rather than a demonstrated guidance assertion defect; their exact environmental cause is unconfirmed. Both unchanged touch cases passed in a fresh Chromium process, retries 0: **2 passed in 45.4 seconds** (20.6/20.2 seconds). All **25 distinct selected journeys** therefore have passing verification across runs; this is not one green 25-case batch. No runtime source changes followed the final build.
+
+Commands from `frontend/`, Node **22.23.3**, one worker, browser `PLAYWRIGHT_PORT=4197`:
+
+```powershell
+npm test -- --maxWorkers=1 src/components/IncidentPause.test.tsx src/game/incidentPause.test.ts src/components/CampaignAttention.test.tsx src/game/campaignAttention.test.ts src/components/idleAttention.test.ts
+npm run lint
+npm run typecheck
+npm run build
+node node_modules/@playwright/test/cli.js test incidentPause.spec.ts mobile.spec.ts campaignAttention.spec.ts campaignTutorial.spec.ts controls.spec.ts --grep 'incident Pause:|action confirmation shared immediate gold:|Chapter 0 requires real|Challenge incident transport' --retries=0 --output=../test-results/phase2-pause/browser-final-artifacts
+node node_modules/@playwright/test/cli.js test mobile.spec.ts --project=mobile-chromium --grep 'incident Pause:' --retries=0 --output=../test-results/phase2-pause/browser-touch-diagnostic-artifacts
+```
+
+Only four paths are changed for this correction: the existing `CampaignAttention.tsx` host, its `IncidentPause.test.tsx` tests, `incidentPause.spec.ts` and this report. The first failed product reproduction, browser failure traces and local screenshots remain ignored under `test-results/phase2-pause/`. No skip, forced click, automatic retry, timeout increase or relaxed assertion was introduced. This is focused frontend validation, not full coverage, backend validation or the complete browser suite; Chromium touch emulation does not establish real-device, Safari/Firefox or screen-reader acceptance. No commit or push is authorized or performed.
+
+## Historical Phase 1 implementation
+
 Local implementation on `fe/campaign-guidance-phase-1`. At task start, `git fetch origin main` succeeded; the freshly fetched comparison was 0 ahead / 0 behind. All earlier Phase 1, progression-attention and recovery-report work is preserved. No new branch/worktree, commit, push, PR, merge or deployment.
 
 ## Audit and root cause

@@ -12,14 +12,21 @@ import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } fro
 // Every test still receives isolated snapshots and exercises the real store/host.
 const transitions = new Map([1, 2, 3, 4, 5, 6].map(chapter => [chapter, pauseTransition(chapter)]));
 const transition = (chapter: number) => structuredClone(transitions.get(chapter)!);
+const pointerLockDescriptor = Object.getOwnPropertyDescriptor(document, "pointerLockElement");
 
 beforeEach(() => {
   localStorage.clear(); useGame.setState(useGame.getInitialState(), true);
+  // jsdom does not implement native pointer capture; model only this browser boundary.
+  Object.defineProperty(document, "pointerLockElement", { configurable: true, get: () => null });
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ x: 10, y: 10, top: 10, left: 10, right: 54, bottom: 54, width: 44, height: 44, toJSON: () => ({}) });
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup(); vi.useRealTimers(); vi.restoreAllMocks();
+  if (pointerLockDescriptor) Object.defineProperty(document, "pointerLockElement", pointerLockDescriptor);
+  else Reflect.deleteProperty(document, "pointerLockElement");
+});
 function show(game = transition(3).before) {
   useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null });
   render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /><CampaignOverlays /></CampaignAttentionHost></StrictMode>);
@@ -132,4 +139,41 @@ it("does not defer a background incident invitation until focus returns", () => 
   show(); fireEvent.click(screen.getByRole("button", { name: "Run" }));
   fireEvent(window, new Event("blur")); act(() => useGame.getState().tick(1)); expect(gold()).toHaveLength(0);
   fireEvent(window, new Event("focus")); expect(gold()).toHaveLength(0);
+});
+
+it.each([1, 2, 3, 4, 5, 6])("marks a running Chapter %i incident with the mouse captured, and keeps it through Escape", chapter => {
+  show(transition(chapter).before); const canvas = document.createElement("canvas"); document.body.append(canvas);
+  const lock = vi.spyOn(document, "pointerLockElement", "get").mockReturnValue(canvas);
+  fireEvent(document, new Event("pointerlockchange"));
+  startIncident(); expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Pause");
+  fireEvent.keyDown(document, { key: "Escape" });
+  lock.mockReturnValue(null); fireEvent(document, new Event("pointerlockchange"));
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Pause");
+  fireEvent.click(gold()[0]); expect(gold()).toHaveLength(0); expect(useGame.getState().running).toBe(false);
+  canvas.remove();
+});
+
+it("does not treat repeated held movement as acknowledgement of a new incident", () => {
+  show(); startIncident(); expect(gold()).toHaveLength(1);
+  fireEvent.keyDown(document, { key: "w", repeat: true });
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Pause");
+  fireEvent.keyDown(document, { key: "w", repeat: false }); expect(gold()).toHaveLength(0);
+});
+it("still gives a real modal priority while the room owns the pointer", async () => {
+  show(); const canvas = document.createElement("canvas"); document.body.append(canvas);
+  vi.spyOn(document, "pointerLockElement", "get").mockReturnValue(canvas);
+  fireEvent(document, new Event("pointerlockchange"));
+  const modal = document.createElement("div"); modal.className = "modal-backdrop";
+  await act(async () => { document.body.append(modal); });
+  startIncident(); expect(useGame.getState().running).toBe(true); expect(gold()).toHaveLength(0);
+  await act(async () => { modal.remove(); canvas.remove(); });
+  expect(gold()).toHaveLength(0);
+});
+it("does not offer Pause during accepted recovery work with the mouse captured", () => {
+  show(decide(transition(1).before, { type: "start_db_upgrade" }));
+  const canvas = document.createElement("canvas"); document.body.append(canvas);
+  vi.spyOn(document, "pointerLockElement", "get").mockReturnValue(canvas);
+  fireEvent(document, new Event("pointerlockchange"));
+  startIncident(); expect(useGame.getState().running).toBe(true); expect(gold()).toHaveLength(0);
+  canvas.remove();
 });

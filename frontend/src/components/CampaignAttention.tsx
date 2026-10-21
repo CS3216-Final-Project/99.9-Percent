@@ -9,6 +9,8 @@ import { Icon } from "./icons";
 import { tipProps } from "./tips";
 import "./CampaignAttention.css";
 import { CampaignAttentionContext, useCampaignAttention } from "./useCampaignAttention";
+import { chapter4Stage } from "@/game/chapter4Guidance";
+import { Chapter4StagePopup } from "./Chapter4StagePopup";
 
 function visibleControl(selector: string): HTMLElement | null {
   return [...document.querySelectorAll<HTMLElement>(selector)].find(node => {
@@ -32,6 +34,7 @@ const TARGETS: Record<GuidanceTarget, string> = {
   db: '.campaign-panel [data-tutorial="inspect-db"]',
   app: '.campaign-panel [data-tutorial="inspect-app"]',
   network: '.campaign-panel [data-tutorial="inspect-gateway"]',
+  monitoring: '.campaign-panel [data-tutorial="inspect-monitoring"]',
   requirements: ".chapter-actions > button:last-child",
   next: ".chapter-advance",
   reliability: '[data-guidance="arm_reliability"]',
@@ -55,13 +58,16 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const [pauseOffer, updatePauseOffer] = useState<string | null>(null);
   const pauseToken = useRef<string | null>(null);
   const setPauseOffer = useCallback((offer: string | null) => { pauseToken.current = offer; updatePauseOffer(offer); }, []);
-  const manual = useRef({ accepted, opened, key: "", blocked: false });
+  const manual = useRef({ accepted, opened, key: "", pauseBlocked: false });
   const button = useRef<HTMLButtonElement>(null), card = useRef<HTMLDivElement>(null);
   const revealedTarget = useRef<HTMLElement | null>(null);
   const markedTarget = useRef<HTMLElement | null>(null);
   const decision = useMemo(() => campaignAttention(game), [game]);
+  const spikeStage = chapter4Stage(game);
   const available = !!game.campaign && started && tour?.track !== "campaign" && !practice;
-  const blocked = covered || !!confirming || risk || !!tour || !!practice || hidden || locked || !focused;
+  // Capturing the room's mouse blocks optional help, not an urgent Pause invitation.
+  const pauseBlocked = covered || !!confirming || risk || !!tour || !!practice || hidden || !focused;
+  const blocked = pauseBlocked || locked;
   const key = `${generation}:${decision.key}`;
   const choices = decision.growthChoices;
   const chooseRisk = choices && (growthChoice?.key === key ? growthChoice.risk : !choices.upgrade);
@@ -69,22 +75,27 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const guidanceTarget = choices ? chooseRisk ? "risk" : choices.upgrade ? "db" : "requirements" : decision.target;
   const riskConfirmation = available && risk && !confirming && !covered && !tour && !hidden && !locked && focused && decision.reason === "scaling-choice" && !!choices?.risk && previewCampaignAction(game, { type: "accept_scaling_risk" }).ok;
   const actionSelector = recommendedAction ? `[data-guidance-action="${guidanceActionId(recommendedAction.action)}"]` : "";
-  const selectedInspection = decision.target === "db" && selected === "db" ? "Database" : decision.target === "app" && selected === "app" ? "Servers" : decision.target === "network" && selected === "gateway" ? "Network" : null;
+  const selectedInspection = decision.target === "db" && selected === "db" ? "Database" : decision.target === "app" && selected === "app" ? "Servers" : decision.target === "network" && selected === "gateway" ? "Network" : decision.target === "monitoring" && selected === "monitoring" ? "Monitoring" : null;
   const targetSelector = recommendedAction ? `${actionSelector}.campaign-action-card > button.act, button${actionSelector}` : selectedInspection ? ".campaign-panel .equipment-readings > details > summary" : guidanceTarget ? TARGETS[guidanceTarget] : "";
   const acceptedNow = accepted === key;
   const spotlightSelector = riskConfirmation ? '[data-guidance="accept_scaling_risk"]' : targetSelector;
   const openNow = opened === key && available && !blocked;
   const incidentKey = `${generation}:${game.campaign?.runId}:${game.campaign?.incident?.id}`;
   const pauseDiagnosis = incidentNeedsPause(game, decision);
-  const pauseGold = available && !blocked && !view && !openNow && !acceptedNow && running && clockAvailable && pauseDiagnosis && pauseOffer === incidentKey;
+  const pauseGold = available && !pauseBlocked && !view && !openNow && !acceptedNow && running && clockAvailable && pauseDiagnosis && pauseOffer === incidentKey;
   const timerKey = `${key}:${view}:${selected}:${panel}:${floor}:${running}`;
   const candidate = available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && (decision.attention === "progression" || decision.attention === "hint" || decision.attention === "run" && !running && clockAvailable);
 
-  useLayoutEffect(() => { manual.current = { accepted, opened, key, blocked }; }, [accepted, opened, key, blocked]);
+  useLayoutEffect(() => { manual.current = { accepted, opened, key, pauseBlocked }; }, [accepted, opened, key, pauseBlocked]);
   useEffect(() => {
     if (!pauseGold) return;
     // Any deliberate interaction acknowledges this one-time invitation; ordinary hover does not.
-    const dismiss = () => setPauseOffer(null);
+    const dismiss = (event: Event) => {
+      // Releasing the captured mouse (Escape) and held movement-key repeats do not
+      // acknowledge an incident the player has only just been shown.
+      if (event instanceof KeyboardEvent && (event.key === "Escape" || event.repeat)) return;
+      setPauseOffer(null);
+    };
     const events = ["pointerdown", "keydown", "wheel", "touchmove"] as const;
     for (const event of events) document.addEventListener(event, dismiss, { capture: true, passive: true });
     return () => { for (const event of events) document.removeEventListener(event, dismiss, true); };
@@ -97,13 +108,14 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       setCovered(modal);
       setHidden(document.hidden);
       setLocked(!!document.pointerLockElement);
-      if (modal || document.hidden || document.pointerLockElement) clear();
+      if (modal || document.hidden) clear();
+      else if (document.pointerLockElement) { setOpened(null); setAccepted(null); }
     };
     const unsubscribe = useGame.subscribe((s, before) => {
       if (s.tour !== before.tour || s.tutorialCompany !== before.tutorialCompany || s.generation !== before.generation || s.started !== before.started || s.running !== before.running) clear();
       if (s.view !== before.view || pauseToken.current && s.game !== before.game && !incidentNeedsPause(s.game)) setPauseOffer(null);
       const c = s.game.campaign, prior = before.game.campaign;
-      if (c?.incident && c.runId === prior?.runId && c.incident.id !== prior.incident?.id && s.generation === before.generation && s.started && s.running && !s.tour && !s.tutorialCompany && !s.view && !manual.current.blocked && !document.hidden && document.hasFocus() && !document.pointerLockElement) {
+      if (c?.incident && c.runId === prior?.runId && c.incident.id !== prior.incident?.id && s.generation === before.generation && s.started && s.running && !s.tour && !s.tutorialCompany && !s.view && !manual.current.pauseBlocked && !document.hidden && document.hasFocus()) {
         const next = campaignAttention(s.game), previous = campaignAttention(before.game);
         const previousKey = `${before.generation}:${previous.key}`;
         const sameAdvice = previous.target === next.target && previous.reason === next.reason &&
@@ -225,6 +237,8 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     openHint: () => { if (!blocked) { setPauseOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
   const close = () => { setOpened(null); button.current?.focus(); };
   return <CampaignAttentionContext.Provider value={context}>{children}
+    {spikeStage && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !game.campaign?.incident && game.phase === "management" && !decision.reason.match(/^(review|next)$/) &&
+      <Chapter4StagePopup key={`${spikeStage.key}:${spikeStage.stage}`} model={spikeStage} />}
     {openNow && createPortal(<div ref={card} id="campaign-hint-card" className="campaign-hint-card" role="dialog" aria-modal="false" aria-label="Hint" tabIndex={-1} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
       <div className="campaign-hint-heading"><h3><Icon name="bulb" />Hint</h3><button type="button" className="icon-btn" aria-label="Close Hint" onClick={close}><Icon name="close" /></button></div>
       <div className="campaign-hint-copy" role="region" aria-label="Hint explanation" tabIndex={0}><p>{decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : selectedInspection && !recommendedAction ? `Check About ${selectedInspection} to understand the readings before choosing a response.` : decision.message}</p></div>

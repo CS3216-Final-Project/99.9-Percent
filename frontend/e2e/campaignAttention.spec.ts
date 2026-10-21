@@ -2,7 +2,7 @@ import { test, expect, seedSave, savedGame, expectRoom, tutorial, setGameSpeed }
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
-import { act, tick, spikeCompany, dataCompany } from "../src/sim/__tests__/spikeFixtures";
+import { act, tick, spikeCompany, dataCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "../src/sim/__tests__/reliabilityFixture";
 import { combinedCompany } from "../src/sim/__tests__/combinedFixture";
 import { dataCompany as enteredDataCompany } from "../src/sim/__tests__/dataFixture";
@@ -37,9 +37,37 @@ async function expectFullyVisibleGold(page: Page) {
 }
 
 const scaling = () => act(act(tick(act(tick(newGame(), 6), { type: "start_db_upgrade" }), 30), { type: "acknowledge_review" }), { type: "acknowledge_milestone" });
+test("guidance Chapter 4 baseline: Run advances a real qualifying observation", async ({ page, installClock }) => {
+  await installClock(); const game = untilOffset(tick(act(spikeCompany(false), { type: "set_traffic_limit", enabled: true })), 68);
+  await boot(page, game); const before = (await savedGame(page)).campaign!;
+  await idle(page, 9999); await expect(gold(page)).toHaveCount(0);
+  await page.clock.runFor(1); await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Run");
+  expect((await savedGame(page)).campaign!.step).toBe(before.step);
+  await gold(page).click(); await page.clock.runFor(1000); await expect(gold(page)).toHaveCount(0);
+  expect((await savedGame(page)).campaign!.spikeStage!.baselineStableSteps).toBe(before.spikeStage!.baselineStableSteps + 1);
+});
+
+test("guidance Chapter 4 investigation: Hint owns idle attention and transfers to the relevant action and Confirm", async ({ page, installClock }) => {
+  await installClock(); let game = spikeCompany(false);
+  game = tick(game, game.campaign!.spikeStage!.deadlines[0] - game.campaign!.step);
+  await boot(page, game); const before = (await savedGame(page)).campaign!;
+  await idle(page, 9999); await expect(gold(page)).toHaveCount(0);
+  await page.clock.runFor(1); await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Hint");
+  await gold(page).click(); const card = page.getByRole("dialog", { name: "Hint", exact: true });
+  await expect(card.locator("p")).toHaveCount(1); await expect(card).toContainText("Add a server, then connect it after installation");
+  expect((await card.locator("p").innerText()).split(/\s+/).length).toBeLessThan(25);
+  await card.getByRole("button", { name: "Got it", exact: true }).click();
+  await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName(/^Add server/);
+  await gold(page).click(); await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Confirm");
+  expect((await savedGame(page)).campaign!.inputs).toEqual(before.inputs);
+  expect((await savedGame(page)).campaign!.step).toBe(before.step);
+  await gold(page).click(); await expect(gold(page)).toHaveCount(0);
+  expect((await savedGame(page)).campaign!.pending.some(a => a.type === "add-app")).toBe(true);
+});
+
 for (const [chapter, company, expected] of [
   [1, newGame, "Run"], [2, scaling, "Hint"], [3, dataCompany, /^Next:/],
-  [4, () => spikeCompany(false), "Run"], [5, reliabilityCompany, "Start reliability test"], [6, combinedCompany, "Run"],
+  [4, () => spikeCompany(false), "Hint"], [5, reliabilityCompany, "Start reliability test"], [6, combinedCompany, "Run"],
   ["2 accepted risk", () => act(scaling(), { type: "accept_scaling_risk" }), "Run"],
   ["3 workload", enteredDataCompany, "Run"],
 ] as const) test(`guidance Chapter ${chapter}: authoritative idle priority`, async ({ page, installClock }) => {
@@ -351,7 +379,7 @@ test("action guidance preparation: required risk choice retains ownership and ne
 
 for(const [chapter,company,target] of [
   [1,newGame,"Run"],[2,scaling,"Upgrade database"],
-  [3,enteredDataCompany,"Run"],[4,()=>spikeCompany(false),"Run"],
+  [3,enteredDataCompany,"Run"],[4,()=>spikeCompany(false),"App Server"],
   [5,reliabilityCompany,"Start reliability test"],[6,combinedCompany,"Run"],
 ] as const) test(`simple Hint Chapter ${chapter}: one explanation and valid next choices`,async ({page,installClock},info)=>{
   await installClock(); await boot(page,company());

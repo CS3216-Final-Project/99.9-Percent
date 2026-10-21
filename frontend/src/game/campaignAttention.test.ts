@@ -72,7 +72,8 @@ it("uses Data's real scheduling eligibility and preserves explicit continuation"
   expect(guidance(enteredDataCompany())).toMatchObject({ attention: "run", reason: "data-growth" });
 });
 it("recognises traffic pulse time without requiring autoscaling", () => {
-  expect(guidance(spikeCompany(false))).toMatchObject({ chapter: 4, attention: "run", reason: "spike-pulses" });
+  const game = act(spikeCompany(false), { type: "incident_inspect", equipment: "app" });
+  expect(guidance(game)).toMatchObject({ chapter: 4, attention: "run", reason: "spike-pulses" });
 });
 it("reliability requires explicit arming; pending setup is not a mandatory arm blocker", () => {
   const game = reliabilityCompany();
@@ -168,15 +169,24 @@ it("selects measured read-cache help when the unlocked DB tier cannot fit, while
   expect(guidance(reads).action?.action.type).toBe("deploy_cache");
   expect(guidance(writes).action?.action.type).not.toBe("deploy_cache");
 });
-it("keeps every chapter's displayed Hint short while retaining its internal evidence", () => {
-  const scaling=act(act(tick(act(tick(newGame(),6),{type:"start_db_upgrade"}),30),{type:"acknowledge_review"}),{type:"acknowledge_milestone"});
-  const games=[newGame(),advanceSteps(newGame(),6).state,scaling,enteredDataCompany(),tick(enteredDataCompany(),12),spikeCompany(false),reliabilityCompany(),tick(act(reliabilityCompany(),{type:"arm_reliability"}),8),combinedCompany(),tick(combinedCompany(),5)];
-  for(const game of games){
-    const hint=guidance(game);
-    expect(hint.message.split(/\s+/).length).toBeLessThan(25);
-    expect(hint.message).not.toMatch(/admission relief|queue drainage|predicate|headroom|activation state|ops\/s/);
-    expect(hint.observation.length).toBeGreaterThan(0);
-  }
+// Keep each chapter's real engine-generated history inside its own test budget.
+// Constructing all ten histories in one case obscured which stage was slow.
+it.each([
+  ["Opening", () => newGame()],
+  ["Opening incident", () => advanceSteps(newGame(), 6).state],
+  ["Scaling", () => act(act(tick(act(tick(newGame(), 6), { type: "start_db_upgrade" }), 30), { type: "acknowledge_review" }), { type: "acknowledge_milestone" })],
+  ["Data", () => enteredDataCompany()],
+  ["Data workload", () => tick(enteredDataCompany(), 12)],
+  ["Spikes", () => spikeCompany(false)],
+  ["Reliability", () => reliabilityCompany()],
+  ["Reliability failure", () => tick(act(reliabilityCompany(), { type: "arm_reliability" }), 8)],
+  ["Growth", () => combinedCompany()],
+  ["Growth readiness", () => tick(combinedCompany(), 5)],
+] as const)("keeps %s's displayed Hint short while retaining its internal evidence", (_stage, company) => {
+  const hint = guidance(company());
+  expect(hint.message.split(/\s+/).length).toBeLessThan(25);
+  expect(hint.message).not.toMatch(/admission relief|queue drainage|predicate|headroom|activation state|ops\/s/);
+  expect(hint.observation.length).toBeGreaterThan(0);
 });
 
 it("derives Chapter 2 strategies from dispatcher availability and removes them after actual preparation or consent", () => {

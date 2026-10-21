@@ -19,3 +19,4 @@
 .campaign-hint-heading { justify-content: space-between; }
 .campaign-hint-card p { margin: 10px 0; }
 .tooltip-title { display: block; margin-bottom: 3px; }
+.chapter4-stage-popup { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100vw - 24px)); max-height: min(280px, calc(100dvh - 240px)); overflow-y: auto; }
