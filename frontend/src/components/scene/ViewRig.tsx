@@ -7,6 +7,8 @@ import type { MapControls as MapControlsImpl } from "three-stdlib";
 import { useGame } from "@/game/store";
 import { fromAvatar, type Viewpoint } from "@/game/viewpoints";
 import { SHAFT } from "./floorplan";
+import { ROOM } from "./layout";
+import { CABIN, CABIN_WALLS, inCabin } from "./lift";
 import { FLOOR_Y } from "./levels";
 import { now, riding, viewHeight } from "./ride";
 import { avatar, held, TURN_KEYS } from "./walk";
@@ -25,6 +27,7 @@ import {
   overviewOffset,
   VIEW_EASE,
   type Pose,
+  type Wall,
 } from "./views";
 import { wallUp, type WallId } from "./wallState";
 import { cameras, lookApi, mouse, resetRig, rig, setViewFade, viewNow } from "./viewState";
@@ -74,6 +77,12 @@ function letGoOfPointer(): void {
 
 /** The floor the avatar's feet are on, riding included. */
 const footing = () => (riding() ? viewHeight() : FLOOR_Y[avatar.floor]);
+
+/**
+ * What the follow view keeps within: with the avatar in the elevator's car, the car's walls and under its ceiling,
+ * so it never looks in through the roof; otherwise the room, clear of the shaft.
+ */
+const followWithin = (): [readonly Wall[], number, number] => (inCabin(avatar.x, avatar.z) ? [CABIN_WALLS, FOLLOW.fov, CABIN.h] : [SHAFT, FOLLOW.fov, ROOM.wallH]);
 
 const ALL_WALLS: WallId[] = ["back", "left", "front", "right"];
 
@@ -432,7 +441,7 @@ export function ViewRig() {
       const live =
         showing === "first"
           ? firstPose(avatar.x, y, avatar.z, viewNow.heading, viewNow.eyesPitch, fov)
-          : trail(followPose(avatar.x, y, avatar.z, viewNow.heading, viewNow.pitch, viewNow.distance, SHAFT), dt, instant);
+          : trail(followPose(avatar.x, y, avatar.z, viewNow.heading, viewNow.pitch, viewNow.distance, ...followWithin()), dt, instant);
       pose = m && !crossing && m.pose ? blendPose(m.pose, live, instant ? 1 : (t - m.at) / VIEW_EASE) : live;
       if (showing === "first") rig.trailing = null;
     }

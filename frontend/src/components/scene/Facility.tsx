@@ -45,7 +45,11 @@ import { openRoomArea } from "../roomArea";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { Office } from "./Office";
 import { ServerFloor } from "./ServerFloor";
-import { Counterweight, ElevatorCar, Landing, ShaftCollar } from "./Elevator";
+import { ElevatorCar, Landing, ShaftRun } from "./Elevator";
+import { carDoors, resetErrands, settleErrand } from "./trips";
+import { Visitors } from "./Visitors";
+import { playerDeparts } from "./crowd";
+import { aroundShaft } from "./lift";
 import { ELEVATOR_SPOT } from "./floorplan";
 import { backAt, FLOOR_NUMBER, FLOOR_Y, glideAt, rideAt, washAt } from "./levels";
 import { depart, hurry, now, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
@@ -64,7 +68,7 @@ import { buildModel, racksOf, type SceneModel } from "./sceneModel";
 import { CAMERA_DISTANCE, CAMERA_FAR, CAMERA_NEAR, MIN_TILT, MAX_TILT, turnAbout } from "./camera";
 import { headingFromOffset } from "./views";
 import { ViewRig } from "./ViewRig";
-import { bindViewFade, cameras, lookApi, lookingFromAvatar, viewNow } from "./viewState";
+import { bindViewFade, bothFloors, cameras, lookApi, lookingFromAvatar, viewNow } from "./viewState";
 import { Ceiling } from "./Ceiling";
 import { ViewOverlay } from "./ViewOverlay";
 import { Minimap } from "./Minimap";
@@ -957,18 +961,48 @@ function Labels({ landed }: { landed: Floor | null }) {
 /** Tint of the polished concrete under the corridors in HD. */
 const CONCRETE_TINT = ROOM_PALETTE.floor.concrete;
 
+/**
+ * How many people walk about the building: fewer when drawing without a graphics card or at Low quality, where every
+ * animated creature costs, but never none.
+ */
+function visitorCount(q: QualityProfile): number {
+  if (q.fps !== null && q.fps <= 20) return 4;
+  return q.detail === "basic" ? 6 : 10;
+}
+
+/** Metres each tile of the basic concrete floor spans. */
+const BASIC_TILE = 1.6;
+
+/** Flat rectangles lying on the floor, facing up, their texture laid in world metres, `size` to a repeat. */
+function floorGeometry(rects: [number, number, number, number][], size: number): THREE.BufferGeometry {
+  const position: number[] = [];
+  const index: number[] = [];
+  rects.forEach(([x0, z0, x1, z1], i) => {
+    position.push(x0, 0, z0, x0, 0, z1, x1, 0, z1, x1, 0, z0);
+    index.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3);
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(position, 3));
+  g.setAttribute("normal", new THREE.Float32BufferAttribute(rects.flatMap(() => [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]), 3));
+  g.setIndex(index);
+  return projectUV(g, size);
+}
+
+/** The floor, open where the elevator's shaft passes down through it. */
+const FLOOR_PIECES = aroundShaft();
+/** The slab under the floor, round the shaft too, as [centre x, centre z, width, depth]. */
+const SLAB_PIECES = aroundShaft(0.25).map(([x0, z0, x1, z1]) => [(x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0]);
+
 function Room({ servers = false }: { servers?: boolean }) {
-  const tiles = useMemo(() => {
-    const t = concreteFloor();
-    t.repeat.set(ROOM.w / 1.6, ROOM.d / 1.6);
-    return t;
-  }, []);
+  const basic = useMemo(() => floorGeometry(FLOOR_PIECES, BASIC_TILE), []);
+  const tiles = useMemo(() => concreteFloor(), []);
   const surfaces = useSurfaces();
   const hd = useMemo(() => {
     if (!surfaces) return null;
     const s = surfaces.concrete;
-    return { geometry: projectUV(new THREE.PlaneGeometry(ROOM.w, ROOM.d), s.size, [ROOM.cx, -ROOM.cz, 0]), material: surfaceMaterial(s, CONCRETE_TINT, 0.9) };
+    return { geometry: floorGeometry(FLOOR_PIECES, s.size), material: surfaceMaterial(s, CONCRETE_TINT, 0.9) };
   }, [surfaces]);
+  useEffect(() => () => basic.dispose(), [basic]);
   useEffect(
     () => () => {
       hd?.geometry.dispose();
@@ -979,17 +1013,18 @@ function Room({ servers = false }: { servers?: boolean }) {
   return (
     <group>
       {hd ? (
-        <mesh key="hd" receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]} geometry={hd.geometry} material={hd.material} />
+        <mesh key="hd" receiveShadow geometry={hd.geometry} material={hd.material} />
       ) : (
-        <mesh key="basic" receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.cx, 0, ROOM.cz]}>
-          <planeGeometry args={[ROOM.w, ROOM.d]} />
+        <mesh key="basic" receiveShadow geometry={basic}>
           <meshLambertMaterial map={tiles} />
         </mesh>
       )}
-      <mesh position={[ROOM.cx, -0.26, ROOM.cz]}>
-        <boxGeometry args={[ROOM.w + 0.5, 0.5, ROOM.d + 0.5]} />
-        <meshStandardMaterial color={ROOM_PALETTE.slab} roughness={0.9} />
-      </mesh>
+      {SLAB_PIECES.map(([x, z, w, d]) => (
+        <mesh key={`${x},${z}`} position={[x, -0.26, z]}>
+          <boxGeometry args={[w, 0.5, d]} />
+          <meshStandardMaterial color={ROOM_PALETTE.slab} roughness={0.9} />
+        </mesh>
+      ))}
       {/* Four walls; the ones between the camera and the room drop to a low rim. */}
       <Wall wall="back" x={ROOM.cx} z={ROOM.z0 - 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color={ROOM_PALETTE.wall} />
       <Wall wall="front" x={ROOM.cx} z={ROOM.z1 + 0.12} size={[ROOM.w + 0.5, ROOM.wallH, 0.24]} color={ROOM_PALETTE.wall} />
@@ -1199,8 +1234,10 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
   // Draw one floor at a time, and light whichever it is: the lights move rather than switch, so no material is rebuilt.
   useFrame(() => {
     const shown = shownFloor();
-    if (office.current) office.current.visible = shown === "office";
-    if (servers.current) servers.current.visible = shown === "servers";
+    // Riding from the avatar, the floor being left and the one being reached are both seen through the car's glass.
+    const both = bothFloors();
+    if (office.current) office.current.visible = both || shown === "office";
+    if (servers.current) servers.current.visible = both || shown === "servers";
     // Seen from the avatar, under the ceiling and inside the walls, the city cannot be seen, so it is not drawn.
     if (outside.current) outside.current.visible = !viewNow.perspective;
     const y = FLOOR_Y[shown] + 3.4;
@@ -1253,8 +1290,8 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
         <Exterior />
       </group>
       <ElevatorCar />
-      <ShaftCollar />
-      <Counterweight />
+      <ShaftRun />
+      <Visitors count={visitorCount(quality)} />
       <Avatar walking={walking} />
       <WalkDriver walking={walking} footprints={inspectableFootprints} names={m.names} racks={racks} />
 
@@ -1444,6 +1481,9 @@ const onControl = (el: HTMLElement | null) => !!el?.closest('button, a, [role="t
 function WalkControls() {
   const walking = useGame((s) => s.walking && s.started);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
+  // Nothing is within reach while the car rides: the prompt waits for it to arrive.
+  const [aboard, setAboard] = useState(riding);
+  useEffect(() => onRide((event) => setAboard(event === "depart")), []);
   // What the prompt button says a fun thing is doing, while its animation plays.
   const [activity, setActivity] = useState<{ propId: string; label: string } | null>(null);
   const activityTimer = useRef<number | null>(null);
@@ -1509,7 +1549,7 @@ function WalkControls() {
     },
     []
   );
-  const shown = walking ? prompt : null;
+  const shown = walking && !aboard ? prompt : null;
   const doing = shown?.kind === "prop" && activity?.propId === shown.prop.id ? activity.label : null;
   return (
     <>
@@ -1551,9 +1591,16 @@ function useLanded(): Floor | null {
   const [landed, setLanded] = useState<Floor | null>(() => useGame.getState().floor);
   useEffect(() => {
     placeCar(useGame.getState().floor);
+    resetErrands();
     const stopRide = onRide((event) => setLanded(event === "arrive" ? ride.to : null));
     const stopFloor = useGame.subscribe((s, prev) => {
-      if (s.floor !== prev.floor) depart(s.floor, reducedMotion());
+      if (s.floor === prev.floor) return;
+      // The player's ride comes first: an errand ends where it is, and whoever was on it is set down where they were
+      // going. Riding with the avatar the ride runs its course; seen from above, a click or a key cuts it short.
+      const open = carDoors(ride.to);
+      settleErrand();
+      depart(s.floor, reducedMotion(), !(s.walking && s.started), open);
+      playerDeparts(ride.from, ride.to);
     });
     return () => {
       stopFloor();
@@ -1566,8 +1613,8 @@ function useLanded(): Floor | null {
 /** Take the view to a floor, or, pressed again for the floor already on its way, hurry the car there. */
 function pressFloor(floor: Floor, how: "menu" | "key" | "map"): void {
   const s = useGame.getState();
-  if (s.floor === floor) hurry();
-  else s.goToFloor(floor, how);
+  if (s.floor !== floor) s.goToFloor(floor, how);
+  else if (!(s.walking && s.started)) hurry();
 }
 
 /**
@@ -1715,6 +1762,8 @@ export default function Facility() {
         events={roomEvents}
         onCreated={({ gl, camera }) => {
           cameras.overview = camera as THREE.OrthographicCamera;
+          // The elevator's car and its riders are cut to the part of the shaft in view (see viewState.ts).
+          gl.localClippingEnabled = true;
           const software = isSoftwareRenderer(gl);
           // Before the first frame, so no material is ever compiled with shadows that are not wanted.
           if (!resolveQuality(chosen, software ? "software" : "gpu", override).shadows) gl.shadowMap.enabled = false;

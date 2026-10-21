@@ -46,9 +46,9 @@ function useCrew(): Crew | null {
  * a soft sheen. Materials are shared between creatures of a species.
  */
 const materials = new Map<string, THREE.Material>();
-function creatureMaterial(source: THREE.Material, detail: Detail): THREE.Material {
+function creatureMaterial(source: THREE.Material, detail: Detail, clip?: THREE.Plane[]): THREE.Material {
   const s = source as THREE.MeshStandardMaterial;
-  const key = `${detail}|${s.uuid}`;
+  const key = `${detail}|${s.uuid}|${clip ? "clipped" : ""}`;
   let m = materials.get(key);
   if (!m) {
     m =
@@ -56,6 +56,7 @@ function creatureMaterial(source: THREE.Material, detail: Detail): THREE.Materia
         ? new THREE.MeshStandardMaterial({ color: s.color, map: s.map, roughness: 0.55, metalness: 0 })
         : new THREE.MeshLambertMaterial({ color: s.color, map: s.map });
     m.name = s.name;
+    if (clip) m.clippingPlanes = clip;
     materials.set(key, m);
   }
   return m;
@@ -102,6 +103,8 @@ export interface CreatureProps {
   holding?: "paddle";
   /** Keep the clip in time with something else, such as a ball in play. */
   beat?: Beat;
+  /** Planes to cut the creature by, as the elevator's riders are to the part of the shaft in view. */
+  clip?: THREE.Plane[];
 }
 
 export function Creature(props: CreatureProps) {
@@ -131,7 +134,7 @@ function paddle(detail: Detail): THREE.Group {
   return g;
 }
 
-function CreatureModel({ gltf, species, activity, pose = "stand", position, rotation = 0, phase = 0, seat = SEAT, pace, holding, beat }: CreatureProps & { gltf: GLTF }) {
+function CreatureModel({ gltf, species, activity, pose = "stand", position, rotation = 0, phase = 0, seat = SEAT, pace, holding, beat, clip }: CreatureProps & { gltf: GLTF }) {
   const detail = useDetail();
   const info = SPECIES[species];
   const model = useMemo(() => {
@@ -142,7 +145,7 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
       mesh.castShadow = true;
       // Animated skins move outside their bind-pose bounds; culling them would make limbs pop.
       mesh.frustumCulled = false;
-      mesh.material = Array.isArray(mesh.material) ? mesh.material.map((m) => creatureMaterial(m, detail)) : creatureMaterial(mesh.material, detail);
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map((m) => creatureMaterial(m, detail, clip)) : creatureMaterial(mesh.material, detail, clip);
     });
     // Measure the rest pose. The compressed vertices only reach their true size through the skeleton, which is not
     // posed until the first frame, so pose it now and measure the skinned result.
@@ -176,7 +179,7 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
     // The model faces +z, so its back is at the box's -z side and its front at the +z side; once turned round they are
     // how far it reaches behind and ahead.
     return { object, scale, foot: -box.min.y * scale, back: -box.min.z * scale, front: box.max.z * scale, mixer: new THREE.AnimationMixer(object), grip };
-  }, [gltf, detail, info.height, holding]);
+  }, [gltf, detail, info.height, holding, clip]);
 
   const current = useRef<THREE.AnimationAction | null>(null);
   const motion = motionFor(info.kind, activity);

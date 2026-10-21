@@ -36,9 +36,25 @@ const MATERIAL: Record<Detail, Record<Shape, THREE.Material>> = {
   },
 };
 
-function Instances({ shape, items, shadows }: { shape: Shape; items: Prim[]; shadows: boolean }) {
+/** The shared materials again, cut by clipping planes, one set for each set of planes. */
+const clipped = new WeakMap<THREE.Plane[], Map<string, THREE.Material>>();
+function clippedMaterial(detail: Detail, shape: Shape, planes: THREE.Plane[]): THREE.Material {
+  let byKey = clipped.get(planes);
+  if (!byKey) clipped.set(planes, (byKey = new Map()));
+  const key = `${detail}|${shape}`;
+  let m = byKey.get(key);
+  if (!m) {
+    m = MATERIAL[detail][shape].clone();
+    m.clippingPlanes = planes;
+    byKey.set(key, m);
+  }
+  return m;
+}
+
+function Instances({ shape, items, shadows, clip }: { shape: Shape; items: Prim[]; shadows: boolean; clip?: THREE.Plane[] }) {
   const ref = useRef<THREE.InstancedMesh>(null);
-  const material = MATERIAL[useDetail()][shape];
+  const detail = useDetail();
+  const material = clip ? clippedMaterial(detail, shape, clip) : MATERIAL[detail][shape];
   useLayoutEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;
@@ -62,7 +78,7 @@ function Instances({ shape, items, shadows }: { shape: Shape; items: Prim[]; sha
 }
 
 /** Draw many static prims: one instanced mesh per shape. */
-export function PrimBatch({ prims, shadows = true }: { prims: Prim[]; shadows?: boolean }) {
+export function PrimBatch({ prims, shadows = true, clip }: { prims: Prim[]; shadows?: boolean; clip?: THREE.Plane[] }) {
   const byShape = useMemo(() => {
     const out: Record<Shape, Prim[]> = { box: [], cyl: [], ball: [], cone: [] };
     for (const p of prims) out[p.k].push(p);
@@ -71,7 +87,7 @@ export function PrimBatch({ prims, shadows = true }: { prims: Prim[]; shadows?: 
   return (
     <group>
       {(Object.keys(byShape) as Shape[]).map((k) => (
-        <Instances key={k} shape={k} items={byShape[k]} shadows={shadows} />
+        <Instances key={k} shape={k} items={byShape[k]} shadows={shadows} clip={clip} />
       ))}
     </group>
   );
