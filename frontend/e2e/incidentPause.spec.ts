@@ -66,3 +66,30 @@ test("incident Pause: deliberate continued-running activity dismisses once, not 
   await page.clock.runFor(2000); expect((await savedGame(page)).campaign!.incident!.id).toBe(id);
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible(); await expect(gold).toHaveCount(0);
 });
+
+// A real captured mouse is the normal first-person play path, not a blocking dialog.
+for (const chapter of [2, 3, 4, 5, 6]) test(`incident Pause: first-person Chapter ${chapter} arrival keeps Pause through releasing the mouse`, async ({ page, installClock }) => {
+  await installClock(); const pair = pauseTransition(chapter); await bootPause(page, pair.before);
+  await page.locator(".stage-canvas").focus();
+  await page.keyboard.press("v"); await page.clock.runFor(200);
+  await page.keyboard.press("v"); await page.clock.runFor(200);
+  await expect(page.locator(".view-dot")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => !!document.pointerLockElement)).toBe(true);
+  await page.keyboard.press("p"); await page.clock.runFor(1000);
+  expect((await savedGame(page)).campaign!.incident!.id).toBe(pair.incident.campaign!.incident!.id);
+  await expect.poll(() => page.evaluate(() => !!document.pointerLockElement)).toBe(true);
+  const gold = page.locator(".campaign-gold-attention");
+  await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeEnabled();
+  await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("Pause");
+  await page.keyboard.press("Escape");
+  await expect.poll(() => page.evaluate(() => document.pointerLockElement)).toBeNull();
+  await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("Pause");
+  await gold.click(); await expect(gold).toHaveCount(0);
+  const paused = (await savedGame(page)).campaign!.step;
+  await page.clock.runFor(1000); expect((await savedGame(page)).campaign!.step).toBe(paused);
+  if (chapter === 3) {
+    await page.clock.runFor(8999); await expect(gold).toHaveCount(0);
+    await page.clock.runFor(1); await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("Hint");
+    expect((await savedGame(page)).campaign!.step).toBe(paused);
+  }
+});
