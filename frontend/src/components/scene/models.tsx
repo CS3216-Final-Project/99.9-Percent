@@ -28,6 +28,8 @@ export interface Placement {
   id: ModelId;
   /** Where the bottom centre of the model's bounding box goes. */
   p: V3;
+  /** Sits on top of this placement as drawn, so it stays on its support when an HD stand-in has a different height. Must come earlier in the list. */
+  on?: Placement;
   /** Turn about the vertical, in radians. */
   rot?: number;
   /** A number scales the model's natural size; [w, h, d] stretches it to exactly that size in metres. */
@@ -123,14 +125,18 @@ interface Batch {
 }
 
 /** Every placed model baked into one mesh per material, with photo-scanned stand-ins where they have loaded. */
-function bake(placements: Placement[], scenes: Map<ModelId, THREE.Object3D>, standIns: Map<HdId, THREE.Object3D> | null, detail: Detail): Batch[] {
+export function bake(placements: Placement[], scenes: Map<ModelId, THREE.Object3D>, standIns: Map<HdId, THREE.Object3D> | null, detail: Detail): Batch[] {
   const byMaterial = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  const tops = new Map<Placement, number>();
   for (const pl of placements) {
     const original = prepare(MODELS[pl.id], scenes.get(pl.id)!, detail);
     const swap = HD_SWAPS[pl.id];
     const standIn = swap && standIns?.get(swap.id);
     const prep = swap && standIn ? prepare(HD_MODELS[swap.id], standIn, detail, true) : original;
-    const m = swap && standIn ? standInMatrix(pl, original, prep, swap) : matrixFor(pl, original);
+    const y = pl.on ? tops.get(pl.on) ?? pl.p[1] : pl.p[1];
+    const positioned = pl.on ? { ...pl, p: [pl.p[0], y, pl.p[2]] as V3 } : pl;
+    const m = swap && standIn ? standInMatrix(positioned, original, prep, swap) : matrixFor(positioned, original);
+    tops.set(pl, new THREE.Vector3(prep.base.x, prep.base.y + prep.size.y, prep.base.z).applyMatrix4(m).y);
     for (const part of prep.parts) byMaterial.set(part.material, [...(byMaterial.get(part.material) ?? []), part.geometry.clone().applyMatrix4(m)]);
   }
   return [...byMaterial].map(([material, list]) => {
