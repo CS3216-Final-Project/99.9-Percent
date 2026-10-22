@@ -34,6 +34,7 @@ export function campaignGuidance(g: GameState) {
  const reportsAcknowledged=c.reports.every(r=>c.trace.some(t=>t.type==="review-acknowledged"&&t.data.incidentId===r.id));
  const queuesEmpty=c.dbBacklog===0&&c.apps.every(a=>a.backlog===0);
  const requirements:Requirement[]=[];
+ const finalGoals:Requirement[]=[];
  const add=(id:string,label:string,met:boolean)=>requirements.push({id,label,met});
  let waiting:string|null=null,notice:string|null=null,optional:string|null=null;
  let pendingAction:GuidanceAction|null=null;
@@ -43,8 +44,14 @@ export function campaignGuidance(g: GameState) {
   add("cash","Positive company cash",c.cashCents>0);add("admission","Serve full demand; traffic limit inactive",c.limit===null&&c.snapshot.admitted===c.snapshot.incoming);
   add("incident","No active incident",!c.incident);add("queues","All retained queues empty",queuesEmpty);add("reports","Incident reports acknowledged",reportsAcknowledged);
   add("healthy","Applications healthy and service stable",c.apps.every(a=>a.health!=="failed")&&qualifiesForRecovery(c.snapshot));
-  add("pending","Accepted work finished",!c.pending.length);add("rounds",`Growth outcomes acknowledged: ${d.completedRounds.length} / 3`,d.completedRounds.length===3);
-  add("target",`Registered users: ${d.users.toLocaleString("en-US")} / ${d.finalUserTarget.toLocaleString("en-US")}`,d.users>=d.finalUserTarget);
+  add("pending","Accepted deployments and routing finished",!c.pending.length);
+  add("promotion","Optional promotion ended",!c.promotion||c.step>=c.promotion.endStep);
+  if(r?.fault)add("restored","Failed server restored",r.fault.restoredStep!==null);
+  const checks=r?r.stableSteps:d.nextRoundIndex===3?d.finalStableSteps:d.readinessSteps;
+  add("checks",`${r?"Wave stability":d.nextRoundIndex===3?"Final stability":"Full-demand readiness"}: ${checks} / 5`,checks===5);
+  finalGoals.push({id:"rounds",label:`Growth outcomes acknowledged: ${d.completedRounds.length} / 3`,met:d.completedRounds.length===3},
+   {id:"target",label:`Registered users: ${d.users.toLocaleString("en-US")} / ${d.finalUserTarget.toLocaleString("en-US")}`,met:d.users>=d.finalUserTarget},
+   {id:"completion",label:"Final Campaign review completed",met:d.acknowledged});
   if(d.finalReview)pendingAction={label:"Review campaign scorecard"};
   else if(pendingCombined(c))pendingAction={label:"Review growth outcome"};
   else if(canStartGrowth(g))pendingAction={label:"Start next growth wave",action:{type:"start_growth_wave"}};
@@ -103,13 +110,12 @@ export function campaignGuidance(g: GameState) {
   add("db-inspection","Database inspected after growth",r.databaseInspected);
   add("observations",`Stable observations: ${c.openingPrevention?.stableSteps??0} / 5`,!!c.openingPrevention?.outcome);
   add("review","Prevention outcome acknowledged",!!c.openingPrevention?.outcome?.acknowledged);
-  add("recovery","Real Opening incident recovered and postmortem acknowledged",false);
   add("milestone","Opening milestone acknowledged",openingDone);
-  optional="Prevention is recorded separately. Scaling requires a real recovered Opening incident, its acknowledged postmortem and the Opening milestone. No incident is forced.";
+  optional="Verified prevention and incident recovery are both valid paths. For prevention, meet every requirement, acknowledge the outcome, then complete the Opening recognition to continue.";
   if(c.limit!==null)notice="Traffic limiting prevents full-demand qualification. Remove the limit and serve the full 800 req/s to continue the prevention path.";
   else if(Object.values(r).every(Boolean)&&!c.openingPrevention?.outcome)waiting="Observe five consecutive new game seconds. Pausing adds no observations; a failing game second resets the streak.";
   if(pendingPreventionReview(c))pendingAction={label:"Review outcome"};
-  else if(c.openingPrevention?.outcome?.acknowledged)waiting="Prevention recorded. This company remains in Opening; prevention does not unlock Scaling.";
+  else if(c.openingPrevention?.outcome?.acknowledged)waiting="Prevention recorded. Complete the verified Opening recognition to continue to Scaling & Routing.";
  } else if(c.incident||c.openingRecovered||c.reports.length||pendingMilestone) {
   add("recovery",c.openingMilestone?.outcomeId?"Opening prevention qualified":"Incident recovered",c.openingMilestone?.outcomeId?!!c.openingPrevention?.outcome:c.openingRecovered);
   add("review",c.openingMilestone?.outcomeId?"Prevention outcome acknowledged":"Postmortem reviewed",c.openingMilestone?.outcomeId?!!c.openingPrevention?.outcome?.acknowledged:reportsAcknowledged&&c.reports.length>0);
@@ -117,7 +123,7 @@ export function campaignGuidance(g: GameState) {
   if(c.incident)waiting="Restore stable service and observe measured recovery. Use Run and Pause to inspect real changes.";
  } else {
   add("growth","Opening growth occurred",c.consumedEvents.includes("opening-growth"));
-  add("outcome","Real Opening incident recovered and postmortem acknowledged",false);
+  add("outcome","Verified prevention outcome or recovered incident acknowledged",false);
   add("milestone","Opening milestone acknowledged",false);
  }
  // Required acknowledgements take priority over stage continuation in every stage.
@@ -127,5 +133,5 @@ export function campaignGuidance(g: GameState) {
  if(g.phase==="ended") { pendingAction=null;waiting=null;notice=""+(g.outcome==="won"?"Campaign complete. Inspect your scorecard and final architecture before explicitly starting a new company.":"The company is bankrupt. Review final evidence and explicitly restart from the Menu.")+""; }
  const incomplete=requirements.filter(r=>!r.met),completed=requirements.filter(r=>r.met);
  const lockReason=c.spikeStage&&!c.combinedStage?notice:pendingAction?`Next action: ${pendingAction.label}.`:incomplete.length?incomplete[0].label:waiting;
- return {stage,nextStage,openingDone,dataAvailable,spikesAvailable,pendingMilestone,prevention,requirements,incomplete,completed,pendingAction,waiting,notice,optional,lockReason};
+ return {stage,nextStage,openingDone,dataAvailable,spikesAvailable,pendingMilestone,prevention,finalGoals,requirements,incomplete,completed,pendingAction,waiting,notice,optional,lockReason};
 }

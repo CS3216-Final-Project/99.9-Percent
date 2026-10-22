@@ -26,7 +26,7 @@ export function CampaignChapters() {
         <p>{learning ? "Chapter 0" : `Chapter ${current.number} of 6`}</p>
         <h2 aria-label="Current chapter"><span aria-label="Current Guided Mode stage">{current.name}</span></h2>
       </div>
-      <p className="chapter-objective" aria-label="Current objective"><b>Goal:</b> {learning ? "Learn the controls, game time and finances before running your company." : campaignObjective(game)}</p>
+      <p className="chapter-objective" aria-label="Current objective"><b>Goal:</b> <span className={!learning && current.number >= 1 && current.number <= 6 ? "chapter-goal-text" : undefined}>{learning ? "Learn the controls, game time and finances before running your company." : campaignObjective(game)}</span></p>
       <div className="chapter-actions">
         {advance && <button type="button" className="btn btn-primary chapter-advance" disabled={!advance.ready} aria-label={`Next: ${advance.label}`} aria-describedby={reason ? reasonId : undefined} {...tipProps(advance.label)} onClick={() => useGame.getState().act(advance.action)}>Next<Icon name="next" /></button>}
         <button type="button" className="btn" aria-haspopup="dialog" onClick={() => {

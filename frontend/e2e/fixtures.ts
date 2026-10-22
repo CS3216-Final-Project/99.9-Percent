@@ -11,7 +11,13 @@ const controlledPages = new WeakSet<Page>();
 type ClockOptions = Parameters<Page["clock"]["install"]>[0];
 
 // Unhandled browser errors fail each case. Journeys that call withoutRoom() skip the WebGL scene; the rest draw it.
-export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; recoveryNotices: void; reviewRecoveryNotice: boolean; overviewChosen: boolean; chosenView: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
+export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; recoveryNotices: void; reviewRecoveryNotice: boolean; companyMessages: void; reviewCompanyMessage: boolean; overviewChosen: boolean; chosenView: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
+  // Unrelated journeys dismiss optional narrative, while dedicated introduction tests opt out.
+  reviewCompanyMessage: [true, { option: true }],
+  companyMessages: [async ({ page, reviewCompanyMessage }, use) => {
+    if (reviewCompanyMessage) await page.addLocatorHandler(page.getByRole('dialog', { name: 'Company Message', exact: true }), dialog => dialog.getByRole('button', { name: 'Got it', exact: true }).click());
+    await use();
+  }, { auto: true }],
   // Existing journeys still review and acknowledge the actual report themselves. Only the new
   // presentation step is handled here; dedicated two-stage/reload/focus journeys opt out.
   reviewRecoveryNotice: [true, { option: true }],

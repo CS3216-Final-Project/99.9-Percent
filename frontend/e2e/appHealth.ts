@@ -25,6 +25,10 @@ export async function appHealthJourney(page: Page, width: number, height: number
     await healthWordFits(entry);
     if (touch) await entry.tap();
     else {
+        // Finish the modal introduction before testing keyboard focus. The
+        // locator handler dismisses it with a pointer, so establish keyboard modality.
+        await expect(page.getByRole("dialog", { name: "Company Message", exact: true })).toBeHidden();
+        await page.keyboard.press("Tab");
         await entry.focus(); await expect(page.getByRole("tooltip")).toContainText("estimated response time");
         await page.keyboard.press("Escape"); await entry.press("Enter");
     }

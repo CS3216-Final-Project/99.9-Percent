@@ -7,6 +7,7 @@ import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { COST_NAMES, financeForecast, totalCharges, financeMoney as money } from "@/game/campaignFinance";
 import { Modal, Row, Stat } from "./ui";
 import "./CampaignFinance.css";
+import { chapter6FinancialRisk } from "@/game/chapter6Finance";
 
 export function FinanceEntry() {
     const [open,setOpen] = useState(false);
@@ -18,7 +19,7 @@ export function FinanceEntry() {
     </Stat>{open && <CampaignFinance onClose={()=>setOpen(false)} />}</>;
 }
 export function CampaignFinance({onClose}:{onClose:()=>void}) {
-    const c = useGame(s=>s.game.campaign!);
+    const game = useGame(s=>s.game), c = game.campaign!, risk = chapter6FinancialRisk(game);
     const accrued = accruedCharges(c), installed = operatingCharges(c), last = c.settlements.at(-1), forecast = financeForecast(c);
     const pendingRevenue = c.ledger.successes*Q.revenueCents;
     const other = installed.lb+installed.cache+installed.controller+installed.checks+installed.failover;
@@ -49,6 +50,7 @@ export function CampaignFinance({onClose}:{onClose:()=>void}) {
             <p className="muted">Salaries and equipment costs continue even when equipment is idle.</p>
         </section>
         <section aria-labelledby="finance-health"><h3 id="finance-health">Financial health</h3>
+            {risk&&<p className="finance-warning" role="note">{risk.message}{risk.kind==="blocked"&&" Close finances and open Menu to export your save or start a new company."}</p>}
             <p className={forecast && forecast.burnCents>0 ? "finance-warning" : ""}>{health}</p>
             {!closed && c.cashCents<=totalCharges(accrued) && <p className="finance-warning" role="note">Money available does not cover costs already waiting to be paid. Earnings awaiting the cash update may help cover them.</p>}
             {forecast && forecast.runwayPeriods!==null && <p>How long your money might last: at this rate, your available money covers about {forecast.runwayPeriods.toFixed(1)} full periods. Cash updates may leave you short sooner.</p>}

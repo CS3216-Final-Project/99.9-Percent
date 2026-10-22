@@ -23,6 +23,8 @@ test("exports a company and imports it into a fresh browser", async ({ page, bro
   await other.goto("/"); await other.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
   await completeTutorial(other);
   expect((await savedGame(other)).campaign!.step).toBe(1);
+  // This manually created context has no fixture locator handler.
+  await other.getByRole("dialog", { name: "Company Message", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
   await other.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = other.getByRole("dialog", { name: "Menu" });
   await menu.getByRole("tab", { name: "Saves" }).click();

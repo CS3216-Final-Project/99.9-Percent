@@ -4,7 +4,7 @@ import type { ServiceMeasurement } from "./campaignTypes";
 import type { CampaignInput } from "./campaignTypes";
 import { newGame } from "./state";
 import { applyCampaignInputInPlace, pendingStop, projectCampaign, stepInPlace } from "./step";
-import { pendingPreventionReview } from "./openingPrevention";
+import { pendingPreventionReview, awardPreventionMilestone } from "./openingPrevention";
 
 /** Replays longer than this are refused rather than freezing the page on a hostile file. */
 export const MAX_REPLAY_STEPS = 1_000_000;
@@ -30,12 +30,17 @@ export function replayCampaign(seed: number, runId: string, inputs: readonly Cam
     if(foundation)s.campaign!.foundation={...foundation};
     let inputIndex=0;
     for (const input of inputs) {
-        if(inputIndex===legacyPreventionInputs)clearUnenteredPreventionMilestone(s);
         if (!Number.isSafeInteger(input.step) || input.step > finalStep)
             throw new Error("Input step is out of range");
         advanceTo(s, input.step, legacyPrevention);
         if (legacyPrevention && input.action.type !== "acknowledge_prevention_review") acknowledgeUnseenPrevention(s);
-        applyCampaignInputInPlace(s, input.action, inputIndex++<legacyPreventionInputs);
+        // Before this fix an acknowledged prevention result could legally keep
+        // running without recognition. Preserve that history until its next
+        // explicit milestone acknowledgement (or the end of the saved log).
+        const defer = input.action.type === "acknowledge_prevention_review" && finalStep > input.step &&
+            !inputs.slice(inputIndex + 1).some(next => next.step === input.step && next.action.type === "acknowledge_milestone");
+        if (input.action.type === "acknowledge_milestone" && s.phase === "management") awardPreventionMilestone(s.campaign!);
+        applyCampaignInputInPlace(s, input.action, inputIndex++<legacyPreventionInputs, defer);
         // Phase 1 acknowledgement already returned to management: preserve that state.
         // Record the added acknowledgement so subsequent saves replay exactly.
         if(legacyMilestones && s.campaign!.openingMilestone?.incidentId && !s.campaign!.openingMilestone.acknowledged) {
@@ -43,15 +48,9 @@ export function replayCampaign(seed: number, runId: string, inputs: readonly Cam
             applyCampaignInputInPlace(s, {type:"acknowledge_milestone", enterScaling:false});
         }
     }
-    clearUnenteredPreventionMilestone(s);
     advanceTo(s, finalStep, legacyPrevention);
+    if (s.phase === "management") awardPreventionMilestone(s.campaign!);
     return projectCampaign(s);
-}
-
-/** Keep already-entered companies intact; prevention alone cannot grant a new continuation. */
-function clearUnenteredPreventionMilestone(s: GameState): void {
-    const c=s.campaign!;
-    if(!c.scaling && c.openingMilestone?.outcomeId==="opening-prevention")c.openingMilestone=null;
 }
 
 function advanceTo(s: GameState, target: number, legacyPrevention: boolean): void {
@@ -74,5 +73,5 @@ function acknowledgeUnseenPrevention(s: GameState): void {
     if (!pendingPreventionReview(s.campaign)) return;
     const foundation = s.campaign!.foundation;
     if (foundation && s.campaign!.inputs.length < foundation.inputs) foundation.inputs++;
-    applyCampaignInputInPlace(s, { type: "acknowledge_prevention_review" });
+    applyCampaignInputInPlace(s, { type: "acknowledge_prevention_review" }, false, true);
 }

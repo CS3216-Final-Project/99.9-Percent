@@ -26,7 +26,8 @@ test("incident Pause: pause to ten-second Hint", async ({ page, installClock }) 
   await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
   await expect(gold).toHaveAccessibleName("Pause"); await gold.click(); await expect(gold).toHaveCount(0);
   const paused = (await savedGame(page)).campaign!;
-  await page.clock.runFor(9999); await expect(gold).toHaveCount(0);
+  // Once paused, advance only the idle deadline, retaining the 9,999/10,000ms boundary.
+  await page.clock.fastForward(9999); await expect(gold).toHaveCount(0);
   await page.clock.runFor(1); await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("Hint");
   expect((await savedGame(page)).campaign!.inputs).toEqual(paused.inputs);
   expect((await savedGame(page)).campaign!.step).toBe(paused.step);

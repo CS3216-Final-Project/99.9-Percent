@@ -9,6 +9,19 @@ const COPY = {
   recover: "Both spikes have finished. Check that your app is stable, then review your results.",
 };
 export type SpikeStage = Exclude<keyof typeof COPY, "respond">;
+/** Retained observations, deduplicated when an incident report overlaps recent readings. */
+export function chapter4Performance(game: GameState) {
+  const c = game.campaign, d = c?.spikeStage;
+  if (!c || !d) return null;
+  const readings = [...new Map([...c.reports.flatMap(r => r.snapshots), ...c.recent]
+    .filter(m => m.step >= d.deadlines[0] && m.step < d.deadlines[1]).map(m => [m.step, m])).values()];
+  const served = readings.reduce((n, m) => n + m.successful, 0), rejected = readings.reduce((n, m) => n + m.rejected, 0);
+  const incidents = c.trace.filter(t => t.type === "incident-opened" && t.step >= d.deadlines[0] && t.step < d.deadlines[1]).length;
+  const appStruggled = readings.some(m => m.app.demand > m.app.capacity || m.instances?.some(a => a.routed && a.demand > a.capacity));
+  const dbDemand = Math.max(0, ...readings.map(m => m.db.demand));
+  const summary = readings.length ? `Recorded Spike 1: ${served.toLocaleString("en-US")} served, ${rejected.toLocaleString("en-US")} rejected; ${incidents} incident${incidents === 1 ? "" : "s"} recorded.` : "First-spike observations are unavailable.";
+  return { readings, served, rejected, incidents, appStruggled, dbDemand, summary };
+}
 /** Presentation of recorded events only; no clock, dispatcher or progression state. */
 export function chapter4Stage(game: GameState) {
   const c = game.campaign, d = c?.spikeStage;
@@ -20,7 +33,9 @@ export function chapter4Stage(game: GameState) {
   const event = c.trace.find(t => stage === "prepare" ? t.type === "spike-stage-entered"
     : t.data.eventId === ({ spike1: "spike-1-start", between: "spike-1-end", spike2: "spike-2-start", recover: "spike-2-end" })[stage]);
   const overloaded = c.snapshot.db.demand > c.snapshot.db.capacity || !!c.snapshot.instances?.some(x => x.routed && x.demand > x.capacity);
-  const cues: { id: string; title: string; message: string }[] = [{ id: stage, title: ({ prepare: "Prepare", spike1: "Spike 1", between: "Between spikes", spike2: "Spike 2", recover: "Recover" })[stage], message: COPY[stage] }];
+  const performance = stage === "between" ? chapter4Performance(game) : null;
+  const message = performance?.readings.length ? `Spike 1: ${performance.served.toLocaleString("en-US")} served, ${performance.rejected.toLocaleString("en-US")} rejected. Evaluate capacity and routing; changes are optional. Test your choice in Spike 2.` : COPY[stage];
+  const cues: { id: string; title: string; message: string }[] = [{ id: stage, title: ({ prepare: "Prepare", spike1: "Spike 1", between: "Between spikes", spike2: "Spike 2", recover: "Recover" })[stage], message }];
   if (overloaded && (stage === "spike1" || stage === "spike2")) cues.push({ id: `respond-${stage}`, title: "Respond", message: COPY.respond });
   return { stage, since, eventId: event?.id ?? -1, key: `${c.runId}:${d.enteredStep}`, cues };
 }
