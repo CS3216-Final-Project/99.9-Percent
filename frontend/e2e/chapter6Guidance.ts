@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { expect, expectRoom, savedGame, seedSave } from "./fixtures";
+import { expect, expectRoom, savedGame, seedSave, setGameSpeed } from "./fixtures";
 import { act, tick, strategyPredecessor, sequence } from "../src/sim/__tests__/combinedFixture";
 import type { GameState } from "../src/sim";
 import { expectCueColours } from "./chapter4Cues";
@@ -34,16 +34,21 @@ export async function chapter6Preparation(page: Page, touch = false) {
   await accept(/^Configure routing/); await press(gold);
   await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("All apps"); await press(gold);
   expect((await savedGame(page)).campaign!.limit).toBe(500);
-  await accept(/^Run$/); await press(gold); await page.clock.runFor(1000);
+  // Deliver the same game ticks via the existing 2× control, with half as many WebGL frames.
+  await setGameSpeed(page, 2);
+  // The clock delivers 200ms ticks: three ticks at 2× complete one game second.
+  await accept(/^Run$/); await press(gold); await page.clock.runFor(600);
   await press(page.getByRole("button", { name: "Pause", exact: true }));
+  expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step + 1);
   await accept(/^Remove traffic limit/); await press(gold);
   await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("Confirm");
   await press(page.getByRole("button", { name: "Cancel", exact: true }));
   expect((await savedGame(page)).campaign!.limit).toBe(500);
   await accept(/^Remove traffic limit/); await press(gold);
   await expect(gold).toHaveAccessibleName("Confirm"); await press(gold);
-  await accept(/^Run$/); await press(gold); await page.clock.runFor(5000);
+  await accept(/^Run$/); await press(gold); await page.clock.runFor(2500);
   await press(page.getByRole("button", { name: "Pause", exact: true }));
+  await setGameSpeed(page, 1);
   const after = await savedGame(page);
   expect(after.campaign!.limit).toBeNull(); expect(after.campaign!.combinedStage!.readinessSteps).toBe(5);
   expect(after.campaign!.incident).toBeNull();
