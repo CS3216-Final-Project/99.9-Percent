@@ -21,9 +21,7 @@ On Linux CI, use `npx playwright install --with-deps chromium` for browser and s
 For interactive tests rebuild with `npm run build` after changing application code.
 Preview runs on port 4175 by default (override with `PLAYWRIGHT_PORT` when another checkout is active); a reused local server must serve the current build.
 
-Locally, run only the browser specs a change affects, because bare `npm run test:e2e` runs the whole suite on one worker.
-Pass the spec files, for example `npm run test:e2e -- e2e/clock.spec.ts`, and add `-g "<test name>"` to narrow further.
-The full suite runs in the `frontend` CI check.
+Locally, `npm run test:e2e` runs the whole suite on one worker.
 
 ## What is covered
 

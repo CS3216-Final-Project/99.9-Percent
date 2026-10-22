@@ -5,7 +5,7 @@ description: Add, maintain or debug Playwright browser journeys for the 99.99% f
 
 # Browser journeys
 
-Read `frontend/playwright.config.ts`, `frontend/e2e/fixtures.ts` and `docs/testing.md`. Run from `frontend/`: install Chromium with `npx playwright install chromium`, then run the affected specs with `npm run test:e2e -- e2e/<name>.spec.ts`. The suite uses the production build on port 4175 and an isolated browser context for each test.
+Read `frontend/playwright.config.ts`, `frontend/e2e/fixtures.ts` and `docs/testing.md`. Run from `frontend/`: install Chromium with `npx playwright install chromium`, then `npm run test:e2e`. The suite uses the production build on port 4175 and an isolated browser context for each test.
 
 - Use roles, accessible names and web-first assertions. Scope ambiguous controls to their region or dialog. Avoid arbitrary sleeps, forced clicks and brittle positional selectors.
 - Keep the actual WebGL room in browser tests. `expectRoom` checks a live WebGL context and equipment controls; a visible canvas alone is insufficient. Unhandled page errors fail the suite.

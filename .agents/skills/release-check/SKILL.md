@@ -5,7 +5,7 @@ description: Diagnose 99.99% CI failures, prepare a validated pull request, or v
 
 # PR and release verification
 
-Read `.github/workflows/ci.yml`, `.github/workflows/cd.yml` and `docs/DEPLOYMENT.md`. Preserve the required `frontend` and `backend` job names. Browser journeys are part of the required frontend job.
+Read `.github/workflows/ci.yml`, `.github/workflows/cd.yml` and the README deployment section. Preserve the required `frontend` and `backend` job names. Browser journeys are part of the required frontend job.
 
 For a PR, inspect the final diff and run the relevant local checks in `docs/testing.md`. Confirm package manifests and locks agree, generated outputs are ignored, and no secrets or unrelated backend changes appear. State what changed, why, what was verified and what remains unverified. Create the PR when requested and inspect CI on the exact pushed commit; do not report an earlier run as current.
 

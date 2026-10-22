@@ -34,7 +34,7 @@ Preserve uncommitted work before rebasing and never discard others' changes to r
 
 Use Node 22 (see `.nvmrc`) and install separately with `npm ci` in `frontend/` and `backend/`. There is no root npm workspace.
 
-For changed packages run `npm run lint`, `npm run typecheck` and the relevant tests. Before a PR run both packages' `npm run test:coverage`, the frontend build, and, for gameplay changes, the browser specs the change affects (see `docs/testing.md`); the full browser suite runs in CI. For simulation/balance changes include `npm run balance`. For schema changes include `npm run db:generate` and verify only intentional new migration files appear. See `docs/testing.md` for the browser installation and commands.
+For changed packages run `npm run lint`, `npm run typecheck` and the relevant tests. Before a PR run both packages' `npm run test:coverage`, the frontend build, and the browser suite for gameplay changes. For simulation/balance changes include `npm run balance`. For schema changes include `npm run db:generate` and verify only intentional new migration files appear. See `docs/testing.md` for the browser installation and commands.
 
 Both required CI checks, `frontend` and `backend`, must pass. Browser tests run inside `frontend`, so existing branch protection also gates them. Report failed, skipped or unavailable verification honestly. A coverage percentage does not establish correctness; investigate relevant uncovered behavior.
 
