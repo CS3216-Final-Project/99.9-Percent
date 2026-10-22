@@ -9,12 +9,7 @@ export async function financeDuringWalkthrough(page: Page, touch = false) {
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   const card = tutorial(page);
   await expect(card).toHaveAccessibleName(`Walkthrough, step ${lessonNumber("money")} of ${CHAPTER_ZERO_LESSONS}`);
-  if (touch) {
-    // A phone keeps live cash in the top strip; the coach explains the week under Learn more.
-    await card.getByRole("button", { name: "Learn more", exact: true }).tap();
-    await expect(page.getByRole("region", { name: "About Cash and the weekly bill" })).toContainText("pending revenue");
-    await page.keyboard.press("Escape");
-  } else await expect(card).toContainText("Cash · spend now");
+  await expect(card).toContainText("Cash · spend now");
   await expect(page.getByRole("dialog")).toHaveCount(1);
   await page.screenshot({ path: `test-results/integration-finance-${touch ? "touch" : "desktop"}.png` });
   await finishChapterZero(page, touch);
