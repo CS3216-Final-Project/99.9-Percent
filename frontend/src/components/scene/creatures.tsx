@@ -8,8 +8,13 @@ import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js
 import { motionFor, SPECIES, type Activity, type Species } from "./cast";
 import { useDetail, type Detail } from "./detail";
 import { loadCrew, type Crew } from "./creatureCatalog";
-import { poseAt, type Plan } from "./routes";
+import { heading, poseAt, wrapAngle, type Plan } from "./routes";
 import { avatar, gridHere } from "./walk";
+import { now, riding } from "./ride";
+import { FLOOR_Y } from "./levels";
+import { sceneSound } from "./sceneSounds";
+import { fresh, glance, GREET_SECONDS, greetingLine, notices, voiceLevel, voiceOf } from "./greetings";
+import { SpeechBubble } from "./bubble";
 import { bodiesOn, standing, within } from "./crewSpots";
 import { useGame } from "@/game/store";
 import { apart, intrudes, radiusOf, sidestep, sweptIntrudes } from "./spacing";
@@ -107,6 +112,8 @@ export interface CreatureProps {
   beat?: Beat;
   /** Planes to cut the creature by, as the elevator's riders are to the part of the shaft in view. */
   clip?: THREE.Plane[];
+  /** Notices the player's avatar walking up: a glance, a word and a sound. The chat groups answer for their members themselves. */
+  greets?: boolean;
 }
 
 export function Creature(props: CreatureProps) {
@@ -136,7 +143,7 @@ function paddle(detail: Detail): THREE.Group {
   return g;
 }
 
-function CreatureModel({ gltf, species, activity, pose = "stand", position, rotation = 0, phase = 0, seat = SEAT, pace, holding, beat, clip }: CreatureProps & { gltf: GLTF }) {
+function CreatureModel({ gltf, species, activity, pose = "stand", position, rotation = 0, phase = 0, seat = SEAT, pace, holding, beat, clip, greets = true }: CreatureProps & { gltf: GLTF }) {
   const detail = useDetail();
   const info = SPECIES[species];
   const model = useMemo(() => {
@@ -183,8 +190,18 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
     return { object, scale, foot: -box.min.y * scale, back: -box.min.z * scale, front: box.max.z * scale, mixer: new THREE.AnimationMixer(object), grip };
   }, [gltf, detail, info.height, holding, clip]);
 
+  // A greeting to the avatar, while the bubble shows and the glance and clip last; mirrored in a ref for the frame loop.
+  const [greeting, setGreeting] = useState<{ line: string; at: number } | null>(null);
+  const greeted = useRef<{ line: string; at: number } | null>(null);
+  const notice = useRef(fresh());
+  const count = useRef(0);
+  const turn = useRef(0);
+  const outer = useRef<THREE.Group>(null);
+  // A greeting plays its hello's clip: sitting it just nods along; panicking or walking it keeps its own.
+  const shownActivity: Activity = greeting && !beat && activity !== "panic" && activity !== "walk" ? (pose === "sit" ? "chat" : "greet") : activity;
+
   const current = useRef<THREE.AnimationAction | null>(null);
-  const motion = motionFor(info.kind, activity);
+  const motion = motionFor(info.kind, shownActivity);
   useEffect(() => {
     const clip = THREE.AnimationClip.findByName(gltf.animations, `CharacterArmature|${motion.clip}`) ?? gltf.animations[0];
     if (!clip) return;
@@ -194,12 +211,13 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
     action.timeScale = beat ? 0 : motion.speed * walkSpeed;
     if (current.current !== action) {
       action.reset();
-      action.time = (phase * 0.37) % clip.duration;
+      // A hello's hop or wave starts from the top; the day-long loops start partway so neighbours differ.
+      action.time = shownActivity === "greet" ? 0 : (phase * 0.37) % clip.duration;
       action.play();
       if (current.current) current.current.crossFadeTo(action, BLEND, false);
       current.current = action;
     }
-  }, [model, gltf, motion.clip, motion.speed, pace, activity, info.kind, phase, beat]);
+  }, [model, gltf, motion.clip, motion.speed, pace, activity, shownActivity, info.kind, phase, beat]);
 
   // The map shows where every creature stands.
   useEffect(() => standing(model.object, radiusOf(species)), [model, species]);
@@ -249,6 +267,37 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
     } else {
       model.mixer.update(Math.min(dt, 0.1));
     }
+
+    const t = now();
+    const g = greeted.current;
+    if (g && t - g.at >= GREET_SECONDS) {
+      greeted.current = null;
+      setGreeting(null);
+    }
+    // Noticing the avatar: elevator riders (clipped) and the sleeper never do, and nobody does while it rides.
+    const eligible = greets && !clip && activity !== "doze";
+    if (eligible && outer.current && useGame.getState().walking && !riding()) {
+      const e = outer.current.matrixWorld.elements;
+      const floor = e[13] < (FLOOR_Y.office + FLOOR_Y.servers) / 2 ? "servers" : "office";
+      if (floor === avatar.floor) {
+        const d = Math.hypot(avatar.x - e[12], avatar.z - e[14]);
+        if (notices(notice.current, d, t)) {
+          count.current++;
+          // The creature's local +z axis in world gives its yaw; it faces -z, so the way to the avatar is a heading.
+          const worldYaw = Math.atan2(e[8], e[10]);
+          turn.current = wrapAngle(heading(avatar.x - e[12], avatar.z - e[14]) - worldYaw);
+          sceneSound(voiceOf(info.kind), voiceLevel(d));
+          const line = greetingLine(species, activity, count.current + Math.floor(phase * 7));
+          greeted.current = { line, at: t };
+          setGreeting({ line, at: t });
+        }
+      }
+    }
+    // Glancing at the avatar: only a standing, unhurried creature turns; seated crew, walkers mid-stride and players
+    // on a beat keep their bodies still.
+    const said = greeted.current;
+    const glances = !!said && pose === "stand" && activity !== "walk" && !beat;
+    if (outer.current) outer.current.rotation.y = rotation + (said && glances ? turn.current * glance(t - said.at) : 0);
   });
 
   // Small creatures perch on the seat, moved forward until their backs clear the backrest; round ones move further.
@@ -259,8 +308,13 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
   const offset = sit ? -Math.max(0, model.back - BACKREST) : stand ? Math.max(0, model.front + DESK_GAP - DESK_EDGE) : 0;
   const y = info.kind === "flyer" ? HOVER : sit ? seat : 0;
   return (
-    <group position={position} rotation={[0, rotation, 0]}>
+    <group ref={outer} position={position} rotation={[0, rotation, 0]}>
       <primitive object={model.object} scale={model.scale} position={[0, y + model.foot, offset]} rotation={[0, Math.PI, 0]} />
+      {greeting && (
+        <group position={[0, 0, offset]}>
+          <SpeechBubble text={greeting.line} alarmed={activity === "panic"} height={y + info.height} />
+        </group>
+      )}
     </group>
   );
 }

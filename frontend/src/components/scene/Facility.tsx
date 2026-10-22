@@ -56,6 +56,7 @@ import { depart, hurry, now, onRide, placeCar, ride, rideClock, riding, shownFlo
 import { Avatar, WalkDriver, WalkFloor } from "./Avatar";
 import { GlassDoors } from "./Doors";
 import { avatar, clearPrompt, held, jump, movesAvatar, onPrompt, play, resetJump, walkTo } from "./walk";
+import { clearOverheard, onOverheard, type Overheard } from "./overheard";
 import type { Prompt } from "./player";
 import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
@@ -1568,6 +1569,27 @@ function WalkControls() {
   );
 }
 
+/**
+ * A line of a chatting group the avatar is near enough to make out, captioned like a subtitle above the walk
+ * prompt (under it on a phone). Purely visual flavour, changing every few seconds: not a live region, so it does
+ * not nag screen readers.
+ */
+function OverheardLine() {
+  const walking = useGame((s) => s.walking && s.started);
+  const [heard, setHeard] = useState<Overheard | null>(null);
+  useEffect(() => onOverheard(setHeard), []);
+  useEffect(() => {
+    if (!walking) clearOverheard();
+  }, [walking]);
+  if (!walking || !heard) return null;
+  return (
+    <p className={`overheard${heard.alarmed ? " is-alarmed" : ""}`}>
+      <span className="overheard-where">Overheard at the {heard.where}</span>
+      <q>{heard.line}</q>
+    </p>
+  );
+}
+
 /** The keys to know, for the camera or, in walk mode, for walking. */
 function CameraHint() {
   const walking = useGame((s) => s.walking);
@@ -1821,6 +1843,7 @@ export default function Facility() {
       <Labels landed={landed} />
       <HoverTip container={container} />
       <WalkControls />
+      <OverheardLine />
       <RoomDock stage={container} />
     </div>
   );

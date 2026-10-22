@@ -307,3 +307,27 @@ test("the map says where the avatar is, changes floor from its tabs, and walks t
   await expect(page.locator(".room-map.is-closed").getByRole("button", { name: "Map" })).toBeVisible();
   expect((await events(page, "map_toggled")).map((d) => d?.open)).toEqual([false]);
 });
+
+test("the menu's map finds equipment and places, and sends the room to them", async ({ page }) => {
+  await open(page);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menu" });
+  await menu.getByRole("tab", { name: "Map" }).click();
+  const plan = page.getByRole("region", { name: "Floor plan" });
+  await expect(plan).toBeVisible();
+  await expect(page.getByRole("group", { name: "Map floor" }).getByRole("button", { name: /^Server floor/ })).toHaveAttribute("aria-pressed", "true");
+  // The search looks on both floors and the match carries its floor's name.
+  await plan.getByRole("searchbox", { name: "Find on the map" }).fill("lounge");
+  const matches = page.getByRole("region", { name: "Matches" });
+  await matches.getByRole("button", { name: /^Lounge/ }).click();
+  await expect(page.getByRole("group", { name: "Map floor" }).getByRole("button", { name: /^Office floor/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("group", { name: "Selected place" })).toContainText("Lounge");
+  // Back downstairs, a piece of equipment's card opens the room on it.
+  await plan.getByRole("searchbox", { name: "Find on the map" }).fill("");
+  await page.getByRole("group", { name: "Map floor" }).getByRole("button", { name: /^Server floor/ }).click();
+  await page.getByRole("region", { name: "Places on this floor" }).getByRole("button", { name: /^Database/ }).click();
+  await page.getByRole("group", { name: "Selected place" }).getByRole("button", { name: "Show in room" }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Database" })).toBeVisible();
+  await expect(page.locator(".room-menu > summary .floor-number")).toHaveText("6");
+});

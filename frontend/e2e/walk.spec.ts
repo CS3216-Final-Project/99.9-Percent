@@ -225,6 +225,40 @@ test("walking away from the meeting leaves its nearby presentation sound behind"
   expect(heard(away)).toBe(false);
 });
 
+test("eavesdrops on the reception catch-up: its words are captioned and heard in the speakers' voices", async ({ page }) => {
+  test.slow();
+  // The catch-up's members are all blobs: their voice's two syllables at 235 and 270 Hz, through the real audio.
+  const audio = await trackEffectFrequencies(page);
+  // Resume mid-walk on the office floor next to the group: about 2 m from its middle, inside earshot, and about
+  // 1.35 m from the nearest member — close enough that it turns and says a word of its own.
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "nn.classic.exploration.v1",
+      JSON.stringify({ version: 1, floor: "office", walking: true, viewChosen: true, avatar: { floor: "office", x: 0.4, z: 9.4, yaw: 0 }, camera: null }),
+    ),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue week 2" }).click();
+  // The office floor's labels are the people's desks; expectRoom's "Servers" lives downstairs.
+  const canvas = page.getByRole("main").locator("canvas");
+  await expect(canvas).toBeVisible();
+  await expect
+    .poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 })
+    .toBe(true);
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+  const caption = page.locator(".overheard");
+  await expect(caption).toContainText("Overheard at the catch-up by reception", { timeout: 20_000 });
+  const first = await caption.locator("q").textContent();
+  await expect
+    .poll(async () => {
+      const frequencies = await audio.frequencies();
+      return near(frequencies, 235) && near(frequencies, 270);
+    }, { timeout: 20_000 })
+    .toBe(true);
+  // The talk moves on: a fresh line takes the caption over.
+  await expect.poll(async () => (await caption.locator("q").textContent()) !== first, { timeout: 15_000 }).toBe(true);
+});
+
 test("changes the avatar mid-game from the menu, fetching only the one chosen", async ({ page }) => {
   const fetched: string[] = [];
   page.on("request", (r) => {

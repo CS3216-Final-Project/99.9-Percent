@@ -933,10 +933,51 @@ button:disabled {
   font-weight: 700;
 }
 
+/* A chatting group the avatar is near enough to hear, captioned like a subtitle above the walk prompt. */
+.overheard {
+  position: absolute;
+  left: 50%;
+  bottom: 112px;
+  z-index: 25;
+  max-width: min(560px, calc(100% - 32px));
+  margin: 0;
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--press);
+  font-family: var(--font-display);
+  text-align: center;
+  pointer-events: none;
+}
+
+.overheard-where {
+  display: block;
+  font-size: var(--text-xs);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .7;
+}
+
+.overheard q {
+  font-size: var(--text-sm);
+  font-style: italic;
+}
+
+.overheard.is-alarmed q {
+  color: var(--critical-ink);
+}
+
 /* On a phone the floor menu and camera buttons fill the bottom corner, so what is within reach shows at the top. */
 @media (max-width: 900px) {
   .walk-prompt {
     top: 10px;
+    bottom: auto;
+  }
+  .overheard {
+    top: 56px;
     bottom: auto;
   }
 }
@@ -4154,7 +4195,7 @@ button:disabled {
 }
 
 @media (max-width: 759px) {
-  /* Narrow screens: the menu's run card and Resume stack, and its seven tabs take two rows of
+  /* Narrow screens: the menu's run card and Resume stack, and its nine tabs take three rows of
      icon-above-label buttons, so every label stays full size and tappable. */
   .modal-menu .menu-overview {
     grid-template-columns: minmax(0, 1fr);
@@ -4186,9 +4227,9 @@ button:disabled {
     font-size: var(--text-lg);
   }
 
-  /* The menu's seven tabs take four columns, still two rows. */
+  /* The menu's nine tabs take three rows of three. */
   .modal-menu .tab-strip {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     padding-bottom: 12px;
   }
 
