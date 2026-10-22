@@ -22,17 +22,19 @@ it("lists outstanding prevention requirements and inspects components without ad
  fireEvent.click(screen.getByRole("button",{name:"Inspect Database"}));expect(requirement("db-inspection").getAttribute("data-met")).toBe("true");
  expect(useGame.getState().game.campaign!.step).toBe(4);
 });
-it("records prevention and explains why Scaling remains locked",()=>{
+it("recognises prevention accurately and continues to Scaling after both acknowledgements",()=>{
  const g=qualified();show(g);const step=g.campaign!.step,cash=g.campaign!.cashCents;
  expect(screen.queryByRole("dialog",{name:"Incident postmortem"})).toBeNull();
  const review=screen.getByRole("dialog",{name:"Prevention review"});
  expect(review.textContent).toContain("Database upgrade: active before completion · setup $3,000.00");expect(review.textContent).toContain("Traffic limit removal: active before completion");
  fireEvent.click(within(review).getByRole("button",{name:/Continue company/}));
- expect(review.textContent).toContain("Scaling unlocks only after a real Opening incident");
- expect(screen.queryByRole("dialog",{name:"First growth challenge handled"})).toBeNull();
+ const recognition=screen.getByRole("dialog",{name:"First growth challenge handled"});
+ expect(recognition.textContent).toContain("You spotted the bottleneck early and prevented an outage.");
  expect(useGame.getState().game.campaign!.scaling).toBeNull();
- expect(requirement("recovery").getAttribute("data-met")).toBe("false");
+ expect(requirement("recovery").getAttribute("data-met")).toBe("true");
  expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe("Opening");
+ fireEvent.click(within(recognition).getByRole("button",{name:/Continue operating/}));
+ expect(useGame.getState().game.campaign!.scaling).toBeTruthy();expect(useGame.getState().game.campaign!.reports).toEqual([]);
  expect(useGame.getState().game.campaign!.cashCents).toBe(cash);expect(useGame.getState().game.campaign!.step).toBe(step);
 });
 it.each(["streak","outcome","acknowledged"])("reload preserves prevention %s with paused time",kind=>{
@@ -42,7 +44,7 @@ it.each(["streak","outcome","acknowledged"])("reload preserves prevention %s wit
  render(ui());expect(useGame.getState().running).toBe(false);
  if(kind==="streak")expect(screen.getByRole("region",{name:"Opening prevention progress"}).textContent).toContain("Stable service: 2 / 5");
  if(kind==="outcome")expect(screen.getByRole("dialog",{name:"Prevention review"})).toBeTruthy();
- if(kind==="acknowledged"){expect(screen.queryByRole("dialog")).toBeNull();expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe("Walkthrough");}
+ if(kind==="acknowledged")expect(screen.getByRole("dialog",{name:"First growth challenge handled"})).toBeTruthy();
  expect(useGame.getState().game.campaign).toEqual(g.campaign);
 });
 it("history excludes purchases made after qualification",()=>{

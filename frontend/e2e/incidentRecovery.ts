@@ -40,14 +40,14 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   } else await press(notice.getByRole("button", { name: "View Incident Report" }));
   const report = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
   await expect(report).toBeVisible(); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
-  await expect(report.getByRole("heading", { name: "What went wrong?", exact: true })).toBeInViewport();
+  await expect(report.getByRole("heading", { name: "What happened?", exact: true })).toBeInViewport();
   await expect(report.locator(".report-metrics dt")).toHaveCount(3);
   await expect(report.locator(".report-technical")).not.toHaveAttribute("open");
-  await expect(report).toContainText(limited ? "less traffic was admitted" : "database capacity increased");
+  await expect(report.getByText(limited ? /Recorded responses included a traffic limit/ : /Recorded responses included a database upgrade/)).toBeVisible();
   await expect(report.locator(".report-metrics")).toContainText(limited ? "Recovered with traffic limited" : "Recovered at full incoming demand");
   expect((await savedGame(page)).campaign!.inputs).toEqual(recovered.campaign!.inputs);
   await page.screenshot({ path: info.outputPath("postmortem.png") });
-  const summary = report.locator("summary", { hasText: "View technical details" });
+  const summary = report.locator("summary", { hasText: "View Technical Details" });
   await page.keyboard.press("Tab"); await expect(summary).toBeFocused();
   await page.keyboard.press("Shift+Tab"); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
   await press(summary); await expect(report.getByRole("table")).toBeVisible();
@@ -59,6 +59,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   expect((await savedGame(page)).campaign!.inputs).toEqual(recovered.campaign!.inputs);
   await press(report.getByRole("button", { name: "Continue company", exact: true }));
   await expect(page.getByRole("dialog", { name: "First growth challenge handled" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "First growth challenge handled" })).toContainText("You diagnosed an outage and restored your service.");
   await press(page.getByRole("button", { name: "Continue operating", exact: true }));
   const after = (await savedGame(page)); expect(after.phase).toBe("management");
   expect(after.campaign!.runId).toBe(game.campaign!.runId); expect(after.campaign!.step).toBe(recovered.campaign!.step);
@@ -68,6 +69,6 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   await press(page.getByRole("button", { name: "History", exact: true }));
   await press(page.getByRole("tab", { name: "Incidents (1)", exact: true }));
   await press(page.getByRole("button", { name: /Game seconds.*Service slowdown/ }));
-  await expect(page.getByText("What went wrong?", { exact: true })).toBeVisible();
+  await expect(page.getByText("What happened?", { exact: true })).toBeVisible();
   await expect(notice).toHaveCount(0);
 }

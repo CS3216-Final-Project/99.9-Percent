@@ -1,3 +1,8 @@
+import { reliabilityClarity } from "./reliabilityClarity";
+import { campaignReportJourney } from "./campaignReports";
+import { chapter6FinanceJourney } from "./chapter6Finance";
+import { act as chapter6Act, tick as chapter6Tick, combinedCompany as chapter6Company, promotionRiskCompany } from "../src/sim/__tests__/combinedFixture";
+import { chapter6Preparation, bootChapter6 } from "./chapter6Guidance";
 import { appHealthDuringTutorial, appHealthJourney, appHealthProblem } from "./appHealth";
 import type { Page } from "@playwright/test";
 import { keyboardDetails, purchaseLayout } from "./purchaseLayout";
@@ -9,7 +14,36 @@ import { recoveryJourney } from "./incidentRecovery";
 import { pauseArrival } from "./incidentPause";
 import { advanceSteps } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
-import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
+import { spikeCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
+import { expectCueColours, chapter4TrafficTarget } from "./chapter4Cues";
+import { companyMessageJourney } from "./companyMessages";
+
+test.describe("Company messages on touch", () => {
+  test.use({reviewCompanyMessage:false});
+  for (const width of [390,320]) test(`company message: Chapter 4 queues stage guidance at ${width}px touch`, async ({page}, info) => {
+    await page.setViewportSize({width,height:width===320?568:844});
+    await companyMessageJourney(page,info,4,true);
+  });
+});
+
+test("Chapter 4 traffic target: safe removal and confirmation stay actionable on 320px touch", async ({ page, installClock }) => {
+  await installClock(); await page.setViewportSize({ width: 320, height: 568 }); await chapter4TrafficTarget(page, true);
+});
+
+for (const [offset, name, tone] of [[0, "Prepare", "prepare"], [8, "Spike 1", "pressure"], [8, "Respond", "pressure"], [28, "Between spikes", "recovery"], [48, "Spike 2", "pressure"], [68, "Recover", "recovery"]] as const)
+  test(`Chapter 4 colours: ${name} remains readable and dismissible on 320px touch`, async ({ page, installClock }, info) => {
+    await installClock(); await page.setViewportSize({ width: 320, height: 568 });
+    const initial = spikeCompany(false);
+    const game = offset ? untilOffset(name === "Respond" ? initial : tick(act(initial, { type: "set_traffic_limit", enabled: true })), offset) : initial;
+    await page.route("**/api/**", route => route.abort()); await seedSave(page, game); await page.goto("/");
+    await page.getByRole("button", { name: "Continue company", exact: true }).tap(); await expectRoom(page);
+    if (name === "Respond") await page.getByRole("dialog", { name: "Chapter 4: Spike 1", exact: true }).getByRole("button", { name: "Got it", exact: true }).tap();
+    const cue = page.getByRole("dialog", { name: `Chapter 4: ${name}`, exact: true });
+    await expectCueColours(cue, tone); await page.screenshot({ path: info.outputPath(`${name.replaceAll(" ", "-")}-320-touch.png`) });
+    const before = (await savedGame(page)).campaign!.step;
+    await cue.getByRole("button", { name: "Got it", exact: true }).tap(); await expect(cue).toHaveCount(0);
+    expect((await savedGame(page)).campaign!.step).toBe(before);
+  });
 
 for (const width of [390, 320]) test(`Phase 1 Hint and accepted control remain usable by touch at ${width}px`, async ({ page, installClock }, info) => {
   await installClock(); await page.setViewportSize({ width, height: width === 320 ? 568 : 844 });
@@ -174,23 +208,28 @@ test("purchase details keyboard navigation handles overflow and fitting content"
 });
 
 
-test("Opening prevention recognition keeps Scaling locked after touch review and reload",async({ page, withoutRoom })=>{
- await withoutRoom();
+test("Opening prevention recognition unlocks Scaling after touch review and reload",async({ page })=>{
  let g=newGame(0,"touch-prevention");
  g=act(g,{type:"set_traffic_limit",enabled:true});g=act(g,{type:"start_db_upgrade"});g=advanceSteps(g,4).state;
  g=act(g,{type:"incident_inspect",equipment:"app"});g=act(g,{type:"incident_inspect",equipment:"db"});
  g=act(g,{type:"set_traffic_limit",enabled:false});g=advanceSteps(g,5).state;
  await page.route("**/api/**",r=>r.abort());await page.setViewportSize({width:390,height:844});
  await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
+ await expectRoom(page);
  const review=page.getByRole("dialog",{name:"Prevention review"});
- await expect(review).toContainText("Scaling unlocks only after a real Opening incident");
+ await expect(review).toContainText("Verified prevention is a valid Opening completion path");
  await review.getByRole("button",{name:"Continue company",exact:true}).tap();
- await expect(page.getByRole("dialog",{name:"First growth challenge handled"})).toHaveCount(0);
+ const recognition=page.getByRole("dialog",{name:"First growth challenge handled"});
+ await expect(recognition).toContainText("You spotted the bottleneck early and prevented an outage.");
  await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Opening");
  await expect(page.getByRole("region",{name:"Scaling controls"})).toHaveCount(0);
- const before=(await savedGame(page)).campaign!;expect(before.openingMilestone).toBeNull();expect(before.scaling).toBeNull();
+ const before=(await savedGame(page)).campaign!;expect(before.openingMilestone!.acknowledged).toBe(false);expect(before.scaling).toBeNull();
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  expect((await savedGame(page)).campaign).toEqual(before);await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Opening");
+ await recognition.getByRole("button",{name:"Continue operating",exact:true}).tap();
+ const after=(await savedGame(page)).campaign!;
+ expect(after.scaling).not.toBeNull();expect(after.reports).toEqual([]);expect(after.openingRecovered).toBe(false);expect(after.step).toBe(before.step);expect(after.cashCents).toBe(before.cashCents);
+ await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Scaling & Routing");
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 test("current chapter is prominent and the full journey opens on touch", async ({ page, withoutRoom }) => {
@@ -447,7 +486,7 @@ test("traffic spikes: touch selects an instance after retirement leaves an ID ga
  await page.getByRole("button",{name:"Menu",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Menu",exact:true})).toBeVisible();
 });
 
-test("combined: touch scorecard, completed guidance, technology inspection and paused reload",async({page,withoutRoom})=>{await withoutRoom();const {finishedCompany}=await import("../src/sim/__tests__/combinedFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,finishedCompany());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Grow the Company");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Grow the Company"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("50,000");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
+test("combined: touch scorecard, completed guidance, technology inspection and paused reload",async({page,withoutRoom})=>{await withoutRoom();const {finishedCompany}=await import("../src/sim/__tests__/combinedFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,finishedCompany());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Grow the Company");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Grow the Company"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await page.getByRole("region",{name:"Run scorecard"}).getByText("View Technical Details",{exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("50,000");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
 
 for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secondary controls fit at ${width}px`,async({page})=>{
  // The room is drawn in software, and its labels settle only as the camera brings each machine above the panel.
@@ -605,4 +644,45 @@ for (const width of [390, 320]) test(`incident Pause: immediate touch attention 
   await installClock(); await page.setViewportSize({ width, height: width === 320 ? 568 : 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await pauseArrival(page, info, width === 320 ? 5 : 2, true);
+});
+
+
+test("Chapter 6 guidance: 320px touch preparation, actionable routing and safe removal", async ({ page, installClock }) => {
+  await installClock(); await page.setViewportSize({ width: 320, height: 568 });
+  await chapter6Preparation(page, true);
+});
+
+
+for (const milestone of ["wave", "recovery", "final"] as const)
+  test(`Chapter 6 guidance: 320px touch ${milestone} milestone colours`, async ({ page, installClock }, info) => {
+    await installClock(); await page.setViewportSize({ width: 320, height: 568 });
+    const wave = chapter6Act(chapter6Tick(chapter6Company(), 5), { type: "start_growth_wave" });
+    const game = milestone === "wave" ? wave : milestone === "recovery" ? chapter6Tick(wave, 24) : promotionRiskCompany();
+    const title = milestone === "wave" ? "Growth wave 1" : milestone === "recovery" ? "Recover at full demand" : "Final checks";
+    await bootChapter6(page, game);
+    const cue = page.getByRole("dialog", { name: `Chapter 6: ${title}`, exact: true });
+    await expectCueColours(cue, milestone === "wave" ? "pressure" : "recovery");
+    await expect(cue.locator("h3 > .icon")).toBeInViewport({ ratio: 1 });
+    await expect(cue.getByRole("button", { name: "Dismiss chapter guidance", exact: true })).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: info.outputPath(`${milestone}-320.png`) });
+    await cue.getByRole("button", { name: "Got it", exact: true }).tap();
+    await expect(cue).toHaveCount(0);
+  });
+
+
+test("Chapter 5 clarity: outcome and details remain usable on 320px touch", async ({ page, installClock }, info) => {
+  await installClock(); await page.setViewportSize({ width: 320, height: 568 });
+  await reliabilityClarity(page, info, true);
+});
+
+for (const kind of ["spikes", "completion"] as const) {
+  test(`Campaign report: ${kind} summary and acknowledgement on 320px touch`, async ({ page, installClock }, info) => {
+    await installClock(); await page.setViewportSize({ width: 320, height: 568 });
+    await campaignReportJourney(page, info, kind, true);
+  });
+}
+
+test("Chapter 6 finances: funding warning and existing cash spotlight on 320px touch", async ({ page, installClock }, info) => {
+  await installClock(); await page.setViewportSize({ width: 320, height: 568 });
+  await chapter6FinanceJourney(page, info, true);
 });

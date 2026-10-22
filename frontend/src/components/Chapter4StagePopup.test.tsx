@@ -19,11 +19,12 @@ afterEach(() => { cleanup(); setConfirming(null); vi.restoreAllMocks(); });
 const popup = () => screen.queryByRole("dialog", { name: /^Chapter 4:/ });
 const show = (offset = 0) => chapter4Stage(offset ? untilOffset(limited, offset) : initial)!;
 
-it.each([[0, "Prepare"], [8, "Spike 1"], [28, "Between spikes"], [48, "Spike 2"], [68, "Recover"]] as const)("renders the small nonmodal %s cue once", (offset, title) => {
+it.each([[0, "Prepare", "prepare"], [8, "Spike 1", "pressure"], [28, "Between spikes", "recovery"], [48, "Spike 2", "pressure"], [68, "Recover", "recovery"]] as const)("renders the small nonmodal %s cue once", (offset, title, tone) => {
   const model = show(offset);
   render(<StrictMode><Chapter4StagePopup model={model} /></StrictMode>);
   expect(popup()?.getAttribute("aria-modal")).toBe("false");
   expect(popup()?.getAttribute("aria-label")).toBe(`Chapter 4: ${title}`);
+  expect(popup()?.getAttribute("data-tone")).toBe(tone);
   expect(document.querySelector(".modal-backdrop")).toBeNull();
   fireEvent.click(within(popup()!).getByRole("button", { name: "Got it" })); expect(popup()).toBeNull();
   cleanup(); render(<Chapter4StagePopup model={model} />); expect(popup()).toBeNull();
@@ -33,6 +34,7 @@ it("sequences Spike 1 then Respond only while overloaded, and deduplicates both"
   render(<Chapter4StagePopup model={model} />);
   fireEvent.click(within(popup()!).getByRole("button", { name: "Got it" }));
   expect(popup()?.textContent).toContain("Pause and inspect");
+  expect(popup()?.getAttribute("data-tone")).toBe("pressure");
   fireEvent.click(within(popup()!).getByRole("button", { name: "Dismiss chapter guidance" }));
   expect(popup()).toBeNull(); cleanup(); render(<Chapter4StagePopup model={model} />); expect(popup()).toBeNull();
 });
@@ -60,6 +62,7 @@ it("preserves pause/resume, manual Hint ownership and confirmation priority with
   useGame.setState({ game: initial, ready: true, started: true, running: false, onboarding: false, tour: null });
   render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost>);
   const before = useGame.getState().game;
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Company Message" })).getByRole("button", { name: "Got it" }));
   expect(popup()).not.toBeNull(); act(() => useGame.getState().setRunning(true)); expect(popup()).not.toBeNull();
   act(() => useGame.getState().setRunning(false)); expect(popup()).not.toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Hint" })); expect(popup()).toBeNull();
@@ -88,4 +91,40 @@ it("transfers Hint to the small server's real Scale up, immediate Confirm, and a
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   fireEvent.click(within(screen.getByRole("dialog", { name: "Hint" })).getByRole("button", { name: "Got it" }));
   expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
+});
+
+it("escapes stale About Network advice with protective Run when the open inspector predates the pulse", () => {
+  const game = untilOffset(decide(limited, { type: "incident_inspect", equipment: "gateway" }), 8);
+  useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null, selected: "gateway", panelOpen: true });
+  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost>);
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  const hint = screen.getByRole("dialog", { name: "Hint" });
+  expect(hint.textContent).toContain("Keep the limit"); expect(hint.textContent).not.toContain("About Network");
+  fireEvent.click(within(hint).getByRole("button", { name: "Got it" }));
+  const gold = document.querySelectorAll(".campaign-gold-attention");
+  expect(gold).toHaveLength(1); expect(gold[0].getAttribute("aria-label")).toBe("Run");
+  expect(useGame.getState().game).toBe(game);
+});
+
+it("targets Remove traffic limit in an already-open Network panel, yields to Confirm, and recovers after Cancel", () => {
+  let game = tick(decide(initial, { type: "add_server" }), 2);
+  game = tick(decide(game, { type: "scale_up", appId: "app-3" }), 3);
+  game = tick(decide(game, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] }));
+  game = untilOffset(tick(decide(game, { type: "set_traffic_limit", enabled: true })), 8);
+  useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null, selected: "gateway", panelOpen: true });
+  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost>);
+  const gold = () => document.querySelectorAll<HTMLElement>(".campaign-gold-attention");
+  const accept = () => {
+    fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+    const hint = screen.getByRole("dialog", { name: "Hint" }); expect(hint.textContent).not.toContain("About Network");
+    fireEvent.click(within(hint).getByRole("button", { name: "Got it" }));
+    expect(gold()).toHaveLength(1);
+  };
+  accept(); expect(gold()[0].textContent).toContain("Remove traffic limit"); fireEvent.click(gold()[0]);
+  expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(gold()).toHaveLength(0); expect(useGame.getState().game).toBe(game);
+  accept(); fireEvent.click(gold()[0]); fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+  expect(useGame.getState().game.campaign!.pending.some(p => p.type === "unlimit")).toBe(true);
+  accept(); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
 });

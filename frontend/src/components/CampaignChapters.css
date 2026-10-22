@@ -30,6 +30,37 @@
 .chapter-current h2 { font-family: var(--font-display); font-size: var(--text-lg); line-height: 1.15; }
 .chapter-objective { margin: 0; padding-left: 16px; border-left: 1px solid var(--on-night-soft); font-size: var(--text-lg); line-height: 1.5; }
 .chapter-objective b { color: var(--go); }
+/* Two identical colour cycles make the seven-second wrap seamless. */
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .chapter-goal-text {
+    background-image: linear-gradient(90deg,
+      #f4b942, #f28b82, #f4a5ce, #c4b5fd, #7dd3fc, #55bfa6,
+      #f4b942, #f28b82, #f4a5ce, #c4b5fd, #7dd3fc, #55bfa6, #f4b942);
+    background-size: 200% 100%;
+    background-position: 0% 50%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: chapter-goal-flow 7s linear infinite, chapter-goal-breathe 3s ease-in-out infinite;
+  }
+}
+
+@keyframes chapter-goal-flow {
+  to { background-position: 100% 50%; }
+}
+
+@keyframes chapter-goal-breathe {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 0 rgb(255 255 255 / 0)); }
+  50% { filter: brightness(1.6) drop-shadow(0 0 4px rgb(255 255 255 / .45)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chapter-goal-text { animation: none; }
+}
+
+@media (forced-colors: active) {
+  .chapter-goal-text { animation: none; background-image: none; color: CanvasText; }
+}
 .chapter-next-reason { grid-column: 1 / -1; margin: 0; font-size: var(--text-xs); color: var(--on-night-soft); }
 .chapter-overview { list-style: none; padding: 0; margin: 0; }
 .chapter-number { flex: none; display: grid; place-content: center; width: 26px; height: 26px; border: 2px solid currentColor; border-radius: 50%; font-family: var(--font-num); font-size: var(--text-xs); font-weight: 700; }

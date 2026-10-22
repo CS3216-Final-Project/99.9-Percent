@@ -38,7 +38,7 @@ it("shows one acknowledgement, focuses the report button, and leaves acknowledge
   fireEvent.keyDown(button, { key: "Escape" }); expect(screen.getByRole("dialog", { name: "System Recovered!" })).toBeTruthy();
   fireEvent.click(button); const report = screen.getByRole("dialog", { name: "Incident postmortem" });
   expect(useGame.getState().game).toBe(game); expect(document.activeElement).toBe(within(report).getByRole("button", { name: "Continue company" }));
-  expect(within(report).getAllByRole("heading", { level: 3 }).map(e => e.textContent)).toEqual(["What went wrong?", "What changed?", "What did you learn?", "Remember for next time"]);
+  expect(within(report).getAllByRole("heading", { level: 3 }).filter(n => !n.closest("details")).map(e => e.textContent)).toEqual(["What happened?", "How did you respond?", "What could be improved?", "Key takeaway"]);
   view.unmount(); show(game); expect(screen.queryByRole("dialog", { name: "System Recovered!" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
   const after = useGame.getState().game;
@@ -48,9 +48,9 @@ it("shows one acknowledgement, focuses the report button, and leaves acknowledge
 });
 it("retains every explanation, observation and event behind one collapsed technical disclosure", () => {
   const r = recovery().campaign!.reports[0]; render(<CampaignIncidentReport report={r} />);
-  const detail = screen.getByText("View technical details").closest("details")!;
+  const detail = screen.getByText("View Technical Details").closest("details")!;
   expect(detail.open).toBe(false); expect(screen.getByLabelText("Recovery summary").querySelectorAll("dt")).toHaveLength(3);
-  fireEvent.click(screen.getByText("View technical details"));
+  fireEvent.click(screen.getByText("View Technical Details"));
   for (const explanation of r.explanations) expect(detail.textContent).toContain(explanation);
   expect(detail.textContent).toContain(JSON.stringify(r.snapshots, null, 2));
   for (const event of r.events) expect(detail.textContent).toContain(JSON.stringify(event.data, null, 2));
@@ -67,7 +67,7 @@ it("consolidates missing workload details and does not render an empty evidence 
 it.each(["walkthrough", "practice"])("preserves the existing %s report instead of the new flow", kind => {
   const game = recovery(); useGame.setState({ game, started: true, tour: { track: "campaign", step: 0 }, tutorialCompany: kind === "practice" ? { game, remainderMs: 0, measurement: useGame.getState().measurement } : null });
   render(<CampaignOverlays />); expect(screen.queryByRole("dialog", { name: "System Recovered!" })).toBeNull();
-  expect(screen.getByRole("dialog", { name: "Incident postmortem" }).textContent).toContain("Causes, actions and trade-offs");
+  expect(screen.getByRole("dialog", { name: "Incident postmortem" }).textContent).toContain("Recorded causes, actions and trade-offs");
 });
 it("still opens the report when receipt storage is unavailable and avoids repeats during the visit", () => {
   vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("unavailable"); });

@@ -1,4 +1,4 @@
-import { completeTutorial, advanceCampaignStep, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
+import { completeTutorial, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
@@ -23,19 +23,23 @@ test("new players see Guided Mode first with Challenge Mode locked", async ({ pa
 });
 
 // The room stays mounted while the game underneath it is swapped, so this journey keeps drawing it.
-test("switches between Guided Mode and unlocked Challenge Mode from the menu, keeping each run", async ({ page , installClock}) => {
- await installClock();
+test("switches between Guided Mode and unlocked Challenge Mode from the menu, keeping each run", async ({ page }) => {
   await seedSave(page, advanceSteps(newGame(1, "mode-switch"), 1).state, { challengeUnlocked: true });
   await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
-  await advanceCampaignStep(page);
+  // This journey tests mode persistence; the public step control advances the same
+  // company by one game second without an unrelated animated-clock exercise.
+  await page.getByRole("button", { name: "Step 1 game second", exact: true }).click();
   const campaign = await savedGame(page);
   expect(campaign.campaign!.step).toBe(2);
 
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: "Switch to Challenge Mode" }).click();
   await expect(page.getByRole("dialog", { name: "Menu" })).toBeHidden();
-  await completeTutorial(page);
+  // This guide follows the moving camera. Dismiss through its real keyboard
+  // control so pointer hit-testing during that motion does not consume the journey budget.
+  const skip = page.getByRole("button", { name: "Skip", exact: true });
+  await expect(skip).toBeVisible(); await skip.press("Enter");
   await expectRoom(page);
   await page.getByRole("button", { name: /Next week/ }).click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("nn.classic.save.v1")!).game.turn)).toBe(2);

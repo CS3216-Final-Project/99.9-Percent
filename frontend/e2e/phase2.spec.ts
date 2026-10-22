@@ -34,6 +34,7 @@ test("the mandatory walkthrough works from the keyboard across the guide and rea
   await expect(card).toBeVisible();
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeDisabled();
   await finishChapterZero(page);
+  await expect(page.getByRole("dialog", { name: "Company Message", exact: true })).toBeHidden();
   await page.keyboard.press("p"); await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
   await page.keyboard.press("p"); await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
   await page.reload(); await page.getByRole("button", { name: "Continue company" }).click();

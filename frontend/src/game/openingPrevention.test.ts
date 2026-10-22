@@ -18,24 +18,25 @@ function oldEnvelope(entered:boolean) {
  return {...makeEnvelope(g),schemaVersion:6,inputs};
 }
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});
-it("reloads a prevented company but does not unlock Scaling or award a milestone",()=>{
+it("reloads verified prevention and unlocks Scaling only after recognition",()=>{
  let g=deadEnd();localStorage.setItem(CAMPAIGN_SAVE_KEY,JSON.stringify(makeEnvelope(g)));
  const loaded=loadGame();if(loaded.status!=="ok")throw Error("load");expect(loaded.game).toEqual(g);
  g=inspecting(loaded.game);g=act(g,{type:"set_traffic_limit",enabled:false});g=advanceSteps(g,5).state;
  expect(g.campaign!.openingPrevention!.outcome!.qualifiedStep).toBe(410);
- g=act(g,{type:"acknowledge_prevention_review"});expect(applyAction(g,{type:"acknowledge_milestone"}).ok).toBe(false);
+ g=act(g,{type:"acknowledge_prevention_review"});expect(g.campaign!.openingMilestone!.acknowledged).toBe(false);
  expect(applyAction(g,{type:"enter_scaling"}).ok).toBe(false);expect(saveGame(g)).toBe(true);
  const again=loadGame();if(again.status!=="ok")throw Error("load");
- expect(again.game).toEqual(g);expect(g.campaign!.openingMilestone).toBeNull();expect(g.campaign!.scaling).toBeNull();expect(g.campaign!.openingRecovered).toBe(false);
+ expect(again.game).toEqual(g);expect(g.campaign!.scaling).toBeNull();expect(g.campaign!.openingRecovered).toBe(false);
+ expect(act(again.game,{type:"acknowledge_milestone"}).campaign!.scaling).toBeTruthy();
 });
-it.each([1,4])("normalizes unseen prevention for schema %s without manufacturing a progression milestone",schemaVersion=>{
+it.each([1,4])("preserves schema %s history and offers verified prevention recognition at load time",schemaVersion=>{
  const raw=JSON.stringify({schemaVersion,scenarioId:"opening-db",scenarioVersion:1,runId:"pre-prevention",seed:0,step:40,
   inputs:[{step:0,action:{type:"start_db_upgrade"}},{step:4,action:{type:"incident_inspect",equipment:"app"}},{step:4,action:{type:"incident_inspect",equipment:"db"}},{step:20,action:{type:"add_server"}}],
   runtime:{remainderMs:0,measurement:emptyMeasurement()},savedAt:1});
  const loaded=decodeSave(raw);if(loaded.status!=="ok")throw Error(loaded.status);
  const c=loaded.game.campaign!;
  expect(c.step).toBe(40);expect(c.openingPrevention!.outcome).toMatchObject({qualifiedStep:9,acknowledged:true});
- expect(c.openingMilestone).toBeNull();expect(c.scaling).toBeNull();expect(c.apps).toHaveLength(2);
+ expect(c.openingMilestone).toMatchObject({outcomeId:"opening-prevention",awardedStep:40,acknowledged:false});expect(c.scaling).toBeNull();expect(c.apps).toHaveLength(2);
  const resaved=decodeSave(JSON.stringify(makeEnvelope(loaded.game)));if(resaved.status!=="ok")throw Error(resaved.status);
  expect(resaved.game).toEqual(loaded.game);
 });
@@ -58,16 +59,17 @@ it("does not count paused ticks, review reading or repeated acknowledgement",()=
  useGame.getState().setRunning(true);useGame.getState().tick(3);expect(useGame.getState().running).toBe(false);
  const n=useGame.getState().game.campaign!.step;useGame.getState().tick(100);useGame.getState().advance();expect(useGame.getState().game.campaign!.step).toBe(n);
  expect(useGame.getState().act({type:"acknowledge_prevention_review"})).toBe(true);expect(useGame.getState().act({type:"acknowledge_prevention_review"})).toBe(false);
- expect(useGame.getState().act({type:"acknowledge_milestone"})).toBe(false);expect(useGame.getState().game.campaign!.step).toBe(n);
+ expect(useGame.getState().act({type:"acknowledge_milestone"})).toBe(true);expect(useGame.getState().act({type:"acknowledge_milestone"})).toBe(false);expect(useGame.getState().game.campaign!.step).toBe(n);
 });
-it("projects prevention recognition once, separately from Opening completion and purchases",()=>{
+it("projects verified prevention and Opening recognition once, separately from purchases",()=>{
  let g=inspecting(deadEnd());g=act(g,{type:"set_traffic_limit",enabled:false});
  const m=beginSession(emptyMeasurement(),g,"prevention-session","2026-10-10T00:00:00Z");m.cursor=g.campaign!.trace.find(t=>t.type==="opening-prevention-eligible")!.id-1;
  g=advanceSteps(g,5).state;g=act(g,{type:"acknowledge_prevention_review"});
  const out=projectEvents(m,g,"2026-10-10T00:01:00Z");expect(projectEvents(out,g,"2026-10-10T00:02:00Z")).toEqual(out);
  for(const name of ["opening_prevention_eligible","opening_prevention_application_inspected","opening_prevention_database_inspected","opening_prevention_qualified","opening_prevention_review_acknowledged"])expect(out.pending.filter(e=>e.name===name)).toHaveLength(1);
  expect(out.pending.filter(e=>e.name==="gameplay_decision")).toHaveLength(1);
- expect(out.pending.filter(e=>e.name==="run_completed_opening")).toHaveLength(0);
+ expect(out.pending.filter(e=>e.name==="run_completed_opening")).toHaveLength(1);
+ expect(g.campaign!.reports).toEqual([]);expect(g.campaign!.openingRecovered).toBe(false);
 });
 it("backs up schema-6 bytes and preserves an already-entered company's architecture and continuation",()=>{
  const e=oldEnvelope(true),raw=JSON.stringify(e);localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);
@@ -81,11 +83,12 @@ it("backs up schema-6 bytes and preserves an already-entered company's architect
  const again=loadGame();if(again.status!=="ok")throw Error(again.status);expect(again.game).toEqual(g);
  expect(again.game.campaign!.legacyPreventionInputs).toBe(e.inputs.length);
 });
-it("does not let an old pending prevention milestone grant a new Scaling entry",()=>{
+it("requires explicit acknowledgement of a restored schema-6 prevention recognition",()=>{
  const e=oldEnvelope(false),loaded=decodeSave(JSON.stringify(e));if(loaded.status!=="ok")throw Error(loaded.status);
- const g=loaded.game;expect(g.campaign!.openingPrevention!.outcome!.acknowledged).toBe(true);expect(g.campaign!.openingMilestone).toBeNull();
- expect(applyAction(g,{type:"acknowledge_milestone"}).ok).toBe(false);expect(applyAction(g,{type:"enter_scaling"}).ok).toBe(false);
+ const g=loaded.game;expect(g.campaign!.openingPrevention!.outcome!.acknowledged).toBe(true);expect(g.campaign!.openingMilestone!.acknowledged).toBe(false);
+ expect(applyAction(g,{type:"enter_scaling"}).ok).toBe(false);
  const again=decodeSave(JSON.stringify(makeEnvelope(g)));if(again.status!=="ok")throw Error(again.status);expect(again.game).toEqual(g);
+ expect(act(again.game,{type:"acknowledge_milestone"}).campaign!.scaling).toBeTruthy();
 });
 it.each([-1,1.5,1000001])("rejects an invalid historical input prefix %s",legacyPreventionInputs=>{
  expect(decodeSave(JSON.stringify({...makeEnvelope(qualified()),legacyPreventionInputs})).status).toBe("corrupt");
