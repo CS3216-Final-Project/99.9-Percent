@@ -477,7 +477,7 @@ export function bubbleTexture(text: string, alarmed: boolean): THREE.CanvasTextu
   });
 }
 
-/** The company's neon sign. Redrawn once Space Grotesk has loaded. */
+/** The company's neon sign, its name in the logo's Pixelify Sans. Redrawn once both fonts have loaded. */
 export function logoSign(): THREE.CanvasTexture {
   const [c, g] = canvas(512, 160);
   const draw = () => {
@@ -487,7 +487,7 @@ export function logoSign(): THREE.CanvasTexture {
     g.shadowColor = "#ffd84a";
     g.shadowBlur = 18;
     g.fillStyle = "#ffe680";
-    g.font = '700 104px "Space Grotesk", sans-serif';
+    g.font = '700 104px "Pixelify Sans", "Space Grotesk", sans-serif';
     g.fillText("99.99%", 256, 70);
     g.shadowColor = "#ff7ad9";
     g.shadowBlur = 12;
@@ -498,7 +498,7 @@ export function logoSign(): THREE.CanvasTexture {
   draw();
   const t = finish(c);
   t.magFilter = THREE.LinearFilter;
-  document.fonts?.load('700 104px "Space Grotesk"').then(() => {
+  Promise.all([document.fonts?.load('700 104px "Pixelify Sans"'), document.fonts?.load('700 30px "Space Grotesk"')]).then(() => {
     draw();
     t.needsUpdate = true;
   });

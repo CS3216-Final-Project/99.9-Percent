@@ -161,7 +161,7 @@ function BottomBar() {
       />
 
       <RoomControlsSlot />
-      <div className="time-controls" role="group" aria-label="Time" data-label="Time">
+      <div className="time-controls" role="group" aria-label="Time">
         <WeekClock />
         <TimeMenu automatic={management} />
         <button type="button" className="btn btn-primary advance dock-primary" disabled={!management && !incident} onClick={incident ? () => setRunning(!running) : advance} aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : undefined}>

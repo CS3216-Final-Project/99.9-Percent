@@ -25,6 +25,12 @@ async function open(page: Page) {
   await expectRoom(page);
 }
 
+/** The round map starts folded: unfold it from its Map button. */
+async function showMap(page: Page) {
+  await page.locator(".room-map.is-closed").getByRole("button", { name: "Map", exact: true }).click();
+  await expect(map(page)).toBeVisible();
+}
+
 /** Where a spot on the floor shows on the round map, which turns with the view, in page pixels. */
 async function onMap(page: Page, x: number, z: number) {
   return map(page)
@@ -183,6 +189,7 @@ test("where the browser will not hand over the mouse, first person turns towards
     } as typeof HTMLElement.prototype.requestPointerLock;
   });
   await open(page);
+  await showMap(page);
   await stage(page).focus();
   await page.keyboard.press("v");
   await page.keyboard.press("v");
@@ -225,6 +232,7 @@ test("where the browser will not hand over the mouse, first person turns towards
 
 test("seen from the avatar the elevator simply rides, without the overview's cutscene", async ({ page }) => {
   await open(page);
+  await showMap(page);
   await stage(page).focus();
   await page.keyboard.press("v");
   await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
@@ -276,8 +284,10 @@ test("the first-person view picks up again after a reload, with walk mode", asyn
   await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
 });
 
-test("the map says where the avatar is, changes floor from its tabs, and walks the avatar where it is clicked", async ({ page }) => {
+test("the map starts folded, says where the avatar is, changes floor from its tabs, and walks the avatar where it is clicked", async ({ page }) => {
   await open(page);
+  await expect(map(page)).toHaveCount(0);
+  await showMap(page);
   // Before walking, the avatar sits in the founder's chair upstairs.
   await expect(where(page)).toHaveText("Meeting room, office floor");
   await expect(map(page).getByRole("button", { name: /^Servers/ })).toHaveAttribute("aria-pressed", "true");
@@ -305,7 +315,7 @@ test("the map says where the avatar is, changes floor from its tabs, and walks t
   // Back on the office floor, where the walk left it.
   await page.getByRole("button", { name: "Continue week 2" }).click();
   await expect(page.locator(".room-map.is-closed").getByRole("button", { name: "Map" })).toBeVisible();
-  expect((await events(page, "map_toggled")).map((d) => d?.open)).toEqual([false]);
+  expect((await events(page, "map_toggled")).map((d) => d?.open)).toEqual([true, false]);
 });
 
 test("the menu's map finds equipment and places, and sends the room to them", async ({ page }) => {

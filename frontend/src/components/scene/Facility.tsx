@@ -468,7 +468,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
           cut.held = viewPoint(c.target, camera);
           touched.current = cut.from.touched || !!focusing.current;
         }
-        const a = reducedMotion() ? 1 : backAt(now() - ride.arrived);
+        const a = cutsRide() ? 1 : backAt(now() - ride.arrived);
         tiltTo(offset, cut.held.polar + (cut.from.polar - cut.held.polar) * a);
         // A view the player made their own mid-ride (walk mode taken while the car ran) is still their own: back to it.
         if ((cut.from.touched || touched.current) && !focusing.current) {
@@ -1606,6 +1606,8 @@ function CameraHint() {
 
 /** The player has asked their system for less motion: floors cut rather than ride. */
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+/** Floors cut rather than ride: for less motion, or because the player chose to skip the elevator's cutscene. */
+const cutsRide = () => reducedMotion() || useGame.getState().graphics.skipElevator;
 
 /**
  * The floor the elevator stands at, whose labels and equipment can be clicked: null while it rides. It follows the
@@ -1623,7 +1625,7 @@ function useLanded(): Floor | null {
       // going. Riding with the avatar the ride runs its course; seen from above, a click or a key cuts it short.
       const open = carDoors(ride.to);
       settleErrand();
-      depart(s.floor, reducedMotion(), !(s.walking && s.started), open);
+      depart(s.floor, cutsRide(), !(s.walking && s.started), open);
       playerDeparts(ride.from, ride.to);
     });
     return () => {

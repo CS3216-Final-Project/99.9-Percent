@@ -122,16 +122,10 @@
   .campaign-clock.controls-dock .time-menu > summary { width: 54px; }
   .campaign-clock.controls-dock .dock-second { white-space: nowrap; }
 }
-/* Keep the Time heading with its controls instead of positioning it from the whole dock. */
 .campaign-clock.controls-dock .time-controls {
   display: grid;
   grid-template-columns: 132px 64px auto 142px;
   justify-content: end;
-  padding-top: 0;
-}
-.campaign-clock.controls-dock .time-controls::before {
-  position: static;
-  grid-column: 1 / -1;
 }
 .controls-dock .time-menu > summary { height: 48px; }
 .controls-dock .time-menu > summary > span { flex: 1; text-align: center; }
@@ -154,12 +148,10 @@
       grid-column: 1 / -1;
       grid-row: 1;
       justify-content: flex-end;
-      padding: 19px 0 8px;
+      padding: 0 0 8px;
       border-bottom: 1px solid var(--night-line);
     }
-    .controls-dock > .room-controls[data-label]::before { position: absolute; top: 0; left: 0; margin: 0; }
-    .controls-dock > .view-tabs { position: relative; grid-column: 1; grid-row: 2; }
-    .controls-dock > .view-tabs[data-label]::before { top: 0; }
+    .controls-dock > .view-tabs { grid-column: 1; grid-row: 2; }
     .controls-dock > .time-controls { grid-column: 2 / -1; grid-row: 2; }
   }
   @container controls-dock (max-width: 800px) {

@@ -40,9 +40,9 @@ describe("the Controls section", () => {
     expect(slider).toHaveProperty("value", "75");
     expect([slider.getAttribute("min"), slider.getAttribute("max")]).toEqual(["70", "90"]);
     fireEvent.change(slider, { target: { value: "86" } });
-    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 86 });
+    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 86, skipElevator: false });
     expect(slider.getAttribute("aria-valuetext")).toBe("86 degrees");
-    expect(loadGraphics()).toEqual({ quality: "auto", fov: 86 });
+    expect(loadGraphics()).toEqual({ quality: "auto", fov: 86, skipElevator: false });
   });
 
   it("starts at what was saved, and reads anything unreadable as the defaults", () => {

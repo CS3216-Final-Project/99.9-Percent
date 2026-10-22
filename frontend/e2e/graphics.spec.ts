@@ -21,7 +21,7 @@ test("changes the graphics quality from the menu, redraws the room and remembers
   await expect(menu.getByRole("radio", { name: "Auto" })).toBeChecked();
   await menu.getByRole("radio", { name: "Low" }).check();
   await expect(menu.getByRole("radio", { name: "Low" })).toBeChecked();
-  expect(await page.evaluate(() => localStorage.getItem("nn.graphics.v1"))).toBe(JSON.stringify({ quality: "low", fov: 75 }));
+  expect(await page.evaluate(() => localStorage.getItem("nn.graphics.v1"))).toBe(JSON.stringify({ quality: "low", fov: 75, skipElevator: false }));
   await page.screenshot({ path: "test-results/graphics-menu.png" });
   await menu.getByRole("button", { name: "Close" }).click();
 

@@ -9,5 +9,5 @@ export function RoomControlsHost({ children }: { children: ReactNode }) {
 }
 export function RoomControlsSlot() {
   const register = useContext(Register);
-  return <div ref={register} className="room-controls" role="group" aria-label="Navigation" data-label="Navigation" />;
+  return <div ref={register} className="room-controls" role="group" aria-label="Navigation" />;
 }

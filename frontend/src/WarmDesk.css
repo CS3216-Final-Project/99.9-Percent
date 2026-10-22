@@ -53,8 +53,6 @@
 
 /* The purple dock matches the HUD shell; paper controls and pastel icons stay distinct. */
 .app .controls-dock { background: var(--night-2); color: var(--paper); border-top: 1px solid var(--night-line); box-shadow: none; }
-.controls-dock [data-label] { padding-top: 19px; }
-.controls-dock [data-label]::before { content: attr(data-label); position: absolute; top: 8px; margin-left: 6px; font: 500 var(--text-xs)/1.2 var(--font-display); color: var(--on-night-soft); letter-spacing: .07em; text-transform: uppercase; }
 .app .controls-dock .view-tabs button { background: transparent; color: var(--paper); border-color: transparent; border-width: 1px; box-shadow: none; }
 .app .controls-dock .view-tabs button:hover:not(:disabled):not(.is-active) { background: var(--night-3); }
 .app .controls-dock .view-tabs button.is-active { background: var(--selection); color: var(--ink); border-color: var(--selection-edge); }
@@ -97,10 +95,6 @@
 .campaign-action-popover .campaign-purchase-note { color: var(--text-soft); }
 .campaign-action-popover[data-side]::before { background: var(--control-edge); }
 
-@media (max-width: 1250px) {
-  .controls-dock .room-controls[data-label] { padding-top: 0; }
-  .controls-dock .room-controls[data-label]::before { position: static; margin-right: auto; }
-}
 @media (max-width: 900px) {
   /* Keep Healthy on one line; longer statuses wrap inside their card. */
   .topbar .stat-action[aria-label="View app health"] { gap: 3px; }
@@ -115,8 +109,6 @@
 @media (max-width: 640px) {
   .topbar .stat-action[aria-label="View app health"] { padding-inline: 1px; }
   .topbar .stat-action[aria-label="View app health"] .stat-icon { flex-basis: 18px; }
-  .controls-dock [data-label] { padding-top: 0; }
-  .controls-dock [data-label]::before { display: none; }
   .app .controls-dock .room-controls { width: 148px; }
   .app .controls-dock .room-menu > summary { width: 148px; }
   .controls-dock .summary-floor-number { display: none; }
