@@ -1,4 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
+import { isPhoneEdition } from "@/phone/edition";
 import { createPortal } from "react-dom";
 import type { Action, EquipmentId } from "@/sim";
 import { previewCampaignAction } from "@/game/campaignFinance";
@@ -246,7 +247,8 @@ function ActionPopover({ anchor, children }: { anchor: string; children: ReactNo
     let frame = 0;
     const place = () => {
       const s = stage.getBoundingClientRect();
-      const sheet = window.innerWidth <= 900;
+      // A phone always confirms in a sheet, even turned on its side, wider than the desktop's narrow layout.
+      const sheet = isPhoneEdition() || window.innerWidth <= 900;
       el.dataset.layout = sheet ? "sheet" : "anchored";
       const area = confirmationRoomArea(s,sheet);
       // Size the complete border box before measuring or clamping its position.

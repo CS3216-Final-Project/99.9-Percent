@@ -23,6 +23,7 @@ import { loadExploration, saveExploration, type SavedCameraView } from "@/game/e
 import { canInspectEquipment, inspectInRoom, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { nextViewpoint } from "@/game/viewpoints";
+import { isPhoneEdition } from "@/phone/edition";
 import {
   AISLE_Z,
   appSlot,
@@ -1747,7 +1748,7 @@ export default function Facility() {
       e.preventDefault();
       if (view) {
         const s = useGame.getState();
-        s.setViewpoint(nextViewpoint(s.walking ? s.viewpoint : "overview"), "key");
+        s.setViewpoint(nextViewpoint(s.walking ? s.viewpoint : "overview", isPhoneEdition()), "key");
         return;
       }
       pressFloor(e.key === "PageUp" ? "office" : "servers", "key");
@@ -1839,7 +1840,7 @@ export default function Facility() {
       <div className="ride-bar is-bottom" aria-hidden="true" />
       <div className="view-fade" aria-hidden="true" ref={bindViewFade} />
       <ViewOverlay />
-      <Minimap onFloor={(f) => pressFloor(f, "map")} />
+      {!isPhoneEdition() && <Minimap onFloor={(f) => pressFloor(f, "map")} />}
       <Labels landed={landed} />
       <HoverTip container={container} />
       <WalkControls />

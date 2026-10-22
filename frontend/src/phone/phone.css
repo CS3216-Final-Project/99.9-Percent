@@ -1,0 +1,12 @@
+/*
+ * Phone edition styles. Every rule is scoped to [data-edition="phone"], which only the phone shell sets (on the app
+ * root and on <html>), so nothing here can reach the desktop edition. This file is loaded with the phone shell's own
+ * chunk, never on the desktop.
+ */
+
+/* The home screen has no account or avatar chips on a phone, so the brand leads. */
+[data-edition="phone"] .phone-home .home-head {
+  grid-template-areas:
+    "title title"
+    "tag tag";
+}

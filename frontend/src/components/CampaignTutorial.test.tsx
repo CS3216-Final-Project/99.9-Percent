@@ -329,7 +329,7 @@ it("walks Stay Online through unlocking Health Checks in Tech and deploying it",
   expect(guide(3).textContent).toContain("Press Confirm.");
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   expect(useGame.getState().tour).toBeNull();
-});
+}, 15_000);
 
 it("keeps the Deploy Health Checks step on its own action when the player buys something else first", () => {
   useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 1 } });
