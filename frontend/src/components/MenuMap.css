@@ -81,19 +81,58 @@
   width: 100%;
 }
 
+.menu-map-show {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.menu-map-show-label {
+  font: 600 var(--text-sm) var(--font-display);
+  color: var(--text-soft);
+  margin-right: 2px;
+}
+
 .menu-map-layers {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
+.menu-map-layer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px 0 10px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  font: 600 var(--text-sm) var(--font-display);
+}
+
+.menu-map-layer[aria-pressed="false"] {
+  background: var(--paper);
+  color: var(--text-soft);
+  border-color: var(--control-edge);
+}
+
+.menu-map-layer:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The plan drawn as a dark ops board: the HUD's night tokens, zones coloured by what they are for, and a
+   one-metre grid over the lot. The same rules restyle the legend's miniature symbols, so they cannot drift. */
 .menu-map-frame {
   position: relative;
   aspect-ratio: 44 / 24;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--night-line);
   border-radius: 8px;
   overflow: hidden;
-  background: var(--night-2);
+  background: var(--night);
   touch-action: pan-y;
   cursor: grab;
 }
@@ -112,63 +151,151 @@
   height: 100%;
 }
 
+.menu-map-frame .map-floor {
+  fill: var(--night-2);
+}
+
+.menu-map-frame pattern path {
+  fill: none;
+  stroke: rgb(255 247 232 / 0.05);
+  stroke-width: 0.04;
+}
+
+.menu-map-frame .map-zones polygon {
+  stroke: rgb(255 247 232 / 0.12);
+  stroke-width: 0.08;
+}
+
+.menu-map-frame .map-zones .kind-machines {
+  fill: color-mix(in srgb, var(--c-tech) 26%, transparent);
+}
+
+.menu-map-frame .map-zones .kind-work {
+  fill: color-mix(in srgb, var(--c-users) 22%, transparent);
+}
+
+.menu-map-frame .map-zones .kind-break {
+  fill: color-mix(in srgb, var(--c-team) 18%, transparent);
+}
+
+.menu-map-frame .map-zones .kind-plant {
+  fill: color-mix(in srgb, var(--c-revenue) 26%, transparent);
+}
+
+.menu-map-frame .map-zones .is-elevator {
+  fill: rgb(255 247 232 / 0.14);
+}
+
+.menu-map-frame .map-furniture {
+  fill: rgb(255 247 232 / 0.1);
+}
+
+.menu-map-frame .map-glass line {
+  stroke: color-mix(in srgb, var(--c-users) 75%, transparent);
+  stroke-width: 0.14;
+}
+
+.menu-map-frame .map-shaft line {
+  stroke: var(--paper);
+  stroke-width: 0.22;
+}
+
+.menu-map-frame .map-walls {
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 0.4;
+}
+
+.menu-map-frame .map-names text {
+  fill: var(--paper);
+  fill-opacity: 0.72;
+  stroke: var(--night-2);
+  stroke-width: 0.15;
+  font-weight: 600;
+}
+
+:is(.menu-map-frame, .menu-map-legend) .map-crew circle {
+  fill: var(--paper-3);
+  stroke: var(--night);
+  stroke-width: 0.1;
+}
+
+/* The legend's crew dot is drawn in pixels, not metres. */
+.menu-map-legend .map-crew circle {
+  stroke-width: 0.8;
+}
+
 /* Pins hold their screen size at any zoom (they are scaled by metres-per-pixel in the component). */
-.map-pin {
+:is(.menu-map-frame, .menu-map-legend) .map-pin {
   cursor: pointer;
 }
 
-.map-pin rect,
-.map-pin > circle {
+:is(.menu-map-frame, .menu-map-legend) .map-pin rect {
   fill: var(--paper);
-  stroke: var(--ink);
+  stroke: var(--night);
   stroke-width: 1.5;
 }
 
-.map-pin.is-picked rect,
-.map-pin.is-picked > circle {
-  fill: var(--go);
+:is(.menu-map-frame, .menu-map-legend) .map-pin.kind-fun > circle {
+  fill: var(--night-4);
+  stroke: var(--paper);
+  stroke-width: 1.5;
 }
 
-.map-pin.state-warn rect {
-  stroke: var(--warn-ink);
-  stroke-width: 2.5;
+:is(.menu-map-frame, .menu-map-legend) .map-pin.kind-fun .map-pin-icon {
+  color: var(--paper);
 }
 
-.map-pin.state-critical rect,
-.map-pin.state-down rect {
+:is(.menu-map-frame, .menu-map-legend) .map-pin.state-warn rect {
+  stroke: var(--warn);
+  stroke-width: 3;
+}
+
+:is(.menu-map-frame, .menu-map-legend) .map-pin.state-critical rect,
+:is(.menu-map-frame, .menu-map-legend) .map-pin.state-down rect {
   stroke: var(--critical);
-  stroke-width: 2.5;
+  stroke-width: 3;
 }
 
-.map-pin-icon {
+:is(.menu-map-frame, .menu-map-legend) .map-pin.is-picked rect,
+:is(.menu-map-frame, .menu-map-legend) .map-pin.is-picked > circle {
+  fill: var(--go);
+  stroke: var(--go);
+}
+
+:is(.menu-map-frame, .menu-map-legend) .map-pin.is-picked .map-pin-icon {
+  color: var(--ink);
+}
+
+:is(.menu-map-frame, .menu-map-legend) .map-pin-icon {
   color: var(--ink);
   overflow: visible;
 }
 
-.map-pin-mark circle {
+:is(.menu-map-frame, .menu-map-legend) .map-pin-mark circle {
   fill: var(--critical);
   stroke: var(--ink);
   stroke-width: 1;
 }
 
-.map-pin.mark-busy .map-pin-mark circle {
+:is(.menu-map-frame, .menu-map-legend) .map-pin.mark-busy .map-pin-mark circle {
   fill: var(--focus);
 }
 
-.map-pin-mark text {
+:is(.menu-map-frame, .menu-map-legend) .map-pin-mark text {
   fill: #fff;
   font: 700 8px var(--font-num);
   text-anchor: middle;
 }
 
-.map-pin.mark-alert .map-pin-mark circle {
+:is(.menu-map-frame, .menu-map-legend) .map-pin.mark-alert .map-pin-mark circle {
   animation: floor-alert 1s ease-in-out infinite;
 }
 
-.map-pin-label,
-.map-avatar .map-pin-label {
-  fill: var(--ink);
-  stroke: #efe6d3;
+:is(.menu-map-frame, .menu-map-legend) .map-pin-label,
+:is(.menu-map-frame, .menu-map-legend) .map-avatar .map-pin-label {
+  fill: var(--paper);
+  stroke: var(--night-2);
   stroke-width: 3px;
   paint-order: stroke;
   font-family: var(--font-display);
@@ -178,18 +305,43 @@
   pointer-events: none;
 }
 
-.menu-map-compass {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--ink);
-  color: var(--paper);
-  display: grid;
-  place-items: center;
-  font: 700 var(--text-xs) var(--font-display);
+:is(.menu-map-frame, .menu-map-legend) .map-pin-label.is-quiet {
+  fill-opacity: 0.72;
+  font-weight: 600;
+}
+
+:is(.menu-map-frame, .menu-map-legend) .map-avatar circle {
+  fill: rgb(255 216 74 / 0.22);
+}
+
+:is(.menu-map-frame, .menu-map-legend) .map-avatar path {
+  fill: var(--go);
+  stroke: var(--night);
+  stroke-width: 1.5;
+}
+
+.menu-map-frame .map-you-pulse {
+  fill: none;
+  stroke: var(--go);
+  stroke-width: 2;
+  transform-origin: 0 0;
+  animation: map-you-pulse 1.8s ease-out infinite;
+}
+
+@keyframes map-you-pulse {
+  from {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.menu-map-frame .map-destination {
+  stroke: var(--go);
+  stroke-dasharray: 3 2;
 }
 
 .menu-map-zoom {
@@ -202,6 +354,7 @@
 
 .menu-map-zoom .icon-btn {
   background: var(--paper);
+  border-color: var(--night-line);
 }
 
 .menu-map-scale {
@@ -212,13 +365,13 @@
   align-items: flex-end;
   gap: 6px;
   font: 600 var(--text-xs) var(--font-num);
-  color: var(--ink);
+  color: var(--paper);
 }
 
 .menu-map-scale i {
   display: block;
   height: 6px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--paper);
   border-top: 0;
 }
 
@@ -228,21 +381,94 @@
   bottom: 10px;
   margin: 0;
   font-size: var(--text-xs);
-  color: var(--text-soft);
-  background: rgb(255 255 255 / 0.7);
+  color: var(--paper-3);
+  background: rgb(26 22 51 / 0.75);
   padding: 2px 8px;
   border-radius: 999px;
 }
 
+.menu-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 500 var(--text-xs) var(--font-display);
+  color: var(--text-soft);
+}
+
+.menu-map-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.menu-map-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--night-2);
+  border: 1px solid var(--night-line);
+}
+
+.menu-map-swatch.kind-machines {
+  background: color-mix(in srgb, var(--c-tech) 40%, var(--night-2));
+}
+
+.menu-map-swatch.kind-work {
+  background: color-mix(in srgb, var(--c-users) 40%, var(--night-2));
+}
+
+.menu-map-swatch.kind-break {
+  background: color-mix(in srgb, var(--c-team) 40%, var(--night-2));
+}
+
+.menu-map-swatch.kind-plant {
+  background: color-mix(in srgb, var(--c-revenue) 40%, var(--night-2));
+}
+
+.menu-map-legend-sym {
+  width: 20px;
+  height: 20px;
+  overflow: visible;
+}
+
+.menu-map-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.menu-map-dot.tone-warn {
+  background: var(--warn);
+}
+
+.menu-map-dot.tone-critical {
+  background: var(--critical);
+}
+
+.menu-map-dot.tone-muted {
+  background: var(--paper-3);
+}
+
 .menu-map-card {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 14px;
-  padding: 10px 12px;
+  padding: 10px 56px 10px 12px;
   border: 1px solid var(--control-edge);
   border-radius: var(--radius);
   background: var(--paper-2);
+}
+
+.menu-map-card > .icon-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 
 .menu-map-card > .chip-icon {
@@ -282,13 +508,6 @@
 }
 
 @media (max-width: 759px) {
-  .menu-map-compass {
-    width: 22px;
-    height: 22px;
-    top: 8px;
-    left: 8px;
-  }
-
   .menu-map-zoom {
     top: 8px;
     right: 8px;
@@ -301,7 +520,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .map-pin.mark-alert .map-pin-mark circle {
+  .map-pin.mark-alert .map-pin-mark circle,
+  .map-you-pulse {
     animation: none;
   }
 }
