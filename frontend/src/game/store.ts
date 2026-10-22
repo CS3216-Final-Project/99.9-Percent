@@ -71,7 +71,8 @@ import { checkpointCloud, localCloudCopy, rememberCloud } from "./cloud";
 import { loadExploration, saveExploration } from "./exploration";
 import { floorFromSearch, floorOf, type Floor, type FloorSwitch } from "./floors";
 import { DEFAULT_AVATAR, type AvatarId } from "./avatars";
-import { clampFov, fromAvatar, type Viewpoint, type ViewSwitch } from "./viewpoints";
+import { clampFov, fromAvatar, offeredViewpoint, type Viewpoint, type ViewSwitch } from "./viewpoints";
+import { isPhoneEdition } from "@/phone/edition";
 import { clampLookSpeed, DEFAULT_CONTROLS, type ControlSettings } from "./controls";
 
 export type View = "tech" | "engineers" | "history" | "menu" | "guidance" | "scorecard" | null;
@@ -482,9 +483,11 @@ export const useGame = create<Store>()((set, get) => {
     const overview = { walking: false, viewpoint: "overview" as const };
     if (typeof window !== "undefined" && floorFromSearch(window.location.search) !== null) return overview;
     const exploration = loadExploration(mode);
+    // A phone opens from above, where its layout is made to be read, and has no first person to come back to.
+    const phone = isPhoneEdition();
     const opened = !exploration.viewChosen
-      ? (tour ? overview : { walking: true, viewpoint: "first" as const })
-      : exploration.walking && exploration.floor === floor ? { walking: true, viewpoint: exploration.viewpoint } : overview;
+      ? (tour || phone ? overview : { walking: true, viewpoint: "first" as const })
+      : exploration.walking && exploration.floor === floor ? { walking: true, viewpoint: offeredViewpoint(exploration.viewpoint, phone) } : overview;
     // The walk is timed from here, like one the player starts.
     if (opened.walking) walkStart = performance.now();
     return opened;
@@ -870,8 +873,9 @@ export const useGame = create<Store>()((set, get) => {
       if (remember) saveExploration(get().mode, { floor: get().floor, walking: on, viewChosen: true, ...(on ? {} : { viewpoint: "overview" as const }) });
     },
     viewpoint: "overview",
-    setViewpoint: (v, how) => {
+    setViewpoint: (asked, how) => {
       const s = get();
+      const v = offeredViewpoint(asked, isPhoneEdition());
       if (!s.started) return;
       if (fromAvatar(v) && !s.walking) s.setWalking(true);
       const from = get().viewpoint;

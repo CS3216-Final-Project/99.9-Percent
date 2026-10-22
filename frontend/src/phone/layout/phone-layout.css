@@ -208,6 +208,8 @@
 /* The whole row opens the overview; Next stays its own target above it. */
 .phone-app[data-edition="phone"] .phone-top .phone-chapter-open { position: static; width: 40px; height: 40px; background: transparent; color: var(--on-night); border-color: transparent; }
 .phone-app[data-edition="phone"] .phone-chapter-open::after { content: ""; position: absolute; inset: 0; }
+/* Hint belongs to Guided Mode, so it lives in the chapter row and leaves the strip's width to Cash and App Health. */
+.phone-app[data-edition="phone"] .phone-chapter-row .campaign-hint { position: relative; z-index: 1; flex: none; width: 44px; height: 44px; background: transparent; color: var(--go); border-color: transparent; }
 .phone-app[data-edition="phone"] .phone-chapter-open:focus-visible::after { outline: 3px solid var(--focus); outline-offset: -3px; border-radius: 8px; }
 .phone-app[data-edition="phone"] .phone-chapter-row .chapter-advance {
   position: relative;

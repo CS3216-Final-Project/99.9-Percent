@@ -11,7 +11,7 @@ const controlledPages = new WeakSet<Page>();
 type ClockOptions = Parameters<Page["clock"]["install"]>[0];
 
 // Unhandled browser errors fail each case. Journeys that call withoutRoom() skip the WebGL scene; the rest draw it.
-export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; recoveryNotices: void; reviewRecoveryNotice: boolean; companyMessages: void; reviewCompanyMessage: boolean; overviewChosen: boolean; chosenView: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
+export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; recoveryNotices: void; reviewRecoveryNotice: boolean; companyMessages: void; reviewCompanyMessage: boolean; overviewChosen: boolean; chosenView: void; edition: 'auto' | 'desktop' | 'phone'; editionAddress: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
   // Unrelated journeys dismiss optional narrative, while dedicated introduction tests opt out.
   reviewCompanyMessage: [true, { option: true }],
   companyMessages: [async ({ page, reviewCompanyMessage }, use) => {
@@ -48,6 +48,24 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
           if (localStorage.getItem(key) === null) localStorage.setItem(key, JSON.stringify({ version: 1, floor: 'servers', walking: false, viewpoint: 'overview', viewChosen: true, avatar: null, camera: null }));
         }
       });
+    }
+    await use();
+  }, { auto: true }],
+  /**
+   * Which edition the page plays. 'auto' lets the device decide (a touch phone gets the phone edition); a journey about
+   * one edition's layout pins it with test.use({ edition }), the way a player would with ?edition= in the address.
+   * The address is set before the game reads it, and a reload keeps it.
+   */
+  edition: ['auto', { option: true }],
+  editionAddress: [async ({ context, edition }, use) => {
+    if (edition !== 'auto') {
+      await context.addInitScript(chosen => {
+        const address = new URL(location.href);
+        if (address.protocol.startsWith('http') && address.searchParams.get('edition') !== chosen) {
+          address.searchParams.set('edition', chosen);
+          history.replaceState(history.state, '', address);
+        }
+      }, edition);
     }
     await use();
   }, { auto: true }],
@@ -121,7 +139,7 @@ export async function savedGame(page: Page): Promise<GameState> {
 export async function expectRoom(page: Page, timeout?: number) {
   const room = page.getByRole('main');
   const canvas = room.locator('canvas');
-  await expect(canvas).toBeVisible();
+  await expect(canvas).toBeVisible({ timeout });
   // A visible canvas alone does not prove that WebGL initialized successfully.
   await expect.poll(() => canvas.evaluate(el => {
     const gl = (el as HTMLCanvasElement).getContext('webgl2');

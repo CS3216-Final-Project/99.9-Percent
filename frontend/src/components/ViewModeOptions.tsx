@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import { useGame } from "@/game/store";
-import type { Viewpoint } from "@/game/viewpoints";
+import { PHONE_VIEWPOINTS, type Viewpoint } from "@/game/viewpoints";
+import { useEdition } from "@/phone/editionContext";
 import { Icon, type IconName } from "./icons";
 
 /** The ways to see the room: from above with walk mode off or on, or from the avatar, which turns walk mode on. */
@@ -15,8 +16,10 @@ const OPTIONS: { walk: boolean; view: Viewpoint; label: string; note: string; ic
 export function ViewModeOptions({ stage }: { stage: RefObject<HTMLDivElement | null> }) {
   const walking = useGame(s => s.walking);
   const viewpoint = useGame(s => s.viewpoint);
+  const phone = useEdition() === "phone";
+  const options = phone ? OPTIONS.filter(option => PHONE_VIEWPOINTS.includes(option.view)) : OPTIONS;
   return <div className="view-mode-options" role="group" aria-label="View mode">
-    {OPTIONS.map(option =>
+    {options.map(option =>
       <button type="button" key={option.label} aria-label={option.label} aria-pressed={walking === option.walk && (!walking || viewpoint === option.view)}
         onClick={event => {
           const s = useGame.getState();

@@ -175,9 +175,11 @@ The Menu holds the run card, Resume, the mode switch and only the Run, Sound and
 
 The room gets most of the screen.
 A 52 px top strip shows Cash and App Health with their icons, sound and Menu; Users and pending revenue sit behind one tap, with pending revenue still marked as not cash yet.
-Guided Mode adds a one-line chapter row with the chapter, goal and Next.
+Guided Mode adds a one-line chapter row with the chapter, goal, Next and Hint, so the strip keeps its width for Cash and App Health.
 System metrics is a bottom sheet over the room with peek, half and full states, changed by its handle button, a swipe or the arrow keys; selecting equipment opens it to half and an incident keeps it at least half open.
 The canvas never resizes when the sheet moves.
+Phones walk from above or behind the avatar: View mode offers Overview, Walk mode and Follow, the V key goes round those, and a remembered first person opens as Follow.
+The room has no round minimap on a phone; the Menu's building map stays.
 The dock is one 56 px row: views, Navigation, the clock, the speed menu (which also holds the time steps) and the primary time action, with every target at least 44 px.
 
 Chapter 0 and the later guides use a fixed coach strip directly above the dock, with the same box and Back/Next positions in every lesson.

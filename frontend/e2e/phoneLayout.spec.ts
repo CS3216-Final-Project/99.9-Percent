@@ -37,7 +37,8 @@ async function openGuided(page: Page, size: { width: number; height: number }, g
   await seedSave(page, game);
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
-  await expect(handle(page)).toBeVisible();
+  // The phone shell loads on demand and a Company Message may open first, so the first paint gets a longer budget.
+  await expect(handle(page)).toBeVisible({ timeout: 30_000 });
 }
 
 async function openChallenge(page: Page, size: { width: number; height: number }) {
@@ -48,7 +49,8 @@ async function openChallenge(page: Page, size: { width: number; height: number }
   await seedClassicSave(page, advanceTurn(newLegacyGame(1)));
   await page.goto("/");
   await page.getByRole("button", { name: /^Continue week/ }).tap();
-  await expect(handle(page)).toBeVisible();
+  // The phone shell loads on demand and a Company Message may open first, so the first paint gets a longer budget.
+  await expect(handle(page)).toBeVisible({ timeout: 30_000 });
 }
 
 for (const size of [{ width: 390, height: 844 }, { width: 360, height: 640 }]) {
@@ -235,4 +237,32 @@ test("Challenge Mode: equipment and weekly operations share the sheet, and the v
   await tree.getByRole("button", { name: "Close", exact: true }).tap();
   await expect(tree).toBeHidden();
   await expectNoHorizontalOverflow(page);
+});
+
+for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) test(`Hint in the chapter row leads to the action on a ${size.width}px phone`, async ({ page, installClock }, info) => {
+  await installClock();
+  const game = advanceSteps(newGame(), 6).state;
+  await openGuided(page, size, game);
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
+  // Hint sits in the Guided Mode chapter row, so the strip keeps Cash and App Health readable at 320px.
+  const row = page.locator(".phone-chapter-row");
+  const hint = row.getByRole("button", { name: "Hint", exact: true });
+  await expect(hint).toBeInViewport({ ratio: 1 });
+  for (const name of ["View finances", "View app health"]) {
+    const value = page.locator(".phone-top").getByRole("button", { name }).locator(".stat-body > strong");
+    expect(await value.evaluate(el => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+  }
+  await hint.tap();
+  const card = page.getByRole("dialog", { name: "Hint", exact: true });
+  await expect(card).toBeInViewport({ ratio: 1 });
+  await expect(card).toContainText("Your database is overloaded");
+  await card.getByRole("button", { name: "Got it" }).tap();
+  // An incident holds the sheet half open, so the gold mark lands on the action itself.
+  await expect(handle(page)).toHaveAttribute("aria-expanded", "true");
+  const target = page.locator(".campaign-gold-attention");
+  await expect(target).toHaveCount(1);
+  await expect(target).toHaveAccessibleName(/^Upgrade database/);
+  await expect(target).toBeInViewport({ ratio: 1 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: info.outputPath(`hint-phone-${size.width}.png`) });
 });

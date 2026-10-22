@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import { useGame } from "@/game/store";
+import { CampaignHintButton } from "@/components/CampaignAttention";
 import { ChapterOverview } from "@/components/CampaignChapters";
 import { useChapterBar } from "@/components/useChapterBar";
 import { Icon } from "@/components/icons";
@@ -30,6 +31,7 @@ export function PhoneChapterRow() {
       {advance && <button type="button" className={`btn btn-primary chapter-advance${advance.ready ? "" : " is-waiting"}`}
         aria-disabled={!advance.ready} aria-label={`Next: ${advance.label}`} aria-describedby={reason ? reasonId : undefined} {...tipProps(advance.label)}
         onClick={() => advance.ready ? useGame.getState().act(advance.action) : setWhy(!why)}>Next<Icon name="next" size={16} /></button>}
+      <CampaignHintButton />
       <button type="button" className="icon-btn phone-chapter-open" aria-haspopup="dialog" aria-label="View chapters" {...tipProps("View chapters")} onClick={() => {
         useGame.getState().setRunning(false);
         setOpen(true);

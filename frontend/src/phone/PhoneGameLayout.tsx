@@ -1,3 +1,4 @@
+import { CampaignAttentionHost } from "@/components/CampaignAttention";
 import { RoomControlsHost } from "@/components/RoomControlsHost";
 import { Room } from "@/components/Game";
 import { useAppClassName } from "@/components/useGameRuntime";
@@ -31,7 +32,7 @@ export function PhoneGameLayout() {
   const className = useAppClassName();
   const chapters = useGame((s) => s.started && !!s.game.campaign);
   const sheet = shownSheetState(useSheetState(), useGame((s) => s.game.phase === "incident"));
-  return <RoomControlsHost><div className={`${className} phone-app`} data-edition="phone" data-sheet={sheet} data-chapters={chapters || undefined}>
+  return <RoomControlsHost><CampaignAttentionHost><div className={`${className} phone-app`} data-edition="phone" data-sheet={sheet} data-chapters={chapters || undefined}>
     <PhoneTopStrip />
     <main className="stage">
       <Room />
@@ -40,5 +41,5 @@ export function PhoneGameLayout() {
     <PhoneDock />
     <PhoneOverlays />
     <PhoneCoach />
-  </div></RoomControlsHost>;
+  </div></CampaignAttentionHost></RoomControlsHost>;
 }

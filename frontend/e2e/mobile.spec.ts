@@ -18,6 +18,10 @@ import { spikeCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
 import { expectCueColours, chapter4TrafficTarget } from "./chapter4Cues";
 import { companyMessageJourney } from "./companyMessages";
 
+// These journeys cover the desktop edition's narrow touch layout, which narrow windows and the full campaign still use.
+// A phone plays its own edition, covered by phoneLayout.spec.ts and phoneTutorial.spec.ts.
+test.use({ edition: "desktop" });
+
 test.describe("Company messages on touch", () => {
   test.use({reviewCompanyMessage:false});
   for (const width of [390,320]) test(`company message: Chapter 4 queues stage guidance at ${width}px touch`, async ({page}, info) => {

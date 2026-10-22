@@ -16,19 +16,21 @@ for (const width of [1440, 390]) {
     await page.goto("/");
     await page.getByRole("button", { name: "Continue week 1", exact: true }).tap();
     await expectRoom(page);
+    // A 390px touch screen is a phone: the weekly work lives in the System metrics sheet over the room.
+    const phone = width === 390;
+    const handle = page.getByRole("button", { name: "System metrics", exact: true });
+    if (phone) await handle.tap();
     const operations = page.getByRole("complementary", { name: "Operations" });
+    await expect(operations).toBeVisible();
     const roomBox = await page.getByRole("main").boundingBox();
     const railBox = await operations.boundingBox();
     expect(roomBox).not.toBeNull();
     expect(railBox).not.toBeNull();
-    if (width === 390) {
-      expect(railBox!.y).toBeGreaterThanOrEqual(roomBox!.y + roomBox!.height - 1);
-      await operations.getByRole("button", { name: /Operations/ }).tap();
-      const expandedRoom = await page.getByRole("main").boundingBox();
-      const expandedRail = await operations.boundingBox();
-      expect(expandedRail!.y).toBeGreaterThanOrEqual(expandedRoom!.y + expandedRoom!.height - 1);
-      expect(expandedRoom!.height).toBeGreaterThan(300);
-      expect(expandedRail!.height).toBeLessThanOrEqual(page.viewportSize()!.height * 0.3 + 1);
+    if (phone) {
+      const sheet = (await page.locator(".phone-sheet").boundingBox())!;
+      expect(railBox!.y).toBeGreaterThanOrEqual(sheet.y - 1);
+      // The half sheet leaves the room at least 40% of the screen.
+      expect(sheet.y).toBeGreaterThanOrEqual(page.viewportSize()!.height * 0.4);
     } else {
       expect(railBox!.x).toBe(0);
       expect(roomBox!.x).toBeGreaterThanOrEqual(railBox!.x + railBox!.width);
@@ -48,7 +50,7 @@ for (const width of [1440, 390]) {
     await expect(tracker).toContainText("1 wk left");
     await page.reload();
     await page.getByRole("button", { name: "Continue week 2", exact: true }).tap();
-    if (width === 390) await operations.getByRole("button", { name: /Operations/ }).tap();
+    if (phone) await handle.tap();
     await expect(tracker).toContainText("1 wk left");
     await page.getByRole("button", { name: "Next week", exact: true }).tap();
     await expect(tracker).toContainText("Ready to ship");
@@ -60,16 +62,12 @@ for (const width of [1440, 390]) {
     await expect(tracker.getByText("Ready to ship")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `test-results/work-tracker-${width}.png` });
-    if (width === 390) {
-      await operations.getByRole("button", { name: /Operations/ }).tap();
+    if (phone) {
+      // Back to peek: the sheet folds away and the room is whole again.
+      await handle.focus();
+      await page.keyboard.press("Home");
+      await expect(handle).toHaveAttribute("aria-expanded", "false");
       await expect(tracker).toBeHidden();
-      await expect(operations).toContainText("2 tasks");
-      // Wait for WebGL's ResizeObserver to follow the restored room height.
-      await expect.poll(() => page.locator("canvas").evaluate((element) => {
-        const canvas = element as HTMLCanvasElement;
-        const box = canvas.getBoundingClientRect();
-        return Math.abs(canvas.width / canvas.height - box.width / box.height);
-      })).toBeLessThan(0.02);
       await page.screenshot({ path: "test-results/operations-mobile-collapsed.png" });
     }
   });
