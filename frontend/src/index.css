@@ -933,10 +933,51 @@ button:disabled {
   font-weight: 700;
 }
 
+/* A chatting group the avatar is near enough to hear, captioned like a subtitle above the walk prompt. */
+.overheard {
+  position: absolute;
+  left: 50%;
+  bottom: 112px;
+  z-index: 25;
+  max-width: min(560px, calc(100% - 32px));
+  margin: 0;
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--press);
+  font-family: var(--font-display);
+  text-align: center;
+  pointer-events: none;
+}
+
+.overheard-where {
+  display: block;
+  font-size: var(--text-xs);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .7;
+}
+
+.overheard q {
+  font-size: var(--text-sm);
+  font-style: italic;
+}
+
+.overheard.is-alarmed q {
+  color: var(--critical-ink);
+}
+
 /* On a phone the floor menu and camera buttons fill the bottom corner, so what is within reach shows at the top. */
 @media (max-width: 900px) {
   .walk-prompt {
     top: 10px;
+    bottom: auto;
+  }
+  .overheard {
+    top: 56px;
     bottom: auto;
   }
 }

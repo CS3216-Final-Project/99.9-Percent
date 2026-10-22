@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ALL_ROLES, ALL_SPECIES, CLIPS, creature, motionFor, SPECIES, standsAtDesk, type Activity, type Kind } from './cast';
+import { ALL_ROLES, ALL_SPECIES, CLIPS, creature, motionFor, roleOf, SPECIES, standsAtDesk, type Activity, type Kind } from './cast';
 
-const ACTIVITIES: Activity[] = ['type', 'relax', 'mug', 'laptop', 'idle', 'chat', 'walk', 'listen', 'present', 'panic', 'play', 'doze'];
+const ACTIVITIES: Activity[] = ['type', 'relax', 'mug', 'laptop', 'idle', 'chat', 'walk', 'listen', 'present', 'panic', 'play', 'doze', 'greet'];
 
 /** The animation names inside a GLB file, without the armature prefix. */
 function clipsInFile(file: string): string[] {
@@ -23,6 +23,10 @@ describe('the crew', () => {
 
   it('casts every role with a known species', () => {
     for (const role of ALL_ROLES) for (let n = 0; n < 12; n++) expect(ALL_SPECIES).toContain(creature(n, role));
+  });
+
+  it('names the role every species plays', () => {
+    for (const role of ALL_ROLES) for (let n = 0; n < 12; n++) expect(roleOf(creature(n, role))).toBe(role);
   });
 
   it('puts different species at neighbouring desks', () => {

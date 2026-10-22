@@ -186,6 +186,28 @@ function burst(ctx: Ctx, out: AudioNode, at: number, hiss: AudioBuffer, hz: numb
 }
 
 /**
+ * A few speech-like syllables in one clearer voice than the murmur: a sawtooth per syllable through a bandpass
+ * "vowel", a tiny consonant at each start, all softened through a lowpass. The second syllable rises a little, so a
+ * two-syllable bark reads as a friendly "hello?".
+ */
+function syllables(ctx: Ctx, out: AudioNode, at: number, hiss: AudioBuffer, parts: readonly (readonly [number, number, number, number])[], cutoff: number): void {
+  const room = filter(ctx, "lowpass", cutoff);
+  room.connect(out);
+  parts.forEach(([delay, hz, formant, length], i) => {
+    const t = at + delay;
+    const vowel = filter(ctx, "bandpass", formant);
+    vowel.Q.value = 1.6;
+    const o = osc(ctx, "sawtooth", hz, t, t + length);
+    if (i === 1) {
+      o.frequency.setValueAtTime(hz, t);
+      o.frequency.linearRampToValueAtTime(hz * 1.08, t + length);
+    }
+    o.connect(envelope(ctx, t, length, 0.18, 0.03, 0.07)).connect(vowel).connect(room);
+    burst(ctx, room, t, hiss, formant * 1.8, Math.min(0.045, length), hit(ctx, t, 0.18 * 0.35, 0.035));
+  });
+}
+
+/**
  * The sounds of the office's zones, heard clearly up close near where they are heard (see scene/zoneSounds.ts). They are
  * not game events, so they have no place among the cues above and never compete with them.
  */
@@ -346,7 +368,8 @@ export const LIFT_CUES = Object.keys(LIFT_VOICES) as LiftCue[];
 
 /**
  * Sounds of walking the building: footsteps on carpet, on tile or concrete and on the server hall's raised floor;
- * the hiss of a glass door sliding; and the pop of a new avatar arriving.
+ * the hiss of a glass door sliding; the pop of a new avatar arriving; and the crew's own voices, a short bark each
+ * in the register of its body plan, for a hello or a word overheard (see scene/greetings.ts).
  */
 const SCENE_VOICES = {
   stepSoft: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 320, 0.07, hit(ctx, at, 0.22, 0.06)),
@@ -374,6 +397,29 @@ const SCENE_VOICES = {
     o.frequency.exponentialRampToValueAtTime(420, at + 0.12);
     o.connect(hit(ctx, at, 0.3, 0.14)).connect(out);
     osc(ctx, "triangle", 1320, at + 0.05, at + 0.14).connect(hit(ctx, at + 0.05, 0.08, 0.08)).connect(out);
+  },
+  /** The small round species: a quick, high two-syllable chirp. */
+  voiceBlob: (ctx, out, at, hiss) =>
+    syllables(ctx, out, at, hiss, [
+      [0, 235, 950, 0.11],
+      [0.14, 270, 1250, 0.13],
+    ] as const, 2600),
+  /** The big two-legged species: a low, slow two-syllable rumble. */
+  voiceBig: (ctx, out, at, hiss) =>
+    syllables(ctx, out, at, hiss, [
+      [0, 105, 520, 0.18],
+      [0.23, 92, 700, 0.2],
+    ] as const, 1300),
+  /** The hovering flyer: a buzz that wobbles, not syllables. */
+  voiceFlyer: (ctx, out, at) => {
+    const bp = filter(ctx, "bandpass", 1400);
+    bp.Q.value = 1.2;
+    const o = osc(ctx, "sawtooth", 180, at, at + 0.3);
+    const wobble = osc(ctx, "sine", 28, at, at + 0.3);
+    const depth = ctx.createGain();
+    depth.gain.value = 40;
+    wobble.connect(depth).connect(o.detune);
+    o.connect(bp).connect(envelope(ctx, at, 0.3, 0.16, 0.04, 0.1)).connect(out);
   },
 } satisfies Record<string, Voice>;
 
