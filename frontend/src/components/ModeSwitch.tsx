@@ -12,11 +12,17 @@ const ABOUT: Record<GameMode, string> = {
 };
 const NAME: Record<GameMode, string> = { campaign: "Guided Mode", classic: "Challenge Mode" };
 
-/** The menu section that switches to the other mode, asking first when the current run cannot be saved. */
-export function ModeSwitch({ to }: { to: GameMode }) {
+/**
+ * The menu section that switches to the other mode, asking first when the current run cannot be saved.
+ * Another edition can pass its own lock and wording; by default Challenge Mode stays locked until the Guided Mode
+ * company acknowledges its final chapter.
+ */
+export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Complete the first five Guided Mode chapters to unlock Challenge Mode.", lockedLabel = "Complete Guided Mode to unlock", about = ABOUT[to] }: {
+  to: GameMode; locked?: boolean; lockedText?: string; lockedLabel?: string; about?: string;
+}) {
   const switchMode = useGame((s) => s.switchMode);
-  // Challenge Mode stays locked until the Guided Mode company acknowledges its final chapter.
-  const locked = useGame((s) => to === "classic" && s.mode !== "classic" && !s.meta.challengeUnlocked && s.game.campaign?.reliabilityStage?.acknowledged !== true);
+  const defaultLocked = useGame((s) => to === "classic" && s.mode !== "classic" && !s.meta.challengeUnlocked && s.game.campaign?.reliabilityStage?.acknowledged !== true);
+  const locked = lockedOverride ?? defaultLocked;
   const [unsaved, setUnsaved] = useState(false);
   const from: GameMode = to === "campaign" ? "classic" : "campaign";
   return (
@@ -26,15 +32,15 @@ export function ModeSwitch({ to }: { to: GameMode }) {
         Game mode
       </h4>
       <p className="menu-note">
-        You are playing {NAME[from]}. {ABOUT[to]} Each mode keeps its own saved run.
+        You are playing {NAME[from]}. {about} Each mode keeps its own saved run.
       </p>
       {locked ? (
         <>
-          <p className="menu-note">Complete the first five Guided Mode chapters to unlock Challenge Mode.</p>
+          <p className="menu-note">{lockedText}</p>
           <div className="menu-actions">
             <button type="button" className="btn" disabled>
               <Icon name="lock" size={20} />
-              Complete Guided Mode to unlock
+              {lockedLabel}
             </button>
           </div>
         </>

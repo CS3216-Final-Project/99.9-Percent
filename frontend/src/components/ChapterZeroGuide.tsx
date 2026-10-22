@@ -1,27 +1,22 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { useGame } from "@/game/store";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { LessonId } from "@/game/walkthrough";
 import { Icon } from "./icons";
 import LessonVisual from "./ChapterZero";
-import { confirmingAction, confirmationCancelCount, setConfirming, subscribeConfirming } from "./actionConfirmation";
 import type { ChapterZeroLesson } from "./chapterZeroLessons";
-import { useChapterZeroControls } from "./useChapterZeroControls";
+import { useChapterZeroLesson } from "./useChapterZeroLesson";
 import { cardStyle, placeFor, useTargetBox } from "./spotlight";
 import "./ChapterZero.css";
 
-/** Lessons whose Next waits for the real exercise; the rest are read and continued. */
-const REQUIRED = new Set<LessonId>(["inspect-app", "inspect-db", "run", "quote", "cancel", "speed"]);
 /** The short label pinned to the lit control. */
 const CTA: Partial<Record<LessonId, string>> = { "inspect-app": "Click", "inspect-db": "Click", run: "Press Run", quote: "Open one", cancel: "Cancel", speed: "Change speed" };
 const KEYS: Partial<Record<LessonId, ReactNode>> = {
   run: <><kbd className="lesson-keycap">P</kbd> also runs and pauses.</>,
   speed: <><kbd className="lesson-keycap">Q</kbd> / <kbd className="lesson-keycap">E</kbd> rotate the view; <kbd className="lesson-keycap" aria-label="Page Up">PgUp</kbd> / <kbd className="lesson-keycap" aria-label="Page Down">PgDn</kbd> switch floors.</>,
 };
-/** Exercises that open the next lesson as soon as they are done. Inspections wait for Next, so the readings can be read. */
-const AUTO = new Set<LessonId>(["run", "quote", "cancel", "speed"]);
 const CARD_WIDTH = 360;
 
-function LessonText({ text, terms = [] }: { text?: string; terms?: readonly string[] }) {
+/** A lesson's instruction with its key controls and concepts in bold. */
+export function LessonText({ text, terms = [] }: { text?: string; terms?: readonly string[] }) {
   if (!text || !terms.length) return text;
   const phrases = [...terms].sort((a, b) => b.length - a.length).map(term => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const parts = text.split(new RegExp(`\\b(${phrases.join("|")})\\b`, "gi"));
@@ -33,99 +28,12 @@ function LessonText({ text, terms = [] }: { text?: string; terms?: readonly stri
  * card next to that control says what to do. The game's own dialogs and keyboard controls keep working.
  */
 export default function ChapterZeroGuide({ lessons }: { lessons: readonly ChapterZeroLesson[] }) {
-  const s = useGame(), index = s.tour?.step ?? 0;
-  const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
-  const cancellations = useSyncExternalStore(subscribeConfirming, confirmationCancelCount);
-  const [readyFor, setReadyFor] = useState<number | null>(null);
-  const [completedThrough, setCompletedThrough] = useState(Math.max(index, s.meta.walkthroughFurthestStep ?? 0) - 1);
-  const entry = useRef({ index, speed: s.speed, cancellations });
   const card = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
   const [cardHeight, setCardHeight] = useState(260);
-  const lesson = lessons[index], id = lesson?.id;
-  const reviewed = index <= completedThrough;
-  const required = !!id && REQUIRED.has(id);
-  const ready = !required || reviewed || readyFor === index;
-  // A lesson finished just now moves on by itself; one revisited with Back waits for Next. An open Menu holds it.
-  const moving = !!id && AUTO.has(id) && !reviewed && readyFor === index && s.view !== "menu";
-  useChapterZeroControls(id, confirming);
-
-  useEffect(() => {
-    const now = useGame.getState();
-    entry.current = { index, speed: now.speed, cancellations: confirmationCancelCount() };
-    if (id !== "quote" && id !== "cancel") setConfirming(null);
-    if (id === "goal" || id === "inspect-app") now.select(null);
-    if (card.current) card.current.scrollTop = 0;
-    heading.current?.focus({ preventScroll: true });
-  }, [index, id]);
-
-  useEffect(() => {
-    if (entry.current.index !== index) return;
-    const done = id === "inspect-app" ? s.selected === "app"
-      : id === "inspect-db" ? s.selected === "db"
-      : id === "run" ? !!s.tour?.clockUntil && s.game.campaign!.step >= s.tour.clockUntil && !s.running
-      : id === "quote" ? !!confirming
-      : id === "cancel" ? cancellations > entry.current.cancellations && !confirming
-      : id === "speed" ? s.speed !== entry.current.speed
-      : false;
-    if (done) setReadyFor(index);
-  }, [index, id, confirming, cancellations, s.selected, s.speed, s.running, s.game.campaign, s.tour]);
-
-  // A reload or an earlier dismissal must never leave the Cancel instruction without a real quote.
-  useEffect(() => {
-    if (id !== "cancel" || confirming || readyFor === index || cancellations > entry.current.cancellations) return;
-    const control = document.querySelector('.campaign-panel .act:not(:disabled)') ?? document.querySelector('.campaign-panel .act');
-    const action = control?.closest('[data-campaign-action]')?.getAttribute('data-campaign-action');
-    if (action) setConfirming(action);
-  }, [id, index, confirming, cancellations, readyFor]);
-
-  const next = () => {
-    const now = useGame.getState(), step = now.tour?.step ?? 0;
-    setCompletedThrough(c => Math.max(c, step));
-    if (!(lessons[step]?.id === "quote" && confirmingAction())) now.openView(null);
-    if (step === lessons.length - 1) now.endTour(true); else now.tourNext();
-  };
-  const advance = useRef(next);
-  useEffect(() => { advance.current = next; });
-  useEffect(() => { if (moving) advance.current(); }, [moving]);
-
-  // Once a component is inspected, its readings are what the player should look at.
-  const inspected = id === "inspect-app" && s.selected === "app" || id === "inspect-db" && s.selected === "db";
-  const target = inspected ? '.campaign-evidence'
-    : id === "inspect-app" ? '[data-tutorial="inspect-app"]'
-    : id === "inspect-db" ? '[data-tutorial="inspect-db"]'
-    : id === "warnings" ? '.incident-symptoms'
-    : id === "run" ? '.campaign-play'
-    : id === "quote" ? confirming ? '.campaign-action-confirm' : '.campaign-panel .act:not(:disabled)'
-    : id === "cancel" ? confirming ? '.campaign-action-confirm .btn-row button:last-child' : null
-    : id === "money" ? '.stat-cash'
-    : id === "speed" ? '.campaign-clock .time-menu'
-    : null;
-  // The whole quote is lit while it is being read; its Cancel is what the ring points at.
-  const lit = id === "quote" || id === "cancel" ? confirming ? '.campaign-action-popover' : target : target;
+  const { s, index, lesson, id, confirming, required, ready, moving, inspected, target, lit, why, more, last, next } = useChapterZeroLesson(lessons, card, heading);
   // Floors are optional in the speed lesson: an open Navigation menu is lit instead, so the card stays clear of it.
   const { box, covered, viewport } = useTargetBox(id === "speed" ? ['.room-controls:has(details[open])', lit!] : lit);
 
-  useEffect(() => {
-    if (!target) return;
-    const el = document.querySelector<HTMLElement>(target);
-    if (!el) return;
-    el.classList.add("chapter-zero-target");
-    // A short screen shows little of the panel: the numbers themselves go to its top.
-    const shown = (inspected && window.innerHeight < 500 && el.querySelector<HTMLElement>(".evidence-rows")) || (lit && document.querySelector<HTMLElement>(lit)) || el;
-    let frame = 0;
-    // Readings start at the top of the panel, leaving the most room for the numbers.
-    const block = inspected ? "start" : shown === el && el.closest(".campaign-panel") ? "center" : "nearest";
-    const reveal = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => shown.scrollIntoView?.({ block, inline: "nearest" }));
-    };
-    // The room, responsive panel and local fonts can finish sizing after the first render.
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(reveal);
-    for (const node of [el, document.querySelector(".stage"), document.querySelector(".campaign-panel")]) if (node) observer?.observe(node);
-    reveal();
-    return () => { observer?.disconnect(); cancelAnimationFrame(frame); el.classList.remove("chapter-zero-target"); };
-  }, [target, lit, inspected, index]);
-  useEffect(() => () => setConfirming(null), []);
   // The card's height decides whether it fits above or below the lit control.
   useLayoutEffect(() => {
     const el = card.current;
@@ -138,8 +46,6 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
   }, [index, s.started]);
 
   if (!s.started || !lesson) return null;
-  const why = typeof lesson.why === "function" ? lesson.why(s) : lesson.why;
-  const more = typeof lesson.more === "function" ? lesson.more(s) : lesson.more;
   const task = id === "inspect-app" ? ready ? "Read its demand and capacity, then press Next." : "Click App Server under Inspect equipment."
     : id === "inspect-db" ? ready ? "Compare its numbers with the App Server's, then press Next." : "Now click Database and compare."
     : id === "warnings" ? "Find Latency, Errors and Backlog in the panel."
@@ -149,7 +55,6 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
     : id === "money" ? "Cash is in the top bar."
     : id === "speed" ? "Open the speed menu and pick another speed."
     : null;
-  const last = index === lessons.length - 1;
   // A real dialog over the game (Menu, Finance) has the player's attention; the guide waits behind it.
   // Menu and sound stay reachable above a card docked to the top of a phone.
   const topbar = typeof document === "undefined" ? undefined : document.querySelector(".topbar")?.getBoundingClientRect().bottom;
