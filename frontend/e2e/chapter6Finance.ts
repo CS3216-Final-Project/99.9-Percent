@@ -14,7 +14,9 @@ export async function chapter6FinanceJourney(page: Page, info: TestInfo, touch =
   await expect(panel).toContainText("at most $7,200 per period but costs $7,600");
   const cash = page.getByRole("button", { name: "View finances", exact: true });
   const beforeBox = await cash.boundingBox();
-  await page.clock.runFor(10000);
+  // The company is paused: only the inactivity deadline needs to elapse.
+  // Avoid rendering 600 WebGL frames; cumulative simulation ticks are not involved.
+  await page.clock.fastForward(10000);
   const gold = page.locator(".campaign-gold-attention");
   await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("Hint");
   await press(gold);
