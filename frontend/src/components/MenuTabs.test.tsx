@@ -49,8 +49,8 @@ describe("menu tabs", () => {
     fireEvent.keyDown(tab("Playtest"), { key: "ArrowRight" });
     expect(tab("Run").getAttribute("aria-selected")).toBe("true");
     fireEvent.keyDown(tab("Run"), { key: "ArrowRight" });
-    expect(document.activeElement).toBe(tab("Sound"));
-    expect(screen.getByText("Showing sound")).toBeTruthy();
+    expect(document.activeElement).toBe(tab("Map"));
+    expect(screen.getByText("Showing map")).toBeTruthy();
   });
 
   it("jumps to the first and last tab with Home and End", () => {
@@ -64,7 +64,7 @@ describe("menu tabs", () => {
   it("puts Account between Saves and Playtest, and mounts it on click", () => {
     render(<Harness />);
     const names = screen.getAllByRole("tab").map((t) => t.textContent);
-    expect(names).toEqual(["Run", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]);
+    expect(names).toEqual(["Run", "Map", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]);
     fireEvent.click(tab("Account"));
     expect(screen.getByText("Showing account")).toBeTruthy();
   });
@@ -73,9 +73,9 @@ describe("menu tabs", () => {
     render(<Harness />);
     tab("Run").focus();
     fireEvent.keyDown(tab("Run"), { key: "ArrowDown" });
-    expect(tab("Sound").getAttribute("aria-selected")).toBe("true");
-    expect(document.activeElement).toBe(tab("Sound"));
-    fireEvent.keyDown(tab("Sound"), { key: "ArrowUp" });
+    expect(tab("Map").getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(tab("Map"));
+    fireEvent.keyDown(tab("Map"), { key: "ArrowUp" });
     expect(tab("Run").getAttribute("aria-selected")).toBe("true");
     fireEvent.keyDown(tab("Run"), { key: "ArrowRight", altKey: true });
     fireEvent.keyDown(tab("Run"), { key: "constructor" });

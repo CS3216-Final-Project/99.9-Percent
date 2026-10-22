@@ -13,6 +13,7 @@ import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
 import { MenuActions, MenuRun, MenuTile } from "./MenuRun";
+import { MenuMap } from "./MenuMap";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { ModeSwitch } from "./ModeSwitch";
 import { SaveFiles } from "./SaveFiles";
@@ -351,6 +352,8 @@ export function Menu() {
             <ModeSwitch to="campaign" />
           </>
         )}
+
+        {tab === "map" && <MenuMap />}
 
         {tab === "sound" && <SoundSettings />}
 

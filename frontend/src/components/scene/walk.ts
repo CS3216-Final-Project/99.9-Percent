@@ -1,10 +1,10 @@
 import type { Floor } from "@/game/floors";
 import type { EquipmentId } from "@/sim";
-import { ALL_RACKS, ELEVATOR_DOOR, ELEVATOR_SPOT, type FunProp, type Racks } from "./floorplan";
+import { ALL_RACKS, ELEVATOR_DOOR, ELEVATOR_SPOT, SPOTS, type FunProp, type Racks } from "./floorplan";
 import type { Footprint } from "./layout";
 import { blocked, findPath, gridOf, nearestFree, type Grid } from "./navgrid";
 import { facing, followPath, promptAt, slide, SPEED, steer, turnTowards, type Keys, type Prompt } from "./player";
-import { riding } from "./ride";
+import { ride, riding } from "./ride";
 
 /*
  * The player's avatar in walk mode, shared by the room that draws it and the controls on the page: where it stands,
@@ -96,6 +96,12 @@ export function jump(): boolean {
 export function resetJump(): void {
   avatar.lift = 0;
   avatar.vy = 0;
+}
+
+/** Where the maps draw and name the avatar: walking, where it walks; otherwise in the founder's chair upstairs. */
+export function avatarSpot(walking: boolean): { floor: Floor; x: number; z: number; yaw: number; to: Floor | null } {
+  if (!walking) return { floor: "office", x: SPOTS.founder.x, z: SPOTS.founder.z, yaw: SPOTS.founder.rot, to: null };
+  return { floor: avatar.floor, x: avatar.x, z: avatar.z, yaw: avatar.yaw, to: riding() ? ride.to : null };
 }
 
 /** Walk to (x, z) by the shortest way, or to the nearest free place to it; false if there is no way there. */
