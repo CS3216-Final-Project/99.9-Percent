@@ -77,6 +77,13 @@ const CASTING: Record<Role, Species[]> = {
 
 export const ALL_ROLES = Object.keys(CASTING) as Role[];
 
+/** The role a species is cast in; every species plays exactly one. */
+export function roleOf(species: Species): Role {
+  const role = ALL_ROLES.find((r) => CASTING[r].includes(species));
+  if (!role) throw new Error(`${species} is cast in no role`);
+  return role;
+}
+
 /** The roles people at desks and in passing cycle through, so neighbours differ. */
 const ROTATION: Role[] = ["dev", "data", "sre", "designer", "intern", "security", "dev", "marketer", "founder", "pm", "frontdesk"];
 
@@ -91,7 +98,7 @@ export function creature(n: number, role: Role = ROTATION[n % ROTATION.length]):
 /* What each activity looks like                                       */
 /* ------------------------------------------------------------------ */
 
-export type Activity = "type" | "relax" | "mug" | "laptop" | "idle" | "chat" | "walk" | "listen" | "present" | "panic" | "play" | "doze";
+export type Activity = "type" | "relax" | "mug" | "laptop" | "idle" | "chat" | "walk" | "listen" | "present" | "panic" | "play" | "doze" | "greet";
 
 /** The animations each body plan comes with. */
 export const CLIPS: Record<Kind, readonly string[]> = {
@@ -116,6 +123,7 @@ export function motionFor(kind: Kind, activity: Activity): Motion {
     if (activity === "walk") return { clip: "Fast_Flying", speed: 1 };
     if (activity === "play") return { clip: "Headbutt", speed: 1 };
     if (activity === "panic") return { clip: "No", speed: 1.3 };
+    if (activity === "greet") return { clip: "Yes", speed: 1.1 };
     if (activity === "listen" || activity === "chat") return { clip: "Yes", speed: 0.8 };
     if (activity === "doze") return { clip: "Flying_Idle", speed: 0.35 };
     return { clip: "Flying_Idle", speed: 1 };
@@ -133,6 +141,9 @@ export function motionFor(kind: Kind, activity: Activity): Motion {
       return kind === "big" ? { clip: "Wave", speed: 0.8 } : { clip: "Yes", speed: 0.9 };
     case "panic":
       return { clip: "No", speed: 1.3 };
+    case "greet":
+      // A hello: the small ones hop, the big ones wave.
+      return kind === "big" ? { clip: "Wave", speed: 0.9 } : { clip: "Jump", speed: 1 };
     case "play":
       // A swing: the big species swing an arm, the small ones lunge.
       return kind === "big" ? { clip: "Weapon", speed: 1 } : { clip: "Bite_Front", speed: 1 };

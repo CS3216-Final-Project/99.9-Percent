@@ -170,6 +170,26 @@ describe("sound effects", () => {
     sfx.dispose();
   });
 
+  it("voice the crew in their own registers: blobs higher than bigs, the flyer a buzz", () => {
+    const sfx = createSfx(() => true);
+    sfx.setVolume(80);
+    sfx.play("blip");
+    const ctx = FakeAudioContext.made[0];
+    const heard = (cue: "voiceBlob" | "voiceBig" | "voiceFlyer") => {
+      const before = ctx.oscillators.length;
+      sfx.playScene(cue, 0.4);
+      return ctx.oscillators.slice(before).map((o) => o.frequency.value);
+    };
+    const blob = heard("voiceBlob");
+    const big = heard("voiceBig");
+    const flyer = heard("voiceFlyer");
+    expect(blob.length).toBeGreaterThanOrEqual(2);
+    expect(big.length).toBeGreaterThanOrEqual(2);
+    expect(flyer.length).toBeGreaterThanOrEqual(2);
+    for (const hz of blob) for (const low of big) expect(hz).toBeGreaterThan(low);
+    sfx.dispose();
+  });
+
   it("do not repeat a cue inside its gap, but play different cues together", () => {
     let t = 1000;
     const sfx = createSfx(() => true, () => t);

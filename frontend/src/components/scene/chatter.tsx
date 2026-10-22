@@ -1,70 +1,131 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { useGame } from "@/game/store";
 import { SPECIES } from "./cast";
+import { SpeechBubble } from "./bubble";
 import { memberRotation, turnAt, type Group, type Turn } from "./conversations";
 import { Creature } from "./creatures";
-import { BUBBLE_CANVAS, bubbleTexture } from "./textures";
+import { asideLine, captionLine, earshot, fresh, glance, GREET_SECONDS, greetingLine, notices, voiceLevel, voiceOf } from "./greetings";
+import { overhear } from "./overheard";
+import { now, riding } from "./ride";
+import { heading, wrapAngle } from "./routes";
+import { avatar } from "./walk";
+import { sceneSound } from "./sceneSounds";
 
 /*
  * Groups of crew chatting (see conversations.ts), with a speech bubble over
- * whoever is speaking. Bubbles keep the same size on screen at any zoom and
- * hide when the office is zoomed too far out to read them. They are drawn over
- * everything and ignore the pointer, so clicks still reach the equipment.
+ * whoever is speaking. Seen from the avatar the bubbles are only legible
+ * within earshot (see greetings.ts): what the group says is captioned on the
+ * page and heard in the speaker's own voice, and right up close a member
+ * turns to the avatar with a word of its own.
  */
-
-/** A bubble's size on screen, in pixels. */
-const BUBBLE_PX = 190;
-/** Metres wide a bubble is, seen from the avatar. */
-const BUBBLE_WIDE = 1.3;
-/** Below this zoom the office is too small for bubbles to read. */
-const BUBBLE_MIN_ZOOM = 22;
-/** How far above a speaker's head the bubble's tail ends. */
-const ABOVE_HEAD = 0.12;
-const noRaycast = () => {};
-
-function SpeechBubble({ text, alarmed, height }: { text: string; alarmed: boolean; height: number }) {
-  const sprite = useRef<THREE.Sprite>(null);
-  const material = useMemo(
-    () => new THREE.SpriteMaterial({ map: bubbleTexture(text, alarmed), transparent: true, depthTest: false, depthWrite: false, toneMapped: false }),
-    [text, alarmed],
-  );
-  useEffect(() => () => material.dispose(), [material]);
-  useFrame(({ camera }) => {
-    const s = sprite.current;
-    if (!s) return;
-    // Seen from the avatar there is no zoom, and the bubble keeps a size of its own above the speaker.
-    const flat = (camera as THREE.OrthographicCamera).isOrthographicCamera === true;
-    const zoom = camera.zoom;
-    s.visible = !flat || zoom >= BUBBLE_MIN_ZOOM;
-    const w = flat ? BUBBLE_PX / zoom : BUBBLE_WIDE;
-    s.scale.set(w, (w * BUBBLE_CANVAS[1]) / BUBBLE_CANVAS[0], 1);
-  });
-  return <sprite ref={sprite} material={material} position={[0, height + ABOVE_HEAD, 0]} center={[0.5, 0]} renderOrder={1000} raycast={noRaycast} />;
-}
 
 /** A group chatting: the speaker talks while the rest listen, or panic during an incident. */
 export function Conversation({ group, incident }: { group: Group; incident: boolean }) {
   const [turn, setTurn] = useState<Turn>(() => turnAt(group, 0, incident));
   const shown = useRef(turn);
+  // An aside to the avatar, while its bubble shows and the member's turn lasts.
+  const [aside, setAside] = useState<{ member: number; line: string; at: number } | null>(null);
+  const asided = useRef<{ member: number; line: string; at: number; turn: number } | null>(null);
+  const asides = useRef(0);
+  const notice = useRef(fresh());
+  // How far the avatar is from the group's middle now, read every frame by the bubbles.
+  const heard = useRef(Infinity);
+  const lastOverheard = useRef<string | null>(null);
+  // The last line actually said, so the caption holds through the pause between speakers.
+  const lastLine = useRef<string | null>(null);
+  const members = useRef<(THREE.Group | null)[]>([]);
+
+  useEffect(() => () => overhear(group.name, null), [group.name]);
+
   useFrame(({ clock }) => {
+    const t = now();
+    const walking = useGame.getState().walking && avatar.floor === "office" && !riding();
+    const d = walking ? Math.hypot(avatar.x - group.centre[0], avatar.z - group.centre[1]) : Infinity;
+    heard.current = d;
+
     const next = turnAt(group, clock.elapsedTime, incident);
+    if (walking && next.line && (next.speaker !== shown.current.speaker || next.line !== shown.current.line)) {
+      // Each new line is heard in the speaker's voice.
+      const level = voiceLevel(d);
+      if (level > 0.01) sceneSound(voiceOf(SPECIES[group.members[next.speaker].species].kind), level);
+    }
     // Only a new speaker or line needs React.
     if (next.speaker !== shown.current.speaker || next.line !== shown.current.line) {
       shown.current = next;
       setTurn(next);
     }
+    // The caption on the page repeats what can be followed from here, holding the last line through the pause
+    // between speakers; publish it only when it changes. Out of earshot the stale line is forgotten, so the next
+    // approach does not start on it.
+    const audible = walking && earshot(d) >= 0.5;
+    if (next.line) lastLine.current = next.line;
+    if (!audible) lastLine.current = null;
+    const line = captionLine(next.line, lastLine.current, audible);
+    const caption = audible && line ? { where: group.name, line, alarmed: incident } : null;
+    const key = caption ? `${caption.line}${caption.alarmed}` : null;
+    if (key !== lastOverheard.current) {
+      lastOverheard.current = key;
+      overhear(group.name, caption);
+    }
+
+    // An aside: right up close, the member nearest the avatar turns and says a word to it.
+    if (asided.current && t - asided.current.at >= GREET_SECONDS) {
+      asided.current = null;
+      setAside(null);
+    }
+    if (walking) {
+      let nearest = -1;
+      let nd = Infinity;
+      group.members.forEach((m, i) => {
+        const dm = Math.hypot(avatar.x - m.x, avatar.z - m.z);
+        if (dm < nd) {
+          nearest = i;
+          nd = dm;
+        }
+      });
+      if (nearest >= 0 && notices(notice.current, nd, t)) {
+        asides.current++;
+        const m = group.members[nearest];
+        const turnTo = wrapAngle(heading(avatar.x - m.x, avatar.z - m.z) - memberRotation(group, nearest));
+        sceneSound(voiceOf(SPECIES[m.species].kind), voiceLevel(nd));
+        const n = asides.current + Math.round(group.offset * 10);
+        const a = { member: nearest, line: incident ? greetingLine(m.species, "panic", n) : asideLine(n), at: t, turn: turnTo };
+        asided.current = a;
+        setAside({ member: a.member, line: a.line, at: a.at });
+      }
+    }
+    // Turn each member to the group, the one giving an aside towards the avatar while it lasts.
+    group.members.forEach((_, i) => {
+      const g = members.current[i];
+      if (!g) return;
+      const extra = asided.current?.member === i ? asided.current.turn * glance(t - asided.current.at) : 0;
+      g.rotation.y = memberRotation(group, i) + extra;
+    });
   });
+
   return (
     <group>
       {group.members.map((m, i) => {
         const speaking = i === turn.speaker;
+        const asideHere = aside && aside.member === i ? aside : null;
         return (
-          <group key={i} position={[m.x, 0, m.z]}>
-            <Creature species={m.species} activity={speaking ? "chat" : incident ? "panic" : "idle"} position={[0, 0, 0]} rotation={memberRotation(group, i)} phase={i * 2.3 + group.offset} />
-            {speaking && turn.line && <SpeechBubble text={turn.line} alarmed={incident} height={SPECIES[m.species].height} />}
+          <group
+            key={i}
+            ref={(g) => {
+              members.current[i] = g;
+            }}
+            position={[m.x, 0, m.z]}
+          >
+            <Creature species={m.species} activity={asideHere ? (incident ? "panic" : "greet") : speaking ? "chat" : incident ? "panic" : "idle"} position={[0, 0, 0]} rotation={0} phase={i * 2.3 + group.offset} greets={false} />
+            {asideHere ? (
+              <SpeechBubble text={asideHere.line} alarmed={incident} height={SPECIES[m.species].height} />
+            ) : (
+              speaking && turn.line && <SpeechBubble text={turn.line} alarmed={incident} height={SPECIES[m.species].height} opacity={() => earshot(heard.current)} />
+            )}
           </group>
         );
       })}
