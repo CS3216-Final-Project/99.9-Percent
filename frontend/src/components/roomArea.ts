@@ -26,7 +26,7 @@ export function confirmationRoomArea(stage: DOMRect, sheet: boolean) {
   const cardWidth = Math.min(sheet ? 420 : 320, right-left);
   const cardLeft = sheet ? (left+right-cardWidth)/2 : left;
   const cardRight = cardLeft+cardWidth;
-  for (const node of document.querySelectorAll<HTMLElement>(".bottombar, .floor-menu, .camera-buttons, .walk-prompt")) {
+  for (const node of document.querySelectorAll<HTMLElement>(".bottombar, .floor-menu, .camera-buttons, .walk-prompt, .phone-coach")) {
     // Closed disclosures can retain measurable descendant boxes, although none are painted.
     if (node.closest("details:not([open])") || !node.getClientRects().length || getComputedStyle(node).visibility==="hidden") continue;
     const box = node.getBoundingClientRect();

@@ -4,8 +4,16 @@ import type { LessonId } from "@/game/walkthrough";
 const CONTROLS = 'button, a, input, select, textarea, summary, [tabindex], canvas';
 const ALWAYS = '.chapter-zero-guide, .music-btn, .menu-btn, .modal-backdrop:has(> .modal-menu)';
 
+/** What a presentation of the guide adds to the boundary. The desktop card adds nothing. */
+export interface ChapterZeroControlOptions {
+  /** Controls of the presentation's own that stay usable in every lesson, such as a phone's sheet handle. */
+  always?: string;
+  /** Where Escape belongs to the presentation (for example to close its reading layer) instead of being stopped. */
+  escapeWithin?: string;
+}
+
 /** The walkthrough enables real controls for the current lesson, without changing their game rules. */
-export function useChapterZeroControls(lesson: LessonId | undefined, quote: string | null) {
+export function useChapterZeroControls(lesson: LessonId | undefined, quote: string | null, { always, escapeWithin }: ChapterZeroControlOptions = {}) {
   const scope = lesson === "inspect-app" ? '[data-tutorial="inspect-app"], .campaign-evidence'
     : lesson === "inspect-db" ? '[data-tutorial="inspect-app"], [data-tutorial="inspect-db"], .campaign-evidence'
     : lesson === "warnings" ? '.stat-health, .app-health-dashboard'
@@ -19,7 +27,8 @@ export function useChapterZeroControls(lesson: LessonId | undefined, quote: stri
   const moving = lesson === "speed";
 
   useLayoutEffect(() => {
-    const selector = scope ? `${ALWAYS}, ${scope}` : ALWAYS;
+    const base = always ? `${ALWAYS}, ${always}` : ALWAYS;
+    const selector = scope ? `${base}, ${scope}` : base;
     const allowed = (el: Element) => !!el.closest(selector);
     const changed = new Map<HTMLElement, { aria: string | null; tab: string | null }>();
     const restore = (el: HTMLElement, before: { aria: string | null; tab: string | null }) => {
@@ -77,6 +86,7 @@ export function useChapterZeroControls(lesson: LessonId | undefined, quote: stri
       }
       if (event.key === 'Escape') {
         if (el.closest('[role="dialog"][aria-modal="true"]') && allowed(el)) return;
+        if (escapeWithin && el.closest(escapeWithin)) return;
         stop(event);
         return;
       }
@@ -103,5 +113,5 @@ export function useChapterZeroControls(lesson: LessonId | undefined, quote: stri
       window.removeEventListener('wheel', wheel, true);
       changed.forEach((before, el) => restore(el, before));
     };
-  }, [scope, lesson, moving]);
+  }, [scope, lesson, moving, always, escapeWithin]);
 }

@@ -3,6 +3,7 @@ import { beginSession, emptyMeasurement, event, projectEvents, type Measurement 
 import { archiveEvents } from "./persist";
 import { RUN_LESSON, WALKTHROUGH_LESSONS } from "./walkthrough";
 import { finishedChapter } from "./campaignChapters";
+import { FULL_SCOPE, scopeAllows, scopeComplete, type PlayScope } from "./scope";
 import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
 import type { Campaign } from "@/sim/campaignTypes";
@@ -70,7 +71,8 @@ import { checkpointCloud, localCloudCopy, rememberCloud } from "./cloud";
 import { loadExploration, saveExploration } from "./exploration";
 import { floorFromSearch, floorOf, type Floor, type FloorSwitch } from "./floors";
 import { DEFAULT_AVATAR, type AvatarId } from "./avatars";
-import { clampFov, fromAvatar, type Viewpoint, type ViewSwitch } from "./viewpoints";
+import { clampFov, fromAvatar, offeredViewpoint, type Viewpoint, type ViewSwitch } from "./viewpoints";
+import { isPhoneEdition } from "@/phone/edition";
 import { clampLookSpeed, DEFAULT_CONTROLS, type ControlSettings } from "./controls";
 
 export type View = "tech" | "engineers" | "history" | "menu" | "guidance" | "scorecard" | null;
@@ -298,8 +300,11 @@ interface Store {
   /** The latest walkthrough start or end, for product analytics. */
   lastTour: TourEvent | null;
   rating: number | null;
+  /** How much of the game this edition offers (see game/scope.ts). Set once by `boot`. */
+  scope: PlayScope;
 
-  boot: () => void;
+  /** Load settings and the last-played mode, once. `scope` is the edition's reach; the desktop edition plays everything. */
+  boot: (scope?: PlayScope) => void;
   /** Leave the title screen and start (or continue) playing. */
   play: () => void;
   act: (action: Action) => boolean;
@@ -354,7 +359,6 @@ const intro = (kind: IntroKind): LastIntro => ({ id: introId++, kind });
 let tourEventId = 1;
 let lastIncidentSave = 0;
 
-const CHALLENGE_LOCKED = "Complete the first five Guided Mode chapters to unlock Challenge Mode.";
 
 const ACKNOWLEDGEMENTS = {
   "reliability-review": "acknowledge_reliability",
@@ -479,9 +483,11 @@ export const useGame = create<Store>()((set, get) => {
     const overview = { walking: false, viewpoint: "overview" as const };
     if (typeof window !== "undefined" && floorFromSearch(window.location.search) !== null) return overview;
     const exploration = loadExploration(mode);
+    // A phone opens from above, where its layout is made to be read, and has no first person to come back to.
+    const phone = isPhoneEdition();
     const opened = !exploration.viewChosen
-      ? (tour ? overview : { walking: true, viewpoint: "first" as const })
-      : exploration.walking && exploration.floor === floor ? { walking: true, viewpoint: exploration.viewpoint } : overview;
+      ? (tour || phone ? overview : { walking: true, viewpoint: "first" as const })
+      : exploration.walking && exploration.floor === floor ? { walking: true, viewpoint: offeredViewpoint(exploration.viewpoint, phone) } : overview;
     // The walk is timed from here, like one the player starts.
     if (opened.walking) walkStart = performance.now();
     return opened;
@@ -497,8 +503,7 @@ export const useGame = create<Store>()((set, get) => {
   }
   /** The unlock already earned in memory, or the one durable in the campaign profile/save. */
   function challengeUnlockedNow():boolean {
-    return get().mode === "classic" || get().meta.challengeUnlocked ||
-      get().game.campaign?.reliabilityStage?.acknowledged === true || challengeUnlocked();
+    return challengeAvailable(get()) || challengeUnlocked();
   }
   /** Apply a new game state, record analytics for phase changes and save. */
   function commit(next: GameState, opts: { save?: boolean } = {}): void {
@@ -523,8 +528,10 @@ export const useGame = create<Store>()((set, get) => {
         saveMeta(meta);
         patch.meta=meta;
       }
-      // The first acknowledged reliability outcome permanently unlocks Challenge Mode.
-      if(!was?.reliabilityStage?.acknowledged && c.reliabilityStage?.acknowledged && !get().meta.challengeUnlocked) {
+      // The first acknowledged reliability outcome permanently unlocks Challenge Mode, as does finishing a smaller
+      // edition's Guided Mode (the phone edition's ends with Scaling & Routing).
+      const scopeDone=scopeComplete(get().scope,next);
+      if(((!was?.reliabilityStage?.acknowledged && c.reliabilityStage?.acknowledged) || scopeDone) && !(patch.meta??get().meta).challengeUnlocked) {
         const meta={...(patch.meta??get().meta),challengeUnlocked:true};
         saveMeta(meta);
         patch.meta=meta;
@@ -866,8 +873,9 @@ export const useGame = create<Store>()((set, get) => {
       if (remember) saveExploration(get().mode, { floor: get().floor, walking: on, viewChosen: true, ...(on ? {} : { viewpoint: "overview" as const }) });
     },
     viewpoint: "overview",
-    setViewpoint: (v, how) => {
+    setViewpoint: (asked, how) => {
       const s = get();
+      const v = offeredViewpoint(asked, isPhoneEdition());
       if (!s.started) return;
       if (fromAvatar(v) && !s.walking) s.setWalking(true);
       const from = get().viewpoint;
@@ -920,9 +928,11 @@ export const useGame = create<Store>()((set, get) => {
     chapterComplete: null,
     lastTour: null,
     rating: null,
+    scope: FULL_SCOPE,
 
-    boot: () => {
+    boot: (scope = FULL_SCOPE) => {
       if (get().ready) return;
+      set({ scope });
       // Read once here, not on every mode switch: if storage fails, the in-memory settings are the ones to keep.
       // The map starts folded away until the player opens it, so the room has its corner to itself.
       set({ audio: loadAudio(), graphics: loadGraphics(), avatar: loadAvatar(), controls: loadControls(), mapOpen: loadMapOpen() ?? false });
@@ -982,6 +992,8 @@ export const useGame = create<Store>()((set, get) => {
       const c = get().game.campaign;
       const acknowledgement = c && requiredAcknowledgement(c);
       if(c && (!get().started || (acknowledgement && action.type !== acknowledgement))) return false;
+      // A smaller edition stops at its last chapter; the company carries on operating there.
+      if(c && !scopeAllows(get().scope, action)) { get().notify(get().scope.endOfGuided, "info"); return false; }
       const record = (ok: boolean) => set({ lastAction: { id: actionId++, type: action.type, ok } });
       if (c) {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
@@ -1152,7 +1164,7 @@ export const useGame = create<Store>()((set, get) => {
     switchMode: (mode, opts = {}) => {
       if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return false;}
       if (mode === get().mode) return true;
-      if (mode === "classic" && !challengeUnlockedNow()) { get().notify(CHALLENGE_LOCKED, "info"); return false; }
+      if (mode === "classic" && !challengeUnlockedNow()) { get().notify(get().scope.challengeLocked, "info"); return false; }
       if (!persist() && !opts.discard) return false;
       saveMode(mode);
       track("mode_switched", { to: mode });
@@ -1177,7 +1189,7 @@ export const useGame = create<Store>()((set, get) => {
       }
       const game = campaign.status === "ok" ? campaign.game : (classic as Extract<ReturnType<typeof decodeClassicSave>, { status: "ok" }>).game;
       const mode: GameMode = game.campaign ? "campaign" : "classic";
-      if (mode === "classic" && !challengeUnlockedNow()) { get().notify(CHALLENGE_LOCKED, "info"); return false; }
+      if (mode === "classic" && !challengeUnlockedNow()) { get().notify(get().scope.challengeLocked, "info"); return false; }
         // Preserve current progress and any owner-bound pending copy before replacement.
         if ((mode !== get().mode || get().hasRun) && !persist()) {
           get().notify("Could not save the current run. Export it before importing a replacement.", "error");
@@ -1356,6 +1368,17 @@ export const useGame = create<Store>()((set, get) => {
 useGame.subscribe((s, prev) => {
   if (prev.started && !s.started && s.walking) s.setWalking(false, false);
 });
+
+/**
+ * Whether Challenge Mode is open to this player without reading storage: already playing it, unlocked for good, the
+ * loaded company past its final reliability review, or finished with everything this edition's Guided Mode offers.
+ */
+export function challengeAvailable(s: Pick<Store, "mode" | "meta" | "game" | "scope">): boolean {
+  return s.mode === "classic" || s.meta.challengeUnlocked || s.game.campaign?.reliabilityStage?.acknowledged === true || scopeComplete(s.scope, s.game);
+}
+
+/** Whether the loaded company has finished everything this edition's Guided Mode offers (never, on the desktop). */
+export const guidedScopeComplete = (s: Pick<Store, "scope" | "game">): boolean => scopeComplete(s.scope, s.game);
 
 /** Equipment whose inspection records component evidence in Guided Mode. */
 const CAMPAIGN_EVIDENCE: EquipmentId[] = ["app", "db", "monitoring", "gateway"];

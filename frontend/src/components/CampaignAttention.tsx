@@ -47,6 +47,9 @@ const TARGETS: Record<GuidanceTarget, string> = {
   finance: '[aria-label="View finances"]',
 };
 
+/** What opens the folded equipment and actions: the desktop panel's reopen button, or the phone sheet's handle at peek. */
+const PANEL_ENTRY = '.panel-reopen, .phone-sheet-handle[aria-expanded="false"]';
+
 /** One ephemeral owner for the header, dock, idle timer and explicitly accepted control attention. */
 export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const game = useGame(s => s.game), started = useGame(s => s.started), running = useGame(s => s.running);
@@ -163,7 +166,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     const update = () => {
       clear();
       target = visibleControl(TARGETS[decision.target!]) ??
-        (["risk", "reliability", "growth"].includes(decision.target!) ? visibleControl(".panel-reopen") : null) ?? visibleControl(".campaign-hint");
+        (["risk", "reliability", "growth"].includes(decision.target!) ? visibleControl(PANEL_ENTRY) : null) ?? visibleControl(".campaign-hint");
       target?.classList.add("campaign-gold-attention");
     };
     update();
@@ -208,7 +211,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       }
       if (node) node.dataset.guidanceStep = "true";
       target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node ? visibleControl('[data-guidance-step="true"]') : null) ?? visibleControl('.sheet-head button[aria-label="Close"]') ??
-        (guidanceTarget !== "run" && guidanceTarget !== "next" && guidanceTarget !== "requirements" && guidanceTarget !== "menu" && guidanceTarget !== "finance" ? visibleControl(".panel-reopen") : null);
+        (guidanceTarget !== "run" && guidanceTarget !== "next" && guidanceTarget !== "requirements" && guidanceTarget !== "menu" && guidanceTarget !== "finance" ? visibleControl(PANEL_ENTRY) : null);
       if (node) delete node.dataset.guidanceStep;
       target?.classList.add("campaign-gold-attention");
       markedTarget.current = target;

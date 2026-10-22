@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const port=Number(process.env.PLAYWRIGHT_PORT ?? 4175);
+// Journeys that run on a phone (Pixel 7: coarse pointer, so the phone edition) instead of the desktop.
+const PHONE_SPECS = ['**/mobile.spec.ts', '**/phoneLayout.spec.ts', '**/phoneTutorial.spec.ts'];
 
 export default defineConfig({
   testDir: './e2e',
@@ -22,8 +24,8 @@ export default defineConfig({
     launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
   },
   projects: [
-    { name: 'chromium', testIgnore: '**/mobile.spec.ts', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
-    { name: 'mobile-chromium', testMatch: '**/mobile.spec.ts', use: { ...devices['Pixel 7'] } },
+    { name: 'chromium', testIgnore: PHONE_SPECS, use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'mobile-chromium', testMatch: PHONE_SPECS, use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
     command: `npm run preview -- --host 127.0.0.1 --port ${port} --strictPort`,
