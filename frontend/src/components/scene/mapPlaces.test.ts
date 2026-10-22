@@ -13,11 +13,13 @@ import {
   textWidth,
   viewBoxOf,
   panView,
+  ZONE_KIND,
   zoomView,
   type LabelBox,
   type PlaceModel,
 } from "./mapPlaces";
 import { buildModel } from "./sceneModel";
+import { zoneNamesOn } from "./places";
 
 const model = () => buildModel(newLegacyGame(1)) as PlaceModel;
 
@@ -29,20 +31,26 @@ describe("placesOn", () => {
     const names = places.map((p) => p.name);
     expect(names).toContain("Server hall");
     expect(names).toContain("Workshop");
+    expect(names).toContain("Elevator");
     expect(names).not.toContain("Cache");
     for (const p of places) expect(p.floor).toBe("servers");
   });
 
-  it("lists the office floor's equipment, then its fourteen zones, then the five fun things", () => {
+  it("lists the office floor's equipment, then its fifteen zones, then the five fun things", () => {
     const places = placesOn("office", model());
     expect(places.slice(0, 3).map((p) => p.name)).toEqual(["Deploy", "Team", "Growth"]);
     const zones = places.filter((p) => p.kind === "zone");
     const fun = places.filter((p) => p.kind === "fun");
-    expect(zones).toHaveLength(14);
+    expect(zones).toHaveLength(15);
+    expect(zones.at(-1)?.name).toBe("Elevator");
     expect(fun).toHaveLength(5);
     // Groups keep their order: equipment, zones, fun.
     expect(places[3].kind).toBe("zone");
-    expect(places[17].kind).toBe("fun");
+    expect(places[18].kind).toBe("fun");
+  });
+
+  it("gives every named zone on both floors a kind", () => {
+    for (const floor of ["office", "servers"] as const) for (const [name] of zoneNamesOn(floor)) expect(ZONE_KIND[name], name).toBeTruthy();
   });
 
   it("marks symptomatic equipment as an alert and what is being investigated as busy", () => {
