@@ -11,7 +11,7 @@ import {
   type Racks,
 } from "./floorplan";
 import { ROOM } from "./layout";
-import { zoneAreas } from "./places";
+import { zoneAreas, type ZoneArea } from "./places";
 
 /*
  * The plan both maps are drawn from: a floor's zones, furniture, glass, shaft and walls, in world metres. The round
@@ -30,7 +30,7 @@ const shape = (o: Obstacle, key: string) =>
  * The still part of a floor's plan: its zones, each tinted apart from the ones it meets, then walls, glass, the shaft
  * and furniture.
  */
-export const Plan = memo(function Plan({ floor, racks }: { floor: Floor; racks: Racks }) {
+export const Plan = memo(function Plan({ floor, racks, zoneClass = (zone) => (zone.tone === null ? "is-elevator" : `tone-${zone.tone}`) }: { floor: Floor; racks: Racks; zoneClass?: (zone: ZoneArea) => string }) {
   const furniture = floor === "office" ? [...OBSTACLES, ...ROOM_OBSTACLES] : serverObstacles(racks);
   const glass = floor === "office" ? GLASS : SERVER_GLASS;
   return (
@@ -40,7 +40,7 @@ export const Plan = memo(function Plan({ floor, racks }: { floor: Floor; racks: 
         {zoneAreas(floor).map((zone, i) => (
           <polygon
             key={`${zone.name}-${i}`}
-            className={zone.tone === null ? "is-elevator" : `tone-${zone.tone}`}
+            className={zoneClass(zone)}
             data-zone={zone.name}
             points={zone.points.map(([x, z]) => `${x.toFixed(2)},${z.toFixed(2)}`).join(" ")}
           />

@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { attentionOn, FLOOR_NAME, FLOORS, type Attention, type Floor } from "@/game/floors";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { EQUIPMENT_ICON, STATE_META } from "./presentation";
 import { tipProps } from "./tips";
 import { crewOn } from "./scene/crewSpots";
-import type { Racks } from "./scene/floorplan";
+import { ELEVATOR_SPOT, type Racks } from "./scene/floorplan";
 import { ROOM } from "./scene/layout";
 import { FLOOR_NUMBER } from "./scene/levels";
 import { Plan } from "./scene/MapPlan";
@@ -21,6 +21,8 @@ import {
   placesOn,
   textWidth,
   viewBoxOf,
+  ZONE_KIND_NAME,
+  zoneKindOf,
   zoomView,
   type FixedLabel,
   type LabelAsk,
@@ -28,6 +30,7 @@ import {
   type MapView,
   type Place,
   type PlaceModel,
+  type ZoneKind,
 } from "./scene/mapPlaces";
 import { placeAt, whereLine, zoneNamesOn } from "./scene/places";
 import { riding } from "./scene/ride";
@@ -71,12 +74,15 @@ function useMapModel(): MapModel {
 type Picked = { place: Place } | { spot: { floor: Floor; x: number; z: number } };
 
 const LAYERS = [
-  ["equipment", "Equipment"],
-  ["people", "People"],
-  ["fun", "Things to do"],
-  ["names", "Zone names"],
+  ["equipment", "Equipment", "server"],
+  ["people", "People", "user"],
+  ["fun", "Things to do", "party"],
+  ["names", "Zone names", "floor"],
 ] as const;
 type Layer = (typeof LAYERS)[number][0];
+
+const KIND_ORDER: ZoneKind[] = ["machines", "work", "break", "plant"];
+const ELEVATOR_CENTRE: [number, number] = [(ELEVATOR_SPOT[0] + ELEVATOR_SPOT[2]) / 2, (ELEVATOR_SPOT[1] + ELEVATOR_SPOT[3]) / 2];
 
 export function MenuMap() {
   const started = useGame((s) => s.started);
@@ -96,6 +102,7 @@ export function MenuMap() {
   const drag = useRef<{ id: number; x: number; y: number; view: MapView } | null>(null);
   const dragged = useRef(false);
   const [panning, setPanning] = useState(false);
+  const gridId = `map-grid-${useId()}`;
 
   useEffect(() => {
     const id = window.setInterval(() => setTick((n) => (n + 1) % 1e6), 200);
@@ -156,25 +163,31 @@ export function MenuMap() {
     ? zoneNamesOn(floor).map(([n, x, z]) => {
         const [px, py] = toPx(x, z);
         const w = textWidth(n, 12);
-        return { key: n, box: { x: px - w / 2, y: py - 8, w, h: 16 } };
+        // A name that would run past the frame is nudged back inside it.
+        const bx = Math.min(Math.max(px - w / 2, 4), Math.max(4, svgWidth - w - 4));
+        return { key: n, box: { x: bx, y: py - 8, w, h: 16 } };
       })
     : [];
   const asks: LabelAsk[] = [];
   if (layers.people && a.floor === floor && !a.to) {
     const [px, py] = toPx(a.x, a.z);
-    asks.push({ key: "you", x: px, y: py, text: "You", clear: 11 });
+    asks.push({ key: "you", x: px, y: py, text: "You", clear: 16 });
   }
   const equipmentPins = layers.equipment ? places.filter((p) => p.kind === "equipment") : [];
   const funPins = layers.fun && floor === "office" ? places.filter((p) => p.kind === "fun") : [];
   for (const p of equipmentPins) {
     const [px, py] = toPx(p.x, p.z);
-    asks.push({ key: p.key, x: px, y: py, text: p.name, clear: 11 });
+    asks.push({ key: p.key, x: px, y: py, text: p.name, clear: 13 });
   }
   for (const p of funPins) {
     const [px, py] = toPx(p.x, p.z);
-    asks.push({ key: p.key, x: px, y: py, text: p.name, clear: 9 });
+    asks.push({ key: p.key, x: px, y: py, text: p.name, clear: 11 });
   }
-  const labels = placeLabels(asks, fixed, bounds, 11);
+  if (layers.names) {
+    const [px, py] = toPx(ELEVATOR_CENTRE[0], ELEVATOR_CENTRE[1]);
+    asks.push({ key: `zone:${floor}:Elevator`, x: px, y: py, text: "Elevator", clear: 1.3 / s });
+  }
+  const labels = placeLabels(asks, fixed, bounds, 12);
 
   function focusFor(f: Floor): [number, number] | null {
     const spot = avatarSpot(walking && started);
@@ -195,6 +208,15 @@ export function MenuMap() {
     setView(initialView(svgWidth, focusFor(f)));
   };
 
+  const centreOnYou = () => {
+    const spot = avatarSpot(walking && started);
+    if (spot.floor !== floor) {
+      setFloor(spot.floor);
+      setPicked((p) => (p && "spot" in p ? null : p));
+    }
+    setView((v) => centreView({ ...v, k: Math.max(v.k, 2) }, spot.x, spot.z));
+  };
+
   const pin = (place: Place) => {
     const isPicked = picked !== null && "place" in picked && picked.place.key === place.key;
     const cls = `map-pin kind-${place.kind} state-${place.state ?? "none"}${place.mark ? ` mark-${place.mark}` : ""}${isPicked ? " is-picked" : ""}`;
@@ -213,9 +235,9 @@ export function MenuMap() {
       >
         {place.kind === "equipment" ? (
           <>
-            <rect x={-11} y={-11} width={22} height={22} rx={5} />
-            <svg x={-7} y={-7} width={14} height={14} className="map-pin-icon">
-              <Icon name={EQUIPMENT_ICON[place.equipment!]} size={14} />
+            <rect x={-13} y={-13} width={26} height={26} rx={6} />
+            <svg x={-8} y={-8} width={16} height={16} className="map-pin-icon">
+              <Icon name={EQUIPMENT_ICON[place.equipment!]} size={16} />
             </svg>
             {place.mark && (
               <g className="map-pin-mark" transform="translate(10 -10)">
@@ -226,14 +248,14 @@ export function MenuMap() {
           </>
         ) : (
           <>
-            <circle r={9} />
+            <circle r={11} />
             <svg x={-6} y={-6} width={12} height={12} className="map-pin-icon">
               <Icon name="party" size={12} />
             </svg>
           </>
         )}
         {lab && (
-          <text className="map-pin-label" x={lab.box.x + lab.box.w / 2 - px} y={lab.box.y + 2 - py} style={{ fontSize: 11 }}>
+          <text className="map-pin-label" x={lab.box.x + lab.box.w / 2 - px} y={lab.box.y + 2 - py} style={{ fontSize: 12 }}>
             {place.name}
           </text>
         )}
@@ -280,9 +302,12 @@ export function MenuMap() {
     return (
       <button key={p.key} type="button" className={cls} aria-pressed={isPicked} onClick={() => pick(p)} {...tipProps(tip)}>
         {p.kind === "equipment" && (
-          <span className="chip-icon">
-            <Icon name={EQUIPMENT_ICON[p.equipment!]} />
-          </span>
+          <>
+            <i className={`menu-map-dot tone-${STATE_META[p.state!].tone}`} aria-hidden="true" />
+            <span className="chip-icon">
+              <Icon name={EQUIPMENT_ICON[p.equipment!]} />
+            </span>
+          </>
         )}
         {p.kind === "fun" && (
           <span className="chip-icon">
@@ -406,8 +431,8 @@ export function MenuMap() {
           ))}
         </div>
         <p className="menu-map-you" aria-live="polite">
-          <Icon name="walk" size={16} />
-          <strong>You:</strong> {where}
+          <Icon name="locate" size={16} />
+          <strong>You are here:</strong> {where}
         </p>
       </div>
       <div className="menu-map-tools">
@@ -415,18 +440,23 @@ export function MenuMap() {
           <span className="visually-hidden">Find on the map</span>
           <input type="search" value={query} placeholder="Find a place or equipment" onChange={(e) => setQuery(e.target.value)} />
         </label>
-        <div className="menu-map-layers" role="group" aria-label="Show on the map">
-          {LAYERS.map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={`btn btn-small menu-toggle${layers[id] ? " is-on" : ""}`}
-              aria-pressed={layers[id]}
-              onClick={() => setLayers((l) => ({ ...l, [id]: !l[id] }))}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="menu-map-show">
+          <span className="menu-map-show-label">Show</span>
+          <div className="menu-map-layers" role="group" aria-label="Show on the map">
+            {LAYERS.map(([id, label, icon]) => (
+              <button
+                key={id}
+                type="button"
+                className="menu-map-layer"
+                aria-pressed={layers[id]}
+                onClick={() => setLayers((l) => ({ ...l, [id]: !l[id] }))}
+                {...tipProps(`Show ${label.toLowerCase()} on the plan`)}
+              >
+                <Icon name={layers[id] ? "check" : icon} size={16} />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <div
@@ -437,30 +467,53 @@ export function MenuMap() {
         onPointerCancel={onPointerEnd}
       >
         <svg ref={svgRef} className="menu-map-plan" viewBox={`${box.x.toFixed(2)} ${box.y.toFixed(2)} ${box.w.toFixed(2)} ${box.h.toFixed(2)}`} aria-hidden="true" onClick={onClick}>
-          <Plan floor={floor} racks={racks} />
+          <defs>
+            <pattern id={gridId} width={1} height={1} patternUnits="userSpaceOnUse">
+              <path d="M1 0H0V1" />
+            </pattern>
+          </defs>
+          <Plan floor={floor} racks={racks} zoneClass={(zone) => (zone.tone === null ? "is-elevator" : `kind-${zoneKindOf(zone.name)}`)} />
+          <rect className="map-grid" x={ROOM.x0} y={ROOM.z0} width={ROOM.w} height={ROOM.d} fill={`url(#${gridId})`} />
           {layers.names && (
             <g className="map-names">
               {zoneNamesOn(floor)
                 .filter(([n]) => !labels.hidden.has(n))
-                .map(([n, x, z]) => (
-                  <text key={n} x={x} y={z} style={{ fontSize: 12 * s }}>
-                    {n}
-                  </text>
-                ))}
+                .map(([n, , z]) => {
+                  const fb = fixed.find((f) => f.key === n)!;
+                  return (
+                    <text key={n} x={(fb.box.x + fb.box.w / 2) * s + box.x} y={z} style={{ fontSize: 12 * s }}>
+                      {n}
+                    </text>
+                  );
+                })}
             </g>
           )}
           {layers.people && (
             <g className="map-crew">
               {crew.map(([x, z], i) => (
-                <circle key={i} cx={x} cy={z} r={4 * s} />
+                <circle key={i} cx={x} cy={z} r={5 * s} />
               ))}
             </g>
           )}
           {funPins.map(pin)}
           {equipmentPins.map(pin)}
+          {layers.names &&
+            (() => {
+              const lab = labels.placed.get(`zone:${floor}:Elevator`);
+              if (!lab) return null;
+              const [px, py] = toPx(ELEVATOR_CENTRE[0], ELEVATOR_CENTRE[1]);
+              return (
+                <g transform={`translate(${ELEVATOR_CENTRE[0]} ${ELEVATOR_CENTRE[1]}) scale(${s})`}>
+                  <text className="map-pin-label is-quiet" x={lab.box.x + lab.box.w / 2 - px} y={lab.box.y + 2 - py} style={{ fontSize: 12 }}>
+                    Elevator
+                  </text>
+                </g>
+              );
+            })()}
           {layers.people && a.floor === floor && !a.to && (
             <g className="map-avatar" transform={`translate(${a.x} ${a.z}) scale(${s})`}>
-              <g transform={`rotate(${(-a.yaw * 180) / Math.PI})`}>
+              <circle className="map-you-pulse" r={14} />
+              <g transform={`rotate(${(-a.yaw * 180) / Math.PI}) scale(1.3)`}>
                 <circle r={11} />
                 <path d="M0 -9 L7 6 L0 2.5 L-7 6 Z" />
               </g>
@@ -469,7 +522,7 @@ export function MenuMap() {
                 if (!lab) return null;
                 const [px, py] = toPx(a.x, a.z);
                 return (
-                  <text className="map-pin-label" x={lab.box.x + lab.box.w / 2 - px} y={lab.box.y + 2 - py} style={{ fontSize: 11 }}>
+                  <text className="map-pin-label" x={lab.box.x + lab.box.w / 2 - px} y={lab.box.y + 2 - py} style={{ fontSize: 12 }}>
                     You
                   </text>
                 );
@@ -480,18 +533,18 @@ export function MenuMap() {
             <circle className="map-destination" cx={picked.spot.x} cy={picked.spot.z} r={8 * s} style={{ strokeWidth: 2.5 * s }} />
           )}
         </svg>
-        <div className="menu-map-compass" aria-hidden="true">
-          N
-        </div>
         <div className="menu-map-zoom" role="group" aria-label="Map zoom">
-          <button type="button" className="icon-btn" aria-label="Zoom in" disabled={view.k >= MAP_ZOOM.max} onClick={() => setView((v) => zoomView(v, MAP_ZOOM.step))}>
+          <button type="button" className="icon-btn" aria-label="Zoom in" disabled={view.k >= MAP_ZOOM.max} onClick={() => setView((v) => zoomView(v, MAP_ZOOM.step))} {...tipProps("Zoom in")}>
             <Icon name="plus" size={18} />
           </button>
-          <button type="button" className="icon-btn" aria-label="Zoom out" disabled={view.k <= MAP_ZOOM.min} onClick={() => setView((v) => zoomView(v, 1 / MAP_ZOOM.step))}>
+          <button type="button" className="icon-btn" aria-label="Zoom out" disabled={view.k <= MAP_ZOOM.min} onClick={() => setView((v) => zoomView(v, 1 / MAP_ZOOM.step))} {...tipProps("Zoom out")}>
             <Icon name="minus" size={18} />
           </button>
-          <button type="button" className="icon-btn" aria-label="Fit the floor" onClick={() => setView(HOME_VIEW)}>
-            <Icon name="refresh" size={18} />
+          <button type="button" className="icon-btn" aria-label="Fit the floor" onClick={() => setView(HOME_VIEW)} {...tipProps("Fit the whole floor")}>
+            <Icon name="fit" size={18} />
+          </button>
+          <button type="button" className="icon-btn" aria-label="Centre on you" disabled={a.to !== null} onClick={centreOnYou} {...tipProps("Centre on you")}>
+            <Icon name="locate" size={18} />
           </button>
         </div>
         <div className="menu-map-scale" aria-hidden="true">
@@ -500,20 +553,79 @@ export function MenuMap() {
         </div>
         <p className="menu-map-hint">Drag to move, scroll to zoom</p>
       </div>
+      <ul className="menu-map-legend" aria-label="Legend">
+        {KIND_ORDER.map((k) => (
+          <li key={k}>
+            <i className={`menu-map-swatch kind-${k}`} aria-hidden="true" />
+            {ZONE_KIND_NAME[k]}
+          </li>
+        ))}
+        {layers.equipment && (
+          <li>
+            <svg viewBox="-16 -16 32 32" className="menu-map-legend-sym" aria-hidden="true">
+              <g className="map-pin kind-equipment state-ok">
+                <rect x={-10} y={-10} width={20} height={20} rx={5} />
+              </g>
+            </svg>
+            Equipment
+          </li>
+        )}
+        {layers.fun && (
+          <li>
+            <svg viewBox="-16 -16 32 32" className="menu-map-legend-sym" aria-hidden="true">
+              <g className="map-pin kind-fun">
+                <circle r={9} />
+              </g>
+            </svg>
+            Thing to do
+          </li>
+        )}
+        {layers.people && (
+          <>
+            <li>
+              <svg viewBox="-16 -16 32 32" className="menu-map-legend-sym" aria-hidden="true">
+                <g className="map-crew">
+                  <circle r={5} />
+                </g>
+              </svg>
+              Person
+            </li>
+            <li>
+              <svg viewBox="-16 -16 32 32" className="menu-map-legend-sym" aria-hidden="true">
+                <g className="map-avatar">
+                  <path d="M0 -9 L7 6 L0 2.5 L-7 6 Z" />
+                </g>
+              </svg>
+              You
+            </li>
+          </>
+        )}
+        <li>
+          <svg viewBox="-16 -16 32 32" className="menu-map-legend-sym" aria-hidden="true">
+            <g className="map-pin mark-alert">
+              <g className="map-pin-mark">
+                <circle r={7} />
+                <text y={2.5}>!</text>
+              </g>
+            </g>
+          </svg>
+          Incident
+        </li>
+      </ul>
       {card()}
       {matches === null ? (
         <section className="menu-section" aria-label="Places on this floor">
           {layers.equipment && (
             <>
-              <h4>Equipment</h4>
+              <h4>Equipment ({places.filter((p) => p.kind === "equipment").length})</h4>
               <div className="chips">{places.filter((p) => p.kind === "equipment").map(chipFor)}</div>
             </>
           )}
-          <h4>Places</h4>
+          <h4>Places ({places.filter((p) => p.kind === "zone").length})</h4>
           <div className="chips">{places.filter((p) => p.kind === "zone").map(chipFor)}</div>
           {floor === "office" && layers.fun && (
             <>
-              <h4>Things to do</h4>
+              <h4>Things to do ({places.filter((p) => p.kind === "fun").length})</h4>
               <div className="chips">{places.filter((p) => p.kind === "fun").map(chipFor)}</div>
             </>
           )}

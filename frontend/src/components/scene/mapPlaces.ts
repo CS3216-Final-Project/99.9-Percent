@@ -1,6 +1,6 @@
 import { EQUIPMENT_ORDER, type EquipmentId, type EquipmentState } from "@/sim";
 import { FLOORS, floorOf, type Floor } from "@/game/floors";
-import { FUN_PROPS } from "./floorplan";
+import { ELEVATOR_SPOT, FUN_PROPS } from "./floorplan";
 import { ROOM } from "./layout";
 import { placeAt, zoneNamesOn } from "./places";
 
@@ -8,6 +8,36 @@ import { placeAt, zoneNamesOn } from "./places";
  * What the menu's map lists and marks: every place worth finding on a floor, and the pan/zoom framing of the plan.
  * Kept free of React, the browser and three.js so the rules can be tested.
  */
+
+export type ZoneKind = "machines" | "work" | "break" | "plant";
+
+/** What each zone is for, so the plan can colour zones by meaning and the legend can say what the colours mean. */
+export const ZONE_KIND: Record<string, ZoneKind> = {
+  "Server hall": "machines",
+  "Network and power room": "machines",
+  "Monitoring room": "machines",
+  "Cooling plant": "plant",
+  Workshop: "plant",
+  Stores: "plant",
+  "Open desks": "work",
+  "Quiet desks": "work",
+  Engineering: "work",
+  "Meeting room": "work",
+  "Huddle room": "work",
+  Reception: "work",
+  Kitchen: "break",
+  Dining: "break",
+  Lounge: "break",
+  "Games room": "break",
+  Foosball: "break",
+  "Nap pods": "break",
+  Events: "break",
+  Library: "break",
+};
+
+export const ZONE_KIND_NAME: Record<ZoneKind, string> = { machines: "Machines", work: "Desks and meetings", break: "Breaks and fun", plant: "Back of house" };
+
+export const zoneKindOf = (name: string): ZoneKind => ZONE_KIND[name] ?? "work";
 
 export type PlaceKind = "equipment" | "zone" | "fun";
 export interface Place {
@@ -54,6 +84,7 @@ export function placesOn(floor: Floor, model: PlaceModel): Place[] {
     };
   });
   const zones = zoneNamesOn(floor).map(([name, x, z]): Place => ({ key: `zone:${floor}:${name}`, kind: "zone", floor, name, x, z, zone: name }));
+  zones.push({ key: `zone:${floor}:Elevator`, kind: "zone", floor, name: "Elevator", x: (ELEVATOR_SPOT[0] + ELEVATOR_SPOT[2]) / 2, z: (ELEVATOR_SPOT[1] + ELEVATOR_SPOT[3]) / 2, zone: "Elevator" });
   const fun = floor === "office" ? FUN_PROPS.map((p): Place => ({ key: `fun:${p.id}`, kind: "fun", floor, name: p.label, x: p.x, z: p.z, zone: placeAt("office", p.x, p.z) })) : [];
   return [...equipment, ...zones, ...fun];
 }

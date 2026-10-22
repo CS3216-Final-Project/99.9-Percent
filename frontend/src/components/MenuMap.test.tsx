@@ -144,6 +144,36 @@ describe("the menu's map", () => {
     }
   });
 
+  it("names the zone kinds and the map's symbols in a legend", () => {
+    render(<MenuMap />);
+    const legend = screen.getByRole("list", { name: "Legend" });
+    for (const name of ["Machines", "Desks and meetings", "Breaks and fun", "Back of house", "Equipment", "Thing to do", "Person", "You", "Incident"])
+      expect(within(legend).getByText(name)).toBeTruthy();
+  });
+
+  it("centres the plan on the avatar, switching floors if need be", () => {
+    useGame.setState({ walking: true });
+    placeAvatar("servers");
+    render(<MenuMap />);
+    fireEvent.click(within(floors()).getByRole("button", { name: /^Office floor/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Centre on you" }));
+    expect(within(floors()).getByRole("button", { name: /^Server floor/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(plan().getAttribute("viewBox")!.split(" ")[2]).toBe("22.00");
+  });
+
+  it("lists the elevator as a place and labels its shaft quietly on the plan", () => {
+    render(<MenuMap />);
+    expect(within(directory()).getByRole("button", { name: "Elevator" })).toBeTruthy();
+    const label = document.querySelector(".map-pin-label.is-quiet");
+    expect(label?.textContent).toBe("Elevator");
+  });
+
+  it("marks each equipment chip with its state", () => {
+    render(<MenuMap />);
+    const db = within(directory()).getByRole("button", { name: "Database" });
+    expect(db.querySelector(".menu-map-dot.tone-ok")).not.toBeNull();
+  });
+
   it("stops its clock when it unmounts", () => {
     const before = vi.getTimerCount();
     const { unmount } = render(<MenuMap />);
