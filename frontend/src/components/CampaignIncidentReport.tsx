@@ -1,25 +1,28 @@
 import { useEffect, useState } from "react";
 import type { CampaignPostmortem } from "@/sim/campaignTypes";
 import { incidentLesson } from "@/game/campaignPostmortem";
+import { incidentSummary } from "@/game/campaignReport";
+import { CampaignReport } from "./CampaignReport";
+import { useReportTechnicalOpen } from "./useReportTechnicalOpen";
+import type { ReliabilityLesson } from "@/game/reliabilityLesson";
 import { Modal, Row } from "./ui";
 import "./CampaignIncidentReport.css";
 
 const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(c / 100);
 
-export function CampaignIncidentReport({ report }: { report: CampaignPostmortem }) {
-  const [technicalOpen, setTechnicalOpen] = useState(false);
-  const lesson = incidentLesson(report);
-  const workload = report.snapshots.filter(s => s.data);
-  return <div className="campaign-incident-report">
+export function CampaignIncidentReport({ report, reliability }: { report: CampaignPostmortem; reliability?: ReliabilityLesson }) {
+  const lesson = reliability ? { happened: reliability.happened, response: reliability.recovered, improve: reliability.improve, takeaway: reliability.takeaway } : incidentSummary(report);
+  return <CampaignReport lesson={lesson}><IncidentEvidence report={report}/></CampaignReport>;
+}
+export function IncidentEvidence({ report }: { report: CampaignPostmortem }) {
+  const technicalOpen = useReportTechnicalOpen();
+  const lesson = incidentLesson(report), workload = report.snapshots.filter(s => s.data);
+  return <>
     <dl className="rows report-metrics" aria-label="Recovery summary">
       <Row label="Episode setup spending" value={dollars(report.setupCents)} />
       {lesson.latencyMs !== undefined && <Row label="Final response time" value={`${Math.round(lesson.latencyMs)} ms`} />}
       <Row label="Traffic status" value={lesson.traffic} />
     </dl>
-    {([ ["What went wrong?", lesson.wrong], ["What changed?", lesson.changed],
-      ["What did you learn?", lesson.learned], ["Remember for next time", lesson.remember] ] as const).map(([title, text]) =>
-      <section key={title}><h3>{title}</h3><p>{text}</p></section>)}
-    <details className="more report-technical" onToggle={e => { if (e.target === e.currentTarget) setTechnicalOpen(e.currentTarget.open); }}><summary>View technical details</summary>
       <p>Game seconds {report.openedStep}–{report.recoveredStep}. Episode setup spending includes recorded purchases since the preceding report (or company start), including preparation; it is not total running cost.</p>
       <h4>Recorded causes, actions and trade-offs</h4>
       {report.explanations.map((text, i) => <p key={i}>{text}</p>)}
@@ -33,9 +36,8 @@ export function CampaignIncidentReport({ report }: { report: CampaignPostmortem 
       </div>}
       <h4>Action and recovery observation history</h4>
       {report.events.length ? <ol className="report-events">{report.events.map(e => <li key={e.id}>Game second {e.step} · {e.type}<pre>{JSON.stringify(e.data, null, 2)}</pre></li>)}</ol> : <p>No event history was retained.</p>}
-      {report.snapshots.length > 0 && <details><summary>Complete recorded observations</summary><pre>{JSON.stringify(report.snapshots, null, 2)}</pre></details>}
-    </details>
-  </div>;
+      {report.snapshots.length > 0 && <div><h4>Complete recorded observations</h4><pre>{JSON.stringify(report.snapshots, null, 2)}</pre></div>}
+  </>;
 }
 
 // Presentation-only receipt, separate from saves and the engine's review acknowledgement.
@@ -46,7 +48,7 @@ function wasPresented(runId: string, token: string) {
   try { return localStorage.getItem(receiptKey(runId)) === token || receipts.get(runId) === token; }
   catch { return receipts.get(runId) === token; }
 }
-export function CampaignRecoveryReview({ report, runId, onContinue }: { report: CampaignPostmortem; runId: string; onContinue: () => void }) {
+export function CampaignRecoveryReview({ report, runId, onContinue, reliability }: { report: CampaignPostmortem; runId: string; onContinue: () => void; reliability?: ReliabilityLesson }) {
   const token = `${report.id}:${report.recoveredStep}`;
   const [notice, setNotice] = useState(() => !wasPresented(runId, token));
   useEffect(() => {
@@ -60,7 +62,7 @@ export function CampaignRecoveryReview({ report, runId, onContinue }: { report: 
     <div className="modal-foot"><button className="btn btn-primary" onClick={() => setNotice(false)}>View Incident Report</button></div>
   </Modal>;
   return <Modal title="Incident postmortem" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "incident" }}>
-    <CampaignIncidentReport report={report} />
+    <CampaignIncidentReport report={report} reliability={reliability} />
     <div className="modal-foot"><button className="btn btn-primary" onClick={onContinue}>Continue company</button></div>
   </Modal>;
 }

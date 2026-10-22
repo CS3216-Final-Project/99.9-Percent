@@ -11,6 +11,32 @@ export function preventionAvailable(c: Campaign): boolean {
 export function pendingPreventionReview(c: Campaign | undefined): boolean {
   return !!c?.openingPrevention?.outcome && !c.openingPrevention.outcome.acknowledged;
 }
+
+/** Historical engine evidence, not today's readings or a purchased upgrade. */
+export function verifiedPrevention(c: Campaign): boolean {
+  const p = c.openingPrevention, o = p?.outcome;
+  if (!p || !o?.acknowledged || p.stableSteps !== Q.stableSteps ||
+    p.appInspectedStep === null || p.dbInspectedStep === null || o.snapshots.length !== Q.stableSteps) return false;
+  const first = o.qualifiedStep - Q.stableSteps + 1;
+  return c.consumedEvents.includes("opening-growth") && p.eligibleStep >= Q.growthStep &&
+    p.appInspectedStep >= p.eligibleStep && p.dbInspectedStep >= p.eligibleStep &&
+    p.appInspectedStep < first && p.dbInspectedStep < first &&
+    c.trace.some(e => e.type === "opening-prevention-qualified" && e.step === o.qualifiedStep && e.data.outcomeId === o.id) &&
+    c.trace.some(e => e.type === "opening-prevention-review-acknowledged" && e.step >= o.qualifiedStep && e.data.outcomeId === o.id) &&
+    c.trace.some(e => e.type === "opening-prevention-application-inspected" && e.step === p.appInspectedStep) &&
+    c.trace.some(e => e.type === "opening-prevention-database-inspected" && e.step === p.dbInspectedStep) &&
+    !c.trace.some(e => e.type === "incident-opened" && e.step <= o.qualifiedStep) &&
+    o.snapshots.every((m, i) => m.step === first + i && m.incoming === Q.grownTraffic && m.admitted === Q.grownTraffic && m.rejected === 0 &&
+      m.app.backlog === 0 && m.db.backlog === 0 && (!m.instances || m.instances.every(a => a.backlog === 0)) &&
+      m.latencyMs < Q.latencyThresholdMs && m.serviceErrorRate !== null && m.serviceErrorRate < Q.errorThreshold && m.successful + m.failed > 0);
+}
+
+/** Idempotent award, shared by live acknowledgement and old input-log recovery. */
+export function awardPreventionMilestone(c: Campaign): void {
+  if (c.openingMilestone || c.scaling || !verifiedPrevention(c)) return;
+  c.openingMilestone = { id: "opening-stability", incidentId: null, outcomeId: "opening-prevention", awardedStep: c.step, acknowledged: false };
+  trace(c, "milestone-awarded", { outcomeId: "opening-prevention", outcome: "prevention" });
+}
 export function ensurePrevention(c: Campaign): OpeningPrevention | undefined {
   if (!preventionAvailable(c)) return undefined;
   if (!c.openingPrevention) {

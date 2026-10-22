@@ -39,8 +39,9 @@ it("preventive limit explains full-demand qualification and leaves removal actio
 it("new inspections and observations update prevention without auto-completing it",()=>{
  let g=prevented();g=decision(g,{type:"incident_inspect",equipment:"app"});g=decision(g,{type:"incident_inspect",equipment:"db"});g=decision(g,{type:"set_traffic_limit",enabled:false});
  g=advanceSteps(g,2).state;expect(row(g,"observations").label).toBe("Stable observations: 2 / 5");expect(row(g,"db-inspection").met).toBe(true);expect(campaignGuidance(g).notice).toBeNull();
+ expect(campaignGuidance(g).requirements.some(r=>r.id==="recovery")).toBe(false);expect(campaignGuidance(g).optional).toContain("both valid paths");
  g=advanceSteps(g,3).state;expect(campaignGuidance(g).pendingAction?.label).toBe("Review outcome");expect(g.campaign!.openingMilestone).toBeNull();expect(g.campaign!.openingRecovered).toBe(false);
- g=decision(g,{type:"acknowledge_prevention_review"});expect(campaignGuidance(g).pendingAction).toBeNull();expect(campaignGuidance(g).stage).toBe("Opening");expect(row(g,"recovery").met).toBe(false);expect(campaignGuidance(g).waiting).toContain("prevention does not unlock Scaling");
+ g=decision(g,{type:"acknowledge_prevention_review"});expect(campaignGuidance(g).pendingAction?.label).toBe("Complete Opening");expect(campaignGuidance(g).stage).toBe("Opening");expect(row(g,"recovery").met).toBe(true);expect(row(g,"review").met).toBe(true);expect(row(g,"milestone").met).toBe(false);
 });
 it("Scaling exposes purchased headroom readiness separately from consumed growth",()=>{
  const g=scaling();expect(row(g,"headroom").met).toBe(false);expect(row(g,"growth").met).toBe(false);expect(campaignGuidance(g).waiting).toBeNull();

@@ -4,9 +4,11 @@
 .campaign-recovery-report > .modal-body { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .campaign-recovery-report .campaign-incident-report { min-height: 0; overflow-y: auto; }
 .campaign-recovery-report .modal-foot { flex: none; }
-.campaign-incident-report > section { margin-block: 16px; }
+.campaign-incident-report > section { margin-block: 10px; }
 .campaign-incident-report > section h3 { margin-bottom: 4px; }
 .campaign-incident-report > section p { margin-block: 0; line-height: 1.5; }
+.campaign-recovery-report .campaign-report-shell { display: flex; min-height: 0; }
+.campaign-recovery-report .modal-foot { padding-top: 10px; }
 .campaign-incident-report .report-metrics .row { flex-wrap: wrap; gap: 4px 12px; }
 .campaign-incident-report .report-metrics dd { max-width: 100%; }
 .report-technical { overflow-wrap: anywhere; }

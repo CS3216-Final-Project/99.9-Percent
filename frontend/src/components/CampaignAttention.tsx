@@ -10,7 +10,10 @@ import { tipProps } from "./tips";
 import "./CampaignAttention.css";
 import { CampaignAttentionContext, useCampaignAttention } from "./useCampaignAttention";
 import { chapter4Stage } from "@/game/chapter4Guidance";
-import { Chapter4StagePopup } from "./Chapter4StagePopup";
+import { chapter6Stage } from "@/game/chapter6Guidance";
+import { Chapter4StagePopup, Chapter6StagePopup } from "./Chapter4StagePopup";
+import { chapterCompanyMessage } from "@/game/chapterCompanyMessage";
+import { ChapterCompanyMessage } from "./ChapterCompanyMessage";
 
 function visibleControl(selector: string): HTMLElement | null {
   return [...document.querySelectorAll<HTMLElement>(selector)].find(node => {
@@ -41,6 +44,7 @@ const TARGETS: Record<GuidanceTarget, string> = {
   growth: '[data-guidance="start_growth_wave"]',
   risk: '[aria-label="Scaling growth risk"] > button',
   menu: ".menu-btn",
+  finance: '[aria-label="View finances"]',
 };
 
 /** One ephemeral owner for the header, dock, idle timer and explicitly accepted control attention. */
@@ -64,6 +68,8 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const markedTarget = useRef<HTMLElement | null>(null);
   const decision = useMemo(() => campaignAttention(game), [game]);
   const spikeStage = chapter4Stage(game);
+  const growthStage = chapter6Stage(game);
+  const companyMessage = chapterCompanyMessage(game);
   const available = !!game.campaign && started && tour?.track !== "campaign" && !practice;
   // Capturing the room's mouse blocks optional help, not an urgent Pause invitation.
   const pauseBlocked = covered || !!confirming || risk || !!tour || !!practice || hidden || !focused;
@@ -101,7 +107,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     return () => { for (const event of events) document.removeEventListener(event, dismiss, true); };
   }, [pauseGold, setPauseOffer]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const clear = () => { setOpened(null); setAccepted(null); setPauseOffer(null); };
     const update = () => {
       const modal = !!document.querySelector('.modal-backdrop');
@@ -202,7 +208,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       }
       if (node) node.dataset.guidanceStep = "true";
       target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node ? visibleControl('[data-guidance-step="true"]') : null) ?? visibleControl('.sheet-head button[aria-label="Close"]') ??
-        (guidanceTarget !== "run" && guidanceTarget !== "next" && guidanceTarget !== "requirements" && guidanceTarget !== "menu" ? visibleControl(".panel-reopen") : null);
+        (guidanceTarget !== "run" && guidanceTarget !== "next" && guidanceTarget !== "requirements" && guidanceTarget !== "menu" && guidanceTarget !== "finance" ? visibleControl(".panel-reopen") : null);
       if (node) delete node.dataset.guidanceStep;
       target?.classList.add("campaign-gold-attention");
       markedTarget.current = target;
@@ -237,8 +243,12 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     openHint: () => { if (!blocked) { setPauseOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
   const close = () => { setOpened(null); button.current?.focus(); };
   return <CampaignAttentionContext.Provider value={context}>{children}
-    {spikeStage && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !game.campaign?.incident && game.phase === "management" && !decision.reason.match(/^(review|next)$/) &&
+    {companyMessage && <ChapterCompanyMessage key={companyMessage.key} model={companyMessage} enabled={available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !game.campaign?.incident && game.phase === "management" && !decision.reason.match(/^(review|next)$/)}>
+    {growthStage &&
+      <Chapter6StagePopup key={`${growthStage.key}:${growthStage.stage}`} model={growthStage} />}
+    {spikeStage &&
       <Chapter4StagePopup key={`${spikeStage.key}:${spikeStage.stage}`} model={spikeStage} />}
+    </ChapterCompanyMessage>}
     {openNow && createPortal(<div ref={card} id="campaign-hint-card" className="campaign-hint-card" role="dialog" aria-modal="false" aria-label="Hint" tabIndex={-1} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
       <div className="campaign-hint-heading"><h3><Icon name="bulb" />Hint</h3><button type="button" className="icon-btn" aria-label="Close Hint" onClick={close}><Icon name="close" /></button></div>
       <div className="campaign-hint-copy" role="region" aria-label="Hint explanation" tabIndex={0}><p>{decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : selectedInspection && !recommendedAction ? `Check About ${selectedInspection} to understand the readings before choosing a response.` : decision.message}</p></div>

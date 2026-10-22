@@ -1,3 +1,7 @@
+import { outcomeSummary, scorecardSummary } from "@/game/campaignReport";
+import { CampaignReport } from "./CampaignReport";
+import { chapter6FinancialRisk } from "@/game/chapter6Finance";
+import { reliabilityLesson } from "@/game/reliabilityLesson";
 import { saveTextFile as download } from "@/lib/download";
 import { EquipmentPanel } from "./EquipmentPanel";
 import { CampaignReadings } from "./CampaignReadings";
@@ -32,7 +36,7 @@ import { money, num } from "@/game/format";
 import { useEffect, useState } from "react";
 import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
-import { CampaignIncidentReport, CampaignRecoveryReview } from "./CampaignIncidentReport";
+import { CampaignIncidentReport, CampaignRecoveryReview, IncidentEvidence } from "./CampaignIncidentReport";
 import { campaignClockAvailable, inspectOrSelect, useGame, walkthroughHoldsClock } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
@@ -57,7 +61,6 @@ import { ViewSheet, ViewTabs } from "./ViewSheet";
 import { Callout, Concept, Meter, Modal, Row, Stat } from "./ui";
 
 const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(c / 100);
-const percent = (v: number | null) => v === null ? "No completed requests" : (v * 100).toFixed(2) + "%";
 const PLACES = ["gateway", "app", "cache", "db", "monitoring"] as const;
 const PLACE_NAMES = { gateway: "Network", app: "App Server", db: "Database", monitoring: "Monitoring", cache: "Read Cache" };
 /** Inspecting the office rooms reports how the company works; they are room inspections, not measured components. */
@@ -90,15 +93,18 @@ function RequirementList({items}:{items:Requirement[]}) {
 function CampaignGuidance() {
   const {game,act}=useGame(),c=game.campaign!;
   const model=campaignGuidance(game),action=model.pendingAction;
+  const financialRisk=chapter6FinancialRisk(game);
 
   return <section className="campaign-guidance" aria-label="Guided Mode guidance">
+    {financialRisk&&<Callout compact tone="warn" icon="cash" kicker={financialRisk.kind==="blocked"?"Capacity funding blocked":"Money at risk"}><span role="note">{financialRisk.message}</span></Callout>}
     {c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
-    {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">{c.combinedStage?"Next growth requirements":"Chapter requirements"}<span> · {model.completed.length}/{model.requirements.length}</span></h3>
-      <RequirementList items={c.combinedStage?model.incomplete:model.requirements}/>
+    {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">{c.combinedStage?"Current growth requirements":"Chapter requirements"}<span> · {model.completed.length}/{model.requirements.length}</span></h3>
+      <RequirementList items={c.combinedStage?model.requirements.filter(r=>!r.met||r.id==="checks"):model.requirements}/>
       {!c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
       {model.notice&&<p role="note">{model.notice}</p>}
       {model.optional&&<p className="muted">{model.optional}</p>}
     </section>}
+    {model.finalGoals.length>0&&<section className="campaign-requirements" aria-label="Final Campaign goals"><h3 className="campaign-requirements-heading">Final Campaign goals</h3><RequirementList items={model.finalGoals}/></section>}
     {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
     {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
     {c.openingMilestone?.acknowledged&&!c.dataStage&&!c.scaling?.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
@@ -293,17 +299,8 @@ export function CampaignControls() {
   </footer>;
 }
 
-function Report({ report, meta = true }: { report: CampaignPostmortem; meta?: boolean }) {
-  return <div>
-    {meta && <p className="pm-meta"><span className="tag tag-ok"><Icon name="check" size={12} />Recovered{report.limited ? " under traffic limit" : " at full demand"}</span><span className="muted">Game seconds {report.openedStep}–{report.recoveredStep}</span></p>}
-    <dl className="rows"><Row label="Setup spending" value={dollars(report.setupCents)} /></dl>
-    <h3>What happened and what changed</h3><div className="pm-lines">{report.explanations.slice(0,1).map((text, i) => <Callout compact key={i} tone="info" icon="search" kicker="Recorded evidence">
-      {text.replace(/\b\d+\.\d{3,}\b/g, value => Number(value).toFixed(2))}
-    </Callout>)}</div>
-    <details className="more"><summary>Causes, actions and trade-offs</summary>{report.explanations.slice(1).map((text,i)=><p key={i}>{text.replace(/\b\d+\.\d{3,}\b/g,value=>Number(value).toFixed(2))}</p>)}</details>
-    <details className="more"><summary>Workload and cache evidence</summary>{report.snapshots.map(m=><p key={m.step}>Game second {m.step}: {m.data?`${m.data.profile}; logical work ${m.data.logical}; hits ${m.data.hits}; eligible misses ${m.data.eligibleMisses}; writes ${m.data.writes}; non-cacheable reads ${m.data.nonCacheableReads}; used rate ${m.data.effectiveHitRateUsed/100}%; warmth used/after ${m.data.warmthUsed/100}%/${m.data.warmthAfterStep/100}%; target ${m.data.target/100}%; DB demand ${m.db.demand}/${m.db.capacity}; backlog ${m.db.backlog}`:"Workload detail not recorded in this historical snapshot"}</p>)}</details>
-    <details className="more campaign-details"><summary>Recorded incident evidence</summary><table className="campaign-table"><caption>Recorded observations; older game seconds retain aggregate evidence.</caption><thead><tr><th>Game second</th><th>Applications: demand/capacity · backlog</th><th>Routing</th><th>DB demand/capacity</th><th>DB backlog</th><th>Latency</th><th>Errors</th></tr></thead><tbody>{report.snapshots.map(m => <tr key={m.step}><td>{m.step}</td><td>{m.instances?m.instances.map(a=><div key={a.id}>{appName(a.id)}: {a.demand}/{a.capacity} · {a.backlog}</div>):`${m.app.demand}/${m.app.capacity} · ${m.app.backlog} (aggregate)`}</td><td>{m.routing?`${m.routing.mode}: ${m.routing.targets.map(appName).join(", ")}`:"Not recorded"}</td><td>{m.db.demand}/{m.db.capacity}</td><td>{m.db.backlog}</td><td>{m.latencyMs.toFixed(0)} ms</td><td>{percent(m.serviceErrorRate)}</td></tr>)}</tbody></table></details>
-  </div>;
+function Report({ report }: { report: CampaignPostmortem }) {
+  return <CampaignIncidentReport report={report}/>;
 }
 
 /** The campaign menu: the same run card, Resume, tabs and tiles as Classic's, with the company's own actions. */
@@ -392,31 +389,42 @@ export function CampaignOverlays() {
 function CampaignDialog() {
   const { game, view, openView, act, chapterComplete, tour, tutorialCompany } = useGame();
   const c = game.campaign!;
-  if(view==="scorecard"&&(c.scorecard||c.combinedStage?.finalReview))return <Modal title="Company scorecard" onClose={()=>openView("guidance")}><CampaignScorecard card={(c.scorecard??c.combinedStage!.finalReview)!} pendingReview={!c.scorecard}/></Modal>;
-  if(pendingCombined(c)&&!["guidance","menu","history"].includes(view??"")){const d=c.combinedStage!,r=d.currentRound;return <Modal title={d.finalReview?"Final campaign review":"Growth outcome"} onClose={()=>openView("guidance")}>{d.finalReview?<><CampaignScorecard card={d.finalReview} pendingReview/><button className="btn btn-primary" onClick={()=>act({type:"complete_campaign"})}>Complete campaign</button></>:<><h3>What happened</h3><p>{r!.scenario.template}: registered users reached {r!.users.toLocaleString("en-US")}. Temporary pressure has ended.</p><h3>What the evidence showed</h3><p>All applications restored; five stable full-demand baseline game seconds; actual incident reports acknowledged.</p><h3>Trade-offs</h3><p>Rejected requests during this round: {c.cumulative.rejected-r!.rejectedBefore}; setup spending {dollars(c.investedCents-r!.setupBefore)}. Review actual actions and causal reports in History.</p><button className="btn btn-primary" onClick={()=>act({type:"acknowledge_growth"})}>Continue company</button></>}</Modal>;}
-  if (pendingReliability(c)) return <Modal title="Reliability outcome" icon={{ kind: "ok", name: "health" }}>
+  if(view==="scorecard"&&(c.scorecard||c.combinedStage?.finalReview))return <Modal title="Company scorecard" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={(c.scorecard??c.combinedStage!.finalReview)!} pendingReview={!c.scorecard}/></Modal>;
+  if(pendingCombined(c)&&!["guidance","menu","history"].includes(view??"")){
+    const d=c.combinedStage!,r=d.currentRound;
+    return <Modal title={d.finalReview?"Final campaign review":"Growth outcome"} className="campaign-recovery-report" onClose={()=>openView("guidance")}>
+      {d.finalReview?<><CampaignScorecard card={d.finalReview} pendingReview/><div className="modal-foot"><button className="btn btn-primary" onClick={()=>act({type:"complete_campaign"})}>Complete campaign</button></div></>:
+        <><CampaignReport lesson={outcomeSummary(c,"growth",r!)}>
+          <h4>Recorded growth outcome</h4><p>{r!.scenario.template}: registered users reached {r!.users.toLocaleString("en-US")}. Temporary pressure has ended.</p>
+          <p>All applications restored; five stable full-demand baseline game seconds; actual incident reports acknowledged.</p>
+          <p>Rejected requests during this round: {c.cumulative.rejected-r!.rejectedBefore}; setup spending {dollars(c.investedCents-r!.setupBefore)}. Review actual actions and causal reports in History.</p>
+          <pre>{JSON.stringify(r,null,2)}</pre>
+        </CampaignReport><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_growth"})}/></>}
+    </Modal>;
+  }
+  if (pendingReliability(c)) return <Modal title="Reliability outcome" className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}>
     <ReliabilityOutcome campaign={c} />
     <ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_reliability"})} />
   </Modal>;
-  if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_prevention_review"})} /></Modal>;
+  if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_prevention_review"})} /></Modal>;
   if (game.phase === "review") {
     const report = c.reports[c.reports.length - 1];
-    if (!tutorialCompany && tour?.track !== "campaign") return <CampaignRecoveryReview key={`${c.runId}:${report.id}:${report.recoveredStep}`} runId={c.runId} report={report} onContinue={() => act({ type: "acknowledge_review" })} />;
-    return <Modal title="Incident postmortem" wide icon={{ kind: "ok", name: "incident" }}><Report report={report} /><ContinueFoot label="Continue company" onClick={() => act({ type: "acknowledge_review" })} /></Modal>;
+    if (!tutorialCompany && tour?.track !== "campaign") return <CampaignRecoveryReview key={`${c.runId}:${report.id}:${report.recoveredStep}`} runId={c.runId} report={report} reliability={!c.combinedStage ? reliabilityLesson(c, report) : undefined} onContinue={() => act({ type: "acknowledge_review" })} />;
+    return <Modal title="Incident postmortem" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "incident" }}><Report report={report} /><ContinueFoot label="Continue company" onClick={() => act({ type: "acknowledge_review" })} /></Modal>;
   }
-  if(c.openingMilestone&&!c.openingMilestone.acknowledged)return <Modal title="First growth challenge handled" icon={{ kind: "go", name: "goal" }}>
-    <p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
-    <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p>
+  if(c.openingMilestone&&!c.openingMilestone.acknowledged)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }}>
+    <CampaignReport lesson={outcomeSummary(c,"opening")}><p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
+    <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p><pre>{JSON.stringify(c.openingMilestone,null,2)}</pre></CampaignReport>
     <ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_milestone"})} />
   </Modal>;
-  if(pendingSpikeAcknowledgement(c) && view!=="menu" && view!=="history") return <Modal title="Spike response handled" icon={{ kind: "go", name: "goal" }} onClose={()=>openView("history")}><p>Both demand pulses ended and five baseline game seconds qualified for stable service. The same company continues with its investments and operating costs.</p><ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_spikes"})} /></Modal>;
+  if(pendingSpikeAcknowledgement(c) && view!=="menu" && view!=="history") return <Modal title="Spike response handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={()=>openView("history")}><CampaignReport lesson={outcomeSummary(c,"spikes")}><p>Both demand pulses ended and five baseline game seconds qualified for stable service. The same company continues with its investments and operating costs.</p><pre>{JSON.stringify({stage:c.spikeStage,observations:c.recent.filter(m=>m.spikes)},null,2)}</pre></CampaignReport><ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_spikes"})} /></Modal>;
   // It pauses the clock when it appears, so it shows over History and guidance rather than waiting behind them.
   if(chapterComplete&&chapterComplete===finishedChapter(game)&&view!=="menu")return <ChapterComplete chapter={chapterComplete} />;
-  if(game.phase==="ended"&&game.outcome==="won"&&!["guidance","menu","history","tech"].includes(view??""))return <Modal title="Campaign complete" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard!}/><button className="btn" onClick={()=>openView("guidance")}>Inspect final company</button><button className="btn" onClick={()=>openView("menu")}>Export or start a new company</button></Modal>;
-  if (game.phase === "ended" && game.outcome !== "won" && view === null) return <Modal title="Company bankrupt" tone="alert" icon={{ kind: "critical", name: "cash" }} onClose={() => openView("menu")}>
-    <Callout tone="critical" icon="cash" kicker="Company closed">Cash reached {dollars(c.cashCents)} after settlement at game second {c.step}. Final metrics and history remain available.</Callout>
+  if(game.phase==="ended"&&game.outcome==="won"&&!["guidance","menu","history","tech"].includes(view??""))return <Modal title="Campaign complete" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard!}/><div className="modal-foot"><button className="btn" onClick={()=>openView("guidance")}>Inspect final company</button><button className="btn" onClick={()=>openView("menu")}>Export or start a new company</button></div></Modal>;
+  if (game.phase === "ended" && game.outcome !== "won" && view === null) return <Modal title="Company bankrupt" className="campaign-recovery-report" tone="alert" icon={{ kind: "critical", name: "cash" }} onClose={() => openView("menu")}>
+    <CampaignReport lesson={c.scorecard?scorecardSummary(c.scorecard,false):{happened:"The company ran out of cash.",response:"No specific recovery is established by the retained record.",improve:"Compare operating costs with earned revenue before expanding.",takeaway:"Capacity must be affordable to operate."}}><Callout tone="critical" icon="cash" kicker="Company closed">Cash reached {dollars(c.cashCents)} after settlement at game second {c.step}. Final metrics and history remain available.</Callout>
     <p>Last period revenue: {dollars(c.settlements.at(-1)?.revenueCents??0)}. Infrastructure: {dollars(infrastructureCents(c.settlements.at(-1)))}. Salaries: {dollars(c.settlements.at(-1)?.salaryCents??0)}.</p>
-    <p>Upfront investment: {dollars(c.investedCents)}. Rejected demand: {c.cumulative.rejected} requests (not an extra cash charge).</p>
+    <p>Upfront investment: {dollars(c.investedCents)}. Rejected demand: {c.cumulative.rejected} requests (not an extra cash charge).</p><pre>{JSON.stringify(c.scorecard,null,2)}</pre></CampaignReport>
     <div className="modal-foot"><button className="btn btn-quiet" onClick={() => openView("history")}><Icon name="history" size={16} />View history</button><button className="btn btn-primary" onClick={() => openView("menu")}><Icon name="refresh" size={16} />Export or start a new company</button></div>
   </Modal>;
   if (view === "menu") return <CampaignMenu initialTab={game.phase === "ended" ? "saves" : "run"} />;
@@ -434,9 +442,11 @@ function ChapterComplete({ chapter }: { chapter: ChapterCompletion }) {
   const done = COMPLETIONS[chapter];
   const next = campaignChapters(game).find(c => c.id === done.next)!;
   const action = campaignGuidance(game).pendingAction!;
-  return <Modal title={done.title} icon={{ kind: "go", name: "goal" }} onClose={dismissChapterComplete}>
-    <p>{done.text} Your architecture, cash and investments carry forward.</p>
-    <p>Next: {next.name}. {next.description}</p>
+  return <Modal title={done.title} className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={dismissChapterComplete}>
+    <CampaignReport lesson={outcomeSummary(game.campaign!,chapter)}>
+      <p>{done.text} Your architecture, cash and investments carry forward.</p><p>Next: {next.name}. {next.description}</p>
+      <pre>{JSON.stringify({stage:chapter==="scaling"?game.campaign!.scaling:game.campaign!.dataStage,snapshot:game.campaign!.snapshot},null,2)}</pre>
+    </CampaignReport>
     <div className="modal-foot">
       <button className="btn btn-quiet" onClick={dismissChapterComplete}>Stay in this chapter</button>
       <button className="btn btn-primary" onClick={() => { dismissChapterComplete(); act(action.action!); }}>{action.label}<Icon name="next" /></button>
@@ -491,7 +501,7 @@ function CampaignHistory() {
           <span><Icon name="incident" size={16} />Game seconds {report.openedStep}–{report.recoveredStep}: Service slowdown</span>
           <span className="tag tag-ok"><Icon name="check" size={12} />Recovered{report.limited ? " under traffic limit" : ""}</span>
         </button>
-        {open === report.id && <div className="pm">{legacy ? <Report report={report} meta={false} /> : <CampaignIncidentReport report={report} />}</div>}
+        {open === report.id && <div className="pm">{legacy ? <Report report={report} /> : <CampaignIncidentReport report={report} />}</div>}
       </li>)}</ul>}
     </div>}
   </div>;
@@ -505,7 +515,9 @@ function ReliabilityOutcome({campaign:c}:{campaign:Campaign}) {
   const completion=c.trace.find(e=>e.type==="reliability-stage-completed");
   const detection=c.trace.find(e=>e.type==="health-change-detected"&&e.data.appId===f.targetId&&e.data.detectedHealth==="unhealthy"&&e.step>=f.startStep);
   const promotion=c.trace.find(e=>e.type==="failover-activated"&&e.data.eventId===f.id);
-  return <div>
+  const lesson=reliabilityLesson(c);
+  return <>
+    <CampaignReport lesson={lesson?{happened:lesson.happened,response:lesson.recovered,improve:lesson.improve,takeaway:lesson.takeaway}: {happened:"The reliability test completed.",response:"The retained records do not establish a specific repair.",takeaway:"Verify service after restoring a server."}}>
     <Callout compact tone="success" icon="health" kicker={completion?.data.limited?"Stable — traffic limited":"Stable service"}>
       {completion?.data.incidentOccurred?"A production incident occurred during the test and its measured recovery was reviewed.":"The test completed without opening a production incident."} Five stable management observations followed restoration.
     </Callout>
@@ -517,18 +529,23 @@ function ReliabilityOutcome({campaign:c}:{campaign:Campaign}) {
       <Row label="Company rejected requests at completion" value={num(Number(completion?.data.rejected??0))} />
       <Row label="Company setup spending at completion" value={dollars(Number(completion?.data.setupCents??0))} /></dl>
     <p>Health Checks detect; spares and routing provide surviving capacity. Failover creates no capacity. Compare per-instance demand and capacity in recorded incident evidence.</p>
-  </div>;
+    {c.reports.filter(r=>r.snapshots.some(m=>m.reliability?.faultId===f.id)).map(report=><IncidentEvidence key={report.id} report={report}/>)}
+    </CampaignReport>
+  </>;
 }
 
 const PREPARATION_NAMES: Partial<Record<ScheduledAction["type"], string>> = {"upgrade-db":"Database upgrade","add-app":"Additional application",limit:"Traffic limit",unlimit:"Traffic limit removal"};
 function PreventionOutcome({campaign}:{campaign:Campaign}) {
+  return <CampaignReport lesson={outcomeSummary(campaign,"prevention")}><PreventionEvidence campaign={campaign}/></CampaignReport>;
+}
+function PreventionEvidence({campaign}:{campaign:Campaign}) {
   const o=campaign.openingPrevention!.outcome!,m=o.snapshots.at(-1)!;
   const qualified=campaign.trace.find(t=>t.type==="opening-prevention-qualified"&&t.step===o.qualifiedStep);
   const requested=new Set(campaign.trace.filter(t=>t.type==="action-requested"&&qualified&&t.id<qualified.id).map(t=>t.data.actionId));
   const prepared=campaign.actions.filter(a=>requested.has(a.id)&&PREPARATION_NAMES[a.type]);
   return <div>
     <Callout tone="success" icon="health" kicker="First growth prevented">Traffic increased from {num(Q.startingTraffic)} to {num(Q.grownTraffic)} req/s and the Application and Database handled full demand with empty queues and healthy service for {Q.stableSteps} consecutive game seconds.</Callout>
-    <p>Prevention is recorded separately. Scaling unlocks only after a real Opening incident is recovered and its postmortem and milestone are acknowledged. No incident is forced.</p>
+    <p>Verified prevention is a valid Opening completion path. Acknowledge this outcome, then the Opening recognition, to unlock Scaling &amp; Routing. No incident or postmortem is required for prevention.</p>
     {prepared.length?<ul>{prepared.map(a=><li key={a.id}>{PREPARATION_NAMES[a.type]}: {a.activatedStep!==null&&a.activatedStep<=o.qualifiedStep?"active before completion":"still pending at completion"}{a.costCents>0?` · setup ${dollars(a.costCents)}`:" · no setup cost"}.</li>)}</ul>:<p>No infrastructure or admission changes were recorded before completion.</p>}
     <dl className="rows">
       <Row label="Application demand / capacity" value={`${num(m.app.demand)} / ${num(m.app.capacity)} req/s`} />

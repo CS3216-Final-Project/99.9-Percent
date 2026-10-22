@@ -1,8 +1,10 @@
+import { CampaignReport } from "./CampaignReport";
+import { scorecardSummary } from "@/game/campaignReport";
 import type { CampaignScorecard as Scorecard } from "@/sim/campaignTypes";
 const money=(n:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(n/100);
-export default function CampaignScorecard({card,pendingReview=false}:{card:Scorecard;pendingReview?:boolean}) {
+function ScorecardEvidence({card,pendingReview=false}:{card:Scorecard;pendingReview?:boolean}) {
  const m=card.measurement,scope=m.scope==="full-run"?"Whole run":"Since save upgrade";
- return <section aria-label="Run scorecard"><h2>Run scorecard</h2><p>{pendingReview?"Ready to complete campaign":card.outcome==="won"?"Campaign complete":"Company bankrupt"} · Registered users {card.users.toLocaleString("en-US")} {card.finalUserTarget?`/ ${card.finalUserTarget.toLocaleString("en-US")}`:""}</p>
+ return <section><h2>Run scorecard</h2><p>{pendingReview?"Ready to complete campaign":card.outcome==="won"?"Campaign complete":"Company bankrupt"} · Registered users {card.users.toLocaleString("en-US")} {card.finalUserTarget?`/ ${card.finalUserTarget.toLocaleString("en-US")}`:""}</p>
  <p>Registration represents growth opportunity; rejected or failed requests earn no revenue.</p>
  <dl><dt>Cash remaining</dt><dd>{money(card.cashCents)}</dd><dt>Settled revenue</dt><dd>{money(card.revenueCents)}</dd><dt>Unsettled revenue (not spendable)</dt><dd>{money(card.pendingRevenueCents)}</dd>
  <dt>Infrastructure setup</dt><dd>{money(card.infrastructureSetupCents)}</dd><dt>Settled infrastructure operations</dt><dd>{money(card.infrastructureOperatingCents)}</dd><dt>Settled salaries</dt><dd>{money(card.salaryCents)}</dd><dt>Promotion spending</dt><dd>{money(card.promotionCents)}</dd>
@@ -15,4 +17,8 @@ export default function CampaignScorecard({card,pendingReview=false}:{card:Score
  <h3>Final architecture</h3><ul>{card.architecture.apps.map(a=><li key={a.id}>{a.id}: {a.capacity} req/s, {a.health}, {a.role}, {a.routed?"configured for traffic":"unrouted"}</li>)}</ul>
  <p>Database {card.architecture.dbCapacity} ops/s; routing {card.architecture.routing.mode}: {card.architecture.routing.targets.join(", ")}. Load balancer {card.architecture.loadBalancer?"deployed":"absent"}; cache {card.architecture.readCache?`${card.architecture.readCache.warmth/100}% warm` :"absent"}.</p>
  <p>Owned technologies: {card.ownedTechIds.join(", ")||"None"}. Deployed technologies: {card.deployedTechIds.join(", ")||"None"}.</p><p>Run {card.runId}; seed {card.seed}; captured at physical step {card.capturedStep}.</p></section>;
+}
+
+export default function CampaignScorecard({card,pendingReview=false}:{card:Scorecard;pendingReview?:boolean}) {
+ return <section className="campaign-report-shell" aria-label="Run scorecard"><CampaignReport key={`${card.runId}:${card.capturedStep}:${pendingReview}`} lesson={scorecardSummary(card,pendingReview)}><ScorecardEvidence card={card} pendingReview={pendingReview}/></CampaignReport></section>;
 }
