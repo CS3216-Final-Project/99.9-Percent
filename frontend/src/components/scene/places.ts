@@ -41,6 +41,11 @@ export function placeAt(floor: Floor, x: number, z: number): string {
   return best[0];
 }
 
+/** The zones' names on a floor, where they hang in the room. */
+export function zoneNamesOn(floor: Floor): [string, number, number][] {
+  return floor === "office" ? ZONE_NAMES : [...SERVER_ZONE_NAMES, ...SERVER_ROOMS.map(([n, r]): [string, number, number] => [n, (r[0] + r[2]) / 2, n === "Server hall" ? r[1] + 1.4 : (r[1] + r[3]) / 2])];
+}
+
 type Point = [number, number];
 
 /** A zone as the map draws it: its name, its outline on the floor, and which of the map's tints it takes. */

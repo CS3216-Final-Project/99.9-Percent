@@ -37,6 +37,7 @@ import { campaignClockAvailable, inspectOrSelect, useGame, walkthroughHoldsClock
 import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
+import { MenuMap } from "./MenuMap";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { MenuActions, MenuRun, MenuTile } from "./MenuRun";
 import { useMenuExit } from "./MenuExit";
@@ -347,6 +348,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
         </MenuActions>
         <ModeSwitch to="classic" />
       </>}
+      {tab === "map" && <MenuMap />}
       {tab === "sound" && <SoundSettings />}
       {tab === "graphics" && <GraphicsSettings />}
       {tab === "controls" && <ControlSettings />}

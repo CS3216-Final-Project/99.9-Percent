@@ -1,33 +1,20 @@
 "use client";
 
-import { memo, useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
 import { EQUIPMENT_ORDER } from "@/sim";
 import { FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { useGame } from "@/game/store";
 import { Icon } from "../icons";
 import { crewOn } from "./crewSpots";
-import {
-  GLASS,
-  OBSTACLES,
-  ROOM_OBSTACLES,
-  SERVER_GLASS,
-  SERVER_ROOMS,
-  SERVER_ZONE_NAMES,
-  SHAFT,
-  SPOTS,
-  ZONE_NAMES,
-  serverObstacles,
-  type Obstacle,
-  type Racks,
-} from "./floorplan";
-import { ROOM } from "./layout";
+import type { Racks } from "./floorplan";
 import { DIAL_RADIUS, dialTurn, halfWidthAngle, northOnDial, onRim, toDial, viewWedge } from "./mapDial";
 import { FLOOR_NUMBER } from "./levels";
-import { placeAt, whereLine, zoneAreas } from "./places";
+import { Plan } from "./MapPlan";
+import { placeAt, whereLine, zoneNamesOn } from "./places";
 import "./views.css";
-import { ride, riding } from "./ride";
+import { riding } from "./ride";
 import { buildModel, racksOf } from "./sceneModel";
-import { avatar, walkTo } from "./walk";
+import { avatar, avatarSpot, walkTo } from "./walk";
 import { viewNow } from "./viewState";
 
 /*
@@ -67,78 +54,23 @@ function useMapModel(): MapModel {
   return useMemo(() => JSON.parse(key) as MapModel, [key]);
 }
 
-const shape = (o: Obstacle, key: string) =>
-  "box" in o ? (
-    <rect key={key} x={o.box[0]} y={o.box[1]} width={o.box[2] - o.box[0]} height={o.box[3] - o.box[1]} />
-  ) : (
-    <circle key={key} cx={o.disc[0]} cy={o.disc[1]} r={o.disc[2]} />
-  );
-
 /** A zone just entered, glowing on the plan for a moment; `n` counts entries, so entering again glows again. */
 interface Entered {
   name: string;
   n: number;
 }
 
-/**
- * The still part of a floor's plan: its zones, each tinted apart from the ones it meets, then walls, glass, the shaft
- * and furniture. Drawn again only when the floor or the machines change, not each time the dial turns or the avatar
- * and the crew are redrawn.
- */
-const Plan = memo(function Plan({ floor, racks }: { floor: Floor; racks: Racks }) {
-  const furniture = floor === "office" ? [...OBSTACLES, ...ROOM_OBSTACLES] : serverObstacles(racks);
-  const glass = floor === "office" ? GLASS : SERVER_GLASS;
-  return (
-    <>
-      <rect className="map-floor" x={ROOM.x0} y={ROOM.z0} width={ROOM.w} height={ROOM.d} />
-      <g className="map-zones">
-        {zoneAreas(floor).map((zone, i) => (
-          <polygon
-            key={`${zone.name}-${i}`}
-            className={zone.tone === null ? "is-elevator" : `tone-${zone.tone}`}
-            data-zone={zone.name}
-            points={zone.points.map(([x, z]) => `${x.toFixed(2)},${z.toFixed(2)}`).join(" ")}
-          />
-        ))}
-      </g>
-      <g className="map-furniture">{furniture.map((o, i) => shape(o, `${o.name}-${i}`))}</g>
-      <g className="map-glass">
-        {glass.map(([x1, z1, x2, z2], i) => (
-          <line key={i} x1={x1} y1={z1} x2={x2} y2={z2} />
-        ))}
-      </g>
-      <g className="map-shaft">
-        {SHAFT.map(([x1, z1, x2, z2], i) => (
-          <line key={i} x1={x1} y1={z1} x2={x2} y2={z2} />
-        ))}
-      </g>
-      <rect className="map-walls" x={ROOM.x0} y={ROOM.z0} width={ROOM.w} height={ROOM.d} />
-    </>
-  );
-});
-
-/** The zones' names on a floor, where they hang in the room. */
-function namesOn(floor: Floor): [string, number, number][] {
-  return floor === "office" ? ZONE_NAMES : [...SERVER_ZONE_NAMES, ...SERVER_ROOMS.map(([n, r]): [string, number, number] => [n, (r[0] + r[2]) / 2, n === "Server hall" ? r[1] + 1.4 : (r[1] + r[3]) / 2])];
-}
-
 /** The zones' names, each turned back against the dial so it always reads upright. */
 function Names({ floor, dial, entered }: { floor: Floor; dial: Dial; entered: Entered | null }) {
   return (
     <g className="map-names">
-      {namesOn(floor).map(([name, x, z]) => (
+      {zoneNamesOn(floor).map(([name, x, z]) => (
         <text key={entered?.name === name ? `${name}-${entered.n}` : name} className={entered?.name === name ? "is-entered" : undefined} x={x} y={z} transform={nameAt(dial, x, z)}>
           {name}
         </text>
       ))}
     </g>
   );
-}
-
-/** Where the avatar is drawn and said to be: walking, where it walks; otherwise in the founder's chair upstairs. */
-function avatarSpot(walking: boolean) {
-  if (!walking) return { floor: "office" as Floor, x: SPOTS.founder.x, z: SPOTS.founder.z, yaw: SPOTS.founder.rot, to: null as Floor | null };
-  return { floor: avatar.floor, x: avatar.x, z: avatar.z, yaw: avatar.yaw, to: riding() ? ride.to : null };
 }
 
 /** How the dial sits this moment: what it is centred on and which way it faces, and where the avatar is. */

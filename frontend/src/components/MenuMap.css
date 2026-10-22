@@ -1,0 +1,307 @@
+/* The menu's Map tab: the pause-menu plan. It reuses the minimap's .map-* classes from views.css; these are only
+   the parts a flat page map needs that a round dial does not. */
+
+.menu-map {
+  display: grid;
+  gap: 12px;
+}
+
+.menu-map-head,
+.menu-map-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.menu-map-floors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.menu-map-floors button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px 0 6px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.menu-map-floors button .floor-number {
+  width: 22px;
+  height: 22px;
+}
+
+.menu-map-floors button[aria-pressed="true"] {
+  background: var(--go);
+}
+
+.menu-map-floors button:hover {
+  background: #fff;
+}
+
+.menu-map-floors button[aria-pressed="true"]:hover {
+  background: var(--go-hover);
+}
+
+.menu-map-floors .floor-badge {
+  position: static;
+  margin-left: 4px;
+}
+
+.menu-map-you {
+  margin: 0;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 12px;
+  border: 1px solid var(--control-edge);
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+}
+
+.menu-map-find {
+  margin: 0;
+  flex: 1 1 220px;
+}
+
+.menu-map-find input {
+  width: 100%;
+}
+
+.menu-map-layers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.menu-map-frame {
+  position: relative;
+  aspect-ratio: 44 / 24;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--night-2);
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.menu-map-frame.is-zoomed {
+  touch-action: none;
+}
+
+.menu-map-frame.is-panning {
+  cursor: grabbing;
+}
+
+.menu-map-plan {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Pins hold their screen size at any zoom (they are scaled by metres-per-pixel in the component). */
+.map-pin {
+  cursor: pointer;
+}
+
+.map-pin rect,
+.map-pin > circle {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.map-pin.is-picked rect,
+.map-pin.is-picked > circle {
+  fill: var(--go);
+}
+
+.map-pin.state-warn rect {
+  stroke: var(--warn-ink);
+  stroke-width: 2.5;
+}
+
+.map-pin.state-critical rect,
+.map-pin.state-down rect {
+  stroke: var(--critical);
+  stroke-width: 2.5;
+}
+
+.map-pin-icon {
+  color: var(--ink);
+  overflow: visible;
+}
+
+.map-pin-mark circle {
+  fill: var(--critical);
+  stroke: var(--ink);
+  stroke-width: 1;
+}
+
+.map-pin.mark-busy .map-pin-mark circle {
+  fill: var(--focus);
+}
+
+.map-pin-mark text {
+  fill: #fff;
+  font: 700 8px var(--font-num);
+  text-anchor: middle;
+}
+
+.map-pin.mark-alert .map-pin-mark circle {
+  animation: floor-alert 1s ease-in-out infinite;
+}
+
+.map-pin-label,
+.map-avatar .map-pin-label {
+  fill: var(--ink);
+  stroke: #efe6d3;
+  stroke-width: 3px;
+  paint-order: stroke;
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: hanging;
+  pointer-events: none;
+}
+
+.menu-map-compass {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  display: grid;
+  place-items: center;
+  font: 700 var(--text-xs) var(--font-display);
+}
+
+.menu-map-zoom {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.menu-map-zoom .icon-btn {
+  background: var(--paper);
+}
+
+.menu-map-scale {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  font: 600 var(--text-xs) var(--font-num);
+  color: var(--ink);
+}
+
+.menu-map-scale i {
+  display: block;
+  height: 6px;
+  border: 2px solid var(--ink);
+  border-top: 0;
+}
+
+.menu-map-hint {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-soft);
+  background: rgb(255 255 255 / 0.7);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.menu-map-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+}
+
+.menu-map-card > .chip-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.menu-map-card-text {
+  display: grid;
+  flex: 1 1 200px;
+}
+
+.menu-map-card-kicker {
+  font-size: var(--text-xs);
+  color: var(--text-soft);
+}
+
+.menu-map-card-note {
+  font-size: var(--text-sm);
+  flex-basis: 100%;
+}
+
+.chip-plain {
+  padding: 4px 10px;
+}
+
+.menu-map-floor-tag {
+  margin-left: 4px;
+  font-size: var(--text-xs);
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+@media (max-width: 759px) {
+  .menu-map-compass {
+    width: 22px;
+    height: 22px;
+    top: 8px;
+    left: 8px;
+  }
+
+  .menu-map-zoom {
+    top: 8px;
+    right: 8px;
+    gap: 4px;
+  }
+
+  .menu-map-hint {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-pin.mark-alert .map-pin-mark circle {
+    animation: none;
+  }
+}

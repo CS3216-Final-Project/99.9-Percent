@@ -4154,7 +4154,7 @@ button:disabled {
 }
 
 @media (max-width: 759px) {
-  /* Narrow screens: the menu's run card and Resume stack, and its seven tabs take two rows of
+  /* Narrow screens: the menu's run card and Resume stack, and its nine tabs take three rows of
      icon-above-label buttons, so every label stays full size and tappable. */
   .modal-menu .menu-overview {
     grid-template-columns: minmax(0, 1fr);
@@ -4186,9 +4186,9 @@ button:disabled {
     font-size: var(--text-lg);
   }
 
-  /* The menu's seven tabs take four columns, still two rows. */
+  /* The menu's nine tabs take three rows of three. */
   .modal-menu .tab-strip {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     padding-bottom: 12px;
   }
 
