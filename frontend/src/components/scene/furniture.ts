@@ -75,9 +75,18 @@ export function mdl(id: ModelId, x: number, z: number, rot = 0, s?: number | V3,
   return { id, p: [x, y, z], rot, s };
 }
 
+export function atop(under: Placement, pl: Placement): Placement {
+  return { ...pl, on: under };
+}
+
 /** Models built around the origin, placed at (x, z) and turned by rot. */
 export function placeModels(items: Placement[], x: number, z: number, rot = 0): Placement[] {
-  return items.map((it) => ({ ...it, p: at(x, z, rot, it.p), rot: (it.rot ?? 0) + rot }));
+  const placed = new Map<Placement, Placement>();
+  for (const it of items) placed.set(it, { ...it, p: at(x, z, rot, it.p), rot: (it.rot ?? 0) + rot });
+  return items.map((it) => {
+    const copy = placed.get(it)!;
+    return it.on ? { ...copy, on: placed.get(it.on) ?? it.on } : copy;
+  });
 }
 
 export const DESK_TOP = 0.74;

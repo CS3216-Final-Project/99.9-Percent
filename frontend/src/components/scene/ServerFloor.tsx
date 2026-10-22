@@ -9,7 +9,7 @@ import { BENCHES, CAGE, CHILLER, CHILLERS, PALLETS, PUMPS, RACK_FRAMES, RESPONDE
 import { heading } from "./routes";
 import { others } from "./walk";
 import { ModelBatch, type Placement } from "./models";
-import { deskGear, deskModels, glassFrames, ignoreRay, mdl, PANEL, placeModels, placeProps, rand } from "./furniture";
+import { atop, deskGear, deskModels, glassFrames, ignoreRay, mdl, PANEL, placeModels, placeProps, rand } from "./furniture";
 import { Beacon, Floors, GlassPanes, ScreenPlane, ZoneNames, type Zone } from "./Office";
 import { FURNITURE, ROOM_PALETTE } from "./palette";
 import { PrimBatch } from "./prims";
@@ -223,12 +223,13 @@ function buildStatic(): Prim[] {
 function buildModels(): Placement[] {
   const out: Placement[] = [];
   out.push(...placeModels(deskModels(1.8, 12, !standsAtDesk(ON_CALL)), 8.2, -6.9));
-  out.push(mdl("boxClosed", 7.3, -4.1, 0.2, 1.3), mdl("boxClosed", 7.32, -4.1, 0.5, 1.1, 0.7), mdl("boxOpen", 8.2, -4.0, -0.3, 1.1));
+  const stackBase = mdl("boxClosed", 7.3, -4.1, 0.2, 1.3);
+  out.push(stackBase, atop(stackBase, mdl("boxClosed", 7.32, -4.1, 0.5, 1.1)), mdl("boxOpen", 8.2, -4.0, -0.3, 1.1));
   out.push(mdl("pottedPlant", 6.0, -5.1), mdl("trashcan", 10.9, -9.0, 0, 0.8));
   // Servers still in their boxes on the pallets, and a stool at each workbench
   for (const [x, z] of PALLETS) {
-    for (let k = 0; k < 4; k++) out.push(mdl("boxClosed", x + (k % 2 ? 0.3 : -0.3), z + (k < 2 ? -0.3 : 0.3), (k * 0.3) % 1, 1.3, 0.14));
-    out.push(mdl("boxClosed", x, z, 0.4, 1.2, 0.68));
+    const boxes = Array.from({ length: 4 }, (_, k) => mdl("boxClosed", x + (k % 2 ? 0.3 : -0.3), z + (k < 2 ? -0.3 : 0.3), (k * 0.3) % 1, 1.3, 0.14));
+    out.push(...boxes, atop(boxes[0], mdl("boxClosed", x, z, 0.4, 1.2)));
   }
   out.push(mdl("stoolBar", -6.4, 8.8), mdl("stoolBar", -2.8, 8.8, 0.6), mdl("trashcan", 0.4, 7.8, 0, 0.8));
   return out;

@@ -43,7 +43,7 @@ import { ModelBatch, type Placement } from "./models";
 import { PrimBatch } from "./prims";
 import { ball, bx, cy, place, type Prim, type V3 } from "./shapes";
 import { ARCADE_SCREEN, MAC, type PropItem } from "./propModels";
-import { at, deskGear, deskModels, GLASS_MATERIAL, glassFrames, ignoreRay, mdl, PANEL, placeModels, placeProps, shelf } from "./furniture";
+import { at, atop, deskGear, deskModels, GLASS_MATERIAL, glassFrames, ignoreRay, mdl, PANEL, placeModels, placeProps, shelf } from "./furniture";
 import { DetailedProps } from "./props";
 import { FURNITURE, PIXEL_FLOORS, ROOM_PALETTE } from "./palette";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
@@ -407,10 +407,12 @@ function buildModels(): Placement[] {
 
   // Library corner
   out.push(mdl("armchair", -19.6, 10.8, Math.PI / 2, 0.95), mdl("armchair", -18.4, 12.6, Math.PI, 0.95));
-  out.push(mdl("sideTable", -19.1, 11.9, Math.PI / 4, 0.7), mdl("lampTable", -19.1, 11.9, 0, 0.9, 0.52), mdl("lampRoundFloor", -20.9, 13.7), mdl("pottedPlant", FIXTURES.plantByLibrary.x, FIXTURES.plantByLibrary.z, 0, 1.1));
+  const libraryTable = mdl("sideTable", -19.1, 11.9, Math.PI / 4, 0.7);
+  out.push(libraryTable, atop(libraryTable, mdl("lampTable", -19.1, 11.9, 0, 0.9)), mdl("lampRoundFloor", -20.9, 13.7), mdl("pottedPlant", FIXTURES.plantByLibrary.x, FIXTURES.plantByLibrary.z, 0, 1.1));
 
   // The nap room: a side table with a lamp by the door, and a plant
-  out.push(mdl("sideTable", NAP_ROOM[0] + 0.5, NAP_ROOM[3] - 0.5, 0, 0.6), mdl("lampTable", NAP_ROOM[0] + 0.5, NAP_ROOM[3] - 0.5, 0, 0.8, 0.45));
+  const napTable = mdl("sideTable", NAP_ROOM[0] + 0.5, NAP_ROOM[3] - 0.5, 0, 0.6);
+  out.push(napTable, atop(napTable, mdl("lampTable", NAP_ROOM[0] + 0.5, NAP_ROOM[3] - 0.5, 0, 0.8)));
   out.push(mdl("pottedPlant", NAP_ROOM[0] + 0.45, NAP_ROOM[1] + 0.45, 0, 0.9));
 
   // Meeting room
