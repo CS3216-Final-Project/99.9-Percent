@@ -2,11 +2,16 @@
 import {it,expect} from "vitest";
 import {newGame,applyAction} from "../index";
 import {readyReliability,reliabilityCompany,preparedReliability,act,tick,replay} from "./reliabilityFixture";
-import {researchBalance,pendingReliability} from "../reliability";
+import {researchBalance,pendingReliability,reliabilityEntryGates,canEnterReliability} from "../reliability";
+import {spikeCompany,untilOffset} from "./spikeFixtures";
 import {has,completedTechIds,techStatus} from "../tech";
 it("entry preserves company and grants the bounded research once",()=>{
  const before=readyReliability(),s=act(before,{type:"enter_reliability"}),c=s.campaign!;
  expect(c.runId).toBe(before.campaign!.runId);expect(c.cashCents).toBe(before.campaign!.cashCents);expect(c.snapshot).toEqual(before.campaign!.snapshot);expect(c.pending).toEqual(before.campaign!.pending);expect(c.reliabilityStage!.owned).toEqual([]);expect(researchBalance(c)).toBe(4);expect(applyAction(s,{type:"enter_reliability"}).ok).toBe(false);
+});
+it("names the entry gates: met once the spikes end, baseline traffic unmet during a pulse",()=>{
+ const ready=readyReliability();expect(Object.values(reliabilityEntryGates(ready)).every(Boolean)).toBe(true);expect(canEnterReliability(ready)).toBe(true);
+ const pulse=untilOffset(spikeCompany(false),13);expect(reliabilityEntryGates(pulse)).toMatchObject({baseline:false,cash:true});expect(canEnterReliability(pulse)).toBe(false);
 });
 it("locks reliability before entry and failover without real prerequisites",()=>{
  expect(applyAction(newGame(),{type:"unlock_reliability",tech:"health_checks"}).ok).toBe(false);
