@@ -34,7 +34,7 @@ export default function LessonVisual({ id }: { id: LessonId }) {
       <Machine icon="server" name="App Server"><small>the waiters</small></Machine><Arrow />
       <Machine icon="database" name="Database"><small>the kitchen</small></Machine>
     </div>
-    <figcaption>Like a restaurant: when waiters or the kitchen fall behind, orders queue up. That queue is the <strong>backlog</strong>.</figcaption>
+    <figcaption>Your company's app is like a restaurant: when waiters or the kitchen fall behind, orders queue up. That queue is the <strong>backlog</strong>.</figcaption>
   </figure>;
   if (id === "inspect-app" && s.selected === "app") return <dl className="lesson-loads" aria-label="Live App Server reading">
     <Load name="App Server" demand={c.snapshot.app.demand} capacity={c.snapshot.app.capacity} unit="requests/s" />

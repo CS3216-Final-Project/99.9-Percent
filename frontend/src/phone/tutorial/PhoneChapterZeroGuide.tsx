@@ -19,7 +19,7 @@ import "./phone-tutorial.css";
  */
 export default function PhoneChapterZeroGuide({ lessons }: { lessons: readonly ChapterZeroLesson[] }) {
   const card = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null), toggle = useRef<HTMLButtonElement>(null), layer = useRef<HTMLDivElement>(null);
-  const { s, index, lesson, id, confirming, required, ready, moving, inspected, target, lit, why, more, last, next } =
+  const { s, index, lesson, id, confirming, required, ready, done, moving, inspected, target, lit, why, more, last, next } =
     useChapterZeroLesson(lessons, card, heading, { always: SHEET_HANDLE, escapeWithin: ".phone-coach", readingsFirst: true });
   // The lesson whose reading layer is open: each lesson opens with its reading closed.
   const [readingFor, setReadingFor] = useState<number | null>(null);
@@ -43,7 +43,7 @@ export default function PhoneChapterZeroGuide({ lessons }: { lessons: readonly C
 
   if (!s.started || !lesson || !id) return null;
   const phone = PHONE_LESSONS[id];
-  const task = phone.task({ ready, quoting: !!confirming });
+  const task = phone.task({ ready, done, quoting: !!confirming });
   const close = () => { setReadingFor(null); toggle.current?.focus({ preventScroll: true }); };
   const pointing = !!(box && target);
   return <>
@@ -68,19 +68,20 @@ export default function PhoneChapterZeroGuide({ lessons }: { lessons: readonly C
         if (control) { event.preventDefault(); control.focus(); }
       }}>
       <header className="phone-coach-meta">
-        <span className="phone-coach-kicker">{s.tutorialCompany ? "Practice · " : ""}{lesson.section}</span>
+        <span className="phone-coach-kicker">{s.tutorialCompany ? "Practice" : "Walkthrough"}</span>
         <span className="phone-coach-count" aria-label={`Lesson ${index + 1} of ${lessons.length}`}>
           {!s.meta.tutorialDone && <span className="phone-coach-progress" aria-hidden="true"><i style={{ width: `${(index + 1) / lessons.length * 100}%` }} /></span>}
           {index + 1}/{lessons.length}
         </span>
-        {s.meta.tutorialDone && <button type="button" className="phone-coach-return" onClick={() => { s.openView(null); s.endTour(false); }}>Return to game</button>}
+        {s.meta.tutorialDone && <button type="button" className="phone-coach-return" onClick={() => { s.openView(null); s.endTour(false); }}>Skip tutorial</button>}
       </header>
       <h3 ref={heading} tabIndex={-1}>{lesson.title}</h3>
       <p className="phone-coach-task" aria-live="polite" data-done={ready && required || undefined}>
         <Icon name={ready && required ? "check" : "eye"} size={18} /><span><LessonText text={task} terms={lesson.emphasis} /></span>
       </p>
       <footer className="phone-coach-actions">
-        <button type="button" className="btn phone-coach-back" disabled={index === 0} onClick={() => { s.openView(null); s.tourBack(); }}>
+        {/* The first lesson has no Back; its slot stays so Learn more and Next keep their places. */}
+        <button type="button" className="btn phone-coach-back" style={index === 0 ? { visibility: "hidden" } : undefined} onClick={() => { s.openView(null); s.tourBack(); }}>
           <Icon className="lesson-back-arrow" name="next" size={16} /><span className="phone-coach-label">Back</span>
         </button>
         <button ref={toggle} type="button" className="btn phone-coach-more" aria-expanded={reading} aria-controls={layerId} onClick={() => setReadingFor(reading ? null : index)}>

@@ -68,7 +68,8 @@ for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
     const card = tutorial(page);
     await expect(card).toHaveAttribute("aria-modal", "false");
     await expect(card).toHaveClass(/phone-coach/);
-    const back = card.getByRole("button", { name: "Back", exact: true });
+    // The first lesson's Back is invisible but keeps its slot, so it is measured by its place in the strip.
+    const back = card.locator(".phone-coach-back");
     const next = card.getByRole("button", { name: /^(Next|Finish walkthrough)$/ });
     const more = card.getByRole("button", { name: "Learn more", exact: true });
     const reading = page.getByRole("region", { name: /^About / });
@@ -144,6 +145,7 @@ for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
       await expect(card).toHaveAccessibleName(`Walkthrough, step ${lesson} of ${CHAPTER_ZERO_LESSONS}`);
       const id = (await card.getAttribute("data-lesson-id"))!;
       await check(id, "open");
+      await expect(card.getByRole("button", { name: "Back", exact: true })).toHaveCount(lesson === 1 ? 0 : 1);
       await readMore(id);
       if (id === "inspect-app" || id === "inspect-db") {
         await panel.getByRole("button", { name: id === "inspect-app" ? "App Server" : "Database", exact: true }).tap();
@@ -162,6 +164,8 @@ for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
       } else if (id === "cancel") {
         const quote = page.getByRole("region", { name: /^Confirm / });
         await expect(quote.getByRole("button", { name: "Confirm", exact: true })).toBeDisabled();
+        // Next would close the quote too; the quote's own Cancel also moves on.
+        await expect(next).toBeEnabled();
         await quote.getByRole("button", { name: "Cancel", exact: true }).tap();
         await expect(card).toHaveAttribute("data-lesson-id", "money");
         continue;
@@ -186,7 +190,7 @@ for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
   });
 }
 
-test("a completed player's replay keeps Return to game in the strip", async ({ page, withoutRoom }) => {
+test("a completed player's replay keeps Skip tutorial in the strip", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await page.setViewportSize({ width: 320, height: 568 });
   await page.route("**/api/**", route => route.abort());
@@ -195,8 +199,9 @@ test("a completed player's replay keeps Return to game in the strip", async ({ p
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
   const card = tutorial(page);
   await expect(card).toContainText("Practice");
-  const back = await box(card.getByRole("button", { name: "Back", exact: true }));
-  const ret = card.getByRole("button", { name: "Return to game", exact: true });
+  await expect(card.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
+  const back = await box(card.locator(".phone-coach-back"));
+  const ret = card.getByRole("button", { name: "Skip tutorial", exact: true });
   await expect(ret).toBeInViewport({ ratio: 1 });
   expect((await box(ret)).height).toBeGreaterThanOrEqual(44);
   await expect(card.getByRole("heading")).toBeInViewport({ ratio: 1 });

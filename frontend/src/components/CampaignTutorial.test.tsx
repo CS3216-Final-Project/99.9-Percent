@@ -52,8 +52,9 @@ it("starts with the goal, then requires inspection through real game controls an
   expect(card(1).getAttribute("aria-modal")).toBe("false");
   expect(card(1).dataset.lessonId).toBe("goal");
   expect(current().queryByRole("button", { name: "Skip" })).toBeNull();
-  expect(current().queryByRole("button", { name: "Return to game" })).toBeNull();
-  expect(current().getByRole("button", { name: "Back" })).toHaveProperty("disabled", true);
+  expect(current().queryByRole("button", { name: "Skip tutorial" })).toBeNull();
+  expect(current().queryByRole("button", { name: "Back" })).toBeNull();
+  expect(card(1).querySelector(".lesson-section")!.textContent).toBe("Walkthrough");
   next();
   expect(card(at("inspect-app"))).toBeTruthy();
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
@@ -63,7 +64,8 @@ it("starts with the goal, then requires inspection through real game controls an
   expect(useGame.getState().selected).toBe("app");
   // An inspection stays open so its readings can be read; Next continues.
   settle();
-  expect(card(at("inspect-app")).textContent).toContain("Read its demand and capacity, then press Next.");
+  // The live reading replaces the instruction: Next is all that is left to do.
+  expect(card(at("inspect-app")).querySelector(".lesson-task")).toBeNull();
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
   next();
   expect(card(at("inspect-db"))).toBeTruthy();
@@ -121,7 +123,7 @@ it("runs exactly one real second even with a large tick, and cancels the real co
   settle(); expect(card(at("quote"))).toBeTruthy();
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
   exercise(); expect(screen.getByRole("region", { name: "Confirm Add server" })).toBeTruthy();
-  settle(); expect(card(at("cancel"))).toBeTruthy(); expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  settle(); expect(card(at("cancel"))).toBeTruthy(); expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
   exercise(); expect(screen.queryByRole("region", { name: "Confirm Add server" })).toBeNull();
   const c = useGame.getState().game.campaign!;
   expect([c.cashCents, c.apps, c.actions, c.pending]).toEqual([before.cashCents, before.apps, before.actions, before.pending]);
@@ -142,7 +144,7 @@ it("keeps the quote open until the Cancel lesson and never permits a tutorial pu
   fireEvent.click(screen.getByRole("button", { name: "Confirm" })); settle();
   expect(card(at("cancel"))).toBeTruthy();
   expect(screen.getByRole("button", { name: "Cancel" })).toHaveProperty("disabled", false);
-  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", true);
+  expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
   fireEvent.click(screen.getByRole("button", { name: /^Limit to 500/ }));
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   expect(card(at("money"))).toBeTruthy();
@@ -234,6 +236,17 @@ it("saves and exits unfinished and resumes the same company at its saved lesson"
   expect(card(at("money"))).toBeTruthy(); expect(useGame.getState().game.campaign!.runId).toBe(runId);
 });
 
+it("closes the quote with Next in the Cancel lesson, without spending", () => {
+  start(); renderCompany(); reach(at("quote")); exercise();
+  const before = structuredClone(useGame.getState().game.campaign!);
+  expect(card(at("cancel")).textContent).toContain("Press Next to close the quote without buying.");
+  next(); settle();
+  expect(card(at("money"))).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Confirm Add server" })).toBeNull();
+  const c = useGame.getState().game.campaign!;
+  expect([c.cashCents, c.apps, c.actions, c.pending]).toEqual([before.cashCents, before.apps, before.actions, before.pending]);
+});
+
 it("preserves existing completed profiles", () => {
   saveMeta({ ...DEFAULT_META, tutorialDone: true }); start(); renderCompany();
   expect(screen.queryByRole("dialog", { name: /^Walkthrough/ })).toBeNull();
@@ -243,7 +256,7 @@ it("exits a completed player's replay without finishing the lessons or buying th
   saveMeta({ ...DEFAULT_META, tutorialDone: true }); start();
   const company = structuredClone(useGame.getState().game.campaign!);
   useGame.getState().startTour("campaign"); renderCompany(); reach(at("quote")); exercise();
-  fireEvent.click(current().getByRole("button", { name: "Return to game" }));
+  fireEvent.click(current().getByRole("button", { name: "Skip tutorial" }));
   settle();
   expect(screen.queryByRole("dialog", { name: /^Walkthrough/ })).toBeNull();
   expect(screen.queryByRole("region", { name: "Confirm Add server" })).toBeNull();
