@@ -91,7 +91,7 @@ export function Tip({ text, children, side }: { text: string; children: ReactNod
 }
 
 /** Shared headline tile for both gameplay modes. */
-export function Stat({ icon, kind, label, tip, children, onClick, actionLabel }: { icon: IconName; kind: ConceptKind; label: string; tip: string; children: ReactNode; onClick?: () => void; actionLabel?: string }) {
+export function Stat({ icon, kind, label, tip, children, onClick, actionLabel, className = "" }: { icon: IconName; kind: ConceptKind; label: string; tip: string; children: ReactNode; onClick?: () => void; actionLabel?: string; className?: string }) {
   const body = <>
       <span className="stat-icon">
         <Concept kind={kind} icon={icon} />
@@ -101,8 +101,8 @@ export function Stat({ icon, kind, label, tip, children, onClick, actionLabel }:
         {children}
       </div>
     </>;
-  return onClick ? <button type="button" className={`stat stat-${kind} stat-action`} aria-label={actionLabel} aria-description={tip} onClick={onClick} {...tipProps(tip)}>{body}</button>
-    : <div className={`stat stat-${kind}`}>{body}</div>;
+  return onClick ? <button type="button" className={`stat stat-${kind} stat-action ${className}`} aria-label={actionLabel} aria-description={tip} onClick={onClick} {...tipProps(tip)}>{body}</button>
+    : <div className={`stat stat-${kind} ${className}`}>{body}</div>;
 }
 
 export type Tone = "accent" | "ok" | "warn" | "critical";

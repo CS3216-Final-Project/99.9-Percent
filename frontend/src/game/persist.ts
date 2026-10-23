@@ -1,4 +1,3 @@
-import { currentStep, WALKTHROUGH_VERSION } from "./walkthrough";
 import { emptyMeasurement, type Measurement, type PlaytestEvent } from "./telemetry";
 import { DEFAULT_AVATAR, isAvatar, type AvatarId } from "./avatars";
 import { clampFov, FOV } from "./viewpoints";
@@ -50,11 +49,11 @@ export interface Meta {
   firstIncidentCompleted: boolean;
   /** Chapter 0 was explicitly finished (or completed under the older rules); Challenge Mode may also skip its guide. */
   tutorialDone: boolean;
-  /** The step Guided Mode's walkthrough is on while it is under way, so a reload or a new company carries on from it. */
+  /** Set while a Launch Week practice company is under way, so a reload or a new company resumes it. */
   walkthroughStep: number | null;
-  /** Furthest lesson reached, so Back and reload do not repeat completed exercises. Absent in older profiles. */
+  /** Furthest lesson reached under the retired lesson walkthroughs; kept for storage compatibility. */
   walkthroughFurthestStep?: number;
-  /** The lesson list the two steps above index; absent before the 10-lesson walkthrough. */
+  /** The walkthrough data the step above belongs to; pre-3 profiles held lesson indices and count as done. */
   walkthroughVersion?: number;
   /** One-time Guided Mode tips already shown, such as the first weekly settlement. */
   tipsSeen?: GuidedTip[];
@@ -66,10 +65,15 @@ export interface Meta {
   chapterCompletions: { runId: string; chapters: ChapterCompletion[] } | null;
   /** Challenge Mode stays unlocked once earned; completing Guided Mode cannot be taken back. */
   challengeUnlocked: boolean;
+  /** The server floor shows only the request path: no props, people, city or moving sun. Absent in older profiles. */
+  trafficView?: boolean;
 }
 
 export const GUIDED_TIPS = ["settlement"] as const;
 export type GuidedTip = (typeof GUIDED_TIPS)[number];
+
+/** Stored walkthrough records from before Launch Week are finished: their lesson indices no longer exist. */
+export const WALKTHROUGH_VERSION = 3;
 
 export const DEFAULT_META: Meta = {
   onboarded: false,
@@ -170,7 +174,7 @@ export function saveGame(game:GameState,remainderMs=0,explicitReset=false,measur
     let source;
     try {source=JSON.parse(current);} catch {if(!explicitReset)return false;}
     try {
-      if(([1,2,3,4,5,6].includes(source?.schemaVersion) || (source?.schemaVersion === 7 && !source.serviceMeasurementStart)) && Array.isArray(source.inputs)) {
+      if(([1,2,3,4,5,6,7].includes(source?.schemaVersion) || (source?.schemaVersion === 8 && !source.serviceMeasurementStart)) && Array.isArray(source.inputs)) {
         const backup=SAVE_KEY+".backup.v"+source.schemaVersion+"."+source.runId+"."+source.savedAt;
         const prior=window.localStorage.getItem(backup);
         if(prior!==null && prior!==current)return false;
@@ -306,12 +310,6 @@ function parseMeta(raw: string | null): StoredMeta | null {
   }
 }
 
-/** Whether Guided Mode's former introduction was finished or skipped, in a profile from before the walkthrough. */
-function introductionDone(introduction: unknown): boolean {
-  const status = introduction && typeof introduction === "object" ? (introduction as { status?: unknown }).status : null;
-  return status === "completed" || status === "skipped";
-}
-
 function decodeCompletions(raw: unknown): Meta["chapterCompletions"] {
   if (!raw || typeof raw !== "object") return null;
   const { runId, chapters } = raw as { runId?: unknown; chapters?: unknown };
@@ -321,19 +319,18 @@ function decodeCompletions(raw: unknown): Meta["chapterCompletions"] {
 
 /** `campaign` reads Guided Mode's profile, where a player done with the former introduction is done with the walkthrough. */
 function decodeMeta(raw: string | null, campaign = false): Meta {
-  const { music: _music, openingOnboarding, chapterTours, chapterCompletions, walkthroughStep, walkthroughFurthestStep, walkthroughVersion, tipsSeen, ...stored } = parseMeta(raw) ?? {};
+  const record = parseMeta(raw);
+  const { music: _music, openingOnboarding: _openingOnboarding, chapterTours, chapterCompletions, walkthroughStep, walkthroughFurthestStep, walkthroughVersion, tipsSeen, ...stored } = record ?? {};
   const seen = Array.isArray(chapterTours) ? CHAPTER_TOURS.filter((id) => chapterTours.includes(id)) : [];
   const tips = Array.isArray(tipsSeen) ? GUIDED_TIPS.filter((id) => tipsSeen.includes(id)) : [];
-  let step = Number.isInteger(walkthroughStep) && (walkthroughStep as number) >= 0 ? (walkthroughStep as number) : null;
-  let furthest = Number.isSafeInteger(walkthroughFurthestStep) && (walkthroughFurthestStep as number) >= 0 ? walkthroughFurthestStep as number : 0;
-  // Guided Mode's lesson indices from an earlier walkthrough are mapped to the lesson now teaching the same thing.
-  if (campaign) {
-    step = step === null ? null : currentStep(step, walkthroughVersion);
-    furthest = currentStep(furthest, walkthroughVersion);
-  }
+  // Lesson indices from the retired walkthroughs cannot resume; those companies count the walkthrough as done.
+  const legacy = record !== null && walkthroughVersion !== WALKTHROUGH_VERSION;
+  const step = !legacy && walkthroughStep === 0 ? 0 : null;
+  const furthest = !legacy && Number.isSafeInteger(walkthroughFurthestStep) && (walkthroughFurthestStep as number) >= 0 ? walkthroughFurthestStep as number : 0;
+  if (typeof stored.trafficView !== "boolean") delete stored.trafficView;
   const meta: Meta = { ...DEFAULT_META, ...stored, chapterTours: seen, chapterCompletions: decodeCompletions(chapterCompletions), walkthroughStep: step, walkthroughFurthestStep: Math.max(step ?? 0, furthest),
     walkthroughVersion: WALKTHROUGH_VERSION, tipsSeen: tips };
-  if (campaign && introductionDone(openingOnboarding)) meta.tutorialDone = true;
+  if (campaign && legacy) meta.tutorialDone = true;
   return meta;
 }
 

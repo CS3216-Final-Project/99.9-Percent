@@ -1,9 +1,12 @@
 import type { Action, GameState } from "@/sim";
-import { allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData } from "@/sim/step";
+import type { Campaign } from "@/sim/campaignTypes";
+import { admissionCeiling, allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData } from "@/sim/step";
 import { recoverySafe, reportsAcknowledged } from "@/sim/reliability";
 import { currentFault, finalRequirements, stableManagement, canStartGrowth } from "@/sim/combinedCampaign";
 import { preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
+import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
+import { milestoneBlocks } from "./campaignGuidance";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { campaignChapters, chapterAdvance } from "./campaignChapters";
@@ -11,7 +14,7 @@ import { previewCampaignAction } from "./campaignFinance";
 import { chapter4Stage, chapter4Performance } from "./chapter4Guidance";
 import { chapter6Attention, combinedDatabaseDemand } from "./chapter6Guidance";
 
-export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "growth" | "risk" | "menu" | "finance";
+export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "growth" | "risk" | "menu" | "finance" | "endweek" | "research";
 export interface AttentionDecision {
   chapter: number;
   key: string;
@@ -27,6 +30,37 @@ export interface AttentionDecision {
 }
 
 export interface GuidanceAction { action: Action; label: string; evidence: string }
+
+/**
+ * The machines a guidance spotlight lights in the room: the recommended action's own equipment, or the machine
+ * family the decision is about. App instance ids light one rack; an equipment id lights its whole pad.
+ */
+export function spotlightMachines(decision: AttentionDecision, action: Action | undefined, c: Campaign | null): string[] {
+  if (!c) return [];
+  if (action) switch (action.type) {
+    case "start_db_upgrade": return ["db"];
+    case "scale_up": case "restore_app": return [action.appId];
+    case "deploy_cache": case "tune_cache": return ["cache"];
+    case "deploy_health_checks": return ["monitoring"];
+    case "install_spare": case "reserve_spare": case "release_spare": case "deploy_failover": return ["standby"];
+    case "pick_launch_tech": return [action.tech === "caching" ? "cache" : "app"];
+    case "run_promotion": return ["growth"];
+    case "set_routing": case "deploy_load_balancer": case "set_traffic_limit": return ["gateway"];
+    case "add_server": case "deploy_autoscaler": return ["app"];
+    default: break;
+  }
+  switch (decision.target) {
+    case "db": return ["db"];
+    case "network": return ["gateway"];
+    case "app": {
+      const troubled = c.apps.find(a => a.health === "failed")?.id
+        ?? c.snapshot.instances?.find(i => i.routed && i.demand > i.capacity)?.id
+        ?? c.apps.find(a => !a.routed && a.role !== "spare" && a.health !== "failed")?.id;
+      return [troubled ?? "app"];
+    }
+    default: return [];
+  }
+}
 /** Shared stable identity on existing controls; no dispatch or UI availability rules. */
 export const guidanceActionId = (action: Action) => encodeURIComponent(JSON.stringify(action, Object.keys(action).sort()));
 
@@ -68,7 +102,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
   if (decision.reason === "application") {
     for (const instance of c.snapshot.instances ?? []) if (instance.routed && instance.health !== "failed" && instance.demand > instance.capacity)
       offer({ type: "scale_up", appId: instance.id }, `Scale up App ${instance.id.slice(4)}`, `This server receives ${instance.demand} requests/s against ${instance.capacity} capacity. Scaling changes this server only.`);
-    if (c.loadBalancer) offer({ type: "add_server" }, "Add server", "Another server adds installed capacity after activation. You must then route traffic to it; installation alone does not relieve the current bottleneck.");
+    if (c.loadBalancer || c.launchWeek) offer({ type: "add_server" }, "Add server", "Another server adds installed capacity after activation. You must then route traffic to it; installation alone does not relieve the current bottleneck.");
   }
   if (decision.reason === "unrouted") {
     const targets = routableApps(c).filter(a => a.health !== "failed").map(a => a.id);
@@ -87,8 +121,10 @@ export function campaignAttention(game: GameState): AttentionDecision {
   }
   if (["failure", "round-restoration"].includes(decision.reason))
     for (const app of c.apps) if (app.health === "failed") offer({ type: "restore_app", appId: app.id }, `Restore App ${app.id.slice(4)}`, "This server is currently failed. Restoration is free and takes three game seconds; service recovery still requires observations.");
-  if (["database", "application", "unrouted", "failure"].includes(decision.reason) && c.limit === null)
-    offer({ type: "set_traffic_limit", enabled: true }, "Limit to 500 requests/s", "Temporary admission relief is free. Rejected requests earn no revenue; full-demand chapter checks may still require removing the limit later.");
+  // Launch Week never recommends turning traffic away: the lesson is capacity, and limiting costs uptime.
+  const launchLive = !!c.launchWeek && c.launchWeek.completedStep === null;
+  if (["database", "application", "unrouted", "failure"].includes(decision.reason) && c.limit === null && !launchLive)
+    offer({ type: "set_traffic_limit", enabled: true }, `Limit to ~${admissionCeiling(c)} requests/s`, "Temporary admission relief is free. Rejected requests earn no revenue and count against uptime; full-demand chapter checks may still require removing the limit later.");
   if (decision.reason === "full-demand" && c.limit !== null && c.routing.targets.length) {
     const m = c.snapshot, allocation = allocateTraffic(m.incoming, c.routing.targets);
     const observedDbLoad = m.admitted > 0 ? Math.ceil(m.db.demand * m.incoming / m.admitted) : Infinity;
@@ -116,12 +152,13 @@ export function campaignAttention(game: GameState): AttentionDecision {
       return demand(b) - demand(a);
     })[0];
     if (!action && c.snapshot.app.demand < c.snapshot.app.capacity + Q.appCapacity) action = find("add_server");
+    if (!action && launchLive) action = find("add_server");
   } else if (decision.reason === "unrouted") action = find("set_routing") ?? find("scale_up") ?? find("deploy_load_balancer");
   else if (decision.reason === "failure" || decision.reason === "round-restoration") action = find("restore_app");
   else if (decision.reason === "full-demand") action = find("set_traffic_limit");
-  if (!action && c.limit === null && c.snapshot.admitted > Q.admissionLimit && admissionReliefFits(game)) action = find("set_traffic_limit");
+  if (!action && !launchLive && c.limit === null && c.snapshot.admitted > admissionCeiling(c) && admissionReliefFits(game)) action = find("set_traffic_limit");
   const message = decision.reason === "unrouted" && action?.action.type === "scale_up"
-    ? "Your new server needs more capacity before sharing traffic. Scale it up, then connect it." : action ? actionMessage(action) : decision.message;
+    ? "Your new server needs more capacity before sharing traffic. Scale it up, then connect it." : action ? actionMessage(action, c) : decision.message;
   return { ...decision, actions, action, message, key: `${decision.key}:${action ? guidanceActionId(action.action) : "inspect"}` };
 }
 
@@ -129,22 +166,28 @@ export function campaignAttention(game: GameState): AttentionDecision {
 function admissionReliefFits(game: GameState) {
   const c = game.campaign!, m = c.snapshot;
   const targets = m.instances?.filter(x => x.routed).map(x => x.id) ?? c.routing.targets;
-  if (!targets.length || !recoverySafe(c) || c.apps.some(x => x.health === "failed") || c.dbCapacity <= Q.admissionLimit) return false;
-  const allocation = allocateTraffic(Q.admissionLimit, targets);
+  const cap = c.scenarioVersion === 2 ? admissionCeiling(c) : Q.admissionLimit;
+  if (!targets.length || !recoverySafe(c) || c.apps.some(x => x.health === "failed") || c.dbCapacity <= cap) return false;
+  const allocation = allocateTraffic(cap, targets);
   return targets.every(id => (c.apps.find(x => x.id === id)?.capacity ?? 0) > allocation[id]);
 }
 
-function actionMessage({action}: GuidanceAction): string {
+function actionMessage({action}: GuidanceAction, c: Campaign): string {
   switch (action.type) {
     case "start_db_upgrade": return "Your database is overloaded. Upgrade it to handle more requests.";
-    case "scale_up": return `App ${action.appId.slice(4)} is overloaded. Scale it up to handle more requests.`;
-    case "add_server": return "Your app servers need more capacity. Add a server, then connect it after installation.";
+    case "scale_up": return c.launchWeek && c.launchWeek.completedStep === null
+      ? `Keep up with traffic: scale up App ${action.appId.slice(4)}, then the other app. Limiting traffic instead hurts your uptime and reputation.`
+      : `App ${action.appId.slice(4)} is overloaded. Scale it up to handle more requests.`;
+    case "add_server": return c.launchWeek && c.launchWeek.completedStep === null
+      ? "One App Server can't keep up with this traffic. Buy a second server to share it."
+      : "Your app servers need more capacity. Add a server, then connect it after installation.";
     case "set_routing": return "Your new server isn't receiving traffic. Send traffic to All apps in Configure routing.";
-    case "deploy_load_balancer": return "Your new server isn't receiving traffic. Install load balancing so you can connect it.";
+    case "deploy_load_balancer": return c.apps.length > 1 ? "Your new server isn't receiving traffic. Install load balancing so you can connect it."
+      : "One app server can't absorb this spike. Install load balancing so a second server can share the traffic.";
     case "deploy_cache": return "Repeated lookups are overloading your database. Deploy Read Cache to reduce that work as it warms up.";
     case "tune_cache": return "Your cache could handle more repeat requests. Tune it to reduce database work.";
     case "restore_app": return `App ${action.appId.slice(4)} has failed. Restore it to bring it back online.`;
-    case "set_traffic_limit": return action.enabled ? "Your equipment is overloaded. Temporarily limit traffic to give it room to recover; rejected requests won't earn money." : "Your company is ready to serve more traffic. Remove the limit to check it at full demand.";
+    case "set_traffic_limit": return action.enabled ? "Your equipment is overloaded. Temporarily limit traffic to give it room to recover; rejected requests won't earn money and count against uptime." : "Your company is ready to serve more traffic. Remove the limit to check it at full demand.";
     default: return "Check the highlighted action to continue.";
   }
 }
@@ -172,6 +215,15 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     "scaling-choice": "Growth needs preparation. Upgrade your database, or review the optional risk with Consider growth with current capacity.",
     "prevention-recorded": "Your prevention result is recorded. Review its verification and complete the Opening recognition to continue.",
     requirements: "Open View chapters to see what your company needs next.",
+    "launch-first-incident": "Your App Server is overloading. Inspect it to see its status turn red, then fix the cause.",
+    "launch-db-incident": "Your database is overloading. Inspect it to see the work piling up.",
+    "launch-end-week": "Everything is stable again. Use End week to skip to the end of the week.",
+    "launch-open": "Your launch week starts now. Press Run — the first customers are arriving.",
+    "launch-week-report": "A launch week settled. Lost or turned-away requests so far are counted.",
+    "launch-research": "You earned a research point. Spend it on Caching or Autoscaling; each carries into later chapters.",
+    "launch-surge": "The launch campaign is sending five times the traffic. Keep the service up until it ends.",
+    "launch-week": "Your launch week is running. Press Run and keep the service up.",
+    "launch-score": "Launch Week is complete. Check your uptime score and continue into Chapter 2.",
   };
   if (messages[reason]) return messages[reason];
   if (["opening-growth", "scaling-growth", "data-growth", "spike-pulses", "scheduled-failure", "growth-wave", "growth-readiness"].includes(reason)) return "Press Run to see what happens next.";
@@ -193,7 +245,11 @@ function baseAttention(game: GameState): AttentionDecision {
   const progression = (reason: string, observation: string, recommendation: string, target: GuidanceTarget) => result(reason, "progression", observation, recommendation, target);
   if (!c) return required("inactive", "Guidance is available in Guided Mode.", "", null);
   if (game.phase === "ended") return required("ended", "This company has ended.", "Review the scorecard before starting another company.", null);
-  if (game.phase === "review" || pendingStop(c) || c.openingMilestone && !c.openingMilestone.acknowledged)
+  // The score card waits for the research pick, so the week's last lesson is never covered.
+  if (c.launchWeek && milestoneBlocks(c) && c.launchWeek.researchEarned && !c.launchWeek.tech)
+    return result("launch-research", "hint", "Research points buy technology. This one is free; it is billed at the week's settlement.", "Pick Caching or Autoscaling to see your Launch Week score.", "research");
+  if (c.launchWeek && milestoneBlocks(c)) return required("launch-score", "Launch Week is complete.", "Review your uptime score and continue into Chapter 2.", "next");
+  if (game.phase === "review" || pendingStop(c) || milestoneBlocks(c))
     return required("review", "An outcome is waiting for your review.", "Finish the existing review or acknowledgement before continuing.", null);
   const next = chapterAdvance(game);
   if (!c.incident && next?.ready && previewCampaignAction(game, next.action).ok) return progression("next", "The current chapter requirements are complete.", `Use Next: ${next.label}.`, "next");
@@ -244,12 +300,36 @@ function baseAttention(game: GameState): AttentionDecision {
   });
   const scalingChoice = c.scaling && !c.scaling.consumed && c.dbCapacity < P.dbCapacity && !c.scalingConsent;
   if (relevant && (!scalingChoice || relevant.type === "upgrade-db")) return run(`activation-${relevant.type}`, "An accepted change is still waiting to activate. Activation alone does not guarantee recovery.");
+  // Launch Week says nothing before an incident: no upgrade or limit prompts while the week simply runs.
+  if (c.launchWeek && c.launchWeek.completedStep === null && !c.incident) {
+    const lw = c.launchWeek, week = Math.floor(c.step / LW.periodSteps);
+    const settled = c.trace.some(t => t.type === "incident-opened" && Math.floor(t.step / LW.periodSteps) === week);
+    // The free research point is explained before the week is skipped past it.
+    if (lw.researchEarned && !lw.tech) return result("launch-research", "hint", "Research points buy technology. This one is free; it is billed at the week's settlement.", "Pick Caching or Autoscaling. Hover each to preview it in the room.", "research");
+    if (settled && qualifies && !appOver && !dbOver && !c.dbBacklog && c.apps.every(a => !a.backlog) && !pending.length && reportsAcknowledged(c) && game.phase === "management")
+      return progression("launch-end-week", "The incident is settled and service is stable.", "Use End week to skip to the end of this week.", "endweek");
+    {
+      if (c.step < LW.spikeStep) return run("launch-open", "Your company opens its doors this week; the first traffic arrives now.");
+      const report = c.settlements.at(-1);
+      if (report && c.step - report.step < 6) return run("launch-week-report", `Week ${report.period} report: ${c.cumulative.failed.toLocaleString("en-US")} requests lost so far.`);
+      if (lw.surge && lw.surge.endedStep === null) return run("launch-surge", `The launch campaign is sending ${LW.surgeFactor}× traffic until game second ${lw.surge.endStep}.`);
+      return run("launch-week", `Launch week ${Math.min(LW.weeks, Math.floor(c.step / LW.periodSteps) + 1)} of ${LW.weeks}. The launch campaign surge arrives in week 3 — keep the service up.`);
+    }
+  }
   if (c.incident && qualifies && !appOver && !dbOver) return run("recovery", `The latest readings meet recovery conditions. Healthy observations: ${c.incident.stableSteps} / ${Q.stableSteps}. Pausing adds no observations.`);
   if (!safe || fault?.startedStep != null && fault.restoredStep === null && !qualifies)
     return hint("failure", "Service has a server-health problem. Check the observed health and surviving capacity.", "Open App Server to inspect health. Restoration, routing and admission relief are different available strategies.", "app");
   if (appOver && c.apps.some(a => !a.routed && a.role !== "spare" && a.health !== "failed"))
     return hint("unrouted", "An installed App Server is not receiving traffic while routed capacity is under pressure.", "Open Network to compare routing and the available options.", "network");
+  if (dbOver && c.launchWeek && c.launchWeek.completedStep === null && c.incident &&
+      !c.trace.some(t => t.type === "inspection" && t.step >= c.incident!.openedStep && t.data.component === "db"))
+    return hint("launch-db-incident", "The database is receiving more work than it can process.", "Inspect the Database to see its overload, then upgrade it.", "db");
   if (dbOver) return hint("database", "The database is receiving more work than it can process.", "Open Database to compare demand, capacity and waiting work before choosing a response.", "db");
+  // First Launch Week incident: teach the inspect-first beat — the status bar stays up, the app shows red
+  // once looked at, and guidance then points at the fix.
+  if (appOver && c.launchWeek && c.launchWeek.completedStep === null && c.incident &&
+      !c.trace.some(t => t.type === "inspection" && t.step >= c.incident!.openedStep && t.data.component === "app"))
+    return hint("launch-first-incident", "An app server is overloaded and the incident is open.", "Inspect the App Server to see its status turn red, then fix the cause.", "app");
   if (appOver) return hint("application", "Routed application capacity is under pressure.", "Open App Server to compare workload and capacity before choosing a response.", "app");
   if (c.incident) {
     // A measured drainage path, not a forecast. Require comparable observations and spare processing budget.

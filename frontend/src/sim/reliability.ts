@@ -8,7 +8,7 @@ import { qualifiesForRecovery } from "./step";
 export const reportsAcknowledged=(c:Campaign)=>c.reports.every(r=>c.trace.some(t=>t.type==="review-acknowledged"&&t.data.incidentId===r.id));
 export const healthy=(a:AppInstance)=>a.health!=="failed";
 export const serving=(a:AppInstance)=>a.role!=="spare";
-export function researchBalance(c:Campaign):number {return (c.spikeStage?.researchEarned??0)+(c.reliabilityStage?.researchEarned??0)-(c.spikeStage?.researchSpent??0)-(c.reliabilityStage?.owned.length??0);}
+export function researchBalance(c:Campaign):number {return (c.spikeStage?.researchEarned??0)+(c.reliabilityStage?.researchEarned??0)+(c.launchWeek?.researchEarned??0)-(c.spikeStage?.researchSpent??0)-(c.reliabilityStage?.owned.length??0)-(c.launchWeek?.tech?1:0);}
 /** An infrastructure change still installing; reliability installs wait for it. */
 export const installPending=(c:Campaign)=>c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type));
 export function pendingReliability(c:Campaign|undefined):boolean {return !!c?.reliabilityStage&&c.reliabilityStage.completedStep!==null&&!c.reliabilityStage.acknowledged;}

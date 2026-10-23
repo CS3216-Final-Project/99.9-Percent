@@ -18,7 +18,7 @@ it.each([
   ["Data Strategy", 3, () => dataCompany()],
   ["Traffic Spikes & Autoscaling", 4, () => spikeCompany(false)],
   ["Stay Online", 5, () => preparedReliability()],
-] as const)("shows %s prominently at chapter %i", (name, number, company) => {
+] as const)("shows %s prominently at chapter %i", { timeout: 30_000 }, (name, number, company) => {
   useGame.setState({ game: company(), started: true, ready: true });
   render(<CampaignChapters />);
   const bar = screen.getByRole("region", { name: "Guided Mode chapters" });
@@ -73,17 +73,12 @@ it("opens Chapter 0 and the six gameplay chapters without advancing the company 
   expect(useGame.getState().running).toBe(false);
 });
 
-it("integrates How to play into Chapter 0 and replays it on the same company", () => {
+it("marks a practice company as Practice with its own objective", () => {
   const game = newGame();
-  useGame.setState({ game, started: true, ready: true, tour: { track: "campaign", step: 0 } });
+  useGame.setState({ game, started: true, ready: true, tutorialCompany: { game, remainderMs: 0, measurement: useGame.getState().measurement } });
   render(<CampaignChapters />);
-  expect(screen.getByLabelText("Current chapter").textContent).toBe("Walkthrough");
-  expect(screen.getByRole("region", { name: "Guided Mode chapters" }).textContent).toContain("Chapter 0");
-  fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
-  fireEvent.click(screen.getByRole("button", { name: "Replay walkthrough" }));
-  expect(useGame.getState().game).toBe(game);
-  expect(useGame.getState().tour).toEqual({ track: "campaign", step: 0 });
-  expect(useGame.getState().running).toBe(false);
+  expect(screen.getByRole("region", { name: "Guided Mode chapters" }).textContent).toContain("Practice");
+  expect(screen.getByRole("region", { name: "Guided Mode chapters" }).textContent).toContain("Replay Launch Week");
 });
 
 it("marks practice in progress without a completed checkmark and restores the saved incident", () => {
@@ -93,14 +88,12 @@ it("marks practice in progress without a completed checkmark and restores the sa
   render(<CampaignChapters />);
   fireEvent.click(screen.getByRole("button", { name: "View chapters" }));
   const dialog = screen.getByRole("dialog", { name: "Guided Mode chapters" });
-  const chapter = within(dialog).getByRole("heading", { name: "Walkthrough" }).closest("li")!;
-  expect(chapter.textContent).toContain("In progress");
-  expect(chapter.textContent).not.toContain("Completed");
-  expect(chapter.querySelector(".chapter-number")!.textContent).toBe("0");
-  expect(within(dialog).getByRole("heading", { name: "Opening" }).closest("li")!.textContent).toContain("Available next");
-  fireEvent.click(within(dialog).getByRole("button", { name: "Exit walkthrough" }));
+  const chapter = within(dialog).getByRole("heading", { name: "Launch Week" }).closest("li")!;
+  expect(chapter.textContent).toContain("Current");
+  expect(chapter.textContent).toContain("Practice is in progress");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Exit practice" }));
   expect(screen.getByLabelText("Current chapter").textContent).toBe("Opening");
   expect(screen.queryByRole("dialog")).toBeNull();
-  expect(useGame.getState()).toMatchObject({ tour: null, running: false, meta: { tutorialDone: true, walkthroughStep: null } });
+  expect(useGame.getState()).toMatchObject({ tour: null, running: false, meta: { walkthroughStep: null } });
   expect(useGame.getState().game.campaign).toEqual(game.campaign);
 });

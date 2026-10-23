@@ -68,7 +68,7 @@ test("spikes: manual planning installs, scales and routes capacity through room 
  // Render the installed rack while physical game time stays paused.
  await page.clock.runFor(1000);
  await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();const scaleReveal=page.getByRole("dialog",{name:"Servers inspected"});await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Return to room"}).click();await page.getByRole("button",{name:/Scale up App 3/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3,resumeClock:false});
- await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"All apps",exact:true}).click();await advanceCampaignStep(page,{resumeClock:false});
+ await page.getByRole("button",{name:"All apps",exact:true}).click();await advanceCampaignStep(page,{resumeClock:false});
  const c=(await savedGame(page)).campaign!,expected=manualSpikePlan().campaign!;
  expect(c.step).toBe(n+6);
  expect(c.apps.map(({id,tier,capacity,routed})=>({id,tier,capacity,routed}))).toEqual(expected.apps.map(({id,tier,capacity,routed})=>({id,tier,capacity,routed})));
@@ -117,6 +117,6 @@ test("spikes: disabling keeps paid installation and allows an explicit manual ro
  const idle=(await savedGame(page)).campaign!;expect(idle.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(idle.cashCents).toBe(before.cashCents);expect(idle.pending.some(a=>a.type==="routing")).toBe(false);
  await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await expect(page.getByRole("note",{name:"App 3 routing status"})).toBeVisible();
  const idleReveal=page.getByRole("dialog",{name:"Servers inspected"});await expect(idleReveal).toBeVisible();await idleReveal.getByRole("button",{name:"Return to room"}).click();
- await page.locator("summary").filter({hasText:/Configure routing/}).click();await page.getByRole("button",{name:"All apps",exact:true}).click();await runTo(page,(await savedGame(page)).campaign!.step+1);
+ await page.getByRole("button",{name:"All apps",exact:true}).click();await runTo(page,(await savedGame(page)).campaign!.step+1);
  const routed=(await savedGame(page)).campaign!;expect(routed.apps.find(a=>a.id==="app-3")!.routed).toBe(true);expect(routed.spikeStage!.controller!.enabled).toBe(false);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });

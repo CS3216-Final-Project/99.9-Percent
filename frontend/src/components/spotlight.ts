@@ -37,7 +37,7 @@ export function cardStyle(box: Box | null, place: Place, vw: number, vh: number,
   }
   const gap = 14;
   const x = (v: number) => clamp(v, 12, vw - W - 12);
-  const y = (v: number) => clamp(v, 12, Math.max(12, vh - height - 12));
+  const y = (v: number) => clamp(v, topInset, Math.max(topInset, vh - height - 12));
   // Never cover the thing being pointed at: flip sides when there is no room.
   if (place === "left" && box.x - gap - W < 12) place = "right";
   else if (place === "right" && box.x + box.w + gap + W > edge - 12 && box.x - gap - W >= 12) place = "left";

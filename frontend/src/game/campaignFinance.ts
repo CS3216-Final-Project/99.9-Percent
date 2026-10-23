@@ -2,7 +2,7 @@ import type { Action, GameState } from "@/sim";
 import type { Campaign } from "@/sim/campaignTypes";
 import { applyCampaignInput } from "@/sim/step";
 import { accruedCharges, operatingCharges } from "@/sim/settlement";
-import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
+import { openingTuning } from "@/sim/launchWeek";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
@@ -30,9 +30,10 @@ export function previewCampaignAction(game: GameState, action: Action) {
     const c = game.campaign!, after = state.campaign!;
     const scheduled = after.pending.find(p=>!c.pending.some(old=>old.id===p.id));
     const current = operatingCharges(c);
-    const upkeepDelta = !scheduled ? 0 : scheduled.type === "add-app" || scheduled.type === "create-spare" ? Q.appWeeklyCents
-        : scheduled.type === "scale-up" ? P.appWeeklyCents-Q.appWeeklyCents
-        : scheduled.type === "upgrade-db" ? (scheduled.capacityAfter === D.dbCapacity ? D.dbWeeklyCents : scheduled.capacityAfter === P.dbCapacity ? P.dbWeeklyCents : Q.upgradedDbWeeklyCents)-current.db
+    const tuning = openingTuning(c);
+    const upkeepDelta = !scheduled ? 0 : scheduled.type === "add-app" || scheduled.type === "create-spare" ? tuning.appWeeklyCents
+        : scheduled.type === "scale-up" ? P.appWeeklyCents-tuning.appWeeklyCents
+        : scheduled.type === "upgrade-db" ? (scheduled.capacityAfter === D.dbCapacity ? D.dbWeeklyCents : scheduled.capacityAfter !== undefined && scheduled.capacityAfter >= P.dbCapacity ? P.dbWeeklyCents : tuning.upgradedDbWeeklyCents)-current.db
         : scheduled.type === "deploy-lb" ? P.lbWeeklyCents
         : scheduled.type === "cache" ? D.cacheWeeklyCents
         : scheduled.type === "deploy-autoscaler" ? T.controllerWeeklyCents

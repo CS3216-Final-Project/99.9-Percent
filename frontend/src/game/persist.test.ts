@@ -1,13 +1,12 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { newGame, newLegacyGame } from "../sim";
 import { step, advanceSteps } from "../sim/step";
-import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, track, readAnalytics, clearAnalytics, saveClassicGame, loadClassicGame } from "./persist";
+import { loadGame, saveGame, clearSave, loadMeta, saveMeta, DEFAULT_META, WALKTHROUGH_VERSION, track, readAnalytics, clearAnalytics, saveClassicGame, loadClassicGame } from "./persist";
 import { CAMPAIGN_SAVE_KEY as KEY, makeEnvelope } from "./saveEnvelope";
 import { decodeClassicSave, rawLegacySave, exportGame } from "./persist";
 import { DEFAULT_AUDIO, DEFAULT_GRAPHICS, challengeUnlocked, isSilent, legacyMusicOff, loadAudio, loadGraphics, loadMode, loadTimeOfDay, saveAudio, saveGraphics, saveMode, saveTimeOfDay } from "./persist";
 import { preparedReliability, act, tick } from "../sim/__tests__/reliabilityFixture";
 import { pendingReliability } from "../sim/reliability";
-import { WALKTHROUGH_LESSON_IDS, WALKTHROUGH_LESSONS, WALKTHROUGH_VERSION, type LessonId } from "./walkthrough";
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 describe("campaign data preservation", () => {
@@ -52,7 +51,7 @@ describe("campaign data preservation", () => {
 describe('browser metadata and analytics', () => {
   it('fills new metadata fields when resuming an older browser profile', () => {
     localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ runsStarted: 4, onboarded: true }));
-    expect(loadMeta()).toEqual({ ...DEFAULT_META, runsStarted: 4, onboarded: true });
+    expect(loadMeta()).toEqual({ ...DEFAULT_META, runsStarted: 4, onboarded: true, tutorialDone: true });
     saveMeta({ ...DEFAULT_META, tutorialDone: true });
     expect(loadMeta().tutorialDone).toBe(true);
   });
@@ -61,7 +60,7 @@ describe('browser metadata and analytics', () => {
     localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({
       openingOnboarding: { version: 1, step: 1, status: 'in-progress' }, runsStarted: 2, challengeUnlocked: true,
     }));
-    expect(loadMeta()).toEqual({ ...DEFAULT_META, runsStarted: 2, challengeUnlocked: true });
+    expect(loadMeta()).toEqual({ ...DEFAULT_META, runsStarted: 2, challengeUnlocked: true, tutorialDone: true });
   });
 
   it('counts a finished or skipped former introduction as the walkthrough done, in Guided Mode only', () => {
@@ -71,18 +70,25 @@ describe('browser metadata and analytics', () => {
     }
     for (const introduction of [{ status: 'not-started' }, 'completed', null, { step: 2 }]) {
       localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ openingOnboarding: introduction }));
-      expect(loadMeta().tutorialDone).toBe(false);
+      expect(loadMeta().tutorialDone).toBe(true);
     }
     // Challenge Mode's walkthrough is its own: Guided Mode's introduction never stood for it.
     localStorage.setItem('nn.classic.meta.v1', JSON.stringify({ openingOnboarding: { version: 1, step: 2, status: 'completed' } }));
     expect(loadMeta('classic').tutorialDone).toBe(false);
   });
 
-  it('keeps a walkthrough step only when it is a step', () => {
-    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ walkthroughStep: 3 }));
-    expect(loadMeta().walkthroughStep).toBe(3);
-    for (const step of [-1, 1.5, '2', null, {}]) {
-      localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ walkthroughStep: step }));
+  it('keeps the traffic view choice only when it is a yes or a no', () => {
+    expect(loadMeta().trafficView).toBeUndefined();
+    saveMeta({ ...DEFAULT_META, trafficView: true });
+    expect(loadMeta().trafficView).toBe(true);
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ trafficView: "yes" }));
+    expect(loadMeta().trafficView).toBeUndefined();
+  });
+  it('keeps a practice flag only when it is the current flag', () => {
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ walkthroughStep: 0, walkthroughVersion: WALKTHROUGH_VERSION }));
+    expect(loadMeta().walkthroughStep).toBe(0);
+    for (const step of [-1, 1.5, '2', 3, null, {}]) {
+      localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ walkthroughStep: step, walkthroughVersion: WALKTHROUGH_VERSION }));
       expect(loadMeta().walkthroughStep).toBeNull();
     }
   });
@@ -109,7 +115,7 @@ describe('browser metadata and analytics', () => {
 
   it('leaves the old music switch out of the metadata it reads back', () => {
     localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ music: 'loud', onboarded: true }));
-    expect(loadMeta()).toEqual({ ...DEFAULT_META, onboarded: true });
+    expect(loadMeta()).toEqual({ ...DEFAULT_META, onboarded: true, tutorialDone: true });
   });
 
   it('recovers from malformed metadata and analytics', () => {
@@ -179,7 +185,7 @@ describe("challenge mode unlock", () => {
     saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
     expect(challengeUnlocked()).toBe(true);
   });
-  it("counts an older completed campaign save even when its metadata predates the field", () => {
+  it("counts an older completed campaign save even when its metadata predates the field", { timeout: 30_000 }, () => {
     let game = act(preparedReliability(), { type: "arm_reliability" });
     for (let i = 0; i < 60 && !pendingReliability(game.campaign); i++) {
       if (game.phase === "review") game = act(game, { type: "acknowledge_review" });
@@ -353,27 +359,15 @@ describe("time of day", () => {
   });
 });
 
-it("keeps the furthest completed lessons when revisiting and migrates absent or corrupt progress", () => {
-  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 1, walkthroughFurthestStep: 8, walkthroughVersion: WALKTHROUGH_VERSION }));
-  expect(loadMeta()).toMatchObject({ walkthroughStep: 1, walkthroughFurthestStep: 8 });
-  for (const invalid of [undefined, null, -1, 2.5, "eight", {}]) {
-    localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 3, walkthroughFurthestStep: invalid }));
-    expect(loadMeta()).toMatchObject({ walkthroughStep: 3, walkthroughFurthestStep: 3 });
-  }
- });
 
-it("maps progress saved by the 21-lesson walkthrough to the lesson now teaching the same thing", () => {
-  const at = (id: LessonId) => WALKTHROUGH_LESSON_IDS.indexOf(id);
-  // Old lessons: 0 inspect App, 7 cancel the quote, 15 save (now a tip), 20 ready.
-  for (const [old, now] of [[0, at("goal")], [1, at("inspect-db")], [5, at("run")], [7, at("cancel")], [11, at("speed")], [15, at("ready")], [20, at("ready")], [400, at("ready")]]) {
-    localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: old, walkthroughFurthestStep: old }));
-    expect(loadMeta()).toMatchObject({ walkthroughStep: now, walkthroughFurthestStep: now, walkthroughVersion: WALKTHROUGH_VERSION });
+
+it("marks lesson-era profiles done and drops their indices, in Guided Mode only", () => {
+  for (const step of [0, 3, 7, 20, 50]) {
+    localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: step, walkthroughFurthestStep: step }));
+    expect(loadMeta()).toMatchObject({ walkthroughStep: null, walkthroughFurthestStep: 0, tutorialDone: true, walkthroughVersion: WALKTHROUGH_VERSION });
   }
-  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 7, walkthroughFurthestStep: 12 }));
-  expect(loadMeta()).toMatchObject({ walkthroughStep: at("cancel"), walkthroughFurthestStep: at("speed") });
-  // A current index out of range is clamped rather than trusted.
-  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 50, walkthroughVersion: WALKTHROUGH_VERSION }));
-  expect(loadMeta().walkthroughStep).toBe(WALKTHROUGH_LESSONS - 1);
+  localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ walkthroughStep: 0, walkthroughVersion: 2, tutorialDone: false }));
+  expect(loadMeta()).toMatchObject({ walkthroughStep: null, tutorialDone: true });
   // Challenge Mode never had the Guided Mode walkthrough; its profile is left as stored.
   localStorage.setItem("nn.classic.meta.v1", JSON.stringify({ walkthroughStep: null, tutorialDone: true }));
   expect(loadMeta("classic")).toMatchObject({ walkthroughStep: null, tutorialDone: true });

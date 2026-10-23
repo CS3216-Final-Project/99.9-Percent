@@ -40,35 +40,38 @@ test("staying in a completed chapter leaves the player's clock paused", async ({
   expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step + 1);
 });
 
-test("manual steps advance exact game seconds in management and pause a running clock", async ({ page, installClock }) => {
+test("speed buttons set the rate and the week rush stops at the boundary", async ({ page, installClock }) => {
   await installClock();
   const game = dataCompany(), start = game.campaign!.step;
   await seedSave(page, game);
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  const steps = page.getByRole("group", { name: "Step time" }), second = page.getByTestId("physical-step");
-  await steps.getByRole("button", { name: "Step 1 game second" }).click();
-  await expect(second).toHaveText(String(start + 1));
-  await steps.getByRole("button", { name: "Step 5 game seconds" }).click();
-  await expect(second).toHaveText(String(start + 6));
-  await page.keyboard.press("n");
-  await expect(second).toHaveText(String(start + 7));
-  // A step while running pauses first, so the clock stays where the step left it.
+  const speeds = page.getByRole("group", { name: "Game speed" });
+  await expect(speeds.getByRole("button", { name: "1×", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await speeds.getByRole("button", { name: "2×", exact: true }).click();
   await page.getByRole("button", { name: "Run", exact: true }).click();
-  await steps.getByRole("button", { name: "Step 1 game second" }).click();
-  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
-  const after = (await savedGame(page)).campaign!.step;
-  await page.clock.runFor(3_000);
-  expect((await savedGame(page)).campaign!.step).toBe(after);
+  await page.clock.runFor(2000);
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  expect((await savedGame(page)).campaign!.step).toBeGreaterThan(start + 2);
+  // The week rush fast-forwards at 20x and hands the clock back at the boundary.
+  await speeds.getByRole("button", { name: /End the week/ }).click();
+  await page.clock.runFor(30_000);
+  const after = await savedGame(page);
+  expect(after.turn).toBeGreaterThan(game.turn);
+  await expect(speeds.getByRole("button", { name: /End the week/ })).toHaveAttribute("aria-pressed", "false");
+  await expect(speeds.getByRole("button", { name: "2×", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
-test("manual steps keep working during an incident", async ({ page, installClock }) => {
+test("the week rush returns to normal speed when an incident opens", async ({ page, installClock }) => {
   await installClock();
-  await seedSave(page, advanceSteps(newGame(1, "step-incident"), 6).state);
+  await seedSave(page, advanceSteps(newGame(1, "rush-incident"), 6).state);
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
-  await page.getByRole("group", { name: "Step time" }).getByRole("button", { name: "Step 5 game seconds" }).click();
-  await expect(page.getByTestId("physical-step")).toHaveText("11");
-  expect((await savedGame(page)).campaign!.step).toBe(11);
+  const speeds = page.getByRole("group", { name: "Game speed" });
+  await speeds.getByRole("button", { name: /End the week/ }).click();
+  await page.clock.runFor(30_000);
+  expect((await savedGame(page)).campaign!.incident).toBeTruthy();
+  // The rush is off and the picked speed owns the pressed state again.
+  await expect(speeds.getByRole("button", { name: /End the week/ })).toHaveAttribute("aria-pressed", "false");
+  await expect(speeds.getByRole("button", { name: "1×", exact: true })).toHaveAttribute("aria-pressed", "true");
 });

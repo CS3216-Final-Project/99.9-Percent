@@ -3,7 +3,8 @@ import { BALANCE, completedTechIds, metrics, TECH_ORDER } from "@/sim";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { pendingStop } from "@/sim/step";
 import { clock } from "@/game/format";
-import { campaignClockAvailable, useGame, walkthroughHoldsClock } from "@/game/store";
+import { milestoneBlocks } from "@/game/campaignGuidance";
+import { useGame } from "@/game/store";
 import { DockMenu } from "@/components/DockMenu";
 import { Icon } from "@/components/icons";
 import { RoomControlsSlot } from "@/components/RoomControlsHost";
@@ -17,7 +18,8 @@ import "../layout/phone-layout.css";
 /**
  * Region: dock. One row along the bottom edge: the views (Tech, History and, in Challenge Mode, Team) and Navigation
  * on the left, then the clock, the speed menu and the one primary time control on the right, under the thumb.
- * Guided Mode's +1s and +5s steps live in the speed menu with the speeds. Where the views do not fit beside the
+ * Guided Mode adds End week beside the speed menu: a 20x rush to the week boundary that slows back down when an
+ * incident happens. Where the views do not fit beside the
  * time controls they fold into one Views menu. Every menu opens above the dock.
  */
 export function PhoneDock() {
@@ -31,7 +33,7 @@ export function PhoneDock() {
  * the gaps between them and the dock's side padding.
  */
 const DIRECT_VIEWS_MIN: Record<"guided" | "challenge", Record<number, number>> = {
-  guided: { 2: 360 },
+  guided: { 2: 408 },
   challenge: { 1: 360, 2: 408, 3: 456 },
 };
 
@@ -54,20 +56,17 @@ function DockViews({ tabs, mode }: { tabs: ViewTab[]; mode: "guided" | "challeng
   </DockMenu>;
 }
 
-/** Manual steps beside the speeds: one game second to watch a decision land, five to see a trend. */
-const STEPS = [{ count: 1, icon: "step" }, { count: 5, icon: "stepMany" }] as const;
-
 function GuidedDock() {
   const game = useGame((s) => s.game);
   const running = useGame((s) => s.running);
   const setRunning = useGame((s) => s.setRunning);
-  const stepSeconds = useGame((s) => s.stepSeconds);
-  const held = useGame(walkthroughHoldsClock);
-  const steppable = useGame(campaignClockAvailable);
+  const weekRush = useGame((s) => s.weekRush);
+  const endWeek = useGame((s) => s.endWeek);
+  const cancelWeekRush = useGame((s) => s.cancelWeekRush);
   const started = useGame((s) => s.started);
   const c = game.campaign!;
   const incident = game.phase === "incident";
-  const active = started && !held && pendingStop(c) === null && !(c.openingMilestone && !c.openingMilestone.acknowledged) && (game.phase === "management" || incident);
+  const active = started && pendingStop(c) === null && !milestoneBlocks(c) && (game.phase === "management" || incident);
   const second = c.step % Q.periodSteps;
   const tabs: ViewTab[] = [
     { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}` },
@@ -83,16 +82,12 @@ function GuidedDock() {
         <Meter value={second / Q.periodSteps} label="Operating week progress" />
         <span className="visually-hidden" aria-hidden="true" data-testid="physical-step">{c.step}</span>
       </div>
-      <TimeMenu>
-        <h3 className="phone-steps-title">Step time</h3>
-        <div className="dock-steps" role="group" aria-label="Step time">
-          {STEPS.map(({ count, icon }) => <button type="button" key={count} className="dock-step" aria-label={`Step ${count} game ${count === 1 ? "second" : "seconds"}`}
-            {...tipProps(held ? "Finish the walkthrough to run the company" : `Pause and advance exactly ${count} game ${count === 1 ? "second" : "seconds"}${count === 1 ? " (N)" : ""}`)}
-            disabled={!steppable} onClick={() => stepSeconds(count)}><Icon name={icon} size={18} /><span>+{count}s</span></button>)}
-        </div>
-      </TimeMenu>
+      <TimeMenu />
+      <button type="button" className={`dock-speed dock-rush phone-rush${weekRush ? " is-on" : ""}`} aria-pressed={weekRush} aria-label="End the week at 20 times speed"
+        {...tipProps("Fast-forward to the end of the week (20×). Slows back down if an incident happens.")}
+        disabled={!active} onClick={() => weekRush ? cancelWeekRush() : endWeek()}><Icon name="stepMany" size={18} /><span>End week</span></button>
       <button type="button" className={`btn btn-primary campaign-play dock-primary${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"}
-        {...tipProps(held ? "Finish the walkthrough to run the company" : "Run or pause the company (P)")} disabled={!active} onClick={() => setRunning(!running)}>
+        {...tipProps("Run or pause the company (P)")} disabled={!active} onClick={() => setRunning(!running)}>
         <Icon name={running ? "pause" : "play"} /><span>{running ? "Pause" : "Run"}</span>
       </button>
       <span className="visually-hidden" role="status">{running ? "Running" : "Paused"}</span>

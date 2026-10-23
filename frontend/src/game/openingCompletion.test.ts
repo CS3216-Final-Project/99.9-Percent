@@ -7,8 +7,7 @@ import { preventedOpening, recoveredOpening } from "./__fixtures__/openingOutcom
 import { decodeSave, makeEnvelope } from "./saveEnvelope";
 import { outcomeSummary } from "./campaignReport";
 import { chapterAdvance, campaignChapters } from "./campaignChapters";
-import { useGame, walkthroughHoldsClock } from "./store";
-import { DEFAULT_META, saveMeta } from "./persist";
+import { useGame } from "./store";
 import { campaignAttention } from "./campaignAttention";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
@@ -98,18 +97,3 @@ it("leaves Classic progression independent of Campaign prevention", () => {
   expect(classic.campaign).toBeUndefined();
 });
 
-it("keeps Chapter 0 clock hold and practice-company isolation", () => {
-  saveMeta({ ...DEFAULT_META, tutorialDone: true });
-  useGame.getState().boot();
-  const original = act(preventedOpening(), { type: "acknowledge_prevention_review" });
-  useGame.setState({ game: original, ready: true, started: true, onboarding: false });
-  useGame.getState().startTour("campaign");
-  expect(useGame.getState().tutorialCompany?.game).toEqual(original);
-  expect(walkthroughHoldsClock(useGame.getState())).toBe(true);
-  useGame.getState().setRunning(true); useGame.getState().tick(100);
-  expect(useGame.getState().game.campaign!.step).toBe(0);
-  expect(useGame.getState().game.campaign!.openingMilestone).toBeNull();
-  useGame.getState().endTour(false);
-  expect(useGame.getState().game).toEqual(original);
-  expect(useGame.getState().game.campaign!.scaling).toBeNull();
-});

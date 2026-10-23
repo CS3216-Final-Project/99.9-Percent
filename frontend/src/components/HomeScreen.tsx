@@ -171,7 +171,7 @@ export function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, aut
         Your other run could not be saved, so switching now loses it. Press "{label}" again to switch anyway{canExport ? ", or continue that run and export it from Menu, Saves first" : ""}.
       </Callout>}
       {/* A closed company has no Opening left to walk through. */}
-      {summary.tutorialDone && !(mode === "campaign" && summary.ended) && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>{mode === "campaign" ? "Replay walkthrough" : "Replay tutorial"}</button>}
+      {summary.tutorialDone && !(mode === "campaign" && summary.ended) && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>{mode === "campaign" ? "Replay Launch Week" : "Replay tutorial"}</button>}
     </>}
   </section>;
 }

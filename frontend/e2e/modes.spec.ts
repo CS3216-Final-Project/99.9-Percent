@@ -1,4 +1,4 @@
-import { completeTutorial, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
+import { completeTutorial, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
@@ -16,20 +16,18 @@ test("new players see Guided Mode first with Challenge Mode locked", async ({ pa
   expect(await page.evaluate(() => [localStorage.getItem("nn.campaign.save.v1"), localStorage.getItem("nn.classic.save.v1")])).toEqual([null, null]);
   await page.screenshot({ path: "test-results/mode-choice-guided-first.png" });
   await guided.getByRole("button", { name: "Start Guided Mode" }).press("Enter");
-  await expect(tutorial(page)).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Launch week" })).toBeVisible();
   await completeTutorial(page);
-  expect((await savedGame(page)).campaign!.step).toBe(1);
+  expect((await savedGame(page)).campaign!.step).toBe(0);
   await expectRoom(page);
 });
 
 // The room stays mounted while the game underneath it is swapped, so this journey keeps drawing it.
 test("switches between Guided Mode and unlocked Challenge Mode from the menu, keeping each run", async ({ page }) => {
-  await seedSave(page, advanceSteps(newGame(1, "mode-switch"), 1).state, { challengeUnlocked: true });
+  // This journey tests mode persistence, so the company starts two game seconds in.
+  await seedSave(page, advanceSteps(newGame(1, "mode-switch"), 2).state, { challengeUnlocked: true });
   await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
-  // This journey tests mode persistence; the public step control advances the same
-  // company by one game second without an unrelated animated-clock exercise.
-  await page.getByRole("button", { name: "Step 1 game second", exact: true }).click();
   const campaign = await savedGame(page);
   expect(campaign.campaign!.step).toBe(2);
 

@@ -1,45 +1,6 @@
-import { test, expect, savedGame, seedSave, tutorial, finishChapterZero, lessonNumber, CHAPTER_ZERO_LESSONS } from "./fixtures";
-const lesson = (id: Parameters<typeof lessonNumber>[0]) => `Walkthrough, step ${lessonNumber(id)} of ${CHAPTER_ZERO_LESSONS}`;
+import { test, expect, savedGame, seedSave } from "./fixtures";
 import { applyAction, newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
-
-test("the mandatory walkthrough works from the keyboard across the guide and real game controls and remembers Back", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Start Guided Mode" }).press("Enter");
-  const card = tutorial(page);
-  await expect(card.getByRole("heading", { name: "Your job" })).toBeFocused();
-  await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
-  await expect(card.getByRole("heading", { name: "Look at the App Server" })).toBeFocused();
-  const panel = page.getByRole("complementary", { name: "System metrics" });
-  await page.keyboard.press("Tab");
-  await expect(panel.getByRole("button", { name: "App Server", exact: true })).toBeFocused();
-  await page.keyboard.press("Enter");
-  // An inspection waits on its readings; Next opens the next lesson and puts focus on it.
-  await expect(card).toHaveAccessibleName(lesson("inspect-app"));
-  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
-  await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
-  await expect(card).toHaveAccessibleName(lesson("inspect-db"));
-  await expect(card.getByRole("heading", { name: "Compare with the Database" })).toBeFocused();
-  await panel.getByRole("button", { name: "Database", exact: true }).press("Enter");
-  await expect(card.getByRole("button", { name: "Next", exact: true })).toBeEnabled();
-  await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
-  await expect(card).toHaveAccessibleName(lesson("warnings"));
-  await card.getByRole("button", { name: "Back", exact: true }).press("Enter");
-  await expect(card).toHaveAccessibleName(lesson("inspect-db"));
-  await card.getByRole("button", { name: "Next", exact: true }).press("Enter");
-  await expect(card).toHaveAccessibleName(lesson("warnings"));
-  await panel.getByRole("button", { name: "Database", exact: true }).focus();
-  await expect(panel.getByRole("button", { name: "Database", exact: true })).toBeFocused();
-  await page.keyboard.press("Escape"); await page.keyboard.press("p");
-  await expect(card).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeDisabled();
-  await finishChapterZero(page);
-  await expect(page.getByRole("dialog", { name: "Company Message", exact: true })).toBeHidden();
-  await page.keyboard.press("p"); await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
-  await page.keyboard.press("p"); await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
-  await page.reload(); await page.getByRole("button", { name: "Continue company" }).click();
-  await expect(card).toHaveCount(0);
-});
 
 test("pending milestone reload keeps the company paused and awards it only once", async ({ page, withoutRoom }) => {
   await withoutRoom();

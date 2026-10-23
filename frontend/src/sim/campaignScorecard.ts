@@ -1,9 +1,9 @@
 import type { Campaign, CampaignScorecard, ServiceMeasurement, Snapshot } from "./campaignTypes";
 import type { GameState } from "./types";
+import { openingTuning } from "./launchWeek";
 import { clone } from "./state";
 import { completedTechIds } from "./tech";
 import { qualifiesForRecovery } from "./step";
-import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
 import { APPLICATION_SCALING as P } from "./scenarios/applicationScaling";
 import { DATA_STRATEGY as D } from "./scenarios/dataStrategy";
 import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
@@ -21,8 +21,8 @@ export function observeService(m:ServiceMeasurement,s:Snapshot):void {
 }
 /** Operating cost of the current architecture for one settlement period, at the rates settlement charges. */
 export function recurringCost(c:Campaign):number {
- const db=c.dbCapacity===D.dbCapacity?D.dbWeeklyCents:c.dbCapacity>=P.dbCapacity?P.dbWeeklyCents:c.upgraded?Q.upgradedDbWeeklyCents:Q.dbWeeklyCents;
- return Q.engineers*Q.salaryWeeklyCents+c.apps.reduce((n,a)=>n+(a.tier==="large"?P.appWeeklyCents:Q.appWeeklyCents),0)+db+
+ const t=openingTuning(c),db=c.dbCapacity===D.dbCapacity?D.dbWeeklyCents:c.dbCapacity>=P.dbCapacity?P.dbWeeklyCents:c.upgraded?t.upgradedDbWeeklyCents:t.dbWeeklyCents;
+ return t.engineers*t.salaryWeeklyCents+c.apps.reduce((n,a)=>n+(a.tier==="large"?P.appWeeklyCents:t.appWeeklyCents),0)+db+
  (c.loadBalancer?P.lbWeeklyCents:0)+(c.readCache?D.cacheWeeklyCents:0)+(c.spikeStage?.controller?T.controllerWeeklyCents:0)+
  (c.reliabilityStage?.checksStep!=null?R.checksWeeklyCents:0)+(c.reliabilityStage?.failover?R.failoverWeeklyCents:0);
 }
@@ -37,11 +37,11 @@ export function captureScorecard(s:GameState,outcome:"won"|"bankrupt"):CampaignS
  if(c.apps.some(a=>a.role==="spare")||c.actions.some(a=>["create-spare","reserve-spare"].includes(a.type)&&a.activatedStep!==null))deployed.push("standby");
  if(d?.failover)deployed.push("auto_failover");
  return {runId:c.runId,seed:s.seed,outcome,capturedStep:c.step,users:c.combinedStage?.users??2000,
- finalUserTarget:c.combinedStage?.finalUserTarget??null,cashCents:c.cashCents,revenueCents:c.revenueCents,pendingRevenueCents:c.ledger.successes*Q.revenueCents,
+ finalUserTarget:c.combinedStage?.finalUserTarget??null,cashCents:c.cashCents,revenueCents:c.revenueCents,pendingRevenueCents:c.ledger.successes*openingTuning(c).revenueCents,
  infrastructureSetupCents:c.investedCents-promotions,promotionCents:promotions,
  infrastructureOperatingCents:c.settlements.reduce((n,x)=>n+x.appCents+x.dbCents+(x.lbCents??0)+(x.cacheCents??0)+(x.controllerCents??0)+(x.checksCents??0)+(x.failoverCents??0),0),
  salaryCents:c.settlements.reduce((n,x)=>n+x.salaryCents,0),rejectedDemand:c.cumulative.rejected,
- opportunityCents:c.cumulative.rejected*Q.revenueCents,failedDemand:c.cumulative.failed,incidentCount:c.trace.filter(t=>t.type==="incident-opened").length,
+ opportunityCents:c.cumulative.rejected*openingTuning(c).revenueCents,failedDemand:c.cumulative.failed,incidentCount:c.trace.filter(t=>t.type==="incident-opened").length,
  recurringCents:recurringCost(c),measurement:clone(m),combinedMeasurement:c.combinedStage?clone(c.combinedStage.service):null,
  wholeRunUptime:m.scope==="full-run"&&m.eligibleSteps?m.healthySteps/m.eligibleSteps:null,
  wholeRunLargestOutage:m.scope==="full-run"?m.longestDegradedSteps:null,ownedTechIds:completedTechIds(s),deployedTechIds:deployed,

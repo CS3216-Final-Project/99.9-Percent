@@ -1,6 +1,6 @@
 import { advanceCampaignStep } from "./fixtures";
 import type { Page } from "@playwright/test";
-import { completeTutorial, test, expect, tutorial, savedGame } from "./fixtures";
+import { completeTutorial, test, expect, savedGame } from "./fixtures";
 
 /** Count the voices the sound effects start. The music synthesises offline and only plays buffers in real time. */
 async function countEffects(page: Page) {
@@ -30,12 +30,10 @@ test("sounds the company starting, tutorial completion and the alarm, and stays 
   expect(await voices()).toBe(0);
   await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
   await expect.poll(voices).toBeGreaterThanOrEqual(5);
-  const launch = await voices();
-  // Finishing the mandatory walkthrough marks the end of the introduction.
+  await voices();
+  // Opening the doors on Launch Week ends the introduction; the letter makes no sound.
   await completeTutorial(page);
-  await expect(tutorial(page)).toBeHidden();
-  await page.waitForTimeout(300);
-  await expect.poll(voices).toBeGreaterThan(launch);
+  await expect(page.getByRole("dialog", { name: "Launch week" })).toBeHidden();
   const introduced = await voices();
   await advanceCampaignStep(page,{seconds:5-(await savedGame(page)).campaign!.step});
   // Quiet steps make no sound.
@@ -89,7 +87,7 @@ test("starts a new company with the same sound, and lets a saved one continue qu
   await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
   await expect.poll(voices).toBeGreaterThanOrEqual(5);
   await completeTutorial(page);
-  await expect(tutorial(page)).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Launch week" })).toBeHidden();
   // Reloading counts from zero again: the saved company continues without its start-up sound.
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();

@@ -1,11 +1,7 @@
-import { test as base, expect, type BrowserContext, type Locator, type Page } from '@playwright/test';
+import { test as base, expect, type BrowserContext, type Page } from '@playwright/test';
 import type { GameState } from '../src/sim';
 import { CHAPTER_TOURS, DEFAULT_META, type Meta } from '../src/game/persist';
 import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
-import { WALKTHROUGH_LESSON_IDS, WALKTHROUGH_LESSONS as CHAPTER_ZERO_LESSONS } from '../src/game/walkthrough';
-export { CHAPTER_ZERO_LESSONS };
-/** A Chapter 0 lesson's 1-based position, as its card announces it. */
-export const lessonNumber = (id: (typeof WALKTHROUGH_LESSON_IDS)[number]) => WALKTHROUGH_LESSON_IDS.indexOf(id) + 1;
 
 const controlledPages = new WeakSet<Page>();
 type ClockOptions = Parameters<Page["clock"]["install"]>[0];
@@ -98,7 +94,7 @@ export { expect };
 /** The dialog that announces a finished Scaling & Routing or Data Strategy chapter. */
 export const chapterComplete = (page: Page) => page.getByRole('dialog', { name: /^(Scaling & Routing|Data Strategy) complete$/ });
 
-/** The Guided Mode walkthrough's card, whichever step it shows. */
+/** A spotlight guide's card, whichever step it shows. */
 export const tutorial = (page: Page) => page.getByRole('dialog', { name: /^(?:Walkthrough|Tutorial), step/ });
 
 /** Seeds a company whose player has finished the walkthrough and seen every chapter's guide, unless `meta` says otherwise. */
@@ -203,76 +199,24 @@ export async function openCameraControls(page: Page) {
 }
 export async function setGameSpeed(page: Page, speed: number) {
   const menu = page.locator(".time-menu");
-  if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await menu.locator(":scope > summary").click();
-  await page.getByRole("group", { name: "Game speed" }).getByRole("button", { name: `${speed}×`, exact: true }).click();
-  await menu.locator(":scope > summary").click();
-}
-
-/**
- * Press Next until the lesson moves on. The card can move as Next becomes ready (an inspection's spotlight jumps to
- * its readings), so a click may land where the card was and miss; a player would simply press again. The lesson on
- * the card is read afresh before each press, so a press that did land is never repeated on the next lesson.
- */
-async function pressNext(card: Locator, step: string, touch: boolean) {
-  const next = card.getByRole("button", { name: "Next", exact: true });
-  await expect(async () => {
-    // Bounded, so a press that cannot happen fails this try instead of waiting out the whole journey.
-    if ((await card.getAttribute("data-lesson")) === step) await (touch ? next.tap({ timeout: 5_000 }) : next.click({ timeout: 5_000 }));
-    await expect(card).not.toHaveAttribute("data-lesson", step, { timeout: 2_000 });
-  }, `Chapter 0 lesson ${step} did not move on after Next`).toPass({ timeout: 20_000 });
-}
-
-/** Perform the open lesson's required exercise, which moves on by itself (inspections then press Next), or press Next on a reading lesson. */
-export async function nextChapterZero(page: Page, touch = false) {
-  const card = tutorial(page);
-  const click = async (control: Locator) => touch ? control.tap() : control.click();
-  const next = card.getByRole("button", { name: "Next", exact: true });
-  const lesson = (await card.getAttribute("data-lesson-id"))!;
-  const step = (await card.getAttribute("data-lesson"))!;
-  if (await next.isEnabled()) { await pressNext(card, step, touch); return; }
-  const panel = page.getByRole("complementary", { name: "System metrics" });
-  if (lesson === "inspect-app" || lesson === "inspect-db") {
-    // An inspection waits on its readings until the player presses Next.
-    await click(panel.getByRole("button", { name: lesson === "inspect-app" ? "App Server" : "Database", exact: true }));
-    await expect(next).toBeEnabled();
-    await pressNext(card, step, touch);
-    return;
-  } else if (lesson === "run") {
-    await click(page.getByRole("button", { name: "Run", exact: true }));
-    await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
-  } else if (lesson === "quote") await click(panel.locator(".act:not(:disabled)").first());
-  else if (lesson === "speed") {
-    const menu = page.locator(".time-menu");
-    if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await click(menu.locator(":scope > summary"));
-    const speed = page.getByRole("group", { name: "Game speed", exact: true });
-    // Choosing a speed finishes the lesson; the next card may already sit over the menu's trigger.
-    await click(speed.locator('button:not([aria-pressed="true"])').first());
-  } else throw new Error(`Unexpected required interaction in lesson ${lesson}`);
-  // A finished exercise opens the next lesson.
-  await expect(card).not.toHaveAttribute("data-lesson", step);
-}
-
-/** Complete Chapter 0 through the real UI, from whichever lesson is currently open. */
-export async function finishChapterZero(page: Page, touch = false) {
-  const card = tutorial(page);
-  for (let lesson = 0; lesson < CHAPTER_ZERO_LESSONS; lesson++) {
-    const finish = card.getByRole("button", { name: "Finish walkthrough", exact: true });
-    if (await finish.count()) { if (touch) await finish.tap(); else await finish.click(); return; }
-    await nextChapterZero(page, touch);
+  if (await menu.count()) {
+    if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await menu.locator(":scope > summary").click();
+    await page.getByRole("group", { name: "Game speed" }).getByRole("button", { name: `${speed}×`, exact: true }).click();
+    await menu.locator(":scope > summary").click();
+  } else {
+    await page.getByRole("group", { name: "Game speed" }).getByRole("button", { name: `${speed}×`, exact: true }).click();
   }
-  throw new Error("Chapter 0 did not reach its explicit finish action");
 }
 
-/** Unrelated journeys complete mandatory Chapter 0; optional spotlight guides retain their Skip action. */
+/** Unrelated journeys dismiss the Launch Week letter; optional spotlight guides retain their Skip action. */
 export async function completeTutorial(page: Page) {
-  if (await page.locator(".chapter-zero-guide").count()) {
-    // Completing the real lessons is setup for these journeys. Bound that setup
-    // separately, then preserve the journey's original budget and assertion timeouts.
-    const journeyBudget = test.info().timeout;
-    const started = performance.now();
-    test.setTimeout(journeyBudget + 180_000);
-    await test.step("Complete mandatory Chapter 0 setup", () => finishChapterZero(page), { timeout: 180_000 });
-    test.setTimeout(journeyBudget + Math.ceil(performance.now() - started));
-  }
-  else await page.getByRole("button", { name: "Skip", exact: true }).click();
+  const doors = page.getByRole("button", { name: "Open the doors", exact: true });
+  const skip = page.getByRole("button", { name: "Skip", exact: true });
+  // The launch letter mounts with the run: wait for either control rather than polling once.
+  const winner = await Promise.race([
+    doors.waitFor({ timeout: 10_000 }).then(() => "doors" as const).catch(() => null),
+    skip.waitFor({ timeout: 10_000 }).then(() => "skip" as const).catch(() => null),
+  ]);
+  if (winner === "doors") await doors.click();
+  else if (winner === "skip") await skip.click();
 }
