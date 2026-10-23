@@ -8,6 +8,8 @@ import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
 import { saveGame, saveMeta, DEFAULT_META } from "@/game/persist";
 import { newGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
+import { DockMenu } from "./DockMenu";
+import { ViewTabs, type ViewTab } from "./ViewSheet";
 
 // Only timeouts are faked; the spotlight keeps measuring with real intervals.
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); });
@@ -349,6 +351,21 @@ it("walks Stay Online through unlocking Health Checks in Tech and deploying it",
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   expect(useGame.getState().tour).toBeNull();
 }, 15_000);
+
+it("points at a closed dock menu that holds the step's control and names it, but not at other disclosures", async () => {
+  // Deploy Health Checks with Tech open: its control is the Tech tab, folded into a phone's Views menu.
+  useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, view: "tech", tour: { track: "reliability", step: 2 } });
+  const tech: ViewTab[] = [{ id: "tech", label: "Tech", icon: "tree", badge: null }];
+  const prompt = () => screen.getByRole("dialog", { name: "Chapter guide, step 3 of 3" }).querySelector(".tour-prompt")!.textContent;
+  const docked = render(<><div className="controls-dock"><DockMenu name="Views" label="Views"><ViewTabs tabs={tech} /></DockMenu></div><Tutorial /></>);
+  expect(prompt()).toBe("Open Views, then close Tech.");
+  // Once the menu is open the tab itself is the target again.
+  act(() => { document.querySelector("details")!.open = true; });
+  await vi.waitFor(() => expect(prompt()).toBe("Close Tech."));
+  docked.unmount();
+  render(<><details><summary>More</summary><ViewTabs tabs={tech} /></details><Tutorial /></>);
+  expect(prompt()).toBe("Close Tech.");
+});
 
 it("keeps the Deploy Health Checks step on its own action when the player buys something else first", () => {
   useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 1 } });

@@ -22,11 +22,16 @@ export interface Ride {
   closing: number;
   /** How fast the ride's clock runs against the page's: 1, or more once the player has hurried it. */
   rate: number;
+  /**
+   * The ride cut straight to its floor instead of riding, decided as it set off. The view and the sounds follow it
+   * until the next ride, so changing the setting mid-ride never cuts a ride already under way.
+   */
+  cut: boolean;
 }
 
 export type RideEvent = "depart" | "arrive";
 
-export const ride: Ride = { from: "servers", to: "servers", start: -Infinity, arrived: -Infinity, fromY: 0, y: 0, closing: 0, rate: 1 };
+export const ride: Ride = { from: "servers", to: "servers", start: -Infinity, arrived: -Infinity, fromY: 0, y: 0, closing: 0, rate: 1, cut: false };
 
 const listeners = new Set<(event: RideEvent) => void>();
 let timer = 0;
@@ -48,12 +53,13 @@ export function onRide(listener: (event: RideEvent) => void): () => void {
 export function placeCar(floor: Floor): void {
   window.clearTimeout(timer);
   stopSkipping?.();
-  Object.assign(ride, { from: floor, to: floor, start: -Infinity, arrived: -Infinity, fromY: FLOOR_Y[floor], y: FLOOR_Y[floor], closing: 0, rate: 1 });
+  Object.assign(ride, { from: floor, to: floor, start: -Infinity, arrived: -Infinity, fromY: FLOOR_Y[floor], y: FLOOR_Y[floor], closing: 0, rate: 1, cut: false });
 }
 
 /**
- * Ride to `to`. With `instant` (reduced motion) the view cuts straight there. Otherwise any click or key press
- * during the ride hurries the rest of it along, though not the press that started it.
+ * Ride to `to`. With `instant` (reduced motion, or the player's Skip elevator cutscene setting) the view cuts
+ * straight there, and `ride.cut` says so. Otherwise any click or key press during the ride hurries the rest of it
+ * along, though not the press that started it.
  * With the avatar aboard, the ride runs its course without responding to those presses.
  * `closing` preserves doors opened for a visitor call as the player departs.
  */
@@ -61,7 +67,7 @@ export function depart(to: Floor, instant: boolean, skippable = true, closing?: 
   window.clearTimeout(timer);
   stopSkipping?.();
   const t = now();
-  Object.assign(ride, { from: ride.to, to, start: t, arrived: -Infinity, fromY: ride.y, closing: closing ?? (riding() ? 0 : doorsAt(t - ride.arrived)), rate: 1 });
+  Object.assign(ride, { from: ride.to, to, start: t, arrived: -Infinity, fromY: ride.y, closing: closing ?? (riding() ? 0 : doorsAt(t - ride.arrived)), rate: 1, cut: instant });
   for (const l of listeners) l("depart");
   if (instant) {
     arrive();

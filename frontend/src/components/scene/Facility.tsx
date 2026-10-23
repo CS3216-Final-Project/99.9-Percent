@@ -470,7 +470,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
           cut.held = viewPoint(c.target, camera);
           touched.current = cut.from.touched || !!focusing.current;
         }
-        const a = cutsRide() ? 1 : backAt(now() - ride.arrived);
+        const a = ride.cut ? 1 : backAt(now() - ride.arrived);
         tiltTo(offset, cut.held.polar + (cut.from.polar - cut.held.polar) * a);
         // A view the player made their own mid-ride (walk mode taken while the car ran) is still their own: back to it.
         if ((cut.from.touched || touched.current) && !focusing.current) {

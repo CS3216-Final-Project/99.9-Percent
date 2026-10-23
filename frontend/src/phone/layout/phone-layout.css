@@ -453,8 +453,6 @@
   padding: 4px var(--phone-gutter-right) calc(4px + var(--phone-safe-bottom)) var(--phone-gutter-left);
   flex-wrap: nowrap;
 }
-.phone-app[data-edition="phone"] .phone-dock [data-label] { padding-top: 0; }
-.phone-app[data-edition="phone"] .phone-dock [data-label]::before { display: none; }
 
 /* Views: icon above a short label, each a full 48 px target. */
 .phone-app[data-edition="phone"] .phone-dock > .view-tabs { display: flex; flex: none; gap: 2px; grid-row: auto; }

@@ -351,6 +351,9 @@ const LIFT_VOICES = {
     bell(ctx, out, at, 76, 0.15, 1.0);
     bell(ctx, out, at + 0.24, 72, 0.15, 1.3);
   },
+  /** One short bell for a ride cut straight to its floor, on the chime's last note. */
+  dingUp: (ctx, out, at) => bell(ctx, out, at, 84, 0.12, 0.6),
+  dingDown: (ctx, out, at) => bell(ctx, out, at, 72, 0.12, 0.6),
   /** The indicator ticking over as the car passes between the floors. */
   tick: (ctx, out, at, hiss) => {
     osc(ctx, "square", 1760, at, at + 0.04).connect(filter(ctx, "lowpass", 3200)).connect(hit(ctx, at, 0.07, 0.035)).connect(out);
@@ -495,6 +498,8 @@ export interface Sfx {
   liftDepart(up: boolean, tickIn: number): void;
   /** The car arrives: its hum stops, the chime sounds and the doors open, wait and close. */
   liftArrive(up: boolean, doors: LiftDoors): void;
+  /** The view cut straight to a floor, up or down, with no ride shown: one short bell, and the last ride falls silent. */
+  liftCut(up: boolean): void;
   /**
    * Play a sound of walking the building at `level` (0 to 1) of the effects volume. With `wake`, as for a press of
    * the player's own, it may start the audio; otherwise, like the zones' sounds, it plays only while the audio runs.
@@ -513,7 +518,7 @@ export interface Sfx {
   dispose(): void;
 }
 
-const SILENT: Sfx = { play() {}, playZone() {}, liftDepart() {}, liftArrive() {}, playScene() {}, setVolume() {}, dispose() {} };
+const SILENT: Sfx = { play() {}, playZone() {}, liftDepart() {}, liftArrive() {}, liftCut() {}, playScene() {}, setVolume() {}, dispose() {} };
 
 /**
  * `wanted` says whether the player has effects on, so a click can start the
@@ -646,6 +651,15 @@ export function createSfx(wanted: () => boolean = () => false, now: () => number
         LIFT_VOICES.doors(c, ride, at + 0.05, hiss);
         LIFT_VOICES.doors(c, ride, at + doors.close, hiss);
         LIFT_VOICES.thud(c, ride, at + doors.shut, hiss);
+      });
+    },
+    liftCut(up) {
+      whenAwake((c) => {
+        if (!bus) return;
+        if (ride) fade(ride, c, 0.08);
+        ride = lane(c, bus);
+        humming = null;
+        LIFT_VOICES[up ? "dingUp" : "dingDown"](c, ride, c.currentTime + 0.005);
       });
     },
     playZone(cue, level) {
