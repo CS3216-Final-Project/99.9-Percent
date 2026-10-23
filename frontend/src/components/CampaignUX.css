@@ -9,6 +9,15 @@
   z-index: 2;
   box-shadow: 0 0 0 8px var(--paper), 0 14px 10px -4px var(--paper);
 }
+/* A control scrolled into view (guidance, lessons, focus) stops below the switch, not under it:
+ * its 8px offset, about 48px of switch, and an 8px gap. */
+.side.campaign-panel { scroll-padding-top: 64px; }
+/* On a short screen the panel shows only a few rows, so the switch scrolls away with the content instead. */
+@media (max-height: 700px) {
+  /* Relative, not static: it still positions its own thumb. */
+  .campaign-panel .panel-tabs > .segmented { position: relative; box-shadow: none; }
+  .side.campaign-panel { scroll-padding-top: 0; }
+}
 /* One rhythm under the switch: 14px to the guidance, 14px to the tab's content. */
 .campaign-panel .panel-tabs > .campaign-guidance { margin: 14px 0 0; }
 .campaign-panel .panel-tabs > .tab-panel { padding-top: 14px; }

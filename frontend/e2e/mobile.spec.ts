@@ -327,9 +327,12 @@ test("reliability: inspection and effective recipients remain clear on narrow to
  await seedSave(page,tick(act(preparedReliability(),{type:"arm_reliability"}),9));
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  const panel=page.getByRole("region",{name:"Stay Online"});
+ await openPanelTab(page,"Actions");
  await panel.getByRole("button",{name:"Inspect App 2 health · free",exact:true}).tap();
  const instances=page.getByRole("region",{name:"Application instances"});
  await expect(instances.getByRole("button",{name:/App 2: Installed - not receiving traffic/})).toHaveAttribute("aria-pressed","true");
+ // Inspecting brought its readings forward on Analysis; the restoration is back on Actions.
+ await openPanelTab(page,"Actions");
  await expect(panel).toContainText("detected unhealthy");
  await expect(page.getByRole("button",{name:"Restore App 2 · free · 3 game seconds",exact:true})).toBeEnabled();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
@@ -381,6 +384,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   await expect(panel.locator(".campaign-evidence .evidence-rows dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
   await expect(panel.getByRole("progressbar", { name: "Database load: 800 of 600 operations/s" })).toBeVisible();
   expect((await savedGame(page)).campaign!.step).toBe(6);
+  await openPanelTab(page, "Actions");
   for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
     const button = panel.getByRole("button", { name });
     await button.scrollIntoViewIfNeeded();
@@ -464,6 +468,7 @@ test("cache selection, paid activation and warmth reload on touch",async({page, 
  await page.route("**/api/**",route=>route.abort());await seedSave(page,dataCompany());
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
  const panel=page.getByRole("complementary",{name:"System metrics"}),data=page.getByRole("region",{name:"Data strategy"});
+ await openPanelTab(page,"Actions");
  await data.getByRole("button",{name:/Deploy Read Cache/}).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
  await advanceCampaignStep(page,{seconds:2});
  const roomCache=page.getByRole("main").getByRole("button",{name:/Read Cache/});
@@ -488,6 +493,7 @@ test("traffic spikes: touch selects an instance after retirement leaves an ID ga
  await app.tap();await expect(app).toHaveAttribute("aria-pressed","true");
  await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 5:/})).toHaveAttribute("aria-pressed","true");
  await page.getByRole("dialog",{name:"Servers inspected"}).getByRole("button",{name:"Return to room"}).tap();
+ await openPanelTab(page,"Actions");
  await page.getByRole("region",{name:"Traffic spikes and autoscaling"}).scrollIntoViewIfNeeded();
  await page.screenshot({path:"test-results/phase5-mobile.png"});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);

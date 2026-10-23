@@ -1,6 +1,6 @@
 import { advanceCampaignStep } from "./fixtures";
 import type { Page } from "@playwright/test";
-import { completeTutorial, test, expect, tutorial, savedGame } from "./fixtures";
+import { completeTutorial, test, expect, tutorial, savedGame, openPanelTab } from "./fixtures";
 
 /** Count the voices the sound effects start. The music synthesises offline and only plays buffers in real time. */
 async function countEffects(page: Page) {
@@ -48,6 +48,7 @@ test("sounds the company starting, tutorial completion and the alarm, and stays 
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   const inspect = page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true });
   await mute.click();
+  await openPanelTab(page, "Analysis");
   await inspect.click();
   await page.waitForTimeout(300);
   expect(await voices()).toBe(alarm);

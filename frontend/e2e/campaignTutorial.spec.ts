@@ -218,6 +218,7 @@ test("entering Scaling & Routing shows its guide once, on the controls the chapt
 
   await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await openPanelTab(page, "Actions");
   await expect(page.getByRole("region", { name: "Scaling controls" })).toBeVisible();
   await expect(guide).toHaveCount(0);
 });

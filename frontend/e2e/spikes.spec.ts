@@ -106,6 +106,7 @@ test("spikes: manually planned capacity survives the announced wave without an a
 test("spikes: write-heavy DB constraint remains after automatic app routing",async({page,withoutRoom})=>{
  await withoutRoom();
  test.setTimeout(90000);const api=await blockedGuest(page,untilOffset(spikeCompany(true,"write-heavy"),24),false);
+ await openPanelTab(page, "Actions");
  const control=page.getByRole("region",{name:"Traffic spikes and autoscaling"});await expect(control).toContainText("cannot increase DB capacity");
  expect((await savedGame(page)).campaign!.snapshot.db.demand).toBeGreaterThan(3000);
  await openPanelTab(page, "Actions");
@@ -116,6 +117,7 @@ test("spikes: write-heavy DB constraint remains after automatic app routing",asy
 
 test("spikes: disabling keeps paid installation and allows an explicit manual route",async({page})=>{
  const api=await blockedGuest(page,untilOffset(spikeCompany(),10));const before=(await savedGame(page)).campaign!;
+ await openPanelTab(page, "Actions");
  await page.getByRole("button",{name:"Disable autoscaling",exact:true}).click();
  await runTo(page,before.step+3);
  const idle=(await savedGame(page)).campaign!;expect(idle.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(idle.cashCents).toBe(before.cashCents);expect(idle.pending.some(a=>a.type==="routing")).toBe(false);
