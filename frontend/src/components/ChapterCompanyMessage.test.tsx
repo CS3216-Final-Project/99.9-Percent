@@ -26,7 +26,7 @@ beforeEach(() => {
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ x: 10, y: 10, top: 10, left: 10, right: 54, bottom: 54, width: 44, height: 44, toJSON: () => ({}) });
 });
-afterEach(() => { cleanup(); setConfirming(null); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); setConfirming(null); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const host = () => <CampaignAttentionHost><CampaignHeader/><CampaignPanel/><CampaignControls/></CampaignAttentionHost>;
 
 it.each(companies.map((game, i) => [i + 1, game] as const))("shows the actual chapter %i colleague and mission once in StrictMode", (chapter, game) => {
@@ -63,15 +63,41 @@ it("advances one line at a time from the dialogue box and keeps the mission unti
   const model = chapterCompanyMessage(companies[3])!;
   render(<ChapterCompanyMessage model={model} enabled/>);
   const copy = message()!.querySelector(".dialogue-copy")!;
+  // The live region names the speaker, so a screen reader hears who says each line.
   expect(copy.getAttribute("aria-live")).toBe("polite");
-  expect(copy.textContent).toBe(model.lines[0]);
-  expect(fireEvent.mouseDown(copy)).toBe(false); expect(fireEvent.mouseDown(next()!)).toBe(true);
-  fireEvent.click(copy); expect(copy.textContent).toBe(model.lines[1]);
+  expect(copy.textContent).toBe(`Sam: ${model.lines[0]}`);
+  // A press outside the buttons focuses the dialogue, and reading on returns focus to Next.
+  expect(message()!.tabIndex).toBe(-1);
+  message()!.focus(); fireEvent.click(copy); expect(copy.textContent).toBe(`Sam: ${model.lines[1]}`); expect(document.activeElement).toBe(next());
   fireEvent.click(message()!.querySelector(".dialogue-foot")!); expect(copy.textContent).toContain(model.lines[2]);
   fireEvent.click(copy); fireEvent.click(copy);
   expect(copy.textContent).toContain(model.lines.at(-1)); expect(copy.textContent).toContain(model.mission);
   expect(next()).toBeNull(); expect(message()).not.toBeNull();
   expect(message()!.querySelectorAll(".dialogue-progress > [data-read]")).toHaveLength(model.lines.length);
+});
+
+it("lets the player select text without reading on, and reads on with Enter while the dialogue itself has focus", () => {
+  const model = chapterCompanyMessage(companies[3])!;
+  render(<ChapterCompanyMessage model={model} enabled/>);
+  const copy = message()!.querySelector(".dialogue-copy")!, line = copy.querySelector(".dialogue-line")!;
+  expect(fireEvent.mouseDown(copy)).toBe(true);
+  window.getSelection()!.selectAllChildren(line); fireEvent.click(line);
+  expect(copy.textContent).toContain(model.lines[0]);
+  window.getSelection()!.removeAllRanges();
+  message()!.focus(); fireEvent.keyDown(message()!, { key: "Enter" });
+  expect(copy.textContent).toContain(model.lines[1]);
+  fireEvent.keyDown(message()!, { key: "Tab", shiftKey: true });
+  expect(document.activeElement).toBe(next());
+});
+
+it("preloads every portrait of the scene and hides a portrait that fails to load", () => {
+  const requested: string[] = [];
+  vi.stubGlobal("Image", class { set src(value: string) { requested.push(value); } });
+  render(<ChapterCompanyMessage model={chapterCompanyMessage(companies[0])!} enabled/>);
+  expect(requested).toEqual(["/characters/maya.webp"]);
+  const portrait = message()!.querySelector<HTMLImageElement>(".dialogue-portrait")!;
+  expect(portrait.hasAttribute("data-broken")).toBe(false);
+  fireEvent.error(portrait); expect(portrait.hasAttribute("data-broken")).toBe(true);
 });
 
 it("keeps a valid line when the current message gets shorter while it is read", () => {
@@ -164,8 +190,14 @@ it("contains keyboard focus, ignores outside clicks and restores background inte
   fireEvent.keyDown(dismiss,{key:"Tab",shiftKey:true}); expect(document.activeElement).toBe(primary);
   fireEvent.mouseDown(document.querySelector(".dialogue-backdrop")!);
   fireEvent.click(document.querySelector(".dialogue-backdrop")!); expect(message()).not.toBeNull();
-  fireEvent.keyDown(primary,{key:"p"}); expect(message()).not.toBeNull();
+  // Game shortcuts listen on the window; none of the dialogue's keys may reach them.
+  const shortcuts: string[] = [], listen = (event: KeyboardEvent) => shortcuts.push(event.key);
+  window.addEventListener("keydown", listen);
+  fireEvent.keyDown(primary,{key:"p"}); fireEvent.keyDown(message()!,{key:"p"}); expect(message()).not.toBeNull();
+  expect(shortcuts).toEqual([]);
   readThrough(); expect(background.inert).toBeFalsy(); expect(document.activeElement).toBe(trigger);
+  fireEvent.keyDown(trigger,{key:"p"}); expect(shortcuts).toEqual(["p"]);
+  window.removeEventListener("keydown", listen);
   view.unmount(); background.remove();
 });
 

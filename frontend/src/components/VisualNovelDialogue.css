@@ -1,12 +1,14 @@
 /* Visual novel scene: the speaker stands above the dialogue box, which covers the portrait's cut-off edge. */
 .dialogue-backdrop { position: fixed; inset: 0; z-index: 99; display: flex; align-items: flex-end; justify-content: center; padding: 16px 12px max(16px, env(safe-area-inset-bottom)); background: var(--spotlight-dim); overscroll-behavior: contain; touch-action: none; }
 .dialogue { --speaker: var(--go); --portrait: clamp(120px, 36dvh, 320px); position: relative; display: flex; flex-direction: column; width: min(760px, 100%); max-height: 100%; color: var(--ink); touch-action: pan-y; }
+.dialogue:focus { outline: none; }
 .dialogue[data-speaker="maya"] { --speaker: #b98ae0; }
 .dialogue[data-speaker="alex"] { --speaker: #e8b23a; }
 .dialogue[data-speaker="jordan"] { --speaker: #7e8fb0; }
 .dialogue[data-speaker="sam"] { --speaker: #ff8a3d; }
 .dialogue[data-speaker="taylor"] { --speaker: #4fd1c5; }
 .dialogue-portrait { flex: none; align-self: flex-start; width: var(--portrait); height: var(--portrait); margin: 0 0 calc(var(--portrait) * -.16) clamp(8px, 4%, 40px); object-fit: contain; object-position: bottom; filter: drop-shadow(0 10px 18px rgb(14 11 30 / .35)); pointer-events: none; user-select: none; }
+.dialogue-portrait[data-broken] { visibility: hidden; }
 .dialogue-box { position: relative; display: flex; flex-direction: column; min-height: 0; padding: 26px clamp(16px, 3vw, 26px) 16px; border: 2px solid var(--speaker); border-radius: var(--radius-panel); background: var(--paper); box-shadow: var(--lift); }
 .dialogue-plate { position: absolute; top: 0; left: clamp(16px, 3vw, 26px); display: flex; align-items: baseline; gap: 8px; max-width: calc(100% - 96px); margin: 0; padding: 6px 14px; transform: translateY(-50%); border: 2px solid var(--speaker); border-radius: var(--radius); background: var(--night); color: var(--on-night); font-family: var(--font-display); white-space: nowrap; }
 .dialogue-plate strong { font-size: var(--text-lg); }
@@ -22,10 +24,22 @@
 .dialogue-progress { display: flex; gap: 6px; }
 .dialogue-progress > span { width: 8px; height: 8px; border-radius: 50%; background: var(--paper-3); }
 .dialogue-progress > span[data-read] { background: var(--speaker); }
+.dialogue-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+.dialogue-stats > div { flex: 1 1 0; min-width: 84px; padding: 8px 12px; border-radius: var(--radius); background: var(--paper-2); }
+.dialogue-stats dt { color: var(--text-soft); font-family: var(--font-display); font-size: var(--text-xs); }
+.dialogue-stats dd { margin: 0; font-family: var(--font-num); font-size: var(--text-lg); font-variant-numeric: tabular-nums; font-weight: 600; }
 @media (max-width: 480px) {
   .dialogue { --portrait: clamp(104px, 28dvh, 200px); }
   .dialogue-line { font-size: var(--text-md); }
   .dialogue-ending { font-size: var(--text-sm); }
+}
+/* The narrowest phones stack the role under the name instead of cutting it off, and fit three result tiles on one row. */
+@media (max-width: 360px) {
+  .dialogue-box { padding-top: 38px; }
+  .dialogue-plate { flex-direction: column; align-items: flex-start; gap: 0; line-height: 1.2; }
+  .dialogue-stats { gap: 6px; }
+  .dialogue-stats > div { min-width: 0; padding: 6px 8px; }
+  .dialogue-stats dd { font-size: var(--text-sm); }
 }
 @media (prefers-reduced-motion: no-preference) {
   .dialogue-portrait { animation: dialogue-enter .35s ease-out both; }
@@ -35,7 +49,3 @@
 @keyframes dialogue-enter { from { opacity: 0; transform: translateX(-24px); } }
 @keyframes dialogue-rise { from { opacity: 0; transform: translateY(12px); } }
 @keyframes dialogue-line { from { opacity: 0; transform: translateY(4px); } }
-.dialogue-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
-.dialogue-stats > div { flex: 1 1 0; min-width: 84px; padding: 8px 12px; border-radius: var(--radius); background: var(--paper-2); }
-.dialogue-stats dt { color: var(--text-soft); font-family: var(--font-display); font-size: var(--text-xs); }
-.dialogue-stats dd { margin: 0; font-family: var(--font-num); font-size: var(--text-lg); font-variant-numeric: tabular-nums; font-weight: 600; }

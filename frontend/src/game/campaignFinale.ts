@@ -21,4 +21,4 @@ export function campaignFinale(game: GameState) {
   ];
   return { lines, stats, key: `99.99.campaign-finale:${card.runId}` };
 }
-export type CampaignFinale = NonNullable<ReturnType<typeof campaignFinale>>;
+export type CampaignFinaleScene = NonNullable<ReturnType<typeof campaignFinale>>;

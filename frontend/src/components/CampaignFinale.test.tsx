@@ -15,7 +15,7 @@ const next = () => within(finale()!).queryByRole("button", { name: "Next" });
 const portrait = () => finale()!.querySelector<HTMLImageElement>(".dialogue-portrait")!;
 const show = (game = won) => { useGame.setState({ game, ready: true, started: true, onboarding: false, view: null }); return render(<StrictMode><CampaignOverlays/></StrictMode>); };
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("only celebrates a won campaign, with every colleague in order and true numbers", () => {
   expect(campaignFinale(newGame())).toBeNull();
@@ -59,10 +59,26 @@ it.each(["X", "Escape"])("skips to the scorecard with %s from any line", method 
   expect(finale()).toBeNull(); expect(scorecard()).not.toBeNull();
 });
 
-it("does not replay after a reload part way through, even without storage", () => {
+it("plays again if it was left part way, and not once it was skipped", () => {
+  const key = campaignFinale(won)!.key;
+  show(); fireEvent.click(next()!); expect(localStorage.getItem(key)).toBeNull();
+  cleanup(); show(); expect(finale()).not.toBeNull();
+  expect(finale()!.querySelector(".dialogue-copy")!.textContent).toContain("Maya: ");
+  fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  cleanup(); show(); expect(finale()).toBeNull(); expect(scorecard()).not.toBeNull();
+});
+
+it("remembers a finished finale for the session when storage is unavailable", () => {
   vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("Unavailable"); });
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("Unavailable"); });
   const game = structuredClone(won); game.campaign!.scorecard!.runId = "finale-without-storage";
-  show(game); expect(finale()).not.toBeNull(); fireEvent.click(next()!);
+  show(game); fireEvent.keyDown(finale()!, { key: "Escape" });
   cleanup(); show(game); expect(finale()).toBeNull(); expect(scorecard()).not.toBeNull();
+});
+
+it("preloads every celebrating portrait when the finale opens", () => {
+  const requested: string[] = [];
+  vi.stubGlobal("Image", class { set src(value: string) { requested.push(value); } });
+  show();
+  expect([...new Set(requested)]).toEqual(["maya", "jordan", "sam", "taylor", "alex"].map(id => `/characters/${id}-celebrating.webp`));
 });

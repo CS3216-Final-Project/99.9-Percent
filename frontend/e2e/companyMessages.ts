@@ -43,7 +43,9 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   await expect(next).toBeFocused();
   await page.keyboard.press("Tab"); await expect(dismiss).toBeFocused();
   await page.keyboard.press("Shift+Tab"); await expect(next).toBeFocused();
+  // P is the game's Run/Pause shortcut; inside the dialogue it must not start the clock.
   await page.keyboard.press("p"); await expect(card).toBeVisible(); await expect(run).toBeVisible();
+  await expect(page.getByRole("button",{name:"Pause",exact:true,includeHidden:true})).toHaveCount(0);
   const [name, character] = [["Maya","maya"],["Alex","alex"],["Jordan","jordan"],["Sam","sam"],["Taylor","taylor"],["Alex","alex"]][chapter - 1];
   await expect(card.locator(".dialogue-plate")).toContainText(name);
   const portrait = card.getByRole("img",{name:new RegExp(`^${name}, `)});
@@ -54,12 +56,13 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   await expect(card).toBeInViewport({ratio:1});
   await page.screenshot({path:info.outputPath(`company-message-chapter-${chapter}-first-line${touch?"-touch":""}.png`)});
   // Odd chapters read on with the keyboard, even chapters by pressing the dialogue box itself.
-  const copy = card.locator(".dialogue-copy");
-  while (await next.count()) {
-    const line = await copy.textContent();
+  const copy = card.locator(".dialogue-copy"), progress = card.locator(".dialogue-progress");
+  const total = Number((await progress.getAttribute("aria-label"))!.match(/of (\d+)$/)![1]);
+  for (let line = 1; line < total; line++) {
+    await expect(progress).toHaveAttribute("aria-label", `Line ${line} of ${total}`);
     if (chapter % 2) await page.keyboard.press("Enter"); else await press(copy);
-    await expect(copy).not.toHaveText(line!);
   }
+  await expect(progress).toHaveAttribute("aria-label", `Line ${total} of ${total}`); await expect(next).toHaveCount(0);
   await expect(card.getByRole("button",{name:"Got it",exact:true})).toBeFocused();
   await expect(card).toContainText("Your mission:");
   await expect(card).toBeInViewport({ratio:1});

@@ -18,6 +18,7 @@ async function finaleJourney(page: Page, info: TestInfo, touch: boolean) {
   const next = scene.getByRole("button", { name: "Next", exact: true }), copy = scene.locator(".dialogue-copy");
   await expect(next).toBeFocused();
   for (const [i, [name, id]] of CAST.entries()) {
+    await expect(scene.locator(".dialogue-progress")).toHaveAttribute("aria-label", `Line ${i + 1} of ${CAST.length}`);
     await expect(scene.locator(".dialogue-plate")).toContainText(name);
     const portrait = scene.getByRole("img", { name: new RegExp(`^${name}, `) });
     await expect(portrait).toHaveAttribute("src", `/characters/${id}-celebrating.webp`);
