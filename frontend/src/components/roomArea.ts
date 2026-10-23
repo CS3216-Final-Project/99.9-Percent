@@ -8,8 +8,8 @@ export const EDGE = 12;
  */
 export function openRoomArea(stage: DOMRect): { right: number; bottom: number } {
   let right = stage.width - EDGE, bottom = stage.height - EDGE;
-  const panel = (document.querySelector(".phone-sheet") ?? document.querySelector(".campaign-panel"))?.getBoundingClientRect();
-  if (panel && panel.width > 0) {
+  const panel = [".phone-sheet", ".campaign-panel"].map((selector) => document.querySelector(selector)?.getBoundingClientRect()).find((box) => !!box && box.width > 0);
+  if (panel) {
     if (panel.left - stage.left > stage.width * 0.4) right = Math.min(right, panel.left - stage.left - EDGE);
     else if (panel.top - stage.top > stage.height * 0.2) bottom = Math.min(bottom, panel.top - stage.top - EDGE);
   }

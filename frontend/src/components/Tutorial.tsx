@@ -41,6 +41,8 @@ interface Step {
 }
 
 const label = (id: string) => `.eq-label[data-eq="${id}"]`;
+/** "Close Tech." as the second half of "Open Views, then close Tech." */
+const lowerFirst = (hint: string) => hint.charAt(0).toLowerCase() + hint.slice(1);
 const PRIMARY = '[data-tour="primary"]';
 const TECH_TAB = '.view-tabs button[data-view="tech"]';
 /** Only Deploy Health Checks' own confirmation belongs to its step; another action's is the player's detour. */
@@ -208,12 +210,14 @@ function inOpenRoom(r: DOMRect, stage: DOMRect): boolean {
 }
 
 /**
- * The summary of a closed menu that holds `el`. The menu's contents keep a layout box while it is closed, so they look
- * pointable; the step points at the menu instead, as a phone's dock folds its views into one when they do not fit.
+ * The closed, named dock menu that holds `el`, as a phone's dock folds its views into one Views menu when they do not
+ * fit. The menu's contents keep a layout box while it is closed, so they look pointable; the step points at the
+ * menu's summary instead. Other disclosures in the game are left alone.
  */
-function closedMenuOf(el: Element): HTMLElement | null {
-  const summary = el.closest("details:not([open])")?.querySelector<HTMLElement>(":scope > summary");
-  return summary && !summary.contains(el) ? summary : null;
+function closedDockMenu(el: Element): { summary: HTMLElement; name: string } | null {
+  const menu = el.closest<HTMLElement>(".controls-dock details[data-menu-name]:not([open])");
+  const summary = menu?.querySelector<HTMLElement>(":scope > summary");
+  return menu?.dataset.menuName && summary && !summary.contains(el) ? { summary, name: menu.dataset.menuName } : null;
 }
 
 /** `chapterZero` presents Chapter 0's lessons; an edition can bring its own, as the phone's coach strip does. */
@@ -293,9 +297,9 @@ function SpotlightTutorial() {
         if (floorOf(eq) !== s.floor) s.goToFloor(floorOf(eq), "tour");
       }
       const found = document.querySelector<HTMLElement>(sel);
-      const folded = found && closedMenuOf(found);
-      const el = folded ?? found;
-      setMenu(folded ? folded.textContent?.trim() || null : null);
+      const folded = found && closedDockMenu(found);
+      const el = folded?.summary ?? found;
+      setMenu(folded?.name ?? null);
       // Something without a box of its own (hidden, or laid out with display: contents) cannot be pointed at.
       if (!el || el.getClientRects().length === 0) {
         if (last !== "none") {
@@ -384,7 +388,7 @@ function SpotlightTutorial() {
         </div>
         <h3>{step.title}</h3>
         {whyFirst && why && <p className="muted">{why}</p>}
-        <p className="tour-prompt">{menu ? `Open ${menu}.` : step.hint(s)}</p>
+        <p className="tour-prompt">{menu ? `Open ${menu}, then ${lowerFirst(step.hint(s))}` : step.hint(s)}</p>
         {!whyFirst && why && <p className="muted tour-explanation">{why}</p>}
         <div className="tour-foot">
           <button type="button" className="tour-skip" onClick={() => s.endTour(false)}>

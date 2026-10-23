@@ -189,7 +189,7 @@ It shows the progress, the title and the one-line task; Learn more opens the lon
 Each lesson sets the sheet state it needs, and the room keeps at least 40% of a 390 x 844 screen in every lesson.
 Challenge Mode's first-week guide uses the same strip and puts the task before its reason, so the task never scrolls under Skip.
 A lit control in the dock, below the strip, keeps its full window; a lit equipment label under the sheet is brought into the open room above it.
-When the control is folded into a closed dock menu, such as Views on screens narrower than the view buttons need, the guide lights that menu and asks to open it first.
+When the control is folded into a closed dock menu, such as Views on screens narrower than the view buttons need, the guide lights that menu and says so first, for example "Open Views, then open Tech."
 
 ## Responsive and accessible behaviour
 

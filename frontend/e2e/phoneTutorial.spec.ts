@@ -12,6 +12,8 @@ import { advanceSteps } from "../src/sim/step";
 type Box = { x: number; y: number; width: number; height: number };
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width - 1 && b.x < a.x + a.width - 1 && a.y < b.y + b.height - 1 && b.y < a.y + a.height - 1;
 const box = async (locator: Locator) => (await locator.boundingBox())!;
+/** Whether `inner` lies within `outer`, to a pixel. */
+const inside = (inner: Box, outer: Box) => inner.x >= outer.x - 1 && inner.y >= outer.y - 1 && inner.x + inner.width <= outer.x + outer.width + 1 && inner.y + inner.height <= outer.y + outer.height + 1;
 const near = (a: Box, b: Box) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1 && Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
 const SHOTS = process.env.PHONE_TUTORIAL_SHOTS ?? "test-results";
 
@@ -99,10 +101,7 @@ for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
       const target = state === "readings" ? page.locator(".chapter-zero-target .evidence-rows") : page.locator(".chapter-zero-target");
       if (await target.count()) {
         await expect.poll(() => uncovered(target), `${id} ${state}: the lit control is uncovered`).toBe(true);
-        await expect.poll(async () => {
-          const lit = await box(page.locator(".cz-spotlight")), t = await box(target);
-          return t.y >= lit.y - 1 && t.y + t.height <= lit.y + lit.height + 1 && t.x >= lit.x - 1 && t.x + t.width <= lit.x + lit.width + 1;
-        }, `${id} ${state}: the control is inside the lit window`).toBe(true);
+        await expect.poll(async () => inside(await box(target), await box(page.locator(".cz-spotlight"))), `${id} ${state}: the control is inside the lit window`).toBe(true);
         expect(overlaps(await box(target), now)).toBe(false);
       }
       // An open quote, and on short screens an open dock menu, cover the room by design while they are open.
@@ -244,8 +243,8 @@ test("a chapter guide uses the same coach strip above the dock", async ({ page }
 async function lit(page: Page, target: Locator) {
   const hole = page.locator(".tour-hole");
   if (!(await hole.count()) || !(await target.count())) return false;
-  const h = await box(hole), t = await box(target);
-  return h.height > 0 && t.y >= h.y - 1 && t.y + t.height <= h.y + h.height + 1 && t.x >= h.x - 1 && t.x + t.width <= h.x + h.width + 1;
+  const h = await box(hole);
+  return h.height > 0 && inside(await box(target), h);
 }
 
 for (const [width, height] of [[390, 844], [320, 568]]) {
@@ -273,8 +272,8 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     await expect.poll(() => lit(page, servers), "the Servers label is lit").toBe(true);
     await shot("01-servers");
     await servers.tap();
-    const reveal = page.getByRole("dialog", { name: "Servers inspected" });
-    if (await reveal.isVisible()) await reveal.getByRole("button", { name: "Return to room" }).tap();
+    // Inspecting from the room always opens its reveal first.
+    await page.getByRole("dialog", { name: "Servers inspected" }).getByRole("button", { name: "Return to room" }).tap();
     await page.getByRole("button", { name: /Add server/ }).tap();
 
     // 2. Explore Scale Up: the Tech tab is in the dock, or folded into its Views menu on the narrowest phones.
@@ -283,7 +282,7 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     const views = page.locator(".phone-views-menu > summary");
     if (width < 360) {
       await expect(views).toBeVisible();
-      await expect(prompt).toHaveText("Open Views.");
+      await expect(prompt).toHaveText("Open Views, then open Tech.");
       await expect.poll(() => lit(page, views), "the Views menu is lit").toBe(true);
       await shot("02-views");
       await views.tap();
@@ -302,8 +301,7 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     await expect.poll(() => uncovered(growthLabel), "the Growth label is above the sheet").toBe(true);
     await shot("03-growth");
     await growthLabel.tap();
-    const growth = page.getByRole("dialog", { name: "Growth inspected" });
-    if (await growth.isVisible()) await growth.getByRole("button", { name: "Return to room" }).tap();
+    await page.getByRole("dialog", { name: "Growth inspected" }).getByRole("button", { name: "Return to room" }).tap();
     await page.getByRole("button", { name: /^Launch/ }).first().tap();
 
     // 4. Play the week: Next week is in the dock, below the coach strip.

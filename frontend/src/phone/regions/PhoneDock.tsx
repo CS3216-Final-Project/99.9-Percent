@@ -45,7 +45,7 @@ function DockViews({ tabs, mode }: { tabs: ViewTab[]; mode: "guided" | "challeng
   const width = useSyncExternalStore(subscribeWidth, viewportWidth, viewportWidth);
   const active = useGame((s) => tabs.some((tab) => tab.id === s.view));
   if (width >= (DIRECT_VIEWS_MIN[mode][tabs.length] ?? Infinity)) return <ViewTabs tabs={tabs} />;
-  return <DockMenu className={`phone-views-menu${active ? " is-active" : ""}`} label={<><span className="tab-icon" aria-hidden="true"><Icon name="overview" size={17} /></span><span className="tab-label">Views</span></>}>
+  return <DockMenu className={`phone-views-menu${active ? " is-active" : ""}`} name="Views" label={<><span className="tab-icon" aria-hidden="true"><Icon name="overview" size={17} /></span><span className="tab-label">Views</span></>}>
     <h3>Views</h3>
     {/* Choosing a view closes the menu, as the view opens over the room. */}
     <div onClick={(event) => { if ((event.target as Element).closest("button")) event.currentTarget.closest("details")?.removeAttribute("open"); }}>
