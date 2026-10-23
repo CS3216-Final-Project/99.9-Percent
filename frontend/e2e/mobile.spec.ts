@@ -384,14 +384,14 @@ test("investigates and responds through the incident panel on touch", async ({ p
   await expect(panel.locator(".campaign-evidence .evidence-rows dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
   await expect(panel.getByRole("progressbar", { name: "Database load: 800 of 600 operations/s" })).toBeVisible();
   expect((await savedGame(page)).campaign!.step).toBe(6);
+  await expect(panel.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
+  await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
   await openPanelTab(page, "Actions");
   for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
     const button = panel.getByRole("button", { name });
     await button.scrollIntoViewIfNeeded();
     await expect(button).toBeVisible();
   }
-  await expect(panel.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
-  await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
   await panel.getByRole("button", { name: /Upgrade database/ }).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
   await expect(panel.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("3 game second(s)");
   await expect(panel.getByRole("button", { name: /Add server/ })).toBeDisabled();
@@ -478,7 +478,7 @@ test("cache selection, paid activation and warmth reload on touch",async({page, 
  const before=(await savedGame(page)).campaign!;expect(before.readCache).not.toBeNull();expect(before.readCache!.warmth).toBe(0);
  await advanceCampaignStep(page);
  expect((await savedGame(page)).campaign!.readCache!.warmth).toBe(1200);
- await data.scrollIntoViewIfNeeded();await page.screenshot({path:"test-results/phase4-mobile-cache.png"});
+ await openPanelTab(page,"Actions");await data.scrollIntoViewIfNeeded();await page.screenshot({path:"test-results/phase4-mobile-cache.png"});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
  const saved=(await savedGame(page)).campaign!;await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  expect((await savedGame(page)).campaign).toEqual(saved);
