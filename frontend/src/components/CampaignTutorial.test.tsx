@@ -75,6 +75,12 @@ it("starts with the goal, then requires inspection through real game controls an
   expect(current().getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
 });
 
+it("lights a real action once the quote lesson has brought Actions forward", () => {
+  start(); renderCompany(); reach(at("quote"));
+  expect(useGame.getState().panelTab).toBe("actions");
+  expect(document.querySelector(".chapter-zero-target")?.matches(".campaign-panel .act")).toBe(true);
+});
+
 it("opens the next lesson as soon as an action exercise is done", () => {
   start(); renderCompany(); reach(at("quote")); exercise();
   expect(card(at("cancel"))).toBeTruthy();

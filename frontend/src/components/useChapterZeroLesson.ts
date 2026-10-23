@@ -114,7 +114,8 @@ export function useChapterZeroLesson(lessons: readonly ChapterZeroLesson[], card
     for (const node of [el, document.querySelector(".stage"), document.querySelector(".campaign-panel")]) if (node) observer?.observe(node);
     reveal();
     return () => { observer?.disconnect(); cancelAnimationFrame(frame); el.classList.remove("chapter-zero-target"); };
-  }, [target, lit, inspected, index, readingsFirst]);
+    // A lesson's control can be on the panel tab its entry has just brought forward.
+  }, [target, lit, inspected, index, readingsFirst, s.panelTab]);
   useEffect(() => () => setConfirming(null), []);
 
   const why = lesson ? typeof lesson.why === "function" ? lesson.why(s) : lesson.why : undefined;
