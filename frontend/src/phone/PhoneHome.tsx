@@ -1,5 +1,5 @@
 import { challengeAvailable, useGame } from "@/game/store";
-import { AnalyticsConsentPanel, ModeCard } from "@/components/HomeScreen";
+import { AnalyticsConsentPanel, ModeCard, UptimeMark } from "@/components/HomeScreen";
 import { MODES, useModeLauncher, useModeSummaries, type ModeInfo } from "@/components/homeModes";
 import { BALANCE } from "@/sim";
 import { PHONE_CHAPTERS, phoneCampaignSummary } from "./phoneSummary";
@@ -30,7 +30,7 @@ export function PhoneHome() {
   return <div className="title-screen home-screen phone-home">
     <div className="home-card">
       <header className="home-head">
-        <h1>99.99%</h1>
+        <UptimeMark />
         <p className="title-tag">Grow a startup. Keep it online.</p>
       </header>
       <section className="mode-selection" aria-labelledby="mode-heading">

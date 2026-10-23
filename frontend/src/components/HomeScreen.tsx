@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { AvatarButton } from "./AvatarPicker";
 import { BALANCE } from "@/sim";
 import { num } from "@/game/format";
@@ -50,6 +50,28 @@ export function AnalyticsConsentPanel() {
   </section>;
 }
 
+/**
+ * The wordmark climbs from 0.00% to 99.99% once on arrival, easing out like an uptime meter settling, so the game's
+ * name lands as the number the player is about to defend. Screen readers and reduced motion get the name at once.
+ */
+export function UptimeMark() {
+  const digits = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = digits.current;
+    if (!el || typeof window.matchMedia !== "function" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const duration = 1400;
+    const start = performance.now();
+    let frame = requestAnimationFrame(function tick(now) {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = t === 1 ? 1 : 1 - 2 ** (-10 * t);
+      el.textContent = `${(99.99 * eased).toFixed(2)}%`;
+      if (t < 1) frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return <h1 aria-label="99.99%"><span ref={digits} aria-hidden="true">99.99%</span></h1>;
+}
+
 /** Touch screens show a focus ring on an autofocused button, so only keyboard-and-pointer devices get the head start. */
 const autoFocusAllowed = () => typeof window.matchMedia !== "function" || !window.matchMedia("(pointer: coarse)").matches;
 
@@ -75,7 +97,7 @@ export function HomeScreen() {
           <AvatarButton />
           <AccountButton />
         </div>
-        <h1>99.99%</h1>
+        <UptimeMark />
         <p className="title-tag">Grow a startup. Keep it online.</p>
       </header>
       <section className={`mode-selection${unlocked ? "" : " is-locked"}`} aria-label="Choose how you want to play">
