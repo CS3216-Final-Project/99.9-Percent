@@ -79,15 +79,20 @@ const PANEL_ENTRY = '.panel-reopen, .phone-sheet-handle[aria-expanded="false"]';
 /** One ephemeral owner for the header, dock, idle timer and explicitly accepted control attention. */
 /** Scrolls a control fully into its panel with a small margin; a short panel does not always take `scrollIntoView`. */
 function reveal(node: HTMLElement) {
+  // A step card docked across the bottom, as on a phone, covers the end of the panel: keep the control above it.
+  const card = document.querySelector<HTMLElement>(".tour-card.launch-tutorial")?.getBoundingClientRect();
+  const own = node.getBoundingClientRect();
+  const covered = card && card.left < own.right && card.right > own.left ? Math.max(0, innerHeight - card.top) : 0;
   const margin = node.style.scrollMarginBlock;
-  node.style.scrollMarginBlock = "8px";
+  node.style.scrollMarginBlock = `8px ${8 + covered}px`;
   node.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "instant" });
   node.style.scrollMarginBlock = margin;
   const side = node.closest<HTMLElement>(".side");
   if (!side) return;
   const box = node.getBoundingClientRect(), port = side.getBoundingClientRect();
+  const bottom = Math.min(port.bottom, innerHeight - covered);
   if (box.top < port.top + 8) side.scrollTop -= port.top + 8 - box.top;
-  else if (box.bottom > port.bottom - 8) side.scrollTop += Math.min(box.bottom - port.bottom + 8, box.top - port.top - 8);
+  else if (box.bottom > bottom - 8) side.scrollTop += Math.min(box.bottom - bottom + 8, box.top - port.top - 8);
 }
 
 export function CampaignAttentionHost({ children }: { children: ReactNode }) {
