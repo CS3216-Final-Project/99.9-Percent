@@ -112,7 +112,7 @@ describe("desktop edition", () => {
     expect(useGame.getState().scope).toBe(FULL_SCOPE);
     expect(document.documentElement.dataset.edition).toBeUndefined();
     expect(document.querySelector("[data-edition]")).toBeNull();
-    expect(screen.getByRole("region", { name: "Choose how you want to play" }).textContent).toContain("Complete the first five Guided Mode chapters to unlock.");
+    expect(screen.getByRole("region", { name: "Choose how you want to play" }).textContent).toContain("Unlocks after Chapter 5: Stay Online.");
     // The same check that finds nothing on the phone finds the desktop's account, avatar and feedback controls.
     expect(screen.queryAllByRole("button", { name: desktopOnly }).length).toBeGreaterThanOrEqual(3);
   });

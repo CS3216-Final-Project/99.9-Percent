@@ -313,7 +313,7 @@ export function Menu() {
   // Shown beside whichever control asked for the confirmation.
   const warning = (
     <Callout compact tone="warn" icon="alert" kicker="Are you sure?">
-      This replaces your week {week} run. Press the red button again to confirm.
+      This replaces your week {week} run. Press "Lose this run?" again to confirm.
     </Callout>
   );
 

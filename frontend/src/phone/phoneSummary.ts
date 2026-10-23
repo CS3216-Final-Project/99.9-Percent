@@ -10,11 +10,12 @@ export const PHONE_CHAPTERS = SCOPED_CHAPTERS.filter((id) => chapterInScope(PHON
 export function phoneCampaignSummary(game: GameState | null, tutorialDone: boolean): Summary {
   if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Guided Mode" };
   const ended = game.phase === "ended";
-  const chapters = campaignChapters(game);
+  // A save made before the walkthrough ends is still in Chapter 0, not the Opening.
+  const chapters = campaignChapters(game, !tutorialDone, tutorialDone);
   const chapter = chapters.find((c) => c.current) ?? chapters.filter((c) => c.completed).at(-1) ?? chapters[0];
   const progress = ended ? "Company closed"
     : scopeComplete(PHONE_SCOPE, game) || (chapter.number > 0 && !chapterInScope(PHONE_SCOPE, chapter.id as ScopedChapter)) ? "Phone campaign complete"
-    : `Chapter ${chapter.number} of ${PHONE_CHAPTERS}: ${chapter.name}`;
-  return { progress, resumable: true, ended, tutorialDone, continueLabel: "Continue company" };
+    : chapter.number === 0 ? "Walkthrough in progress" : `Chapter ${chapter.number} of ${PHONE_CHAPTERS}: ${chapter.name}`;
+  return { progress, resumable: true, ended, tutorialDone, continueLabel: ended ? "See how it ended" : "Continue company", chapter: chapter.number };
 }
 

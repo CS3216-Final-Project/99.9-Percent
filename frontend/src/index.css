@@ -314,10 +314,15 @@ button:disabled {
   margin: 14px 0 2px;
 }
 
-/* On the title screen the room is the hero: the game's chrome waits offstage. */
+/* On the title screen the room is the hero: the game's chrome waits offstage,
+   keeping its rows so nothing reflows on Start, while the room fills the whole viewport behind it. */
 .app.is-title .topbar,
 .app.is-title .bottombar {
   visibility: hidden;
+}
+
+.app.is-title .stage {
+  grid-row: 1 / -1;
 }
 
 .app.is-title .eq-labels,

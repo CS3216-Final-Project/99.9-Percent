@@ -7,23 +7,27 @@ import { num } from "@/game/format";
 import type { IconName } from "./icons";
 
 /** What a mode's card says about its saved game. Nothing here changes a save. */
-export interface Summary { progress: string | null; resumable: boolean; ended: boolean; tutorialDone: boolean; continueLabel: string }
+export interface Summary { progress: string | null; resumable: boolean; ended: boolean; tutorialDone: boolean; continueLabel: string; chapter?: number }
 
 /** How a home screen describes a Guided Mode save. */
 export type CampaignSummarizer = (game: GameState | null, tutorialDone: boolean) => Summary;
 
 export function campaignSummary(game: GameState | null, tutorialDone: boolean): Summary {
   if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Guided Mode" };
-  const chapters = campaignChapters(game);
+  // A save made before the walkthrough ends is still in Chapter 0, not the Opening.
+  const chapters = campaignChapters(game, !tutorialDone, tutorialDone);
   const chapter = chapters.find((c) => c.current) ?? chapters.filter((c) => c.completed).at(-1) ?? chapters[0];
   const ended = game.phase === "ended";
-  return { progress: ended ? "Company closed" : `Chapter ${chapter.number} of ${chapters.length - 1}: ${chapter.name}`, resumable: true, ended, tutorialDone, continueLabel: "Continue company" };
+  const progress = ended ? (game.outcome === "won" ? "All chapters complete" : "Company closed")
+    : chapter.number === 0 ? "Walkthrough in progress" : `Chapter ${chapter.number} of ${chapters.length - 1}: ${chapter.name}`;
+  // A finished company opens on its final report; nothing is left to continue.
+  return { progress, resumable: true, ended, tutorialDone, continueLabel: ended ? "See how it ended" : "Continue company", chapter: chapter.number };
 }
 
 export function classicSummary(game: GameState | null, tutorialDone: boolean): Summary {
   if (!game || game.campaign || isFreshRun(game)) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Challenge Mode" };
   const ended = game.phase === "ended";
-  return { progress: ended ? "Last game finished" : `Week ${game.turn} of ${BALANCE.maxTurns}`, resumable: !ended, ended, tutorialDone,
+  return { progress: ended ? (game.outcome === "won" ? "Last company reached the goal" : "Last company closed") : `Week ${game.turn} of ${BALANCE.maxTurns}`, resumable: !ended, ended, tutorialDone,
     continueLabel: ended ? "Start Challenge Mode" : `Continue week ${game.turn}` };
 }
 
@@ -51,19 +55,26 @@ export function useModeSummaries(summarizeCampaign: CampaignSummarizer = campaig
   return (m: GameMode) => (m === mode ? active : other);
 }
 
-/** What a mode card says about its mode. */
-export type ModeInfo = { name: string; icon: IconName; pace: string; about: string };
+/** What a mode card says about its mode. The desktop home leaves out the pace line; the phone home shows it. */
+export type ModeInfo = { name: string; icon: IconName; pace?: string; about: string };
 
 export const MODES: Record<GameMode, ModeInfo> = {
   campaign: {
-    name: "Guided Mode", icon: "server", pace: "Continuous play · Six guided chapters",
+    name: "Guided Mode", icon: "server",
     about: "Begin with the walkthrough to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.",
   },
   classic: {
-    name: "Challenge Mode", icon: "week", pace: `Week by week · ${BALANCE.maxTurns}-week challenge`,
+    name: "Challenge Mode", icon: "week",
     about: `Apply what you learned on your own. Grow to ${num(BALANCE.targetUsers)} users in ${BALANCE.maxTurns} weeks while handling outages and keeping the business afloat.`,
   },
 };
+
+/** Guided Mode's pitch once its company has started: finish the walkthrough, then the chapters. */
+export function campaignAbout(summary: Summary): string {
+  if (!summary.resumable) return MODES.campaign.about;
+  if (!summary.tutorialDone) return "Finish the walkthrough to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.";
+  return "Work through six infrastructure chapters at your own pace. Inspect problems, upgrade servers and pause whenever you need.";
+}
 
 /** A home screen's mode controls: play or continue a mode, start a new one and replay its tutorial. */
 export function useModeLauncher(summary: (mode: GameMode) => Summary) {

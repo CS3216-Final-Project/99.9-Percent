@@ -1,7 +1,7 @@
 import { challengeAvailable, useGame } from "@/game/store";
 import { AnalyticsConsentPanel, ModeCard } from "@/components/HomeScreen";
 import { MODES, useModeLauncher, useModeSummaries, type ModeInfo } from "@/components/homeModes";
-import { Callout } from "@/components/ui";
+import { BALANCE } from "@/sim";
 import { PHONE_CHAPTERS, phoneCampaignSummary } from "./phoneSummary";
 import "@/components/HomeScreen.css";
 
@@ -11,7 +11,7 @@ const PHONE_MODES: Record<"campaign" | "classic", ModeInfo> = {
     pace: `Continuous play · Walkthrough and ${PHONE_CHAPTERS} guided chapters`,
     about: "Learn the controls, game time and finances in the walkthrough, then inspect problems, upgrade servers and route traffic in two guided chapters. Pause whenever you need.",
   },
-  classic: MODES.classic,
+  classic: { ...MODES.classic, pace: `Week by week · ${BALANCE.maxTurns}-week challenge` },
 };
 
 /**
@@ -41,9 +41,6 @@ export function PhoneHome() {
             unsaved={unsaved === m} busy={busy} autoFocus={m === mode && !!active.progress}
             onPlay={() => playMode(m)} onNew={() => newGame(m)} onTutorial={() => replayTutorial(m)} />)}
         </div>
-        {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved">
-          This run could not be saved, so switching now loses it. Press the red button again to switch anyway.
-        </Callout>}
       </section>
       <AnalyticsConsentPanel />
     </div>

@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { AvatarButton } from "./AvatarPicker";
+import { BALANCE } from "@/sim";
+import { num } from "@/game/format";
 import type { GameMode } from "@/game/persist";
 import { loadAnalyticsConsent, saveAnalyticsConsent, subscribeAnalyticsConsent } from "@/lib/analytics";
 import { useGame } from "@/game/store";
@@ -7,27 +9,54 @@ import { AccountButton } from "./Account";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
 import { Callout } from "./ui";
-import { MODES, useModeLauncher, useModeSummaries, type ModeInfo, type Summary } from "./homeModes";
+import { campaignAbout, MODES, useModeLauncher, useModeSummaries, type ModeInfo, type Summary } from "./homeModes";
 import "./HomeScreen.css";
 
+/** Chapter 5, Stay Online, unlocks Challenge Mode. */
+const UNLOCK_CHAPTER = 5;
 
-/** The analytics notice, shown only until the player confirms it or opts out. */
+/**
+ * Challenge Mode while it is locked: a short row under Guided Mode that names the goal and shows the way there.
+ * It has no controls, so its text is read in place rather than hidden behind a disabled button.
+ */
+function ChallengeTeaser({ guided }: { guided: Summary }) {
+  const reached = guided.resumable && !guided.ended ? guided.chapter ?? 0 : 0;
+  return <section className="mode-teaser" aria-labelledby="classic-heading">
+    <Icon name="lock" size={20} />
+    <div className="mode-teaser-text">
+      <h2 id="classic-heading">{MODES.classic.name}</h2>
+      <p>Grow to {num(BALANCE.targetUsers)} users in {BALANCE.maxTurns} weeks on your own.</p>
+      <p className="mode-teaser-unlock">Unlocks after Chapter {UNLOCK_CHAPTER}: Stay Online.{reached > 0 && ` You are on Chapter ${reached} of 6.`}</p>
+    </div>
+    <ol className="mode-teaser-pips" aria-hidden="true">
+      {[1, 2, 3, 4, 5, 6].map((n) => <li key={n} className={n < reached ? "is-done" : n === reached ? "is-here" : n === UNLOCK_CHAPTER ? "is-goal" : undefined} />)}
+    </ol>
+  </section>;
+}
+
+/** The analytics notice, shown only until the player confirms it or opts out. One line, with the details on request. */
 export function AnalyticsConsentPanel() {
   const consent = useSyncExternalStore(subscribeAnalyticsConsent, loadAnalyticsConsent, () => null);
   if (consent !== null) return null;
-  return <section className="consent-panel" aria-labelledby="analytics-consent-heading">
-    <h2 id="analytics-consent-heading">Help improve <span className="consent-logo">99.99%</span></h2>
-    <p>We track anonymous gameplay events, like which chapters you finish and how long they take, to help make the game better. We never send account details, URLs, or saved games. Nothing is sent while your browser's Do Not Track or Global Privacy Control setting is on. If you would rather not share, press Opt out.</p>
+  return <section className="consent-strip" aria-label="Help improve 99.99%">
+    <details>
+      <summary>Anonymous gameplay stats help improve 99.99%. <span className="consent-more">Details</span></summary>
+      <p>We track anonymous gameplay events, like which chapters you finish and how long they take, to help make the game better. We never send account details, URLs, or saved games. Nothing is sent while your browser's Do Not Track or Global Privacy Control setting is on. If you would rather not share, press Opt out.</p>
+    </details>
     <div className="consent-actions">
-      <button type="button" className="btn btn-small btn-primary" onClick={() => saveAnalyticsConsent("accepted")}><Icon name="check" />OK</button>
-      <button type="button" className="btn btn-small btn-danger" onClick={() => saveAnalyticsConsent("declined")}>Opt out</button>
+      <button type="button" className="btn btn-small" onClick={() => saveAnalyticsConsent("accepted")}>OK</button>
+      <button type="button" className="btn btn-small" onClick={() => saveAnalyticsConsent("declined")}>Opt out</button>
     </div>
   </section>;
 }
 
+/** Touch screens show a focus ring on an autofocused button, so only keyboard-and-pointer devices get the head start. */
+const autoFocusAllowed = () => typeof window.matchMedia !== "function" || !window.matchMedia("(pointer: coarse)").matches;
+
 /**
  * The one home screen for every visit: first time, a Guided Mode run or a Challenge Mode run in progress.
- * Both modes always have a card, so the player can continue either one or switch from here.
+ * Guided Mode always has a card. Challenge Mode is a short teaser until it unlocks, then a card of its own,
+ * so the player can continue either mode or switch from here.
  */
 export function HomeScreen() {
   const mode = useGame((s) => s.mode);
@@ -39,50 +68,46 @@ export function HomeScreen() {
   const { unsaved, playMode, newGame, replayTutorial } = useModeLauncher(summary);
 
   return <div className="title-screen home-screen">
-    <div className="home-card">
+    <div className={`home-card${unlocked ? "" : " is-solo"}`}>
       <header className="home-head">
         <div className="home-chips">
+          <FeedbackButton />
           <AvatarButton />
           <AccountButton />
         </div>
         <h1>99.99%</h1>
         <p className="title-tag">Grow a startup. Keep it online.</p>
       </header>
-      <section className="mode-selection" aria-labelledby="mode-heading">
-        <h2 id="mode-heading">Choose how you want to play</h2>
+      <section className={`mode-selection${unlocked ? "" : " is-locked"}`} aria-label="Choose how you want to play">
         <div className="mode-options">
-          {(["campaign", "classic"] as const).map((m) => <ModeCard key={m} mode={m} summary={summary(m)} lastPlayed={m === mode && !!active.progress}
-            locked={m === "classic" && !unlocked}
-            unsaved={unsaved === m} busy={busy} autoFocus={m === mode && !!active.progress}
+          {(unlocked ? ["campaign", "classic"] as const : ["campaign"] as const).map((m) => <ModeCard key={m} mode={m} summary={summary(m)} lastPlayed={m === mode && !!active.progress}
+            info={m === "campaign" ? { ...MODES.campaign, about: campaignAbout(summary(m)) } : MODES[m]} locked={false}
+            unsaved={unsaved === m} busy={busy} autoFocus={m === mode && !!active.progress && autoFocusAllowed()}
             onPlay={() => playMode(m)} onNew={() => newGame(m)} onTutorial={() => replayTutorial(m)} />)}
+          {!unlocked && <ChallengeTeaser guided={summary("campaign")} />}
         </div>
-        {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved">
-          This run could not be saved, so switching now loses it. Press the red button again to switch anyway.
-        </Callout>}
       </section>
       <AnalyticsConsentPanel />
-      <footer className="home-foot">
-        <FeedbackButton />
-      </footer>
     </div>
   </div>;
 }
 
-
 /** One mode's card: its description, its saved game and its controls. Another edition can pass its own wording. */
 export function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, autoFocus, onPlay, onNew, onTutorial, info = MODES[mode],
-  lockedText = "Complete the first five Guided Mode chapters to unlock.", lockedLabel = "Complete Guided Mode to unlock" }: {
+  lockedText = "Finish Chapter 5, Stay Online, in Guided Mode to unlock.", lockedLabel = "Finish Chapter 5 to unlock" }: {
   mode: GameMode; summary: Summary; lastPlayed: boolean; locked: boolean; unsaved: boolean; busy: boolean; autoFocus: boolean;
   onPlay: () => void; onNew: () => void; onTutorial: () => void; info?: ModeInfo; lockedText?: string; lockedLabel?: string;
 }) {
   const heading = `${mode}-heading`;
   const label = unsaved ? "Switch and lose this run" : summary.continueLabel;
+  // A Guided Mode company that has ended can start over from here; a Challenge Mode run can at any time.
+  const canRestart = mode === "classic" ? summary.resumable : summary.ended;
   return <section className={`mode-option${lastPlayed ? " is-last-played" : ""}${locked ? " is-locked" : ""}`} aria-labelledby={heading}>
     <div className="mode-option-head">
-      <h3 id={heading}><Icon name={info.icon} />{info.name}</h3>
+      <h2 id={heading}><Icon name={info.icon} />{info.name}</h2>
       {lastPlayed && <span className="mode-badge">Last played</span>}
     </div>
-    <p className="mode-pace">{info.pace}</p>
+    {info.pace && <p className="mode-pace">{info.pace}</p>}
     <p>{info.about}</p>
     {locked ? <>
       <div className="mode-progress is-empty">
@@ -101,10 +126,13 @@ export function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, aut
         <button type="button" className={`btn ${unsaved ? "btn-danger" : "btn-primary"}`} disabled={busy} autoFocus={autoFocus} onClick={onPlay}>
           <Icon name="play" />{label}
         </button>
-        {mode === "classic" && summary.resumable && <button type="button" className="btn" disabled={busy} onClick={onNew}>New game</button>}
+        {canRestart && <button type="button" className="btn" disabled={busy} onClick={onNew}>{mode === "classic" ? "New game" : "New company"}</button>}
       </div>
+      {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved" live="alert">
+        Your other run could not be saved, so switching now loses it. Press "{label}" again to switch anyway, or continue that run and export it from Menu, Saves first.
+      </Callout>}
       {/* A closed company has no Opening left to walk through. */}
-      {summary.tutorialDone && !(mode === "campaign" && summary.ended) && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>{mode === "campaign" ? "Replay walkthrough" : "Replay the tutorial"}</button>}
+      {summary.tutorialDone && !(mode === "campaign" && summary.ended) && <button type="button" className="text-btn mode-tutorial" disabled={busy} onClick={onTutorial}>{mode === "campaign" ? "Replay walkthrough" : "Replay tutorial"}</button>}
     </>}
   </section>;
 }

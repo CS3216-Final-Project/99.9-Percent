@@ -103,7 +103,7 @@ function ChallengeActions({ onResume }: { onResume: () => void }) {
       <MenuTile icon="robot" kind="go" title={label("tutorial", "Tutorial")} text="Replay the guided first week." danger={confirm === "tutorial"} onClick={() => start("tutorial")} />
       <MenuTile icon="play" title={label("new", "New game")} text="Start a new 26-week run." danger={confirm === "new"} onClick={() => start("new")} />
     </MenuActions>
-    {confirm && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces your current run. Press the red button again to confirm.</Callout>}
+    {confirm && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">This replaces your current run. Press "Lose this run?" again to confirm.</Callout>}
     <PhoneModeSwitch to="campaign" />
   </>;
 }
