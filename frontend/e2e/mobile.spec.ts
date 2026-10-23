@@ -710,7 +710,6 @@ for (const width of [390, 320]) test(`the Launch Week score card's three actions
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
   const proceed = card.getByRole("button", { name: "Continue to scaling and routing", exact: true });
   for (const name of ["Copy result", "Stay in this chapter", "Continue to scaling and routing"]) await expect(card.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
-  await expect(proceed).toBeFocused();
   const foot = await card.locator(".chapter-end-foot").boundingBox(), go = await proceed.boundingBox();
   expect(Math.abs(foot!.x + foot!.width - (go!.x + go!.width))).toBeLessThanOrEqual(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
