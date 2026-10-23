@@ -21,7 +21,7 @@ import { admissionCeiling, canEnterData, databaseUpgrade, pendingStop, routableA
 import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
-import { campaignGuidance, milestoneBlocks, type Requirement } from "@/game/campaignGuidance";
+import { campaignGuidance, launchResearchPending, milestoneBlocks, type Requirement } from "@/game/campaignGuidance";
 import { launchWeekScalingOpen, openingTuning } from "@/sim/launchWeek";
 import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
 import { campaignChapters, finishedChapter } from "@/game/campaignChapters";
@@ -515,7 +515,7 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
     if (!tutorialCompany) return <CampaignRecoveryReview key={`${c.runId}:${report.id}:${report.recoveredStep}`} runId={c.runId} report={report} reliability={!c.combinedStage ? reliabilityLesson(c, report) : undefined} onContinue={() => act({ type: "acknowledge_review" })} />;
     return <Modal title="Incident postmortem" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "incident" }}><Report report={report} /><ContinueFoot label="Continue company" onClick={() => act({ type: "acknowledge_review" })} /></Modal>;
   }
-  if(milestoneBlocks(c)&&c.launchWeek&&!(c.launchWeek.researchEarned&&!c.launchWeek.tech))return <LaunchScore campaign={c} />;
+  if(milestoneBlocks(c)&&c.launchWeek&&!launchResearchPending(c))return <LaunchScore campaign={c} />;
   if(c.openingMilestone&&!c.openingMilestone.acknowledged&&!c.launchWeek)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }}>
     <CampaignReport lesson={outcomeSummary(c,"opening")}><p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
     <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p><pre>{JSON.stringify(c.openingMilestone,null,2)}</pre></CampaignReport>

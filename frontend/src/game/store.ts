@@ -1,6 +1,7 @@
 "use client";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
+import { launchResearchPending } from "./campaignGuidance";
 import { finishedChapter } from "./campaignChapters";
 import { FULL_SCOPE, scopeAllows, scopeComplete, type PlayScope } from "./scope";
 import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
@@ -995,7 +996,9 @@ export const useGame = create<Store>()((set, get) => {
     act: (action) => {
       const c = get().game.campaign;
       const acknowledgement = c && requiredAcknowledgement(c);
-      if(c && (!get().started || (acknowledgement && action.type !== acknowledgement))) return false;
+      // Launch Week's research pick still comes before its milestone, which waits for it.
+      const researchPick = !!c && action.type === "pick_launch_tech" && launchResearchPending(c);
+      if(c && (!get().started || (acknowledgement && action.type !== acknowledgement && !researchPick))) return false;
       // A smaller edition stops at its last chapter; the company carries on operating there.
       if(c && !scopeAllows(get().scope, action)) { get().notify(get().scope.endOfGuided, "info"); return false; }
       const record = (ok: boolean) => set({ lastAction: { id: actionId++, type: action.type, ok } });

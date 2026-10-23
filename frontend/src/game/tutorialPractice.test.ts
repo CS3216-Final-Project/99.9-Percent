@@ -39,6 +39,25 @@ it("replays Launch Week on a fresh practice company and returns the untouched in
   expect(useGame.getState()).toMatchObject({ game: company, tour: null });
 });
 
+it("resumes a practice company where it was left, mid-incident included, after a reload", () => {
+  const company = incident();
+  useGame.getState().startTour("campaign");
+  const practice = useGame.getState().game.campaign!.runId;
+  // Play the practice week into its first incident, which pauses the clock.
+  for (let i = 0; i < 400 && useGame.getState().game.phase !== "incident"; i++) { useGame.getState().setRunning(true); useGame.getState().tick(1000); }
+  const left = useGame.getState().game;
+  expect(left.phase).toBe("incident");
+  expect(left.campaign!.step).toBeGreaterThan(1);
+  useGame.getState().endSession();
+  useGame.setState(useGame.getInitialState(), true); start();
+  const s = useGame.getState();
+  expect(s.tutorialCompany?.game).toEqual(company);
+  expect(s.game.campaign!.runId).toBe(practice);
+  expect(s.game.campaign!.step).toBe(left.campaign!.step);
+  expect(s.game.phase).toBe("incident");
+  expect(s.running).toBe(false);
+});
+
 it("preserves the company if practice storage is unavailable", () => {
   const company = incident();
   const write = Storage.prototype.setItem;

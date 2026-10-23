@@ -19,7 +19,7 @@ export default function LaunchScore({ campaign }: { campaign: Campaign }) {
   const nines = ninesOf(uptime);
   const text = nines >= 5 ? "a perfect five nines" : nines === 0 ? "under one nine" : nines === 1 ? "one nine" : nines === 2 ? "two nines" : "three nines";
   const lost = c.cumulative.failed + c.cumulative.rejected;
-  const result = `Launch Week: ${uptimePct(uptime)} uptime (${text}), ${num(lost)} requests lost — 99.9%`;
+  const result = `Launch Week: ${uptimePct(uptime)} uptime (${text}), ${num(lost)} requests lost - 99.99%`;
   const copy = () => {
     void navigator.clipboard?.writeText(result).then(() => setCopied(true), () => {});
   };

@@ -6,7 +6,7 @@ import { currentFault, finalRequirements, stableManagement, canStartGrowth } fro
 import { preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
-import { milestoneBlocks } from "./campaignGuidance";
+import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { campaignChapters, chapterAdvance } from "./campaignChapters";
@@ -246,7 +246,7 @@ function baseAttention(game: GameState): AttentionDecision {
   if (!c) return required("inactive", "Guidance is available in Guided Mode.", "", null);
   if (game.phase === "ended") return required("ended", "This company has ended.", "Review the scorecard before starting another company.", null);
   // The score card waits for the research pick, so the week's last lesson is never covered.
-  if (c.launchWeek && milestoneBlocks(c) && c.launchWeek.researchEarned && !c.launchWeek.tech)
+  if (launchResearchPending(c))
     return result("launch-research", "hint", "Research points buy technology. This one is free; it is billed at the week's settlement.", "Pick Caching or Autoscaling to see your Launch Week score.", "research");
   if (c.launchWeek && milestoneBlocks(c)) return required("launch-score", "Launch Week is complete.", "Review your uptime score and continue into Chapter 2.", "next");
   if (game.phase === "review" || pendingStop(c) || milestoneBlocks(c))

@@ -238,6 +238,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   // A Launch Week step frames its control at once; only the step's own button or using that control moves on.
   useLayoutEffect(() => {
     if (!launchStep) return;
+    let frame = 0;
     const clear = () => {
       if (litTarget.current) { delete litTarget.current.dataset.spotlight; litTarget.current.classList.remove("campaign-gold-attention"); litTarget.current = null; }
       setSpotBox(null);
@@ -249,8 +250,9 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       const closed = desired?.closest("details:not([open])");
       const node = closed?.querySelector<HTMLElement>("summary") ?? desired;
       if (!view && node && node !== revealedTarget.current && !controlVisible(node) && node.getClientRects().length) {
-        revealedTarget.current = node;
-        reveal(node);
+        // The panel resets its scroll in a passive effect when it mounts; reveal after that, or the reset undoes it.
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => { revealedTarget.current = node; reveal(node); });
       }
       const target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
         (targetTab ? visibleControl(tabEntry(targetTab)) : null) ?? (guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research" ? visibleControl(".panel-reopen") : null);
@@ -270,7 +272,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     observer.observe(document.querySelector(".equipment-shell") ?? document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "disabled", "hidden"] });
     window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true);
     document.addEventListener("click", used, true);
-    return () => { clear(); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
+    return () => { clear(); cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
   }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable, targetTab, panelTab]);
   // The room's beams and dimmed racks follow the same spotlight.
   useEffect(() => {

@@ -3,6 +3,8 @@ import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { applyCampaignInput, step } from "../src/sim/step";
 import type { Action } from "../src/sim/types";
+import { WALKTHROUGH_VERSION } from "../src/game/persist";
+import { makeEnvelope } from "../src/game/saveEnvelope";
 
 async function boot(page: Page, game: GameState) {
   await page.route("**/api/**", r => r.abort());
@@ -37,6 +39,82 @@ function nearlyDone() {
   const s = act(researchReady(), { type: "pick_launch_tech", tech: "caching" });
   return runUntil(s, x => x.campaign!.step >= 55);
 }
+
+/** A recovered company whose week ended without its research point being spent. */
+function endedUnspent() {
+  return runUntil(recovered(), x => x.campaign!.launchWeek!.completedStep !== null && x.phase === "management");
+}
+
+/** Seeds a Launch Week replay in progress on a practice company, the original company paused behind it. */
+async function seedPractice(page: Page, company: GameState, practice: GameState) {
+  await seedSave(page, company, { walkthroughStep: 0 });
+  await page.addInitScript(({ key, value }) => { if (localStorage.getItem(key) === null) localStorage.setItem(key, value); },
+    { key: "nn.campaign.tutorial.v1", value: JSON.stringify({ companyRunId: company.campaign!.runId, version: WALKTHROUGH_VERSION, save: makeEnvelope(practice) }) });
+}
+
+/** Opens a seeded company for a journey about the panel and dialogs; it skips drawing the room, which it never touches. */
+async function bootPanel(page: Page, game: GameState) {
+  await page.route("**/api/**", r => r.abort());
+  await seedSave(page, game); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Guided Mode guidance" })).toBeVisible();
+}
+
+/** Spends the research pick through its confirmation, as the player does. */
+async function pickCaching(page: Page) {
+  const sheet = page.getByRole("region", { name: "Launch Week research" });
+  await sheet.getByRole("button", { name: "Caching" }).click();
+  await page.locator(".campaign-action-popover").getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(sheet).toBeHidden();
+}
+
+test("Complete Opening stays hidden until the week is over, even with the milestone recorded mid-week", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await bootPanel(page, recovered());
+  const guidance = page.getByRole("region", { name: "Guided Mode guidance" });
+  await expect(guidance.getByRole("region", { name: "Guided Mode requirements" })).toContainText("1/4");
+  await expect(guidance.getByRole("button", { name: "Complete Opening" })).toHaveCount(0);
+});
+
+test("a week that ends with research unspent asks for the pick, then scores and continues to Chapter 2", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await bootPanel(page, endedUnspent());
+  const guidance = page.getByRole("region", { name: "Guided Mode guidance" });
+  await expect(guidance.getByRole("status").filter({ hasText: "Spend your free research pick" })).toBeVisible();
+  await expect(guidance.getByRole("button", { name: "Complete Opening" })).toHaveCount(0);
+  await expect(tutorial(page)).toContainText("research point");
+  await expect(page.getByRole("region", { name: "Guided Mode chapters" })).toContainText("Spend your free research pick to see your Launch Week score.");
+  // The spotlighted step scrolls the whole research sheet into the panel, both options included.
+  await expect(page.getByRole("region", { name: "Launch Week research" })).toBeInViewport({ ratio: 1 });
+  await pickCaching(page);
+  const card = page.getByRole("dialog", { name: "Launch Week complete" });
+  await expect(card).toBeVisible();
+  await card.getByRole("button", { name: "Continue into Chapter 2" }).click();
+  await expect(card).toBeHidden();
+  const saved = (await savedGame(page)).campaign!;
+  expect(saved.launchWeek?.tech).toBe("caching");
+  expect(saved.openingMilestone?.acknowledged).toBe(true);
+  expect(saved.scaling).not.toBeNull();
+});
+
+test("a practice replay resumes where it was left after a reload, finishes its research and returns the paused company", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  const company = recovered();
+  await seedPractice(page, company, endedUnspent());
+  await page.route("**/api/**", r => r.abort());
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  // The replay is still at the end of its week, not restarted from the launch letter.
+  await expect(page.getByTestId("physical-step")).toHaveText("60");
+  await expect(page.getByRole("dialog", { name: "Launch week" })).toHaveCount(0);
+  await pickCaching(page);
+  await page.getByRole("dialog", { name: "Launch Week complete" }).getByRole("button", { name: "Continue into Chapter 2" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("button", { name: "Return to game" }).click();
+  await expect(page.getByTestId("physical-step")).toHaveText(String(company.campaign!.step));
+  expect((await savedGame(page)).campaign!.runId).toBe(company.campaign!.runId);
+  expect(await page.evaluate(() => localStorage.getItem("nn.campaign.tutorial.v1"))).toBeNull();
+});
 
 test("cold open: the launch letter, the whole room and the opening beat", async ({ page }) => {
   await boot(page, newGame(7, "lw-1", 2));
