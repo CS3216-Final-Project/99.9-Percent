@@ -1,38 +1,58 @@
 # API
 
-Base URL: `VITE_API_URL` (local: `http://localhost:3001`).
-Request and response types live in [`shared/`](../shared). Change a type there only after both sides agree.
+This is the source of truth for the backend's HTTP routes.
+Request and response types live in [`shared/`](../shared); change a type there only after both sides agree.
+How sign-in, sessions and cookies work is in [AUTHENTICATION.md](AUTHENTICATION.md).
 
-| Method | Path | Owner | Types | Status |
-|---|---|---|---|---|
-| GET | `/api/health` | Di Heng | `HealthResponse` (`shared/common.ts`) | Done |
-| GET | `/api/health/db` | Di Heng | `HealthResponse`, or 503 if the database is unreachable | Done |
-| GET | `/api/stats` | Di Heng | `PublicStats` (`backend/src/routes/stats.ts`): public sign-up and cloud-save counts for the landing page, cached for 60 s; 503 with `no-store` when the database is unavailable | Done |
-| POST | `/api/dialogue` | Zi Yao | `DialogueRequest` → `DialogueResponse` (`shared/dialogue.ts`) | Stub |
-| POST | `/api/missions/:id/report` | Zi Yao | → `MissionReport` (`shared/scores.ts`) | Planned |
-| GET | `/api/progress` | Di Heng | TBD | Planned |
-| GET | `/api/areas/:id/layout` | Di Heng | → `CityLayout` (`shared/cityLayout.ts`) | Planned |
+The gameplay itself never needs the API.
+The browser calls public routes directly at `VITE_API_URL` (local: `http://localhost:3001`) and account routes through the same-origin `/api` proxy.
 
-## 🔑 Accounts and cloud saves
+## Public routes
 
-Google OAuth + OpenID Connect, or an email and password, with Express-managed app sessions in Neon. Owner: Di Heng. The browser always calls these through the same-origin `/api` proxy, never through `VITE_API_URL`.
+| Method | Path | Types | Behaviour |
+| --- | --- | --- | --- |
+| GET | `/api/health` | `HealthResponse` (`shared/common.ts`) | Liveness |
+| GET | `/api/health/db` | `HealthResponse` | 503 when the database is unreachable |
+| GET | `/api/stats` | `PublicStats` (`backend/src/routes/stats.ts`) | Sign-up and cloud-save counts for the landing page, cached for 60 s; 503 with `no-store` when the database is unavailable |
+| POST | `/api/feedback` | `FeedbackRequest` / `FeedbackResponse` (`shared/feedback.ts`) | Anonymous player feedback, see below |
+| POST | `/api/dialogue` | `DialogueRequest` / `DialogueResponse` (`shared/dialogue.ts`) | Retained from the earlier LingoQuest project; unused by the game |
 
-| Method | Path | Purpose |
-|---|---|---|
+### Feedback
+
+Players send feedback from Give feedback on the home screen or Menu > Playtest, without signing in.
+The body is `{ id, message, mode }`: a random UUID v4 submission ID, 1 to 2,000 trimmed characters and `campaign` or `classic`.
+
+| Status | Meaning |
+| --- | --- |
+| 201 `{ id }` | Stored in `game_feedback` |
+| 200 `{ id }` | Identical retry of an already stored submission |
+| 400 | Invalid ID, mode or message |
+| 409 | The ID was already used for different feedback |
+| 503 | Database unavailable |
+
+The client reuses the submission ID while the text is unchanged, so a lost response never duplicates a row, and it times out after 15 seconds.
+Only the message, mode and ID are sent; no saves, records, emails or tokens.
+There is no route that reads feedback.
+
+## Account routes
+
+Called only through the `/api` proxy, never through `VITE_API_URL`.
+
+| Method | Path | Behaviour |
+| --- | --- | --- |
 | GET | `/api/auth/google` | Start Google sign-in |
-| GET | `/api/auth/google/callback` | Validate callback, create/resolve account, issue app session |
-| POST | `/api/auth/email/register` | `{email, password, name?}` → `AppSession` (201) and session cookie; 409 if the email has an account |
-| POST | `/api/auth/email/login` | `{email, password}` → `AppSession` and session cookie; 401 for a wrong email or password, 429 while locked |
-| GET | `/api/session` | Restore account state (`AppSession`), or 401 when signed out |
-| POST | `/api/auth/logout` | Revoke app session and clear cookie (CSRF token required) |
-| GET | `/api/runs` | List the account's Campaign cloud saves (`RunSummary[]`) |
-| GET / PUT | `/api/runs/:runId` | Load, or save with an expected revision (`CloudRun`, 409 `SaveConflict`) |
+| GET | `/api/auth/google/callback` | Validate the callback, create or resolve the account and issue an app session |
+| POST | `/api/auth/email/register` | `{ email, password, name? }` to `AppSession` (201) and session cookie; 409 when the email has an account |
+| POST | `/api/auth/email/login` | `{ email, password }` to `AppSession` and session cookie; 401 for a wrong email or password, 429 while locked |
+| GET | `/api/session` | Current `AppSession`, or 401 when signed out |
+| POST | `/api/auth/logout` | Revoke the app session and clear the cookie; CSRF token required |
+| GET | `/api/runs` | The account's Guided Mode cloud saves (`RunSummary[]`) |
+| GET / PUT | `/api/runs/:runId` | Load, or save with an expected revision (`CloudRun`; 409 `SaveConflict`) |
 
-Private save routes validate the app session and enforce owner/revision checks. Guest play stays local. [🔑 Flow, security and deployment](AUTHENTICATION.md)
+Private routes validate the app session and filter every save by owner and revision.
+Writes require the exact `APP_ORIGIN` as `Origin` and the session's CSRF token.
+Request bodies are limited to 1 MB.
 
-## Handoff formats
+## Other shared formats
 
-- **Dialogue** (Zi Yao → Qi Jun): `shared/dialogue.ts`
-- **Mission report** (Zi Yao → Qi Jun): `shared/scores.ts`
-- **City layout** (Di Heng → Qi Jun): `shared/cityLayout.ts`. Units are metres, origin at the area centre.
-- **3D assets** (Hai → Qi Jun): `.glb` in `frontend/public/models/`, 1 unit = 1 metre, snake_case names (e.g. `cafe_counter.glb`). Keep `.blend` files in Google Drive.
+`shared/scores.ts` and `shared/cityLayout.ts` are retained LingoQuest contracts with no route in this backend.

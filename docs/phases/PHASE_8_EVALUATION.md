@@ -1374,14 +1374,10 @@ Use this file with:
 
 ```text
 docs/PROJECT_PROPOSAL.md
-docs/DEVELOPMENT_ROADMAP.md
-docs/phases/PHASE_1_SIMULATION.md
-docs/phases/PHASE_2_PR1.md
-docs/phases/PHASE_3_SCALING.md
-docs/phases/PHASE_4_DATA_STRATEGY.md
-docs/phases/PHASE_5_PROGRESSION.md
-docs/phases/PHASE_6_RELIABILITY.md
-docs/phases/PHASE_7_COMBINED_CAMPAIGN.md
+docs/ROADMAP.md
+docs/GAMEPLAY.md
+docs/ANALYTICS.md
+docs/testing.md
 docs/phases/PHASE_8_EVALUATION.md
 ```
 
@@ -1390,14 +1386,10 @@ Recommended prompt:
 ```text
 Read:
 - docs/PROJECT_PROPOSAL.md
-- docs/DEVELOPMENT_ROADMAP.md
-- docs/phases/PHASE_1_SIMULATION.md
-- docs/phases/PHASE_2_PR1.md
-- docs/phases/PHASE_3_SCALING.md
-- docs/phases/PHASE_4_DATA_STRATEGY.md
-- docs/phases/PHASE_5_PROGRESSION.md
-- docs/phases/PHASE_6_RELIABILITY.md
-- docs/phases/PHASE_7_COMBINED_CAMPAIGN.md
+- docs/ROADMAP.md
+- docs/GAMEPLAY.md
+- docs/ANALYTICS.md
+- docs/testing.md
 - docs/phases/PHASE_8_EVALUATION.md
 
 Treat PHASE_8_EVALUATION.md as the detailed evaluation-freeze, analytics, usability, security, and acceptance specification for this phase.
