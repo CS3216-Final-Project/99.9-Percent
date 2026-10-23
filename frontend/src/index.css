@@ -4852,6 +4852,11 @@ button:disabled {
 .history-notes > .more { padding-top: 12px; }
 .history-card { padding-top: 12px; }
 .history-incidents { display: grid; gap: 10px; }
+.history-subhead { margin: 8px 0 0; font-family: var(--font-display); font-size: var(--text-md); color: var(--on-night); }
+.pm-toggle { min-height: 44px; }
+.pm-title > span { display: grid; gap: 1px; }
+.pm-title small { font-family: var(--font-body); font-size: var(--text-xs); font-weight: 400; color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.pm-toggle .tag { flex: none; }
 .campaign-feed .feed-item { grid-template-columns: 28px 76px 1fr; }
 .request-path { margin: 0 0 4px; font-size: var(--text-xs); }
 .modal select, .modal textarea { display: block; width: 100%; padding: 8px; margin: 8px 0; }

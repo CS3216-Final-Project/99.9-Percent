@@ -6,8 +6,11 @@ import { CampaignReport } from "./CampaignReport";
 import { useReportTechnicalOpen } from "./useReportTechnicalOpen";
 import type { ReliabilityLesson } from "@/game/reliabilityLesson";
 import { Modal, Row } from "./ui";
+import { RecordedFields } from "./RecordedFields";
 import "./CampaignIncidentReport.css";
 
+/** "failure-started" reads as "Failure started". */
+const eventTitle = (type: string) => { const text = type.replaceAll("-", " "); return text.charAt(0).toUpperCase() + text.slice(1); };
 const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(c / 100);
 
 export function CampaignIncidentReport({ report, reliability }: { report: CampaignPostmortem; reliability?: ReliabilityLesson }) {
@@ -19,24 +22,23 @@ export function IncidentEvidence({ report }: { report: CampaignPostmortem }) {
   const lesson = incidentLesson(report), workload = report.snapshots.filter(s => s.data);
   return <>
     <dl className="rows report-metrics" aria-label="Recovery summary">
-      <Row label="Episode setup spending" value={dollars(report.setupCents)} />
+      <Row label="Incident window" value={`Game seconds ${report.openedStep}-${report.recoveredStep}`} />
       {lesson.latencyMs !== undefined && <Row label="Final response time" value={`${Math.round(lesson.latencyMs)} ms`} />}
       <Row label="Traffic status" value={lesson.traffic} />
+      {report.setupCents > 0 && <Row label="Spending since the previous report" value={dollars(report.setupCents)} />}
     </dl>
-      <p>Game seconds {report.openedStep}–{report.recoveredStep}. Episode setup spending includes recorded purchases since the preceding report (or company start), including preparation; it is not total running cost.</p>
-      <h4>Recorded causes, actions and trade-offs</h4>
+      <h4>Causes, actions and trade-offs since the previous report</h4>
       {report.explanations.map((text, i) => <p key={i}>{text}</p>)}
       <h4>Workload and cache evidence</h4>
       {workload.length < report.snapshots.length && <p>Some historical observations retain aggregate evidence only; workload and cache details were not recorded.</p>}
       {!report.snapshots.length && <p>No historical observations were retained.</p>}
-      {workload.map(m => <p key={m.step}>Game second {m.step}: {m.data!.profile}; logical work {m.data!.logical}; hits {m.data!.hits}; eligible misses {m.data!.eligibleMisses}; writes {m.data!.writes}; non-cacheable reads {m.data!.nonCacheableReads}; used rate {m.data!.effectiveHitRateUsed / 100}%; warmth used/after {m.data!.warmthUsed / 100}%/{m.data!.warmthAfterStep / 100}%; target {m.data!.target / 100}%; DB demand {m.db.demand}/{m.db.capacity}; backlog {m.db.backlog}</p>)}
+      {workload.map(m => <p key={m.step}>Game second {m.step}: {m.data!.profile} workload, {m.data!.logical} requests of work. Cache hits {m.data!.hits}, eligible misses {m.data!.eligibleMisses}, writes {m.data!.writes}, uncacheable reads {m.data!.nonCacheableReads}. Hit rate {m.data!.effectiveHitRateUsed / 100}% (target {m.data!.target / 100}%), warmth {m.data!.warmthUsed / 100}% to {m.data!.warmthAfterStep / 100}%. Database {m.db.demand} / {m.db.capacity} ops/s, queue {m.db.backlog}.</p>)}
       {report.snapshots.length > 0 && <div className="report-table-scroll" tabIndex={technicalOpen ? 0 : undefined} role="region" aria-label="Recorded incident evidence">
-        <table className="campaign-table"><caption>Recorded incident evidence · game seconds</caption><thead><tr><th>Game second</th><th>Applications: demand/capacity · backlog</th><th>Routing</th><th>DB demand/capacity · backlog</th><th>Latency</th><th>Service errors</th></tr></thead>
-          <tbody>{report.snapshots.map(m => <tr key={m.step}><td>{m.step}</td><td>{m.instances ? m.instances.map(a => <div key={a.id}>{a.id.replace("app-", "App ")}: {a.demand}/{a.capacity} · {a.backlog}</div>) : `${m.app.demand}/${m.app.capacity} · ${m.app.backlog} (aggregate)`}</td><td>{m.routing ? `${m.routing.mode}: ${m.routing.targets.join(", ")}` : "—"}</td><td>{m.db.demand}/{m.db.capacity} · {m.db.backlog}</td><td>{Math.round(m.latencyMs)} ms</td><td>{m.serviceErrorRate === null ? "No completed requests" : `${(m.serviceErrorRate * 100).toFixed(2)}%`}</td></tr>)}</tbody></table>
+        <table className="campaign-table"><caption>Recorded incident evidence by game second</caption><thead><tr><th>Game second</th><th>Applications: demand / capacity req/s · queue</th><th>Routing</th><th>Database: demand / capacity ops/s · queue</th><th>Latency</th><th>Service errors</th></tr></thead>
+          <tbody>{report.snapshots.map(m => <tr key={m.step}><td>{m.step}</td><td>{m.instances ? m.instances.map(a => <div key={a.id}>{a.id.replace("app-", "App ")}: {a.demand} / {a.capacity} · {a.backlog}</div>) : `${m.app.demand} / ${m.app.capacity} · ${m.app.backlog} (all apps)`}</td><td>{m.routing ? `${m.routing.mode}: ${m.routing.targets.map(t => t.replace("app-", "App ")).join(", ")}` : "Not recorded"}</td><td>{m.db.demand} / {m.db.capacity} · {m.db.backlog}</td><td>{Math.round(m.latencyMs)} ms</td><td>{m.serviceErrorRate === null ? "No completed requests" : `${(m.serviceErrorRate * 100).toFixed(2)}%`}</td></tr>)}</tbody></table>
       </div>}
-      <h4>Action and recovery observation history</h4>
-      {report.events.length ? <ol className="report-events">{report.events.map(e => <li key={e.id}>Game second {e.step} · {e.type}<pre>{JSON.stringify(e.data, null, 2)}</pre></li>)}</ol> : <p>No event history was retained.</p>}
-      {report.snapshots.length > 0 && <div><h4>Complete recorded observations</h4><pre>{JSON.stringify(report.snapshots, null, 2)}</pre></div>}
+      <h4>What happened, second by second</h4>
+      {report.events.length ? <ol className="report-events">{report.events.map(e => <li key={e.id}><span className="report-event-title">Game second {e.step} · {eventTitle(e.type)}</span><RecordedFields data={e.data} /></li>)}</ol> : <p>No event history was retained.</p>}
   </>;
 }
 

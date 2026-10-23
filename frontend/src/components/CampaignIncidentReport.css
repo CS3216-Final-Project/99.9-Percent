@@ -15,5 +15,9 @@
 .report-technical > summary { min-height: 44px; align-content: center; }
 .report-table-scroll { max-width: 100%; overflow-x: auto; }
 .report-table-scroll table { min-width: 640px; }
-.report-technical pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-xs); }
-.report-events { padding-inline-start: 20px; }
+.report-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.report-event-title { display: block; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Recorded engine fields read as label/value pairs instead of raw JSON. */
+.recorded-fields { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 2px 12px; margin: 4px 0 0; font-size: var(--text-xs); line-height: 1.4; }
+.recorded-fields dt { color: var(--text-soft); }
+.recorded-fields dd { margin: 0; font-variant-numeric: tabular-nums; }

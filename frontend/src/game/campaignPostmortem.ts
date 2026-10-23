@@ -72,3 +72,14 @@ export function incidentLesson(report: CampaignPostmortem) {
     latencyMs: final?.latencyMs,
   };
 }
+
+/** A short list title naming what broke, read from the report's own opening evidence. */
+export function incidentTitle(report: CampaignPostmortem) {
+  const opening = report.snapshots.find(s => s.step === report.openedStep) ?? report.snapshots[0];
+  const failed = opening?.instances?.find(a => a.health === "failed");
+  if (failed) return `${failed.id.replace("app-", "App ")} failed`;
+  if ((opening?.reliability?.failedDeliveries ?? 0) > 0) return "Server failure";
+  const db = !!opening && opening.db.demand > opening.db.capacity;
+  const app = !!opening && (opening.instances?.some(a => a.demand > a.capacity) || opening.app.demand > opening.app.capacity);
+  return db && app ? "Application and Database overloaded" : db ? "Database overloaded" : app ? "Application overloaded" : "Service slowdown";
+}

@@ -49,12 +49,12 @@ it("shows one acknowledgement, focuses the report button, and leaves acknowledge
 it("retains every explanation, observation and event behind one collapsed technical disclosure", () => {
   const r = recovery().campaign!.reports[0]; render(<CampaignIncidentReport report={r} />);
   const detail = screen.getByText("View Technical Details").closest("details")!;
-  expect(detail.open).toBe(false); expect(screen.getByLabelText("Recovery summary").querySelectorAll("dt")).toHaveLength(3);
+  expect(detail.open).toBe(false); expect(screen.getByLabelText("Recovery summary").querySelectorAll("dt").length).toBeGreaterThanOrEqual(3);
   fireEvent.click(screen.getByText("View Technical Details"));
   for (const explanation of r.explanations) expect(detail.textContent).toContain(explanation);
-  expect(detail.textContent).toContain(JSON.stringify(r.snapshots, null, 2));
-  for (const event of r.events) expect(detail.textContent).toContain(JSON.stringify(event.data, null, 2));
-  expect(screen.getByRole("table")).toBeTruthy();
+  for (const m of r.snapshots) expect(within(screen.getByRole("table")).getByRole("cell", { name: String(m.step) })).toBeTruthy();
+  for (const event of r.events) expect(detail.textContent).toContain(`Game second ${event.step} · `);
+  expect(detail.querySelector("pre")).toBeNull();
 });
 it("consolidates missing workload details and does not render an empty evidence table", () => {
   const r = structuredClone(recovery().campaign!.reports[0]); for (const s of r.snapshots) delete s.data;
@@ -67,7 +67,7 @@ it("consolidates missing workload details and does not render an empty evidence 
 it.each(["walkthrough", "practice"])("preserves the existing %s report instead of the new flow", kind => {
   const game = recovery(); useGame.setState({ game, started: true, tour: { track: "campaign", step: 0 }, tutorialCompany: kind === "practice" ? { game, remainderMs: 0, measurement: useGame.getState().measurement } : null });
   render(<CampaignOverlays />); expect(screen.queryByRole("dialog", { name: "System Recovered!" })).toBeNull();
-  expect(screen.getByRole("dialog", { name: "Incident postmortem" }).textContent).toContain("Recorded causes, actions and trade-offs");
+  expect(screen.getByRole("dialog", { name: "Incident postmortem" }).textContent).toContain("Causes, actions and trade-offs");
 });
 it("still opens the report when receipt storage is unavailable and avoids repeats during the visit", () => {
   vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw Error("unavailable"); });

@@ -23,7 +23,7 @@ it("shows unmet Data requirements and keeps workload contrast optional",()=>{
 });
 it("counts stable spike observations and waits for an explicit acknowledgement",()=>{
  let g=act(spikeCompany(false),{type:"set_traffic_limit",enabled:true});g=untilOffset(g,68);show(g);
- expect(guidance().textContent).toContain("Stable baseline observations: 1 / 5");expect(guidance().textContent).toContain("Autoscaling is optional");
+ expect(guidance().textContent).toContain("Keep normal traffic stable: 1 / 5 s");expect(guidance().textContent).toContain("Autoscaling is optional");
  renderAct(()=>useGame.setState({game:tick(g,4)}));
  expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(false);
  fireEvent.click(within(screen.getByRole("dialog",{name:"Spike response handled"})).getByRole("button",{name:/Continue operating/}));

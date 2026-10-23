@@ -51,7 +51,7 @@ it("explains a disabled Next without changing its engine gate", () => {
   const next = screen.getByRole("button", { name: "Next: Continue to reliability" });
   expect(next.hasAttribute("disabled")).toBe(true);
   const reason = document.getElementById(next.getAttribute("aria-describedby")!)!;
-  expect(reason.textContent).toContain("stable baseline management and empty queues");
+  expect(reason.textContent).toContain("healthy normal traffic and empty queues");
   expect(reason.tabIndex).toBe(0);
   fireEvent.click(next);
   expect(useGame.getState().game).toBe(game);

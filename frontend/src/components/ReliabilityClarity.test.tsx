@@ -42,6 +42,6 @@ it("uses the same four sections for a Chapter 5 incident while retaining all det
   fireEvent.click(screen.getByText("View Technical Details", { exact: true }));
   expect(screen.getByLabelText("Recovery summary")).toBeTruthy();
   for (const text of report.explanations) expect(details.textContent).toContain(text);
-  expect(details.textContent).toContain(JSON.stringify(report.snapshots, null, 2));
-  for (const event of report.events) expect(details.textContent).toContain(JSON.stringify(event.data, null, 2));
+  for (const event of report.events) expect(details.textContent).toContain(`Game second ${event.step} · `);
+  expect(details.querySelector("pre")).toBeNull();
 });

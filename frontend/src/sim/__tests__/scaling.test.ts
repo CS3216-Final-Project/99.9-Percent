@@ -81,7 +81,7 @@ describe("continuous scaling campaign",()=>{
   g=act(g,{type:"scale_up",appId:"app-1"});expect(g.campaign!.cashCents).toBe(before-200000);
   expect(applyAction(g,{type:"scale_up",appId:"app-1"}).ok).toBe(false);g=ticks(g,2);expect(g.campaign!.apps[0].capacity).toBe(1000);
   g=step(g).state;expect(g.campaign!.apps[0].capacity).toBe(1600);expect(g.campaign!.dbCapacity).toBe(db);
-  g=advanceSteps(g,40).state;expect(g.phase).toBe("review");expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("app-1");
+  g=advanceSteps(g,40).state;expect(g.phase).toBe("review");expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("Capacity changed for App 1");
   expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("contributed");expect(validateEnvelope(makeEnvelope(g)).status).toBe("ok");
  });
  it("horizontal installation and LB deployment do not balance until configuration activates",()=>{

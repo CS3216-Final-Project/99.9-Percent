@@ -38,6 +38,6 @@ it("keeps the recorded reliability outcome available after acknowledgement",()=>
  show(completed);expect(screen.getByRole("dialog",{name:"Reliability outcome"}).textContent).toContain("Spare promotion");
  fireEvent.click(screen.getByRole("button",{name:"Continue operating"}));
  cleanup();const acknowledged=useGame.getState().game;useGame.setState({view:"history"});show(acknowledged);
- fireEvent.click(screen.getByRole("tab",{name:/^Incidents/}));
+ fireEvent.click(screen.getByRole("tab",{name:/^Incidents/}));fireEvent.click(screen.getByRole("button",{name:/Stay Online outcome/}));
  expect(screen.getByRole("region",{name:"Historical reliability outcome"}).textContent).toContain("App 3");
 });

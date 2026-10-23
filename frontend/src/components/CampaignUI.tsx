@@ -1,7 +1,9 @@
 import { outcomeSummary, scorecardSummary } from "@/game/campaignReport";
 import { CampaignReport } from "./CampaignReport";
+import { RecordedFields } from "./RecordedFields";
 import { chapter6FinancialRisk } from "@/game/chapter6Finance";
 import { reliabilityLesson } from "@/game/reliabilityLesson";
+import { incidentTitle } from "@/game/campaignPostmortem";
 import { saveTextFile as download } from "@/lib/download";
 import { EquipmentPanel } from "./EquipmentPanel";
 import { CampaignReadings } from "./CampaignReadings";
@@ -36,7 +38,7 @@ import { money, num } from "@/game/format";
 import { useEffect, useState, type ReactNode } from "react";
 import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
-import { CampaignIncidentReport, CampaignRecoveryReview, IncidentEvidence } from "./CampaignIncidentReport";
+import { CampaignIncidentReport, CampaignRecoveryReview } from "./CampaignIncidentReport";
 import { campaignClockAvailable, inspectOrSelect, useGame, walkthroughHoldsClock } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
@@ -86,8 +88,25 @@ function routeName(c: Campaign) {
   const t = c.routing.targets, apps = routableApps(c).map(a => a.id);
   return apps.length > 1 && sameTargets(t, apps) ? "all apps" : t.length === 1 ? `${appName(t[0])} only` : t.map(appName).join(", ");
 }
-function RequirementList({items}:{items:Requirement[]}) {
-  return <ul className="progression-requirements">{items.map(r=><li key={r.id} data-requirement={r.id} data-met={r.met}><Icon name={r.met?"check":"close"} size={12} /> {r.label}</li>)}</ul>;
+const STEP_STATUS = { done: "Done", current: "Current step", upcoming: "Not yet" } as const;
+/** The chapter's sequence: finished steps recede, the current one carries its hint and later ones stay neutral. */
+function StepList({items,current,label}:{items:Requirement[];current:Requirement|null;label:string}) {
+  return <ol className="progression-steps" aria-label={label}>{items.map((r,i)=>{
+    const state=r.met?"done":r===current?"current":"upcoming";
+    return <li key={r.id} data-requirement={r.id} data-met={r.met} data-state={state}>
+      <span className="progression-marker" aria-hidden="true">{r.met?<Icon name="check" size={12} />:i+1}</span>
+      <span className="progression-text"><span className="visually-hidden">{STEP_STATUS[state]}: </span>{r.label}{state==="current"&&r.hint&&<small>{r.hint}</small>}</span>
+    </li>;})}</ol>;
+}
+/** Standing company checks fold into one line while they all pass and only list the ones that need attention. */
+function CompanyChecks({items}:{items:Requirement[]}) {
+  if(!items.length) return null;
+  const failing=items.filter(r=>!r.met);
+  if(!failing.length) return <p className="company-checks" data-requirement="company-checks" data-met="true"><Icon name="check" size={14} />All {items.length} company checks pass</p>;
+  return <div className="company-checks" data-requirement="company-checks" data-met="false">
+    <p><Icon name="alert" size={14} />{failing.length} of {items.length} company checks need attention</p>
+    <ul>{failing.map(r=><li key={r.id} data-requirement={r.id} data-met="false"><span className="visually-hidden">Needs attention: </span>{r.label}{r.hint&&<small>{r.hint}</small>}</li>)}</ul>
+  </div>;
 }
 
 // Progress is derived from the engine; reading this panel never advances the run.
@@ -95,19 +114,25 @@ function CampaignGuidance() {
   const {game,act}=useGame(),c=game.campaign!;
   const model=campaignGuidance(game),action=model.pendingAction;
   const financialRisk=chapter6FinancialRisk(game);
+  // The next action sits directly under the steps it advances.
+  const cta=<>
+    {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
+    {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
+  </>;
 
   return <section className="campaign-guidance" aria-label="Guided Mode guidance">
     {financialRisk&&<Callout compact tone="warn" icon="cash" kicker={financialRisk.kind==="blocked"?"Capacity funding blocked":"Money at risk"}><span role="note">{financialRisk.message}</span></Callout>}
     {c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
-    {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">{c.combinedStage?"Current growth requirements":"Chapter requirements"}<span> · {model.completed.length}/{model.requirements.length}</span></h3>
-      <RequirementList items={c.combinedStage?model.requirements.filter(r=>!r.met||r.id==="checks"):model.requirements}/>
+    {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">{c.combinedStage?"Current growth requirements":"Chapter requirements"}<span> · {model.steps.filter(r=>r.met).length}/{model.steps.length}<span className="visually-hidden"> steps done</span></span></h3>
+      <CompanyChecks items={model.checks}/>
+      <StepList items={model.steps} current={model.current} label="Chapter steps"/>
+      {cta}
       {!c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
       {model.notice&&<p role="note">{model.notice}</p>}
       {model.optional&&<p className="muted">{model.optional}</p>}
     </section>}
-    {model.finalGoals.length>0&&<section className="campaign-requirements" aria-label="Final Campaign goals"><h3 className="campaign-requirements-heading">Final Campaign goals</h3><RequirementList items={model.finalGoals}/></section>}
-    {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
-    {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
+    {model.finalGoals.length>0&&<section className="campaign-requirements" aria-label="Final Campaign goals"><h3 className="campaign-requirements-heading">Final Campaign goals</h3><StepList items={model.finalGoals} current={null} label="Final Campaign goals"/></section>}
+    {!model.requirements.length&&cta}
     {c.openingMilestone?.acknowledged&&!c.dataStage&&!c.scaling?.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}>View run scorecard</button>}
     {model.prevention&&!c.openingPrevention?.outcome&&<section className="prevention-guidance" aria-label="Opening prevention progress">
@@ -410,7 +435,7 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
           <h4>Recorded growth outcome</h4><p>{r!.scenario.template}: registered users reached {r!.users.toLocaleString("en-US")}. Temporary pressure has ended.</p>
           <p>All applications restored; five stable full-demand baseline game seconds; actual incident reports acknowledged.</p>
           <p>Rejected requests during this round: {c.cumulative.rejected-r!.rejectedBefore}; setup spending {dollars(c.investedCents-r!.setupBefore)}. Review actual actions and causal reports in History.</p>
-          <pre>{JSON.stringify(r,null,2)}</pre>
+          <h4>Recorded growth round</h4><RecordedFields data={r!} />
         </CampaignReport><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_growth"})}/></>}
     </Modal>;
   }
@@ -426,17 +451,17 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
   }
   if(c.openingMilestone&&!c.openingMilestone.acknowledged)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }}>
     <CampaignReport lesson={outcomeSummary(c,"opening")}><p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
-    <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p><pre>{JSON.stringify(c.openingMilestone,null,2)}</pre></CampaignReport>
+    <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p><h4>Recorded milestone</h4><RecordedFields data={c.openingMilestone} /></CampaignReport>
     <ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_milestone"})} />
   </Modal>;
-  if(pendingSpikeAcknowledgement(c) && view!=="menu" && view!=="history") return <Modal title="Spike response handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={()=>openView("history")}><CampaignReport lesson={outcomeSummary(c,"spikes")}><p>Both demand pulses ended and five baseline game seconds qualified for stable service. The same company continues with its investments and operating costs.</p><pre>{JSON.stringify({stage:c.spikeStage,observations:c.recent.filter(m=>m.spikes)},null,2)}</pre></CampaignReport><ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_spikes"})} /></Modal>;
+  if(pendingSpikeAcknowledgement(c) && view!=="menu" && view!=="history") return <Modal title="Spike response handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={()=>openView("history")}><CampaignReport lesson={outcomeSummary(c,"spikes")}><p>Both demand pulses ended and five baseline game seconds qualified for stable service. The same company continues with its investments and operating costs.</p><h4>Recorded spike stage</h4><RecordedFields data={c.spikeStage!} /></CampaignReport><ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_spikes"})} /></Modal>;
   // It pauses the clock when it appears, so it shows over History and guidance rather than waiting behind them.
   if(chapterComplete&&chapterComplete===finishedChapter(game)&&view!=="menu")return completeSlot ? completeSlot(chapterComplete) : <ChapterComplete chapter={chapterComplete} />;
   if(game.phase==="ended"&&game.outcome==="won"&&!["guidance","menu","history","tech"].includes(view??""))return <Modal title="Campaign complete" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard!}/><div className="modal-foot"><button className="btn" onClick={()=>openView("guidance")}>Inspect final company</button><button className="btn" onClick={()=>openView("menu")}>Export or start a new company</button></div></Modal>;
   if (game.phase === "ended" && game.outcome !== "won" && view === null) return <Modal title="Company bankrupt" className="campaign-recovery-report" tone="alert" icon={{ kind: "critical", name: "cash" }} onClose={() => openView("menu")}>
     <CampaignReport lesson={c.scorecard?scorecardSummary(c.scorecard,false):{happened:"The company ran out of cash.",response:"No specific recovery is established by the retained record.",improve:"Compare operating costs with earned revenue before expanding.",takeaway:"Capacity must be affordable to operate."}}><Callout tone="critical" icon="cash" kicker="Company closed">Cash reached {dollars(c.cashCents)} after settlement at game second {c.step}. Final metrics and history remain available.</Callout>
     <p>Last period revenue: {dollars(c.settlements.at(-1)?.revenueCents??0)}. Infrastructure: {dollars(infrastructureCents(c.settlements.at(-1)))}. Salaries: {dollars(c.settlements.at(-1)?.salaryCents??0)}.</p>
-    <p>Upfront investment: {dollars(c.investedCents)}. Rejected demand: {c.cumulative.rejected} requests (not an extra cash charge).</p><pre>{JSON.stringify(c.scorecard,null,2)}</pre></CampaignReport>
+    <p>Upfront investment: {dollars(c.investedCents)}. Rejected demand: {c.cumulative.rejected} requests (not an extra cash charge).</p>{c.scorecard&&<><h4>Recorded scorecard</h4><RecordedFields data={c.scorecard} /></>}</CampaignReport>
     <div className="modal-foot"><button className="btn btn-quiet" onClick={() => openView("history")}><Icon name="history" size={16} />View history</button><button className="btn btn-primary" onClick={() => openView("menu")}><Icon name="refresh" size={16} />Export or start a new company</button></div>
   </Modal>;
   if (view === "menu") { const tab: MenuTab = game.phase === "ended" ? "saves" : "run"; return menu ? menu(tab) : <CampaignMenu initialTab={tab} />; }
@@ -457,7 +482,7 @@ function ChapterComplete({ chapter }: { chapter: ChapterCompletion }) {
   return <Modal title={done.title} className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={dismissChapterComplete}>
     <CampaignReport lesson={outcomeSummary(game.campaign!,chapter)}>
       <p>{done.text} Your architecture, cash and investments carry forward.</p><p>Next: {next.name}. {next.description}</p>
-      <pre>{JSON.stringify({stage:chapter==="scaling"?game.campaign!.scaling:game.campaign!.dataStage,snapshot:game.campaign!.snapshot},null,2)}</pre>
+      <h4>Recorded chapter state</h4><RecordedFields data={(chapter==="scaling"?game.campaign!.scaling:game.campaign!.dataStage)??{}} /><h4>Latest observation</h4><RecordedFields data={game.campaign!.snapshot} />
     </CampaignReport>
     <div className="modal-foot">
       <button className="btn btn-quiet" onClick={dismissChapterComplete}>Stay in this chapter</button>
@@ -491,8 +516,13 @@ function CampaignHistory() {
   const [tab, setTab] = useState<HistoryTab>("charts");
   const [open, setOpen] = useState<string | null>(null);
   const steps = c.recent.map(m => m.step);
+  // Chapter outcomes are not incidents; they sit in their own list below the incident reports.
+  const outcomes = [
+    ...(c.reliabilityStage?.completedStep != null ? [{ id: "reliability-outcome", title: "Stay Online outcome", step: c.reliabilityStage.completedStep, label: "Historical reliability outcome", body: <ReliabilityOutcome campaign={c} /> }] : []),
+    ...(c.openingPrevention?.outcome ? [{ id: "prevention-outcome", title: "Opening prevention outcome", step: c.openingPrevention.outcome.qualifiedStep, label: "Historical Opening prevention outcome", body: <PreventionOutcome campaign={c} /> }] : []),
+  ];
   return <div className="history">
-    <HistoryTabs tab={tab} onChange={setTab} incidents={c.reports.length} />
+    <HistoryTabs tab={tab} onChange={setTab} incidents={c.reports.length}>
     {tab === "charts" && <>
       <div className="charts">
         <LineChart title="Latency" axisLabel="Game second" series={[{ name: "Latency", color: CHART_COLORS.health, values: c.recent.map(m => m.latencyMs) }]} turns={steps} format={v => `${v.toFixed(0)} ms`} />
@@ -506,16 +536,25 @@ function CampaignHistory() {
     </>}
     {tab === "events" && <EventFeed className="campaign-feed" entries={c.trace.filter(e => e.type !== "metrics").reverse().map(e => ({ id: e.id, kind: eventKind(e.type), when: `Game second ${e.step}`, text: eventText(e) }))} />}
     {tab === "postmortems" && <div className="history-incidents">
-      {c.openingPrevention?.outcome&&<section className="history-card" aria-label="Historical Opening prevention outcome"><PreventionOutcome campaign={c} /></section>}
-      {c.reliabilityStage?.completedStep!=null&&<section className="history-card" aria-label="Historical reliability outcome"><ReliabilityOutcome campaign={c} /></section>}
-      {c.reports.length === 0 ? <p className="empty">No incidents yet.</p> : <ul className="pm-list">{[...c.reports].reverse().map(report => <li key={report.id}>
+      {c.reports.length === 0 ? <p className="empty">No incidents yet.</p> : <ul className="pm-list" aria-label="Incident reports">{[...c.reports].reverse().map(report => <li key={report.id}>
         <button type="button" className="pm-toggle" aria-expanded={open === report.id} onClick={() => setOpen(open === report.id ? null : report.id)}>
-          <span><Icon name="incident" size={16} />Game seconds {report.openedStep}–{report.recoveredStep}: Service slowdown</span>
-          <span className="tag tag-ok"><Icon name="check" size={12} />Recovered{report.limited ? " under traffic limit" : ""}</span>
+          <span className="pm-title"><Icon name="incident" size={16} /><span>{incidentTitle(report)}<small>Game seconds {report.openedStep}-{report.recoveredStep}</small></span></span>
+          {report.limited ? <span className="tag tag-warn"><Icon name="alert" size={12} />Recovered under traffic limit</span> : <span className="tag tag-ok"><Icon name="check" size={12} />Recovered</span>}
         </button>
         {open === report.id && <div className="pm">{legacy ? <Report report={report} /> : <CampaignIncidentReport report={report} />}</div>}
       </li>)}</ul>}
+      {outcomes.length > 0 && <>
+        <h3 className="history-subhead">Chapter outcomes</h3>
+        <ul className="pm-list" aria-label="Chapter outcomes">{outcomes.map(o => <li key={o.id}>
+          <button type="button" className="pm-toggle" aria-expanded={open === o.id} onClick={() => setOpen(open === o.id ? null : o.id)}>
+            <span className="pm-title"><Icon name="goal" size={16} /><span>{o.title}<small>Game second {o.step}</small></span></span>
+            <span className="tag tag-ok"><Icon name="check" size={12} />Completed</span>
+          </button>
+          {open === o.id && <section className="pm" aria-label={o.label}>{o.body}</section>}
+        </li>)}</ul>
+      </>}
     </div>}
+    </HistoryTabs>
   </div>;
 }
 
@@ -528,20 +567,25 @@ function ReliabilityOutcome({campaign:c}:{campaign:Campaign}) {
   const detection=c.trace.find(e=>e.type==="health-change-detected"&&e.data.appId===f.targetId&&e.data.detectedHealth==="unhealthy"&&e.step>=f.startStep);
   const promotion=c.trace.find(e=>e.type==="failover-activated"&&e.data.eventId===f.id);
   const lesson=reliabilityLesson(c);
+  const related=c.reports.filter(r=>r.snapshots.some(m=>m.reliability?.faultId===f.id));
+  // The first observation where the failed server was routed around shows whether the survivors could carry the load.
+  const bypass=related.flatMap(r=>r.snapshots).find(m=>m.reliability&&m.step>=f.startedStep!&&!m.reliability.effective.includes(f.targetId));
   return <>
-    <CampaignReport lesson={lesson?{happened:lesson.happened,response:lesson.recovered,improve:lesson.improve,takeaway:lesson.takeaway}: {happened:"The reliability test completed.",response:"The retained records do not establish a specific repair.",takeaway:"Verify service after restoring a server."}}>
-    <Callout compact tone="success" icon="health" kicker={completion?.data.limited?"Stable — traffic limited":"Stable service"}>
-      {completion?.data.incidentOccurred?"A production incident occurred during the test and its measured recovery was reviewed.":"The test completed without opening a production incident."} Five stable management observations followed restoration.
+    <CampaignReport lesson={lesson?{happened:lesson.happened,response:lesson.recovered,improve:lesson.improve,takeaway:lesson.takeaway}: {happened:"The reliability test completed.",response:"The saved records do not show a specific repair.",takeaway:"Verify service after restoring a server."}}>
+    <Callout compact tone="success" icon="health" kicker={completion?.data.limited?"Stable, with traffic limited":"Stable service"}>
+      {completion?.data.incidentOccurred?"The failure opened an incident, and you reviewed its recovery.":"The test completed without opening an incident."} Service then stayed stable for five game seconds after the restore.
     </Callout>
     <dl className="rows"><Row label="Application failure" value={`${appName(f.targetId)} · game second ${f.startedStep}`} />
       <Row label="Failure detected" value={detection?`Game second ${detection.step} · ${detection.data.source==="probe"?"Health Checks":"manual inspection"}`:"Not detected before restoration"} />
       <Row label="Spare promotion" value={promotion?`${appName(String(promotion.data.appId))} · game second ${promotion.step}`:"No automatic promotion"} />
-      <Row label="Restoration" value={`Game second ${f.restoredStep} · ${f.restoreSource==="manual"?"requested restore":"fault expired"}`} />
+      <Row label="Restoration" value={`Game second ${f.restoredStep} · ${f.restoreSource==="manual"?"requested restore":"returned on its own"}`} />
       <Row label="Outcome recorded" value={`Game second ${d.completedStep}`} />
       <Row label="Company rejected requests at completion" value={num(Number(completion?.data.rejected??0))} />
       <Row label="Company setup spending at completion" value={dollars(Number(completion?.data.setupCents??0))} /></dl>
-    <p>Health Checks detect; spares and routing provide surviving capacity. Failover creates no capacity. Compare per-instance demand and capacity in recorded incident evidence.</p>
-    {c.reports.filter(r=>r.snapshots.some(m=>m.reliability?.faultId===f.id)).map(report=><IncidentEvidence key={report.id} report={report}/>)}
+    {bypass&&<dl className="rows"><Row label="Traffic admitted after the failure" value={`${num(bypass.admitted)} req/s`} />
+      <Row label="Capacity of the servers still routed" value={`${num(bypass.reliability!.healthyRoutedCapacity)} req/s`} /></dl>}
+    <p>Health Checks only detect a failure, and failover only moves traffic; neither adds capacity. {bypass?bypass.admitted>bypass.reliability!.healthyRoutedCapacity?"Here the surviving servers had less capacity than the traffic admitted, so they stayed overloaded until the restore.":"Here the surviving servers had enough capacity for the traffic admitted.":"Compare demand with the capacity of the servers that still receive traffic."}</p>
+    {related.map(r=><p key={r.id} className="muted">The full evidence is in the incident report for game seconds {r.openedStep}-{r.recoveredStep}.</p>)}
     </CampaignReport>
   </>;
 }
@@ -557,7 +601,7 @@ function PreventionEvidence({campaign}:{campaign:Campaign}) {
   const prepared=campaign.actions.filter(a=>requested.has(a.id)&&PREPARATION_NAMES[a.type]);
   return <div>
     <Callout tone="success" icon="health" kicker="First growth prevented">Traffic increased from {num(Q.startingTraffic)} to {num(Q.grownTraffic)} req/s and the Application and Database handled full demand with empty queues and healthy service for {Q.stableSteps} consecutive game seconds.</Callout>
-    <p>Verified prevention is a valid Opening completion path. Acknowledge this outcome, then the Opening recognition, to unlock Scaling &amp; Routing. No incident or postmortem is required for prevention.</p>
+    <p>Preventing the outage completes Opening just as recovering from one would. Continue past this review and the Opening recognition to unlock Scaling &amp; Routing.</p>
     {prepared.length?<ul>{prepared.map(a=><li key={a.id}>{PREPARATION_NAMES[a.type]}: {a.activatedStep!==null&&a.activatedStep<=o.qualifiedStep?"active before completion":"still pending at completion"}{a.costCents>0?` · setup ${dollars(a.costCents)}`:" · no setup cost"}.</li>)}</ul>:<p>No infrastructure or admission changes were recorded before completion.</p>}
     <dl className="rows">
       <Row label="Application demand / capacity" value={`${num(m.app.demand)} / ${num(m.app.capacity)} req/s`} />

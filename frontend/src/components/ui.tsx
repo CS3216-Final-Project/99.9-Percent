@@ -338,12 +338,19 @@ export function Tabs<Id extends string>({
   value,
   onChange,
   children,
+  className = "tabset",
+  stripClassName = "tab-strip",
+  iconSize = 20,
 }: {
   label: string;
   tabs: TabItem<Id>[];
   value: Id;
   onChange: (id: Id) => void;
   children: ReactNode;
+  /** The menu's rail is the default look; History keeps its compact pill strip. */
+  className?: string;
+  stripClassName?: string;
+  iconSize?: number;
 }) {
   const base = useId();
   const buttons = useRef(new Map<Id, HTMLButtonElement>());
@@ -378,8 +385,8 @@ export function Tabs<Id extends string>({
     select(target);
   };
   return (
-    <div className="tabset">
-      <div className="tab-strip" role="tablist" aria-label={label} onKeyDown={onKeyDown}>
+    <div className={className}>
+      <div className={stripClassName} role="tablist" aria-label={label} onKeyDown={onKeyDown}>
         {tabs.map((t) => (
           <button
             type="button"
@@ -397,7 +404,7 @@ export function Tabs<Id extends string>({
             className={t.id === value ? "is-active" : ""}
             onClick={() => onChange(t.id)}
           >
-            <Icon name={t.icon} size={20} />
+            <Icon name={t.icon} size={iconSize} />
             <span>{t.label}</span>
           </button>
         ))}
