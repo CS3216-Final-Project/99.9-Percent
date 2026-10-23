@@ -363,6 +363,18 @@ it("keeps the Deploy Health Checks step on its own action when the player buys s
   expect(guide().textContent).toContain("Run until the current install finishes, then press Deploy Health Checks.");
 });
 
+it("points the Deploy Health Checks step back to Actions when the player reads Analysis", () => {
+  useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 1 } });
+  renderCompany();
+  act(() => useGame.getState().act({ type: "unlock_reliability", tech: "health_checks" }));
+  const guide = () => screen.getByRole("dialog", { name: "Chapter guide, step 3 of 3" });
+  expect(useGame.getState().panelTab).toBe("actions");
+  fireEvent.click(screen.getByRole("tab", { name: "Analysis" }));
+  expect(guide().textContent).toContain("Open Actions.");
+  fireEvent.click(screen.getByRole("tab", { name: /^Actions/ }));
+  expect(guide().textContent).toContain("Press Deploy Health Checks.");
+});
+
 it("shows a chapter's guide on the controls the chapter adds", () => {
   start(); renderCompany();
   act(() => useGame.getState().endTour(false));

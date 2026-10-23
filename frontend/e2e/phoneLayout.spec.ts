@@ -1,6 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
+import { reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
 import { expect, expectRoom, openPanelTab, seedClassicSave, seedSave, test, unlockChallenge } from "./fixtures";
 
 /*
@@ -136,6 +137,28 @@ test("Guided Mode incident: the sheet stays at least half open with every respon
   await cancel.tap();
   await expect(sheet(page)).toBeVisible();
   await expectNoHorizontalOverflow(page);
+});
+
+test("Guided Mode: a new panel tab opens at the top of the sheet, not where the last one was scrolled", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  // Stay Online's Actions are long enough to scroll well down, and so are the Database's readings on Analysis.
+  await openGuided(page, { width: 390, height: 844 }, reliabilityCompany());
+  await expect(sheet(page)).toHaveAttribute("data-state", "peek");
+  await handle(page).tap();
+  await handle(page).tap();
+  await expect(sheet(page)).toHaveAttribute("data-state", "full");
+  const panel = page.getByRole("complementary", { name: "System metrics" }), body = page.locator(".phone-sheet-body");
+  await openPanelTab(page, "Analysis");
+  await panel.getByRole("button", { name: "Database", exact: true }).tap();
+  await openPanelTab(page, "Actions");
+  await body.evaluate(el => el.scrollTo({ top: 300 }));
+  await expect.poll(() => body.evaluate(el => el.scrollTop)).toBe(300);
+  // A finger taps the switch where it is stuck; Playwright's own tap would first scroll it to where it sits unstuck.
+  const analysis = await box(page.getByRole("tab", { name: "Analysis" }));
+  await page.touchscreen.tap(analysis.x + analysis.width / 2, analysis.y + analysis.height / 2);
+  await expect(page.getByRole("tab", { name: "Analysis" })).toHaveAttribute("aria-selected", "true");
+  await expect.poll(() => body.evaluate(el => el.scrollTop)).toBe(0);
+  await expect(panel.getByRole("region", { name: "Database readings" })).toBeVisible();
 });
 
 test("Guided Mode top strip: Cash stays visible, users and pending revenue are one tap away, and the chapter row counts the phone's chapters", async ({ page, withoutRoom }) => {

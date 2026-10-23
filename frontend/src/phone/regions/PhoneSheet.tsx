@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { equipmentInfo, metrics, type EquipmentId } from "@/sim";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { clock, num } from "@/game/format";
@@ -38,6 +38,7 @@ function MetricsSheet({ campaign }: { campaign: boolean }) {
   const shown = shownSheetState(state, incident);
   const selected = useGame((s) => s.selected);
   const selectedAppId = useGame((s) => s.selectedAppId);
+  const panelTab = useGame((s) => s.panelTab);
   const panelOpen = useGame((s) => s.panelOpen);
   const setPanelOpen = useGame((s) => s.setPanelOpen);
   const body = useRef<HTMLDivElement>(null);
@@ -56,6 +57,9 @@ function MetricsSheet({ campaign }: { campaign: boolean }) {
     if (selected && getSheetState() === "peek") setSheetState("half");
   }, [selected, selectedAppId]);
   useEffect(() => { body.current?.scrollTo?.({ top: 0 }); }, [selected, selectedAppId, incident]);
+  // The sheet, not the panel, scrolls on a phone, so a new panel tab starts at its top here, before guidance reveals
+  // a control in it (EquipmentPanel does the same on the desktop).
+  useLayoutEffect(() => { body.current?.scrollTo?.({ top: 0 }); }, [panelTab]);
 
   const index = SHEET_STATES.indexOf(shown);
   const lowest = incident ? 1 : 0;

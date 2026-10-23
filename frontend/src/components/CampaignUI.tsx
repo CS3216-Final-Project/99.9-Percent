@@ -33,7 +33,7 @@ import { isChapterEntry } from "@/game/campaignChapters";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest, type ChapterCompletion } from "@/game/persist";
 import { money, num } from "@/game/format";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
 import { CampaignIncidentReport, CampaignRecoveryReview, IncidentEvidence } from "./CampaignIncidentReport";
@@ -174,8 +174,16 @@ export function CampaignPanel() {
   const game = useGame(s => s.game), tab = useGame(s => s.panelTab), setTab = useGame(s => s.setPanelTab);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
   const c = game.campaign!, incident = game.phase === "incident", pending = c.pending.length;
+  // A quote closed from Analysis unmounts the hidden Actions with the button it would hand focus back to,
+  // so focus goes to the selected tab instead of falling to the page.
+  const section = useRef<HTMLElement>(null), hiddenQuote = useRef(false);
+  useLayoutEffect(() => {
+    if (!confirming && hiddenQuote.current && document.activeElement === document.body)
+      section.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+    hiddenQuote.current = !!confirming && tab !== "actions";
+  }, [confirming, tab]);
   return <EquipmentPanel className="campaign-panel" label="System metrics">
-    <section className={`panel-section${incident ? " incident" : ""}`} aria-label={incident ? "Incident" : "System overview"}>
+    <section ref={section} className={`panel-section${incident ? " incident" : ""}`} aria-label={incident ? "Incident" : "System overview"}>
       {incident && <header className="panel-head">
         <span className="panel-icon state-critical"><Icon name="incident" /></span>
         <div><h2>Service slowdown</h2>

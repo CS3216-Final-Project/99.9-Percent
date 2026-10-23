@@ -69,6 +69,19 @@ it("an open quote stays open while the player reads Analysis", () => {
   expect(useGame.getState().game.campaign!.pending.some(a => a.type === "add-app")).toBe(true);
 });
 
+it("closing a quote from Analysis leaves focus on the selected tab, not the page", () => {
+  const room = document.body.appendChild(Object.assign(document.createElement("main"), { className: "stage" }));
+  onTestFinished(() => room.remove());
+  show(); fireEvent.click(tab("Actions"));
+  fireEvent.click(screen.getByRole("button", { name: /Add server/ }));
+  fireEvent.click(tab("Analysis"));
+  const cancel = within(screen.getByRole("region", { name: "Confirm Add server" })).getByRole("button", { name: "Cancel" });
+  act(() => cancel.focus());
+  fireEvent.click(cancel);
+  expect(screen.queryByRole("region", { name: "Confirm Add server" })).toBeNull();
+  expect(document.activeElement).toBe(tab("Analysis"));
+});
+
 it("an accepted hint opens the tab of its purchase once, then leaves the choice of tab to the player", () => {
   show(advanceSteps(newGame(), 6).state);
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
