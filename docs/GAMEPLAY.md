@@ -65,7 +65,7 @@ An added app is installed but unrouted, so it neither adds database capacity nor
 A database upgrade activates after its delay.
 A traffic limit admits at most 500 req/s and rejects the rest.
 
-There are two ways to complete the Opening; both award the same `opening-stability` milestone, which the player acknowledges with Continue operating before Scaling opens.
+There are two ways to complete the Opening; both award the same `opening-stability` milestone, which the player acknowledges from the chapter completion menu (see Guidance).
 
 - **Recovery:** an actual incident, five consecutive qualifying recovery steps, the postmortem, then Continue company.
 - **Prevention:** after growth, with no Opening incident ever opened, the company serves the full 800 req/s without a traffic limit, with positive cash, empty queues, latency under 500 ms and errors under 1%.
@@ -147,6 +147,11 @@ Confirmed replay archives the old company and scorecard and starts a new run ID 
 Guidance never changes the rules; it reads the same state the engine uses.
 
 - The chapter bar shows the chapter, one state-derived goal and Next when a transition is available.
+- Every chapter followed by another one (Launch Week or the Opening, Scaling & Routing, Data Strategy, Traffic Spikes, Stay Online) ends on one completion menu, with the clock paused: Stay in this chapter, or Continue into the next chapter.
+  For Launch Week, the Opening, Traffic Spikes and Stay Online the menu is the chapter's own recognition, which either choice acknowledges; Scaling & Routing and Data Strategy announce it once per company.
+- Continue is disabled while the next chapter's entry gate is unmet, and the menu names every unmet requirement; Next in the chapter bar then offers the chapter, disabled with the same reasons, until the company is ready.
+  Stay Online needs normal 2,400 req/s traffic, positive cash, no incident, read reports, empty queues and healthy requests; Grow the Company also needs finished queued changes and every server up.
+- An Opening the player stays in is remembered for that company in the browser's profile, so the next Play does not move it into Scaling & Routing; a company loaded without that record, such as an older save, an import or a cloud restore, still continues into Scaling & Routing on Play.
 - Chapter requirements list each gate as met or unmet, without revealing future deadlines.
 - Hint is player-requested and points at an existing control; optional attention cues for Run and Next defer to required reviews and guides.
 - Each chapter opens with an optional Company Message from a colleague (Maya, Alex, Jordan, Sam, Taylor, then Alex) stating its mission.
