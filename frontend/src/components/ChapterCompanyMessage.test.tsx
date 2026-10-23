@@ -18,6 +18,9 @@ import { setConfirming } from "./actionConfirmation";
 const companies = [newGame(), dataCompany("read-heavy", false), dataCompany(), spikeCompany(false), preparedReliability(), combinedCompany()];
 const senders = [["Maya", "Customer Support"], ["Alex", "CEO"], ["Jordan", "Software Engineer"], ["Sam", "Marketing"], ["Taylor", "Operations Engineer"], ["Alex", "CEO"]];
 const message = () => screen.queryByRole("dialog", { name: "Company Message" });
+const next = () => within(message()!).queryByRole("button", { name: "Next" });
+/** Advances through the colleague's lines to the mission, then acknowledges it. */
+const readThrough = () => { while (next()) fireEvent.click(next()!); fireEvent.click(within(message()!).getByRole("button", { name: "Got it" })); };
 beforeEach(() => {
   localStorage.clear(); useGame.setState(useGame.getInitialState(), true);
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
@@ -34,20 +37,48 @@ it.each(companies.map((game, i) => [i + 1, game] as const))("shows the actual ch
   expect(screen.getAllByRole("dialog")).toHaveLength(1); expect(message()!.getAttribute("aria-modal")).toBe("true");
   expect(document.querySelector(".company-message-backdrop")).not.toBeNull();
   expect(message()!.textContent).toContain(senders[chapter - 1][0]); expect(message()!.textContent).toContain(senders[chapter - 1][1]);
-  expect(message()!.textContent).toContain("Your mission:"); expect(message()!.textContent).toContain(model.mission);
+  expect(within(message()!).getByRole("img", { name: new RegExp(`^${model.name}, `) }).getAttribute("src")).toBe(`/characters/${model.speaker}.webp`);
   expect(screen.queryByText("Current stage cue")).toBeNull();
+  for (const [i, line] of model.lines.entries()) {
+    expect(message()!.textContent).toContain(line);
+    expect(within(message()!).getByRole("img", { name: `Line ${i + 1} of ${model.lines.length}` })).toBeTruthy();
+    if (i < model.lines.length - 1) { expect(message()!.textContent).not.toContain("Your mission:"); fireEvent.click(next()!); }
+  }
+  expect(message()!.textContent).toContain("Your mission:"); expect(message()!.textContent).toContain(model.mission);
   fireEvent.click(within(message()!).getByRole("button", { name: "Got it" }));
   expect(message()).toBeNull(); expect(document.querySelector(".company-message-backdrop")).toBeNull(); expect(screen.getByText("Current stage cue")).toBeTruthy();
   cleanup(); render(show()); expect(message()).toBeNull();
   expect(JSON.stringify(makeEnvelope(game, 0, 1))).toBe(before);
 });
 
-it.each(["X", "Escape"])("dismisses with %s without starting or pausing the company", method => {
+it.each(["X", "Escape"])("dismisses with %s part way through the dialogue", method => {
   const model = chapterCompanyMessage(newGame())!;
-  render(<ChapterCompanyMessage model={model} enabled/>);
+  render(<ChapterCompanyMessage model={model} enabled/>); fireEvent.click(next()!);
   if (method === "X") fireEvent.click(within(message()!).getByRole("button", { name: "Dismiss company message" }));
   else fireEvent.keyDown(message()!, { key: "Escape" });
   expect(message()).toBeNull();
+});
+
+it("advances one line at a time from the dialogue box and keeps the mission until acknowledged", () => {
+  const model = chapterCompanyMessage(companies[3])!;
+  render(<ChapterCompanyMessage model={model} enabled/>);
+  const copy = message()!.querySelector(".company-message-copy")!;
+  expect(copy.getAttribute("aria-live")).toBe("polite");
+  expect(copy.textContent).toBe(model.lines[0]);
+  expect(fireEvent.mouseDown(copy)).toBe(false); expect(fireEvent.mouseDown(next()!)).toBe(true);
+  fireEvent.click(copy); expect(copy.textContent).toBe(model.lines[1]);
+  fireEvent.click(message()!.querySelector(".company-message-foot")!); expect(copy.textContent).toContain(model.lines[2]);
+  fireEvent.click(copy); fireEvent.click(copy);
+  expect(copy.textContent).toContain(model.lines.at(-1)); expect(copy.textContent).toContain(model.mission);
+  expect(next()).toBeNull(); expect(message()).not.toBeNull();
+});
+
+it("keeps a valid line when the current message gets shorter while it is read", () => {
+  const healthy = chapterCompanyMessage(newGame())!, slow = { ...chapterCompanyMessage(tick(newGame(), 5))!, key: healthy.key };
+  expect(slow.lines.length).toBeLessThan(healthy.lines.length);
+  const view = render(<ChapterCompanyMessage model={healthy} enabled/>); fireEvent.click(next()!); fireEvent.click(next()!);
+  view.rerender(<ChapterCompanyMessage model={slow} enabled/>);
+  expect(message()!.textContent).toContain(slow.lines.at(-1)); expect(message()!.textContent).toContain("Your mission:");
 });
 
 it("deduplicates an already-shown message across reload before dismissal without changing the save", () => {
@@ -66,12 +97,13 @@ it("uses a different receipt for a new company and actual stage entry", () => {
 });
 
 it("uses truthful Opening copy and the actual final target", () => {
-  const healthy = newGame(); expect(chapterCompanyMessage(healthy)!.message).not.toContain("reporting");
-  expect(chapterCompanyMessage(tick(healthy, 5))!.message).toContain("getting slower");
+  const said = (game: Parameters<typeof chapterCompanyMessage>[0]) => chapterCompanyMessage(game)!.lines.join(" ");
+  const healthy = newGame(); expect(said(healthy)).not.toContain("reporting");
+  expect(said(tick(healthy, 5))).toContain("getting slower");
   const custom = structuredClone(companies[5]); custom.campaign!.combinedStage!.finalUserTarget = 75000;
-  expect(chapterCompanyMessage(custom)!.message).toContain("75,000");
+  expect(said(custom)).toContain("75,000"); expect(said(custom)).not.toContain("50,000");
   custom.campaign!.combinedStage!.users = 75000;
-  expect(chapterCompanyMessage(custom)!.message).toContain("finish the final Campaign checks");
+  expect(said(custom)).toContain("finish the final Campaign checks");
   expect(chapterCompanyMessage(newLegacyGame())).toBeNull();
 });
 
@@ -89,7 +121,7 @@ it("defers without consuming a receipt and sequences the Chapter 4 cue after dis
   expect(localStorage.getItem(chapterCompanyMessage(companies[3])!.key)).toBeNull();
   act(() => useGame.setState({tour:null})); expect(message()).not.toBeNull();
   expect(screen.queryByRole("dialog",{name:/^Chapter 4:/})).toBeNull();
-  fireEvent.click(within(message()!).getByRole("button",{name:"Got it"}));
+  readThrough();
   expect(message()).toBeNull(); expect(screen.getByRole("dialog",{name:"Chapter 4: Prepare"})).toBeTruthy();
 });
 
@@ -112,7 +144,7 @@ it("does not replay after pause/resume and preserves manual Hint after dismissal
   render(host()); expect(message()).not.toBeNull();
   act(() => useGame.getState().setRunning(true)); expect(message()).not.toBeNull();
   act(() => useGame.getState().setRunning(false)); expect(screen.getAllByRole("dialog",{name:"Company Message"})).toHaveLength(1);
-  fireEvent.click(within(message()!).getByRole("button",{name:"Got it"}));
+  readThrough();
   fireEvent.click(within(screen.getByRole("dialog",{name:"Chapter 4: Prepare"})).getByRole("button",{name:"Got it"}));
   fireEvent.click(screen.getByRole("button",{name:"Hint"})); expect(message()).toBeNull();
   fireEvent.click(within(screen.getByRole("dialog",{name:"Hint"})).getByRole("button",{name:"Got it"}));
@@ -125,13 +157,14 @@ it("contains keyboard focus, ignores outside clicks and restores background inte
   background.append(trigger); document.body.append(background); trigger.focus();
   const view = render(<ChapterCompanyMessage model={chapterCompanyMessage(companies[0])!} enabled/>);
   const dismiss = within(message()!).getByRole("button",{name:"Dismiss company message"});
-  const gotIt = within(message()!).getByRole("button",{name:"Got it"});
-  expect(background.inert).toBe(true); expect(document.activeElement).toBe(dismiss);
-  fireEvent.keyDown(dismiss,{key:"Tab",shiftKey:true}); expect(document.activeElement).toBe(gotIt);
-  fireEvent.keyDown(gotIt,{key:"Tab"}); expect(document.activeElement).toBe(dismiss);
+  const primary = next()!;
+  expect(background.inert).toBe(true); expect(document.activeElement).toBe(primary);
+  fireEvent.keyDown(primary,{key:"Tab"}); expect(document.activeElement).toBe(dismiss);
+  fireEvent.keyDown(dismiss,{key:"Tab",shiftKey:true}); expect(document.activeElement).toBe(primary);
   fireEvent.mouseDown(document.querySelector(".company-message-backdrop")!);
   fireEvent.click(document.querySelector(".company-message-backdrop")!); expect(message()).not.toBeNull();
-  fireEvent.click(gotIt); expect(background.inert).toBeFalsy(); expect(document.activeElement).toBe(trigger);
+  fireEvent.keyDown(primary,{key:"p"}); expect(message()).not.toBeNull();
+  readThrough(); expect(background.inert).toBeFalsy(); expect(document.activeElement).toBe(trigger);
   view.unmount(); background.remove();
 });
 

@@ -11,7 +11,7 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
   // Unrelated journeys dismiss optional narrative, while dedicated introduction tests opt out.
   reviewCompanyMessage: [true, { option: true }],
   companyMessages: [async ({ page, reviewCompanyMessage }, use) => {
-    if (reviewCompanyMessage) await page.addLocatorHandler(page.getByRole('dialog', { name: 'Company Message', exact: true }), dialog => dialog.getByRole('button', { name: 'Got it', exact: true }).click());
+    if (reviewCompanyMessage) await page.addLocatorHandler(page.getByRole('dialog', { name: 'Company Message', exact: true }), dialog => dialog.getByRole('button', { name: 'Dismiss company message', exact: true }).click());
     await use();
   }, { auto: true }],
   // Existing journeys still review and acknowledge the actual report themselves. Only the new

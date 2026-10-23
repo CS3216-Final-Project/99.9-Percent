@@ -148,6 +148,8 @@ Guidance never changes the rules; it reads the same state the engine uses.
 - Chapter requirements list each gate as met or unmet, without revealing future deadlines.
 - Hint is player-requested and points at an existing control; optional attention cues for Run and Next defer to required reviews and guides.
 - Each chapter opens with an optional Company Message from a colleague (Maya, Alex, Jordan, Sam, Taylor, then Alex) stating its mission.
+  The colleague speaks a few short lines in their own voice, which the player reads one at a time, and the last line carries the mission.
+  Dismissing it at any line counts as reading it.
 - A new diagnostic incident that keeps running shows one Pause invitation.
 - Every report (incident postmortem, prevention review, chapter outcome, growth review, scorecard) uses four short sections and one collapsed View Technical Details disclosure.
   Reports are built from recorded snapshots, trace and actual activations, never from later company state.

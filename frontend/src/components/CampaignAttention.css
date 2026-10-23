@@ -26,12 +26,43 @@
 .chapter-stage-popup .campaign-hint-heading h3 > .icon { color: var(--cue-accent); }
 .chapter-stage-popup > .btn { border-color: var(--cue-accent); background: var(--cue-accent); color: var(--ink); }
 .chapter-stage-popup > .btn:hover:not(:disabled), .chapter-stage-popup > .btn:active:not(:disabled) { background: var(--cue-accent); }
-.company-message-backdrop { position: fixed; inset: 0; z-index: 99; background: var(--spotlight-dim); overscroll-behavior: contain; touch-action: none; }
-.company-message { max-height: min(360px, calc(100dvh - 48px)); touch-action: pan-y; }
-.company-message-sender { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-.company-message-sender p { margin: 0; }
-.company-message-sender p > span { display: block; font-size: var(--text-sm); }
-.company-message-avatar { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--cue-accent); }
+/* Visual novel scene: the speaker stands above the dialogue box, which covers the portrait's cut-off edge. */
+.company-message-backdrop { position: fixed; inset: 0; z-index: 99; display: flex; align-items: flex-end; justify-content: center; padding: 16px 12px max(16px, env(safe-area-inset-bottom)); background: var(--spotlight-dim); overscroll-behavior: contain; touch-action: none; }
+.company-message { --speaker: var(--go); --portrait: clamp(120px, 36dvh, 320px); position: relative; display: flex; flex-direction: column; width: min(760px, 100%); max-height: 100%; color: var(--ink); touch-action: pan-y; }
+.company-message[data-speaker="maya"] { --speaker: #b98ae0; }
+.company-message[data-speaker="alex"] { --speaker: #e8b23a; }
+.company-message[data-speaker="jordan"] { --speaker: #7e8fb0; }
+.company-message[data-speaker="sam"] { --speaker: #ff8a3d; }
+.company-message[data-speaker="taylor"] { --speaker: #4fd1c5; }
+.company-message-portrait { flex: none; align-self: flex-start; width: var(--portrait); height: var(--portrait); margin: 0 0 calc(var(--portrait) * -.16) clamp(8px, 4%, 40px); object-fit: contain; object-position: bottom; filter: drop-shadow(0 10px 18px rgb(14 11 30 / .35)); pointer-events: none; user-select: none; }
+.company-message-box { position: relative; display: flex; flex-direction: column; min-height: 0; padding: 26px clamp(16px, 3vw, 26px) 16px; border: 2px solid var(--speaker); border-radius: var(--radius-panel); background: var(--paper); box-shadow: var(--lift); }
+.company-message-plate { position: absolute; top: 0; left: clamp(16px, 3vw, 26px); display: flex; align-items: baseline; gap: 8px; max-width: calc(100% - 96px); margin: 0; padding: 6px 14px; transform: translateY(-50%); border: 2px solid var(--speaker); border-radius: var(--radius); background: var(--night); color: var(--on-night); font-family: var(--font-display); white-space: nowrap; }
+.company-message-plate strong { font-size: var(--text-lg); }
+.company-message-plate span { overflow: hidden; color: var(--on-night-soft); font-size: var(--text-sm); text-overflow: ellipsis; }
+.company-message-close { position: absolute; top: 10px; right: 10px; }
+.company-message-box[data-more] { cursor: pointer; }
+.company-message-copy { min-height: 0; overflow-y: auto; padding-right: 36px; }
+.company-message-copy p { margin: 6px 0; }
+.company-message-line { font-size: var(--text-lg); line-height: 1.45; }
+.company-message-mission { padding: 10px 12px; border-radius: var(--radius); background: var(--paper-2); font-size: var(--text-md); }
+.company-message-foot { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.company-message-foot > .btn { min-inline-size: 8rem; }
+.company-message-progress { display: flex; gap: 6px; }
+.company-message-progress > span { width: 8px; height: 8px; border-radius: 50%; background: var(--paper-3); }
+.company-message-progress > span[data-read] { background: var(--speaker); }
+@media (max-width: 480px) {
+  .company-message { --portrait: clamp(104px, 28dvh, 200px); }
+  .company-message-line { font-size: var(--text-md); }
+  .company-message-mission { font-size: var(--text-sm); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .company-message-portrait { animation: company-message-enter .35s ease-out both; }
+  .company-message-box { animation: company-message-rise .25s ease-out both; }
+  .company-message-line { animation: company-message-line .22s ease-out both; }
+}
+@keyframes company-message-enter { from { opacity: 0; transform: translateX(-24px); } }
+@keyframes company-message-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes company-message-line { from { opacity: 0; transform: translateY(4px); } }
 
 /* Launch Week's tutorial step: the step tours' card, fixed beside its spotlight and clickable only on its button. */
 .tour-card.launch-tutorial { position: fixed; z-index: 111; pointer-events: none; }
