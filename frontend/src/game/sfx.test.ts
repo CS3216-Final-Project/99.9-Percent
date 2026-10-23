@@ -19,6 +19,7 @@ describe("sound effects without Web Audio", () => {
       sfx.play("alarm");
       sfx.liftDepart(true, 0.6);
       sfx.liftArrive(true, { close: 2.8, shut: 3.2 });
+      sfx.liftCut(false);
     }).not.toThrow();
   });
 });
@@ -142,6 +143,33 @@ describe("sound effects", () => {
     const quiet = ctx.voices;
     sfx.liftDepart(false, 0.6);
     sfx.liftArrive(true, { close: 2.8, shut: 3.2 });
+    expect(ctx.voices).toBe(quiet);
+    sfx.dispose();
+  });
+
+  it("cut straight to a floor with one short bell, silencing what is left of the last ride", () => {
+    const sfx = createSfx(() => true);
+    sfx.liftCut(true);
+    expect(FakeAudioContext.made).toHaveLength(0);
+    sfx.setVolume(80);
+    sfx.liftDepart(false, 0.6);
+    sfx.liftArrive(false, { close: 2.8, shut: 3.2 });
+    const ctx = FakeAudioContext.made[0];
+    const ride = ctx.gains[1];
+    const oscillators = ctx.oscillators.length;
+    const sources = ctx.sources.length;
+    sfx.liftCut(true);
+    expect(ride.gain.ramps.at(-1)).toBe(0);
+    // A single bell, a sine and its octave: no call click, hum, tick or doors.
+    const bell = ctx.oscillators.slice(oscillators);
+    expect(bell.map((o) => o.type)).toEqual(["sine", "sine"]);
+    expect(ctx.sources.length).toBe(sources);
+    // Higher going up than going down, like the full chime.
+    sfx.liftCut(false);
+    expect(ctx.oscillators.at(-2)!.frequency.value).toBeLessThan(bell[0].frequency.value);
+    sfx.setVolume(0);
+    const quiet = ctx.voices;
+    sfx.liftCut(true);
     expect(ctx.voices).toBe(quiet);
     sfx.dispose();
   });

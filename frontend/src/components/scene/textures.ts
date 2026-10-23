@@ -380,11 +380,17 @@ export function skylineDay(): THREE.CanvasTexture {
 const lettered = new Map<string, THREE.CanvasTexture>();
 
 /**
- * A canvas texture with lettering in Space Grotesk, made once per key. It is
- * drawn straight away and again once the font has loaded, so text drawn before
- * the font arrives does not stay in the fallback face.
+ * A canvas texture with lettering, in Space Grotesk unless `fonts` names others, made once per key. It is
+ * drawn straight away and again once the fonts have loaded, so text drawn before
+ * they arrive does not stay in the fallback face.
  */
-export function letteredTexture(key: string, w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void): THREE.CanvasTexture {
+export function letteredTexture(
+  key: string,
+  w: number,
+  h: number,
+  draw: (g: CanvasRenderingContext2D, w: number, h: number) => void,
+  fonts: string[] = ['700 40px "Space Grotesk"'],
+): THREE.CanvasTexture {
   const hit = lettered.get(key);
   if (hit) return hit;
   const [c, g] = canvas(w, h);
@@ -395,10 +401,11 @@ export function letteredTexture(key: string, w: number, h: number, draw: (g: Can
   paint();
   const t = finish(c);
   t.magFilter = THREE.LinearFilter;
-  document.fonts?.load('700 40px "Space Grotesk"').then(() => {
-    paint();
-    t.needsUpdate = true;
-  });
+  if (document.fonts)
+    Promise.all(fonts.map((f) => document.fonts.load(f))).then(() => {
+      paint();
+      t.needsUpdate = true;
+    });
   lettered.set(key, t);
   return t;
 }
@@ -508,22 +515,25 @@ export function logoSign(): THREE.CanvasTexture {
 /** One billboard advertisement's cell in the sheet of them: two across, four down. */
 export const AD_CELL: [number, number] = [512, 160];
 
-/** Advertisements for the valley's made-up startups: a headline, a line under it, and their colours. */
-const ADS: { head: string; line: string; paper: string; ink: string; accent: string }[] = [
+/**
+ * Advertisements for the valley's made-up startups: a headline, a line under it, and their colours. The company's
+ * own advertisement has its name in the logo's Pixelify Sans, like the neon sign.
+ */
+const ADS: { head: string; line: string; paper: string; ink: string; accent: string; logo?: true }[] = [
   { head: "SHIP IT FRIDAY", line: "DeployDuck · zero-downtime deploys", paper: "#ffd84a", ink: "#1d1834", accent: "#ff7a3d" },
   { head: "YOUR AI WROTE THIS", line: "Promptly · billboards that write themselves", paper: "#6f4cff", ink: "#ffffff", accent: "#ffd84a" },
   { head: "SERVERLESS*", line: "*servers sold separately · Nimbus Cloud", paper: "#bfe6ff", ink: "#12304d", accent: "#2f7de1" },
-  { head: "99.99%", line: "keep it online · now hiring", paper: "#1d1834", ink: "#ffe680", accent: "#ff9be3" },
+  { head: "99.99%", line: "keep it online · now hiring", paper: "#1d1834", ink: "#ffe680", accent: "#ff9be3", logo: true },
   { head: "HIRING 10x ENGINEERS", line: "1x welcome too · Gigaflow", paper: "#2ec4b6", ink: "#0f2b2a", accent: "#ffffff" },
   { head: "PIVOT PARTNERS", line: "we have changed direction", paper: "#ff7f3f", ink: "#2b1205", accent: "#fff3d6" },
   { head: "BYTE BURRITO", line: "fuel for late-night deploys", paper: "#d7263d", ink: "#fff3d6", accent: "#ffd84a" },
   { head: "DEBUG IN PROD?", line: "Tracewise sees everything", paper: "#0f2b2a", ink: "#7de8d3", accent: "#ff5a5f" },
 ];
 
-/** Every billboard advertisement on one sheet, in Space Grotesk. */
+/** Every billboard advertisement on one sheet, in Space Grotesk but for the company's name. */
 export function adsTexture(): THREE.CanvasTexture {
   const [cw, ch] = AD_CELL;
-  return letteredTexture("ads", cw * 2, ch * 4, (g) => {
+  const draw = (g: CanvasRenderingContext2D) => {
     ADS.forEach((ad, k) => {
       const x = (k % 2) * cw;
       const y = Math.floor(k / 2) * ch;
@@ -536,16 +546,17 @@ export function adsTexture(): THREE.CanvasTexture {
       g.textBaseline = "middle";
       g.fillStyle = ad.ink;
       // Each line shrinks, if it must, to fit the board.
-      const fit = (text: string, size: number, at: number) => {
-        g.font = `700 ${size}px "Space Grotesk", sans-serif`;
+      const fit = (text: string, size: number, at: number, face = '"Space Grotesk", sans-serif') => {
+        g.font = `700 ${size}px ${face}`;
         const width = g.measureText(text).width;
-        if (width > cw - 70) g.font = `700 ${Math.floor((size * (cw - 70)) / width)}px "Space Grotesk", sans-serif`;
+        if (width > cw - 70) g.font = `700 ${Math.floor((size * (cw - 70)) / width)}px ${face}`;
         g.fillText(text, x + 50, y + at);
       };
-      fit(ad.head, 58, 60);
+      fit(ad.head, 58, 60, ad.logo ? '"Pixelify Sans", "Space Grotesk", sans-serif' : undefined);
       fit(ad.line, 24, 112);
     });
-  });
+  };
+  return letteredTexture("ads", cw * 2, ch * 4, draw, ['700 58px "Pixelify Sans"', '700 40px "Space Grotesk"']);
 }
 
 /** Today's architecture sketch, with the next idea scribbled in red. */
