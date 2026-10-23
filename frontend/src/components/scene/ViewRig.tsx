@@ -61,6 +61,11 @@ function lockPointer(el: HTMLElement, refused: () => void): void {
 
 /** How long to wait for the pointer to lock before taking the browser's silence as a no. */
 const LOCK_WAIT_MS = 1500;
+/**
+ * How long after the player lets go of the pointer a browser may refuse to lock it again (Chrome waits about a
+ * second). A refusal inside this window is the browser's pause, not a browser that cannot lock.
+ */
+const RELOCK_PAUSE_MS = 1100;
 
 /** Tell the page the pointer's state changed: locked, given back, or never to be had here. */
 const lockNews = () => window.dispatchEvent(new Event("nn:look-lock"));
@@ -214,13 +219,20 @@ export function ViewRig() {
       lockNews();
     };
     // Some browsers neither lock nor say no: no lock soon after asking counts as no, until a lock does arrive.
-    let waiting = 0;
+    let waiting = 0, retry = 0;
+    // Asking again too soon after Escape is refused, so ask once the pause is over; the click still counts then.
+    const declined = () => {
+      const pause = unlockedAt + RELOCK_PAUSE_MS - performance.now();
+      window.clearTimeout(retry);
+      if (pause > 0) retry = window.setTimeout(tryLock, pause);
+      else refuse();
+    };
     const tryLock = () => {
-      lockPointer(canvas, refuse);
+      lockPointer(canvas, declined);
       window.clearTimeout(waiting);
       waiting = window.setTimeout(() => {
         if (document.pointerLockElement !== canvas) refuse();
-      }, LOCK_WAIT_MS);
+      }, Math.max(0, unlockedAt + RELOCK_PAUSE_MS - performance.now()) + LOCK_WAIT_MS);
     };
     mouse.take = () => {
       if (finePointer()) tryLock();
@@ -357,7 +369,7 @@ export function ViewRig() {
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointermove", point);
     canvas.addEventListener("pointerleave", away);
-    document.addEventListener("pointerlockerror", refuse);
+    document.addEventListener("pointerlockerror", declined);
     window.addEventListener("pointermove", moveBy);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
@@ -373,8 +385,8 @@ export function ViewRig() {
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", point);
       canvas.removeEventListener("pointerleave", away);
-      document.removeEventListener("pointerlockerror", refuse);
-      window.clearTimeout(waiting);
+      document.removeEventListener("pointerlockerror", declined);
+      window.clearTimeout(waiting); window.clearTimeout(retry);
       viewNow.pointing = null;
       viewNow.dragging = false;
       window.removeEventListener("pointermove", moveBy);
