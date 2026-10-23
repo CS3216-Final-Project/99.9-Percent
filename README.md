@@ -1,181 +1,84 @@
 # 99.99%
 
-A software-startup infrastructure tycoon game. Grow to 50,000 users in 26 weeks, manage upgrades and engineers, and survive production incidents. CS3216 Final Project, Group 5.
+A software-startup infrastructure tycoon game: keep a growing company online by reading evidence, diagnosing bottlenecks and choosing what to build, while staying solvent.
+CS3216 Final Project, Group 5.
 
-The playable frontend was migrated from [99.9-Percent-Prototype](https://github.com/CS3216-Final-Project/99.9-Percent-Prototype). The existing backend, database, shared contracts and CI/CD configuration are retained. See [the migration notes](docs/prototype-migration.md) for the imported features and verification steps.
+Play it at [99-99-percent-web.vercel.app](https://99-99-percent-web.vercel.app).
+Guided Mode teaches the concepts through a walkthrough and six chapters on one company; Challenge Mode, unlocked after five chapters, asks the player to reach 50,000 users in 26 weeks.
+Everything runs in the browser; accounts and cloud saves are optional.
 
-See the [Development Roadmap](docs/DEVELOPMENT_ROADMAP.md) for planned work and the [roadmap summary and proposal review](docs/DEVELOPMENT_ROADMAP_REVIEW.md) for milestones, scope alignment, and decisions to review.
+## Documentation
 
-The [System Architecture](docs/SYSTEM_ARCHITECTURE.md) diagrams show the target MVP's frontend, simulation, Google OAuth, saves, API and Neon database, plus the infrastructure simulated inside the game. [🔑 Authentication](docs/AUTHENTICATION.md) describes the optional Google sign-in, durable app sessions and account-owned cloud saves. Real-provider deployment acceptance remains outstanding.
+Each topic has exactly one home.
 
-The [UI design guide](docs/UI_DESIGN.md) defines the shared visual language, incident and inspector layouts, responsive behaviour and review checks used by both gameplay modes. The [asset pipeline](docs/ASSET_PIPELINE.md) covers where models and textures come from, exporting from Blender, compressing models with `npm run models:compress` and recording licences.
-
-The [PostHog gameplay dashboard](https://us.posthog.com/shared/BAtLorlW6hhWp10C-ZxWuLR-itnjtQ) shows player activity, active gameplay duration, Campaign completion, chapter progression, retention and failed runs once production analytics is enabled.
+| Topic | Document |
+| --- | --- |
+| Gameplay rules, chapters, simulation and economy | [docs/GAMEPLAY.md](docs/GAMEPLAY.md) |
+| The 3D building, controls, crew, city, sound and graphics | [docs/WORLD.md](docs/WORLD.md) |
+| Visual language, screen patterns and UI review | [docs/UI_DESIGN.md](docs/UI_DESIGN.md) |
+| Models, textures and licences | [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md) |
+| System architecture and browser storage | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| HTTP API and player feedback | [docs/api.md](docs/api.md) |
+| Accounts, sessions and cloud saves | [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) |
+| PostHog analytics and local playtest records | [docs/ANALYTICS.md](docs/ANALYTICS.md) |
+| Hosting, environment variables, CI/CD and database | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| Test commands, coverage and CI shards | [docs/testing.md](docs/testing.md) |
+| Status, milestones and scope | [docs/ROADMAP.md](docs/ROADMAP.md), with [phases/](docs/phases/) for the evaluation and showcase plans |
+| Course proposal | [docs/PROJECT_PROPOSAL.md](docs/PROJECT_PROPOSAL.md) |
+| Provenance of the migrated prototype | [docs/prototype-migration.md](docs/prototype-migration.md) |
+| Instructions for coding agents | [AGENTS.md](AGENTS.md) and `.agents/skills/` |
 
 ## Structure
 
 ```
 frontend/   React + Vite + TypeScript + Three.js (react-three-fiber) + Zustand
-backend/    Express + TypeScript API (deployed as a Vercel Function), Drizzle ORM
-  drizzle/  SQL migrations (generated, committed)
-shared/     TypeScript types shared by both sides (the handoff formats)
-docs/       API and design notes
+  src/sim/         deterministic simulation
+  src/game/        store, persistence, guidance and analytics
+  src/components/  UI and 3D scene
+  api/             Vercel functions proxying account routes
+backend/    Express + TypeScript API (a Vercel Function), Drizzle ORM
+  drizzle/  generated SQL migrations
+shared/     TypeScript types shared by both sides
+docs/       documentation
 ```
 
 ## Getting started
 
 Needs Node 22 (`nvm use`).
+There is no root workspace; install each package separately.
 
 ```bash
-# API: http://localhost:3001
+# API: http://localhost:3001 (optional; the game runs without it)
 cd backend
 cp .env.example .env
-npm install
+npm ci
 npm run dev
 
 # Game: http://localhost:5173
 cd frontend
 cp .env.example .env.local
-npm install
+npm ci
 npm run dev
 ```
 
-The frontend opens the 99.99% title screen and an isometric startup building of two floors joined by a glass elevator. The server floor holds the server hall, the network and power room, the monitoring room, a cooling plant, a workshop and the stores. The office floor above is laid out in zones, each with a floor of its own and its name floating over it: open desks, quiet desks, a huddle room, engineering, a meeting room, reception, an events space with a stage, a library, a kitchen and dining area, a lounge, a games room, a foosball corner and a glass nap room, with people at work. Press Play to begin the guided first week. Drag to pan, scroll or pinch to zoom, and click equipment to inspect it. The floor menu over the camera buttons, `Page Up` and `Page Down`, or a click on the elevator ride between the floors, and choosing equipment from a panel takes the view to its floor; a floor out of view that needs you shows a badge. `Shift` + drag (or right-drag, or two fingers) rotates and tilts the room; `Q` and `E` turn it by 45 degrees, and the house button resets the view. Walls between the camera and the room drop out of the way. `P` pauses or resumes; `Esc` closes a view. `?floor=office` opens on the office floor, for screenshots.
+The API runs without a database; routes that need one read Neon connection strings from `backend/.env` (ask Di Heng, or use your own Neon branch).
 
-Press **Walk** beside the camera buttons to walk the building as your avatar, one of 18 cube animals from Kenney's CC0 [Cube Pets](https://kenney.nl/assets/cube-pets) chosen from the chip beside the account's on the home screen or the menu's Avatar tab, and changeable at any time. `W` `A` `S` `D` or the arrow keys walk relative to the view, `Shift` runs, and a click or tap on the floor walks there; clicking equipment walks over to it as well as inspecting it. What is within reach shows as a button: `Space` (or a tap) inspects equipment exactly as clicking it does, rides the elevator, or plays with the coffee machine, the arcades and the nap pods. Glass doors slide open as you come near, footsteps sound of the floor, and the crew wait for you to pass. Walking never changes the game, and `Esc` stops it. When you are not walking, your avatar sits in the founder's chair in the meeting room.
-
-View mode, or `V`, also sees the building from the avatar. **First person** looks through its eyes under the ceiling's lights, and a run opens there until you choose a view; a guide or a `?floor=` link opens from above instead. **Follow** puts the camera a few metres behind the avatar, and scrolling comes closer. Both take the mouse as they open, as in a game: moving it looks around, and in first person the dot in the middle is where a left click walks or inspects, and `WASD` walk. `Esc` only gives the cursor back, with a card to look around again or exit; Exit is the way out. A dialog or a guide's card gives the cursor back by itself, while an inspection's reading does not: the next left click puts it away. Where the browser will not hand over the mouse, moving it towards an edge turns the view instead, and the hint at the top has Exit. On a touch screen, drag to look around. The menu's Controls tab sets the look speed, turns looking up and down round, and sets the field of view (70° to 90°). Both views turn walk mode on, and stopping the walk returns to the overview. The round map in the room's corner turns with the view and is centred on your avatar while you walk. It shows the floor in view with each zone in its own colour, the crew and any incident, a badge beyond its edge waiting on the rim. A line under it says where you are, its tabs change floor, and in walk mode a click on it walks you there. Hide it with its close button; on a phone it starts folded.
-
-The office is staffed by a crew of animated monsters from Quaternius's CC0 [Ultimate Monsters](https://quaternius.com/packs/ultimatemonsters.html) pack, one species per role: cats and birds write the code, a yeti is on call, a monkey runs the meetings, a mushroom crunches data, a chick is the intern, a ninja handles security, a frog fixes hardware, a bunny runs reception and a bee does marketing. They walk, idle, nod and wave with the pack's own animations, and shake their heads during an incident. Six of them wander the office on seeded loops of their own, stopping at the vending machines, the coffee machine, the water cooler, a colleague's desk, the whiteboard or the window; small groups stand chatting with speech bubbles that turn to the outage during an incident; a frog and a bunny keep the ping-pong rally going, a ninja and a cat play foosball, and someone dozes in a nap pod. Downstairs a yeti watches the monitoring wall and technicians tend the hall and the stores, and when an incident starts two engineers ride down from their desks to the racks. Zoomed in, each zone can be heard quietly: foosball clacks, arcade bleeps, the espresso machine and the sleeper's breathing (`frontend/src/components/scene/zoneSounds.ts`). The elevator clicks, hums, chimes and slides its doors, and on the server floor the city gives way to the hall's fans. Licences are in `frontend/public/models/creatures/`.
-
-The office is the top floor of a six-storey glass campus building in a Silicon Valley suburb, with the "99.99%" sign on the storey below it, a palm lawn round about and its own car park. Around it is a grid of palm-lined boulevards with planted medians, lamps, zebra crossings, people on the pavements and traffic, including robotaxis, that takes turns at the junctions. The blocks hold office parks beside their car parks, neighbourhoods of houses with pitched roofs and back-yard pools, strips of shops with billboards for made-up startups, a park with a fountain, and a ring-shaped headquarters round a wooded courtyard. Nothing tall ever stands between the camera and the crew. A whole day passes in twelve minutes of play: the sun crosses the sky, the light warms toward evening, and after dark the moon takes over while offices, lamps and headlights come on; the office keeps its own steady light, and `?time=0.5` fixes the time of day (0.5 is noon). The city is generated in `frontend/src/components/scene/city.ts`, its day in `sky.ts`, its trees, vehicles and passers-by in `treeModels.ts`, `vehicleModels.ts` and `walkerModels.ts`. At HD detail its ground, roofs, walls, tree bark and leaves carry CC0 photo textures from Poly Haven (see `frontend/public/textures/License.txt`; houses are stucco and offices concrete, reusing the office's own sets), tyres have worn two tracks into every lane, palm fronds are cut into leaflets, windows are set back in their walls and reflect the street and the sky, and cars have glossy paint and glass. The whole city fades into the sky with distance, so it has no edge.
-
-The game has its own music, written as notes in `frontend/src/game/score.ts` and synthesised in the browser with the Web Audio API: a mellow groove while you build and a tense loop during incidents. It starts when you press Play, and the speaker button beside the menu turns it off; the choice is remembered.
-
-Every desk has an iMac-style all-in-one in its own colour with a matching keyboard and mouse, and the vending machines (stocked behind lit glass), water cooler, arcade cabinets, server-room cooling units, fridge and espresso machine are modelled part by part in `frontend/src/components/scene/propModels.ts`.
-
-The office furniture comes from two CC0 model packs, [Kenney's Furniture Kit](https://kenney.nl/assets/furniture-kit) and [KayKit Furniture Bits](https://kaylousberg.itch.io/furniture-bits) by Kay Lousberg. Their licences sit beside the models in `frontend/public/models/`.
-
-On a machine with a graphics card the room draws in HD: photo-scanned CC0 floors and walls from [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambientcg.com), photo-scanned Poly Haven plants, sofas, armchairs, tables, boxes and a lamp in place of the stylised ones, physically based materials, soft reflections, softer shadows, ambient occlusion and a glow on screens and lights. Credits are in `frontend/public/textures/License.txt` and `frontend/public/models/polyhaven/License.txt`. Without a GPU it keeps the lighter pixel look and never downloads the HD assets. On a slower machine, Menu > Graphics lets the player pick High, Medium or Low instead of Auto: Medium keeps the HD look without the glow and ambient shading at the screen's normal pixel size, and Low is the flat pixel look with no shadows, fewer pixels and 30 frames a second. The choice is remembered in the browser. Add `?graphics=hd` or `?graphics=basic` to the address to force either detail level.
-
-The [nine-node technology tree](docs/tech-tree.md) groups upgrades into Capacity, Data and Reliability, with metrics and alerts available from the start. It follows the proposal's reduced research scope while retaining the weekly simulation and existing saves.
-
-In either mode, open Menu > Save files to export the current run or import a JSON save. Imports validate before replacing a run and open the matching Campaign or Classic mode. If a pre-update browser save is present, the same menu offers Resume pre-update save and Export pre-update save. Resuming copies the validated weekly run into Classic; the original save, metadata and analytics remain untouched. The music button beside Menu shares its mute setting across both modes and remembers it after reload.
-
-Gameplay, saves and prototype analytics run in the browser and work without the API. Saves stay in this browser and origin; saves on the prototype deployment do not automatically move to a new domain. The backend retains its existing health and dialogue endpoints for later integration.
-
-Campaign continues into [Phase 3 scaling](docs/phases/PHASE_3_SCALING.md) after the opening milestone: buy database headroom, scale an application or install a second server, then explicitly deploy and configure load balancing. After scaling growth, acknowledged reports and drained backlogs, explicitly continue into [Phase 4 data strategy](docs/phases/PHASE_4_DATA_STRATEGY.md): compare read/write workloads, a warming Read Cache, ceiling tuning and the paid 3,000 ops/s database tier. See the [implementation report](docs/phases/PHASE_4_IMPLEMENTATION_REPORT.md) for validation and remaining acceptance work. Classic remains available through the mode selector. Existing replay saves are backed up before conversion to schema 4; historical reports retain their original observations.
-
-Accounts and cloud saves are optional: the home screen's account chip and Campaign's Menu, Saves offer Google or email sign-in. Sign-in never uploads a guest save automatically. Opening the game at `/?signin=1` (the landing page's account links) opens the account dialog on the home screen for a player who is not signed in, once the account check answers; a signed-in player stays on the home screen. The flag is removed from the address once handled. The frontend's server-side `API_PROXY_TARGET` and backend `APP_ORIGIN` (plus the Google settings for Google sign-in) are required for account endpoints; see the authentication guide and package `.env.example` files. All `VITE_*` settings are public. Guest play remains available when accounts are unconfigured or offline.
-
-The API runs without a database. For routes that use one, put Neon's connection strings in `backend/.env` (ask Di Heng, or use your own Neon branch).
-
-## Scripts (in each of `frontend/` and `backend/`)
-
-| Script | What it does |
-|---|---|
+| Script (in `frontend/` and `backend/`) | What it does |
+| --- | --- |
 | `npm run dev` | Run locally with hot reload |
-| `npm run lint` | oxlint |
-| `npm run typecheck` | TypeScript check |
-| `npm run build` | Production build (frontend) / type check (backend) |
-| `npm test` | Tests (vitest). Frontend: simulation, scripted balance players, game startup, tutorial, save/resume, and API client (WebGL is mocked in UI tests). Backend: routes, CORS, and every migration on an in-memory Postgres. |
+| `npm run lint` / `npm run typecheck` | oxlint and TypeScript |
+| `npm test` / `npm run test:coverage` | Vitest, optionally with coverage |
+| `npm run build` | Production build (frontend) or type check (backend) |
 
-`npm run balance` in `frontend/` runs the scripted balancing players across twelve seeds.
+The frontend also has `npm run balance`, `npm run test:e2e` and `npm run models:compress`; the backend has `npm run db:generate`, `db:migrate` and `db:studio`.
+See [testing.md](docs/testing.md) and [DEPLOYMENT.md](docs/DEPLOYMENT.md#database) for when to use them.
 
-`npm run test:coverage` in either package generates coverage reports. For real browser tests, run `npx playwright install chromium` once in `frontend/`, then `npm run test:e2e`. See [testing guidance](docs/testing.md) for the test matrix, debugging and known gaps. Project instructions are in [AGENTS.md](AGENTS.md), with focused agent skills in `.agents/skills/`.
+## Contributing
 
-Database scripts (`backend/` only):
-
-| Script | What it does |
-|---|---|
-| `npm run db:generate` | Write a migration in `drizzle/` from changes to `src/db/schema.ts` |
-| `npm run db:migrate` | Apply migrations to `DATABASE_URL_UNPOOLED` |
-| `npm run db:studio` | Browse the database in the browser |
-
-## Database
-
-Postgres on [Neon](https://neon.tech) (region: Singapore), queried with [Drizzle](https://orm.drizzle.team). Tables are defined in `backend/src/db/schema.ts`:
-
-| Table | Holds |
-|---|---|
-| `players` | One row per player: name, target language, level, total XP |
-| `sessions` | One row per mission attempt |
-| `dialogue_turns` | What the player said and the NPC replied, per session (the conversation history) |
-| `mission_reports` | The `MissionReport` for a finished session |
-| `game_accounts` | Verified Google issuer/subject and display name |
-| `game_sessions` | Hashed opaque session tokens, CSRF token and expiry |
-| `game_auth_attempts` | Short-lived browser-bound OAuth state, nonce and PKCE verifier |
-| `game_runs` | Owner-scoped compact campaign replay saves and revisions |
-
-To change the schema: edit `schema.ts`, run `npm run db:generate`, and commit the new files in `backend/drizzle/`. Never edit a migration that has already been merged. The migration runs on production automatically after the merge.
-
-## CI/CD
-
-| Stage | When | Where | What |
-|---|---|---|---|
-| CI `frontend` | Every PR | GitHub Actions | lint, typecheck, coverage, build, desktop/touch browser tests |
-| CI `backend` | Every PR | GitHub Actions | lint, typecheck, coverage (incl. migrations on in-memory Postgres), migrations match schema |
-| Preview deploy | Every PR | Vercel | Preview URL for each project, linked on the PR |
-| Production deploy | Push to `main` | Vercel | Both projects |
-| Migrate database | Push to `main` | GitHub Actions (`cd.yml`) | `db:migrate` on the production Neon database |
-| Smoke test | After the migration | GitHub Actions (`cd.yml`) | `/api/health` and `/api/health/db` on the live API |
-
-The `frontend` and `backend` checks must pass, on a branch that is up to date with `main`, before merging. CI doesn't re-run after the merge because that code has already been tested.
-
-Vercel and the migration start at the same time, so keep migrations backward-compatible: add first, drop or rename in a later PR.
-
-## How we work
-
-- Never push to `main`. Branch, open a pull request, and get 1 approval.
-- Branch names: `ai/…`, `fe/…`, `be/…`, `3d/…`, `chore/…`
-- PR titles: `type(area): summary`, e.g. `feat(ai): voice loop`. The title becomes the squash commit message.
-- Secrets go in `.env` / Vercel settings, never in code. Only `VITE_*` variables reach the browser, so the OpenAI key lives in the backend only.
-- Changing a file in `shared/` changes a handoff. Agree with the other side first.
-
-## Deployment
-
-Two Vercel projects from this repo, in the `hoo-di-hengs-projects` Vercel team. The backend runs in Singapore (`backend/vercel.json`) to sit next to the database. Each project only rebuilds when its own folder or `shared/` changed (`ignoreCommand` in its `vercel.json`).
-
-| Project | Root directory | Env vars (type) |
-|---|---|---|
-| `frontend` | `frontend` | `VITE_API_URL=https://99-99-percent-backend.vercel.app` (Config) |
-| `lingoquest-backend` | `backend` | `CORS_ORIGINS` (Config), `DATABASE_URL` (Secret, pooled), `OPENAI_API_KEY` (Secret) |
-
-Production frontend: [99-99-percent-web.vercel.app](https://99-99-percent-web.vercel.app). Production backend: [99-99-percent-backend.vercel.app](https://99-99-percent-backend.vercel.app).
-
-Set `CORS_ORIGINS` in the backend's Vercel settings to `https://99-99-percent-web.vercel.app,https://frontend-*-hoo-di-hengs-projects.vercel.app`. The preview pattern follows the existing Vercel project name, independently of its production domain. Local `.env.example` files retain localhost values for development and document the production values separately. Changing a domain does not update Vercel environment variables; redeploy after changing those settings.
-
-GitHub Actions (Settings > Secrets and variables > Actions):
-
-| Name | Kind | Value |
-|---|---|---|
-| `DATABASE_URL_UNPOOLED` | Secret | Neon's direct connection string, used by the migration |
-| `API_URL` | Variable (optional) | Production API URL for the smoke test. Defaults to `https://99-99-percent-backend.vercel.app`. If set explicitly, it must use this new URL too. |
-
-Merges to `main` deploy to production. Pull requests get preview links.
-
-### Player feedback
-
-**Give feedback** on either mode's title screen, or under Menu → Playtest, submits a message without requiring sign-in. The browser uses the existing public `VITE_API_URL` backend origin and its configured `CORS_ORIGINS` policy. Local development expects the backend on port 3001. Account proxy configuration is not required for feedback.
-
-`POST /api/feedback` accepts `{ id, message, mode }`: a random UUID v4 submission ID, 1–2000 trimmed characters, and `campaign` or `classic`. It returns `{ id }` only after persistence in `game_feedback`; replaying the same submission is idempotent. No public feedback-list endpoint is exposed. No saves, email addresses or account tokens are uploaded.
-
-Migration `0002_fearless_exodus.sql` adds the table without changing existing tables. The existing CD job runs `npm run db:migrate` on pushes to `main` after merge. Until the database/migration is available, the form reports a send failure and retains the draft in the open component. Drafts are not persisted across reloads.
-
-### Product analytics
-
-PostHog tracking measures active gameplay duration, chapter progression, all-chapter Campaign completion, failures and returning players.
-Tracking only runs once configured in the frontend's Production environment.
-Development, tests and preview builds do not collect product analytics.
-
-In production, gameplay analytics is on by default.
-It sends only `gameplay_*` events with an allowlist of properties, tied to a random browser ID kept in localStorage.
-It never sends URLs, account details, saves, feedback or observer notes.
-PostHog does see the network details of each request, such as the IP address.
-Players can opt out, or back in, from the notice on the home screen, Menu > Playtest or the Account dialog.
-The choice is kept in this browser only.
-Opting out stops tracking at once and removes the stored browser ID and run records.
-Nothing is collected while the browser's Do Not Track or Global Privacy Control setting is on.
-
-See [analytics setup and dashboard metrics](docs/ANALYTICS.md) for public token configuration, event definitions, dashboard recipes and measurement limits.
-Existing local playtest records and saves retain their formats.
+- Never push to `main`. Branch, open a pull request and get one approval.
+- Branch names: `ai/…`, `fe/…`, `be/…`, `3d/…`, `chore/…`.
+- PR titles: `type(area): summary`, for example `feat(ai): voice loop`. The title becomes the squash commit message.
+- The `frontend` and `backend` CI checks must pass on a branch that is up to date with `main`.
+- Secrets go in `.env` files or Vercel settings, never in code; only `VITE_*` variables reach the browser.
+- Changing a file in `shared/` changes a frontend/backend handoff, so agree it with the other side first.
+- Merging to `main` deploys to production and migrates the production database.

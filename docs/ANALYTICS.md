@@ -1,161 +1,157 @@
-# Gameplay analytics
+# Analytics
 
-The optional PostHog integration measures player engagement in Campaign and Classic.
-It observes the game store at app startup, outside React, without modifying the simulation,
-save format, account API or existing local playtest archive. It sends selected new observations,
-not historical local playtest records.
+This is the source of truth for what 99.99% measures: the PostHog product analytics that leave the browser, and the local playtest records that never do.
 
-## Enable collection
+| | PostHog product analytics | Local playtest records |
+| --- | --- | --- |
+| Code | `frontend/src/lib/analytics.ts`, `frontend/src/game/productAnalytics.ts` | `frontend/src/game/telemetry.ts`, `track()` in `frontend/src/game/persist.ts` |
+| Leaves the browser | Yes, to PostHog | Never; exported by hand from Menu > Playtest |
+| Runs | Production builds only, unless the player opts out | Always |
+| Storage | `nn.product-analytics.v1` and `ph_*` | `nn.campaign.analytics.v1` |
 
-1. Create a PostHog project in the US or EU region and invite the project team.
-2. In the frontend Vercel project's **Production** environment, set:
-   - `VITE_ANALYTICS_ENABLED=true`
-   - `VITE_POSTHOG_TOKEN=<public project ingestion token>`
-   - `VITE_POSTHOG_HOST=https://us.i.posthog.com` (or `https://eu.i.posthog.com`)
-   - Optionally `VITE_BUILD_ID`, for a human-readable release label. Otherwise the Vercel commit SHA is used.
-3. Redeploy the frontend after configuring these public build-time values.
-4. Start a new run and check PostHog's live events before interpreting any dashboard.
+## PostHog product analytics
 
-Never use a personal/project-secret API key in a `VITE_*` value.
-Collection requires a production build, `VERCEL_ENV=production` and explicit enablement.
-Local development, automated test builds, previews, absent tokens and unsupported hosts do not
-initialise the SDK, create its storage or attach analytics timers. Preview configuration cannot
-accidentally enable tracking merely by inheriting production variables.
-Analytics failures must not stop gameplay. No backend/database changes are required.
+The integration observes the game store from outside React and never modifies the simulation, saves or local records.
+It sends only new observations, never historical local records.
+The shared [99.99% Gameplay dashboard](https://us.posthog.com/shared/BAtLorlW6hhWp10C-ZxWuLR-itnjtQ) shows its results.
 
-The dashboard is hosted in PostHog at [US Cloud](https://us.posthog.com) or
-[EU Cloud](https://eu.posthog.com). Create **99.99% Gameplay** under Dashboards.
-Its project/dashboard-specific URL is available after creation; an example URL shape is
-`https://us.posthog.com/project/<project-id>/dashboard/<dashboard-id>`.
-No account or dashboard is provisioned by installing the SDK or merging this PR.
+### Enable collection
 
-## Events and properties
+The SDK loads only when all of these hold:
 
-All events have `event_version`, `build_id`, `content_version`, `mode`,
-`run_id`, `gameplay_session_id`, `device_category`, `chapter_id`,
-`progress_step`, `session_active_ms`, `run_active_ms` and `eligible_started_run`.
-An event has its own `$insert_id`. The SDK supplies a persistent anonymous browser
-`distinct_id`; it is independent of the run and session IDs.
+- A production build (`import.meta.env.PROD`) where Vercel's `VERCEL_ENV` is `production` (mapped to `VITE_DEPLOY_ENV` in `frontend/vite.config.ts`).
+- `VITE_ANALYTICS_ENABLED=true` and a `VITE_POSTHOG_TOKEN` are set in the frontend project's Production environment.
+- `VITE_POSTHOG_HOST` is exactly `https://us.i.posthog.com` (the default) or `https://eu.i.posthog.com`.
+- The player has not opted out, and the browser is not sending Do Not Track or Global Privacy Control.
 
-| Event | When |
+Local development, tests, previews, missing tokens and other hosts never initialise the SDK, create its storage or attach timers.
+`VITE_BUILD_ID` optionally labels the release; otherwise the Vercel commit SHA is used, then `unrecorded`.
+The token is PostHog's public project ingestion token; never put a personal API key in a `VITE_*` value.
+Redeploy the frontend after changing these values, then check PostHog's live events before reading a dashboard.
+
+### Consent and privacy
+
+Analytics is on by default.
+Until the player answers, a notice on the home screen offers OK or Opt out; the choice can also be changed in Menu > Playtest or the Account dialog and is kept in `nn.analytics-consent.v1`.
+Opting out, in any tab, stops collection at once without a closing event and deletes the run ledger and PostHog's stored identity.
+Opting back in starts a new anonymous identity.
+Do Not Track or Global Privacy Control overrides an acceptance without changing the stored choice.
+
+The SDK is configured with autocapture, pageviews, page leave, performance, exception capture, session recording, surveys, feature flags and person profiles all disabled, and with request batching off.
+A `before_send` filter drops every event whose name does not start with `gameplay_` and removes every property outside an allowlist, which strips the URL, referrer, screen, browser and campaign properties the SDK normally adds.
+The SDK properties that remain are `distinct_id`, `$device_id`, `$session_id`, `$window_id`, `$insert_id`, `$lib`, `$lib_version`, `$is_identified`, `$process_person_profile` and `token`.
+`distinct_id` is a random browser ID in localStorage; nothing calls `identify`, so accounts are never linked.
+No URLs, account details, saves, feedback or observer notes are sent.
+PostHog still receives the request's network metadata, such as the IP address, unless IP capture is disabled in the PostHog project.
+
+### Common properties
+
+Every event carries:
+
+| Property | Value |
 | --- | --- |
-| `gameplay_run_started` | A player actually starts a newly observed run. Title-screen boot does not count. Includes `entry_type=new` and `replay`. |
-| `gameplay_run_resumed` | A player opens an existing run, including imports. Includes `entry_type=resume` or `existing_save`. |
-| `gameplay_session_started` | Play begins, a run is changed or a page is restored from back/forward cache. |
-| `gameplay_session_progress` | Every 15 seconds when visible active time has increased, and at visibility boundaries. Includes active_delta_ms since the previous checkpoint. Duration values are cumulative snapshots. |
-| `gameplay_session_ended` | Going home, switching/replacing a run, completion/failure, pagehide or observer disposal. Includes `reason`. |
-| `gameplay_chapter_started` | The player enters a Campaign chapter for the first time observed on this browser. |
-| `gameplay_chapter_completed` | A previously incomplete chapter becomes complete during observed play. |
-| `gameplay_run_completed` | All Campaign chapters are complete in the same run, or Classic reaches its winning outcome. |
-| `gameplay_run_failed` | A run reaches a losing outcome. Includes `outcome` and the last reached chapter. |
-| `gameplay_tutorial_started` | A mode's walkthrough begins, once until it ends (Guided Mode's carries on across reloads and companies without a new start): Guided Mode's Opening walkthrough or Challenge Mode's first-week tutorial. Includes `tutorial_track`, `tutorial_step` and `tutorial_from`. |
-| `gameplay_tutorial_completed` | The player reaches the walkthrough's last step, whether or not they then close its card. Includes `tutorial_track` and `tutorial_step`. |
-| `gameplay_tutorial_skipped` | The walkthrough ends unfinished. Includes `tutorial_track`, `tutorial_step` and `reason`. |
+| `event_version` | `1` |
+| `build_id` | `VITE_BUILD_ID`, else the commit SHA, else `unrecorded` |
+| `content_version` | `chapters-v2` for Guided Mode, `classic-v1` for Challenge Mode |
+| `mode` | `campaign` or `classic` |
+| `run_id` | The Guided Mode run ID, or a random UUID for a Challenge Mode run |
+| `gameplay_session_id` | Random UUID per play session |
+| `device_category` | `touch` for a coarse pointer, otherwise `desktop` |
+| `chapter_id` | `opening`, `scaling`, `data`, `spikes` or `reliability`; null in Challenge Mode |
+| `progress_step` | Guided Mode game second, or Challenge Mode week |
+| `session_active_ms`, `run_active_ms` | Cumulative active time snapshots |
+| `active_delta_ms` | Active time since the previous progress or end event |
+| `eligible_started_run` | Whether this browser saw the run start fresh |
 
-Campaign chapter IDs are `opening`, `scaling`, `data`, `spikes`, `reliability`.
-Completion reuses the same chapter-status function as the visible chapter list.
-All five must be complete, including acknowledgement of the final chapter's outcome.
-Recognising the opening milestone alone is not Campaign completion. Completion stops the
-duration measurement for that run; continuing to operate the finished company does not inflate
-time to completion. Campaign's content definition is versioned as `chapters-v2` (v2 shortened the Chapter 0
-walkthrough to ten lessons, so `tutorial_step` counts a different list than in `chapters-v1`);
-increment it when the set/meaning of required chapters or walkthrough steps changes. Classic is `classic-v1`.
-Build IDs distinguish releases within a content version.
+Active time counts only while the tab is visible and within two minutes of pointer, keyboard, wheel or touch activity; simulation ticks alone do not count as activity.
+Visible planning, onboarding, incident and review time counts even while the game is paused.
+These are engagement estimates, not proof of attention.
 
-Tutorial events describe the two walkthroughs only; Guided Mode's one-card chapter guides and Challenge Mode's incident guide are not reported.
-`tutorial_track` is `campaign` (Guided Mode) or `basics` (Challenge Mode).
-`tutorial_step` is the step showing when the event happened, counted from 0, so a skip on the third card has step 2.
-`tutorial_from` is `first_visit`, `resume` (Guided Mode: a company in the Opening reopened with no walkthrough under way; Challenge Mode: a fresh run reopened before any decision), `new_company`, `menu` or `home`.
-A skip's `reason` is `player` (the Skip button) or `chapter_entered` (a Guided Mode walkthrough still open when the company moved on from the Opening, which counts as done).
-Each start and end is reported once; Challenge Mode's walkthrough, offered behind the title screen, is reported when play begins.
-A reload does not repeat an event, but a fresh company reopened before its first decision offers the walkthrough again and so starts it again.
-The same transitions are recorded in each mode's local records: Guided Mode's playtest events and Challenge Mode's prototype analytics, as `tutorial_started`, `tutorial_completed` and `tutorial_skipped`.
+`content_version` `chapters-v2` counts the ten-lesson walkthrough, so `tutorial_step` means a different lesson list than in `chapters-v1`.
+Increment it in `productAnalytics.ts` when the set or meaning of chapters or walkthrough steps changes; build IDs distinguish releases within a content version.
 
-Visible planning, onboarding, incident and review time counts even while simulation time is paused.
-Hidden-tab time and time beyond two minutes without pointer, keyboard, wheel or touch activity
-do not count. Activity restarts the clock; simulation ticks alone do not reset inactivity.
-These are engagement estimates, not proof that a person was paying attention.
+### Events
 
-An independent local analytics ledger retains the last 100 run records, including active time,
-observed chapter IDs and terminal status. It does not change the game save format.
-Reopening/importing a completed save baselines its milestones and emits no retrospective
-completion. Runs first encountered as existing saves are excluded from new-run completion
-cohorts (`eligible_started_run=false`). If ledger storage fails, timing/deduplication continue
-in memory; deduplication and cumulative duration across reloads can then be incomplete.
+| Event | When | Extra properties |
+| --- | --- | --- |
+| `gameplay_run_started` | A player starts a newly observed run; booting to the home screen does not count | `entry_type=new`, `replay` |
+| `gameplay_run_resumed` | A player opens an existing or imported run | `entry_type` `resume` or `existing_save`, `replay=false` |
+| `gameplay_session_started` | Play begins, the run changes, or the page returns from back/forward cache | |
+| `gameplay_session_progress` | Every 15 seconds while visible active time increased, and on each visibility change | `reason` `heartbeat`, `hidden` or `visible` |
+| `gameplay_session_ended` | Going home, changing run, completion or failure, `pagehide` or observer disposal | `reason` `home`, `run_changed`, `completed`, `failed`, `pagehide`, `unmount` or `already_finished` |
+| `gameplay_chapter_started` | First time this browser sees the run in a chapter | `chapter_id` |
+| `gameplay_chapter_completed` | A chapter becomes complete during observed play | `chapter_id` |
+| `gameplay_run_completed` | Guided Mode: chapters 1 to 5 all complete. Challenge Mode: the winning outcome | `outcome=completed` |
+| `gameplay_run_failed` | A losing outcome | `outcome` |
+| `gameplay_tutorial_started` | A walkthrough begins, once until it ends | `tutorial_track`, `tutorial_step`, `tutorial_from` |
+| `gameplay_tutorial_completed` | The walkthrough reaches its last step | `tutorial_track`, `tutorial_step` |
+| `gameplay_tutorial_skipped` | The walkthrough ends unfinished | `tutorial_track`, `tutorial_step`, `reason` |
 
-## Dashboard recipe
+Guided Mode completion means chapters 1 to 5, the same set that unlocks Challenge Mode.
+Chapter 0 and chapter 6, Grow the Company, are not reported as chapters, and once a run is complete the observer stops measuring it, so chapter 6 play produces no session or duration events.
+Reopening or importing a completed save baselines its milestones and emits no retrospective completion.
 
-Use a default filter for `mode`, `content_version` and a date range, with optional
-`build_id` and `device_category` breakdowns. Keep Campaign and Classic completion separate.
+Tutorial events cover the two walkthroughs only: `tutorial_track` is `campaign` (Guided Mode's Chapter 0) or `basics` (Challenge Mode's first-week tutorial).
+`tutorial_step` counts from 0, so a skip on the third card has step 2.
+`tutorial_from` is `first_visit`, `resume`, `new_company`, `menu` or `home`.
+A skip's `reason` is `player` or `chapter_entered`.
+Challenge Mode's walkthrough starts behind the home screen and is reported when play begins.
+A reload never repeats an event, but a fresh company reopened before its first decision offers the walkthrough again and so starts it again.
 
-| Insight | Definition / configuration |
+### Run ledger
+
+`nn.product-analytics.v1` keeps the last 100 run records with active time, observed chapters and terminal status, so deduplication and cumulative durations survive reloads.
+Runs first seen as existing saves are excluded from new-run cohorts (`eligible_started_run=false`).
+If storage fails, timing and deduplication continue in memory for the visit.
+Up to 200 events are buffered while the SDK loads; if it fails to load, analytics is dropped and play continues.
+
+### Dashboard recipe
+
+Filter by `mode`, `content_version` and a date range, with optional `build_id` and `device_category` breakdowns, and keep the two modes' completion separate.
+
+| Insight | Definition |
 | --- | --- |
-| Unique players | Unique `distinct_id` on `gameplay_session_started`. |
-| Sessions | Unique `gameplay_session_id` on `gameplay_session_started`. |
-| New runs | Unique `run_id` on `gameplay_run_started`. |
-| Gameplay duration | Group all progress/end snapshots by `gameplay_session_id` and take MAX(`session_active_ms`); then chart the median and a histogram. Include unfinished sessions. |
-| Run duration | MAX(`run_active_ms`) per `run_id` and content version, not SUM of snapshots. |
-| Chapter progression | Unique `run_id` and unique players on chapter-started/completed events, broken down by `chapter_id`. |
-| Campaign completions | Unique `run_id`, plus unique players, on Campaign `gameplay_run_completed`. |
-| Player completion rate | Players with a Campaign start in the selected cohort who subsequently complete one of those same run IDs, divided by all players in that start cohort. |
-| Run completion rate | Campaign runs started in the cohort that subsequently complete, divided by all runs started in that cohort. |
-| Time to completion | Median and distribution of `run_active_ms` on completed runs, filtered to `eligible_started_run=true`. |
-| Chapter funnel | Run started, then chapter-completed events in chapter order. Match steps by `run_id` so milestones from different attempts cannot combine. |
-| Drop-off | Highest reached chapter for each eligible started run without a completion within the chosen conversion window. Label as incomplete, not proven abandoned. |
-| Day 1 / Day 7 retention | First gameplay-session-started event to a session-started event or a progress event with active_delta_ms > 0 on the following calendar day / day 7, by anonymous browser identity. This also captures returning to a tab left open overnight. |
-| Replay rate | Players who start a new run after a completed/failed run, divided by players who completed/failed. Match players and time order; the `replay` flag is a convenient browser-local breakdown. |
-| Failures | Unique `run_id` on run-failed, broken down by chapter and mode. |
-| Tutorial completion rate | Funnel from `gameplay_tutorial_started` to `gameplay_tutorial_completed`, filtered to `tutorial_from` = `first_visit` or `new_company` (first-time starts, not replays) and broken down by `tutorial_track`. Match steps by `run_id`. |
-| Tutorial drop-off | `gameplay_tutorial_skipped` broken down by `tutorial_step` and `reason`, per `tutorial_track`: which card players leave on. |
+| Unique players | Unique `distinct_id` on `gameplay_session_started` |
+| Sessions | Unique `gameplay_session_id` on `gameplay_session_started` |
+| New runs | Unique `run_id` on `gameplay_run_started` |
+| Gameplay duration | MAX(`session_active_ms`) per `gameplay_session_id` over progress and end events; chart the median and a histogram, including unfinished sessions |
+| Run duration | MAX(`run_active_ms`) per `run_id` and content version, never a sum of snapshots |
+| Chapter progression | Unique `run_id` and players on chapter events, by `chapter_id` |
+| Completions | Unique `run_id` and players on Guided Mode `gameplay_run_completed` |
+| Completion rate | Runs (or players) with a start in the cohort that later complete one of those same run IDs, over all starts in the cohort |
+| Time to completion | Median `run_active_ms` on completed runs with `eligible_started_run=true` |
+| Chapter funnel | Run started, then chapter-completed events in order, matched by `run_id` |
+| Drop-off | Highest chapter reached by eligible runs without completion inside the conversion window; label it incomplete, not abandoned |
+| Day 1 / Day 7 retention | First `gameplay_session_started`, then a session start or a progress event with `active_delta_ms > 0` on day 1 or day 7, by `distinct_id` |
+| Replay rate | Players who start a new run after a completed or failed run, over players who completed or failed |
+| Failures | Unique `run_id` on `gameplay_run_failed`, by chapter and mode |
+| Tutorial completion | Funnel from started to completed, `tutorial_from` `first_visit` or `new_company`, by `tutorial_track`, matched by `run_id` |
+| Tutorial drop-off | `gameplay_tutorial_skipped` by `tutorial_step` and `reason`, per track |
 
-Use PostHog trends/funnels/retention where supported; use SQL insights for snapshot MAX aggregations
-and matching completion cohorts by run ID. For the completion cohort, select starts in the date
-range and allow later matching completions within an explicit conversion window (for example
-seven days). Show cohort size and window, and mark recent cohorts as still maturing.
-Do not divide completions occurring this week by starts this week: they can be different players/runs.
-PostHog funnels default to people; configure the run ID property to remain constant through all
-steps or use a SQL insight joining steps by run ID. Player completion rate counts each player once,
-even if they replay.
+Use SQL insights for MAX-of-snapshot aggregations and for matching completions to starts by run ID.
+Select starts in the date range, allow completions within an explicit conversion window such as seven days, show the cohort size and mark recent cohorts as still maturing.
+Never divide this week's completions by this week's starts.
 
-Duration snapshots can be recovered without a final event, but a tab/browser crash can lose the
-last checkpoint interval and network delivery is best effort. Do not sum cumulative heartbeat
-durations. Configure the SDK's project retention/billing limits in PostHog and review event volume:
-a visible active session produces about four progress events per minute; idle heartbeats are suppressed.
+### Limits
 
-## Privacy and interpretation
+A browser identity only estimates a player: devices and cleared storage split people, and shared browsers merge them.
+Blocked or offline collection undercounts, delivery is best effort, and a crash can lose the last checkpoint interval.
+Cross-browser imports and cleared ledgers can repeat observations, so count unique run IDs, not raw events.
+A visible active session sends about four progress events a minute; review event volume and retention limits in PostHog.
 
-The SDK uses localStorage for a pseudonymous browser identity.
-Analytics is on by default and stops at once when the player opts out, which also removes the run ledger and PostHog's stored identity.
-While the browser's Do Not Track or Global Privacy Control setting is on, the SDK is not loaded and no analytics data is observed or stored; the stored choice applies again once the setting is off.
-Person profiles, automatic clicks/pageviews, session recording, surveys, automatic exception
-capture and performance capture are disabled. The outgoing property allowlist removes URLs,
-query strings, referrers, account identities, raw saves, observer notes and feedback.
-PostHog still receives network metadata inherent in an HTTPS request.
-Account sign-in/out does not link or reset analytics identities in this first version.
+### Verification
 
-A browser identity estimates a player: different devices, cleared storage or blocked persistence
-can split a person, while a shared browser can combine people. Blocking/offline collection
-undercounts engagement. Cross-browser imports and cleared ledgers can repeat observations;
-dashboard completion counts must use unique run IDs, not raw event totals.
-Retention requires waiting for the relevant day to elapse; missing return events are not proof of
-dissatisfaction.
+Unit tests cover the real store under StrictMode, title-screen boot, reload, resume and replay identity, both walkthroughs, completion, historical saves, failure, visibility, inactivity, back/forward cache and storage and collector failures.
+Adapter tests cover disabled environments, the startup buffer, region routing and the allowlist.
+`frontend/e2e/analytics.spec.ts` exercises the built integration with a synthetic token and intercepted PostHog requests when run with `ANALYTICS_SMOKE=1`; build it with `VERCEL_ENV=production`, `VITE_ANALYTICS_ENABLED=true` and a synthetic `VITE_POSTHOG_TOKEN`, never a real one.
+A live project, its settings and dashboard are not established by these tests.
 
-## Verification
+## Local playtest records
 
-Focused regression tests cover the real store and StrictMode shell, no title-screen starts,
-reload/resume/replay identity, tutorial start/finish/skip in both modes, all-chapter completion, historical completed saves, failure,
-visibility, inactivity, back/forward cache and storage/collector failures. Adapter tests check
-disabled environments, bounded SDK startup buffering, region routing and the outgoing allowlist.
-Browser journeys exercise the build-time integration with synthetic credentials and intercepted
-PostHog requests; no real project events or player data are needed.
+Both modes append events to `nn.campaign.analytics.v1` for facilitated playtests; nothing is sent anywhere and records are never truncated.
+Menu > Playtest exports them as JSON, together with observer notes and the participant source.
 
-For a deliberately enabled local smoke build, set `VERCEL_ENV=production`,
-`VITE_ANALYTICS_ENABLED=true` and a synthetic `VITE_POSTHOG_TOKEN`, then run the analytics browser
-journey with `ANALYTICS_SMOKE=1`. Use only the interception fixture, never a real project token.
-A live PostHog project, configured production settings, event acceptance and actual dashboard
-creation still require operator setup and are not established by mocked tests.
-
-References: [JavaScript SDK](https://posthog.com/docs/libraries/js),
-[Dashboards](https://posthog.com/docs/product-analytics/dashboards),
-[Funnels](https://posthog.com/docs/product-analytics/funnels),
-[Retention](https://posthog.com/docs/product-analytics/retention).
+- Guided Mode records come from the engine trace (`projectEvents` in `telemetry.ts`): run and session starts, inspections, every player and autoscaler action requested and activated, traffic changes, incidents opened and recovered, chapter entries and completions, prevention progress, reliability and growth-wave events, the final scorecard and bankruptcy.
+  Each record has an event ID, run, session, build, scenario and physical step.
+- Both modes also record walkthrough starts, completions and skips, floor switches, walk mode, view changes, map use and avatar changes.
+- Challenge Mode records runs started and finished, incidents started and completed, hints, ratings, voluntary replays, resumes, imports and mode switches.

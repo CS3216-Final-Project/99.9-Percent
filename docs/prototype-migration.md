@@ -1,5 +1,8 @@
 # Prototype feature migration
 
+This records where Challenge Mode and the original 3D room came from.
+The migrated features have since changed; current rules are in [GAMEPLAY.md](GAMEPLAY.md), where the 17-node tree below is now nine nodes.
+
 Source: `CS3216-Final-Project/99.9-Percent-Prototype` at commit `b3d3a552d23e2d50180d283f40e99239c2f5e79f`.
 
 ## Imported features
@@ -20,38 +23,7 @@ Next.js entry points and deployment settings are not imported. React lazy loadin
 
 The existing backend implementation, database configuration and migrations, shared contracts, CI checks, Node version, frontend API client, and Vercel configuration are preserved. No database migrations or server endpoints are added. Package and Vercel project names retain their existing values.
 
-Production domains are now `https://99-99-percent-web.vercel.app` (frontend) and `https://99-99-percent-backend.vercel.app` (backend). The CD smoke-test fallback points to the new backend domain, and environment examples document the corresponding production API and CORS values while retaining localhost defaults. See the README's deployment section for the Vercel environment settings.
-
-Saves retain the prototype's storage format and keys. Browser storage is scoped to the origin, so moving between the prototype domain, a preview, and production does not transfer an existing run. Gameplay and analytics remain local; they do not use the preserved backend or database yet.
-
-## Verification
-
-Run the repository's usual checks in each package:
-
-```sh
-cd frontend
-npm ci
-npm run lint
-npm run typecheck
-npm test
-npm run build
-
-cd ../backend
-npm ci
-npm run lint
-npm run typecheck
-npm test
-npm run db:generate
-git diff --exit-code -- drizzle
-```
-
-For a browser check, run `npm run dev` in `frontend/`, then:
-
-1. Press Play and follow or skip the tutorial; check that the 3D room renders.
-2. Select equipment, launch a promotion, add a server, and open the tech tree.
-3. Advance weeks and check that engineering work, cash, users, and warnings change.
-4. During an incident, inspect equipment, pause/resume, choose a recovery action, and read the postmortem.
-5. Refresh and continue the saved run; use Menu to start a seeded run or inspect prototype data.
+Saves retain the prototype's storage format and keys. Browser storage is scoped to the origin, so moving between the prototype domain, a preview, and production does not transfer an existing run.
 
 ## Browser verification screenshots
 
