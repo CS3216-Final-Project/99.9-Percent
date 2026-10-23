@@ -10,9 +10,13 @@ import type { Campaign } from "@/sim/campaignTypes";
 
 /** A "check" is a standing condition the company must keep; a step is one move in the chapter's sequence. */
 export interface Requirement { id: string; label: string; met: boolean; kind?: "check" | "step"; hint?: string; /** A step the clock completes rather than a player action. */ wait?: boolean }
-/** The opening milestone gates time only once it can be acknowledged: Launch Week defers it until completion. */
+/**
+ * The opening milestone gates time only once it can be acknowledged. Launch Week defers it until the week is over,
+ * no incident is open and every postmortem is read: a week that ends mid-incident must still let the player fix it.
+ */
 export const milestoneBlocks = (c: Campaign) =>
-  !!c.openingMilestone && !c.openingMilestone.acknowledged && (!c.launchWeek || c.launchWeek.completedStep !== null);
+  !!c.openingMilestone && !c.openingMilestone.acknowledged &&
+  (!c.launchWeek || c.launchWeek.completedStep !== null && !c.incident && c.reports.every(r => c.trace.some(t => t.type === "review-acknowledged" && t.data.incidentId === r.id)));
 export interface GuidanceAction { label: string; action?: Action }
 /** One shared objective for the chapter bar; detailed actions and gates remain in the overview. */
 export function campaignObjective(g: GameState) {
@@ -150,7 +154,8 @@ export function campaignGuidance(g: GameState) {
  }
  // Required acknowledgements take priority over stage continuation in every stage.
  if(g.phase==="review"&&c.reports.length)pendingAction={label:"Review postmortem"};
- else if(pendingMilestone)pendingAction={label:"Complete Opening"};
+ // Launch Week's score card completes its milestone itself, once the week is over and settled.
+ else if(milestoneBlocks(c)&&!c.launchWeek)pendingAction={label:"Complete Opening"};
  if(!reportsAcknowledged&&g.phase!=="review"&&!c.incident)notice="A recorded recovered report lacks an acknowledgement, but no review is active. Export company evidence for investigation; this guidance cannot safely repair the saved state.";
  if(g.phase==="ended") { pendingAction=null;waiting=null;notice=""+(g.outcome==="won"?"Campaign complete. Inspect your scorecard and final architecture before explicitly starting a new company.":"The company is bankrupt. Review final evidence and explicitly restart from the Menu.")+""; }
  // "Continue to …" is the chapter's last step, never a reason the chapter is blocked.

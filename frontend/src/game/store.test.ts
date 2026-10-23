@@ -661,3 +661,21 @@ describe("one-time Guided Mode tips", () => {
     expect(useGame.getState().tour).toBeNull();
   });
 });
+
+it("a Launch Week that ends mid-incident still lets the player fix it before the score card", () => {
+  // The week runs out with the database still overloaded and nothing done about it.
+  let g = newGame(7, "lw-late", 2);
+  for (let i = 0; i < 200 && g.campaign!.launchWeek!.completedStep === null; i++) g = advanceSteps(g, 1).state;
+  expect(g.campaign!.incident).not.toBeNull();
+  useGame.setState({ game: g, started: true, ready: true, hasRun: true });
+  // The fix is accepted and time can move, instead of only the acknowledgement the engine would refuse.
+  expect(useGame.getState().act({ type: "start_db_upgrade" })).toBe(true);
+  expect(useGame.getState().act({ type: "acknowledge_milestone", enterScaling: true })).toBe(false);
+  for (let i = 0; i < 60 && useGame.getState().game.phase !== "review"; i++) useGame.getState().stepSeconds(1);
+  expect(useGame.getState().game.phase).toBe("review");
+  expect(useGame.getState().act({ type: "acknowledge_review" })).toBe(true);
+  // Only now does the score card take over.
+  expect(useGame.getState().act({ type: "start_db_upgrade" })).toBe(false);
+  expect(useGame.getState().act({ type: "acknowledge_milestone", enterScaling: true })).toBe(true);
+  expect(useGame.getState().game.campaign!.scaling).not.toBeNull();
+});

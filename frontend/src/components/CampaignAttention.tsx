@@ -220,49 +220,64 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   // A Launch Week step frames its control at once; only the step's own button or using that control moves on.
   useLayoutEffect(() => {
     if (!launchStep) return;
-    let framed: HTMLElement | null = null, measured: Box | null = null, frame = 0;
+    let watched: HTMLElement | null = null, measured: Box | null = null, frame = 0;
+    // Only the player's own scrolling keeps a control out of view. The panel also scrolls itself, for example back
+    // to the top when an incident opens, and that must not count as the player looking elsewhere.
+    let playerScrolled = false;
     const clear = () => {
       if (litTarget.current) { delete litTarget.current.dataset.spotlight; litTarget.current.classList.remove("campaign-gold-attention"); litTarget.current = null; }
-      framed = null; measured = null;
+      watched = null; measured = null;
       setSpotBox(null);
     };
-    const frameBox = (node: HTMLElement) => { framed = node; measured = padBox(node.getBoundingClientRect()); setSpotBox(measured); };
+    // A control scrolled or clipped out of view is still watched, but never framed: its hole would sit over whatever
+    // covers it, such as the dock.
+    const watch = (node: HTMLElement, framed: boolean) => { watched = node; measured = padBox(node.getBoundingClientRect()); setSpotBox(framed ? measured : null); };
     const update = () => {
       clear();
       if (!guidanceTarget && !recommendedAction) return;
       const desired = document.querySelector<HTMLElement>(spotlightSelector);
       const closed = desired?.closest("details:not([open])");
       const node = closed?.querySelector<HTMLElement>("summary") ?? desired;
-      if (!view && node && node !== revealedTarget.current && !controlVisible(node) && node.getClientRects().length) {
+      if (node !== revealedTarget.current) playerScrolled = false;
+      if (!view && node && !playerScrolled && !controlVisible(node) && node.getClientRects().length) {
         revealedTarget.current = node;
         reveal(node);
       }
       const target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
         (guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research" ? visibleControl(".panel-reopen") : null);
       if (target) {
-        frameBox(target);
+        watch(target, true);
         target.dataset.spotlight = "true";
         target.classList.add("campaign-gold-attention");
         litTarget.current = target;
-      } else if (node) frameBox(node);
+      } else if (node) watch(node, false);
     };
-    // The checklist above the panel's controls grows and shrinks, and a panel can still be sliding in, so a framed
-    // control moves without any scroll, resize or mutation near it. Follow it every frame.
+    // The checklist and incident banner above the panel's controls grow and shrink, and a panel can still be sliding
+    // in, so a control moves without any scroll, resize or mutation near it. Follow it every frame.
     const follow = () => {
-      if (framed && !sameBox(measured, padBox(framed.getBoundingClientRect()))) update();
+      if (watched && !sameBox(measured, padBox(watched.getBoundingClientRect()))) update();
       frame = requestAnimationFrame(follow);
     };
+    const SCROLL_KEYS = /^(Arrow(Up|Down)|Page(Up|Down)|Home|End| )$/;
+    const scrolling = (event: Event) => {
+      const el = event.target instanceof Element ? event.target : null, side = el?.closest(".side");
+      if (!side) return;
+      // A pointer on the panel itself, not on anything inside it, is on its scrollbar.
+      if (event.type === "pointerdown" ? el === side : event.type !== "keydown" || SCROLL_KEYS.test((event as KeyboardEvent).key)) playerScrolled = true;
+    };
+    const SCROLL_INPUTS = ["wheel", "touchmove", "keydown", "pointerdown"] as const;
     const used = (event: Event) => {
       const lit = litTarget.current, el = event.target instanceof Element ? event.target : null;
       if (lit && el && lit.contains(el) && lit.matches(spotlightSelector) && !lit.matches(".equipment-readings")) setLaunchDone(key);
     };
     update();
     frame = requestAnimationFrame(follow);
+    for (const type of SCROLL_INPUTS) document.addEventListener(type, scrolling, { capture: true, passive: true });
     const observer = new MutationObserver(update);
     observer.observe(document.querySelector(".equipment-shell") ?? document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "disabled", "hidden"] });
     window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true);
     document.addEventListener("click", used, true);
-    return () => { cancelAnimationFrame(frame); clear(); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
+    return () => { cancelAnimationFrame(frame); for (const type of SCROLL_INPUTS) document.removeEventListener(type, scrolling, true); clear(); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
   }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable]);
   // The room's beams and dimmed racks follow the same spotlight.
   useEffect(() => {

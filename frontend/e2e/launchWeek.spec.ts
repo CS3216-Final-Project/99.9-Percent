@@ -94,3 +94,24 @@ test("the score card reports nines, copies the result and continues to Chapter 1
   expect(saved.openingMilestone?.acknowledged).toBe(true);
   expect(saved.scaling).not.toBeNull();
 });
+
+test("the incident's spotlight frames the Database below the growing checklist", async ({ page }) => {
+  // The incident banner and recovery progress push Inspect equipment below the panel's fold, and the panel scrolls
+  // itself back to the top when the incident opens: the step must still bring its control into view and frame it.
+  await boot(page, runUntil(newGame(7, "lw-2", 2), x => !!x.campaign!.incident));
+  await expect(tutorial(page)).toContainText("Inspect it");
+  const lit = page.locator("[data-spotlight]");
+  await expect(lit).toHaveAccessibleName("Database");
+  await expect(lit).toBeInViewport({ ratio: 1 });
+  const [hole, chip] = await Promise.all([page.locator(".tour-hole").boundingBox(), lit.boundingBox()]);
+  expect(Math.abs(hole!.y + 5 - chip!.y)).toBeLessThan(2);
+  expect(Math.abs(hole!.x + 5 - chip!.x)).toBeLessThan(2);
+});
+
+test("a week that ends mid-incident lets the player fix it before the score card", async ({ page }) => {
+  await boot(page, runUntil(newGame(7, "lw-late", 2), x => x.campaign!.launchWeek!.completedStep !== null));
+  await expect(page.getByRole("dialog", { name: "Launch Week complete" })).toHaveCount(0);
+  const upgrade = page.locator('.campaign-panel .campaign-action-card[data-campaign-action="Upgrade database"] > button.act');
+  await expect(upgrade).toBeEnabled();
+  await expect(page.locator(".campaign-panel")).not.toContainText("Acknowledge the pending review or milestone first.");
+});

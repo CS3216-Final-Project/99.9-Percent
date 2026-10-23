@@ -2,6 +2,7 @@
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
 import { finishedChapter } from "./campaignChapters";
+import { milestoneBlocks } from "./campaignGuidance";
 import { FULL_SCOPE, scopeAllows, scopeComplete, type PlayScope } from "./scope";
 import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
@@ -367,7 +368,7 @@ function requiredAcknowledgement(c: Campaign): Action["type"] | null {
   const stop = pendingStop(c);
   if (stop === "combined-review") return c.combinedStage?.finalReview ? "complete_campaign" : "acknowledge_growth";
   if (stop) return ACKNOWLEDGEMENTS[stop];
-  return c.openingMilestone && !c.openingMilestone.acknowledged && (!c.launchWeek || c.launchWeek.completedStep !== null) ? "acknowledge_milestone" : null;
+  return milestoneBlocks(c) ? "acknowledge_milestone" : null;
 }
 const awaitingAcknowledgement = (c: Campaign) => requiredAcknowledgement(c) !== null;
 /** Whether Guided Mode's clock may move now, by Run or by a manual step: never behind a guide, a pause-only view or an acknowledgement. */
