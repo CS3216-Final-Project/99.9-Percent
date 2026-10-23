@@ -4,15 +4,17 @@ import { Icon } from "./icons";
 import type { chapter4Stage } from "@/game/chapter4Guidance";
 import type { chapter6Stage } from "@/game/chapter6Guidance";
 import { presentationReceipts, recordPresentationReceipt } from "@/game/presentationReceipts";
+import { chapterNumber } from "@/game/scope";
 
 export function Chapter4StagePopup({ model }: { model: NonNullable<ReturnType<typeof chapter4Stage>> }) {
-  return <ChapterStagePopup chapter={4} model={model} />;
+  return <ChapterStagePopup chapter={4} number={chapterNumber("spikes")} model={model} />;
 }
 export function Chapter6StagePopup({ model }: { model: NonNullable<ReturnType<typeof chapter6Stage>> }) {
-  return <ChapterStagePopup chapter={6} model={model} />;
+  return <ChapterStagePopup chapter={6} number={chapterNumber("combined")} model={model} />;
 }
 interface StageModel { key: string; cues: { id: string; title: string; message: string; tone?: "prepare" | "pressure" | "recovery" }[] }
-function ChapterStagePopup({ chapter, model }: { chapter: number; model: StageModel }) {
+/** `chapter` keys the saved receipts and styles by the original chapter list; `number` is what the player sees. */
+function ChapterStagePopup({ chapter, number, model }: { chapter: number; number: number; model: StageModel }) {
   const key = `99.99.chapter${chapter}-cues:${model.key}`;
   const [dismissed, setDismissed] = useState(() => presentationReceipts(key));
   const cue = model.cues.find(x => !dismissed.includes(x.id));
@@ -24,7 +26,7 @@ function ChapterStagePopup({ chapter, model }: { chapter: number; model: StageMo
   if (!cue) return null;
   const tone = cue.tone ?? (cue.id === "prepare" ? "prepare" : cue.id === "between" || cue.id === "recover" ? "recovery" : "pressure");
   const close = () => setDismissed(previous => [...previous, cue.id]);
-  return <ChapterMessageCard title={cue.title} label={`Chapter ${chapter}: ${cue.title}`} className={`chapter${chapter}-stage-popup`} tone={tone} close={close}><p>{cue.message}</p></ChapterMessageCard>;
+  return <ChapterMessageCard title={cue.title} label={`Chapter ${number}: ${cue.title}`} className={`chapter${chapter}-stage-popup`} tone={tone} close={close}><p>{cue.message}</p></ChapterMessageCard>;
 }
 
 /** Shared small card; only colleague introductions block background interaction. */

@@ -32,7 +32,7 @@ export default function LaunchScore({ campaign }: { campaign: Campaign }) {
     </dl>
     <div className="modal-foot">
       <button className="btn btn-quiet" onClick={copy}>{copied ? "Copied" : "Copy result"}</button>
-      <button className="btn btn-primary" onClick={() => act({ type: "acknowledge_milestone", enterScaling: true })}>Continue into Chapter 2<Icon name="next" /></button>
+      <button className="btn btn-primary" onClick={() => act({ type: "acknowledge_milestone", enterScaling: true })}>Continue into Chapter 1<Icon name="next" /></button>
     </div>
   </Modal>;
 }

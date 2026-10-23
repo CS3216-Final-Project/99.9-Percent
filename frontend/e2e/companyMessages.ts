@@ -46,14 +46,14 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   await expect(card).toBeInViewport({ratio:1});
   await expect(card.getByRole("button",{name:"Got it",exact:true})).toBeInViewport({ratio:1});
   expect(await card.evaluate(el=>el.scrollWidth <= el.clientWidth)).toBe(true);
-  await expect(page.getByRole("dialog",{name:/^Chapter [46]:/})).toHaveCount(0);
+  await expect(page.getByRole("dialog",{name:/^Chapter [35]:/})).toHaveCount(0);
   const before = (await savedGame(page)).campaign!;
   await page.screenshot({path:info.outputPath(`company-message-chapter-${chapter}${touch?"-touch":""}.png`)});
   await press(card.getByRole("button", {name:chapter % 2 ? "Got it" : "Dismiss company message",exact:true}));
   await expect(card).toHaveCount(0);
   await expect(backdrop).toHaveCount(0); await expect(page.locator("#root")).not.toHaveAttribute("inert", "");
   if (chapter === 4 || chapter === 6) {
-    const cue = page.getByRole("dialog",{name:new RegExp(`^Chapter ${chapter}:`)});
+    const cue = page.getByRole("dialog",{name:new RegExp(`^Chapter ${chapter - 1}:`)});
     await expect(cue).toBeVisible(); await expect(page.getByRole("dialog")).toHaveCount(1);
     await press(cue.getByRole("button",{name:"Got it",exact:true}));
   }

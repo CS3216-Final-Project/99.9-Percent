@@ -17,7 +17,7 @@ it("lets new players compare both modes without starting a run for them", () => 
   expect(challenge.textContent).toContain("50,000 users in 26 weeks");
   expect(within(choices).getByRole("button", { name: "Start Guided Mode" })).toBeTruthy();
   // Challenge Mode is locked until Chapter 5 is complete, and its teaser has nothing to press.
-  expect(challenge.textContent).toContain("Unlocks after Chapter 5: Stay Online.");
+  expect(challenge.textContent).toContain("Unlocks after Chapter 4: Stay Online.");
   expect(within(challenge).queryAllByRole("button")).toHaveLength(0);
   fireEvent.keyDown(window, { key: "p" });
   act(() => vi.advanceTimersByTime(5000));
@@ -57,8 +57,8 @@ it("shows the locked unlock prompt in the menu instead of a switch control", () 
   render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   const menu = openMenu();
   const modeSection = within(menu).getByRole("region", { name: "Game mode" });
-  expect(modeSection.textContent).toContain("Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.");
-  const lockedButton = within(modeSection).getByRole("button", { name: "Finish Chapter 5 to unlock" });
+  expect(modeSection.textContent).toContain("Finish Chapter 4, Stay Online, in Guided Mode to unlock Challenge Mode.");
+  const lockedButton = within(modeSection).getByRole("button", { name: "Finish Chapter 4 to unlock" });
   expect(lockedButton).toHaveProperty("disabled", true);
   fireEvent.click(lockedButton);
   expect(useGame.getState().mode).toBe("campaign");
@@ -70,7 +70,7 @@ it("keeps the pre-update save resumable only once Challenge Mode is unlocked", (
   const menu = openMenu();
   openTab(menu, "Saves");
   const legacy = within(menu).getByRole("group", { name: "Pre-update save" });
-  expect(legacy.textContent).toContain("Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode before resuming this save.");
+  expect(legacy.textContent).toContain("Finish Chapter 4, Stay Online, in Guided Mode to unlock Challenge Mode before resuming this save.");
   expect(within(legacy).getByRole("button", { name: "Resume pre-update save" })).toHaveProperty("disabled", true);
   expect(within(legacy).getByRole("button", { name: "Export pre-update save" })).toHaveProperty("disabled", false);
   act(() => saveMeta({ ...useGame.getState().meta, challengeUnlocked: true }));

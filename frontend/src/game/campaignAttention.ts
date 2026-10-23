@@ -218,12 +218,12 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     "launch-first-incident": "Your App Server is overloading. Inspect it to see its status turn red, then fix the cause.",
     "launch-db-incident": "Your database is overloading. Inspect it to see the work piling up.",
     "launch-end-week": "Everything is stable again. Use End week to skip to the end of the week.",
-    "launch-open": "Your launch week starts now. Press Run — the first customers are arriving.",
+    "launch-open": "Your launch week starts now. Press Run: the first customers are arriving.",
     "launch-week-report": "A launch week settled. Lost or turned-away requests so far are counted.",
     "launch-research": "You earned a research point. Spend it on Caching or Autoscaling; each carries into later chapters.",
     "launch-surge": "The launch campaign is sending five times the traffic. Keep the service up until it ends.",
     "launch-week": "Your launch week is running. Press Run and keep the service up.",
-    "launch-score": "Launch Week is complete. Check your uptime score and continue into Chapter 2.",
+    "launch-score": "Launch Week is complete. Check your uptime score and continue into Chapter 1.",
   };
   if (messages[reason]) return messages[reason];
   if (["opening-growth", "scaling-growth", "data-growth", "spike-pulses", "scheduled-failure", "growth-wave", "growth-readiness"].includes(reason)) return "Press Run to see what happens next.";
@@ -248,7 +248,7 @@ function baseAttention(game: GameState): AttentionDecision {
   // The score card waits for the research pick, so the week's last lesson is never covered.
   if (c.launchWeek && milestoneBlocks(c) && c.launchWeek.researchEarned && !c.launchWeek.tech)
     return result("launch-research", "hint", "Research points buy technology. This one is free; it is billed at the week's settlement.", "Pick Caching or Autoscaling to see your Launch Week score.", "research");
-  if (c.launchWeek && milestoneBlocks(c)) return required("launch-score", "Launch Week is complete.", "Review your uptime score and continue into Chapter 2.", "next");
+  if (c.launchWeek && milestoneBlocks(c)) return required("launch-score", "Launch Week is complete.", "Review your uptime score and continue into Chapter 1.", "next");
   if (game.phase === "review" || pendingStop(c) || milestoneBlocks(c))
     return required("review", "An outcome is waiting for your review.", "Finish the existing review or acknowledgement before continuing.", null);
   const next = chapterAdvance(game);
@@ -313,7 +313,7 @@ function baseAttention(game: GameState): AttentionDecision {
       const report = c.settlements.at(-1);
       if (report && c.step - report.step < 6) return run("launch-week-report", `Week ${report.period} report: ${c.cumulative.failed.toLocaleString("en-US")} requests lost so far.`);
       if (lw.surge && lw.surge.endedStep === null) return run("launch-surge", `The launch campaign is sending ${LW.surgeFactor}× traffic until game second ${lw.surge.endStep}.`);
-      return run("launch-week", `Launch week ${Math.min(LW.weeks, Math.floor(c.step / LW.periodSteps) + 1)} of ${LW.weeks}. The launch campaign surge arrives in week 3 — keep the service up.`);
+      return run("launch-week", "Keep the service up until the week ends.");
     }
   }
   if (c.incident && qualifies && !appOver && !dbOver) return run("recovery", `The latest readings meet recovery conditions. Healthy observations: ${c.incident.stableSteps} / ${Q.stableSteps}. Pausing adds no observations.`);

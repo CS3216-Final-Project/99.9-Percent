@@ -16,7 +16,7 @@ test("Chapter 4 traffic target: open Network transfers to Remove, Cancel, Confir
 });
 test("Chapter 4 cues: centered 320px Prepare, manual Hint targeting and reload receipt", async ({ page, installClock }, info) => {
   await installClock(); await page.setViewportSize({ width: 320, height: 568 }); await boot(page, spikeCompany(false));
-  const cue = page.getByRole("dialog", { name: "Chapter 4: Prepare", exact: true });
+  const cue = page.getByRole("dialog", { name: "Chapter 3: Prepare", exact: true });
   await expect(cue).toHaveAttribute("aria-modal", "false"); await expect(cue).toBeInViewport({ ratio: 1 });
   await expectCueColours(cue, "prepare");
   const box = await cue.boundingBox(); expect(Math.abs(box!.x + box!.width / 2 - 160)).toBeLessThan(1);
@@ -39,7 +39,7 @@ for (const [offset, name, tone] of [[7, "Spike 1", "pressure"], [27, "Between sp
     await installClock(); await boot(page, untilOffset(act(spikeCompany(false), { type: "set_traffic_limit", enabled: true }), offset));
     await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
     await page.getByRole("button", { name: "Pause", exact: true }).click();
-    const cue = page.getByRole("dialog", { name: `Chapter 4: ${name}`, exact: true }); await expect(cue).toBeVisible();
+    const cue = page.getByRole("dialog", { name: `Chapter 3: ${name}`, exact: true }); await expect(cue).toBeVisible();
     await expectCueColours(cue, tone);
     await cue.getByRole("button", { name: "Got it", exact: true }).click();
     await page.getByRole("button", { name: "Hint", exact: true }).click();
@@ -52,12 +52,12 @@ for (const [offset, name, tone] of [[7, "Spike 1", "pressure"], [27, "Between sp
 test("Chapter 4 cues: Respond yields to immediate incident Pause and action Confirm", async ({ page, installClock }) => {
   await installClock(); await boot(page, untilOffset(spikeCompany(false), 7));
   await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
-  await expectCueColours(page.getByRole("dialog", { name: "Chapter 4: Spike 1", exact: true }), "pressure");
-  await page.getByRole("dialog", { name: "Chapter 4: Spike 1", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Chapter 4: Respond", exact: true })).toContainText("Pause and inspect");
+  await expectCueColours(page.getByRole("dialog", { name: "Chapter 3: Spike 1", exact: true }), "pressure");
+  await page.getByRole("dialog", { name: "Chapter 3: Spike 1", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Chapter 3: Respond", exact: true })).toContainText("Pause and inspect");
   await page.mouse.move(0, 0);
-  await expectCueColours(page.getByRole("dialog", { name: "Chapter 4: Respond", exact: true }), "pressure");
-  await page.clock.runFor(2000); await expect(page.getByRole("dialog", { name: /^Chapter 4:/ })).toHaveCount(0);
+  await expectCueColours(page.getByRole("dialog", { name: "Chapter 3: Respond", exact: true }), "pressure");
+  await page.clock.runFor(2000); await expect(page.getByRole("dialog", { name: /^Chapter 3:/ })).toHaveCount(0);
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Pause"); await gold(page).click();
   await page.getByRole("button", { name: "Hint", exact: true }).click();
   await page.getByRole("dialog", { name: "Hint", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
@@ -69,7 +69,7 @@ test("Chapter 4 cues: Respond yields to immediate incident Pause and action Conf
 test("Chapter 4 decisions: evaluate rejected traffic, optional improvement, Cancel and keep strategy", async ({ page, installClock }) => {
   await installClock(); const game = untilOffset(act(spikeCompany(false), { type: "set_traffic_limit", enabled: true }), 28);
   await boot(page, game);
-  const cue = page.getByRole("dialog", { name: "Chapter 4: Between spikes", exact: true });
+  const cue = page.getByRole("dialog", { name: "Chapter 3: Between spikes", exact: true });
   await expect(cue).toContainText("served"); await expect(cue).toContainText("rejected");
   await cue.getByRole("button", { name: "Got it", exact: true }).click();
   await page.getByRole("button", { name: "Hint", exact: true }).click();

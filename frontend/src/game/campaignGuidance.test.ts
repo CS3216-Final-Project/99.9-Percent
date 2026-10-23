@@ -124,3 +124,26 @@ it("explains a public-action solvent affordability trap without claiming a guara
  g=decision(g,{type:"set_traffic_limit",enabled:false});while(g.campaign!.step<420)g=advanceSteps(g,1).state;
  expect(g.campaign!.cashCents).toBeGreaterThan(0);expect(g.campaign!.snapshot.admitted).toBe(800);expect(g.campaign!.settlements.at(-1)!.netCents).toBe(-10000);expect(canEnterData(g)).toBe(false);
 });
+
+function launchUntil(g:GameState,done:(g:GameState)=>boolean){for(let i=0;i<200&&!done(g);i++)g=g.phase==="review"?decision(g,{type:"acknowledge_review"}):advanceSteps(g,1).state;return g;}
+const current=(g:GameState)=>campaignGuidance(g).current?.id;
+it("Launch Week steps follow the week's script, and Scaling starts at its own first step",()=>{
+ let g=newGame(7,"lw",2);
+ expect(campaignGuidance(g).steps.map(r=>r.id)).toEqual(["recovery","review","research","launch","milestone"]);
+ expect(current(g)).toBe("recovery");
+ g=launchUntil(g,x=>!!x.campaign!.incident);g=decision(g,{type:"start_db_upgrade"});
+ g=launchUntil(g,x=>x.phase==="review");expect(current(g)).toBe("review");
+ g=decision(g,{type:"acknowledge_review"});
+ // Before the free point arrives, the pick is something the clock brings.
+ expect(current(g)).toBe("research");expect(row(g,"research").wait).toBe(true);
+ g=launchUntil(g,x=>!!x.campaign!.launchWeek!.researchEarned&&x.phase==="management");
+ expect(row(g,"research").wait).toBeUndefined();
+ g=decision(g,{type:"pick_launch_tech",tech:"caching"});expect(current(g)).toBe("launch");
+ g=launchUntil(g,x=>x.campaign!.launchWeek!.completedStep!==null&&x.phase==="management");expect(current(g)).toBe("milestone");
+ g=decision(g,{type:"acknowledge_milestone",enterScaling:true});
+ const m=campaignGuidance(g);
+ expect(m.stage).toBe("Scaling & Routing");
+ // Nothing already done before the chapter opened is listed as one of its steps.
+ expect(m.steps.map(r=>r.id)).toEqual(["headroom","growth"]);
+ expect(m.steps.some(r=>/Opening/.test(r.label))).toBe(false);
+});

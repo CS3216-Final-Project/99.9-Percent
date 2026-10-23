@@ -16,7 +16,7 @@ export async function chapter6Preparation(page: Page, touch = false) {
   game = tick(act(game, { type: "set_routing", mode: "single", targets: ["app-1"] }));
   game = act(game, { type: "enter_combined", sequence });
   await bootChapter6(page, game);
-  const cue = page.getByRole("dialog", { name: "Chapter 6: Prepare for full demand", exact: true });
+  const cue = page.getByRole("dialog", { name: "Chapter 5: Prepare for full demand", exact: true });
   await expectCueColours(cue, "prepare");
   await expect(cue.locator("h3 > .icon")).toBeInViewport({ ratio: 1 });
   await expect(cue.getByRole("button", { name: "Dismiss chapter guidance", exact: true })).toBeInViewport({ ratio: 1 });

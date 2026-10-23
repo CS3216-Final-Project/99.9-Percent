@@ -41,8 +41,8 @@ for (const [offset, name, tone] of [[0, "Prepare", "prepare"], [8, "Spike 1", "p
     const game = offset ? untilOffset(name === "Respond" ? initial : tick(act(initial, { type: "set_traffic_limit", enabled: true })), offset) : initial;
     await page.route("**/api/**", route => route.abort()); await seedSave(page, game); await page.goto("/");
     await page.getByRole("button", { name: "Continue company", exact: true }).tap(); await expectRoom(page);
-    if (name === "Respond") await page.getByRole("dialog", { name: "Chapter 4: Spike 1", exact: true }).getByRole("button", { name: "Got it", exact: true }).tap();
-    const cue = page.getByRole("dialog", { name: `Chapter 4: ${name}`, exact: true });
+    if (name === "Respond") await page.getByRole("dialog", { name: "Chapter 3: Spike 1", exact: true }).getByRole("button", { name: "Got it", exact: true }).tap();
+    const cue = page.getByRole("dialog", { name: `Chapter 3: ${name}`, exact: true });
     await expectCueColours(cue, tone); await page.screenshot({ path: info.outputPath(`${name.replaceAll(" ", "-")}-320-touch.png`) });
     const before = (await savedGame(page)).campaign!.step;
     await cue.getByRole("button", { name: "Got it", exact: true }).tap(); await expect(cue).toHaveCount(0);
@@ -220,7 +220,7 @@ test("Opening prevention recognition unlocks Scaling after touch review and relo
  await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  await expectRoom(page);
  const review=page.getByRole("dialog",{name:"Prevention review"});
- await expect(review).toContainText("Verified prevention is a valid Opening completion path");
+ await expect(review).toContainText("Prevention and recovery are both valid ways to complete Opening");
  await review.getByRole("button",{name:"Continue company",exact:true}).tap();
  const recognition=page.getByRole("dialog",{name:"First growth challenge handled"});
  await expect(recognition).toContainText("You spotted the bottleneck early and prevented an outage.");
@@ -641,7 +641,7 @@ for (const milestone of ["wave", "recovery", "final"] as const)
     const game = milestone === "wave" ? wave : milestone === "recovery" ? chapter6Tick(wave, 24) : promotionRiskCompany();
     const title = milestone === "wave" ? "Growth wave 1" : milestone === "recovery" ? "Recover at full demand" : "Final checks";
     await bootChapter6(page, game);
-    const cue = page.getByRole("dialog", { name: `Chapter 6: ${title}`, exact: true });
+    const cue = page.getByRole("dialog", { name: `Chapter 5: ${title}`, exact: true });
     await expectCueColours(cue, milestone === "wave" ? "pressure" : "recovery");
     await expect(cue.locator("h3 > .icon")).toBeInViewport({ ratio: 1 });
     await expect(cue.getByRole("button", { name: "Dismiss chapter guidance", exact: true })).toBeInViewport({ ratio: 1 });

@@ -9,7 +9,7 @@ import { watchIdleAttention } from "./idleAttention";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
 import { Spotlight } from "./SpotOverlay";
-import { cardStyle, type Box, type Place } from "./spotlight";
+import { cardStyle, sameBox, type Box, type Place } from "./spotlight";
 import "./CampaignAttention.css";
 import { CampaignAttentionContext, useCampaignAttention } from "./useCampaignAttention";
 import { chapter4Stage } from "@/game/chapter4Guidance";
@@ -220,10 +220,13 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   // A Launch Week step frames its control at once; only the step's own button or using that control moves on.
   useLayoutEffect(() => {
     if (!launchStep) return;
+    let framed: HTMLElement | null = null, measured: Box | null = null, frame = 0;
     const clear = () => {
       if (litTarget.current) { delete litTarget.current.dataset.spotlight; litTarget.current.classList.remove("campaign-gold-attention"); litTarget.current = null; }
+      framed = null; measured = null;
       setSpotBox(null);
     };
+    const frameBox = (node: HTMLElement) => { framed = node; measured = padBox(node.getBoundingClientRect()); setSpotBox(measured); };
     const update = () => {
       clear();
       if (!guidanceTarget && !recommendedAction) return;
@@ -237,22 +240,29 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       const target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
         (guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research" ? visibleControl(".panel-reopen") : null);
       if (target) {
-        setSpotBox(padBox(target.getBoundingClientRect()));
+        frameBox(target);
         target.dataset.spotlight = "true";
         target.classList.add("campaign-gold-attention");
         litTarget.current = target;
-      } else if (node) setSpotBox(padBox(node.getBoundingClientRect()));
+      } else if (node) frameBox(node);
+    };
+    // The checklist above the panel's controls grows and shrinks, and a panel can still be sliding in, so a framed
+    // control moves without any scroll, resize or mutation near it. Follow it every frame.
+    const follow = () => {
+      if (framed && !sameBox(measured, padBox(framed.getBoundingClientRect()))) update();
+      frame = requestAnimationFrame(follow);
     };
     const used = (event: Event) => {
       const lit = litTarget.current, el = event.target instanceof Element ? event.target : null;
       if (lit && el && lit.contains(el) && lit.matches(spotlightSelector) && !lit.matches(".equipment-readings")) setLaunchDone(key);
     };
     update();
+    frame = requestAnimationFrame(follow);
     const observer = new MutationObserver(update);
     observer.observe(document.querySelector(".equipment-shell") ?? document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "disabled", "hidden"] });
     window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true);
     document.addEventListener("click", used, true);
-    return () => { clear(); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
+    return () => { cancelAnimationFrame(frame); clear(); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
   }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable]);
   // The room's beams and dimmed racks follow the same spotlight.
   useEffect(() => {

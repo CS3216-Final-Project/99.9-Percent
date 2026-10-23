@@ -1,7 +1,7 @@
 import { campaignChapters, chapterAdvance } from "@/game/campaignChapters";
 import { campaignGuidance, campaignObjective } from "@/game/campaignGuidance";
 import { useGame } from "@/game/store";
-import { chapterInScope, scopeAllows, SCOPED_CHAPTERS, type ScopedChapter } from "@/game/scope";
+import { chapterInScope, scopeAllows, type ScopedChapter } from "@/game/scope";
 
 /** Small counts as words, for sentences such as "play two chapters". */
 export const COUNT_WORDS = ["no", "one", "two", "three", "four", "five", "six"];
@@ -19,7 +19,8 @@ export function useChapterBar() {
   const chapters = campaignChapters(game, tutorialDone)
     .filter(chapter => chapter.number === 0 || chapterInScope(scope, chapter.id as ScopedChapter));
   const current = chapters.find((chapter) => chapter.current) ?? chapters.at(-1)!;
-  const total = SCOPED_CHAPTERS.filter(id => chapterInScope(scope, id)).length;
+  // Chapter 0 opens the list; the count is of the numbered chapters after it.
+  const total = chapters.length - 1;
   // A chapter beyond this edition's Guided Mode is never offered as Next.
   const offered = replaying ? null : chapterAdvance(game);
   const advance = offered && scopeAllows(scope, offered.action) ? offered : null;

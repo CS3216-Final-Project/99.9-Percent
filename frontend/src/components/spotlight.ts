@@ -59,7 +59,7 @@ export function cardStyle(box: Box | null, place: Place, vw: number, vh: number,
   }
 }
 
-const sameBox = (a: Box | null, b: Box | null) =>
+export const sameBox = (a: Box | null, b: Box | null) =>
   a === b || (!!a && !!b && Math.round(a.x) === Math.round(b.x) && Math.round(a.y) === Math.round(b.y) && Math.round(a.w) === Math.round(b.w) && Math.round(a.h) === Math.round(b.h));
 
 /**

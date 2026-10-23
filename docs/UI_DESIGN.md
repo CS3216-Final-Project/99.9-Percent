@@ -108,14 +108,14 @@ Use [Jakob Nielsen’s 10 usability heuristics](https://www.nngroup.com/articles
   Feedback, avatar and account chips sit above the game name, which counts up from 0.00% to 99.99% on arrival (shown at once under reduced motion), then the tag line.
   The Guided Mode and Challenge Mode cards follow, Guided first, stacked on narrow screens; the section is named “Choose how you want to play” for assistive technology.
   Each card has a short explanation, a saved-game box and its own primary button; the phone edition adds a pace line.
-  Guided Mode's explanation follows its save: begin with Launch Week, finish Launch Week, or work through the six chapters.
-  The saved-game box reads “Launch Week in progress” while a company is in Launch Week (or, for a version-1 company, in the Opening before the retired walkthrough was done), “Chapter n of 6: name” after that, and “All chapters complete” or “Company closed” once the company has ended; Challenge Mode reads “Week n of 26”, “Last company reached the goal” or “Last company closed”; otherwise “No saved game”.
+  Guided Mode's explanation follows its save: begin with Launch Week, finish Launch Week, or work through the five chapters.
+  The saved-game box reads “Launch Week in progress” while a company is in Launch Week (or, for a version-1 company, in the Opening before the retired walkthrough was done), “Chapter n of 5: name” after that (“of 6” for a version-1 company, which still plays the Opening), and “All chapters complete” or “Company closed” once the company has ended; Challenge Mode reads “Week n of 26”, “Last company reached the goal” or “Last company closed”; otherwise “No saved game”.
   The chapter comes from the company itself, so an imported or cloud save past the Opening shows its chapter even in a browser that never finished Launch Week.
   Guided Mode's button is Start Guided Mode, Continue company, or See how it ended for a company that has ended, which also offers New company.
   Challenge Mode's is Start Challenge Mode or Continue week n, and a run in progress adds New game.
   New company and New game replace a save, so the first press turns the button red as “Lose this company? Press again” or “Lose this run? Press again” with a warning, as in the menu.
   A completed Launch Week offers Replay Launch Week and a completed Challenge Mode guide offers Replay tutorial: Challenge Mode's restarts the first week, Guided Mode's starts a fresh practice company and restores the original company on Finish or Exit, and a company that has ended has none.
-  Until Chapter 5, Stay Online, is complete, Challenge Mode is not a card: the Guided Mode card stands alone and a short teaser below it, with no controls, names the goal (“Grow to 50,000 users in 26 weeks on your own.”), says “Unlocks after Chapter 5: Stay Online.”, adds the player's current chapter once there is one, and shows six chapter pips.
+  Until Chapter 4, Stay Online, is complete, Challenge Mode is not a card: the Guided Mode card stands alone and a short teaser below it, with no controls, names the goal (“Grow to 50,000 users in 26 weeks on your own.”), says “Unlocks after Chapter 4: Stay Online.”, adds the player's current chapter once there is one, and shows one pip per chapter.
   The mode played last gets a yellow “Last played” tag, and on devices with a fine pointer keyboard focus starts on its button.
   Choosing the other mode switches to it at once and keeps the first mode's save; when the current run cannot be saved, the button turns red as “Switch and lose this run” with a warning inside that card, which points to Menu, Saves for export where the edition has it.
   No run starts before a choice.
@@ -161,7 +161,7 @@ Escape or Cancel closes it and returns focus to the action. Only one confirmatio
 
 The UI reads the simulation snapshot and routes decisions through the store. It must not compute a second outcome, reveal a scripted root cause, recommend the matching fix, or restore weekly/timeout mechanics to make the layout look familiar. Costs, delays, unavailable actions and pending progress must reflect the existing rules. Use player-facing names such as “Database upgrade”, never internal IDs such as `upgrade-db`.
 
-## Data Strategy (Chapter 3)
+## Data Strategy (Chapter 2)
 
 Keep the current campaign stage in the HUD while evidence scrolls. Keep Chapter requirements as an always-visible checklist under the stage guidance, with its completed count. The checklist stays expanded inside the equipment workspace; the workspace itself can collapse. Avoid generic messages telling the player to wait for a growth event. Equipment tooltips give a short role summary; longer explanations stay in the inspector's About disclosure. Continue to Data Strategy is explicit and leaves the company paused.
 
@@ -169,7 +169,7 @@ Reveal the Read Cache inspection chip and room label only after data entry. They
 
 Until actual workload growth, show “Waiting for workload growth.” Once applied, show the observed profile/mix, rate used, hits, misses and DB pressure in a compact callout. Keep logical operations, warmth used/after, read/write demand and historical details in disclosures. History with no data observations says the detail was not recorded. Cache/tuning use the same action rows and cost/delay badges as other investments; unavailable database tiers do not advertise a locked purchase.
 
-## Stay Online (Chapter 5) and the technology tree
+## Stay Online (Chapter 4) and the technology tree
 
 Keep the same incident workspace and action rows. Reliability responses follow the three shared capacity/admission responses, before older scaling and data controls. Cost and delay badges wrap inside the button; all three Opening responses remain reachable in the same panel, including their labels and badges, with vertical scrolling when the selected readings need more room.
 

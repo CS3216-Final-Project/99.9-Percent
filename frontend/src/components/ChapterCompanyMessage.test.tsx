@@ -88,9 +88,9 @@ it("defers without consuming a receipt and sequences the Chapter 4 cue after dis
   render(host()); expect(message()).toBeNull();
   expect(localStorage.getItem(chapterCompanyMessage(companies[3])!.key)).toBeNull();
   act(() => useGame.setState({tour:null})); expect(message()).not.toBeNull();
-  expect(screen.queryByRole("dialog",{name:/^Chapter 4:/})).toBeNull();
+  expect(screen.queryByRole("dialog",{name:/^Chapter 3:/})).toBeNull();
   fireEvent.click(within(message()!).getByRole("button",{name:"Got it"}));
-  expect(message()).toBeNull(); expect(screen.getByRole("dialog",{name:"Chapter 4: Prepare"})).toBeTruthy();
+  expect(message()).toBeNull(); expect(screen.getByRole("dialog",{name:"Chapter 3: Prepare"})).toBeTruthy();
 });
 
 it.each(["incident", "review", "prevention", "recognition", "next", "menu", "confirmation", "classic"])("respects %s priority without consuming the introduction", priority => {
@@ -113,7 +113,7 @@ it("does not replay after pause/resume and preserves manual Hint after dismissal
   act(() => useGame.getState().setRunning(true)); expect(message()).not.toBeNull();
   act(() => useGame.getState().setRunning(false)); expect(screen.getAllByRole("dialog",{name:"Company Message"})).toHaveLength(1);
   fireEvent.click(within(message()!).getByRole("button",{name:"Got it"}));
-  fireEvent.click(within(screen.getByRole("dialog",{name:"Chapter 4: Prepare"})).getByRole("button",{name:"Got it"}));
+  fireEvent.click(within(screen.getByRole("dialog",{name:"Chapter 3: Prepare"})).getByRole("button",{name:"Got it"}));
   fireEvent.click(screen.getByRole("button",{name:"Hint"})); expect(message()).toBeNull();
   fireEvent.click(within(screen.getByRole("dialog",{name:"Hint"})).getByRole("button",{name:"Got it"}));
   expect(document.querySelectorAll(".campaign-gold-attention")).toHaveLength(1); expect(message()).toBeNull();

@@ -69,7 +69,7 @@ test("the research sheet previews each option and spends the pick", async ({ pag
   await expect(sheet).toBeHidden();
 });
 
-test("the score card reports nines, copies the result and continues to Chapter 2", async ({ page }) => {
+test("the score card reports nines, copies the result and continues to Chapter 1", async ({ page }) => {
   await boot(page, nearlyDone());
   const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
@@ -89,7 +89,7 @@ test("the score card reports nines, copies the result and continues to Chapter 2
   await expect(card).toBeVisible();
   await expect(card).toContainText("Uptime");
   await expect(card).toContainText("nine");
-  await page.getByRole("button", { name: "Continue into Chapter 2" }).click();
+  await page.getByRole("button", { name: "Continue into Chapter 1" }).click();
   const saved = (await savedGame(page)).campaign!;
   expect(saved.openingMilestone?.acknowledged).toBe(true);
   expect(saved.scaling).not.toBeNull();

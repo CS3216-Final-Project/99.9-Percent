@@ -11,6 +11,8 @@ export interface Summary {
   progress: string | null; resumable: boolean; ended: boolean; tutorialDone: boolean; continueLabel: string;
   /** The Guided Mode chapter the save is in, and whether it is already complete while the company waits on Next. */
   chapter?: number; chapterDone?: boolean;
+  /** How many numbered chapters the save's company plays after Chapter 0, and which of them, Stay Online, unlocks Challenge Mode. */
+  total?: number; unlock?: number;
 }
 
 /** How a home screen describes a Guided Mode save. */
@@ -25,17 +27,17 @@ export function savedChapter(game: GameState, tutorialDone: boolean) {
   const chapters = campaignChapters(game);
   const chapter = chapters.find((c) => c.current) ?? chapters.filter((c) => c.completed).at(-1) ?? chapters[0];
   const walkthrough = !tutorialDone && chapter.id === "opening";
-  return { chapter: walkthrough ? chapters[0] : chapter, done: !walkthrough && !chapter.current, total: chapters.length - 1 };
+  return { chapter: walkthrough ? chapters[0] : chapter, done: !walkthrough && !chapter.current, total: chapters.length - 1, unlock: chapters.find((c) => c.id === "reliability")!.number };
 }
 
 export function campaignSummary(game: GameState | null, tutorialDone: boolean): Summary {
   if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Guided Mode" };
-  const { chapter, done, total } = savedChapter(game, tutorialDone);
+  const { chapter, done, total, unlock } = savedChapter(game, tutorialDone);
   const ended = game.phase === "ended";
   const progress = ended ? (game.outcome === "won" ? "All chapters complete" : "Company closed")
     : chapter.number === 0 ? "Launch Week in progress" : `Chapter ${chapter.number} of ${total}: ${chapter.name}`;
   // A finished company opens on its final report; nothing is left to continue.
-  return { progress, resumable: true, ended, tutorialDone, continueLabel: ended ? "See how it ended" : "Continue company", chapter: chapter.number, chapterDone: done };
+  return { progress, resumable: true, ended, tutorialDone, continueLabel: ended ? "See how it ended" : "Continue company", chapter: chapter.number, chapterDone: done, total, unlock };
 }
 
 export function classicSummary(game: GameState | null, tutorialDone: boolean): Summary {

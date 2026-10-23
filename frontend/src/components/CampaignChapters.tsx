@@ -41,7 +41,7 @@ export function ChapterOverview({ onClose, lead }: { onClose: () => void; lead?:
   const { replaying, tutorialDone, chapters, total } = useChapterBar();
   return <Modal title="Guided Mode chapters" icon={{ kind: "tech", name: "goal" }} onClose={onClose}>
     {lead}
-    <p>Start with Launch Week, then play {COUNT_WORDS[total] ?? total} chapters with the same company. Your servers, investments and progress carry forward.</p>
+    <p>Start with Launch Week, then play {COUNT_WORDS[total] ?? total} {total === 1 ? "chapter" : "chapters"} with the same company. Your servers, investments and progress carry forward.</p>
     <ol className="chapter-overview">
       {chapters.map((chapter) => <li key={chapter.id} aria-current={chapter.current ? "step" : undefined}>
         <span className="chapter-number" aria-hidden="true">{chapter.completed ? <Icon name="check" size={18} /> : chapter.number}</span>

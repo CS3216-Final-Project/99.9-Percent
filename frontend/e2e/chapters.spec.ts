@@ -52,7 +52,7 @@ test("disabled Next explains its actual readiness gate to keyboard users",async(
   const bar=page.getByRole("region",{name:"Guided Mode chapters"});
   const next=bar.getByRole("button",{name:"Next: Continue to reliability"});
   await expect(next).toBeDisabled();
-  await expect(next).toHaveAccessibleDescription(/stable baseline management and empty queues/);
+  await expect(next).toHaveAccessibleDescription(/healthy normal traffic and empty queues/);
   const reason=bar.getByText(/^Next unavailable:/);
   await reason.focus();
   await expect(reason).toBeFocused();

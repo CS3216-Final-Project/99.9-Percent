@@ -98,7 +98,7 @@ export function campaignGuidance(g: GameState) {
   optional="Autoscaling is optional. Manual capacity, admission relief and hybrid responses remain valid.";
   if(pendingSpikeAcknowledgement(c))pendingAction={label:"Review spike recognition"};
  } else if(c.dataStage) {
-  cash();check("milestone","Opening chapter completed",openingDone);management();calm();queues();reports();healthy();
+  cash();check("milestone",c.launchWeek?"Launch Week completed":"Opening chapter completed",openingDone);management();calm();queues();reports();healthy();
   wait("growth","Database demand grows",c.dataStage.consumed,"Press Run until the new workload arrives.");
   add("continue","Continue to Traffic Spikes",false,"Compare cache hits with database demand in the Database panel, then continue.");
   optional="The read cache and database upgrades are optional; you can continue without them.";
@@ -106,8 +106,8 @@ export function campaignGuidance(g: GameState) {
   if(spikesAvailable)pendingAction={label:"Continue to traffic spikes",action:{type:"enter_spikes"}};
  } else if(openingDone) {
   management();calm();queues();reports();
-  add("opening","Complete the Opening chapter",openingDone);
-  add("stage","Start Scaling & Routing",!!c.scaling,"Use Continue to scaling and routing.");
+  // Launch Week's score card enters Scaling & Routing itself; only an Opening company still has to choose it.
+  if(!c.launchWeek)add("stage","Start Scaling & Routing",!!c.scaling,"Use Continue to scaling and routing.");
   if(!c.scaling?.consumed)add("headroom",`Database headroom: ${c.dbCapacity.toLocaleString("en-US")} / ${P.dbCapacity.toLocaleString("en-US")} ops/s`,c.dbCapacity>=P.dbCapacity||!!c.scalingConsent,"Upgrade the Database, or accept the growth risk.");
   wait("growth","The next growth wave arrives",!!c.scaling?.consumed,"Press Run until more users arrive.");
   if(c.scaling?.consumed)add("continue","Continue to Data Strategy",false,"Check that your new servers receive traffic, then continue.");
@@ -129,11 +129,14 @@ export function campaignGuidance(g: GameState) {
   if(pendingPreventionReview(c))pendingAction={label:"Review outcome"};
   else if(c.openingPrevention?.outcome?.acknowledged)waiting="Prevention recorded. Complete the Opening chapter to continue to Scaling & Routing.";
  } else if(c.launchWeek) {
-  const lw=c.launchWeek;
+  const lw=c.launchWeek,weekOver=lw.completedStep!==null;
   cash();
-  add("research","Spend the research pick",!!lw.tech,"Open Tech and choose one research.");
-  add("launch","Survive Launch Week",lw.completedStep!==null,"Press Run and keep service up until the week ends.");
-  add("milestone","Complete the Opening chapter",openingDone);
+  // The week's script in order: the database overload and its postmortem, the free research point, then the score.
+  add("recovery","Fix the database overload",c.reports.length>0||weekOver,"Press Run. When the database overloads, inspect it and upgrade it.");
+  add("review","Read the postmortem",reportsAcknowledged&&c.reports.length>0||weekOver);
+  (lw.researchEarned?add:wait)("research","Spend the research pick",!!lw.tech,lw.researchEarned?"Choose Caching or Autoscaling under Research pick.":"Press Run. A free research point arrives during the week.");
+  wait("launch","The week ends",weekOver,"Press Run, or End week to skip ahead.");
+  add("milestone","Review your uptime score",openingDone);
   optional="The research pick and the upgraded database carry into the later chapters.";
  } else if(c.incident||c.openingRecovered||c.reports.length||pendingMilestone) {
   const prevented=!!c.openingMilestone?.outcomeId;

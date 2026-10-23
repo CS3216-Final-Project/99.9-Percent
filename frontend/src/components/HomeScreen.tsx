@@ -4,6 +4,7 @@ import { BALANCE } from "@/sim";
 import { num } from "@/game/format";
 import type { GameMode } from "@/game/persist";
 import { loadAnalyticsConsent, saveAnalyticsConsent, subscribeAnalyticsConsent } from "@/lib/analytics";
+import { NUMBERED_CHAPTERS, UNLOCK_CHAPTER } from "@/game/scope";
 import { useGame } from "@/game/store";
 import { AccountButton } from "./Account";
 import { FeedbackButton } from "./FeedbackButton";
@@ -12,9 +13,6 @@ import { Callout } from "./ui";
 import { campaignAbout, MODES, useModeLauncher, useModeSummaries, type ModeInfo, type Summary } from "./homeModes";
 import "./HomeScreen.css";
 
-/** Chapter 5, Stay Online, unlocks Challenge Mode. */
-const UNLOCK_CHAPTER = 5;
-
 /**
  * Challenge Mode while it is locked: a short row under Guided Mode that names the goal and shows the way there.
  * It has no controls, so its text is read in place rather than hidden behind a disabled button.
@@ -22,15 +20,18 @@ const UNLOCK_CHAPTER = 5;
 function ChallengeTeaser({ guided }: { guided: Summary }) {
   const reached = guided.resumable && !guided.ended ? guided.chapter ?? 0 : 0;
   const done = (n: number) => n < reached || (n === reached && !!guided.chapterDone);
+  // A version-1 company still plays the Opening, so its chapters run one number higher than a Launch Week company's.
+  const total = guided.resumable && guided.total ? guided.total : NUMBERED_CHAPTERS.length;
+  const unlock = guided.resumable && guided.unlock ? guided.unlock : UNLOCK_CHAPTER;
   return <section className="mode-teaser" aria-labelledby="classic-heading">
     <Icon name="lock" size={20} />
     <div className="mode-teaser-text">
       <h2 id="classic-heading">{MODES.classic.name}</h2>
       <p>Grow to {num(BALANCE.targetUsers)} users in {BALANCE.maxTurns} weeks on your own.</p>
-      <p className="mode-teaser-unlock">Unlocks after Chapter {UNLOCK_CHAPTER}: Stay Online.{reached > 0 && ` You are on Chapter ${reached} of 6.`}</p>
+      <p className="mode-teaser-unlock">Unlocks after Chapter {unlock}: Stay Online.{reached > 0 && ` You are on Chapter ${reached} of ${total}.`}</p>
     </div>
     <ol className="mode-teaser-pips" aria-hidden="true">
-      {[1, 2, 3, 4, 5, 6].map((n) => <li key={n} className={done(n) ? "is-done" : n === reached ? "is-here" : n === UNLOCK_CHAPTER ? "is-goal" : undefined} />)}
+      {Array.from({ length: total }, (_, i) => i + 1).map((n) => <li key={n} className={done(n) ? "is-done" : n === reached ? "is-here" : n === unlock ? "is-goal" : undefined} />)}
     </ol>
   </section>;
 }

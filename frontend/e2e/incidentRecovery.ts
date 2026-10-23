@@ -41,7 +41,8 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   const report = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
   await expect(report).toBeVisible(); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
   await expect(report.getByRole("heading", { name: "What happened?", exact: true })).toBeInViewport();
-  await expect(report.locator(".report-metrics dt")).toHaveCount(3);
+  // The database upgrade is spending during the incident; a traffic limit costs nothing.
+  await expect(report.locator(".report-metrics dt")).toHaveCount(limited ? 3 : 4);
   await expect(report.locator(".report-technical")).not.toHaveAttribute("open");
   await expect(report.getByText(limited ? /Recorded responses included a traffic limit/ : /Recorded responses included a database upgrade/)).toBeVisible();
   await expect(report.locator(".report-metrics")).toContainText(limited ? "Recovered with traffic limited" : "Recovered at full incoming demand");
@@ -52,7 +53,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   await page.keyboard.press("Shift+Tab"); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
   await press(summary); await expect(report.getByRole("table")).toBeVisible();
   for (const explanation of recovered.campaign!.reports.at(-1)!.explanations) await expect(report).toContainText(explanation);
-  await expect(report).toContainText("recovery-streak");
+  await expect(report.locator(".report-events")).toContainText("Recovery progress");
   expect(await report.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await reloadReview();
   await expect(notice).toHaveCount(0); await expect(report).toBeVisible();

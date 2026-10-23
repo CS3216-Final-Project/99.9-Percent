@@ -26,11 +26,11 @@ export async function chapter4TrafficTarget(page: Page, touch = false) {
   await page.route("**/api/**", route => route.abort()); await seedSave(page, game); await page.goto("/");
   await press(page.getByRole("button", { name: "Continue company", exact: true })); await expectRoom(page);
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
-  await press(page.getByRole("dialog", { name: "Chapter 4: Prepare", exact: true }).getByRole("button", { name: "Got it", exact: true }));
+  await press(page.getByRole("dialog", { name: "Chapter 3: Prepare", exact: true }).getByRole("button", { name: "Got it", exact: true }));
   await press(page.locator(".campaign-panel").getByRole("button", { name: "Network", exact: true }));
   await press(page.getByRole("button", { name: "Run", exact: true })); await page.clock.runFor(1000);
   await press(page.getByRole("button", { name: "Pause", exact: true }));
-  await press(page.getByRole("dialog", { name: "Chapter 4: Spike 1", exact: true }).getByRole("button", { name: "Got it", exact: true }));
+  await press(page.getByRole("dialog", { name: "Chapter 3: Spike 1", exact: true }).getByRole("button", { name: "Got it", exact: true }));
   const gold = page.locator(".campaign-gold-attention");
   const accept = async (target: RegExp) => {
     await press(page.getByRole("button", { name: "Hint", exact: true }));
