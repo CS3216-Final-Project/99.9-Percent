@@ -689,6 +689,8 @@ test("Launch Week cold open and research sheet remain usable by touch at 390px",
   }
   await seedSave(page, s); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).tap(); await expectRoom(page);
+  // The pick is a purchase on Actions.
+  await openPanelTab(page, "Actions");
   const sheet = page.getByRole("region", { name: "Launch Week research" });
   await expect(sheet).toBeVisible();
   await page.screenshot({ path: info.outputPath("launch-research-touch.png") });

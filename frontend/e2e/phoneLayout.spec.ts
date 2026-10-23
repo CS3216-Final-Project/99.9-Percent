@@ -176,7 +176,9 @@ test("Guided Mode: inspecting equipment keeps the sheet's place and shows its re
     await expect(button).toHaveAttribute("aria-pressed", "true");
     await expect(panel.getByRole("region", { name: `${readings} readings` })).toBeInViewport();
     await expect(button).toBeInViewport();
-    expect(await body.evaluate(el => el.scrollTop)).toBeGreaterThanOrEqual(before);
+    // Shorter readings can only pull the sheet back as far as its new bottom.
+    const after = await body.evaluate(el => ({ top: el.scrollTop, max: el.scrollHeight - el.clientHeight }));
+    expect(after.top).toBeGreaterThanOrEqual(Math.min(before, after.max) - 1);
   }
 });
 

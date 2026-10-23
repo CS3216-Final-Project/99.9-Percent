@@ -32,7 +32,8 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
     await expect(reason).toContainText("deployment is already pending");await reason.focus();await expect(reason).toBeFocused();
     await openPanelTab(page,"Analysis");
     const app=page.locator('.campaign-panel .chip').filter({hasText:/^App Server$/});
-    await app.hover();
+    // Scrolling first: a scroll while the hover delay runs closes the tip, as it should for a real pointer.
+    await app.scrollIntoViewIfNeeded();await app.hover();
     await expect(page.getByRole("tooltip")).toHaveText("Handles customer requests and uses the Database for data.");
     await app.click();
     const evidence=page.locator('.campaign-panel .campaign-evidence');
