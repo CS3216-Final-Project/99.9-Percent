@@ -6,6 +6,7 @@ import { newGame } from "@/sim";
 import { act as decide, tick } from "@/sim/__tests__/spikeFixtures";
 import { CampaignOverlays } from "./CampaignUI";
 import { CampaignIncidentReport } from "./CampaignIncidentReport";
+import { describeEvents, reportWindowStart } from "@/game/reportEvents";
 
 let serial = 0;
 function recovery() {
@@ -48,19 +49,21 @@ it("shows one acknowledgement, focuses the report button, and leaves acknowledge
 });
 it("retains every explanation, observation and event behind one collapsed technical disclosure", () => {
   const r = recovery().campaign!.reports[0]; render(<CampaignIncidentReport report={r} />);
-  const detail = screen.getByText("View Technical Details").closest("details")!;
+  const detail = screen.getByText("View technical details").closest("details")!;
   expect(detail.open).toBe(false); expect(screen.getByLabelText("Recovery summary").querySelectorAll("dt").length).toBeGreaterThanOrEqual(3);
-  fireEvent.click(screen.getByText("View Technical Details"));
+  fireEvent.click(screen.getByText("View technical details"));
   for (const explanation of r.explanations) expect(detail.textContent).toContain(explanation);
-  for (const m of r.snapshots) expect(within(screen.getByRole("table")).getByRole("cell", { name: String(m.step) })).toBeTruthy();
-  for (const event of r.events) expect(detail.textContent).toContain(`Game second ${event.step} · `);
+  const from = reportWindowStart(r);
+  for (const m of r.snapshots.filter(m => m.step >= from)) expect(within(screen.getByRole("table")).getByRole("rowheader", { name: String(m.step) })).toBeTruthy();
+  expect(detail.querySelectorAll(".report-events li")).toHaveLength(describeEvents(r.events.filter(e => e.step >= from)).length);
   expect(detail.querySelector("pre")).toBeNull();
 });
 it("consolidates missing workload details and does not render an empty evidence table", () => {
   const r = structuredClone(recovery().campaign!.reports[0]); for (const s of r.snapshots) delete s.data;
   const view = render(<CampaignIncidentReport report={r} />);
-  expect(screen.getAllByText(/workload and cache details were not recorded/)).toHaveLength(1);
-  expect(screen.queryByText(/Workload detail not recorded in this historical snapshot/)).toBeNull();
+  // Without any workload readings the section is left out rather than explained.
+  expect(screen.queryByText("Workload and cache evidence")).toBeNull();
+  expect(screen.queryByText(/workload and cache details were not recorded/)).toBeNull();
   view.rerender(<CampaignIncidentReport report={{ ...r, snapshots: [], events: [] }} />);
   expect(screen.queryByRole("table", { hidden: true })).toBeNull(); expect(screen.getByText("No historical observations were retained.")).toBeTruthy();
 });

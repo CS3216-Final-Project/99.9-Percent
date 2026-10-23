@@ -26,7 +26,7 @@ function tradeoff(samples: Snapshot[]) {
 export function incidentSummary(report: CampaignPostmortem): ReportLesson {
   const lesson = incidentLesson(report);
   return { happened: lesson.wrong, response: responses(report.events, report.openedStep, report.recoveredStep) + tradeoff(report.snapshots),
-    improve: report.limited ? "Check capacity before removing the limit; rejected requests earn no revenue." : lesson.remember,
+    improve: lesson.remember,
     takeaway: lesson.learned };
 }
 

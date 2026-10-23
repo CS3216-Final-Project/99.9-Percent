@@ -1,5 +1,8 @@
-import type { Campaign, CampaignPostmortem, TraceEvent } from "./campaignTypes";
+import type { Campaign, CampaignPostmortem, Intervention, TraceEvent } from "./campaignTypes";
 import { currentFault } from "./combinedCampaign";
+
+/** Game seconds of lead-in a report keeps before its incident, so the change that triggered it stays in view. */
+export const REPORT_LEAD_SECONDS = 5;
 export function trace(c: Campaign, type: string, data: TraceEvent["data"] = {}): void {
     c.trace.push({ id: c.nextEventId++, step: c.step, type, data });
 }
@@ -14,8 +17,11 @@ export function retainFoundationTrace(c: Campaign, start: number): void {
     };
     for(const e of c.trace.slice(start))if(keys[e.type])e.data=Object.fromEntries(Object.entries(e.data).filter(([key])=>keys[e.type].includes(key)));
 }
-/** Player-facing names for scheduled actions, so reports never show raw action ids. */
-const ACTION_NAMES: Record<string,string> = { "add-app":"Server installation", "upgrade-db":"Database upgrade", limit:"Traffic limit", unlimit:"Traffic limit removal", "scale-up":"Server scale-up", "deploy-lb":"Load balancer deployment", routing:"Routing change", cache:"Read Cache deployment", "cache-tuning":"Cache tuning", "deploy-autoscaler":"Autoscaling controller deployment", "retire-app":"Server retirement", promotion:"Promotion" };
+/** Player-facing names for every scheduled action, shared by reports, the action list and the event feed. */
+export const ACTION_NAMES: Record<Intervention, string> = {
+    "add-app": "Add server", "upgrade-db": "Database upgrade", limit: "Traffic limit", unlimit: "Remove traffic limit", "scale-up": "Application scale up", "deploy-lb": "Load balancer deployment", routing: "Routing change", cache: "Read Cache deployment", "cache-tuning": "Cache tuning",
+    "deploy-autoscaler": "Autoscaling controller deployment", "retire-app": "Safe application retirement", "health-checks": "Health Checks deployment", "create-spare": "Spare application install", "reserve-spare": "Reserve spare", "release-spare": "Release spare", failover: "Automatic Failover deployment", "promote-spare": "Promote spare", "restore-app": "Restore application", promotion: "Promotion",
+};
 const SPIKE_EVENTS: Record<string,string> = { "traffic-spike-started":"traffic spike started", "traffic-spike-ended":"traffic spike ended", "autoscale-scale-out-decided":"autoscaling added a server", "autoscaler-blocked":"autoscaling was blocked", "autoscale-instance-retired":"autoscaling retired a server" };
 export function causalPostmortem(c: Campaign): CampaignPostmortem {
     const inc = c.incident!;
@@ -23,6 +29,9 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
     const start = snapshots[0];
     const episodeStart = c.reports.at(-1)?.recoveredStep ?? 0;
     const events = c.trace.filter(e => e.step >= episodeStart);
+    // Explanations cover the incident and a short lead-in; older changes since the previous report are only named.
+    const windowStart = Math.max(episodeStart, Math.min(inc.openedStep, snapshots[0]?.step ?? inc.openedStep) - REPORT_LEAD_SECONDS);
+    const recent = events.filter(e => e.step >= windowStart);
     const opening = snapshots.find(m => m.step === inc.openedStep)!;
     const demandEvent = events.filter(e => e.step <= inc.openedStep && (e.type === "traffic-change" || e.type === "traffic-spike-started" || e.type === "traffic-spike-ended" || e.type === "action-activated")).at(-1);
     const spikeEvent=events.filter(e=>e.type==="traffic-spike-started"&&e.step<=inc.openedStep).at(-1);
@@ -54,7 +63,7 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
         explanations.push(`At recovery, healthy routed capacity was ${c.snapshot.reliability?.healthyRoutedCapacity??0} req/s. ${c.combinedStage?"Autoscaling observed only healthy routed capacity during growth pressure":"Autoscaling was suspended during the test"}; installed spare and failed apps still incurred upkeep.`);
     }
     if(c.combinedStage) {
-        for(const e of events) {
+        for(const e of recent) {
             if(e.type==="scenario-started")explanations.push(`At game second ${e.step}, growth round ${Number(e.data.index)+1} (${e.data.template}) began: users rose to ${e.data.users} and demand peaked at ${e.data.peak} req/s.`);
             if(e.type==="scenario-pressure-ended")explanations.push(`At game second ${e.step}, round pressure ended and demand returned to the ${e.data.baseline} req/s baseline.`);
             if(e.type==="promotion-started")explanations.push(`At game second ${e.step}, a promotion added ${e.data.increment} req/s until game second ${e.data.endStep}.`);
@@ -63,7 +72,7 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
         explanations.push("Registrations are a growth opportunity; only successful requests earn revenue.");
     }
     if(c.spikeStage) {
-      for(const e of events.filter(x=>["traffic-spike-started","traffic-spike-ended","autoscale-scale-out-decided","autoscaler-blocked","autoscale-instance-retired"].includes(x.type)))
+      for(const e of recent.filter(x=>["traffic-spike-started","traffic-spike-ended","autoscale-scale-out-decided","autoscaler-blocked","autoscale-instance-retired"].includes(x.type)))
         explanations.push([`Game second ${e.step}: ${SPIKE_EVENTS[e.type]}.`,e.data.reason?`${String(e.data.reason).charAt(0).toUpperCase()}${String(e.data.reason).slice(1)}.`:"",e.data.to?`Incoming demand ${e.data.to} req/s.`:""].filter(Boolean).join(" "));
       explanations.push("Automatic application capacity still requires provisioning and routing. It does not increase database capacity or cache effectiveness; compare actual per-instance and database evidence.");
     }
@@ -73,7 +82,9 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
         const last=c.snapshot.data!;
         explanations.push(`Cache effective hit rate used ${last.effectiveHitRateUsed/100}%; warmth after work ${last.warmthAfterStep/100}%. Hits ${last.hits}, writes ${last.writes}, non-cacheable reads ${last.nonCacheableReads}; these writes, reads and misses still reach DB. Capacity ${c.dbCapacity} ops/s. Cache reduces only new demand, never old backlog.`);
     }
-    for (const action of c.actions.filter(a => a.requestedStep <= c.step && (a.activatedStep === null || a.activatedStep >= episodeStart))) {
+    const earlier = c.actions.filter(a => a.activatedStep !== null && a.activatedStep >= episodeStart && a.activatedStep < windowStart);
+    if (earlier.length) explanations.push(`Earlier changes were already active when this incident began: ${[...new Set(earlier.map(a => ACTION_NAMES[a.type] ?? a.type))].join(", ")}.`);
+    for (const action of c.actions.filter(a => a.requestedStep <= c.step && (a.activatedStep === null || a.activatedStep >= windowStart))) {
         const effect = events.find(e => e.type === "action-activated" && e.data.actionId === action.id);
         if (!effect) {
             if (action.activatedStep === null && action.cancelledStep===undefined)

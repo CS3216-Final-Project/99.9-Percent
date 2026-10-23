@@ -49,7 +49,7 @@ describe("recorded incident lessons", () => {
     expect(lesson.wrong).toContain("database could not keep up");
     expect(lesson.changed).toContain("database capacity increased");
     expect(lesson.changed).toContain("queues were empty");
-    expect(lesson.remember).toContain("ongoing costs");
+    expect(lesson.remember).toContain("leaving room for growth");
     expect(lesson.traffic).toBe("Recovered at full incoming demand");
     expect(lesson.latencyMs).toBe(report.snapshots.at(-1)!.latencyMs);
     expect(JSON.stringify(report)).toBe(before);
@@ -59,7 +59,7 @@ describe("recorded incident lessons", () => {
     const report = game.campaign!.reports[0]; const lesson = incidentLesson(report);
     expect(report.setupCents).toBe(0); expect(lesson.changed).toContain("less traffic was admitted");
     expect(lesson.changed).not.toContain("capacity increased");
-    expect(lesson.traffic).toContain("traffic limited"); expect(lesson.remember).toContain("full demand has not been verified");
+    expect(lesson.traffic).toContain("traffic limited"); expect(lesson.remember).toContain("then remove the traffic limit");
   });
   it("uses prior serving capacity and falling pressure without crediting a purchase", () => {
     const r = structuredClone(upgradeRecovery().campaign!.reports[0]);
@@ -86,7 +86,7 @@ describe("recorded incident lessons", () => {
     r.events = [{ id: 1, step: r.openedStep, type: "action-requested", data: { actionId: "a", type: "cache" } },
       { id: 2, step: r.openedStep, type: "autoscale-scale-out-decided", data: {} }];
     const lesson = incidentLesson(r); expect(lesson.changed).toContain("no new activation");
-    expect(lesson.changed).not.toContain("cache change activated"); expect(lesson.remember).toContain("time to install and route");
+    expect(lesson.changed).not.toContain("cache change activated"); expect(lesson.remember).toContain("to install and route");
   });
   it("keeps failure, restoration and promoted traffic separate", () => {
     const r = structuredClone(upgradeRecovery().campaign!.reports[0]);
@@ -96,7 +96,7 @@ describe("recorded incident lessons", () => {
       { id: 1000, step: r.recoveredStep, type: "failover-activated", data: {} });
     const lesson = incidentLesson(r); expect(lesson.wrong).toContain("server failed");
     expect(lesson.changed).toContain("server was restored"); expect(lesson.changed).toContain("spare server joined the traffic route");
-    expect(lesson.remember).toContain("separate checks");
+    expect(lesson.remember).toContain("carry the traffic when one fails");
   });
   it("does not manufacture missing historical cause, workload or final latency", () => {
     const r: CampaignPostmortem = { id: "old", openedStep: 1, recoveredStep: 8, snapshots: [], events: [], explanations: [], limited: false, setupCents: 0 };

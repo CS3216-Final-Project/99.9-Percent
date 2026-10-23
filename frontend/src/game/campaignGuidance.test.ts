@@ -34,7 +34,7 @@ it("reactive report then milestone actions require explicit acknowledgement",()=
  g=decision(g,{type:"acknowledge_milestone"});expect(campaignGuidance(g).stage).toBe("Scaling & Routing");
 });
 it("preventive limit explains full-demand qualification and leaves removal actionable",()=>{
- const g=prevented(),m=campaignGuidance(g);expect(m.prevention).toBe(true);expect(m.notice).toBe("A traffic limit turns some users away, so prevention cannot count. Remove the limit and serve the full 800 req/s.");expect(row(g,"admission").met).toBe(false);expect(row(g,"app-inspection").met).toBe(false);expect(applyAction(g,{type:"set_traffic_limit",enabled:false}).ok).toBe(true);
+ const g=prevented(),m=campaignGuidance(g);expect(m.prevention).toBe(true);expect(m.notice).toBeNull();expect(row(g,"admission").hint).toContain("A traffic limit turns users away");expect(row(g,"admission").met).toBe(false);expect(row(g,"app-inspection").met).toBe(false);expect(applyAction(g,{type:"set_traffic_limit",enabled:false}).ok).toBe(true);
 });
 it("new inspections and observations update prevention without auto-completing it",()=>{
  let g=prevented();g=decision(g,{type:"incident_inspect",equipment:"app"});g=decision(g,{type:"incident_inspect",equipment:"db"});g=decision(g,{type:"set_traffic_limit",enabled:false});

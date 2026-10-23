@@ -14,9 +14,9 @@ test("Chapter 5 clarity: incident report keeps its evidence and Continue company
   await page.route("**/api/**", route => route.abort()); await seedSave(page, game); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
   const dialog = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
-  await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "How did you respond?", "What could be improved?", "Key takeaway"]);
+  await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "How did you respond?", "What could be improved?", "Key takeaway", "Capacity after the failure"]);
   await expect(dialog.getByText("Incident window", { exact: true })).toBeHidden();
-  await dialog.getByText("View Technical Details", { exact: true }).click();
+  await dialog.getByText("View technical details", { exact: true }).click();
   await expect(dialog.getByText("Incident window", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("table")).toBeVisible();
   await dialog.getByRole("button", { name: "Continue company", exact: true }).click();

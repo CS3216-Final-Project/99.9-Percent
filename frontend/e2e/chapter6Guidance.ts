@@ -54,7 +54,7 @@ export async function chapter6Preparation(page: Page, touch = false) {
   expect(after.campaign!.incident).toBeNull();
   const panel = page.getByRole("region", { name: "Guided Mode guidance", exact: true });
   await expect(panel).toContainText("Serve full demand steadily: 5 / 5 s");
-  await expect(panel.getByRole("region", { name: "Final Campaign goals", exact: true })).toContainText("0 / 3");
+  await expect(panel.getByRole("region", { name: "Final goals", exact: true })).toContainText("0 / 3");
   await page.clock.resume(); await page.reload();
   await press(page.getByRole("button", { name: "Continue company", exact: true })); await expectRoom(page);
   await expect(cue).toHaveCount(0);

@@ -1,4 +1,4 @@
-import type { CampaignPostmortem, TraceEvent } from "@/sim/campaignTypes";
+import type { CampaignPostmortem, Snapshot, TraceEvent } from "@/sim/campaignTypes";
 
 function increased(data: TraceEvent["data"], after: string, before: string) {
   const a = data[after], b = data[before];
@@ -45,22 +45,22 @@ export function incidentLesson(report: CampaignPostmortem) {
     ? `Recorded changes: ${changes.slice(0, 3).join(", ")}${changes.length > 3 ? "; further changes are in the details" : ""}. ${outcome}`
     : `${activated.length ? "Infrastructure changes activated, but the retained evidence does not establish their effect." : alreadyServing ? "Previously installed capacity was already serving traffic; no new activation during the incident is recorded." : "No corrective activation during the incident is recorded."} ${outcome}`;
   let learned = "One overloaded component can slow down the whole app.";
-  let remember = "Check each component's capacity before accepting more traffic.";
+  let remember = "Compare each component's capacity with expected demand before more users arrive.";
   if (failed) {
     learned = "A failed server cannot process requests; a spare helps only when it receives traffic.";
-    remember = "Service recovery and repairing the failed server are separate checks; detection alone adds no capacity.";
+    remember = "Keep enough routed capacity that the other servers can carry the traffic when one fails, and add Health Checks so a failed server is spotted sooner.";
   } else if (cache || db && opening?.data?.deployed) {
     learned = "A working cache can reduce repeated reads; writes and uncached reads still reach the database.";
-    remember = "Research alone does not deploy a cache; check actual hits and database capacity.";
+    remember = "Deploy and warm the cache before demand peaks, and keep database capacity for writes and uncached reads.";
   } else if (app || installed || scaled || routing || automatic) {
     learned = "Installed servers help only when traffic reaches them; the database has its own capacity limit.";
-    remember = automatic ? "Autoscaling still needs time to install and route servers, and adds running costs."
-      : "More servers add running costs, including servers that are not receiving traffic.";
+    remember = automatic ? "Turn on autoscaling before the peak; new servers take a few game seconds to install and route."
+      : "Route traffic to every server you pay for, and add capacity only where demand exceeds it.";
   } else if (eased) {
     learned = "Service can recover when temporary demand falls, without a new purchase.";
-    remember = "Check capacity for the next traffic peak, as well as the quieter baseline.";
-  } else if (upgraded) remember = "More database capacity adds ongoing costs; leave room for future traffic.";
-  if (report.limited) remember = "The traffic limit is still active: rejected requests earn no revenue, and full demand has not been verified.";
+    remember = "Prepare capacity for the next peak before it arrives, not only for normal traffic.";
+  } else if (upgraded) remember = "Upgrade the database before demand reaches its capacity, leaving room for growth.";
+  if (report.limited) remember = "Add enough capacity to serve full demand, then remove the traffic limit; rejected requests earn no revenue.";
   return {
     wrong: failed ? "A server failed, reducing the capacity available to handle requests."
       : db && app ? "Both application and database work exceeded their recorded capacity, causing delays."
@@ -82,4 +82,10 @@ export function incidentTitle(report: CampaignPostmortem) {
   const db = !!opening && opening.db.demand > opening.db.capacity;
   const app = !!opening && (opening.instances?.some(a => a.demand > a.capacity) || opening.app.demand > opening.app.capacity);
   return db && app ? "Application and Database overloaded" : db ? "Database overloaded" : app ? "Application overloaded" : "Service slowdown";
+}
+
+/** The first observation after a server failed: traffic admitted against what the healthy routed servers could serve. */
+export function survivingCapacity(snapshots: Snapshot[]) {
+  const m = snapshots.find(s => s.reliability && s.instances?.some(a => a.health === "failed"));
+  return m ? { step: m.step, admitted: m.admitted, capacity: m.reliability!.healthyRoutedCapacity } : null;
 }

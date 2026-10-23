@@ -4,7 +4,8 @@ import { RecordedFields } from "./RecordedFields";
 import { useMediaQuery } from "./useMediaQuery";
 import { chapter6FinancialRisk } from "@/game/chapter6Finance";
 import { reliabilityLesson } from "@/game/reliabilityLesson";
-import { incidentTitle } from "@/game/campaignPostmortem";
+import { incidentTitle, survivingCapacity } from "@/game/campaignPostmortem";
+import { ACTION_NAMES } from "@/game/reportEvents";
 import { saveTextFile as download } from "@/lib/download";
 import { EquipmentPanel } from "./EquipmentPanel";
 import { CampaignReadings } from "./CampaignReadings";
@@ -39,7 +40,7 @@ import { money, num } from "@/game/format";
 import { useEffect, useState, type ReactNode } from "react";
 import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
-import { CampaignIncidentReport, CampaignRecoveryReview } from "./CampaignIncidentReport";
+import { CampaignIncidentReport, CampaignRecoveryReview, CapacityAfterFailure } from "./CampaignIncidentReport";
 import { campaignClockAvailable, inspectOrSelect, useGame, walkthroughHoldsClock } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
@@ -73,10 +74,6 @@ const OFFICE_EVIDENCE = {
   deploy: { name: "Deploy", text: "Infrastructure changes activate after their listed delay." },
   growth: { name: "Growth", text: "Growth stages increase demand on the system." },
 } as const;
-const ACTION_NAMES: Record<Intervention, string> = {
-  "add-app": "Add server", "upgrade-db": "Database upgrade", limit: "Traffic limit", unlimit: "Remove traffic limit", "scale-up":"Application scale up", "deploy-lb":"Load balancer deployment", routing:"Routing change", cache:"Read Cache deployment", "cache-tuning":"Cache tuning",
-  "deploy-autoscaler":"Autoscaling controller deployment", "retire-app":"Safe application retirement", "health-checks":"Health Checks deployment", "create-spare":"Spare application install", "reserve-spare":"Reserve spare", "release-spare":"Release spare", failover:"Automatic Failover deployment", "promote-spare":"Promote spare", "restore-app":"Restore application", promotion:"Promotion",
-};
 const appName = (id: string) => `App ${id.slice(4)}`;
 const sameTargets = (a: string[], b: string[]) => a.length === b.length && b.every(id => a.includes(id));
 /** Where the load balancer can send traffic: every installed app, or one of them. A reserved spare is not a choice. */
@@ -89,23 +86,25 @@ function routeName(c: Campaign) {
   const t = c.routing.targets, apps = routableApps(c).map(a => a.id);
   return apps.length > 1 && sameTargets(t, apps) ? "all apps" : t.length === 1 ? `${appName(t[0])} only` : t.map(appName).join(", ");
 }
-const STEP_STATUS = { done: "Done", current: "Current step", upcoming: "Not yet" } as const;
+const STEP_STATUS = { done: "done", current: "current step", upcoming: "not yet" } as const;
 /** The chapter's sequence: finished steps recede, the current one carries its hint and later ones stay neutral. */
 function StepList({items,current,label}:{items:Requirement[];current:Requirement|null;label:string}) {
   return <ol className="progression-steps" aria-label={label}>{items.map((r,i)=>{
     const state=r.met?"done":r===current?"current":"upcoming";
-    return <li key={r.id} data-requirement={r.id} data-met={r.met} data-state={state}>
-      <span className="progression-marker" aria-hidden="true">{r.met?<Icon name="check" size={12} />:i+1}</span>
-      <span className="progression-text"><span className="visually-hidden">{STEP_STATUS[state]}: </span>{r.label}{state==="current"&&r.hint&&<small>{r.hint}</small>}</span>
+    // A step the clock completes shows a clock instead of its number, so it reads as "press Run", not "do this".
+    return <li key={r.id} data-requirement={r.id} data-met={r.met} data-state={state} data-wait={r.wait||undefined} aria-current={state==="current"?"step":undefined}>
+      <span className="progression-marker" aria-hidden="true">{r.met?<Icon name="check" size={12} />:r.wait?<Icon name="time" size={12} />:i+1}</span>
+      <span className="progression-text"><span className="visually-hidden">Step {i+1}, {STEP_STATUS[state]}: </span>{r.label}{state==="current"&&r.hint&&<small>{r.hint}</small>}</span>
     </li>;})}</ol>;
 }
 /** Standing company checks fold into one line while they all pass and only list the ones that need attention. */
-function CompanyChecks({items}:{items:Requirement[]}) {
+function CompanyChecks({items,paused}:{items:Requirement[];paused:string|null}) {
   if(!items.length) return null;
+  if(paused) return <p className="company-checks" data-requirement="company-checks" data-met="paused"><Icon name="time" size={14} />{paused}</p>;
   const failing=items.filter(r=>!r.met);
   if(!failing.length) return <p className="company-checks" data-requirement="company-checks" data-met="true"><Icon name="check" size={14} />All {items.length} company checks pass</p>;
   return <div className="company-checks" data-requirement="company-checks" data-met="false">
-    <p><Icon name="alert" size={14} />{failing.length} of {items.length} company checks need attention</p>
+    <p><Icon name="alert" size={14} />{failing.length} of {items.length} company checks {failing.length===1?"needs":"need"} attention</p>
     <ul>{failing.map(r=><li key={r.id} data-requirement={r.id} data-met="false"><span className="visually-hidden">Needs attention: </span>{r.label}{r.hint&&<small>{r.hint}</small>}</li>)}</ul>
   </div>;
 }
@@ -125,14 +124,14 @@ function CampaignGuidance() {
     {financialRisk&&<Callout compact tone="warn" icon="cash" kicker={financialRisk.kind==="blocked"?"Capacity funding blocked":"Money at risk"}><span role="note">{financialRisk.message}</span></Callout>}
     {c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
     {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">{c.combinedStage?"Current growth requirements":"Chapter requirements"}<span> · {model.steps.filter(r=>r.met).length}/{model.steps.length}<span className="visually-hidden"> steps done</span></span></h3>
-      <CompanyChecks items={model.checks}/>
+      <CompanyChecks items={model.checks} paused={model.checksPaused}/>
       <StepList items={model.steps} current={model.current} label="Chapter steps"/>
       {cta}
       {!c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
       {model.notice&&<p role="note">{model.notice}</p>}
       {model.optional&&<p className="muted">{model.optional}</p>}
     </section>}
-    {model.finalGoals.length>0&&<section className="campaign-requirements" aria-label="Final Campaign goals"><h3 className="campaign-requirements-heading">Final Campaign goals</h3><StepList items={model.finalGoals} current={null} label="Final Campaign goals"/></section>}
+    {model.finalGoals.length>0&&<section className="campaign-requirements" aria-label="Final goals"><h3 className="campaign-requirements-heading">Final goals</h3><StepList items={model.finalGoals} current={null} label="Final goals"/></section>}
     {!model.requirements.length&&cta}
     {c.openingMilestone?.acknowledged&&!c.dataStage&&!c.scaling?.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}>View run scorecard</button>}
@@ -208,7 +207,7 @@ export function CampaignPanel() {
       <div className="incident-symptoms">
         <dl className="impact">
           <div><Concept kind={m.latencyMs >= Q.latencyThresholdMs ? "critical" : "users"} icon="timer" /><dt>Latency · ms</dt><dd>{m.latencyMs.toFixed(0)}</dd></div>
-          <div><Concept kind={m.serviceErrorRate !== null && m.serviceErrorRate >= Q.errorThreshold ? "critical" : "muted"} icon="error" /><dt>Errors · %</dt><dd>{m.serviceErrorRate === null ? "—" : (m.serviceErrorRate * 100).toFixed(2)}</dd></div>
+          <div><Concept kind={m.serviceErrorRate !== null && m.serviceErrorRate >= Q.errorThreshold ? "critical" : "muted"} icon="error" /><dt>Errors · %</dt><dd>{m.serviceErrorRate === null ? "-" : (m.serviceErrorRate * 100).toFixed(2)}</dd></div>
           <div><Concept kind="tech" icon="backlog" /><dt>Backlog</dt><dd>{num(m.app.backlog + m.db.backlog)}</dd></div>
         </dl>
       </div>
@@ -557,7 +556,7 @@ function ReportIndex({ entries, incidents, open, onOpen }: { entries: ReportEntr
   const row = (e: ReportEntry) => <li key={e.id} className={wide && e === selected ? "is-selected" : undefined}>
     <button type="button" className="pm-toggle" {...(wide ? { "aria-current": e === selected ? "true" as const : undefined } : { "aria-expanded": e === selected })} onClick={() => onOpen(!wide && e === selected ? null : e.id)}>
       <span className="pm-title"><Icon name={e.group === "incident" ? "incident" : "goal"} size={16} /><span>{e.title}<small>{e.when}</small></span></span>
-      {e.tag}
+      <span className="pm-end">{e.tag}{!wide && <Icon name="down" size={16} className="pm-chevron" />}</span>
     </button>
     {!wide && e === selected && <section className="pm" aria-label={e.label}>{e.body}</section>}
   </li>;
@@ -586,10 +585,9 @@ function ReliabilityOutcome({campaign:c}:{campaign:Campaign}) {
   const promotion=c.trace.find(e=>e.type==="failover-activated"&&e.data.eventId===f.id);
   const lesson=reliabilityLesson(c);
   const related=c.reports.filter(r=>r.snapshots.some(m=>m.reliability?.faultId===f.id));
-  // The first observation where the failed server was routed around shows whether the survivors could carry the load.
-  const bypass=related.flatMap(r=>r.snapshots).find(m=>m.reliability&&m.step>=f.startedStep!&&!m.reliability.effective.includes(f.targetId));
+  const capacity=survivingCapacity(related.flatMap(r=>r.snapshots).filter(m=>m.step>=f.startedStep!));
   return <>
-    <CampaignReport lesson={lesson?{happened:lesson.happened,response:lesson.recovered,improve:lesson.improve,takeaway:lesson.takeaway}: {happened:"The reliability test completed.",response:"The saved records do not show a specific repair.",takeaway:"Verify service after restoring a server."}}>
+    <CampaignReport summary={capacity&&<CapacityAfterFailure {...capacity}/>} lesson={lesson?{happened:lesson.happened,response:lesson.recovered,improve:lesson.improve,takeaway:lesson.takeaway}: {happened:"The reliability test completed.",response:"The saved records do not show a specific repair.",takeaway:"Verify service after restoring a server."}}>
     <Callout compact tone="success" icon="health" kicker={completion?.data.limited?"Stable, with traffic limited":"Stable service"}>
       {completion?.data.incidentOccurred?"The failure opened an incident, and you reviewed its recovery.":"The test completed without opening an incident."} Service then stayed stable for five game seconds after the restore.
     </Callout>
@@ -600,9 +598,6 @@ function ReliabilityOutcome({campaign:c}:{campaign:Campaign}) {
       <Row label="Outcome recorded" value={`Game second ${d.completedStep}`} />
       <Row label="Company rejected requests at completion" value={num(Number(completion?.data.rejected??0))} />
       <Row label="Company setup spending at completion" value={dollars(Number(completion?.data.setupCents??0))} /></dl>
-    {bypass&&<dl className="rows"><Row label="Traffic admitted after the failure" value={`${num(bypass.admitted)} req/s`} />
-      <Row label="Capacity of the servers still routed" value={`${num(bypass.reliability!.healthyRoutedCapacity)} req/s`} /></dl>}
-    <p>Health Checks only detect a failure, and failover only moves traffic; neither adds capacity. {bypass?bypass.admitted>bypass.reliability!.healthyRoutedCapacity?"Here the surviving servers had less capacity than the traffic admitted, so they stayed overloaded until the restore.":"Here the surviving servers had enough capacity for the traffic admitted.":"Compare demand with the capacity of the servers that still receive traffic."}</p>
     {related.map(r=><p key={r.id} className="muted">The full evidence is in the incident report for game seconds {r.openedStep}-{r.recoveredStep}.</p>)}
     </CampaignReport>
   </>;

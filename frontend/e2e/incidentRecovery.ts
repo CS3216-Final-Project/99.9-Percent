@@ -47,7 +47,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   await expect(report.locator(".report-metrics")).toContainText(limited ? "Recovered with traffic limited" : "Recovered at full incoming demand");
   expect((await savedGame(page)).campaign!.inputs).toEqual(recovered.campaign!.inputs);
   await page.screenshot({ path: info.outputPath("postmortem.png") });
-  const summary = report.locator("summary", { hasText: "View Technical Details" });
+  const summary = report.locator("summary", { hasText: "View technical details" });
   await page.keyboard.press("Tab"); await expect(summary).toBeFocused();
   await page.keyboard.press("Shift+Tab"); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
   await press(summary); await expect(report.getByRole("table")).toBeVisible();
