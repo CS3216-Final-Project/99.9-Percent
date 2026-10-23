@@ -7,7 +7,8 @@ import { campaignGuidance, campaignObjective, launchResearchPending } from "./ca
 import { preventedOpening, recoveredOpening } from "./__fixtures__/openingOutcome";
 import { decodeSave, makeEnvelope } from "./saveEnvelope";
 import { outcomeSummary } from "./campaignReport";
-import { chapterAdvance, campaignChapters } from "./campaignChapters";
+import { campaignChapters } from "./campaignChapters";
+import { chapterAdvance } from "./chapterCompletion";
 import { campaignClockAvailable, useGame } from "./store";
 import { campaignAttention } from "./campaignAttention";
 

@@ -33,16 +33,6 @@ const CHAPTER_ENTRIES: ReadonlySet<Action["type"]> = new Set(["enter_scaling", "
 /** Whether an action moves the company into the next chapter. */
 export const isChapterEntry = (action: Action) => CHAPTER_ENTRIES.has(action.type);
 
-/** The control that moves the company into the next chapter, while one is on offer. */
-export function chapterAdvance(game: GameState): { label: string; action: Action; ready: boolean } | null {
-  const c = game.campaign!;
-  const next = campaignGuidance(game).pendingAction;
-  if (next?.action && isChapterEntry(next.action)) return { label: next.label, action: next.action, ready: true };
-  // Stay Online is announced once the spike response is acknowledged, and opens when the company is ready for it.
-  if (!c.reliabilityStage && c.spikeStage?.acknowledged) return { label: "Continue to reliability", action: { type: "enter_reliability" }, ready: canEnterReliability(game) };
-  return null;
-}
-
 /** The chapter whose requirements are met while the company waits for the player to continue past it. */
 export function finishedChapter(game: GameState): ChapterCompletion | null {
   const next = campaignGuidance(game).pendingAction?.action?.type;
