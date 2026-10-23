@@ -1,13 +1,5 @@
 import type { GameState } from "@/sim";
-
-const COLLEAGUES = {
-  maya: { name: "Maya", role: "Customer Support", character: "a purple eyeball creature with a headset and a green visor" },
-  alex: { name: "Alex", role: "CEO", character: "a black and gold dragon in a pinstripe suit" },
-  jordan: { name: "Jordan", role: "Software Engineer", character: "a stone golem in a navy hoodie and glasses" },
-  sam: { name: "Sam", role: "Marketing", character: "a fire imp in a backwards cap, holding a phone" },
-  taylor: { name: "Taylor", role: "Operations Engineer", character: "a hooded skeleton holding a coffee cup, with a pager clipped on" },
-} as const;
-export type ColleagueId = keyof typeof COLLEAGUES;
+import { COLLEAGUES, type ColleagueId } from "./colleagues";
 
 const CHAPTERS = {
   1: { speaker: "maya", lines: ["Hi! I'm Maya from Customer Support. I keep an eye on every ticket. Well, several eyes.", "Customers want our website to stay fast, and they notice the moment it isn't.", "Can you find what might slow it down before they do?"], mission: "Compare demand and capacity to prevent or recover from a bottleneck." },
@@ -30,6 +22,6 @@ export function chapterCompanyMessage(game: GameState) {
     : chapter === 6 ? c.combinedStage!.users >= c.combinedStage!.finalUserTarget
       ? [lines[0], "We've hit our user target. Let's keep our service reliable and finish the final Campaign checks."]
       : lines.map(line => line.replace("50,000", c.combinedStage!.finalUserTarget.toLocaleString("en-US"))) : lines;
-  return { ...COLLEAGUES[speaker], speaker, portrait: `/characters/${speaker}.webp`, lines: said, mission, chapter, key: `99.99.company-messages:${c.runId}:${chapter}:${enteredStep}` };
+  return { ...COLLEAGUES[speaker], speaker, lines: said, mission, chapter, key: `99.99.company-messages:${c.runId}:${chapter}:${enteredStep}` };
 }
 export type ChapterCompanyMessage = NonNullable<ReturnType<typeof chapterCompanyMessage>>;

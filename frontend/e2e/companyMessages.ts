@@ -22,7 +22,7 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   await press(page.getByRole("button", {name:"Continue company",exact:true})); await expectRoom(page);
   const card = page.getByRole("dialog", {name:"Company Message",exact:true});
   await expect(card).toBeVisible(); await expect(card).toHaveAttribute("aria-modal","true");
-  const backdrop = page.locator(".company-message-backdrop");
+  const backdrop = page.locator(".dialogue-backdrop");
   await expect(backdrop).toHaveCount(1); await expect(backdrop).toBeVisible();
   await expect(backdrop).toHaveCSS("background-color","rgba(14, 11, 30, 0.62)");
   await expect(backdrop).toHaveCSS("z-index","99");
@@ -35,7 +35,7 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   const box = await run.boundingBox();
   if (!box) throw new Error("Expected existing Run Company control");
   // On narrow screens the dialogue box itself covers Run, so press a corner of the backdrop instead.
-  const [x, y] = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest(".company-message") ? [8, 8] : [x, y], [box.x + box.width / 2, box.y + box.height / 2]);
+  const [x, y] = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest(".dialogue") ? [8, 8] : [x, y], [box.x + box.width / 2, box.y + box.height / 2]);
   await page.mouse.click(x, y);
   await expect(card).toBeVisible(); await expect(run).toBeVisible();
   const dismiss = card.getByRole("button",{name:"Dismiss company message",exact:true});
@@ -45,7 +45,7 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   await page.keyboard.press("Shift+Tab"); await expect(next).toBeFocused();
   await page.keyboard.press("p"); await expect(card).toBeVisible(); await expect(run).toBeVisible();
   const [name, character] = [["Maya","maya"],["Alex","alex"],["Jordan","jordan"],["Sam","sam"],["Taylor","taylor"],["Alex","alex"]][chapter - 1];
-  await expect(card.locator(".company-message-plate")).toContainText(name);
+  await expect(card.locator(".dialogue-plate")).toContainText(name);
   const portrait = card.getByRole("img",{name:new RegExp(`^${name}, `)});
   await expect(portrait).toHaveAttribute("src",`/characters/${character}.webp`);
   await expect.poll(() => portrait.evaluate(img => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth)).toBe(768);
@@ -54,7 +54,7 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   await expect(card).toBeInViewport({ratio:1});
   await page.screenshot({path:info.outputPath(`company-message-chapter-${chapter}-first-line${touch?"-touch":""}.png`)});
   // Odd chapters read on with the keyboard, even chapters by pressing the dialogue box itself.
-  const copy = card.locator(".company-message-copy");
+  const copy = card.locator(".dialogue-copy");
   while (await next.count()) {
     const line = await copy.textContent();
     if (chapter % 2) await page.keyboard.press("Enter"); else await press(copy);

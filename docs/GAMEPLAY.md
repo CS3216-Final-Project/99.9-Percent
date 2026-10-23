@@ -133,6 +133,8 @@ The seeded pool holds one read-heavy pulse (3,800/4,000 req/s), one write-heavy 
 Five stable full-demand observations make Start next growth wave available, and each wave is announced eight steps ahead.
 After each wave, queues must drain, apps must be healthy, reports must be acknowledged and five stable full-demand observations must follow before the player reviews the growth outcome.
 After all three reviews, five more full-demand steps qualify the final review, and Complete campaign ends the run, freezes the clock and keeps the company inspectable.
+Before the final scorecard, the five colleagues celebrate once per run: Maya, Jordan, Sam, Taylor, then Alex each speak one line built from the recorded scorecard, and the last line shows users, uptime (when known) and incidents.
+Skipping it at any line counts as seeing it.
 
 An optional promotion costs $500, activates next step, adds 400 req/s for twelve steps and has a thirty-step cooldown.
 

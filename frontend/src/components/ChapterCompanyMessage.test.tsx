@@ -35,7 +35,7 @@ it.each(companies.map((game, i) => [i + 1, game] as const))("shows the actual ch
   const show = () => <StrictMode><ChapterCompanyMessage model={model} enabled><p>Current stage cue</p></ChapterCompanyMessage></StrictMode>;
   render(show());
   expect(screen.getAllByRole("dialog")).toHaveLength(1); expect(message()!.getAttribute("aria-modal")).toBe("true");
-  expect(document.querySelector(".company-message-backdrop")).not.toBeNull();
+  expect(document.querySelector(".dialogue-backdrop")).not.toBeNull();
   expect(message()!.textContent).toContain(senders[chapter - 1][0]); expect(message()!.textContent).toContain(senders[chapter - 1][1]);
   expect(within(message()!).getByRole("img", { name: new RegExp(`^${model.name}, `) }).getAttribute("src")).toBe(`/characters/${model.speaker}.webp`);
   expect(screen.queryByText("Current stage cue")).toBeNull();
@@ -46,7 +46,7 @@ it.each(companies.map((game, i) => [i + 1, game] as const))("shows the actual ch
   }
   expect(message()!.textContent).toContain("Your mission:"); expect(message()!.textContent).toContain(model.mission);
   fireEvent.click(within(message()!).getByRole("button", { name: "Got it" }));
-  expect(message()).toBeNull(); expect(document.querySelector(".company-message-backdrop")).toBeNull(); expect(screen.getByText("Current stage cue")).toBeTruthy();
+  expect(message()).toBeNull(); expect(document.querySelector(".dialogue-backdrop")).toBeNull(); expect(screen.getByText("Current stage cue")).toBeTruthy();
   cleanup(); render(show()); expect(message()).toBeNull();
   expect(JSON.stringify(makeEnvelope(game, 0, 1))).toBe(before);
 });
@@ -62,16 +62,16 @@ it.each(["X", "Escape"])("dismisses with %s part way through the dialogue", meth
 it("advances one line at a time from the dialogue box and keeps the mission until acknowledged", () => {
   const model = chapterCompanyMessage(companies[3])!;
   render(<ChapterCompanyMessage model={model} enabled/>);
-  const copy = message()!.querySelector(".company-message-copy")!;
+  const copy = message()!.querySelector(".dialogue-copy")!;
   expect(copy.getAttribute("aria-live")).toBe("polite");
   expect(copy.textContent).toBe(model.lines[0]);
   expect(fireEvent.mouseDown(copy)).toBe(false); expect(fireEvent.mouseDown(next()!)).toBe(true);
   fireEvent.click(copy); expect(copy.textContent).toBe(model.lines[1]);
-  fireEvent.click(message()!.querySelector(".company-message-foot")!); expect(copy.textContent).toContain(model.lines[2]);
+  fireEvent.click(message()!.querySelector(".dialogue-foot")!); expect(copy.textContent).toContain(model.lines[2]);
   fireEvent.click(copy); fireEvent.click(copy);
   expect(copy.textContent).toContain(model.lines.at(-1)); expect(copy.textContent).toContain(model.mission);
   expect(next()).toBeNull(); expect(message()).not.toBeNull();
-  expect(message()!.querySelectorAll(".company-message-progress > [data-read]")).toHaveLength(model.lines.length);
+  expect(message()!.querySelectorAll(".dialogue-progress > [data-read]")).toHaveLength(model.lines.length);
 });
 
 it("keeps a valid line when the current message gets shorter while it is read", () => {
@@ -162,8 +162,8 @@ it("contains keyboard focus, ignores outside clicks and restores background inte
   expect(background.inert).toBe(true); expect(document.activeElement).toBe(primary);
   fireEvent.keyDown(primary,{key:"Tab"}); expect(document.activeElement).toBe(dismiss);
   fireEvent.keyDown(dismiss,{key:"Tab",shiftKey:true}); expect(document.activeElement).toBe(primary);
-  fireEvent.mouseDown(document.querySelector(".company-message-backdrop")!);
-  fireEvent.click(document.querySelector(".company-message-backdrop")!); expect(message()).not.toBeNull();
+  fireEvent.mouseDown(document.querySelector(".dialogue-backdrop")!);
+  fireEvent.click(document.querySelector(".dialogue-backdrop")!); expect(message()).not.toBeNull();
   fireEvent.keyDown(primary,{key:"p"}); expect(message()).not.toBeNull();
   readThrough(); expect(background.inert).toBeFalsy(); expect(document.activeElement).toBe(trigger);
   view.unmount(); background.remove();
@@ -173,7 +173,7 @@ it("restores background interaction when a higher-priority modal interrupts", ()
   const view = render(<ChapterCompanyMessage model={chapterCompanyMessage(companies[0])!} enabled/>);
   expect(view.container.inert).toBe(true);
   view.rerender(<ChapterCompanyMessage model={chapterCompanyMessage(companies[0])!} enabled={false}/>);
-  expect(view.container.inert).toBeFalsy(); expect(document.querySelector(".company-message-backdrop")).toBeNull();
+  expect(view.container.inert).toBeFalsy(); expect(document.querySelector(".dialogue-backdrop")).toBeNull();
 });
 
 it("does not paint over a blocking modal mounted in the same render", () => {
