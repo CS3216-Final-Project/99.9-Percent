@@ -149,8 +149,11 @@ test("first person looks round with the mouse as it opens, Escape gives the curs
   expect(await exploration(page)).toMatchObject({ walking: true, viewpoint: "first" });
   // A click low in the room, where it would otherwise walk the avatar across the floor, only takes the mouse back.
   const canvas = (await stage(page).locator("canvas").boundingBox())!;
-  await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height * 0.8);
-  await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName ?? null)).toBe("CANVAS");
+  // Chrome refuses the mouse for a moment after Escape releases it; the card stays, so a player clicks again.
+  await expect(async () => {
+    if (await paused.isVisible()) await page.mouse.click(canvas.x + canvas.width / 2, canvas.y + canvas.height * 0.8);
+    expect(await page.evaluate(() => document.pointerLockElement?.tagName ?? null)).toBe("CANVAS");
+  }).toPass({ intervals: [300, 600, 1000] });
   await expect(paused).toHaveCount(0);
   await expect(map(page).locator(".map-destination")).toHaveCount(0);
   // The card's Exit leaves first person for the overview.

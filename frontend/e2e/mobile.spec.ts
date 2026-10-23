@@ -462,6 +462,8 @@ test('account controls remain usable on touch while accounts are offline',async(
 
 
 test("cache selection, paid activation and warmth reload on touch",async({page, installClock})=>{
+ // Two room loads, a cache deployment and a full-page screenshot take most of a minute on CI's software renderer.
+ test.setTimeout(120_000);
  await installClock();
  const {dataCompany}=await import("../src/sim/__tests__/dataFixture");
  await page.route("**/api/**",route=>route.abort());await seedSave(page,dataCompany());
