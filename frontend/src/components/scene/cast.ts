@@ -77,6 +77,21 @@ const CASTING: Record<Role, Species[]> = {
 
 export const ALL_ROLES = Object.keys(CASTING) as Role[];
 
+/** How a role is named on screen, as in the caption. */
+export const ROLE_NAMES: Record<Role, string> = {
+  dev: "Dev",
+  sre: "SRE",
+  pm: "PM",
+  designer: "Designer",
+  data: "Data",
+  intern: "Intern",
+  founder: "Founder",
+  security: "Security",
+  tech: "Tech",
+  frontdesk: "Front desk",
+  marketer: "Marketer",
+};
+
 /** The role a species is cast in; every species plays exactly one. */
 export function roleOf(species: Species): Role {
   const role = ALL_ROLES.find((r) => CASTING[r].includes(species));

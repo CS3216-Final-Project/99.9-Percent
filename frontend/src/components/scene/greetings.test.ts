@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SCENE_CUES } from '@/game/sfx';
-import { ALL_ROLES, creature, type Kind } from './cast';
+import { ALL_ROLES, ALL_SPECIES, creature, SPECIES, type Kind } from './cast';
 import { MAX_LINE } from './conversations';
 import {
   ASIDES,
@@ -15,11 +15,13 @@ import {
   GREET_SPACING,
   greetingLine,
   HELLOS,
+  nearness,
   NOTICE_LEAVE,
   NOTICE_REACH,
   notices,
   PANIC_HELLOS,
   resetGreetings,
+  timbreOf,
   voiceLevel,
   voiceOf,
   VOICE_PEAK,
@@ -116,6 +118,38 @@ describe('the shapes of a greeting', () => {
     expect(voiceLevel(EARSHOT[1])).toBe(0);
     expect(voiceLevel(3)).toBeLessThan(VOICE_PEAK);
     expect(voiceLevel(3)).toBeGreaterThan(0);
+  });
+
+  it('measures nearness as 1 within a metre falling to 0 at the edge of earshot', () => {
+    expect(nearness(0.5)).toBe(1);
+    expect(nearness(1)).toBe(1);
+    expect(nearness(EARSHOT[1])).toBe(0);
+    expect(nearness(EARSHOT[1] + 1)).toBe(0);
+    let last = 1;
+    for (let d = 1; d <= EARSHOT[1]; d += 0.25) {
+      expect(nearness(d)).toBeLessThanOrEqual(last);
+      last = nearness(d);
+    }
+    expect(nearness(2)).toBeGreaterThan(nearness(5));
+    // The bark level is the same curve at voice peak.
+    for (const d of [0.4, 1, 3, 5.5, EARSHOT[1]]) expect(voiceLevel(d)).toBeCloseTo(VOICE_PEAK * nearness(d));
+  });
+
+  it('gives every species a speakable timbre, the small ones higher than the big ones', () => {
+    const blobs = ALL_SPECIES.filter((s) => SPECIES[s].kind === 'blob');
+    const bigs = ALL_SPECIES.filter((s) => SPECIES[s].kind === 'big');
+    const flyers = ALL_SPECIES.filter((s) => SPECIES[s].kind === 'flyer');
+    for (const s of ALL_SPECIES) {
+      const t = timbreOf(s);
+      expect(t.pitch, s).toBeGreaterThanOrEqual(0.1);
+      expect(t.pitch, s).toBeLessThanOrEqual(2);
+      expect(t.rate, s).toBeGreaterThan(0);
+    }
+    for (const blob of blobs) for (const big of bigs) expect(timbreOf(blob).pitch).toBeGreaterThan(timbreOf(big).pitch);
+    for (const flyer of flyers) for (const s of ALL_SPECIES) expect(timbreOf(flyer).rate).toBeGreaterThanOrEqual(timbreOf(s).rate);
+    // Same species, same voice; two blobs differ in seed.
+    expect(timbreOf('cat')).toEqual(timbreOf('cat'));
+    expect(timbreOf('cat').seed).not.toBe(timbreOf('birb').seed);
   });
 
   it('gives every body plan a voice the effects player knows', () => {
