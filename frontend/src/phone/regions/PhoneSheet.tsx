@@ -56,7 +56,9 @@ function MetricsSheet({ campaign }: { campaign: boolean }) {
     lastSelection.current = key;
     if (selected && getSheetState() === "peek") setSheetState("half");
   }, [selected, selectedAppId]);
-  useEffect(() => { body.current?.scrollTo?.({ top: 0 }); }, [selected, selectedAppId, incident]);
+  // Guided Mode opens readings in place and reveals them itself (CampaignPanel), so only Challenge Mode starts again at the top.
+  useEffect(() => { if (!campaign) body.current?.scrollTo?.({ top: 0 }); }, [selected, selectedAppId, campaign]);
+  useEffect(() => { body.current?.scrollTo?.({ top: 0 }); }, [incident]);
   // The sheet, not the panel, scrolls on a phone, so a new panel tab starts at its top here, before guidance reveals
   // a control in it (EquipmentPanel does the same on the desktop).
   useLayoutEffect(() => { body.current?.scrollTo?.({ top: 0 }); }, [panelTab]);

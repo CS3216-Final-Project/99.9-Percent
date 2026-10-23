@@ -57,3 +57,23 @@ test("an open quote stays open while Analysis is read during an incident", async
   await quote.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(quote).toBeHidden();
 });
+
+test("inspecting equipment from Analysis keeps the player's place and shows its readings", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await page.route("**/api/**", r => r.abort());
+  // An incident makes Analysis long enough to scroll down to the chips.
+  await seedSave(page, advanceSteps(newGame(1, "panel-inspect-scroll"), 6).state);
+  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  const side = page.locator("aside.side.campaign-panel");
+  for (const [chip, readings] of [["Network", "Network"], ["App Server", "Servers"], ["Database", "Database"], ["Monitoring", "Monitoring"]]) {
+    const button = panel(page).getByRole("button", { name: chip, exact: true });
+    await button.evaluate(el => el.scrollIntoView({ block: "center" }));
+    const before = await side.evaluate(el => el.scrollTop);
+    expect(before).toBeGreaterThan(0);
+    await button.click();
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+    await expect(panel(page).getByRole("region", { name: `${readings} readings` })).toBeInViewport();
+    await expect(button).toBeInViewport();
+    expect(await side.evaluate(el => el.scrollTop)).toBeGreaterThanOrEqual(before);
+  }
+});

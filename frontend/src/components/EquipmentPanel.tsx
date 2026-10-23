@@ -3,8 +3,12 @@ import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 
-/** Visibility is workspace state; selecting a machine or entering an incident reveals it again. */
-export function EquipmentPanel({ children, label, className = "" }: { children: ReactNode; label: string; className?: string }) {
+/**
+ * Visibility is workspace state; selecting a machine or entering an incident reveals it again. A panel whose contents
+ * change with the selection starts again at its top; one that opens readings in place (`inlineReadings`) keeps its
+ * scroll and reveals them itself.
+ */
+export function EquipmentPanel({ children, label, className = "", inlineReadings = false }: { children: ReactNode; label: string; className?: string; inlineReadings?: boolean }) {
   const open = useGame(s => s.panelOpen), setOpen = useGame(s => s.setPanelOpen);
   const phase = useGame(s => s.game.phase), tour = useGame(s => s.tour), generation = useGame(s => s.generation);
   const selected = useGame(s => s.selected), selectedApp = useGame(s => s.selectedAppId);
@@ -13,7 +17,8 @@ export function EquipmentPanel({ children, label, className = "" }: { children: 
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
   const collapse = useRef<HTMLButtonElement>(null), expand = useRef<HTMLButtonElement>(null), focusOnChange = useRef(false);
   const id = useId();
-  useEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [selected, selectedApp, phase]);
+  useEffect(() => { if (!inlineReadings) content.current?.scrollTo?.({ top: 0 }); }, [selected, selectedApp, inlineReadings]);
+  useEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [phase]);
   // A new tab starts at its top before anything (such as accepted guidance) reveals a control in it.
   useLayoutEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [tab]);
   useEffect(() => { setOpen(true); }, [generation, setOpen]);

@@ -182,7 +182,13 @@ export function CampaignPanel() {
       section.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
     hiddenQuote.current = !!confirming && tab !== "actions";
   }, [confirming, tab]);
-  return <EquipmentPanel className="campaign-panel" label="System metrics">
+  // Choosing equipment, in the room or among the chips, opens its readings under the chips. Keep the player's place and
+  // scroll only as far as needed to show them, after a tab switch to Analysis has started that tab at its top.
+  const selected = useGame(s => s.selected), selectedAppId = useGame(s => s.selectedAppId);
+  useEffect(() => {
+    if (selected) section.current?.querySelector(".incident-investigate")?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [selected, selectedAppId]);
+  return <EquipmentPanel className="campaign-panel" label="System metrics" inlineReadings>
     <section ref={section} className={`panel-section${incident ? " incident" : ""}`} aria-label={incident ? "Incident" : "System overview"}>
       {incident && <header className="panel-head">
         <span className="panel-icon state-critical"><Icon name="incident" /></span>

@@ -161,6 +161,25 @@ test("Guided Mode: a new panel tab opens at the top of the sheet, not where the 
   await expect(panel.getByRole("region", { name: "Database readings" })).toBeVisible();
 });
 
+test("Guided Mode: inspecting equipment keeps the sheet's place and shows its readings", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await openGuided(page, { width: 390, height: 844 }, advanceSteps(newGame(1, "phone-layout-inspect"), 6).state);
+  await handle(page).tap();
+  await expect(sheet(page)).toHaveAttribute("data-state", "full");
+  const panel = page.getByRole("complementary", { name: "System metrics" }), body = page.locator(".phone-sheet-body");
+  for (const [chip, readings] of [["Network", "Network"], ["App Server", "Servers"], ["Database", "Database"], ["Monitoring", "Monitoring"]]) {
+    const button = panel.getByRole("button", { name: chip, exact: true });
+    await button.evaluate(el => el.scrollIntoView({ block: "center" }));
+    const before = await body.evaluate(el => el.scrollTop);
+    expect(before).toBeGreaterThan(0);
+    await button.tap();
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+    await expect(panel.getByRole("region", { name: `${readings} readings` })).toBeInViewport();
+    await expect(button).toBeInViewport();
+    expect(await body.evaluate(el => el.scrollTop)).toBeGreaterThanOrEqual(before);
+  }
+});
+
 test("Guided Mode top strip: Cash stays visible, users and pending revenue are one tap away, and the chapter row counts the phone's chapters", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await openGuided(page, { width: 360, height: 640 });

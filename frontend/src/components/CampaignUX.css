@@ -2,12 +2,13 @@
 .campaign-panel .campaign-guidance { margin-bottom: 12px; }
 .campaign-panel .campaign-guidance:empty { display: none; }
 /* The tab switch stays in reach while a long tab scrolls. A paper halo, fading out below it, hides
- * content passing underneath instead of a hard divider. */
+ * content passing underneath instead of a hard divider. The halo reaches past the scroll edge above
+ * (where it is clipped), so no sliver of content shows through at fractional pixel ratios. */
 .campaign-panel .panel-tabs > .segmented {
   position: sticky;
   top: 8px;
   z-index: 2;
-  box-shadow: 0 0 0 8px var(--paper), 0 14px 10px -4px var(--paper);
+  box-shadow: 0 0 0 8px var(--paper), 0 -8px 0 8px var(--paper), 0 14px 10px -4px var(--paper);
 }
 /* A control scrolled into view (guidance, lessons, focus) stops below the switch, not under it:
  * its 8px offset, about 48px of switch, and an 8px gap. */
