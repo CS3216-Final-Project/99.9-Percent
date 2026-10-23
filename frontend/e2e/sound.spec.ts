@@ -80,23 +80,30 @@ test("the header sound button follows the menu sliders and turns sound back on f
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("nn.audio.v1")!))).toEqual({ music: 80, effects: 80, muted: false, captions: true });
 });
 
-test("starts a new company with the same sound, and lets a saved one continue quietly", async ({ page, withoutRoom }) => {
-  await withoutRoom();
-  const voices = await countEffects(page);
-  await page.goto("/");
-  await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
-  await expect.poll(voices).toBeGreaterThanOrEqual(5);
-  await completeTutorial(page);
-  await expect(page.getByRole("dialog", { name: "Launch week" })).toBeHidden();
-  // Reloading counts from zero again: the saved company continues without its start-up sound.
-  await page.reload();
-  await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await page.waitForTimeout(500);
-  expect(await voices()).toBe(0);
-  const menu = page.getByRole("dialog", { name: "Menu" });
-  await page.getByRole("button", { name: "Menu", exact: true }).click();
-  await menu.getByRole("tab", { name: "Saves" }).click();
-  await menu.getByRole("button", { name: "New company", exact: true }).click();
-  await menu.getByRole("button", { name: "Lose this company? Press again" }).click();
-  await expect.poll(voices).toBeGreaterThanOrEqual(5);
+test.describe(() => {
+  // Maya's message is dismissed by hand here: the shared handler can still be clicking it when the page reloads.
+  test.use({ reviewCompanyMessage: false });
+  test("starts a new company with the same sound, and lets a saved one continue quietly", async ({ page, withoutRoom }) => {
+    await withoutRoom();
+    const voices = await countEffects(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
+    await expect.poll(voices).toBeGreaterThanOrEqual(5);
+    await completeTutorial(page);
+    await expect(page.getByRole("dialog", { name: "Launch week" })).toBeHidden();
+    const message = page.getByRole("dialog", { name: "Company Message", exact: true });
+    await message.getByRole("button", { name: "Got it", exact: true }).click();
+    await expect(message).toBeHidden();
+    // Reloading counts from zero again: the saved company continues without its start-up sound.
+    await page.reload();
+    await page.getByRole("button", { name: "Continue company", exact: true }).click();
+    await page.waitForTimeout(500);
+    expect(await voices()).toBe(0);
+    const menu = page.getByRole("dialog", { name: "Menu" });
+    await page.getByRole("button", { name: "Menu", exact: true }).click();
+    await menu.getByRole("tab", { name: "Saves" }).click();
+    await menu.getByRole("button", { name: "New company", exact: true }).click();
+    await menu.getByRole("button", { name: "Lose this company? Press again" }).click();
+    await expect.poll(voices).toBeGreaterThanOrEqual(5);
+  });
 });
