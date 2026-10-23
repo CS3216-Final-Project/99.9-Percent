@@ -14,7 +14,11 @@ export interface CampaignEnvelope {
   savedAt: number;
 }
 export interface Account { id: string; displayName: string }
-export interface AppSession { account: Account; csrfToken: string }
+/**
+ * `newAccount` is true while this session is the one that created the account and the account has no cloud saves,
+ * so the client may save the browser's company there unasked. Absent from older servers; treat that as false.
+ */
+export interface AppSession { account: Account; csrfToken: string; newAccount?: boolean }
 export interface CloudRun { runId: string; revision: number; envelope: CampaignEnvelope; updatedAt: string }
 export type RunSummary = Pick<CloudRun, "runId" | "revision" | "updatedAt">;
 export interface SaveRequest { expectedRevision: number; envelope: CampaignEnvelope }

@@ -1,4 +1,4 @@
-import {beforeEach,afterEach,it,expect,vi} from 'vitest';
+import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
 import {useGame} from './store';
 import {localCloudCopy,rememberCloud} from './cloud';
 import {makeEnvelope,validateEnvelope} from './saveEnvelope';
@@ -118,7 +118,7 @@ it('prevents mode switches and imports from rebinding an in-flight cloud upload'
 it('keeps a quota-failed conflict in memory without an unhandled rejection',async()=>{
   await useGame.getState().restoreAccount();const e=current(),remote={runId:e.runId,revision:2,envelope:e,updatedAt:'now'};
   vi.mocked(api.putRun).mockImplementation(async()=>{vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw Error('quota');});throw new api.AccountApiError(409,{error:'conflict',current:remote});});
-  await expect(useGame.getState().saveCloud(true)).resolves.toBeUndefined();expect(useGame.getState().cloudConflict).toEqual(remote);expect(useGame.getState().cloudStatus).toContain('Keep this tab open');
+  await expect(useGame.getState().saveCloud(true)).resolves.toBe(false);expect(useGame.getState().cloudConflict).toEqual(remote);expect(useGame.getState().cloudStatus).toContain('Keep this tab open');
 });
 
 it('signs in with email in place, without uploading the guest company',async()=>{
@@ -151,4 +151,65 @@ it('loads a cloud save from the home screen while Classic is active, keeping the
   expect(useGame.getState().game.campaign!.runId).toBe('remote-from-classic');
   const kept=loadClassicGame();expect(kept.status==='ok'&&kept.game.turn).toBe(6);
   expect(JSON.parse(localStorage.getItem(`nn.campaign.before-cloud.${local.runId}`)!).runId).toBe(local.runId);
+});
+
+describe('a new account',()=>{
+  const created={account:{id:'owner-new',displayName:'New'},csrfToken:'csrf-new',newAccount:true};
+  const confirm=()=>vi.mocked(api.putRun).mockImplementation(async(envelope,expectedRevision)=>({runId:envelope.runId,revision:expectedRevision+1,envelope,updatedAt:'now'}));
+  const settled=()=>vi.waitFor(()=>expect(useGame.getState().cloudBusy).toBe(false));
+  it('receives the guest company unasked after the sign-up redirect, once, and says so',async()=>{
+    confirm();vi.mocked(api.getSession).mockResolvedValue(created);const e=current();
+    await useGame.getState().restoreAccount();
+    await vi.waitFor(()=>expect(useGame.getState().toast?.text).toBe('Your progress is saved to your account.'));
+    expect(api.putRun).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({runId:e.runId}),0,created.csrfToken);
+    expect(localCloudCopy(e.runId)).toMatchObject({ownerId:'owner-new',revision:1});
+    expect(useGame.getState()).toMatchObject({cloudStatus:'Your progress is saved to your account.',accountSession:{account:created.account,newAccount:false}});
+    useGame.getState().advance();await useGame.getState().refreshCloudRuns();await Promise.resolve();
+    expect(api.putRun).toHaveBeenCalledTimes(1);
+  });
+  it('receives the company on email registration without a reload',async()=>{
+    confirm();vi.mocked(api.getSession).mockRejectedValue(new api.AccountApiError(401,{error:'guest'}));await useGame.getState().restoreAccount();
+    vi.mocked(api.emailRegister).mockResolvedValue(created);const e=current();
+    expect(await useGame.getState().registerWithEmail('New','new@example.com','password-new')).toBeNull();
+    await vi.waitFor(()=>expect(api.putRun).toHaveBeenCalledWith(expect.objectContaining({runId:e.runId}),0,created.csrfToken));
+    await settled();expect(useGame.getState().toast?.kind).toBe('success');
+  });
+  it('never uploads a company that belongs to another account in this browser',async()=>{
+    const e=current();rememberCloud({ownerId:a.account.id,revision:3,local:e});
+    vi.mocked(api.getSession).mockResolvedValue(created);await useGame.getState().restoreAccount();
+    await vi.waitFor(()=>expect(useGame.getState().toast?.text).toMatch(/belongs to another account/));
+    expect(api.putRun).not.toHaveBeenCalled();expect(localCloudCopy(e.runId)).toMatchObject({ownerId:a.account.id,revision:3});
+  });
+  it('keeps the local save when the upload fails, explains it and lets Save to cloud retry',async()=>{
+    vi.mocked(api.putRun).mockRejectedValueOnce(TypeError('Failed to fetch'));vi.mocked(api.getSession).mockResolvedValue(created);
+    const e=current(),before=rawSave();await useGame.getState().restoreAccount();
+    await vi.waitFor(()=>expect(useGame.getState().toast?.kind).toBe('error'));
+    expect(useGame.getState().toast?.text).toMatch(/could not be saved to your account yet/);
+    expect(useGame.getState().cloudStatus).toBe('Cloud saves are unavailable right now. Your local save is unchanged.');
+    expect(rawSave()).toBe(before);expect(useGame.getState().game.campaign!.runId).toBe(e.runId);
+    // One automatic try per page: later changes leave the retry to the player.
+    useGame.getState().advance();await Promise.resolve();expect(api.putRun).toHaveBeenCalledTimes(1);
+    confirm();expect(await useGame.getState().saveCloud()).toBe(true);
+    expect(api.putRun).toHaveBeenLastCalledWith(expect.objectContaining({runId:e.runId}),0,created.csrfToken);
+    expect(localCloudCopy(e.runId)?.revision).toBe(1);
+  });
+  it('reports an upload the server refuses, such as a run another account already holds',async()=>{
+    vi.mocked(api.putRun).mockRejectedValueOnce(new api.AccountApiError(409,{error:'Cloud save changed or this run cannot be attached.'}));
+    vi.mocked(api.getSession).mockResolvedValue(created);await useGame.getState().restoreAccount();
+    await vi.waitFor(()=>expect(useGame.getState().toast?.kind).toBe('error'));
+    expect(useGame.getState()).toMatchObject({cloudConflict:null,cloudStatus:'Cloud save changed or this run cannot be attached.'});
+  });
+  it('waits for a Guided Mode company to open before saving it',async()=>{
+    confirm();saveMeta({...DEFAULT_META,challengeUnlocked:true});saveMode('classic');
+    useGame.setState(useGame.getInitialState(),true);useGame.getState().boot();
+    vi.mocked(api.getSession).mockResolvedValue(created);await useGame.getState().restoreAccount();await Promise.resolve();
+    expect(useGame.getState().mode).toBe('classic');expect(api.putRun).not.toHaveBeenCalled();
+    expect(useGame.getState().switchMode('campaign')).toBe(true);
+    await vi.waitFor(()=>expect(api.putRun).toHaveBeenCalledWith(expect.objectContaining({runId:current().runId}),0,created.csrfToken));
+    await settled();
+  });
+  it('is never assumed for a returning account',async()=>{
+    vi.mocked(api.getSession).mockResolvedValue({...created,newAccount:false});await useGame.getState().restoreAccount();await Promise.resolve();
+    expect(api.putRun).not.toHaveBeenCalled();expect(useGame.getState().cloudStatus).toBe('Signed in. Nothing is uploaded until you choose Save to cloud.');
+  });
 });

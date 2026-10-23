@@ -243,12 +243,13 @@ function CloudSaves({ onLoaded, Heading }: { onLoaded?: () => void; Heading: Hea
   // Only a successful refresh may say the account has no cloud saves.
   const [listing, setListing] = useState<"loading" | "listed" | "failed">("loading");
   const listedFor = useRef<typeof session | null>(null);
+  // A sign-up's automatic save may still be uploading: list once it lands, so the list includes it.
   useEffect(() => {
-    if (listedFor.current === session) return;
+    if (listedFor.current === session || s.cloudBusy) return;
     listedFor.current = session;
     setListing("loading");
     void useGame.getState().refreshCloudRuns().then((ok) => setListing(ok ? "listed" : "failed"));
-  }, [session]);
+  }, [session, s.cloudBusy]);
 
   const campaign = s.mode === "campaign" ? s.game.campaign : undefined;
   const local = campaign && s.hasRun ? campaign.runId : null;
