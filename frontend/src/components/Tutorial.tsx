@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { isPhoneEdition } from "@/phone/edition";
 import { useGame, type TourTrack } from "@/game/store";
 import { floorOf, selectedInView } from "@/game/floors";
 import { num } from "@/game/format";
 import type { EquipmentId } from "@/sim";
 import { pendingStop } from "@/sim/step";
+import { milestoneBlocks } from "@/game/campaignGuidance";
 import { installPending } from "@/sim/reliability";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { EDGE, openRoomArea } from "./roomArea";
-import ChapterZero from "./ChapterZeroGuide";
-import { CHAPTER_ZERO_LESSONS, type ChapterZeroLesson } from "./chapterZeroLessons";
 import { cardStyle, placeFor, type Box } from "./spotlight";
+import { Spotlight } from "./SpotOverlay";
 
 /**
  * Guided walkthroughs. Each step is a goal ("Add a server") plus one short
@@ -191,16 +191,15 @@ const TIPS = {
 
 const TRACKS: Partial<Record<TourTrack, Step[]>> = { basics: BASICS, incident: INCIDENT, ...CHAPTERS, ...TIPS };
 export const BASICS_STEPS = BASICS.length;
-export const CAMPAIGN_STEPS = CHAPTER_ZERO_LESSONS.length;
 
-const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", campaign: "Tutorial", incident: "Incident guide", settlement: "Tip" };
+const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", incident: "Incident guide", settlement: "Tip" };
 
 /** Where a track's steps make sense: Guided Mode's also wait for any review or milestone and for open views. */
 function fits(track: TourTrack, s: Snapshot, step: Pick<Step, "inTech">): boolean {
   if (track === "basics") return s.game.phase === "management";
   if (track === "incident") return s.game.phase === "incident";
   const c = s.game.campaign;
-  return !!c && s.game.phase === "management" && pendingStop(c) === null && !(c.openingMilestone && !c.openingMilestone.acknowledged) && (s.view === null || (!!step.inTech && s.view === "tech"));
+  return !!c && s.game.phase === "management" && pendingStop(c) === null && !milestoneBlocks(c) && (s.view === null || (!!step.inTech && s.view === "tech"));
 }
 
 /** Whether a box on screen lies in the part of the room the panel leaves open. */
@@ -220,13 +219,7 @@ function closedDockMenu(el: Element): { summary: HTMLElement; name: string } | n
   return menu?.dataset.menuName && summary && !summary.contains(el) ? { summary, name: menu.dataset.menuName } : null;
 }
 
-/** `chapterZero` presents Chapter 0's lessons; an edition can bring its own, as the phone's coach strip does. */
-export default function Tutorial({ chapterZero: Guide = ChapterZero }: { chapterZero?: ComponentType<{ lessons: readonly ChapterZeroLesson[] }> } = {}) {
-  const s = useGame();
-  if (s.tour?.track === "campaign") {
-    if (!fits("campaign", { ...s, view: null }, {}) || s.onboarding) return null;
-    return <Guide key={`${s.generation}:${s.tutorialAttempt}`} lessons={CHAPTER_ZERO_LESSONS} />;
-  }
+export default function Tutorial() {
   return <SpotlightTutorial />;
 }
 
@@ -371,8 +364,7 @@ function SpotlightTutorial() {
   // The fixed-height strip scrolls under its Skip and Next, so what to do comes before the reason, as in Guided Mode.
   const whyFirst = !campaign && !docked;
   return (
-    <div className="tour" data-track={tour.track} data-docked={docked || undefined}>
-      {box ? <div className="tour-hole" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} /> : <div className="tour-dim" />}
+    <Spotlight box={box} track={tour.track} docked={docked}>
       <div
         ref={card}
         className="tour-card"
@@ -401,6 +393,6 @@ function SpotlightTutorial() {
           )}
         </div>
       </div>
-    </div>
+    </Spotlight>
   );
 }

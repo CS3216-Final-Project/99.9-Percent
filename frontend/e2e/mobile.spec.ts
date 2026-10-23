@@ -3,16 +3,16 @@ import { campaignReportJourney } from "./campaignReports";
 import { chapter6FinanceJourney } from "./chapter6Finance";
 import { act as chapter6Act, tick as chapter6Tick, combinedCompany as chapter6Company, promotionRiskCompany } from "../src/sim/__tests__/combinedFixture";
 import { chapter6Preparation, bootChapter6 } from "./chapter6Guidance";
-import { appHealthDuringTutorial, appHealthJourney, appHealthProblem } from "./appHealth";
+import { appHealthDuringOpening, appHealthJourney, appHealthProblem } from "./appHealth";
 import type { Page } from "@playwright/test";
 import { keyboardDetails, purchaseLayout } from "./purchaseLayout";
-import { completeTutorial, advanceCampaignStep, finishChapterZero, nextChapterZero, CHAPTER_ZERO_LESSONS } from "./fixtures";
+import { completeTutorial, advanceCampaignStep } from "./fixtures";
 import { financeDuringWalkthrough } from "./financeIntegration";
-import { test, expect, expectRoom, savedGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
+import { test, expect, expectRoom, savedGame, seedSave, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 import { recoveryJourney } from "./incidentRecovery";
 import { pauseArrival } from "./incidentPause";
-import { advanceSteps } from "../src/sim/step";
+import { advanceSteps, applyCampaignInput, step } from "../src/sim/step";
 import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixture";
 import { spikeCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
 import { expectCueColours, chapter4TrafficTarget } from "./chapter4Cues";
@@ -93,24 +93,23 @@ for (const width of [390, 320]) test(`Phase 1 Hint and accepted control remain u
   await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeInViewport({ ratio: 1 });
 });
 
-test("Walkthrough practice stays visible and can be exited by touch during a saved incident", async ({ page, withoutRoom }) => {
+test("Launch Week practice can be exited by touch during a saved incident", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/**", route => route.abort());
   const incident = advanceSteps(newGame(1, "touch-exit-replay"), 6).state;
-  await seedSave(page, incident, { walkthroughStep: 0, walkthroughFurthestStep: 0 });
+  await seedSave(page, incident);
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
-  await expect(tutorial(page)).toHaveAccessibleName(`Walkthrough, step 1 of ${CHAPTER_ZERO_LESSONS}`);
-  await expect(tutorial(page)).toContainText("Practice");
-  await tutorial(page).getByRole("button", { name: "Skip tutorial", exact: true }).tap();
-  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
+  await page.getByRole("button", { name: "View chapters", exact: true }).tap();
+  await page.getByRole("dialog", { name: "Guided Mode chapters" }).getByRole("button", { name: "Replay Launch Week", exact: true }).tap();
+  await expect(page.getByRole("dialog", { name: "Launch week" })).toBeVisible();
+  await page.getByRole("button", { name: "Open the doors", exact: true }).tap();
+  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Launch Week");
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "View chapters", exact: true }).tap();
+  await page.getByRole("dialog", { name: "Guided Mode chapters" }).getByRole("button", { name: "Exit practice", exact: true }).tap();
   expect((await savedGame(page)).campaign).toEqual(incident.campaign);
-  await page.reload();
-  await page.getByRole("button", { name: "Continue company", exact: true }).tap();
-  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
-  await expect(tutorial(page)).toHaveCount(0);
 });
 
 test("the touch Navigation menu keeps floors, walking and camera tools clear of time controls", async ({ page }) => {
@@ -450,7 +449,7 @@ test('account controls remain usable on touch while accounts are offline',async(
   await page.screenshot({path:'test-results/phase3-account-mobile.png'});
   await dialog.getByRole('button',{name:'Close'}).tap();
   await page.getByRole('button',{name:'Start Guided Mode',exact:true}).tap();
-  await expect(tutorial(page)).toBeVisible();
+  await expect(page.getByRole('dialog',{name:'Launch week'})).toBeVisible();
 });
 
 
@@ -492,44 +491,22 @@ test("traffic spikes: touch selects an instance after retirement leaves an ID ga
 
 test("combined: touch scorecard, completed guidance, technology inspection and paused reload",async({page,withoutRoom})=>{await withoutRoom();const {finishedCompany}=await import("../src/sim/__tests__/combinedFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,finishedCompany());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Grow the Company");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Grow the Company"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await page.getByRole("region",{name:"Run scorecard"}).getByText("View technical details",{exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("50,000");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"See how it ended",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
 
-for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secondary controls fit at ${width}px`,async({page})=>{
+for(const width of [390,320]) test(`Campaign UX: the touch opening and secondary controls fit at ${width}px`,async({page})=>{
  // The room is drawn in software, and its labels settle only as the camera brings each machine above the panel.
  test.setTimeout(90_000);
  await page.setViewportSize({width,height:844});
  await page.goto("/");await page.getByRole("button",{name:"Start Guided Mode",exact:true}).tap();
  await expectRoom(page);
- const card=tutorial(page);
- await expect(card).toBeInViewport({ratio:1});
- await page.screenshot({path:`test-results/clarity-tutorial-${width}-goal.png`});
- await nextChapterZero(page,true);
- await expect(card.getByRole("button",{name:"Next",exact:true})).toBeDisabled();
- await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"App Server",exact:true}).tap();
- // The readings stay in view beside the card until the player presses Next.
- await expect(page.locator(".campaign-evidence")).toBeInViewport();
- await expect(card).toHaveAttribute("data-lesson-id","inspect-app");
- await card.getByRole("button",{name:"Next",exact:true}).tap();
- await expect(card).toHaveAttribute("data-lesson-id","inspect-db");
- await expect(page.getByRole("dialog")).toHaveCount(1);
- await page.screenshot({path:`test-results/clarity-tutorial-${width}-first.png`});
- await nextChapterZero(page,true);
- await card.getByRole("button",{name:"Back",exact:true}).tap();
- await expect(card.getByRole("button",{name:"Next",exact:true})).toBeEnabled();
- await nextChapterZero(page,true);
- while(await card.getAttribute("data-lesson-id")!=="cancel")await nextChapterZero(page,true);
- await expect(card.getByRole("button",{name:"Next",exact:true})).toBeEnabled();
- await expect(card).toBeInViewport({ratio:1});
- await page.screenshot({path:`test-results/clarity-tutorial-${width}-purchase.png`});
- await page.getByRole("button",{name:"Cancel",exact:true}).tap();
- await expect(card).toHaveAttribute("data-lesson-id","money");
- while(await card.getAttribute("data-lesson-id")!=="speed")await nextChapterZero(page,true);
+ const letter=page.getByRole("dialog",{name:"Launch week"});
+ await expect(letter).toBeInViewport({ratio:1});
+ await page.screenshot({path:`test-results/clarity-letter-${width}.png`});
+ await letter.getByRole("button",{name:"Open the doors",exact:true}).tap();
  const navigation = page.locator(".room-menu");
  await navigation.locator(":scope > summary").tap();
  const officeFloor = navigation.getByRole("group", { name: "Floors" }).getByRole("button", { name: /^Office floor/ });
  await officeFloor.tap();
  await expect(officeFloor).toHaveAttribute("aria-pressed","true");
  await navigation.locator(":scope > summary").tap();
- await finishChapterZero(page,true);await expect(card).toBeHidden();
- expect((await savedGame(page)).campaign!.actions).toEqual([]);
  await expect(page.getByRole("button",{name:"Run",exact:true})).toBeInViewport();await expect(page.getByRole("button",{name:"Advance game second",exact:true})).toBeHidden();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
  const beforeRun=(await savedGame(page)).campaign!.step;
@@ -574,7 +551,7 @@ test("App Health dashboard and overlays work on narrow touch screens", async ({p
 });
 test("Chapter 0 inspections and App Health work on touch", async ({page}) => {
  await page.setViewportSize({width:390,height:844}); await page.emulateMedia({reducedMotion:"reduce"});
- await appHealthDuringTutorial(page);
+ await appHealthDuringOpening(page);
 });
 test("App Health explains problem evidence on touch", async ({page}) => { await appHealthProblem(page,true); });
 
@@ -689,4 +666,23 @@ for (const kind of ["spikes", "completion"] as const) {
 test("Chapter 6 finances: funding warning and existing cash spotlight on 320px touch", async ({ page, installClock }, info) => {
   await installClock(); await page.setViewportSize({ width: 320, height: 568 });
   await chapter6FinanceJourney(page, info, true);
+});
+
+test("Launch Week cold open and research sheet remain usable by touch at 390px", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/api/**", r => r.abort());
+  // A company whose database incident was fixed, with the research point earned and unspent.
+  let s = newGame(7, "lw-m", 2);
+  for (let i = 0; i < 200 && !s.campaign!.launchWeek?.researchEarned; i++) {
+    if (s.campaign!.incident && !s.campaign!.pending.some(a => a.type === "upgrade-db") && s.campaign!.dbCapacity < 1000) s = applyCampaignInput(s, { type: "start_db_upgrade" }).state;
+    s = s.phase === "review" ? applyCampaignInput(s, { type: "acknowledge_review" }).state : step(s).state;
+  }
+  await seedSave(page, s); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).tap(); await expectRoom(page);
+  const sheet = page.getByRole("region", { name: "Launch Week research" });
+  await expect(sheet).toBeVisible();
+  await page.screenshot({ path: info.outputPath("launch-research-touch.png") });
+  await sheet.getByRole("button", { name: "Autoscaling" }).tap();
+  await page.getByRole("button", { name: "Confirm", exact: true }).tap();
+  expect((await savedGame(page)).campaign!.launchWeek?.tech).toBe("autoscaling");
 });

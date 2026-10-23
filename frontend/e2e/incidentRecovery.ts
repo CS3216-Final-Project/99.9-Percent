@@ -1,5 +1,5 @@
 import type { Page, TestInfo } from "@playwright/test";
-import { expect, expectRoom, savedGame, seedSave } from "./fixtures";
+import { advanceCampaignStep, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame, type GameState } from "../src/sim";
 import { act, tick } from "../src/sim/__tests__/spikeFixtures";
 
@@ -24,7 +24,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   await press(page.getByRole("button", { name: "Continue company", exact: true })); await expectRoom(page);
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
   await expect(page.getByRole("dialog", { name: "System Recovered!" })).toHaveCount(0);
-  await press(page.getByRole("button", { name: "Step 1 game second", exact: true }));
+  await advanceCampaignStep(page, { resumeClock: false });
   const notice = page.getByRole("dialog", { name: "System Recovered!", exact: true });
   await expect(notice).toBeVisible(); await expect(notice).toContainText("Great work! Your app is running smoothly again.");
   const recovered = (await savedGame(page)); expect(recovered.phase).toBe("review"); expect(recovered.campaign!.reports.at(-1)!.id).toBe(game.campaign!.incident!.id);
@@ -68,7 +68,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   await expect(notice).toHaveCount(0); await expect(report).toHaveCount(0);
   await press(page.getByRole("button", { name: "History", exact: true }));
   await press(page.getByRole("tab", { name: "Incidents (1)", exact: true }));
-  await press(page.getByRole("button", { name: /Game seconds.*Service slowdown/ }));
+  await press(page.getByRole("button", { name: /overloaded.*Game seconds/ }));
   await expect(page.getByText("What happened?", { exact: true })).toBeVisible();
   await expect(notice).toHaveCount(0);
 }

@@ -206,7 +206,7 @@ for (const mode of ["Guided", "Challenge"] as const) {
     const panel = await box(dock(page).locator(".time-menu .dock-panel"));
     expect(panel.y + panel.height).toBeLessThanOrEqual(bar.y);
     expect(await box(speed)).toEqual(before);
-    if (mode === "Guided") await expect(dock(page).getByRole("button", { name: "Step 1 game second", exact: true })).toBeInViewport({ ratio: 1 });
+    if (mode === "Guided") await expect(dock(page).getByRole("button", { name: "End the week at 20 times speed", exact: true })).toBeInViewport({ ratio: 1 });
     await speeds.getByRole("button", { name: "2×", exact: true }).tap();
     await expect(speed).toContainText("2×");
     await expect(speed).toHaveJSProperty("offsetWidth", Math.round(before.width));

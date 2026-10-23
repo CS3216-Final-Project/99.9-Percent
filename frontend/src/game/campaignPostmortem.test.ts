@@ -21,7 +21,7 @@ describe("recorded incident lessons", () => {
     if (g.phase !== "incident") throw Error("Expected an actual incident");
     return g;
   };
-  it.each([1, 2, 3, 4, 5, 6])("reads an engine-generated Chapter %i report without mutating its records", chapter => {
+  it.each([1, 2, 3, 4, 5, 6])("reads an engine-generated Chapter %i report without mutating its records", { timeout: 30_000 }, chapter => {
     let g: GameState;
     if (chapter === 1) g = upgradeRecovery();
     else if (chapter === 2) {

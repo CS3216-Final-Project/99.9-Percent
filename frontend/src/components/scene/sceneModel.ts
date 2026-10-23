@@ -10,6 +10,7 @@ import {
   type GameState,
 } from "@/sim";
 import type { Racks } from "./floorplan";
+import { inspectedSinceIncident } from "./traffic";
 import { footprint, MAX_TEMP_SHOWN, type Footprint } from "./layout";
 import type { Led } from "./textures";
 
@@ -46,7 +47,10 @@ export interface SceneModel {
 
 export function buildModel(s: GameState): SceneModel {
   const inc = s.phase === "incident" ? s.incident : null;
-  const inspected = inc ? inc.evidence.map((e) => e.equipment) : [];
+  // A Guided Mode incident keeps its failures at the door: a machine shows its state once the player has inspected it.
+  const campaignInspected = s.campaign?.incident ? [...inspectedSinceIncident(s.campaign)] as EquipmentId[] : null;
+  const inspected = inc ? inc.evidence.map((e) => e.equipment) : campaignInspected ?? [];
+  const hidden = (id: EquipmentId) => !!campaignInspected && !campaignInspected.includes(id);
   const named = has(s, "monitoring") || has(s, "health_checks");
   // During an incident the racks only show what the player has actually looked at.
   const reveal = (id: EquipmentId) => !inc || inspected.includes(id);
@@ -55,9 +59,11 @@ export function buildModel(s: GameState): SceneModel {
   const hosts: Led[] = s.infra.appHosts.map((h, i) => {
     if(s.campaign) {
       const a=s.campaign.apps[i], x=s.campaign.snapshot.instances?.find(x=>x.id===a.id);
-      if(a.health==="failed")return "critical";
       if(a.role==="spare")return "standby";
+      // A failure the health checks have already detected is known; anything else waits for an inspection.
+      if(a.health==="failed")return hidden("app")&&a.detectedHealth!=="unhealthy"?"ok":"critical";
       if(!a.routed&&a.backlog===0)return "off";
+      if(hidden("app"))return "ok";
       return x&&x.demandRatio>1?"critical":a.backlog>0?"warn":"ok";
     }
     if (h.status === "failed") return reveal("app") ? "off" : "ok";
@@ -67,7 +73,7 @@ export function buildModel(s: GameState): SceneModel {
     return "ok";
   });
   const dbStatus = s.infra.dbHost.status;
-  const dbLed: Led =
+  const dbLed: Led = hidden("db") ? "ok" :
     dbStatus === "failed"
       ? reveal("db")
         ? "off"
@@ -86,7 +92,7 @@ export function buildModel(s: GameState): SceneModel {
   const footprints = {} as SceneModel["footprints"];
   for (const id of EQUIPMENT_ORDER) {
     const info = equipmentInfo(s, id);
-    states[id] = info.state;
+    states[id] = hidden(id) && info.built ? "ok" : info.state;
     names[id] = info.name;
     built[id] = info.built;
     footprints[id] = footprint(s, id);

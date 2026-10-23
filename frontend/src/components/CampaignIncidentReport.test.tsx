@@ -67,8 +67,8 @@ it("consolidates missing workload details and does not render an empty evidence 
   view.rerender(<CampaignIncidentReport report={{ ...r, snapshots: [], events: [] }} />);
   expect(screen.queryByRole("table", { hidden: true })).toBeNull(); expect(screen.getByText("No historical observations were retained.")).toBeTruthy();
 });
-it.each(["walkthrough", "practice"])("preserves the existing %s report instead of the new flow", kind => {
-  const game = recovery(); useGame.setState({ game, started: true, tour: { track: "campaign", step: 0 }, tutorialCompany: kind === "practice" ? { game, remainderMs: 0, measurement: useGame.getState().measurement } : null });
+it("preserves the existing practice report instead of the new flow", () => {
+  const game = recovery(); useGame.setState({ game, started: true, tutorialCompany: { game, remainderMs: 0, measurement: useGame.getState().measurement } });
   render(<CampaignOverlays />); expect(screen.queryByRole("dialog", { name: "System Recovered!" })).toBeNull();
   expect(screen.getByRole("dialog", { name: "Incident postmortem" }).textContent).toContain("Causes, actions and trade-offs");
 });

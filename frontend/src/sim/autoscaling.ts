@@ -128,7 +128,7 @@ export function spikeAction(s:GameState,action:Action):Rejection|null|undefined 
  const c=s.campaign!,d=c.spikeStage;
  if(action.type==="enter_spikes"){
   if(!canEnterSpikes(s))return fail("Requires consumed data growth, stable service, drained work and acknowledged reports.");
-  c.spikeStage={id:T.id,version:T.version,configuration:JSON.stringify(T),enteredStep:c.step,deadlines:T.offsets.map(x=>c.step+x),consumed:[],researchEarned:1,researchSpent:0,controller:null,baselineStableSteps:0,completedStep:null,acknowledged:false};
+  c.spikeStage={id:T.id,version:T.version,configuration:JSON.stringify(T),enteredStep:c.step,deadlines:T.offsets.map(x=>c.step+x),consumed:[],researchEarned:1,researchSpent:c.launchWeek?.tech==="autoscaling"?1:0,controller:null,baselineStableSteps:0,completedStep:null,acknowledged:false};
   trace(c,"spike-stage-entered",{stageId:T.id,stageVersion:T.version,configuration:JSON.stringify(T),cashCents:c.cashCents,investedCents:c.investedCents,settledCostCents:c.costsCents,rejected:c.cumulative.rejected});
   trace(c,"progression-awarded",{recognitionId:"data-readiness",research:1});trace(c,"traffic-spikes-announced",{deadlines:JSON.stringify(c.spikeStage.deadlines),baseline:T.baseline,peak:T.peak});
  } else if(!d)return fail("Enter Traffic Spikes & Autoscaling first.");

@@ -1,4 +1,4 @@
-import { test, expect, seedSave, savedGame, expectRoom, tutorial, setGameSpeed } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, setGameSpeed, advanceCampaignStep } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -229,12 +229,12 @@ test("guidance local modal ownership suppresses both spotlights", async ({ page,
   await idle(page); await expect(gold(page)).toHaveCount(0);
 });
 
-test("guidance onboarding keeps the original header and owns all attention", async ({ page, installClock }) => {
-  await installClock(); await seedSave(page, newGame(), { tutorialDone: false });
+test("the Launch Week letter keeps the original header and owns all attention", async ({ page, installClock }) => {
+  await installClock(); await seedSave(page, newGame(undefined, undefined, 2));
   await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
-  await expect(tutorial(page)).toBeVisible(); await idle(page);
+  await expect(page.getByRole("dialog", { name: "Launch week" })).toBeVisible(); await idle(page);
   await expect(page.getByRole("button", { name: "Hint", exact: true })).toHaveCount(0);
-  await expect(gold(page)).toHaveCount(0);
+  await expect(page.locator("[data-spotlight]")).toHaveCount(0); await expect(gold(page)).toHaveCount(0);
   expect((await savedGame(page)).campaign!.step).toBe(0);
 });
 
@@ -297,8 +297,8 @@ test("action guidance routing disclosure transfers to All apps without applying 
   await page.getByRole("button",{name:"Hint",exact:true}).click();
   const card=page.getByRole("dialog",{name:"Hint",exact:true});
   await card.getByRole("button",{name:"Got it", exact:true}).click();
-  await expect(gold(page)).toHaveText(/Configure routing/);
-  await gold(page).click(); await expect(gold(page)).toHaveAccessibleName("All apps");
+  // Routing controls are always visible, so the accepted Hint frames the target option directly.
+  await expect(gold(page)).toHaveAccessibleName("All apps");
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toBeInViewport({ratio:1});
   expect((await savedGame(page)).campaign!.routing.targets).toEqual(["app-1"]);
   await gold(page).click(); await expect(gold(page)).toHaveCount(0);
@@ -435,9 +435,7 @@ test('progression choice: actual database preparation replaces the risk spotligh
   await gold(page).click();
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName('Confirm');
   await gold(page).click(); await expect(gold(page)).toHaveCount(0);
-  await page.getByRole('button', { name: 'Step 1 game second', exact: true }).click();
-  await page.getByRole('button', { name: 'Step 1 game second', exact: true }).click();
-  await page.getByRole('button', { name: 'Step 1 game second', exact: true }).click();
+  await advanceCampaignStep(page, { seconds: 3, resumeClock: false });
   expect((await savedGame(page)).campaign!.dbCapacity).toBe(2000);
   await idle(page); await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName('Run');
   expect((await savedGame(page)).campaign!.scalingConsent).toBeFalsy();

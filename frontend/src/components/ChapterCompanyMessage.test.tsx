@@ -93,7 +93,7 @@ it("defers without consuming a receipt and sequences the Chapter 4 cue after dis
   expect(message()).toBeNull(); expect(screen.getByRole("dialog",{name:"Chapter 4: Prepare"})).toBeTruthy();
 });
 
-it.each(["incident", "review", "prevention", "recognition", "next", "tutorial", "menu", "confirmation", "classic"])("respects %s priority without consuming the introduction", priority => {
+it.each(["incident", "review", "prevention", "recognition", "next", "menu", "confirmation", "classic"])("respects %s priority without consuming the introduction", priority => {
   let game = newGame();
   if(priority === "incident") game = tick(game,6);
   if(priority === "review") game = recoveredOpening();
@@ -102,7 +102,7 @@ it.each(["incident", "review", "prevention", "recognition", "next", "tutorial", 
   if(priority === "next") game = companies[1];
   if(priority === "classic") game = newLegacyGame();
   if(priority === "confirmation") setConfirming("Add server");
-  useGame.setState({game,ready:true,started:true,onboarding:false,tour:priority === "tutorial"?{track:"campaign",step:0}:null,view:priority === "menu"?"menu":null});
+  useGame.setState({game,ready:true,started:true,onboarding:false,tour:null,view:priority === "menu"?"menu":null});
   render(priority === "classic" ? <CampaignAttentionHost><span>Classic company</span></CampaignAttentionHost> : host()); expect(message()).toBeNull();
   const model = chapterCompanyMessage(game); if(model) expect(localStorage.getItem(model.key)).toBeNull();
 });

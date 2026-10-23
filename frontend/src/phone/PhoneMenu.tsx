@@ -16,7 +16,7 @@ export const PHONE_MENU_TABS = ["run", "sound", "graphics"] as const satisfies r
 export type PhoneMenuTab = (typeof PHONE_MENU_TABS)[number];
 
 const PHONE_ABOUT = {
-  campaign: "Guided Mode teaches the basics through the walkthrough and two guided chapters of continuous play.",
+  campaign: "Guided Mode teaches the basics through Launch Week and two guided chapters of continuous play.",
   classic: `Challenge Mode is the ${BALANCE.maxTurns}-week weekly challenge: apply what you learned on your own.`,
 } as const;
 
@@ -47,7 +47,7 @@ function GuidedRun() {
   const saved = useGame((s) => s.saveStatus === "saved");
   const practice = useGame((s) => !!s.tutorialCompany);
   const c = game.campaign!;
-  return <MenuRun title={practice ? "Walkthrough practice" : "At a glance"} saved={saved} stats={[
+  return <MenuRun title={practice ? "Launch Week practice" : "At a glance"} saved={saved} stats={[
     { icon: "week", kind: "go", label: "Week", value: game.turn },
     { icon: "users", kind: "users", label: "Users", value: num(game.users) },
     { icon: "cash", kind: "cash", label: "Cash", value: money(c.cashCents / 100) },
@@ -65,7 +65,7 @@ function ChallengeRun() {
   ]} />;
 }
 
-/** Guided Mode: Resume, the walkthrough and Exit to the home screen; a closed company can be replaced. */
+/** Guided Mode: Resume, Launch Week's replay and Exit to the home screen; a closed company can be replaced. */
 function GuidedActions({ onResume, exit }: { onResume: () => void; exit: ReturnType<typeof useMenuExit> }) {
   const practice = useGame((s) => !!s.tutorialCompany);
   const ended = useGame((s) => s.game.phase === "ended");
@@ -78,7 +78,7 @@ function GuidedActions({ onResume, exit }: { onResume: () => void; exit: ReturnT
     {saveBlocked && <Callout tone="warn" icon="save" kicker="Save preserved" live="alert">Your stored save is unreadable or unsupported and has been preserved. This run stays in memory until you start a new company.</Callout>}
     {complete && <Callout compact tone="success" icon="goal" kicker="Phone campaign complete">{scope.endOfGuided} Challenge Mode is unlocked.</Callout>}
     <MenuActions onResume={onResume}>
-      <MenuTile icon="info" kind="users" title="How to play" text="Replay the walkthrough: controls, game time and finances." onClick={() => useGame.getState().startTour("campaign")} />
+      <MenuTile icon="info" kind="users" title="How to play" text="Replay Launch Week: run the company, handle its first incident and pick research." onClick={() => useGame.getState().startTour("campaign")} />
       {ended && <MenuTile icon="refresh" title={confirmNew ? "Lose this company? Press again" : "New company"} text="Start a new Guided Mode company." danger={confirmNew}
         onClick={() => { if (!confirmNew) { setConfirmNew(true); return; } useGame.getState().newRun(); setConfirmNew(false); }} />}
       <MenuTile icon="logout" title="Exit" text="Return to the title screen." onClick={exit.exit} buttonRef={exit.exitButton} />

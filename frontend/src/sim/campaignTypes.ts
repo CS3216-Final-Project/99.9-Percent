@@ -115,6 +115,7 @@ export interface Settlement {
     cacheCents?: number;
     controllerCents?: number;
     checksCents?: number; failoverCents?: number;
+    researchCents?: number;
 }
 export interface CampaignIncident {
     kind?: "application-failure"; failureId?: string;
@@ -176,6 +177,18 @@ export interface CampaignPromotion {
  actionId:string;requestedStep:number;activationStep:number;activatedStep:number|null;
  endStep:number;endedStep:number|null;cooldownUntil:number;costCents:number;
 }
+export interface LaunchWeek {
+ id: "launch-week"; version: 1; enteredStep: number;
+ /** One free research point, granted by the script and spent on Caching or Autoscaling. */
+ researchEarned: 0 | 1;
+ tech: "caching" | "autoscaling" | null;
+ /** Sunday settlement the pick was billed in; the pick itself deploys at once. */
+ researchBilledPeriod: number | null;
+ surge: null | { startStep: number; endStep: number; endedStep: number | null; incoming: number; served: number };
+ completedStep: number | null;
+ /** The launch letter was opened, so the cold open does not return on reload or import. */
+ doorsOpened?: boolean;
+}
 export interface Campaign {
     /** Boundary of observations made by the deployed Phase 1/2 engine. */
     foundation?: { step: number; inputs: number };
@@ -183,10 +196,11 @@ export interface Campaign {
     combinedStage?:CombinedStage|null;
     scalingConsent?:{policyVersion:1;acceptedStep:number}|null;
     promotion?:CampaignPromotion|null;
+    launchWeek?:LaunchWeek|null;
     serviceMeasurement?:ServiceMeasurement;
     scorecard?:CampaignScorecard|null;
     scenarioId: "opening-db";
-    scenarioVersion: 1;
+    scenarioVersion: 1 | 2;
     runId: string;
     step: number;
     incomingRate: number;
@@ -235,7 +249,7 @@ export interface Campaign {
     overloadSteps: number;
     incident: CampaignIncident | null;
     reports: CampaignPostmortem[];
-    openingMilestone: null | {id:"opening-stability";incidentId:string|null;outcomeId?:"opening-prevention";awardedStep:number;acknowledged:boolean};
+    openingMilestone: null | {id:"opening-stability"|"launch-week";incidentId:string|null;outcomeId?:"opening-prevention";awardedStep:number;acknowledged:boolean};
     openingPrevention?: OpeningPrevention;
     /** Input prefix recorded under schema 6's former prevention progression rule. */
     legacyPreventionInputs?: number;

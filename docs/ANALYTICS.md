@@ -52,12 +52,12 @@ Every event carries:
 | --- | --- |
 | `event_version` | `1` |
 | `build_id` | `VITE_BUILD_ID`, else the commit SHA, else `unrecorded` |
-| `content_version` | `chapters-v2` for Guided Mode, `classic-v1` for Challenge Mode |
+| `content_version` | `launch-week-v1` for Guided Mode, `classic-v1` for Challenge Mode |
 | `mode` | `campaign` or `classic` |
 | `run_id` | The Guided Mode run ID, or a random UUID for a Challenge Mode run |
 | `gameplay_session_id` | Random UUID per play session |
 | `device_category` | `touch` for a coarse pointer, otherwise `desktop` |
-| `chapter_id` | `opening`, `scaling`, `data`, `spikes` or `reliability`; null in Challenge Mode |
+| `chapter_id` | `launch-week` (a version-1 company reports `opening`), `scaling`, `data`, `spikes` or `reliability`; null in Challenge Mode |
 | `progress_step` | Guided Mode game second, or Challenge Mode week |
 | `session_active_ms`, `run_active_ms` | Cumulative active time snapshots |
 | `active_delta_ms` | Active time since the previous progress or end event |
@@ -67,7 +67,7 @@ Active time counts only while the tab is visible and within two minutes of point
 Visible planning, onboarding, incident and review time counts even while the game is paused.
 These are engagement estimates, not proof of attention.
 
-`content_version` `chapters-v2` counts the ten-lesson walkthrough, so `tutorial_step` means a different lesson list than in `chapters-v1`.
+`content_version` `launch-week-v1` marks the playable Launch Week that replaced the Chapter 0 walkthrough; under `chapters-v2` and `chapters-v1`, `tutorial_step` counted different lesson lists.
 Increment it in `productAnalytics.ts` when the set or meaning of chapters or walkthrough steps changes; build IDs distinguish releases within a content version.
 
 ### Events
@@ -91,12 +91,12 @@ Guided Mode completion means chapters 1 to 5, the same set that unlocks Challeng
 Chapter 0 and chapter 6, Grow the Company, are not reported as chapters, and once a run is complete the observer stops measuring it, so chapter 6 play produces no session or duration events.
 Reopening or importing a completed save baselines its milestones and emits no retrospective completion.
 
-Tutorial events cover the two walkthroughs only: `tutorial_track` is `campaign` (Guided Mode's Chapter 0) or `basics` (Challenge Mode's first-week tutorial).
+Tutorial events cover Challenge Mode's first-week tutorial only (`tutorial_track` `basics`); Guided Mode's Launch Week reports `gameplay_launch_beat`, `gameplay_launch_pick` (the research choice) and `gameplay_launch_score` (the final uptime nines) instead.
 `tutorial_step` counts from 0, so a skip on the third card has step 2.
 `tutorial_from` is `first_visit`, `resume`, `new_company`, `menu` or `home`.
-A skip's `reason` is `player` or `chapter_entered`.
+A skip's `reason` is `player`.
 Challenge Mode's walkthrough starts behind the home screen and is reported when play begins.
-A reload never repeats an event, but a fresh company reopened before its first decision offers the walkthrough again and so starts it again.
+A reload never repeats an event, but a fresh run reopened before its first decision offers the tutorial again and so starts it again.
 
 ### Run ledger
 
@@ -141,7 +141,7 @@ A visible active session sends about four progress events a minute; review event
 
 ### Verification
 
-Unit tests cover the real store under StrictMode, title-screen boot, reload, resume and replay identity, both walkthroughs, completion, historical saves, failure, visibility, inactivity, back/forward cache and storage and collector failures.
+Unit tests cover the real store under StrictMode, title-screen boot, reload, resume and replay identity, the Challenge Mode walkthrough, Launch Week beats and scores, completion, historical saves, failure, visibility, inactivity, back/forward cache and storage and collector failures.
 Adapter tests cover disabled environments, the startup buffer, region routing and the allowlist.
 `frontend/e2e/analytics.spec.ts` exercises the built integration with a synthetic token and intercepted PostHog requests when run with `ANALYTICS_SMOKE=1`; build it with `VERCEL_ENV=production`, `VITE_ANALYTICS_ENABLED=true` and a synthetic `VITE_POSTHOG_TOKEN`, never a real one.
 A live project, its settings and dashboard are not established by these tests.
@@ -153,5 +153,5 @@ Menu > Playtest exports them as JSON, together with observer notes and the parti
 
 - Guided Mode records come from the engine trace (`projectEvents` in `telemetry.ts`): run and session starts, inspections, every player and autoscaler action requested and activated, traffic changes, incidents opened and recovered, chapter entries and completions, prevention progress, reliability and growth-wave events, the final scorecard and bankruptcy.
   Each record has an event ID, run, session, build, scenario and physical step.
-- Both modes also record walkthrough starts, completions and skips, floor switches, walk mode, view changes, map use and avatar changes.
+- Both modes also record floor switches, walk mode, view changes, map use and avatar changes; Challenge Mode also records its walkthrough starts, completions and skips.
 - Challenge Mode records runs started and finished, incidents started and completed, hints, ratings, voluntary replays, resumes, imports and mode switches.

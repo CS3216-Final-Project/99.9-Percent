@@ -290,7 +290,7 @@ export function completedTechIds(state: GameState): TechId[] {
 }
 
 export function has(state: Pick<GameState, "techDone" | "campaign">, tech: TechId): boolean {
-  if(state.campaign)return (!!state.campaign.reliabilityStage?.owned.includes(tech as import("./campaignTypes").ReliabilityTech))||(tech==="larger_database"&&state.campaign.dbCapacity>=1000)||(tech==="autoscaling"&&state.campaign.spikeStage?.researchSpent===1)||(tech==="caching"&&!!state.campaign.readCache)||(tech==="cache_tuning"&&!!state.campaign.readCache?.tuned)||tech==="monitoring" || (tech==="load_balancing"&&state.campaign.loadBalancer) || (tech==="larger_servers"&&state.campaign.apps.some(a=>a.tier==="large"));
+  if(state.campaign)return (!!state.campaign.reliabilityStage?.owned.includes(tech as import("./campaignTypes").ReliabilityTech))||(tech==="larger_database"&&state.campaign.dbCapacity>=1000)||(tech==="autoscaling"&&(state.campaign.spikeStage?.researchSpent===1||state.campaign.launchWeek?.tech==="autoscaling"))||(tech==="caching"&&!!state.campaign.readCache)||(tech==="cache_tuning"&&!!state.campaign.readCache?.tuned)||tech==="monitoring" || (tech==="load_balancing"&&state.campaign.loadBalancer) || (tech==="larger_servers"&&state.campaign.apps.some(a=>a.tier==="large"));
   if (tech === "larger_database") return "infra" in state && (state as GameState).infra.dbTier > 0;
   // Metrics and alerts are baseline tools, including when resuming an old save.
   if (tech === "monitoring") return true;

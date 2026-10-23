@@ -1,5 +1,8 @@
 import type { useGame } from "./store";
 import { campaignChapters } from "./campaignChapters";
+import { campaignAttention } from "./campaignAttention";
+import { campaignUptime } from "./campaignUptime";
+import { ninesOf } from "./format";
 
 type State = ReturnType<typeof useGame.getState>;
 type GameStore = Pick<typeof useGame, "getState" | "subscribe">;
@@ -7,7 +10,7 @@ export type AnalyticsProperties = Record<string, string | number | boolean | nul
 export type AnalyticsSink = (name: string, properties: AnalyticsProperties) => void;
 export const ANALYTICS_STORAGE_KEY = "nn.product-analytics.v1";
 /** v2: the 10-lesson Chapter 0 walkthrough; tutorial steps from v1 count a different lesson list. */
-export const CAMPAIGN_CONTENT_VERSION = "chapters-v2";
+export const CAMPAIGN_CONTENT_VERSION = "launch-week-v1";
 export const HEARTBEAT_MS = 15_000;
 export const IDLE_MS = 120_000;
 
@@ -27,13 +30,11 @@ interface ActiveSession {
   activeMs: number;
   state: State;
 }
-const CHAPTER_IDS = ["opening", "scaling", "data", "spikes", "reliability"];
-const currentChapter = (state: State): string | null => {
-  const c = state.game.campaign;
-  return c ? c.reliabilityStage ? "reliability" : c.spikeStage ? "spikes" : c.dataStage ? "data" : c.scaling ? "scaling" : "opening" : null;
-};
+const CHAPTER_IDS = ["launch-week", "opening", "scaling", "data", "spikes", "reliability", "combined"];
+const currentChapter = (state: State): string | null =>
+  state.game.campaign ? campaignChapters(state.game).find(chapter => chapter.current)?.id ?? null : null;
 const completedChapters = (state: State) => state.game.campaign
-  ? campaignChapters(state.game).filter(chapter => chapter.number > 0 && chapter.completed).map(chapter => chapter.id) : [];
+  ? campaignChapters(state.game).filter(chapter => chapter.id !== "getting-started" && chapter.completed).map(chapter => chapter.id) : [];
 const runKey = (state: State) => state.game.campaign
   ? `campaign:${state.game.campaign.runId}:${CAMPAIGN_CONTENT_VERSION}`
   : `classic:${state.game.seed}:${state.meta.runsStarted}`;
@@ -69,6 +70,10 @@ export function watchProductAnalytics(store: GameStore, sink: AnalyticsSink, bui
   let stopped = false;
   // A walkthrough event already under way when the observer is installed mid-play is not a new observation.
   let reportedTour = previous.started ? previous.lastTour?.id ?? 0 : 0;
+  let reportedBeat: string | null = null;
+  let beatAt = performance.now();
+  let reportedPick: string | null = null;
+  let reportedScore: number | null = null;
   const device = window.matchMedia?.("(pointer: coarse)").matches ? "touch" : "desktop";
 
   const save = () => {
@@ -116,8 +121,9 @@ export function watchProductAnalytics(store: GameStore, sink: AnalyticsSink, bui
     const fresh = !existing && state.lastIntro?.kind === "begin" &&
       state.lastIntro.id !== prev.lastIntro?.id;
     const complete = completedChapters(state);
+    const tracked = state.game.campaign ? campaignChapters(state.game).filter(chapter => !["getting-started", "combined"].includes(chapter.id)) : [];
     const terminal = state.game.outcome ? (state.game.outcome === "won" ? "completed" : "failed")
-      : state.game.campaign && complete.length === CHAPTER_IDS.length ? "completed" : null;
+      : state.game.campaign && complete.filter(id => id !== "combined").length === tracked.length ? "completed" : null;
     const run: RunRecord = existing ?? {
       id: state.game.campaign?.runId ?? crypto.randomUUID(), activeMs: 0, started: fresh,
       terminal, chapters: complete, entered: [],
@@ -172,8 +178,23 @@ export function watchProductAnalytics(store: GameStore, sink: AnalyticsSink, bui
       emit("gameplay_chapter_completed", { chapter_id: id });
       save();
     }
-    if (!session.run.terminal && (state.game.outcome || (state.game.campaign && completed.length === CHAPTER_IDS.length))) {
-      const success = state.game.campaign ? completed.length === CHAPTER_IDS.length : state.game.outcome === "won";
+    // Launch Week's beats are reported as reached, with the wall-clock seconds the previous beat held.
+    const lw = state.game.campaign?.launchWeek;
+    const beat = state.game.campaign && lw ? campaignAttention(state.game).reason : null;
+    if (beat !== reportedBeat) {
+      if (beat) emit("gameplay_launch_beat", { beat, previous_seconds: Math.round((performance.now() - beatAt) / 1000) });
+      beatAt = performance.now();
+      reportedBeat = beat;
+    }
+    const tech = lw?.tech ?? null;
+    if (tech && tech !== reportedPick) { reportedPick = tech; emit("gameplay_launch_pick", { tech }); }
+    if (lw && reportedScore !== lw.completedStep && lw.completedStep !== null) {
+      reportedScore = lw.completedStep;
+      emit("gameplay_launch_score", { nines: ninesOf(campaignUptime(state.game.campaign!) ?? 0), uptime: campaignUptime(state.game.campaign!) ?? 0 });
+    }
+    const required = state.game.campaign ? campaignChapters(state.game).filter(c => !["getting-started", "combined"].includes(c.id)).length : 0;
+    if (!session.run.terminal && (state.game.outcome || (state.game.campaign && completed.filter(id => id !== "combined").length === required))) {
+      const success = state.game.campaign ? completed.filter(id => id !== "combined").length === required : state.game.outcome === "won";
       emit(success ? "gameplay_run_completed" : "gameplay_run_failed", {
         outcome: success ? "completed" : state.game.outcome ?? "failed",
       });

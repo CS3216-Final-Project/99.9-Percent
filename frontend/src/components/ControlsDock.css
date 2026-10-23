@@ -24,6 +24,20 @@
 .campaign-clock.controls-dock .week { width: 132px; }
 /* Manual steps sit between speed and Run, shaped like the dock's menu buttons so the row keeps one height. */
 .controls-dock .dock-steps { display: flex; gap: 4px; flex: none; }
+.controls-dock .dock-speeds { display: flex; gap: 4px; flex: none; align-items: center; }
+.controls-dock .dock-speed {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  min-width: 40px; height: 48px; padding: 2px 8px; cursor: pointer;
+  background: var(--paper-2); color: var(--ink);
+  border: 1px solid var(--control-edge); border-radius: var(--radius); box-shadow: var(--press);
+  font-family: var(--font-display); font-weight: 600; font-size: var(--text-xs); font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.controls-dock .dock-speed:hover:not(:disabled) { background: var(--paper-3); }
+.controls-dock .dock-speed:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 0 var(--ink); }
+.controls-dock .dock-speed:disabled { opacity: .5; box-shadow: none; cursor: not-allowed; }
+.controls-dock .dock-speed.is-on { background: var(--go); }
+.controls-dock .dock-rush { margin-left: 4px; }
+.controls-dock .dock-rush span { font-size: var(--text-xs); }
 .controls-dock .dock-step {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
   width: 52px; height: 48px; padding: 2px; cursor: pointer;
@@ -53,7 +67,7 @@
 .controls-dock .camera-menu > summary { width: 118px; }
 .controls-dock .time-menu > summary { width: 64px; padding-inline: 4px; gap: 4px; font-variant-numeric: tabular-nums; }
 .dock-panel {
-  position: absolute; bottom: calc(100% + 10px); right: 12px; z-index: 60;
+  position: absolute; bottom: calc(100% + 10px); right: 12px; z-index: 130;
   width: 294px; max-width: calc(100vw - 24px); max-height: min(440px, 55dvh); overflow: auto;
   padding: 14px; background: var(--paper); color: var(--ink);
   border: 1px solid var(--control-edge); border-radius: var(--radius); box-shadow: var(--lift);
@@ -124,20 +138,21 @@
 }
 .campaign-clock.controls-dock .time-controls {
   display: grid;
-  grid-template-columns: 132px 64px auto 142px;
+  grid-template-columns: 132px auto 142px;
   justify-content: end;
 }
 .controls-dock .time-menu > summary { height: 48px; }
 .controls-dock .time-menu > summary > span { flex: 1; text-align: center; }
 @media (max-width: 640px) {
-  .campaign-clock.controls-dock .time-controls { grid-template-columns: minmax(0, 1fr) 58px auto 96px; }
+  .campaign-clock.controls-dock .time-controls { grid-template-columns: minmax(0, 1fr) auto 96px; }
   .campaign-clock.controls-dock .time-controls .week { width: auto; display: grid; gap: 2px; justify-items: start; }
   .campaign-clock.controls-dock .dock-second { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
   .campaign-clock.controls-dock .week > .meter { display: none; }
   .controls-dock .time-menu > summary { height: 44px; }
 }
 @media (max-width: 360px) {
-  .campaign-clock.controls-dock .time-controls { grid-template-columns: minmax(0, 1fr) 54px auto 80px; }
+  .campaign-clock.controls-dock .time-controls { grid-template-columns: minmax(0, 1fr) auto 80px; }
+  .controls-dock .dock-rush { margin-left: 0; padding-inline: 4px; }
 }
 
 /* The walkthrough narrows the dock without narrowing the window. */

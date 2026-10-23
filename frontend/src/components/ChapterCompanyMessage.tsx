@@ -5,7 +5,7 @@ import { ChapterMessageCard } from "./Chapter4StagePopup";
 import { Icon } from "./icons";
 
 /** One optional narrative slot: introduction first, then the still-current stage cue. */
-export function ChapterCompanyMessage({ model, enabled, children }: { model: Message; enabled: boolean; children?: ReactNode }) {
+export function ChapterCompanyMessage({ model, enabled, children, onOpen }: { model: Message; enabled: boolean; children?: ReactNode; onOpen?: (open: boolean) => void }) {
   const [state, setState] = useState(() => ({ enabled, dismissed: presentationReceipts(model.key).includes("intro") }));
   // An already-shown optional message yields permanently when a higher priority
   // takes over; an unseen message stays pending. No effect-driven render cascade.
@@ -17,6 +17,10 @@ export function ChapterCompanyMessage({ model, enabled, children }: { model: Mes
       recordPresentationReceipt(model.key, "intro");
     }
   }, [enabled, dismissed, model.key]);
+  // Owners that must wait for the introduction learn when it is on screen.
+  const open = enabled && !dismissed;
+  useLayoutEffect(() => { onOpen?.(open); }, [open, onOpen]);
+  useLayoutEffect(() => () => onOpen?.(false), [onOpen]);
   if (!enabled) return null;
   if (dismissed) return children;
   return <ChapterMessageCard title="Company Message" label="Company Message" className="company-message" company close={() => setState({ enabled, dismissed: true })}>

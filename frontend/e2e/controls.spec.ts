@@ -25,14 +25,16 @@ for (const width of [1440, 390, 320]) {
     expect((await savedGame(page)).campaign!.step).toBe(second);
     await expect(page.getByRole("button", { name: /Advance step|Advance game second/ })).toHaveCount(0);
 
-    const speedSize = (await dock.locator(".time-menu > summary").boundingBox())!;
+    // Narrow docks fold the three speeds into the speed menu.
+    const narrow = width <= 640;
+    const speeds = narrow ? dock.locator(".time-menu > summary") : dock.getByRole("group", { name: "Game speed" });
+    const speedSize = (await speeds.boundingBox())!;
     await setGameSpeed(page, 0.5);
-    const changedSize = (await dock.locator(".time-menu > summary").boundingBox())!;
+    if (narrow) await expect(speeds).toHaveText("0.5×");
+    else await expect(speeds.getByRole("button", { name: "0.5×", exact: true })).toHaveAttribute("aria-pressed", "true");
+    const changedSize = (await speeds.boundingBox())!;
     expect([changedSize.width, changedSize.height]).toEqual([speedSize.width, speedSize.height]);
-    expect(await dock.locator(".time-menu > summary").evaluate(el => {
-      const box=el.getBoundingClientRect();
-      return [...el.children].every(child => { const r=child.getBoundingClientRect(); return r.left>=box.left+4 && r.right<=box.right-4; });
-    })).toBe(true);
+    await expect(dock.getByRole("button", { name: /End the week/ })).toBeInViewport({ ratio: 1 });
     await openCameraControls(page);
     const cameraPanel = dock.locator(".dock-menu[open] > .dock-panel");
     await expect(cameraPanel.getByRole("button", { name: "Zoom in", exact: true })).toBeInViewport({ ratio: 1 });

@@ -6,7 +6,6 @@ import { DEFAULT_META, saveMeta } from "@/game/persist";
 import { FULL_SCOPE, PHONE_SCOPE } from "@/game/scope";
 import { useGame } from "@/game/store";
 import { finishingScaling } from "@/sim/__tests__/dataFixture";
-import { completeTutorialFixture } from "@/testing/tutorial";
 import { setEditionForTests } from "./edition";
 import { PHONE_MENU_TABS } from "./PhoneMenu";
 
@@ -41,7 +40,7 @@ describe("phone edition", () => {
     expect(document.querySelector('.app[data-edition="phone"]')).not.toBeNull();
 
     const guided = within(choices).getByRole("region", { name: "Guided Mode" });
-    expect(guided.textContent).toContain("Walkthrough and 2 guided chapters");
+    expect(guided.textContent).toContain("Launch Week and 2 guided chapters");
     const challenge = within(choices).getByRole("region", { name: "Challenge Mode" });
     expect(challenge.textContent).toContain("Complete Scaling & Routing in Guided Mode to unlock.");
     expect(within(challenge).getByRole("button", { name: "Finish both guided chapters to unlock" })).toHaveProperty("disabled", true);
@@ -55,7 +54,6 @@ describe("phone edition", () => {
   it("offers only Sound and Graphics settings in the menu, with Resume and the mode switch", async () => {
     await renderPhone();
     fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
-    act(() => completeTutorialFixture());
     const menu = openMenu();
     expect(within(menu).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Run", "Sound", "Graphics"]);
     expect(PHONE_MENU_TABS).toEqual(["run", "sound", "graphics"]);
