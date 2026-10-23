@@ -32,7 +32,7 @@ const ENTRIES: Partial<Record<Action["type"], ScopedChapter>> = {
 export const FULL_SCOPE: PlayScope = {
   id: "full",
   lastChapter: null,
-  challengeLocked: "Complete the first five Guided Mode chapters to unlock Challenge Mode.",
+  challengeLocked: "Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.",
   endOfGuided: "",
 };
 

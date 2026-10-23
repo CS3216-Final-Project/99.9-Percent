@@ -46,6 +46,8 @@
   --warn-ink: #a65400;
   --critical: #ff4d5e;
   --critical-ink: #c41d33;
+  /* Critical text on the caption's dark band. */
+  --critical-caption: #ffb4bb;
 
   --font-display: "Space Grotesk", "Source Sans 3", sans-serif;
   --font-logo: "Pixelify Sans", var(--font-display);
@@ -314,10 +316,16 @@ button:disabled {
   margin: 14px 0 2px;
 }
 
-/* On the title screen the room is the hero: the game's chrome waits offstage. */
+/* On the title screen the room is the hero: the game's chrome waits offstage, keeping its rows, while the room
+   fills the whole viewport behind it. Start hands the room back to its middle row, so the canvas resizes once,
+   in the same frame the title screen leaves. */
 .app.is-title .topbar,
 .app.is-title .bottombar {
   visibility: hidden;
+}
+
+.app.is-title .stage {
+  grid-row: 1 / -1;
 }
 
 .app.is-title .eq-labels,
@@ -933,41 +941,41 @@ button:disabled {
   font-weight: 700;
 }
 
-/* A chatting group the avatar is near enough to hear, captioned like a subtitle above the walk prompt. */
-.overheard {
+/* What a chatting group within earshot is saying, captioned like a subtitle: a translucent band of ink above the
+   walk prompt (under it on a phone), the speaker's role named ahead of the line. Purely visual, never clickable. */
+.caption {
   position: absolute;
   left: 50%;
   bottom: 112px;
   z-index: 25;
   max-width: min(560px, calc(100% - 32px));
   margin: 0;
-  padding: 8px 14px;
+  padding: 6px 14px 7px;
   transform: translateX(-50%);
-  background: var(--paper);
-  color: var(--ink);
-  border: 1px solid var(--control-edge);
-  border-radius: var(--radius);
-  box-shadow: var(--press);
+  background: rgba(29, 24, 52, .78); /* --ink at 78% */
+  color: var(--paper);
+  border-radius: 8px;
   font-family: var(--font-display);
+  font-size: 1rem;
+  line-height: 1.35;
   text-align: center;
+  text-wrap: balance;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
   pointer-events: none;
 }
 
-.overheard-where {
-  display: block;
-  font-size: var(--text-xs);
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  opacity: .7;
+.caption-speaker {
+  margin-right: .45em;
+  color: var(--selection);
+  font-weight: 600;
 }
 
-.overheard q {
-  font-size: var(--text-sm);
-  font-style: italic;
+.caption q {
+  quotes: none;
 }
 
-.overheard.is-alarmed q {
-  color: var(--critical-ink);
+.caption.is-alarmed q {
+  color: var(--critical-caption);
 }
 
 /* On a phone the floor menu and camera buttons fill the bottom corner, so what is within reach shows at the top. */
@@ -976,9 +984,10 @@ button:disabled {
     top: 10px;
     bottom: auto;
   }
-  .overheard {
+  .caption {
     top: 56px;
     bottom: auto;
+    font-size: var(--text-sm);
   }
 }
 

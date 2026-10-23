@@ -7,11 +7,11 @@ test("new players see Guided Mode first with Challenge Mode locked", async ({ pa
   const choices = page.getByRole("region", { name: "Choose how you want to play" });
   const guided = choices.getByRole("region", { name: "Guided Mode" });
   const challenge = choices.getByRole("region", { name: "Challenge Mode" });
-  await expect(guided).toContainText("Continuous play · Six guided chapters");
+  await expect(guided).toContainText("six infrastructure chapters");
   await expect(challenge).toContainText("50,000 users in 26 weeks");
-  await expect(challenge).toContainText("Complete the first five Guided Mode chapters to unlock.");
   await expect(guided.getByRole("button", { name: "Start Guided Mode" })).toBeVisible();
-  await expect(challenge.getByRole("button", { name: "Complete Guided Mode to unlock" })).toBeDisabled();
+  await expect(challenge).toContainText("Unlocks after Chapter 5: Stay Online.");
+  await expect(challenge.getByRole("button")).toHaveCount(0);
   await page.keyboard.press("p");
   expect(await page.evaluate(() => [localStorage.getItem("nn.campaign.save.v1"), localStorage.getItem("nn.classic.save.v1")])).toEqual([null, null]);
   await page.screenshot({ path: "test-results/mode-choice-guided-first.png" });
@@ -62,8 +62,8 @@ test("the menu offers a disabled unlock instead of a switch while Challenge Mode
   await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu" });
-  await expect(menu.getByRole("region", { name: "Game mode" })).toContainText("Complete the first five Guided Mode chapters to unlock Challenge Mode.");
-  await expect(menu.getByRole("button", { name: "Complete Guided Mode to unlock" })).toBeDisabled();
+  await expect(menu.getByRole("region", { name: "Game mode" })).toContainText("Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.");
+  await expect(menu.getByRole("button", { name: "Finish Chapter 5 to unlock" })).toBeDisabled();
   await expect(menu.getByRole("button", { name: /Switch to/ })).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem("nn.classic.save.v1"))).toBeNull();
 });

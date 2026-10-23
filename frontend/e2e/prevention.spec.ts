@@ -1,11 +1,12 @@
 import { completeTutorial, advanceCampaignStep, setGameSpeed } from "./fixtures";
-import {test,expect,expectRoom,savedGame} from "./fixtures";
+import {test,expect,savedGame} from "./fixtures";
 
-test("Opening prevention: fresh player verifies prevention and explicitly unlocks Scaling without API",async({page, installClock})=>{
- await installClock();
+// This journey checks prevention rules through the panel and dialogs; other journeys check the 3D room, whose software
+// rendering on CI can starve the page of frames for seconds at a time.
+test("Opening prevention: fresh player verifies prevention and explicitly unlocks Scaling without API",async({page, installClock, withoutRoom})=>{
+ await withoutRoom();await installClock();
  test.setTimeout(90000);await page.route("**/api/**",r=>r.abort());await page.goto("/");
  await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await completeTutorial(page);
- await expectRoom(page);
  const id=(await savedGame(page)).campaign!.runId;
  await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
  await setGameSpeed(page,2);

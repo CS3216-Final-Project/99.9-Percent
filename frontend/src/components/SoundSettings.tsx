@@ -50,6 +50,16 @@ export function SoundSettings() {
       <Volume label="Music" value={audio.music} onChange={(music) => setAudio({ music, muted: false })} />
       <Volume label="Sound effects" value={audio.effects} onChange={(effects) => setAudio({ effects, muted: false })} />
       <p className="menu-note muted">{audio.muted ? "Muted. Moving a slider turns sound back on." : silent ? "Both volumes are at 0. Raise one to hear sound." : "Effects play a sample as you set them."}</p>
+      <div className="menu-section-head">
+        <h4>
+          <Icon name="captions" size={20} />
+          Captions
+        </h4>
+        <button type="button" className={`btn btn-small menu-toggle${audio.captions ? " is-on" : ""}`} aria-pressed={audio.captions} onClick={() => setAudio({ captions: !audio.captions })}>
+          Show captions
+        </button>
+      </div>
+      <p className="menu-note">What the crew say within earshot of your avatar, written out above the walk prompt.</p>
     </section>
   );
 }

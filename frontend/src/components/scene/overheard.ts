@@ -1,11 +1,13 @@
+import type { Role } from "./cast";
+
 /*
  * What the avatar can overhear of a chatting group right now, shared by the groups (see chatter.tsx) and the caption
- * on the page (see Facility.tsx). Each group publishes its current line under its own name; the groups stand far
- * apart, so at most one is in earshot and the first entry is what the caption shows.
+ * on the page (see Facility.tsx). Each group publishes its current line and the role of whoever said it under its
+ * own name; the groups stand far apart, so at most one is in earshot and the first entry is what the caption shows.
  */
 
 export interface Overheard {
-  where: string;
+  speaker: Role;
   line: string;
   alarmed: boolean;
 }
@@ -16,7 +18,7 @@ let shown: Overheard | null = null;
 
 function publish(): void {
   const next = heard.values().next().value ?? null;
-  if (next === shown || (next && shown && next.where === shown.where && next.line === shown.line && next.alarmed === shown.alarmed)) return;
+  if (next === shown || (next && shown && next.speaker === shown.speaker && next.line === shown.line && next.alarmed === shown.alarmed)) return;
   shown = next ?? null;
   for (const l of listeners) l(shown);
 }

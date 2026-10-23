@@ -245,7 +245,7 @@ describe("old saves and imports across modes", () => {
     useGame.getState().boot();
     useGame.getState().setAudio({ music: 0, muted: false });
     expect(useGame.getState().resumeLegacySave()).toBe(true);
-    expect(useGame.getState().audio).toEqual({ music: 0, effects: 80, muted: false });
+    expect(useGame.getState().audio).toEqual({ music: 0, effects: 80, muted: false, captions: true });
   });
   it("leaves a malformed legacy save available for export without replacing either run", () => {
     localStorage.setItem("nn.save.v1", "{"); useGame.getState().boot();
@@ -283,7 +283,7 @@ describe("old saves and imports across modes", () => {
   it("keeps the sound settings across mode switches and reloads", () => {
     useGame.getState().boot();
     useGame.getState().setAudio({ music: 35, effects: 60 }); useGame.getState().toggleMute();
-    const settings = { music: 35, effects: 60, muted: true };
+    const settings = { music: 35, effects: 60, muted: true, captions: true };
     useGame.getState().switchMode("classic"); expect(useGame.getState().audio).toEqual(settings);
     useGame.getState().switchMode("campaign"); expect(useGame.getState().audio).toEqual(settings);
     useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
@@ -331,10 +331,23 @@ describe("old saves and imports across modes", () => {
     useGame.getState().boot();
     useGame.getState().setAudio({ music: 0, effects: 60 });
     useGame.getState().toggleMute();
-    expect(useGame.getState().audio).toEqual({ music: 0, effects: 60, muted: true });
+    expect(useGame.getState().audio).toEqual({ music: 0, effects: 60, muted: true, captions: true });
     // Coming back leaves the music at the 0 the player chose.
     useGame.getState().toggleMute();
-    expect(useGame.getState().audio).toEqual({ music: 0, effects: 60, muted: false });
+    expect(useGame.getState().audio).toEqual({ music: 0, effects: 60, muted: false, captions: true });
+  });
+  it("turns captions off and on apart from the volumes, and keeps them off when sound is restored", () => {
+    useGame.getState().boot();
+    useGame.getState().setAudio({ captions: false });
+    expect(useGame.getState().audio).toEqual({ music: 80, effects: 80, muted: false, captions: false });
+    expect(loadAudio().captions).toBe(false);
+    // Restoring sound from both volumes at 0 brings the volumes back, not the captions.
+    useGame.getState().setAudio({ music: 0, effects: 0 });
+    useGame.getState().toggleMute();
+    expect(useGame.getState().audio).toEqual({ music: 80, effects: 80, muted: false, captions: false });
+    useGame.getState().setAudio({ captions: true });
+    expect(useGame.getState().audio.captions).toBe(true);
+    expect(loadAudio().captions).toBe(true);
   });
   it("brings the default volumes back when sound is turned on with both at 0, muted or not", () => {
     useGame.getState().boot();
@@ -374,7 +387,7 @@ it("imports a pre-update incident paused and preserves its recovery state", () =
 });
 
 describe("challenge mode lock", () => {
-  const LOCKED = "Complete the first five Guided Mode chapters to unlock Challenge Mode.";
+  const LOCKED = "Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.";
   it("forces a stale classic last-mode back to campaign while locked", () => {
     saveMode("classic");
     expect(loadMode()).toBe("campaign");

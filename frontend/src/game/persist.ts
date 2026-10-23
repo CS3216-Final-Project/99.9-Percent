@@ -94,9 +94,11 @@ export interface AudioSettings {
   effects: number;
   /** Silences music and effects without losing either volume. */
   muted: boolean;
+  /** Writes out what the crew say within the avatar's earshot. */
+  captions: boolean;
 }
 
-export const DEFAULT_AUDIO: AudioSettings = { music: 80, effects: 80, muted: false };
+export const DEFAULT_AUDIO: AudioSettings = { music: 80, effects: 80, muted: false, captions: true };
 
 /** Nothing would be heard: muted, or both volumes at 0. What the header button and the menu's Mute all show. */
 export const isSilent = (audio: AudioSettings): boolean => audio.muted || (audio.music === 0 && audio.effects === 0);
@@ -373,6 +375,7 @@ export function loadAudio(): AudioSettings {
           music: percent(s.music, DEFAULT_AUDIO.music),
           effects: percent(s.effects, DEFAULT_AUDIO.effects),
           muted: typeof s.muted === "boolean" ? s.muted : DEFAULT_AUDIO.muted,
+          captions: typeof s.captions === "boolean" ? s.captions : DEFAULT_AUDIO.captions,
         };
     } catch {
       /* unreadable: fall back to the older setting */

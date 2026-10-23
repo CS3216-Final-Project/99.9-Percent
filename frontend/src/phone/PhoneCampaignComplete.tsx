@@ -19,7 +19,7 @@ export function PhoneCampaignComplete() {
     <p>Your added capacity and routing carried the growth wave. You have finished Guided Mode on your phone.</p>
     <p>{endOfGuided} Your company is saved in this browser and keeps operating here.</p>
     <p>Challenge Mode is now unlocked: grow a company week by week on your own.</p>
-    {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved">This company could not be saved, so switching now loses it. Press the red button again to switch anyway.</Callout>}
+    {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved">This company could not be saved, so switching now loses it. Press "Switch and lose this company" again to switch anyway.</Callout>}
     <div className="modal-foot">
       <button className="btn btn-quiet" onClick={dismiss}>Keep operating</button>
       <button className={`btn ${unsaved ? "btn-danger" : "btn-primary"}`} onClick={playChallenge}>{unsaved ? "Switch and lose this company" : "Play Challenge Mode"}<Icon name="next" /></button>

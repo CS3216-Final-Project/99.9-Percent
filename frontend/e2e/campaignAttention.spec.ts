@@ -88,6 +88,8 @@ test("guidance incident: ten idle seconds offer Hint without changing company st
 });
 
 test("guidance incident: short help targets the upgrade and preserves readings", async ({ page, installClock }, info) => {
+  // Every step draws the room and two steps screenshot it, which takes about a minute under CI's software rendering.
+  test.setTimeout(120_000);
   await installClock(); await boot(page, advanceSteps(newGame(), 6).state);
   const before = (await savedGame(page)).campaign!;
   await page.getByRole("button", { name: "Hint", exact: true }).click();
