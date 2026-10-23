@@ -24,11 +24,11 @@ it("keeps the selected workload hidden until actual growth and enters through th
  expect(within(guide).getByText(/Chapter requirements/)).toBeTruthy();
  expect(within(guide).queryByRole("button",{name:/Continue to data strategy/})).toBeNull();
  fireEvent.click(within(screen.getByRole("region",{name:"Guided Mode chapters"})).getByRole("button",{name:/Continue to data strategy/}));
- const data=screen.getByRole("region",{name:"Data strategy"});expect(data.textContent).toContain("Waiting for workload growth");
+ openActions();const data=screen.getByRole("region",{name:"Data strategy"});expect(data.textContent).toContain("Waiting for workload growth");
  expect(data.textContent).not.toMatch(/read-heavy|write-heavy|80%|20%/);expect(useGame.getState().running).toBe(false);
 });
 it("shows the current stage cap instead of advertising a locked database tier",()=>{
- show(dataCompany("read-heavy",false));const button=screen.getByRole("button",{name:/Upgrade database/});
+ show(dataCompany("read-heavy",false));openActions();const button=screen.getByRole("button",{name:/Upgrade database/});
  expect(button.hasAttribute("disabled")).toBe(true);expect(button.textContent).toContain("Current stage tier reached");expect(button.textContent).not.toContain("3,000");
  fireEvent.click(screen.getByRole("button",{name:/Continue to data strategy/}));
  expect(button.hasAttribute("disabled")).toBe(false);expect(button.textContent).toContain("4,000");expect(button.textContent).toContain("4 game seconds");
@@ -62,7 +62,7 @@ it("labels the last completed profile separately from an immediate contrast",()=
  const deploy=applyAction(g,{type:"deploy_cache"});if(!deploy.ok)throw Error(deploy.message);
  g=advanceSteps(deploy.state,30).state;const acknowledge=applyAction(g,{type:"acknowledge_review"});if(!acknowledge.ok)throw Error(acknowledge.message);
  const contrast=applyAction(acknowledge.state,{type:"contrast_workload"});if(!contrast.ok)throw Error(contrast.message);
- show(contrast.state);const data=screen.getByRole("region",{name:"Data strategy"});
+ show(contrast.state);openActions();const data=screen.getByRole("region",{name:"Data strategy"});
  expect(data.textContent).toContain("Workload: write-heavy");
  act(()=>inspectOrSelect("cache"));
  const readings=screen.getByRole("region",{name:"Read Cache readings"});
@@ -71,7 +71,7 @@ it("labels the last completed profile separately from an immediate contrast",()=
  expect(readings.textContent).toContain(`${g.campaign!.snapshot.data!.reads.toLocaleString("en-US")} / ${g.campaign!.snapshot.data!.writes.toLocaleString("en-US")}`);
 });
 it("offers each routing choice once and marks the one in use",()=>{
- show(dataCompany("read-heavy",false));const route=screen.getByRole("group",{name:/Send traffic to/});
+ show(dataCompany("read-heavy",false));openActions();const route=screen.getByRole("group",{name:/Send traffic to/});
  expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All apps","App 1 only","App 2 only"]);
  expect(within(route).getByRole("button",{name:"All apps"}).getAttribute("aria-pressed")).toBe("true");
  const before=useGame.getState().game;
@@ -87,7 +87,7 @@ it("offers each routing choice once and marks the one in use",()=>{
 });
 it("leaves a reserved spare out of the routing choices, so the apps in use still read as all apps",()=>{
  const g=protectedCombined();expect(g.campaign!.apps.find(a=>a.id==="app-2")!.role).toBe("spare");
- show(g);const route=screen.getByRole("group",{name:/Send traffic to/});
+ show(g);openActions();const route=screen.getByRole("group",{name:/Send traffic to/});
  expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All apps","App 1 only","App 3 only"]);
  expect(within(route).getByRole("button",{name:"All apps"}).getAttribute("aria-pressed")).toBe("true");
  expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
@@ -118,3 +118,6 @@ it("toggles equipment readings without advancing or changing the company when di
  expect(useGame.getState().game.campaign!.step).toBe(inspected.campaign!.step);
  expect(useGame.getState().game.campaign!.cashCents).toBe(inspected.campaign!.cashCents);
 });
+
+/** Purchases live on the panel's Actions tab. */
+function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

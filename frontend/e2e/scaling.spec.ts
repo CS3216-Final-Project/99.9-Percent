@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect, seedSave, savedGame, expectRoom, advanceCampaignStep } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, advanceCampaignStep, openPanelTab } from "./fixtures";
 import { newGame, applyAction, type GameState, type Action } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
@@ -36,6 +36,7 @@ async function boot(page: Page, game: GameState) {
   return api;
 }
 async function confirm(page: Page, name: RegExp) {
+  await openPanelTab(page, "Actions");
   await page.getByRole("button", { name }).click();
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
 }

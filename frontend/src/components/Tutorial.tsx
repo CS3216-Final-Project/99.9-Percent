@@ -113,25 +113,30 @@ const INCIDENT: Step[] = [
 ];
 
 /** Each later chapter gets one step on the controls it adds, the first time the company enters it. */
-const chapter = (title: string, why: string, hint: string, target: string): Step[] => [{ title, why, hint: () => hint, target: () => target, nextLabel: "Got it" }];
+const chapter = (title: string, why: string, hint: string, target: string, enter?: Step["enter"]): Step[] => [{ title, why, hint: () => hint, target: () => target, enter, nextLabel: "Got it" }];
+/** A step that points at purchase controls opens the panel's Actions tab, where they are. */
+const showActions = (s: Snapshot) => s.setPanelTab("actions");
 const CHAPTERS = {
   scaling: chapter(
     "Scale and route",
     `The next growth wave brings ${num(P.traffic)} requests a second.`,
     "Compare scaling and routing options. Extra servers help only when traffic reaches them.",
     '[aria-label="Scaling controls"]',
+    showActions,
   ),
   data: chapter(
     "Data strategy",
     "Cache hits answer repeated reads; misses and writes still reach the Database.",
     "Inspect the workload and compare your options.",
     '[aria-label="Data strategy"]',
+    showActions,
   ),
   spikes: chapter(
     "Traffic spikes",
     "Two short bursts of traffic are coming.",
     "Inspect demand and compare manual capacity with autoscaling.",
     '[aria-label="Traffic spikes and autoscaling"]',
+    showActions,
   ),
   reliability: [
     ...chapter(
@@ -139,6 +144,7 @@ const CHAPTERS = {
       "The test makes one App Server fail. Manual and automatic responses are available.",
       "Explore the reliability controls before starting the test.",
       '[aria-label="Stay Online"]',
+      showActions,
     ),
     {
       title: "Unlock Health Checks",
@@ -162,6 +168,7 @@ const CHAPTERS = {
               : "Press Deploy Health Checks.",
       // The confirmation opens beside the panel; light it up rather than leaving it under the dim.
       target: (s) => (s.view === "tech" ? TECH_TAB : confirmingChecks() ? ".campaign-action-popover" : '[data-tour="deploy-checks"]'),
+      enter: showActions,
       inTech: true,
       done: (s) => {
         const c = s.game.campaign;

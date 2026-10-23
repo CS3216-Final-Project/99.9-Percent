@@ -33,7 +33,7 @@ import { isChapterEntry } from "@/game/campaignChapters";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest, type ChapterCompletion } from "@/game/persist";
 import { money, num } from "@/game/format";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
 import { CampaignIncidentReport, CampaignRecoveryReview, IncidentEvidence } from "./CampaignIncidentReport";
@@ -50,7 +50,7 @@ import { SoundButton } from "./SoundButton";
 import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { Campaign, CampaignPostmortem, Intervention, ScheduledAction } from "@/sim/campaignTypes";
-import { completedTechIds, TECH_ORDER, type EventKind } from "@/sim";
+import { completedTechIds, TECH_ORDER, type EventKind, type GameState } from "@/sim";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
@@ -59,7 +59,8 @@ import { CHART_COLORS, EQUIPMENT_ICON } from "./presentation";
 import { ModeSwitch } from "./ModeSwitch";
 import { EventFeed, HistoryTabs, LineChart, type HistoryTab } from "./Views";
 import { ViewSheet, ViewTabs } from "./ViewSheet";
-import { Callout, Concept, Meter, Modal, Row, Stat } from "./ui";
+import { Callout, Concept, Meter, Modal, Row, Stat, Tabs } from "./ui";
+import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 
 const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(c / 100);
 const PLACES = ["gateway", "app", "cache", "db", "monitoring"] as const;
@@ -158,27 +159,47 @@ export function CampaignHeader() {
   </header>{started && <CampaignChapters />}</>;
 }
 
+/** Whatever is controllable is disabled while time is held for a decision, or once the run is over. */
+function controlsDisabled(game: GameState): boolean {
+  const c = game.campaign!;
+  return pendingStop(c) !== null || !!(c.openingMilestone && !c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
+}
+
+/**
+ * Two tabs: Analysis reads the system, Actions changes it. The switch leads the panel and guidance
+ * follows it on both tabs. A quote being read holds its tab, so a half-read purchase is never unmounted.
+ */
 export function CampaignPanel() {
-  const { game, act, selected, selectedAppId } = useGame(), c = game.campaign!, m = c.snapshot;
-  const incident = game.phase === "incident";
-  const busy = c.pending.some(a => !["limit","unlimit","routing"].includes(a.type));
-  const unlocked = !!c.openingMilestone?.acknowledged;
-  const dbUpgrade=databaseUpgrade(c);
-  const selectedApp = c.apps.find(a=>a.id===selectedAppId)??c.apps[0];
-  const recipients = c.reliabilityStage ? effectiveTargets(c) : c.routing.targets;
-  const disabled = pendingStop(c) !== null || !!(c.openingMilestone && !c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
-  const admissionPending = c.pending.some(a => a.type === "limit" || a.type === "unlimit");
-  const place = PLACES.find(id => id === selected && (id!=="cache"||c.dataStage));
-  const office = selected === "team" || selected === "deploy" || selected === "growth" ? selected : null;
+  const game = useGame(s => s.game), tab = useGame(s => s.panelTab), setTab = useGame(s => s.setPanelTab);
+  const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
+  const c = game.campaign!, incident = game.phase === "incident", pending = c.pending.length;
   return <EquipmentPanel className="campaign-panel" label="System metrics">
     <section className={`panel-section${incident ? " incident" : ""}`} aria-label={incident ? "Incident" : "System overview"}>
       {incident && <header className="panel-head">
-        <span className={`panel-icon${incident ? " state-critical" : ""}`}><Icon name={incident ? "incident" : "monitor"} /></span>
-        <div><h2>{incident ? "Service slowdown" : "System overview"}</h2>
-          {incident && <span className="state state-critical"><Icon name="alert" size={12} />Incident</span>}
+        <span className="panel-icon state-critical"><Icon name="incident" /></span>
+        <div><h2>Service slowdown</h2>
+          <span className="state state-critical"><Icon name="alert" size={12} />Incident</span>
         </div>
       </header>}
-      <CampaignGuidance />
+      <Tabs variant="segmented" className="panel-tabs" label="Panel sections" value={tab} onChange={setTab} locked={!!confirming} shared={<CampaignGuidance />} tabs={[
+        { id: "analysis", label: "Analysis", icon: "analytics" },
+        { id: "actions", label: "Actions", icon: "wrench", badge: pending, badgeLabel: `${pending} activating` },
+      ]}>
+        {tab === "analysis" ? <CampaignAnalysis /> : <CampaignActions />}
+      </Tabs>
+    </section>
+  </EquipmentPanel>;
+}
+
+/** Readings: impact, recovery progress, and the equipment under inspection. */
+function CampaignAnalysis() {
+  const { game, selected, selectedAppId } = useGame(), c = game.campaign!, m = c.snapshot;
+  const unlocked = !!c.openingMilestone?.acknowledged;
+  const recipients = c.reliabilityStage ? effectiveTargets(c) : c.routing.targets;
+  const disabled = controlsDisabled(game);
+  const place = PLACES.find(id => id === selected && (id!=="cache"||c.dataStage));
+  const office = selected === "team" || selected === "deploy" || selected === "growth" ? selected : null;
+  return <>
       <div className="incident-symptoms">
         <dl className="impact">
           <div><Concept kind={m.latencyMs >= Q.latencyThresholdMs ? "critical" : "users"} icon="timer" /><dt>Latency · ms</dt><dd>{m.latencyMs.toFixed(0)}</dd></div>
@@ -199,7 +220,26 @@ export function CampaignPanel() {
         {unlocked && selected === "app" && <details className="more" open><summary>Application instances · {c.routing.mode} routing</summary>
           <ApplicationInstances campaign={c} recipients={recipients} selectedAppId={selectedAppId} onSelect={id=>inspectOrSelect("app",id)} /></details>}
       </div>
-      <h4 className="step-head">Actions</h4>
+      {c.apps.some(a=>!a.routed) && <p className="muted">{c.apps.filter(a=>!a.routed).map(a=>appName(a.id)).join(", ")}: Installed, not receiving traffic</p>}
+      {c.limit!==null&&<Callout compact tone="warn" icon="network" kicker="Traffic limit active">{num(m.admitted)} admitted / {num(m.rejected)} rejected req/s. Rejected requests earn no revenue. <strong>Infrastructure and salaries still cost the same.</strong></Callout>}
+  </>;
+}
+
+/** Controls: every purchase and setting, then what is still activating. */
+function CampaignActions() {
+  const { game, act, selectedAppId } = useGame(), c = game.campaign!;
+  const busy = c.pending.some(a => !["limit","unlimit","routing"].includes(a.type));
+  const unlocked = !!c.openingMilestone?.acknowledged;
+  const dbUpgrade=databaseUpgrade(c);
+  const selectedApp = c.apps.find(a=>a.id===selectedAppId)??c.apps[0];
+  const disabled = controlsDisabled(game);
+  const admissionPending = c.pending.some(a => a.type === "limit" || a.type === "unlimit");
+  return <>
+      {c.pending.map(a => <div className="working campaign-working" role="status" key={a.id}>
+        <span>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
+        <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
+      </div>)}
+      <h4 className="step-head">Infrastructure</h4>
       <ul className="actions">
         <li><Act icon="server" label="Add server" price={Q.appCostCents / 100} note={`${Q.appDelay} game seconds`} disabled={disabled || busy || c.apps.length >= (c.spikeStage ? T.maximum : Q.maxApps) || c.cashCents <= Q.appCostCents} tip="Adds installed application capacity. Without routing, a new server does not receive traffic." decision={{ type: "add_server" }} onClick={() => act({ type: "add_server" })} /></li>
         <li><Act icon="database" label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbUpgrade?`${dbUpgrade.delay} game seconds · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next Guided Mode stage."} decision={{ type: "start_db_upgrade" }} onClick={() => act({ type: "start_db_upgrade" })} /></li>
@@ -230,21 +270,14 @@ export function CampaignPanel() {
         </details>
       </section>}
       {c.combinedStage&&<CombinedControls disabled={disabled}/>}
-      {c.pending.map(a => <div className="working campaign-working" role="status" key={a.id}>
-        <span>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
-        <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
-      </div>)}
-      {c.apps.some(a=>!a.routed) && <p className="muted">{c.apps.filter(a=>!a.routed).map(a=>appName(a.id)).join(", ")}: Installed, not receiving traffic</p>}
-      {c.limit!==null&&<Callout compact tone="warn" icon="network" kicker="Traffic limit active">{num(m.admitted)} admitted / {num(m.rejected)} rejected req/s. Rejected requests earn no revenue. <strong>Infrastructure and salaries still cost the same.</strong></Callout>}
-    </section>
-    {c.spikeStage&&<SpikeControls disabled={disabled} busy={busy}/>}
-  </EquipmentPanel>;
+      {c.spikeStage&&<SpikeControls disabled={disabled} busy={busy}/>}
+  </>;
 }
 
 function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
  const {game,act}=useGame(),c=game.campaign!,d=c.spikeStage!,a=d.controller,o=c.snapshot.spikes;
  const pulse=spikeInput(c)===T.peak, next=d.deadlines.find(step=>step>c.step);
- return <section className="panel-section scaling-controls" aria-label="Traffic spikes and autoscaling">
+ return <section className="scaling-controls" aria-label="Traffic spikes and autoscaling">
   <h4 className="step-head"><Icon name="load" size={16}/>Traffic Spikes &amp; Autoscaling</h4>
   <Callout compact tone={pulse?"warn":"info"} icon="load" kicker={pulse?"TRAFFIC SPIKE ACTIVE":"Baseline demand"}>
    Incoming {num(c.snapshot.incoming)} req/s. {next!==undefined?`Next pulse boundary in ${next-c.step} game seconds (game second ${next}).`:"Both pulses ended. Stable baseline service completes the stage."}

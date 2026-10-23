@@ -42,6 +42,9 @@ export function useChapterZeroLesson(lessons: readonly ChapterZeroLesson[], card
     entry.current = { index, speed: now.speed, cancellations: confirmationCancelCount() };
     if (id !== "quote" && id !== "cancel") setConfirming(null);
     if (id === "goal" || id === "inspect-app") now.select(null);
+    // Each exercise opens the panel tab it is done in.
+    if (id === "quote" || id === "cancel") now.setPanelTab("actions");
+    else if (id === "inspect-app" || id === "inspect-db" || id === "warnings") now.setPanelTab("analysis");
     card.current?.scrollTo?.({ top: 0 });
     heading.current?.focus({ preventScroll: true });
   }, [index, id, card, heading]);
@@ -64,7 +67,8 @@ export function useChapterZeroLesson(lessons: readonly ChapterZeroLesson[], card
     const control = document.querySelector('.campaign-panel .act:not(:disabled)') ?? document.querySelector('.campaign-panel .act');
     const action = control?.closest('[data-campaign-action]')?.getAttribute('data-campaign-action');
     if (action) setConfirming(action);
-  }, [id, index, confirming, cancellations, readyFor]);
+    // The quote's controls exist once the Actions tab, opened on entry, has rendered.
+  }, [id, index, confirming, cancellations, readyFor, s.panelTab]);
 
   const next = () => {
     const now = useGame.getState(), step = now.tour?.step ?? 0;

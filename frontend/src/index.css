@@ -4100,6 +4100,130 @@ button:disabled {
   border-top: 0;
 }
 
+/* Segmented tabs: a recessed track whose raised thumb slides to the chosen segment. The thumb's
+ * radius is the track's minus its inset, so the two curves stay concentric. */
+.tabset.is-segmented {
+  margin-top: 0;
+}
+
+.segmented {
+  --segment-inset: 3px;
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: var(--segment-inset);
+  background: var(--control-inset);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
+}
+
+.segment-thumb {
+  position: absolute;
+  top: var(--segment-inset);
+  bottom: var(--segment-inset);
+  left: var(--segment-inset);
+  width: calc((100% - 2 * var(--segment-inset)) / var(--segment-count));
+  transform: translateX(calc(var(--segment-index) * 100%));
+  background: #fff;
+  border-radius: calc(var(--radius) - var(--segment-inset) - 1px);
+  box-shadow: 0 0 0 1px var(--control-edge), 0 1px 3px rgb(28 20 42 / .14);
+  /* Approximates a critically damped spring; a transition re-targets from where the thumb is now. */
+  transition: transform .32s cubic-bezier(.32, .72, 0, 1);
+}
+
+.segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--text-soft);
+  border: 0;
+  border-radius: calc(var(--radius) - var(--segment-inset) - 1px);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: color .15s ease, transform .1s ease-out;
+}
+
+.segment > span:not(.segment-badge) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segment .icon {
+  flex: none;
+}
+
+.segment:hover:not(:disabled),
+.segment.is-active {
+  color: var(--ink);
+}
+
+/* Feedback lives on the press. */
+.segment:active:not(:disabled):not(.is-active) {
+  transform: scale(.97);
+}
+
+.segment:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+.segment:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.segment-badge {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 999px;
+  font-family: var(--font-num);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segment-thumb,
+  .segment {
+    transition: none;
+  }
+
+  .segment:active:not(:disabled):not(.is-active) {
+    transform: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .segmented {
+    border-color: var(--ink);
+  }
+
+  .segment-thumb {
+    box-shadow: 0 0 0 2px var(--ink);
+  }
+
+  .segment {
+    color: var(--ink);
+  }
+}
+
 /* Graphics: one card per quality, picked like radio buttons. */
 .quality-options {
   display: grid;

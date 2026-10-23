@@ -62,7 +62,7 @@ it("requires reviewing a changed cash preview and rejects newly unavailable purc
 it("shows an engine reason outside disabled controls and keeps it keyboard reachable",()=>{
     act(()=>useGame.setState({game:advanceSteps(newGame(),60).state}));
     act(()=>useGame.getState().act({type:"start_db_upgrade"}));render(<CampaignPanel/>);
-    const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
+    openActions(); const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
     const reason=card.querySelector<HTMLElement>(".campaign-action-reason")!;
     expect(reason.textContent).toBe("An infrastructure deployment is already pending.");reason.focus();expect(document.activeElement).toBe(reason);
 });
@@ -167,3 +167,6 @@ it("shows unpaid-cost risk before a forecast is available and withholds estimate
     expect(health.textContent).toContain("This company has closed");
     expect(health.textContent).not.toContain("How long your money might last");
 });
+
+/** Purchases live on the panel's Actions tab. */
+function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

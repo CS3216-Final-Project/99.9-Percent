@@ -312,7 +312,7 @@ it("waits through an incident on a resumed company without holding its clock", (
   saveMeta({ ...DEFAULT_META, walkthroughStep: at("quote") - 1, walkthroughFurthestStep: at("quote") - 1 });
   start(); renderCompany();
   expect(screen.queryByRole("dialog", { name: /^Walkthrough/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
   expect(screen.getByRole("button", { name: "Confirm" })).toHaveProperty("disabled", false);
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   act(() => { useGame.getState().setRunning(true); useGame.getState().tick(1); });
@@ -389,3 +389,6 @@ it("explains the first settled week with a one-card tip on Cash", () => {
   fireEvent.click(within(tip).getByRole("button", { name: "Got it" }));
   expect(useGame.getState().tour).toBeNull();
 });
+
+/** Purchases live on the panel's Actions tab. */
+function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

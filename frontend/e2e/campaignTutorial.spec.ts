@@ -1,4 +1,4 @@
-import { test, expect, expectRoom, savedGame, seedSave, tutorial, finishChapterZero, nextChapterZero, CHAPTER_ZERO_LESSONS as N, lessonNumber } from "./fixtures";
+import { test, expect, expectRoom, savedGame, seedSave, tutorial, finishChapterZero, nextChapterZero, CHAPTER_ZERO_LESSONS as N, lessonNumber, openPanelTab } from "./fixtures";
 const step = (n: number) => `Walkthrough, step ${n} of ${N}`;
 import { applyAction, newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -135,6 +135,7 @@ for (const width of [1440, 390]) test(`How to play clears earlier completion and
     expect((await savedGame(page)).campaign).toEqual(before);
   };
   await replay();
+  await openPanelTab(page, "Analysis");
   await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "App Server", exact: true }).click();
   await card.getByRole("button", { name: "Next", exact: true }).click();
   await expect(card).toHaveAccessibleName(step(lessonNumber("inspect-db")));

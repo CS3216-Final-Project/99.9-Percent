@@ -191,6 +191,11 @@ export async function advanceCampaignStep(page: Page, { seconds = 1, resumeClock
   if (resumeClock) await page.clock.resume();
 }
 
+/** Brings a tab of the Guided Mode panel forward: readings on Analysis, purchases and settings on Actions. */
+export async function openPanelTab(page: Page, name: "Analysis" | "Actions") {
+  const tab = page.getByRole("tab", { name: new RegExp(`^${name}`) });
+  if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
+}
 export async function openRoomControls(page: Page) {
   const menu = page.locator(".room-menu");
   if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await menu.locator(":scope > summary").click();

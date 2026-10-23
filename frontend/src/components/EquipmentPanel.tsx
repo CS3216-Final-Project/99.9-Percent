@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
@@ -8,11 +8,14 @@ export function EquipmentPanel({ children, label, className = "" }: { children: 
   const open = useGame(s => s.panelOpen), setOpen = useGame(s => s.setPanelOpen);
   const phase = useGame(s => s.game.phase), tour = useGame(s => s.tour), generation = useGame(s => s.generation);
   const selected = useGame(s => s.selected), selectedApp = useGame(s => s.selectedAppId);
+  const tab = useGame(s => s.panelTab);
   const content = useRef<HTMLElement>(null);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
   const collapse = useRef<HTMLButtonElement>(null), expand = useRef<HTMLButtonElement>(null), focusOnChange = useRef(false);
   const id = useId();
   useEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [selected, selectedApp, phase]);
+  // A new tab starts at its top before anything (such as accepted guidance) reveals a control in it.
+  useLayoutEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [tab]);
   useEffect(() => { setOpen(true); }, [generation, setOpen]);
   useEffect(() => { if (phase === "incident" || tour) setOpen(true); }, [phase, tour, generation, setOpen]);
   useEffect(() => {

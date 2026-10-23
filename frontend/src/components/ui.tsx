@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { BALANCE, releaseRisk, taskEta, testEffort, type GameState, type Release, type Task } from "@/sim";
 import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
@@ -323,6 +323,9 @@ export interface TabItem<Id extends string> {
   id: Id;
   label: string;
   icon: IconName;
+  /** A count shown beside the label, hidden at zero. `badgeLabel` is what a screen reader hears for it. */
+  badge?: number;
+  badgeLabel?: string;
 }
 
 /**
@@ -331,6 +334,10 @@ export interface TabItem<Id extends string> {
  * half-finished choice (a pending confirmation, a chosen file). The arrow keys (right/down for next,
  * left/up for previous, whichever direction the strip runs), Home and End move between tabs, and the
  * selected tab is the only one in the Tab order.
+ *
+ * The "segmented" variant is a compact two-or-three-way switch whose selection thumb slides between
+ * segments. `locked` keeps the selected tab in place, for while its content holds a choice in progress.
+ * `shared` is shown under the tabs whichever is selected, and stays mounted when the tab changes.
  */
 export function Tabs<Id extends string>({
   label,
@@ -338,23 +345,32 @@ export function Tabs<Id extends string>({
   value,
   onChange,
   children,
+  variant = "strip",
+  locked = false,
+  className,
+  shared,
 }: {
   label: string;
   tabs: TabItem<Id>[];
   value: Id;
   onChange: (id: Id) => void;
   children: ReactNode;
+  variant?: "strip" | "segmented";
+  locked?: boolean;
+  className?: string;
+  shared?: ReactNode;
 }) {
   const base = useId();
   const buttons = useRef(new Map<Id, HTMLButtonElement>());
+  const segmented = variant === "segmented";
+  const at = tabs.findIndex((t) => t.id === value);
   const select = (index: number) => {
     const tab = tabs[(index + tabs.length) % tabs.length];
     onChange(tab.id);
     buttons.current.get(tab.id)?.focus();
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.altKey || e.ctrlKey || e.metaKey) return;
-    const at = tabs.findIndex((t) => t.id === value);
+    if (e.altKey || e.ctrlKey || e.metaKey || locked) return;
     let target: number;
     switch (e.key) {
       case "ArrowRight":
@@ -378,8 +394,15 @@ export function Tabs<Id extends string>({
     select(target);
   };
   return (
-    <div className="tabset">
-      <div className="tab-strip" role="tablist" aria-label={label} onKeyDown={onKeyDown}>
+    <div className={`tabset${segmented ? " is-segmented" : ""}${className ? ` ${className}` : ""}`}>
+      <div
+        className={segmented ? "segmented" : "tab-strip"}
+        role="tablist"
+        aria-label={label}
+        onKeyDown={onKeyDown}
+        style={segmented ? ({ "--segment-count": tabs.length, "--segment-index": at } as CSSProperties) : undefined}
+      >
+        {segmented && <span className="segment-thumb" aria-hidden="true" />}
         {tabs.map((t) => (
           <button
             type="button"
@@ -394,14 +417,23 @@ export function Tabs<Id extends string>({
             // Only the selected tab's panel is in the page.
             aria-controls={t.id === value ? `${base}-panel-${t.id}` : undefined}
             tabIndex={t.id === value ? 0 : -1}
-            className={t.id === value ? "is-active" : ""}
+            className={[segmented && "segment", t.id === value && "is-active"].filter(Boolean).join(" ")}
+            data-tab={t.id}
+            disabled={locked && t.id !== value}
             onClick={() => onChange(t.id)}
           >
-            <Icon name={t.icon} size={20} />
+            <Icon name={t.icon} size={segmented ? 18 : 20} />
             <span>{t.label}</span>
+            {!!t.badge && (
+              <span className="segment-badge">
+                <span aria-hidden="true">{t.badge}</span>
+                <span className="visually-hidden">, {t.badgeLabel ?? t.badge}</span>
+              </span>
+            )}
           </button>
         ))}
       </div>
+      {shared}
       <div className="tab-panel" role="tabpanel" id={`${base}-panel-${value}`} aria-labelledby={`${base}-tab-${value}`}>
         {children}
       </div>

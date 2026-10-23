@@ -6,7 +6,7 @@ import { chapter6Preparation, bootChapter6 } from "./chapter6Guidance";
 import { appHealthDuringTutorial, appHealthJourney, appHealthProblem } from "./appHealth";
 import type { Page } from "@playwright/test";
 import { keyboardDetails, purchaseLayout } from "./purchaseLayout";
-import { completeTutorial, advanceCampaignStep, finishChapterZero, nextChapterZero, CHAPTER_ZERO_LESSONS } from "./fixtures";
+import { completeTutorial, advanceCampaignStep, finishChapterZero, nextChapterZero, CHAPTER_ZERO_LESSONS, openPanelTab } from "./fixtures";
 import { financeDuringWalkthrough } from "./financeIntegration";
 import { test, expect, expectRoom, savedGame, seedSave, tutorial, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
@@ -87,6 +87,7 @@ for (const width of [390, 320]) test(`Phase 1 Hint and accepted control remain u
   await expect(target).toHaveCount(1); await expect(target).toHaveAccessibleName("Confirm");
   await expect(target).toBeInViewport({ratio:1});
   await page.getByRole("button",{name:"Cancel",exact:true}).tap(); await expect(target).toHaveCount(0);
+  await openPanelTab(page, "Actions");
   await page.getByRole("button",{name:/^Upgrade database/}).tap(); await expect(target).toHaveAccessibleName("Confirm");
   await target.tap(); await expect(target).toHaveCount(0);
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="upgrade-db")).toBe(true);
@@ -170,6 +171,7 @@ test("finance and infrastructure help are reachable by touch with reduced motion
  await page.locator('.campaign-panel .chip').filter({hasText:/^App Server$/}).tap();
  await page.getByText("About Servers",{exact:true}).tap();
  await expect(page.locator('.campaign-evidence')).toContainText("needs routing");
+ await openPanelTab(page, "Actions");
  await page.getByRole("button",{name:/Add server/}).tap();const confirmation=page.getByRole("region",{name:"Confirm Add server"});
  await expect(confirmation).toContainText("$19,000");await confirmation.getByRole("button",{name:"Cancel"}).tap();
  expect((await savedGame(page)).campaign!.cashCents).toBe(2000000);
@@ -195,6 +197,7 @@ test("purchase details keyboard navigation handles overflow and fitting content"
  await page.route("**/api/**",r=>r.abort());await seedSave(page,tick(newGame(1,"details-keyboard"),60));
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  const before=(await savedGame(page)).campaign;
+ await openPanelTab(page, "Actions");
  await page.getByRole("button",{name:/^Add server/}).tap();
  const card=page.locator(".campaign-action-popover"),content=card.getByRole("region",{name:"Purchase details",exact:true});
  await card.getByText("How it works",{exact:true}).tap();
@@ -350,6 +353,7 @@ test("inspects evidence and advances a physical step on touch", async ({ page , 
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await mute.tap(); await expect(mute).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: "test-results/phase1-mobile.png" });
+  await openPanelTab(page, "Analysis");
   await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).tap();
   const before=(await savedGame(page)).campaign!.step;
   await advanceCampaignStep(page);
@@ -503,6 +507,7 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  await page.screenshot({path:`test-results/clarity-tutorial-${width}-goal.png`});
  await nextChapterZero(page,true);
  await expect(card.getByRole("button",{name:"Next",exact:true})).toBeDisabled();
+ await openPanelTab(page, "Analysis");
  await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"App Server",exact:true}).tap();
  // The readings stay in view beside the card until the player presses Next.
  await expect(page.locator(".campaign-evidence")).toBeInViewport();

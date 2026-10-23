@@ -49,7 +49,7 @@ it("shows inspected evidence as labelled rows and a load bar", () => {
   for (const [label,value] of [["Incoming","800 requests/s"],["Admitted","800 requests/s"],["Rejected","0 requests/s"]]) expect(within(net).getByText(label).closest(".evidence-row")!.querySelector("dd")!.textContent).toBe(value);
 });
 it("quotes a purchase as toned tiles", () => {
-  start(); renderCompany(); fireEvent.click(screen.getByRole("button",{name:/Add server/}));
+  start(); renderCompany(); openActions(); fireEvent.click(screen.getByRole("button",{name:/Add server/}));
   const confirm=screen.getByRole("region",{name:"Confirm Add server"});
   const tone=(label:string)=>within(confirm).getByText(label,{exact:true}).closest(".purchase-tile")!.getAttribute("data-tone");
   expect([tone("Setup"),tone("Cash after"),tone("Upkeep"),tone("Ready in")]).toEqual(["cost","ok","warn","info"]);
@@ -67,7 +67,7 @@ it("system evidence records a real free inspection without advancing the clock",
   fireEvent.click(screen.getByRole("button",{name:"Close"})); expect(useGame.getState().running).toBe(false);
 });
 it("shows what the machine does, paid-now cash, delayed upkeep and routing limitation only when adding an App Server", () => {
-  start(); renderCompany();
+  start(); renderCompany(); openActions();
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
   expect(card.textContent).not.toContain("+$700 per 60 game seconds"); expect(screen.queryByText("Effect & costs")).toBeNull();
   fireEvent.click(screen.getByRole("button",{name:/Add server/}));
@@ -78,7 +78,7 @@ it("shows what the machine does, paid-now cash, delayed upkeep and routing limit
   expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
 });
 it("asks for confirmation before an action is dispatched, and Cancel or Escape leaves the company unchanged", () => {
-  start(); renderCompany();
+  start(); renderCompany(); openActions();
   const add=screen.getByRole("button",{name:/Add server/}), before=useGame.getState().game;
   fireEvent.click(add);
   const confirm=screen.getByRole("region",{name:"Confirm Add server"});
@@ -96,7 +96,7 @@ it("asks for confirmation before an action is dispatched, and Cancel or Escape l
   expect(screen.queryByRole("button",{name:"Confirm"})).toBeNull();
 });
 it("visibly explains cash and pending-infrastructure reasons without altering accepted action rules", () => {
-  start(); renderCompany(); fireEvent.click(screen.getByRole("button",{name:/Upgrade database/})); fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
+  start(); renderCompany(); openActions(); fireEvent.click(screen.getByRole("button",{name:/Upgrade database/})); fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
   expect(card.textContent).toContain("An infrastructure deployment is already pending");
   cleanup(); const game=newGame(); game.campaign!.cashCents=100000; renderCompany(game);
@@ -127,13 +127,13 @@ it("postmortem keeps all actual causes and observations reachable while leading 
 it.each([
   [/Add server/, ["app"]], [/Upgrade database/, ["db"]], [/Limit to 500/, ["gateway"]],
 ] as const)("pointing at %s lights up the machine it changes, and leaving clears it", (name, ids) => {
-  start(); renderCompany();
+  start(); renderCompany(); openActions();
   const card=screen.getByRole("button",{name}).closest(".campaign-action-card")!;
   fireEvent.pointerEnter(card); expect(useGame.getState().affected).toEqual(ids);
   fireEvent.pointerLeave(card); expect(useGame.getState().affected).toEqual([]);
 });
 it("keeps the affected machine lit while its confirmation is open, and clears it after Confirm", () => {
-  start(); renderCompany();
+  start(); renderCompany(); openActions();
   const button=screen.getByRole("button",{name:/Upgrade database/}), card=button.closest(".campaign-action-card")!;
   fireEvent.pointerEnter(card); fireEvent.click(button); fireEvent.pointerLeave(card);
   expect(useGame.getState().affected).toEqual(["db"]);
@@ -141,8 +141,11 @@ it("keeps the affected machine lit while its confirmation is open, and clears it
   expect(useGame.getState().affected).toEqual([]);
 });
 it("opening an action's confirmation from the office floor rides to the floor of the machine it changes", () => {
-  start(); renderCompany(); useGame.setState({floor:"office"});
+  start(); renderCompany(); openActions(); useGame.setState({floor:"office"});
   fireEvent.click(screen.getByRole("button",{name:/Upgrade database/}));
   expect(useGame.getState().floor).toBe("servers");
   expect(screen.getByRole("region",{name:"Confirm Upgrade database"}).textContent).toContain("Stores data");
 });
+
+/** Purchases live on the panel's Actions tab. */
+function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

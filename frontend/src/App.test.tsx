@@ -112,7 +112,7 @@ describe("opening UI", () => {
     expect(recovery.textContent).toContain("Latency below 500 ms");
     expect(recovery.textContent).toContain("Service errors below 1%");
     expect(recovery.textContent).toContain("Traffic is being accepted and requests are completing");
-    fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
+    openActions(); fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(8000));
@@ -369,3 +369,6 @@ it("wraps the week clock without losing the total elapsed counter", () => {
   expect(screen.getByRole("progressbar", { name: "Operating week progress" }).getAttribute("aria-valuenow")).toBe("8");
   expect(document.querySelector(".week")?.textContent).toContain("Week 2");
 });
+
+/** Purchases live on the panel's Actions tab. */
+function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }
