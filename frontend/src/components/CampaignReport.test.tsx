@@ -52,6 +52,7 @@ it("keeps final review explicit and resets the single accordion on completion", 
   expect(useGame.getState().game.outcome).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Complete campaign" }));
   expect(useGame.getState().game.outcome).toBe("won");
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Campaign finale" })).getByRole("button", { name: "Skip to the scorecard" }));
   checkReport();
 });
 

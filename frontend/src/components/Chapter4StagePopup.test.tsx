@@ -62,7 +62,7 @@ it("preserves pause/resume, manual Hint ownership and confirmation priority with
   useGame.setState({ game: initial, ready: true, started: true, running: false, onboarding: false, tour: null });
   render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost>);
   const before = useGame.getState().game;
-  fireEvent.click(within(screen.getByRole("dialog", { name: "Company Message" })).getByRole("button", { name: "Got it" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Company Message" })).getByRole("button", { name: "Dismiss company message" }));
   expect(popup()).not.toBeNull(); act(() => useGame.getState().setRunning(true)); expect(popup()).not.toBeNull();
   act(() => useGame.getState().setRunning(false)); expect(popup()).not.toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Hint" })); expect(popup()).toBeNull();

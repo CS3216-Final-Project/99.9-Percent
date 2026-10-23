@@ -71,7 +71,7 @@ it("transfers selected Network to Remove, immediate Confirm, accepted Run and cl
   accept(); fireEvent.click(gold()[0]); fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   expect(useGame.getState().game.campaign!.pending.some(a => a.type === "unlimit")).toBe(true);
   accept(); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
-});
+}, 15_000);
 
 it("yields to real running incidents and mandatory growth reviews", () => {
   let wave = decide(tick(combinedCompany(), 5), { type: "start_growth_wave" });

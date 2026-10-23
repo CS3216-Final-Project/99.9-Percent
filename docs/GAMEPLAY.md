@@ -135,6 +135,8 @@ The seeded pool holds one read-heavy pulse (3,800/4,000 req/s), one write-heavy 
 Five stable full-demand observations make Start next growth wave available, and each wave is announced eight steps ahead.
 After each wave, queues must drain, apps must be healthy, reports must be acknowledged and five stable full-demand observations must follow before the player reviews the growth outcome.
 After all three reviews, five more full-demand steps qualify the final review, and Complete campaign ends the run, freezes the clock and keeps the company inspectable.
+Before the final scorecard, the five colleagues celebrate once per run: Maya, Jordan, Sam, Taylor, then Alex each speak one line built from the recorded scorecard, and the last line shows users, uptime (when known) and incidents.
+Skipping it at any line counts as seeing it; leaving it part way, for example by reloading, plays it again from the start.
 
 An optional promotion costs $500, activates next step, adds 400 req/s for twelve steps and has a thirty-step cooldown.
 
@@ -150,6 +152,8 @@ Guidance never changes the rules; it reads the same state the engine uses.
 - Chapter requirements list each gate as met or unmet, without revealing future deadlines.
 - Hint is player-requested and points at an existing control; optional attention cues for Run and Next defer to required reviews and guides.
 - Each chapter opens with an optional Company Message from a colleague (Maya, Alex, Jordan, Sam, Taylor, then Alex) stating its mission.
+  The colleague speaks a few short lines in their own voice, which the player reads one at a time, and the last line carries the mission.
+  Dismissing it at any line counts as reading it.
 - A new diagnostic incident that keeps running shows one Pause invitation.
 - Every report (incident postmortem, prevention review, chapter outcome, growth review, scorecard) uses four short sections and one collapsed View Technical Details disclosure.
   Reports are built from recorded snapshots, trace and actual activations, never from later company state.

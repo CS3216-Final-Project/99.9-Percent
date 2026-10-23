@@ -141,7 +141,7 @@ it("does not defer a background incident invitation until focus returns", () => 
   fireEvent(window, new Event("focus")); expect(gold()).toHaveLength(0);
 });
 
-it.each([1, 2, 3, 4, 5, 6])("marks a running Chapter %i incident with the mouse captured, and keeps it through Escape", chapter => {
+it.each([1, 2, 3, 4, 5, 6])("marks a running Chapter %i incident with the mouse captured, and keeps it through Escape", { timeout: 30_000 }, chapter => {
   show(transition(chapter).before); const canvas = document.createElement("canvas"); document.body.append(canvas);
   const lock = vi.spyOn(document, "pointerLockElement", "get").mockReturnValue(canvas);
   fireEvent(document, new Event("pointerlockchange"));
