@@ -1,11 +1,9 @@
 import {render,screen,within,cleanup,fireEvent} from "@testing-library/react";
-import {beforeEach,afterEach,it,expect,vi} from "vitest";
+import {beforeEach,afterEach,it,expect} from "vitest";
 import {CampaignPanel,CampaignHeader,CampaignControls,CampaignOverlays} from "./CampaignUI";
 import {useGame} from "../game/store";
 import {newGame} from "../sim";
 import {readyReliability,reliabilityCompany,preparedReliability,act,tick} from "../sim/__tests__/reliabilityFixture";
-// These cases play a company through the reliability test (up to 3s alone); a busy full suite can push them past the 5s default.
-vi.setConfig({testTimeout:15_000});
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});afterEach(cleanup);
 function show(g:ReturnType<typeof newGame>){useGame.setState({game:g,ready:true,started:true,onboarding:false});render(<><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/></>);}
 it("offers explicit reliability continuation after acknowledged spikes",()=>{show(readyReliability());expect((screen.getByRole("button",{name:/Continue to Stay Online/}) as HTMLButtonElement).disabled).toBe(false);});

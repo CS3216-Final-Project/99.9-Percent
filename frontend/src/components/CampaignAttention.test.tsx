@@ -12,9 +12,6 @@ import { act as decide, tick, dataCompany } from "@/sim/__tests__/spikeFixtures"
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
 import { combinedCompany } from "@/sim/__tests__/combinedFixture";
 
-// These cases play companies into later chapters (1-2s each alone); a busy full suite can push them past the 5s default.
-vi.setConfig({ testTimeout: 15_000 });
-
 beforeEach(() => {
   localStorage.clear(); useGame.setState(useGame.getInitialState(), true);
   vi.spyOn(document, "hasFocus").mockReturnValue(true);

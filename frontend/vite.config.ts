@@ -23,6 +23,8 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./src/testSetup.ts'],
+    // Many UI cases play a whole company into a later chapter (1-3s alone); a busy full run can take them past 5s.
+    testTimeout: 15_000,
     coverage: {
       provider: 'v8',
       include: ['src/sim/**/*.ts', 'src/game/**/*.ts', 'src/lib/**/*.ts'],

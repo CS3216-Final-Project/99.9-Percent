@@ -13,8 +13,6 @@ import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } fro
 const transitions = new Map([1, 2, 3, 4, 5, 6].map(chapter => [chapter, pauseTransition(chapter)]));
 const transition = (chapter: number) => structuredClone(transitions.get(chapter)!);
 const pointerLockDescriptor = Object.getOwnPropertyDescriptor(document, "pointerLockElement");
-// The later chapters' cases render a whole company each tick (about 1.5s alone); a busy full suite can push them past the 5s default.
-vi.setConfig({ testTimeout: 15_000 });
 
 beforeEach(() => {
   localStorage.clear(); useGame.setState(useGame.getInitialState(), true);
