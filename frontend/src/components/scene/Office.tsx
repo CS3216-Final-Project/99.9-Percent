@@ -21,6 +21,7 @@ import {
   GLASS_H,
   HUDDLE_ROOM,
   MEETING_CHAIRS,
+  NAP_MATTRESS,
   NAP_PODS,
   NAP_ROOM,
   OPEN_DESKS,
@@ -49,6 +50,7 @@ import { FURNITURE, PIXEL_FLOORS, ROOM_PALETTE } from "./palette";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
 import { arcadeScreen, carpet, floorTiles, kitchenTiles, logoSign, poster, puffTexture, screenTexture, skyline, skylineDay, whiteboard, zoneName, zzzTexture, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
+import { avatar } from "./walk";
 import { viewFocus } from "./zoneSounds";
 
 /*
@@ -114,9 +116,6 @@ function pingPong(): Prim[] {
 
 /** The top of the mug under the espresso machine, where its steam rises from. */
 const ESPRESSO_MUG: V3 = [17.31, 0.96, -8.91];
-
-/** How high a nap pod's mattress is, where its sleeper lies. */
-const NAP_MATTRESS = 0.56;
 
 /** A nap pod 2 m long along x and 0.82 m wide, its hooded head at the +x end, with a mattress, a pillow and a reading light. */
 function napPod(accent: string): Prim[] {
@@ -898,13 +897,14 @@ function Steam({ position }: { position: V3 }) {
   );
 }
 
-/** An arcade cabinet's screen playing its attract mode, eight frames a second. */
+/** An arcade cabinet's screen playing its attract mode, eight frames a second, racing while the avatar plays. */
 function ArcadeScreen({ variant, x }: { variant: string; x: number }) {
   const game = useMemo(() => arcadeScreen(variant), [variant]);
   useEffect(() => () => game.texture.dispose(), [game]);
   const shown = useRef(-1);
   useFrame(({ clock }) => {
-    const frame = Math.floor(clock.elapsedTime * 8);
+    const fps = avatar.busy?.prop === "arcade" ? 20 : 8;
+    const frame = Math.floor(clock.elapsedTime * fps);
     if (frame === shown.current) return;
     shown.current = frame;
     game.draw(frame);

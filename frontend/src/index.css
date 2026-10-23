@@ -941,6 +941,34 @@ button:disabled {
   font-weight: 700;
 }
 
+/* While a fun thing plays, a bar sweeps along the prompt's foot for as long as it lasts. */
+.walk-prompt.is-doing {
+  overflow: hidden;
+}
+
+.walk-prompt-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--go);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: walk-prompt-sweep linear forwards;
+}
+
+@keyframes walk-prompt-sweep {
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walk-prompt-progress {
+    animation: none;
+    transform: none;
+  }
+}
+
 /* What a chatting group within earshot is saying, captioned like a subtitle: a translucent band of ink above the
    walk prompt (under it on a phone), the speaker's role named ahead of the line. Purely visual, never clickable. */
 .caption {

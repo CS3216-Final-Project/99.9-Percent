@@ -732,6 +732,46 @@ export function zzzTexture(): THREE.CanvasTexture {
   return snore;
 }
 
+let star: THREE.CanvasTexture | null = null;
+
+/** A five-point star in amber with a dark outline, burst out of the arcade when a game goes well. Shared, so never disposed. */
+export function starTexture(): THREE.CanvasTexture {
+  if (star) return star;
+  const [c, g] = canvas(64, 64);
+  g.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 === 0 ? 28 : 12;
+    const x = 32 + Math.cos(a) * r;
+    const y = 32 + Math.sin(a) * r;
+    if (i === 0) g.moveTo(x, y);
+    else g.lineTo(x, y);
+  }
+  g.closePath();
+  g.lineWidth = 5;
+  g.strokeStyle = "rgba(29, 32, 38, 0.9)";
+  g.stroke();
+  g.fillStyle = "#ffd84a";
+  g.fill();
+  star = new THREE.CanvasTexture(c);
+  star.colorSpace = THREE.SRGBColorSpace;
+  return star;
+}
+
+/** A score pop such as "+100" in amber with a dark outline, one per text and shared, so never disposed. */
+export function scoreTexture(text: string): THREE.CanvasTexture {
+  return letteredTexture(`score|${text}`, 128, 64, (g, w, h) => {
+    g.font = '700 44px "Space Grotesk", "Source Sans 3", sans-serif';
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.lineWidth = 7;
+    g.strokeStyle = "rgba(29, 32, 38, 0.9)";
+    g.strokeText(text, w / 2, h / 2 + 2);
+    g.fillStyle = "#ffd84a";
+    g.fillText(text, w / 2, h / 2 + 2);
+  });
+}
+
 /** 0 to 1 and back to 0 as t runs from 0 to 2, and so on: a ball bouncing between two walls. */
 const triangle = (t: number) => 1 - Math.abs((((t % 2) + 2) % 2) - 1);
 

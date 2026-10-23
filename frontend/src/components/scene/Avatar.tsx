@@ -11,7 +11,7 @@ import type { GameMode } from "@/game/persist";
 import { useGame } from "@/game/store";
 import type { EquipmentId } from "@/sim";
 import { useDetail, type Detail } from "./detail";
-import { SPOTS, type Racks } from "./floorplan";
+import { NAP_BED, NAP_PITCH, NAP_YAW, SPOTS, type Racks } from "./floorplan";
 import { ignoreRay } from "./furniture";
 import { loadGltf } from "./gltf";
 import { ROOM, type Footprint } from "./layout";
@@ -73,6 +73,9 @@ function useAvatarModel(id: AvatarId): { id: AvatarId; gltf: GLTF } | null {
   return loaded;
 }
 
+/** An angle brought into (-π, π], so a yaw blend takes the short way round. */
+const wrap = (a: number) => a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
+
 /** The floor the avatar is drawn on now, and where. */
 function placeNow(walking: boolean): { floor: Floor | "car"; x: number; y: number; z: number; yaw: number } {
   if (!walking) return { floor: "office", x: SPOTS.founder.x, y: FLOOR_Y.office + SEAT, z: SPOTS.founder.z, yaw: SPOTS.founder.rot };
@@ -113,6 +116,8 @@ export function Avatar({ walking }: { walking: boolean }) {
   const puffs = useRef<(THREE.Sprite | null)[]>([]);
   const ring = useRef<THREE.Mesh>(null);
   const ringMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  /** How far into lying down for a nap the avatar is, 0 standing to 1 flat. */
+  const lie = useRef(0);
   const puffMaterials = useMemo(() => Array.from({ length: 6 }, () => new THREE.SpriteMaterial({ map: puffTexture(), transparent: true, depthWrite: false, opacity: 0 })), []);
   useEffect(() => () => puffMaterials.forEach((m) => m.dispose()), [puffMaterials]);
 
@@ -126,8 +131,15 @@ export function Avatar({ walking }: { walking: boolean }) {
       current.current = null;
     }
     const at = placeNow(walking);
-    g.position.set(at.x, at.y, at.z);
-    g.rotation.y = at.yaw;
+    // Resting in a nap pod, the avatar hops onto the first pod's mattress and lies back under its hood, and gets
+    // up again after; the walk's own spot never moves. Only on the office floor: lying never happens elsewhere.
+    const target = walking && avatar.busy?.prop === "nap" && at.floor === "office" ? 1 : 0;
+    lie.current += Math.max(-dt / 0.55, Math.min(dt / 0.55, target - lie.current));
+    const c = lie.current;
+    const flat = at.floor === "office" ? c * c * (3 - 2 * c) : 0;
+    const yaw = at.yaw + wrap(NAP_YAW - at.yaw) * flat;
+    g.position.set(at.x + (NAP_BED.x - at.x) * flat, at.y + (NAP_BED.y - at.y) * flat + Math.sin(Math.PI * flat) * 0.2, at.z + (NAP_BED.z - at.z) * flat);
+    g.rotation.set(NAP_PITCH * flat, yaw, 0, "YXZ");
     // Seen through its own eyes, the avatar is not drawn: the camera is in its head.
     g.visible = (at.floor === "car" || at.floor === shownFloor()) && !(walking && viewNow.inHead);
     // The animation for what it is doing, blended from the last.
@@ -147,7 +159,7 @@ export function Avatar({ walking }: { walking: boolean }) {
     }
     model.mixer.update(Math.min(dt, 0.1));
     // In walk mode a ring on the floor marks the player's avatar out from the crew, breathing gently.
-    if (ring.current) ring.current.visible = walking;
+    if (ring.current) ring.current.visible = walking && lie.current < 0.5;
     if (ringMaterial.current) ringMaterial.current.opacity = 0.55 + 0.25 * Math.sin(t * 3);
     // The bounce: a squash and stretch that settles.
     const since = t - arrived.current.at;

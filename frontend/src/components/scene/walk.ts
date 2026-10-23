@@ -22,8 +22,8 @@ export interface AvatarState {
   running: boolean;
   /** A walk to follow, from a click on the floor; empty when steering by keys or standing. */
   path: [number, number][];
-  /** A fun thing it is doing, until a time on the page's clock. */
-  busy: { clip: FunProp["clip"]; until: number } | null;
+  /** A fun thing it is doing: which, its animation, and when on the page's clock it began and ends. */
+  busy: { prop: string; clip: FunProp["clip"]; since: number; until: number } | null;
   /** Within reach now. */
   prompt: Prompt | null;
   /** Height above the floor while jumping. */
@@ -120,7 +120,13 @@ export function walkTo(x: number, z: number): boolean {
 export function play(prop: FunProp, now: number): void {
   avatar.path = [];
   avatar.yaw = facing(prop.face[0] - avatar.x, prop.face[1] - avatar.z);
-  avatar.busy = { clip: prop.clip, until: now + 2.6 };
+  avatar.busy = { prop: prop.id, clip: prop.clip, since: now, until: now + prop.seconds };
+}
+
+/** How far through its fun thing the avatar is, 0 to 1, or null when it is free. */
+export function busyProgress(now: number): number | null {
+  if (!avatar.busy) return null;
+  return Math.min(1, Math.max(0, (now - avatar.busy.since) / (avatar.busy.until - avatar.busy.since)));
 }
 
 const KEYS: Record<string, keyof Keys> = {
@@ -202,6 +208,11 @@ export function stepAvatar(dt: number, forward: [number, number], footprints: Re
 function samePrompt(a: Prompt | null, b: Prompt | null): boolean {
   if (!a || !b) return a === b;
   return a.kind === b.kind && a.label === b.label;
+}
+
+/** Drop whatever fun thing the avatar is doing, as when walk mode ends. */
+export function stopPlaying(): void {
+  avatar.busy = null;
 }
 
 /** Clear what is within reach, as when walk mode ends. */

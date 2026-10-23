@@ -3,7 +3,7 @@ import { EQUIPMENT_ORDER, newLegacyGame, type EquipmentId } from "@/sim";
 import { FUN_PROPS } from "./floorplan";
 import { footprint, type Footprint } from "./layout";
 import { facing, promptAt } from "./player";
-import { avatar, held, jump, placeAvatar, play, stepAvatar } from "./walk";
+import { avatar, busyProgress, held, jump, placeAvatar, play, stepAvatar, stopPlaying } from "./walk";
 import { ride } from "./ride";
 import { FIRST } from "./views";
 
@@ -24,11 +24,23 @@ describe("playing with the office's fun things", () => {
       play(p, 10);
       expect(avatar.path, p.id).toEqual([]);
       expect(avatar.yaw, p.id).toBeCloseTo(facing(p.face[0] - p.x, p.face[1] - p.z));
-      expect(avatar.busy, p.id).toEqual({ clip: p.clip, until: 12.6 });
-      stepAvatar(0.8, [0, 1], footprints, names, 12.7);
+      expect(avatar.busy, p.id).toEqual({ prop: p.id, clip: p.clip, since: 10, until: 10 + p.seconds });
+      stepAvatar(0.8, [0, 1], footprints, names, 10 + p.seconds + 0.1);
       expect(avatar.busy, p.id).toBeNull();
     }
     expect(held.size).toBe(0);
+  });
+
+  it("reads how far through a fun thing the avatar is, until it is dropped", () => {
+    const p = FUN_PROPS[0];
+    placeAvatar("office", [p.x, p.z]);
+    play(p, 10);
+    expect(busyProgress(10)).toBe(0);
+    expect(busyProgress(10 + p.seconds / 2)).toBe(0.5);
+    expect(busyProgress(99)).toBe(1);
+    stopPlaying();
+    expect(avatar.busy).toBeNull();
+    expect(busyProgress(11)).toBeNull();
   });
 });
 
@@ -106,7 +118,7 @@ describe("jumping in walk mode", () => {
     placeAvatar("office", [1, 3]);
     expect(jump()).toBe(false);
     Object.assign(ride, { start: -Infinity, arrived: -Infinity });
-    avatar.busy = { clip: FUN_PROPS[0].clip, until: 10 };
+    avatar.busy = { prop: FUN_PROPS[0].id, clip: FUN_PROPS[0].clip, since: 0, until: 10 };
     expect(jump()).toBe(false);
   });
 });
