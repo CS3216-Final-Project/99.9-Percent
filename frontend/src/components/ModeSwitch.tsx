@@ -17,7 +17,7 @@ const NAME: Record<GameMode, string> = { campaign: "Guided Mode", classic: "Chal
  * Another edition can pass its own lock and wording; by default Challenge Mode stays locked until the Guided Mode
  * company acknowledges its final chapter.
  */
-export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Complete the first five Guided Mode chapters to unlock Challenge Mode.", lockedLabel = "Complete Guided Mode to unlock", about = ABOUT[to] }: {
+export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.", lockedLabel = "Finish Chapter 5 to unlock", about = ABOUT[to] }: {
   to: GameMode; locked?: boolean; lockedText?: string; lockedLabel?: string; about?: string;
 }) {
   const switchMode = useGame((s) => s.switchMode);
@@ -60,7 +60,7 @@ export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Complete 
       )}
       {unsaved && !locked && (
         <Callout compact tone="warn" icon="alert" kicker="Not saved">
-          This run could not be saved, so switching now loses it. Press the red button again to switch anyway.
+          This run could not be saved, so switching now loses it. Press "Switch and lose this run" again to switch anyway.
         </Callout>
       )}
     </section>

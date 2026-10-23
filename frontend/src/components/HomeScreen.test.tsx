@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { advanceTurn, newGame, newLegacyGame } from "@/sim";
+import { advanceTurn, applyAction, newGame, newLegacyGame, type GameState } from "@/sim";
 import { advanceSteps } from "@/sim/step";
 import { DEFAULT_META, loadClassicGame, loadGame, saveClassicGame, saveGame, saveMeta, saveMode } from "@/game/persist";
 import { ANALYTICS_CONSENT_KEY } from "@/lib/analytics";
@@ -31,24 +31,24 @@ it("shows Guided Mode first with Challenge Mode locked until the chapters are do
   const choices = boot("campaign");
   const guided = card(choices, "Guided Mode"), challenge = card(choices, "Challenge Mode");
   expect(choices.compareDocumentPosition(guided) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(guided.textContent).toContain("Continuous play · Six guided chapters");
-  expect(challenge.textContent).toContain("Complete the first five Guided Mode chapters to unlock.");
-  // The locked card's only action is disabled and cannot switch modes.
-  const lockedButton = within(challenge).getByRole("button", { name: "Complete Guided Mode to unlock" });
-  expect(lockedButton).toHaveProperty("disabled", true);
-  expect(within(challenge).queryByRole("button", { name: /Start Challenge Mode|Continue week/ })).toBeNull();
-  fireEvent.click(lockedButton);
+  expect(guided.textContent).toContain("six infrastructure chapters");
+  // The locked teaser names the goal in words and has nothing to press.
+  expect(challenge.textContent).toContain("Grow to 50,000 users in 26 weeks on your own.");
+  expect(challenge.textContent).toContain("Unlocks after Chapter 5: Stay Online.");
+  expect(challenge.textContent).not.toContain("You are on Chapter");
+  expect(within(challenge).queryAllByRole("button")).toHaveLength(0);
   expect(useGame.getState().mode).toBe("campaign");
   expect(choices.textContent).not.toContain("switch between them at any time");
 });
 
 it("shows a Guided Mode run in progress beside Challenge Mode, and switches without losing the company", () => {
-  unlock();
+  saveMeta({ ...DEFAULT_META, challengeUnlocked: true, tutorialDone: true });
   saveGame(newGame(4, "campaign-in-progress"), 0, true);
   const choices = boot("campaign");
   const campaign = card(choices, "Guided Mode"), classic = card(choices, "Challenge Mode");
   expect(campaign.textContent).toContain("Last played");
   expect(campaign.textContent).toMatch(/Saved game\s*Chapter 1 of 6: Opening/);
+  expect(campaign.textContent).toContain("Work through six infrastructure chapters at your own pace.");
   expect(within(campaign).getByRole("button", { name: "Continue company" })).toBeTruthy();
   expect(classic.textContent).toContain("No saved game");
   // Reading the other mode for its card must not write a Classic save.
@@ -68,13 +68,23 @@ it("shows a Challenge Mode run in progress beside Guided Mode, with the same car
   expect(classic.textContent).toContain("Week 2 of 26");
   expect(within(classic).getByRole("button", { name: "Continue week 2" })).toBeTruthy();
   expect(within(classic).getByRole("button", { name: "New game" })).toBeTruthy();
-  expect(campaign.textContent).toContain("Chapter 1 of 6");
+  // The walkthrough has not finished, so the company is still in Chapter 0.
+  expect(campaign.textContent).toMatch(/Saved game\s*Walkthrough in progress/);
+  expect(campaign.textContent).toContain("Finish the walkthrough");
   expect(campaign.textContent).not.toContain("Last played");
   fireEvent.click(within(campaign).getByRole("button", { name: "Continue company" }));
   expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, hasRun: true });
   expect(useGame.getState().game.campaign!.runId).toBe("waiting-campaign");
   const kept = loadClassicGame();
   expect(kept.status === "ok" && kept.game.turn).toBe(2);
+});
+
+it("names the chapter that unlocks Challenge Mode and how far the Guided Mode company has come", () => {
+  saveMeta({ ...DEFAULT_META, tutorialDone: true });
+  saveGame(newGame(4, "campaign-locked"), 0, true);
+  const challenge = card(boot("campaign"), "Challenge Mode");
+  expect(challenge.textContent).toContain("Unlocks after Chapter 5: Stay Online. You are on Chapter 1 of 6.");
+  expect(within(challenge).queryAllByRole("button")).toHaveLength(0);
 });
 
 it("starts a new Challenge Mode game from a Guided Mode home screen when asked", () => {
@@ -84,6 +94,8 @@ it("starts a new Challenge Mode game from a Guided Mode home screen when asked",
   const classic = card(choices, "Challenge Mode");
   expect(within(classic).getByRole("button", { name: "Continue week 2" })).toBeTruthy();
   fireEvent.click(within(classic).getByRole("button", { name: "New game" }));
+  expect(useGame.getState().mode).toBe("campaign");
+  fireEvent.click(within(classic).getByRole("button", { name: "Lose this run? Press again" }));
   expect(useGame.getState()).toMatchObject({ mode: "classic", started: true });
   expect(useGame.getState().game.turn).toBe(1);
 });
@@ -129,6 +141,42 @@ it("offers no Guided Mode walkthrough for a closed company", () => {
   const guided = card(screen.getByRole("region", { name: "Choose how you want to play" }), "Guided Mode");
   expect(guided.textContent).toContain("Company closed");
   expect(within(guided).queryByRole("button", { name: "Replay walkthrough" })).toBeNull();
+  // A closed company has nothing to continue: it can show its final report or make way for a new company.
+  expect(within(guided).queryByRole("button", { name: "Continue company" })).toBeNull();
+  expect(within(guided).getByRole("button", { name: "See how it ended" })).toBeTruthy();
+  // Starting over replaces the company and its final report, so it asks for a second press.
+  fireEvent.click(within(guided).getByRole("button", { name: "New company" }));
+  expect(useGame.getState().game.campaign!.runId).toBe("closed-company");
+  expect(guided.textContent).toContain("Press the button again to confirm.");
+  fireEvent.click(within(guided).getByRole("button", { name: "Lose this company? Press again" }));
+  expect(useGame.getState().game).toMatchObject({ phase: expect.not.stringMatching("ended") });
+  expect(useGame.getState().game.campaign!.runId).not.toBe("closed-company");
+});
+
+it("reads a company past the Opening by its own chapter, even where this browser never finished the walkthrough", () => {
+  const act = (g: GameState, type: "start_db_upgrade" | "acknowledge_review" | "acknowledge_milestone") => {
+    const r = applyAction(g, { type });
+    if (!r.ok) throw Error(r.message);
+    return r.state;
+  };
+  // The company recovers from its first outage and moves on to Scaling & Routing; this browser's profile is fresh.
+  const recovered = advanceSteps(act(advanceSteps(newGame(1, "imported-company"), 6).state, "start_db_upgrade"), 30).state;
+  saveGame(act(act(recovered, "acknowledge_review"), "acknowledge_milestone"), 0, true);
+  const choices = boot("campaign");
+  const guided = card(choices, "Guided Mode");
+  expect(guided.textContent).toMatch(/Saved game\s*Chapter 2 of 6: Scaling & Routing/);
+  expect(guided.textContent).not.toContain("Finish the walkthrough");
+  expect(card(choices, "Challenge Mode").textContent).toContain("You are on Chapter 2 of 6.");
+});
+
+it("names a finished Guided Mode company as complete, not closed", () => {
+  saveMeta({ ...DEFAULT_META, tutorialDone: true });
+  saveMode("campaign");
+  useGame.getState().boot();
+  useGame.setState({ hasRun: true, game: { ...newGame(4, "won-company"), phase: "ended", outcome: "won" } });
+  render(<StrictMode><HomeScreen /></StrictMode>);
+  const guided = card(screen.getByRole("region", { name: "Choose how you want to play" }), "Guided Mode");
+  expect(guided.textContent).toMatch(/Saved game\s*All chapters complete/);
 });
 
 it("asks before switching away from a game that cannot be saved", () => {
@@ -137,7 +185,8 @@ it("asks before switching away from a game that cannot be saved", () => {
   const choices = boot("campaign");
   fireEvent.click(within(card(choices, "Challenge Mode")).getByRole("button", { name: "Start Challenge Mode" }));
   expect(useGame.getState()).toMatchObject({ mode: "campaign", started: false });
-  expect(screen.getByText(/switching now loses it/)).toBeTruthy();
+  // The warning sits in the card that asked, and names the button rather than its colour.
+  expect(within(card(choices, "Challenge Mode")).getByRole("alert").textContent).toContain('Press "Switch and lose this run" again to switch anyway');
   fireEvent.click(within(card(choices, "Challenge Mode")).getByRole("button", { name: "Switch and lose this run" }));
   expect(useGame.getState()).toMatchObject({ mode: "classic", started: true });
   expect(localStorage.getItem("nn.campaign.save.v1")).toBe("{");

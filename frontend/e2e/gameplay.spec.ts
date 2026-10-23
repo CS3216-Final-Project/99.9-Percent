@@ -111,7 +111,7 @@ test("keeps history reachable after bankruptcy", async ({ page, withoutRoom }) =
   let s = newGame(1, "paused");
   for (let i = 0; i < 5 && s.phase !== "ended"; i++) s = advanceSteps(s, 100_000).state;
   expect(s.phase).toBe("ended");
-  await seedSave(page, s); await page.goto("/"); await page.getByRole("button", { name: "Continue company" }).click();
+  await seedSave(page, s); await page.goto("/"); await page.getByRole("button", { name: "See how it ended" }).click();
   const bankrupt = page.getByRole("dialog", { name: "Company bankrupt" });
   await expect(bankrupt).toBeVisible();
   await bankrupt.getByRole("button", { name: "View history" }).click();

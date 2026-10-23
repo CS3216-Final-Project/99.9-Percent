@@ -1,10 +1,12 @@
-/* One home screen for every visit: the brand and account on top, then one card per mode.
-   Both cards keep the same size, surface and action weight whichever mode was played last. */
+/* One home screen for every visit: the brand and account on top, then the modes.
+   With Challenge Mode locked, Guided Mode stands alone in a column on the left and the office fills the rest;
+   once both modes are playable they sit side by side, with the same size, surface and action weight. */
 .title-screen.home-screen {
   justify-items: center;
   align-items: center;
   padding: 16px clamp(16px, 4vw, 48px);
-  background: linear-gradient(90deg, rgb(20 17 40 / 0.97) 0%, rgb(20 17 40 / 0.9) 55%, rgb(20 17 40 / 0.72) 100%);
+  /* Dark behind the text, clearing towards the right so the office reads as the backdrop it is. */
+  background: linear-gradient(90deg, rgb(20 17 40 / 0.95) 0%, rgb(20 17 40 / 0.85) 38%, rgb(20 17 40 / 0.4) 70%, rgb(20 17 40 / 0.15) 100%);
 }
 
 .home-card {
@@ -16,6 +18,12 @@
   padding: 8px;
   display: grid;
   gap: 20px;
+}
+
+.home-card.is-solo {
+  max-width: 560px;
+  justify-self: start;
+  margin-left: clamp(0px, 6vw - 24px, 96px);
 }
 
 /* Keep the account controls above the brand without a separate title badge. */
@@ -32,6 +40,17 @@
 
 .home-head .home-chips {
   grid-area: account;
+}
+
+/* Give feedback sits with the avatar and account as one row of utilities, in the same night chip. */
+.home-chips > .btn {
+  min-height: 52px;
+  background: var(--night-3);
+  color: var(--on-night);
+}
+
+.home-chips > .btn:hover:not(:disabled) {
+  background: var(--night-line);
 }
 
 .home-head h1 {
@@ -58,15 +77,15 @@
   gap: 12px;
 }
 
-.mode-selection h2 {
-  font-family: var(--font-display);
-  font-size: var(--text-2xl);
-}
-
 .mode-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
+}
+
+.mode-selection.is-locked .mode-options {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
 }
 
 .mode-option {
@@ -79,10 +98,36 @@
   border: 1px solid var(--control-edge);
   border-radius: var(--radius-panel);
   box-shadow: none;
+  transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+
+/* The pointer lights a card in the brand yellow. Keyboard focus uses the focus blue, like the button's own ring,
+   so a focused card never shows two colours at once. */
+.mode-option:not(.is-locked):hover {
+  border-color: var(--go);
+  box-shadow: 0 0 0 2px var(--go);
+}
+
+.mode-option:has(:focus-visible) {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mode-option {
+    transition: none;
+  }
 }
 
 .mode-option p {
   margin: 0;
+}
+
+/* The phone home's pace line under each mode's name. */
+.mode-option .mode-pace {
+  color: var(--text-soft);
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 
 .mode-option-head {
@@ -93,7 +138,7 @@
   gap: 8px 12px;
 }
 
-.mode-option h3 {
+.mode-option h2 {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -108,12 +153,6 @@
   border-radius: var(--radius-panel);
   font-family: var(--font-display);
   font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-.mode-option .mode-pace {
-  color: var(--text-soft);
-  font-size: var(--text-sm);
   font-weight: 600;
 }
 
@@ -142,6 +181,11 @@
   color: var(--text-soft);
 }
 
+/* An empty slot only holds the two cards' buttons level; a card on its own has nothing to line up with. */
+.mode-selection.is-locked .mode-progress.is-empty {
+  display: none;
+}
+
 .mode-progress-label {
   color: var(--text-soft);
   font-size: var(--text-xs);
@@ -165,62 +209,140 @@
   min-height: 48px;
 }
 
+/* A restart asking for its second press stacks under the main button, so its longer label stays on one line. */
+.mode-actions:has(> .is-confirming) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .mode-option .mode-tutorial {
   align-self: flex-start;
   color: var(--text-soft);
 }
 
-/* The analytics notice joins the home card, using the same paper surface as the mode cards, but kept compact:
-   text on the left, OK and Opt out on the right. */
-.consent-panel {
+/* Locked Challenge Mode: a quiet row on the night surface, with the goal in words and the route in pips. */
+.mode-teaser {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "head actions" "text actions";
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 4px 20px;
+  gap: 4px 14px;
   padding: 12px 16px;
-  background: var(--paper);
-  color: var(--ink);
-  border: 1px solid var(--control-edge);
+  background: rgb(20 17 40 / 0.72);
+  color: var(--on-night);
+  border: 1px solid var(--night-line);
   border-radius: var(--radius-panel);
-  box-shadow: none;
 }
 
-.consent-panel h2 {
-  grid-area: head;
+.mode-teaser > .icon {
+  color: var(--on-night-soft);
+}
+
+.mode-teaser h2 {
   font-family: var(--font-display);
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
 }
 
-/* The game's name in the same logo face as the title above. */
-.consent-logo {
-  font-family: var(--font-logo);
-}
-
-.consent-panel p {
-  grid-area: text;
-  margin: 0;
+.mode-teaser p {
+  margin: 2px 0 0;
+  color: var(--on-night-soft);
   font-size: var(--text-sm);
 }
 
+.mode-teaser .mode-teaser-unlock {
+  color: var(--on-night);
+  font-weight: 600;
+}
+
+.mode-teaser-pips {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mode-teaser-pips li {
+  width: 10px;
+  height: 10px;
+  background: var(--night-4);
+  border-radius: 2px;
+}
+
+.mode-teaser-pips li.is-done {
+  background: var(--go);
+}
+
+.mode-teaser-pips li.is-here {
+  background: var(--go);
+  box-shadow: 0 0 0 2px var(--night), 0 0 0 3px var(--go);
+}
+
+.mode-teaser-pips li.is-goal {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--go);
+}
+
+/* The analytics notice: one line on the night surface, the full text on request, and two equal answers. */
+.consent-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 8px 8px 16px;
+  background: rgb(20 17 40 / 0.72);
+  color: var(--on-night-soft);
+  border: 1px solid var(--night-line);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+}
+
+.consent-strip details {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.consent-strip summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.consent-strip summary::-webkit-details-marker {
+  display: none;
+}
+
+.consent-more {
+  color: var(--on-night);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.consent-strip details p {
+  max-width: 70ch;
+  margin: 6px 0 2px;
+}
+
 .consent-actions {
-  grid-area: actions;
   display: flex;
   gap: 8px;
 }
 
-.home-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
+.consent-actions .btn {
+  min-width: 84px;
+  min-height: 44px;
 }
+
 
 @media (max-width: 900px) {
   .title-screen.home-screen {
     align-items: center;
     padding-bottom: 16px;
-    background: rgb(20 17 40 / 0.94);
+    /* The column fills the width, so the office shows through the middle, between the brand and the footer. */
+    background: linear-gradient(180deg, rgb(20 17 40 / 0.9) 0%, rgb(20 17 40 / 0.62) 45%, rgb(20 17 40 / 0.9) 100%);
+  }
+  .home-card.is-solo {
+    justify-self: center;
+    margin-left: 0;
   }
 }
 
@@ -240,14 +362,17 @@
     padding: 16px;
     gap: 10px;
   }
-  .consent-panel {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "head" "text" "actions";
-    gap: 8px;
+  .mode-teaser {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .mode-teaser-pips {
+    grid-column: 2;
+  }
+  .consent-actions {
+    flex: 1 1 100%;
   }
   .consent-actions .btn {
     flex: 1;
-    min-height: 44px;
   }
   /* A phone shows both Play buttons first; an empty save slot has nothing to say there. */
   .mode-progress.is-empty {
