@@ -144,7 +144,6 @@
 @media (min-width: 641px) {
   @container controls-dock (max-width: 1250px) {
     .controls-dock > .room-controls {
-      position: relative;
       grid-column: 1 / -1;
       grid-row: 1;
       justify-content: flex-end;
