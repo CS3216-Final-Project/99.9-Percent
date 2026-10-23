@@ -8,7 +8,7 @@ import { cardStyle, placeFor, useTargetBox } from "./spotlight";
 import "./ChapterZero.css";
 
 /** The short label pinned to the lit control. */
-const CTA: Partial<Record<LessonId, string>> = { "inspect-app": "Click", "inspect-db": "Click", run: "Press Run", quote: "Open one", cancel: "Cancel", speed: "Change speed" };
+const CTA: Partial<Record<LessonId, string>> = { "inspect-app": "Click", "inspect-db": "Click", run: "Press Run", quote: "Open one", speed: "Change speed" };
 const KEYS: Partial<Record<LessonId, ReactNode>> = {
   run: <><kbd className="lesson-keycap">P</kbd> also runs and pauses.</>,
   speed: <><kbd className="lesson-keycap">Q</kbd> / <kbd className="lesson-keycap">E</kbd> rotate the view; <kbd className="lesson-keycap" aria-label="Page Up">PgUp</kbd> / <kbd className="lesson-keycap" aria-label="Page Down">PgDn</kbd> switch floors.</>,
@@ -30,7 +30,7 @@ export function LessonText({ text, terms = [] }: { text?: string; terms?: readon
 export default function ChapterZeroGuide({ lessons }: { lessons: readonly ChapterZeroLesson[] }) {
   const card = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
   const [cardHeight, setCardHeight] = useState(260);
-  const { s, index, lesson, id, confirming, required, ready, moving, inspected, target, lit, why, more, last, next } = useChapterZeroLesson(lessons, card, heading);
+  const { s, index, lesson, id, confirming, required, ready, done, moving, inspected, target, lit, why, more, last, next } = useChapterZeroLesson(lessons, card, heading);
   // Floors are optional in the speed lesson: an open Navigation menu is lit instead, so the card stays clear of it.
   const { box, covered, viewport } = useTargetBox(id === "speed" ? ['.room-controls:has(details[open])', lit!] : lit);
 
@@ -46,12 +46,12 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
   }, [index, s.started]);
 
   if (!s.started || !lesson) return null;
-  const task = id === "inspect-app" ? ready ? "Read its demand and capacity, then press Next." : "Click App Server under Inspect equipment."
-    : id === "inspect-db" ? ready ? "Compare its numbers with the App Server's, then press Next." : "Now click Database and compare."
+  const task = id === "inspect-app" ? ready ? null : "Click the highlighted App Server."
+    : id === "inspect-db" ? ready ? "Compare its numbers with the App Server's." : "Now click Database and compare."
     : id === "warnings" ? "Find Latency, Errors and Backlog in the panel."
     : id === "run" ? "Press Run. Time stops again after one game second."
     : id === "quote" ? "Open any action under Actions to see its quote."
-    : id === "cancel" ? confirming ? "Press Cancel on the quote." : ready ? "Quote closed. Your cash is unchanged." : "Reopening a quote for you…"
+    : id === "cancel" ? confirming ? "Press Next to close the quote without buying." : done ? "Quote closed. Your cash is unchanged." : "Reopening a quote for you…"
     : id === "money" ? "Cash is in the top bar."
     : id === "speed" ? "Open the speed menu and pick another speed."
     : null;
@@ -75,13 +75,13 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
         if (control) { event.preventDefault(); control.focus(); }
       }}>
       <header className="lesson-meta">
-        <span className="lesson-section">{s.tutorialCompany ? "Practice · " : ""}{lesson.section}</span>
+        <span className="lesson-section">{s.tutorialCompany ? "Practice" : "Walkthrough"}</span>
         <span className="lesson-count" aria-label={`Lesson ${index + 1} of ${lessons.length}`}>
           <span className="lesson-dots" aria-hidden="true">{lessons.map((l, i) => <i key={l.id} className={i < index ? "is-done" : i === index ? "is-now" : ""} />)}</span>
           {index + 1} / {lessons.length}
         </span>
       </header>
-      {s.meta.tutorialDone && <button className="btn btn-small lesson-return" onClick={() => { s.openView(null); s.endTour(false); }}><Icon name="next" size={16} />Return to game</button>}
+      {s.meta.tutorialDone && <button className="btn btn-small lesson-return" onClick={() => { s.openView(null); s.endTour(false); }}><Icon name="next" size={16} />Skip tutorial</button>}
       <h3 ref={heading} tabIndex={-1}>{lesson.title}</h3>
       {task && <p className="lesson-task" aria-live="polite"><Icon name={ready && required ? "check" : "eye"} size={20} /><span><LessonText text={task} terms={lesson.emphasis} /></span></p>}
       <p className="lesson-why">{why}</p>
@@ -89,7 +89,7 @@ export default function ChapterZeroGuide({ lessons }: { lessons: readonly Chapte
       <LessonVisual id={id!} />
       {(more || KEYS[id!]) && <details className="lesson-more"><summary>Learn more</summary>{more && <p>{more}</p>}{KEYS[id!] && <p>{KEYS[id!]}</p>}</details>}
       <footer className="lesson-footer">
-        <button className="btn" disabled={index === 0} onClick={() => { s.openView(null); s.tourBack(); }}><Icon className="lesson-back-arrow" name="next" size={16} />Back</button>
+        {index > 0 && <button className="btn" onClick={() => { s.openView(null); s.tourBack(); }}><Icon className="lesson-back-arrow" name="next" size={16} />Back</button>}
         <button className="btn btn-primary" disabled={!ready || moving || s.running} onClick={next}>{last ? "Finish walkthrough" : "Next"}<Icon name={last ? "check" : "next"} size={16} /></button>
       </footer>
     </section>

@@ -86,7 +86,8 @@
 /* Back and Next stay reachable when a short screen makes the card scroll. */
 .lesson-footer { position: sticky; bottom: -14px; margin-bottom: -4px; padding-bottom: 4px; display: flex; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 1px solid var(--paper-3); background: var(--paper); }
 .lesson-footer .btn { min-height: 44px; }
-.lesson-footer .btn-primary { min-width: 9.5rem; justify-content: center; }
+/* Next keeps its place on the right when the first lesson has no Back. */
+.lesson-footer .btn-primary { min-width: 9.5rem; justify-content: center; margin-left: auto; }
 .lesson-back-arrow { transform: rotate(180deg); }
 
 /* Small labelled examples and live readings. */

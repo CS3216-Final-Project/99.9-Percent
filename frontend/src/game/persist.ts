@@ -110,9 +110,11 @@ export interface GraphicsSettings {
   quality: GraphicsQuality;
   /** The first-person view's field of view, in degrees (see game/viewpoints.ts). */
   fov: number;
+  /** Change floor at once instead of riding the elevator's cutscene, as reduced motion does. */
+  skipElevator: boolean;
 }
 
-export const DEFAULT_GRAPHICS: GraphicsSettings = { quality: "auto", fov: FOV.initial };
+export const DEFAULT_GRAPHICS: GraphicsSettings = { quality: "auto", fov: FOV.initial, skipElevator: false };
 
 function read(key: string): string | null {
   try {
@@ -386,15 +388,16 @@ export function saveAudio(settings: AudioSettings): boolean {
 
 /**
  * The graphics settings. Missing, corrupt or unknown values fall back to Auto, and a field of view that is missing,
- * as in settings from before it could be chosen, or out of range to the default or the nearest allowed.
+ * as in settings from before it could be chosen, or out of range to the default or the nearest allowed. Anything but
+ * a stored `true` keeps the elevator's cutscene.
  */
 export function loadGraphics(): GraphicsSettings {
   const stored = read(GRAPHICS_KEY);
   if (stored !== null) {
     try {
-      const s = JSON.parse(stored) as { quality?: unknown; fov?: unknown } | null;
+      const s = JSON.parse(stored) as { quality?: unknown; fov?: unknown; skipElevator?: unknown } | null;
       const quality = GRAPHICS_QUALITIES.find((q) => q === s?.quality) ?? DEFAULT_GRAPHICS.quality;
-      return { quality, fov: clampFov(s?.fov) };
+      return { quality, fov: clampFov(s?.fov), skipElevator: s?.skipElevator === true };
     } catch {
       /* unreadable: use the default */
     }

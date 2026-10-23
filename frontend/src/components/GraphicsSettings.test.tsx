@@ -33,7 +33,21 @@ describe("the Graphics section", () => {
     expect(useGame.getState().graphics.quality).toBe("medium");
     expect(screen.getByRole("radio", { name: "Medium" })).toHaveProperty("checked", true);
     expect(screen.getByRole("radio", { name: "Auto" })).toHaveProperty("checked", false);
-    expect(loadGraphics()).toEqual({ quality: "medium", fov: 75 });
+    expect(loadGraphics()).toEqual({ quality: "medium", fov: 75, skipElevator: false });
+  });
+
+  it("skips the elevator cutscene once turned on, remembering it without changing the quality", () => {
+    render(<GraphicsSettings />);
+    const skip = within(screen.getByRole("region", { name: "Graphics" })).getByRole("button", { name: "Skip elevator cutscene" });
+    expect(skip.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(skip);
+    expect(skip.getAttribute("aria-pressed")).toBe("true");
+    expect(loadGraphics()).toEqual({ quality: "auto", fov: 75, skipElevator: true });
+    useGame.setState(useGame.getInitialState(), true);
+    useGame.getState().boot();
+    expect(useGame.getState().graphics.skipElevator).toBe(true);
+    fireEvent.click(skip);
+    expect(loadGraphics().skipElevator).toBe(false);
   });
 
   it("starts at the saved choice", () => {

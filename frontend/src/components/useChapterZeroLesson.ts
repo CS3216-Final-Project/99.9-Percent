@@ -6,8 +6,9 @@ import type { ChapterZeroLesson } from "./chapterZeroLessons";
 import { useChapterZeroControls, type ChapterZeroControlOptions } from "./useChapterZeroControls";
 
 /** Lessons whose Next waits for the real exercise; the rest are read and continued. */
-export const REQUIRED = new Set<LessonId>(["inspect-app", "inspect-db", "run", "quote", "cancel", "speed"]);
-/** Exercises that open the next lesson as soon as they are done. Inspections wait for Next, so the readings can be read. */
+export const REQUIRED = new Set<LessonId>(["inspect-app", "inspect-db", "run", "quote", "speed"]);
+/** Exercises that open the next lesson as soon as they are done. Inspections wait for Next, so the readings can be read.
+ * Cancel needs no exercise: Next closes the quote too, but cancelling it moves on just the same. */
 const AUTO = new Set<LessonId>(["run", "quote", "cancel", "speed"]);
 
 export interface ChapterZeroLessonOptions extends ChapterZeroControlOptions {
@@ -87,7 +88,7 @@ export function useChapterZeroLesson(lessons: readonly ChapterZeroLesson[], card
     : id === "money" ? '.stat-cash'
     : id === "speed" ? '.campaign-clock .time-menu'
     : null;
-  // The whole quote is lit while it is being read; its Cancel is what the ring points at.
+  // The whole quote is lit while it is being read; its Cancel is the control the reading layer keeps clear of.
   const lit = id === "quote" || id === "cancel" ? confirming ? '.campaign-action-popover' : target : target;
 
   useEffect(() => {
@@ -114,5 +115,5 @@ export function useChapterZeroLesson(lessons: readonly ChapterZeroLesson[], card
 
   const why = lesson ? typeof lesson.why === "function" ? lesson.why(s) : lesson.why : undefined;
   const more = lesson ? typeof lesson.more === "function" ? lesson.more(s) : lesson.more : undefined;
-  return { s, index, lesson, id, confirming, reviewed, required, ready, moving, inspected, target, lit, why, more, last: index === lessons.length - 1, next };
+  return { s, index, lesson, id, confirming, reviewed, required, ready, done: readyFor === index, moving, inspected, target, lit, why, more, last: index === lessons.length - 1, next };
 }

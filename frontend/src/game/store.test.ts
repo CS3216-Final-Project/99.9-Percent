@@ -299,18 +299,18 @@ describe("old saves and imports across modes", () => {
   });
   it("keeps the graphics quality across mode switches and reloads", () => {
     useGame.getState().boot();
-    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 75 });
+    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 75, skipElevator: false });
     useGame.getState().setGraphics({ quality: "low" });
-    useGame.getState().switchMode("classic"); expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75 });
-    useGame.getState().switchMode("campaign"); expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75 });
+    useGame.getState().switchMode("classic"); expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75, skipElevator: false });
+    useGame.getState().switchMode("campaign"); expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75, skipElevator: false });
     useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
-    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75 });
+    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 75, skipElevator: false });
   });
   it("applies a graphics quality for this visit even when storage fails, and ignores an unknown one", () => {
     useGame.getState().boot();
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
     useGame.getState().setGraphics({ quality: "medium" });
-    expect(useGame.getState().graphics).toEqual({ quality: "medium", fov: 75 });
+    expect(useGame.getState().graphics).toEqual({ quality: "medium", fov: 75, skipElevator: false });
     const before = useGame.getState().graphics;
     useGame.getState().setGraphics({ quality: "ultra" as never });
     useGame.getState().setGraphics({});
@@ -320,12 +320,12 @@ describe("old saves and imports across modes", () => {
   it("keeps the first-person field of view in range, and the quality and field of view apart", () => {
     useGame.getState().boot();
     useGame.getState().setGraphics({ fov: 120 });
-    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 90 });
+    expect(useGame.getState().graphics).toEqual({ quality: "auto", fov: 90, skipElevator: false });
     useGame.getState().setGraphics({ quality: "low" });
-    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 90 });
+    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 90, skipElevator: false });
     useGame.getState().setGraphics({ fov: 70.4 });
     useGame.setState(useGame.getInitialState(), true); useGame.getState().boot();
-    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 70 });
+    expect(useGame.getState().graphics).toEqual({ quality: "low", fov: 70, skipElevator: false });
   });
   it("toggles mute at the saved volumes, and only unmutes a channel that has volume", () => {
     useGame.getState().boot();
@@ -600,25 +600,23 @@ describe("exploration state", () => {
     expect(useGame.getState().measurement.pending.filter((e) => e.name === "view_changed")).toHaveLength(1);
   });
 
-  it("remembers whether the map is open, starts it folded on a phone, and records each change", () => {
+  it("starts the map folded, remembers whether it is open, and records each change", () => {
     enter();
-    expect(useGame.getState().mapOpen).toBe(true);
+    expect(useGame.getState().mapOpen).toBe(false);
+    useGame.getState().setMapOpen(true);
+    expect(localStorage.getItem("nn.map.v1")).toBe("open");
     useGame.getState().setMapOpen(false);
     expect(localStorage.getItem("nn.map.v1")).toBe("closed");
-    expect(useGame.getState().measurement.pending.filter((e) => e.name === "map_toggled").map((e) => e.payload)).toEqual([expect.objectContaining({ open: false })]);
+    expect(useGame.getState().measurement.pending.filter((e) => e.name === "map_toggled").map((e) => e.payload)).toEqual([expect.objectContaining({ open: true }), expect.objectContaining({ open: false })]);
+    localStorage.setItem("nn.map.v1", "open");
+    useGame.setState(useGame.getInitialState(), true);
+    useGame.getState().boot();
+    expect(useGame.getState().mapOpen).toBe(true);
+    // An unreadable choice falls back to folded.
+    localStorage.setItem("nn.map.v1", "sideways");
     useGame.setState(useGame.getInitialState(), true);
     useGame.getState().boot();
     expect(useGame.getState().mapOpen).toBe(false);
-    localStorage.removeItem("nn.map.v1");
-    useGame.setState(useGame.getInitialState(), true);
-    // A phone on its side, 844 px wide: still a phone's layout.
-    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(max-width: 900px)", media: q }) as MediaQueryList);
-    try {
-      useGame.getState().boot();
-      expect(useGame.getState().mapOpen).toBe(false);
-    } finally {
-      vi.unstubAllGlobals();
-    }
   });
 
   it("persists an explicit Walk or floor choice, without toasting on failure", () => {
