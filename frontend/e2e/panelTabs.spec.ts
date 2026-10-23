@@ -1,10 +1,11 @@
 import type { Page } from "@playwright/test";
 import { test, expect, expectRoom, seedSave } from "./fixtures";
-import { newGame } from "../src/sim";
+import { newGame, type GameState } from "../src/sim";
+import { advanceSteps } from "../src/sim/step";
 
-async function boot(page: Page) {
+async function boot(page: Page, game: GameState = newGame()) {
   await page.route("**/api/**", r => r.abort());
-  await seedSave(page, newGame());
+  await seedSave(page, game);
   await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
 }
@@ -40,4 +41,19 @@ test("choosing equipment in the room brings Analysis forward with its readings",
   await expect(tab(page, "Analysis")).toHaveAttribute("aria-selected", "true");
   await expect(panel(page).getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(panel(page).getByRole("region", { name: "Database readings" })).toBeVisible();
+});
+
+test("an open quote stays open while Analysis is read during an incident", async ({ page }) => {
+  await boot(page, advanceSteps(newGame(), 6).state);
+  await tab(page, "Actions").click();
+  await panel(page).getByRole("button", { name: /^Upgrade database/ }).click();
+  const quote = page.getByRole("region", { name: "Confirm Upgrade database" });
+  await expect(quote).toBeVisible();
+  // Checking the readings is part of the purchase decision, so the quote never locks the tabs.
+  await tab(page, "Analysis").click();
+  await expect(tab(page, "Analysis")).toHaveAttribute("aria-selected", "true");
+  await expect(panel(page).getByRole("heading", { name: "Inspect equipment" })).toBeVisible();
+  await expect(quote).toBeVisible();
+  await quote.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(quote).toBeHidden();
 });

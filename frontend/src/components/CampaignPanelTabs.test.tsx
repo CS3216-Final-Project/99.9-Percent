@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { CampaignAttentionHost } from "./CampaignAttention";
 import { CampaignHeader, CampaignControls, CampaignPanel } from "./CampaignUI";
 import { inspectOrSelect, useGame } from "@/game/store";
@@ -55,14 +55,18 @@ it("choosing equipment brings its readings forward", () => {
   expect(screen.getByRole("region", { name: "Database readings" })).toBeTruthy();
 });
 
-it("holds the Actions tab while a quote is open", () => {
+it("an open quote stays open while the player reads Analysis", () => {
+  // The quote opens over the room, outside the panel.
+  const room = document.body.appendChild(Object.assign(document.createElement("main"), { className: "stage" }));
+  onTestFinished(() => room.remove());
   show(); fireEvent.click(tab("Actions"));
   fireEvent.click(screen.getByRole("button", { name: /Add server/ }));
-  expect(tab("Analysis").hasAttribute("disabled")).toBe(true);
-  fireEvent.keyDown(tab("Actions"), { key: "ArrowLeft" });
-  expect(useGame.getState().panelTab).toBe("actions");
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  expect(tab("Analysis").hasAttribute("disabled")).toBe(false);
+  fireEvent.click(tab("Analysis"));
+  expect(useGame.getState().panelTab).toBe("analysis");
+  expect(screen.getByRole("heading", { name: "Inspect equipment" })).toBeTruthy();
+  const quote = screen.getByRole("region", { name: "Confirm Add server" });
+  fireEvent.click(within(quote).getByRole("button", { name: "Confirm" }));
+  expect(useGame.getState().game.campaign!.pending.some(a => a.type === "add-app")).toBe(true);
 });
 
 it("an accepted hint opens the tab of its purchase once, then leaves the choice of tab to the player", () => {

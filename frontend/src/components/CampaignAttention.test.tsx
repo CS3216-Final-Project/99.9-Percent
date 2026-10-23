@@ -115,6 +115,8 @@ it("does not point at an inspection toggle that would close already-open evidenc
 });
 it("pending confirmations and newly mounted local modals immediately suppress attention", async () => {
   show(); act(() => vi.advanceTimersByTime(10_000)); expect(gold()).toHaveLength(1);
+  // A quote is opened on the Actions tab, where its card lives.
+  act(() => useGame.getState().setPanelTab("actions"));
   act(() => setConfirming("Add server")); expect(gold()).toHaveLength(0);
   act(() => vi.advanceTimersByTime(20_000)); expect(gold()).toHaveLength(0);
   act(() => setConfirming(null));

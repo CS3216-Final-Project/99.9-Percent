@@ -12,7 +12,10 @@
 /* One rhythm under the switch: 14px to the guidance, 14px to the tab's content. */
 .campaign-panel .panel-tabs > .campaign-guidance { margin: 14px 0 0; }
 .campaign-panel .panel-tabs > .tab-panel { padding-top: 14px; }
+/* Actions sits in a box-less wrapper, so it stays mounted (hidden) behind an open quote. */
+.campaign-panel .campaign-actions-tab:not([hidden]) { display: contents; }
 .campaign-panel .panel-tabs > .tab-panel > :first-child,
+.campaign-panel .panel-tabs > .tab-panel > .campaign-actions-tab:first-child > :first-child,
 .campaign-panel .panel-tabs > .tab-panel > .incident-symptoms:first-child > .impact { margin-top: 0; }
 .campaign-panel .panel-tabs > .campaign-guidance .btn-row:last-child { margin-bottom: 0; }
 .campaign-panel .campaign-requirements { justify-self: stretch; }

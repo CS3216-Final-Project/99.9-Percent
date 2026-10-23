@@ -336,7 +336,7 @@ export interface TabItem<Id extends string> {
  * selected tab is the only one in the Tab order.
  *
  * The "segmented" variant is a compact two-or-three-way switch whose selection thumb slides between
- * segments. `locked` keeps the selected tab in place, for while its content holds a choice in progress.
+ * segments.
  * `shared` is shown under the tabs whichever is selected, and stays mounted when the tab changes.
  */
 export function Tabs<Id extends string>({
@@ -346,7 +346,6 @@ export function Tabs<Id extends string>({
   onChange,
   children,
   variant = "strip",
-  locked = false,
   className,
   shared,
 }: {
@@ -356,7 +355,6 @@ export function Tabs<Id extends string>({
   onChange: (id: Id) => void;
   children: ReactNode;
   variant?: "strip" | "segmented";
-  locked?: boolean;
   className?: string;
   shared?: ReactNode;
 }) {
@@ -370,7 +368,7 @@ export function Tabs<Id extends string>({
     buttons.current.get(tab.id)?.focus();
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.altKey || e.ctrlKey || e.metaKey || locked) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     let target: number;
     switch (e.key) {
       case "ArrowRight":
@@ -419,7 +417,6 @@ export function Tabs<Id extends string>({
             tabIndex={t.id === value ? 0 : -1}
             className={[segmented && "segment", t.id === value && "is-active"].filter(Boolean).join(" ")}
             data-tab={t.id}
-            disabled={locked && t.id !== value}
             onClick={() => onChange(t.id)}
           >
             <Icon name={t.icon} size={segmented ? 18 : 20} />

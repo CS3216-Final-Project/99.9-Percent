@@ -167,7 +167,8 @@ function controlsDisabled(game: GameState): boolean {
 
 /**
  * Two tabs: Analysis reads the system, Actions changes it. The switch leads the panel and guidance
- * follows it on both tabs. A quote being read holds its tab, so a half-read purchase is never unmounted.
+ * follows it on both tabs. An open quote keeps Actions mounted, hidden, so the player can check the
+ * readings before deciding.
  */
 export function CampaignPanel() {
   const game = useGame(s => s.game), tab = useGame(s => s.panelTab), setTab = useGame(s => s.setPanelTab);
@@ -181,11 +182,12 @@ export function CampaignPanel() {
           <span className="state state-critical"><Icon name="alert" size={12} />Incident</span>
         </div>
       </header>}
-      <Tabs variant="segmented" className="panel-tabs" label="Panel sections" value={tab} onChange={setTab} locked={!!confirming} shared={<CampaignGuidance />} tabs={[
+      <Tabs variant="segmented" className="panel-tabs" label="Panel sections" value={tab} onChange={setTab} shared={<CampaignGuidance />} tabs={[
         { id: "analysis", label: "Analysis", icon: "analytics" },
         { id: "actions", label: "Actions", icon: "wrench", badge: pending, badgeLabel: `${pending} activating` },
       ]}>
-        {tab === "analysis" ? <CampaignAnalysis /> : <CampaignActions />}
+        {tab === "analysis" && <CampaignAnalysis />}
+        {(tab === "actions" || confirming) && <div className="campaign-actions-tab" hidden={tab !== "actions"}><CampaignActions /></div>}
       </Tabs>
     </section>
   </EquipmentPanel>;
