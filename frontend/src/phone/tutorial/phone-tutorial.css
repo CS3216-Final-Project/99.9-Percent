@@ -38,9 +38,10 @@
 [data-edition="phone"] .tour-card.launch-tutorial .tour-foot { position: sticky; bottom: 0; margin-top: 4px; padding-bottom: 6px; background: var(--paper); }
 [data-edition="phone"] .tour-card.launch-tutorial .tour-foot .btn { min-height: 44px; min-inline-size: 6.5rem; justify-content: center; }
 
-/* An open dock menu (speeds, views) opens over the strip; the step returns when it closes. */
+/* An open dock menu opens over the strip; the step returns when it closes. Other guides keep their strip over the
+   Views menu, whose tabs they can point at, and give way only to the speed menu. */
 body:has(.phone-app[data-edition="phone"] .phone-dock details[open]) .tour-card.launch-tutorial,
-body:has(.phone-app[data-edition="phone"] .phone-dock details[open]) .tour[data-docked] .tour-card { visibility: hidden; }
+body:has(.phone-app[data-edition="phone"] .phone-dock details.time-menu[open]) .tour[data-docked] .tour-card { visibility: hidden; }
 
 /* ---- Chapter guides, tips and Challenge Mode's first week ---- */
 
