@@ -387,7 +387,7 @@ it("imports a pre-update incident paused and preserves its recovery state", () =
 });
 
 describe("challenge mode lock", () => {
-  const LOCKED = "Complete the first five Guided Mode chapters to unlock Challenge Mode.";
+  const LOCKED = "Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.";
   it("forces a stale classic last-mode back to campaign while locked", () => {
     saveMode("classic");
     expect(loadMode()).toBe("campaign");
