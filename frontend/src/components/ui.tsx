@@ -461,7 +461,7 @@ export function Modal({
   useEffect(()=>{
     const previous=document.activeElement as HTMLElement|null;
     const node=dialog.current;
-    node?.querySelector<HTMLElement>("button, a[href], input, select, textarea, [tabindex]")?.focus();
+    (node?.querySelector<HTMLElement>("[data-autofocus]") ?? node?.querySelector<HTMLElement>("button, a[href], input, select, textarea, [tabindex]"))?.focus();
     return ()=>{if(previous?.isConnected)previous.focus();};
   },[title]);
   return (

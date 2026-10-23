@@ -1320,7 +1320,7 @@ export const useGame = create<Store>()((set, get) => {
       // A practice company is restored by endTour, never by play(), and has its own run: recording it would replace the real company's.
       if (choice === "stay" && end.chapter === "opening" && !get().tutorialCompany && !chapterAnnounced(get().meta, runId, "opening")) {
         const meta = announceChapter(get().meta, runId, "opening");
-        saveMeta(meta);
+        if (!saveMeta(meta)) get().notify("Your choice to stay could not be saved in this browser, so the next Play continues into Scaling & Routing.", "error");
         set({ meta });
       }
       return true;

@@ -219,7 +219,8 @@ it("records chapter progress and a failure once with the last reached chapter", 
   useGame.setState({ game: { ...next, phase: "ended", outcome: "bankrupt" } });
   useGame.setState({ game: { ...useGame.getState().game } });
   expect(named("gameplay_run_failed")).toHaveLength(1);
-  expect(named("gameplay_run_failed")[0].properties.chapter_id).toBe("scaling");
+  // The company acknowledged Launch Week without entering Scaling & Routing, so Launch Week is the last chapter it reached.
+  expect(named("gameplay_run_failed")[0].properties.chapter_id).toBe("launch-week");
 });
 
 it("restarts a session on back/forward cache restoration without starting another run", () => {

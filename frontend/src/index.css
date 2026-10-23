@@ -3425,6 +3425,16 @@ button:disabled {
   margin: 0;
 }
 
+/* Stay and Continue sit together on the right; an extra action such as Copy result keeps the left. When a narrow
+   dialog wraps them, each wrapped line stays right-aligned under the one before. */
+.chapter-end-foot {
+  justify-content: flex-end;
+}
+
+.chapter-end-extra {
+  margin-right: auto;
+}
+
 .modal-body h4 {
   margin-top: 18px;
 }

@@ -34,7 +34,7 @@ export function campaignObjective(g: GameState) {
  if(c.reliabilityStage) return "Keep service stable through an application failure, then review the evidence.";
  if(c.spikeStage) return "Handle changing demand while managing capacity costs.";
  if(c.dataStage) return "Compare workload, cache hits and database pressure as demand grows.";
- if(c.openingMilestone?.acknowledged) return "Prepare the system for the next growth wave.";
+ if(c.openingMilestone?.acknowledged) return c.scaling?"Prepare the system for the next growth wave.":"Keep operating, then continue to Scaling & Routing with Next.";
  if(preventionAvailable(c)) return "Inspect the Application and Database; keep service healthy at full demand.";
  return "Observe demand and compare component evidence.";
 }
@@ -42,7 +42,7 @@ export function campaignObjective(g: GameState) {
 export function campaignGuidance(g: GameState) {
  const c=g.campaign!;
  const openingDone=!!c.openingMilestone?.acknowledged;
- const stage=c.combinedStage?"Grow the Company":c.reliabilityStage?"Stay Online":c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":openingDone?"Scaling & Routing":c.launchWeek?"Launch Week":"Opening";
+ const stage=c.combinedStage?"Grow the Company":c.reliabilityStage?"Stay Online":c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":openingDone&&c.scaling?"Scaling & Routing":c.launchWeek?"Launch Week":"Opening";
  const dataAvailable=!c.dataStage&&canEnterData(g),spikesAvailable=canEnterSpikes(g);
  const prevention=preventionAvailable(c);
  const pendingMilestone=!!c.openingMilestone&&!openingDone;
@@ -86,7 +86,7 @@ export function campaignGuidance(g: GameState) {
   add("recognition","Spike response acknowledged",d.acknowledged);
   // Stay Online's entry also checks cash, so the requirements name it with the rest.
   add("cash","Positive company cash",c.cashCents>0);
-  notice=canEnterReliability(g)?"Stay Online is available through Next in the chapter bar.":d.acknowledged?waitsFor("Stay Online",entryBlockers(false,reliabilityEntryGates(g))):"Stay Online opens after you review the spike response.";
+  notice=canEnterReliability(g)?"Stay Online is available through Next in the chapter bar.":d.acknowledged?waitsFor("Stay Online",entryBlockers(false,reliabilityEntryGates(g))):d.completedStep!==null?"Stay Online opens after you review the spike response.":null;
   optional="Autoscaling is optional. Manual capacity, admission relief and hybrid responses remain valid.";
   if(c.step<d.deadlines[3])waiting="Waiting for both announced traffic pulses to end.";
   else if(d.completedStep===null&&!c.incident&&queuesEmpty&&reportsAcknowledged&&g.phase==="management"&&qualifiesForRecovery(c.snapshot))waiting="Observe new stable baseline game seconds with Run. Pausing adds no observations.";
@@ -103,6 +103,11 @@ export function campaignGuidance(g: GameState) {
   optional="Workload contrast is optional; cache purchase and database upgrades are not required for continuation.";
   if(!c.dataStage.consumed&&!canEnterData(g))notice="Data growth waits for management, empty queues, no active incident and acknowledged reports.";
   if(spikesAvailable)pendingAction={label:"Continue to traffic spikes",action:{type:"enter_spikes"}};
+ } else if(openingDone&&!c.scaling) {
+  // The player stayed after the Opening: Scaling & Routing waits for Next, and none of its requirements apply yet.
+  add("opening",c.launchWeek?"Launch Week completed":"Opening completed",true);
+  if(g.phase!=="ended")notice=`${c.launchWeek?"Launch Week":"The Opening"} is complete. Continue to Scaling & Routing through Next in the chapter bar when you are ready.`;
+  if(g.phase!=="ended")pendingAction={label:"Continue to scaling and routing",action:{type:"enter_scaling"}};
  } else if(openingDone) {
   add("opening","Opening completed",openingDone);
   add("stage","Scaling stage active",!!c.scaling);
@@ -113,8 +118,7 @@ export function campaignGuidance(g: GameState) {
   add("growth","Scaling growth occurred",!!c.scaling?.consumed);
   add("reports","All recovered incident reports acknowledged",reportsAcknowledged);
   if(!c.scaling?.consumed&&!c.scalingConsent&&c.dbCapacity<P.dbCapacity&&c.cashCents<=P.dbCostCents)notice="Next growth requires paid database headroom, but current cash cannot fund that investment. Pending revenue is available only after settlement; inspect finances and operating costs before advancing. Solvency alone does not guarantee an affordable growth investment.";
-  if(!c.scaling&&g.phase!=="ended")pendingAction={label:"Continue to scaling and routing",action:{type:"enter_scaling"}};
-  else if(dataAvailable)pendingAction={label:"Continue to data strategy",action:{type:"enter_data"}};
+  if(dataAvailable)pendingAction={label:"Continue to data strategy",action:{type:"enter_data"}};
  } else if(prevention) {
   const r=preventionRequirements(c);
   add("growth","Opening growth occurred",r.growth);

@@ -5,7 +5,7 @@ type Gate = keyof ReturnType<typeof reliabilityEntryGates> | keyof ReturnType<ty
 
 /** A chapter entry gate as the player sees it, worded like the chapter requirements. */
 const GATE_LABELS: Record<Gate, string> = {
-  management: "No report is waiting to be read",
+  management: "Normal operations have resumed",
   cash: "Company cash is positive",
   incident: "No incident is open",
   pending: "Queued changes have finished",

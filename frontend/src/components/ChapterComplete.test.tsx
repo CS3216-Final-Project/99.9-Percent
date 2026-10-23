@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useGame } from "@/game/store";
 import { finishedChapter } from "@/game/campaignChapters";
 import { loadMeta } from "@/game/persist";
@@ -8,11 +8,12 @@ import { step as simStep } from "@/sim/step";
 import { finishingScaling } from "@/sim/__tests__/dataFixture";
 import { dataCompany as finishedData } from "@/sim/__tests__/spikeFixtures";
 import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
+import { campaignGuidance } from "@/game/campaignGuidance";
 import { act as decide, spikeCompany, tick } from "@/sim/__tests__/spikeFixtures";
 import { finishedLaunchWeek, recoveredOpening } from "@/game/__fixtures__/openingOutcome";
 import { reliabilityOutcome, reliabilityOutcomeWithQueuedChange } from "@/game/__fixtures__/reliabilityOutcome";
 import { CampaignChapters } from "./CampaignChapters";
-import { CampaignOverlays } from "./CampaignUI";
+import { CampaignHeader, CampaignOverlays, CampaignPanel } from "./CampaignUI";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(cleanup);
@@ -227,4 +228,40 @@ it("ends a version-1 Opening with Stay or Continue, and a stayed company continu
   expect(useGame.getState().game.campaign!.scaling).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Next: Continue to scaling and routing" }));
   expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+});
+
+it("shows a company that stayed after Launch Week no Scaling & Routing controls or requirements, only Next", () => {
+  useGame.setState({ game: finishedLaunchWeek(), ready: true, hasRun: true, started: true, onboarding: false });
+  render(<><CampaignHeader /><CampaignPanel /><CampaignOverlays /></>);
+  fireEvent.click(button(screen.getByRole("dialog", { name: "Launch Week complete" }), "Stay in this chapter"));
+  expect(screen.queryByRole("region", { name: "Scaling growth risk" })).toBeNull();
+  expect(screen.queryByText(/Scaling stage active|Database headroom/)).toBeNull();
+  expect(screen.getByLabelText("Current chapter").textContent).toBe("Launch Week");
+  expect(screen.getByLabelText("Current objective").textContent).toContain("continue to Scaling & Routing with Next");
+  const guidance = screen.getByRole("region", { name: "Guided Mode guidance" });
+  expect(guidance.textContent).toContain("Launch Week is complete. Continue to Scaling & Routing through Next in the chapter bar when you are ready.");
+  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to scaling and routing" }));
+  expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+});
+
+it("opens each completion menu on Continue, or on Stay while Continue is not possible", () => {
+  show(spikeRecognition());
+  expect(document.activeElement).toBe(button(screen.getByRole("dialog", { name: "Spike response handled" }), /Continue to Stay Online/));
+  cleanup();
+  show(reliabilityOutcomeWithQueuedChange());
+  expect(document.activeElement).toBe(button(screen.getByRole("dialog", { name: "Reliability outcome" }), "Stay in this chapter"));
+});
+
+it("says so when a stay cannot be saved, and still stays for this visit", () => {
+  show(finishedLaunchWeek());
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("full", "QuotaExceededError"); });
+  fireEvent.click(button(screen.getByRole("dialog", { name: "Launch Week complete" }), "Stay in this chapter"));
+  vi.restoreAllMocks();
+  expect(useGame.getState().toast).toMatchObject({ kind: "error", text: expect.stringContaining("could not be saved") });
+  expect(useGame.getState().game.campaign!.scaling).toBeNull();
+});
+
+it("does not mention reviewing the spike response before there is one", () => {
+  expect(campaignGuidance(spikeCompany(false)).notice).toBeNull();
+  expect(campaignGuidance(spikeRecognition()).notice).toBe("Stay Online opens after you review the spike response.");
 });

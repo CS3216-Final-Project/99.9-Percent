@@ -41,7 +41,7 @@ import { chapterEnd, type ChapterEnd } from "@/game/chapterCompletion";
 import { ChapterEndFoot } from "./ChapterEndFoot";
 import { money, num, uptimePct } from "@/game/format";
 import { campaignUptime } from "@/game/campaignUptime";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { TimeMenu } from "./TimeMenu";
 import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
@@ -118,7 +118,7 @@ function CampaignGuidance() {
     {model.finalGoals.length>0&&<section className="campaign-requirements" aria-label="Final Campaign goals"><h3 className="campaign-requirements-heading">Final Campaign goals</h3><RequirementList items={model.finalGoals}/></section>}
     {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={game.phase==="ended"} onClick={()=>act(action.action!)}>{action.label}<Icon name="next" /></button>}
     {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
-    {c.openingMilestone?.acknowledged&&!c.dataStage&&!c.scaling?.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
+    {c.scaling&&!c.dataStage&&!c.scaling.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}>View run scorecard</button>}
     {model.prevention&&!c.openingPrevention?.outcome&&<section className="prevention-guidance" aria-label="Opening prevention progress">
       <p role="status">Stable service: {c.openingPrevention?.stableSteps??0} / {Q.stableSteps} game seconds. Pausing adds no time; unhealthy service restarts the counter.</p>
@@ -494,8 +494,9 @@ export function CampaignOverlays({ home, menu, chapterComplete }: CampaignOverla
 function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOverlaySlots, "menu" | "chapterComplete">) {
   const { game, view, openView, act, chapterComplete, tutorialCompany, scope } = useGame();
   const c = game.campaign!;
-  // A finished chapter's recognition doubles as its completion menu: Stay or Continue.
-  const end = chapterEnd(game, scope);
+  // A finished chapter's recognition doubles as its completion menu: Stay or Continue. Judging what the next chapter
+  // waits for copies the company, so it is worked out once per game state rather than on every store update.
+  const end = useMemo(() => chapterEnd(game, scope), [game, scope]);
   if(view==="scorecard"&&(c.scorecard||c.combinedStage?.finalReview))return <Modal title="Company scorecard" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={(c.scorecard??c.combinedStage!.finalReview)!} pendingReview={!c.scorecard}/></Modal>;
   if(pendingCombined(c)&&!["guidance","menu","history"].includes(view??"")){
     const d=c.combinedStage!,r=d.currentRound;
