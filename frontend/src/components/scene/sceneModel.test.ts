@@ -52,6 +52,19 @@ describe("scene model", () => {
     while (s.campaign!.apps.length < 2) s = step(s).state;
     expect(buildModel(s).hosts).toEqual(["ok", "off"]);
   });
+  it("keeps a Campaign incident's culprit looking normal until it is inspected", () => {
+    let s = step(advanceSteps(newGame(1, "door"), 6).state).state;
+    expect(s.campaign!.incident).not.toBeNull();
+    expect(s.campaign!.snapshot.db.demandRatio).toBeGreaterThan(1);
+    let m = buildModel(s);
+    expect(m).toMatchObject({ dbLed: "ok", inspected: [] });
+    expect(m.states.db).toBe("ok");
+    s = must(s, { type: "incident_inspect", equipment: "db" });
+    m = buildModel(s);
+    expect(m.inspected).toEqual(["db"]);
+    expect(m.states.db).toBe("critical");
+    expect(m.dbLed).not.toBe("ok");
+  });
   it("shows each application's own constraint and keeps an unrouted queue visible until drained", () => {
     let s=newGame(3,"individual-racks");const c=s.campaign!;
     c.apps[0].capacity=1600;c.apps[0].tier="large";

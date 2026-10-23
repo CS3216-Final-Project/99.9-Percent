@@ -1,4 +1,4 @@
-import { test, expect, savedGame } from "./fixtures";
+import { test, expect, savedGame, advanceCampaignStep } from "./fixtures";
 import { chapter6FinanceJourney } from "./chapter6Finance";
 import { recoverableFinancialCompany } from "../src/game/__fixtures__/chapter6Finance";
 import { bootChapter6 } from "./chapter6Guidance";
@@ -21,7 +21,7 @@ test("Chapter 6 finances: low cash with paid-for capacity warns but still guides
   const gold = page.locator(".campaign-gold-attention");
   await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(/^Remove traffic limit/); await gold.click();
   await expect(gold).toHaveAccessibleName("Confirm"); await gold.click();
-  await page.getByRole("button", { name: "Step 5 game seconds", exact: true }).click();
+  await advanceCampaignStep(page, { seconds: 5, resumeClock: false });
   const after = await savedGame(page);
   expect(after.campaign!.limit).toBeNull();
   expect(after.campaign!.combinedStage!.readinessSteps).toBe(5);

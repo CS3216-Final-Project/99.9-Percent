@@ -14,15 +14,15 @@ import { Callout } from "@/components/ui";
  * focusable and says why when pressed, so the row never changes height.
  */
 export function PhoneChapterRow() {
-  const { learning, current, total, advance, reason, goal } = useChapterBar();
+  const { replaying, current, total, advance, reason, goal } = useChapterBar();
   const [open, setOpen] = useState(false);
   const [why, setWhy] = useState(false);
   const reasonId = useId();
-  const label = learning ? "Walkthrough" : `Chapter ${current.number} of ${total}`;
+  const label = replaying ? "Practice" : `Chapter ${current.number} of ${total}`;
 
   return <>
     <section className="phone-chapter-row" aria-label="Guided Mode chapters">
-      <span className="phone-chapter-count" aria-hidden="true">{learning ? "0" : <>{current.number}<small>/{total}</small></>}</span>
+      <span className="phone-chapter-count" aria-hidden="true">{replaying ? "0" : <>{current.number}<small>/{total}</small></>}</span>
       <div className="phone-chapter-text">
         <p className="visually-hidden">{label}</p>
         <h2 aria-label="Current chapter"><span aria-label="Current Guided Mode stage">{current.name}</span></h2>

@@ -17,8 +17,9 @@ export interface Summary {
 export type CampaignSummarizer = (game: GameState | null, tutorialDone: boolean) => Summary;
 
 /**
- * The chapter a Guided Mode save is in, read from the company itself. A company still in the Opening before this
- * browser's walkthrough is done is in Chapter 0; past the Opening, its chapter stands whatever this browser has seen.
+ * The chapter a Guided Mode save is in, read from the company itself. A Launch Week company, or a version-1 company
+ * still in the Opening before this browser's retired walkthrough is done, is in Chapter 0; after that, its chapter
+ * stands whatever this browser has seen.
  */
 export function savedChapter(game: GameState, tutorialDone: boolean) {
   const chapters = campaignChapters(game);
@@ -32,7 +33,7 @@ export function campaignSummary(game: GameState | null, tutorialDone: boolean): 
   const { chapter, done, total } = savedChapter(game, tutorialDone);
   const ended = game.phase === "ended";
   const progress = ended ? (game.outcome === "won" ? "All chapters complete" : "Company closed")
-    : chapter.number === 0 ? "Walkthrough in progress" : `Chapter ${chapter.number} of ${total}: ${chapter.name}`;
+    : chapter.number === 0 ? "Launch Week in progress" : `Chapter ${chapter.number} of ${total}: ${chapter.name}`;
   // A finished company opens on its final report; nothing is left to continue.
   return { progress, resumable: true, ended, tutorialDone, continueLabel: ended ? "See how it ended" : "Continue company", chapter: chapter.number, chapterDone: done };
 }
@@ -74,7 +75,7 @@ export type ModeInfo = { name: string; icon: IconName; pace?: string; about: str
 export const MODES: Record<GameMode, ModeInfo> = {
   campaign: {
     name: "Guided Mode", icon: "server",
-    about: "Begin with the walkthrough to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.",
+    about: "Launch Week teaches the controls, game time and finances as your service opens, then six infrastructure chapters follow. Inspect problems, upgrade servers and pause whenever you need.",
   },
   classic: {
     name: "Challenge Mode", icon: "week",
@@ -82,10 +83,10 @@ export const MODES: Record<GameMode, ModeInfo> = {
   },
 };
 
-/** Guided Mode's pitch once its company has started: finish the walkthrough, then the chapters. */
+/** Guided Mode's pitch once its company has started: finish Launch Week, then the chapters. */
 export function campaignAbout(summary: Summary): string {
   if (!summary.resumable) return MODES.campaign.about;
-  if (summary.chapter === 0) return "Finish the walkthrough to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.";
+  if (summary.chapter === 0) return "Finish Launch Week to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.";
   return "Work through six infrastructure chapters at your own pace. Inspect problems, upgrade servers and pause whenever you need.";
 }
 

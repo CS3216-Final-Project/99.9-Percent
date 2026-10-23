@@ -7,18 +7,21 @@ import { EquipmentPanel } from "./EquipmentPanel";
 import { CampaignReadings } from "./CampaignReadings";
 import { RoomControlsSlot } from "./RoomControlsHost";
 import "./CampaignUX.css";
-import { TimeMenu } from "./TimeMenu";
 import { CampaignAction as Act } from "./CampaignAction";
 import CampaignScorecard from "./CampaignScorecard";
+import LaunchIntro from "./LaunchIntro";
+import LaunchScore from "./LaunchScore";
 import { canPromote, combinedProfile, currentFault, pendingCombined } from "@/sim/combinedCampaign";
 import { pendingSpikeAcknowledgement, spikeInput } from "@/sim/autoscaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
-import { canEnterData, databaseUpgrade, pendingStop, routableApps } from "@/sim/step";
+import { admissionCeiling, canEnterData, databaseUpgrade, pendingStop, routableApps } from "@/sim/step";
 import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
-import { campaignGuidance, type Requirement } from "@/game/campaignGuidance";
+import { campaignGuidance, milestoneBlocks, type Requirement } from "@/game/campaignGuidance";
+import { launchWeekScalingOpen, openingTuning } from "@/sim/launchWeek";
+import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
 import { campaignChapters, finishedChapter } from "@/game/campaignChapters";
 import TechTree from "./TechTree";
 import { AccountSection, CloudSavesSection } from "./Account";
@@ -32,12 +35,14 @@ import { CampaignChapters } from "./CampaignChapters";
 import { isChapterEntry } from "@/game/campaignChapters";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { exportPlaytest, type ChapterCompletion } from "@/game/persist";
-import { money, num } from "@/game/format";
-import { useEffect, useState, type ReactNode } from "react";
+import { money, num, uptimePct } from "@/game/format";
+import { campaignUptime } from "@/game/campaignUptime";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { TimeMenu } from "./TimeMenu";
 import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
 import { CampaignIncidentReport, CampaignRecoveryReview, IncidentEvidence } from "./CampaignIncidentReport";
-import { campaignClockAvailable, inspectOrSelect, useGame, walkthroughHoldsClock } from "@/game/store";
+import { inspectOrSelect, useGame } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
@@ -135,6 +140,15 @@ function IncidentRecovery({ campaign: c }: { campaign: Campaign }) {
   </section>;
 }
 
+/** The headline: the share of all requests so far that were served, to enough digits to tell 99.9 from 99.99. */
+function UptimeStat() {
+  const up = useGame(s => s.game.campaign ? campaignUptime(s.game.campaign) : null);
+  const tone = up === null || up >= 0.9999 ? "ok" : up >= 0.999 ? "warn" : "critical";
+  return <Stat icon="health" kind={tone === "ok" ? "health" : tone} label="Uptime" className="stat-uptime" tip="The share of settled requests your company served. Requests still waiting in a queue don't count until they resolve; requests lost or turned away by a limit do.">
+    <strong>{up === null ? "—" : uptimePct(up)}</strong>
+  </Stat>;
+}
+
 export function CampaignHeader() {
   const { game, openView, started } = useGame(), c = game.campaign!;
   const incident = game.phase === "incident";
@@ -150,6 +164,7 @@ export function CampaignHeader() {
       <Stat icon="revenue" kind="revenue" label="Pending revenue" tip={`${dollars(c.ledger.successes * Q.revenueCents)} earned this operating week, not yet added to cash. Only successful requests earn revenue.`}>
         <strong>{money(c.ledger.successes * Q.revenueCents / 100)}</strong><span className="muted">unsettled</span>
       </Stat>
+      <UptimeStat />
       <AppHealthEntry />
     </div>
     <CampaignHintButton />
@@ -162,11 +177,18 @@ export function CampaignPanel() {
   const { game, act, selected, selectedAppId } = useGame(), c = game.campaign!, m = c.snapshot;
   const incident = game.phase === "incident";
   const busy = c.pending.some(a => !["limit","unlimit","routing"].includes(a.type));
-  const unlocked = !!c.openingMilestone?.acknowledged;
+  const unlocked = !!c.openingMilestone?.acknowledged || !!c.launchWeek;
   const dbUpgrade=databaseUpgrade(c);
+  // Launch Week teaches app capacity first: the database tier stays locked until week-two growth arrives.
+  const dbLocked=!!c.launchWeek&&c.step<LW.growthStep;
+  // ...and load balancing before scaling: a bigger App 1 alone would skip the week-1 lesson.
+  const scaleLocked=!launchWeekScalingOpen(c);
+  // Traffic limiting is introduced with the first Launch Week incident, never before.
+  const launchLive=!!c.launchWeek&&c.launchWeek.completedStep===null;
+  const limitShown=!launchLive||!!c.incident||c.reports.length>0||c.limit!==null;
   const selectedApp = c.apps.find(a=>a.id===selectedAppId)??c.apps[0];
   const recipients = c.reliabilityStage ? effectiveTargets(c) : c.routing.targets;
-  const disabled = pendingStop(c) !== null || !!(c.openingMilestone && !c.openingMilestone.acknowledged) || game.phase === "review" || game.phase === "ended";
+  const disabled = pendingStop(c) !== null || milestoneBlocks(c) || game.phase === "review" || game.phase === "ended";
   const admissionPending = c.pending.some(a => a.type === "limit" || a.type === "unlimit");
   const place = PLACES.find(id => id === selected && (id!=="cache"||c.dataStage));
   const office = selected === "team" || selected === "deploy" || selected === "growth" ? selected : null;
@@ -199,24 +221,32 @@ export function CampaignPanel() {
         {unlocked && selected === "app" && <details className="more" open><summary>Application instances · {c.routing.mode} routing</summary>
           <ApplicationInstances campaign={c} recipients={recipients} selectedAppId={selectedAppId} onSelect={id=>inspectOrSelect("app",id)} /></details>}
       </div>
+      {c.launchWeek?.researchEarned===1&&!c.launchWeek.tech&&<section className="panel-section" aria-label="Launch Week research">
+        <h4 className="step-head"><Icon name="bulb" size={16} />Research pick</h4>
+        <p>One free research point, billed at the next Sunday settlement. Your pick carries into the later chapters.</p>
+        <ul className="actions">
+          <li><Act icon="bolt" label="Caching" price={LW.researchCostCents / 100} note="Answers repeated requests" tip="Answers forty percent of arriving requests during the surge; a read cache carries into the data stage." decision={{ type: "pick_launch_tech", tech: "caching" }} onClick={() => act({ type: "pick_launch_tech", tech: "caching" })} /></li>
+          <li><Act icon="scale" label="Autoscaling" price={LW.researchCostCents / 100} note="Adds capacity under load" tip="Adds application capacity while the surge runs; the unlock carries into Traffic Spikes." decision={{ type: "pick_launch_tech", tech: "autoscaling" }} onClick={() => act({ type: "pick_launch_tech", tech: "autoscaling" })} /></li>
+        </ul>
+      </section>}
       <h4 className="step-head">Actions</h4>
       <ul className="actions">
-        <li><Act icon="server" label="Add server" price={Q.appCostCents / 100} note={`${Q.appDelay} game seconds`} disabled={disabled || busy || c.apps.length >= (c.spikeStage ? T.maximum : Q.maxApps) || c.cashCents <= Q.appCostCents} tip="Adds installed application capacity. Without routing, a new server does not receive traffic." decision={{ type: "add_server" }} onClick={() => act({ type: "add_server" })} /></li>
-        <li><Act icon="database" label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbUpgrade?`${dbUpgrade.delay} game seconds · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next Guided Mode stage."} decision={{ type: "start_db_upgrade" }} onClick={() => act({ type: "start_db_upgrade" })} /></li>
-        <li><Act icon="limit" label={c.limit === null ? "Limit to 500 requests/s" : "Remove traffic limit"} price={0} note={`${Q.admissionDelay} game second`} disabled={disabled || admissionPending} tip="Changes admitted traffic at the next game second. Rejected requests earn no revenue." decision={{ type: "set_traffic_limit", enabled: c.limit === null }} onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>
+        <li><Act icon="server" label="Add server" price={openingTuning(c).appCostCents / 100} note={`${openingTuning(c).appDelay} game seconds`} disabled={disabled || busy || c.apps.length >= (c.spikeStage ? T.maximum : openingTuning(c).maxApps) || c.cashCents <= openingTuning(c).appCostCents} tip="Adds installed application capacity. Without routing, a new server does not receive traffic." decision={{ type: "add_server" }} onClick={() => act({ type: "add_server" })} /></li>
+        <li><Act icon={dbLocked?"lock":"database"} label="Upgrade database" price={dbUpgrade?dbUpgrade.costCents/100:undefined} note={dbLocked?"Week 2":dbUpgrade?`${dbUpgrade.delay} game seconds · ${num(dbUpgrade.capacity)} ops/s`:"Current stage tier reached"} disabled={disabled || busy || dbLocked || !dbUpgrade || c.cashCents <= dbUpgrade.costCents} tip={dbLocked?"Locked while your app servers are the bottleneck. Unlocks in week 2 as demand grows into the database.":dbUpgrade?"Increases database capacity after activation. Running costs also increase.":c.dataStage?"The database is at the highest available tier.":"Further database capacity unlocks after explicitly entering the next Guided Mode stage."} decision={{ type: "start_db_upgrade" }} onClick={() => act({ type: "start_db_upgrade" })} /></li>
+        {limitShown && <li><Act icon="limit" label={c.limit === null ? (c.scenarioVersion === 2 ? `Limit to ~${num(admissionCeiling(c))} requests/s` : "Limit to 500 requests/s") : "Remove traffic limit"} price={0} note={`${openingTuning(c).admissionDelay} game second`} disabled={disabled || admissionPending} tip={launchLive?"Admits 90% of what your servers can sustain. Every rejected request earns nothing and hurts your uptime and reputation; scale up your apps to keep up instead.":"Admits 90% of what your current infrastructure can sustain; the cap follows your upgrades. Rejected requests earn no revenue and count against uptime."} decision={{ type: "set_traffic_limit", enabled: c.limit === null }} onClick={() => act({ type: "set_traffic_limit", enabled: c.limit === null })} /></li>}
       </ul>
       {c.reliabilityStage&&<ReliabilityControls disabled={disabled} busy={installPending(c)} />}
       {unlocked && <section aria-label="Scaling controls" className="scaling-controls">
         <h4 className="step-head">Scale and route</h4>
         <ul className="actions">
-          <li><Act icon="scaleUp" label={`Scale up ${appName(selectedApp.id)}`} price={P.appCostCents/100} note={`${P.appDelay} game seconds`} disabled={disabled||busy||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip="Increases only the selected application's capacity. Database capacity stays unchanged." decision={{type:"scale_up",appId:selectedApp.id}} onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>
+          <li><Act icon={scaleLocked?"lock":"scaleUp"} label={`Scale up ${appName(selectedApp.id)}`} price={P.appCostCents/100} note={scaleLocked?"After load balancing":`${P.appDelay} game seconds`} disabled={disabled||busy||scaleLocked||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip={scaleLocked?"Locked until a load balancer shares traffic across two app servers. Launch Week teaches spreading load first.":"Increases only the selected application's capacity. Database capacity stays unchanged."} decision={{type:"scale_up",appId:selectedApp.id}} onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>
           <li><Act icon="shuffle" label="Deploy load balancing" price={P.lbCostCents/100} note={`${P.lbDelay} game seconds`} disabled={disabled||busy||c.loadBalancer||c.cashCents<=P.lbCostCents} tip="Installs a load balancer. Traffic changes only after you explicitly configure routing." decision={{type:"deploy_load_balancer"}} onClick={()=>act({type:"deploy_load_balancer"})}/></li>
         </ul>
-        <details className="more"><summary>Configure routing · {routeName(c)}</summary>
+        <div className="route-choice-block"><h5 className="step-head route-head">Configure routing · {routeName(c)}</h5>
         <fieldset className="route-choice" disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Send traffic to · changes next game second</legend>
           {routeOptions(c).map(o=>{const on=sameTargets(c.routing.targets,o.targets);return <CampaignDecisionButton decision={{type:"set_routing",mode:"balanced",targets:o.targets}} key={o.label} type="button" className={on?"is-active":""} aria-pressed={on} onClick={()=>{if(!on)act({type:"set_routing",mode:"balanced",targets:o.targets});}} {...tipProps(o.tip)}>{o.label}</CampaignDecisionButton>;})}
-        </fieldset><CampaignUnavailable action={{type:"set_routing",mode:"balanced",targets:routableApps(c).map(a=>a.id)}} disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")} />{!c.loadBalancer&&<p role="note">Deploy load balancing before configuring routing.</p>}{c.pending.some(a=>a.type==="routing"||a.type==="retire-app")&&<p role="note">A routing or retirement change is pending; wait for activation.</p>}</details>
-        <p className="muted">{c.scaling?.consumed?(c.dataStage?"Scaling growth recorded: 1,400 requests/s before data growth.":"Traffic growth applied: 1,400 requests/s."):c.dbCapacity<P.dbCapacity&&!c.scalingConsent?"Next growth waits for a paid database upgrade to 2,000 ops/s.":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Growth waits until the incident and backlogs clear.":c.scaling?.dueStep?`Growth due at game second ${c.scaling.dueStep} while ready.`:"Growth readiness is checked on the next game second."}</p>
+        </fieldset><CampaignUnavailable action={{type:"set_routing",mode:"balanced",targets:routableApps(c).map(a=>a.id)}} disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")} />{!c.loadBalancer&&<p role="note">Deploy load balancing before configuring routing.</p>}{c.pending.some(a=>a.type==="routing"||a.type==="retire-app")&&<p role="note">A routing or retirement change is pending; wait for activation.</p>}</div>
+        {!c.launchWeek&&<p className="muted">{c.scaling?.consumed?(c.dataStage?"Scaling growth recorded: 1,400 requests/s before data growth.":"Traffic growth applied: 1,400 requests/s."):c.dbCapacity<P.dbCapacity&&!c.scalingConsent?"Next growth waits for a paid database upgrade to 2,000 ops/s.":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Growth waits until the incident and backlogs clear.":c.scaling?.dueStep?`Growth due at game second ${c.scaling.dueStep} while ready.`:"Growth readiness is checked on the next game second."}</p>}
       </section>}
       {c.dataStage&&<section aria-label="Data strategy" className="scaling-controls">
         <h4 className="step-head"><Icon name={EQUIPMENT_ICON.cache} size={16} />Data strategy</h4>
@@ -235,7 +265,7 @@ export function CampaignPanel() {
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
       </div>)}
       {c.apps.some(a=>!a.routed) && <p className="muted">{c.apps.filter(a=>!a.routed).map(a=>appName(a.id)).join(", ")}: Installed, not receiving traffic</p>}
-      {c.limit!==null&&<Callout compact tone="warn" icon="network" kicker="Traffic limit active">{num(m.admitted)} admitted / {num(m.rejected)} rejected req/s. Rejected requests earn no revenue. <strong>Infrastructure and salaries still cost the same.</strong></Callout>}
+      {c.limit!==null&&<Callout compact tone={m.rejected*5>m.incoming?"critical":"warn"} icon="network" kicker="Traffic limit active">{num(m.admitted)} admitted / {num(m.rejected)} turned away req/s. Turned-away requests earn no revenue and count against uptime. <strong>Infrastructure and salaries still cost the same.</strong></Callout>}
     </section>
     {c.spikeStage&&<SpikeControls disabled={disabled} busy={busy}/>}
   </EquipmentPanel>;
@@ -266,15 +296,23 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
  </section>;
 }
 
-/** Manual steps beside Run: one game second to watch a decision land, five to see a trend. */
-const STEPS = [{ count: 1, icon: "step" }, { count: 5, icon: "stepMany" }] as const;
+/** The three visible game speeds beside Run: the end-week rush is a separate 20x toggle, not a speed. */
+const SPEEDS = [{ v: 0.5, label: "0.5×" }, { v: 1, label: "1×" }, { v: 2, label: "2×" }] as const;
+
+const NARROW_DOCK = "(max-width: 640px)";
+const watchNarrowDock = (change: () => void) => {
+  const query = window.matchMedia?.(NARROW_DOCK);
+  query?.addEventListener("change", change);
+  return () => query?.removeEventListener("change", change);
+};
+/** Below 640px three speed buttons crowd out the week readout, so the speeds fold into the dock's speed menu. */
+const useNarrowDock = () => useSyncExternalStore(watchNarrowDock, () => window.matchMedia?.(NARROW_DOCK).matches ?? false, () => false);
 
 export function CampaignControls() {
-  const { game, running, setRunning, stepSeconds } = useGame();
+  const { game, running, setRunning, speed, setSpeed, weekRush, endWeek, cancelWeekRush } = useGame();
+  const narrow = useNarrowDock();
   const { runGold, pauseGold } = useCampaignAttention();
-  const held = useGame(walkthroughHoldsClock);
-  const steppable = useGame(campaignClockAvailable);
-  const active = useGame(s=>s.started) && !held && pendingStop(game.campaign) === null && !(game.campaign!.openingMilestone && !game.campaign!.openingMilestone.acknowledged) && (game.phase === "management" || game.phase === "incident");
+  const active = useGame(s=>s.started) && pendingStop(game.campaign) === null && !milestoneBlocks(game.campaign!) && (game.phase === "management" || game.phase === "incident");
   return <footer className={`bottombar controls-dock campaign-clock${running?" is-running":" is-paused"}`}>
     <ViewTabs tabs={[
       { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}` },
@@ -288,13 +326,14 @@ export function CampaignControls() {
         <Meter value={(game.campaign!.step % Q.periodSteps) / Q.periodSteps} label="Operating week progress" />
         <span className="visually-hidden" aria-hidden="true" data-testid="physical-step">{game.campaign!.step}</span>
       </div>
-      <TimeMenu />
-      <div className="dock-steps" role="group" aria-label="Step time">
-        {STEPS.map(({ count, icon }) => <button type="button" key={count} className="dock-step" aria-label={`Step ${count} game ${count === 1 ? "second" : "seconds"}`}
-          {...tipProps(held ? "Finish the walkthrough to run the company" : `Pause and advance exactly ${count} game ${count === 1 ? "second" : "seconds"}${count === 1 ? " (N)" : ""}`)}
-          disabled={!steppable} onClick={() => stepSeconds(count)}><Icon name={icon} size={16} /><span>+{count}s</span></button>)}
+      <div className="dock-speeds" {...(narrow ? {} : { role: "group", "aria-label": "Game speed" })}>
+        {narrow ? <TimeMenu /> : SPEEDS.map(({ v, label }) => <button type="button" key={v} className={`dock-speed${speed === v && !weekRush ? " is-on" : ""}`} aria-pressed={speed === v && !weekRush}
+          {...tipProps(`Run at ${label} speed`)} onClick={() => setSpeed(v)}>{label}</button>)}
+        <button type="button" className={`dock-speed dock-rush${weekRush ? " is-on" : ""}`} aria-pressed={weekRush} aria-label="End the week at 20 times speed"
+          {...tipProps("Fast-forward to the end of the week (20×). Stops at the week boundary and slows back down if an incident happens.")}
+          disabled={!active} onClick={() => weekRush ? cancelWeekRush() : endWeek()}><Icon name="stepMany" size={16} /><span>End week</span></button>
       </div>
-      <button type="button" className={`btn btn-primary campaign-play dock-primary${running ? " is-on" : ""}${runGold || pauseGold ? " campaign-gold-attention" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps(held ? "Finish the walkthrough to run the company" : "Run or pause the company (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /><span>{running ? "Pause" : "Run"}</span></button>
+      <button type="button" className={`btn btn-primary campaign-play dock-primary${running ? " is-on" : ""}${runGold || pauseGold ? " campaign-gold-attention" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps("Run or pause the company (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /><span>{running ? "Pause" : "Run"}</span></button>
       <span className="visually-hidden" role="status">{running ? "Running" : "Paused"}</span>
     </div>
   </footer>;
@@ -340,7 +379,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
       {tab === "run" && <>
         <MenuActions onResume={close}>
           <div data-tutorial="save-now"><MenuTile icon="save" kind="ok" title="Save now" text="Write this company to the browser." onClick={() => saveNow()} /></div>
-          <MenuTile icon="info" kind="users" title="How to play" text="Replay the walkthrough: controls, game time, finances and the route through your company." onClick={() => useGame.getState().startTour("campaign")} />
+          <MenuTile icon="info" kind="users" title="How to play" text="Replay Launch Week: the same opening week on a practice company, your company kept as it is." onClick={() => useGame.getState().startTour("campaign")} />
           <MenuTile icon="logout" title="Exit" text="Return to the title screen." onClick={exit.exit} buttonRef={exit.exitButton} />
         </MenuActions>
         <ModeSwitch to="classic" />
@@ -393,13 +432,14 @@ export function CampaignOverlays({ home, menu, chapterComplete }: CampaignOverla
   return <>
     {view === "tech" && <ViewSheet view="tech"><p className="campaign-tech-intro"><Icon name="tree" size={16} /> Technologies are capabilities. Select an icon to see its effect. <strong>Owned does not mean deployed.</strong> Deployments and their running costs appear in Actions.</p><TechTree /></ViewSheet>}
     {view === "history" && <ViewSheet view="history"><p className="campaign-tech-intro"><Icon name="history" size={16} /> Check what changed after a decision. <strong>Charts</strong> show trends, <strong>Events</strong> list your decisions and <strong>Incidents</strong> hold the reports.</p><CampaignHistory /></ViewSheet>}
+    <LaunchIntro />
     <CampaignDialog menu={menu} chapterComplete={chapterComplete} />
   </>;
 }
 
 /** The one dialog that currently needs the player, if any. */
 function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOverlaySlots, "menu" | "chapterComplete">) {
-  const { game, view, openView, act, chapterComplete, tour, tutorialCompany } = useGame();
+  const { game, view, openView, act, chapterComplete, tutorialCompany } = useGame();
   const c = game.campaign!;
   if(view==="scorecard"&&(c.scorecard||c.combinedStage?.finalReview))return <Modal title="Company scorecard" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={(c.scorecard??c.combinedStage!.finalReview)!} pendingReview={!c.scorecard}/></Modal>;
   if(pendingCombined(c)&&!["guidance","menu","history"].includes(view??"")){
@@ -421,10 +461,11 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
   if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_prevention_review"})} /></Modal>;
   if (game.phase === "review") {
     const report = c.reports[c.reports.length - 1];
-    if (!tutorialCompany && tour?.track !== "campaign") return <CampaignRecoveryReview key={`${c.runId}:${report.id}:${report.recoveredStep}`} runId={c.runId} report={report} reliability={!c.combinedStage ? reliabilityLesson(c, report) : undefined} onContinue={() => act({ type: "acknowledge_review" })} />;
+    if (!tutorialCompany) return <CampaignRecoveryReview key={`${c.runId}:${report.id}:${report.recoveredStep}`} runId={c.runId} report={report} reliability={!c.combinedStage ? reliabilityLesson(c, report) : undefined} onContinue={() => act({ type: "acknowledge_review" })} />;
     return <Modal title="Incident postmortem" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "incident" }}><Report report={report} /><ContinueFoot label="Continue company" onClick={() => act({ type: "acknowledge_review" })} /></Modal>;
   }
-  if(c.openingMilestone&&!c.openingMilestone.acknowledged)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }}>
+  if(milestoneBlocks(c)&&c.launchWeek&&!(c.launchWeek.researchEarned&&!c.launchWeek.tech))return <LaunchScore campaign={c} />;
+  if(c.openingMilestone&&!c.openingMilestone.acknowledged&&!c.launchWeek)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }}>
     <CampaignReport lesson={outcomeSummary(c,"opening")}><p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
     <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p><pre>{JSON.stringify(c.openingMilestone,null,2)}</pre></CampaignReport>
     <ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_milestone"})} />
@@ -487,7 +528,7 @@ const eventText = (e: Campaign["trace"][number]) => {
 /** History uses Classic's tabs: charts, the event log and the incident reports, with the step as the time unit. */
 function CampaignHistory() {
   const c = useGame(s => s.game.campaign!);
-  const legacy = useGame(s => !!s.tutorialCompany || s.tour?.track === "campaign");
+  const legacy = useGame(s => !!s.tutorialCompany);
   const [tab, setTab] = useState<HistoryTab>("charts");
   const [open, setOpen] = useState<string | null>(null);
   const steps = c.recent.map(m => m.step);

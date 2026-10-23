@@ -4,16 +4,19 @@ import { APPLICATION_SCALING as P } from "./scenarios/applicationScaling";
 import { DATA_STRATEGY as D } from "./scenarios/dataStrategy";
 import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
 import { APPLICATION_RELIABILITY as R } from "./scenarios/applicationReliability";
+import { openingTuning } from "./launchWeek";
+import { LAUNCH_WEEK as LW } from "./scenarios/launchWeek";
 import { trace } from "./trace";
 export function emptyLedger(): Ledger {
     return { successes: 0, failures: 0, rejected: 0, appNumerator: 0, dbNumerator: 0, salaryNumerator: 0, lbNumerator: 0, cacheNumerator: 0, controllerNumerator:0 };
 }
 /** Installed recurring costs per complete operating period, including idle equipment. */
 export function operatingCharges(c: Campaign) {
+    const tuning = openingTuning(c);
     return {
-        app: c.apps.reduce((n,a)=>n+(a.tier==="large"?P.appWeeklyCents:Q.appWeeklyCents),0),
-        db: c.dbCapacity===D.dbCapacity?D.dbWeeklyCents:c.dbCapacity >= P.dbCapacity ? P.dbWeeklyCents : c.upgraded ? Q.upgradedDbWeeklyCents : Q.dbWeeklyCents,
-        salary: Q.engineers * Q.salaryWeeklyCents,
+        app: c.apps.reduce((n,a)=>n+(a.tier==="large"?P.appWeeklyCents:tuning.appWeeklyCents),0),
+        db: c.dbCapacity===D.dbCapacity?D.dbWeeklyCents:c.dbCapacity >= P.dbCapacity ? P.dbWeeklyCents : c.upgraded ? tuning.upgradedDbWeeklyCents : tuning.dbWeeklyCents,
+        salary: tuning.engineers * tuning.salaryWeeklyCents,
         lb: c.loadBalancer ? P.lbWeeklyCents : 0,
         cache: c.readCache ? D.cacheWeeklyCents : 0,
         controller: c.spikeStage?.controller ? T.controllerWeeklyCents : 0,
@@ -24,7 +27,8 @@ export function operatingCharges(c: Campaign) {
 export function accruedCharges(c: Campaign) {
     const l = c.ledger;
     const numerator = { app:l.appNumerator, db:l.dbNumerator, salary:l.salaryNumerator, lb:l.lbNumerator??0, cache:l.cacheNumerator??0, controller:l.controllerNumerator??0, checks:c.reliabilityStage ? l.checksNumerator??0 : 0, failover:c.reliabilityStage ? l.failoverNumerator??0 : 0 };
-    return Object.fromEntries(Object.entries(numerator).map(([key,n])=>[key,Math.floor((n+(c.remainders[key as keyof typeof c.remainders]??0))/Q.periodSteps)])) as ReturnType<typeof operatingCharges>;
+    const period = openingTuning(c).periodSteps;
+    return Object.fromEntries(Object.entries(numerator).map(([key,n])=>[key,Math.floor((n+(c.remainders[key as keyof typeof c.remainders]??0))/period)])) as ReturnType<typeof operatingCharges>;
 }
 export function accruePeriod(c: Campaign): void {
     const l = c.ledger, m = c.snapshot;
@@ -41,9 +45,10 @@ export function accruePeriod(c: Campaign): void {
     l.salaryNumerator += costs.salary;
 }
 export function settlePeriod(c: Campaign): void {
-    if (c.step === 0 || c.step % Q.periodSteps !== 0)
+    const periodSteps = openingTuning(c).periodSteps;
+    if (c.step === 0 || c.step % periodSteps !== 0)
         return;
-    const period = c.step / Q.periodSteps;
+    const period = c.step / periodSteps;
     if (period <= c.lastSettledPeriod)
         return;
     const charge = (key: keyof Campaign["remainders"], numerator: number) => {
@@ -58,15 +63,19 @@ export function settlePeriod(c: Campaign): void {
     const cacheCents=charge("cache",c.ledger.cacheNumerator??0);
     const controllerCents=charge("controller",c.ledger.controllerNumerator??0);
     const checksCents=c.reliabilityStage?charge("checks",c.ledger.checksNumerator??0):0,failoverCents=c.reliabilityStage?charge("failover",c.ledger.failoverNumerator??0):0;
-    const revenueCents = c.ledger.successes * Q.revenueCents;
-    const netCents = revenueCents - appCents - dbCents - salaryCents - lbCents - cacheCents - controllerCents - checksCents - failoverCents;
+    const revenueCents = c.ledger.successes * openingTuning(c).revenueCents;
+    // A Launch Week research pick deploys immediately and lands on this settlement instead.
+    const researchCents = c.launchWeek?.tech && c.launchWeek.researchBilledPeriod===null ? LW.researchCostCents : 0;
+    if (researchCents) c.launchWeek!.researchBilledPeriod = period;
+    const netCents = revenueCents - appCents - dbCents - salaryCents - lbCents - cacheCents - controllerCents - checksCents - failoverCents - researchCents;
     c.cashCents += netCents;
     c.revenueCents += revenueCents;
-    c.costsCents += appCents + dbCents + salaryCents + lbCents + cacheCents + controllerCents + checksCents + failoverCents;
+    c.investedCents += researchCents;
+    c.costsCents += appCents + dbCents + salaryCents + lbCents + cacheCents + controllerCents + checksCents + failoverCents + researchCents;
     c.lastSettledPeriod = period;
     const added = { ...(c.dataStage?{cacheCents}:{}), ...(c.spikeStage?{controllerCents}:{}), ...(c.reliabilityStage?{checksCents,failoverCents}:{}) };
     c.settlements.push({ period, step: c.step, revenueCents, appCents, dbCents, salaryCents,
-        ...(c.foundation && c.step<=c.foundation.step ? {} : {lbCents}), ...added, netCents });
-    trace(c, "settlement", { period, revenueCents, appCents, dbCents, salaryCents, lbCents, ...added, netCents });
+        ...(c.foundation && c.step<=c.foundation.step ? {} : {lbCents}), ...added, ...(researchCents?{researchCents}:{}), netCents });
+    trace(c, "settlement", { period, revenueCents, appCents, dbCents, salaryCents, lbCents, ...added, ...(researchCents?{researchCents}:{}), netCents });
     c.ledger = emptyLedger();
 }

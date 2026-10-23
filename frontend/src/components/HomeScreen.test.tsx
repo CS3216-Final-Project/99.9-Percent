@@ -69,8 +69,8 @@ it("shows a Challenge Mode run in progress beside Guided Mode, with the same car
   expect(within(classic).getByRole("button", { name: "Continue week 2" })).toBeTruthy();
   expect(within(classic).getByRole("button", { name: "New game" })).toBeTruthy();
   // The walkthrough has not finished, so the company is still in Chapter 0.
-  expect(campaign.textContent).toMatch(/Saved game\s*Walkthrough in progress/);
-  expect(campaign.textContent).toContain("Finish the walkthrough");
+  expect(campaign.textContent).toMatch(/Saved game\s*Launch Week in progress/);
+  expect(campaign.textContent).toContain("Finish Launch Week");
   expect(campaign.textContent).not.toContain("Last played");
   fireEvent.click(within(campaign).getByRole("button", { name: "Continue company" }));
   expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, hasRun: true });
@@ -100,22 +100,22 @@ it("starts a new Challenge Mode game from a Guided Mode home screen when asked",
   expect(useGame.getState().game.turn).toBe(1);
 });
 
-it("replays Guided Mode's walkthrough on a fresh practice company, preserving the saved company", () => {
+it("replays Launch Week on a fresh practice company, preserving the saved company", () => {
   saveGame(advanceSteps(newGame(4, "replay-company"), 3).state, 0, true);
   let choices = boot("campaign");
-  expect(within(card(choices, "Guided Mode")).queryByRole("button", { name: "Replay walkthrough" })).toBeNull();
+  expect(within(card(choices, "Guided Mode")).queryByRole("button", { name: "Replay Launch Week" })).toBeNull();
   cleanup();
   useGame.setState(useGame.getInitialState(), true);
   saveMeta({ ...DEFAULT_META, tutorialDone: true });
   choices = boot("campaign");
-  fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay walkthrough" }));
-  expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, tour: { track: "campaign", step: 0 } });
+  fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay Launch Week" }));
+  expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, tour: null });
   expect(useGame.getState().game.campaign!.step).toBe(0);
   expect(useGame.getState().tutorialCompany!.game.campaign).toMatchObject({ runId: "replay-company", step: 3 });
   expect(loadGame()).toMatchObject({ status: "ok", game: { campaign: { runId: "replay-company", step: 3 } } });
 });
 
-it("replays Guided Mode's walkthrough from a Challenge Mode home screen, keeping both saves", () => {
+it("replays Launch Week from a Challenge Mode home screen, keeping both saves", () => {
   saveMeta({ ...DEFAULT_META, challengeUnlocked: true, tutorialDone: true });
   saveGame(advanceSteps(newGame(4, "waiting-company"), 3).state, 0, true);
   saveClassicGame(advanceTurn(newLegacyGame(2)));
@@ -123,8 +123,8 @@ it("replays Guided Mode's walkthrough from a Challenge Mode home screen, keeping
   useGame.getState().boot();
   render(<StrictMode><HomeScreen /></StrictMode>);
   const choices = screen.getByRole("region", { name: "Choose how you want to play" });
-  fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay walkthrough" }));
-  expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, tour: { track: "campaign", step: 0 } });
+  fireEvent.click(within(card(choices, "Guided Mode")).getByRole("button", { name: "Replay Launch Week" }));
+  expect(useGame.getState()).toMatchObject({ mode: "campaign", started: true, tour: null });
   expect(useGame.getState().tutorialCompany!.game.campaign!.runId).toBe("waiting-company");
   expect(useGame.getState().game.campaign!.step).toBe(0);
   expect(loadGame()).toMatchObject({ status: "ok", game: { campaign: { runId: "waiting-company", step: 3 } } });
@@ -132,7 +132,7 @@ it("replays Guided Mode's walkthrough from a Challenge Mode home screen, keeping
   expect(kept.status === "ok" && kept.game.turn).toBe(2);
 });
 
-it("offers no Guided Mode walkthrough for a closed company", () => {
+it("offers no Launch Week replay for a closed company", () => {
   saveMeta({ ...DEFAULT_META, tutorialDone: true });
   saveMode("campaign");
   useGame.getState().boot();
@@ -140,7 +140,7 @@ it("offers no Guided Mode walkthrough for a closed company", () => {
   render(<StrictMode><HomeScreen /></StrictMode>);
   const guided = card(screen.getByRole("region", { name: "Choose how you want to play" }), "Guided Mode");
   expect(guided.textContent).toContain("Company closed");
-  expect(within(guided).queryByRole("button", { name: "Replay walkthrough" })).toBeNull();
+  expect(within(guided).queryByRole("button", { name: "Replay Launch Week" })).toBeNull();
   // A closed company has nothing to continue: it can show its final report or make way for a new company.
   expect(within(guided).queryByRole("button", { name: "Continue company" })).toBeNull();
   expect(within(guided).getByRole("button", { name: "See how it ended" })).toBeTruthy();
@@ -165,7 +165,7 @@ it("reads a company past the Opening by its own chapter, even where this browser
   const choices = boot("campaign");
   const guided = card(choices, "Guided Mode");
   expect(guided.textContent).toMatch(/Saved game\s*Chapter 2 of 6: Scaling & Routing/);
-  expect(guided.textContent).not.toContain("Finish the walkthrough");
+  expect(guided.textContent).not.toContain("Finish Launch Week");
   expect(card(choices, "Challenge Mode").textContent).toContain("You are on Chapter 2 of 6.");
 });
 

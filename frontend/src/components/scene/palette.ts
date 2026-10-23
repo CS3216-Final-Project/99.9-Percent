@@ -91,6 +91,35 @@ export const EQUIPMENT = {
   screen: { code: "#151b26", idle: "#0f121a", dash: "#131a26", chart: "#131a26", off: "#0a0b0f", game: "#0d0f17", idleBar: "#2a2e36", tile: "#1f2430", grid: "#2f343d" },
 } as const;
 
+/**
+ * Requests on the server floor, in one colour language used for nothing else in the room: gold in flight, green once
+ * served, orange turned away by a limit, red lost. Queues are amber boxes; a cable with nothing on it is grey.
+ */
+export const TRAFFIC = {
+  flow: "#ffd84a",
+  served: "#3ddc84",
+  turned: "#ff9f1a",
+  dropped: "#ff4d5e",
+  queue: "#ffb347",
+  cable: "#2e3136",
+  idle: "#7c828b",
+  /** The In and Out gates' frames. */
+  gate: "#23262b",
+} as const;
+
+/** Previews of a change in the room: gold for what it adds, red for what it takes away, green when it activates. */
+export const GHOST = {
+  add: "#ffd84a",
+  remove: "#ff4d5e",
+  /** The traffic limit's firewall bricks. */
+  wall: "#ff9f1a",
+  done: "#3ddc84",
+  /** The flashing hover preview: electric cyan, bright against the white floor and the black racks. */
+  flash: "#00c8ff",
+  /** Guided Mode's steady glow under the machines on the request path. */
+  path: "#5fb8ff",
+} as const;
+
 /** Walk-mode wayfinding: the avatar's ring and the target marking a click-planned destination. */
 export const WALK_MARKER = {
   primary: "#ffd84a",

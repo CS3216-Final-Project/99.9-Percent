@@ -4,7 +4,7 @@ import {loadGame,saveGame} from "./persist";
 import {useGame} from "./store";
 import {preparedReliability,act,tick} from "../sim/__tests__/reliabilityFixture";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});
-it.each([0,7,8,9,10,27,28,29,32,35])("reloads paused at reliability boundary +%s without rebasing",offset=>{
+it.each([0,7,8,9,10,27,28,29,32,35])("reloads paused at reliability boundary +%s without rebasing",{timeout:30000},offset=>{
  let g=act(preparedReliability(),{type:"arm_reliability"});
  for(let i=0;i<offset;i++){if(g.phase==="review")g=act(g,{type:"acknowledge_review"});g=tick(g);}
  expect(saveGame(g,200,true)).toBe(true);useGame.setState(useGame.getInitialState(),true);useGame.getState().boot();

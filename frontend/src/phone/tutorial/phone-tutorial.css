@@ -1,7 +1,7 @@
 /*
- * The phone's coach strip: every guide (Chapter 0, chapter guides, tips and Challenge Mode's first week) docks in
- * one fixed-size strip directly above the dock, so the room and the lesson's real control stay in view. Longer
- * reading opens in a layer above the strip that never covers the lit control.
+ * The phone's coach strip: every guide (Launch Week's spotlight steps, chapter guides, tips and Challenge Mode's
+ * first week) docks in one fixed-size strip directly above the dock, so the room and the step's real control stay
+ * in view.
  *
  * Tokens:
  * - --phone-coach-height: the strip's fixed height.
@@ -14,100 +14,34 @@
   --phone-coach-gap: 6px;
   --phone-coach-inset: max(8px, env(safe-area-inset-left), env(safe-area-inset-right));
 }
-.phone-app[data-edition="phone"]:has(> .phone-coach:not([hidden]), > .tour[data-docked] .tour-card) {
+.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial) {
   --phone-coach: calc(var(--phone-coach-height) + var(--phone-coach-gap));
 }
 
-/* ---- Chapter 0 strip ---- */
+/* ---- Launch Week's spotlight steps ---- */
 
-[data-edition="phone"] .chapter-zero-guide.phone-coach {
+[data-edition="phone"] .tour-card.launch-tutorial {
+  position: fixed;
   inset: auto var(--phone-coach-inset) calc(var(--phone-coach-bottom, 0px) + var(--phone-coach-gap));
   box-sizing: border-box;
+  width: auto;
+  max-width: none;
   height: var(--phone-coach-height);
-  max-height: none;
-  overflow: visible;
-  display: grid;
-  /* Kicker, title, a two-line task and the actions: 16 + 22 + 36 + 44, three 4 px gaps and 7 px padding = 144. */
-  grid-template-rows: 16px 22px 36px 44px;
-  gap: 4px;
-  padding: 7px 12px;
-  transition: none;
-}
-[data-edition="phone"] .chapter-zero-guide.phone-coach[hidden] { display: none; }
-
-.phone-coach-meta { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: var(--text-xs); line-height: 16px; color: var(--text-soft); }
-.phone-coach-kicker { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.phone-coach-count { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-num); font-weight: 600; }
-.phone-coach-progress { display: block; width: 56px; height: 4px; border-radius: 2px; background: var(--paper-3); overflow: hidden; }
-.phone-coach-progress i { display: block; height: 100%; border-radius: inherit; background: var(--ink); }
-/* A full-size touch target that does not grow the 16 px row. */
-.phone-coach-return {
-  min-height: 44px;
-  margin-block: -14px;
-  padding: 0 4px;
-  border: 0;
-  background: none;
-  color: var(--ink);
-  font: inherit;
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  white-space: nowrap;
-}
-
-[data-edition="phone"] .chapter-zero-guide.phone-coach h3 {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 1.0625rem;
-  line-height: 22px;
-}
-
-.phone-coach-task { display: flex; gap: 8px; align-items: start; min-height: 0; font-size: var(--text-sm); line-height: 18px; }
-.phone-coach-task > .icon { flex-shrink: 0; margin-top: 0; color: var(--text-soft); }
-.phone-coach-task[data-done] > .icon { color: var(--ok); }
-
-.phone-coach-actions { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
-.phone-coach-actions .btn { min-height: 44px; }
-.phone-coach-back { min-width: 44px; justify-content: center; }
-.phone-coach-more { justify-self: center; border-color: transparent; background: transparent; white-space: nowrap; }
-.phone-coach-next { min-width: 6.5rem; justify-content: center; }
-@media (max-width: 359px) {
-  /* The arrow says Back on the narrowest phones; its name stays Back for assistive technology. */
-  .phone-coach-back { padding-inline: 0; }
-  .phone-coach-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .phone-coach-more { padding-inline: 8px; }
-  .phone-coach-more > .icon { display: none; }
-}
-
-/* ---- Reading layer ---- */
-
-.phone-coach-reading {
-  position: fixed;
-  left: var(--phone-coach-inset);
-  right: var(--phone-coach-inset);
-  z-index: 102;
-  box-sizing: border-box;
-  display: grid;
-  align-content: start;
-  gap: 8px;
+  padding: 8px 12px 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 4px 12px 12px;
-  background: var(--paper);
-  color: var(--ink);
-  border: 1px solid var(--control-edge);
-  border-radius: var(--radius);
-  box-shadow: var(--lift);
+  pointer-events: auto;
 }
-.phone-coach-reading[hidden] { display: none; }
-.phone-coach-reading:focus { outline: none; }
-.phone-coach-reading:focus-visible { outline: 2px solid var(--focus, var(--ink)); outline-offset: 2px; }
-.phone-coach-reading-head { position: sticky; top: -4px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-inline: -4px; padding-inline: 4px; background: var(--paper); font-family: var(--font-display); font-size: var(--text-md); }
-.phone-coach-reading .phone-coach-close { width: 44px; height: 44px; margin-right: -8px; border-color: transparent; background: transparent; box-shadow: none; }
-.phone-coach-reading .lesson-why { font-size: var(--text-sm); line-height: 1.45; }
-.phone-coach-more-text { font-size: var(--text-sm); line-height: 1.45; color: var(--text-soft); }
+[data-edition="phone"] .tour-card.launch-tutorial h3 { font-size: 1.0625rem; line-height: 22px; margin-bottom: 2px; }
+[data-edition="phone"] .tour-card.launch-tutorial .tour-prompt { margin-top: 4px; }
+[data-edition="phone"] .tour-card.launch-tutorial .tour-explanation { margin-top: 4px; }
+[data-edition="phone"] .tour-card.launch-tutorial .tour-foot { position: sticky; bottom: 0; margin-top: 4px; padding-bottom: 6px; background: var(--paper); }
+[data-edition="phone"] .tour-card.launch-tutorial .tour-foot .btn { min-height: 44px; min-inline-size: 6.5rem; justify-content: center; }
+
+/* An open dock menu opens over the strip; the step returns when it closes. Other guides keep their strip over the
+   Views menu, whose tabs they can point at, and give way only to the speed menu. */
+body:has(.phone-app[data-edition="phone"] .phone-dock details[open]) .tour-card.launch-tutorial,
+body:has(.phone-app[data-edition="phone"] .phone-dock details.time-menu[open]) .tour[data-docked] .tour-card { visibility: hidden; }
 
 /* ---- Chapter guides, tips and Challenge Mode's first week ---- */
 
@@ -133,9 +67,6 @@
 
 /* ---- The room stays in view while a guide shows ---- */
 
-/* The coach names the walkthrough and its progress; the chapter row would only repeat it (as on the desktop). */
-.app.phone-app[data-edition="phone"][data-chapters]:has(> .chapter-zero-guide) { --phone-chapter: 0px; }
-.app.phone-app[data-edition="phone"]:has(> .chapter-zero-guide) .phone-chapter-row { display: none; }
 /*
  * A guide opens the sheet to half so a lesson's control in it is in view, and the room keeps at least 40% of the
  * screen: half never takes more than what is left above that. The sheet still shows its header and one row of
@@ -143,22 +74,17 @@
  * those two needs win over the room's share.
  */
 [data-edition="phone"] { --phone-guide-sheet-min: 124px; }
-.phone-app[data-edition="phone"]:has(> .phone-coach[data-lesson-id="quote"]) { --phone-guide-sheet-min: 160px; }
-.phone-app[data-edition="phone"]:has(> .phone-coach[data-inspected]) { --phone-guide-sheet-min: 172px; }
-.app.phone-app[data-edition="phone"][data-sheet="half"]:has(> .phone-coach:not([hidden]), > .tour[data-docked] .tour-card) {
+.app.phone-app[data-edition="phone"][data-sheet="half"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial) {
   --phone-sheet: max(var(--phone-guide-sheet-min), min(calc(var(--phone-room) * 0.5), calc(var(--phone-room) - 41dvh)));
 }
 
-/* Short screens: the same strip, a little tighter. 16 + 20 + 34 + 44, three 3 px gaps and 6/7 px padding = 136. */
+/* Short screens: the same strip, a little tighter. */
 @media (max-height: 700px) {
   [data-edition="phone"] { --phone-coach-height: 136px; }
-  [data-edition="phone"] .chapter-zero-guide.phone-coach { grid-template-rows: 16px 20px 34px 44px; gap: 3px; padding: 6px 12px 7px; }
-  [data-edition="phone"] .chapter-zero-guide.phone-coach h3 { font-size: 1rem; line-height: 20px; }
-  [data-edition="phone"] .phone-coach-task { line-height: 17px; }
 }
 
 /* The dock's menus open above the strip, so a guide never covers the speed or Navigation menu it points at. */
-.phone-app[data-edition="phone"]:has(> .phone-coach:not([hidden]), > .tour[data-docked] .tour-card) .phone-dock .dock-panel {
+.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial) .phone-dock .dock-panel {
   bottom: calc(100% + 10px + var(--phone-coach));
   max-height: min(440px, calc(100dvh - var(--phone-top) - var(--phone-dock) - var(--phone-coach) - 16px));
 }
