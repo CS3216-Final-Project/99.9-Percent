@@ -241,10 +241,7 @@ export async function nextChapterZero(page: Page, touch = false) {
     await click(page.getByRole("button", { name: "Run", exact: true }));
     await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
   } else if (lesson === "quote") await click(panel.locator(".act:not(:disabled)").first());
-  else if (lesson === "cancel") {
-    if (!(await page.getByRole("button", { name: "Cancel", exact: true }).count())) await click(panel.locator(".act:not(:disabled)").first());
-    await click(page.getByRole("button", { name: "Cancel", exact: true }));
-  } else if (lesson === "speed") {
+  else if (lesson === "speed") {
     const menu = page.locator(".time-menu");
     if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await click(menu.locator(":scope > summary"));
     const speed = page.getByRole("group", { name: "Game speed", exact: true });

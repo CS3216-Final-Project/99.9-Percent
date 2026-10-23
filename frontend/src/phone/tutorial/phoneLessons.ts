@@ -5,6 +5,8 @@ import type { SheetState } from "../layout/sheetState";
 export interface TaskState {
   /** The lesson's exercise is done (or it has nothing to do). */
   ready: boolean;
+  /** The lesson's exercise was just done, as opposed to having nothing to do. */
+  done: boolean;
   /** A real purchase quote is open. */
   quoting: boolean;
 }
@@ -25,18 +27,18 @@ export interface PhoneLesson {
 export const PHONE_LESSONS: Record<LessonId, PhoneLesson> = {
   goal: { task: () => "Keep it fast and online without running out of cash.", sheet: "peek", example: true },
   "inspect-app": {
-    task: ({ ready }) => ready ? "Read its demand and capacity, then press Next." : "Tap App Server under Inspect equipment.",
+    task: ({ ready }) => ready ? "Read its demand and capacity in the panel." : "Tap the highlighted App Server.",
     sheet: "half",
   },
   "inspect-db": {
-    task: ({ ready }) => ready ? "Compare it with the App Server, then press Next." : "Now tap Database and compare.",
+    task: ({ ready }) => ready ? "Compare it with the App Server." : "Now tap Database and compare.",
     sheet: "half",
   },
   warnings: { task: () => "Find Latency, Errors and Backlog in the panel.", sheet: "half", example: true },
   run: { task: () => "Press Run. Time stops after one game second.", sheet: "peek" },
   quote: { task: () => "Tap any action under Actions to see its quote.", sheet: "half" },
   cancel: {
-    task: ({ ready, quoting }) => quoting ? "Press Cancel on the quote." : ready ? "Quote closed. Your cash is unchanged." : "Reopening a quote for you…",
+    task: ({ done, quoting }) => quoting ? "Press Next to close the quote without buying." : done ? "Quote closed. Your cash is unchanged." : "Reopening a quote for you…",
     sheet: "half",
   },
   money: { task: () => "Cash is in the top bar.", sheet: "peek" },
@@ -45,4 +47,4 @@ export const PHONE_LESSONS: Record<LessonId, PhoneLesson> = {
 };
 
 /** The short label pinned to the lit control on a touch screen. */
-export const PHONE_CTA: Partial<Record<LessonId, string>> = { "inspect-app": "Tap", "inspect-db": "Tap", run: "Press Run", quote: "Open one", cancel: "Cancel", speed: "Change speed" };
+export const PHONE_CTA: Partial<Record<LessonId, string>> = { "inspect-app": "Tap", "inspect-db": "Tap", run: "Press Run", quote: "Open one", speed: "Change speed" };

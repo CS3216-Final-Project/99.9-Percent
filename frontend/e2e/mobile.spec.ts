@@ -103,7 +103,7 @@ test("Walkthrough practice stays visible and can be exited by touch during a sav
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
   await expect(tutorial(page)).toHaveAccessibleName(`Walkthrough, step 1 of ${CHAPTER_ZERO_LESSONS}`);
   await expect(tutorial(page)).toContainText("Practice");
-  await tutorial(page).getByRole("button", { name: "Return to game", exact: true }).tap();
+  await tutorial(page).getByRole("button", { name: "Skip tutorial", exact: true }).tap();
   await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
   expect((await savedGame(page)).campaign).toEqual(incident.campaign);
@@ -516,7 +516,7 @@ for(const width of [390,320]) test(`Campaign UX: the touch walkthrough and secon
  await expect(card.getByRole("button",{name:"Next",exact:true})).toBeEnabled();
  await nextChapterZero(page,true);
  while(await card.getAttribute("data-lesson-id")!=="cancel")await nextChapterZero(page,true);
- await expect(card.getByRole("button",{name:"Next",exact:true})).toBeDisabled();
+ await expect(card.getByRole("button",{name:"Next",exact:true})).toBeEnabled();
  await expect(card).toBeInViewport({ratio:1});
  await page.screenshot({path:`test-results/clarity-tutorial-${width}-purchase.png`});
  await page.getByRole("button",{name:"Cancel",exact:true}).tap();

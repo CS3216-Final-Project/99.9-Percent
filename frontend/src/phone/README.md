@@ -91,7 +91,8 @@ Every guide on a phone docks in one coach strip directly above the dock, so the 
 
 - Chapter 0 renders `PhoneChapterZeroGuide` through `Tutorial`'s `chapterZero` slot.
   It shares the lesson rules with the desktop card through `components/useChapterZeroLesson.ts`, so the exercises, spotlight, input boundary and saved progress are the same.
-- The strip shows the lesson's section and progress, its title, a one-line task and Back, Learn more and Next (Finish), always in the same places.
+- The strip shows Walkthrough (or Practice) and progress, its title, a one-line task and Back, Learn more and Next (Finish), always in the same places.
+  The first lesson's Back is invisible but keeps its slot.
 - Learn more opens a non-modal reading layer with the reason, the labelled example and the longer explanation.
   It sits in the larger gap above or below the lesson's control, never over it or the top strip, and Escape closes it and returns focus to Learn more.
 - Live readings stay in the real panel and top strip; the strip does not repeat them.
