@@ -12,8 +12,8 @@ import { heading, poseAt, wrapAngle, type Plan } from "./routes";
 import { avatar, gridHere } from "./walk";
 import { now, riding } from "./ride";
 import { FLOOR_Y } from "./levels";
-import { sceneSound } from "./sceneSounds";
-import { fresh, glance, GREET_SECONDS, greetingLine, notices, voiceLevel, voiceOf } from "./greetings";
+import { sceneSpeech } from "./sceneSounds";
+import { fresh, glance, GREET_SECONDS, greetingLine, nearness, notices } from "./greetings";
 import { SpeechBubble } from "./bubble";
 import { bodiesOn, standing, within } from "./crewSpots";
 import { useGame } from "@/game/store";
@@ -286,8 +286,8 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
           // The creature's local +z axis in world gives its yaw; it faces -z, so the way to the avatar is a heading.
           const worldYaw = Math.atan2(e[8], e[10]);
           turn.current = wrapAngle(heading(avatar.x - e[12], avatar.z - e[14]) - worldYaw);
-          sceneSound(voiceOf(info.kind), voiceLevel(d));
           const line = greetingLine(species, activity, count.current + Math.floor(phase * 7));
+          sceneSpeech({ text: line, species, near: nearness(d) });
           greeted.current = { line, at: t };
           setGreeting({ line, at: t });
         }

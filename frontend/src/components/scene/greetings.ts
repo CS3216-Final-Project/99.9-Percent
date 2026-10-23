@@ -1,10 +1,11 @@
 import type { SceneCue } from "@/game/sfx";
-import { roleOf, type Activity, type Kind, type Role, type Species } from "./cast";
+import type { Timbre } from "@/game/speech";
+import { roleOf, SPECIES, type Activity, type Kind, type Role, type Species } from "./cast";
 
 /*
  * The crew noticing the player's avatar in walk mode (see creatures.tsx and chatter.tsx): who greets it, what they
- * say, how far round a glance turns, and how well a chatting group can be overheard from how far away. Nothing here
- * touches React, three.js or audio; the scene reads these every frame.
+ * say, the voice each species speaks it in, how far round a glance turns, and how well a chatting group can be
+ * overheard from how far away. Nothing here touches React, three.js or audio; the scene reads these every frame.
  */
 
 /** Metres: within this a creature notices the avatar. */
@@ -65,12 +66,35 @@ export function asideLine(n: number): string {
   return ASIDES[mod(n, ASIDES.length)];
 }
 
-/** The voice a body plan speaks in (see game/sfx.ts). */
+/** The voice a body plan's bark stands in for (see game/sfx.ts), used where the browser cannot speak. */
 export const voiceOf = (kind: Kind): SceneCue => ({ blob: "voiceBlob", big: "voiceBig", flyer: "voiceFlyer" } as const)[kind];
+
+/** How near `distance` metres is, 1 within a metre easing to 0 at the edge of earshot; scales a spoken line's volume. */
+export function nearness(distance: number): number {
+  return 1 - ease((distance - 1) / (EARSHOT[1] - 1));
+}
 
 /** How loud a voice `distance` metres away plays: VOICE_PEAK within a metre, fading to silence at EARSHOT[1]. */
 export function voiceLevel(distance: number): number {
-  return VOICE_PEAK * (1 - ease((distance - 1) / (EARSHOT[1] - 1)));
+  return VOICE_PEAK * nearness(distance);
+}
+
+/** The pitch and rate a body plan speaks with, before the per-species step. */
+const TIMBRE_BASE: Record<Kind, { pitch: number; rate: number }> = {
+  blob: { pitch: 1.45, rate: 1.1 },
+  big: { pitch: 0.65, rate: 0.9 },
+  flyer: { pitch: 1.75, rate: 1.3 },
+};
+
+/**
+ * The voice a species speaks in (see game/speech.ts): the pitch and rate of its body plan, stepped a little by its
+ * place in the cast so two blobs are not the same voice. Deterministic: the same species always sounds the same.
+ */
+export function timbreOf(species: Species): Timbre {
+  const i = (Object.keys(SPECIES) as Species[]).indexOf(species);
+  const base = TIMBRE_BASE[SPECIES[species].kind];
+  const pitch = Math.min(2, Math.max(0.1, base.pitch + ((i % 5) - 2) * 0.07));
+  return { pitch, rate: base.rate, seed: i };
 }
 
 /** How well a group `distance` metres away can be followed, 1 to 0 (bubble opacity). */

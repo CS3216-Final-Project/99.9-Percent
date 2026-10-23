@@ -225,5 +225,5 @@ test('plays sound from the first click, follows the menu sliders and remembers a
   await page.reload();
   await page.getByRole('button', { name: 'Start Challenge Mode', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Mute sound' })).toHaveAttribute('aria-pressed', 'true');
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('nn.audio.v1')!))).toEqual({ music: 80, effects: 45, muted: true });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('nn.audio.v1')!))).toEqual({ music: 80, effects: 45, muted: true, captions: true });
 });

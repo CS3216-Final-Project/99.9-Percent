@@ -79,7 +79,7 @@ test("the header sound button follows the menu sliders and turns sound back on f
   // A real click on the button: silent at 0 and 0 means turning sound on, not muting again.
   await mute.click();
   await expect(mute).toHaveAttribute("aria-pressed", "false");
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("nn.audio.v1")!))).toEqual({ music: 80, effects: 80, muted: false });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("nn.audio.v1")!))).toEqual({ music: 80, effects: 80, muted: false, captions: true });
 });
 
 test("starts a new company with the same sound, and lets a saved one continue quietly", async ({ page, withoutRoom }) => {

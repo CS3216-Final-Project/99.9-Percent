@@ -205,20 +205,32 @@ describe("challenge mode unlock", () => {
 describe("sound settings", () => {
   it("start at the defaults and round trip, shared by both modes", () => {
     expect(loadAudio()).toEqual(DEFAULT_AUDIO);
-    expect(DEFAULT_AUDIO).toEqual({ music: 80, effects: 80, muted: false });
-    expect(saveAudio({ music: 35, effects: 0, muted: true })).toBe(true);
-    expect(loadAudio()).toEqual({ music: 35, effects: 0, muted: true });
+    expect(DEFAULT_AUDIO).toEqual({ music: 80, effects: 80, muted: false, captions: true });
+    expect(saveAudio({ music: 35, effects: 0, muted: true, captions: true })).toBe(true);
+    expect(loadAudio()).toEqual({ music: 35, effects: 0, muted: true, captions: true });
     saveMode("classic");
-    expect(loadAudio()).toEqual({ music: 35, effects: 0, muted: true });
+    expect(loadAudio()).toEqual({ music: 35, effects: 0, muted: true, captions: true });
+  });
+
+  it("load captions from before the setting existed as on, and a corrupt one the same", () => {
+    localStorage.setItem("nn.audio.v1", JSON.stringify({ music: 35, effects: 60, muted: true }));
+    expect(loadAudio()).toEqual({ music: 35, effects: 60, muted: true, captions: true });
+    localStorage.setItem("nn.audio.v1", JSON.stringify({ music: 35, effects: 60, muted: false, captions: "no" }));
+    expect(loadAudio()).toEqual({ music: 35, effects: 60, muted: false, captions: true });
+  });
+
+  it("remember captions turned off", () => {
+    saveAudio({ music: 80, effects: 80, muted: false, captions: false });
+    expect(loadAudio()).toEqual({ music: 80, effects: 80, muted: false, captions: false });
   });
 
   it("count as silent when muted or when both volumes are at 0, and not otherwise", () => {
     expect(isSilent(DEFAULT_AUDIO)).toBe(false);
     expect(isSilent({ ...DEFAULT_AUDIO, muted: true })).toBe(true);
-    expect(isSilent({ music: 0, effects: 0, muted: false })).toBe(true);
+    expect(isSilent({ music: 0, effects: 0, muted: false, captions: true })).toBe(true);
     // One audible channel is enough to be heard.
-    expect(isSilent({ music: 0, effects: 5, muted: false })).toBe(false);
-    expect(isSilent({ music: 5, effects: 0, muted: false })).toBe(false);
+    expect(isSilent({ music: 0, effects: 5, muted: false, captions: true })).toBe(false);
+    expect(isSilent({ music: 5, effects: 0, muted: false, captions: true })).toBe(false);
   });
 
   it("keep a player who turned the music off muted, at the default volumes", () => {
@@ -241,18 +253,18 @@ describe("sound settings", () => {
 
   it("prefer the new settings over the old switch, and mirror the switch for older builds", () => {
     localStorage.setItem("nn.music.v1", "false");
-    saveAudio({ music: 50, effects: 50, muted: false });
+    saveAudio({ music: 50, effects: 50, muted: false, captions: true });
     expect(loadAudio().muted).toBe(false);
     expect(localStorage.getItem("nn.music.v1")).toBe("true");
-    saveAudio({ music: 0, effects: 50, muted: false });
+    saveAudio({ music: 0, effects: 50, muted: false, captions: true });
     expect(localStorage.getItem("nn.music.v1")).toBe("false");
   });
 
   it.each([
     ["{", { ...DEFAULT_AUDIO, muted: true }],
     ["null", { ...DEFAULT_AUDIO, muted: true }],
-    [JSON.stringify({ music: "loud", effects: 250, muted: "yes" }), { music: 80, effects: 100, muted: false }],
-    [JSON.stringify({ music: -4, effects: 33.4 }), { music: 0, effects: 33, muted: false }],
+    [JSON.stringify({ music: "loud", effects: 250, muted: "yes" }), { music: 80, effects: 100, muted: false, captions: true }],
+    [JSON.stringify({ music: -4, effects: 33.4 }), { music: 0, effects: 33, muted: false, captions: true }],
   ])("tolerate a corrupt value %s", (raw, expected) => {
     // An unreadable record falls back to the older switch, here off.
     localStorage.setItem("nn.music.v1", "false");
@@ -278,7 +290,7 @@ describe("sound settings", () => {
   it("never let the pre-update switch override settings chosen since", () => {
     localStorage.setItem("nn.meta.v1", JSON.stringify({ tutorialDone: true, music: false }));
     // Music at zero mirrors the old switch as off, but that is the player's new choice, not the old one.
-    saveAudio({ music: 0, effects: 80, muted: false });
+    saveAudio({ music: 0, effects: 80, muted: false, captions: true });
     expect(legacyMusicOff()).toBe(false);
   });
 });

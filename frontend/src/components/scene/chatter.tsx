@@ -4,22 +4,22 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { useGame } from "@/game/store";
-import { SPECIES } from "./cast";
+import { roleOf, SPECIES, type Role } from "./cast";
 import { SpeechBubble } from "./bubble";
 import { memberRotation, turnAt, type Group, type Turn } from "./conversations";
 import { Creature } from "./creatures";
-import { asideLine, captionLine, earshot, fresh, glance, GREET_SECONDS, greetingLine, notices, voiceLevel, voiceOf } from "./greetings";
+import { asideLine, captionLine, earshot, fresh, glance, GREET_SECONDS, greetingLine, nearness, notices } from "./greetings";
 import { overhear } from "./overheard";
 import { now, riding } from "./ride";
 import { heading, wrapAngle } from "./routes";
 import { avatar } from "./walk";
-import { sceneSound } from "./sceneSounds";
+import { sceneSpeech } from "./sceneSounds";
 
 /*
  * Groups of crew chatting (see conversations.ts), with a speech bubble over
  * whoever is speaking. Seen from the avatar the bubbles are only legible
  * within earshot (see greetings.ts): what the group says is captioned on the
- * page and heard in the speaker's own voice, and right up close a member
+ * page and spoken in the speaker's own voice, and right up close a member
  * turns to the avatar with a word of its own.
  */
 
@@ -35,8 +35,8 @@ export function Conversation({ group, incident }: { group: Group; incident: bool
   // How far the avatar is from the group's middle now, read every frame by the bubbles.
   const heard = useRef(Infinity);
   const lastOverheard = useRef<string | null>(null);
-  // The last line actually said, so the caption holds through the pause between speakers.
-  const lastLine = useRef<string | null>(null);
+  // The last line actually said, and who said it, so the caption holds through the pause between speakers.
+  const lastLine = useRef<{ line: string; speaker: Role } | null>(null);
   const members = useRef<(THREE.Group | null)[]>([]);
 
   useEffect(() => () => overhear(group.name, null), [group.name]);
@@ -49,9 +49,9 @@ export function Conversation({ group, incident }: { group: Group; incident: bool
 
     const next = turnAt(group, clock.elapsedTime, incident);
     if (walking && next.line && (next.speaker !== shown.current.speaker || next.line !== shown.current.line)) {
-      // Each new line is heard in the speaker's voice.
-      const level = voiceLevel(d);
-      if (level > 0.01) sceneSound(voiceOf(SPECIES[group.members[next.speaker].species].kind), level);
+      // Each new line is spoken in the speaker's voice.
+      const near = nearness(d);
+      if (near > 0.02) sceneSpeech({ text: next.line, species: group.members[next.speaker].species, near });
     }
     // Only a new speaker or line needs React.
     if (next.speaker !== shown.current.speaker || next.line !== shown.current.line) {
@@ -62,11 +62,11 @@ export function Conversation({ group, incident }: { group: Group; incident: bool
     // between speakers; publish it only when it changes. Out of earshot the stale line is forgotten, so the next
     // approach does not start on it.
     const audible = walking && earshot(d) >= 0.5;
-    if (next.line) lastLine.current = next.line;
+    if (next.line) lastLine.current = { line: next.line, speaker: roleOf(group.members[next.speaker].species) };
     if (!audible) lastLine.current = null;
-    const line = captionLine(next.line, lastLine.current, audible);
-    const caption = audible && line ? { where: group.name, line, alarmed: incident } : null;
-    const key = caption ? `${caption.line}${caption.alarmed}` : null;
+    const line = captionLine(next.line, lastLine.current?.line ?? null, audible);
+    const caption = audible && line && lastLine.current ? { speaker: lastLine.current.speaker, line, alarmed: incident } : null;
+    const key = caption ? `${caption.speaker}${caption.line}${caption.alarmed}` : null;
     if (key !== lastOverheard.current) {
       lastOverheard.current = key;
       overhear(group.name, caption);
@@ -91,9 +91,9 @@ export function Conversation({ group, incident }: { group: Group; incident: bool
         asides.current++;
         const m = group.members[nearest];
         const turnTo = wrapAngle(heading(avatar.x - m.x, avatar.z - m.z) - memberRotation(group, nearest));
-        sceneSound(voiceOf(SPECIES[m.species].kind), voiceLevel(nd));
         const n = asides.current + Math.round(group.offset * 10);
         const a = { member: nearest, line: incident ? greetingLine(m.species, "panic", n) : asideLine(n), at: t, turn: turnTo };
+        sceneSpeech({ text: a.line, species: m.species, near: nearness(nd) });
         asided.current = a;
         setAside({ member: a.member, line: a.line, at: a.at });
       }

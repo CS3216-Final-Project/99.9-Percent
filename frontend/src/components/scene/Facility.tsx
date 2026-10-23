@@ -58,6 +58,7 @@ import { Avatar, WalkDriver, WalkFloor } from "./Avatar";
 import { GlassDoors } from "./Doors";
 import { avatar, clearPrompt, held, jump, movesAvatar, onPrompt, play, resetJump, walkTo } from "./walk";
 import { clearOverheard, onOverheard, type Overheard } from "./overheard";
+import { ROLE_NAMES } from "./cast";
 import type { Prompt } from "./player";
 import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
@@ -1572,20 +1573,21 @@ function WalkControls() {
 
 /**
  * A line of a chatting group the avatar is near enough to make out, captioned like a subtitle above the walk
- * prompt (under it on a phone). Purely visual flavour, changing every few seconds: not a live region, so it does
- * not nag screen readers.
+ * prompt (under it on a phone), naming the speaker's role. Purely visual flavour, changing every few seconds:
+ * not a live region, so it does not nag screen readers. The menu's Show captions choice turns it off.
  */
-function OverheardLine() {
+function Caption() {
   const walking = useGame((s) => s.walking && s.started);
+  const captions = useGame((s) => s.audio.captions);
   const [heard, setHeard] = useState<Overheard | null>(null);
   useEffect(() => onOverheard(setHeard), []);
   useEffect(() => {
     if (!walking) clearOverheard();
   }, [walking]);
-  if (!walking || !heard) return null;
+  if (!walking || !captions || !heard) return null;
   return (
-    <p className={`overheard${heard.alarmed ? " is-alarmed" : ""}`}>
-      <span className="overheard-where">Overheard at the {heard.where}</span>
+    <p className={`caption${heard.alarmed ? " is-alarmed" : ""}`}>
+      <span className="caption-speaker">{ROLE_NAMES[heard.speaker]}:</span>
       <q>{heard.line}</q>
     </p>
   );
@@ -1846,7 +1848,7 @@ export default function Facility() {
       <Labels landed={landed} />
       <HoverTip container={container} />
       <WalkControls />
-      <OverheardLine />
+      <Caption />
       <RoomDock stage={container} />
     </div>
   );

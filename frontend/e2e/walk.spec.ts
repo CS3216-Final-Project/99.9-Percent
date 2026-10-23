@@ -79,6 +79,84 @@ async function trackEffectFrequencies(page: Page) {
 /** Whether `hz` appears in the captured frequencies, allowing a small floating-point tolerance. */
 const near = (frequencies: number[], hz: number) => frequencies.some((f) => Math.abs(f - hz) < 0.6);
 
+/** Where a browser stores what the crew had spoken, for tests to read. */
+interface SpokenLine {
+  text: string;
+  pitch: number;
+  rate: number;
+  volume: number;
+  voice: string | undefined;
+}
+
+/**
+ * A fake Web Speech engine: two English voices, utterances that record what they were asked to say and end a
+ * beat later, and a cancel count. Installed before the page loads so the crew's lines can be heard in the test.
+ */
+async function fakeSpeech(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as { spokenLines: SpokenLine[]; speechCancels: number };
+    w.spokenLines = [];
+    w.speechCancels = 0;
+    const voices = [
+      { name: "Test Ada", lang: "en-US", default: true, localService: true, voiceURI: "Test Ada" },
+      { name: "Test Bert", lang: "en-US", default: false, localService: true, voiceURI: "Test Bert" },
+    ];
+    class FakeUtterance {
+      text: string;
+      voice: (typeof voices)[number] | null = null;
+      lang = "";
+      pitch = 1;
+      rate = 1;
+      volume = 1;
+      onstart: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((event: { error: string }) => void) | null = null;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+    const synth = {
+      getVoices: () => voices,
+      speak: (u: FakeUtterance) => {
+        w.spokenLines.push({ text: u.text, pitch: u.pitch, rate: u.rate, volume: u.volume, voice: u.voice?.name });
+        u.onstart?.();
+        setTimeout(() => u.onend?.(), 300);
+      },
+      cancel: () => {
+        w.speechCancels++;
+      },
+      speaking: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+    Object.defineProperty(window, "speechSynthesis", { configurable: true, get: () => synth });
+    (window as unknown as { SpeechSynthesisUtterance: unknown }).SpeechSynthesisUtterance = FakeUtterance;
+  });
+  return {
+    spoken: () => page.evaluate(() => (window as unknown as { spokenLines: SpokenLine[] }).spokenLines),
+    cancels: () => page.evaluate(() => (window as unknown as { speechCancels: number }).speechCancels),
+  };
+}
+
+/** Resume mid-walk on the office floor next to the reception catch-up. */
+async function seedEavesdrop(page: Page) {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "nn.classic.exploration.v1",
+      JSON.stringify({ version: 1, floor: "office", walking: true, viewChosen: true, avatar: { floor: "office", x: 0.4, z: 9.4, yaw: 0 }, camera: null }),
+    ),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue week 2" }).click();
+  // The office floor's labels are the people's desks; expectRoom's "Servers" lives downstairs.
+  const canvas = page.getByRole("main").locator("canvas");
+  await expect(canvas).toBeVisible();
+  await expect
+    .poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 })
+    .toBe(true);
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+}
+
 test("walks the building as an avatar: the elevator by Space, Walk keeping out of Space's way, and Esc to stop", async ({ page }) => {
   // The opening framing and the walk move a share of the way each frame, so software rendering takes a while.
   test.slow();
@@ -225,38 +303,84 @@ test("walking away from the meeting leaves its nearby presentation sound behind"
   expect(heard(away)).toBe(false);
 });
 
-test("eavesdrops on the reception catch-up: its words are captioned and heard in the speakers' voices", async ({ page }) => {
+test("eavesdrops on the reception catch-up: its words are captioned and spoken in the speakers' voices", async ({ page }) => {
   test.slow();
-  // The catch-up's members are all blobs: their voice's two syllables at 235 and 270 Hz, through the real audio.
-  const audio = await trackEffectFrequencies(page);
-  // Resume mid-walk on the office floor next to the group: about 2 m from its middle, inside earshot, and about
-  // 1.35 m from the nearest member — close enough that it turns and says a word of its own.
-  await page.addInitScript(() =>
-    localStorage.setItem(
-      "nn.classic.exploration.v1",
-      JSON.stringify({ version: 1, floor: "office", walking: true, viewChosen: true, avatar: { floor: "office", x: 0.4, z: 9.4, yaw: 0 }, camera: null }),
-    ),
-  );
-  await page.goto("/");
-  await page.getByRole("button", { name: "Continue week 2" }).click();
-  // The office floor's labels are the people's desks; expectRoom's "Servers" lives downstairs.
-  const canvas = page.getByRole("main").locator("canvas");
-  await expect(canvas).toBeVisible();
-  await expect
-    .poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 })
-    .toBe(true);
-  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
-  const caption = page.locator(".overheard");
-  await expect(caption).toContainText("Overheard at the catch-up by reception", { timeout: 20_000 });
+  const speech = await fakeSpeech(page);
+  // About 2 m from the group's middle, inside earshot, and about 1.35 m from the nearest member — close enough
+  // that it turns and says a word of its own.
+  await seedEavesdrop(page);
+  const caption = page.locator(".caption");
+  await expect(caption).toBeVisible({ timeout: 20_000 });
+  await expect(caption.locator(".caption-speaker")).not.toBeEmpty();
   const first = await caption.locator("q").textContent();
+  expect(first).toBeTruthy();
+  const heard: string[] = [first!];
+  // The catch-up's members are all blobs, so the line is spoken high, at a loudness inside the utterance's range.
+  // Keep gathering the caption's lines while listening: whichever group published last also spoke its line.
+  await expect
+    .poll(
+      async () => {
+        const text = await caption.locator("q").textContent();
+        if (text && !heard.includes(text)) heard.push(text);
+        return (await speech.spoken()).some((l) => heard.includes(l.text) && l.pitch > 1 && l.volume > 0 && l.volume <= 1);
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+  // The talk moves on: a fresh line takes the caption over.
+  await expect
+    .poll(
+      async () => {
+        const text = await caption.locator("q").textContent();
+        if (text && !heard.includes(text)) {
+          heard.push(text);
+          return true;
+        }
+        return false;
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+});
+
+test("falls back to the crew's own voices where the browser cannot speak", async ({ page }) => {
+  test.slow();
+  // No speech engine at all: the catch-up's blobs answer with their bark, two syllables at 235 and 270 Hz,
+  // through the real audio, and the caption still shows.
+  const audio = await trackEffectFrequencies(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "speechSynthesis", { configurable: true, get: () => undefined });
+  });
+  await seedEavesdrop(page);
+  const caption = page.locator(".caption");
+  await expect(caption.locator("q")).not.toBeEmpty({ timeout: 20_000 });
   await expect
     .poll(async () => {
       const frequencies = await audio.frequencies();
       return near(frequencies, 235) && near(frequencies, 270);
     }, { timeout: 20_000 })
     .toBe(true);
-  // The talk moves on: a fresh line takes the caption over.
-  await expect.poll(async () => (await caption.locator("q").textContent()) !== first, { timeout: 15_000 }).toBe(true);
+});
+
+test("turns captions off from the menu while the crew are still heard", async ({ page }) => {
+  test.slow();
+  const speech = await fakeSpeech(page);
+  await seedEavesdrop(page);
+  const caption = page.locator(".caption");
+  await expect(caption).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Menu" });
+  await menu.getByRole("tab", { name: "Sound" }).click();
+  const toggle = menu.getByRole("button", { name: "Show captions" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await menu.getByRole("button", { name: "Close" }).click();
+  // The caption is gone, but the talk goes on being spoken: the switch is only about the writing.
+  await expect(caption).toHaveCount(0);
+  const count = (await speech.spoken()).length;
+  await expect.poll(async () => (await speech.spoken()).length, { timeout: 15_000 }).toBeGreaterThan(count);
+  expect((await page.evaluate(() => JSON.parse(localStorage.getItem("nn.audio.v1")!))).captions).toBe(false);
 });
 
 test("changes the avatar mid-game from the menu, fetching only the one chosen", async ({ page }) => {
