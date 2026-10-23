@@ -23,7 +23,7 @@ const GATE_LABELS: Record<Gate, string> = {
 export function entryBlockers(ready: boolean, gates: Partial<Record<Gate, boolean>>): string[] {
   if (ready) return [];
   const unmet = (Object.keys(GATE_LABELS) as Gate[]).filter(id => gates[id] === false).map(id => GATE_LABELS[id]);
-  return unmet.length ? unmet : ["Every chapter requirement is met"];
+  return unmet.length ? unmet : ["The current chapter is complete"];
 }
 
 /** One sentence naming what a chapter still waits for, for notes and disabled controls. */

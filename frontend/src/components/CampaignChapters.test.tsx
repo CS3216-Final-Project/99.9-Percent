@@ -51,7 +51,7 @@ it("explains a disabled Next without changing its engine gate", () => {
   const next = screen.getByRole("button", { name: "Next: Continue to Stay Online" });
   expect(next.hasAttribute("disabled")).toBe(true);
   const reason = document.getElementById(next.getAttribute("aria-describedby")!)!;
-  expect(reason.textContent).toContain("Stay Online opens once: Every chapter requirement is met.");
+  expect(reason.textContent).toContain("Stay Online opens once: The current chapter is complete.");
   expect(reason.tabIndex).toBe(0);
   fireEvent.click(next);
   expect(useGame.getState().game).toBe(game);

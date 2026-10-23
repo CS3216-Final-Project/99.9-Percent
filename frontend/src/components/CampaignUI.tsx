@@ -509,9 +509,9 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
         </CampaignReport><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_growth"})}/></>}
     </Modal>;
   }
-  if (pendingReliability(c)) return <Modal title="Reliability outcome" className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}>
+  if (pendingReliability(c) && end) return <Modal title="Reliability outcome" className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}>
     <ReliabilityOutcome campaign={c} />
-    {end && <ChapterEndFoot end={end} />}
+    <ChapterEndFoot end={end} />
   </Modal>;
   if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_prevention_review"})} /></Modal>;
   if (game.phase === "review") {
@@ -520,12 +520,12 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
     return <Modal title="Incident postmortem" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "incident" }}><Report report={report} /><ContinueFoot label="Continue company" onClick={() => act({ type: "acknowledge_review" })} /></Modal>;
   }
   if(milestoneBlocks(game)&&c.launchWeek&&end?.chapter==="opening")return <LaunchScore campaign={c} end={end} />;
-  if(c.openingMilestone&&!c.openingMilestone.acknowledged&&!c.launchWeek)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }}>
+  if(c.openingMilestone&&!c.openingMilestone.acknowledged&&!c.launchWeek&&end)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }}>
     <CampaignReport lesson={outcomeSummary(c,"opening")}><p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
     <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p><pre>{JSON.stringify(c.openingMilestone,null,2)}</pre></CampaignReport>
-    {end && <ChapterEndFoot end={end} />}
+    <ChapterEndFoot end={end} />
   </Modal>;
-  if(pendingSpikeAcknowledgement(c) && view!=="menu" && view!=="history") return <Modal title="Spike response handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={()=>openView("history")}><CampaignReport lesson={outcomeSummary(c,"spikes")}><p>Both demand pulses ended and five baseline game seconds qualified for stable service. The same company continues with its investments and operating costs.</p><pre>{JSON.stringify({stage:c.spikeStage,observations:c.recent.filter(m=>m.spikes)},null,2)}</pre></CampaignReport>{end && <ChapterEndFoot end={end} />}</Modal>;
+  if(pendingSpikeAcknowledgement(c) && end && view!=="menu" && view!=="history") return <Modal title="Spike response handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={()=>openView("history")}><CampaignReport lesson={outcomeSummary(c,"spikes")}><p>Both demand pulses ended and five baseline game seconds qualified for stable service. The same company continues with its investments and operating costs.</p><pre>{JSON.stringify({stage:c.spikeStage,observations:c.recent.filter(m=>m.spikes)},null,2)}</pre></CampaignReport><ChapterEndFoot end={end} /></Modal>;
   // It pauses the clock when it appears, so it shows over History and guidance rather than waiting behind them.
   if(chapterComplete&&chapterComplete===finishedChapter(game)&&view!=="menu"&&end)return completeSlot ? completeSlot(chapterComplete) : <ChapterComplete chapter={chapterComplete} end={end} />;
   const finale = campaignFinale(game);

@@ -9,7 +9,7 @@ import { finishingScaling } from "@/sim/__tests__/dataFixture";
 import { dataCompany as finishedData } from "@/sim/__tests__/spikeFixtures";
 import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { act as decide, spikeCompany, tick } from "@/sim/__tests__/spikeFixtures";
-import { finishedLaunchWeek } from "@/game/__fixtures__/openingOutcome";
+import { finishedLaunchWeek, recoveredOpening } from "@/game/__fixtures__/openingOutcome";
 import { reliabilityOutcome, reliabilityOutcomeWithQueuedChange } from "@/game/__fixtures__/reliabilityOutcome";
 import { CampaignChapters } from "./CampaignChapters";
 import { CampaignOverlays } from "./CampaignUI";
@@ -215,4 +215,16 @@ it("does not record a stay made on a Launch Week practice company over the real 
   fireEvent.click(button(screen.getByRole("dialog", { name: "Launch Week complete" }), "Stay in this chapter"));
   expect(useGame.getState().game.campaign!.openingMilestone!.acknowledged).toBe(true);
   expect(loadMeta().chapterCompletions).toBeNull();
+});
+
+it("ends a version-1 Opening with Stay or Continue, and a stayed company continues later through Next", () => {
+  useGame.setState({ game: decide(recoveredOpening(), { type: "acknowledge_review" }), ready: true, hasRun: true, started: true, onboarding: false });
+  render(<><CampaignChapters /><CampaignOverlays /></>);
+  const recognition = screen.getByRole("dialog", { name: "First growth challenge handled" });
+  expect(button(recognition, /Continue to scaling and routing/)).toBeTruthy();
+  fireEvent.click(button(recognition, "Stay in this chapter"));
+  expect(useGame.getState().game.campaign!.openingMilestone!.acknowledged).toBe(true);
+  expect(useGame.getState().game.campaign!.scaling).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to scaling and routing" }));
+  expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
 });
