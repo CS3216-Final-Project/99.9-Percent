@@ -5,10 +5,12 @@ import { QUALITY_OPTIONS } from "./scene/quality";
 
 /**
  * The menu's graphics section, the same in every mode: how much detail the 3D room is drawn with, so a
- * slower machine can trade looks for smoothness. The choice applies at once and is remembered.
+ * slower machine can trade looks for smoothness, and whether changing floor rides the elevator's cutscene.
+ * Choices apply at once and are remembered.
  */
 export function GraphicsSettings() {
   const quality = useGame((s) => s.graphics.quality);
+  const skipElevator = useGame((s) => s.graphics.skipElevator);
   const setGraphics = useGame((s) => s.setGraphics);
   const group = useId();
   return (
@@ -43,6 +45,16 @@ export function GraphicsSettings() {
         ))}
       </div>
       <p className="menu-note">Changing this redraws the room, so the camera returns to its starting view.</p>
+      <div className="menu-section-head">
+        <h4>
+          <Icon name="floor" size={20} />
+          Elevator
+        </h4>
+        <button type="button" className={`btn btn-small menu-toggle${skipElevator ? " is-on" : ""}`} aria-pressed={skipElevator} onClick={() => setGraphics({ skipElevator: !skipElevator })}>
+          Skip elevator cutscene
+        </button>
+      </div>
+      <p className="menu-note">Change floors at once instead of watching the elevator ride between them.</p>
     </section>
   );
 }

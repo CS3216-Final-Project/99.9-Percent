@@ -885,7 +885,7 @@ export const useGame = create<Store>()((set, get) => {
       // The whole choice: a walk the run opened in by default was never stored.
       saveExploration(get().mode, { floor: get().floor, walking: get().walking, viewpoint: v, viewChosen: true });
     },
-    mapOpen: true,
+    mapOpen: false,
     setMapOpen: (open) => {
       if (open === get().mapOpen) return;
       record("map_toggled", { open });
@@ -934,10 +934,8 @@ export const useGame = create<Store>()((set, get) => {
       if (get().ready) return;
       set({ scope });
       // Read once here, not on every mode switch: if storage fails, the in-memory settings are the ones to keep.
-      // The map starts folded away on a phone, upright or turned on its side, where the room has little space to
-      // spare: the same widths that lay the room out for a phone.
-      const narrow = typeof window !== "undefined" && (window.matchMedia?.("(max-width: 900px)").matches ?? false);
-      set({ audio: loadAudio(), graphics: loadGraphics(), avatar: loadAvatar(), controls: loadControls(), mapOpen: loadMapOpen() ?? !narrow });
+      // The map starts folded away until the player opens it, so the room has its corner to itself.
+      set({ audio: loadAudio(), graphics: loadGraphics(), avatar: loadAvatar(), controls: loadControls(), mapOpen: loadMapOpen() ?? false });
       enter(loadMode(), false);
     },
 
@@ -1345,8 +1343,9 @@ export const useGame = create<Store>()((set, get) => {
       const now = get().graphics;
       const quality = GRAPHICS_QUALITIES.find((q) => q === patch.quality) ?? now.quality;
       const fov = patch.fov === undefined ? now.fov : clampFov(patch.fov);
-      if (quality === now.quality && fov === now.fov) return;
-      const graphics: GraphicsSettings = { quality, fov };
+      const skipElevator = typeof patch.skipElevator === "boolean" ? patch.skipElevator : now.skipElevator;
+      if (quality === now.quality && fov === now.fov && skipElevator === now.skipElevator) return;
+      const graphics: GraphicsSettings = { quality, fov, skipElevator };
       set({ graphics });
       // Unsaved settings still apply for this visit.
       saveGraphics(graphics);

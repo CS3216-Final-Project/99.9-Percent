@@ -27,7 +27,7 @@ export function ViewTabs({ tabs }: { tabs: ViewTab[] }) {
   const view = useGame((s) => s.view);
   const openView = useGame((s) => s.openView);
   return (
-    <nav className="view-tabs" aria-label="Views" data-label="Company">
+    <nav className="view-tabs" aria-label="Views">
       {tabs.map(({ id, label, icon, badge, disabled }) => (
         <button type="button" key={id} data-view={id} className={view === id ? "is-active" : ""} aria-pressed={view === id} aria-label={label} {...tipProps(label)} disabled={disabled} onClick={() => openView(view === id ? null : id)}>
           <span className="tab-icon" aria-hidden="true">
