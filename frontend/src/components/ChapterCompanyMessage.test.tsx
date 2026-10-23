@@ -71,6 +71,7 @@ it("advances one line at a time from the dialogue box and keeps the mission unti
   fireEvent.click(copy); fireEvent.click(copy);
   expect(copy.textContent).toContain(model.lines.at(-1)); expect(copy.textContent).toContain(model.mission);
   expect(next()).toBeNull(); expect(message()).not.toBeNull();
+  expect(message()!.querySelectorAll(".company-message-progress > [data-read]")).toHaveLength(model.lines.length);
 });
 
 it("keeps a valid line when the current message gets shorter while it is read", () => {
