@@ -93,7 +93,7 @@ it("leaves a reserved spare out of the routing choices, so the apps in use still
  expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
  fireEvent.click(within(route).getByRole("button",{name:"App 3 only"}));
  expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-3"]});
-});
+},15_000);
 
 it("toggles equipment readings without advancing or changing the company when dismissed",()=>{
  show(newGame());

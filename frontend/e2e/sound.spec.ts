@@ -93,7 +93,7 @@ test.describe(() => {
     await completeTutorial(page);
     await expect(page.getByRole("dialog", { name: "Launch week" })).toBeHidden();
     const message = page.getByRole("dialog", { name: "Company Message", exact: true });
-    await message.getByRole("button", { name: "Got it", exact: true }).click();
+    await message.getByRole("button", { name: "Dismiss company message", exact: true }).click();
     await expect(message).toBeHidden();
     // Reloading counts from zero again: the saved company continues without its start-up sound.
     await page.reload();

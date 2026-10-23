@@ -276,7 +276,7 @@ it("teaches Launch Week with spotlighted tutorial steps instead of the Hint butt
   // The colleague introduction comes once, before the first Run; the tutorial waits for it.
   const intro = screen.getByRole("dialog", { name: "Company Message" });
   expect(screen.queryByRole("region", { name: "Launch Week tutorial" })).toBeNull();
-  fireEvent.click(within(intro).getByRole("button", { name: "Got it" }));
+  fireEvent.click(within(intro).getByRole("button", { name: "Dismiss company message" }));
   const card = screen.getByRole("region", { name: "Launch Week tutorial" });
   spotOn("Run");
   fireEvent.click(within(card).getByRole("button", { name: "Got it" })); noSpot();

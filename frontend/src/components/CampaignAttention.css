@@ -26,13 +26,6 @@
 .chapter-stage-popup .campaign-hint-heading h3 > .icon { color: var(--cue-accent); }
 .chapter-stage-popup > .btn { border-color: var(--cue-accent); background: var(--cue-accent); color: var(--ink); }
 .chapter-stage-popup > .btn:hover:not(:disabled), .chapter-stage-popup > .btn:active:not(:disabled) { background: var(--cue-accent); }
-.company-message-backdrop { position: fixed; inset: 0; z-index: 99; background: var(--spotlight-dim); overscroll-behavior: contain; touch-action: none; }
-.company-message { max-height: min(360px, calc(100dvh - 48px)); touch-action: pan-y; }
-.company-message-sender { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-.company-message-sender p { margin: 0; }
-.company-message-sender p > span { display: block; font-size: var(--text-sm); }
-.company-message-avatar { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--cue-accent); }
-
 /* Launch Week's tutorial step: the step tours' card, fixed beside its spotlight and clickable only on its button. */
 .tour-card.launch-tutorial { position: fixed; z-index: 111; pointer-events: none; }
 .tour-card.launch-tutorial button { pointer-events: auto; }

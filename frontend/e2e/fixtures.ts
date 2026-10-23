@@ -7,11 +7,17 @@ const controlledPages = new WeakSet<Page>();
 type ClockOptions = Parameters<Page["clock"]["install"]>[0];
 
 // Unhandled browser errors fail each case. Journeys that call withoutRoom() skip the WebGL scene; the rest draw it.
-export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; recoveryNotices: void; reviewRecoveryNotice: boolean; companyMessages: void; reviewCompanyMessage: boolean; overviewChosen: boolean; chosenView: void; edition: 'auto' | 'desktop' | 'phone'; editionAddress: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
+export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void; recoveryNotices: void; reviewRecoveryNotice: boolean; companyMessages: void; reviewCompanyMessage: boolean; campaignFinales: void; reviewCampaignFinale: boolean; overviewChosen: boolean; chosenView: void; edition: 'auto' | 'desktop' | 'phone'; editionAddress: void; installClock: (options?: ClockOptions) => Promise<void>; withoutRoom: (target?: Page | BrowserContext) => Promise<void> }>({
   // Unrelated journeys dismiss optional narrative, while dedicated introduction tests opt out.
   reviewCompanyMessage: [true, { option: true }],
   companyMessages: [async ({ page, reviewCompanyMessage }, use) => {
-    if (reviewCompanyMessage) await page.addLocatorHandler(page.getByRole('dialog', { name: 'Company Message', exact: true }), dialog => dialog.getByRole('button', { name: 'Got it', exact: true }).click());
+    if (reviewCompanyMessage) await page.addLocatorHandler(page.getByRole('dialog', { name: 'Company Message', exact: true }), dialog => dialog.getByRole('button', { name: 'Dismiss company message', exact: true }).click());
+    await use();
+  }, { auto: true }],
+  // The colleagues' celebration before the final scorecard; campaignFinale.spec.ts opts out to play it.
+  reviewCampaignFinale: [true, { option: true }],
+  campaignFinales: [async ({ page, reviewCampaignFinale }, use) => {
+    if (reviewCampaignFinale) await page.addLocatorHandler(page.getByRole('dialog', { name: 'Campaign finale', exact: true }), dialog => dialog.getByRole('button', { name: 'Skip to the scorecard', exact: true }).click());
     await use();
   }, { auto: true }],
   // Existing journeys still review and acknowledge the actual report themselves. Only the new
