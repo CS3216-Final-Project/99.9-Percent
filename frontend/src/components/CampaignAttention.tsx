@@ -23,22 +23,34 @@ function visibleControl(selector: string): HTMLElement | null {
 }
 
 function controlVisible(node: HTMLElement): boolean {
-  if (node.matches(":disabled, [aria-disabled=true]") || node.closest("[hidden], [inert]")) return false;
-  const box = node.getBoundingClientRect(), style = getComputedStyle(node);
-  if (!box.width || !box.height || style.visibility === "hidden" || style.display === "none") return false;
-  const x = box.left + box.width / 2, y = box.top + box.height / 2;
-  if (box.left < 0 || box.top < 0 || box.right > innerWidth || box.bottom > innerHeight) return false;
-  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
-    const clip = getComputedStyle(parent), bounds = parent.getBoundingClientRect();
-    if (/auto|scroll|hidden|clip/.test(clip.overflowY) && (box.top < bounds.top || box.bottom > bounds.bottom)) return false;
-    if (/auto|scroll|hidden|clip/.test(clip.overflowX) && (box.left < bounds.left || box.right > bounds.right)) return false;
-  }
-  const hit = document.elementFromPoint?.(x, y);
+  if (node.matches(":disabled, [aria-disabled=true]")) return false;
+  const box = node.getBoundingClientRect(), shown = shownPart(node);
+  if (!shown || shown.left !== box.left || shown.top !== box.top || shown.right !== box.right || shown.bottom !== box.bottom) return false;
+  const hit = document.elementFromPoint?.(box.left + box.width / 2, box.top + box.height / 2);
   return !hit || node.contains(hit);
 }
 
+type Edges = Pick<DOMRect, "left" | "top" | "right" | "bottom">;
+/**
+ * The part of `node` inside the viewport and every scrolling or clipping box around it, whether or not something
+ * covers it, or null when none of it is.
+ */
+function shownPart(node: HTMLElement): Edges | null {
+  if (node.closest("[hidden], [inert]")) return null;
+  const box = node.getBoundingClientRect(), style = getComputedStyle(node);
+  if (!box.width || !box.height || style.visibility === "hidden" || style.display === "none") return null;
+  let { left, top, right, bottom } = box;
+  left = Math.max(left, 0); top = Math.max(top, 0); right = Math.min(right, innerWidth); bottom = Math.min(bottom, innerHeight);
+  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+    const clip = getComputedStyle(parent), bounds = parent.getBoundingClientRect();
+    if (/auto|scroll|hidden|clip/.test(clip.overflowY)) { top = Math.max(top, bounds.top); bottom = Math.min(bottom, bounds.bottom); }
+    if (/auto|scroll|hidden|clip/.test(clip.overflowX)) { left = Math.max(left, bounds.left); right = Math.min(right, bounds.right); }
+  }
+  return right > left && bottom > top ? { left, top, right, bottom } : null;
+}
+
 /** The hole reaches a little past the framed control, like the tutorial's. */
-function padBox(r: DOMRect): Box {
+function padBox(r: Edges): Box {
   const pad = 5;
   const x = Math.max(4, r.left - pad), y = Math.max(4, r.top - pad);
   return { x, y, w: Math.min(innerWidth - 4, r.right + pad) - x, h: Math.min(innerHeight - 4, r.bottom + pad) - y };
@@ -229,28 +241,36 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       watched = null; measured = null;
       setSpotBox(null);
     };
-    // A control scrolled or clipped out of view is still watched, but never framed: its hole would sit over whatever
-    // covers it, such as the dock.
-    const watch = (node: HTMLElement, framed: boolean) => { watched = node; measured = padBox(node.getBoundingClientRect()); setSpotBox(framed ? measured : null); };
+    // Only the part of a control that is in view is framed, and one scrolled or clipped out of view entirely is
+    // watched but not framed: a hole over the rest would sit over whatever covers it, such as the dock. A control
+    // merely covered, for example by this step's own card, is still framed so the card can move aside.
+    const watch = (node: HTMLElement) => {
+      watched = node; measured = padBox(node.getBoundingClientRect());
+      const shown = shownPart(node);
+      setSpotBox(shown && padBox(shown));
+    };
     const update = () => {
       clear();
       if (!guidanceTarget && !recommendedAction) return;
       const desired = document.querySelector<HTMLElement>(spotlightSelector);
       const closed = desired?.closest("details:not([open])");
       const node = closed?.querySelector<HTMLElement>("summary") ?? desired;
-      if (node !== revealedTarget.current) playerScrolled = false;
-      if (!view && node && !playerScrolled && !controlVisible(node) && node.getClientRects().length) {
+      // A new control is brought fully into view once. After that it is only brought back when none of it shows,
+      // such as after the panel's own reset to the top: scrolling within it, by keyboard focus or otherwise, wins.
+      const fresh = node !== revealedTarget.current;
+      if (fresh) playerScrolled = false;
+      if (!view && node && !playerScrolled && (fresh ? !controlVisible(node) : !shownPart(node)) && node.getClientRects().length) {
         revealedTarget.current = node;
         reveal(node);
       }
       const target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
         (guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research" ? visibleControl(".panel-reopen") : null);
       if (target) {
-        watch(target, true);
+        watch(target);
         target.dataset.spotlight = "true";
         target.classList.add("campaign-gold-attention");
         litTarget.current = target;
-      } else if (node) watch(node, false);
+      } else if (node) watch(node);
     };
     // The checklist and incident banner above the panel's controls grow and shrink, and a panel can still be sliding
     // in, so a control moves without any scroll, resize or mutation near it. Follow it every frame.
