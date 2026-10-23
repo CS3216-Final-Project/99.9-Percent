@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { advanceTurn, newGame, newLegacyGame } from "@/sim";
+import { advanceTurn, applyAction, newGame, newLegacyGame, type GameState } from "@/sim";
 import { advanceSteps } from "@/sim/step";
 import { DEFAULT_META, loadClassicGame, loadGame, saveClassicGame, saveGame, saveMeta, saveMode } from "@/game/persist";
 import { ANALYTICS_CONSENT_KEY } from "@/lib/analytics";
@@ -94,6 +94,8 @@ it("starts a new Challenge Mode game from a Guided Mode home screen when asked",
   const classic = card(choices, "Challenge Mode");
   expect(within(classic).getByRole("button", { name: "Continue week 2" })).toBeTruthy();
   fireEvent.click(within(classic).getByRole("button", { name: "New game" }));
+  expect(useGame.getState().mode).toBe("campaign");
+  fireEvent.click(within(classic).getByRole("button", { name: "Lose this run? Press again" }));
   expect(useGame.getState()).toMatchObject({ mode: "classic", started: true });
   expect(useGame.getState().game.turn).toBe(1);
 });
@@ -142,9 +144,29 @@ it("offers no Guided Mode walkthrough for a closed company", () => {
   // A closed company has nothing to continue: it can show its final report or make way for a new company.
   expect(within(guided).queryByRole("button", { name: "Continue company" })).toBeNull();
   expect(within(guided).getByRole("button", { name: "See how it ended" })).toBeTruthy();
+  // Starting over replaces the company and its final report, so it asks for a second press.
   fireEvent.click(within(guided).getByRole("button", { name: "New company" }));
+  expect(useGame.getState().game.campaign!.runId).toBe("closed-company");
+  expect(guided.textContent).toContain("Press the button again to confirm.");
+  fireEvent.click(within(guided).getByRole("button", { name: "Lose this company? Press again" }));
   expect(useGame.getState().game).toMatchObject({ phase: expect.not.stringMatching("ended") });
   expect(useGame.getState().game.campaign!.runId).not.toBe("closed-company");
+});
+
+it("reads a company past the Opening by its own chapter, even where this browser never finished the walkthrough", () => {
+  const act = (g: GameState, type: "start_db_upgrade" | "acknowledge_review" | "acknowledge_milestone") => {
+    const r = applyAction(g, { type });
+    if (!r.ok) throw Error(r.message);
+    return r.state;
+  };
+  // The company recovers from its first outage and moves on to Scaling & Routing; this browser's profile is fresh.
+  const recovered = advanceSteps(act(advanceSteps(newGame(1, "imported-company"), 6).state, "start_db_upgrade"), 30).state;
+  saveGame(act(act(recovered, "acknowledge_review"), "acknowledge_milestone"), 0, true);
+  const choices = boot("campaign");
+  const guided = card(choices, "Guided Mode");
+  expect(guided.textContent).toMatch(/Saved game\s*Chapter 2 of 6: Scaling & Routing/);
+  expect(guided.textContent).not.toContain("Finish the walkthrough");
+  expect(card(choices, "Challenge Mode").textContent).toContain("You are on Chapter 2 of 6.");
 });
 
 it("names a finished Guided Mode company as complete, not closed", () => {

@@ -7,21 +7,34 @@ import { num } from "@/game/format";
 import type { IconName } from "./icons";
 
 /** What a mode's card says about its saved game. Nothing here changes a save. */
-export interface Summary { progress: string | null; resumable: boolean; ended: boolean; tutorialDone: boolean; continueLabel: string; chapter?: number }
+export interface Summary {
+  progress: string | null; resumable: boolean; ended: boolean; tutorialDone: boolean; continueLabel: string;
+  /** The Guided Mode chapter the save is in, and whether it is already complete while the company waits on Next. */
+  chapter?: number; chapterDone?: boolean;
+}
 
 /** How a home screen describes a Guided Mode save. */
 export type CampaignSummarizer = (game: GameState | null, tutorialDone: boolean) => Summary;
 
+/**
+ * The chapter a Guided Mode save is in, read from the company itself. A company still in the Opening before this
+ * browser's walkthrough is done is in Chapter 0; past the Opening, its chapter stands whatever this browser has seen.
+ */
+export function savedChapter(game: GameState, tutorialDone: boolean) {
+  const chapters = campaignChapters(game);
+  const chapter = chapters.find((c) => c.current) ?? chapters.filter((c) => c.completed).at(-1) ?? chapters[0];
+  const walkthrough = !tutorialDone && chapter.id === "opening";
+  return { chapter: walkthrough ? chapters[0] : chapter, done: !walkthrough && !chapter.current, total: chapters.length - 1 };
+}
+
 export function campaignSummary(game: GameState | null, tutorialDone: boolean): Summary {
   if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Guided Mode" };
-  // A save made before the walkthrough ends is still in Chapter 0, not the Opening.
-  const chapters = campaignChapters(game, !tutorialDone, tutorialDone);
-  const chapter = chapters.find((c) => c.current) ?? chapters.filter((c) => c.completed).at(-1) ?? chapters[0];
+  const { chapter, done, total } = savedChapter(game, tutorialDone);
   const ended = game.phase === "ended";
   const progress = ended ? (game.outcome === "won" ? "All chapters complete" : "Company closed")
-    : chapter.number === 0 ? "Walkthrough in progress" : `Chapter ${chapter.number} of ${chapters.length - 1}: ${chapter.name}`;
+    : chapter.number === 0 ? "Walkthrough in progress" : `Chapter ${chapter.number} of ${total}: ${chapter.name}`;
   // A finished company opens on its final report; nothing is left to continue.
-  return { progress, resumable: true, ended, tutorialDone, continueLabel: ended ? "See how it ended" : "Continue company", chapter: chapter.number };
+  return { progress, resumable: true, ended, tutorialDone, continueLabel: ended ? "See how it ended" : "Continue company", chapter: chapter.number, chapterDone: done };
 }
 
 export function classicSummary(game: GameState | null, tutorialDone: boolean): Summary {
@@ -72,7 +85,7 @@ export const MODES: Record<GameMode, ModeInfo> = {
 /** Guided Mode's pitch once its company has started: finish the walkthrough, then the chapters. */
 export function campaignAbout(summary: Summary): string {
   if (!summary.resumable) return MODES.campaign.about;
-  if (!summary.tutorialDone) return "Finish the walkthrough to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.";
+  if (summary.chapter === 0) return "Finish the walkthrough to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.";
   return "Work through six infrastructure chapters at your own pace. Inspect problems, upgrade servers and pause whenever you need.";
 }
 

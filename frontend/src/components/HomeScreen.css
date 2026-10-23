@@ -209,6 +209,11 @@
   min-height: 48px;
 }
 
+/* A restart asking for its second press stacks under the main button, so its longer label stays on one line. */
+.mode-actions:has(> .is-confirming) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .mode-option .mode-tutorial {
   align-self: flex-start;
   color: var(--text-soft);
@@ -310,10 +315,6 @@
   text-decoration: underline;
   text-underline-offset: 3px;
   white-space: nowrap;
-}
-
-.consent-strip details[open] .consent-more {
-  display: none;
 }
 
 .consent-strip details p {

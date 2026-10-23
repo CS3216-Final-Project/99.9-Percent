@@ -314,8 +314,9 @@ button:disabled {
   margin: 14px 0 2px;
 }
 
-/* On the title screen the room is the hero: the game's chrome waits offstage,
-   keeping its rows so nothing reflows on Start, while the room fills the whole viewport behind it. */
+/* On the title screen the room is the hero: the game's chrome waits offstage, keeping its rows, while the room
+   fills the whole viewport behind it. Start hands the room back to its middle row, so the canvas resizes once,
+   in the same frame the title screen leaves. */
 .app.is-title .topbar,
 .app.is-title .bottombar {
   visibility: hidden;
