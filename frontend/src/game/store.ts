@@ -1326,8 +1326,9 @@ export const useGame = create<Store>()((set, get) => {
         music: level(patch.music, now.music),
         effects: level(patch.effects, now.effects),
         muted: patch.muted ?? now.muted,
+        captions: patch.captions ?? now.captions,
       };
-      if (audio.music === now.music && audio.effects === now.effects && audio.muted === now.muted) return;
+      if (audio.music === now.music && audio.effects === now.effects && audio.muted === now.muted && audio.captions === now.captions) return;
       set({ audio });
       // Unsaved settings still apply for this visit.
       saveAudio(audio);
@@ -1336,7 +1337,7 @@ export const useGame = create<Store>()((set, get) => {
       const { audio } = get();
       if (!isSilent(audio)) return get().setAudio({ muted: true });
       // A mute only unmutes; volumes dragged to 0 are brought back too, or the click would change nothing you can hear.
-      get().setAudio(audio.music === 0 && audio.effects === 0 ? DEFAULT_AUDIO : { muted: false });
+      get().setAudio(audio.music === 0 && audio.effects === 0 ? { music: DEFAULT_AUDIO.music, effects: DEFAULT_AUDIO.effects, muted: false } : { muted: false });
     },
 
     setGraphics: (patch) => {

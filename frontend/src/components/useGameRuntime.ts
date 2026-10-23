@@ -5,13 +5,16 @@ import { createMusic, type Music } from "@/game/music";
 import type { AudioSettings } from "@/game/persist";
 import type { PlayScope } from "@/game/scope";
 import { createSfx } from "@/game/sfx";
+import { createSpeech } from "@/game/speech";
 import { useGame } from "@/game/store";
 import { fromAvatar } from "@/game/viewpoints";
 import { daylightNow } from "./scene/dayClock";
 import { entryGap, nextGap, viewFocus, ZONE_SOUNDS, zoneLevel, type ZoneSound } from "./scene/zoneSounds";
 import { DOORS, FLOOR_Y, RIDE_SECONDS } from "./scene/levels";
 import { onRide, ride } from "./scene/ride";
-import { onSceneSound } from "./scene/sceneSounds";
+import { onSceneSound, onSceneSpeech } from "./scene/sceneSounds";
+import { SPECIES } from "./scene/cast";
+import { timbreOf, VOICE_PEAK, voiceOf } from "./scene/greetings";
 import { buildModel } from "./scene/sceneModel";
 
 /** Seconds between automatic weeks in Challenge Mode at normal speed. */
@@ -98,13 +101,27 @@ function useSoundEffects(): void {
   useEffect(() => {
     const sfx = createSfx(() => effectsLevel(useGame.getState().audio) > 0);
     sfx.setVolume(effectsLevel(useGame.getState().audio));
+    const speech = createSpeech();
+    speech.setVolume(effectsLevel(useGame.getState().audio));
     const stopVolume = useGame.subscribe((s, prev) => {
-      if (s.audio !== prev.audio) sfx.setVolume(effectsLevel(s.audio));
+      if (s.audio !== prev.audio) {
+        sfx.setVolume(effectsLevel(s.audio));
+        speech.setVolume(effectsLevel(s.audio));
+      }
     });
     const stopCues = watchCues(useGame.subscribe, (cue) => sfx.play(cue));
     // The elevator: a click and the car's hum as it sets off, then the chime and the doors as it arrives.
     // Footsteps and doors, while the audio is already playing; a new avatar's pop answers the player's own choice.
     const stopScene = onSceneSound((cue, level) => sfx.playScene(cue, level));
+    // What the crew say, in a voice of their species; where the browser cannot speak, the bark in its body plan's
+    // register stands in.
+    const stopSpeech = onSceneSpeech(({ text, species, near }) => {
+      if (!speech.say(text, timbreOf(species), near)) sfx.playScene(voiceOf(SPECIES[species].kind), VOICE_PEAK * near);
+    });
+    // A line being said stops with the walk that heard it.
+    const stopWalk = useGame.subscribe((s, prev) => {
+      if ((prev.walking && !s.walking) || (prev.started && !s.started)) speech.hush();
+    });
     const stopAvatar = useGame.subscribe((s, prev) => {
       if (s.avatar !== prev.avatar) sfx.playScene("pop", 0.9, true);
     });
@@ -139,6 +156,9 @@ function useSoundEffects(): void {
     return () => {
       window.clearInterval(zones);
       stopScene();
+      stopSpeech();
+      stopWalk();
+      speech.dispose();
       stopAvatar();
       stopRide();
       stopCues();

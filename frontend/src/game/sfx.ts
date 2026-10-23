@@ -369,7 +369,8 @@ export const LIFT_CUES = Object.keys(LIFT_VOICES) as LiftCue[];
 /**
  * Sounds of walking the building: footsteps on carpet, on tile or concrete and on the server hall's raised floor;
  * the hiss of a glass door sliding; the pop of a new avatar arriving; and the crew's own voices, a short bark each
- * in the register of its body plan, for a hello or a word overheard (see scene/greetings.ts).
+ * in the register of its body plan, standing in for a hello or a word overheard where the browser cannot speak
+ * the line (see game/speech.ts and scene/greetings.ts).
  */
 const SCENE_VOICES = {
   stepSoft: (ctx, out, at, hiss) => burst(ctx, out, at, hiss, 320, 0.07, hit(ctx, at, 0.22, 0.06)),

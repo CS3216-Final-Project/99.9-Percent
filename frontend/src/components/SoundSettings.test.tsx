@@ -38,7 +38,7 @@ describe("the Sound section", () => {
     expect(effects.getAttribute("aria-valuetext")).toBe("40%");
     expect(screen.getByRole("region", { name: "Sound" }).textContent).toContain("40%");
     fireEvent.change(screen.getByRole("slider", { name: "Music" }), { target: { value: "0" } });
-    expect(loadAudio()).toEqual({ music: 0, effects: 40, muted: false });
+    expect(loadAudio()).toEqual({ music: 0, effects: 40, muted: false, captions: true });
   });
 
   it("mutes everything with the same setting as the header button, and a slider unmutes", () => {
@@ -58,7 +58,7 @@ describe("the Sound section", () => {
     // The volumes survive the mute.
     expect(useGame.getState().audio).toMatchObject({ music: 80, effects: 80 });
     fireEvent.change(screen.getByRole("slider", { name: "Music" }), { target: { value: "60" } });
-    expect(useGame.getState().audio).toEqual({ music: 60, effects: 80, muted: false });
+    expect(useGame.getState().audio).toEqual({ music: 60, effects: 80, muted: false, captions: true });
     expect(muteAll.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(header);
     expect(muteAll.getAttribute("aria-pressed")).toBe("true");
@@ -80,13 +80,13 @@ describe("the Sound section", () => {
     expect(header.getAttribute("aria-pressed")).toBe("false");
     expect(muteAll.getAttribute("aria-pressed")).toBe("false");
     fireEvent.change(effects, { target: { value: "0" } });
-    expect(useGame.getState().audio).toEqual({ music: 0, effects: 0, muted: false });
+    expect(useGame.getState().audio).toEqual({ music: 0, effects: 0, muted: false, captions: true });
     expect(header.getAttribute("aria-pressed")).toBe("true");
     expect(muteAll.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("Both volumes are at 0. Raise one to hear sound.")).toBeTruthy();
     // The button then turns sound on rather than muting what is already silent.
     fireEvent.click(header);
-    expect(useGame.getState().audio).toEqual({ music: 80, effects: 80, muted: false });
+    expect(useGame.getState().audio).toEqual({ music: 80, effects: 80, muted: false, captions: true });
     expect(header.getAttribute("aria-pressed")).toBe("false");
     expect(muteAll.getAttribute("aria-pressed")).toBe("false");
     expect(music).toHaveProperty("value", "80");
@@ -96,5 +96,20 @@ describe("the Sound section", () => {
     fireEvent.change(effects, { target: { value: "5" } });
     expect(header.getAttribute("aria-pressed")).toBe("false");
     expect(muteAll.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("turns captions off and back on from the Sound section, and remembers it", () => {
+    render(<SoundSettings />);
+    const section = screen.getByRole("region", { name: "Sound" });
+    const toggle = within(section).getByRole("button", { name: "Show captions" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(useGame.getState().audio.captions).toBe(false);
+    expect(loadAudio().captions).toBe(false);
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    expect(useGame.getState().audio.captions).toBe(true);
+    expect(loadAudio().captions).toBe(true);
   });
 });
