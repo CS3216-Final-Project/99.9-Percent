@@ -217,7 +217,7 @@ test("the score card reports nines, copies the result and continues to Chapter 2
   await expect(card).toBeVisible();
   await expect(card).toContainText("Uptime");
   await expect(card).toContainText("nine");
-  await page.getByRole("button", { name: "Continue into Chapter 2" }).click();
+  await page.getByRole("button", { name: "Continue to scaling and routing" }).click();
   const saved = (await savedGame(page)).campaign!;
   expect(saved.openingMilestone?.acknowledged).toBe(true);
   expect(saved.scaling).not.toBeNull();

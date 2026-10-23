@@ -16,7 +16,7 @@ test("company message: review and recognition take priority, then actual Chapter
   await page.getByRole("button",{name:"View Incident Report",exact:true}).click(); await expect(story).toHaveCount(0);
   await page.getByRole("dialog",{name:"Incident postmortem"}).getByRole("button",{name:"Continue company",exact:true}).click();
   await expect(story).toHaveCount(0);
-  await page.getByRole("button",{name:"Continue operating",exact:true}).click();
+  await page.getByRole("button",{name:"Continue to scaling and routing",exact:true}).click();
   await expect(story).toContainText("Alex"); await expect(story).toContainText("CEO");
   expect((await savedGame(page)).campaign!.scaling).not.toBeNull();
 });

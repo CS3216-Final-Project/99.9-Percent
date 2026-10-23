@@ -232,7 +232,7 @@ test("Opening prevention recognition unlocks Scaling after touch review and relo
  const before=(await savedGame(page)).campaign!;expect(before.openingMilestone!.acknowledged).toBe(false);expect(before.scaling).toBeNull();
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  expect((await savedGame(page)).campaign).toEqual(before);await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Opening");
- await recognition.getByRole("button",{name:"Continue operating",exact:true}).tap();
+ await recognition.getByRole("button",{name:"Continue to scaling and routing",exact:true}).tap();
  const after=(await savedGame(page)).campaign!;
  expect(after.scaling).not.toBeNull();expect(after.reports).toEqual([]);expect(after.openingRecovered).toBe(false);expect(after.step).toBe(before.step);expect(after.cashCents).toBe(before.cashCents);
  await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Scaling & Routing");
