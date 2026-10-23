@@ -3,6 +3,7 @@ import { beginSession, emptyMeasurement, event, projectEvents, type Measurement 
 import { archiveEvents } from "./persist";
 import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { finishedChapter } from "./campaignChapters";
+import { chapterEnd } from "./chapterCompletion";
 import { FULL_SCOPE, scopeAllows, scopeComplete, type PlayScope } from "./scope";
 import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
@@ -56,6 +57,7 @@ import {
   track,
   GRAPHICS_QUALITIES,
   type AudioSettings,
+  type AnnouncedChapter,
   type ChapterCompletion,
   type ChapterTour,
   type GuidedTip,
@@ -298,7 +300,7 @@ interface Store {
   onboarding: boolean;
   tour: Tour | null;
   /** A chapter the company has just finished, announced once until the player continues or stays. */
-  chapterComplete: ChapterCompletion | null;
+  chapterComplete: AnnouncedChapter | null;
   /** The latest walkthrough start or end, for product analytics. */
   lastTour: TourEvent | null;
   rating: number | null;
@@ -342,6 +344,11 @@ interface Store {
   tourBack: () => void;
   endTour: (completed: boolean) => void;
   dismissChapterComplete: () => void;
+  /**
+   * Answer the end of the chapter the company has just finished (see game/chapterCompletion.ts): stay in it, or
+   * continue into the next one. Returns false when nothing is waiting, Continue is not possible, or an action is refused.
+   */
+  finishChapter: (choice: "stay" | "continue") => boolean;
   /** Begin the walkthrough, restarting the intro run first if this one is already under way. */
   startTutorialRun: (from?: TourStart) => void;
   rate: (rating: number) => void;
@@ -956,7 +963,8 @@ export const useGame = create<Store>()((set, get) => {
       // Practice resume is offered by the saved flag; a fresh visit plays the company itself.
       if (state.hasRun && state.meta.walkthroughStep !== null && !state.tutorialCompany) { get().startTour("campaign", "resume"); return; }
       let game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID(),2);
-      if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended") game=applyCampaignInput(game,{type:"enter_scaling"}).state;
+      // An acknowledged Opening continues into Scaling & Routing, as saves from before Scaling did, unless the player chose to stay.
+      if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended" && !chapterAnnounced(state.meta,game.campaign!.runId,"opening")) game=applyCampaignInput(game,{type:"enter_scaling"}).state;
       const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
       const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
       set({game,hasRun:true,meta,measurement,started:true,running:false,...openingView("campaign",state.floor,!state.hasRun && !meta.tutorialDone),
@@ -1301,6 +1309,22 @@ export const useGame = create<Store>()((set, get) => {
       if (tour) set({ tour: { ...tour, step: Math.max(0, tour.step - 1) } });
     },
     dismissChapterComplete: () => set({ chapterComplete: null }),
+    finishChapter: (choice) => {
+      const end = chapterEnd(get().game, get().scope);
+      if (!end) return false;
+      const actions = choice === "stay" ? end.stay : end.blockers.length ? null : end.proceed;
+      if (!actions) return false;
+      const runId = get().game.campaign!.runId;
+      set({ chapterComplete: null });
+      for (const action of actions) if (!get().act(action)) return false;
+      // A practice company is restored by endTour, never by play(), and has its own run: recording it would replace the real company's.
+      if (choice === "stay" && end.chapter === "opening" && !get().tutorialCompany && !chapterAnnounced(get().meta, runId, "opening")) {
+        const meta = announceChapter(get().meta, runId, "opening");
+        saveMeta(meta);
+        set({ meta });
+      }
+      return true;
+    },
     endTour: (completed) => {
       const { tour, meta, game } = get();
       // A practice company exits by restoring the paused original, whatever the player did in it.

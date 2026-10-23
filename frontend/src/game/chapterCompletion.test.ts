@@ -2,12 +2,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyAction, type Action, type GameState } from "@/sim";
 import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
-import { act, spikeCompany, tick } from "@/sim/__tests__/spikeFixtures";
-import { dataCompany } from "@/sim/__tests__/spikeFixtures";
+import { act, dataCompany, spikeCompany, tick } from "@/sim/__tests__/spikeFixtures";
 import { finishingScaling } from "@/sim/__tests__/dataFixture";
 import { step } from "@/sim/step";
 import { finishedLaunchWeek, recoveredOpening } from "./__fixtures__/openingOutcome";
-import { reliabilityOutcome } from "./__fixtures__/reliabilityOutcome";
+import { reliabilityOutcome, reliabilityOutcomeWithQueuedChange } from "./__fixtures__/reliabilityOutcome";
 import { chapterAdvance, chapterEnd } from "./chapterCompletion";
 import { PHONE_SCOPE } from "./scope";
 
@@ -79,6 +78,13 @@ describe("the end of each chapter", () => {
     const queued = act(apply(g, end.stay), { type: "add_server" });
     expect(chapterAdvance(queued)).toMatchObject({ label: "Continue to Grow the Company", ready: false, blockers: ["Queued changes have finished"] });
     expect(applyAction(queued, { type: "enter_combined" }).ok).toBe(false);
+  });
+
+  it("holds Continue while a change queued before the outcome is still installing", () => {
+    const g = reliabilityOutcomeWithQueuedChange();
+    const end = chapterEnd(g)!;
+    expect(end).toMatchObject({ chapter: "reliability", blockers: ["Queued changes have finished"] });
+    expect(apply(g, end.stay).campaign!.reliabilityStage!.acknowledged).toBe(true);
   });
 
   it("offers no Continue past the last chapter of a smaller edition", () => {

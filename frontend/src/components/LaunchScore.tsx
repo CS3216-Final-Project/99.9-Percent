@@ -3,16 +3,15 @@ import type { Campaign } from "@/sim/campaignTypes";
 import { campaignUptime } from "@/game/campaignUptime";
 import { ninesOf, uptimePct } from "@/game/format";
 import { num } from "@/game/format";
-import { useGame } from "@/game/store";
-import { Icon } from "./icons";
+import type { ChapterEnd } from "@/game/chapterCompletion";
+import { ChapterEndFoot } from "./ChapterEndFoot";
 import { Modal } from "./ui";
 
 /**
  * The Launch Week score card: how close to 100% the service stayed, in nines, with the result copyable
- * for sharing. Continuing acknowledges the opening milestone and enters Scaling & Routing.
+ * for sharing. Either choice acknowledges the opening milestone; Continue also enters Scaling & Routing.
  */
-export default function LaunchScore({ campaign }: { campaign: Campaign }) {
-  const { act } = useGame();
+export default function LaunchScore({ campaign, end }: { campaign: Campaign; end: ChapterEnd }) {
   const [copied, setCopied] = useState(false);
   const c = campaign;
   const uptime = campaignUptime(c) ?? 0;
@@ -30,9 +29,6 @@ export default function LaunchScore({ campaign }: { campaign: Campaign }) {
       <div><dt>Score</dt><dd><strong>{text}</strong></dd></div>
       <div><dt>Requests lost</dt><dd><strong>{num(lost)}</strong></dd></div>
     </dl>
-    <div className="modal-foot">
-      <button className="btn btn-quiet" onClick={copy}>{copied ? "Copied" : "Copy result"}</button>
-      <button className="btn btn-primary" onClick={() => act({ type: "acknowledge_milestone", enterScaling: true })}>Continue into Chapter 2<Icon name="next" /></button>
-    </div>
+    <ChapterEndFoot end={end} extra={<button className="btn btn-quiet" onClick={copy}>{copied ? "Copied" : "Copy result"}</button>} />
   </Modal>;
 }

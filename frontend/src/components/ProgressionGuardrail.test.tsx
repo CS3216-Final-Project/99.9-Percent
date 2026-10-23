@@ -26,7 +26,7 @@ it("counts stable spike observations and waits for an explicit acknowledgement",
  expect(guidance().textContent).toContain("Stable baseline observations: 1 / 5");expect(guidance().textContent).toContain("Autoscaling is optional");
  renderAct(()=>useGame.setState({game:tick(g,4)}));
  expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(false);
- fireEvent.click(within(screen.getByRole("dialog",{name:"Spike response handled"})).getByRole("button",{name:/Continue operating/}));
+ fireEvent.click(within(screen.getByRole("dialog",{name:"Spike response handled"})).getByRole("button",{name:"Stay in this chapter"}));
  expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(true);expect(guidance().textContent).toContain("available through Next in the chapter bar");
 });
 it("keeps a pending postmortem in front of the guidance",()=>{

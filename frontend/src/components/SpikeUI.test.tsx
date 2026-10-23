@@ -26,7 +26,7 @@ it("shows live provisioning, counters, delayed routing and per-instance shared s
 it("pending recognition stays visible after saved-state presentation and acknowledgement",()=>{
  let g=spikeCompany(false);g=act(g,{type:"set_traffic_limit",enabled:true});show(untilOffset(g,72));
  expect(screen.getByRole("dialog",{name:"Spike response handled"})).toBeTruthy();expect(screen.getByRole("button",{name:"Run"}).hasAttribute("disabled")).toBe(true);
- fireEvent.click(screen.getByRole("button",{name:"Continue operating"}));expect(chapter("Traffic Spikes")).toContain("Completed");expect(chapter("Stay Online")).toContain("Available next");
+ fireEvent.click(screen.getByRole("button",{name:"Stay in this chapter"}));expect(chapter("Traffic Spikes")).toContain("Completed");expect(chapter("Stay Online")).toContain("Available next");
 });
 
 /** Readings and purchases live on separate tabs of the panel. */
