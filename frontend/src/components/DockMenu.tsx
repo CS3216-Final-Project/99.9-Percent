@@ -1,8 +1,11 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Icon } from "./icons";
 
-/** A disclosure that leaves the clock and primary action visible. */
-export function DockMenu({ label, children, className = "" }: { label: ReactNode; children: ReactNode; className?: string }) {
+/**
+ * A disclosure that leaves the clock and primary action visible. `name` is how a guide refers to the menu when a
+ * control it points at is folded inside (for example "Views").
+ */
+export function DockMenu({ label, children, className = "", name }: { label: ReactNode; children: ReactNode; className?: string; name?: string }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const menu = ref.current;
@@ -53,7 +56,7 @@ export function DockMenu({ label, children, className = "" }: { label: ReactNode
       document.removeEventListener("keydown", escape, true);
     };
   }, []);
-  return <details ref={ref} name="bottom-controls" className={`dock-menu ${className}`}>
+  return <details ref={ref} name="bottom-controls" className={`dock-menu ${className}`} data-menu-name={name}>
     <summary>{label}<Icon name="down" size={12} /></summary>
     <div className="dock-panel">{children}</div>
   </details>;
