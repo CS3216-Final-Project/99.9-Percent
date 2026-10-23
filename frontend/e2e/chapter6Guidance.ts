@@ -31,8 +31,8 @@ export async function chapter6Preparation(page: Page, touch = false) {
     await press(hint.getByRole("button", { name: "Got it", exact: true }));
     await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(name); await expect(gold).toBeEnabled();
   };
-  await accept(/^Configure routing/); await press(gold);
-  await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("All apps"); await press(gold);
+  // Routing options are always visible, so the accepted Hint frames "All apps" directly.
+  await accept(/^All apps$/); await press(gold);
   expect((await savedGame(page)).campaign!.limit).toBe(500);
   // Deliver the same game ticks via the existing 2× control, with half as many WebGL frames.
   await setGameSpeed(page, 2);

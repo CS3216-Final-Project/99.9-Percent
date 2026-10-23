@@ -6,7 +6,6 @@ import { previewCampaignAction } from "@/game/campaignFinance";
 import { PurchaseFinance, PurchaseTile, PurchaseWarning } from "./PurchaseFinance";
 import { useGame } from "@/game/store";
 import { floorOf } from "@/game/floors";
-import { lessonAt } from "@/game/walkthrough";
 import { moneyFull as money } from "@/game/format";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
@@ -19,6 +18,7 @@ import { Icon } from "./icons";
 import { confirmationRoomArea } from "./roomArea";
 import { confirmingAction, setConfirming, subscribeConfirming } from "./actionConfirmation";
 import { guidanceActionId } from "@/game/campaignAttention";
+import { milestoneBlocks } from "@/game/campaignGuidance";
 import { useCampaignAttention } from "./useCampaignAttention";
 
 /** Equipment roles shown in the quote's supporting facts. */
@@ -50,8 +50,6 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   const c = game.campaign!, id = useId(), card = useRef<HTMLDivElement>(null);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
   const { confirmationGold } = useCampaignAttention();
-  const quoteLesson = useGame(s => s.started && !s.onboarding && s.game.phase === "management" && s.tour?.track === "campaign" ? lessonAt(s.tour.step) : undefined);
-  const practiceQuote = quoteLesson === "quote" || quoteLesson === "cancel";
   const open = confirming === props.label;
   const restoreFocus = useRef(false);
   useLayoutEffect(()=>{
@@ -96,7 +94,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   const increase = upkeep === null ? null : isScale ? upkeep - Q.appWeeklyCents : label === "Upgrade database" ? upkeep - currentDbUpkeep : upkeep;
   let reason = "See this action's requirements for details.";
   if (game.phase === "ended") reason = "This company has ended.";
-  else if (game.phase === "review" || pendingStop(c) !== null || c.openingMilestone && !c.openingMilestone.acknowledged) reason = "Acknowledge the pending review or milestone first.";
+  else if (game.phase === "review" || pendingStop(c) !== null || milestoneBlocks(c)) reason = "Acknowledge the pending review or milestone first.";
   else if (props.price && c.cashCents <= props.price * 100) reason = "Not enough available cash. Pending revenue cannot fund purchases.";
   else if (isAdd && c.apps.length >= (c.spikeStage ? T.maximum : Q.maxApps)) reason = "All instance slots are occupied.";
   else if (isScale && app.tier !== "base") reason = "This App Server is already at its largest tier.";
@@ -133,24 +131,24 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   const floor = useGame(s=>s.floor), home = floorOf(affected[0]);
   useEffect(()=>{
     if (!open || floor === home) return;
-    if (practiceQuote) { useGame.getState().goToFloor(home, "action"); return; }
     // Focus inside the closing card goes back to its action, as Cancel does; focus elsewhere stays put.
     restoreFocus.current = !!document.activeElement?.closest(".campaign-action-popover");
     setConfirming(null);
-  },[open, floor, home, practiceQuote]);
+  },[open, floor, home]);
   if (props.decision && preview && !preview.ok && !introductionActive) reason = preview.reason;
   const highlight = open || pointing && confirming === null, affectedKey = affected.join();
+  const decisionKey = props.decision ? JSON.stringify(props.decision) : "";
   useEffect(() => {
     if (!highlight) return;
-    useGame.getState().setAffected(affectedKey.split(",") as EquipmentId[]);
+    useGame.getState().setAffected(affectedKey.split(",") as EquipmentId[], decisionKey ? JSON.parse(decisionKey) as Action : null);
     return () => {
       // Focus leaving another action must not erase the currently open decision's highlight.
       const active = confirmingAction();
       if (active === null || active === props.label) useGame.getState().setAffected([]);
     };
   // Reapply on opening even if this action was already highlighted by hover before the click.
-  }, [highlight, affectedKey, props.label, open]);
-  const cancel = () => { if (quoteLesson === "quote") return; restoreFocus.current=true; setConfirming(null, true); };
+  }, [highlight, affectedKey, decisionKey, props.label, open]);
+  const cancel = () => { restoreFocus.current=true; setConfirming(null, true); };
   const costs = <>
     {preview?.ok ? <PurchaseFinance preview={preview} /> : <dl className="purchase-tiles">
       {props.price !== undefined && <PurchaseTile icon="cost" label="Setup" value={money(props.price)} tone={props.price > 0 ? "cost" : "ok"} />}
@@ -167,7 +165,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   // A per-app action sits next to that app's marker; anything else next to the machine's own.
   const anchor = isScale ? c.apps.find(a => `Scale up App ${a.id.slice(4)}` === label)?.id ?? "app" : affected[0];
   const toggle = () => {
-    if (open) { if (!practiceQuote) setConfirming(null); return; }
+    if (open) { setConfirming(null); return; }
     setConfirming(label);
     reviewed.current = signature(preview);
     setReviewedQuote(signature(preview));
@@ -183,7 +181,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     <Act {...props} disabled={props.disabled || preview?.ok === false} onClick={toggle} />
     {!open && (props.disabled || preview?.ok === false) && <p className="campaign-action-reason" id={id} tabIndex={0}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
     {open && <ActionPopover anchor={anchor}>
-      <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); if (!practiceQuote) cancel(); } }}>
+      <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); cancel(); } }}>
         <div className="campaign-purchase-body" role="region" aria-label="Purchase preview" tabIndex={0}>
           <div className="campaign-purchase-essential">
             <p className="campaign-action-confirm-title">{isAdd ? "Add App Server" : label}</p>
@@ -219,8 +217,8 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
         {(props.disabled || preview?.ok===false) && <p role="status">{reason}</p>}
         {changed && <p role="status">The purchase preview changed. Review the current figures, then confirm again.</p>}
         <div className="btn-row">
-          <button type="button" className={`btn btn-primary btn-small${confirmationGold && preview?.ok && !props.disabled && !practiceQuote && signature(preview) === reviewedQuote ? " campaign-gold-attention" : ""}`} autoFocus={!practiceQuote} disabled={practiceQuote || props.disabled || preview?.ok === false} onClick={() => {
-            if (practiceQuote || !open || dispatched.current) return;
+          <button type="button" className={`btn btn-primary btn-small${confirmationGold && preview?.ok && !props.disabled && signature(preview) === reviewedQuote ? " campaign-gold-attention" : ""}`} autoFocus disabled={props.disabled || preview?.ok === false} onClick={() => {
+            if (!open || dispatched.current) return;
             if (props.decision) {
               const latest = previewCampaignAction(useGame.getState().game,props.decision);
               if (!latest.ok) { useGame.getState().notify(latest.reason,"error"); return; }
@@ -229,7 +227,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
             dispatched.current = true;
             setConfirming(null); props.onClick();
           }}>Confirm</button>
-          <button type="button" className="btn btn-small" disabled={quoteLesson === "quote"} onClick={cancel}>Cancel</button>
+          <button type="button" className="btn btn-small" onClick={cancel}>Cancel</button>
         </div>
         </footer>
       </section>

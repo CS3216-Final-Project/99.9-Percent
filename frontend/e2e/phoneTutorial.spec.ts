@@ -1,18 +1,19 @@
 import type { Locator, Page } from "@playwright/test";
-import { test, expect, expectRoom, seedSave, tutorial, savedGame, CHAPTER_ZERO_LESSONS } from "./fixtures";
+import { test, expect, expectRoom, seedSave, savedGame, savedClassicGame, unlockChallenge } from "./fixtures";
 import { applyAction, newGame, type GameState } from "../src/sim";
-import { advanceSteps } from "../src/sim/step";
+import { advanceSteps, applyCampaignInput, step } from "../src/sim/step";
 
 /*
- * The phone edition's coach strip (Pixel 7, touch). Chapter 0 docks in one fixed-size strip above the dock, so the
- * room keeps at least 40% of the screen and each lesson's real control stays in view and uncovered. Longer reading
- * opens in a layer that never covers that control.
+ * The phone edition's coach strip (Pixel 7, touch). Launch Week's spotlight steps dock in one fixed-size strip above
+ * the dock, so the room keeps at least 40% of the screen and each step's real control stays in view and uncovered.
+ * The dock carries the speed menu and End week beside Run.
  */
 
 type Box = { x: number; y: number; width: number; height: number };
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width - 1 && b.x < a.x + a.width - 1 && a.y < b.y + b.height - 1 && b.y < a.y + a.height - 1;
 const box = async (locator: Locator) => (await locator.boundingBox())!;
-const near = (a: Box, b: Box) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1 && Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
+/** Whether `inner` lies within `outer`, to a pixel. */
+const inside = (inner: Box, outer: Box) => inner.x >= outer.x - 1 && inner.y >= outer.y - 1 && inner.x + inner.width <= outer.x + outer.width + 1 && inner.y + inner.height <= outer.y + outer.height + 1;
 const SHOTS = process.env.PHONE_TUTORIAL_SHOTS ?? "test-results";
 
 /** The share of the screen's height where the room shows: rows whose centre and quarter points reach the stage. */
@@ -41,174 +42,100 @@ function uncovered(locator: Locator) {
   });
 }
 
-/** Lessons where the real control is a full-width purchase quote while it is open: it covers the room by design. */
-const QUOTE_LESSONS = new Set(["quote", "cancel"]);
-/**
- * Lessons whose control is in the System metrics sheet. Under about 700 px of height, the sheet's header and one row
- * of controls (or an inspection's three readings) leave the room less than 40% of the screen, but never less than this.
- */
-const SHEET_LESSONS = new Set(["inspect-app", "inspect-db", "warnings", "quote"]);
-const SHORT_SHEET_SHARE = 0.25;
+const launchStep = (page: Page) => page.getByRole("region", { name: "Launch Week tutorial" });
+const dockBox = (page: Page) => box(page.locator(".phone-dock").first());
 
-async function startWalkthrough(page: Page) {
+/** Advance a Launch Week company in the simulation until `cond` holds. */
+function runUntil(s: GameState, cond: (s: GameState) => boolean, cap = 200): GameState {
+  for (let i = 0; i < cap && !cond(s) && s.phase !== "ended"; i++) {
+    if (s.phase === "review") { const r = applyCampaignInput(s, { type: "acknowledge_review" }); if (!r.result.ok) throw Error(r.result.message); s = r.state; }
+    else s = step(s).state;
+  }
+  return s;
+}
+
+async function boot(page: Page, game: GameState) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("**/api/**", route => route.abort());
-  await seedSave(page, newGame(1, "phone-coach"), { tutorialDone: false, walkthroughStep: 0 });
+  await seedSave(page, game);
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
   await expectRoom(page);
 }
 
+/** The strip sits directly above the dock, at the strip's fixed height, and never covers the lit control. */
+async function expectDocked(page: Page, width: number) {
+  const strip = await box(launchStep(page));
+  const dock = await dockBox(page);
+  expect(strip.height).toBeLessThanOrEqual(150);
+  expect(strip.y + strip.height).toBeLessThanOrEqual(dock.y + 1);
+  expect(dock.y - (strip.y + strip.height)).toBeLessThanOrEqual(12);
+  expect(strip.x).toBeGreaterThanOrEqual(0);
+  expect(strip.x + strip.width).toBeLessThanOrEqual(width + 0.5);
+  const lit = page.locator("[data-spotlight]").first();
+  if (await lit.count()) {
+    await expect(lit).toBeInViewport();
+    expect(overlaps(strip, await box(lit))).toBe(false);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+}
+
 for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
-  test(`Chapter 0 coaches from a fixed strip above the dock and keeps the room and each control in view at ${width}x${height}`, async ({ page }) => {
-    // Every lesson is checked and photographed with the room drawn in software.
-    test.setTimeout(300_000);
+  test(`Launch Week docks its spotlight steps above the dock, with speeds and End week in the dock, at ${width}x${height}`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await startWalkthrough(page);
-    const card = tutorial(page);
-    await expect(card).toHaveAttribute("aria-modal", "false");
-    await expect(card).toHaveClass(/phone-coach/);
-    // The first lesson's Back is invisible but keeps its slot, so it is measured by its place in the strip.
-    const back = card.locator(".phone-coach-back");
-    const next = card.getByRole("button", { name: /^(Next|Finish walkthrough)$/ });
-    const more = card.getByRole("button", { name: "Learn more", exact: true });
-    const reading = page.getByRole("region", { name: /^About / });
-    const panel = page.getByRole("complementary", { name: "System metrics" });
-    let strip: Box | null = null, backBox: Box | null = null, nextBox: Box | null = null;
-
-    const check = async (id: string, state: string) => {
-      await expect(card).toBeInViewport({ ratio: 1 });
-      // The same box, and Back and Next in the same places, in every lesson and state.
-      const now = await box(card), b = await box(back), n = await box(next);
-      strip ??= now; backBox ??= b; nextBox ??= n;
-      expect(near(now, strip), `strip box in ${id} ${state}`).toBe(true);
-      expect(near(b, backBox), `Back in ${id} ${state}`).toBe(true);
-      expect(near(n, nextBox), `Next in ${id} ${state}`).toBe(true);
-      expect(now.height).toBeLessThanOrEqual(150);
-      // Directly above the dock, not over it.
-      const dock = page.locator(".phone-dock, .bottombar").first();
-      const dockTop = (await box(dock)).y;
-      expect(now.y + now.height).toBeLessThanOrEqual(dockTop + 1);
-      expect(dockTop - (now.y + now.height)).toBeLessThanOrEqual(12);
-      // Touch targets.
-      for (const control of [b, n, await box(more)]) expect(control.height).toBeGreaterThanOrEqual(44);
-      // Nothing in the strip is clipped: the title and the one-line task are complete.
-      expect(await card.evaluate(el => [...el.querySelectorAll("h3, .phone-coach-task, .phone-coach-kicker")].every(e => e.scrollWidth <= e.clientWidth + 1 && e.scrollHeight <= e.clientHeight + 1))).toBe(true);
-      // The lit control is fully in view and nothing (strip, reading layer, dock) is on top of it.
-      // Inspected readings: the sheet shows the card's demand, capacity and backlog rows, which are what is lit.
-      const target = state === "readings" ? page.locator(".chapter-zero-target .evidence-rows") : page.locator(".chapter-zero-target");
-      if (await target.count()) {
-        await expect.poll(() => uncovered(target), `${id} ${state}: the lit control is uncovered`).toBe(true);
-        await expect.poll(async () => {
-          const lit = await box(page.locator(".cz-spotlight")), t = await box(target);
-          return t.y >= lit.y - 1 && t.y + t.height <= lit.y + lit.height + 1 && t.x >= lit.x - 1 && t.x + t.width <= lit.x + lit.width + 1;
-        }, `${id} ${state}: the control is inside the lit window`).toBe(true);
-        expect(overlaps(await box(target), now)).toBe(false);
-      }
-      // An open quote, and on short screens an open dock menu, cover the room by design while they are open.
-      const popover = QUOTE_LESSONS.has(id) && await page.locator(".campaign-action-popover").count() || state === "menu" && height < 700;
-      if (!popover) {
-        const least = height < 700 && SHEET_LESSONS.has(id) ? SHORT_SHEET_SHARE : 0.4;
-        await expect.poll(() => roomShare(page), `${id} ${state}: room share`).toBeGreaterThanOrEqual(least);
-        console.log(`${width}x${height} ${id} ${state}: room ${(await roomShare(page)).toFixed(2)}`);
-      }
-      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-      await page.screenshot({ path: `${SHOTS}/phone-coach-${width}x${height}-${String(lesson).padStart(2, "0")}-${id}-${state}.png` });
-    };
-
-    const readMore = async (id: string) => {
-      // Learn more opens beside the lit control, never over it, and Escape returns to the toggle.
-      await more.tap();
-      await expect(more).toHaveAttribute("aria-expanded", "true");
-      await expect(reading).toBeVisible();
-      await expect(reading).toBeFocused();
-      await expect(reading).toBeInViewport();
-      const target = page.locator(".chapter-zero-target");
-      if (await target.count()) {
-        await expect.poll(async () => overlaps(await box(reading), await box(target)), `${id}: reading layer covers the control`).toBe(false);
-        // A useful reading area, not a sliver: it shows all its text or at least 120 px of it.
-        expect(await reading.evaluate(el => el.scrollHeight <= el.clientHeight + 1 || el.clientHeight >= 120)).toBe(true);
-        await expect.poll(() => uncovered(target)).toBe(true);
-      }
-      expect(overlaps(await box(reading), await box(card))).toBe(false);
-      const menu = page.getByRole("button", { name: "Menu", exact: true });
-      await expect.poll(() => uncovered(menu)).toBe(true);
-      await page.screenshot({ path: `${SHOTS}/phone-coach-${width}x${height}-${String(lesson).padStart(2, "0")}-${id}-reading.png` });
-      await page.keyboard.press("Escape");
-      await expect(reading).toBeHidden();
-      await expect(more).toBeFocused();
-      await expect(more).toHaveAttribute("aria-expanded", "false");
-    };
-
-    let lesson = 1;
-    for (; lesson <= CHAPTER_ZERO_LESSONS; lesson++) {
-      await expect(card).toHaveAccessibleName(`Walkthrough, step ${lesson} of ${CHAPTER_ZERO_LESSONS}`);
-      const id = (await card.getAttribute("data-lesson-id"))!;
-      await check(id, "open");
-      await expect(card.getByRole("button", { name: "Back", exact: true })).toHaveCount(lesson === 1 ? 0 : 1);
-      await readMore(id);
-      if (id === "inspect-app" || id === "inspect-db") {
-        await panel.getByRole("button", { name: id === "inspect-app" ? "App Server" : "Database", exact: true }).tap();
-        await expect(next).toBeEnabled();
-        // The readings join the lit window, in view and uncovered.
-        await expect(card).toHaveAttribute("data-inspected", "true");
-        await check(id, "readings");
-      } else if (id === "run") {
-        await page.getByRole("button", { name: "Run", exact: true }).tap();
-        await expect(card).toHaveAttribute("data-lesson-id", "quote");
-        continue;
-      } else if (id === "quote") {
-        await panel.locator(".act:not(:disabled)").first().tap();
-        await expect(card).toHaveAttribute("data-lesson-id", "cancel");
-        continue;
-      } else if (id === "cancel") {
-        const quote = page.getByRole("region", { name: /^Confirm / });
-        await expect(quote.getByRole("button", { name: "Confirm", exact: true })).toBeDisabled();
-        // Next would close the quote too; the quote's own Cancel also moves on.
-        await expect(next).toBeEnabled();
-        await quote.getByRole("button", { name: "Cancel", exact: true }).tap();
-        await expect(card).toHaveAttribute("data-lesson-id", "money");
-        continue;
-      } else if (id === "speed") {
-        const menu = page.locator(".time-menu");
-        await menu.locator(":scope > summary").tap();
-        await check(id, "menu");
-        await page.getByRole("group", { name: "Game speed", exact: true }).locator('button:not([aria-pressed="true"])').first().tap();
-        await expect(card).toHaveAttribute("data-lesson-id", "ready");
-        // The finished exercise closes the speed menu, so the room is clear for the last lesson.
-        await expect(page.getByRole("group", { name: "Game speed", exact: true })).toBeHidden();
-        continue;
-      }
-      await next.tap();
-    }
-    await expect(card).toBeHidden();
-    await expect(page.locator(".cz-spotlight")).toHaveCount(0);
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem("nn.campaign.meta.v1") ?? "{}").tutorialDone)).toBe(true);
-    expect((await savedGame(page)).campaign).toMatchObject({ step: 1, actions: [], pending: [] });
-    await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
+    await boot(page, newGame(7, `phone-lw-${width}`, 2));
+    await page.getByRole("button", { name: "Open the doors", exact: true }).tap();
+    // The first step lights Run, which stays in view and uncovered beside the strip.
+    await expect(launchStep(page)).toContainText("launch week starts now");
+    const run = page.locator(".phone-dock").getByRole("button", { name: "Run", exact: true });
+    await expect(page.locator("[data-spotlight]")).toHaveAccessibleName("Run");
+    await expect(run).toBeInViewport({ ratio: 1 });
+    expect(await uncovered(run)).toBe(true);
+    await expectDocked(page, width);
+    // The dock shows End week beside Run; the three speeds are one tap away in the speed menu.
+    const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
+    await expect(rush).toBeInViewport({ ratio: 1 });
+    expect((await box(rush)).height).toBeGreaterThanOrEqual(44);
+    const dock = await dockBox(page);
+    expect((await box(rush)).y).toBeGreaterThanOrEqual(dock.y - 1);
+    await page.locator(".phone-dock .time-menu > summary").tap();
+    const speeds = page.getByRole("group", { name: "Game speed" });
+    for (const label of ["0.5×", "1×", "2×"]) await expect(speeds.getByRole("button", { name: label, exact: true })).toBeVisible();
+    await speeds.getByRole("button", { name: "2×", exact: true }).tap();
+    await page.locator(".phone-dock .time-menu > summary").tap();
+    await page.screenshot({ path: `${SHOTS}/phone-launch-run-${width}x${height}.png` });
     await expect.poll(() => roomShare(page)).toBeGreaterThanOrEqual(0.4);
+    // Run follows the spotlight; the step clears while the clock runs.
+    await run.tap();
+    await expect(launchStep(page)).toBeHidden();
+    await expect(page.locator(".phone-dock").getByRole("button", { name: "Pause", exact: true })).toBeVisible();
   });
 }
 
-test("a completed player's replay keeps Skip tutorial in the strip", async ({ page, withoutRoom }) => {
-  await withoutRoom();
-  await page.setViewportSize({ width: 320, height: 568 });
-  await page.route("**/api/**", route => route.abort());
-  await seedSave(page, newGame(1, "phone-replay"), { walkthroughStep: 0, walkthroughFurthestStep: 0 });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Continue company", exact: true }).tap();
-  const card = tutorial(page);
-  await expect(card).toContainText("Practice");
-  await expect(card.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
-  const back = await box(card.locator(".phone-coach-back"));
-  const ret = card.getByRole("button", { name: "Skip tutorial", exact: true });
-  await expect(ret).toBeInViewport({ ratio: 1 });
-  expect((await box(ret)).height).toBeGreaterThanOrEqual(44);
-  await expect(card.getByRole("heading")).toBeInViewport({ ratio: 1 });
-  expect(back.height).toBeGreaterThanOrEqual(44);
-  await page.screenshot({ path: `${SHOTS}/phone-coach-replay-320x568.png` });
-  await ret.tap();
-  await expect(card).toBeHidden();
+test("the database incident is taught from the same strip, and End week rushes the clock by touch", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await boot(page, runUntil(newGame(7, "phone-lw-incident", 2), s => !!s.campaign!.incident));
+  // The incident pauses the company and the strip points at the database, never at the app server.
+  await expect(launchStep(page)).toBeVisible();
+  await expect(launchStep(page)).toContainText(/database/i);
+  await expectDocked(page, 390);
+  await page.screenshot({ path: `${SHOTS}/phone-launch-incident-390x844.png` });
+  const saved = await savedGame(page);
+  expect(saved.campaign!.incident).toBeTruthy();
+});
+
+test("End week rushes a stable Launch Week by touch", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  let s = runUntil(newGame(7, "phone-lw-rush", 2), x => !!x.campaign!.incident);
+  const r = applyCampaignInput(s, { type: "start_db_upgrade" });
+  if (!r.result.ok) throw Error(r.result.message);
+  s = runUntil(r.state, x => x.phase === "management" && !x.campaign!.incident && x.campaign!.step >= 20);
+  await boot(page, s);
+  const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
+  await expect(rush).toBeEnabled();
+  await rush.tap();
+  await expect(rush).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => (await savedGame(page)).campaign!.step, { timeout: 20_000 }).toBeGreaterThan(s.campaign!.step);
 });
 
 function act(g: GameState, action: Parameters<typeof applyAction>[1]) { const r = applyAction(g, action); if (!r.ok) throw Error(r.message); return r.state; }
@@ -239,3 +166,86 @@ test("a chapter guide uses the same coach strip above the dock", async ({ page }
   await got.tap();
   await expect(guide).toBeHidden();
 });
+
+/** Whether the spotlight's lit window holds the whole control, so the control the hint names is not under the dim. */
+async function lit(page: Page, target: Locator) {
+  const hole = page.locator(".tour-hole");
+  if (!(await hole.count()) || !(await target.count())) return false;
+  const h = await box(hole);
+  return h.height > 0 && inside(await box(target), h);
+}
+
+for (const [width, height] of [[390, 844], [320, 568]]) {
+  test(`Challenge Mode's first week lights each control it names, including the dock's, at ${width}x${height}`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width, height });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.route("**/api/**", route => route.abort());
+    await unlockChallenge(page);
+    await page.addInitScript(() => localStorage.setItem("nn.mode.v1", "classic"));
+    await page.goto("/");
+    await page.getByRole("button", { name: "Start Challenge Mode", exact: true }).tap();
+    await expectRoom(page);
+    const card = page.getByRole("dialog", { name: /^Tutorial, step/ });
+    const prompt = card.locator(".tour-prompt");
+    const shot = async (name: string) => {
+      // What to press is never scrolled under the strip's Skip and Next.
+      await expect.poll(() => uncovered(prompt), `${name}: the hint is in view`).toBe(true);
+      await page.screenshot({ path: `${SHOTS}/phone-challenge-${width}x${height}-${name}.png` });
+    };
+
+    // 1. Add a server, from the room's Servers label and then the panel.
+    await expect(card).toHaveAccessibleName("Tutorial, step 1 of 5");
+    const servers = page.getByRole("main").getByRole("button", { name: "Servers", exact: true });
+    await expect.poll(() => lit(page, servers), "the Servers label is lit").toBe(true);
+    await shot("01-servers");
+    await servers.tap();
+    // Inspecting from the room always opens its reveal first.
+    await page.getByRole("dialog", { name: "Servers inspected" }).getByRole("button", { name: "Return to room" }).tap();
+    await page.getByRole("button", { name: /Add server/ }).tap();
+
+    // 2. Explore Scale Up: the Tech tab is in the dock, or folded into its Views menu on the narrowest phones.
+    await expect(card).toHaveAccessibleName("Tutorial, step 2 of 5");
+    const techTab = page.locator(".phone-dock").getByRole("button", { name: /^Tech/ });
+    const views = page.locator(".phone-views-menu > summary");
+    if (width < 360) {
+      await expect(views).toBeVisible();
+      await expect(prompt).toHaveText("Open Views, then open Tech.");
+      await expect.poll(() => lit(page, views), "the Views menu is lit").toBe(true);
+      await shot("02-views");
+      await views.tap();
+    }
+    await expect(prompt).toHaveText("Open Tech.");
+    await expect.poll(() => lit(page, techTab), "the Tech tab is lit").toBe(true);
+    await shot("02-tech");
+    await techTab.tap();
+    await page.getByRole("button", { name: "Scale Up: Available" }).tap();
+    await page.getByRole("button", { name: /^Start/ }).tap();
+
+    // 3. Get more users: the Growth label starts under the sheet, so the room brings it into the open part.
+    await expect(card).toHaveAccessibleName("Tutorial, step 3 of 5");
+    const growthLabel = page.getByRole("main").getByRole("button", { name: "Growth", exact: true });
+    await expect.poll(() => lit(page, growthLabel), "the Growth label is lit").toBe(true);
+    await expect.poll(() => uncovered(growthLabel), "the Growth label is above the sheet").toBe(true);
+    await shot("03-growth");
+    await growthLabel.tap();
+    await page.getByRole("dialog", { name: "Growth inspected" }).getByRole("button", { name: "Return to room" }).tap();
+    await page.getByRole("button", { name: /^Launch/ }).first().tap();
+
+    // 4. Play the week: Next week is in the dock, below the coach strip.
+    await expect(card).toHaveAccessibleName("Tutorial, step 4 of 5");
+    const next = page.getByRole("button", { name: "Next week", exact: true });
+    await expect.poll(() => lit(page, next), "Next week is lit").toBe(true);
+    expect(overlaps(await box(page.locator(".tour-hole")), await box(card))).toBe(false);
+    await shot("04-next-week");
+    await next.tap();
+
+    await expect(card).toHaveAccessibleName("Tutorial, step 5 of 5");
+    await card.getByRole("button", { name: "Got it", exact: true }).tap();
+    await expect(card).toBeHidden();
+    const after = await savedClassicGame(page);
+    expect(after.turn).toBe(2);
+    expect(after.infra.appHosts).toHaveLength(2);
+    expect(after.totals.promosRun).toBe(1);
+  });
+}

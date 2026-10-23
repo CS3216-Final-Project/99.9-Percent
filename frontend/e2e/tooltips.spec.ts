@@ -1,6 +1,7 @@
 import { openCameraControls } from "./fixtures";
 import { test, expect, expectRoom, seedSave } from "./fixtures";
-import { newGame } from "../src/sim";
+import { newGame, applyAction } from "../src/sim";
+import { advanceSteps } from "../src/sim/step";
 
 test("explains controls in the shared tooltip, never the browser's own", async ({ page }) => {
   await seedSave(page, newGame(1, "tooltips"));
@@ -35,12 +36,21 @@ test("explains controls in the shared tooltip, never the browser's own", async (
 
 test("explains a locked control, which is where the reason for being locked is shown", async ({ page, withoutRoom }) => {
   await withoutRoom();
-  await page.goto("/"); await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
+  const upgraded = applyAction(advanceSteps(newGame(1, "tooltips-review"), 6).state, { type: "start_db_upgrade" });
+  if (!upgraded.ok) throw Error(upgraded.message);
+  await seedSave(page, advanceSteps(upgraded.state, 30).state);
+  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  // The recovery-notice handler already acknowledges "System Recovered!" into the report.
+  const report = page.getByRole("dialog", { name: "Incident postmortem" });
+  await expect(report).toBeVisible();
+  await report.getByRole("button", { name: "Continue company", exact: true }).click();
   const run = page.getByRole("button", { name: "Run", exact: true });
   await expect(run).toBeDisabled();
-  await run.hover();
+  // The growth-review dialog keeps the Run dock covered, so a real hover cannot reach the
+  // locked control; the shared tooltip listens on pointerover, which still explains the lock.
+  await run.dispatchEvent("pointerover");
   const tip = page.getByRole("tooltip");
-  await expect(tip).toContainText("Finish the walkthrough to run the company");
+  await expect(tip).toContainText("Run or pause the company");
   await expect(tip).toHaveCSS("opacity", "1");
   const box = (await tip.boundingBox())!, view = page.viewportSize()!;
   expect(box.x + box.width).toBeLessThanOrEqual(view.width);

@@ -11,8 +11,22 @@ const LOADED = performance.now();
 const fixed = timeOverride(window.location.search);
 const begin = loadTimeOfDay() ?? START;
 
+/** Seconds the clock has stood still, and since when it has, while the traffic view holds it. */
+let stoppedSeconds = 0;
+let stoppedAt: number | null = null;
+
 export function timeNow(): number {
-  return timeOfDay((performance.now() - LOADED) / 1000, fixed, begin);
+  const at = stoppedAt ?? performance.now();
+  return timeOfDay((at - LOADED) / 1000 - stoppedSeconds, fixed, begin);
+}
+
+/** Stops the day where it is, so the light and the shadows hold still, and lets it run on from there. */
+export function holdDay(hold: boolean): void {
+  if (hold && stoppedAt === null) stoppedAt = performance.now();
+  else if (!hold && stoppedAt !== null) {
+    stoppedSeconds += (performance.now() - stoppedAt) / 1000;
+    stoppedAt = null;
+  }
 }
 
 /** The light and the sky outside, now. */

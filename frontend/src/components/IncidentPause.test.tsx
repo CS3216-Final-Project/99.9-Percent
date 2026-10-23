@@ -111,10 +111,10 @@ it("a valid purchase Confirm wins immediately and consumes the Pause invitation"
   fireEvent.click(screen.getByRole("button", { name: "Cancel" })); expect(gold()).toHaveLength(0);
   act(() => useGame.getState().tick(1)); expect(gold()).toHaveLength(0);
 });
-it.each(["walkthrough", "practice"])("leaves %s incident controls alone", owner => {
+it("leaves practice incident controls alone", () => {
   const { before, incident } = transition(3); show(before);
-  act(() => useGame.setState({ game: incident, running: true, tour: { track: "campaign", step: 0 },
-    tutorialCompany: owner === "practice" ? { game: before, remainderMs: 0, measurement: useGame.getState().measurement } : null }));
+  act(() => useGame.setState({ game: incident, running: true,
+    tutorialCompany: { game: before, remainderMs: 0, measurement: useGame.getState().measurement } }));
   expect(gold()).toHaveLength(0); expect(screen.queryByRole("button", { name: "Hint" })).toBeNull();
 });
 it("offers Pause for a later distinct incident in the same company after a free recovery strategy", () => {

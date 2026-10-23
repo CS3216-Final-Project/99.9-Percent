@@ -125,9 +125,12 @@ function useSoundEffects(): void {
     const stopAvatar = useGame.subscribe((s, prev) => {
       if (s.avatar !== prev.avatar) sfx.playScene("pop", 0.9, true);
     });
+    // A ride cut straight to its floor is never shown, so it has only a short bell as it arrives.
     const stopRide = onRide((event) => {
       const up = FLOOR_Y[ride.to] > FLOOR_Y[ride.from];
-      if (event === "depart") sfx.liftDepart(up, RIDE_SECONDS / 2);
+      if (ride.cut) {
+        if (event === "arrive") sfx.liftCut(up);
+      } else if (event === "depart") sfx.liftDepart(up, RIDE_SECONDS / 2);
       else sfx.liftArrive(up, { close: DOORS.move + DOORS.hold, shut: 2 * DOORS.move + DOORS.hold });
     });
     // The zones' own sounds, near where the camera looks, while a run is on screen and nothing covers the room.

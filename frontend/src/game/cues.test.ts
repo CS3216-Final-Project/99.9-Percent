@@ -1,4 +1,3 @@
-import { completeTutorialFixture } from "@/testing/tutorial";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { advanceTurn, applyAction, incidentTick, newGame, newLegacyGame, type Action, type ActionAttempt, type GameState } from "../sim";
 import { advanceSteps, applyCampaignInput } from "../sim/step";
@@ -460,25 +459,19 @@ describe("watching the store", () => {
     expect(heard).toEqual(["launch"]);
   });
 
-  it("marks the end of the campaign walkthrough, but not its steps, an attempted skip or a replay starting", async () => {
+  it("plays neither a launch nor a finish for a Launch Week practice replay", async () => {
     const s = () => useGame.getState();
     s().boot();
     s().play();
     await settle();
-    expect(s().tour).toEqual({ track: "campaign", step: 0 });
     heard.length = 0;
-    s().tourNext();
-    await settle();
-    s().endTour(false);
-    await settle();
-    expect(heard).toEqual([]);
-    // Replaying it keeps the same company, so it is not a launch; finishing it is the end of the introduction.
+    // Replaying Launch Week on a practice company is neither a launch nor an introduction.
     s().startTour("campaign");
     await settle();
     expect(heard).toEqual([]);
-    completeTutorialFixture();
+    s().endTour(false);
     await settle();
-    expect(heard).toEqual(["unlock"]);
+    expect(heard).toEqual([]);
   });
 
   it("marks the end of the classic walkthrough, but not its steps or a skip", async () => {

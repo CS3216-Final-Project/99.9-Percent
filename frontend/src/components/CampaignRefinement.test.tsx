@@ -10,7 +10,6 @@ import { CampaignAction } from "./CampaignAction";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-// These tests drive the clock, which the Opening walkthrough holds until it is done.
 function start() { saveMeta({ ...DEFAULT_META, tutorialDone: true }); useGame.getState().boot(); useGame.getState().play(); }
 function renderCompany(game?: GameState) {
   if (game) useGame.setState({ game, ready: true, hasRun: true, started: true, onboarding: false });
@@ -18,25 +17,18 @@ function renderCompany(game?: GameState) {
 }
 function perform(game:GameState, action:Parameters<typeof applyAction>[1]) { const r=applyAction(game,action); if(!r.ok) throw Error(r.message); return r.state; }
 
-it("makes Run/Pause primary, with secondary manual steps", () => {
+it("makes Run/Pause primary, with visible speed choices and an end-of-week rush", () => {
   start(); renderCompany(); const run=screen.getByRole("button",{name:"Run"});
   expect(run.className).toContain("btn-primary");
-  expect(screen.queryByRole("button",{name:/Advance (?:game second|step)/,hidden:true})).toBeNull();
+  expect(screen.queryByRole("group",{name:"Step time"})).toBeNull();
   fireEvent.click(run); expect(useGame.getState().running).toBe(true);
   fireEvent.click(screen.getByRole("button",{name:"Pause"})); expect(useGame.getState().running).toBe(false);
-  const steps=within(screen.getByRole("group",{name:"Step time"}));
-  // Steps never compete with Run: they are not primary, and a step pauses a running clock.
-  expect(steps.getByRole("button",{name:"Step 1 game second"}).className).not.toContain("btn-primary");
-  fireEvent.click(run); fireEvent.click(steps.getByRole("button",{name:"Step 1 game second"}));
-  expect(useGame.getState().running).toBe(false); expect(screen.getByTestId("physical-step").textContent).toBe("1");
-  fireEvent.click(steps.getByRole("button",{name:"Step 5 game seconds"})); expect(screen.getByTestId("physical-step").textContent).toBe("6");
-  // The opening incident is live: stepping keeps working there.
-  fireEvent.click(steps.getByRole("button",{name:"Step 1 game second"})); expect(screen.getByTestId("physical-step").textContent).toBe("7");
-});
-it("disables manual steps while the walkthrough holds the clock", () => {
-  useGame.getState().boot(); useGame.getState().play(); renderCompany();
-  expect((screen.getByRole("button",{name:"Step 1 game second"}) as HTMLButtonElement).disabled).toBe(true);
-  expect((screen.getByRole("button",{name:"Step 5 game seconds"}) as HTMLButtonElement).disabled).toBe(true);
+  const speeds=within(screen.getByRole("group",{name:"Game speed"}));
+  fireEvent.click(speeds.getByRole("button",{name:"0.5×"})); expect(useGame.getState().speed).toBe(0.5);
+  fireEvent.click(speeds.getByRole("button",{name:"2×"})); expect(useGame.getState().speed).toBe(2);
+  const rush=speeds.getByRole("button",{name:"End the week at 20 times speed"});
+  fireEvent.click(rush); expect(useGame.getState().weekRush).toBe(true); expect(useGame.getState().running).toBe(true);
+  fireEvent.click(rush); expect(useGame.getState().weekRush).toBe(false);
 });
 it("shows inspected evidence as labelled rows and a load bar", () => {
   renderCompany(advanceSteps(newGame(1,"evidence"),6).state);
@@ -73,30 +65,31 @@ it("shows what the machine does, paid-now cash, delayed upkeep and routing limit
   fireEvent.click(screen.getByRole("button",{name:/Add server/}));
   const confirm=screen.getByRole("region",{name:"Confirm Add server"});
   expect(confirm.textContent).toContain("Processes requests"); expect(confirm.textContent).toContain("Route traffic to this server after activation.");
-  expect(confirm.textContent).toContain("$19,000"); expect(confirm.textContent).toContain("+$700 per 60 game seconds");
+  expect(confirm.textContent).toContain("$1,000"); expect(confirm.textContent).toContain("+$700 per 60 game seconds");
   expect(confirm.textContent).toContain("No refunds.");
-  expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
+  expect(useGame.getState().game.campaign!.cashCents).toBe(1500000);
 });
 it("asks for confirmation before an action is dispatched, and Cancel or Escape leaves the company unchanged", () => {
-  start(); renderCompany(); openActions();
+  // A Launch Week company only sees the limit after an incident, so this uses an original opening.
+  start(); renderCompany(newGame(1, "confirm")); openActions();
   const add=screen.getByRole("button",{name:/Add server/}), before=useGame.getState().game;
   fireEvent.click(add);
   const confirm=screen.getByRole("region",{name:"Confirm Add server"});
-  expect(confirm.textContent).toContain("Add App Server"); expect(confirm.textContent).toContain("$19,000");
+  expect(confirm.textContent).toContain("Add App Server"); expect(confirm.textContent).toContain("$1,000");
   expect(useGame.getState().game).toBe(before);
   fireEvent.click(within(confirm).getByRole("button",{name:"Cancel"}));
   expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull(); expect(document.activeElement).toBe(add);
   fireEvent.click(add); fireEvent.keyDown(screen.getByRole("button",{name:"Confirm"}),{key:"Escape"});
   expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull(); expect(useGame.getState().game).toBe(before);
   // Only one confirmation is open at a time.
-  fireEvent.click(add); fireEvent.click(screen.getByRole("button",{name:/Upgrade database/}));
+  fireEvent.click(add); fireEvent.click(screen.getByRole("button",{name:/Limit to/}));
   expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull();
   fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
-  expect(useGame.getState().game.campaign!.pending.map(a=>a.type)).toEqual(["upgrade-db"]);
+  expect(useGame.getState().game.campaign!.pending.map(a=>a.type)).toEqual(["limit"]);
   expect(screen.queryByRole("button",{name:"Confirm"})).toBeNull();
 });
 it("visibly explains cash and pending-infrastructure reasons without altering accepted action rules", () => {
-  start(); renderCompany(); openActions(); fireEvent.click(screen.getByRole("button",{name:/Upgrade database/})); fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
+  start(); renderCompany(); openActions(); fireEvent.click(screen.getByRole("button",{name:/Add server/})); fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
   const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
   expect(card.textContent).toContain("An infrastructure deployment is already pending");
   cleanup(); const game=newGame(); game.campaign!.cashCents=100000; renderCompany(game);
@@ -106,7 +99,7 @@ it("traffic-limit warning explains rejection without inventing extra charges or 
   const game=advanceSteps(perform(newGame(1,"limit-info"),{type:"set_traffic_limit",enabled:true}),4).state;
   renderCompany(game); expect(screen.getByText(/Infrastructure and salaries still cost the same/)).toBeTruthy();
   expect(screen.queryByText("Operating finances")).toBeNull();
-  expect(screen.getByText(/500 admitted \/ 300 rejected req\/s/)).toBeTruthy();
+  expect(screen.getByText(/500 admitted \/ 300 turned away req\/s/)).toBeTruthy();
 });
 it("Scale Up describes the selected server rather than implying another installed instance", () => {
   useGame.setState({game:dataCompany(),ready:true,started:true,onboarding:false,selectedAppId:"app-1"});
@@ -125,26 +118,34 @@ it("postmortem keeps all actual causes and observations reachable while leading 
   expect(within(report).getByRole("button",{name:"Continue company"})).toBeTruthy();
 });
 it.each([
-  [/Add server/, ["app"]], [/Upgrade database/, ["db"]], [/Limit to 500/, ["gateway"]],
+  [/Add server/, ["app"]], [/Upgrade database/, ["db"]], [/Limit to/, ["gateway"]],
 ] as const)("pointing at %s lights up the machine it changes, and leaving clears it", (name, ids) => {
-  start(); renderCompany(); openActions();
+  start(); renderCompany(newGame(1, "affected")); openActions();
   const card=screen.getByRole("button",{name}).closest(".campaign-action-card")!;
   fireEvent.pointerEnter(card); expect(useGame.getState().affected).toEqual(ids);
   fireEvent.pointerLeave(card); expect(useGame.getState().affected).toEqual([]);
 });
 it("keeps the affected machine lit while its confirmation is open, and clears it after Confirm", () => {
   start(); renderCompany(); openActions();
-  const button=screen.getByRole("button",{name:/Upgrade database/}), card=button.closest(".campaign-action-card")!;
+  const button=screen.getByRole("button",{name:/Add server/}), card=button.closest(".campaign-action-card")!;
   fireEvent.pointerEnter(card); fireEvent.click(button); fireEvent.pointerLeave(card);
-  expect(useGame.getState().affected).toEqual(["db"]);
+  expect(useGame.getState().affected).toEqual(["app"]);
   fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
   expect(useGame.getState().affected).toEqual([]);
 });
 it("opening an action's confirmation from the office floor rides to the floor of the machine it changes", () => {
   start(); renderCompany(); openActions(); useGame.setState({floor:"office"});
-  fireEvent.click(screen.getByRole("button",{name:/Upgrade database/}));
+  fireEvent.click(screen.getByRole("button",{name:/Add server/}));
   expect(useGame.getState().floor).toBe("servers");
-  expect(screen.getByRole("region",{name:"Confirm Upgrade database"}).textContent).toContain("Stores data");
+  expect(screen.getByRole("region",{name:"Confirm Add server"}).textContent).toContain("Processes requests");
+});
+it("introduces traffic limiting in Launch Week only once an incident happens", () => {
+  start(); renderCompany(); openActions();
+  expect(useGame.getState().game.campaign!.launchWeek).toBeTruthy();
+  expect(screen.queryByRole("button",{name:/Limit to/})).toBeNull();
+  cleanup(); renderCompany(advanceSteps(newGame(7,"lw-limit",2),10).state); openActions();
+  expect(useGame.getState().game.campaign!.incident).not.toBeNull();
+  expect(screen.getByRole("button",{name:/Limit to/}).getAttribute("aria-description") ?? "").toMatch(/uptime and reputation/);
 });
 
 /** Purchases live on the panel's Actions tab. */

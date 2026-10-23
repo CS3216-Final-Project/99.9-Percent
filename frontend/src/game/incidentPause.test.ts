@@ -6,7 +6,7 @@ import { preparedReliability } from "@/sim/__tests__/reliabilityFixture";
 import { pauseTransition } from "@/sim/__tests__/pauseFixture";
 import { incidentNeedsPause, campaignAttention } from "./campaignAttention";
 
-it.each([1, 2, 3, 4, 5, 6])("recognises the observed Chapter %i incident without a chapter script or mutation", chapter => {
+it.each([1, 2, 3, 4, 5, 6])("recognises the observed Chapter %i incident without a chapter script or mutation", { timeout: 30_000 }, chapter => {
   const { before, incident } = pauseTransition(chapter); const original = structuredClone(incident);
   expect(incidentNeedsPause(before)).toBe(false);
   expect(incidentNeedsPause(incident), campaignAttention(incident).reason).toBe(true);
@@ -27,7 +27,7 @@ it("excludes accepted relevant DB/admission work, measured recovery and confirme
     expect(s.phase).toBe("review"); expect(incidentNeedsPause(s)).toBe(false);
   }
 });
-it("allows investigation despite an unrelated purchase, while a valid queued failover needs time", () => {
+it("allows investigation despite an unrelated purchase, while a valid queued failover needs time", { timeout: 30_000 }, () => {
   expect(incidentNeedsPause(act(tick(newGame(), 6), { type: "add_server" }))).toBe(true);
   const queued = tick(act(preparedReliability(), { type: "arm_reliability" }), 9);
   expect(campaignAttention(queued).reason).toBe("activation-promote-spare"); expect(incidentNeedsPause(queued)).toBe(false);

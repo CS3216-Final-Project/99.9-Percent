@@ -1,7 +1,7 @@
 import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "./scenarios/dataStrategy";
 import { APPLICATION_SCALING as S } from "./scenarios/applicationScaling";
-import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
+import { openingTuning } from "./launchWeek";
 import { BALANCE, PROMOS } from "./balance";
 import { has, TECH } from "./tech";
 import type { EquipmentId, GameState, PromoId, Release, TechId, Warning } from "./types";
@@ -20,12 +20,12 @@ export function serverCapacity(s: GameState): number {
 }
 
 export function serverUpkeep(s: GameState): number {
-  if(s.campaign)return Q.appWeeklyCents/100;
+  if(s.campaign)return openingTuning(s.campaign).appWeeklyCents/100;
   return Math.round(BALANCE.server.upkeep * (has(s, "larger_servers") ? BALANCE.server.largeUpkeepMult : 1));
 }
 
 export function maxServers(s: GameState): number {
-  if(s.campaign)return Q.maxApps;
+  if(s.campaign)return openingTuning(s.campaign).maxApps;
   return has(s, "load_balancing") ? BALANCE.server.maxWithLb : BALANCE.server.maxWithoutLb;
 }
 
@@ -112,7 +112,7 @@ export interface CostBreakdown {
 }
 
 export function costs(s: GameState, tempServers = 0): CostBreakdown {
-  if(s.campaign){const c=s.campaign,servers=c.apps.reduce((sum,a)=>sum+(a.tier==="large"?S.appWeeklyCents:Q.appWeeklyCents),0)/100,database=(c.dbCapacity===D.dbCapacity?D.dbWeeklyCents:c.dbCapacity===S.dbCapacity?S.dbWeeklyCents:c.upgraded?Q.upgradedDbWeeklyCents:Q.dbWeeklyCents)/100,redundancy=c.loadBalancer?S.lbWeeklyCents/100:0,salaries=Q.engineers*Q.salaryWeeklyCents/100;return {servers,database,salaries,redundancy,tooling:c.readCache?D.cacheWeeklyCents/100:0,autoscale:c.spikeStage?.controller?T.controllerWeeklyCents/100:0,total:servers+database+salaries+redundancy+(c.readCache?D.cacheWeeklyCents/100:0)+(c.spikeStage?.controller?T.controllerWeeklyCents/100:0)};}
+  if(s.campaign){const c=s.campaign,t=openingTuning(c),servers=c.apps.reduce((sum,a)=>sum+(a.tier==="large"?S.appWeeklyCents:t.appWeeklyCents),0)/100,database=(c.dbCapacity===D.dbCapacity?D.dbWeeklyCents:c.dbCapacity===S.dbCapacity?S.dbWeeklyCents:c.upgraded?t.upgradedDbWeeklyCents:t.dbWeeklyCents)/100,redundancy=c.loadBalancer?S.lbWeeklyCents/100:0,salaries=t.engineers*t.salaryWeeklyCents/100;return {servers,database,salaries,redundancy,tooling:c.readCache?D.cacheWeeklyCents/100:0,autoscale:c.spikeStage?.controller?T.controllerWeeklyCents/100:0,total:servers+database+salaries+redundancy+(c.readCache?D.cacheWeeklyCents/100:0)+(c.spikeStage?.controller?T.controllerWeeklyCents/100:0)};}
   const salaries = s.engineers * BALANCE.engineer.salary;
   const servers = s.infra.appHosts.length * serverUpkeep(s);
   const dbUpkeep = BALANCE.db.tiers[s.infra.dbTier].upkeep;

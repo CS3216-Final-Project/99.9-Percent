@@ -102,11 +102,22 @@ describe("the elevator's ride", () => {
     expect(heard).toEqual(["depart", "arrive"]);
   });
 
-  it("cuts straight to the floor with reduced motion", () => {
+  it("cuts straight to the floor when asked to, and says so until the next ride", () => {
+    const cut: boolean[] = [];
+    const stopCut = onRide(() => cut.push(ride.cut));
     depart("office", true);
     expect(heard).toEqual(["depart", "arrive"]);
+    expect(cut).toEqual([true, true]);
     expect(riding()).toBe(false);
     expect(viewHeight()).toBe(FLOOR_Y.office);
+    depart("servers", false);
+    expect(ride.cut).toBe(false);
+    vi.advanceTimersByTime(RIDE_SECONDS * 1000 + 10);
+    expect(cut).toEqual([true, true, false, false]);
+    depart("office", true);
+    placeCar("servers");
+    expect(ride.cut).toBe(false);
+    stopCut();
   });
 
   it("closes the doors it leaves, and turns round from where it is", () => {

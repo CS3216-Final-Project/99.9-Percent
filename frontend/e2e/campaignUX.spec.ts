@@ -9,7 +9,7 @@ test("Campaign option comparison, confirmation, Run/Pause and pause-to-investiga
   await openPanelTab(page,"Actions");
   await page.getByRole("button",{name:/Add server/}).click(); const confirm=page.getByRole("region",{name:"Confirm Add server"});
   await expect(confirm).toContainText("Add App Server"); await expect(confirm).toContainText("Processes requests and accesses the Database.");
-  await expect(confirm).toContainText("+$700 per 60 game seconds"); await expect(confirm).toContainText("$19,000");
+  await expect(confirm).toContainText("+$700 per 60 game seconds"); await expect(confirm).toContainText("$1,000");
   await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("region",{name:"Confirm Add server"})).toHaveCount(0);
   await expect(confirm.getByRole("button",{name:"Confirm"})).toBeFocused();
   await page.keyboard.press("Escape"); await expect(confirm).toBeHidden(); expect((await savedGame(page)).campaign!.apps).toHaveLength(1);

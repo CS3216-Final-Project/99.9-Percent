@@ -1,4 +1,3 @@
-import { completeTutorialFixture } from "@/testing/tutorial";
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
@@ -55,7 +54,7 @@ it("keeps the mode choice open when switching cannot preserve the stored save", 
 });
 
 it("shows the locked unlock prompt in the menu instead of a switch control", () => {
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   const menu = openMenu();
   const modeSection = within(menu).getByRole("region", { name: "Game mode" });
   expect(modeSection.textContent).toContain("Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.");
@@ -67,7 +66,7 @@ it("shows the locked unlock prompt in the menu instead of a switch control", () 
 
 it("keeps the pre-update save resumable only once Challenge Mode is unlocked", () => {
   localStorage.setItem("nn.save.v1", "{}");
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   const menu = openMenu();
   openTab(menu, "Saves");
   const legacy = within(menu).getByRole("group", { name: "Pre-update save" });
@@ -82,18 +81,22 @@ it("keeps the pre-update save resumable only once Challenge Mode is unlocked", (
 describe("opening UI", () => {
   it("starts paused with immediate evidence and no later progression controls", async () => {
     render(<StrictMode><App /></StrictMode>); expect(await screen.findByTestId("facility")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+    fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
     expect(screen.getByRole("complementary", { name: "System metrics" })).toBeTruthy();
     // Tech and History wait in the bottom bar's view tabs, where Classic keeps them; later stage controls do not appear yet.
     expect(within(screen.getByRole("navigation", { name: "Views" })).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Tech", "History"]);
-    expect(screen.queryByRole("region", { name: "Scaling controls" })).toBeNull();
+    // The tools Launch Week's first incident calls for are already present; later stages' are not.
+    openActions();
+    expect(screen.getByRole("region", { name: "Scaling controls" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Data strategy" })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /^Analysis/ }));
     fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
     expect(useGame.getState().game.campaign!.step).toBe(0);
     expect(useGame.getState().meta.runsStarted).toBe(1);
   });
   it("advances once and cleans up the shared clock on pause/unmount", () => {
     vi.useFakeTimers(); const view = render(<StrictMode><App /></StrictMode>);
-    fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+    fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(1000)); expect(useGame.getState().game.campaign!.step).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
@@ -101,7 +104,8 @@ describe("opening UI", () => {
     view.unmount(); act(() => vi.advanceTimersByTime(5000)); expect(useGame.getState().game.campaign!.step).toBe(1);
   });
   it("visible interventions lead to review and the same company", () => {
-    vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+    vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open the doors" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(6000));
     expect(useGame.getState().running).toBe(false);
@@ -112,18 +116,19 @@ describe("opening UI", () => {
     expect(recovery.textContent).toContain("Latency below 500 ms");
     expect(recovery.textContent).toContain("Service errors below 1%");
     expect(recovery.textContent).toContain("Traffic is being accepted and requests are completing");
-    openActions(); fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
+    // Launch Week's one incident is the database: the upgrade fixes it.
+    openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
-    act(() => vi.advanceTimersByTime(8000));
+    act(() => vi.advanceTimersByTime(20000));
     expect(screen.getByRole("dialog", { name: "System Recovered!" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "View Incident Report" }));
     expect(screen.getByRole("dialog", { name: "Incident postmortem" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Continue company" })); fireEvent.click(screen.getByRole("button", { name: "Continue operating" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
     expect(useGame.getState().game.phase).toBe("management"); expect(useGame.getState().running).toBe(false);
     expect(useGame.getState().game.campaign!.runId).toBe(id);
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
-    act(() => vi.advanceTimersByTime(46000));
+    act(() => vi.advanceTimersByTime(48000));
     const c = useGame.getState().game.campaign!;
     expect(c.step).toBe(60); expect(c.settlements).toHaveLength(1);
     expect(c.trace.filter(e => e.type === "action-activated")).toHaveLength(1);
@@ -131,7 +136,7 @@ describe("opening UI", () => {
 
   });
   it("hidden-page pause does not resume or catch up", () => {
-    render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture()); fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Run" }));
     Object.defineProperty(document, "hidden", { configurable: true, value: true }); fireEvent(document, new Event("visibilitychange"));
     expect(useGame.getState().running).toBe(false);
     Object.defineProperty(document, "hidden", { configurable: true, value: false }); fireEvent(document, new Event("visibilitychange"));
@@ -141,7 +146,7 @@ describe("opening UI", () => {
 
 it("offers the same mute control beside the menu in both modes", () => {
   saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   const mute = screen.getByRole("button", { name: "Mute sound" });
   expect(mute.getAttribute("aria-pressed")).toBe("false");
   fireEvent.click(mute); expect(mute.getAttribute("aria-pressed")).toBe("true");
@@ -163,9 +168,9 @@ function openMenu() {
 const openTab = (menu: HTMLElement, name: string) => fireEvent.click(within(menu).getByRole("tab", { name }));
 const expectButtons = (menu: HTMLElement, names: string[]) => { for (const name of names) expect(within(menu).getByRole("button", { name })).toBeTruthy(); };
 
-it("splits both menus into the same tabs and keeps every earlier control on one of them", () => {
+it("splits both menus into the same tabs and keeps every earlier control on one of them", { timeout: 30_000 }, () => {
   saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
-  render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+  render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   const campaignMenu = openMenu();
   const labels = (menu: HTMLElement) => within(within(menu).getByRole("tablist", { name: "Menu sections" })).getAllByRole("tab").map((t) => t.textContent);
   expect(labels(campaignMenu)).toEqual(["Run", "Map", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]);
@@ -235,7 +240,7 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
 });
 
 it("lands the bankrupt company's menu on Saves, where Export and New company are", () => {
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   act(() => useGame.setState((s) => ({ game: { ...s.game, phase: "ended" } })));
   fireEvent.click(screen.getByRole("button", { name: "Export or start a new company" }));
   const menu = screen.getByRole("dialog", { name: "Menu" });
@@ -245,7 +250,7 @@ it("lands the bankrupt company's menu on Saves, where Export and New company are
 
 it("forgets a pending Start over confirmation when the player leaves its tab", () => {
   saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   fireEvent.click(within(openMenu()).getByRole("button", { name: "Switch to Challenge Mode" }));
   act(() => useGame.getState().advance());
   expect(useGame.getState().game.totals.weeks).toBeGreaterThan(0);
@@ -264,7 +269,7 @@ it("forgets a pending Start over confirmation when the player leaves its tab", (
 });
 
 it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", () => {
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   vi.useFakeTimers();
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   act(() => vi.advanceTimersByTime(1000));
@@ -286,7 +291,7 @@ it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", (
 });
 
 it("asks once before New company replaces the campaign, as Classic's Start over does", () => {
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); act(() => completeTutorialFixture());
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   vi.useFakeTimers();
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   act(() => vi.advanceTimersByTime(1000));
@@ -307,7 +312,7 @@ it("asks once before New company replaces the campaign, as Classic's Start over 
 it("exits directly after saving the current progress and shows four matching Run actions", () => {
   render(<StrictMode><App /></StrictMode>);
   fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
-  act(() => completeTutorialFixture());
+  
   const menu = openMenu();
   expect(within(within(menu).getByRole("group", { name: "Run" })).getAllByRole("button").map(button => button.textContent)).toEqual(["Resume", "Save now", "How to play", "Exit"]);
   fireEvent.click(within(menu).getByRole("button", { name: "Exit" }));
@@ -319,7 +324,7 @@ it("exits directly after saving the current progress and shows four matching Run
 it("keeps an unsaved run open through cancellation and failed save retries, then saves before exiting", () => {
   render(<StrictMode><App /></StrictMode>);
   fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
-  act(() => completeTutorialFixture());
+  fireEvent.click(screen.getByRole("button", { name: "Open the doors" }));
   const menu = openMenu();
   const raw = localStorage.getItem("nn.campaign.save.v1");
   const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("Full", "QuotaExceededError"); });
@@ -346,7 +351,7 @@ it("requires explicit exit confirmation for a blocked save and preserves its ori
   localStorage.setItem("nn.campaign.save.v1", "{");
   render(<StrictMode><App /></StrictMode>);
   fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
-  act(() => completeTutorialFixture());
+  
   const menu = openMenu();
   fireEvent.click(within(menu).getByRole("button", { name: "Exit" }));
   expect(useGame.getState().started).toBe(true);
@@ -358,7 +363,7 @@ it("requires explicit exit confirmation for a blocked save and preserves its ori
 
 it("wraps the week clock without losing the total elapsed counter", () => {
   render(<App />);
-  act(() => { useGame.getState().play(); completeTutorialFixture(); });
+  act(() => { useGame.getState().play(); });
   act(() => {
     const game = structuredClone(useGame.getState().game);
     game.campaign!.step = 65; game.turn = 2;

@@ -109,9 +109,9 @@ export function newLegacyGame(seedInput: number | string = BALANCE.introSeed): G
 }
 
 /** The identity is supplied by the application boundary; tests use fixed identities. */
-export function newGame(seedInput: number | string = BALANCE.introSeed, runId = "headless-run"): GameState {
+export function newGame(seedInput: number | string = BALANCE.introSeed, runId = "headless-run", scenarioVersion: 1 | 2 = 1): GameState {
   const s = newLegacyGame(seedInput);
-  s.campaign = initialCampaign(runId);
+  s.campaign = initialCampaign(runId, scenarioVersion);
   s.log = []; s.upcomingSurge = null;
   return projectCampaign(s);
 }

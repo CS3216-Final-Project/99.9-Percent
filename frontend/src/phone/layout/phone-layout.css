@@ -453,8 +453,6 @@
   padding: 4px var(--phone-gutter-right) calc(4px + var(--phone-safe-bottom)) var(--phone-gutter-left);
   flex-wrap: nowrap;
 }
-.phone-app[data-edition="phone"] .phone-dock [data-label] { padding-top: 0; }
-.phone-app[data-edition="phone"] .phone-dock [data-label]::before { display: none; }
 
 /* Views: icon above a short label, each a full 48 px target. */
 .phone-app[data-edition="phone"] .phone-dock > .view-tabs { display: flex; flex: none; gap: 2px; grid-row: auto; }
@@ -601,18 +599,9 @@
 }
 .phone-app[data-edition="phone"] .phone-dock:not(.campaign-clock) .dock-primary { width: 116px; }
 
-/* Guided Mode's steps, under the speeds in the speed menu. */
-.phone-app[data-edition="phone"] .phone-dock .phone-steps-title { margin: 14px 0 8px; }
-.phone-app[data-edition="phone"] .phone-dock .time-menu .dock-steps { display: flex; gap: 8px; }
-.phone-app[data-edition="phone"] .phone-dock .time-menu .dock-step {
-  flex: 1;
-  flex-direction: row;
-  gap: 6px;
-  width: auto;
-  height: 44px;
-  font-size: var(--text-sm);
-  background: var(--control-inset);
-}
+/* Guided Mode's End week rush: an icon button beside the speed menu, named for assistive technology. */
+.phone-app[data-edition="phone"] .phone-dock .phone-rush { flex: none; width: 48px; height: 48px; margin: 0; padding: 0; justify-content: center; }
+.phone-app[data-edition="phone"] .phone-dock .phone-rush > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* The dock's menus open above it, inside the screen. */
 .phone-app[data-edition="phone"] .phone-dock .dock-panel { max-height: min(440px, calc(100dvh - var(--phone-top) - var(--phone-dock) - 16px)); }
@@ -622,6 +611,7 @@
   .phone-app[data-edition="phone"] .phone-dock .time-controls,
   .phone-app[data-edition="phone"] .campaign-clock.phone-dock .time-controls { gap: 3px; }
   .phone-app[data-edition="phone"] .phone-dock .time-menu > summary { width: 48px; }
+  .phone-app[data-edition="phone"] .phone-dock .phone-rush { width: 44px; }
   .phone-app[data-edition="phone"] .campaign-clock.phone-dock .dock-primary { width: 76px; }
   .phone-app[data-edition="phone"] .phone-dock:not(.campaign-clock) .dock-primary { width: 92px; }
   .phone-app[data-edition="phone"] .phone-dock:not(.campaign-clock) .dock-primary > .icon { display: none; }

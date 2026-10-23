@@ -1,15 +1,18 @@
 import { openCameraControls, openPanelTab } from "./fixtures";
 import { purchaseActions, purchaseLayout } from "./purchaseLayout";
-import { completeTutorial, test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
+import { test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
 import { newGame } from "../src/sim";
 import { act, tick, spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 import { dataCompany } from "../src/sim/__tests__/dataFixture";
 import { reliabilityCompany, readyReliability } from "../src/sim/__tests__/reliabilityFixture";
 
 test("an action centres the camera on the machine it changes and opens its confirmation beside it, clear of the panel", async ({ page }) => {
+  // A saved week-1 company: Launch Week locks the database tier in its opening days, so this seeds
+  // the classic tutorial campaign where the upgrade is already available.
+  await page.route("**/api/**", r => r.abort());
+  await seedSave(page, tick(newGame(1, "camera-action"), 60));
   await page.goto("/?floor=office");
-  await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
-  await completeTutorial(page);
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
   // Zoomed far in, so the action has to bring the view back out to its default framing.
   await openCameraControls(page);
   for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Zoom in" }).click();

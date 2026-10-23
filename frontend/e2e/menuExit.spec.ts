@@ -1,4 +1,4 @@
-import { test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
+import { test, expect, expectRoom, seedSave, savedGame, completeTutorial } from "./fixtures";
 import { DEFAULT_META } from "../src/game/persist";
 import { newGame } from "../src/sim";
 import type { Page } from "@playwright/test";
@@ -72,6 +72,7 @@ test("explicitly exiting an unsaved company preserves a corrupt original save", 
   await page.addInitScript(meta => { localStorage.setItem("nn.campaign.save.v1", "{"); localStorage.setItem("nn.campaign.meta.v1", JSON.stringify({ ...meta, tutorialDone: true })); }, DEFAULT_META);
   await page.goto("/");
   await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
+  await completeTutorial(page);
   await expectRoom(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("button", { name: "Exit", exact: true }).click();

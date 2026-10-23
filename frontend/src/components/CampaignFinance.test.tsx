@@ -14,9 +14,9 @@ import { preparedReliability } from "@/sim/__tests__/reliabilityFixture";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);useGame.getState().boot();useGame.getState().play();useGame.setState({onboarding:false,tour:null});});
 afterEach(()=>{cleanup();vi.useRealTimers();});
 it("keeps the open decision's highlight when focus or hover leaves another action",()=>{
-    render(<><CampaignAction label="Upgrade database" decision={{type:"start_db_upgrade"}} onClick={()=>{}}/>
+    render(<><CampaignAction label="Add server" decision={{type:"add_server"}} onClick={()=>{}}/>
         <CampaignAction label="Limit to 500 requests/s" decision={{type:"set_traffic_limit",enabled:true}} onClick={()=>{}}/></>);
-    const database=screen.getByRole("button",{name:"Upgrade database"});
+    const database=screen.getByRole("button",{name:"Add server"});
     fireEvent.focus(database);fireEvent.click(database);
     fireEvent.click(screen.getByRole("button",{name:"Cancel"}));
     const limit=screen.getByRole("button",{name:"Limit to 500 requests/s"});
@@ -47,7 +47,7 @@ it("Cancel and double confirmation dispatch at most one purchase",()=>{
     expect(useGame.getState().game).toBe(before);
     fireEvent.click(screen.getByRole("button",{name:/Add server/}));const confirm=screen.getByRole("button",{name:"Confirm"});
     fireEvent.click(confirm);fireEvent.click(confirm);
-    expect(buy).toHaveBeenCalledTimes(1);expect(useGame.getState().game.campaign!.cashCents).toBe(1900000);
+    expect(buy).toHaveBeenCalledTimes(1);expect(useGame.getState().game.campaign!.cashCents).toBe(1400000);
 });
 it("requires reviewing a changed cash preview and rejects newly unavailable purchases",()=>{
     const buy=vi.fn(()=>useGame.getState().act({type:"add_server"}));
@@ -69,7 +69,7 @@ it("shows an engine reason outside disabled controls and keeps it keyboard reach
 it("disables a confirmation if another deployment makes the action unavailable",()=>{
     const buy=vi.fn();render(<CampaignAction label="Add server" decision={{type:"add_server"}} price={1000} onClick={buy}/>);
     fireEvent.click(screen.getByRole("button",{name:/Add server/}));
-    act(()=>useGame.getState().act({type:"start_db_upgrade"}));
+    act(()=>useGame.getState().act({type:"deploy_load_balancer"}));
     const confirm=screen.getByRole("button",{name:"Confirm"});expect(confirm.hasAttribute("disabled")).toBe(true);
     fireEvent.click(confirm);expect(buy).not.toHaveBeenCalled();
     expect(within(screen.getByRole("region",{name:"Confirm Add server"})).getByText("An infrastructure deployment is already pending.")).toBeTruthy();
@@ -101,7 +101,7 @@ it("closes an open purchase confirmation when the view leaves its machine's floo
     expect(document.activeElement).toBe(elsewhere);elsewhere.remove();
     act(()=>useGame.getState().goToFloor("servers","key"));
     expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull();
-    expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
+    expect(useGame.getState().game.campaign!.cashCents).toBe(1500000);
 });
 
 

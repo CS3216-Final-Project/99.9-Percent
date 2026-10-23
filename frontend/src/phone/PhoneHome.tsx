@@ -8,8 +8,8 @@ import "@/components/HomeScreen.css";
 const PHONE_MODES: Record<"campaign" | "classic", ModeInfo> = {
   campaign: {
     ...MODES.campaign,
-    pace: `Continuous play · Walkthrough and ${PHONE_CHAPTERS} guided chapters`,
-    about: "Learn the controls, game time and finances in the walkthrough, then inspect problems, upgrade servers and route traffic in two guided chapters. Pause whenever you need.",
+    pace: `Continuous play · Launch Week and ${PHONE_CHAPTERS} guided chapters`,
+    about: "Run your company through Launch Week and its first incident, then inspect problems, upgrade servers and route traffic in two guided chapters. Pause whenever you need.",
   },
   classic: { ...MODES.classic, pace: `Week by week · ${BALANCE.maxTurns}-week challenge` },
 };

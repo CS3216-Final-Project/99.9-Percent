@@ -1210,6 +1210,52 @@ button:disabled {
   height: 16px;
 }
 
+.traffic-toggle[aria-pressed="true"] { background: var(--go); color: var(--ink); }
+
+/* The traffic view's load bar under a machine's label: demand over capacity. */
+.eq-label:has(.eq-load) { flex-wrap: wrap; row-gap: 0; }
+.eq-load {
+  display: block;
+  flex-basis: 100%;
+  width: 100%;
+  min-width: 48px;
+  height: 4px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 0.18);
+  overflow: hidden;
+}
+.eq-load > span { display: block; height: 100%; background: var(--ok); }
+.eq-load.tone-warn > span { background: var(--warn); }
+.eq-load.tone-critical > span { background: var(--critical); }
+
+/* Guided Mode's In and Out gates: this second's requests, gold coming in and green going out. */
+.gate-tag {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: 3px 8px;
+  font-size: var(--text-sm);
+  color: var(--on-night);
+}
+.gate-tag b {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--text-xs);
+}
+.gate-in { border-color: var(--go); }
+.gate-in b { color: var(--go); }
+.gate-out { border-color: var(--ok); }
+.gate-out b { color: var(--ok); }
+.gate-note {
+  font-size: var(--text-xs);
+  color: var(--warn);
+}
+.gate-in.is-rejecting { border-color: var(--warn); }
+.gate-in.is-rejecting b { color: var(--warn); }
+.gate-in.is-rejecting .gate-note { color: var(--warn); font-weight: 700; animation: blink 1.2s steps(2, jump-none) infinite; }
+
 @keyframes blink {
   50% {
     opacity: 0.3;
@@ -1956,6 +2002,8 @@ button:disabled {
   max-height: calc(100% - 24px);
   margin: 12px;
   overflow-y: auto;
+  /* Keep scroll targets above the dock; the bar overlaps this panel's lower edge. */
+  scroll-padding-bottom: 96px;
   background: var(--paper);
   border: 1px solid var(--control-edge);
   border-radius: var(--radius);
@@ -4552,6 +4600,10 @@ button:disabled {
   animation: pulse 1.2s steps(2) infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .tour-hole { animation: none; }
+}
+
 @keyframes pulse {
   50% {
     outline-offset: 5px;
@@ -4760,6 +4812,9 @@ button:disabled {
   }
   /* Phones show the four headline numbers only. */
   .stat-body > span {
+    display: none;
+  }
+  .stat-uptime {
     display: none;
   }
   .side {
@@ -4985,6 +5040,8 @@ button:disabled {
 .instance-choices .chip { display: block; width: 100%; white-space: normal; text-align: left; }
 .instance-choices .chip span { display: block; font-family: var(--font-num); font-size: var(--text-xs); margin-top: 4px; }
 .scaling-controls fieldset { display: grid; gap: 6px; min-width: 0; border: 1px solid var(--paper-3); padding: 8px; }
+.route-choice-block { display: grid; gap: 6px; margin-top: 6px; }
+.route-head { margin: 0; font-family: var(--font-display); font-size: var(--text-sm); font-weight: 700; color: var(--ink-2); }
 .route-choice { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
 .route-choice legend { grid-column: 1 / -1; }
 .route-choice button { min-height: 40px; padding: 6px 10px; border: 1px solid var(--control-edge); border-radius: var(--radius); background: var(--paper); color: var(--ink); font-family: var(--font-num); font-weight: 700; font-size: var(--text-sm); box-shadow: var(--press); }

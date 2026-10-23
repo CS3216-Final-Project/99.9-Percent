@@ -60,7 +60,7 @@ test("Chapter 6 guidance: post-review restoration precedes replacement capacity 
   await accept(/^Run$/); await gold.click(); await page.clock.runFor(3000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   expect((await savedGame(page)).campaign!.combinedStage!.currentRound!.fault!.restoredStep).not.toBeNull();
-  await accept(/^Configure routing/); await gold.click(); await expect(gold).toHaveAccessibleName("All apps"); await gold.click();
+  await accept(/^All apps$/); await gold.click();
   await accept(/^Run$/); await gold.click(); await page.clock.runFor(1000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await accept(/^Remove traffic limit/); await gold.click(); await expect(gold).toHaveAccessibleName("Confirm");

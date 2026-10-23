@@ -28,6 +28,12 @@ export function pct(v: number, digits = 0): string {
 }
 
 /** Uptime with enough digits to tell 99.9 from 99.99. */
+/** How many nines an uptime figure holds: 0.95 is one, 0.999 is three, perfect service counts as five. */
+export function ninesOf(uptime: number): number {
+  if (uptime >= 1) return 5;
+  return Math.max(0, Math.floor(-Math.log10(1 - uptime)));
+}
+
 export function uptimePct(v: number): string {
   if (v >= 0.99995) return "100%";
   return `${(v * 100).toFixed(v >= 0.999 ? 3 : 2)}%`;

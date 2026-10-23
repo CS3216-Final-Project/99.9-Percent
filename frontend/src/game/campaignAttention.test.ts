@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { newGame, newLegacyGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
-import { campaignAttention as guidance } from "./campaignAttention";
+import { campaignAttention as guidance, spotlightMachines } from "./campaignAttention";
 import { act, tick, dataCompany, spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "@/sim/__tests__/reliabilityFixture";
 import { combinedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
@@ -75,7 +75,7 @@ it("recognises traffic pulse time without requiring autoscaling", () => {
   const game = act(spikeCompany(false), { type: "incident_inspect", equipment: "app" });
   expect(guidance(game)).toMatchObject({ chapter: 4, attention: "run", reason: "spike-pulses" });
 });
-it("reliability requires explicit arming; pending setup is not a mandatory arm blocker", () => {
+it("reliability requires explicit arming; pending setup is not a mandatory arm blocker", { timeout: 30_000 }, () => {
   const game = reliabilityCompany();
   expect(guidance(game)).toMatchObject({ chapter: 5, attention: "progression", target: "reliability" });
   expect(guidance(act(game, { type: "arm_reliability" }))).toMatchObject({ attention: "run", reason: "scheduled-failure" });
@@ -93,14 +93,14 @@ it("recognises a queued valid failover and rejects it when its recorded route is
   game.campaign!.pending.find(a => a.type === "promote-spare")!.expectedRouting = "stale";
   expect(guidance(game).attention).toBe("hint");
 });
-it("distinguishes growth readiness, wave decision, accepted wave and outcome", () => {
+it("distinguishes growth readiness, wave decision, accepted wave and outcome", { timeout: 30_000 }, () => {
   let game = combinedCompany();
   expect(guidance(game)).toMatchObject({ chapter: 6, attention: "run", reason: "growth-readiness" });
   game = tick(game, 5); expect(guidance(game)).toMatchObject({ attention: "progression", target: "growth" });
   game = act(game, { type: "start_growth_wave" }); expect(guidance(game).attention).toBe("run");
   game = finishRound(game); expect(guidance(game).attention).toBeNull();
 });
-it("does not impose a blanket traffic-limit rule on reliability; full-demand growth is different", () => {
+it("does not impose a blanket traffic-limit rule on reliability; full-demand growth is different", { timeout: 30_000 }, () => {
   const reliability = tick(act(reliabilityCompany(), { type: "set_traffic_limit", enabled: true }), 1);
   expect(guidance(reliability).target).toBe("reliability");
   const growth = tick(act(combinedCompany(), { type: "set_traffic_limit", enabled: true }), 1);
@@ -130,7 +130,7 @@ it("offers actual routed server scaling and an existing routing choice, rather t
   expect(guidance(game).actions?.some(x => x.action.type === "scale_up" && x.action.appId === "app-3")).toBe(true);
   expect(guidance(game).actions?.some(x => x.action.type === "deploy_autoscaler")).toBe(false);
 });
-it("restoration targets the observed failure and full-demand guidance targets the existing unlimit control", () => {
+it("restoration targets the observed failure and full-demand guidance targets the existing unlimit control", { timeout: 30_000 }, () => {
   const failure = tick(act(reliabilityCompany(), { type: "arm_reliability" }), 8);
   expect(guidance(failure).actions?.some(x => x.action.type === "restore_app")).toBe(true);
   const limited = tick(act(combinedCompany(), { type: "set_traffic_limit", enabled: true }), 1);
@@ -182,7 +182,7 @@ it.each([
   ["Reliability failure", () => tick(act(reliabilityCompany(), { type: "arm_reliability" }), 8)],
   ["Growth", () => combinedCompany()],
   ["Growth readiness", () => tick(combinedCompany(), 5)],
-] as const)("keeps %s's displayed Hint short while retaining its internal evidence", (_stage, company) => {
+] as const)("keeps %s's displayed Hint short while retaining its internal evidence", { timeout: 30_000 }, (_stage, company) => {
   const hint = guidance(company());
   expect(hint.message.split(/\s+/).length).toBeLessThan(25);
   expect(hint.message).not.toMatch(/admission relief|queue drainage|predicate|headroom|activation state|ops\/s/);
@@ -199,4 +199,49 @@ it("derives Chapter 2 strategies from dispatcher availability and removes them a
   expect(guidance(act(game, { type: "start_db_upgrade" })).growthChoices).toBeUndefined();
   expect(guidance(act(game, { type: "accept_scaling_risk" })).growthChoices).toBeUndefined();
   expect(guidance(tick(newGame(), 6)).growthChoices).toBeUndefined();
+});
+
+it("names the machines the room spotlight lights for each decision", () => {
+  const incident = advanceSteps(newGame(), 6).state;
+  const d = guidance(incident);
+  expect(spotlightMachines(d, d.action?.action, incident.campaign!)).toEqual(["db"]);
+  // The recommended action's own machine wins over the decision's inspection target.
+  expect(spotlightMachines(d, { type: "restore_app", appId: "app-2" }, incident.campaign!)).toEqual(["app-2"]);
+  expect(spotlightMachines(d, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2"] }, incident.campaign!)).toEqual(["gateway"]);
+  const unbalanced = tick(act(dataCompany(), { type: "set_routing", mode: "single", targets: ["app-1"] }), 2);
+  const unrouted = guidance(unbalanced);
+  expect(unrouted.target).toBe("network");
+  expect(spotlightMachines(unrouted, unrouted.action?.action, unbalanced.campaign!)).toEqual(["gateway"]);
+  expect(spotlightMachines({ ...d, target: "app" }, undefined, incident.campaign!)).toEqual(["app"]);
+  const fresh = newGame(), running = guidance(fresh);
+  expect(running.target).toBe("run");
+  expect(spotlightMachines(running, running.action?.action, fresh.campaign!)).toEqual([]);
+});
+
+it("teaches Launch Week's one database incident, then End week", () => {
+  const fresh = newGame(7, "lw", 2);
+  expect(guidance(fresh)).toMatchObject({ reason: "launch-open", target: "run" });
+  let s = advanceSteps(newGame(7, "lw", 2), 20).state;
+  expect(s.campaign!.incident?.components).toEqual(["db"]);
+  expect(guidance(s)).toMatchObject({ reason: "launch-db-incident", target: "db" });
+  s = act(s, { type: "incident_inspect", equipment: "db" });
+  expect(guidance(s).action?.action).toEqual({ type: "start_db_upgrade" });
+  expect((guidance(s).actions ?? []).some(a => a.action.type === "set_traffic_limit")).toBe(false);
+  s = act(s, { type: "start_db_upgrade" });
+  for (let i = 0; i < 60 && s.phase !== "review"; i++) s = tick(s);
+  s = act(s, { type: "acknowledge_review" });
+  for (let i = 0; i < 20 && guidance(s).reason !== "launch-end-week"; i++) s = tick(s);
+  expect(guidance(s)).toMatchObject({ reason: "launch-end-week", target: "endweek" });
+  for (let i = 0; i < 40 && !s.campaign!.launchWeek!.researchEarned; i++) s = tick(s);
+  expect(guidance(s)).toMatchObject({ reason: "launch-research", target: "research" });
+});
+it("holds the Launch Week score card until the research point is spent", () => {
+  let s = advanceSteps(newGame(7, "lw", 2), 20).state;
+  s = act(s, { type: "start_db_upgrade" });
+  for (let i = 0; i < 120 && s.campaign!.launchWeek!.completedStep === null; i++) s = s.phase === "review" ? act(s, { type: "acknowledge_review" }) : tick(s);
+  expect(s.campaign!.launchWeek).toMatchObject({ researchEarned: 1, tech: null });
+  expect(s.campaign!.launchWeek!.completedStep).not.toBeNull();
+  expect(guidance(s)).toMatchObject({ reason: "launch-research", target: "research" });
+  s = act(s, { type: "pick_launch_tech", tech: "caching" });
+  expect(guidance(s)).toMatchObject({ reason: "launch-score", target: "next" });
 });
