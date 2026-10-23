@@ -124,13 +124,6 @@ it("pending confirmations and newly mounted local modals immediately suppress at
   act(() => vi.advanceTimersByTime(9999)); expect(gold()).toHaveLength(0);
   act(() => vi.advanceTimersByTime(1)); expect(gold()).toHaveLength(1);
 });
-it("tutorial ownership hides Hint and does not add to the onboarding header", () => {
-  useGame.setState({ tour: { track: "campaign", step: 0 } });
-  show(); act(() => useGame.setState({ tour: { track: "campaign", step: 0 } }));
-  expect(screen.queryByRole("button", { name: "Hint" })).toBeNull();
-  act(() => vi.advanceTimersByTime(20_000)); expect(gold()).toHaveLength(0);
-  expect(document.querySelector(".has-global-hint")).toBeNull();
-});
 it("Escape closes only help, restores focus, and the tooltip has the requested title and copy", () => {
   show(); const hint = screen.getByRole("button", { name: "Hint" });
   fireEvent.pointerOver(hint, { pointerType: "mouse" }); act(() => vi.advanceTimersByTime(200));
@@ -196,7 +189,7 @@ it("shared confirmations immediately glow for valid purchases and stop for stale
   act(() => useGame.setState({ game: changed })); expect(gold()).toHaveLength(0);
   fireEvent.click(screen.getByRole("button", { name: "Confirm" })); // existing preview review guard
   expect(gold()).toHaveLength(1);
-  act(() => useGame.setState({ tour: { track: "campaign", step: 0 } })); expect(gold()).toHaveLength(0);
+  act(() => useGame.setState({ tour: { track: "basics", step: 0 } })); expect(gold()).toHaveLength(0);
   act(() => useGame.setState({ tour: null }));
   const invalid = structuredClone(changed); invalid.campaign!.cashCents = 0;
   act(() => useGame.setState({ game: invalid })); expect(gold()).toHaveLength(0);
@@ -263,4 +256,39 @@ it("offers only the valid risk strategy when database preparation is unaffordabl
   expect(screen.queryByRole("dialog", { name: "Hint" })?.querySelectorAll(".btn")).toHaveLength(1);
   expect(screen.getByRole("region", { name: "Hint explanation" }).textContent).not.toContain("Upgrade it");
   acceptHint(); expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Consider growth with current capacity");
+});
+
+const lit = () => document.querySelectorAll<HTMLElement>("[data-spotlight]");
+const overlay = () => document.querySelector(".tour[data-guidance=spotlight]");
+const spotOn = (name: RegExp | string) => {
+  expect(overlay()).toBeTruthy();
+  expect(lit()).toHaveLength(1);
+  const target = lit()[0], text = target.textContent ?? target.getAttribute("aria-label") ?? "";
+  if (name instanceof RegExp) expect(text).toMatch(name); else expect(text).toBe(name);
+};
+const noSpot = () => { expect(overlay()).toBeNull(); expect(lit()).toHaveLength(0); };
+it("teaches Launch Week with spotlighted tutorial steps instead of the Hint button", () => {
+  show(newGame(7, "lw", 2));
+  expect(screen.queryByRole("button", { name: "Hint" })).toBeNull();
+  // The colleague introduction comes once, before the first Run; the tutorial waits for it.
+  const intro = screen.getByRole("dialog", { name: "Company Message" });
+  expect(screen.queryByRole("region", { name: "Launch Week tutorial" })).toBeNull();
+  fireEvent.click(within(intro).getByRole("button", { name: "Dismiss company message" }));
+  const card = screen.getByRole("region", { name: "Launch Week tutorial" });
+  spotOn("Run");
+  fireEvent.click(within(card).getByRole("button", { name: "Got it" })); noSpot();
+  expect(screen.queryByRole("region", { name: "Launch Week tutorial" })).toBeNull();
+  cleanup();
+  // The week's one incident frames the Database inspection straight away.
+  show(advanceSteps(newGame(7, "lw", 2), 20).state);
+  expect(screen.queryByRole("dialog", { name: "Company Message" })).toBeNull();
+  expect(screen.getByRole("region", { name: "Launch Week tutorial" }).textContent).toContain("Your database is overloading");
+  spotOn(/Database/);
+  // Inspecting shows the metrics first; Next moves the spotlight to the fix.
+  fireEvent.click(lit()[0]);
+  const metrics = screen.getByRole("region", { name: "Launch Week tutorial" });
+  expect(metrics.textContent).toContain("Read the metrics");
+  expect(lit()[0].classList.contains("equipment-readings")).toBe(true);
+  fireEvent.click(within(metrics).getByRole("button", { name: "Next" }));
+  spotOn(/^Upgrade database/);
 });

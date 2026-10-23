@@ -1,10 +1,8 @@
-import { completeTutorialFixture } from "@/testing/tutorial";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 import { act as reactAct, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import App from "@/App";
 import { useGame } from "./store";
-import { WALKTHROUGH_LESSONS } from "./walkthrough";
 import { newGame, newLegacyGame } from "@/sim";
 import { DEFAULT_META, saveClassicGame, saveMeta, saveMode } from "./persist";
 import { preparedReliability, act, tick } from "@/sim/__tests__/reliabilityFixture";
@@ -38,34 +36,27 @@ it("counts actual Campaign play once under StrictMode, never the title screen", 
   useGame.getState().play();
   expect(named("gameplay_run_started")).toHaveLength(1);
   expect(named("gameplay_session_started")).toHaveLength(1);
-  expect(named("gameplay_chapter_started")[0].properties.chapter_id).toBe("opening");
+  expect(named("gameplay_chapter_started")[0].properties.chapter_id).toBe("launch-week");
   expect(named("gameplay_run_started")[0].properties).toMatchObject({
-    mode: "campaign", build_id: "test-build", content_version: "chapters-v2", eligible_started_run: true,
+    mode: "campaign", build_id: "test-build", content_version: "launch-week-v1", eligible_started_run: true,
   });
 });
 
 const tutorial = () => events.filter(e => e.name.startsWith("gameplay_tutorial_")).map(({ name, properties: p }) =>
   [name, p.tutorial_track, p.tutorial_step, p.tutorial_from ?? p.reason ?? null]);
 
-it("reports Guided Mode's walkthrough starting and finishing once each, with no skip path, under StrictMode and across a reload", () => {
+it("reports no tutorial events for Guided Mode's Launch Week, its replay or a chapter guide, under StrictMode and across a reload", () => {
   watch();
   render(<StrictMode><App /></StrictMode>);
   fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   useGame.getState().play();
-  reactAct(() => { useGame.getState().tourNext(); useGame.getState().tourNext(); useGame.getState().endTour(false); });
-  reactAct(() => { completeTutorialFixture(); useGame.getState().startTour("campaign", "home"); completeTutorialFixture(); });
-  // A chapter's one-card guide is not the walkthrough.
+  reactAct(() => { useGame.getState().startTour("campaign", "home"); useGame.getState().endTour(false); });
+  // A chapter's one-card guide is not a walkthrough either.
   reactAct(() => { useGame.getState().startTour("scaling"); useGame.getState().endTour(true); });
   cleanup(); stop();
   useGame.setState(useGame.getInitialState(), true);
   watch(); play();
-  expect(tutorial()).toEqual([
-    ["gameplay_tutorial_started", "campaign", 0, "first_visit"],
-    ["gameplay_tutorial_completed", "campaign", WALKTHROUGH_LESSONS - 1, null],
-    ["gameplay_tutorial_started", "campaign", 0, "home"],
-    ["gameplay_tutorial_completed", "campaign", WALKTHROUGH_LESSONS - 1, null],
-  ]);
-  expect(named("gameplay_tutorial_started")[0].properties).toMatchObject({ mode: "campaign", chapter_id: "opening", progress_step: 0 });
+  expect(tutorial()).toEqual([]);
 });
 
 it("reports Challenge Mode's walkthrough, offered behind the title screen, once play begins", () => {
@@ -82,10 +73,11 @@ it("reports Challenge Mode's walkthrough, offered behind the title screen, once 
   expect(named("gameplay_tutorial_started")[0].properties.mode).toBe("classic");
 });
 
-it("does not report a walkthrough already under way when it starts observing, only how it ends", () => {
+it("reports no tutorial for a Launch Week company already under way when it starts observing", () => {
   play(); watch();
-  completeTutorialFixture();
-  expect(tutorial()).toEqual([["gameplay_tutorial_completed", "campaign", WALKTHROUGH_LESSONS - 1, null]]);
+  useGame.getState().startTour("campaign", "home");
+  useGame.getState().endTour(false);
+  expect(tutorial()).toEqual([]);
 });
 
 it("includes paused planning time, caps idle time, and resumes timing on input", () => {
@@ -196,16 +188,38 @@ it("does not mistake a partial or imported completed Campaign for a new completi
   expect(named("gameplay_run_completed")).toHaveLength(0);
 });
 
+it("reports Launch Week beats as they are reached, the research pick and the final nines", () => {
+  const game = newGame(1, "launch-beats", 2);
+  watch();
+  useGame.setState({ game, started: true, ready: true, hasRun: true, onboarding: false });
+  const beats = () => named("gameplay_launch_beat").map(e => e.properties.beat);
+  expect(beats()).toEqual(["launch-open"]);
+  const researching = structuredClone(game); researching.campaign!.step = 105; researching.campaign!.launchWeek!.researchEarned = 1;
+  useGame.setState({ game: researching });
+  expect(beats()).toEqual(["launch-open", "launch-research"]);
+  const picked = structuredClone(researching); picked.campaign!.launchWeek!.tech = "autoscaling";
+  useGame.setState({ game: picked });
+  expect(named("gameplay_launch_pick").map(e => e.properties.tech)).toEqual(["autoscaling"]);
+  const done = structuredClone(picked);
+  done.campaign!.launchWeek!.completedStep = 170;
+  done.campaign!.openingMilestone = { id: "launch-week", incidentId: null, awardedStep: 170, acknowledged: false };
+  useGame.setState({ game: done });
+  expect(beats()).toEqual(["launch-open", "launch-research", "launch-week", "launch-score"]);
+  const score = named("gameplay_launch_score");
+  expect(score).toHaveLength(1);
+  expect(score[0].properties.nines).toBeGreaterThanOrEqual(0);
+});
+
 it("records chapter progress and a failure once with the last reached chapter", () => {
   watch(); play();
   const next = structuredClone(useGame.getState().game);
   next.campaign!.openingMilestone = { ...next.campaign!.openingMilestone!, acknowledged: true };
   useGame.setState({ game: next });
-  expect(named("gameplay_chapter_completed").map(e => e.properties.chapter_id)).toEqual(["opening"]);
+  expect(named("gameplay_chapter_completed").map(e => e.properties.chapter_id)).toEqual(["launch-week"]);
   useGame.setState({ game: { ...next, phase: "ended", outcome: "bankrupt" } });
   useGame.setState({ game: { ...useGame.getState().game } });
   expect(named("gameplay_run_failed")).toHaveLength(1);
-  expect(named("gameplay_run_failed")[0].properties.chapter_id).toBe("opening");
+  expect(named("gameplay_run_failed")[0].properties.chapter_id).toBe("scaling");
 });
 
 it("restarts a session on back/forward cache restoration without starting another run", () => {

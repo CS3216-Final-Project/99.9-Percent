@@ -1,3 +1,4 @@
+:root { --spotlight: var(--go); --spotlight-dim: rgb(14 11 30 / .62); }
 /* Spend empty header space, preserving every existing indicator's width and typography. */
 .topbar.has-global-hint { gap: 6px; }
 .topbar.has-global-hint > .brand { min-width: 106px; }
@@ -6,8 +7,8 @@
   .topbar.has-global-hint { gap: 6px 10px; }
   .topbar.has-global-hint > .brand { min-width: 0; }
 }
-.campaign-gold-attention { outline: 3px solid var(--go) !important; outline-offset: 2px; box-shadow: 0 0 9px 3px #ffd84a99 !important; }
-.campaign-gold-attention:focus-visible { outline-color: var(--focus) !important; box-shadow: 0 0 0 3px var(--go), 0 0 12px 5px #ffd84a99 !important; }
+.campaign-gold-attention { outline: 3px solid var(--go) !important; outline-offset: 2px; box-shadow: 0 0 0 2px #3d2f08, 0 0 14px 5px #ffd84acc !important; }
+.campaign-gold-attention:focus-visible { outline-color: var(--focus) !important; box-shadow: 0 0 0 3px var(--go), 0 0 16px 6px #ffd84acc !important; }
 @media (prefers-reduced-motion: no-preference) {
   .campaign-gold-attention { animation: campaign-attention-pulse 1.8s ease-in-out infinite; }
 }
@@ -25,9 +26,6 @@
 .chapter-stage-popup .campaign-hint-heading h3 > .icon { color: var(--cue-accent); }
 .chapter-stage-popup > .btn { border-color: var(--cue-accent); background: var(--cue-accent); color: var(--ink); }
 .chapter-stage-popup > .btn:hover:not(:disabled), .chapter-stage-popup > .btn:active:not(:disabled) { background: var(--cue-accent); }
-.company-message-backdrop { position: fixed; inset: 0; z-index: 99; background: var(--spotlight-dim); overscroll-behavior: contain; touch-action: none; }
-.company-message { max-height: min(360px, calc(100dvh - 48px)); touch-action: pan-y; }
-.company-message-sender { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-.company-message-sender p { margin: 0; }
-.company-message-sender p > span { display: block; font-size: var(--text-sm); }
-.company-message-avatar { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--cue-accent); }
+/* Launch Week's tutorial step: the step tours' card, fixed beside its spotlight and clickable only on its button. */
+.tour-card.launch-tutorial { position: fixed; z-index: 111; pointer-events: none; }
+.tour-card.launch-tutorial button { pointer-events: auto; }

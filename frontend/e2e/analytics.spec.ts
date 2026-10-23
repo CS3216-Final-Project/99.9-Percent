@@ -1,5 +1,5 @@
 import { gunzipSync } from "node:zlib";
-import { completeTutorial, test, expect, CHAPTER_ZERO_LESSONS } from "./fixtures";
+import { completeTutorial, test, expect } from "./fixtures";
 
 test("optional product analytics observes Play and survives reload with no title-screen start", async ({ page, withoutRoom , installClock}) => {
  await installClock();
@@ -44,9 +44,11 @@ test("optional product analytics observes Play and survives reload with no title
     expect(JSON.stringify(captured)).not.toContain("not-for-analytics");
     expect(captured.every(e => e.event.startsWith("gameplay_"))).toBe(true);
     expect(captured.some(e => e.event === "gameplay_session_progress" && Number(e.properties.session_active_ms) > 0)).toBe(true);
-    // The walkthrough the player completed is reported once each way, with only its track, step and start.
+    // Launch Week's cold open reports its first beat.
+    expect(captured.some(e => e.event === "gameplay_launch_beat" && e.properties.beat === "launch-open")).toBe(true);
+    // Launch Week is played, not walked through: it reports no tutorial events.
     const tutorial = () => captured.filter(e => e.event.startsWith("gameplay_tutorial_")).map(e => [e.event, e.properties.tutorial_track, e.properties.tutorial_step, e.properties.tutorial_from ?? e.properties.reason]);
-    expect(tutorial()).toEqual([["gameplay_tutorial_started", "campaign", 0, "first_visit"], ["gameplay_tutorial_completed", "campaign", CHAPTER_ZERO_LESSONS - 1, undefined]]);
+    expect(tutorial()).toEqual([]);
     await page.reload();
     await page.getByRole("button", { name: "Continue company", exact: true }).click();
     await page.clock.runFor(20_000);

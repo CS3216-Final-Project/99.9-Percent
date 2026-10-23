@@ -22,7 +22,7 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   await press(page.getByRole("button", {name:"Continue company",exact:true})); await expectRoom(page);
   const card = page.getByRole("dialog", {name:"Company Message",exact:true});
   await expect(card).toBeVisible(); await expect(card).toHaveAttribute("aria-modal","true");
-  const backdrop = page.locator(".company-message-backdrop");
+  const backdrop = page.locator(".dialogue-backdrop");
   await expect(backdrop).toHaveCount(1); await expect(backdrop).toBeVisible();
   await expect(backdrop).toHaveCSS("background-color","rgba(14, 11, 30, 0.62)");
   await expect(backdrop).toHaveCSS("z-index","99");
@@ -34,14 +34,36 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   const run = page.getByRole("button",{name:"Run",exact:true,includeHidden:true});
   const box = await run.boundingBox();
   if (!box) throw new Error("Expected existing Run Company control");
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  // On narrow screens the dialogue box itself covers Run, so press a corner of the backdrop instead.
+  const [x, y] = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest(".dialogue") ? [8, 8] : [x, y], [box.x + box.width / 2, box.y + box.height / 2]);
+  await page.mouse.click(x, y);
   await expect(card).toBeVisible(); await expect(run).toBeVisible();
   const dismiss = card.getByRole("button",{name:"Dismiss company message",exact:true});
-  await expect(dismiss).toBeFocused();
-  await page.keyboard.press("Shift+Tab"); await expect(card.getByRole("button",{name:"Got it",exact:true})).toBeFocused();
+  const next = card.getByRole("button",{name:"Next",exact:true});
+  await expect(next).toBeFocused();
   await page.keyboard.press("Tab"); await expect(dismiss).toBeFocused();
+  await page.keyboard.press("Shift+Tab"); await expect(next).toBeFocused();
+  // P is the game's Run/Pause shortcut; inside the dialogue it must not start the clock.
   await page.keyboard.press("p"); await expect(card).toBeVisible(); await expect(run).toBeVisible();
-  await expect(card).toContainText(["Maya", "Alex", "Jordan", "Sam", "Taylor", "Alex"][chapter - 1]);
+  await expect(page.getByRole("button",{name:"Pause",exact:true,includeHidden:true})).toHaveCount(0);
+  const [name, character] = [["Maya","maya"],["Alex","alex"],["Jordan","jordan"],["Sam","sam"],["Taylor","taylor"],["Alex","alex"]][chapter - 1];
+  await expect(card.locator(".dialogue-plate")).toContainText(name);
+  const portrait = card.getByRole("img",{name:new RegExp(`^${name}, `)});
+  await expect(portrait).toHaveAttribute("src",`/characters/${character}.webp`);
+  await expect.poll(() => portrait.evaluate(img => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth)).toBe(768);
+  await expect(portrait).toBeInViewport({ratio:1});
+  await expect(card).not.toContainText("Your mission:");
+  await expect(card).toBeInViewport({ratio:1});
+  await page.screenshot({path:info.outputPath(`company-message-chapter-${chapter}-first-line${touch?"-touch":""}.png`)});
+  // Odd chapters read on with the keyboard, even chapters by pressing the dialogue box itself.
+  const copy = card.locator(".dialogue-copy"), progress = card.locator(".dialogue-progress");
+  const total = Number((await progress.getAttribute("aria-label"))!.match(/of (\d+)$/)![1]);
+  for (let line = 1; line < total; line++) {
+    await expect(progress).toHaveAttribute("aria-label", `Line ${line} of ${total}`);
+    if (chapter % 2) await page.keyboard.press("Enter"); else await press(copy);
+  }
+  await expect(progress).toHaveAttribute("aria-label", `Line ${total} of ${total}`); await expect(next).toHaveCount(0);
+  await expect(card.getByRole("button",{name:"Got it",exact:true})).toBeFocused();
   await expect(card).toContainText("Your mission:");
   await expect(card).toBeInViewport({ratio:1});
   await expect(card.getByRole("button",{name:"Got it",exact:true})).toBeInViewport({ratio:1});

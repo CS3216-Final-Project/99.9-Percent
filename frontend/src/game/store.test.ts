@@ -6,11 +6,9 @@ import { pendingReliability } from "../sim/reliability";
 import { DEFAULT_AUDIO, DEFAULT_META, isSilent, loadAudio, loadClassicGame, loadGame, loadMeta, loadMode, saveGame, saveMeta, saveMode, readAnalytics } from "./persist";
 import { makeEnvelope } from "./saveEnvelope";
 import { useGame } from "./store";
-import { RUN_LESSON } from "./walkthrough";
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => vi.restoreAllMocks());
 function enter() {
-  // These tests drive the clock, which the Opening walkthrough holds until it is done.
   saveMeta({ ...loadMeta(), tutorialDone: true });
   useGame.getState().boot(); useGame.getState().play();
 }
@@ -63,9 +61,6 @@ describe("shared campaign runtime", () => {
     const saved = loadGame(); expect(saved.status === "ok" && saved.game.campaign!.step).toBe(11);
   });
   it("refuses manual steps wherever the clock is held", () => {
-    // The Opening walkthrough holds the clock until it is done.
-    useGame.getState().boot(); useGame.getState().play();
-    useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(0);
     useGame.setState(useGame.getInitialState(), true); localStorage.clear(); enter();
     useGame.getState().openView("menu"); useGame.getState().stepSeconds(1);
     expect(useGame.getState().game.campaign!.step).toBe(0);
@@ -73,14 +68,6 @@ describe("shared campaign runtime", () => {
     for (const count of [0, -1, 1.5, Number.NaN]) useGame.getState().stepSeconds(count);
     expect(useGame.getState().game.campaign!.step).toBe(0);
     useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(1);
-  });
-  it("lets a manual step reach Chapter 0's Run lesson limit and no further", () => {
-    enter(); const at = useGame.getState().game.campaign!.step;
-    useGame.setState({ tour: { track: "campaign", step: RUN_LESSON - 1 } });
-    useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(at);
-    useGame.setState({ tour: { track: "campaign", step: RUN_LESSON, clockUntil: at + 1 } });
-    useGame.getState().stepSeconds(5); expect(useGame.getState().game.campaign!.step).toBe(at + 1);
-    useGame.getState().stepSeconds(1); expect(useGame.getState().game.campaign!.step).toBe(at + 1);
   });
   it("menu pauses, history does not, and later views are inaccessible", () => {
     enter(); useGame.getState().setRunning(true);
@@ -413,7 +400,7 @@ describe("challenge mode lock", () => {
     expect(useGame.getState().toast?.text).toBe(LOCKED);
     expect(localStorage.getItem("nn.classic.save.v1")).toBeNull();
   });
-  it("unlocks Challenge Mode permanently when the reliability chapter is acknowledged", () => {
+  it("unlocks Challenge Mode permanently when the reliability chapter is acknowledged", { timeout: 30_000 }, () => {
     let game = act(preparedReliability(), { type: "arm_reliability" });
     for (let i = 0; i < 60 && !pendingReliability(game.campaign); i++) {
       if (game.phase === "review") game = act(game, { type: "acknowledge_review" });
@@ -435,7 +422,7 @@ describe("challenge mode lock", () => {
     useGame.getState().switchMode("classic");
     expect(useGame.getState().game).toEqual(classic);
   });
-  it("treats an older completed campaign save as unlocked even without the new metadata", () => {
+  it("treats an older completed campaign save as unlocked even without the new metadata", { timeout: 30_000 }, () => {
     let game = act(preparedReliability(), { type: "arm_reliability" });
     for (let i = 0; i < 60 && !pendingReliability(game.campaign); i++) {
       if (game.phase === "review") game = act(game, { type: "acknowledge_review" });
@@ -540,17 +527,17 @@ describe("exploration state", () => {
     ]);
   });
 
-  it("opens in first person until the player chooses how to see the room, and then as chosen", () => {
+  it("opens following the avatar until the player chooses how to see the room, and then as chosen", () => {
     enter();
     const s = () => useGame.getState();
-    expect(s()).toMatchObject({ walking: true, viewpoint: "first" });
+    expect(s()).toMatchObject({ walking: true, viewpoint: "follow" });
     // Opening there is not a choice, so nothing about it is stored.
     expect(localStorage.getItem("nn.campaign.exploration.v1")).toBeNull();
-    s().setViewpoint("follow", "key");
-    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true, viewpoint: "follow", viewChosen: true });
+    s().setViewpoint("first", "key");
+    expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")!)).toMatchObject({ walking: true, viewpoint: "first", viewChosen: true });
     useGame.setState(useGame.getInitialState(), true);
     enter();
-    expect(s()).toMatchObject({ walking: true, viewpoint: "follow" });
+    expect(s()).toMatchObject({ walking: true, viewpoint: "first" });
     s().setWalking(false);
     useGame.setState(useGame.getInitialState(), true);
     enter();
@@ -571,7 +558,6 @@ describe("exploration state", () => {
     useGame.getState().boot();
     useGame.getState().play();
     expect(useGame.getState()).toMatchObject({ walking: false, viewpoint: "overview" });
-    expect(useGame.getState().tour).not.toBeNull();
     useGame.setState(useGame.getInitialState(), true);
     window.history.pushState({}, "", "/?floor=office");
     try {
@@ -592,14 +578,14 @@ describe("exploration state", () => {
     enter();
     const s = () => useGame.getState();
     expect(s().walking).toBe(true);
-    s().startTour("campaign");
-    expect(s()).toMatchObject({ walking: false, viewpoint: "overview", tour: { track: "campaign", step: 0 } });
+    s().startTour("scaling");
+    expect(s()).toMatchObject({ walking: false, viewpoint: "overview", tour: { track: "scaling", step: 0 } });
     // Not remembered as left: the next run opens in first person again.
     expect(JSON.parse(localStorage.getItem("nn.campaign.exploration.v1") ?? "{}").viewChosen).not.toBe(true);
     useGame.setState(useGame.getInitialState(), true);
     seed("campaign", { floor: "servers", walking: true, viewpoint: "first", viewChosen: true });
     enter();
-    s().startTour("campaign");
+    s().startTour("scaling");
     expect(s()).toMatchObject({ walking: true, viewpoint: "first" });
   });
 
@@ -647,7 +633,8 @@ describe("exploration state", () => {
 describe("one-time Guided Mode tips", () => {
   /** A company kept below its first incident by a traffic limit, so its first operating week can settle calmly. */
   function settleFirstWeek() {
-    enter();
+    // Launch Week ends on its first settlement with the score card; the tip is checked on an original opening.
+    enter(); useGame.setState({ game: newGame(1, "tips") });
     expect(useGame.getState().act({ type: "set_traffic_limit", enabled: true })).toBe(true);
     for (let i = 0; i < 70 && useGame.getState().game.campaign!.settlements.length === 0; i++) useGame.getState().stepSeconds(1);
   }

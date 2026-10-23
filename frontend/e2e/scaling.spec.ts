@@ -51,6 +51,8 @@ test("scaling: database headroom activates before the application growth inciden
 
 for (const path of ["vertical", "horizontal"] as const) {
   test(`scaling installation: ${path}`, async ({ page, withoutRoom, installClock }) => {
+    // The horizontal path draws the room through each installation; SwiftShader can spend over a minute on it.
+    if (path === "horizontal") test.setTimeout(120_000);
     await installClock();
     if (path === "vertical") await withoutRoom();
     const api = await boot(page, appIncident());

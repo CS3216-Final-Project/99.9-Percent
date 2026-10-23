@@ -39,8 +39,26 @@ describe("input-log saves", () => {
   });
   it("identifies unknown scenario and schema versions without reinterpreting saves", () => {
     const e = makeEnvelope(newGame());
-    expect(validateEnvelope({ ...e, scenarioVersion: 2 }).status).toBe("unsupported");
+    expect(validateEnvelope({ ...e, scenarioVersion: 3 as 1 }).status).toBe("unsupported");
     expect(decodeSave(JSON.stringify({ ...e, schemaVersion: 99 })).status).toBe("unsupported");
     expect(decodeSave(JSON.stringify({ ...e, schemaVersion: 0 })).status).toBe("unsupported");
+  });
+  it("replays a prior-schema version-1 save byte-identically", () => {
+    const s = applyCampaignInput(playedRun(), { type: "add_server" }).state;
+    const e = makeEnvelope(s);
+    const prior = json({ ...e, schemaVersion: 7 }) as SaveEnvelope;
+    const result = validateEnvelope(prior);
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") expect(json(result.game)).toEqual(json(s));
+  });
+  it("accepts version-2 envelopes and replays them on their own rule set", () => {
+    const v2 = newGame(4, "launch-week", 2);
+    expect(v2.campaign!.scenarioVersion).toBe(2);
+    const roundTrip = validateEnvelope(json(makeEnvelope(v2)) as SaveEnvelope);
+    expect(roundTrip.status).toBe("ok");
+    if (roundTrip.status === "ok") {
+      expect(json(roundTrip.game)).toEqual(json(v2));
+      expect(roundTrip.envelope.scenarioVersion).toBe(2);
+    }
   });
 });

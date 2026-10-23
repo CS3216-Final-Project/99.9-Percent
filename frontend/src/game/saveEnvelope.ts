@@ -4,7 +4,7 @@ import type { CampaignInput } from "@/sim/campaignTypes";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { emptyMeasurement, measurementValid, type Measurement } from "./telemetry";
 export const CAMPAIGN_SAVE_KEY = "nn.campaign.save.v1";
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 /**
  * A save holds the run's identity and the player's inputs, not the state they
  * produced. Loading replays the inputs on the deterministic engine, so a save
@@ -14,7 +14,7 @@ export const SCHEMA_VERSION = 7;
 export interface SaveEnvelope {
     schemaVersion: typeof SCHEMA_VERSION;
     scenarioId: "opening-db";
-    scenarioVersion: 1;
+    scenarioVersion: 1 | 2;
     runId: string;
     seed: number;
     step: number;
@@ -49,7 +49,8 @@ export function validateEnvelope(value: unknown): Validation {
     const phase5 = (e as {schemaVersion: number}).schemaVersion === 5;
     const phase2 = (e as {schemaVersion: number}).schemaVersion === 2;
     const phase6 = (e as {schemaVersion: number}).schemaVersion === 6;
-    if ((!legacy && !phase2 && !phase3 && !phase4 && !phase5 && !phase6 && e.schemaVersion !== SCHEMA_VERSION) || e.scenarioId !== Q.id || e.scenarioVersion !== Q.version)
+    const phase7 = (e as {schemaVersion: number}).schemaVersion === 7;
+    if ((!legacy && !phase2 && !phase3 && !phase4 && !phase5 && !phase6 && !phase7 && e.schemaVersion !== SCHEMA_VERSION) || e.scenarioId !== Q.id || (e.scenarioVersion !== 1 && e.scenarioVersion !== 2))
         return { status: "unsupported" };
     if (typeof e.runId !== "string" || !e.runId || !Number.isSafeInteger(e.seed) || (e.seed | 0) !== e.seed || !integer(e.step) ||
         !Array.isArray(e.inputs) || !e.inputs.every(isInput) ||
@@ -63,12 +64,12 @@ export function validateEnvelope(value: unknown): Validation {
     if ((legacy || phase2 || phase3 || phase4) && e.inputs.some(i => spikeActions.includes(i.action.type))) return {status:"corrupt"};
     const reliabilityActions = ["acknowledge_prevention_review", "enter_reliability", "unlock_reliability", "deploy_health_checks", "install_spare", "reserve_spare",
         "release_spare", "deploy_failover", "set_failover", "restore_app", "arm_reliability", "acknowledge_reliability"];
-    if (!phase6 && e.schemaVersion !== SCHEMA_VERSION && e.inputs.some(i => reliabilityActions.includes(i.action.type))) return {status:"corrupt"};
+    if (!phase6 && !phase7 && e.schemaVersion !== SCHEMA_VERSION && e.inputs.some(i => reliabilityActions.includes(i.action.type))) return {status:"corrupt"};
     const legacyPreventionInputs=phase6?e.inputs.length:e.legacyPreventionInputs??0;
     if(!integer(legacyPreventionInputs) || legacyPreventionInputs>e.inputs.length ||
-        (!phase6 && e.schemaVersion!==SCHEMA_VERSION && legacyPreventionInputs!==0))return {status:"corrupt"};
+        (!phase6 && !phase7 && e.schemaVersion!==SCHEMA_VERSION && legacyPreventionInputs!==0))return {status:"corrupt"};
     const combinedActions = ["enter_combined", "start_growth_wave", "acknowledge_growth", "complete_campaign", "accept_scaling_risk", "run_promotion"];
-    if (e.schemaVersion !== SCHEMA_VERSION && e.inputs.some(i => combinedActions.includes(i.action.type))) return {status:"corrupt"};
+    if (!phase7 && e.schemaVersion !== SCHEMA_VERSION && e.inputs.some(i => combinedActions.includes(i.action.type))) return {status:"corrupt"};
     const serviceStart = e.serviceMeasurementStart ?? {fromStep:e.step+1,scope:"since-upgrade" as const};
     if (!integer(serviceStart.fromStep) || serviceStart.fromStep < 1 || serviceStart.fromStep > e.step+1 ||
         !["full-run","since-upgrade"].includes(serviceStart.scope) || (serviceStart.scope === "full-run" && serviceStart.fromStep !== 1)) return {status:"corrupt"};
@@ -83,7 +84,7 @@ export function validateEnvelope(value: unknown): Validation {
         if(foundation && (!integer(foundation.step) || foundation.step>e.step || !integer(foundation.inputs) || foundation.inputs>inputs.length ||
             inputs.slice(0,foundation.inputs).some(input=>input.step>foundation.step || ["enter_scaling","scale_up","deploy_load_balancer","set_routing",...dataActions,...spikeActions,...foundationReliabilityActions,...combinedActions].includes(input.action.type) ||
                 (input.action.type==="acknowledge_milestone" && input.action.enterScaling!==false)))) return {status:"corrupt"};
-        const game = replayCampaign(e.seed, e.runId, inputs, e.step, legacy, foundation, !phase6 && e.schemaVersion !== SCHEMA_VERSION, legacyPreventionInputs, serviceStart);
+        const game = replayCampaign(e.seed, e.runId, inputs, e.step, legacy, foundation, !phase6 && !phase7 && e.schemaVersion !== SCHEMA_VERSION, legacyPreventionInputs, serviceStart, e.scenarioVersion);
         if(legacy && game.campaign!.foundation)game.campaign!.foundation.inputs=game.campaign!.inputs.length;
         const measurement: Measurement = legacy
             ? {...emptyMeasurement(), origin:"phase1", runStarted:true, cursor:game.campaign!.trace.length}

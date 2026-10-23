@@ -235,6 +235,15 @@ function buildModels(): Placement[] {
   return out;
 }
 
+/** Recede a furnishing colour toward its own lightness, so traffic-view props stay behind the machines and requests. */
+function muted(c: string): string {
+  const n = parseInt(c.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const lum = (r * 299 + g * 587 + b * 114) / 1000;
+  const m = (x: number) => Math.round(x + (lum - x) * 0.72);
+  return `#${((m(r) << 16) | (m(g) << 8) | m(b)).toString(16).padStart(6, "0")}`;
+}
+
 /** The detailed machines on the server floor: the hall's cooling units and the monitoring desk's Macs. */
 function buildProps(): PropItem[] {
   const out: PropItem[] = [];
@@ -362,29 +371,46 @@ function Responder({ index }: { index: number }) {
   );
 }
 
-export function ServerFloor({ incident, engineers }: { incident: boolean; engineers: number }) {
+/**
+ * The server floor's fittings and people. In the traffic view (`focus`) the furnishing stays but recedes to muted
+ * greys, so the requests and the machines carrying them still own every strong colour.
+ */
+export function ServerFloor({ incident, engineers, focus = false }: { incident: boolean; engineers: number; focus?: boolean }) {
   const prims = useMemo(() => buildStatic(), []);
+  const mutedPrims = useMemo(() => prims.map(p => ({ ...p, c: muted(p.c) })), [prims]);
   const models = useMemo(() => buildModels(), []);
   const props = useMemo(() => buildProps(), []);
   const panel = useMemo(() => [bx([-21.93, 1.5, -3.2], [0.1, 1.2, 0.9], ALU), bx([-21.87, 1.7, -3.0], [0.02, 0.2, 0.3], "#ffd84a")], []);
   return (
     <group>
       <Floors zones={ZONES} />
-      <PrimBatch prims={prims} />
-      <ModelBatch placements={models} />
-      <DetailedProps items={props} />
+      {focus ? <PrimBatch prims={mutedPrims} shadows={false} /> : (
+        <>
+          <PrimBatch prims={prims} />
+          <ModelBatch placements={models} />
+          <DetailedProps items={props} />
+        </>
+      )}
       <GlassPanes runs={SERVER_GLASS} />
-      <ZoneNames names={SERVER_ZONE_NAMES} />
-      <ChillerFans />
-      <ColdAir />
+      {!focus && (
+        <>
+          <ZoneNames names={SERVER_ZONE_NAMES} />
+          <ChillerFans />
+          <ColdAir />
+        </>
+      )}
 
       {/* The on-call engineer at the monitoring desk, a technician in the hall and a storekeeper among the shelves */}
       {[-0.45, 0.45].map((dx) => (
         <ScreenPlane key={dx} kind={incident ? "alert" : "dash"} w={PANEL.w} h={PANEL.h} position={[8.2 + dx, PANEL.y, -6.9 + PANEL.z]} />
       ))}
-      <Creature pose="sit" activity={incident ? "type" : "mug"} species={ON_CALL} position={[SPOTS.onCall.x, 0, SPOTS.onCall.z]} phase={7} />
-      <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} species={creature(23, "tech")} phase={2} />
-      <Walker from={[17.5, -7.0]} to={[17.5, 7.5]} speed={0.4} species={creature(26, "tech")} phase={5} />
+      {!focus && (
+        <>
+          <Creature pose="sit" activity={incident ? "type" : "mug"} species={ON_CALL} position={[SPOTS.onCall.x, 0, SPOTS.onCall.z]} phase={7} />
+          <Walker from={[4.4, -0.9]} to={[8.0, -0.9]} speed={0.45} species={creature(23, "tech")} phase={2} />
+          <Walker from={[17.5, -7.0]} to={[17.5, 7.5]} speed={0.4} species={creature(26, "tech")} phase={5} />
+        </>
+      )}
       {/* During an incident, the first engineers come down from their desks */}
       {incident && RESPONDERS.slice(0, engineers).map((_, i) => <Responder key={i} index={i} />)}
 

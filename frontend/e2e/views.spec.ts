@@ -54,10 +54,10 @@ const lockedTo = (page: Page) => page.evaluate(() => document.pointerLockElement
 test.describe("a player who has not chosen a view", () => {
   test.use({ overviewChosen: false });
 
-  test("opens in first person with the mouse, keeps it through a reading but not a dialog, and opens as chosen once a view is chosen", async ({ page }) => {
+  test("opens following the avatar with the mouse, keeps it through a reading but not a dialog, and opens as chosen once a view is chosen", async ({ page }) => {
     await open(page);
-    await expect(page.locator(".view-overlay")).toHaveAttribute("data-viewpoint", "first");
-    await expect(option(page, "First person")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".view-overlay")).toHaveAttribute("data-viewpoint", "follow");
+    await expect(option(page, "Follow")).toHaveAttribute("aria-pressed", "true");
     // Continue's click took the mouse there and then. Opening there was not a choice, so none is remembered.
     await expect.poll(() => lockedTo(page)).toBe("CANVAS");
     expect((await exploration(page))?.viewChosen ?? false).toBe(false);
@@ -83,7 +83,7 @@ test.describe("a player who has not chosen a view", () => {
     await expect(page.getByRole("group", { name: "Mouse look paused" })).toBeVisible();
     await page.evaluate(() => document.getElementById("arrived")?.remove());
     // Ending the walk is a choice, so the next visit opens in the overview.
-    await page.getByRole("group", { name: "Mouse look paused" }).getByRole("button", { name: "Exit first person" }).click();
+    await page.getByRole("group", { name: "Mouse look paused" }).getByRole("button", { name: "Exit follow" }).click();
     await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
     expect(await exploration(page)).toMatchObject({ walking: false, viewpoint: "overview", viewChosen: true });
     await page.reload();

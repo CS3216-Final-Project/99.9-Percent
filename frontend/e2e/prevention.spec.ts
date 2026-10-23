@@ -1,12 +1,13 @@
-import { completeTutorial, advanceCampaignStep, setGameSpeed } from "./fixtures";
+import { advanceCampaignStep, setGameSpeed, seedSave } from "./fixtures";
 import {test,expect,savedGame} from "./fixtures";
 
 // This journey checks prevention rules through the panel and dialogs; other journeys check the 3D room, whose software
 // rendering on CI can starve the page of frames for seconds at a time.
 test("Opening prevention: fresh player verifies prevention and explicitly unlocks Scaling without API",async({page, installClock, withoutRoom})=>{
  await withoutRoom();await installClock();
- test.setTimeout(90000);await page.route("**/api/**",r=>r.abort());await page.goto("/");
- await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await completeTutorial(page);
+ test.setTimeout(90000);await page.route("**/api/**",r=>r.abort());
+ const {newGame}=await import("../src/sim");await seedSave(page,newGame(1,"prevention",1));await page.goto("/");
+ await page.getByRole("button",{name:"Continue company",exact:true}).click();
  const id=(await savedGame(page)).campaign!.runId;
  await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
  await setGameSpeed(page,2);

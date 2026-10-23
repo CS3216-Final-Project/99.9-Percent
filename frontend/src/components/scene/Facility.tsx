@@ -20,7 +20,7 @@ import {
 } from "@/sim";
 import type { GameMode, GraphicsQuality } from "@/game/persist";
 import { loadExploration, saveExploration, type SavedCameraView } from "@/game/exploration";
-import { canInspectEquipment, inspectInRoom, useGame } from "@/game/store";
+import { canInspectEquipment, inspectInRoom, trafficViewOn, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { nextViewpoint } from "@/game/viewpoints";
 import { isPhoneEdition } from "@/phone/edition";
@@ -63,7 +63,7 @@ import type { Prompt } from "./player";
 import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
 import { Exterior } from "./exterior";
-import { daylightNow } from "./dayClock";
+import { daylightNow, holdDay } from "./dayClock";
 import { sunStep, sunSteps, type Vec3 } from "./sky";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
@@ -77,6 +77,16 @@ import { ViewOverlay } from "./ViewOverlay";
 import { Minimap } from "./Minimap";
 import { screenPoint } from "./labels";
 import { EQUIPMENT, ROOM_PALETTE } from "./palette";
+import { trafficModel } from "./traffic";
+import { CampaignTraffic, Gate } from "./TrafficFlow";
+import { Ghosts } from "./Ghosts";
+import { rackLit } from "./spotSpec";
+import { SpotBeams } from "./SpotBeams";
+import { changeOf } from "./ghostSpec";
+import { IN_GATE, OUT_GATE } from "./trafficLayout";
+import { PathGlow } from "./SpotBeams";
+import { num } from "@/game/format";
+import type { Campaign } from "@/sim/campaignTypes";
 
 function useSceneModel(): SceneModel {
   const key = useGame((s) => JSON.stringify(buildModel(s.game)));
@@ -575,6 +585,7 @@ function Rack({
   variant = "server",
   size = RACK,
   tint = STEEL,
+  dim = false,
 }: {
   x: number;
   z: number;
@@ -582,15 +593,18 @@ function Rack({
   variant?: PanelVariant;
   size?: { w: number; d: number; h: number };
   tint?: string;
+  /** The guidance spotlight is on another machine: this one stays readable but recedes. */
+  dim?: boolean;
 }) {
   const tex = useMemo(() => panelTextures(variant, led), [variant, led]);
   // In HD the cabinets are powder-coated steel that catches the room's reflections.
   const hd = useDetail() === "hd";
+  const shell = useMemo(() => (dim ? `#${new THREE.Color(tint).multiplyScalar(0.45).getHexString()}` : tint), [tint, dim]);
   return (
     <group position={[x, 0, z]}>
       <mesh castShadow receiveShadow position={[0, size.h / 2, 0]}>
         <boxGeometry args={[size.w, size.h, size.d]} />
-        <meshStandardMaterial color={tint} metalness={hd ? 0.45 : 0.1} roughness={hd ? 0.42 : 0.8} />
+        <meshStandardMaterial color={shell} metalness={hd ? 0.45 : 0.1} roughness={hd ? 0.42 : 0.8} />
       </mesh>
       <mesh position={[0, size.h / 2, size.d / 2 + 0.006]}>
         <planeGeometry args={[size.w * 0.87, size.h * 0.93]} />
@@ -598,7 +612,7 @@ function Rack({
           map={tex.map}
           emissiveMap={tex.emissive}
           emissive="#ffffff"
-          emissiveIntensity={1.7}
+          emissiveIntensity={dim ? 0.35 : 1.7}
           roughness={0.7}
           metalness={0.05}
         />
@@ -606,14 +620,14 @@ function Rack({
       {/* Side vent panel, visible from the camera's side of the rack. */}
       <mesh position={[size.w / 2 + 0.004, size.h / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[size.d * 0.8, size.h * 0.86]} />
-        <meshStandardMaterial color={TRIM} metalness={0.05} roughness={0.85} />
+        <meshStandardMaterial color={dim ? `#${new THREE.Color(TRIM).multiplyScalar(0.45).getHexString()}` : TRIM} metalness={0.05} roughness={0.85} />
       </mesh>
       <mesh position={[0, size.h + 0.025, size.d / 2 - 0.09]}>
         <boxGeometry args={[size.w * 0.72, 0.05, 0.07]} />
         <meshStandardMaterial
           color={LED_COLORS[led]}
           emissive={LED_COLORS[led]}
-          emissiveIntensity={led === "off" ? 0 : 1.5}
+          emissiveIntensity={led === "off" ? 0 : dim ? 0.35 : 1.5}
           toneMapped={false}
         />
       </mesh>
@@ -785,6 +799,9 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
 const anchors = new Map<string, THREE.Vector3>();
 const labelEls = new Map<string, HTMLElement>();
 const INTERNET = "internet";
+/** Guided Mode's gates: where requests enter the hall and where served ones leave it. */
+const TRAFFIC_IN = "traffic-in";
+const TRAFFIC_OUT = "traffic-out";
 const labelAt = new THREE.Vector2();
 /** Where each label goes this frame, and how large, kept until overlapping ones are moved apart. */
 const placed = new Map<string, { x: number; y: number; scale: number }>();
@@ -812,6 +829,8 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
       anchors.set(id, new THREE.Vector3(f.x, FLOOR_Y[floorOf(id)] + f.h + 0.3, f.z));
     }
     anchors.set(INTERNET, new THREE.Vector3(ROOM.x0 + 0.2, FLOOR_Y.servers + 1.35, AISLE_Z));
+    anchors.set(TRAFFIC_IN, new THREE.Vector3(IN_GATE.x, FLOOR_Y.servers + 2.6, IN_GATE.z));
+    anchors.set(TRAFFIC_OUT, new THREE.Vector3(OUT_GATE.x, FLOOR_Y.servers + 2.6, OUT_GATE.z));
     for (const id of anchors.keys()) if (/^app-/.test(id)) anchors.delete(id);
     if (apps) {
       apps.forEach((a, i) => {
@@ -850,6 +869,8 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
     // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
     const slot = campaignAppIds.indexOf(key);
     y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : slot >= 0 ? slot * 22 - 10 : 0;
+    // The In gate stands just west of the gateway: lift its count clear of the Network label.
+    if (key === TRAFFIC_IN) y -= 38;
     // The mobile bottom panel occupies at most 56% of the room. Spread the
     // growing pool above it by slot order, even when permanent IDs have gaps.
     if (inSpikes && slot >= 0 && size.width <= 900) {
@@ -894,6 +915,28 @@ function approach(id: EquipmentId, f: Footprint): void {
   walkTo(f.x, f.z);
 }
 
+/**
+ * A thin bar for how loaded a machine is (demand over capacity), shown in the traffic view. During an incident it
+ * waits, like the machine's lights, until the player has inspected that machine.
+ */
+function LoadBar({ ratio }: { ratio: number | null }) {
+  if (ratio === null || !Number.isFinite(ratio)) return null;
+  const tone = ratio >= 1 ? "critical" : ratio >= 0.85 ? "warn" : "ok";
+  return <span className={`eq-load tone-${tone}`} aria-hidden="true"><span style={{ width: `${Math.min(100, Math.round(ratio * 100))}%` }} /></span>;
+}
+
+function loadOf(c: Campaign | undefined, m: SceneModel, id: string): number | null {
+  // Guided Mode keeps the bars up during an incident so the struggling machine stays readable; in Challenge
+  // (classic) mode there is no campaign and the bars never show.
+  if (!c) return null;
+  void m;
+  const s = c.snapshot;
+  if (id === "app") return s.app.capacity ? s.app.demand / s.app.capacity : null;
+  if (id === "db") return s.db.demand / s.db.capacity;
+  const x = s.instances?.find(x => x.id === id);
+  return x && x.routed ? x.demandRatio : null;
+}
+
 function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
   const selected = useGame((s) => s.selected === id);
   const hovered = useGame((s) => s.hovered === id);
@@ -902,6 +945,8 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
   const inspecting = m.inspecting === id;
   const inspected = m.inspected.includes(id);
   const tone = inspecting ? "busy" : m.symptomatic.includes(id) ? "alert" : !built ? "absent" : m.states[id];
+  // Guided Mode always shows each machine's load; Challenge Mode has no campaign and never does.
+  const load = useGame(s => loadOf(s.game.campaign, m, id));
   return (
     <button
       type="button"
@@ -925,7 +970,24 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
       {!built && <span className="eq-note">not built</span>}
       {inspecting && <span className="eq-note">investigating</span>}
       {inspected && !inspecting && <span className="eq-note">checked</span>}
+      <LoadBar ratio={load} />
     </button>
+  );
+}
+
+/** In and Out, with this second's requests: the gap between the two is what the company is losing. */
+function GateCounts({ c }: { c: Campaign }) {
+  const m = c.snapshot;
+  return (
+    <>
+      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.incoming)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}`}>
+        <b>In</b> {num(m.incoming)}/s
+        {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away — no revenue, counts against uptime</span>}
+      </span>
+      <span className="wall-tag gate-tag gate-out" ref={bindLabel(TRAFFIC_OUT)} aria-label={`Out: ${num(m.successful)} requests per second served`}>
+        <b>Out</b> {num(m.successful)}/s
+      </span>
+    </>
   );
 }
 
@@ -940,19 +1002,21 @@ function Labels({ landed }: { landed: Floor | null }) {
   const selectedAppId=useGame(s=>s.selectedAppId);
   const selected=useGame(s=>s.selected);
   const appsAffected=useGame(s=>s.affected.includes("app"));
+  const trafficView=useGame(trafficViewOn);
   const servers = landed === "servers";
   return (
     <div className="eq-labels">
-      {servers && (
+      {servers && !c && (
         <span className="wall-tag" ref={bindLabel(INTERNET)}>
           <Icon name="network" />
           Internet
         </span>
       )}
-      {EQUIPMENT_ORDER.filter((id) => floorOf(id) === landed && canInspectEquipment(game, id) && (m.opening ? ["gateway","app","db","monitoring","team","deploy","growth",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id])).map((id) => (
+      {servers && c && <GateCounts c={c} />}
+      {EQUIPMENT_ORDER.filter((id) => floorOf(id) === landed && canInspectEquipment(game, id) && (!trafficView || ["gateway", "app", "db", "cache"].includes(id)) && (m.opening ? ["gateway","app","db","monitoring","team","deploy","growth",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id])).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectInRoom("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span></button>)}
+      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectInRoom("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span><LoadBar ratio={loadOf(c,m,a.id)} /></button>)}
     </div>
   );
 }
@@ -1230,6 +1294,12 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
   const floor = useGame((s) => s.floor);
   const mode = useGame((s) => s.mode);
   const walking = useGame((s) => s.walking && s.started);
+  const trafficView = useGame(trafficViewOn);
+  // The traffic view holds the sun still, so no shadow sweeps across the floor while the player reads the traffic.
+  useEffect(() => {
+    holdDay(trafficView);
+    return () => holdDay(false);
+  }, [trafficView]);
   const office = useRef<THREE.Group>(null);
   const servers = useRef<THREE.Group>(null);
   const outside = useRef<THREE.Group>(null);
@@ -1242,7 +1312,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
     if (office.current) office.current.visible = both || shown === "office";
     if (servers.current) servers.current.visible = both || shown === "servers";
     // Seen from the avatar, under the ceiling and inside the walls, the city cannot be seen, so it is not drawn.
-    if (outside.current) outside.current.visible = !viewNow.perspective;
+    if (outside.current) outside.current.visible = !viewNow.perspective && !trafficView;
     const y = FLOOR_Y[shown] + 3.4;
     for (const l of lights.current) if (l) l.position.y = y;
   });
@@ -1270,7 +1340,9 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
   const racks = useMemo(() => racksOf(m), [m]);
 
   const appCount = Math.min(m.hosts.length, 12);
-  const routedCount = campaign ? Math.max(...campaign.routing.targets.map(id => campaign.apps.findIndex(a=>a.id===id)+1)) : appCount;
+  const routedCount = appCount;
+  const trafficLayout = useMemo(() => ({ apps: campaign?.apps.map(a => a.id) ?? [], dbCabinets: m.dbCabinets }), [campaign?.apps, m.dbCabinets]);
+  const unrouted = useMemo(() => new Set(campaign ? trafficModel(campaign).dimmed : []), [campaign]);
   const appMaxX = appSlot(Math.min(routedCount, 6) - 1).x;
   const dbLastX = dbSlot(m.dbCabinets - 1).x;
   const aisleZ = AISLE_Z;
@@ -1281,6 +1353,12 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
   const edgeAlert = sym("gateway") || sym("app");
   const dataAlert = sym("db");
   const hd = useDetail() === "hd";
+  // The guidance spotlight lights the machines it names; every other rack recedes. Pointing at a purchase
+  // dims the room the same way, leaving the parts it would change lit with their flashing ghost.
+  const spot = useGame(s => s.spotlight);
+  const affected = useGame(s => s.affected);
+  const lit = useMemo(() => [...new Set([...spot, ...affected])], [spot, affected]);
+  const dim = (id: string) => lit.length > 0 && !rackLit(lit, id);
 
   return (
     <>
@@ -1309,40 +1387,41 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
         {onFloor("office").map((id) => (
           <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
         ))}
+        <SpotBeams floor="office" footprints={m.footprints} layout={trafficLayout} />
       </group>
 
       {/* The server floor, a storey below */}
       <group ref={servers} position={[0, FLOOR_Y.servers, 0]}>
         <Room servers />
         <Ceiling floor="servers" />
-        <ServerFloor incident={m.incident} engineers={m.engineers} />
+        <ServerFloor incident={m.incident} engineers={m.engineers} focus={trafficView} />
         <Landing floor="servers" interactive={landed === "servers"} />
         <GlassDoors floor="servers" />
         {walking && landed === "servers" && <WalkFloor />}
 
         {/* Network edge */}
-        <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" />
-        {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint={EQUIPMENT.loadBalancer} />}
+        <Rack x={POS.gateway.x} z={POS.gateway.z} led={m.incident && sym("gateway") && m.inspected.includes("gateway") ? "warn" : "ok"} variant="network" dim={dim("gateway")} />
+        {m.lb && <Rack x={POS.loadBalancer.x} z={POS.loadBalancer.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.5 }} tint={EQUIPMENT.loadBalancer} dim={dim("lb")} />}
 
         {/* App servers */}
         {m.hosts.slice(0, 12).map((led, i) => {
           const p = appSlot(i);
-          return <group key={i} onClick={landed==="servers"?e=>{if(e.delta<=6){e.stopPropagation();inspectInRoom("app",campaign?.apps[i]?.id??`app-${i+1}`);}}:undefined}><Rack x={p.x} z={p.z} led={led} /></group>;
+          return <group key={i} onClick={landed==="servers"?e=>{if(e.delta<=6){e.stopPropagation();inspectInRoom("app",campaign?.apps[i]?.id??`app-${i+1}`);}}:undefined}><Rack x={p.x} z={p.z} led={led} tint={campaign && unrouted.has(campaign.apps[i]?.id) ? EQUIPMENT.face.ledOff : undefined} dim={dim(campaign?.apps[i]?.id ?? `app-${i+1}`)} /></group>;
         })}
         {Array.from({ length: m.temp }, (_, i) => {
           const p = tempSlot(i);
-          return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint={EQUIPMENT.temporary} />;
+          return <Rack key={`t${i}`} x={p.x} z={p.z} led="temp" tint={EQUIPMENT.temporary} dim={dim("temp")} />;
         })}
-        {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint={EQUIPMENT.standby} />}
+        {m.standby && <Rack x={POS.standby.x} z={POS.standby.z} led="standby" tint={EQUIPMENT.standby} dim={dim("standby")} />}
 
         {/* Data tier */}
-        {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint={EQUIPMENT.cache} />}
+        {m.cache && <Rack x={POS.cache.x} z={POS.cache.z} led="ok" variant="cache" size={{ w: 0.95, d: 1.05, h: 1.3 }} tint={EQUIPMENT.cache} dim={dim("cache")} />}
         {Array.from({ length: m.dbCabinets }, (_, i) => {
           const p = dbSlot(i);
-          return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint={EQUIPMENT.database} />;
+          return <Rack key={`d${i}`} x={p.x} z={p.z} led={m.dbLed} variant="db" size={DB_CABINET} tint={EQUIPMENT.database} dim={dim("db")} />;
         })}
-        {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint={EQUIPMENT.database} />}
-        {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint={EQUIPMENT.backup} />}
+        {m.replica && <Rack x={POS.replica.x} z={POS.replica.z} led="ok" variant="db" size={DB_CABINET} tint={EQUIPMENT.database} dim={dim("replica")} />}
+        {m.backup && <Rack x={POS.backup.x} z={POS.backup.z} led="ok" variant="storage" size={{ w: 1.9, d: 1.05, h: 1.25 }} tint={EQUIPMENT.backup} dim={dim("backup")} />}
 
         {/* Monitoring wall */}
         {m.monitoring > 0 &&
@@ -1357,24 +1436,37 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
           ))}
 
         {/* Cabling: internet -> edge -> app servers -> (cache) -> database -> replica / backups */}
-        <Cable points={[[ROOM.x0 + 0.2, aisleZ], [POS.gateway.x, aisleZ]]} speed={flow} alert={edgeAlert} />
-        {campaign ? campaign.routing.targets.map(id=>{const p=appSlot(campaign.apps.findIndex(a=>a.id===id));return <Cable key={id} points={[[POS.gateway.x,aisleZ],[p.x,aisleZ],[p.x,p.z]]} speed={flow} alert={m.hosts[campaign.apps.findIndex(a=>a.id===id)]==="critical"} />;}) : <Cable points={[[POS.gateway.x, aisleZ], [Math.max(appMaxX, -6.6) + 0.4, aisleZ]]} speed={flow} alert={edgeAlert} />}
-        <Cable
-          points={[
-            [trunkX, aisleZ],
-            [trunkX, dataZ],
-            [dbLastX + 0.4, dataZ],
-          ]}
-          speed={flow * (campaign?Math.max(.1,(campaign.snapshot.data?.databaseNewDemand??campaign.snapshot.app.processed)/Math.max(1,campaign.snapshot.app.processed)):(m.cache ? 0.7 : 1))}
-          alert={dataAlert}
-        />
-        {campaign?.readCache&&<Cable points={[[trunkX,aisleZ],[POS.cache.x,aisleZ],[POS.cache.x,POS.cache.z],[POS.cache.x,dataZ],[dbLastX+.4,dataZ]]} speed={flow} alert={dataAlert} />}
+        {campaign ? (
+          // Guided Mode draws its recorded requests: volume, losses and queues, from In to Out.
+          <>
+            <CampaignTraffic campaign={campaign} layout={trafficLayout} />
+            <Ghosts campaign={campaign} layout={trafficLayout} />
+            <Gate at={IN_GATE} kind="in" />
+            <Gate at={OUT_GATE} kind="out" />
+          </>
+        ) : (
+          <>
+            <Cable points={[[ROOM.x0 + 0.2, aisleZ], [POS.gateway.x, aisleZ]]} speed={flow} alert={edgeAlert} />
+            <Cable points={[[POS.gateway.x, aisleZ], [Math.max(appMaxX, -6.6) + 0.4, aisleZ]]} speed={flow} alert={edgeAlert} />
+            <Cable
+              points={[
+                [trunkX, aisleZ],
+                [trunkX, dataZ],
+                [dbLastX + 0.4, dataZ],
+              ]}
+              speed={flow * (m.cache ? 0.7 : 1)}
+              alert={dataAlert}
+            />
+          </>
+        )}
         {m.replica && <Cable points={[[dbLastX + 0.4, dataZ], [POS.replica.x + 0.3, dataZ]]} speed={0.35} alert={false} />}
         {m.backup && <Cable points={[[m.replica ? POS.replica.x + 0.3 : dbLastX + 0.4, dataZ], [POS.backup.x + 0.4, dataZ]]} speed={0.15} alert={false} />}
 
         {onFloor("servers").map((id) => (
           <Pad key={id} id={id} f={m.footprints[id]} built={m.built[id]} symptomatic={sym(id)} inspecting={m.inspecting === id} />
         ))}
+        {campaign && <PathGlow footprints={m.footprints} layout={trafficLayout} cache={!!campaign.readCache} />}
+        <SpotBeams floor="servers" footprints={m.footprints} layout={trafficLayout} />
       </group>
       <LabelAnchors footprints={m.footprints} />
 
@@ -1704,6 +1796,14 @@ function RoomDock({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) 
   </>, host);
 }
 
+/** Guided Mode's traffic view: the server floor with only its requests and the machines that carry them. */
+function TrafficToggle() {
+  const campaign = useGame(s => !!s.game.campaign);
+  const on = useGame(trafficViewOn);
+  if (!campaign) return null;
+  return <button type="button" className="camera-reset traffic-toggle" aria-pressed={on} onClick={() => useGame.getState().setTrafficView(!on)} {...tipProps("Show only the requests and the machines that carry them")}><Icon name="network" />Traffic view</button>;
+}
+
 function CameraTools() {
   return <>
     <div className="camera-buttons" role="group" aria-label="Camera">
@@ -1716,6 +1816,7 @@ function CameraTools() {
         <button type="button" onClick={() => cameraApi.rotateBy(TURN)} aria-label="Rotate right" {...tipProps("Rotate right (E)")}><Icon name="rotateRight" /></button>
       </div></div>
       <button type="button" className="camera-reset" onClick={() => cameraApi.reset()} {...tipProps("Reset view: fit the room and face the starting angle")}><Icon name="monitor" />Reset view</button>
+      <TrafficToggle />
     </div>
     <details className="dock-shortcuts"><summary>Keyboard shortcuts</summary><p><CameraHint /></p></details>
   </>;
@@ -1739,6 +1840,9 @@ function roomEvents(store: Parameters<typeof pointerEvents>[0]) {
 
 export default function Facility() {
   const container = useRef<HTMLDivElement>(null);
+  const trafficView = useGame(trafficViewOn);
+  // The change the room is previewing, named on the stage for assistive checks and tests; the room draws it.
+  const ghost = useGame(s => s.previewAction && s.game.campaign ? changeOf(s.previewAction, s.game.campaign)?.kind ?? null : null);
   const landed = useLanded();
   // Page Up and Page Down ride between the floors, and V changes the view, unless the player is typing or in a
   // dialog or a menu.
@@ -1778,7 +1882,7 @@ export default function Facility() {
   // The letterbox and vignette belong to the overview's cutscene; a view from the avatar rides without them.
   const fromAvatar = useGame((s) => s.walking && s.viewpoint !== "overview");
   return (
-    <div className={`stage-canvas${landed === null && !fromAvatar ? " is-riding" : ""}`} ref={container} tabIndex={-1}>
+    <div className={`stage-canvas${landed === null && !fromAvatar ? " is-riding" : ""}`} ref={container} tabIndex={-1} data-ghost={ghost ?? undefined}>
       {/* Shadow maps cannot be resized or switched on and off once materials are compiled, so a new quality starts a new canvas. */}
       <Canvas
         key={chosen}
@@ -1844,7 +1948,7 @@ export default function Facility() {
       <div className="ride-bar is-bottom" aria-hidden="true" />
       <div className="view-fade" aria-hidden="true" ref={bindViewFade} />
       <ViewOverlay />
-      {!isPhoneEdition() && <Minimap onFloor={(f) => pressFloor(f, "map")} />}
+      {!isPhoneEdition() && !trafficView && <Minimap onFloor={(f) => pressFloor(f, "map")} />}
       <Labels landed={landed} />
       <HoverTip container={container} />
       <WalkControls />

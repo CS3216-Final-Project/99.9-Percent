@@ -4,7 +4,7 @@ A software-startup infrastructure tycoon game: keep a growing company online by 
 CS3216 Final Project, Group 5.
 
 Play it at [99-99-percent-web.vercel.app](https://99-99-percent-web.vercel.app).
-Guided Mode teaches the concepts through a walkthrough and six chapters on one company; Challenge Mode, unlocked after five chapters, asks the player to reach 50,000 users in 26 weeks.
+Guided Mode teaches the concepts through a playable Launch Week and six chapters on one company; Challenge Mode, unlocked after five chapters, asks the player to reach 50,000 users in 26 weeks.
 Everything runs in the browser; accounts and cloud saves are optional.
 
 ## Documentation

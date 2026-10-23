@@ -112,6 +112,6 @@ export function measurementValid(m:Measurement):boolean {
     !["unspecified","organic","recruited"].includes(m.session.source)||!Number.isSafeInteger(m.session.facilitatorInterventions)||m.session.facilitatorInterventions<0))return false;
   return m.pending.every(e=>e.eventVersion===1&&typeof e.eventId==="string"&&typeof e.name==="string"&&
     typeof e.runId==="string"&&typeof e.sessionId==="string"&&typeof e.buildId==="string"&&
-    e.scenarioId==="opening-db"&&e.scenarioVersion===1&&Number.isSafeInteger(e.physicalStep)&&e.physicalStep>=0&&
+    e.scenarioId==="opening-db"&&(e.scenarioVersion===1||e.scenarioVersion===2)&&Number.isSafeInteger(e.physicalStep)&&e.physicalStep>=0&&
     Number.isFinite(Date.parse(e.occurredAt))&&e.payload&&typeof e.payload==="object");
 }

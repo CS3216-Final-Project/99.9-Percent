@@ -22,9 +22,9 @@ test("exports a company and imports it into a fresh browser", async ({ page, bro
   const other = await fresh.newPage();
   await other.goto("/"); await other.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
   await completeTutorial(other);
-  expect((await savedGame(other)).campaign!.step).toBe(1);
+  expect((await savedGame(other)).campaign!.step).toBe(0);
   // This manually created context has no fixture locator handler.
-  await other.getByRole("dialog", { name: "Company Message", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
+  await other.getByRole("dialog", { name: "Company Message", exact: true }).getByRole("button", { name: "Dismiss company message", exact: true }).click();
   await other.getByRole("button", { name: "Menu", exact: true }).click();
   const menu = other.getByRole("dialog", { name: "Menu" });
   await menu.getByRole("tab", { name: "Saves" }).click();
@@ -72,6 +72,7 @@ test("recovers a pre-update run and exports/imports Challenge Mode files from ei
   const buffer = await readFile(await (await classicDownload).path());
   await page.getByRole("tab", { name: "Run" }).click();
   await page.getByRole("button", { name: "Switch to Guided Mode" }).click();
+  await completeTutorial(page);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("tab", { name: "Saves" }).click();
   await page.getByLabel("Save file to import").setInputFiles({ name: "classic.json", mimeType: "application/json", buffer });
