@@ -207,6 +207,15 @@ function inOpenRoom(r: DOMRect, stage: DOMRect): boolean {
   return r.left >= stage.left + EDGE && r.top >= stage.top + EDGE && r.right <= stage.left + right && r.bottom <= stage.top + bottom;
 }
 
+/**
+ * The summary of a closed menu that holds `el`. The menu's contents keep a layout box while it is closed, so they look
+ * pointable; the step points at the menu instead, as a phone's dock folds its views into one when they do not fit.
+ */
+function closedMenuOf(el: Element): HTMLElement | null {
+  const summary = el.closest("details:not([open])")?.querySelector<HTMLElement>(":scope > summary");
+  return summary && !summary.contains(el) ? summary : null;
+}
+
 /** `chapterZero` presents Chapter 0's lessons; an edition can bring its own, as the phone's coach strip does. */
 export default function Tutorial({ chapterZero: Guide = ChapterZero }: { chapterZero?: ComponentType<{ lessons: readonly ChapterZeroLesson[] }> } = {}) {
   const s = useGame();
@@ -227,6 +236,8 @@ function SpotlightTutorial() {
   const [covered, setCovered] = useState(false);
   const [edge, setEdge] = useState<number | undefined>(undefined);
   const [cardHeight, setCardHeight] = useState(240);
+  /** The name of the closed menu the step's control is folded into, which has to be opened first. */
+  const [menu, setMenu] = useState<string | null>(null);
   const card = useRef<HTMLDivElement>(null);
   // Steps can wait on an action's confirmation, which lives outside the store.
   useSyncExternalStore(subscribeConfirming, confirmingAction);
@@ -281,7 +292,10 @@ function SpotlightTutorial() {
         const s = useGame.getState();
         if (floorOf(eq) !== s.floor) s.goToFloor(floorOf(eq), "tour");
       }
-      const el = document.querySelector<HTMLElement>(sel);
+      const found = document.querySelector<HTMLElement>(sel);
+      const folded = found && closedMenuOf(found);
+      const el = folded ?? found;
+      setMenu(folded ? folded.textContent?.trim() || null : null);
       // Something without a box of its own (hidden, or laid out with display: contents) cannot be pointed at.
       if (!el || el.getClientRects().length === 0) {
         if (last !== "none") {
@@ -290,8 +304,8 @@ function SpotlightTutorial() {
         }
         return;
       }
-      // Guided Mode's panel can cover part of the room (its lower half on a phone). Once the label is placed, a machine
-      // out of the open part is brought into it, as Guided Mode's actions do; one in view is left where it is.
+      // A panel can cover part of the room (a phone's sheet its lower half, in either mode). Once the label is placed, a
+      // machine out of the open part is brought into it, as Guided Mode's actions do; one in view is left where it is.
       if (eq && !hiddenByModal && el.style.visibility === "visible") {
         const stage = document.querySelector("main.stage")?.getBoundingClientRect();
         if (stage) {
@@ -299,7 +313,7 @@ function SpotlightTutorial() {
           const layout = `${sel}:${Math.round(stage.width)}:${Math.round(stage.height)}:${Math.round(area.right)}:${Math.round(area.bottom)}`;
           if (focusedFor !== layout) {
             focusedFor = layout;
-            if (useGame.getState().game.campaign && !inOpenRoom(el.getBoundingClientRect(), stage)) useGame.getState().focusCamera(eq);
+            if (!inOpenRoom(el.getBoundingClientRect(), stage)) useGame.getState().focusCamera(eq);
           }
         }
       }
@@ -316,8 +330,10 @@ function SpotlightTutorial() {
       const [pt, pr, pb, pl] = sel.startsWith(".eq-label") ? [10 * k, 46 * k, 120 * k, 46 * k] : [5, 5, 5, 5];
       const x = Math.max(4, r.left - pl);
       const y = Math.max(4, r.top - pt);
-      // A phone's guide is docked above the dock; the lit window ends where the strip starts.
-      const bottom = isPhoneEdition() && card.current ? Math.max(y, card.current.getBoundingClientRect().top - 6) : window.innerHeight - 4;
+      // A phone's guide is docked above the dock; the lit window of a control above the strip ends where the strip
+      // starts. A control in the dock, below the strip, keeps its own height.
+      const strip = isPhoneEdition() ? card.current?.getBoundingClientRect() : undefined;
+      const bottom = strip && r.top < strip.top ? Math.max(y, strip.top - 6) : window.innerHeight - 4;
       const next = {
         x,
         y,
@@ -348,6 +364,8 @@ function SpotlightTutorial() {
   const campaign = !!s.game.campaign;
   // A phone docks every guide in its coach strip above the dock (see the phone's tutorial styles).
   const docked = isPhoneEdition();
+  // The fixed-height strip scrolls under its Skip and Next, so what to do comes before the reason, as in Guided Mode.
+  const whyFirst = !campaign && !docked;
   return (
     <div className="tour" data-track={tour.track} data-docked={docked || undefined}>
       {box ? <div className="tour-hole" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} /> : <div className="tour-dim" />}
@@ -365,9 +383,9 @@ function SpotlightTutorial() {
           ))}
         </div>
         <h3>{step.title}</h3>
-        {!campaign && why && <p className="muted">{why}</p>}
-        <p className="tour-prompt">{step.hint(s)}</p>
-        {campaign && why && <p className="muted tour-explanation">{why}</p>}
+        {whyFirst && why && <p className="muted">{why}</p>}
+        <p className="tour-prompt">{menu ? `Open ${menu}.` : step.hint(s)}</p>
+        {!whyFirst && why && <p className="muted tour-explanation">{why}</p>}
         <div className="tour-foot">
           <button type="button" className="tour-skip" onClick={() => s.endTour(false)}>
             Skip
