@@ -1,6 +1,7 @@
 import { outcomeSummary, scorecardSummary } from "@/game/campaignReport";
 import { CampaignReport } from "./CampaignReport";
 import { RecordedFields } from "./RecordedFields";
+import { useMediaQuery } from "./useMediaQuery";
 import { chapter6FinancialRisk } from "@/game/chapter6Finance";
 import { reliabilityLesson } from "@/game/reliabilityLesson";
 import { incidentTitle } from "@/game/campaignPostmortem";
@@ -516,10 +517,14 @@ function CampaignHistory() {
   const [tab, setTab] = useState<HistoryTab>("charts");
   const [open, setOpen] = useState<string | null>(null);
   const steps = c.recent.map(m => m.step);
-  // Chapter outcomes are not incidents; they sit in their own list below the incident reports.
-  const outcomes = [
-    ...(c.reliabilityStage?.completedStep != null ? [{ id: "reliability-outcome", title: "Stay Online outcome", step: c.reliabilityStage.completedStep, label: "Historical reliability outcome", body: <ReliabilityOutcome campaign={c} /> }] : []),
-    ...(c.openingPrevention?.outcome ? [{ id: "prevention-outcome", title: "Opening prevention outcome", step: c.openingPrevention.outcome.qualifiedStep, label: "Historical Opening prevention outcome", body: <PreventionOutcome campaign={c} /> }] : []),
+  // Chapter outcomes are not incidents; they are listed after the incident reports, newest report first.
+  const done = <span className="tag tag-ok"><Icon name="check" size={12} />Completed</span>;
+  const entries: ReportEntry[] = [
+    ...[...c.reports].reverse().map((report): ReportEntry => ({ id: report.id, group: "incident", title: incidentTitle(report), when: `Game seconds ${report.openedStep}-${report.recoveredStep}`, label: "Incident report",
+      tag: report.limited ? <span className="tag tag-warn"><Icon name="alert" size={12} />Recovered under traffic limit</span> : <span className="tag tag-ok"><Icon name="check" size={12} />Recovered</span>,
+      body: legacy ? <Report report={report} /> : <CampaignIncidentReport report={report} /> })),
+    ...(c.reliabilityStage?.completedStep != null ? [{ id: "reliability-outcome", group: "outcome" as const, title: "Stay Online outcome", when: `Game second ${c.reliabilityStage.completedStep}`, label: "Historical reliability outcome", tag: done, body: <ReliabilityOutcome campaign={c} /> }] : []),
+    ...(c.openingPrevention?.outcome ? [{ id: "prevention-outcome", group: "outcome" as const, title: "Opening prevention outcome", when: `Game second ${c.openingPrevention.outcome.qualifiedStep}`, label: "Historical Opening prevention outcome", tag: done, body: <PreventionOutcome campaign={c} /> }] : []),
   ];
   return <div className="history">
     <HistoryTabs tab={tab} onChange={setTab} incidents={c.reports.length}>
@@ -535,26 +540,39 @@ function CampaignHistory() {
       </div>
     </>}
     {tab === "events" && <EventFeed className="campaign-feed" entries={c.trace.filter(e => e.type !== "metrics").reverse().map(e => ({ id: e.id, kind: eventKind(e.type), when: `Game second ${e.step}`, text: eventText(e) }))} />}
-    {tab === "postmortems" && <div className="history-incidents">
-      {c.reports.length === 0 ? <p className="empty">No incidents yet.</p> : <ul className="pm-list" aria-label="Incident reports">{[...c.reports].reverse().map(report => <li key={report.id}>
-        <button type="button" className="pm-toggle" aria-expanded={open === report.id} onClick={() => setOpen(open === report.id ? null : report.id)}>
-          <span className="pm-title"><Icon name="incident" size={16} /><span>{incidentTitle(report)}<small>Game seconds {report.openedStep}-{report.recoveredStep}</small></span></span>
-          {report.limited ? <span className="tag tag-warn"><Icon name="alert" size={12} />Recovered under traffic limit</span> : <span className="tag tag-ok"><Icon name="check" size={12} />Recovered</span>}
-        </button>
-        {open === report.id && <div className="pm">{legacy ? <Report report={report} /> : <CampaignIncidentReport report={report} />}</div>}
-      </li>)}</ul>}
-      {outcomes.length > 0 && <>
-        <h3 className="history-subhead">Chapter outcomes</h3>
-        <ul className="pm-list" aria-label="Chapter outcomes">{outcomes.map(o => <li key={o.id}>
-          <button type="button" className="pm-toggle" aria-expanded={open === o.id} onClick={() => setOpen(open === o.id ? null : o.id)}>
-            <span className="pm-title"><Icon name="goal" size={16} /><span>{o.title}<small>Game second {o.step}</small></span></span>
-            <span className="tag tag-ok"><Icon name="check" size={12} />Completed</span>
-          </button>
-          {open === o.id && <section className="pm" aria-label={o.label}>{o.body}</section>}
-        </li>)}</ul>
-      </>}
-    </div>}
+    {tab === "postmortems" && <ReportIndex entries={entries} incidents={c.reports.length} open={open} onOpen={setOpen} />}
     </HistoryTabs>
+  </div>;
+}
+
+interface ReportEntry { id: string; group: "incident" | "outcome"; title: string; when: string; label: string; tag: ReactNode; body: ReactNode }
+/**
+ * Wide sheets show the reports as a list beside the selected report, so the sheet's width carries the reading.
+ * Narrow sheets keep each report expanding in place under its row.
+ */
+function ReportIndex({ entries, incidents, open, onOpen }: { entries: ReportEntry[]; incidents: number; open: string | null; onOpen: (id: string | null) => void }) {
+  const wide = useMediaQuery("(min-width: 901px)");
+  if (!entries.length) return <div className="history-incidents"><p className="empty">No incidents yet.</p></div>;
+  const selected = wide ? entries.find(e => e.id === open) ?? entries[0] : entries.find(e => e.id === open) ?? null;
+  const row = (e: ReportEntry) => <li key={e.id} className={wide && e === selected ? "is-selected" : undefined}>
+    <button type="button" className="pm-toggle" {...(wide ? { "aria-current": e === selected ? "true" as const : undefined } : { "aria-expanded": e === selected })} onClick={() => onOpen(!wide && e === selected ? null : e.id)}>
+      <span className="pm-title"><Icon name={e.group === "incident" ? "incident" : "goal"} size={16} /><span>{e.title}<small>{e.when}</small></span></span>
+      {e.tag}
+    </button>
+    {!wide && e === selected && <section className="pm" aria-label={e.label}>{e.body}</section>}
+  </li>;
+  const groups = <>
+    <h3 className="history-subhead">Incidents</h3>
+    {incidents === 0 ? <p className="empty">No incidents yet.</p> : <ul className="pm-list" aria-label="Incident reports">{entries.filter(e => e.group === "incident").map(row)}</ul>}
+    {entries.some(e => e.group === "outcome") && <><h3 className="history-subhead">Chapter outcomes</h3><ul className="pm-list" aria-label="Chapter outcomes">{entries.filter(e => e.group === "outcome").map(row)}</ul></>}
+  </>;
+  if (!wide) return <div className="history-incidents">{groups}</div>;
+  return <div className="history-incidents history-split">
+    <nav className="history-index" aria-label="Reports">{groups}</nav>
+    {selected && <section className="history-report" aria-label={selected.label}>
+      <header><h3>{selected.title}</h3><p>{selected.when}{selected.tag}</p></header>
+      {selected.body}
+    </section>}
   </div>;
 }
 

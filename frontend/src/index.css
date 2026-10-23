@@ -4857,6 +4857,19 @@ button:disabled {
 .pm-title > span { display: grid; gap: 1px; }
 .pm-title small { font-family: var(--font-body); font-size: var(--text-xs); font-weight: 400; color: var(--text-soft); font-variant-numeric: tabular-nums; }
 .pm-toggle .tag { flex: none; }
+/* Wide History: the report list sits beside the selected report and stays in view while it scrolls. */
+.history-split { grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.history-index { position: sticky; top: 12px; display: grid; gap: 10px; }
+.history-incidents > .history-subhead:first-child, .history-index .history-subhead:first-child { margin-top: 0; }
+.history-index .pm-list { max-width: none; }
+.history-index .pm-toggle { align-items: flex-start; flex-wrap: wrap; }
+.history-index .pm-list > li.is-selected { border-color: var(--selection-edge); }
+.history-index .pm-list > li.is-selected .pm-toggle { background: var(--selection); }
+.history-report { min-width: 0; padding: 16px 20px 20px; background: var(--paper); color: var(--ink); border: 1px solid var(--control-edge); border-radius: var(--radius); box-shadow: var(--press); }
+.history-report > header { padding-bottom: 12px; border-bottom: 1px solid var(--paper-3); }
+.history-report > header h3 { margin: 0; font-family: var(--font-display); font-size: var(--text-lg); }
+.history-report > header p { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 4px 0 0; font-size: var(--text-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.history-report p, .history-report h4, .history-report dl.rows { max-width: 75ch; }
 .campaign-feed .feed-item { grid-template-columns: 28px 76px 1fr; }
 .request-path { margin: 0 0 4px; font-size: var(--text-xs); }
 .modal select, .modal textarea { display: block; width: 100%; padding: 8px; margin: 8px 0; }
