@@ -6,15 +6,19 @@ import { canEnterSpikes, pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { pendingPreventionReview, preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
-import type { Campaign } from "@/sim/campaignTypes";
 
 export interface Requirement { id: string; label: string; met: boolean }
-/** The opening milestone gates time only once it can be acknowledged: Launch Week defers it until completion. */
-export const milestoneBlocks = (c: Campaign) =>
-  !!c.openingMilestone && !c.openingMilestone.acknowledged && (!c.launchWeek || c.launchWeek.completedStep !== null);
+/**
+ * The opening milestone gates time only once it can be acknowledged: Launch Week defers it until completion, and an
+ * incident or postmortem still open when the week ends comes first, since the engine accepts the milestone only then.
+ */
+export const milestoneBlocks = (g: GameState) => {
+  const c = g.campaign;
+  return !!c?.openingMilestone && !c.openingMilestone.acknowledged && g.phase === "management" && (!c.launchWeek || c.launchWeek.completedStep !== null);
+};
 /** Launch Week is over but its free research point is unspent: the pick comes before the score card and the milestone. */
-export const launchResearchPending = (c: Campaign) =>
-  milestoneBlocks(c) && !!c.launchWeek?.researchEarned && !c.launchWeek.tech;
+export const launchResearchPending = (g: GameState) =>
+  milestoneBlocks(g) && !!g.campaign!.launchWeek?.researchEarned && !g.campaign!.launchWeek.tech;
 export interface GuidanceAction { label: string; action?: Action }
 /** One shared objective for the chapter bar; detailed actions and gates remain in the overview. */
 export function campaignObjective(g: GameState) {
@@ -23,8 +27,8 @@ export function campaignObjective(g: GameState) {
  if(g.phase==="review") return "Read the postmortem before continuing the same company.";
  if(c.incident) return "Restore stable service while weighing cost and rejected demand.";
  if(c.launchWeek&&!c.launchWeek.completedStep) return "Keep the service up through launch week.";
- if(launchResearchPending(c)) return "Spend your free research pick to see your Launch Week score.";
- if(c.launchWeek&&milestoneBlocks(c)) return "Review your Launch Week score and continue into Chapter 2.";
+ if(launchResearchPending(g)) return "Spend your free research pick to see your Launch Week score.";
+ if(c.launchWeek&&milestoneBlocks(g)) return "Review your Launch Week score and continue into Chapter 2.";
  if(c.combinedStage) return "Serve growing demand, manage costs and review each outcome.";
  if(c.reliabilityStage) return "Keep service stable through an application failure, then review the evidence.";
  if(c.spikeStage) return "Handle changing demand while managing capacity costs.";
@@ -146,8 +150,8 @@ export function campaignGuidance(g: GameState) {
  // Required acknowledgements take priority over stage continuation in every stage.
  if(g.phase==="review"&&c.reports.length)pendingAction={label:"Review postmortem"};
  // Launch Week awards its milestone mid-week but only lets it be acknowledged once the week is over and the research pick is spent.
- else if(launchResearchPending(c))waiting="Launch Week is over. Spend your free research pick on Caching or Autoscaling to see your score.";
- else if(milestoneBlocks(c))pendingAction={label:"Complete Opening"};
+ else if(launchResearchPending(g))waiting="Launch Week is over. Spend your free research pick on Caching or Autoscaling to see your score.";
+ else if(milestoneBlocks(g))pendingAction={label:"Complete Opening"};
  if(!reportsAcknowledged&&g.phase!=="review"&&!c.incident)notice="A recorded recovered report lacks an acknowledgement, but no review is active. Export company evidence for investigation; this guidance cannot safely repair the saved state.";
  if(g.phase==="ended") { pendingAction=null;waiting=null;notice=""+(g.outcome==="won"?"Campaign complete. Inspect your scorecard and final architecture before explicitly starting a new company.":"The company is bankrupt. Review final evidence and explicitly restart from the Menu.")+""; }
  const incomplete=requirements.filter(r=>!r.met),completed=requirements.filter(r=>r.met);

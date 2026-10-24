@@ -100,6 +100,36 @@ test("a week that ends with research unspent asks for the pick, then scores and 
   expect(saved.scaling).not.toBeNull();
 });
 
+test("a week that ends during its database incident lets the player fix and review it, then pick research and continue", async ({ page, withoutRoom, installClock }) => {
+  await withoutRoom(); await installClock();
+  // The database was never upgraded, so the incident is still open when the week ends at game second 60.
+  const over = runUntil(newGame(7, "lw-late", 2), x => x.campaign!.launchWeek!.completedStep !== null);
+  expect(over.phase).toBe("incident");
+  await bootPanel(page, over);
+  await expect(page.getByTestId("physical-step")).toHaveText("60");
+  await expect(page.getByRole("button", { name: "Complete Opening" })).toHaveCount(0);
+  await openPanelTab(page, "Actions");
+  await page.getByRole("button", { name: /^Upgrade database/ }).click();
+  await page.locator(".campaign-action-popover").getByRole("button", { name: "Confirm", exact: true }).click();
+  expect((await savedGame(page)).campaign!.pending.some(a => a.type === "upgrade-db")).toBe(true);
+  // Time still runs past the week's end, so the upgrade lands and the service recovers.
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  // The recovery notice opens first; the fixture's handler moves on from it to the postmortem.
+  const recovered = page.getByRole("dialog", { name: /^(System Recovered!|Incident postmortem)$/ });
+  for (let i = 0; i < 150 && !(await recovered.isVisible()); i++) await page.clock.runFor(200);
+  const report = page.getByRole("dialog", { name: "Incident postmortem" });
+  await report.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expect(report).toBeHidden();
+  await expect(page.getByRole("region", { name: "Guided Mode chapters" })).toContainText("Spend your free research pick to see your Launch Week score.");
+  await pickCaching(page);
+  await page.getByRole("dialog", { name: "Launch Week complete" }).getByRole("button", { name: "Continue into Chapter 2" }).click();
+  const saved = (await savedGame(page)).campaign!;
+  expect(saved.dbCapacity).toBeGreaterThan(over.campaign!.dbCapacity);
+  expect(saved.openingMilestone?.acknowledged).toBe(true);
+  expect(saved.scaling).not.toBeNull();
+});
+
 test("a practice replay resumes where it was left after a reload, finishes its research and returns the paused company", async ({ page, withoutRoom }) => {
   await withoutRoom();
   const company = recovered();

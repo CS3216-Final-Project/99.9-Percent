@@ -66,7 +66,7 @@ function GuidedDock() {
   const started = useGame((s) => s.started);
   const c = game.campaign!;
   const incident = game.phase === "incident";
-  const active = started && pendingStop(c) === null && !milestoneBlocks(c) && (game.phase === "management" || incident);
+  const active = started && pendingStop(c) === null && !milestoneBlocks(game) && (game.phase === "management" || incident);
   const second = c.step % Q.periodSteps;
   const tabs: ViewTab[] = [
     { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}` },

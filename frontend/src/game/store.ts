@@ -1,7 +1,7 @@
 "use client";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
-import { launchResearchPending } from "./campaignGuidance";
+import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { finishedChapter } from "./campaignChapters";
 import { FULL_SCOPE, scopeAllows, scopeComplete, type PlayScope } from "./scope";
 import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
@@ -369,13 +369,13 @@ const ACKNOWLEDGEMENTS = {
   "spike-acknowledgement": "acknowledge_spikes",
 } as const;
 /** The only action accepted while a recognition or milestone awaits the player; time stays paused meanwhile. */
-function requiredAcknowledgement(c: Campaign): Action["type"] | null {
-  const stop = pendingStop(c);
+function requiredAcknowledgement(g: GameState): Action["type"] | null {
+  const c = g.campaign!, stop = pendingStop(c);
   if (stop === "combined-review") return c.combinedStage?.finalReview ? "complete_campaign" : "acknowledge_growth";
   if (stop) return ACKNOWLEDGEMENTS[stop];
-  return c.openingMilestone && !c.openingMilestone.acknowledged && (!c.launchWeek || c.launchWeek.completedStep !== null) ? "acknowledge_milestone" : null;
+  return milestoneBlocks(g) ? "acknowledge_milestone" : null;
 }
-const awaitingAcknowledgement = (c: Campaign) => requiredAcknowledgement(c) !== null;
+const awaitingAcknowledgement = (g: GameState) => !!g.campaign && requiredAcknowledgement(g) !== null;
 /** Whether Guided Mode's clock may move now, by Run or by a manual step: never behind a guide, a pause-only view or an acknowledgement. */
 /**
  * Whether the server floor shows only the request path. It is Guided Mode's alone, and the player's choice.
@@ -387,7 +387,7 @@ export function trafficViewOn(s: { game: GameState; meta: Meta }): boolean {
 
 export function campaignClockAvailable(s: { game: GameState; started: boolean; tour: Tour | null; view: View }): boolean {
   const c = s.game.campaign;
-  return !!c && s.started && !awaitingAcknowledgement(c) && !["menu", "tech", "scorecard"].includes(s.view ?? "")
+  return !!c && s.started && !awaitingAcknowledgement(s.game) && !["menu", "tech", "scorecard"].includes(s.view ?? "")
     && (s.game.phase === "management" || s.game.phase === "incident");
 }
 /** The run in a stored Campaign save, for naming its backup when that save is not the active game. */
@@ -511,7 +511,7 @@ export const useGame = create<Store>()((set, get) => {
       const patch:Partial<Store>={game:next};
       if(!was?.firstPauseConsumed && c.firstPauseConsumed)patch.running=false;
       if(get().selectedAppId&&!c.apps.some(a=>a.id===get().selectedAppId))patch.selectedAppId=c.apps[0].id;
-      if(awaitingAcknowledgement(c)||next.phase==="review"||next.phase==="ended")patch.running=false;
+      if(awaitingAcknowledgement(next)||next.phase==="review"||next.phase==="ended")patch.running=false;
       // Finishing Scaling & Routing or Data Strategy pauses to say so the first time only; the chapter bar keeps the
       // way forward. A chapter already finished when the company loaded is remembered without being announced.
       const sameRun=was?.runId===c.runId, before=sameRun?finishedChapter(prev):null, finished=finishedChapter(next);
@@ -553,7 +553,7 @@ export const useGame = create<Store>()((set, get) => {
       // (its incident can still be running when the week settles), unless another guide is already showing.
       const tips=(patch.meta??get().meta).tipsSeen??[];
       if(was?.runId===c.runId&&c.settlements.length>0&&!tips.includes("settlement")&&!chapterTourOf(c)&&!get().tutorialCompany
-        &&!get().tour&&!patch.tour&&next.phase==="management"&&!awaitingAcknowledgement(c)) {
+        &&!get().tour&&!patch.tour&&next.phase==="management"&&!awaitingAcknowledgement(next)) {
         const meta={...(patch.meta??get().meta),tipsSeen:[...tips,"settlement" as const]};
         saveMeta(meta);
         Object.assign(patch,{meta,tour:{track:"settlement",step:0},running:false});
@@ -994,10 +994,10 @@ export const useGame = create<Store>()((set, get) => {
       persist();
     },
     act: (action) => {
-      const c = get().game.campaign;
-      const acknowledgement = c && requiredAcknowledgement(c);
+      const game = get().game, c = game.campaign;
+      const acknowledgement = c && requiredAcknowledgement(game);
       // Launch Week's research pick still comes before its milestone, which waits for it.
-      const researchPick = !!c && action.type === "pick_launch_tech" && launchResearchPending(c);
+      const researchPick = !!c && action.type === "pick_launch_tech" && launchResearchPending(game);
       if(c && (!get().started || (acknowledgement && action.type !== acknowledgement && !researchPick))) return false;
       // A smaller edition stops at its last chapter; the company carries on operating there.
       if(c && !scopeAllows(get().scope, action)) { get().notify(get().scope.endOfGuided, "info"); return false; }
@@ -1023,7 +1023,7 @@ export const useGame = create<Store>()((set, get) => {
 
     advance: () => {
       const { game } = get();
-      if (game.phase !== "management" || (game.campaign && (!get().started || awaitingAcknowledgement(game.campaign)))) return;
+      if (game.phase !== "management" || (game.campaign && (!get().started || awaitingAcknowledgement(game)))) return;
       const next = advanceTurn(game);
       commit(next);
       const r = next.lastReport;
@@ -1039,7 +1039,7 @@ export const useGame = create<Store>()((set, get) => {
     tick: (dt) => {
       const { game, running, speed } = get();
       if(game.campaign) {
-        if(!get().started || awaitingAcknowledgement(game.campaign) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
+        if(!get().started || awaitingAcknowledgement(game) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
         const credit=get().remainderMs+Math.round(dt*1000*(get().weekRush?20:speed));
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
@@ -1104,7 +1104,7 @@ export const useGame = create<Store>()((set, get) => {
       if (id && get().game.campaign) get().setRunning(false);
     },
     setRunning: (running) => {
-      set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game.campaign!))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase), ...(running ? {} : { weekRush: false }) });
+      set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase), ...(running ? {} : { weekRush: false }) });
       if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
     setSpeed: (speed) => set({ speed, weekRush: false }),
