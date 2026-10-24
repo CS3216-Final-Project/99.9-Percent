@@ -21,7 +21,7 @@ import { admissionCeiling, canEnterData, databaseUpgrade, pendingStop, routableA
 import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
-import { campaignGuidance, launchResearchPending, milestoneBlocks, type Requirement } from "@/game/campaignGuidance";
+import { campaignGuidance, milestoneBlocks, type Requirement } from "@/game/campaignGuidance";
 import { launchWeekScalingOpen, openingTuning } from "@/sim/launchWeek";
 import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
 import { finishedChapter } from "@/game/campaignChapters";

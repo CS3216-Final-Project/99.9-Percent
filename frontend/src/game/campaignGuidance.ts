@@ -29,7 +29,7 @@ export function campaignObjective(g: GameState) {
  if(c.incident) return "Restore stable service while weighing cost and rejected demand.";
  if(c.launchWeek&&!c.launchWeek.completedStep) return "Keep the service up through launch week.";
  if(launchResearchPending(g)) return "Spend your free research pick to see your Launch Week score.";
- if(c.launchWeek&&milestoneBlocks(g)) return "Review your Launch Week score and continue into Chapter 2.";
+ if(c.launchWeek&&milestoneBlocks(g)) return "Review your Launch Week score, then stay or continue to Scaling & Routing.";
  if(c.combinedStage) return "Serve growing demand, manage costs and review each outcome.";
  if(c.reliabilityStage) return "Keep service stable through an application failure, then review the evidence.";
  if(c.spikeStage) return "Handle changing demand while managing capacity costs.";

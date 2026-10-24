@@ -117,7 +117,7 @@ it("offers Complete Opening only once Launch Week is over and its research pick 
   const picked = act(over, { type: "pick_launch_tech", tech: "autoscaling" });
   expect(launchResearchPending(picked)).toBe(false);
   expect(campaignGuidance(picked).pendingAction?.label).toBe("Complete Opening");
-  expect(campaignObjective(picked)).toBe("Review your Launch Week score and continue into Chapter 2.");
+  expect(campaignObjective(picked)).toBe("Review your Launch Week score, then stay or continue to Scaling & Routing.");
 });
 
 it("lets the store spend Launch Week research while the milestone waits, and nothing else", () => {
