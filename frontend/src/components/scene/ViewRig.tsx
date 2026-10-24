@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
 import { useGame } from "@/game/store";
@@ -11,7 +11,8 @@ import { ROOM } from "./layout";
 import { CABIN, CABIN_WALLS, inCabin } from "./lift";
 import { FLOOR_Y } from "./levels";
 import { now, riding, viewHeight } from "./ride";
-import { avatar, held, TURN_KEYS } from "./walk";
+import { avatar, busyProgress, held, napBlend, TURN_KEYS } from "./walk";
+import { eyeNudge, lookLocked, nap, scriptedPose } from "./funScript";
 import {
   blendPose,
   dimAt,
@@ -30,7 +31,7 @@ import {
   type Wall,
 } from "./views";
 import { wallUp, type WallId } from "./wallState";
-import { cameras, lookApi, mouse, resetRig, rig, setViewFade, viewNow } from "./viewState";
+import { cameras, lookApi, mouse, resetRig, rig, setEyelids, setViewFade, viewNow } from "./viewState";
 import { sceneSound } from "./sceneSounds";
 
 /*
@@ -175,6 +176,10 @@ export function ViewRig() {
   const get = useThree((s) => s.get);
   const gl = useThree((s) => s.gl);
   const fov = useGame((s) => s.graphics.fov);
+  /** How far the view has glid toward a scripted pose, easing 0.6 s each way, which prop it glid to, and how shut the eyelids were. */
+  const scriptGlide = useRef(0);
+  const scriptedProp = useRef<string | null>(null);
+  const eyelidsWere = useRef(0);
 
   // A new room starts from the overview, keeping its canvas's own camera for it, and hands that camera back, and the
   // pointer, when it goes. The page is told so: a canvas replaced mid-view must not leave the old canvas's camera named.
@@ -460,9 +465,15 @@ export function ViewRig() {
     }
     if (!wantPerspective) {
       viewNow.inHead = false;
+      scriptGlide.current = 0;
+      scriptedProp.current = null;
+      setEyelids(0, "open");
+      eyelidsWere.current = 0;
       return;
     }
-    turnFor(dt, instant);
+    // Busy with a thing that frames itself in this view — the nap or the arcade anywhere, a held thing in follow — looking round is frozen.
+    const lookingLocked = avatar.busy !== null && lookLocked(avatar.busy.prop, showing === "first" ? "first" : "follow");
+    if (!lookingLocked) turnFor(dt, instant);
 
     // Where the camera goes: dimming away from a view, it holds still; otherwise it is where the view puts it.
     let pose: Pose;
@@ -470,13 +481,45 @@ export function ViewRig() {
     else {
       const y = footing();
       rig.lastSeen = { x: avatar.x, y, z: avatar.z };
+      const busyF = avatar.busy ? (busyProgress(t) ?? 0) : 0;
+      const nudge = showing === "first" && avatar.busy && !instant ? eyeNudge(avatar.busy.prop, busyF) : 0;
       const live =
         showing === "first"
-          ? firstPose(avatar.x, y, avatar.z, viewNow.heading, viewNow.eyesPitch, fov)
+          ? firstPose(avatar.x, y, avatar.z, viewNow.heading, viewNow.eyesPitch + nudge, fov)
           : trail(followPose(avatar.x, y, avatar.z, viewNow.heading, viewNow.pitch, viewNow.distance, ...followWithin()), dt, instant);
       pose = m && !crossing && m.pose ? blendPose(m.pose, live, instant ? 1 : (t - m.at) / VIEW_EASE) : live;
+      // A fun thing that frames the view: into the pod while napping, up to the cabinet's screen while playing,
+      // round the avatar's side while it sips, bites or gulps.
+      const view = showing === "first" ? "first" : "follow";
+      let scripted: Pose | null = null;
+      let weight = 0;
+      if (avatar.busy) {
+        scripted = scriptedPose(avatar.busy.prop, busyF, view, y);
+        if (avatar.busy.prop === "nap") weight = napBlend.value;
+        else if (scripted) {
+          scriptGlide.current = instant ? 1 : Math.min(1, scriptGlide.current + dt / 0.6);
+          weight = scriptGlide.current;
+          scriptedProp.current = avatar.busy.prop;
+        }
+      } else {
+        if (napBlend.value > 0.001) {
+          scripted = scriptedPose("nap", 0, view, y);
+          weight = napBlend.value;
+        }
+        scriptGlide.current = instant ? 0 : Math.max(0, scriptGlide.current - dt / 0.6);
+        if (scriptGlide.current > 0 && scriptedProp.current) {
+          scripted = scripted ?? scriptedPose(scriptedProp.current, 0, view, y);
+          weight = Math.max(weight, scriptGlide.current);
+        }
+      }
+      if (scripted && weight > 0) pose = blendPose(pose, scripted, weight);
       if (showing === "first") rig.trailing = null;
     }
+    // The nap's eyelids over first person: as shut as the sleeper's eyes, or the dark under the hood.
+    const shut = showing === "first" && avatar.busy?.prop === "nap" ? nap(busyProgress(t) ?? 0).eyes : 0;
+    const was = eyelidsWere.current;
+    setEyelids(shut, shut < 0.05 ? "open" : shut > 0.95 ? "shut" : shut > was ? "closing" : shut < was ? "opening" : "shut");
+    eyelidsWere.current = shut;
     rig.drawn = pose;
     viewNow.inHead = showing === "first" && (!m || crossing || (t - m.at) / VIEW_EASE > 0.6);
     aim(cameras.perspective, pose, state.size);

@@ -50,7 +50,10 @@ import { FURNITURE, PIXEL_FLOORS, ROOM_PALETTE } from "./palette";
 import { projectUV, surfaceMaterial, useSurfaces, type SurfaceId } from "./surfaces";
 import { arcadeScreen, carpet, floorTiles, kitchenTiles, logoSign, poster, puffTexture, screenTexture, skyline, skylineDay, whiteboard, zoneName, zzzTexture, type PosterKind, type ScreenKind } from "./textures";
 import { OnWall } from "./walls";
-import { avatar } from "./walk";
+import { arcadeGame, startArcade, stepArcade, stopArcade } from "./arcade";
+import { drawBreakout } from "./breakout";
+import { now } from "./ride";
+import { avatar, napBlend, onBusy } from "./walk";
 import { viewFocus } from "./zoneSounds";
 
 /*
@@ -897,12 +900,24 @@ function Steam({ position }: { position: V3 }) {
   );
 }
 
-/** An arcade cabinet's screen playing its attract mode, eight frames a second, racing while the avatar plays. */
+/** An arcade cabinet's screen playing its attract mode, eight frames a second — except the red cabinet, which runs the real brick breaker while the avatar plays it. */
 function ArcadeScreen({ variant, x }: { variant: string; x: number }) {
   const game = useMemo(() => arcadeScreen(variant), [variant]);
   useEffect(() => () => game.texture.dispose(), [game]);
   const shown = useRef(-1);
-  useFrame(({ clock }) => {
+  // The red cabinet's game lives as long as the avatar's busy with it: starting and ending follow the busy news.
+  useEffect(() => {
+    if (variant !== "red") return;
+    return onBusy((b) => (b?.prop === "arcade" ? startArcade(b.since) : stopArcade()));
+  }, [variant]);
+  useFrame(({ clock }, dt) => {
+    if (variant === "red" && avatar.busy?.prop === "arcade" && arcadeGame) {
+      stepArcade(Math.min(dt, 0.25), now());
+      drawBreakout(game.ctx, arcadeGame, clock.elapsedTime);
+      game.flush();
+      shown.current = -1;
+      return;
+    }
     const fps = avatar.busy?.prop === "arcade" ? 20 : 8;
     const frame = Math.floor(clock.elapsedTime * fps);
     if (frame === shown.current) return;
@@ -916,6 +931,18 @@ function ArcadeScreen({ variant, x }: { variant: string; x: number }) {
       <meshBasicMaterial map={game.texture} toneMapped={false} />
     </mesh>
   );
+}
+
+/**
+ * The first nap pod's reading light: always mounted so nothing recompiles, its glow only ramped up with the
+ * lie-down blend while the avatar sleeps — warming the pillow and the hood's underside in both views.
+ */
+function NapPodLight() {
+  const light = useRef<THREE.PointLight>(null);
+  useFrame(() => {
+    if (light.current) light.current.intensity = 1.4 * napBlend.value;
+  });
+  return <pointLight ref={light} position={[NAP_PODS[0][0] + 0.6, 1.0, NAP_PODS[0][1]]} color="#ffd84a" distance={1.6} decay={2} intensity={0} />;
 }
 
 /** Red beacon above the monitoring wall that spins up during an incident. */
@@ -1123,6 +1150,7 @@ export function Office({ crew }: { crew: Crew }) {
       <Creature species="cat" activity="type" position={[SPOTS.foosballNorth.x, 0, SPOTS.foosballNorth.z]} rotation={SPOTS.foosballNorth.rot} phase={9} />
       <Creature species="pinkSlime" pose="sit" activity="doze" position={[SPOTS.napper.x, 0, SPOTS.napper.z]} rotation={SPOTS.napper.rot} phase={3} seat={NAP_MATTRESS} />
       <Zzz position={[SPOTS.napper.x, NAP_MATTRESS + 0.75, SPOTS.napper.z]} />
+      <NapPodLight />
       <Steam position={ESPRESSO_MUG} />
 
       <OnWall wall="left">

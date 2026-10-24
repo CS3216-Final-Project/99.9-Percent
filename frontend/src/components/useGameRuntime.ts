@@ -12,6 +12,7 @@ import { daylightNow } from "./scene/dayClock";
 import { entryGap, nextGap, viewFocus, ZONE_SOUNDS, zoneLevel, type ZoneSound } from "./scene/zoneSounds";
 import { DOORS, FLOOR_Y, RIDE_SECONDS } from "./scene/levels";
 import { onRide, ride } from "./scene/ride";
+import { avatar } from "./scene/walk";
 import { onSceneSound, onSceneSpeech } from "./scene/sceneSounds";
 import { SPECIES } from "./scene/cast";
 import { timbreOf, VOICE_PEAK, voiceOf } from "./scene/greetings";
@@ -220,7 +221,12 @@ export function useGameRuntime(scope?: PlayScope): void {
         // In a fixed order: a view sheet, then walk mode seen from above, then the selection. Dialogs close themselves
         // first. A view from the avatar is left by its Exit button: there Escape only ever gives the cursor back.
         if (s.view) s.openView(null);
-        else if (s.walking && !fromAvatar(s.viewpoint)) s.setWalking(false);
+        else if (s.walking && !fromAvatar(s.viewpoint)) {
+          // Only the arcade claims Escape to leave its game (WalkControls preventDefaults it there); every other
+          // busy or quiet moment keeps Escape as the way out of walk mode.
+          if (avatar.busy?.prop === "arcade" || e.defaultPrevented) return;
+          s.setWalking(false);
+        }
         else if (s.walking) return;
         else if (s.selected && s.game.phase !== "incident") s.select(null);
       } else if (e.key === "p" || e.key === "P") {
