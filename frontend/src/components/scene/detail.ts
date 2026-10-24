@@ -17,6 +17,11 @@ export function detailOverride(search: string): Detail | null {
   return value === "hd" || value === "basic" ? value : null;
 }
 
+/** Whether the page address asks for the performance probe's hooks (`?perf`), so the room exposes itself for measurement. */
+export function perfHook(search: string): boolean {
+  return new URLSearchParams(search).has("perf");
+}
+
 export const DetailContext = createContext<Detail>("basic");
 
 export function useDetail(): Detail {

@@ -23,6 +23,8 @@ Preview runs on port 4175 by default (override with `PLAYWRIGHT_PORT` when anoth
 
 Locally, `npm run test:e2e` runs the whole suite on one worker.
 
+The frame-time probe measures what the room costs to draw on the machine's own graphics card: `cd frontend && npm run build && npm run perf:probe` opens a headed Chromium, opens a saved company at each graphics quality (`PERF_MODES=low,high` to pick some, `PERF_SECONDS` for how long each window runs, `PERF_DIST=dist-perf` after `npx vite build --minify false --outDir dist-perf` for readable CPU profiles), writes `test-results/perf/<quality>.json`, and prints rendered fps, frame-time percentiles, hitches, GPU waits (shader compiles), draw calls, texture uploads, a scene census and CPU hotspots. It is run by hand, never in CI.
+
 ## What is covered
 
 | Layer | Evidence | Boundaries |
@@ -91,4 +93,4 @@ Google OIDC, email and password accounts and optional account-owned snapshots ar
 
 ## Known gaps
 
-Still needed as the product grows: Firefox/WebKit and real-device checks, broader keyboard/screen-reader accessibility review, performance budgets, and integration tests for any new server-backed gameplay. Add these when their features or support commitments exist; do not label the current suite comprehensive.
+Still needed as the product grows: Firefox/WebKit and real-device checks, broader keyboard/screen-reader accessibility review, performance budgets, and integration tests for any new server-backed gameplay. The frame-time probe runs on one desktop GPU, so real laptop and phone numbers remain unmeasured. Add these when their features or support commitments exist; do not label the current suite comprehensive.

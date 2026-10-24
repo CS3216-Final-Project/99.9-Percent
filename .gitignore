@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-perf/
 .env
 .env.local
 .env.*.local

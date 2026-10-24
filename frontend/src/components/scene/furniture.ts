@@ -69,7 +69,12 @@ export function glassFrames(runs: [number, number, number, number][]): Prim[] {
   return out;
 }
 
-export const GLASS_MATERIAL = new THREE.MeshStandardMaterial({ color: "#a8d8ff", transparent: true, opacity: 0.14, roughness: 0.1, metalness: 0, depthWrite: false, side: THREE.DoubleSide });
+/**
+ * Every pane of glass in the building: partitions, doors, the shaft and the car. Each is a single plane, so it is drawn
+ * in one pass: three otherwise draws a transparent double-sided material twice, back faces then front, and marks the
+ * material changed before each pass, which made the renderer rebuild its shader parameters twice per pane per frame.
+ */
+export const GLASS_MATERIAL = new THREE.MeshStandardMaterial({ color: "#a8d8ff", transparent: true, opacity: 0.14, roughness: 0.1, metalness: 0, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true });
 
 export function mdl(id: ModelId, x: number, z: number, rot = 0, s?: number | V3, y = 0): Placement {
   return { id, p: [x, y, z], rot, s };
