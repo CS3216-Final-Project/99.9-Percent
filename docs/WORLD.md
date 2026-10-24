@@ -32,7 +32,7 @@ Address parameters help with screenshots and testing: `?floor=office` opens on t
 **Walk** beside the camera buttons walks the building as the player's avatar, one of 18 cube animals from Kenney's CC0 [Cube Pets](https://kenney.nl/assets/cube-pets).
 The avatar is chosen from the chip beside the account on the home screen or the menu's Avatar tab, and can be changed at any time.
 `W` `A` `S` `D` or the arrow keys walk relative to the view, `Shift` runs, and a click or tap on the floor walks there; clicking equipment also walks over to it.
-What is within reach shows as a button: `Space` or a tap inspects equipment, rides the elevator, or plays with the coffee machine, the arcades and the nap pods.
+What is within reach shows as a button: `Space` or a tap inspects equipment, rides the elevator, or plays with the office's fun things, each with its own show — a coffee steams and ends up in the avatar's hand, a snack drops out of the vending machine, the cooler glugs as a cup fills, scores pop over the arcade cabinets while their screens race, and a nap lies the avatar down in a pod with z's drifting out of its hood. The prompt sweeps for as long as each lasts.
 Glass doors slide open as the avatar comes near, footsteps sound off the floor, and the crew wait for it to pass.
 `Esc` stops walking, and when not walking the avatar sits in the founder's chair in the meeting room.
 

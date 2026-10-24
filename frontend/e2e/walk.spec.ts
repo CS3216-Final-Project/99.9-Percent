@@ -497,3 +497,24 @@ test("restores the mode, floor, walk position and camera view after a reload", a
   // The campaign's record is still the one it started with: no walk, no spot, no camera.
   expect(JSON.parse((await page.evaluate(() => localStorage.getItem("nn.campaign.exploration.v1"))) ?? "null")).toMatchObject({ walking: false, avatar: null, camera: null });
 });
+
+test("makes a coffee by Space: the prompt says it is under way, sweeps for as long as it lasts, and offers it again after", async ({ page }) => {
+  test.slow();
+  // Resume mid-walk at the kitchen's espresso machine, the first fun thing in reach.
+  await page.addInitScript(() => localStorage.setItem("nn.classic.exploration.v1", JSON.stringify({ version: 1, floor: "office", walking: true, viewChosen: true, avatar: { floor: "office", x: 17.23, z: -7.95, yaw: 0 }, camera: null })));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue week 2" }).click();
+  const canvas = page.getByRole("main").locator("canvas");
+  await expect(canvas).toBeVisible();
+  await expect.poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 }).toBe(true);
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(prompt(page)).toContainText("Make a coffee", { timeout: 20_000 });
+  await page.keyboard.press("Space");
+  await expect(prompt(page)).toContainText("Making a coffee…");
+  await expect(prompt(page).locator(".walk-prompt-progress")).toHaveCount(1);
+  await expect(page.getByRole("status").filter({ hasText: "Making a coffee…" })).toHaveCount(1);
+  // Done after its few seconds: the prompt offers the coffee again and the sweep is gone.
+  await expect(prompt(page)).toContainText("Make a coffee", { timeout: 10_000 });
+  await expect(prompt(page)).not.toContainText("Making");
+  await expect(prompt(page).locator(".walk-prompt-progress")).toHaveCount(0);
+});

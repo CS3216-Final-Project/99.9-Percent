@@ -44,6 +44,7 @@ import { tipProps } from "../tips";
 import { INFRASTRUCTURE_TIPS } from "@/game/infrastructureHelp";
 import { openRoomArea } from "../roomArea";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
+import { ActivityEffects } from "./activities";
 import { Office } from "./Office";
 import { ServerFloor } from "./ServerFloor";
 import { ElevatorCar, Landing, ShaftRun } from "./Elevator";
@@ -51,12 +52,12 @@ import { carDoors, resetErrands, settleErrand } from "./trips";
 import { Visitors } from "./Visitors";
 import { playerDeparts } from "./crowd";
 import { aroundShaft } from "./lift";
-import { ELEVATOR_SPOT } from "./floorplan";
+import { ELEVATOR_SPOT, type FunProp } from "./floorplan";
 import { backAt, FLOOR_NUMBER, FLOOR_Y, glideAt, rideAt, washAt } from "./levels";
 import { depart, hurry, now, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
 import { Avatar, WalkDriver, WalkFloor } from "./Avatar";
 import { GlassDoors } from "./Doors";
-import { avatar, clearPrompt, held, jump, movesAvatar, onPrompt, play, resetJump, walkTo } from "./walk";
+import { avatar, clearPrompt, held, jump, movesAvatar, onPrompt, play, resetJump, stopPlaying, walkTo } from "./walk";
 import { clearOverheard, onOverheard, type Overheard } from "./overheard";
 import { ROLE_NAMES } from "./cast";
 import type { Prompt } from "./player";
@@ -1381,6 +1382,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
         <Room />
         <Ceiling floor="office" />
         <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
+        <ActivityEffects walking={walking} />
         <Landing floor="office" interactive={landed === "office"} />
         <GlassDoors floor="office" />
         {walking && landed === "office" && <WalkFloor />}
@@ -1550,7 +1552,7 @@ function FrameLimiter({ fps }: { fps: number }) {
 }
 
 /** Do what is within the avatar's reach: exactly what clicking it does, the elevator's ride, or a fun thing. */
-function actOn(prompt: Prompt): string | null {
+function actOn(prompt: Prompt): FunProp | null {
   if (prompt.kind === "equipment") {
     inspectInRoom(prompt.id);
     return null;
@@ -1560,7 +1562,7 @@ function actOn(prompt: Prompt): string | null {
     return null;
   }
   play(prompt.prop, now());
-  return prompt.prop.doing;
+  return prompt.prop;
 }
 
 /** What a typing field, an open dialog or a menu does with keys is theirs, not the room's. */
@@ -1580,26 +1582,27 @@ function WalkControls() {
   const [aboard, setAboard] = useState(riding);
   useEffect(() => onRide((event) => setAboard(event === "depart")), []);
   // What the prompt button says a fun thing is doing, while its animation plays.
-  const [activity, setActivity] = useState<{ propId: string; label: string } | null>(null);
+  const [activity, setActivity] = useState<{ propId: string; label: string; seconds: number; started: number } | null>(null);
   const activityTimer = useRef<number | null>(null);
   useEffect(() => onPrompt(setPrompt), []);
   // Stopping walk mode drops whatever the button said the avatar was doing.
   useEffect(() => useGame.subscribe((s) => { if (!s.walking) setActivity(null); }), []);
   const perform = useCallback((p: Prompt) => {
-    const doing = actOn(p);
-    if (!doing) return;
-    setActivity({ propId: p.kind === "prop" ? p.prop.id : "", label: doing });
+    const prop = actOn(p);
+    if (!prop) return;
+    setActivity({ propId: prop.id, label: prop.doing, seconds: prop.seconds, started: Date.now() });
     if (activityTimer.current !== null) window.clearTimeout(activityTimer.current);
     // For as long as the prop's animation runs.
     activityTimer.current = window.setTimeout(() => {
       activityTimer.current = null;
       setActivity(null);
-    }, 2600);
+    }, prop.seconds * 1000);
   }, []);
   useEffect(() => {
     if (!walking) {
       clearPrompt();
       resetJump();
+      stopPlaying();
       if (activityTimer.current !== null) {
         window.clearTimeout(activityTimer.current);
         activityTimer.current = null;
@@ -1651,9 +1654,10 @@ function WalkControls() {
   return (
     <>
       {shown && (
-        <button type="button" className="walk-prompt" onClick={() => perform(shown)}>
+        <button type="button" className={`walk-prompt${doing ? " is-doing" : ""}`} onClick={() => perform(shown)}>
           <kbd>Space</kbd>
           {doing ?? shown.label}
+          {doing && <span key={activity!.started} className="walk-prompt-progress" aria-hidden="true" style={{ animationDuration: `${activity!.seconds}s` }} />}
         </button>
       )}
       <span className="visually-hidden" role="status" aria-live="polite">
