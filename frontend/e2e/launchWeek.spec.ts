@@ -60,8 +60,9 @@ async function bootPanel(page: Page, game: GameState) {
   await expect(page.getByRole("region", { name: "Guided Mode guidance" })).toBeVisible();
 }
 
-/** Spends the research pick through its confirmation, as the player does. */
+/** Spends the research pick through its confirmation on the Actions tab, as the player does. */
 async function pickCaching(page: Page) {
+  await openPanelTab(page, "Actions");
   const sheet = page.getByRole("region", { name: "Launch Week research" });
   await sheet.getByRole("button", { name: "Caching" }).click();
   await page.locator(".campaign-action-popover").getByRole("button", { name: "Confirm", exact: true }).click();
@@ -84,7 +85,9 @@ test("a week that ends with research unspent asks for the pick, then scores and 
   await expect(guidance.getByRole("button", { name: "Complete Opening" })).toHaveCount(0);
   await expect(tutorial(page)).toContainText("research point");
   await expect(page.getByRole("region", { name: "Guided Mode chapters" })).toContainText("Spend your free research pick to see your Launch Week score.");
-  // The spotlighted step scrolls the whole research sheet into the panel, both options included.
+  // The pick is a purchase on Actions: the step lights that tab, then scrolls the whole sheet into the panel.
+  await expect(page.locator("[data-spotlight]")).toHaveAttribute("data-tab", "actions");
+  await openPanelTab(page, "Actions");
   await expect(page.getByRole("region", { name: "Launch Week research" })).toBeInViewport({ ratio: 1 });
   await pickCaching(page);
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
