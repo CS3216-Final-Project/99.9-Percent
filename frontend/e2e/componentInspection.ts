@@ -87,7 +87,7 @@ export async function followHintComponent(page:Page) {
   const gold=page.locator(".campaign-gold-attention");
   await expect(gold).toHaveCount(1);
   for(let step=0;step<5;step++) {
-    if(await gold.evaluate(el=>el.matches('[data-tutorial^="inspect-"], [data-guidance-app], [data-inspection-entry], [data-inspection-back]'))) {
+    if(await gold.evaluate(el=>el.matches('[data-tutorial^="inspect-"], [data-guidance-app], [data-inspection-entry], [data-inspection-back], summary'))) {
       await gold.click();await expect(inspection(page)).toBeVisible();await expect(gold).toHaveCount(1);
     } else break;
   }

@@ -89,12 +89,11 @@ export async function appHealthDuringOpening(page: Page) {
     await page.route("**/api/**", r => r.abort()); await page.goto("/");
     await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await expectRoom(page);
     const entry = page.getByRole("button", { name: "View app health", exact: true });
-    const letter = page.getByRole("dialog", { name: "Launch week" });
-    await expect(letter).toBeVisible();
-    await letter.getByRole("button", { name: "Open the doors", exact: true }).click();
+    const introduction = page.getByRole("region", { name: "Introduction Progress" });
+    await expect(introduction).toContainText("0/4");
     const before = (await savedGame(page)).campaign;
     await entry.click(); const dialog = page.getByRole("dialog", { name: "App Health", exact: true });
-    await expect(dialog).toBeVisible(); await expect(letter).toBeHidden(); await page.keyboard.press("p");
+    await expect(dialog).toBeVisible(); await expect(dialog).toContainText("Not enough data"); await page.keyboard.press("p");
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
     await expect(entry).toBeFocused(); expect((await savedGame(page)).campaign).toEqual(before);
 }

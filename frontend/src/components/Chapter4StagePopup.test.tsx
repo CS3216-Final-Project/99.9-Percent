@@ -79,13 +79,14 @@ it("never overlays an active incident or its immediate Pause control", () => {
   render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost>);
   expect(popup()).toBeNull(); expect(screen.getByRole("button", { name: "Pause" })).not.toBeNull();
 });
-it("transfers Hint to the small server's real Scale up, immediate Confirm, and accepted-install Run", () => {
+it("transfers Hint to the small server's real Scale up, immediate Confirm, and accepted-install Run", async () => {
   const game = tick(decide(untilOffset(initial, 8), { type: "add_server" }), 2);
   useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null, selected: "app", selectedAppId: "app-3", panelOpen: true });
   render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost>);
   const gold = () => document.querySelectorAll(".campaign-gold-attention");
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   fireEvent.click(within(screen.getByRole("dialog", { name: "Hint" })).getByRole("button", { name: "Got it" })); enterHighlightedInspection();
+  await act(async()=>{});enterHighlightedInspection();
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Scale up App 3");
   fireEvent.click(gold()[0]); expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   expect(useGame.getState().game.campaign!.step).toBe(game.campaign!.step);

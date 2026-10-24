@@ -43,7 +43,7 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  await clockTo(page,n+13);let c=(await savedGame(page)).campaign!;expect(c.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(c.snapshot.app.capacity).toBe(3200);
  // Paint the new room label while the company stays paused.
  await page.clock.runFor(1000);
- await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await expect(page.getByRole("note",{name:"App 3 routing status"})).toBeVisible();
+ await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await expect(page.getByRole("dialog",{name:"App Servers"})).toContainText("Not receiving traffic");
  const app3Reveal=page.getByRole("dialog",{name:"App Servers"});await expect(app3Reveal).toBeVisible();await app3Reveal.getByRole("button",{name:"Close"}).click();
  await page.screenshot({path:"test-results/phase5-desktop.png",fullPage:true});
  c=(await savedGame(page)).campaign!;
@@ -104,7 +104,7 @@ test("spikes: manually planned capacity survives the announced wave without an a
 test("spikes: write-heavy DB constraint remains after automatic app routing",async({page,withoutRoom})=>{
  await withoutRoom();
  test.setTimeout(90000);const api=await blockedGuest(page,untilOffset(spikeCompany(true,"write-heavy"),24),false);
- await inspectEquipment(page,"app");await page.getByRole("button",{name:"Autoscaling",exact:true}).click();const control=page.getByRole("region",{name:"Autoscaling",exact:true});await control.getByText("Technical Details",{exact:true}).click();await expect(control).toContainText("cannot increase DB capacity");await closeInspection(page);
+ await inspectEquipment(page,"app");await page.getByRole("button",{name:"Server management",exact:true}).click();await page.getByRole("button",{name:"Autoscaling",exact:true}).click();const control=page.getByRole("region",{name:"Autoscaling",exact:true});await control.getByText("Technical Details",{exact:true}).click();await expect(control).toContainText("cannot increase DB capacity");await closeInspection(page);
  expect((await savedGame(page)).campaign!.snapshot.db.demand).toBeGreaterThan(3000);
  await (await infrastructureAction(page,"Limit to 500 requests/s")).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await setGameSpeed(page,2);await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});await expect(page.getByRole("dialog")).toContainText("does not increase database capacity");
@@ -116,7 +116,7 @@ test("spikes: disabling keeps paid installation and allows an explicit manual ro
  await (await infrastructureAction(page,"Disable autoscaling")).click();
  await closeInspection(page);await runTo(page,before.step+3);
  const idle=(await savedGame(page)).campaign!;expect(idle.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(idle.cashCents).toBe(before.cashCents);expect(idle.pending.some(a=>a.type==="routing")).toBe(false);
- await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await expect(page.getByRole("note",{name:"App 3 routing status"})).toBeVisible();
+ await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await expect(page.getByRole("dialog",{name:"App Servers"})).toContainText("Not receiving traffic");
  const idleReveal=page.getByRole("dialog",{name:"App Servers"});await expect(idleReveal).toBeVisible();await idleReveal.getByRole("button",{name:"Close"}).click();
  await (await infrastructureAction(page,"All apps")).click();await runTo(page,(await savedGame(page)).campaign!.step+1);
  const routed=(await savedGame(page)).campaign!;expect(routed.apps.find(a=>a.id==="app-3")!.routed).toBe(true);expect(routed.spikeStage!.controller!.enabled).toBe(false);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);

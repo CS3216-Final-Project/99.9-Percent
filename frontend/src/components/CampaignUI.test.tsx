@@ -27,7 +27,7 @@ it("keeps the selected workload hidden until actual growth and enters through th
  expect(within(guide).queryByRole("button",{name:/Continue to Data Strategy/})).toBeNull();
  fireEvent.click(within(screen.getByRole("region",{name:"Guided Mode chapters"})).getByRole("button",{name:/Continue to Data Strategy/}));
  expect(useGame.getState().tour?.track).toBe("data");
- expect(screen.getByRole("region",{name:"Data strategy"}).textContent).toContain("Waiting for workload growth");
+ expect(screen.queryByRole("region",{name:"Data strategy"})).toBeNull();
  act(()=>useGame.getState().endTour(true));
  expect(screen.queryByRole("region",{name:"Data strategy"})).toBeNull();
  fireEvent.click(screen.getByRole("button",{name:"Read Cache"}));fireEvent.click(screen.getByRole("button",{name:"Inspect details"}));
@@ -39,6 +39,7 @@ it("shows the current stage cap instead of advertising a locked database tier",(
  expect(button.hasAttribute("disabled")).toBe(true);expect(button.closest(".campaign-action-card")!.textContent).toContain("The database is already upgraded.");expect(button.closest(".campaign-action-card")!.textContent).not.toContain("3,000");
  fireEvent.click(screen.getByRole("button",{name:"Close"}));
  fireEvent.click(screen.getByRole("button",{name:/Continue to Data Strategy/}));
+ act(()=>useGame.getState().endTour(true));
  const nextButton=inspectionAction(/Upgrade database/);
  expect(nextButton.hasAttribute("disabled")).toBe(false);fireEvent.click(nextButton);
  expect(screen.getByRole("region",{name:"Purchase preview"}).textContent).toContain("4 game seconds");

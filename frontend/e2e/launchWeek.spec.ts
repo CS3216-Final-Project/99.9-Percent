@@ -1,3 +1,4 @@
+import {infrastructureAction,purchasePreview} from "./componentInspection";
 import { test, expect, seedSave, savedGame, expectRoom, openCameraControls, openPanelTab } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
@@ -86,7 +87,7 @@ test("a week that ends with research unspent asks for the pick, then scores and 
   await expect(tutorial(page)).toContainText("research point");
   await expect(page.getByRole("region", { name: "Guided Mode chapters" })).toContainText("Spend your free research pick to see your Launch Week score.");
   // The pick is a purchase on Actions: the step lights that tab, then scrolls the whole sheet into the panel.
-  await expect(page.locator("[data-spotlight]")).toHaveAttribute("data-tab", "actions");
+  await expect(page.locator("[data-spotlight]")).toHaveAccessibleName("Launch Week research");
   await openPanelTab(page, "Actions");
   await expect(page.getByRole("region", { name: "Launch Week research" })).toBeInViewport({ ratio: 1 });
   await pickCaching(page);
@@ -109,8 +110,8 @@ test("a week that ends during its database incident lets the player fix and revi
   await expect(page.getByTestId("physical-step")).toHaveText("60");
   await expect(page.getByRole("button", { name: "Complete Opening" })).toHaveCount(0);
   await openPanelTab(page, "Actions");
-  await page.getByRole("button", { name: /^Upgrade database/ }).click();
-  await page.locator(".campaign-action-popover").getByRole("button", { name: "Confirm", exact: true }).click();
+  await (await infrastructureAction(page,/^Upgrade database/)).click();
+  await purchasePreview(page).getByRole("button", { name: "Confirm", exact: true }).click();
   expect((await savedGame(page)).campaign!.pending.some(a => a.type === "upgrade-db")).toBe(true);
   // Time still runs past the week's end, so the upgrade lands and the service recovers.
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
@@ -149,7 +150,7 @@ test("a practice replay resumes where it was left after a reload, finishes its r
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.tutorial.v1"))).toBeNull();
 });
 
-test("Replay Launch Week from View chapters opens the practice company on the launch letter, without a reload", async ({ page, withoutRoom }) => {
+test("Replay Launch Week opens the component introduction and preserves the legacy company", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await bootPanel(page, newGame(7, "lw-replay", 2));
   const letter = page.getByRole("dialog", { name: "Launch week" });
@@ -158,9 +159,11 @@ test("Replay Launch Week from View chapters opens the practice company on the la
   await page.getByRole("button", { name: "View chapters", exact: true }).click();
   await page.getByRole("button", { name: "Replay Launch Week" }).click();
   await expect(page.getByRole("region", { name: "Guided Mode chapters" })).toContainText("Practice");
-  await expect(letter).toBeVisible();
-  await letter.getByRole("button", { name: "Open the doors" }).click();
   await expect(letter).toBeHidden();
+  await expect(page.getByRole("region", { name: "Introduction Progress" })).toContainText("0/4");
+  await expect(page.getByRole("button", { name: "Complete Introduction", exact: true })).toBeDisabled();
+  await expect(page.locator("[data-spotlight]")).toHaveAccessibleName("Network");
+
 });
 
 test("cold open: the launch letter, the whole room and the opening beat", async ({ page }) => {
@@ -181,7 +184,7 @@ test("cold open: the launch letter, the whole room and the opening beat", async 
 test("the research sheet previews each option and spends the pick", async ({ page }) => {
   await boot(page, researchReady());
   // The pick is a purchase on Actions: the step lights that tab until the player opens it.
-  await expect(page.locator("[data-spotlight]")).toHaveAttribute("data-tab", "actions");
+  await expect(page.locator("[data-spotlight]")).toHaveAccessibleName("Launch Week research");
   await openPanelTab(page, "Actions");
   const sheet = page.getByRole("region", { name: "Launch Week research" });
   await expect(sheet).toBeVisible();

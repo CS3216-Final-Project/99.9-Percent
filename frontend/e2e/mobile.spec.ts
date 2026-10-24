@@ -105,10 +105,9 @@ test("Launch Week practice can be exited by touch during a saved incident", asyn
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
   await page.getByRole("button", { name: "View chapters", exact: true }).tap();
   await page.getByRole("dialog", { name: "Guided Mode chapters" }).getByRole("button", { name: "Replay Launch Week", exact: true }).tap();
-  await expect(page.getByRole("dialog", { name: "Launch week" })).toBeVisible();
-  await page.getByRole("button", { name: "Open the doors", exact: true }).tap();
+  await expect(page.getByRole("region",{name:"Introduction Progress"})).toContainText("0/4");
   await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Launch Week");
-  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "View chapters", exact: true }).tap();
   await page.getByRole("dialog", { name: "Guided Mode chapters" }).getByRole("button", { name: "Exit practice", exact: true }).tap();
   expect((await savedGame(page)).campaign).toEqual(incident.campaign);
@@ -324,15 +323,13 @@ test("reliability: inspection and effective recipients remain clear on narrow to
  await page.route("**/api/**",route=>route.abort());
  await seedSave(page,tick(act(preparedReliability(),{type:"arm_reliability"}),9));
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
- await inspectEquipment(page,"app");
- const panel=page.getByRole("region",{name:"Reliability actions"});
- await panel.getByRole("button",{name:"Inspect App 2 health · free",exact:true}).tap();
- const instances=page.getByRole("region",{name:"Application instances"});
- await expect(instances.getByRole("button",{name:/App 2: Installed - not receiving traffic/})).toHaveAttribute("aria-pressed","true");
- // Inspecting brought its readings forward on Analysis; the restoration is back on Actions.
- await openPanelTab(page,"Actions");
- await expect(panel).toContainText("detected unhealthy");
- await expect((await infrastructureAction(page,"Restore App 2 · free · 3 game seconds"))).toBeEnabled();
+ const app=await inspectEquipment(page,"app");
+ await app.getByRole("button",{name:"Server management",exact:true}).tap();
+ const instances=app.getByRole("region",{name:"Application instances"});
+ await instances.locator('[data-guidance-app="app-2"]').tap();
+ await expect(app.getByRole("heading",{name:"App 2",exact:true})).toBeVisible();
+ await expect(app).toContainText("detected unhealthy");
+ await expect((await infrastructureAction(page,/Restore App 2/))).toBeEnabled();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
  await closeInspection(page);await page.getByRole("button",{name:"Tech",exact:true}).tap();
  const tree=page.getByRole("region",{name:"Tech tree"});
@@ -357,7 +354,7 @@ test("inspects evidence and advances a physical step on touch", async ({ page , 
   await openPanelTab(page, "Analysis");
   await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).tap();
   const before=(await savedGame(page)).campaign!.step;
-  await advanceCampaignStep(page);
+  await closeInspection(page);await advanceCampaignStep(page);
   expect((await savedGame(page)).campaign!.step).toBe(before+1);
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeInViewport({ratio:1});
   await page.getByRole("button", { name: "History", exact: true }).tap();
@@ -382,7 +379,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   await expect(database.locator(".campaign-evidence .evidence-rows dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
   await expect(database.getByRole("progressbar", { name: "Database load: 800 of 600 operations/s" })).toBeVisible();
   expect((await savedGame(page)).campaign!.step).toBe(6);
-  await expect(panel.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
+  await expect(database.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
   await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
   await openPanelTab(page, "Actions");
   for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
@@ -440,6 +437,7 @@ test("selects scaling instances through room and evidence on touch",async({page}
  act({type:"acknowledge_review"});act({type:"acknowledge_milestone"});act({type:"add_server"});g=advanceSteps(g,2).state;
  await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
  await page.getByRole("main").getByRole("button",{name:"App 2",exact:true}).tap();
+ await page.getByRole("dialog",{name:"App Servers"}).getByRole("button",{name:"Back to Server management",exact:true}).tap();
  await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 2:/})).toHaveAttribute("aria-pressed","true");
  await page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 1:/}).tap();
  await expect(page.getByRole("main").getByRole("button",{name:"App 1",exact:true})).toHaveAttribute("aria-pressed","true");
@@ -479,7 +477,7 @@ test("cache selection, paid activation and warmth reload on touch",async({page, 
  const before=(await savedGame(page)).campaign!;expect(before.readCache).not.toBeNull();expect(before.readCache!.warmth).toBe(0);
  await advanceCampaignStep(page);
  expect((await savedGame(page)).campaign!.readCache!.warmth).toBe(1200);
- await openPanelTab(page,"Actions");await data.scrollIntoViewIfNeeded();await page.screenshot({path:"test-results/phase4-mobile-cache.png"});
+ await openPanelTab(page,"Actions");await inspectEquipment(page,"cache",true);await data.scrollIntoViewIfNeeded();await page.screenshot({path:"test-results/phase4-mobile-cache.png"});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
  const saved=(await savedGame(page)).campaign!;await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  expect((await savedGame(page)).campaign).toEqual(saved);
@@ -510,6 +508,7 @@ for(const width of [390,320]) test(`Campaign UX: the touch opening and secondary
  await page.goto("/");await page.getByRole("button",{name:"Start Guided Mode",exact:true}).tap();
  await expectRoom(page);
  const introduction=page.getByRole("region",{name:"Introduction Progress"});
+ await introduction.scrollIntoViewIfNeeded();
  await expect(introduction).toBeInViewport({ratio:1});
  await page.screenshot({path:`test-results/clarity-introduction-${width}.png`});
  await completeTutorial(page);

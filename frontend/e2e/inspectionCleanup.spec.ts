@@ -57,7 +57,7 @@ test("inspection modal: blocks camera input and restores dragging and scene clic
   const canvas=page.getByRole("main").locator("canvas"),box=(await canvas.boundingBox())!;
   const x=box.x+box.width*.25,y=box.y+box.height*.55;
   await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+40,y+10,{steps:8});await page.mouse.up();
-  const blocked=await settledCamera(page),popup=await inspectEquipment(page,"db");
+  const popup=await inspectEquipment(page,"db"),blocked=await settledCamera(page);
   // An outside pointer-down deliberately dismisses the existing modal. Drag its
   // header instead, and verify it stays open throughout the blocking check.
   const header=(await popup.locator(".modal-head").boundingBox())!;
@@ -70,6 +70,7 @@ test("inspection modal: blocks camera input and restores dragging and scene clic
   const after=await settledCamera(page);
   expect(Math.hypot(after.target.x-blocked.target.x,after.target.z-blocked.target.z)).toBeGreaterThan(1);
   await openCameraControls(page);await page.getByRole("button",{name:"Reset view",exact:true}).click();
+  await page.keyboard.press("Escape");await settledCamera(page);
   await page.getByRole("main").getByRole("button",{name:"Database",exact:true}).click();
   await expect(page.getByRole("dialog",{name:"Database inspected",exact:true})).toBeVisible();
 });
@@ -87,7 +88,8 @@ for(const chapter of [4,5,6]) test(`inspection content: Chapter ${chapter} keeps
   await inspectEquipment(page,"gateway",true);await expect(network.getByRole("region",{name:"Network readings"})).toContainText("Admitted");
   if(chapter>=5)await expect(await infrastructureAction(page,"Deploy Automatic Failover")).toBeVisible();
   const cache=await inspectEquipment(page,"cache",true);
-  await expect(cache).not.toContainText(/Workload:|Growth due|Waiting for workload growth/);
+  await expect(cache).not.toContainText(/Growth due|Waiting for workload growth/);
+  await expect(cache.getByRole("region",{name:"Data strategy"})).toContainText("Workload:");
   await expect(cache.getByRole("region",{name:"Read Cache readings"})).toContainText("Effective hit rate used");
   await expect(cache.getByRole("button",{name:/Tune cache ceiling/})).toBeVisible();
   const app=await inspectEquipment(page,"app",true);

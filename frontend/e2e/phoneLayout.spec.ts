@@ -1,4 +1,4 @@
-import { infrastructureAction, closeInspection, followHintComponent } from "./componentInspection";
+import { infrastructureAction, closeInspection, followHintComponent, inspectEquipment } from "./componentInspection";
 import type { Locator, Page } from "@playwright/test";
 import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -140,26 +140,19 @@ test("Guided Mode incident: the sheet stays at least half open with every respon
   await expectNoHorizontalOverflow(page);
 });
 
-test("Guided Mode: a new panel tab opens at the top of the sheet, not where the last one was scrolled", async ({ page, withoutRoom }) => {
+test("Guided Mode: a new component opens at the top rather than retaining the previous inspection scroll", async ({ page, withoutRoom }) => {
   await withoutRoom();
-  // Stay Online's Actions are long enough to scroll well down, and so are the Database's readings on Analysis.
-  await openGuided(page, { width: 390, height: 844 }, reliabilityCompany());
-  await expect(sheet(page)).toHaveAttribute("data-state", "peek");
-  await handle(page).tap();
-  await handle(page).tap();
-  await expect(sheet(page)).toHaveAttribute("data-state", "full");
-  const panel = page.getByRole("complementary", { name: "System metrics" }), body = page.locator(".phone-sheet-body");
-  await openPanelTab(page, "Analysis");
-  await panel.getByRole("button", { name: "Database", exact: true }).tap();
-  await openPanelTab(page, "Actions");
-  await body.evaluate(el => el.scrollTo({ top: 300 }));
-  await expect.poll(() => body.evaluate(el => el.scrollTop)).toBe(300);
-  // A finger taps the switch where it is stuck; Playwright's own tap would first scroll it to where it sits unstuck.
-  const analysis = await box(page.getByRole("tab", { name: "Analysis" }));
-  await page.touchscreen.tap(analysis.x + analysis.width / 2, analysis.y + analysis.height / 2);
-  await expect(page.getByRole("tab", { name: "Analysis" })).toHaveAttribute("aria-selected", "true");
-  await expect.poll(() => body.evaluate(el => el.scrollTop)).toBe(0);
-  await expect(panel.getByRole("region", { name: "Database readings" })).toBeVisible();
+  await openGuided(page,{width:390,height:844},reliabilityCompany());
+  await handle(page).tap();await handle(page).tap();
+  await expect(sheet(page)).toHaveAttribute("data-state","full");
+  const app=await inspectEquipment(page,"app",true),body=app.locator(".modal-body");
+  await body.evaluate(el=>el.scrollTo({top:el.scrollHeight}));
+  await expect.poll(()=>body.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+  await closeInspection(page);
+  const network=await inspectEquipment(page,"gateway");
+  await expect(network.getByRole("button",{name:"Inspect details",exact:true})).toHaveAttribute("aria-expanded","false");
+  expect(await network.locator(".modal-body").evaluate(el=>el.scrollTop)).toBe(0);
+  await expect(network.locator(".component-inspection-summary")).toBeInViewport();
 });
 
 test("Guided Mode: inspecting equipment keeps the sheet's place and shows its readings", async ({ page, withoutRoom }) => {
@@ -172,10 +165,12 @@ test("Guided Mode: inspecting equipment keeps the sheet's place and shows its re
     const button = panel.getByRole("button", { name: chip, exact: true });
     await button.evaluate(el => el.scrollIntoView({ block: "center" }));
     const before = await body.evaluate(el => el.scrollTop);
-    expect(before).toBeGreaterThan(0);
+    // The compact dashboard may fit without scrolling.
     await button.tap();
     await expect(button).toHaveAttribute("aria-pressed", "true");
-    await expect(panel.getByRole("region", { name: `${readings} readings` })).toBeInViewport();
+    const popup=await inspectEquipment(page,chip==="Network"?"gateway":chip==="App Server"?"app":chip==="Database"?"db":"monitoring",true);
+    await expect(popup.getByRole("region", { name: `${readings} readings` })).toBeInViewport();
+    await closeInspection(page);
     await expect(button).toBeInViewport();
     // Shorter readings can only pull the sheet back as far as its new bottom.
     const after = await body.evaluate(el => ({ top: el.scrollTop, max: el.scrollHeight - el.clientHeight }));

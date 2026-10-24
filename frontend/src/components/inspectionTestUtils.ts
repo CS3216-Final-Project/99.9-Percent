@@ -29,7 +29,7 @@ export function enterHighlightedInspection() {
   const target=document.querySelector<HTMLElement>('.campaign-gold-attention');
   if(target?.matches('[data-tutorial^="inspect-"]')) fireEvent.click(target);
   for(let step=0;step<5;step++) {
-    const entry=document.querySelector<HTMLElement>('.campaign-gold-attention[data-guidance-app], .campaign-gold-attention[data-inspection-entry], .campaign-gold-attention[data-inspection-back]');
+    const entry=document.querySelector<HTMLElement>('.campaign-gold-attention[data-guidance-app], .campaign-gold-attention[data-inspection-entry], .campaign-gold-attention[data-inspection-back], summary.campaign-gold-attention');
     if(!entry)break;fireEvent.click(entry);
   }
 }

@@ -21,7 +21,11 @@ function appIncident() {
 /** The exact pending configuration reached by each installation journey below. */
 function pendingRecovery(path: ScalingPath) {
   let game = act(appIncident(),{type:"incident_inspect",equipment:"app",appId:"app-1"});
-  if (path === "vertical") return act(game, { type: "scale_up", appId: "app-1" });
+  if (path === "vertical") {
+    // Fleet inspection and selecting its server each record the same public observation.
+    game=act(game,{type:"incident_inspect",equipment:"app",appId:"app-1"});
+    return act(game, { type: "scale_up", appId: "app-1" });
+  }
   game = advanceSteps(act(game, { type: "add_server" }), 2).state;
   game = act(game, { type: "incident_inspect", equipment: "app", appId: "app-2" });
   game=act(game,{type:"incident_inspect",equipment:"gateway"});

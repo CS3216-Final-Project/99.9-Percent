@@ -198,7 +198,10 @@ export async function advanceCampaignStep(page: Page, { seconds = 1, resumeClock
 /** Brings a tab of the Guided Mode panel forward: readings on Analysis, purchases and settings on Actions. */
 export async function openPanelTab(page: Page, name: "Analysis" | "Actions") {
   const tab = page.getByRole("tab", { name: new RegExp(`^${name}`) });
-  if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
+  // Normal companies expose shared inspections; historical practice retains tabs.
+  if (await tab.count()) {
+    if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
+  } else await expect(page.locator('.campaign-panel [data-tutorial="inspect-db"]')).toHaveCount(1);
 }
 export async function openRoomControls(page: Page) {
   const menu = page.locator(".room-menu");

@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useGame, inspectInRoom } from "@/game/store";
 import { newGame, type GameState } from "@/sim";
-import { advanceSteps } from "@/sim/step";
+import { advanceSteps, step } from "@/sim/step";
 import { act as decide, tick, spikeCompany, untilOffset } from "@/sim/__tests__/spikeFixtures";
 import { combinedCompany } from "@/sim/__tests__/combinedFixture";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
@@ -242,4 +242,32 @@ it("summarises a failed fleet without exposing server cards until management",()
  expect(popup.querySelector(".component-inspection-metric")?.textContent).toContain(`${c.apps.filter(a=>a.health!=="failed").length} healthy`);
  open("Server management");
  expect(popup.querySelectorAll('[data-guidance-app]')).toHaveLength(c.apps.length);
+});
+
+it("returns keyboard focus to the shortcut after initial and nested inspection dismissal",()=>{
+ show(newGame());
+ const shortcut=screen.getByRole("button",{name:"App Server"});
+ shortcut.focus();fireEvent.click(shortcut);
+ const popup=screen.getByRole("dialog",{name:"App Servers"});
+ fireEvent.keyDown(within(popup).getByRole("button",{name:"Close"}),{key:"Escape"});
+ expect(document.activeElement).toBe(shortcut);
+ fireEvent.click(shortcut);open("Server management");
+ fireEvent.keyDown(screen.getByRole("dialog",{name:"App Servers"}),{key:"Escape"});
+ expect(document.activeElement).toBe(shortcut);
+});
+
+it("keeps legacy Launch Week incident inspections and upgrades usable after the week ends",()=>{
+ let game=newGame(7,"late-launch-inspection",2);
+ // Step explicitly past the incident pause to reproduce an already-saved week-end incident.
+ for(let i=0;i<60;i++)game=step(game).state;
+ expect(game.phase).toBe("incident");
+ expect(game.campaign!.launchWeek!.completedStep).not.toBeNull();
+ expect(game.campaign!.openingMilestone!.acknowledged).toBe(false);
+ show(game);open("Database");
+ const popup=screen.getByRole("dialog",{name:"Database inspected"});
+ const upgrade=within(popup).getByRole("button",{name:/Upgrade database/});
+ expect(upgrade.hasAttribute("disabled")).toBe(false);
+ fireEvent.click(upgrade);
+ expect(screen.getByRole("region",{name:"Confirm Upgrade database"})).toBeTruthy();
+ expect(screen.getByRole("button",{name:"Confirm"}).hasAttribute("disabled")).toBe(false);
 });

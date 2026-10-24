@@ -1,3 +1,5 @@
+import InspectionReveal from "./InspectionReveal";
+import {enterHighlightedInspection} from "./inspectionTestUtils";
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -20,7 +22,7 @@ afterEach(() => { cleanup(); setConfirming(null); vi.useRealTimers(); vi.restore
 it("gives Hint the ten-second idle cue while safe limit removal still needs a decision", () => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
   useGame.setState({ game: initial, ready: true, started: true, running: false, onboarding: false, tour: null });
-  render(<CampaignAttentionHost><CampaignHeader/><CampaignPanel/><CampaignControls/></CampaignAttentionHost>);
+  render(<CampaignAttentionHost><CampaignHeader/><CampaignPanel/><InspectionReveal/><CampaignControls/></CampaignAttentionHost>);
   act(() => vi.advanceTimersByTime(9999)); expect(document.querySelectorAll(".campaign-gold-attention")).toHaveLength(0);
   act(() => vi.advanceTimersByTime(1));
   const gold = document.querySelectorAll(".campaign-gold-attention");
@@ -54,20 +56,20 @@ it("shares the coloured nonmodal component for wave and recovery milestones", ()
 
 it("transfers selected Network to Remove, immediate Confirm, accepted Run and clears after Cancel", () => {
   useGame.setState({ game: initial, ready: true, started: true, running: false, onboarding: false, tour: null, selected: "gateway", panelOpen: true });
-  render(<CampaignAttentionHost><CampaignHeader/><CampaignPanel/><CampaignControls/></CampaignAttentionHost>);
+  render(<CampaignAttentionHost><CampaignHeader/><CampaignPanel/><InspectionReveal/><CampaignControls/></CampaignAttentionHost>);
   const gold = () => document.querySelectorAll<HTMLElement>(".campaign-gold-attention");
   const accept = () => {
     fireEvent.click(screen.getByRole("button", { name: "Hint" }));
     const hint = screen.getByRole("dialog", { name: "Hint" });
     expect(hint.textContent).not.toContain("About Network");
-    fireEvent.click(within(hint).getByRole("button", { name: "Got it" }));
+    fireEvent.click(within(hint).getByRole("button", { name: "Got it" })); enterHighlightedInspection();
     expect(gold()).toHaveLength(1);
   };
-  accept(); expect(gold()[0].textContent).toContain("Remove traffic limit"); fireEvent.click(gold()[0]);
+  accept(); const inspected=useGame.getState().game;expect(gold()[0].textContent).toContain("Remove traffic limit"); fireEvent.click(gold()[0]);
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   expect(screen.queryByRole("dialog", { name: /^Chapter 6:/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  expect(useGame.getState().game).toBe(initial); expect(gold()).toHaveLength(0);
+  expect(useGame.getState().game).toBe(inspected); expect(gold()).toHaveLength(0);
   accept(); fireEvent.click(gold()[0]); fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   expect(useGame.getState().game.campaign!.pending.some(a => a.type === "unlimit")).toBe(true);
   accept(); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
@@ -79,6 +81,6 @@ it("yields to real running incidents and mandatory growth reviews", () => {
   wave = tick(decide(wave, { type: "set_routing", mode: "single", targets: ["app-1"] }), 11);
   expect(wave.phase).toBe("incident");
   useGame.setState({ game: wave, ready: true, started: true, running: true, onboarding: false, tour: null });
-  render(<CampaignAttentionHost><CampaignHeader/><CampaignPanel/><CampaignControls/></CampaignAttentionHost>);
+  render(<CampaignAttentionHost><CampaignHeader/><CampaignPanel/><InspectionReveal/><CampaignControls/></CampaignAttentionHost>);
   expect(screen.queryByRole("dialog", { name: /^Chapter 6:/ })).toBeNull();
 });

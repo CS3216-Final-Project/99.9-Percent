@@ -7,6 +7,7 @@ import { EQUIPMENT_ICON, STATE_META } from "./presentation";
 import { InspectionPurchaseContext } from "./useCampaignAttention";
 import { CampaignDataDetails, CampaignEquipmentActions, type EquipmentActionView } from "./CampaignUI";
 import { CampaignReadings } from "./CampaignReadings";
+import { milestoneBlocks } from "@/game/campaignGuidance";
 import { pendingStop } from "@/sim/step";
 import { effectiveTargets } from "@/sim/reliability";
 import { num } from "@/game/format";
@@ -72,10 +73,17 @@ function ComponentInspection() {
   const [page,setPage]=useState<"overview"|"management"|EquipmentActionView>(()=>inspection?.equipment==="app"&&inspection.appId?"server":"overview");
   const subview=useRef<HTMLDivElement>(null);
   const navigate=(next:typeof page)=>{setDetails(false);setPage(next);};
-  useLayoutEffect(()=>{subview.current?.focus({preventScroll:true});subview.current?.closest(".modal-body")?.scrollTo?.({top:0});},[page]);
+  const previousPage=useRef(page);
+  useLayoutEffect(()=>{
+    // Let Modal capture the opener before focusing its initial control. Only
+    // internal navigation moves focus here; otherwise Escape restores a removed node.
+    if(previousPage.current!==page)subview.current?.focus({preventScroll:true});
+    previousPage.current=page;
+    subview.current?.closest(".modal-body")?.scrollTo?.({top:0});
+  },[page]);
   const confirming=useSyncExternalStore(subscribeConfirming,confirmingAction);
   const c=game.campaign!;
-  const mandatory=pendingStop(c)!==null||!!(c.openingMilestone&&!c.openingMilestone.acknowledged)||!!chapterComplete;
+  const mandatory=pendingStop(c)!==null||milestoneBlocks(game)||!!chapterComplete;
   const previousPending=useRef(c.pending.map(a=>a.id));
   useEffect(()=>{
     const added=c.pending.some(a=>!previousPending.current.includes(a.id));

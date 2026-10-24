@@ -72,7 +72,8 @@ test("recovers a pre-update run and exports/imports Challenge Mode files from ei
   const buffer = await readFile(await (await classicDownload).path());
   await page.getByRole("tab", { name: "Run" }).click();
   await page.getByRole("button", { name: "Switch to Guided Mode" }).click();
-  await completeTutorial(page);
+  // Switching back resumes the company whose introduction was already completed.
+  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("tab", { name: "Saves" }).click();
   await page.getByLabel("Save file to import").setInputFiles({ name: "classic.json", mimeType: "application/json", buffer });
