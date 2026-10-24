@@ -68,6 +68,30 @@ export function onPrompt(listener: (p: Prompt | null) => void): () => void {
   return () => promptListeners.delete(listener);
 }
 
+const busyListeners = new Set<(b: AvatarState["busy"]) => void>();
+
+/** Hear when the fun thing the avatar is doing starts or ends, by its prop's name. */
+export function onBusy(listener: (b: AvatarState["busy"]) => void): () => void {
+  busyListeners.add(listener);
+  return () => busyListeners.delete(listener);
+}
+
+/** What the nap's lie-down blend is at, written by the avatar each frame so the scripted camera can follow it. */
+export const napBlend = { value: 0 };
+
+/** The loaded model's drawn size, nose to tail and floor to crown, written when it loads; held things place themselves just beyond the nose. Defaults stand in until a model is drawn. */
+export const avatarBounds = { depth: 0.5, height: 0.85 };
+
+/** Set what the avatar is busy with, telling listeners only when the prop itself changes, not every frame. */
+function setBusy(next: AvatarState["busy"]): void {
+  if ((next?.prop ?? null) === (avatar.busy?.prop ?? null)) {
+    avatar.busy = next;
+    return;
+  }
+  avatar.busy = next;
+  for (const l of busyListeners) l(next);
+}
+
 /** The middle of the elevator's car, and the spot in front of its doors where whoever rode steps out. */
 export const CAR: [number, number] = [(ELEVATOR_SPOT[0] + ELEVATOR_SPOT[2]) / 2 - 0.1, ELEVATOR_DOOR.z];
 export const LOBBY: [number, number] = [ELEVATOR_DOOR.x + 0.8, ELEVATOR_DOOR.z];
@@ -83,6 +107,7 @@ export function startAt(floor: Floor): [number, number] {
 
 /** Stand the avatar on a floor, still, facing away from the camera's usual view. */
 export function placeAvatar(floor: Floor, at: [number, number] = startAt(floor), yaw = Math.PI * 0.75): void {
+  setBusy(null);
   Object.assign(avatar, { floor, x: at[0], z: at[1], yaw, moving: false, running: false, path: [], busy: null, lift: 0, vy: 0 });
   held.clear();
 }
@@ -104,15 +129,15 @@ export function avatarSpot(walking: boolean): { floor: Floor; x: number; z: numb
   return { floor: avatar.floor, x: avatar.x, z: avatar.z, yaw: avatar.yaw, to: riding() ? ride.to : null };
 }
 
-/** Walk to (x, z) by the shortest way, or to the nearest free place to it; false if there is no way there. */
+/** Walk to (x, z) by the shortest way, or to the nearest free place to it; false if there is no way there, or while busy. */
 export function walkTo(x: number, z: number): boolean {
+  if (avatar.busy) return false;
   const g = gridHere();
   const target = nearestFree(g, x, z, 2);
   if (!target) return false;
   const path = findPath(g, [avatar.x, avatar.z], target);
   if (!path) return false;
   avatar.path = path;
-  avatar.busy = null;
   return true;
 }
 
@@ -120,12 +145,18 @@ export function walkTo(x: number, z: number): boolean {
 export function play(prop: FunProp, now: number): void {
   avatar.path = [];
   avatar.yaw = facing(prop.face[0] - avatar.x, prop.face[1] - avatar.z);
-  avatar.busy = { prop: prop.id, clip: prop.clip, since: now, until: now + prop.seconds };
+  setBusy({ prop: prop.id, clip: prop.clip, since: now, until: now + prop.seconds });
 }
 
-/** How far through its fun thing the avatar is, 0 to 1, or null when it is free. */
+/** A fun thing without its own timer schedules its own end, as the arcade does when its game finishes. */
+export function endBusyAt(until: number): void {
+  if (avatar.busy) avatar.busy.until = until;
+}
+
+/** How far through its fun thing the avatar is, 0 to 1, or null when it is free; an endless thing is always at 0. */
 export function busyProgress(now: number): number | null {
   if (!avatar.busy) return null;
+  if (!Number.isFinite(avatar.busy.until)) return 0;
   return Math.min(1, Math.max(0, (now - avatar.busy.since) / (avatar.busy.until - avatar.busy.since)));
 }
 
@@ -172,25 +203,25 @@ export function stepAvatar(dt: number, forward: [number, number], footprints: Re
   const world = gridHere().world;
   const run = held.has("ShiftLeft") || held.has("ShiftRight");
   const speed = (run ? SPEED.run : SPEED.walk) * (eyes?.pace ?? 1);
-  const [dx, dz] = steer(keysHeld(!!eyes), forward);
+  // Busy with a fun thing, the avatar stands still until it is done: steering and a planned walk are ignored.
+  const [dx, dz] = avatar.busy ? [0, 0] : steer(keysHeld(!!eyes), forward);
   let moved = false;
   if (dx || dz) {
-    // Steering takes over from a planned walk or a fun thing.
+    // Steering takes over from a planned walk.
     avatar.path = [];
-    avatar.busy = null;
     const [x, z] = slide(world, avatar.x, avatar.z, dx * speed * dt, dz * speed * dt);
     moved = Math.hypot(x - avatar.x, z - avatar.z) > 1e-4;
     avatar.x = x;
     avatar.z = z;
     avatar.yaw = turnTowards(avatar.yaw, facing(dx, dz), dt);
-  } else if (avatar.path.length) {
+  } else if (avatar.path.length && !avatar.busy) {
     const next = followPath(world, avatar.x, avatar.z, avatar.path, speed, dt);
     moved = Math.hypot(next.x - avatar.x, next.z - avatar.z) > 1e-4;
     Object.assign(avatar, { x: next.x, z: next.z, path: next.path });
     if (next.dx || next.dz) avatar.yaw = turnTowards(avatar.yaw, facing(next.dx, next.dz), dt);
   }
   if (eyes && !avatar.busy) avatar.yaw = eyes.heading;
-  if (avatar.busy && now > avatar.busy.until) avatar.busy = null;
+  if (avatar.busy && now > avatar.busy.until) setBusy(null);
   avatar.moving = moved;
   avatar.running = moved && run;
   if (avatar.lift > 0 || avatar.vy > 0) {
@@ -212,7 +243,7 @@ function samePrompt(a: Prompt | null, b: Prompt | null): boolean {
 
 /** Drop whatever fun thing the avatar is doing, as when walk mode ends. */
 export function stopPlaying(): void {
-  avatar.busy = null;
+  setBusy(null);
 }
 
 /** Clear what is within reach, as when walk mode ends. */

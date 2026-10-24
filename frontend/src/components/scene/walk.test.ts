@@ -3,7 +3,7 @@ import { EQUIPMENT_ORDER, newLegacyGame, type EquipmentId } from "@/sim";
 import { FUN_PROPS } from "./floorplan";
 import { footprint, type Footprint } from "./layout";
 import { facing, promptAt } from "./player";
-import { avatar, busyProgress, held, jump, placeAvatar, play, stepAvatar, stopPlaying } from "./walk";
+import { avatar, busyProgress, endBusyAt, held, jump, onBusy, placeAvatar, play, stepAvatar, stopPlaying, walkTo } from "./walk";
 import { ride } from "./ride";
 import { FIRST } from "./views";
 
@@ -25,6 +25,13 @@ describe("playing with the office's fun things", () => {
       expect(avatar.path, p.id).toEqual([]);
       expect(avatar.yaw, p.id).toBeCloseTo(facing(p.face[0] - p.x, p.face[1] - p.z));
       expect(avatar.busy, p.id).toEqual({ prop: p.id, clip: p.clip, since: 10, until: 10 + p.seconds });
+      if (!Number.isFinite(p.seconds)) {
+        // An endless thing (the arcade) never times out: its game schedules the end instead.
+        stepAvatar(0.8, [0, 1], footprints, names, 1000);
+        expect(avatar.busy, p.id).not.toBeNull();
+        stopPlaying();
+        continue;
+      }
       stepAvatar(0.8, [0, 1], footprints, names, 10 + p.seconds + 0.1);
       expect(avatar.busy, p.id).toBeNull();
     }
@@ -41,6 +48,56 @@ describe("playing with the office's fun things", () => {
     stopPlaying();
     expect(avatar.busy).toBeNull();
     expect(busyProgress(11)).toBeNull();
+  });
+
+  it("does not move the avatar while it is busy, however the player steers or clicks", () => {
+    const p = FUN_PROPS[0];
+    placeAvatar("office", [p.x, p.z]);
+    play(p, 10);
+    held.add("KeyD");
+    stepAvatar(0.5, [0, -1], footprints, names, 10.5);
+    expect(avatar.x).toBeCloseTo(p.x);
+    expect(avatar.z).toBeCloseTo(p.z);
+    expect(avatar.moving).toBe(false);
+    expect(avatar.busy).not.toBeNull();
+    expect(walkTo(p.x + 1, p.z + 1)).toBe(false);
+    expect(avatar.path).toEqual([]);
+    expect(avatar.busy).not.toBeNull();
+    held.clear();
+  });
+
+  it("tells listeners when a fun thing starts and ends, not every frame", () => {
+    const heard: (string | null)[] = [];
+    const off = onBusy((b) => heard.push(b?.prop ?? null));
+    const p = FUN_PROPS[0];
+    placeAvatar("office", [p.x, p.z]);
+    play(p, 10);
+    stepAvatar(0.1, [0, -1], footprints, names, 10.1);
+    stepAvatar(0.1, [0, -1], footprints, names, 10.2);
+    // The timer's end is news too, and so is being cut short or the walk being placed anew.
+    stepAvatar(0.1, [0, -1], footprints, names, 10 + p.seconds + 0.1);
+    play(p, 20);
+    stopPlaying();
+    play(p, 30);
+    placeAvatar("office", [1, 3]);
+    expect(heard).toEqual([p.id, null, p.id, null, p.id, null]);
+    off();
+  });
+
+  it("never times out an endless fun thing and schedules its own end", () => {
+    const arcade = FUN_PROPS.find((p) => p.id === "arcade")!;
+    expect(arcade.seconds).toBe(Infinity);
+    placeAvatar("office", [arcade.x, arcade.z]);
+    play(arcade, 10);
+    expect(busyProgress(9999)).toBe(0);
+    stepAvatar(0.5, [0, -1], footprints, names, 9999);
+    expect(avatar.busy).not.toBeNull();
+    // The game schedules its own ending, which the clock then honours.
+    endBusyAt(10_010);
+    stepAvatar(0.5, [0, -1], footprints, names, 10_009);
+    expect(avatar.busy).not.toBeNull();
+    stepAvatar(0.5, [0, -1], footprints, names, 10_011);
+    expect(avatar.busy).toBeNull();
   });
 });
 

@@ -779,7 +779,7 @@ const triangle = (t: number) => 1 - Math.abs((((t % 2) + 2) % 2) - 1);
  * An arcade cabinet's attract mode, redrawn a frame at a time: space invaders marching on the purple cabinet and a
  * game of bricks on the other. Each cabinet gets its own small canvas, so the shared screen pictures stay still.
  */
-export function arcadeScreen(variant: string): { texture: THREE.CanvasTexture; draw: (frame: number) => void } {
+export function arcadeScreen(variant: string): { texture: THREE.CanvasTexture; draw: (frame: number) => void; ctx: CanvasRenderingContext2D; flush: () => void } {
   const W = 64;
   const H = 52;
   const [c, g] = canvas(W, H);
@@ -826,7 +826,8 @@ export function arcadeScreen(variant: string): { texture: THREE.CanvasTexture; d
     texture.needsUpdate = true;
   };
   draw(0);
-  return { texture, draw };
+  // `ctx` is the screen's own 2D context, for a live game to paint over the attract mode; `flush` re-uploads it.
+  return { texture, draw, ctx: g, flush: () => { texture.needsUpdate = true; } };
 }
 
 /** Short-pile carpet in one colour with a darker fleck. */

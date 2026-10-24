@@ -122,3 +122,25 @@ export function setViewFade(dark: number): void {
   fadeEl.style.opacity = next;
   fadeShown = next;
 }
+
+let eyelidsEl: HTMLDivElement | null = null;
+/** What the eyelids were last set to, so a frame with nothing to change writes nothing to the page. */
+let eyelidsShown = "";
+
+/** The eyelids laid over the room as the nap closes them in first person (see ViewOverlay.tsx). */
+export const bindEyelids = (el: HTMLDivElement | null) => {
+  eyelidsEl = el;
+  eyelidsShown = "";
+};
+
+/**
+ * How shut the nap's eyelids are, 0 open to 1 shut, and which way they are moving; written to the overlay only
+ * when it changes, like the view's fade.
+ */
+export function setEyelids(shut: number, phase: "open" | "closing" | "shut" | "opening"): void {
+  const next = `${shut.toFixed(3)}|${phase}`;
+  if (!eyelidsEl || next === eyelidsShown) return;
+  eyelidsEl.style.setProperty("--shut", shut.toFixed(3));
+  eyelidsEl.dataset.eyes = phase;
+  eyelidsShown = next;
+}

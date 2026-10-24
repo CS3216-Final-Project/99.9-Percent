@@ -20,7 +20,9 @@ import { blocked } from "./navgrid";
 import { WALK_MARKER } from "./palette";
 import { onRide, ride, riding, shownFloor, now } from "./ride";
 import { puffTexture } from "./textures";
-import { avatar, CAR, gridHere, LOBBY, placeAvatar, setRacks, stepAvatar, walkTo } from "./walk";
+import { arcadeHit } from "./arcade";
+import { bodyPose, nap } from "./funScript";
+import { avatar, avatarBounds, busyProgress, CAR, gridHere, LOBBY, napBlend, placeAvatar, setRacks, stepAvatar, stopPlaying, walkTo } from "./walk";
 import { footingAt, STRIDE } from "./footing";
 import { sceneSound } from "./sceneSounds";
 import { FIRST } from "./views";
@@ -108,6 +110,13 @@ export function Avatar({ walking }: { walking: boolean }) {
     },
     [model],
   );
+  useEffect(() => {
+    if (!model) return;
+    // The drawn bounds (the raw models face +z, so depth is the z extent) place things held just past the nose.
+    const size = new THREE.Box3().setFromObject(model.object).getSize(new THREE.Vector3());
+    avatarBounds.depth = size.z * SCALE;
+    avatarBounds.height = size.y * SCALE;
+  }, [model]);
 
   const group = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
@@ -135,11 +144,18 @@ export function Avatar({ walking }: { walking: boolean }) {
     // up again after; the walk's own spot never moves. Only on the office floor: lying never happens elsewhere.
     const target = walking && avatar.busy?.prop === "nap" && at.floor === "office" ? 1 : 0;
     lie.current += Math.max(-dt / 0.55, Math.min(dt / 0.55, target - lie.current));
+    napBlend.value = lie.current;
     const c = lie.current;
     const flat = at.floor === "office" ? c * c * (3 - 2 * c) : 0;
     const yaw = at.yaw + wrap(NAP_YAW - at.yaw) * flat;
-    g.position.set(at.x + (NAP_BED.x - at.x) * flat, at.y + (NAP_BED.y - at.y) * flat + Math.sin(Math.PI * flat) * 0.2, at.z + (NAP_BED.z - at.z) * flat);
-    g.rotation.set(NAP_PITCH * flat, yaw, 0, "YXZ");
+    // What the activity's own choreography asks of the body: a sip tipped back, a bite's nod, the nap's sit-up rise.
+    const f = avatar.busy ? busyProgress(t) : null;
+    const pose = f !== null && avatar.busy ? bodyPose(avatar.busy.prop, f) : { pitch: 0, bob: 0 };
+    const breathe = f !== null && avatar.busy?.prop === "nap" ? nap(f).breathe : 0;
+    // A hop whenever the arcade's ball meets the paddle or a brick.
+    const hop = Math.max(0, 0.03 * (1 - (t - arcadeHit.at) / 0.15));
+    g.position.set(at.x + (NAP_BED.x - at.x) * flat, at.y + (NAP_BED.y - at.y) * flat + Math.sin(Math.PI * flat) * 0.2 + pose.bob + hop, at.z + (NAP_BED.z - at.z) * flat);
+    g.rotation.set(NAP_PITCH * flat + pose.pitch, yaw, 0, "YXZ");
     // Seen through its own eyes, the avatar is not drawn: the camera is in its head.
     g.visible = (at.floor === "car" || at.floor === shownFloor()) && !(walking && viewNow.inHead);
     // The animation for what it is doing, blended from the last.
@@ -164,7 +180,7 @@ export function Avatar({ walking }: { walking: boolean }) {
     // The bounce: a squash and stretch that settles.
     const since = t - arrived.current.at;
     const k = since < BOUNCE ? Math.sin((since / BOUNCE) * Math.PI * 3) * (1 - since / BOUNCE) * 0.25 : 0;
-    body.current?.scale.set(SCALE * (1 - k * 0.5), SCALE * (1 + k), SCALE * (1 - k * 0.5));
+    body.current?.scale.set(SCALE * (1 - k * 0.5), SCALE * (1 + k) * (1 + 0.03 * breathe), SCALE * (1 - k * 0.5));
     puffs.current.forEach((sprite, i) => {
       if (!sprite) return;
       const f = since / 0.7;
@@ -251,7 +267,8 @@ export function WalkDriver({ walking, footprints, names, racks }: { walking: boo
     const offRide = onRide((event) => {
       if (event === "depart") {
         // Into the car, whatever sent it: a press in the car, the floor menu or a choice in a panel.
-        Object.assign(avatar, { floor: ride.to, x: CAR[0], z: CAR[1], path: [], busy: null, moving: false });
+        stopPlaying();
+        Object.assign(avatar, { floor: ride.to, x: CAR[0], z: CAR[1], path: [], moving: false });
       } else {
         walkTo(LOBBY[0], LOBBY[1]);
       }
