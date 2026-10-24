@@ -26,7 +26,7 @@ describe("the end of each chapter", () => {
     expect(chapterEnd(finishedLaunchWeek(false))).toBeNull();
     const g = finishedLaunchWeek();
     const end = chapterEnd(g)!;
-    expect(end).toMatchObject({ chapter: "opening", label: "Continue to scaling and routing", blockers: [], next: { name: "Scaling & Routing" } });
+    expect(end).toMatchObject({ chapter: "opening", label: "Continue to Scaling & Routing", blockers: [], next: { name: "Scaling & Routing" } });
     const stayed = apply(g, end.stay);
     expect(stayed.campaign!.openingMilestone!.acknowledged).toBe(true);
     expect(stayed.campaign!.scaling).toBeNull();
@@ -46,8 +46,8 @@ describe("the end of each chapter", () => {
   it("continues Scaling & Routing and Data Strategy with their entry actions and nothing to acknowledge", () => {
     expect(chapterEnd(finishingScaling())).toBeNull();
     const scaling = step(finishingScaling()).state;
-    expect(chapterEnd(scaling)).toMatchObject({ chapter: "scaling", stay: [], proceed: [{ type: "enter_data" }], label: "Continue to data strategy", next: { name: "Data Strategy" } });
-    expect(chapterEnd(dataCompany())).toMatchObject({ chapter: "data", stay: [], proceed: [{ type: "enter_spikes" }], label: "Continue to traffic spikes" });
+    expect(chapterEnd(scaling)).toMatchObject({ chapter: "scaling", stay: [], proceed: [{ type: "enter_data" }], label: "Continue to Data Strategy", next: { name: "Data Strategy" } });
+    expect(chapterEnd(dataCompany())).toMatchObject({ chapter: "data", stay: [], proceed: [{ type: "enter_spikes" }], label: "Continue to Traffic Spikes" });
   });
 
   it("acknowledges the spike response either way, and Continue also enters Stay Online", () => {
@@ -76,14 +76,14 @@ describe("the end of each chapter", () => {
     expect(apply(g, end.proceed!).campaign!.combinedStage).toBeTruthy();
     // A change queued after staying keeps Next on offer, disabled with the reason.
     const queued = act(apply(g, end.stay), { type: "add_server" });
-    expect(chapterAdvance(queued)).toMatchObject({ label: "Continue to Grow the Company", ready: false, blockers: ["Queued changes have finished"] });
+    expect(chapterAdvance(queued)).toMatchObject({ label: "Continue to Grow the Company", ready: false, blockers: ["queued changes have finished"] });
     expect(applyAction(queued, { type: "enter_combined" }).ok).toBe(false);
   });
 
   it("holds Continue while a change queued before the outcome is still installing", () => {
     const g = reliabilityOutcomeWithQueuedChange();
     const end = chapterEnd(g)!;
-    expect(end).toMatchObject({ chapter: "reliability", blockers: ["Queued changes have finished"] });
+    expect(end).toMatchObject({ chapter: "reliability", blockers: ["queued changes have finished"] });
     expect(apply(g, end.stay).campaign!.reliabilityStage!.acknowledged).toBe(true);
   });
 

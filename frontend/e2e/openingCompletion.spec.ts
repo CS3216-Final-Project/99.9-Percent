@@ -35,7 +35,7 @@ test("Opening legacy prevention: later history survives and recognition unlocks 
   await page.reload(); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   expect((await savedGame(page)).campaign).toEqual(before);
   await expect(recognition.locator("details")).not.toHaveAttribute("open");
-  await recognition.getByRole("button", { name: "Continue to scaling and routing", exact: true }).click();
+  await recognition.getByRole("button", { name: "Continue to Scaling & Routing", exact: true }).click();
   await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Scaling & Routing");
   const after = (await savedGame(page)).campaign!;
   expect(after.scaling).not.toBeNull(); expect(after.reports).toEqual([]); expect(after.openingRecovered).toBe(false);

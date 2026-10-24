@@ -148,7 +148,7 @@ test("a chapter guide uses the same coach strip above the dock", async ({ page }
   await seedSave(page, act(recovered, { type: "acknowledge_review" }), { chapterTours: [] });
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
-  await page.getByRole("dialog", { name: "First growth challenge handled" }).getByRole("button", { name: "Continue to scaling and routing" }).tap();
+  await page.getByRole("dialog", { name: "First growth challenge handled" }).getByRole("button", { name: "Continue to Scaling & Routing" }).tap();
   const guide = page.getByRole("dialog", { name: "Chapter guide, step 1 of 1" });
   await expect(guide).toContainText("Scale and route");
   const strip = await box(guide);

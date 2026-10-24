@@ -14,7 +14,7 @@ function chapter(name:string) {
 }
 it("extends the current strip with factual available continuation and no new store",()=>{
  show(dataCompany());expect(chapter("Traffic Spikes")).toContain("Available next");
- fireEvent.click(screen.getByRole("button",{name:"Next: Continue to traffic spikes"}));expect(chapter("Data Strategy")).toContain("Completed");expect(screen.getByLabelText("Current chapter").textContent).toBe("Traffic Spikes & Autoscaling");expect(useGame.getState().running).toBe(false);expect(screen.getByRole("region",{name:"Guided Mode requirements"}).textContent).not.toContain("before continuing to traffic spikes");
+ fireEvent.click(screen.getByRole("button",{name:"Next: Continue to Traffic Spikes"}));expect(chapter("Data Strategy")).toContain("Completed");expect(screen.getByLabelText("Current chapter").textContent).toBe("Traffic Spikes & Autoscaling");expect(useGame.getState().running).toBe(false);expect(screen.getByRole("region",{name:"Guided Mode requirements"}).textContent).not.toContain("before continuing to traffic spikes");
 });
 it("shows live provisioning, counters, delayed routing and per-instance shared selection",()=>{
  show(untilOffset(spikeCompany(),13));openTab("Actions");const control=screen.getByRole("region",{name:"Traffic spikes and autoscaling"});expect(control.textContent).toContain("TRAFFIC SPIKE ACTIVE");expect(control.textContent).toContain("3 game seconds, followed by 1 routing game second");

@@ -84,7 +84,7 @@ Responses are scaling an app to 1,600 req/s, or installing another app and confi
 Deploying a load balancer does not change routing, and a new app receives no new work until routing includes it.
 Balanced routing splits integer demand equally across the selected apps in numeric order; it does not weight by capacity, so a mixed 1,600/1,000 pool can overload its smaller app.
 
-Continue to data strategy unlocks once growth has been consumed, queues are empty, no incident is active and every report is acknowledged.
+Continue to Data Strategy unlocks once growth has been consumed, queues are empty, no incident is active and every report is acknowledged.
 
 ### Chapter 3: Data Strategy
 
@@ -152,6 +152,7 @@ Guidance never changes the rules; it reads the same state the engine uses.
 - Continue is disabled while the next chapter's entry gate is unmet, and the menu names every unmet requirement; Next in the chapter bar then offers the chapter, disabled with the same reasons, until the company is ready.
   Stay Online needs normal 2,400 req/s traffic, positive cash, no incident, read reports, empty queues and healthy requests; Grow the Company also needs finished queued changes and every server up.
 - The menu asks to open with Continue focused when it is possible, and with Stay focused otherwise.
+- Escape, Close and a click outside the menu all mean Stay in this chapter: the recognition is acknowledged and the menu does not return for that company.
 - A company that stays after Launch Week or the Opening remains in that finished chapter: none of Scaling & Routing's controls or requirements appear until Next enters it.
 - An Opening the player stays in is remembered for that company in the browser's profile, so the next Play does not move it into Scaling & Routing; a company loaded without that record, such as an older save, an import or a cloud restore, still continues into Scaling & Routing on Play.
 - Chapter requirements list each gate as met or unmet, without revealing future deadlines.

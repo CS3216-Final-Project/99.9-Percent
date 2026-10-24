@@ -33,7 +33,7 @@ it("recognises prevention accurately and continues to Scaling after both acknowl
  expect(useGame.getState().game.campaign!.scaling).toBeNull();
  expect(requirement("recovery").getAttribute("data-met")).toBe("true");
  expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe("Opening");
- fireEvent.click(within(recognition).getByRole("button",{name:/Continue to scaling and routing/}));
+ fireEvent.click(within(recognition).getByRole("button",{name:/Continue to Scaling & Routing/}));
  expect(useGame.getState().game.campaign!.scaling).toBeTruthy();expect(useGame.getState().game.campaign!.reports).toEqual([]);
  expect(useGame.getState().game.campaign!.cashCents).toBe(cash);expect(useGame.getState().game.campaign!.step).toBe(step);
 });

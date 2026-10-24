@@ -70,7 +70,7 @@ it("stays in the chapter without announcing it again", () => {
 it("continues straight into the next chapter", () => {
   show(finishingScaling());
   step();
-  fireEvent.click(screen.getByRole("button", { name: /Continue to data strategy/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Continue to Data Strategy/ }));
   expect(dialog()).toBeNull();
   expect(useGame.getState().game.campaign!.dataStage).toBeTruthy();
 });
@@ -121,7 +121,7 @@ it("announces Data Strategy and continues into Traffic Spikes", () => {
   recover();
   expect(useGame.getState().running).toBe(false);
   expect(dataDialog()!.textContent).toContain("Next: Traffic Spikes & Autoscaling.");
-  fireEvent.click(screen.getByRole("button", { name: /Continue to traffic spikes/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Continue to Traffic Spikes/ }));
   expect(dataDialog()).toBeNull();
   expect(useGame.getState().game.campaign!.spikeStage).toBeTruthy();
 });
@@ -180,7 +180,7 @@ it("disables Continue and names what Grow the Company waits for while a change i
   const proceed = button(outcome, /Continue to Grow the Company/) as HTMLButtonElement;
   expect(proceed.disabled).toBe(true);
   const reason = document.getElementById(proceed.getAttribute("aria-describedby")!)!;
-  expect(reason.textContent).toContain("Grow the Company opens once: Queued changes have finished.");
+  expect(reason.textContent).toContain("Grow the Company opens once queued changes have finished.");
   fireEvent.click(proceed);
   expect(useGame.getState().game).toBe(game);
   expect(useGame.getState().finishChapter("continue")).toBe(false);
@@ -193,7 +193,7 @@ it("ends Launch Week with Stay, Continue and Copy result; Continue enters Scalin
   show(finishedLaunchWeek());
   const card = screen.getByRole("dialog", { name: "Launch Week complete" });
   expect(button(card, "Copy result")).toBeTruthy();
-  fireEvent.click(button(card, /Continue to scaling and routing/));
+  fireEvent.click(button(card, /Continue to Scaling & Routing/));
   expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
 });
 
@@ -222,11 +222,11 @@ it("ends a version-1 Opening with Stay or Continue, and a stayed company continu
   useGame.setState({ game: decide(recoveredOpening(), { type: "acknowledge_review" }), ready: true, hasRun: true, started: true, onboarding: false });
   render(<><CampaignChapters /><CampaignOverlays /></>);
   const recognition = screen.getByRole("dialog", { name: "First growth challenge handled" });
-  expect(button(recognition, /Continue to scaling and routing/)).toBeTruthy();
+  expect(button(recognition, /Continue to Scaling & Routing/)).toBeTruthy();
   fireEvent.click(button(recognition, "Stay in this chapter"));
   expect(useGame.getState().game.campaign!.openingMilestone!.acknowledged).toBe(true);
   expect(useGame.getState().game.campaign!.scaling).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to scaling and routing" }));
+  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to Scaling & Routing" }));
   expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
 });
 
@@ -240,8 +240,23 @@ it("shows a company that stayed after Launch Week no Scaling & Routing controls 
   expect(screen.getByLabelText("Current objective").textContent).toContain("continue to Scaling & Routing with Next");
   const guidance = screen.getByRole("region", { name: "Guided Mode guidance" });
   expect(guidance.textContent).toContain("Launch Week is complete. Continue to Scaling & Routing through Next in the chapter bar when you are ready.");
-  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to scaling and routing" }));
+  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to Scaling & Routing" }));
   expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+});
+
+it.each([
+  ["Launch Week complete", () => finishedLaunchWeek(), (g: GameState) => g.campaign!.openingMilestone!.acknowledged && !g.campaign!.scaling],
+  ["First growth challenge handled", () => decide(recoveredOpening(), { type: "acknowledge_review" }), (g: GameState) => g.campaign!.openingMilestone!.acknowledged && !g.campaign!.scaling],
+  ["Spike response handled", () => spikeRecognition(), (g: GameState) => g.campaign!.spikeStage!.acknowledged && !g.campaign!.reliabilityStage],
+  ["Reliability outcome", () => reliabilityOutcome(), (g: GameState) => g.campaign!.reliabilityStage!.acknowledged && !g.campaign!.combinedStage],
+] as const)("stays in the chapter for good when Escape closes %s", (name, company, stayed) => {
+  show(company());
+  fireEvent.keyDown(screen.getByRole("dialog", { name }), { key: "Escape" });
+  expect(screen.queryByRole("dialog", { name })).toBeNull();
+  expect(stayed(useGame.getState().game)).toBe(true);
+  expect(useGame.getState().view).toBeNull();
+  step();
+  expect(screen.queryByRole("dialog", { name })).toBeNull();
 });
 
 it("opens each completion menu on Continue, or on Stay while Continue is not possible", () => {

@@ -33,7 +33,7 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  await expect(overview.getByRole("listitem").filter({hasText:"Traffic Spikes"})).toContainText("Available next");
  await overview.getByRole("button",{name:"Back to company"}).click();
  await expect(page.getByRole("button",{name:"View chapters",exact:true})).toBeFocused();
- const before=(await savedGame(page)).campaign!;await page.getByRole("button",{name:"Next: Continue to traffic spikes"}).click();
+ const before=(await savedGame(page)).campaign!;await page.getByRole("button",{name:"Next: Continue to Traffic Spikes"}).click();
  await openPanelTab(page, "Actions");
  const unlock=page.getByRole("button",{name:/Unlock autoscaling/});await unlock.focus();await expect(unlock).toBeFocused();await page.keyboard.press("Enter");await expect(page.getByRole("button",{name:"Confirm",exact:true})).toBeFocused();await page.keyboard.press("Enter");await openPanelTab(page,"Actions");await page.getByRole("button",{name:/Deploy autoscaling/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;

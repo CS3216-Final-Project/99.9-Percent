@@ -17,8 +17,8 @@ export function ChapterEndFoot({ end, extra }: { end: ChapterEnd; extra?: ReactN
     {blocked && <Callout compact tone="warn" icon="alert" kicker="Not yet"><span id={reason} role="note">{waitsFor(end.next.name, end.blockers)} Stay in this chapter and continue later with Next in the chapter bar.</span></Callout>}
     <div className="modal-foot chapter-end-foot">
       {extra && <span className="chapter-end-extra">{extra}</span>}
-      <button className="btn btn-quiet" onClick={() => finish("stay")}>Stay in this chapter</button>
-      {/* The dialog opens on Continue when it is possible, so Enter keeps meaning "carry on" as before. */}
+      {/* The dialog opens on Continue when it is possible, so Enter keeps meaning "carry on" as before, and otherwise on Stay. */}
+      <button className="btn btn-quiet" data-autofocus={end.proceed && !blocked ? undefined : true} onClick={() => finish("stay")}>Stay in this chapter</button>
       {end.proceed && <button className="btn btn-primary" data-autofocus={blocked ? undefined : true} disabled={blocked} aria-describedby={blocked ? reason : undefined} onClick={() => finish("continue")}>{end.label}<Icon name="next" /></button>}
     </div>
   </>;

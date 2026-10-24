@@ -33,7 +33,7 @@ test("chapter bar stays visible and follows the same company into Data Strategy"
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(bar.getByRole("button", { name: "View chapters" })).toBeFocused();
-  await bar.getByRole("button", { name: "Next: Continue to data strategy", exact: true }).press("Space");
+  await bar.getByRole("button", { name: "Next: Continue to Data Strategy", exact: true }).press("Space");
   await expect(bar).toContainText("Chapter 3 of 6");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Data Strategy");
   expect((await savedGame(page)).campaign!.runId).toBe(before.campaign!.runId);
@@ -54,7 +54,7 @@ test("disabled Next explains its actual readiness gate to keyboard users",async(
   const bar=page.getByRole("region",{name:"Guided Mode chapters"});
   const next=bar.getByRole("button",{name:"Next: Continue to Stay Online"});
   await expect(next).toBeDisabled();
-  await expect(next).toHaveAccessibleDescription(/Stay Online opens once: Application and Database queues are empty; Requests are fast and error-free\./);
+  await expect(next).toHaveAccessibleDescription(/Stay Online opens once the Application and Database queues are empty and requests are fast and error-free\./);
   const reason=bar.getByText(/^Next unavailable:/);
   await reason.focus();
   await expect(reason).toBeFocused();
@@ -139,7 +139,7 @@ test("finishing Scaling & Routing stops once to announce it and continues from t
   await expect(dialog).toHaveAccessibleName("Scaling & Routing complete");
   await expect(dialog).toContainText("Next: Data Strategy.");
   await page.screenshot({ path: "test-results/chapter-complete-scaling.png" });
-  await dialog.getByRole("button", { name: "Continue to data strategy", exact: true }).click();
+  await dialog.getByRole("button", { name: "Continue to Data Strategy", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Data Strategy");
   expect((await savedGame(page)).campaign!.dataStage).toBeTruthy();

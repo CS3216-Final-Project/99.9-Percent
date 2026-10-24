@@ -17,7 +17,7 @@ test("pending milestone reload keeps the company paused and awards it only once"
   await page.reload(); await page.getByRole("button", { name: "Continue company" }).click();
   await expect(page.getByRole("dialog", { name: "First growth challenge handled" })).toBeVisible();
   expect(await savedGame(page)).toEqual(before);
-  await page.getByRole("button", { name: "Continue to scaling and routing" }).click();
+  await page.getByRole("button", { name: "Continue to Scaling & Routing" }).click();
   const after = await savedGame(page);
   expect(after.campaign!.runId).toBe(before.campaign!.runId);
   expect(after.campaign!.step).toBe(before.campaign!.step);

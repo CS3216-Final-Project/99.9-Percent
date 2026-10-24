@@ -60,7 +60,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   await press(report.getByRole("button", { name: "Continue company", exact: true }));
   await expect(page.getByRole("dialog", { name: "First growth challenge handled" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "First growth challenge handled" })).toContainText("You diagnosed an outage and restored your service.");
-  await press(page.getByRole("button", { name: "Continue to scaling and routing", exact: true }));
+  await press(page.getByRole("button", { name: "Continue to Scaling & Routing", exact: true }));
   const after = (await savedGame(page)); expect(after.phase).toBe("management");
   expect(after.campaign!.runId).toBe(game.campaign!.runId); expect(after.campaign!.step).toBe(recovered.campaign!.step);
   expect(after.campaign!.cashCents).toBe(recovered.campaign!.cashCents);

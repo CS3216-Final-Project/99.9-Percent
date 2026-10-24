@@ -22,15 +22,15 @@ it("keeps the selected workload hidden until actual growth and enters through th
  expect(screen.getByLabelText("Current objective").textContent).toContain("Prepare the system for the next growth wave.");
  expect(guide.textContent).not.toContain("Prepare the system for the next growth wave.");
  expect(within(guide).getByText(/Chapter requirements/)).toBeTruthy();
- expect(within(guide).queryByRole("button",{name:/Continue to data strategy/})).toBeNull();
- fireEvent.click(within(screen.getByRole("region",{name:"Guided Mode chapters"})).getByRole("button",{name:/Continue to data strategy/}));
+ expect(within(guide).queryByRole("button",{name:/Continue to Data Strategy/})).toBeNull();
+ fireEvent.click(within(screen.getByRole("region",{name:"Guided Mode chapters"})).getByRole("button",{name:/Continue to Data Strategy/}));
  openActions();const data=screen.getByRole("region",{name:"Data strategy"});expect(data.textContent).toContain("Waiting for workload growth");
  expect(data.textContent).not.toMatch(/read-heavy|write-heavy|80%|20%/);expect(useGame.getState().running).toBe(false);
 });
 it("shows the current stage cap instead of advertising a locked database tier",()=>{
  show(dataCompany("read-heavy",false));openActions();const button=screen.getByRole("button",{name:/Upgrade database/});
  expect(button.hasAttribute("disabled")).toBe(true);expect(button.textContent).toContain("Current stage tier reached");expect(button.textContent).not.toContain("3,000");
- fireEvent.click(screen.getByRole("button",{name:/Continue to data strategy/}));
+ fireEvent.click(screen.getByRole("button",{name:/Continue to Data Strategy/}));
  expect(button.hasAttribute("disabled")).toBe(false);expect(button.textContent).toContain("4,000");expect(button.textContent).toContain("4 game seconds");
 });
 it("selects the cache through the same inspection action and displays actual used evidence",()=>{

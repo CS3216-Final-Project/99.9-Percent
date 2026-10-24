@@ -36,28 +36,25 @@ const NEXT_CHAPTER: Record<EndedChapter, string> = { opening: "scaling", scaling
 export function chapterEnd(game: GameState, scope: PlayScope = FULL_SCOPE): ChapterEnd | null {
   const c = game.campaign;
   if (!c || game.phase === "ended") return null;
-  const end = (chapter: EndedChapter, label: string, stay: Action[], proceed: Action[], blockers: string[] = []): ChapterEnd => {
+  const end = (chapter: EndedChapter, stay: Action[], proceed: Action[], blockers: string[] = []): ChapterEnd => {
     const next = campaignChapters(game).find(x => x.id === NEXT_CHAPTER[chapter])!;
-    return { chapter, next: { name: next.name, description: next.description }, stay, proceed: scopeAllows(scope, proceed.at(-1)!) ? proceed : null, label, blockers };
+    return { chapter, next: { name: next.name, description: next.description }, stay, proceed: scopeAllows(scope, proceed.at(-1)!) ? proceed : null, label: `Continue to ${next.shortName}`, blockers };
   };
   if (pendingReliability(c)) {
     const ack: Action = { type: "acknowledge_reliability" };
     const after = applyCampaignInput(game, ack).state;
-    return end("reliability", "Continue to Grow the Company", [ack], [ack, { type: "enter_combined" }], entryBlockers(canEnterCombined(after), combinedEntryGates(after)));
+    return end("reliability", [ack], [ack, { type: "enter_combined" }], entryBlockers(canEnterCombined(after), combinedEntryGates(after), "Stay Online"));
   }
   if (pendingSpikeAcknowledgement(c)) {
     const ack: Action = { type: "acknowledge_spikes" };
     const after = applyCampaignInput(game, ack).state;
-    return end("spikes", "Continue to Stay Online", [ack], [ack, { type: "enter_reliability" }], entryBlockers(canEnterReliability(after), reliabilityEntryGates(after)));
+    return end("spikes", [ack], [ack, { type: "enter_reliability" }], entryBlockers(canEnterReliability(after), reliabilityEntryGates(after), "Traffic Spikes"));
   }
   // Launch Week's score card waits for its research pick.
   if (milestoneBlocks(game) && !launchResearchPending(game))
-    return end("opening", "Continue to scaling and routing", [{ type: "acknowledge_milestone", enterScaling: false }], [{ type: "acknowledge_milestone", enterScaling: true }]);
+    return end("opening", [{ type: "acknowledge_milestone", enterScaling: false }], [{ type: "acknowledge_milestone", enterScaling: true }]);
   const finished = finishedChapter(game);
-  if (finished) {
-    const action = campaignGuidance(game).pendingAction!;
-    return end(finished, action.label, [], [action.action!]);
-  }
+  if (finished) return end(finished, [], [campaignGuidance(game).pendingAction!.action!]);
   return null;
 }
 
@@ -70,11 +67,11 @@ export function chapterAdvance(game: GameState): ChapterAdvance | null {
   const next = campaignGuidance(game).pendingAction;
   if (next?.action && isChapterEntry(next.action)) return { label: next.label, action: next.action, ready: true, blockers: [] };
   if (game.phase === "ended") return null;
-  if (!c.reliabilityStage && c.spikeStage?.acknowledged) return offer("Continue to Stay Online", { type: "enter_reliability" }, canEnterReliability(game), reliabilityEntryGates(game));
-  if (!c.combinedStage && c.reliabilityStage?.acknowledged) return offer("Continue to Grow the Company", { type: "enter_combined" }, canEnterCombined(game), combinedEntryGates(game));
+  if (!c.reliabilityStage && c.spikeStage?.acknowledged) return offer("Continue to Stay Online", { type: "enter_reliability" }, canEnterReliability(game), reliabilityEntryGates(game), "Traffic Spikes");
+  if (!c.combinedStage && c.reliabilityStage?.acknowledged) return offer("Continue to Grow the Company", { type: "enter_combined" }, canEnterCombined(game), combinedEntryGates(game), "Stay Online");
   return null;
 }
 
-function offer(label: string, action: Action, ready: boolean, gates: Record<string, boolean>): ChapterAdvance {
-  return { label, action, ready, blockers: entryBlockers(ready, gates) };
+function offer(label: string, action: Action, ready: boolean, gates: Record<string, boolean>, previous: string): ChapterAdvance {
+  return { label, action, ready, blockers: entryBlockers(ready, gates, previous) };
 }

@@ -233,7 +233,7 @@ test("Opening prevention recognition unlocks Scaling after touch review and relo
  const before=(await savedGame(page)).campaign!;expect(before.openingMilestone!.acknowledged).toBe(false);expect(before.scaling).toBeNull();
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  expect((await savedGame(page)).campaign).toEqual(before);await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Opening");
- await recognition.getByRole("button",{name:"Continue to scaling and routing",exact:true}).tap();
+ await recognition.getByRole("button",{name:"Continue to Scaling & Routing",exact:true}).tap();
  const after=(await savedGame(page)).campaign!;
  expect(after.scaling).not.toBeNull();expect(after.reports).toEqual([]);expect(after.openingRecovered).toBe(false);expect(after.step).toBe(before.step);expect(after.cashCents).toBe(before.cashCents);
  await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Scaling & Routing");
@@ -708,8 +708,8 @@ for (const width of [390, 320]) test(`the Launch Week score card's three actions
   await seedSave(page, finishedLaunchWeek()); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).tap(); await expectRoom(page);
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
-  const proceed = card.getByRole("button", { name: "Continue to scaling and routing", exact: true });
-  for (const name of ["Copy result", "Stay in this chapter", "Continue to scaling and routing"]) await expect(card.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
+  const proceed = card.getByRole("button", { name: "Continue to Scaling & Routing", exact: true });
+  for (const name of ["Copy result", "Stay in this chapter", "Continue to Scaling & Routing"]) await expect(card.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
   const foot = await card.locator(".chapter-end-foot").boundingBox(), go = await proceed.boundingBox();
   expect(Math.abs(foot!.x + foot!.width - (go!.x + go!.width))).toBeLessThanOrEqual(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);

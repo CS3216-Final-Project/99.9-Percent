@@ -29,7 +29,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  await expect(overview.getByRole("listitem").filter({hasText:"Data Strategy"})).toContainText("Available next");
  await overview.getByRole("button",{name:"Back to company"}).click();
  await expect(viewChapters).toBeFocused();
- await page.getByRole("button",{name:"Next: Continue to data strategy",exact:true}).click();
+ await page.getByRole("button",{name:"Next: Continue to Data Strategy",exact:true}).click();
  await expect(chapters.getByLabel("Current chapter",{exact:true})).toHaveText("Data Strategy");
  await expect(chapters.getByLabel("Current objective")).toHaveText("Goal: Compare workload, cache hits and database pressure as demand grows.");
  await openPanelTab(page,"Actions");

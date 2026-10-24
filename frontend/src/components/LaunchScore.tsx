@@ -11,7 +11,7 @@ import { Modal } from "./ui";
  * The Launch Week score card: how close to 100% the service stayed, in nines, with the result copyable
  * for sharing. Either choice acknowledges the opening milestone; Continue also enters Scaling & Routing.
  */
-export default function LaunchScore({ campaign, end }: { campaign: Campaign; end: ChapterEnd }) {
+export default function LaunchScore({ campaign, end, onClose }: { campaign: Campaign; end: ChapterEnd; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const c = campaign;
   const uptime = campaignUptime(c) ?? 0;
@@ -22,7 +22,7 @@ export default function LaunchScore({ campaign, end }: { campaign: Campaign; end
   const copy = () => {
     void navigator.clipboard?.writeText(result).then(() => setCopied(true), () => {});
   };
-  return <Modal title="Launch Week complete" icon={{ kind: "go", name: "goal" }}>
+  return <Modal title="Launch Week complete" icon={{ kind: "go", name: "goal" }} onClose={onClose}>
     <p>One week of launch traffic and its first database overload. Your architecture, cash and research pick carry into the campaign.</p>
     <dl className="purchase-tiles">
       <div><dt>Uptime</dt><dd><strong>{uptimePct(uptime)}</strong></dd></div>
