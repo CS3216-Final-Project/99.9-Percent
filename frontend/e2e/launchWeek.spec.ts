@@ -119,6 +119,20 @@ test("a practice replay resumes where it was left after a reload, finishes its r
   expect(await page.evaluate(() => localStorage.getItem("nn.campaign.tutorial.v1"))).toBeNull();
 });
 
+test("Replay Launch Week from View chapters opens the practice company on the launch letter, without a reload", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  await bootPanel(page, newGame(7, "lw-replay", 2));
+  const letter = page.getByRole("dialog", { name: "Launch week" });
+  await letter.getByRole("button", { name: "Open the doors" }).click();
+  await expect(letter).toBeHidden();
+  await page.getByRole("button", { name: "View chapters", exact: true }).click();
+  await page.getByRole("button", { name: "Replay Launch Week" }).click();
+  await expect(page.getByRole("region", { name: "Guided Mode chapters" })).toContainText("Practice");
+  await expect(letter).toBeVisible();
+  await letter.getByRole("button", { name: "Open the doors" }).click();
+  await expect(letter).toBeHidden();
+});
+
 test("cold open: the launch letter, the whole room and the opening beat", async ({ page }) => {
   await boot(page, newGame(7, "lw-1", 2));
   await expect(page.getByRole("dialog", { name: "Launch week" })).toBeVisible();
