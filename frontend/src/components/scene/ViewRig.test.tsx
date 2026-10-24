@@ -88,3 +88,17 @@ it("cancels the retry when the room unmounts", () => {
   act(() => vi.advanceTimersByTime(3000));
   expect(request).toHaveBeenCalledTimes(2);
 });
+
+it("allows an explicit pointer request while existing nonmodal chapter guidance remains open", () => {
+  const hint = document.createElement("div");
+  hint.setAttribute("role", "dialog"); hint.setAttribute("aria-modal", "false");
+  document.body.append(hint);
+  pendingRetry();
+  request.mockImplementation(() => {
+    locked = scene.gl.domElement;
+    fireEvent(document, new Event("pointerlockchange"));
+  });
+  act(() => vi.advanceTimersByTime(1100));
+  expect(request).toHaveBeenCalledTimes(3);
+  expect(viewNow.locked).toBe(true);
+});

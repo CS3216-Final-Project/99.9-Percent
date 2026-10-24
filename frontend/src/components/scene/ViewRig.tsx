@@ -228,7 +228,8 @@ export function ViewRig() {
     const cancelTake = () => { window.clearTimeout(waiting); window.clearTimeout(retry); };
     const canTake = () => {
       const s = useGame.getState();
-      return s.started && s.walking && fromAvatar(s.viewpoint) && !s.view && !document.querySelector(DIALOG);
+      // Existing nonmodal chapter guidance does not block an explicit request to look around.
+      return s.started && s.walking && fromAvatar(s.viewpoint) && !s.view && !document.querySelector(`:is(${DIALOG}):not([aria-modal="false"])`);
     };
     // Asking again too soon after Escape is refused, so ask once the pause is over; the click still counts then.
     const declined = () => {
