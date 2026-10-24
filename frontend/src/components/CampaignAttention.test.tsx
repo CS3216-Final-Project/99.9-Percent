@@ -24,6 +24,7 @@ function show(game: GameState = newGame()) {
   render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost><TooltipLayer /></StrictMode>);
 }
 const gold = () => document.querySelectorAll(".campaign-gold-attention");
+const openActions = () => fireEvent.click(screen.getByRole("tab", { name: /^Actions/ }));
 function acceptHint() {
   const card = within(screen.getByRole("dialog", { name: "Hint" }));
   fireEvent.click(card.queryByRole("button", { name: "Got it" }) ?? card.queryByRole("button", { name: "Upgrade database" }) ?? card.getByRole("button", { name: "Accept risk" }));
@@ -55,7 +56,7 @@ it.each([
 });
 it("keeps database preparation available and switches to Run after actual headroom activation", () => {
   show(scaling()); act(() => vi.advanceTimersByTime(10000));
-  fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(screen.getByRole("button", { name: "Confirm" })); expect(gold()).toHaveLength(0);
   act(() => useGame.setState({ game: tick(useGame.getState().game, 3) }));
@@ -72,7 +73,7 @@ it("never marks a disabled progression control, and accepted manual help owns th
 });
 it("lets a valid purchase Confirm take priority over the open nonmodal growth explanation", () => {
   show(scaling()); fireEvent.click(screen.getByRole("button", { name: "Consider growth with current capacity" }));
-  fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(screen.getByRole("button", { name: "Cancel" })); expect(gold()).toHaveLength(1);
   expect(gold()[0]).toBe(screen.getByRole("button", { name: "Accept growth risk" }));
@@ -114,6 +115,8 @@ it("does not point at an inspection toggle that would close already-open evidenc
 });
 it("pending confirmations and newly mounted local modals immediately suppress attention", async () => {
   show(); act(() => vi.advanceTimersByTime(10_000)); expect(gold()).toHaveLength(1);
+  // A quote is opened on the Actions tab, where its card lives.
+  act(() => useGame.getState().setPanelTab("actions"));
   act(() => setConfirming("Add server")); expect(gold()).toHaveLength(0);
   act(() => vi.advanceTimersByTime(20_000)); expect(gold()).toHaveLength(0);
   act(() => setConfirming(null));
@@ -183,7 +186,7 @@ it("clears an accepted purchase when cash becomes insufficient mid-sequence", ()
   act(() => useGame.setState({ game })); expect(gold()).toHaveLength(0);
 });
 it("shared confirmations immediately glow for valid purchases and stop for stale, invalid and tutorial-owned quotes", () => {
-  show(); fireEvent.click(screen.getByRole("button", { name: /Add server/ }));
+  show(); openActions(); fireEvent.click(screen.getByRole("button", { name: /Add server/ }));
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   const changed = structuredClone(useGame.getState().game); changed.campaign!.cashCents -= 1;
   act(() => useGame.setState({ game: changed })); expect(gold()).toHaveLength(0);
@@ -196,14 +199,14 @@ it("shared confirmations immediately glow for valid purchases and stop for stale
   expect(screen.getByRole("button", { name: "Confirm" }).hasAttribute("disabled")).toBe(true);
 });
 it("Confirm purchase dispatches the unchanged action and removes its sole spotlight", () => {
-  show(); fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
+  show(); openActions(); fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
   expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(gold()[0]); expect(gold()).toHaveLength(0);
   expect(useGame.getState().game.campaign!.pending.some(a => a.type === "upgrade-db")).toBe(true);
 });
 
 it("a blocking local modal takes priority over an actual valid purchase quote", async () => {
-  show(); fireEvent.click(screen.getByRole("button", { name: /Add server/ }));
+  show(); openActions(); fireEvent.click(screen.getByRole("button", { name: /Add server/ }));
   expect(gold()[0].textContent).toBe("Confirm");
   const modal = document.createElement("div"); modal.className = "modal-backdrop";
   await act(async () => { document.body.append(modal); }); expect(gold()).toHaveLength(0);
@@ -290,5 +293,8 @@ it("teaches Launch Week with spotlighted tutorial steps instead of the Hint butt
   expect(metrics.textContent).toContain("Read the metrics");
   expect(lit()[0].classList.contains("equipment-readings")).toBe(true);
   fireEvent.click(within(metrics).getByRole("button", { name: "Next" }));
+  // The fix is a purchase on the Actions tab, so the tab carries the spotlight until the player opens it.
+  spotOn(/^Actions/);
+  fireEvent.click(lit()[0]);
   spotOn(/^Upgrade database/);
 });

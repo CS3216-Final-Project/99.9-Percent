@@ -1,4 +1,4 @@
-import { openCameraControls } from "./fixtures";
+import { openCameraControls, openPanelTab } from "./fixtures";
 import { purchaseActions, purchaseLayout } from "./purchaseLayout";
 import { test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
 import { newGame } from "../src/sim";
@@ -17,6 +17,7 @@ test("an action centres the camera on the machine it changes and opens its confi
   await openCameraControls(page);
   for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Zoom in" }).click();
   const panel = page.getByRole("complementary", { name: "System metrics" });
+  await openPanelTab(page, "Actions");
   await panel.getByRole("button", { name: /^Upgrade database/ }).click();
   await expect(page.locator('.floor-menu button[data-floor="servers"]')).toHaveAttribute("aria-pressed", "true");
   await expectRoom(page);

@@ -106,7 +106,7 @@ it("chapter tutorial ownership suppresses the new offer", () => {
 });
 it("a valid purchase Confirm wins immediately and consumes the Pause invitation", () => {
   show(transition(1).before); startIncident(); expect(gold()).toHaveLength(1);
-  fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(screen.getByRole("button", { name: "Cancel" })); expect(gold()).toHaveLength(0);
   act(() => useGame.getState().tick(1)); expect(gold()).toHaveLength(0);
@@ -121,7 +121,7 @@ it("offers Pause for a later distinct incident in the same company after a free 
   show(pauseTransition(1, "pause-repeat").before); startIncident();
   const first = useGame.getState().game.campaign!.incident!.id;
   fireEvent.click(screen.getByRole("button", { name: "Pause" }));
-  fireEvent.click(screen.getByRole("button", { name: /^Limit to 500/ }));
+  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Limit to 500/ }));
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   for (let i = 0; i < 40 && useGame.getState().game.phase !== "review"; i++) act(() => useGame.getState().tick(1));
@@ -177,3 +177,6 @@ it("does not offer Pause during accepted recovery work with the mouse captured",
   startIncident(); expect(useGame.getState().running).toBe(true); expect(gold()).toHaveLength(0);
   canvas.remove();
 });
+
+/** Purchases live on the panel's Actions tab. */
+function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

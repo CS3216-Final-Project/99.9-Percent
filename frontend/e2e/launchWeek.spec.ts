@@ -1,4 +1,4 @@
-import { test, expect, seedSave, savedGame, expectRoom, openCameraControls } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, openCameraControls, openPanelTab } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { applyCampaignInput, step } from "../src/sim/step";
@@ -55,6 +55,9 @@ test("cold open: the launch letter, the whole room and the opening beat", async 
 
 test("the research sheet previews each option and spends the pick", async ({ page }) => {
   await boot(page, researchReady());
+  // The pick is a purchase on Actions: the step lights that tab until the player opens it.
+  await expect(page.locator("[data-spotlight]")).toHaveAttribute("data-tab", "actions");
+  await openPanelTab(page, "Actions");
   const sheet = page.getByRole("region", { name: "Launch Week research" });
   await expect(sheet).toBeVisible();
   // A spotlighted tutorial step explains the free research point beside the sheet.

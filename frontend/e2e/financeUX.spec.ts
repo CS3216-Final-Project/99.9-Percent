@@ -1,4 +1,4 @@
-import { test, expect, seedSave, savedGame } from "./fixtures";
+import { test, expect, seedSave, savedGame, openPanelTab } from "./fixtures";
 import { newGame } from "../src/sim";
 import { tick } from "../src/sim/__tests__/spikeFixtures";
 
@@ -21,6 +21,7 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
     await expect(finance.getByText(/This is a budget estimate, not a bankruptcy deadline/)).toBeInViewport();
     await page.keyboard.press("Escape");await expect(page.getByRole("button",{name:"View finances"})).toBeFocused();
     expect((await savedGame(page)).campaign).toEqual(before.campaign);
+    await openPanelTab(page,"Actions");
     await page.getByRole("button",{name:/Add server/}).click();
     const confirmation=page.getByRole("region",{name:"Confirm Add server"});
     await expect(confirmation).toContainText("Upkeep");await expect(confirmation).toContainText("Warning:");
@@ -29,8 +30,10 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
     expect((await savedGame(page)).campaign!.cashCents).toBe(before.campaign!.cashCents-100000);
     const reason=page.locator('.campaign-action-card').filter({has:page.getByRole("button",{name:/Add server/})}).locator('.campaign-action-reason');
     await expect(reason).toContainText("deployment is already pending");await reason.focus();await expect(reason).toBeFocused();
+    await openPanelTab(page,"Analysis");
     const app=page.locator('.campaign-panel .chip').filter({hasText:/^App Server$/});
-    await app.hover();
+    // Scrolling first: a scroll while the hover delay runs closes the tip, as it should for a real pointer.
+    await app.scrollIntoViewIfNeeded();await app.hover();
     await expect(page.getByRole("tooltip")).toHaveText("Handles customer requests and uses the Database for data.");
     await app.click();
     const evidence=page.locator('.campaign-panel .campaign-evidence');

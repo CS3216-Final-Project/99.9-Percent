@@ -115,28 +115,35 @@ const INCIDENT: Step[] = [
 ];
 
 /** Each later chapter gets one step on the controls it adds, the first time the company enters it. */
-const chapter = (title: string, why: string, hint: string, target: string): Step[] => [{ title, why, hint: () => hint, target: () => target, nextLabel: "Got it" }];
+const chapter = (title: string, why: string, hint: string, target: string, enter?: Step["enter"]): Step[] => [{ title, why, hint: () => hint, target: () => target, enter, nextLabel: "Got it" }];
+/** The Guided Mode panel's Actions tab, lit when the controls a step points at are on it but another tab is shown. */
+const ACTIONS_TAB = '.campaign-panel [role="tab"][data-tab="actions"]';
+const onActions = (s: Snapshot, target: string) => (s.panelTab === "actions" ? target : ACTIONS_TAB);
+/** A chapter whose controls are purchases: it opens the panel's Actions tab, and lights that tab if the player leaves it. */
+const actionsChapter = (title: string, why: string, hint: string, target: string): Step[] =>
+  chapter(title, why, hint, target).map((step) => ({ ...step, target: (s) => onActions(s, target), enter: showActions }));
+const showActions = (s: Snapshot) => s.setPanelTab("actions");
 const CHAPTERS = {
-  scaling: chapter(
+  scaling: actionsChapter(
     "Scale and route",
     `The next growth wave brings ${num(P.traffic)} requests a second.`,
     "Compare scaling and routing options. Extra servers help only when traffic reaches them.",
     '[aria-label="Scaling controls"]',
   ),
-  data: chapter(
+  data: actionsChapter(
     "Data strategy",
     "Cache hits answer repeated reads; misses and writes still reach the Database.",
     "Inspect the workload and compare your options.",
     '[aria-label="Data strategy"]',
   ),
-  spikes: chapter(
+  spikes: actionsChapter(
     "Traffic spikes",
     "Two short bursts of traffic are coming.",
     "Inspect demand and compare manual capacity with autoscaling.",
     '[aria-label="Traffic spikes and autoscaling"]',
   ),
   reliability: [
-    ...chapter(
+    ...actionsChapter(
       "Stay online",
       "The test makes one App Server fail. Manual and automatic responses are available.",
       "Explore the reliability controls before starting the test.",
@@ -159,11 +166,14 @@ const CHAPTERS = {
           ? "Close Tech."
           : confirmingChecks()
             ? "Press Confirm."
-            : s.game.campaign && installPending(s.game.campaign)
-              ? "Run until the current install finishes, then press Deploy Health Checks."
-              : "Press Deploy Health Checks.",
+            : s.panelTab !== "actions"
+              ? "Open Actions."
+              : s.game.campaign && installPending(s.game.campaign)
+                ? "Run until the current install finishes, then press Deploy Health Checks."
+                : "Press Deploy Health Checks.",
       // The confirmation opens beside the panel; light it up rather than leaving it under the dim.
-      target: (s) => (s.view === "tech" ? TECH_TAB : confirmingChecks() ? ".campaign-action-popover" : '[data-tour="deploy-checks"]'),
+      target: (s) => (s.view === "tech" ? TECH_TAB : confirmingChecks() ? ".campaign-action-popover" : onActions(s, '[data-tour="deploy-checks"]')),
+      enter: showActions,
       inTech: true,
       done: (s) => {
         const c = s.game.campaign;

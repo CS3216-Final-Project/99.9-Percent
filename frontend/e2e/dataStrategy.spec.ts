@@ -1,4 +1,4 @@
-import { advanceCampaignStep } from "./fixtures";
+import { advanceCampaignStep, openPanelTab } from "./fixtures";
 import {test,expect,seedSave,savedGame} from "./fixtures";
 import {newGame,applyAction,type Action,type GameState} from "../src/sim";
 import {advanceSteps} from "../src/sim/step";
@@ -32,6 +32,7 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  await page.getByRole("button",{name:"Next: Continue to data strategy",exact:true}).click();
  await expect(chapters.getByLabel("Current chapter",{exact:true})).toHaveText("Data Strategy");
  await expect(chapters.getByLabel("Current objective")).toHaveText("Goal: Compare workload, cache hits and database pressure as demand grows.");
+ await openPanelTab(page,"Actions");
  await expect(page.getByRole("region",{name:"Data strategy"})).toContainText("Waiting for workload growth");
  expect((await savedGame(page)).campaign!.dataStage!.profile).toBe("read-heavy");
  await advanceCampaignStep(page,{seconds:6});
@@ -48,8 +49,10 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  } else expect(c.dbCapacity).toBe(3000);
  await page.getByRole("button",{name:"Continue company",exact:true}).click();
  if(strategy==="cache") {
+  await openPanelTab(page,"Analysis");
   await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Read Cache",exact:true}).click();
   await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");
+  await openPanelTab(page,"Actions");
   await data.locator("summary").filter({hasText:"Observe another workload"}).click();
   await data.getByRole("button",{name:"Observe contrasting workload",exact:true}).click();
   await page.getByRole("button",{name:"Run",exact:true}).click();await expect.poll(async()=>(await savedGame(page)).campaign!.snapshot.db.demand).toBe(2112);

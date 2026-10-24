@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { createPortal } from "react-dom";
 import { campaignAttention, guidanceActionId, incidentNeedsPause, spotlightMachines, type GuidanceTarget } from "@/game/campaignAttention";
 import { previewCampaignAction } from "@/game/campaignFinance";
-import { campaignClockAvailable, useGame } from "@/game/store";
+import { campaignClockAvailable, useGame, type PanelTab } from "@/game/store";
 import { isPhoneEdition } from "@/phone/edition";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { watchIdleAttention } from "./idleAttention";
@@ -64,6 +64,11 @@ const TARGETS: Record<GuidanceTarget, string> = {
 /** What opens the folded equipment and actions: the desktop panel's reopen button, or the phone sheet's handle at peek. */
 const PANEL_ENTRY = '.panel-reopen, .phone-sheet-handle[aria-expanded="false"]';
 
+/** Guidance targets inside one of the Guided Mode panel's tabs. Purchases are on Actions; the rest sit above the tabs or outside the panel. */
+const TARGET_TAB: Partial<Record<GuidanceTarget, PanelTab>> = { db: "analysis", app: "analysis", network: "analysis", monitoring: "analysis", research: "actions" };
+/** The tab button that reveals a target hidden on the other tab. */
+const tabEntry = (tab: PanelTab) => `.campaign-panel [role="tab"][data-tab="${tab}"]:not(.is-active)`;
+
 /** One ephemeral owner for the header, dock, idle timer and explicitly accepted control attention. */
 /** Scrolls a control fully into its panel with a small margin; a short panel does not always take `scrollIntoView`. */
 function reveal(node: HTMLElement) {
@@ -82,6 +87,8 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const game = useGame(s => s.game), started = useGame(s => s.started), running = useGame(s => s.running);
   const tour = useGame(s => s.tour), practice = useGame(s => s.tutorialCompany), generation = useGame(s => s.generation);
   const view = useGame(s => s.view), selected = useGame(s => s.selected), panel = useGame(s => s.panelOpen), floor = useGame(s => s.floor);
+  const selectedAppId = useGame(s => s.selectedAppId), panelTab = useGame(s => s.panelTab), setPanelTab = useGame(s => s.setPanelTab);
+  const switchedTab = useRef<string | null>(null);
   const clockAvailable = useGame(campaignClockAvailable);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
   const [covered, setCovered] = useState(false), [hidden, setHidden] = useState(document.hidden);
@@ -126,6 +133,16 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     (decision.reason === "application" && selected === "app" || decision.reason === "database" && selected === "db");
   const targetSelector = metricsStep ? ".campaign-panel .equipment-readings" : recommendedAction ? `${actionSelector}.campaign-action-card > button.act, button${actionSelector}` : selectedInspection ? ".campaign-panel .equipment-readings > details > summary" : guidanceTarget ? TARGETS[guidanceTarget] : "";
   const acceptedNow = accepted === key;
+  // Scaling one server is two steps: pick it among the readings, then buy on Actions.
+  const scaleApp = recommendedAction?.action.type === "scale_up" ? recommendedAction.action.appId : null;
+  const apps = game.campaign?.apps ?? [];
+  const scalePicked = !!scaleApp && (apps.find(a => a.id === selectedAppId) ?? apps[0])?.id === scaleApp;
+  const targetTab: PanelTab | null = riskConfirmation ? null
+    : metricsStep ? "analysis"
+    : scaleApp && !scalePicked ? "analysis"
+    : recommendedAction ? "actions"
+    : selectedInspection ? "analysis"
+    : guidanceTarget ? TARGET_TAB[guidanceTarget] ?? null : null;
   const spotlightSelector = riskConfirmation ? '[data-guidance="accept_scaling_risk"]' : targetSelector;
   const openNow = opened === key && available && !blocked;
   const incidentKey = `${generation}:${game.campaign?.runId}:${game.campaign?.incident?.id}`;
@@ -181,7 +198,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       }
       // An inspector navigation resets its own scroll even when React reuses the
       // same final button. Reveal it again after navigation, never after scrolling.
-      if (s.selected !== before.selected || s.selectedAppId !== before.selectedAppId || s.panelOpen !== before.panelOpen || s.view !== before.view) revealedTarget.current = null;
+      if (s.selected !== before.selected || s.selectedAppId !== before.selectedAppId || s.panelOpen !== before.panelOpen || s.panelTab !== before.panelTab || s.view !== before.view) revealedTarget.current = null;
     });
     const unconfirm = subscribeConfirming(() => { if (confirmingAction()) { revealedTarget.current = null; clear(); } });
     const observer = new MutationObserver(records => {
@@ -207,7 +224,8 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     const clear = () => { target?.classList.remove("campaign-gold-attention"); target = null; };
     const update = () => {
       clear();
-      target = visibleControl(TARGETS[decision.target!]) ??
+      const tab = TARGET_TAB[decision.target!];
+      target = visibleControl(TARGETS[decision.target!]) ?? (tab ? visibleControl(tabEntry(tab)) : null) ??
         (["risk", "reliability", "growth"].includes(decision.target!) ? visibleControl(PANEL_ENTRY) : null) ?? visibleControl(".campaign-hint");
       target?.classList.add("campaign-gold-attention");
     };
@@ -216,7 +234,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["disabled", "aria-disabled", "hidden", "open"] });
     window.addEventListener("resize", update); document.addEventListener("scroll", update, true);
     return () => { clear(); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); };
-  }, [candidate, idle, timerKey, decision.attention, decision.target]);
+  }, [candidate, idle, timerKey, decision.attention, decision.target, panelTab]);
   // A Launch Week step frames its control at once; only the step's own button or using that control moves on.
   useLayoutEffect(() => {
     if (!launchStep) return;
@@ -235,7 +253,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
         reveal(node);
       }
       const target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
-        (guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research" ? visibleControl(".panel-reopen") : null);
+        (targetTab ? visibleControl(tabEntry(targetTab)) : null) ?? (guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research" ? visibleControl(".panel-reopen") : null);
       if (target) {
         setSpotBox(padBox(target.getBoundingClientRect()));
         target.dataset.spotlight = "true";
@@ -253,7 +271,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true);
     document.addEventListener("click", used, true);
     return () => { clear(); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
-  }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable]);
+  }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable, targetTab, panelTab]);
   // The room's beams and dimmed racks follow the same spotlight.
   useEffect(() => {
     useGame.getState().setSpotlight(machines);
@@ -269,6 +287,16 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       markedTarget.current = null;
     }
   }, [blocked, acceptedNow, riskConfirmation]);
+
+  // Accepting guidance is explicit intent, so the tab holding its next step comes forward, once
+  // per step: the player can still look at the other tab without being pulled back.
+  useEffect(() => {
+    if (!acceptedNow || !available || blocked || !targetTab) return;
+    const step = `${key}:${targetTab}`;
+    if (switchedTab.current === step) return;
+    switchedTab.current = step;
+    if (panelTab !== targetTab) setPanelTab(targetTab);
+  }, [acceptedNow, available, blocked, targetTab, key, panelTab, setPanelTab]);
 
   // The inspector resets its scroll in a passive effect on selection. Reveal after
   // that existing child effect, so intermediate instance selection remains visible.
@@ -291,7 +319,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
         reveal(node);
       }
       if (node) node.dataset.guidanceStep = "true";
-      target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node ? visibleControl('[data-guidance-step="true"]') : null) ?? visibleControl('.sheet-head button[aria-label="Close"]') ??
+      target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node ? visibleControl('[data-guidance-step="true"]') : null) ?? visibleControl('.sheet-head button[aria-label="Close"]') ?? (targetTab ? visibleControl(tabEntry(targetTab)) : null) ??
         (guidanceTarget !== "run" && guidanceTarget !== "next" && guidanceTarget !== "requirements" && guidanceTarget !== "menu" && guidanceTarget !== "finance" ? visibleControl(PANEL_ENTRY) : null);
       if (node) delete node.dataset.guidanceStep;
       target?.classList.add("campaign-gold-attention");
@@ -304,7 +332,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("resize", update); document.addEventListener("scroll", update, true);
     document.addEventListener("click", interact, true);
     return () => { clear(); observer.disconnect(); document.querySelectorAll('[data-guidance-step]').forEach(n => n.removeAttribute('data-guidance-step')); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("click", interact, true); };
-  }, [acceptedNow, available, blocked, guidanceTarget, spotlightSelector, key, panel, view, running, clockAvailable, selected, recommendedAction, riskConfirmation]);
+  }, [acceptedNow, available, blocked, guidanceTarget, spotlightSelector, key, panel, view, running, clockAvailable, selected, recommendedAction, riskConfirmation, targetTab, panelTab]);
 
   useLayoutEffect(() => {
     if (!openNow) return;
@@ -344,8 +372,8 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     {openNow && createPortal(<div ref={card} id="campaign-hint-card" className="campaign-hint-card" role="dialog" aria-modal="false" aria-label="Hint" tabIndex={-1} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
       <div className="campaign-hint-heading"><h3><Icon name="bulb" />Hint</h3><button type="button" className="icon-btn" aria-label="Close Hint" onClick={close}><Icon name="close" /></button></div>
       <div className="campaign-hint-copy" role="region" aria-label="Hint explanation" tabIndex={0}><p>{decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : selectedInspection && !recommendedAction ? `Check About ${selectedInspection} to understand the readings before choosing a response.` : decision.message}</p></div>
-      <button type="button" className="btn btn-primary" onClick={() => { close(); revealedTarget.current = null; setAccepted(key); }}>{choices?.upgrade ? "Upgrade database" : choices?.risk ? "Accept risk" : "Got it"}</button>
-      {choices?.upgrade && choices.risk && <button type="button" className="btn" onClick={() => { close(); revealedTarget.current = null; setGrowthChoice({ key, risk: true }); setAccepted(key); }}>Accept risk</button>}
+      <button type="button" className="btn btn-primary" onClick={() => { close(); revealedTarget.current = null; switchedTab.current = null; setAccepted(key); }}>{choices?.upgrade ? "Upgrade database" : choices?.risk ? "Accept risk" : "Got it"}</button>
+      {choices?.upgrade && choices.risk && <button type="button" className="btn" onClick={() => { close(); revealedTarget.current = null; switchedTab.current = null; setGrowthChoice({ key, risk: true }); setAccepted(key); }}>Accept risk</button>}
     </div>, document.body)}
   </CampaignAttentionContext.Provider>;
 }
