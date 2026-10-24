@@ -78,7 +78,7 @@ function GuidedActions({ onResume, exit }: { onResume: () => void; exit: ReturnT
     {saveBlocked && <Callout tone="warn" icon="save" kicker="Save preserved" live="alert">Your stored save is unreadable or unsupported and has been preserved. This run stays in memory until you start a new company.</Callout>}
     {complete && <Callout compact tone="success" icon="goal" kicker="Phone campaign complete">{scope.endOfGuided} Challenge Mode is unlocked.</Callout>}
     <MenuActions onResume={onResume}>
-      <MenuTile icon="info" kind="users" title="How to play" text="Replay Launch Week: run the company, handle its first incident and pick research." onClick={() => useGame.getState().startTour("campaign")} />
+      <MenuTile icon="info" kind="users" title="How to play" text="Replay Launch Week: explore Network, App Servers, Database and Monitoring." onClick={() => useGame.getState().startTour("campaign")} />
       {ended && <MenuTile icon="refresh" title={confirmNew ? "Lose this company? Press again" : "New company"} text="Start a new Guided Mode company." danger={confirmNew}
         onClick={() => { if (!confirmNew) { setConfirmNew(true); return; } useGame.getState().newRun(); setConfirmNew(false); }} />}
       <MenuTile icon="logout" title="Exit" text="Return to the title screen." onClick={exit.exit} buttonRef={exit.exitButton} />

@@ -1,3 +1,4 @@
+import { introductionActive } from "@/sim/introduction";
 import type { TourTrack } from "@/game/store";
 import { useGame } from "@/game/store";
 import Tutorial from "@/components/Tutorial";
@@ -19,8 +20,9 @@ export function PhoneCoach() {
 }
 
 function Coach() {
+  const introduction=useGame(s=>introductionActive(s.game.campaign));
   const track = useGame((s) => s.tour?.track);
   useDockOffset();
-  useGuideSheet(track ? GUIDE_SHEET[track] ?? null : null);
+  useGuideSheet(introduction ? "full" : track ? GUIDE_SHEET[track] ?? null : null);
   return <Tutorial />;
 }

@@ -1,3 +1,4 @@
+import { introductionActive } from "@/sim/introduction";
 import type { GameState } from "@/sim";
 import { COLLEAGUES, type ColleagueId } from "./colleagues";
 
@@ -13,7 +14,7 @@ const CHAPTERS = {
 /** Identity comes from the actual entered stage, never a timer or an unlocked Next button. */
 export function chapterCompanyMessage(game: GameState) {
   const c = game.campaign;
-  if (!c || game.phase === "ended") return null;
+  if (!c || introductionActive(c) || game.phase === "ended") return null;
   const chapter = c.combinedStage ? 6 : c.reliabilityStage ? 5 : c.spikeStage ? 4 : c.dataStage ? 3 : c.scaling ? 2 : 1;
   const enteredStep = (c.combinedStage ?? c.reliabilityStage ?? c.spikeStage ?? c.dataStage ?? c.scaling)?.enteredStep ?? 0;
   const { speaker, lines, mission } = CHAPTERS[chapter];

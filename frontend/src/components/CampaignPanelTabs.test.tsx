@@ -1,3 +1,5 @@
+import InspectionReveal from "./InspectionReveal";
+import { enterHighlightedInspection } from "./inspectionTestUtils";
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
@@ -14,9 +16,10 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ x: 10, y: 10, top: 10, left: 10, right: 54, bottom: 54, width: 44, height: 44, toJSON: () => ({}) });
 });
 afterEach(() => { cleanup(); setConfirming(null); vi.restoreAllMocks(); });
-function show(game: GameState = newGame()) {
-  useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null });
-  render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost></StrictMode>);
+// Tabs remain available for historical practice; normal companies use component inspections.
+function show(game: GameState = newGame(), legacy = true) {
+  useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null, tutorialCompany: legacy ? { game: newGame(1,"original"), remainderMs: 0, measurement: useGame.getState().measurement } : null });
+  render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost></StrictMode>);
 }
 const tab = (name: string) => screen.getByRole("tab", { name: new RegExp(`^${name}`) });
 const gold = () => document.querySelectorAll(".campaign-gold-attention");
@@ -82,27 +85,26 @@ it("closing a quote from Analysis leaves focus on the selected tab, not the page
   expect(document.activeElement).toBe(tab("Analysis"));
 });
 
-it("an accepted hint opens the tab of its purchase once, then leaves the choice of tab to the player", () => {
-  show(advanceSteps(newGame(), 6).state);
+it("an accepted hint guides the player through the component to its purchase", () => {
+  show(advanceSteps(newGame(), 6).state, false);
+  expect(screen.queryByRole("tab", { name: /^Actions/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   fireEvent.click(within(screen.getByRole("dialog", { name: "Hint" })).getByRole("button", { name: "Got it" }));
-  expect(useGame.getState().panelTab).toBe("actions");
+  expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Database");
+  enterHighlightedInspection();
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Upgrade database");
-  fireEvent.click(tab("Analysis"));
-  expect(useGame.getState().panelTab).toBe("analysis");
-  // The purchase is out of sight now, so its tab carries the spotlight instead.
-  expect(gold()).toHaveLength(1); expect(gold()[0]).toBe(tab("Actions"));
 });
 
-it("accepting the same hint again opens its tab again", () => {
-  show(advanceSteps(newGame(), 6).state);
+it("accepting the same hint again restores component guidance after inspection dismissal", () => {
+  show(advanceSteps(newGame(), 6).state, false);
   const accept = () => {
     fireEvent.click(screen.getByRole("button", { name: "Hint" }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Hint" })).getByRole("button", { name: "Got it" }));
   };
-  accept(); fireEvent.click(tab("Analysis"));
+  accept(); enterHighlightedInspection();
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Database inspected" })).getByRole("button", { name: "Close" }));
   accept();
-  expect(useGame.getState().panelTab).toBe("actions");
+  expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Database");
 });
 
 it("a new company starts on Analysis", () => {

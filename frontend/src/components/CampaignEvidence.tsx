@@ -26,10 +26,11 @@ export function LoadBar({ name, demand, capacity, unit }: { name: string; demand
 }
 
 /** One card per installed App Server: whether it receives traffic, how full it is and what it got through. */
-export function ApplicationInstances({ campaign: c, recipients, selectedAppId, onSelect }: {
-  campaign: Campaign; recipients: string[]; selectedAppId: string | null; onSelect: (id: string) => void;
+export function ApplicationInstances({ campaign: c, recipients, selectedAppId, onSelect, inspection=false }: {
+  campaign: Campaign; recipients: string[]; selectedAppId: string | null; onSelect: (id: string) => void; inspection?: boolean;
 }) {
   const m = c.snapshot;
+  const unrouted=c.apps.filter(a=>!a.routed && (!inspection || a.role!=="spare"));
   return <section aria-label="Application instances">
     <dl className="evidence-rows">
       <EvidenceRow icon="shuffle" label="Load balancer" value={c.loadBalancer ? "Deployed" : "Not deployed"} tone={c.loadBalancer ? "ok" : "muted"} />
@@ -50,6 +51,7 @@ export function ApplicationInstances({ campaign: c, recipients, selectedAppId, o
         </> : <span className="instance-figures"><span>capacity <b>{num(a.capacity)}</b> req/s</span><span>backlog <b>{num(a.backlog)}</b></span></span>}
       </button>;
     })}</div>
-    {c.apps.filter(a => !a.routed).map(a => <p role="note" className="evidence-note" aria-label={`${appName(a.id)} routing status`} key={a.id}>Installed capacity does not receive traffic until routing includes this app.</p>)}
+    {inspection ? unrouted.length>0&&<p role="note" className="evidence-note" aria-label={`${unrouted.map(a=>appName(a.id)).join(", ")} routing status`}>{unrouted.map(a=>appName(a.id)).join(", ")}: installed capacity does not receive traffic until Network routing includes {unrouted.length===1?"this app":"these apps"}.</p>
+      : unrouted.map(a => <p role="note" className="evidence-note" aria-label={`${appName(a.id)} routing status`} key={a.id}>Installed capacity does not receive traffic until routing includes this app.</p>)}
   </section>;
 }

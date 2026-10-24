@@ -14,3 +14,6 @@
 @media (max-width: 360px) {
     .stat-action[aria-label="View app health"] strong { font-size: var(--text-sm); }
 }
+
+.app-health-dashboard .app-health-uptime-card { border: 0; padding: 8px 10px; border-radius: 10px; background: var(--tile-blue); }
+.app-health-uptime-note { font-size: var(--text-sm); }

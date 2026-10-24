@@ -6,7 +6,7 @@ for (const [width, height] of [[1440, 900], [1366, 768]]) {
         await appHealthJourney(page, width, height);
     });
 }
-test("the Launch Week letter gives way to the App Health dialog", async ({ page }) => {
+test("Chapter 0 opens App Health without advancing the introduction", async ({ page }) => {
     await appHealthDuringOpening(page);
 });
 

@@ -1,3 +1,4 @@
+import {closeInspection} from "./componentInspection";
 import { advanceCampaignStep } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { completeTutorial, test, expect, savedGame, openPanelTab } from "./fixtures";
@@ -50,6 +51,7 @@ test("sounds the company starting, tutorial completion and the alarm, and stays 
   await inspect.click();
   await page.waitForTimeout(300);
   expect(await voices()).toBe(alarm);
+  await closeInspection(page);
   // Unmuting plays a sample, and decisions are heard again.
   await mute.click();
   await expect.poll(voices).toBeGreaterThan(alarm);

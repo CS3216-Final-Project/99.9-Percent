@@ -16,7 +16,7 @@ test("new players see Guided Mode first with Challenge Mode locked", async ({ pa
   expect(await page.evaluate(() => [localStorage.getItem("nn.campaign.save.v1"), localStorage.getItem("nn.classic.save.v1")])).toEqual([null, null]);
   await page.screenshot({ path: "test-results/mode-choice-guided-first.png" });
   await guided.getByRole("button", { name: "Start Guided Mode" }).press("Enter");
-  await expect(page.getByRole("dialog", { name: "Launch week" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Introduction Progress" })).toContainText("0/4");
   await completeTutorial(page);
   expect((await savedGame(page)).campaign!.step).toBe(0);
   await expectRoom(page);

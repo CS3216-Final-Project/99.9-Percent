@@ -1,5 +1,6 @@
+import { infrastructureAction, closeInspection } from "./componentInspection";
 import type { Locator, Page } from "@playwright/test";
-import { expect, expectRoom, openPanelTab, savedGame, seedSave } from "./fixtures";
+import { expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { step } from "../src/sim/step";
 
@@ -17,12 +18,15 @@ export async function appHealthJourney(page: Page, width: number, height: number
     await page.setViewportSize({ width, height });
     if (touch) await page.emulateMedia({ reducedMotion: "reduce" });
     await page.route("**/api/**", r => r.abort());
-    await seedSave(page, newGame(1, `health-${width}`));
+    let game = newGame(1, `health-${width}`);
+    for (let i = 0; i < 3; i++) game = step(game).state;
+    await seedSave(page, game);
     await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
     await expectRoom(page);
     const before = (await savedGame(page)).campaign;
     const entry = page.getByRole("button", { name: "View app health", exact: true });
     await healthWordFits(entry);
+    await expect(entry).not.toContainText("Uptime");
     if (touch) await entry.tap();
     else {
         // Finish the modal introduction before testing keyboard focus. The
@@ -34,6 +38,8 @@ export async function appHealthJourney(page: Page, width: number, height: number
     }
     const dialog = page.getByRole("dialog", { name: "App Health", exact: true });
     await expect(dialog).toBeVisible();
+    await expect(dialog.locator(".app-health-uptime-card")).toContainText("100%");
+    await expect(dialog.getByText(/across this company/)).toBeVisible();
     await expect(dialog.getByRole("heading", { name: "Healthy", exact: true })).toBeVisible();
     await expect(dialog).toContainText("100 ms (estimated)"); await expect(dialog).toContainText("0.00%");
     await expect(dialog.getByText(/Rejected requests:/)).toBeHidden();
@@ -60,29 +66,34 @@ export async function appHealthJourney(page: Page, width: number, height: number
     await page.getByRole("button", { name: "View finances", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Company finances", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Close", exact: true }).click();
-    await openPanelTab(page, "Actions");
-    await page.getByRole("button", { name: /^Add server/ }).click();
+    await (await infrastructureAction(page,/^Add server/)).click();
     const purchase = page.getByRole("region", { name: "Confirm Add server", exact: true });
     await expect(purchase).toBeVisible();
-    await entry.click(); await expect(dialog).toBeVisible(); await page.keyboard.press("Escape");
+    expect(await entry.evaluate(el=>{const b=el.getBoundingClientRect();return !el.contains(document.elementFromPoint(b.x+b.width/2,b.y+b.height/2));})).toBe(true);
     await expect(purchase).toBeVisible(); await expect(purchase.getByRole("button", { name: "Confirm", exact: true })).toBeEnabled();
-    await purchase.getByRole("button", { name: "Cancel", exact: true }).click();
+    await purchase.getByRole("button", { name: "Cancel", exact: true }).click();await closeInspection(page);
+    await entry.click();await expect(dialog).toBeVisible();await page.keyboard.press("Escape");
     await page.getByRole("main").getByRole("button", { name: "Servers", exact: true }).click();
-    const inspection = page.getByRole("dialog", { name: "Servers inspected", exact: true });
-    await expect(inspection).toBeVisible(); await inspection.getByRole("button", { name: "Return to room", exact: true }).click();
+    const inspection = page.getByRole("dialog", { name: "App Servers", exact: true });
+    await expect(inspection).toBeVisible(); await inspection.getByRole("button", { name: "Close", exact: true }).click();
     expect((await savedGame(page)).campaign!.cashCents).toBe(before!.cashCents);
+    await page.reload();
+    await page.getByRole("button", { name: "Continue company", exact: true }).click();
+    await expectRoom(page);
+    await entry.click();
+    await expect(dialog.locator(".app-health-uptime-card")).toContainText("100%");
+    await expect(entry).not.toContainText("Uptime");
 }
 
 export async function appHealthDuringOpening(page: Page) {
     await page.route("**/api/**", r => r.abort()); await page.goto("/");
     await page.getByRole("button", { name: "Start Guided Mode", exact: true }).click(); await expectRoom(page);
     const entry = page.getByRole("button", { name: "View app health", exact: true });
-    const letter = page.getByRole("dialog", { name: "Launch week" });
-    await expect(letter).toBeVisible();
-    await letter.getByRole("button", { name: "Open the doors", exact: true }).click();
+    const introduction = page.getByRole("region", { name: "Introduction Progress" });
+    await expect(introduction).toContainText("0/4");
     const before = (await savedGame(page)).campaign;
     await entry.click(); const dialog = page.getByRole("dialog", { name: "App Health", exact: true });
-    await expect(dialog).toBeVisible(); await expect(letter).toBeHidden(); await page.keyboard.press("p");
+    await expect(dialog).toBeVisible(); await expect(dialog).toContainText("Not enough data"); await page.keyboard.press("p");
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
     await expect(entry).toBeFocused(); expect((await savedGame(page)).campaign).toEqual(before);
 }

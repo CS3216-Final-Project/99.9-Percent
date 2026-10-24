@@ -1,4 +1,5 @@
-import { completeTutorial, advanceCampaignStep, test, expect, savedGame, openPanelTab } from "./fixtures";
+import { infrastructureAction, closeInspection } from "./componentInspection";
+import { completeTutorial, advanceCampaignStep, test, expect, savedGame } from "./fixtures";
 
 test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
 test("Campaign option comparison, confirmation, Run/Pause and pause-to-investigate use public controls", async ({page, installClock}) => {
@@ -6,13 +7,13 @@ test("Campaign option comparison, confirmation, Run/Pause and pause-to-investiga
   await page.goto("/"); await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click(); await completeTutorial(page);
   await expect(page.getByText("Effect & costs")).toHaveCount(0);
   await expect(page.getByText("Operating finances")).toHaveCount(0); await expect(page.getByLabel("Request dependencies")).toHaveCount(0);
-  await openPanelTab(page,"Actions");
-  await page.getByRole("button",{name:/Add server/}).click(); const confirm=page.getByRole("region",{name:"Confirm Add server"});
+  await (await infrastructureAction(page,/Add server/)).click(); const confirm=page.getByRole("region",{name:"Confirm Add server"});
   await expect(confirm).toContainText("Add App Server"); await expect(confirm).toContainText("Processes requests and accesses the Database.");
   await expect(confirm).toContainText("+$700 per 60 game seconds"); await expect(confirm).toContainText("$1,000");
-  await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("region",{name:"Confirm Add server"})).toHaveCount(0);
+  await expect(page.getByRole("dialog",{name:"Purchase preview",exact:true})).toHaveAttribute("aria-modal","true");
   await expect(confirm.getByRole("button",{name:"Confirm"})).toBeFocused();
   await page.keyboard.press("Escape"); await expect(confirm).toBeHidden(); expect((await savedGame(page)).campaign!.apps).toHaveLength(1);
+  await closeInspection(page);
   const beforeAdvance=(await savedGame(page)).campaign!.step;
   await advanceCampaignStep(page);
   expect((await savedGame(page)).campaign!.step).toBe(beforeAdvance+1);

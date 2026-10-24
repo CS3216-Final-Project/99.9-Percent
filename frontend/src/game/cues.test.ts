@@ -8,6 +8,13 @@ import { makeEnvelope } from "./saveEnvelope";
 import { CUE_NAMES, type Cue } from "./sfx";
 import { useGame, type IntroKind } from "./store";
 
+// Audio clock checks finish the real introduction before operating the company.
+function finishIntroduction() {
+  const s=()=>useGame.getState();
+  for(const equipment of ["gateway","app","db","monitoring"] as const){s().act({type:"incident_inspect",equipment});s().act({type:"acknowledge_introduction",equipment});}
+  s().act({type:"complete_introduction"});s().endTour(true);
+}
+
 const state = (game: GameState, over: Partial<CueState> = {}): CueState => ({
   game,
   generation: 1,
@@ -303,6 +310,8 @@ describe("watching the store", () => {
     // In the game a click starts play, well after boot: anything in the same task as a load is dropped.
     await settle();
     expect(heard).toEqual(["launch"]);
+    finishIntroduction();
+    await settle();
     heard.length = 0;
     s().setRunning(true);
     s().tick(30);
@@ -323,6 +332,7 @@ describe("watching the store", () => {
     s().boot();
     s().play();
     await settle();
+    finishIntroduction();await settle();
     heard.length = 0;
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
     s().setRunning(true);

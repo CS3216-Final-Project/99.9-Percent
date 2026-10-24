@@ -1,3 +1,4 @@
+import { inspectEquipment, closeInspection } from "./componentInspection";
 import { test, expect, expectRoom, seedSave, savedGame } from "./fixtures";
 import { newGame } from "../src/sim";
 
@@ -18,19 +19,17 @@ for (const width of [1440, 390, 320]) test(`Warm Classic equipment workspace and
   const heading = panel.getByRole("heading", { name: "Inspect equipment", exact: true });
   await expect(heading.locator(".tip")).toHaveCount(0);
   const before = (await savedGame(page)).campaign!.step;
-  for (const [name, title] of [["Network", "Network"], ["App Server", "Servers"], ["Database", "Database"], ["Monitoring", "Monitoring"]]) {
-    await panel.getByRole("button", { name, exact: true }).click();
-    const readings = panel.getByRole("region", { name: `${title} readings` });
+  for (const [component,name,title] of [["gateway","Network", "Network"], ["app","App Server", "Servers"], ["db","Database", "Database"], ["monitoring","Monitoring", "Monitoring"]] as const) {
+    const popup=await inspectEquipment(page,component,true);
+    const readings = popup.getByRole("region", { name: `${title} readings` });
     await expect(readings.getByRole("heading", { name: title, exact: true })).toBeVisible();
     await expect(readings.getByText("Live", { exact: true })).toBeVisible();
     await expect(readings.locator("h3 .icon")).toBeVisible();
     await expect(readings).not.toContainText("Latest measurement:");
     await expect(readings).not.toContainText("Busy is the share of capacity doing work.");
-    await panel.getByRole("button", { name, exact: true }).click();
-    await expect(readings).toHaveCount(0);
-    await expect(panel.getByRole("button", { name, exact: true })).toHaveAttribute("aria-pressed", "false");
-    await panel.getByRole("button", { name, exact: true }).click();
-    await expect(readings).toBeVisible();
+    await closeInspection(page);await expect(readings).toHaveCount(0);
+    await expect(panel.getByRole("button", { name, exact: true })).toHaveAttribute("aria-pressed", "true");
+    await inspectEquipment(page,component,true);await expect(readings).toBeVisible();await closeInspection(page);
   }
   expect((await savedGame(page)).campaign!.step).toBe(before);
   await panel.evaluate(el => { el.scrollTop = 0; });
@@ -46,7 +45,7 @@ for (const width of [1440, 390, 320]) test(`Warm Classic equipment workspace and
   await page.getByRole("button", { name: "Hide equipment and actions", exact: true }).click();
   // Even selecting the already-selected machine in the room reveals its inspector again.
   await page.getByRole("main").getByRole("button", { name: "Monitoring", exact: true }).click();
-  await page.getByRole("dialog", { name: "Monitoring inspected" }).getByRole("button", { name: "Return to room" }).click();
+  await page.getByRole("dialog", { name: "Monitoring inspected" }).getByRole("button", { name: "Close" }).click();
   await expect(panel).toBeVisible();
   await expect(page.locator(".dock-second")).toContainText(`${before % 60} / 60 s`);
   await expect(page.locator(".dock-primary > .icon")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");

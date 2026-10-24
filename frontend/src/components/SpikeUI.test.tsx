@@ -1,10 +1,11 @@
 import {it,expect,beforeEach,afterEach} from "vitest";
 import {render,screen,within,cleanup,fireEvent} from "@testing-library/react";
 import {CampaignHeader,CampaignPanel,CampaignOverlays,CampaignControls} from "./CampaignUI";
+import InspectionReveal from "./InspectionReveal";
 import {useGame} from "../game/store";
 import {dataCompany,spikeCompany,untilOffset,act} from "../sim/__tests__/spikeFixtures";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});afterEach(cleanup);
-function show(g:ReturnType<typeof dataCompany>){useGame.setState({game:g,started:true,ready:true,onboarding:false});render(<><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/></>);}
+function show(g:ReturnType<typeof dataCompany>){useGame.setState({game:g,started:true,ready:true,onboarding:false});render(<><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/><InspectionReveal/></>);}
 function chapter(name:string) {
  fireEvent.click(screen.getByRole("button",{name:"View chapters"}));
  const dialog=screen.getByRole("dialog",{name:"Guided Mode chapters"});
@@ -17,11 +18,12 @@ it("extends the current strip with factual available continuation and no new sto
  fireEvent.click(screen.getByRole("button",{name:"Next: Continue to Traffic Spikes"}));expect(chapter("Data Strategy")).toContain("Completed");expect(screen.getByLabelText("Current chapter").textContent).toBe("Traffic Spikes & Autoscaling");expect(useGame.getState().running).toBe(false);expect(screen.getByRole("region",{name:"Guided Mode requirements"}).textContent).not.toContain("before continuing to traffic spikes");
 });
 it("shows live provisioning, counters, delayed routing and per-instance shared selection",()=>{
- show(untilOffset(spikeCompany(),13));openTab("Actions");const control=screen.getByRole("region",{name:"Traffic spikes and autoscaling"});expect(control.textContent).toContain("TRAFFIC SPIKE ACTIVE");expect(control.textContent).toContain("3 game seconds, followed by 1 routing game second");
- openTab("Analysis");fireEvent.click(screen.getByRole("button",{name:"App Server"}));
- expect(screen.getByRole("note",{name:"App 3 routing status"}).textContent).toContain("Installed capacity does not receive traffic");
+ show(untilOffset(spikeCompany(),13));expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("Spike 1 active");
+ fireEvent.click(screen.getByRole("button",{name:"App Server"}));
+ fireEvent.click(screen.getByRole("button",{name:"Server management"}));fireEvent.click(screen.getByRole("button",{name:"Autoscaling"}));expect(screen.getByRole("region",{name:"Autoscaling"}).textContent).toContain("3 game seconds, followed by 1 routing game second");
+ fireEvent.click(screen.getByRole("button",{name:"Back to Server management"}));expect(document.querySelector(".inspection-warning")?.textContent).toContain("installed capacity does not receive traffic");
  fireEvent.click(within(screen.getByRole("region",{name:"Application instances"})).getByRole("button",{name:/App 3:/}));expect(useGame.getState().selectedAppId).toBe("app-3");
- openTab("Actions");expect(screen.getAllByRole("status").some(x=>x.textContent?.includes("Routing change: activates in 1"))).toBe(true);
+ expect(screen.getAllByRole("status").some(x=>x.textContent?.includes("Routing change: activates in 1"))).toBe(true);
 });
 it("pending recognition stays visible after saved-state presentation and acknowledgement",()=>{
  let g=spikeCompany(false);g=act(g,{type:"set_traffic_limit",enabled:true});show(untilOffset(g,72));
@@ -30,4 +32,3 @@ it("pending recognition stays visible after saved-state presentation and acknowl
 });
 
 /** Readings and purchases live on separate tabs of the panel. */
-function openTab(name: string) { fireEvent.click(screen.getByRole("tab", { name: new RegExp(`^${name}`) })); }

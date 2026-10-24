@@ -1,3 +1,5 @@
+import { introductionActive, INTRODUCTION_COMPONENTS } from "@/sim/introduction";
+import { introductionInstruction, INTRODUCTION_COPY } from "./introduction";
 import { canEnterCombined, canStartGrowth, combinedEntryGates, pendingCombined } from "@/sim/combinedCampaign";
 import { canEnterReliability, pendingReliability, reliabilityEntryGates } from "@/sim/reliability";
 import { entryBlockers, waitsFor } from "./entryGates";
@@ -24,10 +26,11 @@ export interface GuidanceAction { label: string; action?: Action }
 /** One shared objective for the chapter bar; detailed actions and gates remain in the overview. */
 export function campaignObjective(g: GameState) {
  const c=g.campaign!;
+ if(introductionActive(c))return "Explore Network, App Servers, Database and Monitoring, then complete the introduction.";
  if(g.phase==="ended") return g.outcome==="won"?"Inspect the final architecture and scorecard.":"Review the company's finances and recorded evidence.";
  if(g.phase==="review") return "Read the postmortem before continuing the same company.";
  if(c.incident) return "Restore stable service while weighing cost and rejected demand.";
- if(c.launchWeek&&!c.launchWeek.completedStep) return "Keep the service up through launch week.";
+ if(c.launchWeek&&c.launchWeek.completedStep===null) return "Keep the service up through launch week.";
  if(launchResearchPending(g)) return "Spend your free research pick to see your Launch Week score.";
  if(c.launchWeek&&milestoneBlocks(g)) return "Review your Launch Week score, then stay or continue to Scaling & Routing.";
  if(c.combinedStage) return "Serve growing demand, manage costs and review each outcome.";
@@ -54,7 +57,10 @@ export function campaignGuidance(g: GameState) {
  let waiting:string|null=null,notice:string|null=null,optional:string|null=null;
  let pendingAction:GuidanceAction|null=null;
  const nextStage=c.combinedStage?"Campaign complete":c.reliabilityStage?"Combined campaign":c.spikeStage?"Stay Online":c.dataStage?"Survive Traffic Spikes":openingDone?"Data Bottlenecks":"Scale Your App";
- if(c.combinedStage){
+ if(introductionActive(c)) {
+  for(const id of INTRODUCTION_COMPONENTS)add(id,`${INTRODUCTION_COPY[id].name} explored`,c.launchWeek!.introduction!.explored.includes(id));
+  notice=introductionInstruction(c).message;
+ } else if(c.combinedStage){
   const d=c.combinedStage,r=d.currentRound;
   add("cash","Positive company cash",c.cashCents>0);add("admission","Serve full demand; traffic limit inactive",c.limit===null&&c.snapshot.admitted===c.snapshot.incoming);
   add("incident","No active incident",!c.incident);add("queues","All retained queues empty",queuesEmpty);add("reports","Incident reports acknowledged",reportsAcknowledged);

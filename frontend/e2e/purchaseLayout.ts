@@ -1,4 +1,4 @@
-import { openCameraControls, openPanelTab } from "./fixtures";
+import { infrastructureAction, purchasePreview, expectInspectionsOnly } from "./componentInspection";
 import type { Page } from "@playwright/test";
 import { expect, expectRoom, seedSave, savedGame } from "./fixtures";
 import { newGame, type GameState } from "../src/sim";
@@ -6,15 +6,20 @@ import { tick } from "../src/sim/__tests__/spikeFixtures";
 
 /** Checks complete rectangles and hit targets, not just partially visible elements. */
 export async function usableCard(page:Page) {
-    const card=page.locator(".campaign-action-popover");
+    const card=purchasePreview(page);
     await expect.poll(()=>card.evaluate(el=>{
         const box=el.getBoundingClientRect(),stage=document.querySelector("main.stage")!.getBoundingClientRect();
-        if(box.left<Math.max(0,stage.left) || box.top<Math.max(0,stage.top) || box.right>Math.min(innerWidth,stage.right)+1 || box.bottom>Math.min(innerHeight,stage.bottom)+1)return false;
-        if(innerWidth>900 && Math.abs(box.left-stage.left-12)>1)return false;
-        for(const node of document.querySelectorAll<HTMLElement>(".campaign-panel,.bottombar,.floor-menu,.camera-buttons")){
-            if(node.closest("details:not([open])") || getComputedStyle(node).visibility==="hidden" || !node.getClientRects().length)continue;
-            const r=node.getBoundingClientRect();
-            if(box.left<r.right && box.right>r.left && box.top<r.bottom && box.bottom>r.top)return false;
+        if(el.classList.contains("component-purchase")) {
+            if(box.left<0||box.top<0||box.right>innerWidth||box.bottom>innerHeight)return false;
+            if(Math.abs(box.left+box.width/2-innerWidth/2)>1)return false;
+        } else {
+            if(box.left<Math.max(0,stage.left)||box.top<Math.max(0,stage.top)||box.right>Math.min(innerWidth,stage.right)+1||box.bottom>Math.min(innerHeight,stage.bottom)+1)return false;
+            if(innerWidth>900&&Math.abs(box.left-stage.left-12)>1)return false;
+            for(const node of document.querySelectorAll<HTMLElement>(".campaign-panel,.bottombar,.floor-menu,.camera-buttons")){
+                if(node.closest("details:not([open])")||getComputedStyle(node).visibility==="hidden"||!node.getClientRects().length)continue;
+                const r=node.getBoundingClientRect();
+                if(box.left<r.right&&box.right>r.left&&box.top<r.bottom&&box.bottom>r.top)return false;
+            }
         }
         for(const node of el.querySelectorAll<HTMLElement>(".campaign-purchase-footer button,.finance-warning")){
             const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
@@ -27,7 +32,7 @@ export async function usableCard(page:Page) {
 }
 
 export async function keyboardDetails(page:Page) {
-    const content=page.locator(".campaign-action-popover").getByRole("region",{name:"Purchase details",exact:true});
+    const content=purchasePreview(page).getByRole("region",{name:"Purchase details",exact:true});
     await content.focus();await expect(content).toBeFocused();
     await content.press("End");
     // Integer dimensions can differ from fractional scrollTop by a pixel.
@@ -44,29 +49,31 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
     await page.route("**/api/**",r=>r.abort());
     await seedSave(page,tick(newGame(1,`purchase-layout-${width}`),60));
     await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
-    await openPanelTab(page,"Actions");
-    const before=(await savedGame(page)).campaign!;
+    let before=await savedGame(page);
     const panel=page.getByRole("complementary",{name:"System metrics"});
-    // Each opening action uses the same left-side placement and its own equipment highlight.
+    // Each component opens the same centered quote and its own equipment highlight.
     for(const [label,equipment] of [[/^Upgrade database/,"db"],[/^Limit to 500/,"gateway"]] as const){
-        const action=panel.getByRole("button",{name:label});
+        const action=await infrastructureAction(page,label);
+        const beforeCancel=await savedGame(page);
         if(touch)await action.tap();else await action.click();
         await usableCard(page);
         await expect(page.locator(`.eq-label[data-eq="${equipment}"]`)).toHaveClass(/is-affected/);
-        await page.locator(".campaign-action-popover").getByText("How it works",{exact:true}).click();
+        await purchasePreview(page).getByText("How it works",{exact:true}).click();
         await usableCard(page);
         await page.keyboard.press("Escape");await expect(action).toBeFocused();
+        expect(await savedGame(page)).toEqual(beforeCancel);
     }
-    const entry=panel.getByRole("button",{name:/^Add server/});
+    const entry=(await infrastructureAction(page,/^Add server/));
+    before=await savedGame(page);
     if(touch)await entry.tap();else await entry.click();
-    const card=page.locator(".campaign-action-popover"),confirm=card.getByRole("button",{name:"Confirm",exact:true});
+    const card=purchasePreview(page),confirm=card.getByRole("button",{name:"Confirm",exact:true});
     await expect(confirm).toBeFocused();
     await expect(card.getByText("Handle more traffic with another server.",{exact:true})).toBeVisible();
     await expect(card.getByText("Route traffic to this server after activation.",{exact:true})).toBeVisible();
     await expect(card.getByRole("note")).toBeVisible();
     await expect(page.locator('.eq-label[data-eq="app"]')).toHaveClass(/is-affected/);
     await expect(card.locator(".campaign-action-machine")).toBeHidden();
-    if(touch)await expect(panel).toBeHidden();else await expect(panel).toBeVisible();
+    await expect(page.getByRole("dialog",{name:"Purchase preview",exact:true})).toHaveAttribute("aria-modal","true");
     await usableCard(page);
     await page.screenshot({path:`test-results/purchase-${width}x${height}.png`});
     const summary=card.getByText("How it works",{exact:true});
@@ -75,10 +82,11 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
     await usableCard(page);
     await page.screenshot({path:`test-results/purchase-${width}x${height}-expanded.png`});
     if(!touch){
-        await openCameraControls(page); await page.getByRole("button",{name:"Rotate left",exact:true}).click();await usableCard(page);
+        // A modal deliberately blocks the camera; resizing must still keep its footer usable.
+        await expect.poll(()=>page.getByRole("main").evaluate(el=>{const b=el.getBoundingClientRect();return !el.contains(document.elementFromPoint(b.x+b.width/2,b.y+b.height/2));})).toBe(true);
         await page.setViewportSize({width:width===1440?1366:1440,height:width===1440?768:900});
         await usableCard(page);
-        await page.setViewportSize({width:390,height:844});await expect(card).toHaveAttribute("data-layout","sheet");
+        await page.setViewportSize({width:390,height:844});await expect(card).toHaveAttribute("aria-modal","true");
         await usableCard(page);
         await page.screenshot({path:`test-results/purchase-${width}-resized-touch.png`});
     }
@@ -86,12 +94,12 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
     const cancel=card.getByRole("button",{name:"Cancel",exact:true});
     if(touch)await cancel.tap();else await cancel.click();
     await expect(card).toBeHidden();await expect(panel).toBeVisible();await expect(entry).toBeFocused();
-    expect((await savedGame(page)).campaign).toEqual(before);
+    expect(await savedGame(page)).toEqual(before);
     if(touch)await entry.tap();else await entry.click();
     await usableCard(page);
     if(touch)await card.getByRole("button",{name:"Confirm",exact:true}).tap();else await card.getByRole("button",{name:"Confirm",exact:true}).click();
     await expect(card).toBeHidden();
-    expect((await savedGame(page)).campaign!.cashCents).toBe(before.cashCents-100000);
+    expect((await savedGame(page)).campaign!.cashCents).toBe(before.campaign!.cashCents-100000);
     expect((await savedGame(page)).campaign!.pending.filter(a=>a.type==="add-app")).toHaveLength(1);
 }
 
@@ -99,15 +107,14 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
 export async function purchaseActions(page:Page,game:GameState,actions:readonly (readonly [RegExp,string])[]) {
     await page.route("**/api/**",r=>r.abort());await seedSave(page,game);
     await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
-    await openPanelTab(page,"Actions");
-    const before=(await savedGame(page)).campaign;
+    const before=await savedGame(page);
     for(const [label,equipment] of actions){
-        const button=page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:label});
+        const button=await infrastructureAction(page,label);
         await button.click();await usableCard(page);
         await expect(page.locator(`.eq-label[data-eq="${equipment}"]`)).toHaveClass(/is-affected/);
-        await page.locator(".campaign-action-popover").getByText("How it works",{exact:true}).click();await usableCard(page);
-        await page.locator(".campaign-action-popover").getByRole("button",{name:"Cancel",exact:true}).click();
+        await purchasePreview(page).getByText("How it works",{exact:true}).click();await usableCard(page);
+        await purchasePreview(page).getByRole("button",{name:"Cancel",exact:true}).click();
         await expect(button).toBeFocused();
     }
-    expect((await savedGame(page)).campaign).toEqual(before);
+    await expectInspectionsOnly(page,before);
 }

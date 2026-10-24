@@ -57,6 +57,8 @@ it("closes the dashboard when a different company replaces the current company",
     expect(screen.queryByRole("dialog", { name: "App Health" })).toBeNull();
 });
 it("keeps an open purchase quote and its highlight through dashboard inspection", () => {
+    // Quotes are available on operating companies after the component introduction.
+    useGame.setState({game:newGame(1,"health-purchase",2)});
     render(<><CampaignHeader /><CampaignAction label="Add server" decision={{ type: "add_server" }} price={1000} onClick={() => {}} /></>);
     fireEvent.click(screen.getByRole("button", { name: /Add server/ }));
     const quote = screen.getByRole("region", { name: "Confirm Add server" }).textContent;
@@ -65,4 +67,21 @@ it("keeps an open purchase quote and its highlight through dashboard inspection"
     fireEvent.click(within(screen.getByRole("dialog", { name: "App Health" })).getByRole("button", { name: "Close" }));
     expect(confirmingAction()).toBe("Add server"); expect(useGame.getState().affected).toEqual(affected);
     expect(screen.getByRole("region", { name: "Confirm Add server" }).textContent).toBe(quote);
+});
+
+it("keeps uptime in the detailed panel and leaves only status in the header", () => {
+    render(<CampaignHeader />);
+    const entry = screen.getByRole("button", { name: "View app health" });
+    expect(entry.textContent).not.toContain("Uptime");
+    fireEvent.click(entry);
+    const dialog = screen.getByRole("dialog", { name: "App Health" });
+    expect(within(dialog).getByText("\u2014 / Not enough data")).toBeTruthy();
+    const game = structuredClone(useGame.getState().game);
+    Object.assign(game.campaign!.cumulative, { successful: 9999, failed: 1, rejected: 0 });
+    act(() => useGame.setState({ game }));
+    expect(within(dialog).getByText("99.990%")).toBeTruthy();
+    expect(entry.querySelector("strong")!.textContent).toBe("Healthy");
+    expect(within(entry).queryByText(/Uptime/)).toBeNull();
+    expect(within(dialog).getByText(/across this company/)).toBeTruthy();
+    expect(document.querySelector(".stat-uptime")).toBeNull();
 });

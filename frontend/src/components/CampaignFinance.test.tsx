@@ -1,6 +1,9 @@
+import InspectionReveal from "./InspectionReveal";
+import { inspectionAction } from "./inspectionTestUtils";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useGame } from "@/game/store";
+import { saveGame } from "@/game/persist";
 import { newGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
 import { CampaignHeader, CampaignPanel } from "./CampaignUI";
@@ -11,7 +14,8 @@ import { financeMoney, totalCharges } from "@/game/campaignFinance";
 import { tick } from "@/sim/__tests__/spikeFixtures";
 import { preparedReliability } from "@/sim/__tests__/reliabilityFixture";
 
-beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);useGame.getState().boot();useGame.getState().play();useGame.setState({onboarding:false,tour:null});});
+// Resume an operating company to exercise financial decisions outside the safe introduction.
+beforeEach(()=>{localStorage.clear();saveGame(newGame(1,"finance-legacy",2));useGame.setState(useGame.getInitialState(),true);useGame.getState().boot();useGame.getState().play();useGame.setState({onboarding:false,tour:null});});
 afterEach(()=>{cleanup();vi.useRealTimers();});
 it("keeps the open decision's highlight when focus or hover leaves another action",()=>{
     render(<><CampaignAction label="Add server" decision={{type:"add_server"}} onClick={()=>{}}/>
@@ -43,16 +47,16 @@ it("opens finance from Cash, pauses and restores focus without changing company 
 it("Cancel and double confirmation dispatch at most one purchase",()=>{
     const buy=vi.fn(()=>useGame.getState().act({type:"add_server"}));
     render(<CampaignAction label="Add server" price={1000} decision={{type:"add_server"}} onClick={buy}/>);
-    const before=useGame.getState().game;fireEvent.click(screen.getByRole("button",{name:/Add server/}));fireEvent.click(screen.getByRole("button",{name:"Cancel"}));
+    const before=useGame.getState().game;fireEvent.click(inspectionAction(/Add server/));fireEvent.click(screen.getByRole("button",{name:"Cancel"}));
     expect(useGame.getState().game).toBe(before);
-    fireEvent.click(screen.getByRole("button",{name:/Add server/}));const confirm=screen.getByRole("button",{name:"Confirm"});
+    fireEvent.click(inspectionAction(/Add server/));const confirm=screen.getByRole("button",{name:"Confirm"});
     fireEvent.click(confirm);fireEvent.click(confirm);
     expect(buy).toHaveBeenCalledTimes(1);expect(useGame.getState().game.campaign!.cashCents).toBe(1400000);
 });
 it("requires reviewing a changed cash preview and rejects newly unavailable purchases",()=>{
     const buy=vi.fn(()=>useGame.getState().act({type:"add_server"}));
     render(<CampaignAction label="Add server" decision={{type:"add_server"}} price={1000} onClick={buy}/>);
-    fireEvent.click(screen.getByRole("button",{name:/Add server/}));
+    fireEvent.click(inspectionAction(/Add server/));
     const g=structuredClone(useGame.getState().game);g.campaign!.cashCents=1800000;
     act(()=>useGame.setState({game:g}));fireEvent.click(screen.getByRole("button",{name:"Confirm"}));
     expect(buy).not.toHaveBeenCalled();expect(screen.getByRole("status").textContent).toContain("preview changed");
@@ -61,14 +65,14 @@ it("requires reviewing a changed cash preview and rejects newly unavailable purc
 });
 it("shows an engine reason outside disabled controls and keeps it keyboard reachable",()=>{
     act(()=>useGame.setState({game:advanceSteps(newGame(),60).state}));
-    act(()=>useGame.getState().act({type:"start_db_upgrade"}));render(<CampaignPanel/>);
-    openActions(); const card=screen.getByRole("button",{name:/Add server/}).closest(".campaign-action-card")!;
+    act(()=>useGame.getState().act({type:"start_db_upgrade"}));render(<><CampaignPanel/><InspectionReveal/></>);
+    const card=inspectionAction(/Add server/).closest(".campaign-action-card")!;
     const reason=card.querySelector<HTMLElement>(".campaign-action-reason")!;
     expect(reason.textContent).toBe("An infrastructure deployment is already pending.");reason.focus();expect(document.activeElement).toBe(reason);
 });
 it("disables a confirmation if another deployment makes the action unavailable",()=>{
     const buy=vi.fn();render(<CampaignAction label="Add server" decision={{type:"add_server"}} price={1000} onClick={buy}/>);
-    fireEvent.click(screen.getByRole("button",{name:/Add server/}));
+    fireEvent.click(inspectionAction(/Add server/));
     act(()=>useGame.getState().act({type:"deploy_load_balancer"}));
     const confirm=screen.getByRole("button",{name:"Confirm"});expect(confirm.hasAttribute("disabled")).toBe(true);
     fireEvent.click(confirm);expect(buy).not.toHaveBeenCalled();
@@ -76,7 +80,7 @@ it("disables a confirmation if another deployment makes the action unavailable",
 });
 it("drops an open purchase confirmation when a different company is loaded",()=>{
     render(<CampaignAction label="Add server" decision={{type:"add_server"}} price={1000} onClick={()=>{}}/>);
-    fireEvent.click(screen.getByRole("button",{name:/Add server/}));
+    fireEvent.click(inspectionAction(/Add server/));
     act(()=>useGame.setState({game:newGame(1,"replacement-company")}));
     expect(screen.queryByRole("button",{name:"Confirm"})).toBeNull();
     expect(useGame.getState().game.campaign!.cashCents).toBe(2000000);
@@ -84,7 +88,7 @@ it("drops an open purchase confirmation when a different company is loaded",()=>
 it("closes an open purchase confirmation when the view leaves its machine's floor",()=>{
     act(()=>useGame.getState().goToFloor("office","menu"));
     render(<CampaignAction label="Add server" decision={{type:"add_server"}} price={1000} onClick={()=>{}}/>);
-    fireEvent.click(screen.getByRole("button",{name:/Add server/}));
+    fireEvent.click(inspectionAction(/Add server/));
     // Opening it took the view to the App Servers' floor, and the card stays while the view is there.
     expect(useGame.getState().floor).toBe("servers");
     expect(screen.getByRole("region",{name:"Confirm Add server"})).toBeTruthy();
@@ -92,10 +96,10 @@ it("closes an open purchase confirmation when the view leaves its machine's floo
     act(()=>useGame.getState().goToFloor("office","key"));
     expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull();
     // Focus that was in the card returns to its action rather than falling to the page.
-    expect(document.activeElement).toBe(screen.getByRole("button",{name:/Add server/}));
+    expect(document.activeElement).toBe(inspectionAction(/Add server/));
     act(()=>useGame.getState().goToFloor("servers","key"));
     const elsewhere=document.createElement("button");document.body.append(elsewhere);
-    fireEvent.click(screen.getByRole("button",{name:/Add server/}));elsewhere.focus();
+    fireEvent.click(inspectionAction(/Add server/));elsewhere.focus();
     act(()=>useGame.getState().goToFloor("office","elevator"));
     expect(screen.queryByRole("region",{name:"Confirm Add server"})).toBeNull();
     expect(document.activeElement).toBe(elsewhere);elsewhere.remove();
@@ -169,4 +173,3 @@ it("shows unpaid-cost risk before a forecast is available and withholds estimate
 });
 
 /** Purchases live on the panel's Actions tab. */
-function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

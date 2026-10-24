@@ -110,7 +110,7 @@ export function decodeSave(raw: string): Validation {
 }
 export function makeEnvelope(game: GameState, remainderMs = 0, savedAt = Date.now(), measurement: Measurement = emptyMeasurement()): SaveEnvelope {
     const c = game.campaign!;
-    return { schemaVersion: SCHEMA_VERSION, scenarioId: c.scenarioId, scenarioVersion: c.scenarioVersion, runId: c.runId, seed: game.seed, step: c.step, inputs: c.inputs, serviceMeasurementStart: {fromStep:c.serviceMeasurement?.fromStep??c.step+1,scope:c.serviceMeasurement?.scope==="full-run"?"full-run":"since-upgrade"}, ...(c.foundation?{foundation:c.foundation}:{}), ...(c.legacyPreventionInputs?{legacyPreventionInputs:c.legacyPreventionInputs}:{}), runtime: { remainderMs, measurement }, savedAt };
+    return { schemaVersion: SCHEMA_VERSION, scenarioId: c.scenarioId, scenarioVersion: c.replayScenarioVersion??c.scenarioVersion, runId: c.runId, seed: game.seed, step: c.step, inputs: c.inputs, serviceMeasurementStart: {fromStep:c.serviceMeasurement?.fromStep??c.step+1,scope:c.serviceMeasurement?.scope==="full-run"?"full-run":"since-upgrade"}, ...(c.foundation?{foundation:c.foundation}:{}), ...(c.legacyPreventionInputs?{legacyPreventionInputs:c.legacyPreventionInputs}:{}), runtime: { remainderMs, measurement }, savedAt };
 }
 /** Never replace an existing save unless its payload can actually be replayed. */
 export function replaceable(raw: string | null): boolean {
