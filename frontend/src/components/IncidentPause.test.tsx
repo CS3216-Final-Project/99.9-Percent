@@ -1,3 +1,5 @@
+import InspectionReveal from "./InspectionReveal";
+import { inspectionAction, enterHighlightedInspection } from "./inspectionTestUtils";
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -29,7 +31,7 @@ afterEach(() => {
 });
 function show(game = transition(3).before) {
   useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null });
-  render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /><CampaignOverlays /></CampaignAttentionHost></StrictMode>);
+  render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /><CampaignOverlays /></CampaignAttentionHost></StrictMode>);
 }
 const gold = () => document.querySelectorAll(".campaign-gold-attention");
 function startIncident() {
@@ -57,7 +59,7 @@ it("Pause leads to a fresh ten-second Hint, accepted action, immediate Confirm a
   act(() => vi.advanceTimersByTime(9999)); expect(gold()).toHaveLength(0);
   act(() => vi.advanceTimersByTime(1)); expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
-  fireEvent.click(screen.getByRole("button", { name: "Got it" }));
+  fireEvent.click(screen.getByRole("button", { name: "Got it" })); enterHighlightedInspection();
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Upgrade database");
   fireEvent.click(gold()[0]); expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(gold()[0]); expect(gold()).toHaveLength(0); expect(useGame.getState().running).toBe(false);
@@ -91,7 +93,7 @@ it("preserves a still-valid accepted investigation when its new incident opens",
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   // The observed overload already exists before the third qualifying overloaded second opens the incident.
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
-  fireEvent.click(screen.getByRole("button", { name: "Got it" }));
+  fireEvent.click(screen.getByRole("button", { name: "Got it" })); enterHighlightedInspection();
   const target = gold()[0]; expect(target.textContent).toContain("Upgrade database");
   act(() => useGame.getState().tick(1)); expect(gold()).toHaveLength(1); expect(gold()[0]).toBe(target);
 });
@@ -106,7 +108,7 @@ it("chapter tutorial ownership suppresses the new offer", () => {
 });
 it("a valid purchase Confirm wins immediately and consumes the Pause invitation", () => {
   show(transition(1).before); startIncident(); expect(gold()).toHaveLength(1);
-  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+  fireEvent.click(inspectionAction(/^Upgrade database/));
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(screen.getByRole("button", { name: "Cancel" })); expect(gold()).toHaveLength(0);
   act(() => useGame.getState().tick(1)); expect(gold()).toHaveLength(0);
@@ -121,14 +123,14 @@ it("offers Pause for a later distinct incident in the same company after a free 
   show(pauseTransition(1, "pause-repeat").before); startIncident();
   const first = useGame.getState().game.campaign!.incident!.id;
   fireEvent.click(screen.getByRole("button", { name: "Pause" }));
-  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Limit to 500/ }));
+  fireEvent.click(inspectionAction(/^Limit to 500/));
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   for (let i = 0; i < 40 && useGame.getState().game.phase !== "review"; i++) act(() => useGame.getState().tick(1));
   expect(useGame.getState().game.phase).toBe("review"); expect(gold()).toHaveLength(0);
   fireEvent.click(screen.getByRole("button", { name: "View Incident Report" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
-  fireEvent.click(screen.getByRole("button", { name: /^Remove traffic limit/ }));
+  fireEvent.click(inspectionAction(/^Remove traffic limit/));
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   for (let i = 0; i < 10 && !useGame.getState().game.campaign!.incident; i++) act(() => useGame.getState().tick(1));
@@ -179,4 +181,3 @@ it("does not offer Pause during accepted recovery work with the mouse captured",
 });
 
 /** Purchases live on the panel's Actions tab. */
-function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

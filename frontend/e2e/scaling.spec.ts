@@ -1,5 +1,6 @@
+import { infrastructureAction } from "./componentInspection";
 import type { Page } from "@playwright/test";
-import { test, expect, seedSave, savedGame, expectRoom, advanceCampaignStep, openPanelTab } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, advanceCampaignStep } from "./fixtures";
 import { newGame, applyAction, type GameState, type Action } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
@@ -15,15 +16,17 @@ function company() {
   return act(act(game, { type: "acknowledge_review" }), { type: "acknowledge_milestone" });
 }
 function appIncident() {
-  return advanceSteps(act(company(), { type: "start_db_upgrade" }), 9).state;
+  return advanceSteps(act(act(company(), {type:"incident_inspect",equipment:"db"}), { type: "start_db_upgrade" }), 9).state;
 }
 /** The exact pending configuration reached by each installation journey below. */
 function pendingRecovery(path: ScalingPath) {
-  let game = appIncident();
+  let game = act(appIncident(),{type:"incident_inspect",equipment:"app",appId:"app-1"});
   if (path === "vertical") return act(game, { type: "scale_up", appId: "app-1" });
   game = advanceSteps(act(game, { type: "add_server" }), 2).state;
   game = act(game, { type: "incident_inspect", equipment: "app", appId: "app-2" });
+  game=act(game,{type:"incident_inspect",equipment:"gateway"});
   game = advanceSteps(act(game, { type: "deploy_load_balancer" }), 2).state;
+  game=act(game,{type:"incident_inspect",equipment:"gateway"});
   return act(game, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2"] });
 }
 async function boot(page: Page, game: GameState) {
@@ -36,8 +39,7 @@ async function boot(page: Page, game: GameState) {
   return api;
 }
 async function confirm(page: Page, name: RegExp) {
-  await openPanelTab(page, "Actions");
-  await page.getByRole("button", { name }).click();
+  await (await infrastructureAction(page,name)).click();
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
 }
 
@@ -68,15 +70,15 @@ for (const path of ["vertical", "horizontal"] as const) {
       // Paint the installed rack with the physical game still paused.
       await page.clock.runFor(200);
       await page.getByRole("main").getByRole("button", { name: "App 2", exact: true }).click();
-      const reveal = page.getByRole("dialog", { name: "Servers inspected" });
+      const reveal = page.getByRole("dialog", { name: "App Servers" });
       await expect(reveal).toContainText("App 2");
-      await reveal.getByRole("button", { name: "Return to room" }).click();
-      await expect(page.getByRole("region", { name: "Application instances" }).getByRole("button", { name: /App 2:/ })).toHaveAttribute("aria-pressed", "true");
+      await reveal.getByRole("button",{name:"Back to Server management",exact:true}).click();await expect(reveal.getByRole("region", { name: "Application instances" }).getByRole("button", { name: /App 2:/ })).toHaveAttribute("aria-pressed", "true");
+      await reveal.getByRole("button", { name: "Close",exact:true }).click();
       await confirm(page, /Deploy load balancing/);
       await advanceCampaignStep(page, { seconds: 2, resumeClock: false });
       expect((await savedGame(page)).campaign!.routing.mode).toBe("single");
-      await page.getByText("Configure routing · App 1 only", { exact: true }).click();
-      await page.getByRole("button", { name: "All apps", exact: true }).click();
+      await infrastructureAction(page,"All apps");
+      await (await infrastructureAction(page,"All apps")).click();
     } else await confirm(page, /Scale up App 1/);
     // Validate the handoff as well as the controls: recovery seeds this very configuration.
     expect((await savedGame(page)).campaign).toEqual(pendingRecovery(path).campaign);

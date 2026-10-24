@@ -1,3 +1,4 @@
+import { infrastructureAction, closeInspection, followHintComponent } from "./componentInspection";
 import type { Locator, Page } from "@playwright/test";
 import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -120,21 +121,21 @@ test("Guided Mode incident: the sheet stays at least half open with every respon
   await expect(panel.getByRole("region", { name: "Incident recovery" })).toBeVisible();
   await openPanelTab(page, "Actions");
   for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
-    const response = panel.getByRole("button", { name });
+    const response = await infrastructureAction(page,name);
     await response.scrollIntoViewIfNeeded();
-    // Inside the sheet's own scroll area, clipped by it like any other reader would be.
+    // The existing action is reachable in its component dialog.
     await expect(response).toBeInViewport({ ratio: 0.95 });
     await expect(response).toBeEnabled();
   }
-  // The quote opens as a sheet of its own over the room, with Confirm and Cancel pinned above the dock.
-  await panel.getByRole("button", { name: /Upgrade database/ }).tap();
+  // The shared quote blocks the background and keeps its decision visible on this phone.
+  await (await infrastructureAction(page,/Upgrade database/)).tap();
   const confirm = page.getByRole("button", { name: "Confirm", exact: true });
   const cancel = page.getByRole("button", { name: "Cancel", exact: true });
   await expect(confirm).toBeInViewport({ ratio: 1 });
   await expect(cancel).toBeInViewport({ ratio: 1 });
   expect((await box(cancel)).y + (await box(cancel)).height).toBeLessThanOrEqual((await box(dock(page))).y);
-  await expect(sheet(page)).toBeHidden();
-  await cancel.tap();
+  expect(await handle(page).evaluate(el=>{const b=el.getBoundingClientRect();return !el.contains(document.elementFromPoint(b.x+b.width/2,b.y+b.height/2));})).toBe(true);
+  await cancel.tap();await closeInspection(page);
   await expect(sheet(page)).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
@@ -302,10 +303,11 @@ for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }]) t
   await expect(card).toBeInViewport({ ratio: 1 });
   await expect(card).toContainText("Your database is overloaded");
   await card.getByRole("button", { name: "Got it" }).tap();
-  // An incident holds the sheet half open, so the gold mark lands on the action itself.
+  // The incident keeps its sheet open; accepted help reaches the shared component popup first.
   await expect(handle(page)).toHaveAttribute("aria-expanded", "true");
   const target = page.locator(".campaign-gold-attention");
   await expect(target).toHaveCount(1);
+  await expect(target).toHaveAccessibleName("Database");await followHintComponent(page);
   await expect(target).toHaveAccessibleName(/^Upgrade database/);
   await expect(target).toBeInViewport({ ratio: 1 });
   await expectNoHorizontalOverflow(page);

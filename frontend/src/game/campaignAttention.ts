@@ -1,3 +1,5 @@
+import { introductionActive } from "@/sim/introduction";
+import { introductionInstruction } from "./introduction";
 import type { Action, GameState } from "@/sim";
 import type { Campaign } from "@/sim/campaignTypes";
 import { admissionCeiling, allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData } from "@/sim/step";
@@ -74,6 +76,12 @@ export function incidentNeedsPause(game: GameState, decision = campaignAttention
 
 /** Keep technical candidates internal; present one justified, validated next interaction. */
 export function campaignAttention(game: GameState): AttentionDecision {
+  if(introductionActive(game.campaign)) {
+    const c=game.campaign!,instruction=introductionInstruction(c);
+    return {chapter:0,key:`${c.runId}:introduction:${c.launchWeek!.introduction!.explored.length}`,reason:"introduction",attention:"hint",
+      observation:instruction.description,recommendation:instruction.message,message:`${instruction.description} ${instruction.message}`,
+      target:instruction.equipment==="gateway"?"network":instruction.equipment??"next"};
+  }
   const decision = baseAttention(game), c = game.campaign;
   if (c && decision.reason === "scaling-choice") {
     const upgrade = previewCampaignAction(game, { type: "start_db_upgrade" }).ok

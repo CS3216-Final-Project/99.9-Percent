@@ -1,3 +1,4 @@
+import { infrastructureAction, inspectEquipment, closeInspection, purchasePreview, followHintComponent, expectInspectionsOnly } from "./componentInspection";
 import { reliabilityClarity } from "./reliabilityClarity";
 import { campaignReportJourney } from "./campaignReports";
 import { chapter6FinanceJourney } from "./chapter6Finance";
@@ -60,7 +61,7 @@ for (const width of [390, 320]) test(`Phase 1 Hint and accepted control remain u
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
   await page.getByRole("button", {name:"Hide equipment and actions",exact:true}).tap();
   // A real tap resets inactivity without changing the company.
-  await page.getByRole("button", { name: "Hint", exact: true }).tap();
+  await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).tap();
   const card = page.getByRole("dialog", { name: "Hint", exact: true });
   await expect(card).toBeInViewport({ ratio: 1 }); await expect(card).toContainText("Your database is overloaded");
   await expect(card.locator("p")).toHaveCount(1); await expect(card.locator("input,fieldset,select")).toHaveCount(0);
@@ -70,10 +71,10 @@ for (const width of [390, 320]) test(`Phase 1 Hint and accepted control remain u
   const target = page.locator(".campaign-gold-attention");
   await expect(target).toHaveCount(1); await expect(target).toHaveAccessibleName("Equipment & actions");
   await target.tap();
-  await expect(target).toHaveCount(1); await expect(target).toHaveAccessibleName(/^Upgrade database/);
+  await expect(target).toHaveCount(1); await followHintComponent(page); await expect(target).toHaveAccessibleName(/^Upgrade database/);
   await expect(target).toBeInViewport({ ratio: 1 });
   expect(await target.evaluate(node => getComputedStyle(node).animationName)).toBe("none");
-  expect((await savedGame(page)).campaign!.inputs).toEqual(game.campaign!.inputs);
+  await expectInspectionsOnly(page,game);
   await page.screenshot({ path: info.outputPath(`hint-target-touch-${width}.png`) });
   await target.tap(); await expect(target).toHaveCount(1); await expect(target).toHaveAccessibleName("Confirm");
   await expect(target).toBeInViewport({ratio:1});
@@ -88,8 +89,7 @@ for (const width of [390, 320]) test(`Phase 1 Hint and accepted control remain u
   await expect(target).toHaveCount(1); await expect(target).toHaveAccessibleName("Confirm");
   await expect(target).toBeInViewport({ratio:1});
   await page.getByRole("button",{name:"Cancel",exact:true}).tap(); await expect(target).toHaveCount(0);
-  await openPanelTab(page, "Actions");
-  await page.getByRole("button",{name:/^Upgrade database/}).tap(); await expect(target).toHaveAccessibleName("Confirm");
+  await (await infrastructureAction(page,/^Upgrade database/)).tap(); await expect(target).toHaveAccessibleName("Confirm");
   await target.tap(); await expect(target).toHaveCount(0);
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="upgrade-db")).toBe(true);
   await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeInViewport({ ratio: 1 });
@@ -169,10 +169,9 @@ test("finance and infrastructure help are reachable by touch with reduced motion
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
  await finance.getByRole("button",{name:"Close",exact:true}).tap();
  await page.locator('.campaign-panel .chip').filter({hasText:/^App Server$/}).tap();
- await page.getByText("About Servers",{exact:true}).tap();
+ await inspectEquipment(page,"app",true);await page.getByText("About Servers",{exact:true}).tap();
  await expect(page.locator('.campaign-evidence')).toContainText("needs routing");
- await openPanelTab(page, "Actions");
- await page.getByRole("button",{name:/Add server/}).tap();const confirmation=page.getByRole("region",{name:"Confirm Add server"});
+ await (await infrastructureAction(page,/Add server/)).tap();const confirmation=page.getByRole("region",{name:"Confirm Add server"});
  await expect(confirmation).toContainText("$19,000");await confirmation.getByRole("button",{name:"Cancel"}).tap();
  expect((await savedGame(page)).campaign!.cashCents).toBe(2000000);
 });
@@ -196,10 +195,9 @@ test("purchase details keyboard navigation handles overflow and fitting content"
  await withoutRoom();await page.setViewportSize({width:390,height:667});await page.emulateMedia({reducedMotion:"reduce"});
  await page.route("**/api/**",r=>r.abort());await seedSave(page,tick(newGame(1,"details-keyboard"),60));
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
- const before=(await savedGame(page)).campaign;
- await openPanelTab(page, "Actions");
- await page.getByRole("button",{name:/^Add server/}).tap();
- const card=page.locator(".campaign-action-popover"),content=card.getByRole("region",{name:"Purchase details",exact:true});
+ const before=await savedGame(page);
+ await (await infrastructureAction(page,/^Add server/)).tap();
+ const card=purchasePreview(page),content=card.getByRole("region",{name:"Purchase details",exact:true});
  await card.getByText("How it works",{exact:true}).tap();
  await expect.poll(()=>content.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(0);
  await expect.poll(()=>content.evaluate(el=>{
@@ -210,8 +208,8 @@ test("purchase details keyboard navigation handles overflow and fitting content"
  await page.setViewportSize({width:390,height:1200});
  await expect.poll(()=>content.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(0);
  await keyboardDetails(page); // Natural fitting content; no artificial overflow.
- await card.getByRole("button",{name:"Cancel",exact:true}).tap();
- expect((await savedGame(page)).campaign).toEqual(before);
+ await card.getByRole("button",{name:"Cancel",exact:true}).tap();await closeInspection(page);
+ await expectInspectionsOnly(page,before);
 });
 
 
@@ -326,17 +324,17 @@ test("reliability: inspection and effective recipients remain clear on narrow to
  await page.route("**/api/**",route=>route.abort());
  await seedSave(page,tick(act(preparedReliability(),{type:"arm_reliability"}),9));
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
- const panel=page.getByRole("region",{name:"Stay Online"});
- await openPanelTab(page,"Actions");
+ await inspectEquipment(page,"app");
+ const panel=page.getByRole("region",{name:"Reliability actions"});
  await panel.getByRole("button",{name:"Inspect App 2 health · free",exact:true}).tap();
  const instances=page.getByRole("region",{name:"Application instances"});
  await expect(instances.getByRole("button",{name:/App 2: Installed - not receiving traffic/})).toHaveAttribute("aria-pressed","true");
  // Inspecting brought its readings forward on Analysis; the restoration is back on Actions.
  await openPanelTab(page,"Actions");
  await expect(panel).toContainText("detected unhealthy");
- await expect(page.getByRole("button",{name:"Restore App 2 · free · 3 game seconds",exact:true})).toBeEnabled();
+ await expect((await infrastructureAction(page,"Restore App 2 · free · 3 game seconds"))).toBeEnabled();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
- await page.getByRole("button",{name:"Tech",exact:true}).tap();
+ await closeInspection(page);await page.getByRole("button",{name:"Tech",exact:true}).tap();
  const tree=page.getByRole("region",{name:"Tech tree"});
  await expect(tree.locator("[data-tech]")).toHaveCount(9);
  await tree.getByRole("button",{name:"Automatic Failover: Owned",exact:true}).tap();
@@ -380,21 +378,24 @@ test("investigates and responds through the incident panel on touch", async ({ p
   const latencyBox = (await panel.getByText("Latency · ms", { exact: true }).boundingBox())!;
   expect(requirementBox.y + requirementBox.height).toBeLessThanOrEqual(latencyBox.y);
   await expect(panel.getByRole("region", { name: "Incident recovery" })).toContainText("Latency below 500 ms");
-  await panel.getByRole("button", { name: "Database", exact: true }).tap();
-  await expect(panel.locator(".campaign-evidence .evidence-rows dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
-  await expect(panel.getByRole("progressbar", { name: "Database load: 800 of 600 operations/s" })).toBeVisible();
+  const database=await inspectEquipment(page,"db",true);
+  await expect(database.locator(".campaign-evidence .evidence-rows dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
+  await expect(database.getByRole("progressbar", { name: "Database load: 800 of 600 operations/s" })).toBeVisible();
   expect((await savedGame(page)).campaign!.step).toBe(6);
   await expect(panel.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
   await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
   await openPanelTab(page, "Actions");
   for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
-    const button = panel.getByRole("button", { name });
+    const button = await infrastructureAction(page,name);
     await button.scrollIntoViewIfNeeded();
     await expect(button).toBeVisible();
   }
-  await panel.getByRole("button", { name: /Upgrade database/ }).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
+  await inspectEquipment(page,"db",true);
+  await expect(database.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
+  await expect(database.getByText("Full system evidence", { exact: true })).toHaveCount(0);
+  await (await infrastructureAction(page,/Upgrade database/)).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
   await expect(panel.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("3 game second(s)");
-  await expect(panel.getByRole("button", { name: /Add server/ })).toBeDisabled();
+  await expect((await infrastructureAction(page,/Add server/))).toBeDisabled();await closeInspection(page);
   await page.screenshot({ path: "test-results/phase1-mobile-incident.png" });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
   await page.getByRole("button", { name: "Run", exact: true }).tap();
@@ -440,10 +441,9 @@ test("selects scaling instances through room and evidence on touch",async({page}
  await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
  await page.getByRole("main").getByRole("button",{name:"App 2",exact:true}).tap();
  await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 2:/})).toHaveAttribute("aria-pressed","true");
- await page.getByRole("dialog",{name:"Servers inspected"}).getByRole("button",{name:"Return to room"}).tap();
  await page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 1:/}).tap();
  await expect(page.getByRole("main").getByRole("button",{name:"App 1",exact:true})).toHaveAttribute("aria-pressed","true");
- await page.screenshot({path:"test-results/phase3-mobile.png"});
+ await closeInspection(page);await page.screenshot({path:"test-results/phase3-mobile.png"});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
 });
 
@@ -458,7 +458,7 @@ test('account controls remain usable on touch while accounts are offline',async(
   await page.screenshot({path:'test-results/phase3-account-mobile.png'});
   await dialog.getByRole('button',{name:'Close'}).tap();
   await page.getByRole('button',{name:'Start Guided Mode',exact:true}).tap();
-  await expect(page.getByRole('dialog',{name:'Launch week'})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Introduction Progress'})).toContainText('0/4');
 });
 
 
@@ -470,12 +470,11 @@ test("cache selection, paid activation and warmth reload on touch",async({page, 
  await page.route("**/api/**",route=>route.abort());await seedSave(page,dataCompany());
  await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
  const panel=page.getByRole("complementary",{name:"System metrics"}),data=page.getByRole("region",{name:"Data strategy"});
- await openPanelTab(page,"Actions");
- await data.getByRole("button",{name:/Deploy Read Cache/}).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
+ await (await infrastructureAction(page,/Deploy Read Cache/)).tap(); await page.getByRole("button", { name: "Confirm", exact: true }).tap();
  await advanceCampaignStep(page,{seconds:2});
  const roomCache=page.getByRole("main").getByRole("button",{name:/Read Cache/});
  await roomCache.tap();await expect(roomCache).toHaveAttribute("aria-pressed","true");await expect(panel.getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");
- await page.getByRole("dialog",{name:"Read Cache inspected"}).getByRole("button",{name:"Return to room"}).tap();
+ await page.getByRole("dialog",{name:"Read Cache inspected"}).getByRole("button",{name:"Close"}).tap();
  await advanceCampaignStep(page);
  const before=(await savedGame(page)).campaign!;expect(before.readCache).not.toBeNull();expect(before.readCache!.warmth).toBe(0);
  await advanceCampaignStep(page);
@@ -493,11 +492,11 @@ test("traffic spikes: touch selects an instance after retirement leaves an ID ga
  await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
  const room=page.getByRole("main"),app=room.getByRole("button",{name:"App 5",exact:true});
  await app.tap();await expect(app).toHaveAttribute("aria-pressed","true");
+ await expect(page.getByRole("dialog",{name:"App Servers"}).getByRole("heading",{name:"App 5",exact:true})).toBeVisible();await page.getByRole("button",{name:"Back to Server management",exact:true}).tap();
  await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 5:/})).toHaveAttribute("aria-pressed","true");
- await page.getByRole("dialog",{name:"Servers inspected"}).getByRole("button",{name:"Return to room"}).tap();
- await openPanelTab(page,"Actions");
- await page.getByRole("region",{name:"Traffic spikes and autoscaling"}).scrollIntoViewIfNeeded();
- await page.screenshot({path:"test-results/phase5-mobile.png"});
+ await page.getByRole("dialog",{name:"App Servers"}).getByRole("button",{name:"Close"}).tap();
+ await inspectEquipment(page,"app");await page.getByRole("button",{name:"Server management",exact:true}).tap();await page.getByRole("button",{name:"Autoscaling",exact:true}).tap();await page.getByRole("region",{name:"Autoscaling",exact:true}).scrollIntoViewIfNeeded();
+ await page.screenshot({path:"test-results/phase5-mobile.png"});await closeInspection(page);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
  await page.getByRole("button",{name:"Menu",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Menu",exact:true})).toBeVisible();
 });
@@ -510,10 +509,10 @@ for(const width of [390,320]) test(`Campaign UX: the touch opening and secondary
  await page.setViewportSize({width,height:844});
  await page.goto("/");await page.getByRole("button",{name:"Start Guided Mode",exact:true}).tap();
  await expectRoom(page);
- const letter=page.getByRole("dialog",{name:"Launch week"});
- await expect(letter).toBeInViewport({ratio:1});
- await page.screenshot({path:`test-results/clarity-letter-${width}.png`});
- await letter.getByRole("button",{name:"Open the doors",exact:true}).tap();
+ const introduction=page.getByRole("region",{name:"Introduction Progress"});
+ await expect(introduction).toBeInViewport({ratio:1});
+ await page.screenshot({path:`test-results/clarity-introduction-${width}.png`});
+ await completeTutorial(page);
  const navigation = page.locator(".room-menu");
  await navigation.locator(":scope > summary").tap();
  const officeFloor = navigation.getByRole("group", { name: "Floors" }).getByRole("button", { name: /^Office floor/ });

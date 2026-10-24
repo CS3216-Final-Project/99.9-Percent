@@ -1,3 +1,5 @@
+import InspectionReveal from "./InspectionReveal";
+import { inspectionAction, enterHighlightedInspection } from "./inspectionTestUtils";
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -21,13 +23,13 @@ beforeEach(() => {
 afterEach(() => { cleanup(); setConfirming(null); vi.useRealTimers(); vi.restoreAllMocks(); });
 function show(game: GameState = newGame()) {
   useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null });
-  render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost><TooltipLayer /></StrictMode>);
+  render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost><TooltipLayer /></StrictMode>);
 }
 const gold = () => document.querySelectorAll(".campaign-gold-attention");
-const openActions = () => fireEvent.click(screen.getByRole("tab", { name: /^Actions/ }));
 function acceptHint() {
   const card = within(screen.getByRole("dialog", { name: "Hint" }));
   fireEvent.click(card.queryByRole("button", { name: "Got it" }) ?? card.queryByRole("button", { name: "Upgrade database" }) ?? card.getByRole("button", { name: "Accept risk" }));
+  enterHighlightedInspection();
 }
 
 const scaling = () => decide(decide(tick(decide(tick(newGame(), 6), { type: "start_db_upgrade" }), 30), { type: "acknowledge_review" }), { type: "acknowledge_milestone" });
@@ -56,7 +58,7 @@ it.each([
 });
 it("keeps database preparation available and switches to Run after actual headroom activation", () => {
   show(scaling()); act(() => vi.advanceTimersByTime(10000));
-  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+  fireEvent.click(inspectionAction(/^Upgrade database/));
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(screen.getByRole("button", { name: "Confirm" })); expect(gold()).toHaveLength(0);
   act(() => useGame.setState({ game: tick(useGame.getState().game, 3) }));
@@ -73,7 +75,7 @@ it("never marks a disabled progression control, and accepted manual help owns th
 });
 it("lets a valid purchase Confirm take priority over the open nonmodal growth explanation", () => {
   show(scaling()); fireEvent.click(screen.getByRole("button", { name: "Consider growth with current capacity" }));
-  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+  fireEvent.click(inspectionAction(/^Upgrade database/));
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(screen.getByRole("button", { name: "Cancel" })); expect(gold()).toHaveLength(1);
   expect(gold()[0]).toBe(screen.getByRole("button", { name: "Accept growth risk" }));
@@ -102,7 +104,7 @@ it("uses a collapsed panel entry without opening it or applying an action", () =
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   acceptHint();
   expect(gold()[0].textContent).toContain("Equipment & actions"); expect(useGame.getState().panelOpen).toBe(false);
-  fireEvent.click(screen.getByRole("button", { name: "Equipment & actions" })); expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Upgrade database");
+  fireEvent.click(screen.getByRole("button", { name: "Equipment & actions" })); enterHighlightedInspection(); expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Upgrade database");
 });
 it("does not point at an inspection toggle that would close already-open evidence", () => {
   show(advanceSteps(newGame(), 6).state);
@@ -170,7 +172,7 @@ it("transfers accepted upgrade guidance through a collapsed inspector to immedia
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   acceptHint();
   expect(gold()[0].textContent).toContain("Equipment & actions");
-  fireEvent.click(gold()[0]);
+  fireEvent.click(gold()[0]); enterHighlightedInspection();
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Upgrade database");
   act(() => useGame.setState({ game: structuredClone(useGame.getState().game) }));
   expect(gold()).toHaveLength(1);
@@ -186,27 +188,29 @@ it("clears an accepted purchase when cash becomes insufficient mid-sequence", ()
   act(() => useGame.setState({ game })); expect(gold()).toHaveLength(0);
 });
 it("shared confirmations immediately glow for valid purchases and stop for stale, invalid and tutorial-owned quotes", () => {
-  show(); openActions(); fireEvent.click(screen.getByRole("button", { name: /Add server/ }));
+  show(); fireEvent.click(inspectionAction(/Add server/));
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   const changed = structuredClone(useGame.getState().game); changed.campaign!.cashCents -= 1;
   act(() => useGame.setState({ game: changed })); expect(gold()).toHaveLength(0);
   fireEvent.click(screen.getByRole("button", { name: "Confirm" })); // existing preview review guard
   expect(gold()).toHaveLength(1);
   act(() => useGame.setState({ tour: { track: "basics", step: 0 } })); expect(gold()).toHaveLength(0);
+  expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
   act(() => useGame.setState({ tour: null }));
+  fireEvent.click(inspectionAction(/Add server/));
   const invalid = structuredClone(changed); invalid.campaign!.cashCents = 0;
   act(() => useGame.setState({ game: invalid })); expect(gold()).toHaveLength(0);
   expect(screen.getByRole("button", { name: "Confirm" }).hasAttribute("disabled")).toBe(true);
 });
 it("Confirm purchase dispatches the unchanged action and removes its sole spotlight", () => {
-  show(); openActions(); fireEvent.click(screen.getByRole("button", { name: /Upgrade database/ }));
+  show(); fireEvent.click(inspectionAction(/Upgrade database/));
   expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(gold()[0]); expect(gold()).toHaveLength(0);
   expect(useGame.getState().game.campaign!.pending.some(a => a.type === "upgrade-db")).toBe(true);
 });
 
 it("a blocking local modal takes priority over an actual valid purchase quote", async () => {
-  show(); openActions(); fireEvent.click(screen.getByRole("button", { name: /Add server/ }));
+  show(); fireEvent.click(inspectionAction(/Add server/));
   expect(gold()[0].textContent).toBe("Confirm");
   const modal = document.createElement("div"); modal.className = "modal-backdrop";
   await act(async () => { document.body.append(modal); }); expect(gold()).toHaveLength(0);
@@ -217,7 +221,7 @@ it("a blocking local modal takes priority over an actual valid purchase quote", 
 it("removes gold from a control clipped by its scrolling inspector without discarding acceptance", () => {
   show(advanceSteps(newGame(), 6).state);
   fireEvent.click(screen.getByRole("button", { name: "Hint" })); acceptHint();
-  const inspector = screen.getByRole("complementary", { name: "System metrics" });
+  const inspector = screen.getByRole("dialog", { name: "Database inspected" });
   inspector.style.overflowY = "auto";
   Object.defineProperty(inspector, "getBoundingClientRect", { configurable:true, value:()=>({ x:10,y:10,top:10,left:10,right:54,bottom:35,width:44,height:25,toJSON:()=>({}) }) });
   fireEvent.scroll(inspector); expect(gold()).toHaveLength(0);
@@ -236,7 +240,7 @@ it("shows one short explanation, no choices and an immediately enabled acknowled
   expect(screen.getByRole("button",{name:"Got it"}).hasAttribute("disabled")).toBe(false);
   expect(useGame.getState().game).toBe(before);
   acceptHint(); expect(gold()[0].textContent).toContain("Upgrade database");
-  expect(screen.getByRole("button",{name:/^Limit to 500/}).hasAttribute("disabled")).toBe(false);
+  expect(inspectionAction(/^Limit to 500/).hasAttribute("disabled")).toBe(false);
 });
 
 it("offers both real growth strategies and transfers accepted risk without dispatching until confirmation", () => {
@@ -291,10 +295,8 @@ it("teaches Launch Week with spotlighted tutorial steps instead of the Hint butt
   fireEvent.click(lit()[0]);
   const metrics = screen.getByRole("region", { name: "Launch Week tutorial" });
   expect(metrics.textContent).toContain("Read the metrics");
-  expect(lit()[0].classList.contains("equipment-readings")).toBe(true);
+  expect(lit()[0].classList.contains("component-inspection-summary")).toBe(true);
   fireEvent.click(within(metrics).getByRole("button", { name: "Next" }));
-  // The fix is a purchase on the Actions tab, so the tab carries the spotlight until the player opens it.
-  spotOn(/^Actions/);
-  fireEvent.click(lit()[0]);
+  // The fix is in the shared Database inspection, already open after reading metrics.
   spotOn(/^Upgrade database/);
 });

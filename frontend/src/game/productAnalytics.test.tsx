@@ -4,7 +4,7 @@ import { act as reactAct, cleanup, fireEvent, render, screen } from "@testing-li
 import App from "@/App";
 import { useGame } from "./store";
 import { newGame, newLegacyGame } from "@/sim";
-import { DEFAULT_META, saveClassicGame, saveMeta, saveMode } from "./persist";
+import { DEFAULT_META, saveGame, saveClassicGame, saveMeta, saveMode } from "./persist";
 import { preparedReliability, act, tick } from "@/sim/__tests__/reliabilityFixture";
 import { pendingReliability } from "@/sim/reliability";
 import { ANALYTICS_STORAGE_KEY, HEARTBEAT_MS, IDLE_MS, watchProductAnalytics, type AnalyticsProperties } from "./productAnalytics";
@@ -212,15 +212,22 @@ it("reports Launch Week beats as they are reached, the research pick and the fin
 
 it("records chapter progress and a failure once with the last reached chapter", () => {
   watch(); play();
-  const next = structuredClone(useGame.getState().game);
-  next.campaign!.openingMilestone = { ...next.campaign!.openingMilestone!, acknowledged: true };
-  useGame.setState({ game: next });
+  for(const equipment of ["gateway","app","db","monitoring"] as const) {
+    useGame.getState().act({type:"incident_inspect",equipment});
+    useGame.getState().act({type:"acknowledge_introduction",equipment});
+  }
+  useGame.getState().act({type:"complete_introduction",handoff:"opening"});
   expect(named("gameplay_chapter_completed").map(e => e.properties.chapter_id)).toEqual(["launch-week"]);
+  let next=tick(useGame.getState().game,6);
+  next=tick(act(next,{type:"start_db_upgrade"}),30);
+  next=act(act(next,{type:"acknowledge_review"}),{type:"acknowledge_milestone"});
+  useGame.setState({ game: next });
+  expect(named("gameplay_chapter_completed").map(e => e.properties.chapter_id)).toEqual(["launch-week","opening"]);
   useGame.setState({ game: { ...next, phase: "ended", outcome: "bankrupt" } });
   useGame.setState({ game: { ...useGame.getState().game } });
   expect(named("gameplay_run_failed")).toHaveLength(1);
-  // The company acknowledged Launch Week without entering Scaling & Routing, so Launch Week is the last chapter it reached.
-  expect(named("gameplay_run_failed")[0].properties.chapter_id).toBe("launch-week");
+  // The corrected introduction and Opening recognition have advanced this company into Scaling & Routing.
+  expect(named("gameplay_run_failed")[0].properties.chapter_id).toBe("scaling");
 });
 
 it("restarts a session on back/forward cache restoration without starting another run", () => {
@@ -259,6 +266,8 @@ it("does not replay milestones from an existing save or leak saves and observer 
 });
 
 it("ignores malformed analytics storage, storage failures and a throwing collector", () => {
+  // Resume an operating company so the clock still verifies collector isolation.
+  saveGame(newGame(1,"analytics-storage-failure",2));
   localStorage.setItem(ANALYTICS_STORAGE_KEY, '{"runs":{"bad":{"activeMs":-1}}}');
   saveMeta({ ...DEFAULT_META, tutorialDone: true });
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });

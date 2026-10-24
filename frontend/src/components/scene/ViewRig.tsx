@@ -205,7 +205,8 @@ export function ViewRig() {
     const host = canvas.parentElement ?? canvas;
     let drag: { id: number; x: number; y: number; moved: boolean } | null = null;
     let unlockedAt = -Infinity;
-    const looking = () => viewNow.want !== "overview" && viewNow.perspective;
+    const covered = () => !!document.querySelector(".modal-backdrop:not(:has(> .inspection-reveal)), .company-message-backdrop");
+    const looking = () => viewNow.want !== "overview" && viewNow.perspective && !covered();
     const turn = (dx: number, dy: number) => {
       const { lookSpeed, invertY } = useGame.getState().controls;
       const k = (viewNow.locked ? MOUSE_LOOK_PER_PIXEL : LOOK_PER_PIXEL) * lookSpeed;
@@ -243,6 +244,7 @@ export function ViewRig() {
     };
     // Where the mouse is over the room, for looking round by pointing.
     const point = (e: PointerEvent) => {
+      if (covered()) { viewNow.pointing=null;return; }
       if (e.pointerType !== "mouse" || viewNow.locked) return;
       const r = canvas.getBoundingClientRect();
       viewNow.pointing = { x: ((e.clientX - r.left) / r.width) * 2 - 1, y: ((e.clientY - r.top) / r.height) * 2 - 1 };
@@ -300,7 +302,7 @@ export function ViewRig() {
       if (viewNow.locked && !locked) {
         unlockedAt = performance.now();
         const state = useGame.getState();
-        if (state.roomInspection) {
+        if (state.roomInspection && !document.querySelector(".component-inspection")) {
           state.dismissRoomInspection();
           viewNow.quietPause = true;
         }
@@ -316,6 +318,8 @@ export function ViewRig() {
     };
     const escape = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // The interactive Campaign dialog owns Escape, including during pointer release.
+      if (document.querySelector(".component-inspection")) return;
       const state = useGame.getState();
       if (state.roomInspection) {
         e.stopImmediatePropagation();
@@ -350,11 +354,11 @@ export function ViewRig() {
     };
     // A dialog or a guide's card opening over the room needs the cursor, so the mouse is let go to reach it.
     const dialogs = new MutationObserver((records) => {
-      if (!viewNow.locked) return;
       for (const r of records)
         for (const n of r.addedNodes)
           if (n instanceof Element && (n.matches(DIALOG) || n.querySelector(DIALOG))) {
-            letGoOfPointer();
+            if (covered()) { drag=null;viewNow.dragging=false;viewNow.pointing=null; }
+            if (viewNow.locked) letGoOfPointer();
             return;
           }
     });

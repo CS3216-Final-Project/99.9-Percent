@@ -1,3 +1,4 @@
+import { closeInspection, followHintComponent, expectInspectionsOnly } from "./componentInspection";
 import type { Locator, Page } from "@playwright/test";
 import { expect, expectRoom, openPanelTab, savedGame, seedSave } from "./fixtures";
 import { act, tick, spikeCompany } from "../src/sim/__tests__/spikeFixtures";
@@ -28,29 +29,29 @@ export async function chapter4TrafficTarget(page: Page, touch = false) {
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
   await press(page.getByRole("dialog", { name: "Chapter 4: Prepare", exact: true }).getByRole("button", { name: "Got it", exact: true }));
   await press(page.locator(".campaign-panel").getByRole("button", { name: "Network", exact: true }));
-  await press(page.getByRole("button", { name: "Run", exact: true })); await page.clock.runFor(1000);
+  await closeInspection(page);await press(page.getByRole("button", { name: "Run", exact: true })); await page.clock.runFor(1000);
   await press(page.getByRole("button", { name: "Pause", exact: true }));
   await press(page.getByRole("dialog", { name: "Chapter 4: Spike 1", exact: true }).getByRole("button", { name: "Got it", exact: true }));
   const gold = page.locator(".campaign-gold-attention");
   const accept = async (target: RegExp) => {
-    await press(page.getByRole("button", { name: "Hint", exact: true }));
+    await closeInspection(page);await press(page.getByRole("button", { name: "Hint", exact: true }));
     const hint = page.getByRole("dialog", { name: "Hint", exact: true });
     await expect(hint).not.toContainText("About Network");
     await press(hint.getByRole("button", { name: "Got it", exact: true }));
-    await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(target); await expect(gold).toBeEnabled();
+    await followHintComponent(page);await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(target); await expect(gold).toBeEnabled();
   };
-  const before = (await savedGame(page)).campaign!.inputs;
+  const before = await savedGame(page);
   await accept(/^Remove traffic limit/); await press(gold);
   await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("Confirm");
   await press(page.getByRole("button", { name: "Cancel", exact: true })); await expect(gold).toHaveCount(0);
-  expect((await savedGame(page)).campaign!.inputs).toEqual(before);
+  await expectInspectionsOnly(page, before);
   await accept(/^Remove traffic limit/); await press(gold); await press(page.getByRole("button", { name: "Confirm", exact: true }));
   expect((await savedGame(page)).campaign!.pending.some(p => p.type === "unlimit")).toBe(true);
-  await accept(/^Run$/); await press(gold); await page.clock.runFor(1000);
+  await closeInspection(page);await accept(/^Run$/); await press(gold); await page.clock.runFor(1000);
   await press(page.getByRole("button", { name: "Pause", exact: true }));
   const after = (await savedGame(page)).campaign!;
   expect(after.limit).toBeNull(); expect(after.snapshot.app.demand).toBeLessThanOrEqual(after.snapshot.app.capacity);
   await openPanelTab(page, "Analysis");
   await press(page.locator(".campaign-panel").getByRole("button", { name: "Monitoring", exact: true }));
-  await accept(/^Run$/); expect((await savedGame(page)).campaign!.pending).toHaveLength(0);
+  await closeInspection(page);await accept(/^Run$/); expect((await savedGame(page)).campaign!.pending).toHaveLength(0);
 }

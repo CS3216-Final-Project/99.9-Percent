@@ -45,14 +45,16 @@ The first incident pauses automatically.
 Pending recovery reviews, milestones, spike recognition and bankruptcy stop advancement.
 Opening the menu or hiding the browser tab pauses play; there is no offline catch-up.
 
-### Chapter 0: Walkthrough
+### Chapter 0: Guided infrastructure introduction
 
-A mandatory, nonmodal guide with ten lessons runs beside the real game for new profiles.
-It holds management time apart from a bounded one-second Run exercise, enables only the controls each lesson needs and lets the player open a purchase quote but not confirm it.
-Progress is stored in the profile, so it resumes from the same lesson after a reload, Save and exit or a new company.
-Finishing requires the explicit Finish walkthrough action.
-A completed player can replay it from View chapters, Menu > How to play or the home screen; a replay runs on a practice company and restores the original company on Finish or Exit.
-The lesson list and its control restrictions are specified in [UI_DESIGN.md](UI_DESIGN.md#screen-structure).
+New companies start Launch Week with four sequential inspections: Network, App Servers, Database, then Monitoring. The current component's popup must be opened and acknowledged (Got it, Close or Escape); exploring another component does not advance the current step. Complete Introduction becomes available only after all four acknowledgements.
+
+Simulation time is frozen throughout the introduction: no incidents, settlement, research purchases, capacity upgrades or financial targets are required. Inspecting is free. The normal component popups supply live readings, and Hint repeats the current explanation. The compact side panel shows X/4 components explored and the exact next action.
+
+Introduction inputs are part of the deterministic save log, including inspection acknowledgements. A reload resumes the same step. Complete Introduction records an explicit Opening handoff and reuses the existing Opening initializer: $20,000, one 1,000 requests/s application, a 600 ops/s database and the original 300 requests/s starting workload. The $15,000/400 ops/s tutorial profile is an isolated demonstration, not Chapter 1's business state. The run identity, input history and tutorial completion are retained; time remains zero. No Opening milestone, research reward or Scaling entry is granted by the tutorial. Opening still requires its existing proactive prevention or reactive incident-recovery pathway and explicit recognition before Chapter 2 Scaling & Routing. Chapters 3-6 retain their existing rules. Practice restores the parked original company on completion or Exit.
+
+Saves retain their original replay scenario and input prefix. New completion inputs identify the Opening destination, and subsequent saves replay the original tutorial before entering the existing Opening profile. Historical completion inputs without that destination retain their recorded direct-to-Scaling result; existing companies are not silently rewound or rebalanced. An unfinished older introduction can use the corrected completion button. Existing scripted Launch Week saves retain their original incident and score-card behavior. The chapter list always reserves 1 for Opening, 2 for Scaling & Routing and 3-6 for the remaining chapters, including historical saves. Classic Mode and save schema 8 are unchanged.
+
 
 ### Chapter 1: Opening
 

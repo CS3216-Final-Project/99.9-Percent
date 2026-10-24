@@ -23,13 +23,16 @@ it("replays Launch Week on a fresh practice company and returns the untouched in
   expect(s.game.campaign!.launchWeek).not.toBeNull();
   expect(s.game.campaign!.runId).not.toBe(company.campaign!.runId);
   expect(s.game.campaign!.step).toBe(0);
-  // Nothing holds the practice company's clock.
+  // Practice freezes the simulation and saves acknowledged component progress.
   useGame.getState().setRunning(true); useGame.getState().tick(30);
-  expect(useGame.getState().game.campaign!.step).toBeGreaterThan(0);
+  expect(useGame.getState().game.campaign!.step).toBe(0);
+  useGame.getState().act({type:"incident_inspect",equipment:"gateway"});
+  useGame.getState().act({type:"acknowledge_introduction",equipment:"gateway"});
   expect(loadGame()).toMatchObject({ status: "ok", game: company, remainderMs: 400 });
   useGame.getState().endSession();
   useGame.setState(useGame.getInitialState(), true); start();
-  // The flag resumes practice; exiting returns the saved company.
+  // The flag resumes practice at the next component; exiting returns the saved company.
+  expect(useGame.getState().game.campaign!.launchWeek!.introduction!.explored).toEqual(["gateway"]);
   expect(useGame.getState().tutorialCompany).not.toBeNull();
   expect(useGame.getState().game.campaign!.launchWeek).not.toBeNull();
   useGame.getState().endTour(false);
@@ -43,8 +46,8 @@ it("resumes a practice company where it was left, mid-incident included, after a
   const company = incident();
   useGame.getState().startTour("campaign");
   const practice = useGame.getState().game.campaign!.runId;
-  // Play the practice week into its first incident, which pauses the clock.
-  for (let i = 0; i < 400 && useGame.getState().game.phase !== "incident"; i++) { useGame.getState().setRunning(true); useGame.getState().tick(1000); }
+  // A historical saved practice still resumes its real incident; new introductions freeze time.
+  useGame.setState({game:advanceSteps(newGame(1,practice,2),20).state});
   const left = useGame.getState().game;
   expect(left.phase).toBe("incident");
   expect(left.campaign!.step).toBeGreaterThan(1);

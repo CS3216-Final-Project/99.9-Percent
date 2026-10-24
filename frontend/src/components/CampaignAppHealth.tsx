@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useGame } from "@/game/store";
-import { num } from "@/game/format";
+import { num, uptimePct } from "@/game/format";
+import { campaignUptime } from "@/game/campaignUptime";
 import { campaignAppHealth } from "@/game/campaignAppHealth";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { Modal, Row, Stat } from "./ui";
@@ -16,7 +17,7 @@ function HealthEntry() {
     const game = useGame(s => s.game);
     const health = campaignAppHealth(game);
     return <><Stat icon="health" kind={health.tone} label="App Health" actionLabel="View app health"
-        tip={`${health.word}. See estimated response time, failed requests and requests waiting.`}
+        tip={`${health.word}. See estimated response time, failed requests and requests waiting. Uptime is the share of settled requests your company served. Requests still waiting in a queue don't count until they resolve; requests lost or turned away by a limit do.`}
         onClick={() => { useGame.getState().setRunning(false); setOpen(true); }}>
         <strong>{health.word}</strong>
     </Stat>{open && <CampaignAppHealth onClose={() => setOpen(false)} />}</>;
@@ -24,6 +25,7 @@ function HealthEntry() {
 export function CampaignAppHealth({ onClose }: { onClose: () => void }) {
     const game = useGame(s => s.game);
     const health = campaignAppHealth(game);
+    const uptime = game.campaign ? campaignUptime(game.campaign) : null;
     return createPortal(<Modal title="App Health" icon={{ kind: health.tone, name: health.icon }} onClose={onClose} className="app-health-dashboard">
         <section aria-label="Current app health">
             <h3>{health.word}</h3>
@@ -31,10 +33,12 @@ export function CampaignAppHealth({ onClose }: { onClose: () => void }) {
             <p className="muted app-health-snapshot">{health.step === 0 ? "Starting readings" : `Latest readings · Step ${health.step}`}</p>
         </section>
         <dl className="rows" aria-label="App measurements">
+            <div className="row app-health-uptime-card"><dt>Uptime</dt><dd>{uptime === null ? "\u2014 / Not enough data" : uptimePct(uptime)}</dd></div>
             <Row label="Response time" value={health.responseMs === null ? "Unavailable" : `${health.responseMs.toFixed(0)} ms (estimated)`} />
             <Row label="Failed requests (%)" value={health.failedRate === null ? "Unavailable" : `${(health.failedRate * 100).toFixed(2)}%`} />
             <Row label="Requests waiting" value={health.waiting === null ? "Unavailable" : num(health.waiting)} />
         </dl>
+        <p className="muted app-health-uptime-note">Uptime is the share of settled requests served across this company's recorded run. Failed and rejected requests count against it; requests still waiting are excluded.</p>
         <p className="app-health-interpretation">{health.interpretation}</p>
         <p className="muted">Compare App Server, Database and Monitoring in System Overview.</p>
         <details className="app-health-details"><summary>More details</summary>

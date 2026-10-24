@@ -1,4 +1,5 @@
-import { advanceCampaignStep, setGameSpeed, seedSave, openPanelTab } from "./fixtures";
+import { infrastructureAction, closeInspection } from "./componentInspection";
+import { advanceCampaignStep, setGameSpeed, seedSave } from "./fixtures";
 import {test,expect,savedGame} from "./fixtures";
 
 // This journey checks prevention rules through the panel and dialogs; other journeys check the 3D room, whose software
@@ -11,16 +12,14 @@ test("Opening prevention: fresh player verifies prevention and explicitly unlock
  const id=(await savedGame(page)).campaign!.runId;
  await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
  await setGameSpeed(page,2);
- await openPanelTab(page, "Actions");
- await page.getByRole("button",{name:/Limit to 500 requests\/s/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
- await page.getByRole("button",{name:/Upgrade database/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
+ await (await infrastructureAction(page,/Limit to 500 requests\/s/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
+ await (await infrastructureAction(page,/Upgrade database/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await advanceCampaignStep(page,{seconds:4-(await savedGame(page)).campaign!.step,resumeClock:false});
  let c=(await savedGame(page)).campaign!;expect(c.consumedEvents).toContain("opening-growth");expect(c.incident).toBeNull();expect(c.reports).toEqual([]);
  const guidance=page.getByRole("region",{name:"Guided Mode requirements"}),progress=page.getByRole("region",{name:"Opening prevention progress"});
  await expect(progress).toContainText("Stable service: 0 / 5");await expect(guidance.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","false");
- await openPanelTab(page, "Actions");
- await page.getByRole("button",{name:/Remove traffic limit/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
- await progress.getByRole("button",{name:"Inspect Application"}).click();await progress.getByRole("button",{name:"Inspect Database"}).click();
+ await (await infrastructureAction(page,/Remove traffic limit/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
+ await progress.getByRole("button",{name:"Inspect Application"}).click();await closeInspection(page);await progress.getByRole("button",{name:"Inspect Database"}).click();await closeInspection(page);
  await advanceCampaignStep(page,{seconds:2});
  await expect(progress).toContainText("Stable service: 2 / 5");await expect(guidance.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","true");c=(await savedGame(page)).campaign!;
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);await expect(progress).toContainText("Stable service: 2 / 5");

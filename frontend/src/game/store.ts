@@ -1,4 +1,5 @@
 "use client";
+import { introductionActive, nextIntroductionComponent } from "@/sim/introduction";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
 import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
@@ -240,7 +241,7 @@ interface Store {
   panelTab: PanelTab;
   setPanelTab: (tab: PanelTab) => void;
   selectApp: (id: string) => void;
-  /** The room-originated inspection asking for its reveal, or none. */
+  /** Ephemeral room or Campaign shortcut inspection asking for its reveal, or none. */
   roomInspection: RoomInspection | null;
   dismissRoomInspection: () => void;
   /**
@@ -394,13 +395,20 @@ export function trafficViewOn(s: { game: GameState; meta: Meta }): boolean {
 
 export function campaignClockAvailable(s: { game: GameState; started: boolean; tour: Tour | null; view: View }): boolean {
   const c = s.game.campaign;
-  return !!c && s.started && !awaitingAcknowledgement(s.game) && !["menu", "tech", "scorecard"].includes(s.view ?? "")
+  return !!c && !introductionActive(c) && s.started && !awaitingAcknowledgement(s.game) && !["menu", "tech", "scorecard"].includes(s.view ?? "")
     && (s.game.phase === "management" || s.game.phase === "incident");
 }
 /** The run in a stored Campaign save, for naming its backup when that save is not the active game. */
 function storedRunId(raw: string): string {
   try { const runId = (JSON.parse(raw) as { runId?: unknown }).runId; return typeof runId === "string" ? runId : "unreadable"; }
   catch { return "unreadable"; }
+}
+
+/** An explicit first input keeps existing scenario-v2 saves replayable without migrating their rules. */
+function newIntroduction(seed:number|string,runId:string):GameState {
+ const result=applyAction(newGame(seed,runId,2),{type:"begin_introduction"});
+ if(!result.ok)throw new Error(result.message);
+ return result.state;
 }
 
 export const useGame = create<Store>()((set, get) => {
@@ -714,7 +722,7 @@ export const useGame = create<Store>()((set, get) => {
         ...(practice ? { game: practice.game, remainderMs: practice.remainderMs, measurement: practice.measurement,
           tutorialCompany: { game: loaded.game, remainderMs: loaded.remainderMs, measurement: loaded.measurement }, meta: { ...meta, walkthroughStep: 0, walkthroughFurthestStep: 0 } } : {}) });
     } else {
-      set({ ...fresh, started: false, game: newGame(BALANCE.introSeed, "headless-run", 2), saveBlocked: loaded.status !== "none" });
+      set({ ...fresh, started: false, game: newIntroduction(BALANCE.introSeed,"headless-run"), saveBlocked: loaded.status !== "none" });
       if (loaded.status !== "none") get().notify("Existing save could not be loaded. It has been preserved. Export it from the menu before explicitly starting a new company.", "error");
     }
     if (started) get().play();
@@ -837,7 +845,7 @@ export const useGame = create<Store>()((set, get) => {
     saveStatus: "unsaved",
     ready: false,
     started: false,
-    game: newGame(BALANCE.introSeed, "headless-run", 2),
+    game: newIntroduction(BALANCE.introSeed,"headless-run"),
     generation: 0,
     tutorialAttempt: 0,
     tutorialCompany: null,
@@ -854,7 +862,16 @@ export const useGame = create<Store>()((set, get) => {
     setPanelTab: tab => set({panelTab: tab}),
     selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({panelOpen:true,panelTab:"analysis",selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
     roomInspection: null,
-    dismissRoomInspection: () => set({ roomInspection: null }),
+    dismissRoomInspection: () => {
+      const inspection=get().roomInspection;
+      // Only acknowledging a popup actually opened by the player can complete a component step.
+      if(inspection && introductionActive(get().game.campaign)) {
+        const intro=get().game.campaign!.launchWeek!.introduction!;
+        if(intro.inspected===inspection.equipment && nextIntroductionComponent(get().game.campaign!)===inspection.equipment)
+          get().act({type:"acknowledge_introduction",equipment:inspection.equipment});
+      }
+      set({roomInspection:null});
+    },
     // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
     floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
     goToFloor: (floor, how) => set(floorPatch(floor, how)),
@@ -962,7 +979,7 @@ export const useGame = create<Store>()((set, get) => {
       const state=get();
       // Practice resume is offered by the saved flag; a fresh visit plays the company itself.
       if (state.hasRun && state.meta.walkthroughStep !== null && !state.tutorialCompany) { get().startTour("campaign", "resume"); return; }
-      let game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID(),2);
+      let game=state.hasRun?state.game:newIntroduction(BALANCE.introSeed,crypto.randomUUID());
       // An acknowledged Opening continues into Scaling & Routing, as saves from before Scaling did, unless the player chose to stay.
       if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended" && !chapterAnnounced(state.meta,game.campaign!.runId,"opening")) game=applyCampaignInput(game,{type:"enter_scaling"}).state;
       const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
@@ -1002,6 +1019,8 @@ export const useGame = create<Store>()((set, get) => {
       persist();
     },
     act: (action) => {
+      // Version new completions while preserving historical replay inputs.
+      if(action.type==="complete_introduction")action={...action,handoff:"opening"};
       const game = get().game, c = game.campaign;
       const acknowledgement = c && requiredAcknowledgement(game);
       // Launch Week's research pick still comes before its milestone, which waits for it.
@@ -1017,6 +1036,10 @@ export const useGame = create<Store>()((set, get) => {
         record(result.ok);
         commit(state);
         if (!result.ok) get().notify(result.message, "error");
+        if(result.ok && action.type==="complete_introduction") {
+          if(get().tutorialCompany)get().endTour(true);
+          else {const meta={...get().meta,tutorialDone:true};set({meta,running:false});saveMeta(meta);persist();}
+        }
         return result.ok;
       }
       const result = applyAction(get().game, action);
@@ -1136,7 +1159,7 @@ export const useGame = create<Store>()((set, get) => {
       const pending=get().measurement.pending;
       let replaySeed=crypto.getRandomValues(new Uint32Array(1))[0]|0;
       if(replaySeed===old.game.seed)replaySeed=(replaySeed+1)|0;
-      const game=newGame(opts.seed??replaySeed,replacementRunId,2);
+      const game=newIntroduction(opts.seed??replaySeed,replacementRunId);
       const m=emptyMeasurement();m.replayOf=old.hasRun?old.game.campaign!.runId:null;
       // Preserve unsaved old-run records in the same archive. Refuse reset if it cannot retain them.
       if(pending.length&&!archiveEvents(pending)) {
@@ -1155,7 +1178,7 @@ export const useGame = create<Store>()((set, get) => {
 
       const { meta, mode, game: old } = get();
       const seed = opts.seed !== undefined && opts.seed !== "" ? opts.seed : Math.floor(Math.random() * 1_000_000_000);
-      const game = mode === "classic" ? newLegacyGame(seed) : newGame(seed, crypto.randomUUID(), 2);
+      const game = mode === "classic" ? newLegacyGame(seed) : newIntroduction(seed,crypto.randomUUID());
       const nextMeta = { ...meta, runsStarted: meta.runsStarted + 1 };
       saveMeta(nextMeta, mode);
       const saved = mode === "classic" ? saveClassicGame(game) : saveGame(game, 0, true);
@@ -1266,7 +1289,7 @@ export const useGame = create<Store>()((set, get) => {
         if (!persist()) return;
         const s = get();
         const company = s.tutorialCompany ?? { game: s.game, remainderMs: s.remainderMs, measurement: s.measurement };
-        const game = newGame(BALANCE.introSeed, crypto.randomUUID(), 2);
+        const game = newIntroduction(BALANCE.introSeed,crypto.randomUUID());
         const measurement = beginSession(emptyMeasurement(), game, crypto.randomUUID(), new Date().toISOString());
         if (!saveTutorialPractice(company.game.campaign!.runId, { game, remainderMs: 0, measurement })) {
           s.notify("Could not start practice: browser storage is unavailable. Your company is unchanged.", "error");
@@ -1466,8 +1489,8 @@ export function inspectOrSelect(id: EquipmentId, appId?: string): void {
 let roomInspectionSeq = 0;
 /**
  * An inspection the player starts in the 3D room — clicking a model or label, or the avatar's prompt: the shared
- * gameplay action runs, then the diagnostic reveal opens. Panels and the Campaign UI call `inspectOrSelect`
- * directly, so their inspections stay with the inspector alone.
+ * gameplay action runs, then the diagnostic reveal opens. Campaign shortcuts use this same entry;
+ * tutorial and Classic panels keep their existing inline `inspectOrSelect` flow.
  */
 export function inspectInRoom(id: EquipmentId, appId?: string): void {
   if (!canInspectEquipment(useGame.getState().game, id)) return;
@@ -1491,3 +1514,7 @@ function loadGraphicsSafe(): GraphicsSettings {
 }
 
 export { clearSave };
+
+/** Component introductions and operating chapters share live modal inspections, including introduction practice. */
+export const componentInspectionEnabled = (s: Pick<Store,"game"|"tour"|"tutorialCompany">): boolean =>
+  !!s.game.campaign && !s.tour && (!s.tutorialCompany || introductionActive(s.game.campaign));

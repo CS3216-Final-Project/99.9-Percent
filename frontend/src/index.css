@@ -5266,3 +5266,42 @@ button:disabled {
 .route-choice:disabled button { opacity: .55; box-shadow: none; }
 .scaling-controls legend { font-size: var(--text-xs); }
 .scaling-controls .btn { white-space: normal; }
+
+/* Shared Campaign equipment dialog: both room and shortcut entries use this card. */
+.component-inspection { width: min(460px, 100%); }
+.component-inspection-summary { text-align: center; }
+.component-inspection-summary .inspection-scanner { margin-inline: auto; }
+.component-inspection-summary .inspection-status { justify-content: center; }
+.component-inspection-metric { font-weight: 700; font-variant-numeric: tabular-nums; }
+.component-inspection-controls { display: flex; gap: 12px; align-items: stretch; }
+.component-inspection-controls > .btn { flex: 1; min-height: 44px; }
+.component-inspection-controls > .component-actions { flex: 1; min-width: 0; }
+.component-inspection .actions { margin: 0; }
+.component-inspection .actions:empty { display: none; }
+.component-inspection .component-actions h4 { margin-top: 8px; }
+.component-inspection .modal-backdrop { position: fixed; z-index: 101; }
+.component-purchase { width: min(420px, 100%); }
+.component-purchase .campaign-action-confirm { max-height: none; border: 0; padding: 0; }
+.component-purchase .campaign-purchase-body { max-height: 45dvh; overflow: auto; }
+.component-purchase .campaign-purchase-details-content { max-height: max(180px, 20dvh); overflow: auto; }
+@media (max-width: 600px) {
+ .component-inspection-controls { gap: 8px; }
+}
+
+.component-inspection:not(.component-inspection-db) .component-inspection-controls { flex-wrap: wrap; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls > * { min-width: 0; flex: 1 1 0; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls > .btn { padding: 10px; gap: 4px; }
+@media (max-width: 359px) {
+ .component-inspection:not(.component-inspection-db) .component-inspection-controls > * { flex-basis: 40%; }
+}
+.component-inspection:not(.component-inspection-db) .component-actions { width: 100%; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls > .component-actions { display: grid; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls .actions > li { display: grid; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls .campaign-action-card { display: flex; flex-direction: column; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls .act { flex: 1; }
+
+.component-inspection .act { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; min-height: 44px; margin: 0; padding: 10px; }
+.component-inspection .act-label { min-width: 0; }
+.component-inspection .actions { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+
+@media (max-width: 359px) { .component-inspection .readings-grid { grid-template-columns: 1fr; } }

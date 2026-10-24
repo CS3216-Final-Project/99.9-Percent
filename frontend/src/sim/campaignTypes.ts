@@ -177,7 +177,11 @@ export interface CampaignPromotion {
  actionId:string;requestedStep:number;activationStep:number;activatedStep:number|null;
  endStep:number;endedStep:number|null;cooldownUntil:number;costCents:number;
 }
+export interface Introduction {
+ version: 1; explored: ("gateway"|"app"|"db"|"monitoring")[]; inspected: string|null; completed: boolean;
+}
 export interface LaunchWeek {
+ introduction?: Introduction;
  id: "launch-week"; version: 1; enteredStep: number;
  /** One free research point, granted by the script and spent on Caching or Autoscaling. */
  researchEarned: 0 | 1;
@@ -201,6 +205,9 @@ export interface Campaign {
     scorecard?:CampaignScorecard|null;
     scenarioId: "opening-db";
     scenarioVersion: 1 | 2;
+    /** Replay starts in the tutorial profile; runtime uses the existing Opening profile after handoff. */
+    replayScenarioVersion?: 1 | 2;
+    completedIntroduction?: Introduction;
     runId: string;
     step: number;
     incomingRate: number;

@@ -9,6 +9,8 @@ import { useGame } from "./store";
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => vi.restoreAllMocks());
 function enter() {
+  // Operating-clock tests resume an existing company; fresh intros are tested separately.
+  if (loadGame().status === "none") saveGame(newGame(1, "runtime-legacy", 2));
   saveMeta({ ...loadMeta(), tutorialDone: true });
   useGame.getState().boot(); useGame.getState().play();
 }
@@ -86,7 +88,8 @@ it("reports quota failures on entry and reset while allowing in-memory play",()=
   useGame.getState().newRun();
   expect(useGame.getState().toast?.kind).toBe("error");
   useGame.getState().advance();
-  expect(useGame.getState().game.campaign!.step).toBe(1);
+  expect(useGame.getState().game.campaign!.step).toBe(0);
+  expect(useGame.getState().game.campaign!.launchWeek!.introduction).toBeTruthy();
 });
 
 describe("importing a save", () => {
