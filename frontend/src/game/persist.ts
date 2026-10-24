@@ -37,9 +37,14 @@ export type GameMode = "campaign" | "classic";
 /** The Guided Mode chapters after the Opening, each with a short guide shown when the company first enters it. */
 export const CHAPTER_TOURS = ["scaling", "data", "spikes", "reliability", "combined"] as const;
 export type ChapterTour = (typeof CHAPTER_TOURS)[number];
-/** Chapters that end without a recognition of their own, so the company stops once to say so. */
-export const CHAPTER_COMPLETIONS = ["scaling", "data"] as const;
+/**
+ * Chapter ends remembered for one company: Scaling & Routing and Data Strategy, announced once, and an Opening the
+ * player chose to stay in, so the next Play does not continue it into Scaling & Routing.
+ */
+export const CHAPTER_COMPLETIONS = ["opening", "scaling", "data"] as const;
 export type ChapterCompletion = (typeof CHAPTER_COMPLETIONS)[number];
+/** Chapters that end without a recognition of their own, so the company stops once to say so. */
+export type AnnouncedChapter = Exclude<ChapterCompletion, "opening">;
 
 export interface Meta {
   onboarded: boolean;

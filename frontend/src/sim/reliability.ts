@@ -12,8 +12,14 @@ export function researchBalance(c:Campaign):number {return (c.spikeStage?.resear
 /** An infrastructure change still installing; reliability installs wait for it. */
 export const installPending=(c:Campaign)=>c.pending.some(a=>!["limit","unlimit","routing","promote-spare"].includes(a.type));
 export function pendingReliability(c:Campaign|undefined):boolean {return !!c?.reliabilityStage&&c.reliabilityStage.completedStep!==null&&!c.reliabilityStage.acknowledged;}
+/** The operating conditions Stay Online's entry checks, each named so the interface can say which one is unmet. */
+export function reliabilityEntryGates(s:GameState) {
+ const c=s.campaign!;
+ return {management:s.phase==="management",cash:c.cashCents>0,incident:!c.incident,reports:reportsAcknowledged(c),
+  queues:!c.dbBacklog&&c.apps.every(a=>!a.backlog),baseline:c.incomingRate===2400,healthy:qualifiesForRecovery(c.snapshot)};
+}
 export function canEnterReliability(s:GameState):boolean {
- const c=s.campaign;return !!c?.spikeStage?.acknowledged&&c.spikeStage.completedStep!==null&&!c.reliabilityStage&&s.phase==="management"&&c.cashCents>0&&!c.incident&&!!c.openingMilestone?.acknowledged&&reportsAcknowledged(c)&&!c.dbBacklog&&c.apps.every(a=>!a.backlog)&&c.incomingRate===2400&&qualifiesForRecovery(c.snapshot);
+ const c=s.campaign;return !!c?.spikeStage?.acknowledged&&c.spikeStage.completedStep!==null&&!c.reliabilityStage&&!!c.openingMilestone?.acknowledged&&Object.values(reliabilityEntryGates(s)).every(Boolean);
 }
 export function effectiveTargets(c:Campaign):string[] {return c.routing.targets.filter(id=>{
  const a=c.apps.find(a=>a.id===id)!;return serving(a)&&!(c.reliabilityStage?.checksStep!==null&&c.reliabilityStage?.checksStep!==undefined&&c.loadBalancer&&a.detectedHealth==="unhealthy");

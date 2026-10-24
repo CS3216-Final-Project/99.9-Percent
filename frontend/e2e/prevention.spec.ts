@@ -38,7 +38,7 @@ test("Opening prevention: fresh player verifies prevention and explicitly unlock
  c=(await savedGame(page)).campaign!;expect(c.runId).toBe(id);expect(c.step).toBe(9);expect(c.openingRecovered).toBe(false);expect(c.scaling).toBeNull();expect(c.openingMilestone!.acknowledged).toBe(false);expect(c.openingPrevention!.outcome!.acknowledged).toBe(true);
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);
  await expect(recognition).toContainText("You spotted the bottleneck early and prevented an outage.");
- await recognition.getByRole("button",{name:"Continue operating",exact:true}).click();
+ await recognition.getByRole("button",{name:"Continue to Scaling & Routing",exact:true}).click();
  await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Scaling & Routing");
  const entered=(await savedGame(page)).campaign!;
  expect(entered.scaling).not.toBeNull();expect(entered.step).toBe(c.step);expect(entered.cashCents).toBe(c.cashCents);expect(entered.reports).toEqual([]);

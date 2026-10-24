@@ -37,7 +37,7 @@ it("keeps Next absent before eligibility, then advances through the existing pau
   const game = dataCompany("read-heavy", false);
   useGame.setState({ game, running: true });
   render(<CampaignChapters />);
-  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to data strategy" }));
+  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to Data Strategy" }));
   expect(useGame.getState().game.campaign!.dataStage).toBeTruthy();
   expect(useGame.getState().game.campaign!.runId).toBe(game.campaign!.runId);
   expect(useGame.getState().running).toBe(false);
@@ -48,10 +48,10 @@ it("explains a disabled Next without changing its engine gate", () => {
   game.campaign!.spikeStage!.acknowledged = true;
   useGame.setState({ game, started: true, ready: true });
   render(<CampaignChapters />);
-  const next = screen.getByRole("button", { name: "Next: Continue to reliability" });
+  const next = screen.getByRole("button", { name: "Next: Continue to Stay Online" });
   expect(next.hasAttribute("disabled")).toBe(true);
   const reason = document.getElementById(next.getAttribute("aria-describedby")!)!;
-  expect(reason.textContent).toContain("stable baseline management and empty queues");
+  expect(reason.textContent).toContain("Stay Online opens once Traffic Spikes is finished.");
   expect(reason.tabIndex).toBe(0);
   fireEvent.click(next);
   expect(useGame.getState().game).toBe(game);

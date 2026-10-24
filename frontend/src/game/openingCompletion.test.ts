@@ -7,7 +7,8 @@ import { campaignGuidance, campaignObjective, launchResearchPending } from "./ca
 import { preventedOpening, recoveredOpening } from "./__fixtures__/openingOutcome";
 import { decodeSave, makeEnvelope } from "./saveEnvelope";
 import { outcomeSummary } from "./campaignReport";
-import { chapterAdvance, campaignChapters } from "./campaignChapters";
+import { campaignChapters } from "./campaignChapters";
+import { chapterAdvance } from "./chapterCompletion";
 import { campaignClockAvailable, useGame } from "./store";
 import { campaignAttention } from "./campaignAttention";
 
@@ -116,7 +117,7 @@ it("offers Complete Opening only once Launch Week is over and its research pick 
   const picked = act(over, { type: "pick_launch_tech", tech: "autoscaling" });
   expect(launchResearchPending(picked)).toBe(false);
   expect(campaignGuidance(picked).pendingAction?.label).toBe("Complete Opening");
-  expect(campaignObjective(picked)).toBe("Review your Launch Week score and continue into Chapter 2.");
+  expect(campaignObjective(picked)).toBe("Review your Launch Week score, then stay or continue to Scaling & Routing.");
 });
 
 it("lets the store spend Launch Week research while the milestone waits, and nothing else", () => {

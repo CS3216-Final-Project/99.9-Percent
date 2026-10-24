@@ -17,6 +17,7 @@ import {preparedReliability,act,tick} from "../src/sim/__tests__/reliabilityFixt
 import { spikeCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
 import { expectCueColours, chapter4TrafficTarget } from "./chapter4Cues";
 import { companyMessageJourney } from "./companyMessages";
+import { finishedLaunchWeek } from "../src/game/__fixtures__/openingOutcome";
 
 // These journeys cover the desktop edition's narrow touch layout, which narrow windows and the full campaign still use.
 // A phone plays its own edition, covered by phoneLayout.spec.ts and phoneTutorial.spec.ts.
@@ -232,7 +233,7 @@ test("Opening prevention recognition unlocks Scaling after touch review and relo
  const before=(await savedGame(page)).campaign!;expect(before.openingMilestone!.acknowledged).toBe(false);expect(before.scaling).toBeNull();
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  expect((await savedGame(page)).campaign).toEqual(before);await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Opening");
- await recognition.getByRole("button",{name:"Continue operating",exact:true}).tap();
+ await recognition.getByRole("button",{name:"Continue to Scaling & Routing",exact:true}).tap();
  const after=(await savedGame(page)).campaign!;
  expect(after.scaling).not.toBeNull();expect(after.reports).toEqual([]);expect(after.openingRecovered).toBe(false);expect(after.step).toBe(before.step);expect(after.cashCents).toBe(before.cashCents);
  await expect(page.getByLabel("Current Guided Mode stage")).toHaveText("Scaling & Routing");
@@ -699,4 +700,20 @@ test("Launch Week cold open and research sheet remain usable by touch at 390px",
   await sheet.getByRole("button", { name: "Autoscaling" }).tap();
   await page.getByRole("button", { name: "Confirm", exact: true }).tap();
   expect((await savedGame(page)).campaign!.launchWeek?.tech).toBe("autoscaling");
+});
+
+for (const width of [390, 320]) test(`the Launch Week score card's three actions stay reachable and right-aligned at ${width}px`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.route("**/api/**", r => r.abort());
+  await seedSave(page, finishedLaunchWeek()); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).tap(); await expectRoom(page);
+  const card = page.getByRole("dialog", { name: "Launch Week complete" });
+  const proceed = card.getByRole("button", { name: "Continue to Scaling & Routing", exact: true });
+  for (const name of ["Copy result", "Stay in this chapter", "Continue to Scaling & Routing"]) await expect(card.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
+  const foot = await card.locator(".chapter-end-foot").boundingBox(), go = await proceed.boundingBox();
+  expect(Math.abs(foot!.x + foot!.width - (go!.x + go!.width))).toBeLessThanOrEqual(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  await page.screenshot({ path: info.outputPath(`launch-score-${width}.png`) });
+  await proceed.tap();
+  expect((await savedGame(page)).campaign!.scaling).not.toBeNull();
 });

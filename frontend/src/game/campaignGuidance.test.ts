@@ -112,7 +112,7 @@ it("cash-constrained headroom explains affordability without inventing a bailout
  const g=scaling();g.campaign!.cashCents=1;const before=JSON.stringify(g);expect(campaignGuidance(g).notice).toContain("current cash cannot fund that investment");expect(row(g,"headroom").met).toBe(false);expect(JSON.stringify(g)).toBe(before);
 });
 it("acknowledged Opening with missing Scaling entry exposes the existing explicit continuation",()=>{
- const g=scaling();g.campaign!.scaling=null;expect(campaignGuidance(g).pendingAction?.action?.type).toBe("enter_scaling");expect(row(g,"stage").met).toBe(false);
+ const g=scaling();g.campaign!.scaling=null;const m=campaignGuidance(g);expect(m.pendingAction?.action?.type).toBe("enter_scaling");expect(m.stage).toBe("Opening");expect(row(g,"opening").met).toBe(true);expect(m.requirements.some(r=>r.id==="stage"||r.id==="headroom")).toBe(false);expect(m.notice).toContain("Continue to Scaling & Routing through Next");
 });
 
 it("explains a public-action solvent affordability trap without claiming a guaranteed rescue",()=>{

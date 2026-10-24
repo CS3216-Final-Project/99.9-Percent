@@ -33,7 +33,7 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  await expect(overview.getByRole("listitem").filter({hasText:"Traffic Spikes"})).toContainText("Available next");
  await overview.getByRole("button",{name:"Back to company"}).click();
  await expect(page.getByRole("button",{name:"View chapters",exact:true})).toBeFocused();
- const before=(await savedGame(page)).campaign!;await page.getByRole("button",{name:"Next: Continue to traffic spikes"}).click();
+ const before=(await savedGame(page)).campaign!;await page.getByRole("button",{name:"Next: Continue to Traffic Spikes"}).click();
  await openPanelTab(page, "Actions");
  const unlock=page.getByRole("button",{name:/Unlock autoscaling/});await unlock.focus();await expect(unlock).toBeFocused();await page.keyboard.press("Enter");await expect(page.getByRole("button",{name:"Confirm",exact:true})).toBeFocused();await page.keyboard.press("Enter");await openPanelTab(page,"Actions");await page.getByRole("button",{name:/Deploy autoscaling/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
@@ -58,7 +58,7 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Incident postmortem");await page.getByRole("button",{name:"Continue company",exact:true}).click();
  await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Spike response handled");
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(page.getByRole("dialog",{name:"Spike response handled"})).toBeVisible();
- await page.getByRole("button",{name:"Continue operating",exact:true}).click();expect((await savedGame(page)).campaign!.runId).toBe(before.runId);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
+ await page.getByRole("button",{name:"Stay in this chapter",exact:true}).click();expect((await savedGame(page)).campaign!.runId).toBe(before.runId);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
 test("spikes: manual planning installs, scales and routes capacity through room controls",async({page, installClock})=>{
  await installClock();

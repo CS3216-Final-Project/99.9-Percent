@@ -1,4 +1,5 @@
-import { campaignChapters, chapterAdvance } from "@/game/campaignChapters";
+import { campaignChapters } from "@/game/campaignChapters";
+import { chapterAdvance } from "@/game/chapterCompletion";
 import { campaignGuidance, campaignObjective } from "@/game/campaignGuidance";
 import { useGame } from "@/game/store";
 import { chapterInScope, scopeAllows, SCOPED_CHAPTERS, type ScopedChapter } from "@/game/scope";

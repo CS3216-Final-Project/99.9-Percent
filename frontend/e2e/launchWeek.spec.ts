@@ -92,7 +92,7 @@ test("a week that ends with research unspent asks for the pick, then scores and 
   await pickCaching(page);
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
   await expect(card).toBeVisible();
-  await card.getByRole("button", { name: "Continue into Chapter 2" }).click();
+  await card.getByRole("button", { name: "Continue to Scaling & Routing" }).click();
   await expect(card).toBeHidden();
   const saved = (await savedGame(page)).campaign!;
   expect(saved.launchWeek?.tech).toBe("caching");
@@ -123,7 +123,7 @@ test("a week that ends during its database incident lets the player fix and revi
   await expect(report).toBeHidden();
   await expect(page.getByRole("region", { name: "Guided Mode chapters" })).toContainText("Spend your free research pick to see your Launch Week score.");
   await pickCaching(page);
-  await page.getByRole("dialog", { name: "Launch Week complete" }).getByRole("button", { name: "Continue into Chapter 2" }).click();
+  await page.getByRole("dialog", { name: "Launch Week complete" }).getByRole("button", { name: "Continue to Scaling & Routing" }).click();
   const saved = (await savedGame(page)).campaign!;
   expect(saved.dbCapacity).toBeGreaterThan(over.campaign!.dbCapacity);
   expect(saved.openingMilestone?.acknowledged).toBe(true);
@@ -141,7 +141,7 @@ test("a practice replay resumes where it was left after a reload, finishes its r
   await expect(page.getByTestId("physical-step")).toHaveText("60");
   await expect(page.getByRole("dialog", { name: "Launch week" })).toHaveCount(0);
   await pickCaching(page);
-  await page.getByRole("dialog", { name: "Launch Week complete" }).getByRole("button", { name: "Continue into Chapter 2" }).click();
+  await page.getByRole("dialog", { name: "Launch Week complete" }).getByRole("button", { name: "Continue to Scaling & Routing" }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("button", { name: "Return to game" }).click();
   await expect(page.getByTestId("physical-step")).toHaveText(String(company.campaign!.step));
@@ -217,7 +217,7 @@ test("the score card reports nines, copies the result and continues to Chapter 2
   await expect(card).toBeVisible();
   await expect(card).toContainText("Uptime");
   await expect(card).toContainText("nine");
-  await page.getByRole("button", { name: "Continue into Chapter 2" }).click();
+  await page.getByRole("button", { name: "Continue to Scaling & Routing" }).click();
   const saved = (await savedGame(page)).campaign!;
   expect(saved.openingMilestone?.acknowledged).toBe(true);
   expect(saved.scaling).not.toBeNull();

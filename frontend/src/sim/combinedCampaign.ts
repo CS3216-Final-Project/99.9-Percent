@@ -11,15 +11,25 @@ import { COMBINED_CAMPAIGN as C, baselineDemand, growthUsers, targetValid, seque
 export function pendingCombined(c:Campaign|undefined):boolean {
  const d=c?.combinedStage;return !!d&&!d.acknowledged&&(!!d.finalReview||d.currentRound?.completedStep!=null);
 }
+/** `stableManagement` split into named parts, so the interface can say which one is unmet. */
+function stableManagementGates(s:GameState) {
+ const c=s.campaign!;
+ return {management:s.phase==="management",cash:c.cashCents>0,incident:!c.incident,pending:!c.pending.length,
+  queues:!c.dbBacklog&&c.apps.every(a=>!a.backlog),apps:c.apps.every(healthy),reports:reportsAcknowledged(c),
+  healthy:qualifiesForRecovery(c.snapshot)};
+}
 export function stableManagement(s:GameState,full=false):boolean {
- const c=s.campaign!;return s.phase==="management"&&c.cashCents>0&&!c.incident&&!c.pending.length&&!c.dbBacklog&&
- c.apps.every(a=>!a.backlog&&healthy(a))&&reportsAcknowledged(c)&&qualifiesForRecovery(c.snapshot)&&
+ const c=s.campaign!;return Object.values(stableManagementGates(s)).every(Boolean)&&
  (!full||(c.limit===null&&c.snapshot.admitted===c.snapshot.incoming&&c.snapshot.rejected===0));
+}
+/** The operating conditions Grow the Company's entry checks. */
+export function combinedEntryGates(s:GameState) {
+ return {...stableManagementGates(s),baseline:s.campaign!.incomingRate===2400};
 }
 export function canEnterCombined(s:GameState):boolean {
  const c=s.campaign,d=c?.reliabilityStage;
  return !!c&&!!d?.acknowledged&&d.completedStep!==null&&!c.combinedStage&&!!c.openingMilestone?.acknowledged&&
- !!c.spikeStage?.acknowledged&&stableManagement(s)&&c.incomingRate===2400;
+ !!c.spikeStage?.acknowledged&&Object.values(combinedEntryGates(s)).every(Boolean);
 }
 export function promotionActive(c:Campaign,at=c.step):boolean {
  const p=c.promotion;return !!p&&at>=p.activationStep&&at<p.endStep;

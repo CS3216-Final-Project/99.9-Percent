@@ -14,19 +14,19 @@ beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),
 it("shows the Scaling headroom blocker without disabling experimentation",()=>{
  show(decision(decision(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"}));
  expect(met("headroom")).toBe("false");expect(guidance().textContent).toContain("Database headroom: 1,000 / 2,000 ops/s");
- openActions();expect((screen.getByRole("button",{name:/Add server/}) as HTMLButtonElement).disabled).toBe(false);expect(screen.queryByRole("button",{name:/Continue to data strategy/})).toBeNull();
+ openActions();expect((screen.getByRole("button",{name:/Add server/}) as HTMLButtonElement).disabled).toBe(false);expect(screen.queryByRole("button",{name:/Continue to Data Strategy/})).toBeNull();
 });
 it("shows unmet Data requirements and keeps workload contrast optional",()=>{
  const g=dataCompany();g.campaign!.dbBacklog=1;g.campaign!.snapshot.latencyMs=500;show(g);
  expect(met("queues")).toBe("false");expect(met("healthy")).toBe("false");expect(guidance().textContent).toContain("Workload contrast is optional");
- expect(screen.queryByRole("button",{name:/Continue to traffic spikes/})).toBeNull();
+ expect(screen.queryByRole("button",{name:/Continue to Traffic Spikes/})).toBeNull();
 });
 it("counts stable spike observations and waits for an explicit acknowledgement",()=>{
  let g=act(spikeCompany(false),{type:"set_traffic_limit",enabled:true});g=untilOffset(g,68);show(g);
  expect(guidance().textContent).toContain("Stable baseline observations: 1 / 5");expect(guidance().textContent).toContain("Autoscaling is optional");
  renderAct(()=>useGame.setState({game:tick(g,4)}));
  expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(false);
- fireEvent.click(within(screen.getByRole("dialog",{name:"Spike response handled"})).getByRole("button",{name:/Continue operating/}));
+ fireEvent.click(within(screen.getByRole("dialog",{name:"Spike response handled"})).getByRole("button",{name:"Stay in this chapter"}));
  expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(true);expect(guidance().textContent).toContain("available through Next in the chapter bar");
 });
 it("keeps a pending postmortem in front of the guidance",()=>{

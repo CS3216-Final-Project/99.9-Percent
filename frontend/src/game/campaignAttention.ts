@@ -9,7 +9,8 @@ import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
 import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
-import { campaignChapters, chapterAdvance } from "./campaignChapters";
+import { campaignChapters } from "./campaignChapters";
+import { chapterAdvance } from "./chapterCompletion";
 import { previewCampaignAction } from "./campaignFinance";
 import { chapter4Stage, chapter4Performance } from "./chapter4Guidance";
 import { chapter6Attention, combinedDatabaseDemand } from "./chapter6Guidance";
@@ -223,7 +224,7 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     "launch-research": "You earned a research point. Spend it on Caching or Autoscaling; each carries into later chapters.",
     "launch-surge": "The launch campaign is sending five times the traffic. Keep the service up until it ends.",
     "launch-week": "Your launch week is running. Press Run and keep the service up.",
-    "launch-score": "Launch Week is complete. Check your uptime score and continue into Chapter 2.",
+    "launch-score": "Launch Week is complete. Check your uptime score, then stay in Launch Week or continue to Scaling & Routing.",
   };
   if (messages[reason]) return messages[reason];
   if (["opening-growth", "scaling-growth", "data-growth", "spike-pulses", "scheduled-failure", "growth-wave", "growth-readiness"].includes(reason)) return "Press Run to see what happens next.";
@@ -248,7 +249,7 @@ function baseAttention(game: GameState): AttentionDecision {
   // The score card waits for the research pick, so the week's last lesson is never covered.
   if (launchResearchPending(game))
     return result("launch-research", "hint", "Research points buy technology. This one is free; it is billed at the week's settlement.", "Pick Caching or Autoscaling to see your Launch Week score.", "research");
-  if (c.launchWeek && milestoneBlocks(game)) return required("launch-score", "Launch Week is complete.", "Review your uptime score and continue into Chapter 2.", "next");
+  if (c.launchWeek && milestoneBlocks(game)) return required("launch-score", "Launch Week is complete.", "Review your uptime score, then stay in Launch Week or continue to Scaling & Routing.", "next");
   if (game.phase === "review" || pendingStop(c) || milestoneBlocks(game))
     return required("review", "An outcome is waiting for your review.", "Finish the existing review or acknowledgement before continuing.", null);
   const next = chapterAdvance(game);

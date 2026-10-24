@@ -57,7 +57,7 @@ Every event carries:
 | `run_id` | The Guided Mode run ID, or a random UUID for a Challenge Mode run |
 | `gameplay_session_id` | Random UUID per play session |
 | `device_category` | `touch` for a coarse pointer, otherwise `desktop` |
-| `chapter_id` | `launch-week` (a version-1 company reports `opening`), `scaling`, `data`, `spikes` or `reliability`; null in Challenge Mode |
+| `chapter_id` | `launch-week` (a version-1 company reports `opening`), `scaling`, `data`, `spikes` or `reliability`; a company that chose Stay at the end of Launch Week reports `launch-week` until it enters Scaling & Routing; null in Challenge Mode |
 | `progress_step` | Guided Mode game second, or Challenge Mode week |
 | `session_active_ms`, `run_active_ms` | Cumulative active time snapshots |
 | `active_delta_ms` | Active time since the previous progress or end event |

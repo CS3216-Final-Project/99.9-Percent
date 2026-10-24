@@ -24,7 +24,7 @@ it("keeps outcome evidence collapsed and preserves explicit same-company acknowl
   expect(within(details).getByText("Application failure")).toBeTruthy();
   expect(within(details).getByText("Company setup spending at completion")).toBeTruthy();
   expect(useGame.getState().game).toBe(game);
-  fireEvent.click(within(dialog).getByRole("button", { name: "Continue operating" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Stay in this chapter" }));
   const after = useGame.getState().game;
   expect(after.campaign!.reliabilityStage!.acknowledged).toBe(true);
   expect(after.campaign!.runId).toBe(game.campaign!.runId); expect(after.campaign!.step).toBe(game.campaign!.step);
