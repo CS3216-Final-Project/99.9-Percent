@@ -377,6 +377,11 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* The sheet scrolls the Guided Mode panel, so it keeps scrolled-to controls clear of the panel's sticky tab switch.
+   Under 700px tall the switch is not sticky (CampaignUX.css), so nothing needs clearing. */
+@media (min-height: 701px) {
+  .phone-app[data-edition="phone"] .phone-sheet-body:has(.campaign-panel) { scroll-padding-top: 64px; }
+}
 /* Closed to its handle, the sheet's contents leave the page's focus order and accessibility tree. */
 .phone-app[data-edition="phone"] .phone-sheet[data-state="peek"] .phone-sheet-body { visibility: hidden; }
 

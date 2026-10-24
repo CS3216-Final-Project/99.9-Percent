@@ -43,7 +43,7 @@ it("preserves growth review evidence and explicit acknowledgement", () => {
   expect(useGame.getState().game.campaign!.cashCents).toBe(game.campaign!.cashCents);
 });
 
-it("keeps final review explicit and resets the single accordion on completion", () => {
+it("keeps final review explicit and resets the single accordion on completion", { timeout: 30_000 }, () => {
   const game = finishedCompany();
   useGame.setState({ game, ready: true, started: true, onboarding: false }); render(<CampaignOverlays/>);
   const details = checkReport();

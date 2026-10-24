@@ -70,6 +70,8 @@ test("incident Pause: deliberate continued-running activity dismisses once, not 
 
 // A real captured mouse is the normal first-person play path, not a blocking dialog.
 for (const chapter of [2, 3, 4, 5, 6]) test(`incident Pause: first-person Chapter ${chapter} arrival keeps Pause through releasing the mouse`, async ({ page, installClock }) => {
+  // First person loads the room twice over and Chapter 3 also waits out the hint delay: about a minute on CI.
+  test.setTimeout(120_000);
   await installClock(); const pair = pauseTransition(chapter); await bootPause(page, pair.before);
   await page.locator(".stage-canvas").focus();
   await page.keyboard.press("v"); await page.clock.runFor(200);

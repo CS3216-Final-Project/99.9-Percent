@@ -14,7 +14,7 @@ beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),
 it("shows the Scaling headroom blocker without disabling experimentation",()=>{
  show(decision(decision(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"}));
  expect(met("headroom")).toBe("false");expect(guidance().textContent).toContain("Database headroom: 1,000 / 2,000 ops/s");
- expect((screen.getByRole("button",{name:/Add server/}) as HTMLButtonElement).disabled).toBe(false);expect(screen.queryByRole("button",{name:/Continue to data strategy/})).toBeNull();
+ openActions();expect((screen.getByRole("button",{name:/Add server/}) as HTMLButtonElement).disabled).toBe(false);expect(screen.queryByRole("button",{name:/Continue to data strategy/})).toBeNull();
 });
 it("shows unmet Data requirements and keeps workload contrast optional",()=>{
  const g=dataCompany();g.campaign!.dbBacklog=1;g.campaign!.snapshot.latencyMs=500;show(g);
@@ -36,3 +36,6 @@ it("keeps a pending postmortem in front of the guidance",()=>{
  expect(screen.getByRole("dialog",{name:"Incident postmortem"})).toBeTruthy();
  expect(met("recovery")).toBe("true");expect(met("review")).toBe("false");
 });
+
+/** Purchases live on the panel's Actions tab. */
+function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

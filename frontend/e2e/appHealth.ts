@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { expect, expectRoom, savedGame, seedSave } from "./fixtures";
+import { expect, expectRoom, openPanelTab, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { step } from "../src/sim/step";
 
@@ -60,6 +60,7 @@ export async function appHealthJourney(page: Page, width: number, height: number
     await page.getByRole("button", { name: "View finances", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Company finances", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Close", exact: true }).click();
+    await openPanelTab(page, "Actions");
     await page.getByRole("button", { name: /^Add server/ }).click();
     const purchase = page.getByRole("region", { name: "Confirm Add server", exact: true });
     await expect(purchase).toBeVisible();

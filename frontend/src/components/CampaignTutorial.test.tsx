@@ -85,7 +85,7 @@ it("waits through an incident on a resumed company without holding its clock", (
   saveGame(advanceSteps(newGame(1, "resumed-incident"), 6).state);
   saveMeta({ ...DEFAULT_META, tutorialDone: true });
   start(); renderCompany();
-  fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
   expect(screen.getByRole("button", { name: "Confirm" })).toHaveProperty("disabled", false);
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   act(() => { useGame.getState().setRunning(true); useGame.getState().tick(1); });
@@ -144,6 +144,18 @@ it("keeps the Deploy Health Checks step on its own action when the player buys s
   expect(guide().textContent).toContain("Run until the current install finishes, then press Deploy Health Checks.");
 });
 
+it("points the Deploy Health Checks step back to Actions when the player reads Analysis", () => {
+  useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 1 } });
+  renderCompany();
+  act(() => useGame.getState().act({ type: "unlock_reliability", tech: "health_checks" }));
+  const guide = () => screen.getByRole("dialog", { name: "Chapter guide, step 3 of 3" });
+  expect(useGame.getState().panelTab).toBe("actions");
+  fireEvent.click(screen.getByRole("tab", { name: "Analysis" }));
+  expect(guide().textContent).toContain("Open Actions.");
+  fireEvent.click(screen.getByRole("tab", { name: /^Actions/ }));
+  expect(guide().textContent).toContain("Press Deploy Health Checks.");
+});
+
 it("shows a chapter's guide on the controls the chapter adds", () => {
   useGame.setState({ game: newGame(1, "chapter-guide"), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "scaling", step: 0 } });
   renderCompany();
@@ -161,3 +173,6 @@ it("explains the first settled week with a one-card tip on Cash", () => {
   fireEvent.click(within(tip).getByRole("button", { name: "Got it" }));
   expect(useGame.getState().tour).toBeNull();
 });
+
+/** Purchases live on the panel's Actions tab. */
+function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

@@ -353,7 +353,7 @@ export function HistoryTabs({ tab, onChange, incidents, children }: { tab: Histo
     { id: "events", label: "Events", icon: "week" },
     { id: "postmortems", label: `Incidents (${incidents})`, icon: "incident" },
   ];
-  return <Tabs label="History sections" tabs={tabs} value={tab} onChange={onChange} className="history-tabset" stripClassName="tabs" iconSize={16}>{children}</Tabs>;
+  return <Tabs label="History sections" tabs={tabs} value={tab} onChange={onChange} variant="pills" className="history-tabset">{children}</Tabs>;
 }
 
 export interface FeedEntry {

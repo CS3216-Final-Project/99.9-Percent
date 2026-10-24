@@ -14,7 +14,7 @@ it("shows the stage and a legal way to start the test",()=>{
  show(reliabilityCompany());expect(screen.getByLabelText("Current Guided Mode stage").textContent).toBe("Stay Online");expect(screen.getByRole("button",{name:/Start reliability test/})).toBeTruthy();
 });
 it("exposes actual and detected health and surviving capacity",()=>{
- show(tick(act(preparedReliability(),{type:"arm_reliability"}),8));const panel=screen.getByRole("region",{name:"Stay Online"});
+ show(tick(act(preparedReliability(),{type:"arm_reliability"}),8));openActions();const panel=screen.getByRole("region",{name:"Stay Online"});
  expect(panel.textContent).toContain("failed");expect(panel.textContent).toContain("detected healthy");expect(panel.textContent).toContain("1,600 /");
  expect(within(panel).getByRole("button",{name:"Restore App 2 · free · 3 game seconds"})).toBeTruthy();
 });
@@ -23,13 +23,13 @@ it("uses effective routing for labels and selects an inspected application",()=>
  fireEvent.click(screen.getByRole("button",{name:"App Server"}));
  const instances=screen.getByRole("region",{name:"Application instances"});
  expect(within(instances).getByRole("button",{name:/App 2: Installed - not receiving traffic/})).toBeTruthy();
- fireEvent.click(screen.getByRole("button",{name:"Inspect App 2 health · free"}));
+ openActions();fireEvent.click(screen.getByRole("button",{name:"Inspect App 2 health · free"}));
  expect(useGame.getState().selectedAppId).toBe("app-2");expect(useGame.getState().selected).toBe("app");
 });
 it("disables failover deployment without a reserved spare and purchases that exhaust cash",()=>{
  let g=preparedReliability();g=act(g,{type:"release_spare"});g=tick(g);
  g.campaign!.reliabilityStage!.failover=null;g.campaign!.reliabilityStage!.checksStep=null;g.campaign!.cashCents=50000;
- show(g);const panel=screen.getByRole("region",{name:"Stay Online"});
+ show(g);openActions();const panel=screen.getByRole("region",{name:"Stay Online"});
  for(const name of ["Deploy Automatic Failover","Deploy Health Checks","Install spare"])
   expect((within(panel).getByRole("button",{name:new RegExp(name)}) as HTMLButtonElement).disabled).toBe(true);
 });
@@ -41,3 +41,6 @@ it("keeps the recorded reliability outcome available after acknowledgement",()=>
  fireEvent.click(screen.getByRole("tab",{name:/^Incidents/}));fireEvent.click(screen.getByRole("button",{name:/Stay Online outcome/}));
  expect(screen.getByRole("region",{name:"Historical reliability outcome"}).textContent).toContain("App 3");
 });
+
+/** Purchases live on the panel's Actions tab. */
+function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

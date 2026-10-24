@@ -1,4 +1,4 @@
-import { test, expect, seedSave, savedGame, expectRoom, setGameSpeed, advanceCampaignStep } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, setGameSpeed, advanceCampaignStep, openPanelTab } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -103,16 +103,18 @@ test("guidance incident: short help targets the upgrade and preserves readings",
   await page.screenshot({ path: info.outputPath("database-gold.png") });
   expect((await savedGame(page)).campaign!.inputs).toEqual(before.inputs);
   expect((await savedGame(page)).campaign!.step).toBe(before.step);
+  // The accepted hint opened Actions; reading the database brings Analysis back and the spotlight waits on the Actions tab.
+  await openPanelTab(page, "Analysis");
   await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Database",exact:true}).click();
-  await expect(gold(page)).toHaveAccessibleName(/^Upgrade database/);
+  await expect(gold(page)).toHaveAccessibleName(/^Actions/);
   await expect(page.getByRole("region", { name: "Database readings" })).toBeVisible();
   await expect(page.getByRole("region", {name:"Database readings"})).toContainText("Capacity");
-  await expect(page.getByRole("button",{name:/^Limit to 500/})).toBeEnabled();
+  await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Hint", exact: true }).click();
   await expect(card).toContainText("Upgrade it to handle more requests");
   await card.getByRole("button", { name: "Got it" }).click();
   await expect(gold(page)).toHaveAccessibleName(/^Upgrade database/);
-  await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button",{name:/^Limit to 500/})).toBeEnabled();
   await gold(page).click(); await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Confirm");
   await page.getByRole("button",{name:"Cancel",exact:true}).click(); await expect(gold(page)).toHaveCount(0);
 });
@@ -212,11 +214,12 @@ test("guidance collapsed entry, keyboard tooltip and reduced motion", async ({ p
   await expect(gold(page)).toHaveAccessibleName("Equipment & actions");
   expect(await gold(page).evaluate(node => getComputedStyle(node).animationName)).toBe("none");
   await gold(page).click(); await expect(gold(page)).toHaveAccessibleName(/^Upgrade database/);
-  await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Database", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^Actions/ })).toHaveAttribute("aria-selected", "true");
 });
 
 test("guidance confirmation ownership suppresses both spotlights", async ({ page, installClock }) => {
   await installClock(); await boot(page, newGame());
+  await openPanelTab(page, "Actions");
   await page.getByRole("button", { name: /^Add server/ }).click();
   await expect(gold(page)).toHaveAccessibleName("Confirm");
   await idle(page); await expect(gold(page)).toHaveAccessibleName("Confirm");
@@ -328,6 +331,7 @@ for (const [label,company] of [
 ] as const) test(`action confirmation shared immediate gold: ${label}`,async ({page,installClock})=>{
   await installClock(); await boot(page,company());
   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
+  await openPanelTab(page,"Actions");
   const control=page.getByRole("button",{name:new RegExp(`^${label}`)}); await control.click();
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Confirm");
   await expectFullyVisibleGold(page);
@@ -362,6 +366,7 @@ for (const [chapter,label,company] of [[2,"Upgrade database",scaling],[6,"Add se
   test(`action confirmation chapter ${chapter}: ${label}`,async ({page,installClock})=>{
     await installClock(); await boot(page,company());
     await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
+    await openPanelTab(page,"Actions");
     await page.getByRole("button",{name:new RegExp(`^${label}`)}).click();
     await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Confirm");
     await page.getByRole("button",{name:"Cancel",exact:true}).click(); await expect(gold(page)).toHaveCount(0);
@@ -413,6 +418,7 @@ test('progression choice: opening the growth explanation never accepts risk', as
   await gold(page).click(); await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName('Accept growth risk');
   await expect(page.getByRole('button', { name: 'Accept growth risk', exact: true })).toBeVisible();
   expect((await savedGame(page)).campaign!.inputs).toEqual(before.inputs);
+  await openPanelTab(page, 'Actions');
   await page.getByRole('button', { name: /^Upgrade database/ }).click();
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName('Confirm');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();

@@ -1,4 +1,4 @@
-import { test, expect, seedSave, savedGame, expectRoom, openCameraControls } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, openCameraControls, openPanelTab } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { applyCampaignInput, step } from "../src/sim/step";
@@ -55,6 +55,9 @@ test("cold open: the launch letter, the whole room and the opening beat", async 
 
 test("the research sheet previews each option and spends the pick", async ({ page }) => {
   await boot(page, researchReady());
+  // The pick is a purchase on Actions: the step lights that tab until the player opens it.
+  await expect(page.locator("[data-spotlight]")).toHaveAttribute("data-tab", "actions");
+  await openPanelTab(page, "Actions");
   const sheet = page.getByRole("region", { name: "Launch Week research" });
   await expect(sheet).toBeVisible();
   // A spotlighted tutorial step explains the free research point beside the sheet.
@@ -111,6 +114,7 @@ test("the incident's spotlight frames the Database below the growing checklist",
 test("a week that ends mid-incident lets the player fix it before the score card", async ({ page }) => {
   await boot(page, runUntil(newGame(7, "lw-late", 2), x => x.campaign!.launchWeek!.completedStep !== null));
   await expect(page.getByRole("dialog", { name: "Launch Week complete" })).toHaveCount(0);
+  await openPanelTab(page, "Actions");
   const upgrade = page.locator('.campaign-panel .campaign-action-card[data-campaign-action="Upgrade database"] > button.act');
   await expect(upgrade).toBeEnabled();
   await expect(page.locator(".campaign-panel")).not.toContainText("Acknowledge the pending review or milestone first.");

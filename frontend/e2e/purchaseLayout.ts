@@ -1,4 +1,4 @@
-import { openCameraControls } from "./fixtures";
+import { openCameraControls, openPanelTab } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { expect, expectRoom, seedSave, savedGame } from "./fixtures";
 import { newGame, type GameState } from "../src/sim";
@@ -44,6 +44,7 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
     await page.route("**/api/**",r=>r.abort());
     await seedSave(page,tick(newGame(1,`purchase-layout-${width}`),60));
     await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
+    await openPanelTab(page,"Actions");
     const before=(await savedGame(page)).campaign!;
     const panel=page.getByRole("complementary",{name:"System metrics"});
     // Each opening action uses the same left-side placement and its own equipment highlight.
@@ -98,6 +99,7 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
 export async function purchaseActions(page:Page,game:GameState,actions:readonly (readonly [RegExp,string])[]) {
     await page.route("**/api/**",r=>r.abort());await seedSave(page,game);
     await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
+    await openPanelTab(page,"Actions");
     const before=(await savedGame(page)).campaign;
     for(const [label,equipment] of actions){
         const button=page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:label});
