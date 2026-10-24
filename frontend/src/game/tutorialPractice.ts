@@ -22,10 +22,10 @@ export function saveTutorialPractice(companyRunId: string, practice: TutorialCom
 export function loadTutorialPractice(companyRunId: string): TutorialCompany | null {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) ?? "null");
-    // Practice saved by the retired lesson walkthroughs cannot resume; only a just-started practice company can.
+    // Practice saved by the retired lesson walkthroughs cannot resume; a Launch Week practice resumes where it was left.
     if (value?.companyRunId !== companyRunId || value?.version !== WALKTHROUGH_VERSION) return null;
     const result = decodeSave(JSON.stringify(value.save));
-    if (result.status !== "ok" || result.game.phase !== "management" || result.game.campaign!.step > 1) return null;
+    if (result.status !== "ok") return null;
     return { game: result.game, remainderMs: result.envelope.runtime.remainderMs, measurement: result.envelope.runtime.measurement };
   } catch { return null; }
 }

@@ -1213,14 +1213,15 @@ button:disabled {
 .traffic-toggle[aria-pressed="true"] { background: var(--go); color: var(--ink); }
 
 /* The traffic view's load bar under a machine's label: demand over capacity. */
-.eq-label:has(.eq-load) { flex-wrap: wrap; row-gap: 0; }
+/* The label pads its icon side less than its text side; the bar's start margin evens out both ends. */
+.eq-label:has(.eq-load) { flex-wrap: wrap; row-gap: 0; padding-bottom: 6px; }
 .eq-load {
+  --eq-load-inset: 6px;
   display: block;
-  flex-basis: 100%;
-  width: 100%;
+  flex-basis: calc(100% - var(--eq-load-inset));
   min-width: 48px;
   height: 4px;
-  margin-top: 3px;
+  margin: 4px 0 0 var(--eq-load-inset);
   border-radius: 2px;
   background: rgb(0 0 0 / 0.18);
   overflow: hidden;
@@ -4904,6 +4905,12 @@ button:disabled {
     padding: 2px 6px 2px 2px;
     gap: 4px;
     border-width: 2px;
+  }
+  .eq-label:has(.eq-load) {
+    padding-bottom: 5px;
+  }
+  .eq-load {
+    --eq-load-inset: 4px;
   }
   .eq-icon {
     width: 18px;

@@ -21,7 +21,7 @@ import { admissionCeiling, canEnterData, databaseUpgrade, pendingStop, routableA
 import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
-import { campaignGuidance, milestoneBlocks, type Requirement } from "@/game/campaignGuidance";
+import { campaignGuidance, launchResearchPending, milestoneBlocks, type Requirement } from "@/game/campaignGuidance";
 import { launchWeekScalingOpen, openingTuning } from "@/sim/launchWeek";
 import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
 import { campaignChapters, finishedChapter } from "@/game/campaignChapters";
@@ -179,7 +179,7 @@ export function CampaignHeader() {
 /** Whatever is controllable is disabled while time is held for a decision, or once the run is over. */
 function controlsDisabled(game: GameState): boolean {
   const c = game.campaign!;
-  return pendingStop(c) !== null || milestoneBlocks(c) || game.phase === "review" || game.phase === "ended";
+  return pendingStop(c) !== null || milestoneBlocks(game) || game.phase === "review" || game.phase === "ended";
 }
 
 /**
@@ -279,7 +279,7 @@ function CampaignActions() {
         <span>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
       </div>)}
-      {c.launchWeek?.researchEarned===1&&!c.launchWeek.tech&&<section className="panel-section" aria-label="Launch Week research">
+      {!!c.launchWeek?.researchEarned&&!c.launchWeek.tech&&<section className="panel-section" aria-label="Launch Week research">
         <h4 className="step-head"><Icon name="bulb" size={16} />Research pick</h4>
         <p>One free research point, billed at the next Sunday settlement. Your pick carries into the later chapters.</p>
         <ul className="actions">
@@ -363,7 +363,7 @@ export function CampaignControls() {
   const { game, running, setRunning, speed, setSpeed, weekRush, endWeek, cancelWeekRush } = useGame();
   const narrow = useNarrowDock();
   const { runGold, pauseGold } = useCampaignAttention();
-  const active = useGame(s=>s.started) && pendingStop(game.campaign) === null && !milestoneBlocks(game.campaign!) && (game.phase === "management" || game.phase === "incident");
+  const active = useGame(s=>s.started) && pendingStop(game.campaign) === null && !milestoneBlocks(game) && (game.phase === "management" || game.phase === "incident");
   return <footer className={`bottombar controls-dock campaign-clock${running?" is-running":" is-paused"}`}>
     <ViewTabs tabs={[
       { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}` },
@@ -515,7 +515,7 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
     if (!tutorialCompany) return <CampaignRecoveryReview key={`${c.runId}:${report.id}:${report.recoveredStep}`} runId={c.runId} report={report} reliability={!c.combinedStage ? reliabilityLesson(c, report) : undefined} onContinue={() => act({ type: "acknowledge_review" })} />;
     return <Modal title="Incident postmortem" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "incident" }}><Report report={report} /><ContinueFoot label="Continue company" onClick={() => act({ type: "acknowledge_review" })} /></Modal>;
   }
-  if(milestoneBlocks(c)&&c.launchWeek&&!(c.launchWeek.researchEarned&&!c.launchWeek.tech))return <LaunchScore campaign={c} />;
+  if(milestoneBlocks(game)&&c.launchWeek&&!launchResearchPending(game))return <LaunchScore campaign={c} />;
   if(c.openingMilestone&&!c.openingMilestone.acknowledged&&!c.launchWeek)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }}>
     <CampaignReport lesson={outcomeSummary(c,"opening")}><p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
     <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p><pre>{JSON.stringify(c.openingMilestone,null,2)}</pre></CampaignReport>

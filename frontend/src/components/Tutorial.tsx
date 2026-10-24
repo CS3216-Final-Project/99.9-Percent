@@ -209,7 +209,7 @@ function fits(track: TourTrack, s: Snapshot, step: Pick<Step, "inTech">): boolea
   if (track === "basics") return s.game.phase === "management";
   if (track === "incident") return s.game.phase === "incident";
   const c = s.game.campaign;
-  return !!c && s.game.phase === "management" && pendingStop(c) === null && !milestoneBlocks(c) && (s.view === null || (!!step.inTech && s.view === "tech"));
+  return !!c && s.game.phase === "management" && pendingStop(c) === null && !milestoneBlocks(s.game) && (s.view === null || (!!step.inTech && s.view === "tech"));
 }
 
 /** Whether a box on screen lies in the part of the room the panel leaves open. */

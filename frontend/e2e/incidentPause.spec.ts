@@ -91,7 +91,9 @@ for (const chapter of [2, 3, 4, 5, 6]) test(`incident Pause: first-person Chapte
   const paused = (await savedGame(page)).campaign!.step;
   await page.clock.runFor(1000); expect((await savedGame(page)).campaign!.step).toBe(paused);
   if (chapter === 3) {
-    await page.clock.runFor(8999); await expect(gold).toHaveCount(0);
+    // The company is paused, so only the idle deadline needs to pass: jump to it rather than drawing every
+    // first-person frame of the wait, which kept this case at the edge of its time budget.
+    await page.clock.fastForward(8999); await expect(gold).toHaveCount(0);
     await page.clock.runFor(1); await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("Hint");
     expect((await savedGame(page)).campaign!.step).toBe(paused);
   }

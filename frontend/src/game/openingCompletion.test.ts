@@ -1,13 +1,14 @@
 import { beforeEach, expect, it } from "vitest";
-import { applyAction, newLegacyGame } from "@/sim";
+import { applyAction, newGame, newLegacyGame, type GameState } from "@/sim";
 import { act, tick } from "@/sim/__tests__/spikeFixtures";
 import { verifiedPrevention } from "@/sim/openingPrevention";
-import { enterScaling, canEnterData } from "@/sim/step";
+import { enterScaling, canEnterData, step } from "@/sim/step";
+import { campaignGuidance, campaignObjective, launchResearchPending } from "./campaignGuidance";
 import { preventedOpening, recoveredOpening } from "./__fixtures__/openingOutcome";
 import { decodeSave, makeEnvelope } from "./saveEnvelope";
 import { outcomeSummary } from "./campaignReport";
 import { chapterAdvance, campaignChapters } from "./campaignChapters";
-import { useGame } from "./store";
+import { campaignClockAvailable, useGame } from "./store";
 import { campaignAttention } from "./campaignAttention";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
@@ -87,6 +88,101 @@ it("repairs an old acknowledged prevention log after later actions/time, without
   const entered = act(twice.game, { type: "acknowledge_milestone" });
   const again = decodeSave(JSON.stringify(makeEnvelope(entered))); if (again.status !== "ok") throw Error(again.status);
   expect(again.game).toEqual(entered);
+});
+
+/** A Launch Week company whose database incident was fixed by the upgrade and its postmortem acknowledged. */
+function launchRecovered() {
+  const until = (s: GameState, cond: (s: GameState) => boolean) => {
+    for (let i = 0; i < 200 && !cond(s); i++) s = s.phase === "review" ? act(s, { type: "acknowledge_review" }) : step(s).state;
+    return s;
+  };
+  let s = until(newGame(7, "lw-gates", 2), x => !!x.campaign!.incident);
+  s = until(act(s, { type: "start_db_upgrade" }), x => x.phase === "review");
+  return { s: act(s, { type: "acknowledge_review" }), until };
+}
+
+it("offers Complete Opening only once Launch Week is over and its research pick is spent", () => {
+  const { s: midWeek, until } = launchRecovered();
+  // The milestone is recorded mid-week, but the week is not survived yet.
+  expect(midWeek.campaign!.openingMilestone?.acknowledged).toBe(false);
+  expect(midWeek.campaign!.launchWeek!.completedStep).toBeNull();
+  expect(campaignGuidance(midWeek).pendingAction).toBeNull();
+  const over = until(midWeek, x => x.campaign!.launchWeek!.completedStep !== null);
+  expect(over.campaign!.launchWeek).toMatchObject({ researchEarned: 1, tech: null });
+  expect(launchResearchPending(over)).toBe(true);
+  expect(campaignGuidance(over)).toMatchObject({ pendingAction: null, waiting: expect.stringContaining("research pick") });
+  expect(campaignObjective(over)).toBe("Spend your free research pick to see your Launch Week score.");
+  expect(campaignAttention(over)).toMatchObject({ reason: "launch-research", target: "research" });
+  const picked = act(over, { type: "pick_launch_tech", tech: "autoscaling" });
+  expect(launchResearchPending(picked)).toBe(false);
+  expect(campaignGuidance(picked).pendingAction?.label).toBe("Complete Opening");
+  expect(campaignObjective(picked)).toBe("Review your Launch Week score and continue into Chapter 2.");
+});
+
+it("lets the store spend Launch Week research while the milestone waits, and nothing else", () => {
+  const { s, until } = launchRecovered();
+  const over = until(s, x => x.campaign!.launchWeek!.completedStep !== null);
+  useGame.setState({ game: over, started: true, hasRun: true });
+  expect(useGame.getState().act({ type: "add_server" })).toBe(false);
+  expect(useGame.getState().act({ type: "set_traffic_limit", enabled: true })).toBe(false);
+  expect(useGame.getState().game).toBe(over);
+  expect(useGame.getState().act({ type: "pick_launch_tech", tech: "caching" })).toBe(true);
+  expect(useGame.getState().game.campaign!.launchWeek!.tech).toBe("caching");
+  // With the pick spent the milestone is the only accepted action again, and it continues into Chapter 2.
+  expect(useGame.getState().act({ type: "pick_launch_tech", tech: "autoscaling" })).toBe(false);
+  expect(useGame.getState().act({ type: "add_server" })).toBe(false);
+  expect(useGame.getState().act({ type: "acknowledge_milestone", enterScaling: true })).toBe(true);
+  expect(useGame.getState().game.campaign).toMatchObject({ openingMilestone: { acknowledged: true }, scaling: expect.anything() });
+});
+
+/** A Launch Week company that upgrades its database at game second `upgradeStep` (or never), stepped to the week's end. */
+function launchWeekEnd(upgradeStep: number | null) {
+  let s = newGame(7, "lw-late", 2);
+  for (let i = 0; i < 200 && s.campaign!.launchWeek!.completedStep === null && s.phase !== "review"; i++) {
+    if (s.campaign!.step === upgradeStep) s = act(s, { type: "start_db_upgrade" });
+    s = step(s).state;
+  }
+  return s;
+}
+const store = () => useGame.getState();
+
+it("lets a company whose Launch Week ends mid-incident recover, review and then complete the Opening", () => {
+  const over = launchWeekEnd(null);
+  expect(over).toMatchObject({ phase: "incident", campaign: { step: 60, launchWeek: { completedStep: 60, tech: null }, openingMilestone: { acknowledged: false } } });
+  expect(applyAction(over, { type: "acknowledge_milestone" }).ok).toBe(false);
+  useGame.setState({ game: over, started: true, hasRun: true });
+  // The incident comes first: the milestone cannot be acknowledged yet, so it holds neither the clock nor the response.
+  expect(campaignClockAvailable(store())).toBe(true);
+  expect(campaignGuidance(over).pendingAction).toBeNull();
+  expect(campaignObjective(over)).toBe("Restore stable service while weighing cost and rejected demand.");
+  expect(campaignAttention(over).reason).not.toMatch(/^launch-(research|score)$/);
+  expect(store().act({ type: "acknowledge_milestone" })).toBe(false);
+  expect(store().act({ type: "start_db_upgrade" })).toBe(true);
+  let s = store().game;
+  for (let i = 0; i < 60 && s.phase !== "review"; i++) s = step(s).state;
+  expect(s.phase).toBe("review");
+  useGame.setState({ game: s });
+  expect(campaignAttention(s).reason).toBe("review");
+  expect(store().act({ type: "acknowledge_review" })).toBe(true);
+  expect(launchResearchPending(store().game)).toBe(true);
+  expect(campaignClockAvailable(store())).toBe(false);
+  expect(store().act({ type: "pick_launch_tech", tech: "caching" })).toBe(true);
+  expect(store().act({ type: "acknowledge_milestone", enterScaling: true })).toBe(true);
+  expect(store().game.campaign!.scaling).toBeTruthy();
+});
+
+it("lets the postmortem that lands on Launch Week's last second be acknowledged before the score", () => {
+  const over = launchWeekEnd(53);
+  expect(over).toMatchObject({ phase: "review", campaign: { step: 60, launchWeek: { completedStep: 60 }, incident: null } });
+  useGame.setState({ game: over, started: true, hasRun: true });
+  expect(campaignAttention(over)).toMatchObject({ reason: "review", attention: null });
+  expect(campaignGuidance(over).pendingAction?.label).toBe("Review postmortem");
+  expect(launchResearchPending(over)).toBe(false);
+  expect(store().act({ type: "pick_launch_tech", tech: "caching" })).toBe(false);
+  expect(store().act({ type: "acknowledge_review" })).toBe(true);
+  expect(campaignAttention(store().game).reason).toBe("launch-research");
+  expect(store().act({ type: "pick_launch_tech", tech: "autoscaling" })).toBe(true);
+  expect(campaignGuidance(store().game).pendingAction?.label).toBe("Complete Opening");
 });
 
 it("leaves Classic progression independent of Campaign prevention", () => {

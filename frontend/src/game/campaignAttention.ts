@@ -6,7 +6,7 @@ import { currentFault, finalRequirements, stableManagement, canStartGrowth } fro
 import { preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
-import { milestoneBlocks } from "./campaignGuidance";
+import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { campaignChapters, chapterAdvance } from "./campaignChapters";
@@ -218,7 +218,7 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     "launch-first-incident": "Your App Server is overloading. Inspect it to see its status turn red, then fix the cause.",
     "launch-db-incident": "Your database is overloading. Inspect it to see the work piling up.",
     "launch-end-week": "Everything is stable again. Use End week to skip to the end of the week.",
-    "launch-open": "Your launch week starts now. Press Run — the first customers are arriving.",
+    "launch-open": "Your launch week starts now. Press Run - the first customers are arriving.",
     "launch-week-report": "A launch week settled. Lost or turned-away requests so far are counted.",
     "launch-research": "You earned a research point. Spend it on Caching or Autoscaling; each carries into later chapters.",
     "launch-surge": "The launch campaign is sending five times the traffic. Keep the service up until it ends.",
@@ -246,10 +246,10 @@ function baseAttention(game: GameState): AttentionDecision {
   if (!c) return required("inactive", "Guidance is available in Guided Mode.", "", null);
   if (game.phase === "ended") return required("ended", "This company has ended.", "Review the scorecard before starting another company.", null);
   // The score card waits for the research pick, so the week's last lesson is never covered.
-  if (c.launchWeek && milestoneBlocks(c) && c.launchWeek.researchEarned && !c.launchWeek.tech)
+  if (launchResearchPending(game))
     return result("launch-research", "hint", "Research points buy technology. This one is free; it is billed at the week's settlement.", "Pick Caching or Autoscaling to see your Launch Week score.", "research");
-  if (c.launchWeek && milestoneBlocks(c)) return required("launch-score", "Launch Week is complete.", "Review your uptime score and continue into Chapter 2.", "next");
-  if (game.phase === "review" || pendingStop(c) || milestoneBlocks(c))
+  if (c.launchWeek && milestoneBlocks(game)) return required("launch-score", "Launch Week is complete.", "Review your uptime score and continue into Chapter 2.", "next");
+  if (game.phase === "review" || pendingStop(c) || milestoneBlocks(game))
     return required("review", "An outcome is waiting for your review.", "Finish the existing review or acknowledgement before continuing.", null);
   const next = chapterAdvance(game);
   if (!c.incident && next?.ready && previewCampaignAction(game, next.action).ok) return progression("next", "The current chapter requirements are complete.", `Use Next: ${next.label}.`, "next");
@@ -313,7 +313,7 @@ function baseAttention(game: GameState): AttentionDecision {
       const report = c.settlements.at(-1);
       if (report && c.step - report.step < 6) return run("launch-week-report", `Week ${report.period} report: ${c.cumulative.failed.toLocaleString("en-US")} requests lost so far.`);
       if (lw.surge && lw.surge.endedStep === null) return run("launch-surge", `The launch campaign is sending ${LW.surgeFactor}× traffic until game second ${lw.surge.endStep}.`);
-      return run("launch-week", `Launch week ${Math.min(LW.weeks, Math.floor(c.step / LW.periodSteps) + 1)} of ${LW.weeks}. The launch campaign surge arrives in week 3 — keep the service up.`);
+      return run("launch-week", `Launch week ${Math.min(LW.weeks, Math.floor(c.step / LW.periodSteps) + 1)} of ${LW.weeks}. The launch campaign surge arrives in week 3 - keep the service up.`);
     }
   }
   if (c.incident && qualifies && !appOver && !dbOver) return run("recovery", `The latest readings meet recovery conditions. Healthy observations: ${c.incident.stableSteps} / ${Q.stableSteps}. Pausing adds no observations.`);
@@ -325,7 +325,7 @@ function baseAttention(game: GameState): AttentionDecision {
       !c.trace.some(t => t.type === "inspection" && t.step >= c.incident!.openedStep && t.data.component === "db"))
     return hint("launch-db-incident", "The database is receiving more work than it can process.", "Inspect the Database to see its overload, then upgrade it.", "db");
   if (dbOver) return hint("database", "The database is receiving more work than it can process.", "Open Database to compare demand, capacity and waiting work before choosing a response.", "db");
-  // First Launch Week incident: teach the inspect-first beat — the status bar stays up, the app shows red
+  // First Launch Week incident: teach the inspect-first beat - the status bar stays up, the app shows red
   // once looked at, and guidance then points at the fix.
   if (appOver && c.launchWeek && c.launchWeek.completedStep === null && c.incident &&
       !c.trace.some(t => t.type === "inspection" && t.step >= c.incident!.openedStep && t.data.component === "app"))
