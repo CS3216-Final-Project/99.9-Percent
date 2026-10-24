@@ -44,6 +44,9 @@ import { tipProps } from "../tips";
 import { INFRASTRUCTURE_TIPS } from "@/game/infrastructureHelp";
 import { openRoomArea } from "../roomArea";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
+import { ActivityEffects } from "./activities";
+import { ArcadePanel } from "./ArcadePanel";
+import { serveArcade } from "./arcade";
 import { Office } from "./Office";
 import { ServerFloor } from "./ServerFloor";
 import { ElevatorCar, Landing, ShaftRun } from "./Elevator";
@@ -51,12 +54,12 @@ import { carDoors, resetErrands, settleErrand } from "./trips";
 import { Visitors } from "./Visitors";
 import { playerDeparts } from "./crowd";
 import { aroundShaft } from "./lift";
-import { ELEVATOR_SPOT } from "./floorplan";
+import { ELEVATOR_SPOT, FUN_PROPS, type FunProp } from "./floorplan";
 import { backAt, FLOOR_NUMBER, FLOOR_Y, glideAt, rideAt, washAt } from "./levels";
 import { depart, hurry, now, onRide, placeCar, ride, rideClock, riding, shownFloor, viewHeight } from "./ride";
 import { Avatar, WalkDriver, WalkFloor } from "./Avatar";
 import { GlassDoors } from "./Doors";
-import { avatar, clearPrompt, held, jump, movesAvatar, onPrompt, play, resetJump, walkTo } from "./walk";
+import { avatar, clearPrompt, held, jump, movesAvatar, onBusy, onPrompt, play, resetJump, stopPlaying, walkTo } from "./walk";
 import { clearOverheard, onOverheard, type Overheard } from "./overheard";
 import { ROLE_NAMES } from "./cast";
 import type { Prompt } from "./player";
@@ -1381,6 +1384,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
         <Room />
         <Ceiling floor="office" />
         <Office crew={{ engineers: m.engineers, busy: m.busy, incident: m.incident, releases: m.releases, promos: m.promos }} />
+        <ActivityEffects walking={walking} />
         <Landing floor="office" interactive={landed === "office"} />
         <GlassDoors floor="office" />
         {walking && landed === "office" && <WalkFloor />}
@@ -1550,7 +1554,7 @@ function FrameLimiter({ fps }: { fps: number }) {
 }
 
 /** Do what is within the avatar's reach: exactly what clicking it does, the elevator's ride, or a fun thing. */
-function actOn(prompt: Prompt): string | null {
+function actOn(prompt: Prompt): FunProp | null {
   if (prompt.kind === "equipment") {
     inspectInRoom(prompt.id);
     return null;
@@ -1560,7 +1564,7 @@ function actOn(prompt: Prompt): string | null {
     return null;
   }
   play(prompt.prop, now());
-  return prompt.prop.doing;
+  return prompt.prop;
 }
 
 /** What a typing field, an open dialog or a menu does with keys is theirs, not the room's. */
@@ -1571,7 +1575,8 @@ const onControl = (el: HTMLElement | null) => !!el?.closest('button, a, [role="t
 
 /**
  * Walk mode's controls on the page: the keys that move the avatar and use what is within its reach, a button with
- * what that is (so a tap works on a phone), and the same news for screen readers.
+ * what that is (so a tap works on a phone), and the same news for screen readers. While a fun thing plays the
+ * avatar cannot move: the button is disabled until it ends, Space serves the arcade's ball, and Escape leaves it.
  */
 function WalkControls() {
   const walking = useGame((s) => s.walking && s.started);
@@ -1579,37 +1584,44 @@ function WalkControls() {
   // Nothing is within reach while the car rides: the prompt waits for it to arrive.
   const [aboard, setAboard] = useState(riding);
   useEffect(() => onRide((event) => setAboard(event === "depart")), []);
-  // What the prompt button says a fun thing is doing, while its animation plays.
-  const [activity, setActivity] = useState<{ propId: string; label: string } | null>(null);
-  const activityTimer = useRef<number | null>(null);
+  // The fun thing under way, straight from the avatar's busy: starts, ends and the arcade's own ending all arrive here.
+  const [busy, setBusy] = useState(avatar.busy);
+  useEffect(() => onBusy(setBusy), []);
   useEffect(() => onPrompt(setPrompt), []);
-  // Stopping walk mode drops whatever the button said the avatar was doing.
-  useEffect(() => useGame.subscribe((s) => { if (!s.walking) setActivity(null); }), []);
   const perform = useCallback((p: Prompt) => {
-    const doing = actOn(p);
-    if (!doing) return;
-    setActivity({ propId: p.kind === "prop" ? p.prop.id : "", label: doing });
-    if (activityTimer.current !== null) window.clearTimeout(activityTimer.current);
-    // For as long as the prop's animation runs.
-    activityTimer.current = window.setTimeout(() => {
-      activityTimer.current = null;
-      setActivity(null);
-    }, 2600);
+    if (avatar.busy) return;
+    actOn(p);
   }, []);
   useEffect(() => {
     if (!walking) {
       clearPrompt();
       resetJump();
-      if (activityTimer.current !== null) {
-        window.clearTimeout(activityTimer.current);
-        activityTimer.current = null;
-      }
+      stopPlaying();
       return;
     }
     const down = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (typing(el) || inOverlay(el) || e.ctrlKey || e.metaKey || e.altKey) return;
       const arrow = e.code.startsWith("Arrow");
+      const steering = movesAvatar(e.code) || e.code === "ShiftLeft" || e.code === "ShiftRight";
+      // Arrows belong to a focused tab, radio, slider or button, as everywhere else.
+      if (arrow && onControl(el)) return;
+      // The keys keep being tracked even while busy: the arcade's paddle reads them.
+      if (steering) {
+        if (!riding()) held.add(e.code);
+        if (arrow) e.preventDefault();
+      }
+      // Busy with a fun thing: nothing steers, Space only serves the arcade's ball, Escape leaves the game.
+      if (avatar.busy) {
+        if (e.code === "Space") {
+          e.preventDefault();
+          if (!e.repeat && avatar.busy.prop === "arcade") serveArcade();
+        } else if (e.code === "Escape" && avatar.busy.prop === "arcade") {
+          e.preventDefault();
+          stopPlaying();
+        }
+        return;
+      }
       if (e.code === "Space" && avatar.prompt && !riding()) {
         // A nearby thing to use beats whatever button last held focus.
         e.preventDefault();
@@ -1617,10 +1629,7 @@ function WalkControls() {
         return;
       }
       if ((arrow || e.code === "Space") && onControl(el)) return;
-      if (movesAvatar(e.code) || e.code === "ShiftLeft" || e.code === "ShiftRight") {
-        if (!riding()) held.add(e.code);
-        if (arrow) e.preventDefault();
-      } else if (e.code === "Space") {
+      if (e.code === "Space") {
         e.preventDefault();
         if (!e.repeat && !riding() && !useGame.getState().roomInspection) jump();
       }
@@ -1640,24 +1649,21 @@ function WalkControls() {
       held.clear();
     };
   }, [walking, perform]);
-  useEffect(
-    () => () => {
-      if (activityTimer.current !== null) window.clearTimeout(activityTimer.current);
-    },
-    []
-  );
   const shown = walking && !aboard ? prompt : null;
-  const doing = shown?.kind === "prop" && activity?.propId === shown.prop.id ? activity.label : null;
+  const busyProp = busy ? FUN_PROPS.find((p) => p.id === busy.prop) : null;
+  const doing = shown?.kind === "prop" && busyProp && shown.prop.id === busyProp.id ? busyProp : null;
+  const seconds = doing && Number.isFinite(busy!.until - busy!.since) ? busy!.until - busy!.since : null;
   return (
     <>
       {shown && (
-        <button type="button" className="walk-prompt" onClick={() => perform(shown)}>
+        <button type="button" className={`walk-prompt${doing ? " is-doing" : ""}`} aria-disabled={doing ? "true" : undefined} onClick={() => perform(shown)}>
           <kbd>Space</kbd>
-          {doing ?? shown.label}
+          {doing?.doing ?? shown.label}
+          {doing && seconds !== null && <span key={busy!.since} className="walk-prompt-progress" aria-hidden="true" style={{ animationDuration: `${seconds}s` }} />}
         </button>
       )}
       <span className="visually-hidden" role="status" aria-live="polite">
-        {shown ? (doing ?? `${shown.label}: press Space`) : ""}
+        {shown ? (doing?.doing ?? `${shown.label}: press Space`) : ""}
       </span>
     </>
   );
@@ -1952,6 +1958,7 @@ export default function Facility() {
       <Labels landed={landed} />
       <HoverTip container={container} />
       <WalkControls />
+      <ArcadePanel />
       <Caption />
       <RoomDock stage={container} />
     </div>

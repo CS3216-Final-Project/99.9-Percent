@@ -2,7 +2,7 @@ import {describe,it,expect,vi} from "vitest";
 import {applyAction,newGame} from "../index";
 import {step,advanceSteps} from "../step";
 import {canRetire} from "../autoscaling";
-import {canEnterCombined,combinedInput,canStartGrowth,pendingCombined} from "../combinedCampaign";
+import {canEnterCombined,combinedEntryGates,combinedInput,canStartGrowth,pendingCombined} from "../combinedCampaign";
 import {baselineDemand,growthUsers,sequenceValid} from "../scenarios/combinedCampaign";
 import {captureScorecard,emptyServiceMeasurement,observeService} from "../campaignScorecard";
 import {makeEnvelope,validateEnvelope} from "@/game/saveEnvelope";
@@ -12,6 +12,7 @@ import {act,tick,completedReliability,combinedCompany,finishRound,finishedCompan
 vi.setConfig({testTimeout:15_000});
 describe("Combined campaign",()=>{
  it("enters explicitly with the same company, resources, ownership and history",()=>{const p=completedReliability(),before=structuredClone(p);const s=act(p,{type:"enter_combined"});expect(p).toEqual(before);expect(canEnterCombined(p)).toBe(true);expect(s.campaign!.runId).toBe(p.campaign!.runId);expect(s.campaign!.cashCents).toBe(p.campaign!.cashCents);expect(s.campaign!.apps).toEqual(p.campaign!.apps);expect(s.campaign!.reliabilityStage).toEqual(p.campaign!.reliabilityStage);expect(s.campaign!.combinedStage!.users).toBe(2000);expect(sequenceValid(s.campaign!.combinedStage!.sequence)).toBe(true);expect(validateEnvelope(makeEnvelope(s)).status).toBe("ok");});
+ it("names the entry gate a queued change leaves unmet",()=>{const p=completedReliability();expect(Object.values(combinedEntryGates(p)).every(Boolean)).toBe(true);const queued=act(p,{type:"add_server"});expect(combinedEntryGates(queued)).toMatchObject({pending:false,cash:true,healthy:true,baseline:true});expect(canEnterCombined(queued)).toBe(false);expect(applyAction(queued,{type:"enter_combined"}).ok).toBe(false);});
  it("rejects premature entry without changing the company",()=>{const s=newGame(1);expect(applyAction(s,{type:"enter_combined"}).ok).toBe(false);expect(s.campaign!.combinedStage).toBeNull();});
  it("uses the approved registration and baseline progression",()=>{expect([0,1,2].map(i=>growthUsers(50000,i))).toEqual([20000,35000,50000]);expect([2000,20000,35000,50000].map(u=>baselineDemand(u,50000))).toEqual([2400,2625,2812,3000]);});
  it("requires five new full-demand readiness steps before a player starts pressure",()=>{let s=combinedCompany();expect(canStartGrowth(s)).toBe(false);s=tick(s,4);expect(applyAction(s,{type:"start_growth_wave"}).ok).toBe(false);s=tick(s);expect(canStartGrowth(s)).toBe(true);const n=s.campaign!.step;s=act(s,{type:"start_growth_wave"});expect(s.campaign!.step).toBe(n);expect(s.campaign!.combinedStage!.currentRound!.startStep).toBe(n+8);s=tick(s,7);expect(s.campaign!.incomingRate).toBe(2400);s=tick(s);expect(s.users).toBe(20000);expect(s.campaign!.incomingRate).toBe(4000);expect(validateEnvelope(makeEnvelope(s)).status).toBe("ok");});

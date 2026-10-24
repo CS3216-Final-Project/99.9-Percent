@@ -941,6 +941,34 @@ button:disabled {
   font-weight: 700;
 }
 
+/* While a fun thing plays, a bar sweeps along the prompt's foot for as long as it lasts. */
+.walk-prompt.is-doing {
+  overflow: hidden;
+}
+
+.walk-prompt-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--go);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: walk-prompt-sweep linear forwards;
+}
+
+@keyframes walk-prompt-sweep {
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walk-prompt-progress {
+    animation: none;
+    transform: none;
+  }
+}
+
 /* What a chatting group within earshot is saying, captioned like a subtitle: a translucent band of ink above the
    walk prompt (under it on a phone), the speaker's role named ahead of the line. Purely visual, never clickable. */
 .caption {
@@ -978,6 +1006,161 @@ button:disabled {
   color: var(--critical-caption);
 }
 
+/* The brick breaker's panel while the avatar plays the arcade: a paper card centred above the walk prompt, with
+   a pixel-scaled copy of the cabinet's screen. In first person the cabinet's own screen is the display. */
+.arcade-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 112px;
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: min(360px, calc(100% - 32px));
+  padding: 12px 14px;
+  transform: translateX(-50%);
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--press);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+}
+
+.arcade-panel .arcade-screen {
+  width: 320px;
+  height: 260px;
+  image-rendering: pixelated;
+  border-radius: 6px;
+  background: #0b0d1a;
+}
+
+.arcade-panel.is-first {
+  /* In first person the cabinet's own screen is the display: the panel docks at the edge, a compact strip the
+     top row of bricks clears: status and Leave on one row, the hint wrapped under them. */
+  left: 16px;
+  top: 56px;
+  bottom: auto;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  transform: none;
+}
+
+.arcade-panel.is-first .arcade-hint {
+  flex-basis: 100%;
+}
+
+.arcade-panel.is-first .arcade-screen {
+  display: none;
+}
+
+.arcade-panel p {
+  margin: 0;
+}
+
+.arcade-panel .arcade-status {
+  font-family: var(--font-num);
+  font-weight: 700;
+}
+
+.arcade-panel .arcade-hint,
+.arcade-panel kbd {
+  font-size: var(--text-xs);
+}
+
+.arcade-panel kbd {
+  padding: 1px 6px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 3px;
+  font-family: var(--font-num);
+  font-weight: 700;
+}
+
+.arcade-panel .arcade-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.arcade-panel .arcade-hold {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 1.1rem;
+}
+
+/* The nap's eyelids over the room: two halves of pod-dark closing to meet in the middle, softly edged. While
+   they are shut, three faint z's drift through the dark. */
+.view-eyelids {
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  pointer-events: none;
+  --shut: 0;
+}
+
+.view-eyelids::before,
+.view-eyelids::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: #0b0d1a;
+}
+
+.view-eyelids::before {
+  top: 0;
+  transform: scaleY(var(--shut));
+  transform-origin: top;
+  box-shadow: 0 24px 24px -12px rgba(11, 13, 26, .85);
+}
+
+.view-eyelids::after {
+  bottom: 0;
+  transform: scaleY(var(--shut));
+  transform-origin: bottom;
+  box-shadow: 0 -24px 24px -12px rgba(11, 13, 26, .85);
+}
+
+.view-eyelids i {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 700;
+  color: rgba(244, 241, 234, .75);
+  opacity: 0;
+}
+
+.view-eyelids[data-eyes="shut"] i {
+  animation: view-eyelid-z 2.8s linear infinite;
+}
+
+.view-eyelids i:nth-child(1) { left: 44%; font-size: 1.4rem; }
+.view-eyelids i:nth-child(2) { left: 50%; font-size: 1.9rem; animation-delay: -0.9s !important; }
+.view-eyelids i:nth-child(3) { left: 56%; font-size: 2.4rem; animation-delay: -1.8s !important; }
+
+@keyframes view-eyelid-z {
+  0% { opacity: 0; transform: translate(0, 0); }
+  20% { opacity: .9; }
+  80% { opacity: .9; }
+  100% { opacity: 0; transform: translate(-14px, -34px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-eyelids[data-eyes="shut"] i {
+    animation: none;
+    opacity: .7;
+  }
+}
+
 /* On a phone the floor menu and camera buttons fill the bottom corner, so what is within reach shows at the top. */
 @media (max-width: 900px) {
   .walk-prompt {
@@ -988,6 +1171,22 @@ button:disabled {
     top: 56px;
     bottom: auto;
     font-size: var(--text-sm);
+  }
+}
+
+/* On a small phone the arcade's panel is a full-width card at the bottom, hold buttons beside its Leave. */
+@media (max-width: 640px) {
+  .arcade-panel {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    top: auto;
+    max-width: none;
+    transform: none;
+  }
+  .arcade-panel .arcade-screen {
+    width: 256px;
+    height: 208px;
   }
 }
 
@@ -1213,14 +1412,15 @@ button:disabled {
 .traffic-toggle[aria-pressed="true"] { background: var(--go); color: var(--ink); }
 
 /* The traffic view's load bar under a machine's label: demand over capacity. */
-.eq-label:has(.eq-load) { flex-wrap: wrap; row-gap: 0; }
+/* The label pads its icon side less than its text side; the bar's start margin evens out both ends. */
+.eq-label:has(.eq-load) { flex-wrap: wrap; row-gap: 0; padding-bottom: 6px; }
 .eq-load {
+  --eq-load-inset: 6px;
   display: block;
-  flex-basis: 100%;
-  width: 100%;
+  flex-basis: calc(100% - var(--eq-load-inset));
   min-width: 48px;
   height: 4px;
-  margin-top: 3px;
+  margin: 4px 0 0 var(--eq-load-inset);
   border-radius: 2px;
   background: rgb(0 0 0 / 0.18);
   overflow: hidden;
@@ -3424,6 +3624,16 @@ button:disabled {
   margin: 0;
 }
 
+/* Stay and Continue sit together on the right; an extra action such as Copy result keeps the left. When a narrow
+   dialog wraps them, each wrapped line stays right-aligned under the one before. */
+.chapter-end-foot {
+  justify-content: flex-end;
+}
+
+.chapter-end-extra {
+  margin-right: auto;
+}
+
 .modal-body h4 {
   margin-top: 18px;
 }
@@ -4904,6 +5114,12 @@ button:disabled {
     padding: 2px 6px 2px 2px;
     gap: 4px;
     border-width: 2px;
+  }
+  .eq-label:has(.eq-load) {
+    padding-bottom: 5px;
+  }
+  .eq-load {
+    --eq-load-inset: 4px;
   }
   .eq-icon {
     width: 18px;

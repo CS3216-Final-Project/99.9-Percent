@@ -1,5 +1,5 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useGame } from "@/game/store";
 import { finishedChapter } from "@/game/campaignChapters";
 import { loadMeta } from "@/game/persist";
@@ -7,7 +7,13 @@ import { applyAction, type Action, type GameState } from "@/sim";
 import { step as simStep } from "@/sim/step";
 import { finishingScaling } from "@/sim/__tests__/dataFixture";
 import { dataCompany as finishedData } from "@/sim/__tests__/spikeFixtures";
-import { CampaignOverlays } from "./CampaignUI";
+import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
+import { campaignGuidance } from "@/game/campaignGuidance";
+import { act as decide, spikeCompany, tick } from "@/sim/__tests__/spikeFixtures";
+import { finishedLaunchWeek, recoveredOpening } from "@/game/__fixtures__/openingOutcome";
+import { reliabilityOutcome, reliabilityOutcomeWithQueuedChange } from "@/game/__fixtures__/reliabilityOutcome";
+import { CampaignChapters } from "./CampaignChapters";
+import { CampaignHeader, CampaignOverlays, CampaignPanel } from "./CampaignUI";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(cleanup);
@@ -64,7 +70,7 @@ it("stays in the chapter without announcing it again", () => {
 it("continues straight into the next chapter", () => {
   show(finishingScaling());
   step();
-  fireEvent.click(screen.getByRole("button", { name: /Continue to data strategy/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Continue to Data Strategy/ }));
   expect(dialog()).toBeNull();
   expect(useGame.getState().game.campaign!.dataStage).toBeTruthy();
 });
@@ -115,7 +121,7 @@ it("announces Data Strategy and continues into Traffic Spikes", () => {
   recover();
   expect(useGame.getState().running).toBe(false);
   expect(dataDialog()!.textContent).toContain("Next: Traffic Spikes & Autoscaling.");
-  fireEvent.click(screen.getByRole("button", { name: /Continue to traffic spikes/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Continue to Traffic Spikes/ }));
   expect(dataDialog()).toBeNull();
   expect(useGame.getState().game.campaign!.spikeStage).toBeTruthy();
 });
@@ -127,4 +133,150 @@ it("does not announce a company loaded already finished after an incident and re
   play(rebalance);
   recover();
   expect(dataDialog()).toBeNull();
+});
+
+/** A Traffic Spikes company whose spike response awaits the player. */
+function spikeRecognition(): GameState {
+  let g = spikeCompany(false);
+  for (let i = 0; i < 300 && !pendingSpikeAcknowledgement(g.campaign!); i++) g = g.phase === "review" ? decide(g, { type: "acknowledge_review" }) : tick(g);
+  return g;
+}
+const button = (dialog: HTMLElement, name: string | RegExp) => within(dialog).getByRole("button", { name });
+
+it("ends Traffic Spikes with Stay or Continue, and Continue enters Stay Online paused", () => {
+  show(spikeRecognition());
+  const recognition = screen.getByRole("dialog", { name: "Spike response handled" });
+  expect(button(recognition, "Stay in this chapter")).toBeTruthy();
+  fireEvent.click(button(recognition, /Continue to Stay Online/));
+  const c = useGame.getState().game.campaign!;
+  expect(c.spikeStage!.acknowledged).toBe(true);
+  expect(c.reliabilityStage).toBeTruthy();
+  expect(screen.queryByRole("dialog", { name: "Spike response handled" })).toBeNull();
+  expect(useGame.getState().running).toBe(false);
+});
+
+it("stays in Traffic Spikes and offers Stay Online through Next in the chapter bar", () => {
+  useGame.setState({ game: spikeRecognition(), ready: true, hasRun: true, started: true, onboarding: false });
+  render(<><CampaignChapters /><CampaignOverlays /></>);
+  fireEvent.click(button(screen.getByRole("dialog", { name: "Spike response handled" }), "Stay in this chapter"));
+  expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(true);
+  expect(useGame.getState().game.campaign!.reliabilityStage).toBeFalsy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to Stay Online" }));
+  expect(useGame.getState().game.campaign!.reliabilityStage).toBeTruthy();
+});
+
+it("ends Stay Online with Stay or Continue into Grow the Company", () => {
+  show(reliabilityOutcome());
+  fireEvent.click(button(screen.getByRole("dialog", { name: "Reliability outcome" }), /Continue to Grow the Company/));
+  expect(useGame.getState().game.campaign!.reliabilityStage!.acknowledged).toBe(true);
+  expect(useGame.getState().game.campaign!.combinedStage).toBeTruthy();
+});
+
+it("disables Continue and names what Grow the Company waits for while a change is installing", () => {
+  const game = reliabilityOutcomeWithQueuedChange();
+  show(game);
+  const outcome = screen.getByRole("dialog", { name: "Reliability outcome" });
+  const proceed = button(outcome, /Continue to Grow the Company/) as HTMLButtonElement;
+  expect(proceed.disabled).toBe(true);
+  const reason = document.getElementById(proceed.getAttribute("aria-describedby")!)!;
+  expect(reason.textContent).toContain("Grow the Company opens once queued changes have finished.");
+  fireEvent.click(proceed);
+  expect(useGame.getState().game).toBe(game);
+  expect(useGame.getState().finishChapter("continue")).toBe(false);
+  fireEvent.click(button(outcome, "Stay in this chapter"));
+  expect(useGame.getState().game.campaign!.reliabilityStage!.acknowledged).toBe(true);
+  expect(useGame.getState().game.campaign!.combinedStage).toBeNull();
+});
+
+it("ends Launch Week with Stay, Continue and Copy result; Continue enters Scaling & Routing", () => {
+  show(finishedLaunchWeek());
+  const card = screen.getByRole("dialog", { name: "Launch Week complete" });
+  expect(button(card, "Copy result")).toBeTruthy();
+  fireEvent.click(button(card, /Continue to Scaling & Routing/));
+  expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+});
+
+it("keeps a Launch Week company that stayed out of Scaling & Routing after a reload", () => {
+  show(finishedLaunchWeek());
+  fireEvent.click(button(screen.getByRole("dialog", { name: "Launch Week complete" }), "Stay in this chapter"));
+  const { runId, openingMilestone, scaling } = useGame.getState().game.campaign!;
+  expect(openingMilestone!.acknowledged).toBe(true);
+  expect(scaling).toBeNull();
+  expect(loadMeta().chapterCompletions).toEqual({ runId, chapters: ["opening"] });
+  act(() => { useGame.getState().saveNow(true); useGame.setState(useGame.getInitialState(), true); useGame.getState().boot(); useGame.getState().play(); });
+  expect(useGame.getState().game.campaign!.runId).toBe(runId);
+  expect(useGame.getState().game.campaign!.scaling).toBeNull();
+});
+
+it("does not record a stay made on a Launch Week practice company over the real company's record", () => {
+  const real = finishedLaunchWeek();
+  show(finishedLaunchWeek());
+  act(() => useGame.setState({ tutorialCompany: { game: real, remainderMs: 0, measurement: useGame.getState().measurement } }));
+  fireEvent.click(button(screen.getByRole("dialog", { name: "Launch Week complete" }), "Stay in this chapter"));
+  expect(useGame.getState().game.campaign!.openingMilestone!.acknowledged).toBe(true);
+  expect(loadMeta().chapterCompletions).toBeNull();
+});
+
+it("ends a version-1 Opening with Stay or Continue, and a stayed company continues later through Next", () => {
+  useGame.setState({ game: decide(recoveredOpening(), { type: "acknowledge_review" }), ready: true, hasRun: true, started: true, onboarding: false });
+  render(<><CampaignChapters /><CampaignOverlays /></>);
+  const recognition = screen.getByRole("dialog", { name: "First growth challenge handled" });
+  expect(button(recognition, /Continue to Scaling & Routing/)).toBeTruthy();
+  fireEvent.click(button(recognition, "Stay in this chapter"));
+  expect(useGame.getState().game.campaign!.openingMilestone!.acknowledged).toBe(true);
+  expect(useGame.getState().game.campaign!.scaling).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to Scaling & Routing" }));
+  expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+});
+
+it("shows a company that stayed after Launch Week no Scaling & Routing controls or requirements, only Next", () => {
+  useGame.setState({ game: finishedLaunchWeek(), ready: true, hasRun: true, started: true, onboarding: false });
+  render(<><CampaignHeader /><CampaignPanel /><CampaignOverlays /></>);
+  fireEvent.click(button(screen.getByRole("dialog", { name: "Launch Week complete" }), "Stay in this chapter"));
+  expect(screen.queryByRole("region", { name: "Scaling growth risk" })).toBeNull();
+  expect(screen.queryByText(/Scaling stage active|Database headroom/)).toBeNull();
+  expect(screen.getByLabelText("Current chapter").textContent).toBe("Launch Week");
+  expect(screen.getByLabelText("Current objective").textContent).toContain("continue to Scaling & Routing with Next");
+  const guidance = screen.getByRole("region", { name: "Guided Mode guidance" });
+  expect(guidance.textContent).toContain("Launch Week is complete. Continue to Scaling & Routing through Next in the chapter bar when you are ready.");
+  fireEvent.click(screen.getByRole("button", { name: "Next: Continue to Scaling & Routing" }));
+  expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
+});
+
+it.each([
+  ["Launch Week complete", () => finishedLaunchWeek(), (g: GameState) => g.campaign!.openingMilestone!.acknowledged && !g.campaign!.scaling],
+  ["First growth challenge handled", () => decide(recoveredOpening(), { type: "acknowledge_review" }), (g: GameState) => g.campaign!.openingMilestone!.acknowledged && !g.campaign!.scaling],
+  ["Spike response handled", () => spikeRecognition(), (g: GameState) => g.campaign!.spikeStage!.acknowledged && !g.campaign!.reliabilityStage],
+  ["Reliability outcome", () => reliabilityOutcome(), (g: GameState) => g.campaign!.reliabilityStage!.acknowledged && !g.campaign!.combinedStage],
+] as const)("stays in the chapter for good when Escape closes %s", (name, company, stayed) => {
+  show(company());
+  fireEvent.keyDown(screen.getByRole("dialog", { name }), { key: "Escape" });
+  expect(screen.queryByRole("dialog", { name })).toBeNull();
+  expect(stayed(useGame.getState().game)).toBe(true);
+  expect(useGame.getState().view).toBeNull();
+  step();
+  expect(screen.queryByRole("dialog", { name })).toBeNull();
+});
+
+it("opens each completion menu on Continue, or on Stay while Continue is not possible", () => {
+  show(spikeRecognition());
+  expect(document.activeElement).toBe(button(screen.getByRole("dialog", { name: "Spike response handled" }), /Continue to Stay Online/));
+  cleanup();
+  show(reliabilityOutcomeWithQueuedChange());
+  expect(document.activeElement).toBe(button(screen.getByRole("dialog", { name: "Reliability outcome" }), "Stay in this chapter"));
+});
+
+it("says so when a stay cannot be saved, and still stays for this visit", () => {
+  show(finishedLaunchWeek());
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("full", "QuotaExceededError"); });
+  fireEvent.click(button(screen.getByRole("dialog", { name: "Launch Week complete" }), "Stay in this chapter"));
+  vi.restoreAllMocks();
+  expect(useGame.getState().toast).toMatchObject({ kind: "error", text: expect.stringContaining("could not be saved") });
+  expect(useGame.getState().game.campaign!.scaling).toBeNull();
+});
+
+it("does not mention reviewing the spike response before there is one", () => {
+  expect(campaignGuidance(spikeCompany(false)).notice).toBeNull();
+  expect(campaignGuidance(spikeRecognition()).notice).toBe("Stay Online opens after you review the spike response.");
 });

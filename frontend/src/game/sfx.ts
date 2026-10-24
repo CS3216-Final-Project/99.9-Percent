@@ -402,6 +402,10 @@ const SCENE_VOICES = {
     o.connect(hit(ctx, at, 0.3, 0.14)).connect(out);
     osc(ctx, "triangle", 1320, at + 0.05, at + 0.14).connect(hit(ctx, at + 0.05, 0.08, 0.08)).connect(out);
   },
+  /** A brick breaker's blip: a short square chirp for the ball meeting the paddle or a brick. */
+  blip: (ctx, out, at) => {
+    osc(ctx, "square", 1200, at, at + 0.06).connect(hit(ctx, at, 0.3, 0.05)).connect(out);
+  },
   /** The small round species: a quick, high two-syllable chirp. */
   voiceBlob: (ctx, out, at, hiss) =>
     syllables(ctx, out, at, hiss, [

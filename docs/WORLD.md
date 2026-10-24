@@ -32,9 +32,12 @@ Address parameters help with screenshots and testing: `?floor=office` opens on t
 **Walk** beside the camera buttons walks the building as the player's avatar, one of 18 cube animals from Kenney's CC0 [Cube Pets](https://kenney.nl/assets/cube-pets).
 The avatar is chosen from the chip beside the account on the home screen or the menu's Avatar tab, and can be changed at any time.
 `W` `A` `S` `D` or the arrow keys walk relative to the view, `Shift` runs, and a click or tap on the floor walks there; clicking equipment also walks over to it.
-What is within reach shows as a button: `Space` or a tap inspects equipment, rides the elevator, or plays with the coffee machine, the arcades and the nap pods.
+What is within reach shows as a button: `Space` or a tap inspects equipment, rides the elevator, or plays with the office's fun things, each with its own show.
+While one plays the avatar cannot move: the coffee brews steaming and the mug is raised and sipped, the snack bag drops out of the vending machine and is eaten in three bites, the cooler's cup fills, is gulped down and crushed, and the nap lies the avatar down in a pod where z's drift out of the hood — in first person the held thing is seen in the player's own hands and the nap closes the eyes over the view.
+The arcade is a real brick breaker on the red cabinet's screen: `←` `→` or `A` `D` move the paddle, `Space` serves, the best score is remembered in the browser, and `Esc` or the panel's Leave gives it up — `Esc` only gives the cursor back while the pointer is locked, so it may take a second press to leave.
+The prompt sweeps for as long as each lasts.
 Glass doors slide open as the avatar comes near, footsteps sound off the floor, and the crew wait for it to pass.
-`Esc` stops walking, and when not walking the avatar sits in the founder's chair in the meeting room.
+`Esc` stops walking — and only the arcade claims it to leave its game instead — and when not walking the avatar sits in the founder's chair in the meeting room.
 
 View mode, or `V`, also sees the building from the avatar.
 

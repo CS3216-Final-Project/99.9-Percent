@@ -28,7 +28,7 @@ import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliabi
 import { campaignGuidance, milestoneBlocks, type Requirement } from "@/game/campaignGuidance";
 import { launchWeekScalingOpen, openingTuning } from "@/sim/launchWeek";
 import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
-import { campaignChapters, finishedChapter } from "@/game/campaignChapters";
+import { finishedChapter } from "@/game/campaignChapters";
 import TechTree from "./TechTree";
 import { AccountSection, CloudSavesSection } from "./Account";
 import { FinanceEntry } from "./CampaignFinance";
@@ -40,10 +40,12 @@ import { HomeScreen } from "./HomeScreen";
 import { CampaignChapters } from "./CampaignChapters";
 import { isChapterEntry } from "@/game/campaignChapters";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
-import { exportPlaytest, type ChapterCompletion } from "@/game/persist";
+import { exportPlaytest, type AnnouncedChapter } from "@/game/persist";
+import { chapterEnd, type ChapterEnd } from "@/game/chapterCompletion";
+import { ChapterEndFoot } from "./ChapterEndFoot";
 import { money, num, uptimePct } from "@/game/format";
 import { campaignUptime } from "@/game/campaignUptime";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { TimeMenu } from "./TimeMenu";
 import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
@@ -141,7 +143,7 @@ function CampaignGuidance() {
     </section>}
     {model.finalGoals.length>0&&<section className="campaign-requirements" aria-label="Final goals"><h3 className="campaign-requirements-heading">Final goals</h3><StepList items={model.finalGoals} current={null} label="Final goals"/></section>}
     {!model.requirements.length&&cta}
-    {c.openingMilestone?.acknowledged&&!c.dataStage&&!c.scaling?.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
+    {c.scaling&&!c.dataStage&&!c.scaling.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}>View run scorecard</button>}
     {model.prevention&&!c.openingPrevention?.outcome&&<section className="prevention-guidance" aria-label="Opening prevention progress">
       <p role="status">Stable service: {c.openingPrevention?.stableSteps??0} / {Q.stableSteps} game seconds. Pausing adds no time; unhealthy service restarts the counter.</p>
@@ -204,7 +206,7 @@ export function CampaignHeader() {
 /** Whatever is controllable is disabled while time is held for a decision, or once the run is over. */
 function controlsDisabled(game: GameState): boolean {
   const c = game.campaign!;
-  return pendingStop(c) !== null || milestoneBlocks(c) || game.phase === "review" || game.phase === "ended";
+  return pendingStop(c) !== null || milestoneBlocks(game) || game.phase === "review" || game.phase === "ended";
 }
 
 /**
@@ -304,7 +306,7 @@ function CampaignActions() {
         <span>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
       </div>)}
-      {c.launchWeek?.researchEarned===1&&!c.launchWeek.tech&&<section className="panel-section" aria-label="Launch Week research">
+      {!!c.launchWeek?.researchEarned&&!c.launchWeek.tech&&<section className="panel-section" aria-label="Launch Week research">
         <h4 className="step-head"><Icon name="bulb" size={16} />Research pick</h4>
         <p>One free research point, billed at the next Sunday settlement. Your pick carries into the later chapters.</p>
         <ul className="actions">
@@ -388,7 +390,7 @@ export function CampaignControls() {
   const { game, running, setRunning, speed, setSpeed, weekRush, endWeek, cancelWeekRush } = useGame();
   const narrow = useNarrowDock();
   const { runGold, pauseGold } = useCampaignAttention();
-  const active = useGame(s=>s.started) && pendingStop(game.campaign) === null && !milestoneBlocks(game.campaign!) && (game.phase === "management" || game.phase === "incident");
+  const active = useGame(s=>s.started) && pendingStop(game.campaign) === null && !milestoneBlocks(game) && (game.phase === "management" || game.phase === "incident");
   return <footer className={`bottombar controls-dock campaign-clock${running?" is-running":" is-paused"}`}>
     <ViewTabs tabs={[
       { id: "tech", label: "Tech", icon: "tree", badge: `${completedTechIds(game).length}/${TECH_ORDER.length}` },
@@ -498,7 +500,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
 export interface CampaignOverlaySlots {
   home?: ReactNode;
   menu?: (initialTab: MenuTab) => ReactNode;
-  chapterComplete?: (chapter: ChapterCompletion) => ReactNode;
+  chapterComplete?: (chapter: AnnouncedChapter) => ReactNode;
 }
 
 export function CampaignOverlays({ home, menu, chapterComplete }: CampaignOverlaySlots = {}) {
@@ -515,8 +517,13 @@ export function CampaignOverlays({ home, menu, chapterComplete }: CampaignOverla
 
 /** The one dialog that currently needs the player, if any. */
 function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOverlaySlots, "menu" | "chapterComplete">) {
-  const { game, view, openView, act, chapterComplete, tutorialCompany } = useGame();
+  const { game, view, openView, act, chapterComplete, tutorialCompany, scope, finishChapter } = useGame();
   const c = game.campaign!;
+  // Escape, Close and the backdrop answer every completion menu the way Stay in this chapter does.
+  const stay = () => finishChapter("stay");
+  // A finished chapter's recognition doubles as its completion menu: Stay or Continue. Judging what the next chapter
+  // waits for copies the company, so it is worked out once per game state rather than on every store update.
+  const end = useMemo(() => chapterEnd(game, scope), [game, scope]);
   if(view==="scorecard"&&(c.scorecard||c.combinedStage?.finalReview))return <Modal title="Company scorecard" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={(c.scorecard??c.combinedStage!.finalReview)!} pendingReview={!c.scorecard}/></Modal>;
   if(pendingCombined(c)&&!["guidance","menu","history"].includes(view??"")){
     const d=c.combinedStage!,r=d.currentRound;
@@ -530,9 +537,9 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
         </CampaignReport><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_growth"})}/></>}
     </Modal>;
   }
-  if (pendingReliability(c)) return <Modal title="Reliability outcome" className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}>
+  if (pendingReliability(c) && end) return <Modal title="Reliability outcome" className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }} onClose={stay}>
     <ReliabilityOutcome campaign={c} />
-    <ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_reliability"})} />
+    <ChapterEndFoot end={end} />
   </Modal>;
   if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_prevention_review"})} /></Modal>;
   if (game.phase === "review") {
@@ -540,15 +547,15 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
     if (!tutorialCompany) return <CampaignRecoveryReview key={`${c.runId}:${report.id}:${report.recoveredStep}`} runId={c.runId} report={report} reliability={!c.combinedStage ? reliabilityLesson(c, report) : undefined} onContinue={() => act({ type: "acknowledge_review" })} />;
     return <Modal title="Incident postmortem" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "incident" }}><Report report={report} /><ContinueFoot label="Continue company" onClick={() => act({ type: "acknowledge_review" })} /></Modal>;
   }
-  if(milestoneBlocks(c)&&c.launchWeek&&!(c.launchWeek.researchEarned&&!c.launchWeek.tech))return <LaunchScore campaign={c} />;
-  if(c.openingMilestone&&!c.openingMilestone.acknowledged&&!c.launchWeek)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }}>
+  if(milestoneBlocks(game)&&c.launchWeek&&end?.chapter==="opening")return <LaunchScore campaign={c} end={end} onClose={stay} />;
+  if(c.openingMilestone&&!c.openingMilestone.acknowledged&&!c.launchWeek&&end)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={stay}>
     <CampaignReport lesson={outcomeSummary(c,"opening")}><p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
     <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p><h4>Recorded milestone</h4><RecordedFields data={c.openingMilestone} /></CampaignReport>
-    <ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_milestone"})} />
+    <ChapterEndFoot end={end} />
   </Modal>;
-  if(pendingSpikeAcknowledgement(c) && view!=="menu" && view!=="history") return <Modal title="Spike response handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={()=>openView("history")}><CampaignReport lesson={outcomeSummary(c,"spikes")}><p>Both demand pulses ended and five baseline game seconds qualified for stable service. The same company continues with its investments and operating costs.</p><h4>Recorded spike stage</h4><RecordedFields data={c.spikeStage!} /></CampaignReport><ContinueFoot label="Continue operating" onClick={()=>act({type:"acknowledge_spikes"})} /></Modal>;
+  if(pendingSpikeAcknowledgement(c) && end && view!=="menu" && view!=="history") return <Modal title="Spike response handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={stay}><CampaignReport lesson={outcomeSummary(c,"spikes")}><p>Both demand pulses ended and five baseline game seconds qualified for stable service. The same company continues with its investments and operating costs.</p><h4>Recorded spike stage</h4><RecordedFields data={c.spikeStage!} /></CampaignReport><ChapterEndFoot end={end} /></Modal>;
   // It pauses the clock when it appears, so it shows over History and guidance rather than waiting behind them.
-  if(chapterComplete&&chapterComplete===finishedChapter(game)&&view!=="menu")return completeSlot ? completeSlot(chapterComplete) : <ChapterComplete chapter={chapterComplete} />;
+  if(chapterComplete&&chapterComplete===finishedChapter(game)&&view!=="menu"&&end)return completeSlot ? completeSlot(chapterComplete) : <ChapterComplete chapter={chapterComplete} end={end} onClose={stay} />;
   const finale = campaignFinale(game);
   if(finale&&!["guidance","menu","history","tech"].includes(view??""))return <CampaignFinale key={finale.key} finale={finale}><Modal title="Campaign complete" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard!}/><div className="modal-foot"><button className="btn" onClick={()=>openView("guidance")}>Inspect final company</button><button className="btn" onClick={()=>openView("menu")}>Export or start a new company</button></div></Modal></CampaignFinale>;
   if (game.phase === "ended" && game.outcome !== "won" && view === null) return <Modal title="Company bankrupt" className="campaign-recovery-report" tone="alert" icon={{ kind: "critical", name: "cash" }} onClose={() => openView("menu")}>
@@ -561,26 +568,21 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
   return null;
 }
 
-const COMPLETIONS: Record<ChapterCompletion, { title: string; text: string; next: string }> = {
-  scaling: { title: "Scaling & Routing complete", text: "Your added capacity and routing carried the growth wave.", next: "data" },
-  data: { title: "Data Strategy complete", text: "Your Database kept up with the new workload.", next: "spikes" },
+const COMPLETIONS: Record<AnnouncedChapter, { title: string; text: string }> = {
+  scaling: { title: "Scaling & Routing complete", text: "Your added capacity and routing carried the growth wave." },
+  data: { title: "Data Strategy complete", text: "Your Database kept up with the new workload." },
 };
 
 /** Scaling & Routing and Data Strategy have no recognition of their own, so finishing them stops here once. */
-function ChapterComplete({ chapter }: { chapter: ChapterCompletion }) {
-  const { game, act, dismissChapterComplete } = useGame();
+function ChapterComplete({ chapter, end, onClose }: { chapter: AnnouncedChapter; end: ChapterEnd; onClose: () => void }) {
+  const { game } = useGame();
   const done = COMPLETIONS[chapter];
-  const next = campaignChapters(game).find(c => c.id === done.next)!;
-  const action = campaignGuidance(game).pendingAction!;
-  return <Modal title={done.title} className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={dismissChapterComplete}>
+  return <Modal title={done.title} className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={onClose}>
     <CampaignReport lesson={outcomeSummary(game.campaign!,chapter)}>
-      <p>{done.text} Your architecture, cash and investments carry forward.</p><p>Next: {next.name}. {next.description}</p>
+      <p>{done.text} Your architecture, cash and investments carry forward.</p><p>Next: {end.next.name}. {end.next.description}</p>
       <h4>Recorded chapter state</h4><RecordedFields data={(chapter==="scaling"?game.campaign!.scaling:game.campaign!.dataStage)??{}} /><h4>Latest observation</h4><RecordedFields data={game.campaign!.snapshot} />
     </CampaignReport>
-    <div className="modal-foot">
-      <button className="btn btn-quiet" onClick={dismissChapterComplete}>Stay in this chapter</button>
-      <button className="btn btn-primary" onClick={() => { dismissChapterComplete(); act(action.action!); }}>{action.label}<Icon name="next" /></button>
-    </div>
+    <ChapterEndFoot end={end} />
   </Modal>;
 }
 

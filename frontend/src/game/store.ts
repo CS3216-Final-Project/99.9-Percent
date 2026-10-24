@@ -1,8 +1,9 @@
 "use client";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
+import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { finishedChapter } from "./campaignChapters";
-import { milestoneBlocks } from "./campaignGuidance";
+import { chapterEnd } from "./chapterCompletion";
 import { FULL_SCOPE, scopeAllows, scopeComplete, type PlayScope } from "./scope";
 import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
@@ -56,6 +57,7 @@ import {
   track,
   GRAPHICS_QUALITIES,
   type AudioSettings,
+  type AnnouncedChapter,
   type ChapterCompletion,
   type ChapterTour,
   type GuidedTip,
@@ -298,7 +300,7 @@ interface Store {
   onboarding: boolean;
   tour: Tour | null;
   /** A chapter the company has just finished, announced once until the player continues or stays. */
-  chapterComplete: ChapterCompletion | null;
+  chapterComplete: AnnouncedChapter | null;
   /** The latest walkthrough start or end, for product analytics. */
   lastTour: TourEvent | null;
   rating: number | null;
@@ -342,6 +344,11 @@ interface Store {
   tourBack: () => void;
   endTour: (completed: boolean) => void;
   dismissChapterComplete: () => void;
+  /**
+   * Answer the end of the chapter the company has just finished (see game/chapterCompletion.ts): stay in it, or
+   * continue into the next one. Returns false when nothing is waiting, Continue is not possible, or an action is refused.
+   */
+  finishChapter: (choice: "stay" | "continue") => boolean;
   /** Begin the walkthrough, restarting the intro run first if this one is already under way. */
   startTutorialRun: (from?: TourStart) => void;
   rate: (rating: number) => void;
@@ -369,13 +376,13 @@ const ACKNOWLEDGEMENTS = {
   "spike-acknowledgement": "acknowledge_spikes",
 } as const;
 /** The only action accepted while a recognition or milestone awaits the player; time stays paused meanwhile. */
-function requiredAcknowledgement(c: Campaign): Action["type"] | null {
-  const stop = pendingStop(c);
+function requiredAcknowledgement(g: GameState): Action["type"] | null {
+  const c = g.campaign!, stop = pendingStop(c);
   if (stop === "combined-review") return c.combinedStage?.finalReview ? "complete_campaign" : "acknowledge_growth";
   if (stop) return ACKNOWLEDGEMENTS[stop];
-  return milestoneBlocks(c) ? "acknowledge_milestone" : null;
+  return milestoneBlocks(g) ? "acknowledge_milestone" : null;
 }
-const awaitingAcknowledgement = (c: Campaign) => requiredAcknowledgement(c) !== null;
+const awaitingAcknowledgement = (g: GameState) => !!g.campaign && requiredAcknowledgement(g) !== null;
 /** Whether Guided Mode's clock may move now, by Run or by a manual step: never behind a guide, a pause-only view or an acknowledgement. */
 /**
  * Whether the server floor shows only the request path. It is Guided Mode's alone, and the player's choice.
@@ -387,7 +394,7 @@ export function trafficViewOn(s: { game: GameState; meta: Meta }): boolean {
 
 export function campaignClockAvailable(s: { game: GameState; started: boolean; tour: Tour | null; view: View }): boolean {
   const c = s.game.campaign;
-  return !!c && s.started && !awaitingAcknowledgement(c) && !["menu", "tech", "scorecard"].includes(s.view ?? "")
+  return !!c && s.started && !awaitingAcknowledgement(s.game) && !["menu", "tech", "scorecard"].includes(s.view ?? "")
     && (s.game.phase === "management" || s.game.phase === "incident");
 }
 /** The run in a stored Campaign save, for naming its backup when that save is not the active game. */
@@ -511,7 +518,7 @@ export const useGame = create<Store>()((set, get) => {
       const patch:Partial<Store>={game:next};
       if(!was?.firstPauseConsumed && c.firstPauseConsumed)patch.running=false;
       if(get().selectedAppId&&!c.apps.some(a=>a.id===get().selectedAppId))patch.selectedAppId=c.apps[0].id;
-      if(awaitingAcknowledgement(c)||next.phase==="review"||next.phase==="ended")patch.running=false;
+      if(awaitingAcknowledgement(next)||next.phase==="review"||next.phase==="ended")patch.running=false;
       // Finishing Scaling & Routing or Data Strategy pauses to say so the first time only; the chapter bar keeps the
       // way forward. A chapter already finished when the company loaded is remembered without being announced.
       const sameRun=was?.runId===c.runId, before=sameRun?finishedChapter(prev):null, finished=finishedChapter(next);
@@ -553,7 +560,7 @@ export const useGame = create<Store>()((set, get) => {
       // (its incident can still be running when the week settles), unless another guide is already showing.
       const tips=(patch.meta??get().meta).tipsSeen??[];
       if(was?.runId===c.runId&&c.settlements.length>0&&!tips.includes("settlement")&&!chapterTourOf(c)&&!get().tutorialCompany
-        &&!get().tour&&!patch.tour&&next.phase==="management"&&!awaitingAcknowledgement(c)) {
+        &&!get().tour&&!patch.tour&&next.phase==="management"&&!awaitingAcknowledgement(next)) {
         const meta={...(patch.meta??get().meta),tipsSeen:[...tips,"settlement" as const]};
         saveMeta(meta);
         Object.assign(patch,{meta,tour:{track:"settlement",step:0},running:false});
@@ -956,7 +963,8 @@ export const useGame = create<Store>()((set, get) => {
       // Practice resume is offered by the saved flag; a fresh visit plays the company itself.
       if (state.hasRun && state.meta.walkthroughStep !== null && !state.tutorialCompany) { get().startTour("campaign", "resume"); return; }
       let game=state.hasRun?state.game:newGame(BALANCE.introSeed,crypto.randomUUID(),2);
-      if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended") game=applyCampaignInput(game,{type:"enter_scaling"}).state;
+      // An acknowledged Opening continues into Scaling & Routing, as saves from before Scaling did, unless the player chose to stay.
+      if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended" && !chapterAnnounced(state.meta,game.campaign!.runId,"opening")) game=applyCampaignInput(game,{type:"enter_scaling"}).state;
       const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
       const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
       set({game,hasRun:true,meta,measurement,started:true,running:false,...openingView("campaign",state.floor,!state.hasRun && !meta.tutorialDone),
@@ -994,9 +1002,11 @@ export const useGame = create<Store>()((set, get) => {
       persist();
     },
     act: (action) => {
-      const c = get().game.campaign;
-      const acknowledgement = c && requiredAcknowledgement(c);
-      if(c && (!get().started || (acknowledgement && action.type !== acknowledgement))) return false;
+      const game = get().game, c = game.campaign;
+      const acknowledgement = c && requiredAcknowledgement(game);
+      // Launch Week's research pick still comes before its milestone, which waits for it.
+      const researchPick = !!c && action.type === "pick_launch_tech" && launchResearchPending(game);
+      if(c && (!get().started || (acknowledgement && action.type !== acknowledgement && !researchPick))) return false;
       // A smaller edition stops at its last chapter; the company carries on operating there.
       if(c && !scopeAllows(get().scope, action)) { get().notify(get().scope.endOfGuided, "info"); return false; }
       const record = (ok: boolean) => set({ lastAction: { id: actionId++, type: action.type, ok } });
@@ -1021,7 +1031,7 @@ export const useGame = create<Store>()((set, get) => {
 
     advance: () => {
       const { game } = get();
-      if (game.phase !== "management" || (game.campaign && (!get().started || awaitingAcknowledgement(game.campaign)))) return;
+      if (game.phase !== "management" || (game.campaign && (!get().started || awaitingAcknowledgement(game)))) return;
       const next = advanceTurn(game);
       commit(next);
       const r = next.lastReport;
@@ -1037,7 +1047,7 @@ export const useGame = create<Store>()((set, get) => {
     tick: (dt) => {
       const { game, running, speed } = get();
       if(game.campaign) {
-        if(!get().started || awaitingAcknowledgement(game.campaign) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
+        if(!get().started || awaitingAcknowledgement(game) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
         const credit=get().remainderMs+Math.round(dt*1000*(get().weekRush?20:speed));
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
@@ -1102,7 +1112,7 @@ export const useGame = create<Store>()((set, get) => {
       if (id && get().game.campaign) get().setRunning(false);
     },
     setRunning: (running) => {
-      set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game.campaign!))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase), ...(running ? {} : { weekRush: false }) });
+      set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase), ...(running ? {} : { weekRush: false }) });
       if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
     setSpeed: (speed) => set({ speed, weekRush: false }),
@@ -1299,6 +1309,22 @@ export const useGame = create<Store>()((set, get) => {
       if (tour) set({ tour: { ...tour, step: Math.max(0, tour.step - 1) } });
     },
     dismissChapterComplete: () => set({ chapterComplete: null }),
+    finishChapter: (choice) => {
+      const end = chapterEnd(get().game, get().scope);
+      if (!end) return false;
+      const actions = choice === "stay" ? end.stay : end.blockers.length ? null : end.proceed;
+      if (!actions) return false;
+      const runId = get().game.campaign!.runId;
+      set({ chapterComplete: null });
+      for (const action of actions) if (!get().act(action)) return false;
+      // A practice company is restored by endTour, never by play(), and has its own run: recording it would replace the real company's.
+      if (choice === "stay" && end.chapter === "opening" && !get().tutorialCompany && !chapterAnnounced(get().meta, runId, "opening")) {
+        const meta = announceChapter(get().meta, runId, "opening");
+        if (!saveMeta(meta)) get().notify("Your choice to stay could not be saved in this browser, so the next Play continues into Scaling & Routing.", "error");
+        set({ meta });
+      }
+      return true;
+    },
     endTour: (completed) => {
       const { tour, meta, game } = get();
       // A practice company exits by restoring the paused original, whatever the player did in it.

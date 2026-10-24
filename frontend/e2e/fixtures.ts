@@ -203,6 +203,9 @@ export async function openRoomControls(page: Page) {
   if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await menu.locator(":scope > summary").click();
 }
 export async function openCameraControls(page: Page) {
+  // The lazily loaded room portals its dock menus in together; until it mounts, the camera menu's absence would
+  // send this to the Floor menu, which has no camera tools.
+  await page.locator(".room-menu").waitFor();
   const menu = page.locator(".camera-menu");
   if (await menu.isVisible()) {
     if (!(await menu.evaluate(el => (el as HTMLDetailsElement).open))) await menu.locator(":scope > summary").click();

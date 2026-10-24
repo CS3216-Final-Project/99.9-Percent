@@ -6,10 +6,11 @@ import { currentFault, finalRequirements, stableManagement, canStartGrowth } fro
 import { preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
-import { milestoneBlocks } from "./campaignGuidance";
+import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
-import { campaignChapters, chapterAdvance } from "./campaignChapters";
+import { campaignChapters } from "./campaignChapters";
+import { chapterAdvance } from "./chapterCompletion";
 import { previewCampaignAction } from "./campaignFinance";
 import { chapter4Stage, chapter4Performance } from "./chapter4Guidance";
 import { chapter6Attention, combinedDatabaseDemand } from "./chapter6Guidance";
@@ -223,7 +224,7 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     "launch-research": "You earned a research point. Spend it on Caching or Autoscaling; each carries into later chapters.",
     "launch-surge": "The launch campaign is sending five times the traffic. Keep the service up until it ends.",
     "launch-week": "Your launch week is running. Press Run and keep the service up.",
-    "launch-score": "Launch Week is complete. Check your uptime score and continue into Chapter 1.",
+    "launch-score": "Launch Week is complete. Check your uptime score, then stay in Launch Week or continue to Scaling & Routing.",
   };
   if (messages[reason]) return messages[reason];
   if (["opening-growth", "scaling-growth", "data-growth", "spike-pulses", "scheduled-failure", "growth-wave", "growth-readiness"].includes(reason)) return "Press Run to see what happens next.";
@@ -246,10 +247,10 @@ function baseAttention(game: GameState): AttentionDecision {
   if (!c) return required("inactive", "Guidance is available in Guided Mode.", "", null);
   if (game.phase === "ended") return required("ended", "This company has ended.", "Review the scorecard before starting another company.", null);
   // The score card waits for the research pick, so the week's last lesson is never covered.
-  if (c.launchWeek && milestoneBlocks(c) && c.launchWeek.researchEarned && !c.launchWeek.tech)
+  if (launchResearchPending(game))
     return result("launch-research", "hint", "Research points buy technology. This one is free; it is billed at the week's settlement.", "Pick Caching or Autoscaling to see your Launch Week score.", "research");
-  if (c.launchWeek && milestoneBlocks(c)) return required("launch-score", "Launch Week is complete.", "Review your uptime score and continue into Chapter 1.", "next");
-  if (game.phase === "review" || pendingStop(c) || milestoneBlocks(c))
+  if (c.launchWeek && milestoneBlocks(game)) return required("launch-score", "Launch Week is complete.", "Review your uptime score, then stay in Launch Week or continue to Scaling & Routing.", "next");
+  if (game.phase === "review" || pendingStop(c) || milestoneBlocks(game))
     return required("review", "An outcome is waiting for your review.", "Finish the existing review or acknowledgement before continuing.", null);
   const next = chapterAdvance(game);
   if (!c.incident && next?.ready && previewCampaignAction(game, next.action).ok) return progression("next", "The current chapter requirements are complete.", `Use Next: ${next.label}.`, "next");
@@ -325,7 +326,7 @@ function baseAttention(game: GameState): AttentionDecision {
       !c.trace.some(t => t.type === "inspection" && t.step >= c.incident!.openedStep && t.data.component === "db"))
     return hint("launch-db-incident", "The database is receiving more work than it can process.", "Inspect the Database to see its overload, then upgrade it.", "db");
   if (dbOver) return hint("database", "The database is receiving more work than it can process.", "Open Database to compare demand, capacity and waiting work before choosing a response.", "db");
-  // First Launch Week incident: teach the inspect-first beat — the status bar stays up, the app shows red
+  // First Launch Week incident: teach the inspect-first beat - the status bar stays up, the app shows red
   // once looked at, and guidance then points at the fix.
   if (appOver && c.launchWeek && c.launchWeek.completedStep === null && c.incident &&
       !c.trace.some(t => t.type === "inspection" && t.step >= c.incident!.openedStep && t.data.component === "app"))

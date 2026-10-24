@@ -4,6 +4,8 @@ import { completedReliability } from "../src/sim/__tests__/combinedFixture";
 import { newGame } from "../src/sim";
 import { readyReliability, act, tick } from "../src/sim/__tests__/reliabilityFixture";
 import { canEnterReliability } from "../src/sim/reliability";
+import { pendingSpikeAcknowledgement } from "../src/sim/autoscaling";
+import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 
 // These journeys exercise panels and persistence; room interaction has dedicated browser coverage.
 test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
@@ -31,7 +33,7 @@ test("chapter bar stays visible and follows the same company into Data Strategy"
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(bar.getByRole("button", { name: "View chapters" })).toBeFocused();
-  await bar.getByRole("button", { name: "Next: Continue to data strategy", exact: true }).press("Space");
+  await bar.getByRole("button", { name: "Next: Continue to Data Strategy", exact: true }).press("Space");
   await expect(bar).toContainText("Chapter 3 of 6");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Data Strategy");
   expect((await savedGame(page)).campaign!.runId).toBe(before.campaign!.runId);
@@ -50,13 +52,38 @@ test("disabled Next explains its actual readiness gate to keyboard users",async(
   await page.getByRole("button",{name:"Continue company",exact:true}).click();
   
   const bar=page.getByRole("region",{name:"Guided Mode chapters"});
-  const next=bar.getByRole("button",{name:"Next: Continue to reliability"});
+  const next=bar.getByRole("button",{name:"Next: Continue to Stay Online"});
   await expect(next).toBeDisabled();
-  await expect(next).toHaveAccessibleDescription(/healthy normal traffic and empty queues/);
+  await expect(next).toHaveAccessibleDescription(/Stay Online opens once the Application and Database queues are empty and requests are fast and error-free\./);
   const reason=bar.getByText(/^Next unavailable:/);
   await reason.focus();
   await expect(reason).toBeFocused();
   await expect(reason).toBeInViewport();
+});
+
+test("the spike response offers Stay or Continue, and Continue takes the same company into Stay Online", async ({ page }) => {
+  await page.route("**/api/**", route => route.abort());
+  let game = spikeCompany(false);
+  for (let i = 0; i < 300 && !pendingSpikeAcknowledgement(game.campaign!); i++) game = game.phase === "review" ? act(game, { type: "acknowledge_review" }) : tick(game);
+  expect(pendingSpikeAcknowledgement(game.campaign!)).toBe(true);
+  await seedSave(page, game);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+
+  const recognition = page.getByRole("dialog", { name: "Spike response handled" });
+  await expect(recognition.getByRole("button", { name: "Stay in this chapter", exact: true })).toBeVisible();
+  const proceed = recognition.getByRole("button", { name: "Continue to Stay Online", exact: true });
+  await expect(proceed).toBeEnabled();
+  await page.screenshot({ path: "test-results/chapter-end-spikes.png" });
+  await proceed.click();
+  await expect(recognition).toBeHidden();
+  const bar = page.getByRole("region", { name: "Guided Mode chapters" });
+  await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Stay Online");
+  const after = (await savedGame(page)).campaign!;
+  expect(after.runId).toBe(game.campaign!.runId);
+  expect(after.spikeStage!.acknowledged).toBe(true);
+  expect(after.reliabilityStage).toBeTruthy();
+  expect(after.step).toBe(game.campaign!.step);
 });
 
 test("compact chapter summary, objective and Next stay clear at desktop and laptop widths", async ({ page }) => {
@@ -112,7 +139,7 @@ test("finishing Scaling & Routing stops once to announce it and continues from t
   await expect(dialog).toHaveAccessibleName("Scaling & Routing complete");
   await expect(dialog).toContainText("Next: Data Strategy.");
   await page.screenshot({ path: "test-results/chapter-complete-scaling.png" });
-  await dialog.getByRole("button", { name: "Continue to data strategy", exact: true }).click();
+  await dialog.getByRole("button", { name: "Continue to Data Strategy", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Data Strategy");
   expect((await savedGame(page)).campaign!.dataStage).toBeTruthy();

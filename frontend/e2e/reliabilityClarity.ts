@@ -17,7 +17,7 @@ export async function reliabilityClarity(page: Page, info: TestInfo, touch = fal
   await expect(outcome.getByText("Company setup spending at completion", { exact: true })).toBeVisible();
   await page.reload(); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expect(outcome.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "How did you respond?", "What could be improved?", "Key takeaway", "Capacity after the failure"]);
-  const button = outcome.getByRole("button", { name: "Continue operating", exact: true });
+  const button = outcome.getByRole("button", { name: "Stay in this chapter", exact: true });
   if (touch) await button.tap(); else await button.click();
   const after = (await savedGame(page)).campaign!;
   expect(after.reliabilityStage!.acknowledged).toBe(true);

@@ -6,7 +6,7 @@ import {newGame} from "../sim";
 import {readyReliability,reliabilityCompany,preparedReliability,act,tick} from "../sim/__tests__/reliabilityFixture";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});afterEach(cleanup);
 function show(g:ReturnType<typeof newGame>){useGame.setState({game:g,ready:true,started:true,onboarding:false});render(<><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/></>);}
-it("offers explicit reliability continuation after acknowledged spikes",()=>{show(readyReliability());expect((screen.getByRole("button",{name:/Continue to reliability/}) as HTMLButtonElement).disabled).toBe(false);});
+it("offers explicit reliability continuation after acknowledged spikes",()=>{show(readyReliability());expect((screen.getByRole("button",{name:/Continue to Stay Online/}) as HTMLButtonElement).disabled).toBe(false);});
 it("shows nine technology nodes with derived database ownership and locked future nodes",()=>{
  const g=newGame();g.campaign!.dbCapacity=1000;g.campaign!.upgraded=true;show(g);fireEvent.click(within(screen.getByRole("navigation",{name:"Views"})).getByRole("button",{name:"Tech"}));const dialog=screen.getByRole("region",{name:"Tech tree"});expect(dialog.querySelectorAll("[data-tech]")).toHaveLength(9);expect(within(dialog).getByRole("button",{name:"Larger Database: Owned"})).toBeTruthy();expect(within(dialog).getByRole("button",{name:"Health Checks: Locked"})).toBeTruthy();expect(within(dialog).queryByText(/engineer-weeks/)).toBeNull();
 });
@@ -36,7 +36,7 @@ it("disables failover deployment without a reserved spare and purchases that exh
 it("keeps the recorded reliability outcome available after acknowledgement",()=>{
  const completed=tick(act(preparedReliability(),{type:"arm_reliability"}),35);
  show(completed);expect(screen.getByRole("dialog",{name:"Reliability outcome"}).textContent).toContain("Spare promotion");
- fireEvent.click(screen.getByRole("button",{name:"Continue operating"}));
+ fireEvent.click(screen.getByRole("button",{name:"Stay in this chapter"}));
  cleanup();const acknowledged=useGame.getState().game;useGame.setState({view:"history"});show(acknowledged);
  fireEvent.click(screen.getByRole("tab",{name:/^Incidents/}));fireEvent.click(screen.getByRole("button",{name:/Stay Online outcome/}));
  expect(screen.getByRole("region",{name:"Historical reliability outcome"}).textContent).toContain("App 3");

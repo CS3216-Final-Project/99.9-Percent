@@ -4,6 +4,9 @@ import { act, tick, combinedCompany, finishedCompany, finishRound } from "../src
 import { expectCueColours } from "./chapter4Cues";
 
 test("Chapter 6 guidance: capacity before removal, Confirm, Run, readiness and reload", async ({ page, installClock }) => {
+  // The virtual clock renders every animation frame of the 2.5s readiness run at 1440x900 in software: about 20s of
+  // the 55-65s this takes on CI. The 320px touch variant in mobile.spec.ts finishes the same steps in half the time.
+  test.setTimeout(120_000);
   await installClock(); await chapter6Preparation(page);
 });
 

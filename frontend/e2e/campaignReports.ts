@@ -26,7 +26,7 @@ export async function campaignReportJourney(page: Page, info: TestInfo, kind: Re
   await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "How did you respond?", "What could be improved?", "Key takeaway"]);
   const details = dialog.locator("details");
   await expect(details).toHaveCount(1); await expect(details).not.toHaveAttribute("open");
-  const button = dialog.getByRole("button", { name: kind === "completion" ? "Complete campaign" : kind === "spikes" ? "Continue operating" : "Continue company", exact: true });
+  const button = dialog.getByRole("button", { name: kind === "completion" ? "Complete campaign" : kind === "spikes" ? "Stay in this chapter" : "Continue company", exact: true });
   await expect(button).toBeInViewport({ ratio: 1 });
   await expect(dialog.getByRole("heading", { name: "What happened?", exact: true })).toBeInViewport();
   if (kind === "spikes") await expect(dialog.locator(".campaign-incident-report > section")).toContainText(["Both traffic spikes ended", "rejected"]);

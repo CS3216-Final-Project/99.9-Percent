@@ -69,7 +69,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
     await expect(report).toBeVisible({ timeout: 25000 });
     if (path === "app-then-upgrade") await expect(report).toContainText("did not relieve");
     await report.getByRole("button", { name: "Continue company" }).click();
-    await page.getByRole("button",{name:"Continue operating"}).click();
+    await page.getByRole("button",{name:"Continue to Scaling & Routing"}).click();
     const after = await savedGame(page);
     expect(after.campaign!.runId).toBe(opening.runId); expect(after.phase).toBe("management");
     if (path === "limit") expect(after.campaign!.limit).toBe(500);

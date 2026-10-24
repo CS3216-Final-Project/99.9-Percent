@@ -94,7 +94,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   const increase = upkeep === null ? null : isScale ? upkeep - Q.appWeeklyCents : label === "Upgrade database" ? upkeep - currentDbUpkeep : upkeep;
   let reason = "See this action's requirements for details.";
   if (game.phase === "ended") reason = "This company has ended.";
-  else if (game.phase === "review" || pendingStop(c) !== null || milestoneBlocks(c)) reason = "Acknowledge the pending review or milestone first.";
+  else if (game.phase === "review" || pendingStop(c) !== null || milestoneBlocks(game)) reason = "Acknowledge the pending review or milestone first.";
   else if (props.price && c.cashCents <= props.price * 100) reason = "Not enough available cash. Pending revenue cannot fund purchases.";
   else if (isAdd && c.apps.length >= (c.spikeStage ? T.maximum : Q.maxApps)) reason = "All instance slots are occupied.";
   else if (isScale && app.tier !== "base") reason = "This App Server is already at its largest tier.";

@@ -497,3 +497,80 @@ test("restores the mode, floor, walk position and camera view after a reload", a
   // The campaign's record is still the one it started with: no walk, no spot, no camera.
   expect(JSON.parse((await page.evaluate(() => localStorage.getItem("nn.campaign.exploration.v1"))) ?? "null")).toMatchObject({ walking: false, avatar: null, camera: null });
 });
+
+test("makes a coffee by Space: the prompt says it is under way, sweeps for as long as it lasts, and offers it again after", async ({ page }) => {
+  test.slow();
+  // Resume mid-walk at the kitchen's espresso machine, the first fun thing in reach.
+  await page.addInitScript(() => localStorage.setItem("nn.classic.exploration.v1", JSON.stringify({ version: 1, floor: "office", walking: true, viewChosen: true, avatar: { floor: "office", x: 17.23, z: -7.95, yaw: 0 }, camera: null })));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue week 2" }).click();
+  const canvas = page.getByRole("main").locator("canvas");
+  await expect(canvas).toBeVisible();
+  await expect.poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 }).toBe(true);
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(prompt(page)).toContainText("Make a coffee", { timeout: 20_000 });
+  await page.keyboard.press("Space");
+  await expect(prompt(page)).toContainText("Making a coffee…");
+  await expect(prompt(page).locator(".walk-prompt-progress")).toHaveCount(1);
+  await expect(page.getByRole("status").filter({ hasText: "Making a coffee…" })).toHaveCount(1);
+  // Busy, the avatar cannot be steered away: holding a direction cancels nothing.
+  await page.keyboard.down("KeyD");
+  await page.waitForTimeout(600);
+  await page.keyboard.up("KeyD");
+  await expect(prompt(page)).toContainText("Making a coffee…");
+  // Done after its 6.5 seconds: the prompt offers the coffee again and the sweep is gone — the avatar never walked off.
+  await expect(prompt(page)).toContainText("Make a coffee", { timeout: 10_000 });
+  await expect(prompt(page)).not.toContainText("Making");
+  await expect(prompt(page).locator(".walk-prompt-progress")).toHaveCount(0);
+});
+
+test("plays the arcade: a real brick breaker served and steered, left by Escape", async ({ page }) => {
+  test.slow();
+  // Resume mid-walk in front of the red cabinet in the games corner.
+  await page.addInitScript(() => localStorage.setItem("nn.classic.exploration.v1", JSON.stringify({ version: 1, floor: "office", walking: true, viewChosen: true, avatar: { floor: "office", x: 21.1, z: 11.45, yaw: 0 }, camera: null })));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue week 2" }).click();
+  const canvas = page.getByRole("main").locator("canvas");
+  await expect(canvas).toBeVisible();
+  await expect.poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 }).toBe(true);
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(prompt(page)).toContainText("Play the arcade", { timeout: 20_000 });
+  await page.keyboard.press("Space");
+  const game = page.getByRole("group", { name: "Arcade: brick breaker" });
+  await expect(game).toBeVisible();
+  await expect(game).toContainText("Space");
+  await expect(game).toContainText("leave");
+  await expect(prompt(page)).toContainText("Playing the arcade…");
+  // Space serves the ball; the score line shows the three lives.
+  await page.keyboard.press("Space");
+  await expect(game).toContainText(/Score \d+/);
+  await expect(game).toContainText(/[●○]{3}/);
+  // Steering moves the paddle, not the avatar: the game simply plays on.
+  await page.keyboard.down("ArrowLeft");
+  await page.waitForTimeout(300);
+  await page.keyboard.up("ArrowLeft");
+  await expect(game).toBeVisible();
+  // Escape leaves the arcade, and the prompt offers it again.
+  await page.keyboard.press("Escape");
+  await expect(game).toHaveCount(0);
+  await expect(prompt(page)).toContainText("Play the arcade");
+});
+
+test("naps in first person: eyes close and open", async ({ page }) => {
+  test.slow();
+  // Resume mid-walk through the avatar's eyes, at the nap room's door.
+  await page.addInitScript(() => localStorage.setItem("nn.classic.exploration.v1", JSON.stringify({ version: 1, floor: "office", walking: true, viewpoint: "first", viewChosen: true, avatar: { floor: "office", x: 10.0, z: 6.6, yaw: Math.PI / 2 }, camera: null })));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue week 2" }).click();
+  const canvas = page.getByRole("main").locator("canvas");
+  await expect(canvas).toBeVisible();
+  await expect.poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 }).toBe(true);
+  await expect(page.locator(".view-overlay")).toHaveAttribute("data-viewpoint", "first", { timeout: 20_000 });
+  await expect(prompt(page)).toContainText("Rest in a nap pod", { timeout: 20_000 });
+  const eyelids = page.locator(".view-eyelids");
+  await page.keyboard.press("Space");
+  // The lids close over the view as the avatar settles, then open again as it wakes.
+  await expect(eyelids).toHaveAttribute("data-eyes", "shut", { timeout: 4_000 });
+  await expect(eyelids).toHaveAttribute("data-eyes", "open", { timeout: 12_000 });
+  await expect(prompt(page)).toContainText("Rest in a nap pod");
+});

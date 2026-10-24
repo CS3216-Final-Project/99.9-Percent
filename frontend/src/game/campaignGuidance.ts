@@ -1,22 +1,28 @@
-import { canEnterCombined, canStartGrowth, pendingCombined } from "@/sim/combinedCampaign";
-import { canEnterReliability, pendingReliability } from "@/sim/reliability";
+import { canEnterCombined, canStartGrowth, combinedEntryGates, pendingCombined } from "@/sim/combinedCampaign";
+import { canEnterReliability, pendingReliability, reliabilityEntryGates } from "@/sim/reliability";
+import { entryBlockers, waitsFor } from "./entryGates";
 import type { GameState, Action } from "@/sim";
 import { canEnterData, qualifiesForRecovery } from "@/sim/step";
 import { canEnterSpikes, pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { pendingPreventionReview, preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
-import type { Campaign } from "@/sim/campaignTypes";
 
 /** A "check" is a standing condition the company must keep; a step is one move in the chapter's sequence. */
 export interface Requirement { id: string; label: string; met: boolean; kind?: "check" | "step"; hint?: string; /** A step the clock completes rather than a player action. */ wait?: boolean }
 /**
- * The opening milestone gates time only once it can be acknowledged. Launch Week defers it until the week is over,
- * no incident is open and every postmortem is read: a week that ends mid-incident must still let the player fix it.
+ * The opening milestone gates time only once it can be acknowledged, since the engine accepts it only then: never
+ * behind an open report, and Launch Week defers it until the week is over, no incident is open and every postmortem
+ * is read. A week that ends mid-incident must still let the player fix it.
  */
-export const milestoneBlocks = (c: Campaign) =>
-  !!c.openingMilestone && !c.openingMilestone.acknowledged &&
-  (!c.launchWeek || c.launchWeek.completedStep !== null && !c.incident && c.reports.every(r => c.trace.some(t => t.type === "review-acknowledged" && t.data.incidentId === r.id)));
+export const milestoneBlocks = (g: GameState) => {
+  const c = g.campaign;
+  return !!c?.openingMilestone && !c.openingMilestone.acknowledged && g.phase === "management" &&
+    (!c.launchWeek || c.launchWeek.completedStep !== null && !c.incident && c.reports.every(r => c.trace.some(t => t.type === "review-acknowledged" && t.data.incidentId === r.id)));
+};
+/** Launch Week is over but its free research point is unspent: the pick comes before the score card and the milestone. */
+export const launchResearchPending = (g: GameState) =>
+  milestoneBlocks(g) && !!g.campaign!.launchWeek?.researchEarned && !g.campaign!.launchWeek.tech;
 export interface GuidanceAction { label: string; action?: Action }
 /** One shared objective for the chapter bar; detailed actions and gates remain in the overview. */
 export function campaignObjective(g: GameState) {
@@ -25,11 +31,13 @@ export function campaignObjective(g: GameState) {
  if(g.phase==="review") return "Read the postmortem before continuing the same company.";
  if(c.incident) return "Restore stable service while weighing cost and rejected demand.";
  if(c.launchWeek&&!c.launchWeek.completedStep) return "Keep the service up through launch week.";
+ if(launchResearchPending(g)) return "Spend your free research pick to see your Launch Week score.";
+ if(c.launchWeek&&milestoneBlocks(g)) return "Review your Launch Week score, then stay or continue to Scaling & Routing.";
  if(c.combinedStage) return "Serve growing demand, manage costs and review each outcome.";
  if(c.reliabilityStage) return "Keep service stable through an application failure, then review the evidence.";
  if(c.spikeStage) return "Handle changing demand while managing capacity costs.";
  if(c.dataStage) return "Compare workload, cache hits and database pressure as demand grows.";
- if(c.openingMilestone?.acknowledged) return "Prepare the system for the next growth wave.";
+ if(c.openingMilestone?.acknowledged) return c.scaling?"Prepare the system for the next growth wave.":"Keep operating, then continue to Scaling & Routing with Next.";
  if(preventionAvailable(c)) return "Inspect the Application and Database; keep service healthy at full demand.";
  return "Observe demand and compare component evidence.";
 }
@@ -37,7 +45,7 @@ export function campaignObjective(g: GameState) {
 export function campaignGuidance(g: GameState) {
  const c=g.campaign!;
  const openingDone=!!c.openingMilestone?.acknowledged;
- const stage=c.combinedStage?"Grow the Company":c.reliabilityStage?"Stay Online":c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":openingDone?"Scaling & Routing":c.launchWeek?"Launch Week":"Opening";
+ const stage=c.combinedStage?"Grow the Company":c.reliabilityStage?"Stay Online":c.spikeStage?"Traffic Spikes & Autoscaling":c.dataStage?"Data Strategy":openingDone&&c.scaling?"Scaling & Routing":c.launchWeek?"Launch Week":"Opening";
  const dataAvailable=!c.dataStage&&canEnterData(g),spikesAvailable=canEnterSpikes(g);
  const prevention=preventionAvailable(c);
  const pendingMilestone=!!c.openingMilestone&&!openingDone;
@@ -89,16 +97,17 @@ export function campaignGuidance(g: GameState) {
   if(d.fault&&d.completedStep===null)checksPaused="Company checks pause while the reliability test runs.";
   add("recognition","Review the reliability outcome",d.acknowledged);
   if(pendingReliability(c))pendingAction={label:"Review reliability outcome"};else if(!d.fault)pendingAction={label:"Start reliability test",action:{type:"arm_reliability"}};
-  if(d.acknowledged){notice="Stay Online completed. Continue the same company into Grow the Company once service is healthy and all changes have finished.";if(canEnterCombined(g))pendingAction={label:"Continue to Grow the Company",action:{type:"enter_combined"}};}
+  if(d.acknowledged){if(canEnterCombined(g)){notice="Stay Online completed. Continue the same company into Grow the Company through Next in the chapter bar.";pendingAction={label:"Continue to Grow the Company",action:{type:"enter_combined"}};}else notice=waitsFor("Grow the Company",entryBlockers(false,combinedEntryGates(g),"Stay Online"));}
   optional="Health Checks, spares and failover are optional. A failed server also returns on its own, or you can restore it for free.";} else if(c.spikeStage) {
   const d=c.spikeStage;
-  management();calm();queues();reports();healthy();
+  // Stay Online's entry also checks cash, so the checks name it with the rest.
+  cash();management();calm();queues();reports();healthy();
   check("baseline","Traffic is back to normal",c.incomingRate===T.baseline,"Traffic falls back after the second spike.");
   wait("pulses","Both traffic spikes end",c.step>=d.deadlines[3],"Press Run to play through both announced spikes.");
   wait("observations",`Keep normal traffic stable: ${d.baselineStableSteps} / 5 s`,d.completedStep!==null,"Press Run with healthy service. Pausing adds no time, and an unhealthy second restarts the count.");
   if(c.step<d.deadlines[3])checksPaused="Company checks pause while the traffic spikes run.";
   add("recognition","Review the spike response",d.acknowledged);
-  notice=canEnterReliability(g)?"Stay Online is available through Next in the chapter bar.":"Stay Online opens after you review the spike response with healthy normal traffic and empty queues.";
+  notice=canEnterReliability(g)?"Stay Online is available through Next in the chapter bar.":d.acknowledged?waitsFor("Stay Online",entryBlockers(false,reliabilityEntryGates(g),"Traffic Spikes")):d.completedStep!==null?"Stay Online opens after you review the spike response.":null;
   optional="Autoscaling is optional. Manual capacity, admission relief and hybrid responses remain valid.";
   if(pendingSpikeAcknowledgement(c))pendingAction={label:"Review spike recognition"};
  } else if(c.dataStage) {
@@ -107,17 +116,20 @@ export function campaignGuidance(g: GameState) {
   add("continue","Continue to Traffic Spikes",false,"Compare cache hits with database demand in the Database panel, then continue.");
   optional="The read cache and database upgrades are optional; you can continue without them.";
   if(!c.dataStage.consumed&&!canEnterData(g))notice="Database growth waits until no report is open, no incident is open, queues are empty and every report has been read.";
-  if(spikesAvailable)pendingAction={label:"Continue to traffic spikes",action:{type:"enter_spikes"}};
+  if(spikesAvailable)pendingAction={label:"Continue to Traffic Spikes",action:{type:"enter_spikes"}};
+ } else if(openingDone&&!c.scaling) {
+  // The player stayed after the Opening: Scaling & Routing waits for Next, and none of its requirements apply yet.
+  add("opening",c.launchWeek?"Launch Week completed":"Opening completed",true);
+  add("continue","Continue to Scaling & Routing",false,"Use Next in the chapter bar when you are ready.");
+  if(g.phase!=="ended")notice=`${c.launchWeek?"Launch Week":"The Opening"} is complete. Continue to Scaling & Routing through Next in the chapter bar when you are ready.`;
+  if(g.phase!=="ended")pendingAction={label:"Continue to Scaling & Routing",action:{type:"enter_scaling"}};
  } else if(openingDone) {
   management();calm();queues();reports();
-  // Launch Week's score card enters Scaling & Routing itself; only an Opening company still has to choose it.
-  if(!c.launchWeek)add("stage","Start Scaling & Routing",!!c.scaling,"Use Continue to scaling and routing.");
   if(!c.scaling?.consumed)add("headroom",`Database headroom: ${c.dbCapacity.toLocaleString("en-US")} / ${P.dbCapacity.toLocaleString("en-US")} ops/s`,c.dbCapacity>=P.dbCapacity||!!c.scalingConsent,"Upgrade the Database, or accept the growth risk.");
   wait("growth","The next growth wave arrives",!!c.scaling?.consumed,"Press Run until more users arrive.");
   if(c.scaling?.consumed)add("continue","Continue to Data Strategy",false,"Check that your new servers receive traffic, then continue.");
   if(!c.scaling?.consumed&&!c.scalingConsent&&c.dbCapacity<P.dbCapacity&&c.cashCents<=P.dbCostCents)notice="Next growth requires paid database headroom, but current cash cannot fund that investment. Pending revenue is available only after settlement; inspect finances and operating costs before advancing. Solvency alone does not guarantee an affordable growth investment.";
-  if(!c.scaling&&g.phase!=="ended")pendingAction={label:"Continue to scaling and routing",action:{type:"enter_scaling"}};
-  else if(dataAvailable)pendingAction={label:"Continue to data strategy",action:{type:"enter_data"}};
+  if(dataAvailable)pendingAction={label:"Continue to Data Strategy",action:{type:"enter_data"}};
  } else if(prevention) {
   const r=preventionRequirements(c);
   calm(r.noIncident);cash(r.positiveCash);
@@ -154,8 +166,9 @@ export function campaignGuidance(g: GameState) {
  }
  // Required acknowledgements take priority over stage continuation in every stage.
  if(g.phase==="review"&&c.reports.length)pendingAction={label:"Review postmortem"};
- // Launch Week's score card completes its milestone itself, once the week is over and settled.
- else if(milestoneBlocks(c)&&!c.launchWeek)pendingAction={label:"Complete Opening"};
+ // Launch Week awards its milestone mid-week but only lets it be acknowledged once the week is over, settled and the research pick is spent.
+ else if(launchResearchPending(g))waiting="Launch Week is over. Spend your free research pick on Caching or Autoscaling to see your score.";
+ else if(milestoneBlocks(g))pendingAction={label:"Complete Opening"};
  if(!reportsAcknowledged&&g.phase!=="review"&&!c.incident)notice="A recorded recovered report lacks an acknowledgement, but no review is active. Export company evidence for investigation; this guidance cannot safely repair the saved state.";
  if(g.phase==="ended") { pendingAction=null;waiting=null;notice=""+(g.outcome==="won"?"Campaign complete. Inspect your scorecard and final architecture before explicitly starting a new company.":"The company is bankrupt. Review final evidence and explicitly restart from the Menu.")+""; }
  // "Continue to …" is the chapter's last step, never a reason the chapter is blocked.

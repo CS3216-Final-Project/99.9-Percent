@@ -22,6 +22,16 @@ export const NAP_PODS: [number, number][] = [
   [11.45, 8.5],
 ];
 
+/** How high a nap pod's mattress is, where its sleeper lies. */
+export const NAP_MATTRESS = 0.56;
+
+/** Where the avatar lies for a nap: on the first pod's mattress, out from under the hood so it shows. */
+export const NAP_BED = { x: NAP_PODS[0][0] - 0.3, y: NAP_MATTRESS + 0.1, z: NAP_PODS[0][1] };
+/** Facing -x while lying, so lying back puts the head under the hood at +x. */
+export const NAP_YAW = Math.PI / 2;
+/** Radians back from upright: nearly flat, head a little propped on the pillow. */
+export const NAP_PITCH = 1.35;
+
 /** The foosball table's centre, its length along x, in the corner beside reception. */
 export const FOOSBALL = { x: 10.3, z: 12.4 };
 
@@ -589,14 +599,17 @@ export interface FunProp {
   z: number;
   /** The way to face while playing. */
   face: [number, number];
-  clip: "eat" | "dance" | "gesture-positive";
+  clip: "eat" | "dance" | "gesture-positive" | "idle";
+  /** How long it takes, in seconds; Infinity while a prop ends itself, as the arcade's game does. */
+  seconds: number;
 }
 
 /** The office's fun things to do. None of them changes the game. */
 export const FUN_PROPS: FunProp[] = [
-  { id: "espresso", label: "Make a coffee", doing: "Making a coffee…", x: 17.23, z: -7.95, face: [17.23, -9.15], clip: "eat" },
-  { id: "vending", label: "Get a snack", doing: "Getting a snack…", x: 13.15, z: -7.9, face: [13.15, -9.0], clip: "eat" },
-  { id: "cooler", label: "Have some water", doing: "Having some water…", x: 15.75, z: -3.6, face: [15.0, -4.0], clip: "eat" },
-  { id: "arcade", label: "Play the arcade", doing: "Playing the arcade…", x: (ARCADES[0][1] + ARCADES[1][1]) / 2, z: ARCADE_Z + 0.95, face: [(ARCADES[0][1] + ARCADES[1][1]) / 2, ARCADE_Z], clip: "dance" },
-  { id: "nap", label: "Rest in a nap pod", doing: "Resting in a nap pod…", x: 10.0, z: NAP_PODS[0][1], face: [NAP_PODS[0][0], NAP_PODS[0][1]], clip: "gesture-positive" },
+  { id: "espresso", label: "Make a coffee", doing: "Making a coffee…", x: 17.23, z: -7.95, face: [17.23, -9.15], clip: "idle", seconds: 6.5 },
+  { id: "vending", label: "Get a snack", doing: "Getting a snack…", x: 13.15, z: -7.9, face: [13.15, -9.0], clip: "idle", seconds: 6.0 },
+  { id: "cooler", label: "Have some water", doing: "Having some water…", x: 15.75, z: -3.6, face: [15.0, -4.0], clip: "idle", seconds: 5.5 },
+  // The arcade ends when its game does, not on a timer: an endless busy the game schedules itself (see arcade.ts).
+  { id: "arcade", label: "Play the arcade", doing: "Playing the arcade…", x: 21.1, z: ARCADE_Z + 0.95, face: [21.3, ARCADE_Z], clip: "idle", seconds: Infinity },
+  { id: "nap", label: "Rest in a nap pod", doing: "Resting in a nap pod…", x: 10.0, z: NAP_PODS[0][1], face: [NAP_PODS[0][0], NAP_PODS[0][1]], clip: "idle", seconds: 9.0 },
 ];

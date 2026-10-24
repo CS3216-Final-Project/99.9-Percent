@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useGame } from "@/game/store";
 import { Icon } from "../icons";
-import { mouse, viewNow } from "./viewState";
+import { bindEyelids, mouse, viewNow } from "./viewState";
 
 /** Leave the view from the avatar for the overview, ending the walk: the only way out, as Escape only frees the cursor. */
 function leave() {
@@ -43,7 +43,15 @@ export function ViewOverlay() {
     window.addEventListener("nn:look-lock", changed);
     return () => window.removeEventListener("nn:look-lock", changed);
   }, []);
-  if (viewpoint === "overview") return null;
+  // The nap's eyelids sit over the room whatever the view: shut, first person looks into the dark of the pod.
+  const eyelids = (
+    <div className="view-eyelids" aria-hidden="true" data-eyes="open" ref={bindEyelids}>
+      <i>z</i>
+      <i>z</i>
+      <i>z</i>
+    </div>
+  );
+  if (viewpoint === "overview") return eyelids;
   const first = viewpoint === "first";
   const name = first ? "first person" : "follow";
   const exit = (
@@ -52,7 +60,9 @@ export function ViewOverlay() {
     </button>
   );
   return (
-    <div className={`view-overlay is-${viewpoint}${locked ? " is-looking" : ""}`} data-viewpoint={viewpoint}>
+    <>
+      {eyelids}
+      <div className={`view-overlay is-${viewpoint}${locked ? " is-looking" : ""}`} data-viewpoint={viewpoint}>
       {first && <span className="view-dot" aria-hidden="true" />}
       <p className="view-hint">
         {locked && reading ? (
@@ -122,6 +132,7 @@ export function ViewOverlay() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

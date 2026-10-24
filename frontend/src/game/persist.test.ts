@@ -98,6 +98,9 @@ describe('browser metadata and analytics', () => {
     expect(loadMeta().chapterCompletions).toEqual({ runId: 'run-1', chapters: ['scaling', 'data'] });
     localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ chapterCompletions: { runId: 'run-1', chapters: ['data', 'spikes', 'data'] } }));
     expect(loadMeta().chapterCompletions).toEqual({ runId: 'run-1', chapters: ['data'] });
+    // A profile written before the Opening was remembered keeps its record; an Opening stay decodes with it.
+    localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ chapterCompletions: { runId: 'run-1', chapters: ['scaling', 'opening'] } }));
+    expect(loadMeta().chapterCompletions).toEqual({ runId: 'run-1', chapters: ['opening', 'scaling'] });
     for (const record of [null, 'run-1', [], { runId: 1, chapters: [] }, { runId: 'run-1' }]) {
       localStorage.setItem('nn.campaign.meta.v1', JSON.stringify({ chapterCompletions: record }));
       expect(loadMeta().chapterCompletions).toBeNull();
