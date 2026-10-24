@@ -1,4 +1,4 @@
-import { completeTutorial, advanceCampaignStep, test, expect, savedGame } from "./fixtures";
+import { completeTutorial, advanceCampaignStep, test, expect, savedGame, openPanelTab } from "./fixtures";
 
 test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
 test("Campaign option comparison, confirmation, Run/Pause and pause-to-investigate use public controls", async ({page, installClock}) => {
@@ -6,6 +6,7 @@ test("Campaign option comparison, confirmation, Run/Pause and pause-to-investiga
   await page.goto("/"); await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click(); await completeTutorial(page);
   await expect(page.getByText("Effect & costs")).toHaveCount(0);
   await expect(page.getByText("Operating finances")).toHaveCount(0); await expect(page.getByLabel("Request dependencies")).toHaveCount(0);
+  await openPanelTab(page,"Actions");
   await page.getByRole("button",{name:/Add server/}).click(); const confirm=page.getByRole("region",{name:"Confirm Add server"});
   await expect(confirm).toContainText("Add App Server"); await expect(confirm).toContainText("Processes requests and accesses the Database.");
   await expect(confirm).toContainText("+$700 per 60 game seconds"); await expect(confirm).toContainText("$1,000");

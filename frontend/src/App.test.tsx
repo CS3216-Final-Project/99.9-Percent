@@ -86,8 +86,10 @@ describe("opening UI", () => {
     // Tech and History wait in the bottom bar's view tabs, where Classic keeps them; later stage controls do not appear yet.
     expect(within(screen.getByRole("navigation", { name: "Views" })).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Tech", "History"]);
     // The tools Launch Week's first incident calls for are already present; later stages' are not.
+    openActions();
     expect(screen.getByRole("region", { name: "Scaling controls" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Data strategy" })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /^Analysis/ }));
     fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
     expect(useGame.getState().game.campaign!.step).toBe(0);
     expect(useGame.getState().meta.runsStarted).toBe(1);
@@ -115,7 +117,7 @@ describe("opening UI", () => {
     expect(recovery.textContent).toContain("Service errors below 1%");
     expect(recovery.textContent).toContain("Traffic is being accepted and requests are completing");
     // Launch Week's one incident is the database: the upgrade fixes it.
-    fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+    openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(20000));
@@ -372,3 +374,6 @@ it("wraps the week clock without losing the total elapsed counter", () => {
   expect(screen.getByRole("progressbar", { name: "Operating week progress" }).getAttribute("aria-valuenow")).toBe("8");
   expect(document.querySelector(".week")?.textContent).toContain("Week 2");
 });
+
+/** Purchases live on the panel's Actions tab. */
+function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

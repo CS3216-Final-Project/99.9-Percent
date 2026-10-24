@@ -1,4 +1,4 @@
-import { completeTutorial, advanceCampaignStep, setGameSpeed } from "./fixtures";
+import { completeTutorial, advanceCampaignStep, setGameSpeed, openPanelTab } from "./fixtures";
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -35,19 +35,23 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       await expect(panel.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
       await expect(panel.getByText("Live", { exact: true })).toBeVisible();
       await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
+      await openPanelTab(page, "Actions");
       for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
         const action = panel.getByRole("button", { name });
         await action.scrollIntoViewIfNeeded();
         await expect(action).toBeInViewport();
       }
       // Inspection is repeatable and cannot advance the physical clock.
+      await openPanelTab(page, "Analysis");
       await panel.getByRole("button", { name: "Database", exact: true }).click();
       await panel.evaluate(el => { el.scrollTop = 0; });
       await page.screenshot({ path: "test-results/phase1-desktop.png" });
     }
     const opening = (await savedGame(page)).campaign!;
     expect(opening.step).toBe(6);
+    await openPanelTab(page, "Analysis");
     await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).click();
+    await openPanelTab(page, "Actions");
     if (path === "app-then-upgrade") {
       await page.getByRole("button", { name: /Add server/ }).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
       await page.getByRole("button", { name: "Run", exact: true }).click();

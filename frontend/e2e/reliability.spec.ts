@@ -1,4 +1,4 @@
-import { advanceCampaignStep } from "./fixtures";
+import { advanceCampaignStep, openPanelTab } from "./fixtures";
 import {test,expect,seedSave,savedGame} from "./fixtures";
 import {readyReliability,preparedReliability,act} from "../src/sim/__tests__/reliabilityFixture";
 import type {Page} from "@playwright/test";
@@ -20,6 +20,7 @@ test("reliability: manual restoration, measured report, outcome and paused reloa
  await installClock();
  test.setTimeout(120000);
  await boot(page,act(readyReliability(),{type:"enter_reliability"}));
+ await openPanelTab(page,"Actions");
  await page.getByRole("button",{name:"Start reliability test",exact:true}).click();
  await advance(page,8);
  await expect(page.getByRole("region",{name:"Stay Online"})).toContainText("failed");
@@ -32,6 +33,7 @@ test("reliability: manual restoration, measured report, outcome and paused reloa
  await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect.poll(async()=>(await savedGame(page)).campaign!.step).toBeGreaterThan(resumedStep);
  await page.getByRole("button",{name:"Pause",exact:true}).click();
+ await openPanelTab(page,"Actions");
  await page.getByRole("button",{name:`Restore App ${f.targetId.slice(4)} · free · 3 game seconds`,exact:true}).click();
  const restoring=(await savedGame(page)).campaign!;
  expect(restoring.apps.find(app=>app.id===f.targetId)!.health).toBe("failed");
@@ -51,5 +53,5 @@ test("reliability: one-step detection and delayed real spare promotion",async({p
  // Retain the existing budget for both boots and the final promotion.
  test.setTimeout(120_000);
  await installClock();
- await boot(page,preparedReliability());await page.getByRole("button",{name:"Start reliability test",exact:true}).click();await advance(page,8);let c=(await savedGame(page)).campaign!;expect(c.apps[1].health).toBe("failed");expect(c.apps[1].detectedHealth).toBe("healthy");await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.apps[1].detectedHealth).toBe("unhealthy");expect(c.pending.some(a=>a.type==="promote-spare")).toBe(true);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.routing.targets).toEqual(["app-1","app-3"]);expect(c.apps).toHaveLength(3);await expect(page.getByRole("region",{name:"Stay Online"})).toContainText("3,200 /");
+ await boot(page,preparedReliability());await openPanelTab(page,"Actions");await page.getByRole("button",{name:"Start reliability test",exact:true}).click();await advance(page,8);let c=(await savedGame(page)).campaign!;expect(c.apps[1].health).toBe("failed");expect(c.apps[1].detectedHealth).toBe("healthy");await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.apps[1].detectedHealth).toBe("unhealthy");expect(c.pending.some(a=>a.type==="promote-spare")).toBe(true);await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await advance(page,1);c=(await savedGame(page)).campaign!;expect(c.routing.targets).toEqual(["app-1","app-3"]);expect(c.apps).toHaveLength(3);await openPanelTab(page,"Actions");await expect(page.getByRole("region",{name:"Stay Online"})).toContainText("3,200 /");
 });

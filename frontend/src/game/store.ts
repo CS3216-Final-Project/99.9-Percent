@@ -76,6 +76,8 @@ import { clampLookSpeed, DEFAULT_CONTROLS, type ControlSettings } from "./contro
 
 export type View = "tech" | "engineers" | "history" | "menu" | "guidance" | "scorecard" | null;
 export type Speed = 0.5 | 1 | 2;
+/** The Guided Mode panel's two halves: readings of the system, and the controls that change it. */
+export type PanelTab = "analysis" | "actions";
 
 /**
  * Challenge Mode's first-week walkthrough ("basics") and first-incident guide ("incident"); Guided Mode's Opening
@@ -232,6 +234,9 @@ interface Store {
   /** Temporary workspace visibility; never serialized into a save. */
   panelOpen: boolean;
   setPanelOpen: (open: boolean) => void;
+  /** Which half of the Guided Mode panel is shown. Workspace state; never serialized into a save. */
+  panelTab: PanelTab;
+  setPanelTab: (tab: PanelTab) => void;
   selectApp: (id: string) => void;
   /** The room-originated inspection asking for its reveal, or none. */
   roomInspection: RoomInspection | null;
@@ -867,7 +872,9 @@ export const useGame = create<Store>()((set, get, api) => {
     selectedAppId: null,
     panelOpen: true,
     setPanelOpen: open => set({panelOpen: open}),
-    selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({panelOpen:true,selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
+    panelTab: "analysis",
+    setPanelTab: tab => set({panelTab: tab}),
+    selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({panelOpen:true,panelTab:"analysis",selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
     roomInspection: null,
     dismissRoomInspection: () => set({ roomInspection: null }),
     // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
@@ -1095,7 +1102,8 @@ export const useGame = create<Store>()((set, get, api) => {
       commit(advanceSteps(game, count).state);
     },
 
-    select: id => set({...(id ? {panelOpen:true} : {}),selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null,...(id?floorPatch(floorOf(id),"select"):{})}),
+    // Choosing equipment asks to read it, so the panel brings its readings forward.
+    select: id => set({...(id ? {panelOpen:true,panelTab:"analysis" as const} : {}),selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null,...(id?floorPatch(floorOf(id),"select"):{})}),
     hover: (id) => {
       if (get().hovered !== id) set({ hovered: id });
     },
@@ -1402,6 +1410,11 @@ export const useGame = create<Store>()((set, get, api) => {
 // to be walking is remembered, so the next visit picks it up again.
 useGame.subscribe((s, prev) => {
   if (prev.started && !s.started && s.walking) s.setWalking(false, false);
+});
+
+// Every new, loaded or practice company opens its panel on Analysis, whichever action replaced the last one.
+useGame.subscribe((s, prev) => {
+  if (s.generation !== prev.generation && s.panelTab !== "analysis") useGame.setState({ panelTab: "analysis" });
 });
 
 /**
