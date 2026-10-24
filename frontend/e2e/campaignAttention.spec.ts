@@ -304,7 +304,13 @@ test("action guidance routing disclosure transfers to All apps without applying 
   await closeInspection(page); await page.getByRole("button",{name:"Hint",exact:true}).click();
   const card=page.getByRole("dialog",{name:"Hint",exact:true});
   await card.getByRole("button",{name:"Got it", exact:true}).click();
-  await followHintComponent(page);await expect(gold(page)).toHaveText(/Configure routing/);
+  // Verify each navigation step before opening the routing disclosure ourselves.
+  for (const [attribute,value] of [["data-tutorial","inspect-gateway"],["data-inspection-entry","management"],["data-inspection-entry","routing"]]) {
+    await expect(gold(page)).toHaveCount(1);
+    await expect(gold(page)).toHaveAttribute(attribute,value);
+    await gold(page).click();
+  }
+  await expect(gold(page)).toHaveText(/Configure routing/);
   await gold(page).click(); await expect(gold(page)).toHaveAccessibleName("All apps");
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toBeInViewport({ratio:1});
   expect((await savedGame(page)).campaign!.routing.targets).toEqual(["app-1"]);

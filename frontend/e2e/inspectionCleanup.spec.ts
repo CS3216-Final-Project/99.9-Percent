@@ -48,29 +48,39 @@ test("inspection camera: pan and rotate survive live rerenders",async({page,inst
   await expect(page.locator(".component-inspection")).toHaveCount(0);
 });
 
-test("inspection modal: blocks camera input and restores dragging and scene clicks after close",async({page})=>{
+test("inspection modal: blocks camera input and restores dragging and scene clicks after close",async({page,installClock})=>{
+  // Advancing every WebGL frame costs more than wall time on software-rendered CI.
+  test.setTimeout(120_000);
+  await installClock();
   await page.route("**/api/**",route=>route.abort());
   await seedSave(page,newGame(1,"inspection-camera-modal"));await page.goto("/");
   await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
+  await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+1000));
+  // Deliver all damping frames explicitly; quiet rounded storage can otherwise
+  // appear settled between slow CI frames before changing by one final digit.
+  const camera=async()=>{
+    await page.clock.runFor(3000);
+    return page.evaluate(()=>JSON.parse(localStorage.getItem("nn.campaign.exploration.v1")??"null")?.camera);
+  };
   // Take manual control before the exact blocking comparison. Rounded saved
   // framing values can otherwise sit unchanged before one final easing tick.
   const canvas=page.getByRole("main").locator("canvas"),box=(await canvas.boundingBox())!;
   const x=box.x+box.width*.25,y=box.y+box.height*.55;
   await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+40,y+10,{steps:8});await page.mouse.up();
-  const popup=await inspectEquipment(page,"db"),blocked=await settledCamera(page);
+  const popup=await inspectEquipment(page,"db"),blocked=await camera();
   // An outside pointer-down deliberately dismisses the existing modal. Drag its
   // header instead, and verify it stays open throughout the blocking check.
   const header=(await popup.locator(".modal-head").boundingBox())!;
   await page.mouse.move(header.x+header.width/2,header.y+header.height/2);await page.mouse.down();
   await page.mouse.move(header.x+header.width/2+40,header.y+header.height/2,{steps:12});await page.mouse.up();
-  await page.keyboard.press("q");const covered=await settledCamera(page);await expect(popup).toBeVisible();
+  await page.keyboard.press("q");const covered=await camera();await expect(popup).toBeVisible();
   expect(covered.target).toEqual(blocked.target);expect(covered.offset).toEqual(blocked.offset);expect(covered.zoom).toBe(blocked.zoom);
   await closeInspection(page);
   await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+80,y+30,{steps:12});await page.mouse.up();
-  const after=await settledCamera(page);
+  const after=await camera();
   expect(Math.hypot(after.target.x-blocked.target.x,after.target.z-blocked.target.z)).toBeGreaterThan(1);
   await openCameraControls(page);await page.getByRole("button",{name:"Reset view",exact:true}).click();
-  await page.keyboard.press("Escape");await settledCamera(page);
+  await page.keyboard.press("Escape");await camera();
   await page.getByRole("main").getByRole("button",{name:"Database",exact:true}).click();
   await expect(page.getByRole("dialog",{name:"Database inspected",exact:true})).toBeVisible();
 });
