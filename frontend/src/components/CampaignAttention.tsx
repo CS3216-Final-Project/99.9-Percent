@@ -111,9 +111,14 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const spikeStage = chapter4Stage(game);
   const growthStage = chapter6Stage(game);
   const companyMessage = chapterCompanyMessage(game);
-  const available = !!game.campaign && started && !practice;
+  const lw = game.campaign?.launchWeek;
+  // The research step outlives the week's end: the score card waits for the pick.
+  const launchTutorial = !!lw && (lw.completedStep === null || !!lw.researchEarned && !lw.tech);
+  // A practice company replays Launch Week, so it keeps the tutorial steps; other help stays with the real company.
+  const practiceBlocked = !!practice && !launchTutorial;
+  const available = !!game.campaign && started && !practiceBlocked;
   // Capturing the room's mouse blocks optional help, not an urgent Pause invitation.
-  const pauseBlocked = covered || !!confirming || risk || !!tour || !!practice || hidden || !focused;
+  const pauseBlocked = covered || !!confirming || risk || !!tour || practiceBlocked || hidden || !focused;
   const blocked = pauseBlocked || locked;
   const key = `${generation}:${decision.key}`;
   const choices = decision.growthChoices;
@@ -123,9 +128,6 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const riskConfirmation = available && risk && !confirming && !covered && !tour && !hidden && !locked && focused && decision.reason === "scaling-choice" && !!choices?.risk && previewCampaignAction(game, { type: "accept_scaling_risk" }).ok;
   const actionSelector = recommendedAction ? `[data-guidance-action="${guidanceActionId(recommendedAction.action)}"]` : "";
   const selectedInspection = decision.target === "db" && selected === "db" ? "Database" : decision.target === "app" && selected === "app" ? "Servers" : decision.target === "network" && selected === "gateway" ? "Network" : decision.target === "monitoring" && selected === "monitoring" ? "Monitoring" : null;
-  const lw = game.campaign?.launchWeek;
-  // The research step outlives the week's end: the score card waits for the pick.
-  const launchTutorial = !!lw && (lw.completedStep === null || !!lw.researchEarned && !lw.tech);
   const lwIncident = lw && lw.completedStep === null ? game.campaign!.incident : null;
   const metricsKey = lwIncident ? `${lwIncident.id}:${decision.reason}` : "";
   // After inspecting the overloaded machine, its readings come first, then its fix.
