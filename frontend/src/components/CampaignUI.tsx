@@ -99,22 +99,25 @@ function routeName(c: Campaign) {
 const STEP_STATUS = { done: "done", current: "current step", upcoming: "not yet" } as const;
 /** The chapter's sequence: finished steps recede, the current one carries its hint and later ones stay neutral. */
 function StepList({items,current,label}:{items:Requirement[];current:Requirement|null;label:string}) {
+  const running=useGame(s=>s.running);
   return <ol className="progression-steps" aria-label={label}>{items.map((r,i)=>{
     const state=r.met?"done":r===current?"current":"upcoming";
-    // A step the clock completes shows a clock instead of its number, so it reads as "press Run", not "do this".
+    // A step the clock completes keeps its number and adds a clock after its label, so it reads as "press Run", not "do this".
     return <li key={r.id} data-requirement={r.id} data-met={r.met} data-state={state} data-wait={r.wait||undefined} aria-current={state==="current"?"step":undefined}>
-      <span className="progression-marker" aria-hidden="true">{r.met?<Icon name="check" size={12} />:r.wait?<Icon name="time" size={12} />:i+1}</span>
-      <span className="progression-text"><span className="visually-hidden">Step {i+1}, {STEP_STATUS[state]}: </span>{r.label}{state==="current"&&r.hint&&<small>{r.hint}</small>}</span>
+      <span className="progression-marker" aria-hidden="true">{r.met?<Icon name="check" size={12} />:i+1}</span>
+      <span className="progression-text"><span className="visually-hidden">Step {i+1}, {STEP_STATUS[state]}: </span>{r.label}
+        {r.wait&&!r.met&&<span className="progression-wait"><Icon name="time" size={12} />{running?"Running":"Press Run"}</span>}
+        {state==="current"&&r.hint&&<small>{r.hint}</small>}</span>
     </li>;})}</ol>;
 }
 /** Standing company checks fold into one line while they all pass and only list the ones that need attention. */
 function CompanyChecks({items,paused}:{items:Requirement[];paused:string|null}) {
   if(!items.length) return null;
-  if(paused) return <p className="company-checks" data-requirement="company-checks" data-met="paused"><Icon name="time" size={14} />{paused}</p>;
-  const failing=items.filter(r=>!r.met);
-  if(!failing.length) return <p className="company-checks" data-requirement="company-checks" data-met="true"><Icon name="check" size={14} />All {items.length} company checks pass</p>;
+  if(paused) return <p className="company-checks" data-requirement="company-checks" data-met="paused"><Icon name="pause" size={14} />{paused}</p>;
+  const failing=items.filter(r=>!r.met),one=items.length===1;
+  if(!failing.length) return <p className="company-checks" data-requirement="company-checks" data-met="true"><Icon name="check" size={14} />{one?"The company check passes":`All ${items.length} company checks pass`}</p>;
   return <div className="company-checks" data-requirement="company-checks" data-met="false">
-    <p><Icon name="alert" size={14} />{failing.length} of {items.length} company checks {failing.length===1?"needs":"need"} attention</p>
+    <p><Icon name="alert" size={14} />{one?"The company check needs attention":`${failing.length} of ${items.length} company checks ${failing.length===1?"needs":"need"} attention`}</p>
     <ul>{failing.map(r=><li key={r.id} data-requirement={r.id} data-met="false"><span className="visually-hidden">Needs attention: </span>{r.label}{r.hint&&<small>{r.hint}</small>}</li>)}</ul>
   </div>;
 }
@@ -646,12 +649,27 @@ interface ReportEntry { id: string; group: "incident" | "outcome"; title: string
  */
 function ReportIndex({ entries, incidents, open, onOpen }: { entries: ReportEntry[]; incidents: number; open: string | null; onOpen: (id: string | null) => void }) {
   const wide = useMediaQuery("(min-width: 901px)");
-  if (!entries.length) return <div className="history-incidents"><p className="empty">No incidents yet.</p></div>;
+  const reportHeading = useRef<HTMLHeadingElement>(null);
+  const focusReport = useRef(false);
   const selected = wide ? entries.find(e => e.id === open) ?? entries[0] : entries.find(e => e.id === open) ?? null;
+  // Choosing a report in the wide list moves focus to it, so keyboard and screen reader users land on what they chose.
+  useEffect(() => {
+    if (!focusReport.current) return;
+    focusReport.current = false;
+    reportHeading.current?.focus();
+  }, [selected?.id]);
+  if (!entries.length) return <div className="history-incidents"><p className="empty">No incidents yet.</p></div>;
   const row = (e: ReportEntry) => <li key={e.id} className={wide && e === selected ? "is-selected" : undefined}>
-    <button type="button" className="pm-toggle" {...(wide ? { "aria-current": e === selected ? "true" as const : undefined } : { "aria-expanded": e === selected })} onClick={() => onOpen(!wide && e === selected ? null : e.id)}>
-      <span className="pm-title"><Icon name={e.group === "incident" ? "incident" : "goal"} size={16} /><span>{e.title}<small>{e.when}</small></span></span>
-      <span className="pm-end">{e.tag}{!wide && <Icon name="down" size={16} className="pm-chevron" />}</span>
+    <button type="button" className="pm-toggle" {...(wide ? { "aria-current": e === selected ? "true" as const : undefined } : { "aria-expanded": e === selected })} onClick={() => {
+      if (!wide) return onOpen(e === selected ? null : e.id);
+      if (e === selected) return reportHeading.current?.focus();
+      focusReport.current = true;
+      onOpen(e.id);
+    }}>
+      <Icon name={e.group === "incident" ? "incident" : "goal"} size={16} />
+      {/* The tag sits under the title, so a long outcome never pushes the chevron past a phone-width row. */}
+      <span className="pm-title">{e.title}<small>{e.when}</small>{e.tag}</span>
+      {!wide && <Icon name="down" size={16} className="pm-chevron" />}
     </button>
     {!wide && e === selected && <section className="pm" aria-label={e.label}>{e.body}</section>}
   </li>;
@@ -664,7 +682,7 @@ function ReportIndex({ entries, incidents, open, onOpen }: { entries: ReportEntr
   return <div className="history-incidents history-split">
     <nav className="history-index" aria-label="Reports">{groups}</nav>
     {selected && <section className="history-report" aria-label={selected.label}>
-      <header><h3>{selected.title}</h3><p>{selected.when}{selected.tag}</p></header>
+      <header><h3 ref={reportHeading} tabIndex={-1}>{selected.title}</h3><p>{selected.when}{selected.tag}</p></header>
       {selected.body}
     </section>}
   </div>;

@@ -12,6 +12,7 @@ export function incidentLesson(report: CampaignPostmortem) {
   const events = report.events.filter(e => e.step <= report.recoveredStep);
   const during = events.filter(e => e.step >= report.openedStep);
   const failed = (opening?.reliability?.failedDeliveries ?? 0) > 0 || !!opening?.instances?.some(a => a.health === "failed" && a.routed && a.demand > 0);
+  const routedToFailed = !!opening && sentToFailed(opening) > 0;
   const db = !!opening && opening.db.demand > opening.db.capacity;
   const app = opening?.instances?.find(a => a.demand > a.capacity);
   const requested = new Map(events.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.type]));
@@ -62,7 +63,8 @@ export function incidentLesson(report: CampaignPostmortem) {
   } else if (upgraded) remember = "Upgrade the database before demand reaches its capacity, leaving room for growth.";
   if (report.limited) remember = "Add enough capacity to serve full demand, then remove the traffic limit; rejected requests earn no revenue.";
   return {
-    wrong: failed ? "A server failed, reducing the capacity available to handle requests."
+    wrong: failed && routedToFailed ? "A server failed, but traffic was still routed to it, and every request it received failed."
+      : failed ? "A server failed, reducing the capacity available to handle requests."
       : db && app ? "Both application and database work exceeded their recorded capacity, causing delays."
       : db ? "The database could not keep up with the work reaching it, causing delays."
       : app || opening && opening.app.demand > opening.app.capacity ? "Application work exceeded serving capacity, causing delays."
@@ -84,8 +86,26 @@ export function incidentTitle(report: CampaignPostmortem) {
   return db && app ? "Application and Database overloaded" : db ? "Database overloaded" : app ? "Application overloaded" : "Service slowdown";
 }
 
-/** The first observation after a server failed: traffic admitted against what the healthy routed servers could serve. */
-export function survivingCapacity(snapshots: Snapshot[]) {
-  const m = snapshots.find(s => s.reliability && s.instances?.some(a => a.health === "failed"));
-  return m ? { step: m.step, admitted: m.admitted, capacity: m.reliability!.healthyRoutedCapacity } : null;
+/** Admitted traffic the route still sent to failed servers in one observation; a failed server does no work, so all of it errors. */
+export function sentToFailed(m: Snapshot) {
+  if (m.instances) return m.instances.filter(a => a.health === "failed" && a.routed).reduce((n, a) => n + a.demand, 0);
+  return Math.max(0, (m.reliability?.failedDeliveries ?? 0) - (m.reliability?.unroutable ?? 0));
 }
+
+/**
+ * The first observation after a server failed: traffic admitted, the share the route still sent to failed servers,
+ * and what the healthy routed servers could serve. When traffic reached a failed server, it also finds the first later
+ * observation where it stopped, and whether the server was taken out of the route or restored.
+ */
+export function survivingCapacity(snapshots: Snapshot[]) {
+  const i = snapshots.findIndex(s => s.reliability && s.instances?.some(a => a.health === "failed"));
+  if (i < 0) return null;
+  const m = snapshots[i], failed = m.instances!.filter(a => a.health === "failed").map(a => a.id), toFailed = sentToFailed(m);
+  const after = toFailed > 0 ? snapshots.slice(i + 1).find(s => s.reliability && sentToFailed(s) === 0) : undefined;
+  const restored = !!after && failed.every(id => after.instances?.find(a => a.id === id)?.health !== "failed");
+  return {
+    step: m.step, admitted: m.admitted, capacity: m.reliability!.healthyRoutedCapacity, failed, toFailed,
+    stopped: after ? { step: after.step, by: restored ? "restored" as const : "rerouted" as const, admitted: after.admitted, capacity: after.reliability!.healthyRoutedCapacity } : null,
+  };
+}
+export type SurvivingCapacity = NonNullable<ReturnType<typeof survivingCapacity>>;

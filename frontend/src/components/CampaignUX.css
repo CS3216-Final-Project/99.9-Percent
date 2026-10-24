@@ -56,6 +56,9 @@
 /* A current wait keeps the ink ring but stays hollow: the clock, not the player, finishes it. */
 .campaign-panel li[data-state="current"][data-wait] .progression-marker { border-width: 2px; background: var(--paper); color: var(--ink); }
 .campaign-panel li[data-state="current"] small { font-weight: 400; }
+/* "Press Run" marks a step the clock finishes; the number stays, so the sequence never shows gaps. */
+.campaign-panel .progression-wait { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--paper-3); color: var(--text-soft); font-size: var(--text-xs); font-weight: 600; line-height: 1.5; white-space: nowrap; vertical-align: 1px; }
+.campaign-panel .progression-wait svg { flex: none; }
 .campaign-panel .campaign-requirements > .btn { margin: 0 0 12px; }
 .campaign-panel .campaign-action-card { border-bottom: 1px solid var(--paper-3); padding-bottom: 8px; }
 .campaign-panel .campaign-action-reason { margin: 4px 0; font-size: var(--text-xs); color: var(--warn-ink); }
@@ -192,3 +195,16 @@
 .purchase-facts dt { color: var(--text-soft); font-size: var(--text-xs); font-weight: 600; }
 .purchase-facts dd { margin: 0; color: var(--ink); line-height: 1.4; }
 .campaign-action-popover .campaign-purchase-refund { color: var(--text-soft); font-size: var(--text-xs); margin-bottom: 6px; }
+/* Launch Week score: three readings side by side, divided by hairlines, so the result reads at a glance. */
+.launch-score { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 14px 0 4px; border-block: 1px solid var(--paper-3); }
+.launch-score > div { min-width: 0; padding: 10px 12px; }
+.launch-score > div:first-child { padding-left: 0; }
+.launch-score > div + div { border-left: 1px solid var(--paper-3); }
+.launch-score dt { color: var(--text-soft); font-family: var(--font-display); font-size: var(--text-xs); font-weight: 600; }
+.launch-score dd { margin: 2px 0 0; color: var(--ink); font-family: var(--font-num); font-size: var(--text-lg); font-weight: 700; line-height: 1.25; font-variant-numeric: tabular-nums; text-wrap: balance; }
+@media (max-width: 420px) {
+  .launch-score { grid-template-columns: 1fr; }
+  .launch-score > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; }
+  .launch-score > div + div { border-left: 0; border-top: 1px solid var(--paper-3); }
+  .launch-score dd { margin: 0; text-align: right; }
+}

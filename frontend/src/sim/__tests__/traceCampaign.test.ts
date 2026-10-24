@@ -10,8 +10,8 @@ describe("causal evidence", () => {
     }
     while (s.phase !== "review") s = step(s).state;
     const report = s.campaign!.reports[0];
-    expect(report.explanations.join(" ")).toContain("Admitted demand fell");
-    expect(report.explanations.join(" ")).toContain("Database capacity increased");
+    expect(report.explanations.join(" ")).toContain("Admitted traffic fell");
+    expect(report.explanations.join(" ")).toContain("Database capacity rose");
     expect(report.events.some(e => e.type === "inspection")).toBe(true);
     expect(report.snapshots.at(-1)!.serviceErrorRate).toBe(0);
     expect(report.events.filter(e => e.type === "action-activated")).toHaveLength(2);
@@ -42,9 +42,9 @@ it.each([10, 11])("does not credit a database upgrade requested at step %i after
   expect(upgraded.campaign!.step).toBe(baseline.campaign!.step);
   const report = upgraded.campaign!.reports[0];
   expect(report.snapshots.find(m => m.step === 13)!.db.backlog).toBe(0);
-  const capacity = report.explanations.find(t => t.startsWith("Database capacity increased"))!;
-  expect(capacity).toContain("already zero"); expect(capacity).toContain("not credited");
-  expect(report.explanations.find(t => t.startsWith("Admitted demand fell"))).toContain("backlog fell from 600 to 500");
+  const capacity = report.explanations.find(t => t.startsWith("Database capacity rose"))!;
+  expect(capacity).toContain("already empty"); expect(capacity).toContain("not credited");
+  expect(report.explanations.find(t => t.startsWith("Admitted traffic fell"))).toContain("queue fell from 600 to 500");
   expect(report.explanations.join(" ")).not.toContain("enabling backlog drainage");
 });
 
@@ -54,5 +54,5 @@ it("records actual drainage when upgrading the overloaded database", () => {
   if (!action.ok) throw Error(action.message);
   s = advanceSteps(action.state, 30).state;
   expect(s.phase).toBe("review");
-  expect(s.campaign!.reports[0].explanations.join(" ")).toContain("backlog fell from 600 to 400 at activation (game second 9)");
+  expect(s.campaign!.reports[0].explanations.join(" ")).toContain("queue fell from 600 to 400 when it took effect (game second 9)");
 });

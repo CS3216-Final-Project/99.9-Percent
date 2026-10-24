@@ -7,14 +7,14 @@ import { tipProps } from "./tips";
 import "./CampaignChapters.css";
 
 export function CampaignChapters() {
-  const { replaying, current, total, advance, reason, goal } = useChapterBar();
+  const { current, advance, reason, goal, label } = useChapterBar();
   const [open, setOpen] = useState(false);
   const reasonId = useId();
 
   return <>
     <section className="chapter-bar" aria-label="Guided Mode chapters">
       <div className="chapter-current">
-        <p>{replaying ? "Practice" : `Chapter ${current.number} of ${total}`}</p>
+        <p>{label}</p>
         <h2 aria-label="Current chapter"><span aria-label="Current Guided Mode stage">{current.name}</span></h2>
       </div>
       <p className="chapter-objective" aria-label="Current objective"><b>Goal:</b> <span className={current.number >= 1 && current.number <= 6 ? "chapter-goal-text" : undefined}>{goal}</span></p>
@@ -44,7 +44,7 @@ export function ChapterOverview({ onClose, lead }: { onClose: () => void; lead?:
     <p>Start with Launch Week, then play {COUNT_WORDS[total] ?? total} {total === 1 ? "chapter" : "chapters"} with the same company. Your servers, investments and progress carry forward.</p>
     <ol className="chapter-overview">
       {chapters.map((chapter) => <li key={chapter.id} aria-current={chapter.current ? "step" : undefined}>
-        <span className="chapter-number" aria-hidden="true">{chapter.completed ? <Icon name="check" size={18} /> : chapter.number}</span>
+        <span className="chapter-number" aria-hidden="true">{chapter.completed ? <Icon name="check" size={18} /> : chapter.number === 0 ? <Icon name="week" size={18} /> : chapter.number}</span>
         <div><h3>{chapter.name}</h3><span className="chapter-status">{chapter.status}{chapter.current && chapter.completed ? " · You are here" : ""}</span><p>{chapter.description}</p>{chapter.number === 0 && (replaying ? <>
           <p>Practice is in progress. Exit practice to return to your paused company.</p>
           <button className="btn btn-primary" onClick={() => { useGame.getState().endTour(false); onClose(); }}>Exit practice</button>

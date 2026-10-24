@@ -137,7 +137,7 @@ it("historical telemetry retains the profile used before contrasting workload",(
 
 it("reports the actual data workload change instead of attributing it to old opening growth",()=>{
  const g=advanceSteps(install(incident(),{type:"start_db_upgrade"},4),20).state;
- expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("Workload changed to read-heavy");
+ expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("the workload changed to read heavy");
 });
 
 it("does not attribute a same-step pre-entry request to the data stage",()=>{

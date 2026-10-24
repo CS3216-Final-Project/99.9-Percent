@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CampaignPostmortem } from "@/sim/campaignTypes";
-import { incidentLesson, survivingCapacity } from "@/game/campaignPostmortem";
+import { incidentLesson, survivingCapacity, type SurvivingCapacity } from "@/game/campaignPostmortem";
 import { incidentSummary } from "@/game/campaignReport";
 import { CampaignReport } from "./CampaignReport";
 import { useReportTechnicalOpen } from "./useReportTechnicalOpen";
@@ -17,12 +17,31 @@ export function CampaignIncidentReport({ report, reliability }: { report: Campai
   return <CampaignReport lesson={lesson} summary={capacity && <CapacityAfterFailure {...capacity} />}><IncidentEvidence report={report}/></CampaignReport>;
 }
 const num = (n: number) => n.toLocaleString("en-US");
-/** The Stay Online lesson in two numbers: what was admitted, and what the healthy routed servers could serve. */
-export function CapacityAfterFailure({ step, admitted, capacity }: { step: number; admitted: number; capacity: number }) {
+const appNames = (ids: string[]) => ids.map(id => id.replace("app-", "App ")).join(" and ");
+/**
+ * The Stay Online lesson in numbers: what was admitted, what the route still sent to the failed server, and what the
+ * healthy routed servers could serve. "Enough capacity" is said only when no traffic reached a failed server.
+ */
+export function CapacityAfterFailure({ step, admitted, capacity, failed, toFailed, stopped }: SurvivingCapacity) {
+  const name = appNames(failed), healthy = admitted - toFailed;
+  // Only overloaded healthy servers need more capacity; a routing problem is fixed by routing, not purchases.
+  const overloaded = healthy > capacity || !!stopped && stopped.admitted > stopped.capacity || toFailed === 0 && admitted > capacity;
+  let story: string;
+  if (toFailed > 0) {
+    const until = !stopped ? "until it was taken out of the route or restored"
+      : stopped.by === "restored" ? `until it was restored at game second ${stopped.step}`
+      : `until it was taken out of the route at game second ${stopped.step}`;
+    story = `A failed server does no work, so every request the load balancer sent to ${name} failed ${until}.`;
+    story += healthy > capacity ? " The healthy servers were overloaded by their own share as well."
+      : ` The healthy servers could serve their own ${num(healthy)} req/s; the errors came from the failed server staying in the route.`;
+    if (stopped?.by === "rerouted" && stopped.admitted > stopped.capacity) story += ` Once it was out of the route, the healthy servers could serve ${num(stopped.capacity)} of the ${num(stopped.admitted)} req/s admitted, so they stayed overloaded.`;
+  } else story = admitted > capacity ? "The servers still receiving traffic could not serve everything admitted, so they stayed overloaded until capacity came back."
+    : "No traffic reached the failed server, and the servers still receiving traffic had enough capacity for everything admitted.";
   return <section className="report-capacity" aria-label="Capacity after the failure"><h3>Capacity after the failure</h3>
     <dl className="rows"><Row label={`Traffic admitted at game second ${step}`} value={`${num(admitted)} req/s`} />
+      {toFailed > 0 && <Row label={`Sent to the failed ${name}`} value={`${num(toFailed)} req/s, all failed`} />}
       <Row label="Capacity of healthy servers receiving traffic" value={`${num(capacity)} req/s`} /></dl>
-    <p>{admitted > capacity ? "The servers still receiving traffic could not serve everything admitted, so they stayed overloaded until capacity came back." : "The servers still receiving traffic had enough capacity for everything admitted."} Health Checks only detect a failure and failover only moves traffic; neither adds capacity.</p>
+    <p>{story}{overloaded && " Health Checks only detect a failure and failover only moves traffic; neither adds capacity."}</p>
   </section>;
 }
 export function IncidentEvidence({ report }: { report: CampaignPostmortem }) {
@@ -42,14 +61,18 @@ export function IncidentEvidence({ report }: { report: CampaignPostmortem }) {
       {spent > 0 && <Row label="Spending during this incident" value={dollars(spent)} />}
     </dl>
       <h4>Causes, actions and trade-offs</h4>
-      {report.explanations.map((text, i) => <p key={i}>{text}</p>)}
+      {/* One finding per bullet, so the reasoning scans instead of reading as a wall of prose. */}
+      <ul className="report-explanations">{report.explanations.map((text, i) => <li key={i}>{text}</li>)}</ul>
       {workload.length > 0 && <h4>Workload and cache evidence</h4>}
       {snapshots.some(m => !m.data) && workload.length > 0 && <p>Some observations kept only totals; their workload and cache details were not recorded.</p>}
-      {workload.map(m => <p key={m.step}>From game second {m.step}: {m.data!.profile.replaceAll("-", " ")} workload, {m.data!.logical} requests of work. Cache hits {m.data!.hits}, eligible misses {m.data!.eligibleMisses}, writes {m.data!.writes}, uncacheable reads {m.data!.nonCacheableReads}. Hit rate {m.data!.effectiveHitRateUsed / 100}% (target {m.data!.target / 100}%). Database {m.db.demand} / {m.db.capacity} ops/s, queue {m.db.backlog}.</p>)}
+      {workload.length > 0 && <div className="report-table-scroll" tabIndex={technicalOpen ? 0 : undefined} role="region" aria-label="Workload and cache evidence">
+        <table className="campaign-table"><caption>Workload and cache readings, shown when they change</caption><thead><tr><th scope="col">From game second</th><th scope="col">Workload</th><th scope="col">Requests of work</th><th scope="col">Cache hits / misses</th><th scope="col">Writes</th><th scope="col">Uncacheable reads</th><th scope="col">Hit rate (target)</th><th scope="col">Database: demand / capacity ops/s · queue</th></tr></thead>
+          <tbody>{workload.map(m => <tr key={m.step}><th scope="row">{m.step}</th><td>{m.data!.profile.replaceAll("-", " ")}</td><td>{num(m.data!.logical)}</td><td>{num(m.data!.hits)} / {num(m.data!.eligibleMisses)}</td><td>{num(m.data!.writes)}</td><td>{num(m.data!.nonCacheableReads)}</td><td>{m.data!.effectiveHitRateUsed / 100}% ({m.data!.target / 100}%)</td><td>{num(m.db.demand)} / {num(m.db.capacity)} · {num(m.db.backlog)}</td></tr>)}</tbody></table>
+      </div>}
       {!report.snapshots.length && <p>No historical observations were retained.</p>}
       {snapshots.length > 0 && <div className="report-table-scroll" tabIndex={technicalOpen ? 0 : undefined} role="region" aria-label="Recorded incident evidence">
         <table className="campaign-table"><caption>Recorded incident evidence by game second</caption><thead><tr><th scope="col">Game second</th><th scope="col">Applications: demand / capacity req/s · queue</th><th scope="col">Routing</th><th scope="col">Database: demand / capacity ops/s · queue</th><th scope="col">Latency</th><th scope="col">Service errors</th></tr></thead>
-          <tbody>{snapshots.map(m => <tr key={m.step}><th scope="row">{m.step}</th><td>{m.instances ? m.instances.map(a => <div key={a.id}>{a.id.replace("app-", "App ")}: {a.demand} / {a.capacity} · {a.backlog}{a.health === "failed" ? " (failed)" : ""}</div>) : `${m.app.demand} / ${m.app.capacity} · ${m.app.backlog} (all apps)`}</td><td>{m.routing ? `${m.routing.targets.map(t => t.replace("app-", "App ")).join(", ")} (${m.routing.mode})` : "Not recorded"}</td><td>{m.db.demand} / {m.db.capacity} · {m.db.backlog}</td><td>{Math.round(m.latencyMs)} ms</td><td>{m.serviceErrorRate === null ? "No completed requests" : `${(m.serviceErrorRate * 100).toFixed(2)}%`}</td></tr>)}</tbody></table>
+          <tbody>{snapshots.map(m => <tr key={m.step}><th scope="row">{m.step}</th><td>{m.instances ? m.instances.map(a => <div key={a.id}>{a.id.replace("app-", "App ")}: {num(a.demand)} / {a.health === "failed" ? "0" : num(a.capacity)} · {num(a.backlog)}{a.health === "failed" ? " (failed)" : ""}</div>) : `${num(m.app.demand)} / ${num(m.app.capacity)} · ${num(m.app.backlog)} (all apps)`}</td><td>{m.routing ? `${m.routing.targets.map(t => t.replace("app-", "App ")).join(", ")} (${m.routing.mode})` : "Not recorded"}</td><td>{num(m.db.demand)} / {num(m.db.capacity)} · {num(m.db.backlog)}</td><td>{num(Math.round(m.latencyMs))} ms</td><td>{m.serviceErrorRate === null ? "No completed requests" : `${(m.serviceErrorRate * 100).toFixed(2)}%`}</td></tr>)}</tbody></table>
       </div>}
       <h4>What happened, second by second</h4>
       {events.length ? <ol className="report-events">{events.map(e => <li key={e.id}><span className="report-event-step">{e.step}</span><span><b>{e.title}</b>{e.detail && <small>{e.detail}</small>}</span></li>)}</ol> : <p>No event history was retained.</p>}

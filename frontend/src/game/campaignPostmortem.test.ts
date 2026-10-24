@@ -5,8 +5,10 @@ import { act, tick } from "@/sim/__tests__/spikeFixtures";
 import { spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
+import type { Snapshot } from "@/sim/campaignTypes";
 import { combinedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
-import { incidentLesson } from "./campaignPostmortem";
+import { incidentLesson, survivingCapacity } from "./campaignPostmortem";
+import { reliabilityOutcome } from "./__fixtures__/reliabilityOutcome";
 
 export function recovered(game: GameState) {
   for (let i = 0; i < 120 && game.phase !== "review"; i++) game = tick(game);
@@ -115,5 +117,34 @@ describe("recorded incident lessons", () => {
     const opening = r.snapshots.find(s => s.step === r.openedStep)!;
     opening.instances!.push({ ...opening.instances![0], id: "app-unused", health: "failed", routed: false, demand: 0, processed: 0 });
     expect(incidentLesson(r).wrong).toContain("database could not keep up");
+  });
+});
+
+describe("capacity after a server failure", () => {
+  /** Health Checks are live before the failure, so the load balancer drops App 3 once they detect it. */
+  function checkedFailure() {
+    let g = act(reliabilityCompany(), { type: "unlock_reliability", tech: "health_checks" });
+    g = act(tick(act(g, { type: "deploy_health_checks" }), 2), { type: "arm_reliability" });
+    for (let i = 0; i < 150 && g.campaign!.reliabilityStage!.completedStep === null; i++) g = tick(g.phase === "review" ? act(g, { type: "acknowledge_review" }) : g);
+    const c = g.campaign!, f = c.reliabilityStage!.fault!;
+    const samples = [...new Map<number, Snapshot>([...c.reports.flatMap(r => r.snapshots), ...c.recent].map(m => [m.step, m])).values()];
+    return { f, samples: samples.filter(m => m.step >= f.startedStep!).sort((a, b) => a.step - b.step) };
+  }
+  it("counts the traffic balanced routing still sent to the failed server until it was restored", () => {
+    const c = reliabilityOutcome(true).campaign!, f = c.reliabilityStage!.fault!;
+    const report = c.reports.find(r => r.snapshots.some(m => m.reliability?.faultId === f.id))!;
+    // Three balanced servers share 2,400 req/s, so the failed App 3 still receives a third of it.
+    expect(survivingCapacity(report.snapshots)).toEqual({ step: f.startedStep, admitted: 2400, capacity: 3200, failed: ["app-3"], toFailed: 800,
+      stopped: { step: f.restoredStep, by: "restored", admitted: 2400, capacity: 4800 } });
+    expect(incidentLesson(report).wrong).toBe("A server failed, but traffic was still routed to it, and every request it received failed.");
+  });
+  it("records when Health Checks take the failed server out of the route", () => {
+    const { f, samples } = checkedFailure();
+    expect(survivingCapacity(samples)).toEqual({ step: f.startedStep, admitted: 2400, capacity: 3200, failed: ["app-3"], toFailed: 800,
+      stopped: { step: f.startedStep! + 1, by: "rerouted", admitted: 2400, capacity: 3200 } });
+  });
+  it("finds no traffic sent to a failed server that is already outside the route", () => {
+    const { f, samples } = checkedFailure();
+    expect(survivingCapacity(samples.filter(m => m.step > f.startedStep!))).toEqual({ step: f.startedStep! + 1, admitted: 2400, capacity: 3200, failed: ["app-3"], toFailed: 0, stopped: null });
   });
 });

@@ -1,4 +1,5 @@
 import type { Campaign, CampaignPostmortem } from "@/sim/campaignTypes";
+import { survivingCapacity } from "./campaignPostmortem";
 
 export interface ReliabilityLesson { happened: string; recovered: string; improve: string; takeaway: string }
 /** Read recorded evidence only, bounded to this outcome/report so later chapters cannot rewrite it. */
@@ -24,9 +25,15 @@ export function reliabilityLesson(c: Campaign, report?: CampaignPostmortem): Rel
   if (!recovery.length) recovery.push("The recorded service checks confirmed recovery; the retained evidence does not identify a specific repair");
   const recoveryText = recovery.join("; ");
   const app = `App ${f.targetId.slice(4)}`;
+  // Say what the route did with the failed server's share, not only that its requests were lost.
+  const capacity = survivingCapacity(samples.filter(m => m.step >= f.startedStep!).sort((a, b) => a.step - b.step));
+  const until = capacity?.stopped?.by === "rerouted" ? "taken out of the route" : capacity?.stopped?.by === "restored" ? "restored" : "taken out of the route or restored";
+  const failure = capacity && capacity.toFailed > 0 ? `${app} failed, but the load balancer kept sending it traffic until it was ${until}. Every request sent there failed, so an incident opened.`
+    : capacity && capacity.admitted > capacity.capacity ? `${app} failed, and the servers still receiving traffic could not serve everything admitted, so an incident opened.`
+    : `${app} failed, and the requests it would have served were lost, so an incident opened.`;
   const rejection = significant ? " Many incoming requests were turned away by traffic limiting." : "";
   return {
-    happened: hadIncident ? `${app} failed, and the requests it would have served were lost, so an incident opened.` : `${app} failed without opening an incident.`,
+    happened: hadIncident ? failure : `${app} failed without opening an incident.`,
     recovered: `${recoveryText[0].toUpperCase()}${recoveryText.slice(1)}.${rejection}`,
     improve: significant ? "Add enough healthy, routed capacity to serve everyone without the traffic limit."
       : !detected ? "Deploy Health Checks so a failed server is detected sooner; with load balancing, traffic then skips it."

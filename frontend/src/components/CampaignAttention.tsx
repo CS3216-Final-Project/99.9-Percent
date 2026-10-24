@@ -100,6 +100,13 @@ function reveal(node: HTMLElement) {
   else if (box.bottom > bottom - 8) side.scrollTop += Math.min(box.bottom - bottom + 8, box.top - port.top - 8);
 }
 
+/** The visible height of the box a control scrolls in, or 0 when nothing around it scrolls. */
+function scrollPort(node: HTMLElement): number {
+  for (let parent = node.parentElement; parent; parent = parent.parentElement)
+    if (/auto|scroll/.test(getComputedStyle(parent).overflowY)) return parent.clientHeight;
+  return 0;
+}
+
 export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const game = useGame(s => s.game), started = useGame(s => s.started), running = useGame(s => s.running);
   const tour = useGame(s => s.tour), practice = useGame(s => s.tutorialCompany), generation = useGame(s => s.generation);
@@ -259,6 +266,9 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     // Only the player's own scrolling keeps a control out of view. The panel also scrolls itself, for example back
     // to the top when an incident opens, and that must not count as the player looking elsewhere.
     let playerScrolled = false;
+    // The height of the box the control scrolls in when it was revealed. A layout change, such as the phone's sheet
+    // making room for this step's card, can leave the control half hidden; that is not the player looking elsewhere.
+    let revealedPort = 0;
     const clear = () => {
       if (litTarget.current) { delete litTarget.current.dataset.spotlight; litTarget.current.classList.remove("campaign-gold-attention"); litTarget.current = null; }
       watched = null; measured = null;
@@ -282,10 +292,15 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       // such as after the panel's own reset to the top: scrolling within it, by keyboard focus or otherwise, wins.
       const fresh = node !== revealedTarget.current;
       if (fresh) playerScrolled = false;
-      if (!view && node && !playerScrolled && (fresh ? !controlVisible(node) : !shownPart(node)) && node.getClientRects().length) {
+      const resized = !!node && scrollPort(node) !== revealedPort;
+      if (!view && node && !playerScrolled && (fresh || resized ? !controlVisible(node) : !shownPart(node)) && node.getClientRects().length) {
         // The panel resets its scroll in a passive effect when it mounts; reveal after that, or the reset undoes it.
         cancelAnimationFrame(revealFrame);
-        revealFrame = requestAnimationFrame(() => { revealedTarget.current = node; reveal(node); });
+        revealFrame = requestAnimationFrame(() => {
+          revealedTarget.current = node;
+          reveal(node);
+          revealedPort = scrollPort(node);
+        });
       }
       const target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
         (targetTab ? visibleControl(tabEntry(targetTab)) : null) ?? (guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research" ? visibleControl(".panel-reopen") : null);
@@ -437,8 +452,8 @@ export function CampaignHintButton() {
 /** The Launch Week tutorial's steps: run, walk the incident through its fix, then skip the settled week. */
 const LAUNCH_FLOW = /^(launch-open|launch-week|launch-research|launch-first-incident|launch-db-incident|launch-end-week|application|unrouted|database|recovery|draining|investigate|failure|activation-.+)$/;
 const LAUNCH_STEP_TITLES: Record<string, string> = {
-  "launch-open": "Open the doors", "launch-week": "Keep the week running", "launch-first-incident": "Your servers are overloading",
-  "launch-db-incident": "Your database is overloading", "launch-end-week": "Skip to the end of the week", "launch-research": "Spend your research point",
+  "launch-open": "Open the doors", "launch-week": "Keep the week running", "launch-first-incident": "Inspect the App Server",
+  "launch-db-incident": "Inspect the database", "launch-end-week": "Skip to the end of the week", "launch-research": "Spend your research point",
   database: "Upgrade the database", recovery: "Recovering", draining: "Recovering", investigate: "Check the readings", failure: "A server failed",
 };
 function launchStepTitle(reason: string, action?: string): string {

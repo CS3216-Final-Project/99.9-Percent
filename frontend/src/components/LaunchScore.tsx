@@ -5,6 +5,7 @@ import { ninesOf, uptimePct } from "@/game/format";
 import { num } from "@/game/format";
 import type { ChapterEnd } from "@/game/chapterCompletion";
 import { ChapterEndFoot } from "./ChapterEndFoot";
+import { COUNT_WORDS } from "./useChapterBar";
 import { Modal } from "./ui";
 
 /**
@@ -16,7 +17,7 @@ export default function LaunchScore({ campaign, end, onClose }: { campaign: Camp
   const c = campaign;
   const uptime = campaignUptime(c) ?? 0;
   const nines = ninesOf(uptime);
-  const text = nines >= 5 ? "a perfect five nines" : nines === 0 ? "under one nine" : nines === 1 ? "one nine" : nines === 2 ? "two nines" : "three nines";
+  const text = nines >= 5 ? "a perfect five nines" : nines === 0 ? "under one nine" : `${COUNT_WORDS[nines]} nine${nines === 1 ? "" : "s"}`;
   const lost = c.cumulative.failed + c.cumulative.rejected;
   const result = `Launch Week: ${uptimePct(uptime)} uptime (${text}), ${num(lost)} requests lost - 99.99%`;
   const copy = () => {
@@ -24,10 +25,10 @@ export default function LaunchScore({ campaign, end, onClose }: { campaign: Camp
   };
   return <Modal title="Launch Week complete" icon={{ kind: "go", name: "goal" }} onClose={onClose}>
     <p>One week of launch traffic and its first database overload. Your architecture, cash and research pick carry into the campaign.</p>
-    <dl className="purchase-tiles">
-      <div><dt>Uptime</dt><dd><strong>{uptimePct(uptime)}</strong></dd></div>
-      <div><dt>Score</dt><dd><strong>{text}</strong></dd></div>
-      <div><dt>Requests lost</dt><dd><strong>{num(lost)}</strong></dd></div>
+    <dl className="launch-score">
+      <div><dt>Uptime</dt><dd>{uptimePct(uptime)}</dd></div>
+      <div><dt>Score</dt><dd>{text.charAt(0).toUpperCase() + text.slice(1)}</dd></div>
+      <div><dt>Requests lost</dt><dd>{num(lost)}</dd></div>
     </dl>
     <ChapterEndFoot end={end} extra={<button className="btn btn-quiet" onClick={copy}>{copied ? "Copied" : "Copy result"}</button>} />
   </Modal>;

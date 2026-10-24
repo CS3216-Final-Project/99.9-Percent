@@ -77,7 +77,7 @@ test("Complete Opening stays hidden until the week is over, even with the milest
   await expect(guidance.getByRole("button", { name: "Complete Opening" })).toHaveCount(0);
 });
 
-test("a week that ends with research unspent asks for the pick, then scores and continues to Chapter 2", async ({ page, withoutRoom }) => {
+test("a week that ends with research unspent asks for the pick, then scores and continues to Chapter 1", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await bootPanel(page, endedUnspent());
   const guidance = page.getByRole("region", { name: "Guided Mode guidance" });
@@ -227,7 +227,7 @@ test("the incident's spotlight frames the Database below the growing checklist",
   // The incident banner and recovery progress push Inspect equipment below the panel's fold, and the panel scrolls
   // itself back to the top when the incident opens: the step must still bring its control into view and frame it.
   await boot(page, runUntil(newGame(7, "lw-2", 2), x => !!x.campaign!.incident));
-  await expect(tutorial(page)).toContainText("Inspect it");
+  await expect(tutorial(page)).toContainText("Choose Database under Inspect equipment");
   const lit = page.locator("[data-spotlight]");
   await expect(lit).toHaveAccessibleName("Database");
   await expect(lit).toBeInViewport({ ratio: 1 });

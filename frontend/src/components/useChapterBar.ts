@@ -28,5 +28,7 @@ export function useChapterBar() {
   const guidance = campaignGuidance(game);
   const reason = advance && !advance.ready ? guidance.notice ?? guidance.lockReason : null;
   const goal = replaying ? "Replay Launch Week on a practice company; your real company is paused." : campaignObjective(game);
-  return { replaying, tutorialDone, chapters, current, total, advance, reason, goal };
+  // Launch Week opens the campaign unnumbered, so the first numbered chapter is Chapter 1 everywhere.
+  const label = replaying ? "Practice" : current.number === 0 ? "Prologue" : `Chapter ${current.number} of ${total}`;
+  return { replaying, tutorialDone, chapters, current, total, advance, reason, goal, label };
 }

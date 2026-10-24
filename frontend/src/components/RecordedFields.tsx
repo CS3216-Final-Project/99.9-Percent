@@ -3,8 +3,11 @@ import { Fragment } from "react";
 type Value = unknown;
 const dollars = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 
-/** Engine bookkeeping a player never needs: identifiers, versions and copied configuration. */
-const HIDDEN = /^(id|.*Id|.*Version|version|configuration|snapshot|snapshotStep)$/;
+/**
+ * Engine bookkeeping a player never needs: identifiers, versions and copied configuration. The acknowledgement flag
+ * is the dialog's own state, so it would only ever read "no" while the dialog asks for it.
+ */
+const HIDDEN = /^(id|.*Id|.*Version|version|configuration|snapshot|snapshotStep|acknowledged)$/;
 /** Shares and rates the engine stores in basis points (6,000 means 60%). */
 const BASIS_POINTS = /(BasisPoints|[Hh]itRate|[Hh]itRateUsed|[Tt]arget|[Ww]armth|[Ww]armthUsed|[Ww]armthAfterStep|[Ss]hare)$/;
 

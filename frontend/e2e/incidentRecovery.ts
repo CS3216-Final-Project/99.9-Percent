@@ -51,7 +51,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   const summary = report.locator("summary", { hasText: "View technical details" });
   await page.keyboard.press("Tab"); await expect(summary).toBeFocused();
   await page.keyboard.press("Shift+Tab"); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
-  await press(summary); await expect(report.getByRole("table")).toBeVisible();
+  await press(summary); await expect(report.getByRole("table", { name: "Recorded incident evidence by game second" })).toBeVisible();
   for (const explanation of recovered.campaign!.reports.at(-1)!.explanations) await expect(report).toContainText(explanation);
   await expect(report.locator(".report-events")).toContainText("Recovery progress");
   expect(await report.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);

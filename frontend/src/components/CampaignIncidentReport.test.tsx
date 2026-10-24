@@ -5,7 +5,8 @@ import { useGame } from "@/game/store";
 import { newGame } from "@/sim";
 import { act as decide, tick } from "@/sim/__tests__/spikeFixtures";
 import { CampaignOverlays } from "./CampaignUI";
-import { CampaignIncidentReport } from "./CampaignIncidentReport";
+import { CampaignIncidentReport, CapacityAfterFailure } from "./CampaignIncidentReport";
+import { reliabilityOutcome } from "@/game/__fixtures__/reliabilityOutcome";
 import { describeEvents, reportWindowStart } from "@/game/reportEvents";
 
 let serial = 0;
@@ -54,7 +55,7 @@ it("retains every explanation, observation and event behind one collapsed techni
   fireEvent.click(screen.getByText("View technical details"));
   for (const explanation of r.explanations) expect(detail.textContent).toContain(explanation);
   const from = reportWindowStart(r);
-  for (const m of r.snapshots.filter(m => m.step >= from)) expect(within(screen.getByRole("table")).getByRole("rowheader", { name: String(m.step) })).toBeTruthy();
+  for (const m of r.snapshots.filter(m => m.step >= from)) expect(within(screen.getByRole("table", { name: "Recorded incident evidence by game second" })).getByRole("rowheader", { name: String(m.step) })).toBeTruthy();
   expect(detail.querySelectorAll(".report-events li")).toHaveLength(describeEvents(r.events.filter(e => e.step >= from)).length);
   expect(detail.querySelector("pre")).toBeNull();
 });
@@ -84,4 +85,32 @@ it("does not confuse a new recovered incident with the previous presentation rec
   const next = structuredClone(game); next.campaign!.reports.at(-1)!.id += "-next";
   act(() => useGame.setState({ game: next }));
   expect(screen.getByRole("dialog", { name: "System Recovered!" })).toBeTruthy();
+});
+
+it("says the load balancer kept sending traffic to a failed server instead of claiming enough capacity", () => {
+  const c = reliabilityOutcome(true).campaign!, f = c.reliabilityStage!.fault!;
+  render(<CampaignIncidentReport report={c.reports.find(r => r.snapshots.some(m => m.reliability?.faultId === f.id))!} />);
+  const block = screen.getByRole("region", { name: "Capacity after the failure" });
+  expect(within(block).getByText("Sent to the failed App 3").nextSibling?.textContent).toBe("800 req/s, all failed");
+  expect(block.textContent).toContain(`every request the load balancer sent to App 3 failed until it was restored at game second ${f.restoredStep}.`);
+  expect(block.textContent).toContain("The healthy servers could serve their own 1,600 req/s; the errors came from the failed server staying in the route.");
+  expect(block.textContent).not.toContain("enough capacity");
+  // A failed server does no work, so the evidence table never credits it with capacity.
+  fireEvent.click(screen.getByText("View technical details", { exact: true }));
+  const evidence = screen.getByRole("table", { name: "Recorded incident evidence by game second" });
+  expect(evidence.textContent).toContain("App 3: 800 / 0 · 0 (failed)");
+  expect(evidence.textContent).not.toMatch(/App 3: [\d,]+ \/ 1,600 · [\d,]+ \(failed/);
+});
+
+it.each([
+  [{ toFailed: 800, stopped: { step: 21, by: "rerouted" as const, admitted: 2400, capacity: 3200 } }, "failed until it was taken out of the route at game second 21", "the errors came from the failed server staying in the route."],
+  [{ toFailed: 800, stopped: { step: 21, by: "rerouted" as const, admitted: 2400, capacity: 1600 } }, "failed until it was taken out of the route at game second 21", "the healthy servers could serve 1,600 of the 2,400 req/s admitted, so they stayed overloaded"],
+  [{ toFailed: 800, stopped: null, capacity: 1200 }, "failed until it was taken out of the route or restored", "overloaded by their own share as well"],
+  [{ toFailed: 0, stopped: null }, "No traffic reached the failed server", "had enough capacity for everything admitted"],
+  [{ toFailed: 0, stopped: null, capacity: 1600 }, "could not serve everything admitted", "stayed overloaded until capacity came back"],
+])("tells the capacity story the evidence supports (%#)", (props, first, second) => {
+  render(<CapacityAfterFailure step={20} admitted={2400} capacity={3200} failed={["app-3"]} {...props} />);
+  const block = screen.getByRole("region", { name: "Capacity after the failure" });
+  expect(block.textContent).toContain(first); expect(block.textContent).toContain(second);
+  expect(!!within(block).queryByText("Sent to the failed App 3")).toBe(props.toFailed > 0);
 });

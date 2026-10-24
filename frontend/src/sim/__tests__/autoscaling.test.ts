@@ -44,7 +44,7 @@ it("limits suppress triggers, and manual capacity can prevent incidents without 
 it("autoscaling leaves write-heavy DB capacity and cache effectiveness unchanged",()=>{
  let g=untilOffset(spikeCompany(true,"write-heavy"),24);expect(g.campaign!.dbCapacity).toBe(3000);expect(g.campaign!.readCache!.target).toBe(6000);expect(g.campaign!.snapshot.data!.effectiveHitRateUsed).toBe(6000);
  expect(g.campaign!.snapshot.db.demand).toBeGreaterThan(3000);expect(g.campaign!.incident).not.toBeNull();
- g=act(g,{type:"set_traffic_limit",enabled:true});while(g.phase!=="review")g=tick(g);expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("does not increase database capacity");
+ g=act(g,{type:"set_traffic_limit",enabled:true});while(g.phase!=="review")g=tick(g);expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("adds no database capacity");
 });
 it("save/resume retains provisioning, routing, cooldown and deterministic continuation",()=>{
  let g=spikeCompany();for(let i=0;i<68;i++){
