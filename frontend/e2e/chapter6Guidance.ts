@@ -16,7 +16,7 @@ export async function chapter6Preparation(page: Page, touch = false) {
   game = tick(act(game, { type: "set_routing", mode: "single", targets: ["app-1"] }));
   game = act(game, { type: "enter_combined", sequence });
   await bootChapter6(page, game);
-  const cue = page.getByRole("dialog", { name: "Chapter 6: Prepare for full demand", exact: true });
+  const cue = page.getByRole("dialog", { name: "Chapter 5: Prepare for full demand", exact: true });
   await expectCueColours(cue, "prepare");
   await expect(cue.locator("h3 > .icon")).toBeInViewport({ ratio: 1 });
   await expect(cue.getByRole("button", { name: "Dismiss chapter guidance", exact: true })).toBeInViewport({ ratio: 1 });
@@ -53,8 +53,8 @@ export async function chapter6Preparation(page: Page, touch = false) {
   expect(after.campaign!.limit).toBeNull(); expect(after.campaign!.combinedStage!.readinessSteps).toBe(5);
   expect(after.campaign!.incident).toBeNull();
   const panel = page.getByRole("region", { name: "Guided Mode guidance", exact: true });
-  await expect(panel).toContainText("Full-demand readiness: 5 / 5");
-  await expect(panel.getByRole("region", { name: "Final Campaign goals", exact: true })).toContainText("0 / 3");
+  await expect(panel).toContainText("Serve full demand steadily: 5 / 5 s");
+  await expect(panel.getByRole("region", { name: "Final goals", exact: true })).toContainText("0 / 3");
   await page.clock.resume(); await page.reload();
   await press(page.getByRole("button", { name: "Continue company", exact: true })); await expectRoom(page);
   await expect(cue).toHaveCount(0);

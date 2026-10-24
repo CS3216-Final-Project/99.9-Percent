@@ -114,7 +114,7 @@ it("postmortem keeps all actual causes and observations reachable while leading 
   fireEvent.click(screen.getByRole("button",{name:"View Incident Report"}));
   const report=screen.getByRole("dialog",{name:"Incident postmortem"});
   for(const explanation of game.campaign!.reports[0].explanations) expect(report.textContent).toContain(explanation);
-  fireEvent.click(within(report).getByText("View Technical Details"));
+  fireEvent.click(within(report).getByText("View technical details"));
   expect(within(report).getByRole("button",{name:"Continue company"})).toBeTruthy();
 });
 it.each([

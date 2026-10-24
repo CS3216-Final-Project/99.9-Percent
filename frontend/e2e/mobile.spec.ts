@@ -42,8 +42,8 @@ for (const [offset, name, tone] of [[0, "Prepare", "prepare"], [8, "Spike 1", "p
     const game = offset ? untilOffset(name === "Respond" ? initial : tick(act(initial, { type: "set_traffic_limit", enabled: true })), offset) : initial;
     await page.route("**/api/**", route => route.abort()); await seedSave(page, game); await page.goto("/");
     await page.getByRole("button", { name: "Continue company", exact: true }).tap(); await expectRoom(page);
-    if (name === "Respond") await page.getByRole("dialog", { name: "Chapter 4: Spike 1", exact: true }).getByRole("button", { name: "Got it", exact: true }).tap();
-    const cue = page.getByRole("dialog", { name: `Chapter 4: ${name}`, exact: true });
+    if (name === "Respond") await page.getByRole("dialog", { name: "Chapter 3: Spike 1", exact: true }).getByRole("button", { name: "Got it", exact: true }).tap();
+    const cue = page.getByRole("dialog", { name: `Chapter 3: ${name}`, exact: true });
     await expectCueColours(cue, tone); await page.screenshot({ path: info.outputPath(`${name.replaceAll(" ", "-")}-320-touch.png`) });
     const before = (await savedGame(page)).campaign!.step;
     await cue.getByRole("button", { name: "Got it", exact: true }).tap(); await expect(cue).toHaveCount(0);
@@ -224,7 +224,7 @@ test("Opening prevention recognition unlocks Scaling after touch review and relo
  await seedSave(page,g);await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  await expectRoom(page);
  const review=page.getByRole("dialog",{name:"Prevention review"});
- await expect(review).toContainText("Verified prevention is a valid Opening completion path");
+ await expect(review).toContainText("Prevention and recovery are both valid ways to complete Opening");
  await review.getByRole("button",{name:"Continue company",exact:true}).tap();
  const recognition=page.getByRole("dialog",{name:"First growth challenge handled"});
  await expect(recognition).toContainText("You spotted the bottleneck early and prevented an outage.");
@@ -502,7 +502,7 @@ test("traffic spikes: touch selects an instance after retirement leaves an ID ga
  await page.getByRole("button",{name:"Menu",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Menu",exact:true})).toBeVisible();
 });
 
-test("combined: touch scorecard, completed guidance, technology inspection and paused reload",async({page,withoutRoom})=>{await withoutRoom();const {finishedCompany}=await import("../src/sim/__tests__/combinedFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,finishedCompany());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Grow the Company");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Grow the Company"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await page.getByRole("region",{name:"Run scorecard"}).getByText("View Technical Details",{exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("50,000");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"See how it ended",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
+test("combined: touch scorecard, completed guidance, technology inspection and paused reload",async({page,withoutRoom})=>{await withoutRoom();const {finishedCompany}=await import("../src/sim/__tests__/combinedFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,finishedCompany());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Grow the Company");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Grow the Company"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await page.getByRole("region",{name:"Run scorecard"}).getByText("View technical details",{exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("50,000");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"See how it ended",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
 
 for(const width of [390,320]) test(`Campaign UX: the touch opening and secondary controls fit at ${width}px`,async({page})=>{
  // The room is drawn in software, and its labels settle only as the camera brings each machine above the panel.
@@ -654,7 +654,7 @@ for (const milestone of ["wave", "recovery", "final"] as const)
     const game = milestone === "wave" ? wave : milestone === "recovery" ? chapter6Tick(wave, 24) : promotionRiskCompany();
     const title = milestone === "wave" ? "Growth wave 1" : milestone === "recovery" ? "Recover at full demand" : "Final checks";
     await bootChapter6(page, game);
-    const cue = page.getByRole("dialog", { name: `Chapter 6: ${title}`, exact: true });
+    const cue = page.getByRole("dialog", { name: `Chapter 5: ${title}`, exact: true });
     await expectCueColours(cue, milestone === "wave" ? "pressure" : "recovery");
     await expect(cue.locator("h3 > .icon")).toBeInViewport({ ratio: 1 });
     await expect(cue.getByRole("button", { name: "Dismiss chapter guidance", exact: true })).toBeInViewport({ ratio: 1 });

@@ -65,7 +65,7 @@ it("transfers selected Network to Remove, immediate Confirm, accepted Run and cl
   };
   accept(); expect(gold()[0].textContent).toContain("Remove traffic limit"); fireEvent.click(gold()[0]);
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
-  expect(screen.queryByRole("dialog", { name: /^Chapter 6:/ })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: /^Chapter 5:/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   expect(useGame.getState().game).toBe(initial); expect(gold()).toHaveLength(0);
   accept(); fireEvent.click(gold()[0]); fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
@@ -80,5 +80,5 @@ it("yields to real running incidents and mandatory growth reviews", () => {
   expect(wave.phase).toBe("incident");
   useGame.setState({ game: wave, ready: true, started: true, running: true, onboarding: false, tour: null });
   render(<CampaignAttentionHost><CampaignHeader/><CampaignPanel/><CampaignControls/></CampaignAttentionHost>);
-  expect(screen.queryByRole("dialog", { name: /^Chapter 6:/ })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: /^Chapter 5:/ })).toBeNull();
 });

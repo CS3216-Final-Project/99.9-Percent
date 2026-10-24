@@ -40,10 +40,10 @@ describe("phone edition", () => {
     expect(document.querySelector('.app[data-edition="phone"]')).not.toBeNull();
 
     const guided = within(choices).getByRole("region", { name: "Guided Mode" });
-    expect(guided.textContent).toContain("Launch Week and 2 guided chapters");
+    expect(guided.textContent).toContain("Launch Week and Scaling & Routing");
     const challenge = within(choices).getByRole("region", { name: "Challenge Mode" });
     expect(challenge.textContent).toContain("Complete Scaling & Routing in Guided Mode to unlock.");
-    expect(within(challenge).getByRole("button", { name: "Finish both guided chapters to unlock" })).toHaveProperty("disabled", true);
+    expect(within(challenge).getByRole("button", { name: "Finish Scaling & Routing to unlock" })).toHaveProperty("disabled", true);
 
     const consent = screen.getByRole("region", { name: /Help improve/ });
     expect(within(consent).getByRole("button", { name: "OK" })).toBeTruthy();
@@ -110,7 +110,7 @@ describe("desktop edition", () => {
     expect(useGame.getState().scope).toBe(FULL_SCOPE);
     expect(document.documentElement.dataset.edition).toBeUndefined();
     expect(document.querySelector("[data-edition]")).toBeNull();
-    expect(screen.getByRole("region", { name: "Choose how you want to play" }).textContent).toContain("Unlocks after Chapter 5: Stay Online.");
+    expect(screen.getByRole("region", { name: "Choose how you want to play" }).textContent).toContain("Unlocks after Chapter 4: Stay Online.");
     // The same check that finds nothing on the phone finds the desktop's account, avatar and feedback controls.
     expect(screen.queryAllByRole("button", { name: desktopOnly }).length).toBeGreaterThanOrEqual(3);
   });

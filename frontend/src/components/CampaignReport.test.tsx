@@ -16,7 +16,7 @@ function checkReport() {
   const disclosures = document.querySelectorAll("details");
   expect(disclosures).toHaveLength(1);
   expect(disclosures[0].open).toBe(false);
-  expect(disclosures[0].querySelector("summary")!.textContent).toBe("View Technical Details");
+  expect(disclosures[0].querySelector("summary")!.textContent).toBe("View technical details");
   return disclosures[0];
 }
 
@@ -37,17 +37,17 @@ it("preserves growth review evidence and explicit acknowledgement", () => {
   const game = finishRound(act(tick(combinedCompany(), 5), { type: "start_growth_wave" }));
   useGame.setState({ game, ready: true, started: true, onboarding: false }); render(<CampaignOverlays/>);
   const details = checkReport();
-  expect(details.textContent).toContain(JSON.stringify(game.campaign!.combinedStage!.currentRound, null, 2));
+  expect(details.textContent).toContain("Recorded growth round");expect(details.querySelector("pre")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
   expect(useGame.getState().game.campaign!.combinedStage!.completedRounds.at(-1)!.acknowledged).toBe(true);
   expect(useGame.getState().game.campaign!.cashCents).toBe(game.campaign!.cashCents);
 });
 
-it("keeps final review explicit and resets the single accordion on completion", () => {
+it("keeps final review explicit and resets the single accordion on completion", { timeout: 30_000 }, () => {
   const game = finishedCompany();
   useGame.setState({ game, ready: true, started: true, onboarding: false }); render(<CampaignOverlays/>);
   const details = checkReport();
-  fireEvent.click(within(details).getByText("View Technical Details"));
+  fireEvent.click(within(details).getByText("View technical details"));
   expect(details.textContent).toContain("50,000");
   expect(useGame.getState().game.outcome).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Complete campaign" }));

@@ -32,7 +32,7 @@ export async function campaignReportJourney(page: Page, info: TestInfo, kind: Re
   if (kind === "spikes") await expect(dialog.locator(".campaign-incident-report > section")).toContainText(["Both traffic spikes ended", "rejected"]);
   await page.evaluate(async () => { await document.fonts.ready; });
   await page.screenshot({ path: info.outputPath(`${kind}-summary.png`) });
-  const disclosure = dialog.getByText("View Technical Details", { exact: true });
+  const disclosure = dialog.getByText("View technical details", { exact: true });
   if (touch) await disclosure.tap(); else await disclosure.click();
   await expect(details).toHaveAttribute("open", "");
   await expect(button).toBeInViewport({ ratio: 1 });

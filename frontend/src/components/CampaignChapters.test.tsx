@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { useGame } from "@/game/store";
-import { newGame } from "@/sim";
+import { applyAction, newGame, type Action, type GameState } from "@/sim";
 import { advanceSteps } from "@/sim/step";
 import { DEFAULT_META, saveGame, saveMeta } from "@/game/persist";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
@@ -27,6 +27,28 @@ it.each([
   expect(within(bar).queryByRole("list", { name: "Chapter progress" })).toBeNull();
   expect(within(bar).getByLabelText("Current objective").textContent).not.toBe("");
   expect(within(bar).getAllByRole("button", { name: "View chapters" })).toHaveLength(1);
+});
+
+/** A Launch Week company that has just continued from its score card into Scaling & Routing. */
+function afterLaunchWeek(): GameState {
+  const act = (g: GameState, a: Action) => { const r = applyAction(g, a); if (!r.ok) throw new Error(r.message); return r.state; };
+  const until = (g: GameState, done: (g: GameState) => boolean) => { for (let i = 0; i < 200 && !done(g); i++) g = g.phase === "review" ? act(g, { type: "acknowledge_review" }) : advanceSteps(g, 1).state; return g; };
+  let g = act(until(newGame(7, "lw", 2), x => !!x.campaign!.incident), { type: "start_db_upgrade" });
+  g = act(until(g, x => !!x.campaign!.launchWeek!.researchEarned && x.phase === "management"), { type: "pick_launch_tech", tech: "caching" });
+  g = until(g, x => x.campaign!.launchWeek!.completedStep !== null && x.phase === "management");
+  return act(g, { type: "acknowledge_milestone", enterScaling: true });
+}
+
+it("numbers the chapters after Launch Week from 1, as the score card promised", { timeout: 30_000 }, () => {
+  useGame.setState({ game: afterLaunchWeek(), started: true, ready: true });
+  render(<CampaignChapters />);
+  const bar = screen.getByRole("region", { name: "Guided Mode chapters" });
+  expect(within(bar).getByLabelText("Current chapter").textContent).toBe("Scaling & Routing");
+  expect(bar.textContent).toContain("Chapter 1 of 5");
+  fireEvent.click(within(bar).getByRole("button", { name: "View chapters" }));
+  const overview = screen.getByRole("dialog", { name: "Guided Mode chapters" });
+  expect(overview.textContent).toContain("then play five chapters");
+  expect(within(overview).getAllByRole("heading", { level: 3 }).map(h => h.textContent)).toEqual(["Launch Week", "Scaling & Routing", "Data Strategy", "Traffic Spikes & Autoscaling", "Stay Online", "Grow the Company"]);
 });
 
 it("keeps Next absent before eligibility, then advances through the existing paused action", () => {

@@ -14,11 +14,11 @@ test("Chapter 6 guidance: wave and recovery use real boundaries without repeatin
   await installClock();
   const game = act(tick(combinedCompany(), 5), { type: "start_growth_wave" });
   await bootChapter6(page, tick(game, 23));
-  const wave = page.getByRole("dialog", { name: "Chapter 6: Growth wave 1", exact: true });
+  const wave = page.getByRole("dialog", { name: "Chapter 5: Growth wave 1", exact: true });
   await expectCueColours(wave, "pressure"); await wave.getByRole("button", { name: "Got it", exact: true }).click();
   await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
-  const recover = page.getByRole("dialog", { name: "Chapter 6: Recover at full demand", exact: true });
+  const recover = page.getByRole("dialog", { name: "Chapter 5: Recover at full demand", exact: true });
   await expectCueColours(recover, "recovery"); await recover.getByRole("button", { name: "Got it", exact: true }).click();
   await page.getByRole("button", { name: "Hint", exact: true }).click();
   const hint = page.getByRole("dialog", { name: "Hint", exact: true }); await expect(hint).toContainText("full-demand");
@@ -26,7 +26,7 @@ test("Chapter 6 guidance: wave and recovery use real boundaries without repeatin
   await expect(page.locator(".campaign-gold-attention")).toHaveAccessibleName("Run");
   await page.locator(".campaign-gold-attention").click(); await page.clock.runFor(4000);
   await expect(page.getByRole("dialog", { name: "Growth outcome", exact: true })).toBeVisible();
-  await expect(page.getByRole("dialog", { name: /^Chapter 6:/ })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: /^Chapter 5:/ })).toHaveCount(0);
   await expect(page.locator(".campaign-gold-attention")).toHaveCount(0);
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   expect((await savedGame(page)).campaign!.combinedStage!.completedRounds).toHaveLength(1);
@@ -35,7 +35,7 @@ test("Chapter 6 guidance: wave and recovery use real boundaries without repeatin
 test("Chapter 6 guidance: final review owns completion and is never bypassed", async ({ page, installClock }) => {
   await installClock(); const game = finishedCompany(); await bootChapter6(page, game);
   await expect(page.getByRole("dialog", { name: "Final campaign review", exact: true })).toBeVisible();
-  await expect(page.getByRole("dialog", { name: /^Chapter 6:/ })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: /^Chapter 5:/ })).toHaveCount(0);
   expect((await savedGame(page)).outcome).toBeNull();
   await page.getByRole("button", { name: "Complete campaign", exact: true }).click();
   expect((await savedGame(page)).outcome).toBe("won");
@@ -50,7 +50,7 @@ test("Chapter 6 guidance: post-review restoration precedes replacement capacity 
   for (let i = 0; i < 15 && game.phase !== "review"; i++) game = tick(game);
   expect(game.phase).toBe("review"); await bootChapter6(page, game);
   await page.getByRole("dialog", { name: "Incident postmortem", exact: true }).getByRole("button", { name: "Continue company", exact: true }).click();
-  const cue = page.getByRole("dialog", { name: /^Chapter 6:/ });
+  const cue = page.getByRole("dialog", { name: /^Chapter 5:/ });
   await cue.getByRole("button", { name: "Got it", exact: true }).click();
   const gold = page.locator(".campaign-gold-attention");
   const accept = async (name: RegExp) => {

@@ -10,7 +10,7 @@ The home screen offers two modes, each with its own save.
 
 | Mode | Internal name | Clock | Goal |
 | --- | --- | --- | --- |
-| Guided Mode | `campaign` | Continuous game seconds, settled every 60 seconds as an operating week | Learn infrastructure concepts through a walkthrough and six chapters |
+| Guided Mode | `campaign` | Continuous game seconds, settled every 60 seconds as an operating week | Learn infrastructure concepts through Launch Week (Chapter 0) and five chapters |
 | Challenge Mode | `classic` | Weekly turns, 26 weeks | Reach 50,000 users before week 26 without going bankrupt |
 
 Challenge Mode is locked until the first five Guided Mode chapters (Opening to Stay Online) are complete.
@@ -54,7 +54,9 @@ Finishing requires the explicit Finish walkthrough action.
 A completed player can replay it from View chapters, Menu > How to play or the home screen; a replay runs on a practice company and restores the original company on Finish or Exit.
 The lesson list and its control restrictions are specified in [UI_DESIGN.md](UI_DESIGN.md#screen-structure).
 
-### Chapter 1: Opening
+### Opening (version-1 companies)
+
+Launch Week replaced the Opening for new companies, so the chapters after it are numbered from 1.
 
 The company starts with $20,000, one 1,000 req/s application, one 600 ops/s database, 300 incoming req/s, 2,000 displayed users and four engineers.
 At step 4 demand rises to 800 req/s, so the database is overloaded while the application has headroom.
@@ -75,7 +77,7 @@ There are two ways to complete the Opening; both award the same `opening-stabili
 
 The prevention rules are in `frontend/src/sim/openingPrevention.ts`.
 
-### Chapter 2: Scaling & Routing
+### Chapter 1: Scaling & Routing
 
 Growth to 1,400 req/s is scheduled three steps after the company is ready: management phase, no active incident, empty queues and purchased database capacity of at least 2,000 ops/s.
 A separate confirmation lets the player accept the growth with current database capacity; it grants nothing and overload and bankruptcy stay possible.
@@ -86,7 +88,7 @@ Balanced routing splits integer demand equally across the selected apps in numer
 
 Continue to Data Strategy unlocks once growth has been consumed, queues are empty, no incident is active and every report is acknowledged.
 
-### Chapter 3: Data Strategy
+### Chapter 2: Data Strategy
 
 Entry deterministically picks a read-heavy (80% reads) or write-heavy (20% reads) profile from the saved RNG.
 Growth to 2,400 req/s is scheduled three steps after readiness.
@@ -100,7 +102,7 @@ For example, 2,400 processed requests with a warm 60% cache produce 1,152 hits a
 The other major response is the 3,000 ops/s database tier.
 Observe contrasting workload optionally switches the profile once after growth.
 
-### Chapter 4: Traffic Spikes & Autoscaling
+### Chapter 3: Traffic Spikes & Autoscaling
 
 Entry requires consumed data growth, positive cash, stable management, empty queues and acknowledged reports, and grants one research point for the autoscaling technology.
 For entry at step `n`, demand is 4,000 req/s during `[n+8, n+28)` and `[n+48, n+68)` and 2,400 req/s otherwise.
@@ -116,14 +118,14 @@ It watches routed processed work divided by routed capacity:
 Manually installed or vertically upgraded apps are never retired, and there are no refunds.
 After both pulses, five stable baseline steps complete the chapter, which the player then acknowledges.
 
-### Chapter 5: Stay Online
+### Chapter 4: Stay Online
 
 The player explicitly starts a temporary app failure test.
 The target app fails eight steps later and restores itself after twenty failed steps, unless the free three-step manual restoration finishes first.
 Health Checks detect the failure on a later step, and a reserved spare is promoted after a delay; failover reroutes traffic but adds no capacity.
 Actual reports and five stable observations after restoration precede the explicit reliability acknowledgement.
 
-### Chapter 6: Grow the Company
+### Chapter 5: Grow the Company
 
 Entry requires acknowledged reliability, stable full-demand management at 2,400 req/s, empty queues, healthy apps, positive cash and finished actions and reports.
 Registered users grow from 2,000 to 20,000, 35,000 and 50,000 across three announced waves.

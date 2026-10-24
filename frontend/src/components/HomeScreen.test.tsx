@@ -34,7 +34,7 @@ it("shows Guided Mode first with Challenge Mode locked until the chapters are do
   expect(guided.textContent).toContain("six infrastructure chapters");
   // The locked teaser names the goal in words and has nothing to press.
   expect(challenge.textContent).toContain("Grow to 50,000 users in 26 weeks on your own.");
-  expect(challenge.textContent).toContain("Unlocks after Chapter 5: Stay Online.");
+  expect(challenge.textContent).toContain("Unlocks after Chapter 4: Stay Online.");
   expect(challenge.textContent).not.toContain("You are on Chapter");
   expect(within(challenge).queryAllByRole("button")).toHaveLength(0);
   expect(useGame.getState().mode).toBe("campaign");

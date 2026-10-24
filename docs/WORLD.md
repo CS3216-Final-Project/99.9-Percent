@@ -47,6 +47,7 @@ View mode, or `V`, also sees the building from the avatar.
 
 Both views take the mouse, as in a game: moving it looks around, and in first person the centre dot is where a left click walks or inspects.
 `Esc` only gives the cursor back, with a card to look around again or exit.
+A click during the browser's brief post-Escape cooldown retries once the cooldown ends; opening a dialog, leaving the view from the avatar or returning home cancels that pending retry.
 A dialog or a guide's card gives the cursor back by itself, while an inspection's reading does not: the next left click puts it away.
 Where the browser will not hand over the mouse, moving it towards an edge turns the view, and the hint at the top has Exit.
 On a touch screen, drag to look around.

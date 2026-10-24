@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { exportGame, rawLegacySave, rawSave } from "@/game/persist";
+import { CHALLENGE_LOCKED } from "@/game/scope";
 import { useGame } from "@/game/store";
 import { saveTextFile as download } from "@/lib/download";
 import { Icon } from "./icons";
@@ -39,7 +40,7 @@ export function SaveFiles() {
         <button type="button" className="btn btn-quiet" onClick={() => setPending(null)}>Cancel import</button></div></div>}
     {legacy !== null && <div className="menu-sub" role="group" aria-labelledby={legacyTitle}>
       <h5 id={legacyTitle}>Pre-update save</h5>
-      <p className="menu-note">Your original save is preserved. Resume a copy in Challenge Mode or export the original file.{!challengeUnlocked && " Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode before resuming this save."}</p>
+      <p className="menu-note">Your original save is preserved. Resume a copy in Challenge Mode or export the original file.{!challengeUnlocked && ` ${CHALLENGE_LOCKED.slice(0, -1)} before resuming this save.`}</p>
       <div className="menu-actions">
         <button type="button" className="btn" onClick={() => download("pre-update-save.json", legacy)}><Icon name="download" size={20} />Export pre-update save</button>
         <button type="button" className="btn" disabled={!challengeUnlocked} onClick={() => { setConfirmLegacy(true); setPending(null); }}><Icon name="play" size={20} />Resume pre-update save</button>

@@ -7,7 +7,7 @@ it("distinguishes requested restoration from natural return using recorded event
   const manual = reliabilityOutcome(true).campaign!, natural = reliabilityOutcome().campaign!;
   expect(reliabilityLesson(manual)?.recovered).toContain("requested a free server restore");
   expect(reliabilityLesson(natural)?.recovered).toContain("returned automatically");
-  expect(reliabilityLesson(natural)?.happened).toContain("a service incident was recorded");
+  expect(reliabilityLesson(natural)?.happened).toContain("so an incident opened");
   expect(reliabilityLesson(natural)?.recovered).not.toContain("Automatic failover");
   const before = JSON.stringify(natural); reliabilityLesson(natural); expect(JSON.stringify(natural)).toBe(before);
 });
@@ -17,8 +17,8 @@ it("records actual spare promotion and substantial rejection without claiming it
   const lesson = reliabilityLesson(c)!;
   expect(lesson.recovered).toContain("Automatic failover brought a reserved spare");
   expect(lesson.recovered).toContain("Many incoming requests were turned away");
-  expect(lesson.improve).toContain("without relying on the traffic limit");
-  expect(lesson.happened).toContain("without opening a production incident");
+  expect(lesson.improve).toContain("without the traffic limit");
+  expect(lesson.happened).toContain("without opening an incident");
 });
 
 it("keeps historical explanations bounded and refuses unrelated older incident reports", () => {

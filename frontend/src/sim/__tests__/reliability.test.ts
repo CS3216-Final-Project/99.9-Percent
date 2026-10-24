@@ -37,7 +37,7 @@ it("manual inspection detects only the selected actual app without time or hidde
  const s=tick(act(reliabilityCompany(),{type:"arm_reliability"}),8),n=act(s,{type:"incident_inspect",equipment:"app",appId:"app-3"});expect(n.campaign!.step).toBe(s.campaign!.step);expect(n.campaign!.apps[2].detectedHealth).toBe("unhealthy");expect(n.campaign!.apps[1].detectedHealth).toBe("unknown");expect(n.campaign!.routing).toEqual(s.campaign!.routing);
 });
 it("manual restoration remains free and measured report/outcome acknowledgement is mandatory",()=>{
- let s=tick(act(reliabilityCompany(),{type:"arm_reliability"}),10);expect(s.phase).toBe("incident");const cash=s.campaign!.cashCents;s=act(s,{type:"restore_app",appId:"app-3"});expect(s.campaign!.cashCents).toBe(cash);s=tick(s,3);expect(s.phase).toBe("incident");expect(s.campaign!.apps[2].health).toBe("healthy");for(let i=0;i<10&&s.phase!=="review";i++)s=tick(s);expect(s.phase).toBe("review");expect(s.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("creates no capacity");s=act(s,{type:"acknowledge_review"});s=tick(s,5);expect(pendingReliability(s.campaign)).toBe(true);expect(tick(s)).toEqual(s);s=act(s,{type:"acknowledge_reliability"});expect(s.campaign!.reliabilityStage!.acknowledged).toBe(true);
+ let s=tick(act(reliabilityCompany(),{type:"arm_reliability"}),10);expect(s.phase).toBe("incident");const cash=s.campaign!.cashCents;s=act(s,{type:"restore_app",appId:"app-3"});expect(s.campaign!.cashCents).toBe(cash);s=tick(s,3);expect(s.phase).toBe("incident");expect(s.campaign!.apps[2].health).toBe("healthy");for(let i=0;i<10&&s.phase!=="review";i++)s=tick(s);expect(s.phase).toBe("review");expect(s.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("add no capacity");s=act(s,{type:"acknowledge_review"});s=tick(s,5);expect(pendingReliability(s.campaign)).toBe(true);expect(tick(s)).toEqual(s);s=act(s,{type:"acknowledge_reliability"});expect(s.campaign!.reliabilityStage!.acknowledged).toBe(true);
 });
 it("conserves failed deliveries and charges existing installed infrastructure",()=>{
  let s=act(reliabilityCompany(),{type:"arm_reliability"});for(let i=0;i<13;i++){s=tick(s);const c=s.campaign!;expect(c.cumulative.admitted).toBe(c.cumulative.successful+c.cumulative.failed+c.dbBacklog+c.apps.reduce((n,a)=>n+a.backlog,0));}expect(s.campaign!.ledger.appNumerator).toBeGreaterThan(0);
@@ -122,8 +122,8 @@ it.each([500,900])("evaluates %s req/s against 600 surviving capacity after dete
   g=tick(g,4);expect(g.phase).toBe("incident");expect(g.campaign!.incident!.stableSteps).toBe(0);
   g=tick(act(g,{type:"set_traffic_limit",enabled:true}),25);
   expect(g.phase).toBe("review");const report=g.campaign!.reports.at(-1)!;
-  expect(report.explanations.join(" ")).toContain("600 req/s against 900 req/s");
-  expect(report.explanations.join(" ")).toContain("correct rerouting still left the applications overloaded");
+  expect(report.explanations.join(" ")).toContain("could serve 600 req/s, and 900 req/s was admitted");
+  expect(report.explanations.join(" ")).toContain("stayed overloaded even though routing was correct");
   expect(report.explanations.join(" ")).not.toContain('"appId":');
  }
 });

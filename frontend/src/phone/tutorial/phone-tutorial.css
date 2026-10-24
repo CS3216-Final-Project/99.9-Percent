@@ -14,7 +14,8 @@
   --phone-coach-gap: 6px;
   --phone-coach-inset: max(8px, env(safe-area-inset-left), env(safe-area-inset-right));
 }
-.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial) {
+/* Launch Week's step card is portalled to <body>, outside the app root, so it is matched from the document. */
+.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card), :root:has(body > .tour-card.launch-tutorial) .phone-app[data-edition="phone"] {
   --phone-coach: calc(var(--phone-coach-height) + var(--phone-coach-gap));
 }
 
@@ -37,6 +38,8 @@
 [data-edition="phone"] .tour-card.launch-tutorial .tour-explanation { margin-top: 4px; }
 [data-edition="phone"] .tour-card.launch-tutorial .tour-foot { position: sticky; bottom: 0; margin-top: 4px; padding-bottom: 6px; background: var(--paper); }
 [data-edition="phone"] .tour-card.launch-tutorial .tour-foot .btn { min-height: 44px; min-inline-size: 6.5rem; justify-content: center; }
+/* Text that scrolls under the sticky foot fades out instead of ending in a hard cut. */
+[data-edition="phone"] .tour-card.launch-tutorial .tour-foot::before, [data-edition="phone"] .tour[data-docked] .tour-foot::before { content: ""; position: absolute; inset: -14px 0 auto; height: 14px; background: linear-gradient(to bottom, transparent, var(--paper)); pointer-events: none; }
 
 /* An open dock menu opens over the strip; the step returns when it closes. Other guides keep their strip over the
    Views menu, whose tabs they can point at, and give way only to the speed menu. */
@@ -74,17 +77,19 @@ body:has(.phone-app[data-edition="phone"] .phone-dock details.time-menu[open]) .
  * those two needs win over the room's share.
  */
 [data-edition="phone"] { --phone-guide-sheet-min: 124px; }
-.app.phone-app[data-edition="phone"][data-sheet="half"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial) {
+.app.phone-app[data-edition="phone"][data-sheet="half"]:has(> .tour[data-docked] .tour-card),
+:root:has(body > .tour-card.launch-tutorial) .app.phone-app[data-edition="phone"][data-sheet="half"] {
   --phone-sheet: max(var(--phone-guide-sheet-min), min(calc(var(--phone-room) * 0.5), calc(var(--phone-room) - 41dvh)));
 }
 
 /* Short screens: the same strip, a little tighter. */
 @media (max-height: 700px) {
-  [data-edition="phone"] { --phone-coach-height: 136px; }
+  [data-edition="phone"] { --phone-coach-height: 132px; }
 }
 
 /* The dock's menus open above the strip, so a guide never covers the speed or Navigation menu it points at. */
-.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial) .phone-dock .dock-panel {
+.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card) .phone-dock .dock-panel,
+:root:has(body > .tour-card.launch-tutorial) .phone-app[data-edition="phone"] .phone-dock .dock-panel {
   bottom: calc(100% + 10px + var(--phone-coach));
   max-height: min(440px, calc(100dvh - var(--phone-top) - var(--phone-dock) - var(--phone-coach) - 16px));
 }

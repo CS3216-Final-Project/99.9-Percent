@@ -50,7 +50,7 @@ it.each(["streak","outcome","acknowledged"])("reload preserves prevention %s wit
 it("history excludes purchases made after qualification",()=>{
  let g=qualified();g=act(g,{type:"acknowledge_prevention_review"});g=act(g,{type:"add_server"});
  useGame.setState({view:"history"});show(g);
- fireEvent.click(screen.getByRole("tab",{name:/^Incidents/}));
+ fireEvent.click(screen.getByRole("tab",{name:/^Incidents/}));fireEvent.click(screen.getByRole("button",{name:/Opening prevention outcome/}));
  const history=screen.getByRole("region",{name:"Historical Opening prevention outcome"});
  expect(within(history).getAllByText(/Database upgrade:/)).toHaveLength(1);expect(history.textContent).not.toContain("still pending at completion");expect(history.textContent).toContain("$3,000.00");
 });

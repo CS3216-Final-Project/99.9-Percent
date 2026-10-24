@@ -18,12 +18,12 @@ it("shows the Scaling headroom blocker without disabling experimentation",()=>{
 });
 it("shows unmet Data requirements and keeps workload contrast optional",()=>{
  const g=dataCompany();g.campaign!.dbBacklog=1;g.campaign!.snapshot.latencyMs=500;show(g);
- expect(met("queues")).toBe("false");expect(met("healthy")).toBe("false");expect(guidance().textContent).toContain("Workload contrast is optional");
+ expect(met("queues")).toBe("false");expect(met("healthy")).toBe("false");expect(guidance().textContent).toContain("The read cache and database upgrades are optional");
  expect(screen.queryByRole("button",{name:/Continue to Traffic Spikes/})).toBeNull();
 });
 it("counts stable spike observations and waits for an explicit acknowledgement",()=>{
  let g=act(spikeCompany(false),{type:"set_traffic_limit",enabled:true});g=untilOffset(g,68);show(g);
- expect(guidance().textContent).toContain("Stable baseline observations: 1 / 5");expect(guidance().textContent).toContain("Autoscaling is optional");
+ expect(guidance().textContent).toContain("Keep normal traffic stable: 1 / 5 s");expect(guidance().textContent).toContain("Autoscaling is optional");
  renderAct(()=>useGame.setState({game:tick(g,4)}));
  expect(useGame.getState().game.campaign!.spikeStage!.acknowledged).toBe(false);
  fireEvent.click(within(screen.getByRole("dialog",{name:"Spike response handled"})).getByRole("button",{name:"Stay in this chapter"}));

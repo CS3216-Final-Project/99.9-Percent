@@ -22,7 +22,7 @@ test("Opening prevention: fresh player verifies prevention and explicitly unlock
  await page.getByRole("button",{name:/Remove traffic limit/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await progress.getByRole("button",{name:"Inspect Application"}).click();await progress.getByRole("button",{name:"Inspect Database"}).click();
  await advanceCampaignStep(page,{seconds:2});
- await expect(progress).toContainText("Stable service: 2 / 5");await expect(guidance.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","true");c=(await savedGame(page)).campaign!;
+ await expect(progress).toContainText("Stable service: 2 / 5");await expect(guidance.locator('[data-requirement="company-checks"]')).toHaveAttribute("data-met","true");c=(await savedGame(page)).campaign!;
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);await expect(progress).toContainText("Stable service: 2 / 5");
  await advanceCampaignStep(page,{seconds:3});
  const outcome=page.getByRole("dialog",{name:"Prevention review"});await expect(outcome).toContainText("First growth prevented");

@@ -62,6 +62,11 @@ function lockPointer(el: HTMLElement, refused: () => void): void {
 
 /** How long to wait for the pointer to lock before taking the browser's silence as a no. */
 const LOCK_WAIT_MS = 1500;
+/**
+ * How long after the player lets go of the pointer a browser may refuse to lock it again (Chrome waits about a
+ * second). A refusal inside this window is the browser's pause, not a browser that cannot lock.
+ */
+const RELOCK_PAUSE_MS = 1100;
 
 /** Tell the page the pointer's state changed: locked, given back, or never to be had here. */
 const lockNews = () => window.dispatchEvent(new Event("nn:look-lock"));
@@ -219,13 +224,29 @@ export function ViewRig() {
       lockNews();
     };
     // Some browsers neither lock nor say no: no lock soon after asking counts as no, until a lock does arrive.
-    let waiting = 0;
+    let waiting = 0, retry = 0;
+    const cancelTake = () => { window.clearTimeout(waiting); window.clearTimeout(retry); };
+    const canTake = () => {
+      const s = useGame.getState();
+      // Existing nonmodal chapter guidance does not block an explicit request to look around.
+      return s.started && s.walking && fromAvatar(s.viewpoint) && !s.view && !document.querySelector(`:is(${DIALOG}):not([aria-modal="false"])`);
+    };
+    // Asking again too soon after Escape is refused, so ask once the pause is over; the click still counts then.
+    const declined = () => {
+      if (!canTake()) return cancelTake();
+      const pause = unlockedAt + RELOCK_PAUSE_MS - performance.now();
+      window.clearTimeout(retry);
+      if (pause > 0) retry = window.setTimeout(tryLock, pause);
+      else refuse();
+    };
     const tryLock = () => {
-      lockPointer(canvas, refuse);
+      if (!canTake()) return cancelTake();
+      window.clearTimeout(retry);
+      lockPointer(canvas, declined);
       window.clearTimeout(waiting);
       waiting = window.setTimeout(() => {
-        if (document.pointerLockElement !== canvas) refuse();
-      }, LOCK_WAIT_MS);
+        if (canTake() && document.pointerLockElement !== canvas) refuse();
+      }, Math.max(0, unlockedAt + RELOCK_PAUSE_MS - performance.now()) + LOCK_WAIT_MS);
     };
     mouse.take = () => {
       if (finePointer()) tryLock();
@@ -235,7 +256,8 @@ export function ViewRig() {
     const stopTaking = useGame.subscribe((s, prev) => {
       const now = s.started && s.walking && fromAvatar(s.viewpoint);
       const was = prev.started && prev.walking && fromAvatar(prev.viewpoint);
-      if (now && !was) mouse.take();
+      if (!now || s.view) cancelTake();
+      else if (!was) mouse.take();
     });
     const down = (e: PointerEvent) => {
       if (!looking() || viewNow.locked || (e.pointerType === "mouse" && e.button !== 0)) return;
@@ -297,6 +319,7 @@ export function ViewRig() {
     };
     const lockChanged = () => {
       const locked = document.pointerLockElement === canvas;
+      if (locked && !canTake()) { cancelTake(); letGoOfPointer(); return; }
       if (viewNow.locked && !locked) {
         unlockedAt = performance.now();
         const state = useGame.getState();
@@ -308,7 +331,7 @@ export function ViewRig() {
       viewNow.locked = locked;
       if (locked) {
         // The browser said yes: whatever happens to the lock later, it was not refused.
-        window.clearTimeout(waiting);
+        cancelTake();
         viewNow.lockRefused = false;
         viewNow.quietPause = false;
       }
@@ -350,10 +373,10 @@ export function ViewRig() {
     };
     // A dialog or a guide's card opening over the room needs the cursor, so the mouse is let go to reach it.
     const dialogs = new MutationObserver((records) => {
-      if (!viewNow.locked) return;
       for (const r of records)
         for (const n of r.addedNodes)
           if (n instanceof Element && (n.matches(DIALOG) || n.querySelector(DIALOG))) {
+            cancelTake();
             letGoOfPointer();
             return;
           }
@@ -362,7 +385,7 @@ export function ViewRig() {
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointermove", point);
     canvas.addEventListener("pointerleave", away);
-    document.addEventListener("pointerlockerror", refuse);
+    document.addEventListener("pointerlockerror", declined);
     window.addEventListener("pointermove", moveBy);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
@@ -378,8 +401,8 @@ export function ViewRig() {
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", point);
       canvas.removeEventListener("pointerleave", away);
-      document.removeEventListener("pointerlockerror", refuse);
-      window.clearTimeout(waiting);
+      document.removeEventListener("pointerlockerror", declined);
+      cancelTake();
       viewNow.pointing = null;
       viewNow.dragging = false;
       window.removeEventListener("pointermove", moveBy);

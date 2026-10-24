@@ -117,7 +117,14 @@ test("the database incident is taught from the same strip, and End week rushes t
   await boot(page, runUntil(newGame(7, "phone-lw-incident", 2), s => !!s.campaign!.incident));
   // The incident pauses the company and the strip points at the database, never at the app server.
   await expect(launchStep(page)).toBeVisible();
-  await expect(launchStep(page)).toContainText(/database/i);
+  await expect(launchStep(page)).toContainText("Choose Database under Inspect equipment");
+  // The sheet stands above the strip and scrolls the Database inspect control into view, lit and uncovered.
+  const lit = page.locator("[data-spotlight]");
+  await expect(lit).toHaveCount(1);
+  await expect(lit).toHaveAttribute("data-tutorial", "inspect-db");
+  await expect(lit).toBeInViewport({ ratio: 1 });
+  expect(await uncovered(lit)).toBe(true);
+  expect(overlaps(await box(launchStep(page)), await box(lit))).toBe(false);
   await expectDocked(page, 390);
   await page.screenshot({ path: `${SHOTS}/phone-launch-incident-390x844.png` });
   const saved = await savedGame(page);

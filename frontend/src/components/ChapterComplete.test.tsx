@@ -197,6 +197,26 @@ it("ends Launch Week with Stay, Continue and Copy result; Continue enters Scalin
   expect(useGame.getState().game.campaign!.scaling).toBeTruthy();
 });
 
+it("shows four nines and copies the correctly named game from the chapter-end score card", async () => {
+  const game = finishedLaunchWeek();
+  game.campaign!.cumulative = { ...game.campaign!.cumulative, successful: 19998, failed: 2, rejected: 0 };
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  try {
+    show(game);
+    const card = screen.getByRole("dialog", { name: "Launch Week complete" });
+    expect(within(card).getByText("Four nines")).toBeTruthy();
+    await act(async () => { fireEvent.click(button(card, "Copy result")); });
+    expect(writeText).toHaveBeenCalledWith("Launch Week: 99.990% uptime (four nines), 2 requests lost - 99.99%");
+    expect(button(card, "Stay in this chapter")).toBeTruthy();
+    expect(button(card, "Continue to Scaling & Routing")).toBeTruthy();
+  } finally {
+    if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
+});
+
 it("keeps a Launch Week company that stayed out of Scaling & Routing after a reload", () => {
   show(finishedLaunchWeek());
   fireEvent.click(button(screen.getByRole("dialog", { name: "Launch Week complete" }), "Stay in this chapter"));

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { GameMode } from "@/game/persist";
+import { CHALLENGE_LOCKED, UNLOCK_CHAPTER } from "@/game/scope";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { Callout } from "./ui";
@@ -17,7 +18,7 @@ const NAME: Record<GameMode, string> = { campaign: "Guided Mode", classic: "Chal
  * Another edition can pass its own lock and wording; by default Challenge Mode stays locked until the Guided Mode
  * company acknowledges its final chapter.
  */
-export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.", lockedLabel = "Finish Chapter 5 to unlock", about = ABOUT[to] }: {
+export function ModeSwitch({ to, locked: lockedOverride, lockedText = CHALLENGE_LOCKED, lockedLabel = `Finish Chapter ${UNLOCK_CHAPTER} to unlock`, about = ABOUT[to] }: {
   to: GameMode; locked?: boolean; lockedText?: string; lockedLabel?: string; about?: string;
 }) {
   const switchMode = useGame((s) => s.switchMode);

@@ -8,7 +8,7 @@ export async function chapter6FinanceJourney(page: Page, info: TestInfo, touch =
   const press = async (button: ReturnType<Page["getByRole"]>) => touch ? button.tap() : button.click();
   await press(page.getByRole("button", { name: "Continue company", exact: true })); await expectRoom(page);
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
-  await press(page.getByRole("dialog", { name: "Chapter 6: Prepare for full demand", exact: true }).getByRole("button", { name: "Got it", exact: true }));
+  await press(page.getByRole("dialog", { name: "Chapter 5: Prepare for full demand", exact: true }).getByRole("button", { name: "Got it", exact: true }));
   const panel = page.getByRole("region", { name: "Guided Mode guidance", exact: true });
   await expect(panel).toContainText("Capacity funding blocked");
   await expect(panel).toContainText("at most $7,200 per period but costs $7,600");

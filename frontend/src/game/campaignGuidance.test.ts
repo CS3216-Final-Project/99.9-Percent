@@ -34,11 +34,11 @@ it("reactive report then milestone actions require explicit acknowledgement",()=
  g=decision(g,{type:"acknowledge_milestone"});expect(campaignGuidance(g).stage).toBe("Scaling & Routing");
 });
 it("preventive limit explains full-demand qualification and leaves removal actionable",()=>{
- const g=prevented(),m=campaignGuidance(g);expect(m.prevention).toBe(true);expect(m.notice).toBe("Traffic limiting prevents full-demand qualification. Remove the limit and serve the full 800 req/s to continue the prevention path.");expect(row(g,"admission").met).toBe(false);expect(row(g,"app-inspection").met).toBe(false);expect(applyAction(g,{type:"set_traffic_limit",enabled:false}).ok).toBe(true);
+ const g=prevented(),m=campaignGuidance(g);expect(m.prevention).toBe(true);expect(m.notice).toBeNull();expect(row(g,"admission").hint).toContain("A traffic limit turns users away");expect(row(g,"admission").met).toBe(false);expect(row(g,"app-inspection").met).toBe(false);expect(applyAction(g,{type:"set_traffic_limit",enabled:false}).ok).toBe(true);
 });
 it("new inspections and observations update prevention without auto-completing it",()=>{
  let g=prevented();g=decision(g,{type:"incident_inspect",equipment:"app"});g=decision(g,{type:"incident_inspect",equipment:"db"});g=decision(g,{type:"set_traffic_limit",enabled:false});
- g=advanceSteps(g,2).state;expect(row(g,"observations").label).toBe("Stable observations: 2 / 5");expect(row(g,"db-inspection").met).toBe(true);expect(campaignGuidance(g).notice).toBeNull();
+ g=advanceSteps(g,2).state;expect(row(g,"observations").label).toBe("Keep service stable: 2 / 5 s");expect(row(g,"db-inspection").met).toBe(true);expect(campaignGuidance(g).notice).toBeNull();
  expect(campaignGuidance(g).requirements.some(r=>r.id==="recovery")).toBe(false);expect(campaignGuidance(g).optional).toContain("both valid paths");
  g=advanceSteps(g,3).state;expect(campaignGuidance(g).pendingAction?.label).toBe("Review outcome");expect(g.campaign!.openingMilestone).toBeNull();expect(g.campaign!.openingRecovered).toBe(false);
  g=decision(g,{type:"acknowledge_prevention_review"});expect(campaignGuidance(g).pendingAction?.label).toBe("Complete Opening");expect(campaignGuidance(g).stage).toBe("Opening");expect(row(g,"recovery").met).toBe(true);expect(row(g,"review").met).toBe(true);expect(row(g,"milestone").met).toBe(false);
@@ -75,11 +75,11 @@ it("Data optional investments and contrast are never mandatory",()=>{
 it("Data omits generic waiting copy but explains blocked readiness",()=>{
  const g=dataCompany();g.campaign!.dataStage!.consumed=false;g.campaign!.dataStage!.dueStep=999999;
  expect(campaignGuidance(g).waiting).toBeNull();expect(JSON.stringify(campaignGuidance(g))).not.toContain("999999");
- g.campaign!.dbBacklog=1;expect(campaignGuidance(g).waiting).toBeNull();expect(campaignGuidance(g).notice).toContain("empty queues");
+ g.campaign!.dbBacklog=1;expect(campaignGuidance(g).waiting).toBeNull();expect(campaignGuidance(g).notice).toContain("queues are empty");
 });
 it("Spikes observes completion and acknowledgement without requiring automation",()=>{
  let g=spikeCompany(false);g=act(g,{type:"set_traffic_limit",enabled:true});g=untilOffset(g,68);
- expect(row(g,"pulses").met).toBe(true);expect(row(g,"observations").label).toBe("Stable baseline observations: 1 / 5");expect(campaignGuidance(g).pendingAction).toBeNull();expect(campaignGuidance(g).optional).toContain("optional");
+ expect(row(g,"pulses").met).toBe(true);expect(row(g,"observations").label).toBe("Keep normal traffic stable: 1 / 5 s");expect(campaignGuidance(g).pendingAction).toBeNull();expect(campaignGuidance(g).optional).toContain("optional");
  g=tick(g,4);expect(campaignGuidance(g).pendingAction?.label).toBe("Review spike recognition");expect(g.campaign!.spikeStage!.acknowledged).toBe(false);
  g=act(g,{type:"acknowledge_spikes"});expect(row(g,"recognition").met).toBe(true);expect(campaignGuidance(g).notice).toContain("available through Next in the chapter bar");
 });
@@ -123,4 +123,44 @@ it("explains a public-action solvent affordability trap without claiming a guara
  expect(campaignGuidance(g).notice).toContain("Solvency alone does not guarantee");
  g=decision(g,{type:"set_traffic_limit",enabled:false});while(g.campaign!.step<420)g=advanceSteps(g,1).state;
  expect(g.campaign!.cashCents).toBeGreaterThan(0);expect(g.campaign!.snapshot.admitted).toBe(800);expect(g.campaign!.settlements.at(-1)!.netCents).toBe(-10000);expect(canEnterData(g)).toBe(false);
+});
+
+function launchUntil(g:GameState,done:(g:GameState)=>boolean){for(let i=0;i<200&&!done(g);i++)g=g.phase==="review"?decision(g,{type:"acknowledge_review"}):advanceSteps(g,1).state;return g;}
+const current=(g:GameState)=>campaignGuidance(g).current?.id;
+it("Launch Week steps follow the week's script, and Scaling starts at its own first step",()=>{
+ let g=newGame(7,"lw",2);
+ expect(campaignGuidance(g).steps.map(r=>r.id)).toEqual(["recovery","review","research","launch","milestone"]);
+ expect(current(g)).toBe("recovery");
+ g=launchUntil(g,x=>!!x.campaign!.incident);g=decision(g,{type:"start_db_upgrade"});
+ g=launchUntil(g,x=>x.phase==="review");expect(current(g)).toBe("review");
+ g=decision(g,{type:"acknowledge_review"});
+ // Before the free point arrives, the pick is something the clock brings.
+ expect(current(g)).toBe("research");expect(row(g,"research").wait).toBe(true);
+ g=launchUntil(g,x=>!!x.campaign!.launchWeek!.researchEarned&&x.phase==="management");
+ expect(row(g,"research").wait).toBeUndefined();
+ g=decision(g,{type:"pick_launch_tech",tech:"caching"});expect(current(g)).toBe("launch");
+ g=launchUntil(g,x=>x.campaign!.launchWeek!.completedStep!==null&&x.phase==="management");expect(current(g)).toBe("milestone");
+ g=decision(g,{type:"acknowledge_milestone",enterScaling:true});
+ const m=campaignGuidance(g);
+ expect(m.stage).toBe("Scaling & Routing");
+ // Nothing already done before the chapter opened is listed as one of its steps.
+ expect(m.steps.map(r=>r.id)).toEqual(["headroom","growth"]);
+ expect(m.steps.some(r=>/Opening/.test(r.label))).toBe(false);
+});
+
+it("keeps an overdue Launch Week incident and unread report incomplete",()=>{
+ let g=launchUntil(newGame(7,"late-guidance",2),x=>x.campaign!.launchWeek!.completedStep!==null);
+ expect(g.campaign!.incident).not.toBeNull();expect(g.campaign!.reports).toHaveLength(0);
+ expect(row(g,"recovery").met).toBe(false);expect(row(g,"review").met).toBe(false);expect(current(g)).toBe("recovery");
+ g=launchUntil(decision(g,{type:"start_db_upgrade"}),x=>x.phase==="review");
+ expect(row(g,"recovery").met).toBe(true);expect(row(g,"review").met).toBe(false);expect(current(g)).toBe("review");
+ g=decision(g,{type:"acknowledge_review"});expect(row(g,"review").met).toBe(true);
+});
+
+it("still skips recovery and review for an incident-free Launch Week",()=>{
+ // Boundary fixture: a company already has enough database headroom, so no report can exist to acknowledge.
+ const prepared=newGame(7,"prevented-guidance",2);prepared.campaign!.dbCapacity=2600;
+ const g=launchUntil(prepared,x=>x.campaign!.launchWeek!.completedStep!==null);
+ expect(g.campaign!.incident).toBeNull();expect(g.campaign!.reports).toHaveLength(0);
+ expect(row(g,"recovery").met).toBe(true);expect(row(g,"review").met).toBe(true);
 });

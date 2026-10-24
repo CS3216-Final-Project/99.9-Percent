@@ -27,7 +27,7 @@ test("Opening legacy prevention: later history survives and recognition unlocks 
   await expect(recognition.locator("details")).toHaveCount(1);
   await expect(recognition.locator("details")).not.toHaveAttribute("open");
   await page.screenshot({path:info.outputPath("prevention-recognition-320.png")});
-  await recognition.getByText("View Technical Details", { exact: true }).click();
+  await recognition.getByText("View technical details", { exact: true }).click();
   await expect(recognition.locator("details")).toHaveAttribute("open", "");
   const before = (await savedGame(page)).campaign!;
   expect(before.step).toBe(20); expect(before.apps).toHaveLength(2);

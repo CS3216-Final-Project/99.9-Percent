@@ -336,7 +336,7 @@ export interface TabItem<Id extends string> {
  * selected tab is the only one in the Tab order.
  *
  * The "segmented" variant is a compact two-or-three-way switch whose selection thumb slides between
- * segments.
+ * segments. The "pills" variant is History's small strip of rounded tabs.
  * `shared` is shown under the tabs whichever is selected, and stays mounted when the tab changes.
  */
 export function Tabs<Id extends string>({
@@ -354,13 +354,13 @@ export function Tabs<Id extends string>({
   value: Id;
   onChange: (id: Id) => void;
   children: ReactNode;
-  variant?: "strip" | "segmented";
+  variant?: "strip" | "segmented" | "pills";
   className?: string;
   shared?: ReactNode;
 }) {
   const base = useId();
   const buttons = useRef(new Map<Id, HTMLButtonElement>());
-  const segmented = variant === "segmented";
+  const segmented = variant === "segmented", pills = variant === "pills";
   const at = tabs.findIndex((t) => t.id === value);
   const select = (index: number) => {
     const tab = tabs[(index + tabs.length) % tabs.length];
@@ -392,9 +392,9 @@ export function Tabs<Id extends string>({
     select(target);
   };
   return (
-    <div className={`tabset${segmented ? " is-segmented" : ""}${className ? ` ${className}` : ""}`}>
+    <div className={[segmented ? "tabset is-segmented" : pills ? "" : "tabset", className].filter(Boolean).join(" ")}>
       <div
-        className={segmented ? "segmented" : "tab-strip"}
+        className={segmented ? "segmented" : pills ? "tabs" : "tab-strip"}
         role="tablist"
         aria-label={label}
         onKeyDown={onKeyDown}
@@ -419,7 +419,7 @@ export function Tabs<Id extends string>({
             data-tab={t.id}
             onClick={() => onChange(t.id)}
           >
-            <Icon name={t.icon} size={segmented ? 18 : 20} />
+            <Icon name={t.icon} size={segmented ? 18 : pills ? 16 : 20} />
             <span>{t.label}</span>
             {!!t.badge && (
               <span className="segment-badge">

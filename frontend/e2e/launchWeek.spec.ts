@@ -73,11 +73,11 @@ test("Complete Opening stays hidden until the week is over, even with the milest
   await withoutRoom();
   await bootPanel(page, recovered());
   const guidance = page.getByRole("region", { name: "Guided Mode guidance" });
-  await expect(guidance.getByRole("region", { name: "Guided Mode requirements" })).toContainText("1/4");
+  await expect(guidance.getByRole("region", { name: "Guided Mode requirements" })).toContainText("2/5");
   await expect(guidance.getByRole("button", { name: "Complete Opening" })).toHaveCount(0);
 });
 
-test("a week that ends with research unspent asks for the pick, then scores and continues to Chapter 2", async ({ page, withoutRoom }) => {
+test("a week that ends with research unspent asks for the pick, then scores and continues to Chapter 1", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await bootPanel(page, endedUnspent());
   const guidance = page.getByRole("region", { name: "Guided Mode guidance" });
@@ -197,7 +197,7 @@ test("the research sheet previews each option and spends the pick", async ({ pag
   await expect(sheet).toBeHidden();
 });
 
-test("the score card reports nines, copies the result and continues to Chapter 2", async ({ page }) => {
+test("the score card reports nines, copies the result and continues to Chapter 1", async ({ page }) => {
   await boot(page, nearlyDone());
   const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
@@ -221,4 +221,26 @@ test("the score card reports nines, copies the result and continues to Chapter 2
   const saved = (await savedGame(page)).campaign!;
   expect(saved.openingMilestone?.acknowledged).toBe(true);
   expect(saved.scaling).not.toBeNull();
+});
+
+test("the incident's spotlight frames the Database below the growing checklist", async ({ page }) => {
+  // The incident banner and recovery progress push Inspect equipment below the panel's fold, and the panel scrolls
+  // itself back to the top when the incident opens: the step must still bring its control into view and frame it.
+  await boot(page, runUntil(newGame(7, "lw-2", 2), x => !!x.campaign!.incident));
+  await expect(tutorial(page)).toContainText("Choose Database under Inspect equipment");
+  const lit = page.locator("[data-spotlight]");
+  await expect(lit).toHaveAccessibleName("Database");
+  await expect(lit).toBeInViewport({ ratio: 1 });
+  const [hole, chip] = await Promise.all([page.locator(".tour-hole").boundingBox(), lit.boundingBox()]);
+  expect(Math.abs(hole!.y + 5 - chip!.y)).toBeLessThan(2);
+  expect(Math.abs(hole!.x + 5 - chip!.x)).toBeLessThan(2);
+});
+
+test("a week that ends mid-incident lets the player fix it before the score card", async ({ page }) => {
+  await boot(page, runUntil(newGame(7, "lw-late", 2), x => x.campaign!.launchWeek!.completedStep !== null));
+  await expect(page.getByRole("dialog", { name: "Launch Week complete" })).toHaveCount(0);
+  await openPanelTab(page, "Actions");
+  const upgrade = page.locator('.campaign-panel .campaign-action-card[data-campaign-action="Upgrade database"] > button.act');
+  await expect(upgrade).toBeEnabled();
+  await expect(page.locator(".campaign-panel")).not.toContainText("Acknowledge the pending review or milestone first.");
 });

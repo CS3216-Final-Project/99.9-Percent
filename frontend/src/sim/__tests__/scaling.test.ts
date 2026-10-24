@@ -81,8 +81,8 @@ describe("continuous scaling campaign",()=>{
   g=act(g,{type:"scale_up",appId:"app-1"});expect(g.campaign!.cashCents).toBe(before-200000);
   expect(applyAction(g,{type:"scale_up",appId:"app-1"}).ok).toBe(false);g=ticks(g,2);expect(g.campaign!.apps[0].capacity).toBe(1000);
   g=step(g).state;expect(g.campaign!.apps[0].capacity).toBe(1600);expect(g.campaign!.dbCapacity).toBe(db);
-  g=advanceSteps(g,40).state;expect(g.phase).toBe("review");expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("app-1");
-  expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("contributed");expect(validateEnvelope(makeEnvelope(g)).status).toBe("ok");
+  g=advanceSteps(g,40).state;expect(g.phase).toBe("review");expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("Capacity changed for App 1");
+  expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("helped recovery");expect(validateEnvelope(makeEnvelope(g)).status).toBe("ok");
  });
  it("horizontal installation and LB deployment do not balance until configuration activates",()=>{
   let g=ticks(headroom(),6);g=ticks(act(g,{type:"add_server"}),2);
@@ -93,7 +93,7 @@ describe("continuous scaling campaign",()=>{
   expect(g.campaign!.snapshot.instances!.map(a=>a.demand)).toEqual([700,700]);expect(g.campaign!.apps[1].backlog).toBe(0);
   const copy=JSON.parse(JSON.stringify(g));expect(advanceSteps(copy,40)).toEqual(advanceSteps(g,40));
   g=advanceSteps(g,40).state;expect(g.phase).toBe("review");expect(validateEnvelope(makeEnvelope(g)).status).toBe("ok");
-  const report=g.campaign!.reports.at(-1)!.explanations.join(" ");expect(report).toContain("remained unrouted");expect(report).toContain("Routing changed");
+  const report=g.campaign!.reports.at(-1)!.explanations.join(" ");expect(report).toContain("received no traffic");expect(report).toContain("Routing changed");
  });
  it("does not credit a late vertical upgrade for queues already drained by a traffic limit",()=>{
   let g=ticks(headroom(),6);expect(g.phase).toBe("incident");
@@ -101,7 +101,7 @@ describe("continuous scaling campaign",()=>{
   const effect=g.campaign!.trace.find(e=>e.type==="action-activated"&&e.data.targetId==="app-1")!;
   expect(effect.data.measuredRelief).toBe(false);expect(effect.data.withoutChangeAppBacklog).toBe(0);
   g=advanceSteps(g,30).state;expect(g.phase).toBe("review");
-  expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("no measured relief");
+  expect(g.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("no measurable difference");
  });
  it("retains a traffic limit and reports prevention without manufacturing an incident",()=>{
   let g=headroom();g=act(g,{type:"set_traffic_limit",enabled:true});g=ticks(g,8);

@@ -216,10 +216,10 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     "scaling-choice": "Growth needs preparation. Upgrade your database, or review the optional risk with Consider growth with current capacity.",
     "prevention-recorded": "Your prevention result is recorded. Review its verification and complete the Opening recognition to continue.",
     requirements: "Open View chapters to see what your company needs next.",
-    "launch-first-incident": "Your App Server is overloading. Inspect it to see its status turn red, then fix the cause.",
-    "launch-db-incident": "Your database is overloading. Inspect it to see the work piling up.",
+    "launch-first-incident": "Your App Server is overloading. Choose App Server under Inspect equipment to see its status turn red, then fix the cause.",
+    "launch-db-incident": "Your database is overloading. Choose Database under Inspect equipment to see the work piling up.",
     "launch-end-week": "Everything is stable again. Use End week to skip to the end of the week.",
-    "launch-open": "Your launch week starts now. Press Run - the first customers are arriving.",
+    "launch-open": "Your launch week starts now. Press Run: the first customers are arriving.",
     "launch-week-report": "A launch week settled. Lost or turned-away requests so far are counted.",
     "launch-research": "You earned a research point. Spend it on Caching or Autoscaling; each carries into later chapters.",
     "launch-surge": "The launch campaign is sending five times the traffic. Keep the service up until it ends.",
@@ -314,7 +314,7 @@ function baseAttention(game: GameState): AttentionDecision {
       const report = c.settlements.at(-1);
       if (report && c.step - report.step < 6) return run("launch-week-report", `Week ${report.period} report: ${c.cumulative.failed.toLocaleString("en-US")} requests lost so far.`);
       if (lw.surge && lw.surge.endedStep === null) return run("launch-surge", `The launch campaign is sending ${LW.surgeFactor}× traffic until game second ${lw.surge.endStep}.`);
-      return run("launch-week", `Launch week ${Math.min(LW.weeks, Math.floor(c.step / LW.periodSteps) + 1)} of ${LW.weeks}. The launch campaign surge arrives in week 3 - keep the service up.`);
+      return run("launch-week", "Keep the service up until the week ends.");
     }
   }
   if (c.incident && qualifies && !appOver && !dbOver) return run("recovery", `The latest readings meet recovery conditions. Healthy observations: ${c.incident.stableSteps} / ${Q.stableSteps}. Pausing adds no observations.`);

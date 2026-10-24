@@ -1,9 +1,9 @@
 import type { GameState } from "@/sim";
-import { chapterInScope, PHONE_SCOPE, scopeComplete, SCOPED_CHAPTERS, type ScopedChapter } from "@/game/scope";
+import { chapterInScope, NUMBERED_CHAPTERS, PHONE_SCOPE, scopeComplete, type ScopedChapter } from "@/game/scope";
 import { savedChapter, type Summary } from "@/components/homeModes";
 
 /** Guided Mode on a phone: Launch Week and the chapters up to the phone scope's last one. */
-export const PHONE_CHAPTERS = SCOPED_CHAPTERS.filter((id) => chapterInScope(PHONE_SCOPE, id)).length;
+export const PHONE_CHAPTERS = NUMBERED_CHAPTERS.filter((id) => chapterInScope(PHONE_SCOPE, id)).length;
 
 /** How the phone home screen describes a Guided Mode save: its chapter out of the phone's, or the campaign done. */
 export function phoneCampaignSummary(game: GameState | null, tutorialDone: boolean): Summary {

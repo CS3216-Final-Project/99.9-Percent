@@ -16,7 +16,7 @@ export const PHONE_MENU_TABS = ["run", "sound", "graphics"] as const satisfies r
 export type PhoneMenuTab = (typeof PHONE_MENU_TABS)[number];
 
 const PHONE_ABOUT = {
-  campaign: "Guided Mode teaches the basics through Launch Week and two guided chapters of continuous play.",
+  campaign: "Guided Mode teaches the basics through Launch Week and Scaling & Routing, in continuous play.",
   classic: `Challenge Mode is the ${BALANCE.maxTurns}-week weekly challenge: apply what you learned on your own.`,
 } as const;
 
@@ -112,5 +112,5 @@ function ChallengeActions({ onResume }: { onResume: () => void }) {
 function PhoneModeSwitch({ to }: { to: "campaign" | "classic" }) {
   const available = useGame(challengeAvailable);
   const scope = useGame((s) => s.scope);
-  return <ModeSwitch to={to} locked={to === "classic" && !available} lockedText={scope.challengeLocked} lockedLabel="Finish both guided chapters to unlock" about={PHONE_ABOUT[to]} />;
+  return <ModeSwitch to={to} locked={to === "classic" && !available} lockedText={scope.challengeLocked} lockedLabel="Finish Scaling & Routing to unlock" about={PHONE_ABOUT[to]} />;
 }

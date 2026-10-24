@@ -185,7 +185,9 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+.phone-app[data-edition="phone"] .phone-chapter-count { gap: 2px; }
 .phone-app[data-edition="phone"] .phone-chapter-count small { font-size: var(--text-xs); opacity: .75; }
+.phone-app[data-edition="phone"] .phone-chapter-count svg { align-self: center; }
 .phone-app[data-edition="phone"] .phone-chapter-text { flex: 1 1 auto; min-width: 0; display: grid; gap: 1px; }
 .phone-app[data-edition="phone"] .phone-chapter-text h2 {
   overflow: hidden;

@@ -2,8 +2,8 @@ import type { Action, GameState } from "@/sim";
 import { finishedChapter } from "./campaignChapters";
 
 /**
- * How much of the game an edition offers. The desktop edition plays everything; the phone edition plays Chapter 0,
- * the Opening and Scaling & Routing of Guided Mode, then Challenge Mode. A scope only gates what the player can
+ * How much of the game an edition offers. The desktop edition plays everything; the phone edition plays Launch Week
+ * and Scaling & Routing of Guided Mode, then Challenge Mode. A scope only gates what the player can
  * reach: the chapters themselves, the simulation and the saves stay the same in every edition.
  */
 export interface PlayScope {
@@ -20,6 +20,17 @@ export interface PlayScope {
 export const SCOPED_CHAPTERS = ["opening", "scaling", "data", "spikes", "reliability", "combined"] as const;
 export type ScopedChapter = (typeof SCOPED_CHAPTERS)[number];
 
+/**
+ * The chapters a company plays after Launch Week (Chapter 0), numbered from 1. Launch Week replaced the Opening,
+ * which only a version-1 company still plays.
+ */
+export const NUMBERED_CHAPTERS = SCOPED_CHAPTERS.filter(id => id !== "opening");
+/** A chapter's number as the chapter bar shows it after Launch Week. */
+export const chapterNumber = (id: Exclude<ScopedChapter, "opening">) => NUMBERED_CHAPTERS.indexOf(id) + 1;
+/** Finishing Stay Online unlocks Challenge Mode. */
+export const UNLOCK_CHAPTER = chapterNumber("reliability");
+export const CHALLENGE_LOCKED = `Finish Chapter ${UNLOCK_CHAPTER}, Stay Online, in Guided Mode to unlock Challenge Mode.`;
+
 /** The action that moves a company into each chapter after the Opening. */
 const ENTRIES: Partial<Record<Action["type"], ScopedChapter>> = {
   enter_scaling: "scaling",
@@ -32,7 +43,7 @@ const ENTRIES: Partial<Record<Action["type"], ScopedChapter>> = {
 export const FULL_SCOPE: PlayScope = {
   id: "full",
   lastChapter: null,
-  challengeLocked: "Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.",
+  challengeLocked: CHALLENGE_LOCKED,
   endOfGuided: "",
 };
 

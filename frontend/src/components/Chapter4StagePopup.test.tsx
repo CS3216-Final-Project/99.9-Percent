@@ -16,14 +16,14 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ x: 10, y: 10, top: 10, left: 10, right: 54, bottom: 54, width: 44, height: 44, toJSON: () => ({}) });
 });
 afterEach(() => { cleanup(); setConfirming(null); vi.restoreAllMocks(); });
-const popup = () => screen.queryByRole("dialog", { name: /^Chapter 4:/ });
+const popup = () => screen.queryByRole("dialog", { name: /^Chapter 3:/ });
 const show = (offset = 0) => chapter4Stage(offset ? untilOffset(limited, offset) : initial)!;
 
 it.each([[0, "Prepare", "prepare"], [8, "Spike 1", "pressure"], [28, "Between spikes", "recovery"], [48, "Spike 2", "pressure"], [68, "Recover", "recovery"]] as const)("renders the small nonmodal %s cue once", (offset, title, tone) => {
   const model = show(offset);
   render(<StrictMode><Chapter4StagePopup model={model} /></StrictMode>);
   expect(popup()?.getAttribute("aria-modal")).toBe("false");
-  expect(popup()?.getAttribute("aria-label")).toBe(`Chapter 4: ${title}`);
+  expect(popup()?.getAttribute("aria-label")).toBe(`Chapter 3: ${title}`);
   expect(popup()?.getAttribute("data-tone")).toBe(tone);
   expect(document.querySelector(".modal-backdrop")).toBeNull();
   fireEvent.click(within(popup()!).getByRole("button", { name: "Got it" })); expect(popup()).toBeNull();
@@ -44,7 +44,7 @@ it("does not repeat a displayed cue on remount even before explicit dismissal", 
 });
 it("does not replay earlier stages when loading in the middle of the chapter", () => {
   render(<Chapter4StagePopup model={show(48)} />);
-  expect(popup()?.getAttribute("aria-label")).toBe("Chapter 4: Spike 2");
+  expect(popup()?.getAttribute("aria-label")).toBe("Chapter 3: Spike 2");
 });
 it("allows Escape without running the company or trapping focus", () => {
   const button = document.createElement("button"); document.body.append(button); button.focus();

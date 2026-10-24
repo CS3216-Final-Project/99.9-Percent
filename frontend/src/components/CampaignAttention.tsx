@@ -9,7 +9,7 @@ import { watchIdleAttention } from "./idleAttention";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
 import { Spotlight } from "./SpotOverlay";
-import { cardStyle, type Box, type Place } from "./spotlight";
+import { cardStyle, sameBox, type Box, type Place } from "./spotlight";
 import "./CampaignAttention.css";
 import { CampaignAttentionContext, useCampaignAttention } from "./useCampaignAttention";
 import { chapter4Stage } from "@/game/chapter4Guidance";
@@ -23,22 +23,34 @@ function visibleControl(selector: string): HTMLElement | null {
 }
 
 function controlVisible(node: HTMLElement): boolean {
-  if (node.matches(":disabled, [aria-disabled=true]") || node.closest("[hidden], [inert]")) return false;
-  const box = node.getBoundingClientRect(), style = getComputedStyle(node);
-  if (!box.width || !box.height || style.visibility === "hidden" || style.display === "none") return false;
-  const x = box.left + box.width / 2, y = box.top + box.height / 2;
-  if (box.left < 0 || box.top < 0 || box.right > innerWidth || box.bottom > innerHeight) return false;
-  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
-    const clip = getComputedStyle(parent), bounds = parent.getBoundingClientRect();
-    if (/auto|scroll|hidden|clip/.test(clip.overflowY) && (box.top < bounds.top || box.bottom > bounds.bottom)) return false;
-    if (/auto|scroll|hidden|clip/.test(clip.overflowX) && (box.left < bounds.left || box.right > bounds.right)) return false;
-  }
-  const hit = document.elementFromPoint?.(x, y);
+  if (node.matches(":disabled, [aria-disabled=true]")) return false;
+  const box = node.getBoundingClientRect(), shown = shownPart(node);
+  if (!shown || shown.left !== box.left || shown.top !== box.top || shown.right !== box.right || shown.bottom !== box.bottom) return false;
+  const hit = document.elementFromPoint?.(box.left + box.width / 2, box.top + box.height / 2);
   return !hit || node.contains(hit);
 }
 
+type Edges = Pick<DOMRect, "left" | "top" | "right" | "bottom">;
+/**
+ * The part of `node` inside the viewport and every scrolling or clipping box around it, whether or not something
+ * covers it, or null when none of it is.
+ */
+function shownPart(node: HTMLElement): Edges | null {
+  if (node.closest("[hidden], [inert]")) return null;
+  const box = node.getBoundingClientRect(), style = getComputedStyle(node);
+  if (!box.width || !box.height || style.visibility === "hidden" || style.display === "none") return null;
+  let { left, top, right, bottom } = box;
+  left = Math.max(left, 0); top = Math.max(top, 0); right = Math.min(right, innerWidth); bottom = Math.min(bottom, innerHeight);
+  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+    const clip = getComputedStyle(parent), bounds = parent.getBoundingClientRect();
+    if (/auto|scroll|hidden|clip/.test(clip.overflowY)) { top = Math.max(top, bounds.top); bottom = Math.min(bottom, bounds.bottom); }
+    if (/auto|scroll|hidden|clip/.test(clip.overflowX)) { left = Math.max(left, bounds.left); right = Math.min(right, bounds.right); }
+  }
+  return right > left && bottom > top ? { left, top, right, bottom } : null;
+}
+
 /** The hole reaches a little past the framed control, like the tutorial's. */
-function padBox(r: DOMRect): Box {
+function padBox(r: Edges): Box {
   const pad = 5;
   const x = Math.max(4, r.left - pad), y = Math.max(4, r.top - pad);
   return { x, y, w: Math.min(innerWidth - 4, r.right + pad) - x, h: Math.min(innerHeight - 4, r.bottom + pad) - y };
@@ -72,15 +84,27 @@ const tabEntry = (tab: PanelTab) => `.campaign-panel [role="tab"][data-tab="${ta
 /** One ephemeral owner for the header, dock, idle timer and explicitly accepted control attention. */
 /** Scrolls a control fully into its panel with a small margin; a short panel does not always take `scrollIntoView`. */
 function reveal(node: HTMLElement) {
+  // A step card docked across the bottom, as on a phone, covers the end of the panel: keep the control above it.
+  const card = document.querySelector<HTMLElement>(".tour-card.launch-tutorial")?.getBoundingClientRect();
+  const own = node.getBoundingClientRect();
+  const covered = card && card.left < own.right && card.right > own.left ? Math.max(0, innerHeight - card.top) : 0;
   const margin = node.style.scrollMarginBlock;
-  node.style.scrollMarginBlock = "8px";
+  node.style.scrollMarginBlock = `8px ${8 + covered}px`;
   node.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "instant" });
   node.style.scrollMarginBlock = margin;
   const side = node.closest<HTMLElement>(".side");
   if (!side) return;
   const box = node.getBoundingClientRect(), port = side.getBoundingClientRect();
+  const bottom = Math.min(port.bottom, innerHeight - covered);
   if (box.top < port.top + 8) side.scrollTop -= port.top + 8 - box.top;
-  else if (box.bottom > port.bottom - 8) side.scrollTop += Math.min(box.bottom - port.bottom + 8, box.top - port.top - 8);
+  else if (box.bottom > bottom - 8) side.scrollTop += Math.min(box.bottom - bottom + 8, box.top - port.top - 8);
+}
+
+/** The visible height of the box a control scrolls in, or 0 when nothing around it scrolls. */
+function scrollPort(node: HTMLElement): number {
+  for (let parent = node.parentElement; parent; parent = parent.parentElement)
+    if (/auto|scroll/.test(getComputedStyle(parent).overflowY)) return parent.clientHeight;
+  return 0;
 }
 
 export function CampaignAttentionHost({ children }: { children: ReactNode }) {
@@ -238,10 +262,25 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   // A Launch Week step frames its control at once; only the step's own button or using that control moves on.
   useLayoutEffect(() => {
     if (!launchStep) return;
-    let frame = 0;
+    let watched: HTMLElement | null = null, measured: Box | null = null, frame = 0, revealFrame = 0;
+    // Only the player's own scrolling keeps a control out of view. The panel also scrolls itself, for example back
+    // to the top when an incident opens, and that must not count as the player looking elsewhere.
+    let playerScrolled = false;
+    // The height of the box the control scrolls in when it was revealed. A layout change, such as the phone's sheet
+    // making room for this step's card, can leave the control half hidden; that is not the player looking elsewhere.
+    let revealedPort = 0;
     const clear = () => {
       if (litTarget.current) { delete litTarget.current.dataset.spotlight; litTarget.current.classList.remove("campaign-gold-attention"); litTarget.current = null; }
+      watched = null; measured = null;
       setSpotBox(null);
+    };
+    // Only the part of a control that is in view is framed, and one scrolled or clipped out of view entirely is
+    // watched but not framed: a hole over the rest would sit over whatever covers it, such as the dock. A control
+    // merely covered, for example by this step's own card, is still framed so the card can move aside.
+    const watch = (node: HTMLElement) => {
+      watched = node; measured = padBox(node.getBoundingClientRect());
+      const shown = shownPart(node);
+      setSpotBox(shown && padBox(shown));
     };
     const update = () => {
       clear();
@@ -249,30 +288,55 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       const desired = document.querySelector<HTMLElement>(spotlightSelector);
       const closed = desired?.closest("details:not([open])");
       const node = closed?.querySelector<HTMLElement>("summary") ?? desired;
-      if (!view && node && node !== revealedTarget.current && !controlVisible(node) && node.getClientRects().length) {
+      // A new control is brought fully into view once. After that it is only brought back when none of it shows,
+      // such as after the panel's own reset to the top: scrolling within it, by keyboard focus or otherwise, wins.
+      const fresh = node !== revealedTarget.current;
+      if (fresh) playerScrolled = false;
+      const resized = !!node && scrollPort(node) !== revealedPort;
+      if (!view && node && !playerScrolled && (fresh || resized ? !controlVisible(node) : !shownPart(node)) && node.getClientRects().length) {
         // The panel resets its scroll in a passive effect when it mounts; reveal after that, or the reset undoes it.
-        cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(() => { revealedTarget.current = node; reveal(node); });
+        cancelAnimationFrame(revealFrame);
+        revealFrame = requestAnimationFrame(() => {
+          revealedTarget.current = node;
+          reveal(node);
+          revealedPort = scrollPort(node);
+        });
       }
       const target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
         (targetTab ? visibleControl(tabEntry(targetTab)) : null) ?? (guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research" ? visibleControl(".panel-reopen") : null);
       if (target) {
-        setSpotBox(padBox(target.getBoundingClientRect()));
+        watch(target);
         target.dataset.spotlight = "true";
         target.classList.add("campaign-gold-attention");
         litTarget.current = target;
-      } else if (node) setSpotBox(padBox(node.getBoundingClientRect()));
+      } else if (node) watch(node);
     };
+    // The checklist and incident banner above the panel's controls grow and shrink, and a panel can still be sliding
+    // in, so a control moves without any scroll, resize or mutation near it. Follow it every frame.
+    const follow = () => {
+      if (watched && !sameBox(measured, padBox(watched.getBoundingClientRect()))) update();
+      frame = requestAnimationFrame(follow);
+    };
+    const SCROLL_KEYS = /^(Arrow(Up|Down)|Page(Up|Down)|Home|End| )$/;
+    const scrolling = (event: Event) => {
+      const el = event.target instanceof Element ? event.target : null, side = el?.closest(".side");
+      if (!side) return;
+      // A pointer on the panel itself, not on anything inside it, is on its scrollbar.
+      if (event.type === "pointerdown" ? el === side : event.type !== "keydown" || SCROLL_KEYS.test((event as KeyboardEvent).key)) playerScrolled = true;
+    };
+    const SCROLL_INPUTS = ["wheel", "touchmove", "keydown", "pointerdown"] as const;
     const used = (event: Event) => {
       const lit = litTarget.current, el = event.target instanceof Element ? event.target : null;
       if (lit && el && lit.contains(el) && lit.matches(spotlightSelector) && !lit.matches(".equipment-readings")) setLaunchDone(key);
     };
     update();
+    frame = requestAnimationFrame(follow);
+    for (const type of SCROLL_INPUTS) document.addEventListener(type, scrolling, { capture: true, passive: true });
     const observer = new MutationObserver(update);
     observer.observe(document.querySelector(".equipment-shell") ?? document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "disabled", "hidden"] });
     window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true);
     document.addEventListener("click", used, true);
-    return () => { clear(); cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
+    return () => { cancelAnimationFrame(frame); cancelAnimationFrame(revealFrame); for (const type of SCROLL_INPUTS) document.removeEventListener(type, scrolling, true); clear(); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
   }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable, targetTab, panelTab]);
   // The room's beams and dimmed racks follow the same spotlight.
   useEffect(() => {
@@ -388,8 +452,8 @@ export function CampaignHintButton() {
 /** The Launch Week tutorial's steps: run, walk the incident through its fix, then skip the settled week. */
 const LAUNCH_FLOW = /^(launch-open|launch-week|launch-research|launch-first-incident|launch-db-incident|launch-end-week|application|unrouted|database|recovery|draining|investigate|failure|activation-.+)$/;
 const LAUNCH_STEP_TITLES: Record<string, string> = {
-  "launch-open": "Open the doors", "launch-week": "Keep the week running", "launch-first-incident": "Your servers are overloading",
-  "launch-db-incident": "Your database is overloading", "launch-end-week": "Skip to the end of the week", "launch-research": "Spend your research point",
+  "launch-open": "Open the doors", "launch-week": "Keep the week running", "launch-first-incident": "Inspect the App Server",
+  "launch-db-incident": "Inspect the database", "launch-end-week": "Skip to the end of the week", "launch-research": "Spend your research point",
   database: "Upgrade the database", recovery: "Recovering", draining: "Recovering", investigate: "Check the readings", failure: "A server failed",
 };
 function launchStepTitle(reason: string, action?: string): string {
