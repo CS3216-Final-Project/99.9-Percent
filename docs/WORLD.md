@@ -123,6 +123,6 @@ At HD the city's ground, roofs, walls and trees also carry photo textures, windo
 Without a GPU the room keeps a lighter pixel look and never downloads the HD assets.
 
 Menu > Graphics offers Auto (the default), High, Medium and Low.
-Medium keeps the HD look without the glow and ambient shading, and Low is the flat pixel look with no shadows, fewer pixels and 30 frames a second.
+Medium keeps the HD look without the glow and ambient shading, and Low is the flat pixel look with no shadows and fewer pixels.
 The choice is remembered in the browser; the per-level details are in [UI_DESIGN.md](UI_DESIGN.md).
 Texture credits are in `frontend/public/textures/License.txt` and `frontend/public/models/polyhaven/License.txt`.
