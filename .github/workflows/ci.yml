@@ -86,7 +86,10 @@ jobs:
           path: ~/.cache/ms-playwright
           # Unrelated npm dependency updates do not invalidate the browser download.
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-shell-${{ steps.playwright.outputs.version }}
-      - run: npx playwright install --with-deps --only-shell chromium
+      # No --with-deps: the hosted Ubuntu image already has every shared library the
+      # headless shell needs. That apt step only added CJK fonts and Xvfb, and the
+      # Ubuntu mirror has served them at 33 kB/s (12 minutes) on some runners.
+      - run: npx playwright install --only-shell chromium
       # Each runner keeps one worker: software WebGL needs its CPU to itself.
       - name: Browser journeys against the production build
         run: node scripts/browser-shards.mjs ${{ matrix.shard }}/${{ strategy.job-total }}
