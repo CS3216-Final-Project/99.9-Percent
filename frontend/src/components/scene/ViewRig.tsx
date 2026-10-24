@@ -225,18 +225,26 @@ export function ViewRig() {
     };
     // Some browsers neither lock nor say no: no lock soon after asking counts as no, until a lock does arrive.
     let waiting = 0, retry = 0;
+    const cancelTake = () => { window.clearTimeout(waiting); window.clearTimeout(retry); };
+    const canTake = () => {
+      const s = useGame.getState();
+      return s.started && s.walking && fromAvatar(s.viewpoint) && !s.view && !document.querySelector(DIALOG);
+    };
     // Asking again too soon after Escape is refused, so ask once the pause is over; the click still counts then.
     const declined = () => {
+      if (!canTake()) return cancelTake();
       const pause = unlockedAt + RELOCK_PAUSE_MS - performance.now();
       window.clearTimeout(retry);
       if (pause > 0) retry = window.setTimeout(tryLock, pause);
       else refuse();
     };
     const tryLock = () => {
+      if (!canTake()) return cancelTake();
+      window.clearTimeout(retry);
       lockPointer(canvas, declined);
       window.clearTimeout(waiting);
       waiting = window.setTimeout(() => {
-        if (document.pointerLockElement !== canvas) refuse();
+        if (canTake() && document.pointerLockElement !== canvas) refuse();
       }, Math.max(0, unlockedAt + RELOCK_PAUSE_MS - performance.now()) + LOCK_WAIT_MS);
     };
     mouse.take = () => {
@@ -247,7 +255,8 @@ export function ViewRig() {
     const stopTaking = useGame.subscribe((s, prev) => {
       const now = s.started && s.walking && fromAvatar(s.viewpoint);
       const was = prev.started && prev.walking && fromAvatar(prev.viewpoint);
-      if (now && !was) mouse.take();
+      if (!now || s.view) cancelTake();
+      else if (!was) mouse.take();
     });
     const down = (e: PointerEvent) => {
       if (!looking() || viewNow.locked || (e.pointerType === "mouse" && e.button !== 0)) return;
@@ -309,6 +318,7 @@ export function ViewRig() {
     };
     const lockChanged = () => {
       const locked = document.pointerLockElement === canvas;
+      if (locked && !canTake()) { cancelTake(); letGoOfPointer(); return; }
       if (viewNow.locked && !locked) {
         unlockedAt = performance.now();
         const state = useGame.getState();
@@ -320,7 +330,7 @@ export function ViewRig() {
       viewNow.locked = locked;
       if (locked) {
         // The browser said yes: whatever happens to the lock later, it was not refused.
-        window.clearTimeout(waiting);
+        cancelTake();
         viewNow.lockRefused = false;
         viewNow.quietPause = false;
       }
@@ -362,10 +372,10 @@ export function ViewRig() {
     };
     // A dialog or a guide's card opening over the room needs the cursor, so the mouse is let go to reach it.
     const dialogs = new MutationObserver((records) => {
-      if (!viewNow.locked) return;
       for (const r of records)
         for (const n of r.addedNodes)
           if (n instanceof Element && (n.matches(DIALOG) || n.querySelector(DIALOG))) {
+            cancelTake();
             letGoOfPointer();
             return;
           }
@@ -391,7 +401,7 @@ export function ViewRig() {
       canvas.removeEventListener("pointermove", point);
       canvas.removeEventListener("pointerleave", away);
       document.removeEventListener("pointerlockerror", declined);
-      window.clearTimeout(waiting); window.clearTimeout(retry);
+      cancelTake();
       viewNow.pointing = null;
       viewNow.dragging = false;
       window.removeEventListener("pointermove", moveBy);

@@ -147,3 +147,20 @@ it("Launch Week steps follow the week's script, and Scaling starts at its own fi
  expect(m.steps.map(r=>r.id)).toEqual(["headroom","growth"]);
  expect(m.steps.some(r=>/Opening/.test(r.label))).toBe(false);
 });
+
+it("keeps an overdue Launch Week incident and unread report incomplete",()=>{
+ let g=launchUntil(newGame(7,"late-guidance",2),x=>x.campaign!.launchWeek!.completedStep!==null);
+ expect(g.campaign!.incident).not.toBeNull();expect(g.campaign!.reports).toHaveLength(0);
+ expect(row(g,"recovery").met).toBe(false);expect(row(g,"review").met).toBe(false);expect(current(g)).toBe("recovery");
+ g=launchUntil(decision(g,{type:"start_db_upgrade"}),x=>x.phase==="review");
+ expect(row(g,"recovery").met).toBe(true);expect(row(g,"review").met).toBe(false);expect(current(g)).toBe("review");
+ g=decision(g,{type:"acknowledge_review"});expect(row(g,"review").met).toBe(true);
+});
+
+it("still skips recovery and review for an incident-free Launch Week",()=>{
+ // Boundary fixture: a company already has enough database headroom, so no report can exist to acknowledge.
+ const prepared=newGame(7,"prevented-guidance",2);prepared.campaign!.dbCapacity=2600;
+ const g=launchUntil(prepared,x=>x.campaign!.launchWeek!.completedStep!==null);
+ expect(g.campaign!.incident).toBeNull();expect(g.campaign!.reports).toHaveLength(0);
+ expect(row(g,"recovery").met).toBe(true);expect(row(g,"review").met).toBe(true);
+});

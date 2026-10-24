@@ -7,7 +7,7 @@ import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
 import type { Snapshot } from "@/sim/campaignTypes";
 import { combinedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
-import { incidentLesson, survivingCapacity } from "./campaignPostmortem";
+import { incidentLesson, incidentTitle, survivingCapacity } from "./campaignPostmortem";
 import { reliabilityOutcome } from "./__fixtures__/reliabilityOutcome";
 
 export function recovered(game: GameState) {
@@ -147,4 +147,21 @@ describe("capacity after a server failure", () => {
     const { f, samples } = checkedFailure();
     expect(survivingCapacity(samples.filter(m => m.step > f.startedStep!))).toEqual({ step: f.startedStep! + 1, admitted: 2400, capacity: 3200, failed: ["app-3"], toFailed: 0, stopped: null });
   });
+});
+
+it("names the actual overload when the announced failed server was already outside the route", () => {
+  let g=combinedCompany();
+  for(let i=0;i<2;i++){
+    g=act(tick(g,5),{type:"start_growth_wave"});
+    g=act(finishRound(g),{type:"acknowledge_growth"});
+  }
+  g=act(tick(g,5),{type:"start_growth_wave"});
+  g=act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2"]});
+  for(let i=0;i<100&&g.phase!=="review";i++)g=tick(g);
+  expect(g.phase).toBe("review");
+  const report=g.campaign!.reports.at(-1)!,opening=report.snapshots.find(s=>s.step===report.openedStep)!;
+  expect(opening.instances!.find(a=>a.id==="app-3")).toMatchObject({health:"failed",routed:false,demand:0});
+  expect(opening.reliability!.failedDeliveries).toBe(0);
+  expect(incidentLesson(report).wrong).toContain("Application work exceeded");
+  expect(incidentTitle(report)).toBe("Application overloaded");
 });

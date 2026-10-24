@@ -146,10 +146,11 @@ export function campaignGuidance(g: GameState) {
   else if(c.openingPrevention?.outcome?.acknowledged)waiting="Prevention recorded. Complete the Opening chapter to continue to Scaling & Routing.";
  } else if(c.launchWeek) {
   const lw=c.launchWeek,weekOver=lw.completedStep!==null;
+  const prevented=weekOver&&!c.incident&&c.reports.length===0;
   cash();
   // The week's script in order: the database overload and its postmortem, the free research point, then the score.
-  add("recovery","Fix the database overload",c.reports.length>0||weekOver,"Press Run. When the database overloads, inspect it and upgrade it.");
-  add("review","Read the postmortem",reportsAcknowledged&&c.reports.length>0||weekOver);
+  add("recovery","Fix the database overload",c.reports.length>0||prevented,"Press Run. When the database overloads, inspect it and upgrade it.");
+  add("review","Read the postmortem",reportsAcknowledged&&c.reports.length>0||prevented);
   (lw.researchEarned?add:wait)("research","Spend the research pick",!!lw.tech,lw.researchEarned?"Choose Caching or Autoscaling under Research pick.":"Press Run. A free research point arrives during the week.");
   wait("launch","The week ends",weekOver,"Press Run, or End week to skip ahead.");
   add("milestone","Review your uptime score",openingDone);

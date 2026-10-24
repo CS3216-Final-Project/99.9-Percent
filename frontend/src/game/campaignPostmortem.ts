@@ -78,7 +78,7 @@ export function incidentLesson(report: CampaignPostmortem) {
 /** A short list title naming what broke, read from the report's own opening evidence. */
 export function incidentTitle(report: CampaignPostmortem) {
   const opening = report.snapshots.find(s => s.step === report.openedStep) ?? report.snapshots[0];
-  const failed = opening?.instances?.find(a => a.health === "failed");
+  const failed = opening?.instances?.find(a => a.health === "failed" && a.routed && a.demand > 0);
   if (failed) return `${failed.id.replace("app-", "App ")} failed`;
   if ((opening?.reliability?.failedDeliveries ?? 0) > 0) return "Server failure";
   const db = !!opening && opening.db.demand > opening.db.capacity;
