@@ -38,8 +38,11 @@ authRouter.get('/auth/google/callback',async(req,res)=>{
   let identity;
   try { identity=await exchangeGoogle(new URL(req.originalUrl,origin),state,attempt); }
   catch {res.redirect(`${origin}/?auth=failed`);return;}
-  const [account]=await db.insert(gameAccounts).values(identity).onConflictDoUpdate({target:[gameAccounts.issuer,gameAccounts.subject],set:{displayName:identity.displayName}}).returning();
-  await startSession(req,res,account);res.redirect(`${origin}/?auth=signed-in`);
+  // Inserting first tells a sign-up from a returning sign-in; a concurrent callback for the same identity updates instead.
+  const [created]=await db.insert(gameAccounts).values(identity).onConflictDoNothing().returning();
+  const [account]=created?[created]:await db.update(gameAccounts).set({displayName:identity.displayName})
+    .where(and(eq(gameAccounts.issuer,identity.issuer),eq(gameAccounts.subject,identity.subject))).returning();
+  await startSession(req,res,account,!!created);res.redirect(`${origin}/?auth=signed-in`);
 });
 // Email accounts never merge with a Google account that shares the address: each issuer is its own identity.
 const LOCK_AFTER=10, LOCK_MS=15*60_000;
@@ -63,7 +66,8 @@ authRouter.post('/auth/email/register',async(req,res)=>{
   const [account]=created?[created]:await db.select().from(gameAccounts).where(and(eq(gameAccounts.issuer,EMAIL_ISSUER),eq(gameAccounts.subject,email)));
   const [credential]=await db.insert(gameEmailCredentials).values({accountId:account.id,passwordHash}).onConflictDoNothing().returning();
   if(!credential){res.status(409).json({error:'An account with this email already exists. Sign in instead.'});return;}
-  res.status(201).json(await startSession(req,res,account));
+  // Without a credential nobody could have signed in to the account, so completing it is creating it.
+  res.status(201).json(await startSession(req,res,account,true));
 });
 authRouter.post('/auth/email/login',async(req,res)=>{
   if(!fromApp(req,res))return;

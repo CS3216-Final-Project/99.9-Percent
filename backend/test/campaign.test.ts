@@ -46,7 +46,7 @@ it('rejects unauthenticated private operations and disables private caching',asy
 });
 it('restores sessions, rejects expiry, and does not store raw session tokens',async()=>{
   const s=await session();const r=await request(app).get('/api/session').set('Cookie',s.cookie);
-  expect(r.body).toEqual({account:{id:s.account.id,displayName:'one'},csrfToken:s.csrf});
+  expect(r.body).toEqual({account:{id:s.account.id,displayName:'one'},csrfToken:s.csrf,newAccount:false});
   expect((await db.select().from(gameSessions))[0].tokenHash).not.toContain(s.cookie.split('=')[1]);
   const expired=await session('expired',true);expect((await request(app).get('/api/session').set('Cookie',expired.cookie)).status).toBe(401);
 });
@@ -116,6 +116,35 @@ it('uses durable single-use bound attempts, signs in, and restores a returning a
   expect((await request(app).get(`/api/auth/google/callback?state=${first.state}&code=valid`).set('Cookie',first.cookie)).status).toBe(400);
   const second=await attempt();await request(app).get(`/api/auth/google/callback?state=${second.state}&code=valid`).set('Cookie',`${second.cookie}; ${sessionCookie}`);
   expect(await db.select().from(gameAccounts)).toHaveLength(1);expect(await db.select().from(gameSessions)).toHaveLength(1);
+});
+it('marks only the sign-up session as a new account, until its first cloud save',async()=>{
+  const signIn=async(cookie='')=>{
+    const a=await attempt();
+    const r=await request(app).get(`/api/auth/google/callback?state=${a.state}&code=valid`).set('Cookie',cookie?`${a.cookie}; ${cookie}`:a.cookie);
+    expect(r.headers.location).toBe(`${origin}/?auth=signed-in`);
+    return (r.headers['set-cookie'] as unknown as string[]).find(x=>x.startsWith('nn_session='))!.split(';')[0];
+  };
+  const restore=async(cookie:string)=>(await request(app).get('/api/session').set('Cookie',cookie)).body;
+  const signUp=await signIn(),created=await restore(signUp);
+  expect(created.newAccount).toBe(true);
+  // The redirect reloads the page, so the flag survives repeated session checks until a save lands.
+  expect((await restore(signUp)).newAccount).toBe(true);
+  // A returning sign-in in another browser holds a session that did not create the account.
+  vi.mocked(exchangeGoogle).mockResolvedValue({issuer:'https://accounts.google.com',subject:'google-1',displayName:'Renamed'});
+  const otherBrowser=await signIn(),returning=await restore(otherBrowser);
+  expect(returning).toMatchObject({account:{id:created.account.id,displayName:'Renamed'},newAccount:false});
+  expect(await db.select().from(gameAccounts)).toHaveLength(1);
+  const saved=await request(app).put('/api/runs/company').set('Cookie',signUp).set('Origin',origin).set('X-CSRF-Token',created.csrfToken).send({expectedRevision:0,envelope:envelope()});
+  expect(saved.status).toBe(200);
+  expect((await restore(signUp)).newAccount).toBe(false);
+});
+it('never marks a returning Google account as new, even when it has no cloud saves',async()=>{
+  await db.insert(gameAccounts).values({issuer:'https://accounts.google.com',subject:'google-1',displayName:'Player'});
+  const a=await attempt();
+  const r=await request(app).get(`/api/auth/google/callback?state=${a.state}&code=valid`).set('Cookie',a.cookie);
+  const cookie=(r.headers['set-cookie'] as unknown as string[]).find(x=>x.startsWith('nn_session='))!.split(';')[0];
+  expect((await request(app).get('/api/session').set('Cookie',cookie)).body.newAccount).toBe(false);
+  expect((await db.select().from(gameSessions))[0].createdAccount).toBe(false);
 });
 it('rejects a mismatched browser binding without consuming the real attempt',async()=>{
   const a=await attempt();expect((await request(app).get(`/api/auth/google/callback?state=${a.state}&code=valid`).set('Cookie',`nn_auth=${randomToken()}`)).status).toBe(400);

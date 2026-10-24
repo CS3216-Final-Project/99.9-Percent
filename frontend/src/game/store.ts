@@ -186,7 +186,8 @@ interface Store {
   signOut: () => Promise<void>;
   /** Resolves true once the list reflects the account. */
   refreshCloudRuns: () => Promise<boolean>;
-  saveCloud: (attach?:boolean) => Promise<void>;
+  /** Resolves true once the cloud confirms the save. */
+  saveCloud: (attach?:boolean) => Promise<boolean>;
   /** Resolves true once the cloud save is the local Campaign save. */
   resumeCloud: (runId:string) => Promise<boolean>;
   keepLocalConflict: () => Promise<void>;
@@ -395,7 +396,7 @@ function storedRunId(raw: string): string {
   catch { return "unreadable"; }
 }
 
-export const useGame = create<Store>()((set, get) => {
+export const useGame = create<Store>()((set, get, api) => {
   let accountRequest = 0;
   /** When walk mode last began, for how long it lasted. */
   let walkStart = 0;
@@ -713,6 +714,33 @@ export const useGame = create<Store>()((set, get) => {
   }
 
   const SIGNED_IN='Signed in. Nothing is uploaded until you choose Save to cloud.';
+  const NEW_ACCOUNT='Account created. Your Guided Mode company is saved to it automatically.';
+  const SAVED_TO_NEW='Your progress is saved to your account.';
+  const signedInStatus=(session:AppSession)=>session.newAccount?NEW_ACCOUNT:SIGNED_IN;
+  /**
+   * A new account has no cloud saves and no other owner, so the session that created it receives the open Guided Mode
+   * company unasked: at sign-up, after the Google redirect reloads the page, or once a company opens. One try per company
+   * and page; a failure leaves Save to cloud to retry. A returning account never uploads without the player choosing it.
+   */
+  let offeredToNewAccount:string|null=null;
+  function saveToNewAccount(s:Store) {
+    const session=s.accountSession,runId=(s.tutorialCompany??s).game.campaign?.runId;
+    if(!session?.newAccount||s.cloudBusy||s.mode!=='campaign'||!s.hasRun||s.saveBlocked||!runId)return;
+    const key=`${session.account.id}/${runId}`;if(offeredToNewAccount===key)return;offeredToNewAccount=key;
+    // Deferred out of the state listener that noticed the company, so the upload's own updates are not nested in it.
+    queueMicrotask(async()=>{
+      let owner:string|undefined;
+      try{owner=localCloudCopy(runId)?.ownerId;}catch{/* Save to cloud reports unreadable records. */}
+      if(owner&&owner!==session.account.id){
+        get().notify("Signed in. This browser's company belongs to another account, so it stays in this browser.","info");return;
+      }
+      const saved=await get().saveCloud(true);
+      if(get().accountSession!==session)return;
+      if(!saved){get().notify("Signed in, but your progress could not be saved to your account yet. It is still in this browser: open Account to see why and try again.","error");return;}
+      set({accountSession:{...session,newAccount:false},cloudStatus:SAVED_TO_NEW});get().notify(SAVED_TO_NEW,"success");
+    });
+  }
+  api.subscribe(saveToNewAccount);
   function accountFailure(error:unknown) {
     if(error instanceof AccountApiError && error.status===401)set({accountSession:null,accountStatus:'guest'});
     // fetch failures (TypeError) and unreadable responses (SyntaxError) carry browser wording, not ours.
@@ -723,7 +751,7 @@ export const useGame = create<Store>()((set, get) => {
   async function emailSession(request:()=>Promise<AppSession>):Promise<string|null> {
     if(get().cloudBusy)return 'Wait for the current cloud action to finish.';
     ++accountRequest;set({cloudBusy:true});
-    try {const session=await request();set({accountSession:session,accountStatus:'signed-in',cloudRuns:[],cloudConflict:null,cloudStatus:SIGNED_IN});return null;}
+    try {const session=await request();set({accountSession:session,accountStatus:'signed-in',cloudRuns:[],cloudConflict:null,cloudStatus:signedInStatus(session)});return null;}
     catch(error){return error instanceof AccountApiError?error.message:'Accounts are unavailable right now. You can keep playing; progress saves in this browser.';}
     finally{set({cloudBusy:false});}
   }
@@ -736,7 +764,7 @@ export const useGame = create<Store>()((set, get) => {
         if(get().accountStatus==='checking'||get().cloudBusy)return;
         const request=++accountRequest;
         set({accountStatus:'checking'});
-        try {const session=await getSession();if(request!==accountRequest)return;set({accountSession:session,accountStatus:'signed-in',cloudRuns:[],cloudStatus:SIGNED_IN});}
+        try {const session=await getSession();if(request!==accountRequest)return;set({accountSession:session,accountStatus:'signed-in',cloudRuns:[],cloudStatus:signedInStatus(session)});}
         catch(error){if(request!==accountRequest)return;const outcome=new URLSearchParams(window.location.search).get('auth'),guest=error instanceof AccountApiError&&error.status===401;
           set({accountSession:null,accountStatus:guest?'guest':'unavailable',cloudStatus:outcome==='cancelled'?'Google sign-in was cancelled. Your local save is unchanged.':outcome==='failed'?'Google sign-in failed. Your local save is unchanged.':guest?'Playing as a guest. Progress saves in this browser.':'Accounts are unavailable right now. You can keep playing; progress saves in this browser.'});}
     },
@@ -756,7 +784,7 @@ export const useGame = create<Store>()((set, get) => {
       catch(error){accountFailure(error);return false;}finally{set({cloudBusy:false});}
     },
     saveCloud: async(attach=false)=>{
-      if(get().cloudBusy)return;set({cloudBusy:true});
+      if(get().cloudBusy)return false;set({cloudBusy:true});
       let envelope:SaveEnvelope|undefined;
       try {
         const session=ownSession();if(!get().hasRun||get().saveBlocked)throw Error('Start a Guided Mode game before saving it to the cloud.');
@@ -769,10 +797,11 @@ export const useGame = create<Store>()((set, get) => {
         rememberCloud({ownerId:session.account.id,revision:copy?.revision??0,local:envelope});
         const game=get().game;
         const saved=await putRun(envelope,copy?.revision??0,session.csrfToken);
-        if(get().accountSession!==session)return;
+        if(get().accountSession!==session)return false;
         if(saved.runId!==envelope.runId || !Number.isSafeInteger(saved.revision) || saved.revision<1)throw Error('The cloud did not confirm the save. Your local save is unchanged.');
         rememberCloud({ownerId:session.account.id,revision:saved.revision,local:currentEnvelope()});
         set({cloudConflict:null,cloudStatus:get().game===game?'Saved to the cloud.':'Saved to the cloud. Progress made since then is only in this browser.'});
+        return true;
       } catch(error) {
         if(error instanceof AccountApiError&&error.status===409&&error.detail.current&&envelope) {
           set({cloudConflict:error.detail.current});
@@ -782,6 +811,7 @@ export const useGame = create<Store>()((set, get) => {
           } catch {set({cloudStatus:'Both versions could not be stored. Keep this tab open and download a backup before continuing.'});}
         } else accountFailure(error);
       } finally{set({cloudBusy:false});}
+      return false;
     },
     keepLocalConflict: async()=>{
       if(get().cloudBusy)return;
