@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useGame } from "@/game/store";
 import { ViewSheet, ViewTabs } from "./ViewSheet";
 import { HistoryTabs, type HistoryTab } from "./Views";
 
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 function Workspace() {
   const view = useGame(s => s.view);
@@ -40,6 +40,25 @@ it("keeps view switching available and restores focus to the newly selected view
   const back = screen.getByRole("button", { name: "Back to room" });
   back.focus(); fireEvent.click(back);
   expect(document.activeElement).toBe(history);
+});
+
+it("returns to the phone Views summary when its closed contents still have layout boxes", () => {
+  function FoldedWorkspace() {
+    const view = useGame(s => s.view);
+    return <><footer className="controls-dock"><details open><summary>Views</summary>
+      <div onClick={event => event.currentTarget.closest("details")?.removeAttribute("open")}>
+        <ViewTabs tabs={[{ id: "tech", label: "Tech", icon: "tree", badge: null }]}/>
+      </div>
+    </details></footer>{view === "tech" && <ViewSheet view={view}>Content</ViewSheet>}</>;
+  }
+  render(<FoldedWorkspace/>);
+  const opener = screen.getByRole("button", { name: "Tech" });
+  const rects = Object.assign([new DOMRect(0, 0, 44, 44)], { item: (index: number) => index === 0 ? new DOMRect(0, 0, 44, 44) : null });
+  vi.spyOn(opener, "getClientRects").mockReturnValue(rects);
+  opener.focus(); fireEvent.click(opener);
+  const back = screen.getByRole("button", { name: "Back to room" });
+  back.focus(); fireEvent.click(back);
+  expect(document.activeElement).toBe(screen.getByText("Views", { selector: "summary" }));
 });
 
 it("supports keyboard navigation between History sections with one labelled panel", () => {

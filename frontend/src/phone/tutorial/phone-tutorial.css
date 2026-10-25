@@ -18,6 +18,12 @@
   --phone-coach: calc(var(--phone-coach-height) + var(--phone-coach-gap));
 }
 
+/* Full-page workspaces reach the dock, but their last action must scroll above the coach strip. */
+.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card) .sheet:is(.sheet-tech, .sheet-history) .sheet-body {
+  padding-bottom: calc(var(--phone-coach) + var(--phone-coach-gap));
+  scroll-padding-bottom: calc(var(--phone-coach) + var(--phone-coach-gap));
+}
+
 /* ---- Launch Week's spotlight steps ---- */
 
 [data-edition="phone"] .tour-card.launch-tutorial {

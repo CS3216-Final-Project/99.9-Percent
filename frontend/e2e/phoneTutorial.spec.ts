@@ -222,7 +222,10 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     await shot("02-tech");
     await techTab.tap();
     await page.getByRole("button", { name: "Scale Up: Available" }).tap();
-    await page.getByRole("button", { name: /^Start/ }).tap();
+    const start = page.getByRole("button", { name: /^Start/ });
+    await start.scrollIntoViewIfNeeded();
+    await expect.poll(() => uncovered(start), "the Start action stays above the coach strip").toBe(true);
+    await start.tap();
 
     // 3. Get more users: the Growth label starts under the sheet, so the room brings it into the open part.
     await expect(card).toHaveAccessibleName("Tutorial, step 3 of 5");

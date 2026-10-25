@@ -10,7 +10,7 @@ import { researchBalance } from "@/sim/reliability";
 
 import { BALANCE, BRANCHES, costs, missingPrerequisites, TECH, TECH_ORDER, techStatus, type EquipmentId, type GameState, type TechId, type TechStatus } from "@/sim";
 import { moneyFull, num, pct } from "@/game/format";
-import { canInspectEquipment, componentInspectionEnabled, inspectInRoom, inspectOrSelect, useGame } from "@/game/store";
+import { canInspectEquipment, inspectInRoom, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { tipProps } from "./tips";
 import { TECH_ICON } from "./presentation";
@@ -288,8 +288,7 @@ function CampaignDetail({game,id}:{game:GameState;id:TechId}) {
   const choose = () => {
     if (!canInspectEquipment(game, equipment)) return;
     openView(null);
-    if (componentInspectionEnabled(useGame.getState())) inspectInRoom(equipment);
-    else inspectOrSelect(equipment);
+    inspectInRoom(equipment);
   };
   const facts = campaignTechFacts(game, id);
   const pending = c.pending.filter((a) => CAMPAIGN_ACTION[id] === a.type);

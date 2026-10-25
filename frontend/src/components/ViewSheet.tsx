@@ -47,13 +47,16 @@ export function ViewSheet({ view, children }: { view: SheetView; children: React
   const workspace = view === "tech" || view === "history";
   const heading = useRef<HTMLHeadingElement>(null);
   useLayoutEffect(() => {
-    const opener = document.activeElement;
+    // Closing the phone's Views menu can move focus to the body before this view mounts.
+    const active = document.activeElement;
+    const opener = active instanceof HTMLElement && active !== document.body ? active : document.querySelector<HTMLElement>(`.controls-dock [data-view="${view}"]`);
     const menuTrigger = opener instanceof HTMLElement ? opener.closest("details")?.querySelector<HTMLElement>(":scope > summary") : null;
     const sheet = heading.current?.closest("section");
     heading.current?.focus({ preventScroll: true });
     return () => {
       if (sheet?.contains(document.activeElement) && opener instanceof HTMLElement && opener.isConnected) {
-        const target = opener.getClientRects().length ? opener : menuTrigger ?? opener;
+        // Closed details contents may retain layout boxes, but their buttons cannot receive focus.
+        const target = opener.closest("details:not([open])") ? menuTrigger : opener.getClientRects().length ? opener : menuTrigger ?? opener;
         target?.focus({ preventScroll: true });
       }
     };

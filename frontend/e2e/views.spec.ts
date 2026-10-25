@@ -27,6 +27,15 @@ async function open(page: Page) {
 
 test("focused workspaces ignore hidden room keyboard shortcuts", async ({ page }) => {
   await open(page);
+  // The opening auto-fit saves its first camera asynchronously. Choose a real zoom to establish a
+  // player-owned view, which stops auto-framing, before comparing exact saved camera coordinates.
+  await expect.poll(async () => (await exploration(page))?.camera ?? null).not.toBeNull();
+  const initialZoom = (await exploration(page)).camera.zoom;
+  const cameraMenu = page.locator(".camera-menu > summary");
+  await cameraMenu.click();
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await cameraMenu.click();
+  await expect.poll(async () => (await exploration(page))?.camera?.zoom ?? 0).toBeGreaterThan(initialZoom);
   const before = await exploration(page);
   for (const [name, title] of [["Tech", "Tech tree"], ["History", "History"]]) {
     await page.getByRole("button", { name, exact: true }).click();

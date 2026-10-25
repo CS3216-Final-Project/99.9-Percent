@@ -1,6 +1,7 @@
 import { test, expect, seedSave } from "./fixtures";
 import { inspectEquipment } from "./componentInspection";
 import { newGame } from "../src/sim";
+import { advanceSteps } from "../src/sim/step";
 
 // Written for CI. These surfaces use equipment shortcuts, so drawing the room adds no coverage.
 for (const phone of [false, true]) test.describe(phone ? "phone focused workspaces" : "desktop focused workspaces", () => {
@@ -9,7 +10,8 @@ for (const phone of [false, true]) test.describe(phone ? "phone focused workspac
   test.beforeEach(async ({ page, withoutRoom }) => {
     await withoutRoom();
     await page.route("**/api/**", route => route.abort());
-    await seedSave(page, newGame(1, "focused-workspaces"));
+    // A measured observation makes individual-server health available without entering overload.
+    await seedSave(page, advanceSteps(newGame(1, "focused-workspaces"), 1).state);
     await page.goto("/");
     await page.getByRole("button", { name: "Continue company", exact: true }).click();
   });
@@ -39,13 +41,14 @@ for (const phone of [false, true]) test.describe(phone ? "phone focused workspac
       await expect(time).toBeInViewport({ ratio: 1 });
       await expect(time).toContainText("Week");
       await expect(time.getByRole("button", { name: /^(Run|Pause)$/ })).toBeInViewport({ ratio: 1 });
-      // Speed controls remain usable over the opaque workspace, including their upward-opening menu.
+      // Wide docks show inline speeds; narrow docks open their speeds above the workspace.
       const speedMenu = dock.locator(".time-menu > summary");
-      await speedMenu.click();
+      const foldedSpeeds = await speedMenu.isVisible();
+      if (foldedSpeeds) await speedMenu.click();
       const doubleSpeed = dock.getByRole("group", { name: "Game speed" }).getByRole("button", { name: "2×", exact: true });
       await doubleSpeed.click();
       await expect(doubleSpeed).toHaveAttribute("aria-pressed", "true");
-      await speedMenu.click();
+      if (foldedSpeeds) await speedMenu.click();
       await expect(entry).toHaveAttribute("aria-pressed", "true");
       await page.screenshot({ path: testInfo.outputPath(`${label.toLowerCase()}.png`) });
       await workspace.getByRole("button", { name: "Back to room", exact: true }).click();

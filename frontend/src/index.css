@@ -5283,6 +5283,11 @@ button:disabled {
 .history-notes > .more { padding-top: 12px; }
 .history-card { padding-top: 12px; }
 .history-incidents { display: grid; gap: 10px; }
+
+@media (max-width: 480px) {
+  .history-tabset .segment { padding-inline: 4px; }
+  .history-tabset .segment .icon { display: none; }
+}
 .campaign-feed .feed-item { grid-template-columns: 28px 76px 1fr; }
 .request-path { margin: 0 0 4px; font-size: var(--text-xs); }
 .modal select, .modal textarea { display: block; width: 100%; padding: 8px; margin: 8px 0; }
