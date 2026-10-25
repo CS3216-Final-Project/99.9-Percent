@@ -53,6 +53,8 @@ export function campaignGuidance(g: GameState) {
  const queuesEmpty=c.dbBacklog===0&&c.apps.every(a=>a.backlog===0);
  const requirements:Requirement[]=[];
  const finalGoals:Requirement[]=[];
+ /** The prevention path's own checks, nested under its one chapter requirement so the chapter's count stays put. */
+ const preventionChecks:Requirement[]=[];
  const add=(id:string,label:string,met:boolean)=>requirements.push({id,label,met});
  let waiting:string|null=null,notice:string|null=null,optional:string|null=null;
  let pendingAction:GuidanceAction|null=null;
@@ -127,17 +129,19 @@ export function campaignGuidance(g: GameState) {
   if(dataAvailable)pendingAction={label:"Continue to Data Strategy",action:{type:"enter_data"}};
  } else if(prevention) {
   const r=preventionRequirements(c);
+  const check=(id:string,label:string,met:boolean)=>preventionChecks.push({id,label,met});
   add("growth","Opening growth occurred",r.growth);
-  add("incident","No Opening incident opened",r.noIncident);
-  add("cash","Positive company cash",r.positiveCash);
-  add("admission","Full 800 req/s admitted; traffic limit inactive",r.fullDemand);
-  add("queues","Application and Database queues empty",r.emptyQueues);
-  add("healthy","Healthy latency and service errors",r.healthy);
-  add("app-inspection","Application inspected after growth",r.applicationInspected);
-  add("db-inspection","Database inspected after growth",r.databaseInspected);
-  add("observations",`Stable observations: ${c.openingPrevention?.stableSteps??0} / 5`,!!c.openingPrevention?.outcome);
-  add("review","Prevention outcome acknowledged",!!c.openingPrevention?.outcome?.acknowledged);
+  add("outcome","Verified prevention outcome or recovered incident acknowledged",!!c.openingPrevention?.outcome?.acknowledged);
   add("milestone","Opening milestone acknowledged",openingDone);
+  check("incident","No Opening incident opened",r.noIncident);
+  check("cash","Positive company cash",r.positiveCash);
+  check("admission","Full 800 req/s admitted; traffic limit inactive",r.fullDemand);
+  check("queues","Application and Database queues empty",r.emptyQueues);
+  check("healthy","Healthy latency and service errors",r.healthy);
+  check("app-inspection","Application inspected after growth",r.applicationInspected);
+  check("db-inspection","Database inspected after growth",r.databaseInspected);
+  check("observations",`Stable observations: ${c.openingPrevention?.stableSteps??0} / 5`,!!c.openingPrevention?.outcome);
+  check("review","Prevention outcome acknowledged",!!c.openingPrevention?.outcome?.acknowledged);
   optional="Verified prevention and incident recovery are both valid paths. For prevention, meet every requirement, acknowledge the outcome, then complete the Opening recognition to continue.";
   if(c.limit!==null)notice="Traffic limiting prevents full-demand qualification. Remove the limit and serve the full 800 req/s to continue the prevention path.";
   else if(Object.values(r).every(Boolean)&&!c.openingPrevention?.outcome)waiting="Observe five consecutive new game seconds. Pausing adds no observations; a failing game second resets the streak.";
@@ -169,5 +173,5 @@ export function campaignGuidance(g: GameState) {
  if(g.phase==="ended") { pendingAction=null;waiting=null;notice=""+(g.outcome==="won"?"Campaign complete. Inspect your scorecard and final architecture before explicitly starting a new company.":"The company is bankrupt. Review final evidence and explicitly restart from the Menu.")+""; }
  const incomplete=requirements.filter(r=>!r.met),completed=requirements.filter(r=>r.met);
  const lockReason=c.spikeStage&&!c.combinedStage?notice:pendingAction?`Next action: ${pendingAction.label}.`:incomplete.length?incomplete[0].label:waiting;
- return {stage,nextStage,openingDone,dataAvailable,spikesAvailable,pendingMilestone,prevention,finalGoals,requirements,incomplete,completed,pendingAction,waiting,notice,optional,lockReason};
+ return {stage,nextStage,openingDone,dataAvailable,spikesAvailable,pendingMilestone,prevention,preventionChecks,finalGoals,requirements,incomplete,completed,pendingAction,waiting,notice,optional,lockReason};
 }

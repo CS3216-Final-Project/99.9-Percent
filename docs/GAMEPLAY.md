@@ -75,6 +75,9 @@ There are two ways to complete the Opening; both award the same `opening-stabili
   A failing step resets the streak; pausing, reading and reloading add no observations.
   The player reviews the prevention outcome and presses Continue company.
 
+The panel lists three chapter requirements for the whole Opening: growth, a verified prevention outcome or recovered incident, and the milestone.
+While prevention is still possible, its own checks are listed under Opening prevention progress rather than as extra chapter requirements.
+
 The prevention rules are in `frontend/src/sim/openingPrevention.ts`.
 
 ### Chapter 2: Scaling & Routing

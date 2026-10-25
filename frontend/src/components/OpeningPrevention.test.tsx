@@ -12,10 +12,11 @@ const qualified=()=>advanceSteps(inspected(),5).state;
 const ui=()=><><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/></>;
 function show(g:GameState){useGame.setState({game:g,ready:true,started:true,onboarding:false});return render(ui());}
 const guidance=()=>screen.getByRole("region",{name:"Guided Mode requirements"});
-const requirement=(id:string)=>guidance().querySelector(`[data-requirement="${id}"]`)!;
+const requirement=(id:string)=>(screen.queryByRole("region",{name:"Opening prevention progress"})?.querySelector(`[data-requirement="${id}"]`)??guidance().querySelector(`[data-requirement="${id}"]`))!;
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});afterEach(cleanup);
 it("lists outstanding prevention requirements and inspects components without advancing time",()=>{
  show(prevented());
+ expect(guidance().textContent).toContain("1/3");expect(guidance().querySelector('[data-requirement="admission"]')).toBeNull();
  expect(requirement("admission").getAttribute("data-met")).toBe("false");expect(requirement("app-inspection").getAttribute("data-met")).toBe("false");
  expect(screen.getByRole("region",{name:"Opening prevention progress"}).textContent).toContain("Stable service: 0 / 5");
  fireEvent.click(screen.getByRole("button",{name:"Inspect Application"}));expect(requirement("app-inspection").getAttribute("data-met")).toBe("true");
