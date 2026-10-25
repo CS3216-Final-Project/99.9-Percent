@@ -84,7 +84,9 @@ it("keeps canonical chapter identities through Chapter 6, including legacy Launc
  expect(games.map(g=>campaignChapters(g).find(c=>c.current)?.number)).toEqual([1,2,3,4,5,6]);
  expect(games.map(g=>campaignAttention(g).chapter)).toEqual([1,2,3,4,5,6]);
  expect(games.map(g=>chapterCompanyMessage(g)?.chapter)).toEqual([1,2,3,4,5,6]);
- expect(chapterCompanyMessage(fresh())).toBeNull();
+ const introduction=chapterCompanyMessage(fresh());
+ expect(introduction).toMatchObject({chapter:0,speaker:"maya"});
+ expect(introduction!.key).not.toBe(chapterCompanyMessage(games[0])!.key);
  let legacy=fresh();for(const id of INTRODUCTION_COMPONENTS)legacy=explore(legacy,id);legacy=act(legacy,{type:"complete_introduction"});
  expect(campaignChapters(legacy).find(c=>c.current)?.number).toBe(2);
 });

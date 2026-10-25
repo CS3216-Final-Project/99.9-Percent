@@ -21,6 +21,8 @@ test("exports a company and imports it into a fresh browser", async ({ page, bro
   await withoutRoom(fresh);
   const other = await fresh.newPage();
   await other.goto("/"); await other.getByRole("button", { name: "Start Guided Mode", exact: true }).click();
+  // This fresh context has no fixture handler for Maya's Chapter 0 greeting.
+  await other.getByRole("dialog", { name: "Company Message", exact: true }).getByRole("button", { name: "Dismiss company message", exact: true }).click();
   await completeTutorial(other);
   expect((await savedGame(other)).campaign!.step).toBe(0);
   // This manually created context has no fixture locator handler.
