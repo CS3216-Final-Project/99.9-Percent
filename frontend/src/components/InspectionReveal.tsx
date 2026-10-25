@@ -152,7 +152,7 @@ function ComponentInspection() {
   const title=place==="app"?"App Servers":`${info.name} inspected`;
   const summary=<div className="component-inspection-summary">
       <div className="inspection-scanner" aria-hidden="true"><Icon name={EQUIPMENT_ICON[place]} size={56}/></div>
-      <p className="inspection-status"><span className={`state state-${stateKey}`}><Icon name={state.icon} size={12}/>{word}</span>{server&&<span>App {selected.id.slice(4)}</span>}</p>
+      <p className="inspection-status"><span className={`state state-${stateKey}`}><Icon name={state.icon} size={12}/>{word}</span></p>
       <p className="component-inspection-metric">{metric}</p><p>{description}</p>
     </div>;
   const failedApps=c.apps.filter(a=>a.health==="failed"),unrouted=c.apps.filter(a=>!routes.includes(a.id)&&a.role!=="spare"&&a.health!=="failed");

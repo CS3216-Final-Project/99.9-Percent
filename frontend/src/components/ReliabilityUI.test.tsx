@@ -45,5 +45,6 @@ it("keeps the recorded reliability outcome available after acknowledgement",()=>
  fireEvent.click(screen.getByRole("button",{name:"Stay in this chapter"}));
  cleanup();const acknowledged=useGame.getState().game;useGame.setState({view:"history"});show(acknowledged);
  fireEvent.click(screen.getByRole("tab",{name:/^Incidents/}));
+ fireEvent.click(screen.getByRole("button",{name:/Stay Online outcome/}));
  expect(screen.getByRole("region",{name:"Historical reliability outcome"}).textContent).toContain("App 3");
 });

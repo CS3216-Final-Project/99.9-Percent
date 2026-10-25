@@ -437,6 +437,15 @@
   margin: 8px;
 }
 
+/* Focused views cover the top strip and room, ending exactly where the persistent clock dock starts. */
+.phone-app[data-edition="phone"] .sheet:is(.sheet-tech, .sheet-history) {
+  position: fixed;
+  inset: 0 0 var(--phone-dock);
+  margin: 0;
+  padding-top: var(--phone-safe-top);
+  padding-inline: var(--phone-safe-left) var(--phone-safe-right);
+}
+
 /* ------------------------------------------------------------------ */
 /* Dock                                                                */
 /* ------------------------------------------------------------------ */

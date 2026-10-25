@@ -74,7 +74,7 @@ test("Stay Online guide unlocks Health Checks in Tech and confirms its purchase"
   await guide(1).getByRole("button",{name:"Got it",exact:true}).click();
   await expect(guide(2)).toContainText("Open Tech.");
   await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Tech",exact:true}).click();
-  await page.getByRole("button",{name:"Health Checks: Available",exact:true}).click();
+  await page.getByRole("button",{name:"Health Checks: Research available",exact:true}).click();
   await expect(guide(2)).toContainText("Press Unlock Health Checks.");
   await page.getByRole("button",{name:/^Unlock Health Checks/}).click();
   await expect(guide(3)).toContainText("Close Tech.");

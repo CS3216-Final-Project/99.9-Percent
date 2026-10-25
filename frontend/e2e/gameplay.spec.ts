@@ -119,6 +119,6 @@ test("keeps history reachable after bankruptcy", async ({ page, withoutRoom }) =
   const history = page.getByRole("region", { name: "History" });
   await expect(history).toContainText("Financial settlements");
   await expect(bankrupt).toBeHidden();
-  await history.getByRole("button", { name: "Close" }).click();
+  await history.getByRole("button", { name: "Back to room" }).click();
   await expect(bankrupt).toBeVisible();
 });

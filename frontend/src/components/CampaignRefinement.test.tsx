@@ -63,7 +63,7 @@ it("system evidence records a real free inspection without advancing the clock",
   fireEvent.click(screen.getByRole("button",{name:"Close"}));
   fireEvent.click(screen.getByRole("button",{name:"Tech"}));
   expect(screen.getByRole("region",{name:"Tech tree"}).textContent).toContain("Owned does not mean deployed");
-  fireEvent.click(screen.getByRole("button",{name:"Close"})); expect(useGame.getState().running).toBe(false);
+  fireEvent.click(screen.getByRole("button",{name:"Back to room"})); expect(useGame.getState().running).toBe(false);
 });
 it("shows what the machine does, paid-now cash, delayed upkeep and routing limitation only when adding an App Server", () => {
   start(); renderCompany();

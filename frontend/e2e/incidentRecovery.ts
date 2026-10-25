@@ -50,7 +50,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   const summary = report.locator("summary", { hasText: "View Technical Details" });
   await page.keyboard.press("Tab"); await expect(summary).toBeFocused();
   await page.keyboard.press("Shift+Tab"); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
-  await press(summary); await expect(report.getByRole("table")).toBeVisible();
+  await press(summary); await expect(report.getByRole("table", { name: "Recorded incident evidence by game second", exact: true })).toBeVisible();
   for (const explanation of recovered.campaign!.reports.at(-1)!.explanations) await expect(report).toContainText(explanation);
   await expect(report).toContainText("recovery-streak");
   expect(await report.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
@@ -68,7 +68,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   await expect(notice).toHaveCount(0); await expect(report).toHaveCount(0);
   await press(page.getByRole("button", { name: "History", exact: true }));
   await press(page.getByRole("tab", { name: "Incidents (1)", exact: true }));
-  await press(page.getByRole("button", { name: /Game seconds.*Service slowdown/ }));
+  await press(page.getByRole("button", { name: /Database overloaded.*Game seconds/ }));
   await expect(page.getByText("What happened?", { exact: true })).toBeVisible();
   await expect(notice).toHaveCount(0);
 }

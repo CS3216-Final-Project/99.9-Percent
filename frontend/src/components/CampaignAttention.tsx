@@ -336,7 +336,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
         reveal(node);
       }
       if (node) node.dataset.guidanceStep = "true";
-      target = (inspection && equipment && !inEquipment ? visibleControl('.component-inspection > .modal-head button[aria-label="Close"]') : null) ?? (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node ? visibleControl('[data-guidance-step="true"]') : null) ?? visibleControl('.sheet-head button[aria-label="Close"]') ??
+      target = (inspection && equipment && !inEquipment ? visibleControl('.component-inspection > .modal-head button[aria-label="Close"]') : null) ?? (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node ? visibleControl('[data-guidance-step="true"]') : null) ?? visibleControl('.sheet-head [data-return-to-room]') ??
         (guidanceTarget !== "run" && guidanceTarget !== "next" && guidanceTarget !== "requirements" && guidanceTarget !== "menu" && guidanceTarget !== "finance" ? visibleControl(PANEL_ENTRY) : null);
       if (node) delete node.dataset.guidanceStep;
       target?.classList.add("campaign-gold-attention");

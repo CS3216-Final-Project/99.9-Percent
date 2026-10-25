@@ -35,10 +35,35 @@
 .topbar .icon-btn { width: 44px; height: 44px; }
 .topbar .meter { background: var(--paper-3); }
 
-/* Leave a little of the room visible around every shared view sheet. */
+/* Team retains its sheet; Tech and History are focused workspaces above the dock. */
 .sheet { margin: 16px; min-width: 0; overflow: hidden; }
 .sheet-head { flex: none; }
 .sheet-body { min-width: 0; }
+.app .sheet:is(.sheet-tech, .sheet-history) {
+  position: relative;
+  inset: auto;
+  grid-column: 1 / -1;
+  grid-row: 1 / -2;
+  align-self: stretch;
+  z-index: 40;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--night);
+}
+.app:has(.sheet-tech, .sheet-history) > :is(.topbar, .chapter-bar, .stage, .side, .operations-rail, .phone-top, .phone-sheet, .phone-coach) { visibility: hidden; }
+.app:has(.sheet-tech, .sheet-history) .controls-dock .room-controls { display: none; }
+.app:has(.sheet-tech, .sheet-history) .controls-dock { grid-template-columns: auto 1fr; z-index: 41; }
+.app:has(.sheet-tech, .sheet-history) .controls-dock .time-controls { justify-content: flex-end; }
+@media (min-width: 641px) {
+  .app:has(.sheet-tech, .sheet-history) .controls-dock > .view-tabs { grid-column: 1; grid-row: 1; }
+  .app:has(.sheet-tech, .sheet-history) .controls-dock > .time-controls { grid-column: 2; grid-row: 1; }
+}
+.sheet-head h2:focus { outline: none; }
+.sheet-return { flex: none; }
+.component-inspection-summary { display: grid; justify-items: center; gap: 12px; }
+.component-inspection-summary > p { margin: 0; }
 .sheet-history .charts { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
 .sheet-history .tabs { flex-wrap: wrap; }
 .campaign-tech-intro { max-width: none; margin: 0; padding: 12px 16px; }

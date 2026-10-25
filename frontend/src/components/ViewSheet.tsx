@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { useGame, type View } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { tipProps } from "./tips";
@@ -41,18 +41,33 @@ export function ViewTabs({ tabs }: { tabs: ViewTab[] }) {
   );
 }
 
-/** A view opened from the bottom bar: it covers the room, and Close or Esc returns to it. */
+/** A workspace above the persistent dock; returning restores the view control's focus. */
 export function ViewSheet({ view, children }: { view: SheetView; children: ReactNode }) {
   const openView = useGame((s) => s.openView);
+  const workspace = view === "tech" || view === "history";
+  const heading = useRef<HTMLHeadingElement>(null);
+  useLayoutEffect(() => {
+    const opener = document.activeElement;
+    const menuTrigger = opener instanceof HTMLElement ? opener.closest("details")?.querySelector<HTMLElement>(":scope > summary") : null;
+    const sheet = heading.current?.closest("section");
+    heading.current?.focus({ preventScroll: true });
+    return () => {
+      if (sheet?.contains(document.activeElement) && opener instanceof HTMLElement && opener.isConnected) {
+        const target = opener.getClientRects().length ? opener : menuTrigger ?? opener;
+        target?.focus({ preventScroll: true });
+      }
+    };
+  }, [view]);
   return (
     <section className={`sheet sheet-${view}`} aria-label={VIEW_TITLES[view]}>
       <header className="sheet-head">
-        <h2>
+        <h2 ref={heading} tabIndex={-1}>
           <Concept kind={VIEW_ICONS[view][0]} icon={VIEW_ICONS[view][1]} />
           {VIEW_TITLES[view]}
         </h2>
-        <button type="button" className="icon-btn" onClick={() => openView(null)} aria-label="Close">
+        <button type="button" className={workspace ? "btn sheet-return" : "icon-btn"} data-return-to-room onClick={() => openView(null)} aria-label={workspace ? undefined : "Close"}>
           <Icon name="close" />
+          {workspace && "Back to room"}
         </button>
       </header>
       <div className="sheet-body">{children}</div>
