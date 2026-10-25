@@ -530,10 +530,19 @@ function lampMaterial(): THREE.MeshBasicMaterial {
   });
 }
 
-/** Shared materials: plain vertex colours, tinted per instance where needed, the bright ones that glow, and vehicles. */
+/**
+ * Shared materials: plain vertex colours, tinted per instance where needed, the bright ones that glow, and
+ * vehicles. Each is made once per way it is drawn — plain meshes, instanced meshes, and instanced meshes tinted
+ * per instance — because the renderer refetches a material's program each time it is drawn instanced after plain
+ * or tinted after untinted. The variants are made by the same factory call, never `clone()`, which would drop
+ * `onBeforeCompile` and `customProgramCacheKey`.
+ */
 const M = {
   shaded: faded({ vertexColors: true }, "city-lit", "lit"),
+  shadedInstanced: faded({ vertexColors: true }, "city-lit", "lit"),
+  shadedInstancedTinted: faded({ vertexColors: true }, "city-lit", "lit"),
   glow: faded({ vertexColors: true, toneMapped: false }, "city-glow", "glow"),
+  glowInstancedTinted: faded({ vertexColors: true, toneMapped: false }, "city-glow", "glow"),
   white: faded({ color: "#e3e1da" }, "city-lit", "lit"),
   yellow: faded({ color: "#e0b53a" }, "city-lit", "lit"),
   lamps: lampMaterial(),
@@ -1048,7 +1057,7 @@ function Parked({ lite, shade }: { lite: boolean; shade: Shade | null }) {
     <group>
       {shade && <Instances geometry={shade.disc} material={shade.material} matrices={shades} />}
       {fleets.map(({ kind, matrices, colours }) => (
-        <Instances key={kind} geometry={geo.get(kind) as THREE.BufferGeometry} material={lite ? M.shaded : VEHICLE_LOOKS[kind]} matrices={matrices} colours={colours} />
+        <Instances key={kind} geometry={geo.get(kind) as THREE.BufferGeometry} material={lite ? M.shadedInstancedTinted : VEHICLE_LOOKS[kind]} matrices={matrices} colours={colours} />
       ))}
     </group>
   );
@@ -1653,7 +1662,7 @@ function Park({ basic }: { basic: boolean }) {
     <group>
       <Merged geometry={stone} material={M.shaded} />
       <Merged geometry={water} material={M.glow} />
-      <Instances geometry={bench} material={M.shaded} matrices={seats} />
+      <Instances geometry={bench} material={M.shadedInstanced} matrices={seats} />
     </group>
   );
 }
@@ -1694,8 +1703,8 @@ function Lamps({ pools }: { pools: boolean }) {
       {styles.map(({ style, matrices, colours }) =>
         matrices.length ? (
           <group key={style}>
-            <Instances geometry={geo.posts.get(style) as THREE.BufferGeometry} material={M.shaded} matrices={matrices} />
-            <Instances geometry={geo.heads.get(style) as THREE.BufferGeometry} material={M.glow} matrices={matrices} colours={colours} />
+            <Instances geometry={geo.posts.get(style) as THREE.BufferGeometry} material={M.shadedInstanced} matrices={matrices} />
+            <Instances geometry={geo.heads.get(style) as THREE.BufferGeometry} material={M.glowInstancedTinted} matrices={matrices} colours={colours} />
           </group>
         ) : null,
       )}
@@ -1780,7 +1789,7 @@ function Traffic({ share, lite, shade }: { share: number; lite: boolean; shade: 
     <group>
       {fleets.map(({ kind, vehicles }) => {
         const g = geo.get(kind) as { body: THREE.BufferGeometry; lights: THREE.BufferGeometry };
-        return <Fleet key={kind} vehicles={vehicles} body={g.body} lights={g.lights} material={lite ? M.shaded : VEHICLE_LOOKS[kind]} shade={shade} size={vehicleSize(kind)} />;
+        return <Fleet key={kind} vehicles={vehicles} body={g.body} lights={g.lights} material={lite ? M.shadedInstancedTinted : VEHICLE_LOOKS[kind]} shade={shade} size={vehicleSize(kind)} />;
       })}
     </group>
   );

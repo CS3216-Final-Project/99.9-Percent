@@ -29,8 +29,9 @@ describe('chosen quality', () => {
     expect(low.detail).toBe('basic');
     expect(high.shadowMapSize).toBeGreaterThan(medium.shadowMapSize);
     expect(low.dpr).toBeLessThan(1);
-    expect(low.fps).toBe(30);
+    expect(low.fps).toBeNull();
     expect(medium.fps).toBeNull();
+    expect(resolveQuality('auto', 'software').fps).toBe(20);
   });
 
   it('applies the same way whatever draws the canvas, so a weak GPU can choose Low and a CPU can choose High', () => {

@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useDetail, type Detail } from "./detail";
 import { buildProp, shade, type PropItem, type Sign, type Surface } from "./propModels";
+import { shadowDepthMaterial } from "./shadowDepth";
 import { letteredTexture } from "./textures";
 
 /*
@@ -58,7 +59,7 @@ function PropInstances({ geometry, surface, matrices }: { geometry: THREE.Buffer
     mesh.computeBoundingSphere();
   }, [matrices]);
   const shadows = surface !== "glass" && surface !== "glow";
-  return <instancedMesh key={matrices.length} ref={ref} args={[geometry, undefined, matrices.length]} material={material} castShadow={shadows} receiveShadow={surface !== "glow"} />;
+  return <instancedMesh key={matrices.length} ref={ref} args={[geometry, undefined, matrices.length]} material={material} castShadow={shadows} customDepthMaterial={shadows ? shadowDepthMaterial("instanced") : undefined} receiveShadow={surface !== "glow"} />;
 }
 
 /** A lit sign with lettering. */

@@ -3,6 +3,7 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useDetail, type Detail } from "./detail";
+import { shadowDepthMaterial } from "./shadowDepth";
 import type { Prim, Shape } from "./shapes";
 
 /*
@@ -74,7 +75,7 @@ function Instances({ shape, items, shadows, clip }: { shape: Shape; items: Prim[
   }, [items]);
   if (items.length === 0) return null;
   // The material is a prop rather than a constructor argument, so changing detail swaps it without rebuilding the instances.
-  return <instancedMesh key={items.length} ref={ref} args={[GEOMETRY[shape], undefined, items.length]} material={material} castShadow={shadows} receiveShadow />;
+  return <instancedMesh key={items.length} ref={ref} args={[GEOMETRY[shape], undefined, items.length]} material={material} castShadow={shadows} customDepthMaterial={shadows ? shadowDepthMaterial("instancedTinted") : undefined} receiveShadow />;
 }
 
 /** Draw many static prims: one instanced mesh per shape. */

@@ -15,13 +15,13 @@ export interface QualityProfile {
   shadowRadius: number;
   /** Pixels drawn per CSS pixel: one number, or the range the display's own density is clamped to. */
   dpr: number | [number, number];
-  /** Frames a second when capped, or null to draw as often as the display asks. */
+  /** Frames a second when capped — only for drawing on the CPU, where every frame is expensive — or null to draw as often as the display asks. */
   fps: number | null;
 }
 
 const HIGH: QualityProfile = { detail: "hd", effects: true, shadows: true, shadowMapSize: 4096, shadowRadius: 3, dpr: [1, 1.75], fps: null };
 const MEDIUM: QualityProfile = { detail: "hd", effects: false, shadows: true, shadowMapSize: 2048, shadowRadius: 2, dpr: 1, fps: null };
-const LOW: QualityProfile = { detail: "basic", effects: false, shadows: false, shadowMapSize: 1024, shadowRadius: 1, dpr: 0.75, fps: 30 };
+const LOW: QualityProfile = { detail: "basic", effects: false, shadows: false, shadowMapSize: 1024, shadowRadius: 1, dpr: 0.75, fps: null };
 /** Drawing in software, without a graphics card: no shadows, half the pixels, 20 frames a second. */
 const SOFTWARE: QualityProfile = { detail: "basic", effects: false, shadows: false, shadowMapSize: 1024, shadowRadius: 1, dpr: 0.5, fps: 20 };
 
@@ -64,7 +64,7 @@ export const QUALITY_OPTIONS: { id: GraphicsQuality; label: string; summary: str
   {
     id: "low",
     label: "Low",
-    summary: "The flat pixel look with no shadows, fewer pixels and 30 frames a second.",
+    summary: "The flat pixel look with no shadows and fewer pixels.",
     details: "For older or low-powered machines",
   },
 ];

@@ -35,7 +35,7 @@ import {
   tempSlot,
   type Footprint,
 } from "./layout";
-import { DetailContext, detailOverride, useDetail, type Renderer } from "./detail";
+import { DetailContext, detailOverride, perfHook, useDetail, type Renderer } from "./detail";
 import { adapt, adapts, resolveQuality, type QualityProfile } from "./quality";
 import { projectUV, surfaceMaterial, useSurfaces } from "./surfaces";
 import { concreteFloor, LED_COLORS, panelTextures, screenTexture, type Led, type PanelVariant, type ScreenKind } from "./textures";
@@ -47,7 +47,7 @@ import { EQUIPMENT_ICON, STATE_META } from "../presentation";
 import { ActivityEffects } from "./activities";
 import { ArcadePanel } from "./ArcadePanel";
 import { serveArcade } from "./arcade";
-import { Office } from "./Office";
+import { NapPodLight, Office } from "./Office";
 import { ServerFloor } from "./ServerFloor";
 import { ElevatorCar, Landing, ShaftRun } from "./Elevator";
 import { carDoors, resetErrands, settleErrand } from "./trips";
@@ -1285,9 +1285,18 @@ function Reflections() {
  * renderer used before.
  */
 function Effects() {
+  // With transparency awareness on, N8AO renders the scene twice more and traverses it five times every frame.
+  // Without it, AO is taken from the opaque depth and composited over glass and bubbles, which reads fine in this room.
+  // A callback ref, so every pass the composer makes (it makes a new one for a new camera) is set up as it attaches.
+  const opaqueOnly = useCallback((pass: unknown) => {
+    const p = pass as { autoDetectTransparency: boolean; configuration: { transparencyAware: boolean } } | null;
+    if (!p) return;
+    p.autoDetectTransparency = false;
+    p.configuration.transparencyAware = false;
+  }, []);
   return (
     <EffectComposer multisampling={4}>
-      <N8AO aoRadius={0.8} distanceFalloff={1} intensity={2.5} quality="medium" halfRes />
+      <N8AO ref={opaqueOnly} aoRadius={0.8} distanceFalloff={1} intensity={2.5} quality="medium" halfRes />
       <Bloom mipmapBlur luminanceThreshold={0.9} luminanceSmoothing={0.25} intensity={0.6} />
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
     </EffectComposer>
@@ -1313,6 +1322,8 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
   const outside = useRef<THREE.Group>(null);
   const lights = useRef<(THREE.PointLight | null)[]>([]);
   // Draw one floor at a time, and light whichever it is: the lights move rather than switch, so no material is rebuilt.
+  // For the same reason every light stays outside the floor groups: three collects lights from visible subtrees
+  // only, so one inside would change the light count when the floor hides and rebuild every material's shader.
   useFrame(() => {
     const shown = shownFloor();
     // Riding from the avatar, the floor being left and the one being reached are both seen through the car's glass.
@@ -1374,6 +1385,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
       <Daylight quality={quality} hd={hd} />
       <pointLight ref={(l) => { lights.current[0] = l; }} position={[-3, 3.4, -3.5]} intensity={24} distance={13} color="#8fc3ff" />
       <pointLight ref={(l) => { lights.current[1] = l; }} position={[0, 3.4, 5]} intensity={20} distance={12} color="#ffcf94" />
+      <NapPodLight />
 
       <group ref={outside}>
         <Exterior />
@@ -1904,7 +1916,9 @@ export default function Facility() {
         // How strongly the HD environment lights materials; without one it has no effect.
         scene={{ environmentIntensity: HD_REFLECTIONS }}
         events={roomEvents}
-        onCreated={({ gl, camera }) => {
+        onCreated={({ gl, camera, scene }) => {
+          // frontend/perf/probe.spec.ts reads this to count the scene's meshes, lights and shaders.
+          if (perfHook(window.location.search)) (window as unknown as { __nnRoom: unknown }).__nnRoom = { gl, scene, camera };
           cameras.overview = camera as THREE.OrthographicCamera;
           // The elevator's car and its riders are cut to the part of the shaft in view (see viewState.ts).
           gl.localClippingEnabled = true;

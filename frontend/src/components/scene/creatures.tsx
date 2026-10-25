@@ -4,7 +4,6 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { motionFor, SPECIES, type Activity, type Species } from "./cast";
 import { useDetail, type Detail } from "./detail";
 import { loadCrew, type Crew } from "./creatureCatalog";
@@ -15,6 +14,8 @@ import { FLOOR_Y } from "./levels";
 import { sceneSpeech } from "./sceneSounds";
 import { fresh, glance, GREET_SECONDS, greetingLine, nearness, notices } from "./greetings";
 import { SpeechBubble } from "./bubble";
+import { cloneSharingSkeletons } from "./skinning";
+import { shadowDepthMaterial } from "./shadowDepth";
 import { bodiesOn, standing, within } from "./crewSpots";
 import { useGame } from "@/game/store";
 import { apart, intrudes, radiusOf, sidestep, sweptIntrudes } from "./spacing";
@@ -147,11 +148,12 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
   const detail = useDetail();
   const info = SPECIES[species];
   const model = useMemo(() => {
-    const object = cloneSkinned(gltf.scene);
+    const object = cloneSharingSkeletons(gltf.scene);
     object.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
+      if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) mesh.customDepthMaterial = shadowDepthMaterial("skinned");
       // Animated skins move outside their bind-pose bounds; culling them would make limbs pop.
       mesh.frustumCulled = false;
       mesh.material = Array.isArray(mesh.material) ? mesh.material.map((m) => creatureMaterial(m, detail, clip)) : creatureMaterial(mesh.material, detail, clip);

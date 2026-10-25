@@ -936,8 +936,11 @@ function ArcadeScreen({ variant, x }: { variant: string; x: number }) {
 /**
  * The first nap pod's reading light: always mounted so nothing recompiles, its glow only ramped up with the
  * lie-down blend while the avatar sleeps — warming the pillow and the hood's underside in both views.
+ * It lives at the scene's root rather than inside the office floor's group: three collects lights from visible
+ * subtrees only, so a light inside a floor's group would change the light count when the floor hides, and every
+ * material's shader would be rebuilt on the first ride — a freeze of several seconds.
  */
-function NapPodLight() {
+export function NapPodLight() {
   const light = useRef<THREE.PointLight>(null);
   useFrame(() => {
     if (light.current) light.current.intensity = 1.4 * napBlend.value;
@@ -1150,7 +1153,6 @@ export function Office({ crew }: { crew: Crew }) {
       <Creature species="cat" activity="type" position={[SPOTS.foosballNorth.x, 0, SPOTS.foosballNorth.z]} rotation={SPOTS.foosballNorth.rot} phase={9} />
       <Creature species="pinkSlime" pose="sit" activity="doze" position={[SPOTS.napper.x, 0, SPOTS.napper.z]} rotation={SPOTS.napper.rot} phase={3} seat={NAP_MATTRESS} />
       <Zzz position={[SPOTS.napper.x, NAP_MATTRESS + 0.75, SPOTS.napper.z]} />
-      <NapPodLight />
       <Steam position={ESPRESSO_MUG} />
 
       <OnWall wall="left">
