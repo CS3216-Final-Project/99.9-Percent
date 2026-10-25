@@ -38,6 +38,8 @@ interface Step {
   nextLabel?: string;
   /** The step leads through the Tech tree, so an open tree does not hide it. */
   inTech?: boolean;
+  /** A one-card guide the player follows by opening equipment: inspecting any of it completes the card. */
+  endsOnInspection?: boolean;
 }
 
 const label = (id: string) => `.eq-label[data-eq="${id}"]`;
@@ -115,7 +117,7 @@ const INCIDENT: Step[] = [
 ];
 
 /** Each later chapter gets one step on the controls it adds, the first time the company enters it. */
-const chapter = (title: string, why: string, hint: string, target: string, enter?: Step["enter"]): Step[] => [{ title, why, hint: () => hint, target: () => target, enter, nextLabel: "Got it" }];
+const chapter = (title: string, why: string, hint: string, target: string, enter?: Step["enter"]): Step[] => [{ title, why, hint: () => hint, target: () => target, enter, nextLabel: "Got it", endsOnInspection: true }];
 /** A Guided Mode equipment shortcut; its inspection holds that equipment's purchases. */
 const shortcut = (id: EquipmentId) => `.campaign-panel [data-tutorial="inspect-${id}"]`;
 /** Where Deploy Health Checks is reached: Monitoring's inspection, then its details. */
@@ -252,6 +254,8 @@ function SpotlightTutorial() {
   /** The name of the closed menu the step's control is folded into, which has to be opened first. */
   const [menu, setMenu] = useState<string | null>(null);
   const card = useRef<HTMLDivElement>(null);
+  /** The inspection already open when the step began, which does not count as following it. */
+  const inspectionAtStart = useRef<number | null>(null);
   // Steps can wait on an action's confirmation, which lives outside the store.
   useSyncExternalStore(subscribeConfirming, confirmingAction);
 
@@ -271,6 +275,7 @@ function SpotlightTutorial() {
   // Run a step's setup once, then move focus to the card for keyboard and screen-reader users.
   useEffect(() => {
     if (!step) return;
+    inspectionAtStart.current = useGame.getState().roomInspection?.seq ?? null;
     step.enter?.(useGame.getState());
     card.current?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -280,6 +285,12 @@ function SpotlightTutorial() {
   useEffect(() => {
     if (step?.done && visible && step.done(useGame.getState())) advance();
   });
+  // Opening equipment is following a one-card guide, so the card and its dim give way to the inspection.
+  const inspectionSeq = s.roomInspection?.seq ?? null;
+  useEffect(() => {
+    if (step?.endsOnInspection && visible && inspectionSeq !== null && inspectionSeq !== inspectionAtStart.current) advance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inspectionSeq, visible]);
 
   // Follow the spotlighted element as the layout, camera or panel contents change.
   useEffect(() => {

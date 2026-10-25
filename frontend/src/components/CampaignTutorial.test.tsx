@@ -5,6 +5,7 @@ import { useGame, WALKTHROUGH_STEPS } from "@/game/store";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
 import Tutorial, { BASICS_STEPS } from "./Tutorial";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
+import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { saveGame, saveMeta, DEFAULT_META } from "@/game/persist";
 import { newGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
@@ -162,6 +163,29 @@ it("shows a chapter's guide on the controls the chapter adds", () => {
   expect(guide.textContent).toContain("Scale and route");
   fireEvent.click(within(guide).getByRole("button", { name: "Got it" }));
   expect(useGame.getState().tour).toBeNull();
+});
+
+it.each([
+  ["Scale and route", "scaling" as const, () => newGame(1, "chapter-guide-inspect")],
+  ["Data strategy", "data" as const, () => dataCompany()],
+])("closes the %s guide and its spotlight once the player opens equipment", (title, track, game) => {
+  useGame.setState({ game: game(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track, step: 0 } });
+  renderCompany();
+  expect(screen.getByRole("dialog", { name: "Chapter guide, step 1 of 1" }).textContent).toContain(title);
+  // Any equipment counts, not only the one the guide points at.
+  fireEvent.click(screen.getByRole("button", { name: "Database" }));
+  expect(useGame.getState().tour).toBeNull();
+  expect(screen.queryByRole("dialog", { name: /^Chapter guide/ })).toBeNull();
+  expect(document.querySelector(".tour")).toBeNull();
+  expect(screen.getByRole("dialog", { name: "Database inspected" })).toBeTruthy();
+});
+
+it("keeps a chapter guide up when an inspection was already open as it began", () => {
+  useGame.setState({ game: newGame(1, "chapter-guide-open"), ready: true, hasRun: true, started: true, onboarding: false });
+  renderCompany();
+  fireEvent.click(screen.getByRole("button", { name: "Database" }));
+  act(() => useGame.setState({ tour: { track: "scaling", step: 0 } }));
+  expect(screen.getByRole("dialog", { name: "Chapter guide, step 1 of 1" })).toBeTruthy();
 });
 
 it("explains the first settled week with a one-card tip on Cash", () => {
