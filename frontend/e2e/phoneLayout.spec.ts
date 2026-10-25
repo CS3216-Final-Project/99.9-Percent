@@ -146,6 +146,9 @@ test("Guided Mode: a new component opens at the top rather than retaining the pr
   await handle(page).tap();await handle(page).tap();
   await expect(sheet(page)).toHaveAttribute("data-state","full");
   const app=await inspectEquipment(page,"app",true),body=app.locator(".modal-body");
+  // Compact readings fit without scrolling; expand the real help before
+  // verifying that a later inspection does not inherit a nonzero scroll.
+  await app.getByText("About Servers",{exact:true}).tap();
   await body.evaluate(el=>el.scrollTo({top:el.scrollHeight}));
   await expect.poll(()=>body.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
   await closeInspection(page);

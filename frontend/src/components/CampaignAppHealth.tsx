@@ -32,16 +32,15 @@ export function CampaignAppHealth({ onClose }: { onClose: () => void }) {
             <p>{health.reason}</p>
             <p className="muted app-health-snapshot">{health.step === 0 ? "Starting readings" : `Latest readings · Step ${health.step}`}</p>
         </section>
-        <dl className="rows" aria-label="App measurements">
-            <div className="row app-health-uptime-card"><dt>Uptime</dt><dd>{uptime === null ? "\u2014 / Not enough data" : uptimePct(uptime)}</dd></div>
+        <dl className="app-health-measurements" aria-label="App measurements">
+            <Row label="Uptime" value={uptime === null ? "\u2014 / Not enough data" : uptimePct(uptime)} />
             <Row label="Response time" value={health.responseMs === null ? "Unavailable" : `${health.responseMs.toFixed(0)} ms (estimated)`} />
             <Row label="Failed requests (%)" value={health.failedRate === null ? "Unavailable" : `${(health.failedRate * 100).toFixed(2)}%`} />
             <Row label="Requests waiting" value={health.waiting === null ? "Unavailable" : num(health.waiting)} />
         </dl>
-        <p className="muted app-health-uptime-note">Uptime is the share of settled requests served across this company's recorded run. Failed and rejected requests count against it; requests still waiting are excluded.</p>
         <p className="app-health-interpretation">{health.interpretation}</p>
-        <p className="muted">Compare App Server, Database and Monitoring in System Overview.</p>
         <details className="app-health-details"><summary>More details</summary>
+            <p><b>Uptime:</b> The share of settled requests served across this company's recorded run. Failed and rejected requests count against it; requests still waiting are excluded.</p>
             <p><b>Response time (latency)</b> estimates how long requests take, including time waiting for processing.</p>
             <p>{Q.latencyThresholdMs} ms is a target for this game, not a rule for every real app.</p>
             <p><b>Failed requests (error rate)</b>: Of requests that succeeded or failed, this is the percentage that failed. Waiting and rejected requests are excluded. With no outcomes, the percentage is unavailable.</p>

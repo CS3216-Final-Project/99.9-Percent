@@ -14,15 +14,15 @@ const CHAPTERS = {
 /** Identity comes from the actual entered stage, never a timer or an unlocked Next button. */
 export function chapterCompanyMessage(game: GameState) {
   const c = game.campaign;
-  if (!c || introductionActive(c) || game.phase === "ended") return null;
-  const chapter = c.combinedStage ? 6 : c.reliabilityStage ? 5 : c.spikeStage ? 4 : c.dataStage ? 3 : c.scaling ? 2 : 1;
+  if (!c || game.phase === "ended") return null;
+  const chapter = introductionActive(c) ? 0 : c.combinedStage ? 6 : c.reliabilityStage ? 5 : c.spikeStage ? 4 : c.dataStage ? 3 : c.scaling ? 2 : 1;
   const enteredStep = (c.combinedStage ?? c.reliabilityStage ?? c.spikeStage ?? c.dataStage ?? c.scaling)?.enteredStep ?? 0;
-  const { speaker, lines, mission } = CHAPTERS[chapter];
+  const { speaker, lines, mission } = CHAPTERS[chapter || 1];
   const slow = c.snapshot.latencyMs >= 500 || c.snapshot.app.backlog > 0 || c.snapshot.db.backlog > 0;
   const target = c.combinedStage?.finalUserTarget ?? 0;
   const told = lines.map(line => typeof line === "string" ? line : line(target.toLocaleString("en-US")));
   const said: readonly string[] = chapter === 1 && slow ? ["Maya from Customer Support here. My inbox is lighting up!", "Customers are reporting that our website is getting slower. Can you find out what's causing it?"]
     : chapter === 6 && c.combinedStage!.users >= target ? [told[0], "We've hit our user target. Let's keep our service reliable and finish the final Campaign checks."] : told;
-  return { ...COLLEAGUES[speaker], speaker, lines: said, mission, chapter, key: `99.99.company-messages:${c.runId}:${chapter}:${enteredStep}` };
+  return { ...COLLEAGUES[speaker], speaker, lines: said, mission: chapter === 0 ? "Explore Network, App Servers, Database and Monitoring." : mission, chapter, key: `99.99.company-messages:${c.runId}:${chapter}:${enteredStep}` };
 }
 export type ChapterCompanyMessage = NonNullable<ReturnType<typeof chapterCompanyMessage>>;
