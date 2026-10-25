@@ -387,5 +387,3 @@ it("wraps the week clock without losing the total elapsed counter", () => {
   expect(screen.getByRole("progressbar", { name: "Operating week progress" }).getAttribute("aria-valuenow")).toBe("8");
   expect(document.querySelector(".week")?.textContent).toContain("Week 2");
 });
-
-/** Purchases live on the panel's Actions tab. */

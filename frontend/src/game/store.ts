@@ -80,8 +80,6 @@ import { clampLookSpeed, DEFAULT_CONTROLS, type ControlSettings } from "./contro
 
 export type View = "tech" | "engineers" | "history" | "menu" | "guidance" | "scorecard" | null;
 export type Speed = 0.5 | 1 | 2;
-/** The Guided Mode panel's two halves: readings of the system, and the controls that change it. */
-export type PanelTab = "analysis" | "actions";
 
 /**
  * Challenge Mode's first-week walkthrough ("basics") and first-incident guide ("incident"); Guided Mode's Opening
@@ -237,9 +235,6 @@ interface Store {
   /** Temporary workspace visibility; never serialized into a save. */
   panelOpen: boolean;
   setPanelOpen: (open: boolean) => void;
-  /** Which half of the Guided Mode panel is shown. Workspace state; never serialized into a save. */
-  panelTab: PanelTab;
-  setPanelTab: (tab: PanelTab) => void;
   selectApp: (id: string) => void;
   /** Ephemeral room or Campaign shortcut inspection asking for its reveal, or none. */
   roomInspection: RoomInspection | null;
@@ -858,9 +853,7 @@ export const useGame = create<Store>()((set, get) => {
     selectedAppId: null,
     panelOpen: true,
     setPanelOpen: open => set({panelOpen: open}),
-    panelTab: "analysis",
-    setPanelTab: tab => set({panelTab: tab}),
-    selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({panelOpen:true,panelTab:"analysis",selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
+    selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({panelOpen:true,selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
     roomInspection: null,
     dismissRoomInspection: () => {
       const inspection=get().roomInspection;
@@ -1107,7 +1100,7 @@ export const useGame = create<Store>()((set, get) => {
     },
 
     // Choosing equipment asks to read it, so the panel brings its readings forward.
-    select: id => set({...(id ? {panelOpen:true,panelTab:"analysis" as const} : {}),selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null,...(id?floorPatch(floorOf(id),"select"):{})}),
+    select: id => set({...(id ? {panelOpen:true} : {}),selected:id,selectedAppId:id==="app"?(get().selectedAppId??"app-1"):null,...(id?floorPatch(floorOf(id),"select"):{})}),
     hover: (id) => {
       if (get().hovered !== id) set({ hovered: id });
     },
@@ -1432,11 +1425,6 @@ useGame.subscribe((s, prev) => {
   if (prev.started && !s.started && s.walking) s.setWalking(false, false);
 });
 
-// Every new, loaded or practice company opens its panel on Analysis, whichever action replaced the last one.
-useGame.subscribe((s, prev) => {
-  if (s.generation !== prev.generation && s.panelTab !== "analysis") useGame.setState({ panelTab: "analysis" });
-});
-
 /**
  * Whether Challenge Mode is open to this player without reading storage: already playing it, unlocked for good, the
  * loaded company past its final reliability review, or finished with everything this edition's Guided Mode offers.
@@ -1490,7 +1478,7 @@ let roomInspectionSeq = 0;
 /**
  * An inspection the player starts in the 3D room — clicking a model or label, or the avatar's prompt: the shared
  * gameplay action runs, then the diagnostic reveal opens. Campaign shortcuts use this same entry;
- * tutorial and Classic panels keep their existing inline `inspectOrSelect` flow.
+ * Classic panels keep their existing inline `inspectOrSelect` flow.
  */
 export function inspectInRoom(id: EquipmentId, appId?: string): void {
   if (!canInspectEquipment(useGame.getState().game, id)) return;
@@ -1514,7 +1502,3 @@ function loadGraphicsSafe(): GraphicsSettings {
 }
 
 export { clearSave };
-
-/** Component introductions and operating chapters share live modal inspections, including introduction practice. */
-export const componentInspectionEnabled = (s: Pick<Store,"game"|"tour"|"tutorialCompany">): boolean =>
-  !!s.game.campaign && !s.tour && (!s.tutorialCompany || introductionActive(s.game.campaign));

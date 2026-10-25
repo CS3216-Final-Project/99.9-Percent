@@ -117,8 +117,6 @@ it("does not point at an inspection toggle that would close already-open evidenc
 });
 it("pending confirmations and newly mounted local modals immediately suppress attention", async () => {
   show(); act(() => vi.advanceTimersByTime(10_000)); expect(gold()).toHaveLength(1);
-  // A quote is opened on the Actions tab, where its card lives.
-  act(() => useGame.getState().setPanelTab("actions"));
   act(() => setConfirming("Add server")); expect(gold()).toHaveLength(0);
   act(() => vi.advanceTimersByTime(20_000)); expect(gold()).toHaveLength(0);
   act(() => setConfirming(null));
@@ -194,10 +192,10 @@ it("shared confirmations immediately glow for valid purchases and stop for stale
   act(() => useGame.setState({ game: changed })); expect(gold()).toHaveLength(0);
   fireEvent.click(screen.getByRole("button", { name: "Confirm" })); // existing preview review guard
   expect(gold()).toHaveLength(1);
+  // A guide leaves the inspection and its quote open, but owns the attention while it runs.
   act(() => useGame.setState({ tour: { track: "basics", step: 0 } })); expect(gold()).toHaveLength(0);
-  expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
-  act(() => useGame.setState({ tour: null }));
-  fireEvent.click(inspectionAction(/Add server/));
+  expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy();
+  act(() => useGame.setState({ tour: null })); expect(gold()).toHaveLength(1);
   const invalid = structuredClone(changed); invalid.campaign!.cashCents = 0;
   act(() => useGame.setState({ game: invalid })); expect(gold()).toHaveLength(0);
   expect(screen.getByRole("button", { name: "Confirm" }).hasAttribute("disabled")).toBe(true);

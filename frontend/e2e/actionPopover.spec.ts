@@ -79,7 +79,15 @@ test("Stay Online guide unlocks Health Checks in Tech and confirms its purchase"
   await page.getByRole("button",{name:/^Unlock Health Checks/}).click();
   await expect(guide(3)).toContainText("Close Tech.");
   await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Tech",exact:true}).click();
-  await (await infrastructureAction(page,/^Deploy Health Checks/)).click();
+  // The guide keeps the normal panel: no tabs, and Deploy Health Checks is reached through Monitoring's inspection.
+  await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("tablist")).toHaveCount(0);
+  await expect(guide(3)).toContainText("Click Monitoring.");
+  await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Monitoring",exact:true}).click();
+  const monitoring=page.getByRole("dialog",{name:"Monitoring inspected",exact:true});
+  await expect(guide(3)).toContainText("Press Inspect details.");
+  await monitoring.getByRole("button",{name:"Inspect details",exact:true}).click();
+  await expect(guide(3)).toContainText("Press Deploy Health Checks.");
+  await monitoring.getByRole("button",{name:/^Deploy Health Checks/}).click();
   await expect(guide(3)).toContainText("Press Confirm.");
   const confirmation=page.getByRole("region",{name:"Confirm Deploy Health Checks",exact:true});
   await expect(page.locator('.eq-label[data-eq="monitoring"]')).toHaveClass(/is-affected/);

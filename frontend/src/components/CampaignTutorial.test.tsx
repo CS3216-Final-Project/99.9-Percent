@@ -93,10 +93,11 @@ it("waits through an incident on a resumed company without holding its clock", (
   expect(useGame.getState().game.campaign!.step).toBe(7);
 });
 
-it("walks Stay Online through unlocking Health Checks in Tech and deploying it", { timeout: 30_000 }, () => {
+it("walks Stay Online through unlocking Health Checks in Tech and deploying it from Monitoring", { timeout: 30_000 }, async () => {
   useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 0 } });
   renderCompany();
   const guide = (step: number) => screen.getByRole("dialog", { name: `Chapter guide, step ${step} of 3` });
+  expect(screen.queryByRole("tablist")).toBeNull();
   fireEvent.click(within(guide(1)).getByRole("button", { name: "Got it" }));
   expect(guide(2).textContent).toContain("Unlock Health Checks");
   expect(guide(2).textContent).toContain("Open Tech.");
@@ -110,8 +111,14 @@ it("walks Stay Online through unlocking Health Checks in Tech and deploying it",
   expect(useGame.getState().game.campaign!.reliabilityStage!.owned).toContain("health_checks");
   expect(guide(3).textContent).toContain("Close Tech.");
   fireEvent.click(screen.getByRole("button", { name: "Tech" }));
-  expect(guide(3).textContent).toContain("Press Deploy Health Checks.");
-  fireEvent.click(screen.getByRole("button", { name: /^Deploy Health Checks/ }));
+  expect(guide(3).textContent).toContain("Click Monitoring.");
+  fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
+  const monitoring = screen.getByRole("dialog", { name: "Monitoring inspected" });
+  // The inspection holds the step's control, so the guide stays up over it.
+  expect(guide(3).textContent).toContain("Press Inspect details.");
+  fireEvent.click(within(monitoring).getByRole("button", { name: "Inspect details" }));
+  await vi.waitFor(() => expect(guide(3).textContent).toContain("Press Deploy Health Checks."));
+  fireEvent.click(within(monitoring).getByRole("button", { name: /^Deploy Health Checks/ }));
   expect(guide(3).textContent).toContain("Press Confirm.");
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   expect(useGame.getState().tour).toBeNull();
@@ -132,29 +139,20 @@ it("points at a closed dock menu that holds the step's control and names it, but
   expect(prompt()).toBe("Close Tech.");
 });
 
-it("keeps the Deploy Health Checks step on its own action when the player buys something else first", { timeout: 30_000 }, () => {
+it("keeps the Deploy Health Checks step on its own action when the player buys something else first", { timeout: 30_000 }, async () => {
   useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 1 } });
   renderCompany();
   act(() => useGame.getState().act({ type: "unlock_reliability", tech: "health_checks" }));
   const guide = () => screen.getByRole("dialog", { name: "Chapter guide, step 3 of 3" });
-  expect(guide().textContent).toContain("Press Deploy Health Checks.");
-  fireEvent.click(screen.getByRole("button", { name: /^Add server/ }));
+  expect(guide().textContent).toContain("Click Monitoring.");
+  fireEvent.click(screen.getByRole("button", { name: "App Server" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "App Servers" })).getByRole("button", { name: /^Add server/ }));
   expect(guide().textContent).not.toContain("Press Confirm.");
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+  fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Monitoring inspected" })).getByRole("button", { name: "Inspect details" }));
   expect(screen.getByRole("button", { name: /^Deploy Health Checks/ })).toHaveProperty("disabled", true);
-  expect(guide().textContent).toContain("Run until the current install finishes, then press Deploy Health Checks.");
-});
-
-it("points the Deploy Health Checks step back to Actions when the player reads Analysis", () => {
-  useGame.setState({ game: reliabilityCompany(), ready: true, hasRun: true, started: true, onboarding: false, tour: { track: "reliability", step: 1 } });
-  renderCompany();
-  act(() => useGame.getState().act({ type: "unlock_reliability", tech: "health_checks" }));
-  const guide = () => screen.getByRole("dialog", { name: "Chapter guide, step 3 of 3" });
-  expect(useGame.getState().panelTab).toBe("actions");
-  fireEvent.click(screen.getByRole("tab", { name: "Analysis" }));
-  expect(guide().textContent).toContain("Open Actions.");
-  fireEvent.click(screen.getByRole("tab", { name: /^Actions/ }));
-  expect(guide().textContent).toContain("Press Deploy Health Checks.");
+  await vi.waitFor(() => expect(guide().textContent).toContain("Run until the current install finishes, then press Deploy Health Checks."));
 });
 
 it("shows a chapter's guide on the controls the chapter adds", () => {
@@ -174,5 +172,3 @@ it("explains the first settled week with a one-card tip on Cash", () => {
   fireEvent.click(within(tip).getByRole("button", { name: "Got it" }));
   expect(useGame.getState().tour).toBeNull();
 });
-
-/** Purchases live on the panel's Actions tab. */

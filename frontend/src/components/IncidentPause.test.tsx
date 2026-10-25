@@ -179,5 +179,3 @@ it("does not offer Pause during accepted recovery work with the mouse captured",
   startIncident(); expect(useGame.getState().running).toBe(true); expect(gold()).toHaveLength(0);
   canvas.remove();
 });
-
-/** Purchases live on the panel's Actions tab. */

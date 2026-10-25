@@ -1,5 +1,5 @@
 import {infrastructureAction,purchasePreview} from "./componentInspection";
-import { test, expect, seedSave, savedGame, expectRoom, openCameraControls, openPanelTab } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, openCameraControls } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { applyCampaignInput, step } from "../src/sim/step";
@@ -61,9 +61,8 @@ async function bootPanel(page: Page, game: GameState) {
   await expect(page.getByRole("region", { name: "Guided Mode guidance" })).toBeVisible();
 }
 
-/** Spends the research pick through its confirmation on the Actions tab, as the player does. */
+/** Spends the research pick through its confirmation, as the player does. */
 async function pickCaching(page: Page) {
-  await openPanelTab(page, "Actions");
   const sheet = page.getByRole("region", { name: "Launch Week research" });
   await sheet.getByRole("button", { name: "Caching" }).click();
   await page.locator(".campaign-action-popover").getByRole("button", { name: "Confirm", exact: true }).click();
@@ -86,9 +85,8 @@ test("a week that ends with research unspent asks for the pick, then scores and 
   await expect(guidance.getByRole("button", { name: "Complete Opening" })).toHaveCount(0);
   await expect(tutorial(page)).toContainText("research point");
   await expect(page.getByRole("region", { name: "Guided Mode chapters" })).toContainText("Spend your free research pick to see your Launch Week score.");
-  // The pick is a purchase on Actions: the step lights that tab, then scrolls the whole sheet into the panel.
+  // The step lights the research sheet and scrolls the whole sheet into the panel.
   await expect(page.locator("[data-spotlight]")).toHaveAccessibleName("Launch Week research");
-  await openPanelTab(page, "Actions");
   await expect(page.getByRole("region", { name: "Launch Week research" })).toBeInViewport({ ratio: 1 });
   await pickCaching(page);
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
@@ -109,7 +107,6 @@ test("a week that ends during its database incident lets the player fix and revi
   await bootPanel(page, over);
   await expect(page.getByTestId("physical-step")).toHaveText("60");
   await expect(page.getByRole("button", { name: "Complete Opening" })).toHaveCount(0);
-  await openPanelTab(page, "Actions");
   await (await infrastructureAction(page,/^Upgrade database/)).click();
   await purchasePreview(page).getByRole("button", { name: "Confirm", exact: true }).click();
   expect((await savedGame(page)).campaign!.pending.some(a => a.type === "upgrade-db")).toBe(true);
@@ -183,9 +180,8 @@ test("cold open: the launch letter, the whole room and the opening beat", async 
 
 test("the research sheet previews each option and spends the pick", async ({ page }) => {
   await boot(page, researchReady());
-  // The pick is a purchase on Actions: the step lights that tab until the player opens it.
+  // The step lights the research sheet in the panel.
   await expect(page.locator("[data-spotlight]")).toHaveAccessibleName("Launch Week research");
-  await openPanelTab(page, "Actions");
   const sheet = page.getByRole("region", { name: "Launch Week research" });
   await expect(sheet).toBeVisible();
   // A spotlighted tutorial step explains the free research point beside the sheet.

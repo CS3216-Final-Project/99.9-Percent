@@ -116,38 +116,38 @@ const INCIDENT: Step[] = [
 
 /** Each later chapter gets one step on the controls it adds, the first time the company enters it. */
 const chapter = (title: string, why: string, hint: string, target: string, enter?: Step["enter"]): Step[] => [{ title, why, hint: () => hint, target: () => target, enter, nextLabel: "Got it" }];
-/** The Guided Mode panel's Actions tab, lit when the controls a step points at are on it but another tab is shown. */
-const ACTIONS_TAB = '.campaign-panel [role="tab"][data-tab="actions"]';
-const onActions = (s: Snapshot, target: string) => (s.panelTab === "actions" ? target : ACTIONS_TAB);
-/** A chapter whose controls are purchases: it opens the panel's Actions tab, and lights that tab if the player leaves it. */
-const actionsChapter = (title: string, why: string, hint: string, target: string): Step[] =>
-  chapter(title, why, hint, target).map((step) => ({ ...step, target: (s) => onActions(s, target), enter: showActions }));
-const showActions = (s: Snapshot) => s.setPanelTab("actions");
+/** A Guided Mode equipment shortcut; its inspection holds that equipment's purchases. */
+const shortcut = (id: EquipmentId) => `.campaign-panel [data-tutorial="inspect-${id}"]`;
+/** Where Deploy Health Checks is reached: Monitoring's inspection, then its details. */
+const DEPLOY_CHECKS = '.component-inspection [data-tour="deploy-checks"]';
+const MONITORING_DETAILS = ".component-inspection-monitoring [data-inspection-details]";
+const checksStep = (s: Snapshot) =>
+  s.roomInspection?.equipment !== "monitoring" ? "inspect" : document.querySelector(DEPLOY_CHECKS) ? "deploy" : "details";
 const CHAPTERS = {
-  scaling: actionsChapter(
+  scaling: chapter(
     "Scale and route",
     `The next growth wave brings ${num(P.traffic)} requests a second.`,
-    "Compare scaling and routing options. Extra servers help only when traffic reaches them.",
-    '[aria-label="Scaling controls"]',
+    "Inspect App Server and Network to compare scaling and routing options. Extra servers help only when traffic reaches them.",
+    shortcut("app"),
   ),
-  data: actionsChapter(
+  data: chapter(
     "Data strategy",
     "Cache hits answer repeated reads; misses and writes still reach the Database.",
-    "Inspect the workload and compare your options.",
-    '[aria-label="Data strategy"]',
+    "Inspect Read Cache to see the workload and compare your options.",
+    shortcut("cache"),
   ),
-  spikes: actionsChapter(
+  spikes: chapter(
     "Traffic spikes",
     "Two short bursts of traffic are coming.",
-    "Inspect demand and compare manual capacity with autoscaling.",
-    '[aria-label="Traffic spikes and autoscaling"]',
+    "Inspect App Server to compare manual capacity with autoscaling.",
+    shortcut("app"),
   ),
   reliability: [
-    ...actionsChapter(
+    ...chapter(
       "Stay online",
       "The test makes one App Server fail. Manual and automatic responses are available.",
-      "Explore the reliability controls before starting the test.",
-      '[aria-label="Stay Online"]',
+      "Explore the reliability controls on Monitoring, App Server and Network before starting the test.",
+      '.campaign-panel [aria-label="Chapter Progress"]',
     ),
     {
       title: "Unlock Health Checks",
@@ -166,14 +166,20 @@ const CHAPTERS = {
           ? "Close Tech."
           : confirmingChecks()
             ? "Press Confirm."
-            : s.panelTab !== "actions"
-              ? "Open Actions."
-              : s.game.campaign && installPending(s.game.campaign)
-                ? "Run until the current install finishes, then press Deploy Health Checks."
-                : "Press Deploy Health Checks.",
-      // The confirmation opens beside the panel; light it up rather than leaving it under the dim.
-      target: (s) => (s.view === "tech" ? TECH_TAB : confirmingChecks() ? ".campaign-action-popover" : onActions(s, '[data-tour="deploy-checks"]')),
-      enter: showActions,
+            : checksStep(s) === "inspect"
+              ? "Click Monitoring."
+              : checksStep(s) === "details"
+                ? "Press Inspect details."
+                : s.game.campaign && installPending(s.game.campaign)
+                  ? "Run until the current install finishes, then press Deploy Health Checks."
+                  : "Press Deploy Health Checks.",
+      // The confirmation opens over the inspection; light it up rather than leaving it under the dim.
+      target: (s) =>
+        s.view === "tech"
+          ? TECH_TAB
+          : confirmingChecks()
+            ? ".component-purchase, .campaign-action-popover"
+            : { inspect: shortcut("monitoring"), details: MONITORING_DETAILS, deploy: DEPLOY_CHECKS }[checksStep(s)],
       inTech: true,
       done: (s) => {
         const c = s.game.campaign;
@@ -185,7 +191,7 @@ const CHAPTERS = {
     "Grow the company",
     "Three growth waves use everything you have built.",
     "Start each wave when you are ready, then review how it went.",
-    ".campaign-guidance",
+    '.campaign-panel [aria-label="Next step"]',
   ),
 } satisfies Record<string, Step[]>;
 
@@ -286,7 +292,8 @@ function SpotlightTutorial() {
       const height = card.current?.getBoundingClientRect().height;
       if (height) setCardHeight(previous => previous === height ? previous : height);
       setViewport((v) => (v.w === window.innerWidth && v.h === window.innerHeight ? v : { w: window.innerWidth, h: window.innerHeight }));
-      const hiddenByModal = !!document.querySelector(".modal-backdrop");
+      // A Guided Mode inspection is where a step's control lives, not a dialog the guide waits behind.
+      const hiddenByModal = [...document.querySelectorAll(".modal-backdrop")].some((node) => !node.closest(".component-inspection") && !node.querySelector(":scope > .component-inspection"));
       setCovered(hiddenByModal);
       if (hiddenByModal) focusedFor = "";
       const sel = step.target(useGame.getState());
@@ -326,7 +333,7 @@ function SpotlightTutorial() {
       }
       if (scrolledFor !== sel) {
         scrolledFor = sel;
-        if (el.closest(".side, .sheet-body, .tree-scroll, .tree-detail")) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+        if (el.closest(".side, .sheet-body, .tree-scroll, .tree-detail, .component-inspection")) el.scrollIntoView({ block: "nearest", inline: "nearest" });
       }
       const r = el.getBoundingClientRect();
       const side = document.querySelector(".side")?.getBoundingClientRect();

@@ -171,5 +171,3 @@ it("shows unpaid-cost risk before a forecast is available and withholds estimate
     expect(health.textContent).toContain("This company has closed");
     expect(health.textContent).not.toContain("How long your money might last");
 });
-
-/** Purchases live on the panel's Actions tab. */

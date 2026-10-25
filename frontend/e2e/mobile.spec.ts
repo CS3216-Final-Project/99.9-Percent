@@ -7,7 +7,7 @@ import { chapter6Preparation, bootChapter6 } from "./chapter6Guidance";
 import { appHealthDuringOpening, appHealthJourney, appHealthProblem } from "./appHealth";
 import type { Page } from "@playwright/test";
 import { keyboardDetails, purchaseLayout } from "./purchaseLayout";
-import { completeTutorial, advanceCampaignStep, openPanelTab } from "./fixtures";
+import { completeTutorial, advanceCampaignStep } from "./fixtures";
 import { financeDuringWalkthrough } from "./financeIntegration";
 import { test, expect, expectRoom, savedGame, seedSave, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
@@ -351,7 +351,6 @@ test("inspects evidence and advances a physical step on touch", async ({ page , 
   const mute = page.getByRole("button", { name: "Mute sound", exact: true });
   await mute.tap(); await expect(mute).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: "test-results/phase1-mobile.png" });
-  await openPanelTab(page, "Analysis");
   await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).tap();
   const before=(await savedGame(page)).campaign!.step;
   await closeInspection(page);await advanceCampaignStep(page);
@@ -381,7 +380,6 @@ test("investigates and responds through the incident panel on touch", async ({ p
   expect((await savedGame(page)).campaign!.step).toBe(6);
   await expect(database.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
   await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
-  await openPanelTab(page, "Actions");
   for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
     const button = await infrastructureAction(page,name);
     await button.scrollIntoViewIfNeeded();
@@ -477,7 +475,7 @@ test("cache selection, paid activation and warmth reload on touch",async({page, 
  const before=(await savedGame(page)).campaign!;expect(before.readCache).not.toBeNull();expect(before.readCache!.warmth).toBe(0);
  await advanceCampaignStep(page);
  expect((await savedGame(page)).campaign!.readCache!.warmth).toBe(1200);
- await openPanelTab(page,"Actions");await inspectEquipment(page,"cache",true);await data.scrollIntoViewIfNeeded();await page.screenshot({path:"test-results/phase4-mobile-cache.png"});
+ await inspectEquipment(page,"cache",true);await data.scrollIntoViewIfNeeded();await page.screenshot({path:"test-results/phase4-mobile-cache.png"});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
  const saved=(await savedGame(page)).campaign!;await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).tap();
  expect((await savedGame(page)).campaign).toEqual(saved);
@@ -690,8 +688,6 @@ test("Launch Week cold open and research sheet remain usable by touch at 390px",
   }
   await seedSave(page, s); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).tap(); await expectRoom(page);
-  // The pick is a purchase on Actions.
-  await openPanelTab(page, "Actions");
   const sheet = page.getByRole("region", { name: "Launch Week research" });
   await expect(sheet).toBeVisible();
   await page.screenshot({ path: info.outputPath("launch-research-touch.png") });

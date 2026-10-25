@@ -155,5 +155,3 @@ it("introduces traffic limiting in Launch Week only once an incident happens", (
   expect(useGame.getState().game.campaign!.incident).not.toBeNull();
   expect(inspectionAction(/Limit to/).getAttribute("aria-description") ?? "").toMatch(/uptime and reputation/);
 });
-
-/** Purchases live on the panel's Actions tab. */
