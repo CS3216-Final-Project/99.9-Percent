@@ -31,7 +31,7 @@ export function launchWeekCacheHits(c: Campaign, admitted: number): number {
  */
 export function advanceLaunchWeek(c: Campaign): void {
     const lw = c.launchWeek;
-    if (!lw) return;
+    if (!lw || lw.introduction) return;
     if (c.step === L.spikeStep && !c.consumedEvents.includes("launch-week-1")) {
         const from = c.incomingRate;
         c.incomingRate = L.spikeTraffic;

@@ -1,3 +1,4 @@
+import { closeInspection, followHintComponent, inspectEquipment } from "./componentInspection";
 import { test, expect, seedSave, savedGame, expectRoom } from "./fixtures";
 import { act, spikeCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
 import type { GameState } from "../src/sim";
@@ -23,11 +24,11 @@ test("Chapter 4 cues: centered 320px Prepare, manual Hint targeting and reload r
   await page.screenshot({ path: info.outputPath("prepare-320.png") });
   const before = (await savedGame(page)).campaign!;
   await cue.getByRole("button", { name: "Got it", exact: true }).click();
-  await page.getByRole("button", { name: "Hint", exact: true }).click();
+  await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).click();
   const hint = page.getByRole("dialog", { name: "Hint", exact: true }); await expect(hint).toContainText("Check App Server capacity");
   await hint.getByRole("button", { name: "Got it", exact: true }).click();
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("App Server");
-  await gold(page).click(); await expect(page.getByRole("region", { name: "Servers readings" })).toBeVisible();
+  await gold(page).click();await inspectEquipment(page,"app",true); await expect(page.getByRole("region", { name: "Servers readings" })).toBeVisible();
   expect((await savedGame(page)).campaign!.step).toBe(before.step);
   await page.clock.resume(); await page.reload();
   await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
@@ -42,9 +43,10 @@ for (const [offset, name, tone] of [[7, "Spike 1", "pressure"], [27, "Between sp
     const cue = page.getByRole("dialog", { name: `Chapter 4: ${name}`, exact: true }); await expect(cue).toBeVisible();
     await expectCueColours(cue, tone);
     await cue.getByRole("button", { name: "Got it", exact: true }).click();
-    await page.getByRole("button", { name: "Hint", exact: true }).click();
+    await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).click();
     const hint = page.getByRole("dialog", { name: "Hint", exact: true }); await expect(hint).toContainText(/reject/);
     await hint.getByRole("button", { name: "Got it", exact: true }).click();
+    if(name==="Between spikes")await followHintComponent(page);
     await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName(name === "Between spikes" ? /^Add server/ : "Run");
     expect((await savedGame(page)).campaign!.step).toBe(spikeCompany(false).campaign!.spikeStage!.enteredStep + offset + 1);
   });
@@ -59,9 +61,9 @@ test("Chapter 4 cues: Respond yields to immediate incident Pause and action Conf
   await expectCueColours(page.getByRole("dialog", { name: "Chapter 4: Respond", exact: true }), "pressure");
   await page.clock.runFor(2000); await expect(page.getByRole("dialog", { name: /^Chapter 4:/ })).toHaveCount(0);
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Pause"); await gold(page).click();
-  await page.getByRole("button", { name: "Hint", exact: true }).click();
+  await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).click();
   await page.getByRole("dialog", { name: "Hint", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
-  await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName(/^Add server/);
+  await expect(gold(page)).toHaveCount(1); await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Add server/);
   await gold(page).click(); await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Confirm");
 });
 
@@ -72,15 +74,15 @@ test("Chapter 4 decisions: evaluate rejected traffic, optional improvement, Canc
   const cue = page.getByRole("dialog", { name: "Chapter 4: Between spikes", exact: true });
   await expect(cue).toContainText("served"); await expect(cue).toContainText("rejected");
   await cue.getByRole("button", { name: "Got it", exact: true }).click();
-  await page.getByRole("button", { name: "Hint", exact: true }).click();
+  await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).click();
   const hint = page.getByRole("dialog", { name: "Hint", exact: true });
   await expect(hint).toContainText("0 incidents recorded"); await expect(hint).toContainText("Changes are optional");
   await hint.getByRole("button", { name: "Got it", exact: true }).click();
-  await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName(/^Add server/);
+  await expect(gold(page)).toHaveCount(1); await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Add server/);
   await gold(page).click(); await expect(gold(page)).toHaveAccessibleName("Confirm");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   expect((await savedGame(page)).campaign!.cashCents).toBe(game.campaign!.cashCents);
-  await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
+  await closeInspection(page);await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step + 1);
   expect((await savedGame(page)).campaign!.limit).toBe(500);

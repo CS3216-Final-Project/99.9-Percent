@@ -1,3 +1,4 @@
+import {infrastructureAction} from "./componentInspection";
 import { expectRoom, openPanelTab, seedSave, test, expect } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -14,10 +15,11 @@ test("hovering and quoting an action previews it in the room until cancelled", a
   const stage = page.locator(".stage-canvas");
   await expect(stage).not.toHaveAttribute("data-ghost");
   await openPanelTab(page, "Actions");
-  const upgrade = page.getByRole("button", { name: /Upgrade database/ });
+  const upgrade = await infrastructureAction(page,/Upgrade database/);
   await upgrade.hover();
   await expect(stage).toHaveAttribute("data-ghost", "upgrade-db");
-  await page.getByRole("button", { name: /Add server/ }).hover();
+  const add = await infrastructureAction(page,/Add server/);
+  await add.hover();
   await expect(stage).toHaveAttribute("data-ghost", "add-app");
   await page.getByRole("button", { name: /Add server/ }).click();
   const confirm = page.getByRole("region", { name: "Confirm Add server" });

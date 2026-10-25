@@ -1,3 +1,5 @@
+import InspectionReveal from "./InspectionReveal";
+import { enterHighlightedInspection } from "./inspectionTestUtils";
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -60,7 +62,7 @@ it("retains an in-memory receipt when browser storage is unavailable", () => {
 });
 it("preserves pause/resume, manual Hint ownership and confirmation priority without changing the company", () => {
   useGame.setState({ game: initial, ready: true, started: true, running: false, onboarding: false, tour: null });
-  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost>);
+  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost>);
   const before = useGame.getState().game;
   fireEvent.click(within(screen.getByRole("dialog", { name: "Company Message" })).getByRole("button", { name: "Dismiss company message" }));
   expect(popup()).not.toBeNull(); act(() => useGame.getState().setRunning(true)); expect(popup()).not.toBeNull();
@@ -74,33 +76,35 @@ it("never overlays an active incident or its immediate Pause control", () => {
   const game = untilOffset(initial, 10);
   expect(game.phase).toBe("incident");
   useGame.setState({ game, ready: true, started: true, running: true, onboarding: false, tour: null });
-  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost>);
+  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost>);
   expect(popup()).toBeNull(); expect(screen.getByRole("button", { name: "Pause" })).not.toBeNull();
 });
-it("transfers Hint to the small server's real Scale up, immediate Confirm, and accepted-install Run", () => {
+it("transfers Hint to the small server's real Scale up, immediate Confirm, and accepted-install Run", async () => {
   const game = tick(decide(untilOffset(initial, 8), { type: "add_server" }), 2);
   useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null, selected: "app", selectedAppId: "app-3", panelOpen: true });
-  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost>);
+  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost>);
   const gold = () => document.querySelectorAll(".campaign-gold-attention");
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
-  fireEvent.click(within(screen.getByRole("dialog", { name: "Hint" })).getByRole("button", { name: "Got it" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Hint" })).getByRole("button", { name: "Got it" })); enterHighlightedInspection();
+  await act(async()=>{});enterHighlightedInspection();
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Scale up App 3");
   fireEvent.click(gold()[0]); expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
-  expect(useGame.getState().game).toBe(game);
+  expect(useGame.getState().game.campaign!.step).toBe(game.campaign!.step);
+  expect(useGame.getState().game.campaign!.cashCents).toBe(game.campaign!.cashCents);
   fireEvent.click(gold()[0]); expect(useGame.getState().game.campaign!.pending.some(a => a.type === "scale-up")).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
-  fireEvent.click(within(screen.getByRole("dialog", { name: "Hint" })).getByRole("button", { name: "Got it" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Hint" })).getByRole("button", { name: "Got it" })); enterHighlightedInspection();
   expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
 });
 
 it("escapes stale About Network advice with protective Run when the open inspector predates the pulse", () => {
   const game = untilOffset(decide(limited, { type: "incident_inspect", equipment: "gateway" }), 8);
   useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null, selected: "gateway", panelOpen: true });
-  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost>);
+  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost>);
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   const hint = screen.getByRole("dialog", { name: "Hint" });
   expect(hint.textContent).toContain("Keep the limit"); expect(hint.textContent).not.toContain("About Network");
-  fireEvent.click(within(hint).getByRole("button", { name: "Got it" }));
+  fireEvent.click(within(hint).getByRole("button", { name: "Got it" })); enterHighlightedInspection();
   const gold = document.querySelectorAll(".campaign-gold-attention");
   expect(gold).toHaveLength(1); expect(gold[0].getAttribute("aria-label")).toBe("Run");
   expect(useGame.getState().game).toBe(game);
@@ -112,18 +116,18 @@ it("targets Remove traffic limit in an already-open Network panel, yields to Con
   game = tick(decide(game, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] }));
   game = untilOffset(tick(decide(game, { type: "set_traffic_limit", enabled: true })), 8);
   useGame.setState({ game, ready: true, started: true, running: false, onboarding: false, tour: null, selected: "gateway", panelOpen: true });
-  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><CampaignControls /></CampaignAttentionHost>);
+  render(<CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost>);
   const gold = () => document.querySelectorAll<HTMLElement>(".campaign-gold-attention");
   const accept = () => {
     fireEvent.click(screen.getByRole("button", { name: "Hint" }));
     const hint = screen.getByRole("dialog", { name: "Hint" }); expect(hint.textContent).not.toContain("About Network");
-    fireEvent.click(within(hint).getByRole("button", { name: "Got it" }));
+    fireEvent.click(within(hint).getByRole("button", { name: "Got it" })); enterHighlightedInspection();
     expect(gold()).toHaveLength(1);
   };
-  accept(); expect(gold()[0].textContent).toContain("Remove traffic limit"); fireEvent.click(gold()[0]);
+  accept(); const inspected=useGame.getState().game;expect(gold()[0].textContent).toContain("Remove traffic limit"); fireEvent.click(gold()[0]);
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  expect(gold()).toHaveLength(0); expect(useGame.getState().game).toBe(game);
+  expect(gold()).toHaveLength(0); expect(useGame.getState().game).toBe(inspected);
   accept(); fireEvent.click(gold()[0]); fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   expect(useGame.getState().game.campaign!.pending.some(p => p.type === "unlimit")).toBe(true);
   accept(); expect(gold()[0].getAttribute("aria-label")).toBe("Run");

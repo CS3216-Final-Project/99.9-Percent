@@ -1,3 +1,4 @@
+import { introductionActive, introductionAction } from "./introduction";
 import { advanceCombinedTraffic, combinedAction, combinedProfile, currentFault, observeCombined, pendingCombined } from "./combinedCampaign";
 import { captureScorecard, emptyServiceMeasurement, observeService } from "./campaignScorecard";
 import { activateReliability, advanceHealth, detect, effectiveTargets, initializeHealth, observeReliability, pendingReliability, recoverySafe, reliabilityAction } from "./reliability";
@@ -162,7 +163,7 @@ export function qualifiesForRecovery(m: Snapshot): boolean {
     return m.latencyMs < Q.latencyThresholdMs && m.serviceErrorRate !== null &&
         m.serviceErrorRate < Q.errorThreshold && m.admitted > 0 && m.successful + m.failed > 0;
 }
-export type StopReason = "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | "reliability-review" | "combined-review" | null;
+export type StopReason = "introduction" | "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | "reliability-review" | "combined-review" | null;
 export function step(prev: GameState): {
     state: GameState;
     stopReason: StopReason;
@@ -171,6 +172,7 @@ export function step(prev: GameState): {
         throw new Error("Physical step requires an opening-db campaign");
     if (prev.phase === "review" || prev.phase === "ended")
         return { state: prev, stopReason: prev.phase };
+    if (introductionActive(prev.campaign)) return {state:prev,stopReason:"introduction"};
     const pending = pendingStop(prev.campaign);
     if (pending)
         return { state: prev, stopReason: pending };
@@ -188,6 +190,7 @@ export function pendingStop(c: Campaign | undefined): "reliability-review" | "pr
  */
 export function stepInPlace(s: GameState): StopReason {
     const c = s.campaign!;
+    if(introductionActive(c))return "introduction";
     const pending = pendingStop(c);
     if (pending) return pending;
     const traceStart = c.trace.length;
@@ -427,6 +430,7 @@ export function advanceSteps(prev: GameState, count: number): {
         throw new Error("Physical step requires an opening-db campaign");
     if (prev.phase === "review" || prev.phase === "ended")
         return { state: prev, stepsConsumed: 0, stopReason: prev.phase };
+    if(introductionActive(prev.campaign))return {state:prev,stepsConsumed:0,stopReason:"introduction"};
     const pending = pendingStop(prev.campaign);
     if (pending) return { state: prev, stepsConsumed: 0, stopReason: pending };
     // Copy once and step the copy, so a long advance costs no more than its steps.
@@ -466,6 +470,23 @@ type Rejection = Extract<ActionResult, { ok: false }>;
 function actInPlace(s: GameState, action: Action, legacyPreventionMilestone: boolean, deferPreventionMilestone: boolean): Rejection | null {
     const fail = (message: string): Rejection => ({ ok: false, reason: "invalid", message });
     const c0 = s.campaign!;
+    const introduction=introductionAction(s,action);
+    if(introduction!==undefined) {
+      if(!introduction && action.type==="complete_introduction") {
+        if(action.handoff==="opening") {
+          // The tutorial has no business time or purchases. Reuse the untouched Opening initializer.
+          const tutorial=s.campaign!,opening=initialCampaign(tutorial.runId,1);
+          opening.replayScenarioVersion=tutorial.replayScenarioVersion??tutorial.scenarioVersion;
+          opening.completedIntroduction=tutorial.launchWeek!.introduction;
+          opening.inputs=tutorial.inputs;opening.trace=tutorial.trace;opening.nextEventId=tutorial.nextEventId;
+          opening.serviceMeasurement=tutorial.serviceMeasurement;
+          s.campaign=opening;
+          trace(opening,"opening-stage-entered",{from:"introduction",scenarioVersion:1,cashCents:opening.cashCents,dbCapacity:opening.dbCapacity});
+          projectCampaign(s);
+        } else enterScalingInPlace(s);
+      }
+      return introduction;
+    }
     const combined = combinedAction(s, action);
     if (combined !== undefined) {
         if (!combined) projectCampaign(s);
@@ -563,7 +584,7 @@ function actInPlace(s: GameState, action: Action, legacyPreventionMilestone: boo
         return fail("An infrastructure deployment is already pending.");
     if (type === "add-app" && c.apps.length >= (c.spikeStage?T.maximum:openingTuning(c).maxApps))
         return fail(c.spikeStage ? "Four application instances are already installed." : "Two application instances are already installed.");
-    if (type === "upgrade-db" && c.launchWeek && c.step < L.growthStep)
+    if (type === "upgrade-db" && c.launchWeek && c.launchWeek.completedStep===null && c.step < L.growthStep)
         return fail("The database upgrade unlocks when week-two growth saturates the current database.");
     if (type === "upgrade-db" && !databaseUpgrade(c))
         return fail("The database is already upgraded.");

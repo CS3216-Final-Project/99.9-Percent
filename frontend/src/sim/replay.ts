@@ -1,3 +1,4 @@
+import { introductionActive } from "./introduction";
 import type { GameState } from "./types";
 import { emptyServiceMeasurement } from "./campaignScorecard";
 import type { ServiceMeasurement } from "./campaignTypes";
@@ -58,7 +59,7 @@ function advanceTo(s: GameState, target: number, legacyPrevention: boolean): voi
         throw new Error("Inputs are out of order");
     while (s.campaign!.step < target) {
         if (legacyPrevention) acknowledgeUnseenPrevention(s);
-        if (s.phase === "review" || s.phase === "ended" || pendingStop(s.campaign))
+        if (introductionActive(s.campaign) || s.phase === "review" || s.phase === "ended" || pendingStop(s.campaign))
             throw new Error("The run cannot advance past a review, recognition or bankruptcy");
         stepInPlace(s);
     }

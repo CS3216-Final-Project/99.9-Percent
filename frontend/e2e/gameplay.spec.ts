@@ -1,4 +1,5 @@
-import { completeTutorial, advanceCampaignStep, setGameSpeed, openPanelTab } from "./fixtures";
+import { infrastructureAction, inspectEquipment, closeInspection } from "./componentInspection";
+import { completeTutorial, advanceCampaignStep, setGameSpeed } from "./fixtures";
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -27,44 +28,40 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       // Clicking in the room opens the diagnostic card; the panel's inspection behind it is unchanged.
       const dbReveal = page.getByRole("dialog", { name: "Database inspected" });
       await expect(dbReveal).toBeVisible();
-      await dbReveal.getByRole("button", { name: "Return to room" }).click();
+      await dbReveal.getByRole("button", { name: "Inspect details",exact:true }).click();
       await expect(panel.getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");
-      const evidence=panel.locator(".campaign-evidence .evidence-rows");
+      const evidence=dbReveal.locator(".campaign-evidence .evidence-rows");
       await expect(evidence.locator("dd")).toHaveText(["800 operations/s", "600 operations/s", "600"]);
-      await expect(panel.getByRole("progressbar", { name: "Database load: 800 of 600 operations/s" })).toBeVisible();
-      await expect(panel.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
-      await expect(panel.getByText("Live", { exact: true })).toBeVisible();
-      await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
-      await openPanelTab(page, "Actions");
+      await expect(dbReveal.getByRole("progressbar", { name: "Database load: 800 of 600 operations/s" })).toBeVisible();
+      await expect(dbReveal.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
+      await expect(dbReveal.getByText("Live", { exact: true })).toBeVisible();
+      await expect(dbReveal.getByText("Full system evidence", { exact: true })).toHaveCount(0);
       for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
-        const action = panel.getByRole("button", { name });
+        const action = await infrastructureAction(page,name);
         await action.scrollIntoViewIfNeeded();
         await expect(action).toBeInViewport();
       }
       // Inspection is repeatable and cannot advance the physical clock.
-      await openPanelTab(page, "Analysis");
-      await panel.getByRole("button", { name: "Database", exact: true }).click();
+      await inspectEquipment(page,"db",true);
       await panel.evaluate(el => { el.scrollTop = 0; });
-      await page.screenshot({ path: "test-results/phase1-desktop.png" });
+      await page.screenshot({ path: "test-results/phase1-desktop.png" });await closeInspection(page);
     }
     const opening = (await savedGame(page)).campaign!;
     expect(opening.step).toBe(6);
-    await openPanelTab(page, "Analysis");
     await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Monitoring", exact: true }).click();
-    await openPanelTab(page, "Actions");
     if (path === "app-then-upgrade") {
-      await page.getByRole("button", { name: /Add server/ }).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
+      await (await infrastructureAction(page,/Add server/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
       await page.getByRole("button", { name: "Run", exact: true }).click();
       await expect.poll(async () => (await savedGame(page)).campaign!.apps.length).toBe(2);
       await page.getByRole("button", { name: "Pause", exact: true }).click();
       expect((await savedGame(page)).campaign!.dbCapacity).toBe(600);
     }
-    await page.getByRole("button", { name: path === "limit" ? /Limit to 500 requests\/s/ : /Upgrade database/ }).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
+    await (await infrastructureAction(page,path === "limit" ? /Limit to 500 requests\/s/ : /Upgrade database/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
     if (path === "upgrade") {
       await expect(page.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("activates in 3 game second(s)");
-      await expect(page.getByRole("button", { name: /Add server/ })).toBeDisabled();
+      await expect((await infrastructureAction(page,/Add server/))).toBeDisabled();
     }
-    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await closeInspection(page);await page.getByRole("button", { name: "Run", exact: true }).click();
     const report = page.getByRole("dialog", { name: "Incident postmortem" });
     await expect(report).toBeVisible({ timeout: 25000 });
     if (path === "app-then-upgrade") await expect(report).toContainText("did not relieve");

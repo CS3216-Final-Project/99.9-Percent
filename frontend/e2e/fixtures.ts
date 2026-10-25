@@ -168,6 +168,8 @@ export async function savedClassicGame(page: Page): Promise<GameState> {
 /** Run for exact game seconds through public controls and fixed-duration ticks. */
 export async function advanceCampaignStep(page: Page, { seconds = 1, resumeClock = true }: { seconds?: number; resumeClock?: boolean } = {}) {
   if (seconds <= 0) return;
+  const equipment=page.locator(".component-inspection");
+  if(await equipment.isVisible())await equipment.getByRole("button",{name:"Close",exact:true}).click();
   if (!controlledPages.has(page)) throw new Error("Call installClock before navigation in journeys that advance exact game seconds.");
   const counter = page.getByTestId("physical-step");
   const before = Number(await counter.textContent());
@@ -196,7 +198,10 @@ export async function advanceCampaignStep(page: Page, { seconds = 1, resumeClock
 /** Brings a tab of the Guided Mode panel forward: readings on Analysis, purchases and settings on Actions. */
 export async function openPanelTab(page: Page, name: "Analysis" | "Actions") {
   const tab = page.getByRole("tab", { name: new RegExp(`^${name}`) });
-  if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
+  // Normal companies expose shared inspections; historical practice retains tabs.
+  if (await tab.count()) {
+    if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
+  } else await expect(page.locator('.campaign-panel [data-tutorial="inspect-db"]')).toHaveCount(1);
 }
 export async function openRoomControls(page: Page) {
   const menu = page.locator(".room-menu");
@@ -222,15 +227,21 @@ export async function setGameSpeed(page: Page, speed: number) {
   }
 }
 
-/** Unrelated journeys dismiss the Launch Week letter; optional spotlight guides retain their Skip action. */
-export async function completeTutorial(page: Page) {
-  const doors = page.getByRole("button", { name: "Open the doors", exact: true });
-  const skip = page.getByRole("button", { name: "Skip", exact: true });
-  // The launch letter mounts with the run: wait for either control rather than polling once.
-  const winner = await Promise.race([
-    doors.waitFor({ timeout: 10_000 }).then(() => "doors" as const).catch(() => null),
-    skip.waitFor({ timeout: 10_000 }).then(() => "skip" as const).catch(() => null),
-  ]);
-  if (winner === "doors") await doors.click();
-  else if (winner === "skip") await skip.click();
+/** Complete the current introduction, retaining support for saved legacy runs and Classic guides. */
+export async function completeTutorial(page: Page, {keepChapterGuide=false}: {keepChapterGuide?:boolean} = {}) {
+  const complete=page.getByRole("button",{name:"Complete Introduction",exact:true});
+  const doors=page.getByRole("button",{name:"Open the doors",exact:true});
+  const skip=page.getByRole("button",{name:"Skip",exact:true});
+  await expect(complete.or(doors).or(skip).first()).toBeVisible();
+  if(await complete.isVisible()) {
+    const panel=page.getByRole("complementary",{name:"System metrics"});
+    for(const name of ["Network","App Server","Database","Monitoring"]) {
+      await panel.getByRole("button",{name,exact:true}).click();
+      await page.locator(".component-inspection").getByRole("button",{name:"Got it",exact:true}).click();
+    }
+    await complete.click();
+    const guide=page.getByRole("dialog",{name:"Chapter guide, step 1 of 1"});
+    if(!keepChapterGuide&&await guide.isVisible())await guide.getByRole("button",{name:"Got it",exact:true}).click();
+  } else if(await doors.isVisible())await doors.click();
+  else await skip.click();
 }

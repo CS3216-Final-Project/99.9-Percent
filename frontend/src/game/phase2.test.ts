@@ -37,12 +37,13 @@ it("landing boot creates neither durable company nor run event; explicit entry i
  useGame.getState().play();useGame.getState().play();
  expect(readAnalytics().filter(e=>e.name==="run_started")).toHaveLength(1);
 });
-it("starts a fresh company straight into Launch Week with a free clock and no tour",()=>{
+it("starts a fresh company in the safe component introduction without a separate tour",()=>{
  enter();
  expect(useGame.getState().tour).toBeNull();
  expect(useGame.getState().onboarding).toBe(false);
  useGame.getState().setRunning(true);useGame.getState().tick(3);
- expect(useGame.getState().game.campaign!.step).toBe(3);
+ expect(useGame.getState().game.campaign!.step).toBe(0);
+ expect(useGame.getState().game.campaign!.launchWeek!.introduction!.explored).toEqual([]);
  useGame.setState(useGame.getInitialState(),true);enter();
  expect(useGame.getState().tour).toBeNull();
  useGame.getState().newRun();
@@ -242,7 +243,12 @@ it("continuation retains run identity; reset retains old evidence and requires a
  useGame.getState().endSession();useGame.getState().play();expect(useGame.getState().game.campaign!.runId).toBe(id);
  useGame.getState().newRun();expect(useGame.getState().game.campaign!.runId).not.toBe(id);
  expect(readAnalytics().filter(e=>e.name==="gameplay_decision")).toHaveLength(0);
- useGame.getState().act({type:"add_server"});
+ for(const equipment of ["gateway","app","db","monitoring"] as const) {
+  expect(useGame.getState().act({type:"incident_inspect",equipment})).toBe(true);
+  expect(useGame.getState().act({type:"acknowledge_introduction",equipment})).toBe(true);
+ }
+ expect(useGame.getState().act({type:"complete_introduction"})).toBe(true);
+ expect(useGame.getState().act({type:"add_server"})).toBe(true);
  expect(readAnalytics().filter(e=>e.name==="gameplay_decision")).toHaveLength(1);
  expect(readAnalytics().some(e=>e.name==="run_evidence")).toBe(true);
  const exported=JSON.parse(exportPlaytest(useGame.getState().game,useGame.getState().measurement));

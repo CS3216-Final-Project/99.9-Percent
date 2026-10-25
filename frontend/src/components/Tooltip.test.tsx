@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
+import { saveGame } from "../game/persist";
+import { newGame } from "../sim";
 import { useGame } from "../game/store";
 import { TooltipLayer } from "./Tooltip";
 import { tipProps } from "./tips";
@@ -165,9 +167,11 @@ describe("tooltip layer", () => {
 
 describe("game interface", () => {
   it("uses no native title tooltips on the title screen, in play or in an incident", () => {
+    // Incident tooltip coverage resumes an existing operating company.
+    saveGame(newGame(1,"tooltip-incident"));
     render(<App />);
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
     expect(document.querySelectorAll("[title]")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(6000));

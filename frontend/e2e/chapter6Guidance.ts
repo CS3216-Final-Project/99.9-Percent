@@ -1,3 +1,4 @@
+import { closeInspection, followHintComponent } from "./componentInspection";
 import type { Locator, Page } from "@playwright/test";
 import { expect, expectRoom, savedGame, seedSave, setGameSpeed } from "./fixtures";
 import { act, tick, strategyPredecessor, sequence } from "../src/sim/__tests__/combinedFixture";
@@ -25,19 +26,19 @@ export async function chapter6Preparation(page: Page, touch = false) {
   await press(page.locator(".campaign-panel").getByRole("button", { name: "Network", exact: true }));
   const gold = page.locator(".campaign-gold-attention");
   const accept = async (name: RegExp) => {
-    await press(page.getByRole("button", { name: "Hint", exact: true }));
+    await closeInspection(page);await press(page.getByRole("button", { name: "Hint", exact: true }));
     const hint = page.getByRole("dialog", { name: "Hint", exact: true });
     await expect(hint).not.toContainText("About Network");
     await press(hint.getByRole("button", { name: "Got it", exact: true }));
-    await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(name); await expect(gold).toBeEnabled();
+    await followHintComponent(page);await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(name); await expect(gold).toBeEnabled();
   };
-  // Routing options are always visible, so the accepted Hint frames "All apps" directly.
+  // Follow the routing subview and its disclosure before choosing the highlighted All apps option.
   await accept(/^All apps$/); await press(gold);
   expect((await savedGame(page)).campaign!.limit).toBe(500);
   // Deliver the same game ticks via the existing 2× control, with half as many WebGL frames.
   await setGameSpeed(page, 2);
   // The clock delivers 200ms ticks: three ticks at 2× complete one game second.
-  await accept(/^Run$/); await press(gold); await page.clock.runFor(600);
+  await closeInspection(page);await accept(/^Run$/); await press(gold); await page.clock.runFor(600);
   await press(page.getByRole("button", { name: "Pause", exact: true }));
   expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step + 1);
   await accept(/^Remove traffic limit/); await press(gold);
@@ -46,15 +47,17 @@ export async function chapter6Preparation(page: Page, touch = false) {
   expect((await savedGame(page)).campaign!.limit).toBe(500);
   await accept(/^Remove traffic limit/); await press(gold);
   await expect(gold).toHaveAccessibleName("Confirm"); await press(gold);
-  await accept(/^Run$/); await press(gold); await page.clock.runFor(2500);
+  await closeInspection(page);await accept(/^Run$/); await press(gold); await page.clock.runFor(2500);
   await press(page.getByRole("button", { name: "Pause", exact: true }));
   await setGameSpeed(page, 1);
   const after = await savedGame(page);
   expect(after.campaign!.limit).toBeNull(); expect(after.campaign!.combinedStage!.readinessSteps).toBe(5);
   expect(after.campaign!.incident).toBeNull();
-  const panel = page.getByRole("region", { name: "Guided Mode guidance", exact: true });
+  const panel = page.getByRole("region", { name: "Campaign mission dashboard", exact: true });
   await expect(panel).toContainText("Full-demand readiness: 5 / 5");
+  await panel.getByText("View all requirements",{exact:true}).click();
   await expect(panel.getByRole("region", { name: "Final Campaign goals", exact: true })).toContainText("0 / 3");
+  await panel.getByText("View all requirements",{exact:true}).click();
   await page.clock.resume(); await page.reload();
   await press(page.getByRole("button", { name: "Continue company", exact: true })); await expectRoom(page);
   await expect(cue).toHaveCount(0);

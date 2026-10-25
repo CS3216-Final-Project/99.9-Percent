@@ -446,8 +446,10 @@ export function Modal({
   tone,
   icon,
   className,
+  initialFocus,
 }: {
   title: string;
+  initialFocus?: string;
   children: ReactNode;
   onClose?: () => void;
   wide?: boolean;
@@ -461,12 +463,13 @@ export function Modal({
   useEffect(()=>{
     const previous=document.activeElement as HTMLElement|null;
     const node=dialog.current;
-    (node?.querySelector<HTMLElement>("[data-autofocus]") ?? node?.querySelector<HTMLElement>("button, a[href], input, select, textarea, [tabindex]"))?.focus();
+    ((initialFocus ? node?.querySelector<HTMLElement>(initialFocus) : null) ?? node?.querySelector<HTMLElement>("[data-autofocus]") ?? node?.querySelector<HTMLElement>("button, a[href], input, select, textarea, [tabindex]"))?.focus();
     return ()=>{if(previous?.isConnected)previous.focus();};
-  },[title]);
+  },[title,initialFocus]);
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <div className={`modal${wide ? " modal-wide" : ""}${tone ? ` modal-${tone}` : ""}${className ? ` ${className}` : ""}`} ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={e=>{
+        if ((e.target as Element).closest('[role="dialog"]') !== e.currentTarget) return;
         if(e.key==="Escape"){e.stopPropagation();onClose?.();}
         if(e.key==="Tab"){
           const nodes=Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,select,textarea,summary,[tabindex="0"]')??[]).filter(node=>{

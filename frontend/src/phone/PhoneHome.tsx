@@ -9,7 +9,7 @@ const PHONE_MODES: Record<"campaign" | "classic", ModeInfo> = {
   campaign: {
     ...MODES.campaign,
     pace: `Continuous play · Launch Week and ${PHONE_CHAPTERS} guided chapters`,
-    about: "Run your company through Launch Week and its first incident, then inspect problems, upgrade servers and route traffic in two guided chapters. Pause whenever you need.",
+    about: "Explore your infrastructure in Launch Week, then inspect problems, upgrade servers and route traffic in two guided chapters. Pause whenever you need.",
   },
   classic: { ...MODES.classic, pace: `Week by week · ${BALANCE.maxTurns}-week challenge` },
 };

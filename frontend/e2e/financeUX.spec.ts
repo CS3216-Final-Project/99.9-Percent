@@ -1,4 +1,5 @@
-import { test, expect, seedSave, savedGame, openPanelTab } from "./fixtures";
+import { infrastructureAction, inspectEquipment, closeInspection } from "./componentInspection";
+import { test, expect, seedSave, savedGame } from "./fixtures";
 import { newGame } from "../src/sim";
 import { tick } from "../src/sim/__tests__/spikeFixtures";
 
@@ -21,22 +22,23 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
     await expect(finance.getByText(/This is a budget estimate, not a bankruptcy deadline/)).toBeInViewport();
     await page.keyboard.press("Escape");await expect(page.getByRole("button",{name:"View finances"})).toBeFocused();
     expect((await savedGame(page)).campaign).toEqual(before.campaign);
-    await openPanelTab(page,"Actions");
-    await page.getByRole("button",{name:/Add server/}).click();
+    const add=await infrastructureAction(page,/Add server/),beforePurchase=await savedGame(page);await add.click();
     const confirmation=page.getByRole("region",{name:"Confirm Add server"});
     await expect(confirmation).toContainText("Upkeep");await expect(confirmation).toContainText("Warning:");
-    await confirmation.getByRole("button",{name:"Cancel"}).click();expect((await savedGame(page)).campaign).toEqual(before.campaign);
-    await page.getByRole("button",{name:/Add server/}).click();await page.getByRole("button",{name:"Confirm",exact:true}).click();
+    await confirmation.getByRole("button",{name:"Cancel"}).click();expect(await savedGame(page)).toEqual(beforePurchase);
+    await (await infrastructureAction(page,/Add server/)).click();await page.getByRole("button",{name:"Confirm",exact:true}).click();
     expect((await savedGame(page)).campaign!.cashCents).toBe(before.campaign!.cashCents-100000);
-    const reason=page.locator('.campaign-action-card').filter({has:page.getByRole("button",{name:/Add server/})}).locator('.campaign-action-reason');
+    await infrastructureAction(page,/Add server/);
+    const reason=page.locator('.component-inspection .campaign-action-card').filter({has:page.getByRole('button',{name:/Add server/})}).locator('.campaign-action-reason');
     await expect(reason).toContainText("deployment is already pending");await reason.focus();await expect(reason).toBeFocused();
-    await openPanelTab(page,"Analysis");
+    await closeInspection(page);
     const app=page.locator('.campaign-panel .chip').filter({hasText:/^App Server$/});
     // Scrolling first: a scroll while the hover delay runs closes the tip, as it should for a real pointer.
     await app.scrollIntoViewIfNeeded();await app.hover();
     await expect(page.getByRole("tooltip")).toHaveText("Handles customer requests and uses the Database for data.");
     await app.click();
-    const evidence=page.locator('.campaign-panel .campaign-evidence');
+    await inspectEquipment(page,"app",true);
+    const evidence=page.locator('.component-inspection .campaign-evidence');
     await evidence.getByText("About Servers",{exact:true}).click();
     await expect(evidence).toContainText("Scale Up makes one existing");
 });

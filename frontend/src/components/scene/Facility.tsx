@@ -20,7 +20,7 @@ import {
 } from "@/sim";
 import type { GameMode, GraphicsQuality } from "@/game/persist";
 import { loadExploration, saveExploration, type SavedCameraView } from "@/game/exploration";
-import { canInspectEquipment, inspectInRoom, trafficViewOn, useGame } from "@/game/store";
+import { canInspectEquipment, componentInspectionEnabled, inspectInRoom, trafficViewOn, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { nextViewpoint } from "@/game/viewpoints";
 import { isPhoneEdition } from "@/phone/edition";
@@ -237,6 +237,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
   });
   // The overview's controls rest while a view from the avatar is on.
   const resting = useGame((s) => s.walking && s.viewpoint !== "overview");
+  const inspecting = useGame(s=>!!s.roomInspection&&componentInspectionEnabled(s));
   /** The player has panned, zoomed or dragged the view, so it no longer follows the facility. */
   const touched = useRef(false);
   /** Turning back to the starting angle after Reset view. */
@@ -370,7 +371,8 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.closest('[role="dialog"], [role="menu"], [role="listbox"]'))) return;
+      if (document.querySelector(".modal-backdrop, .company-message-backdrop")) return;
       if (e.ctrlKey || e.metaKey || e.altKey || !useGame.getState().started || lookingFromAvatar()) return;
       if (e.key === "q" || e.key === "Q") cameraApi.rotateBy(-TURN);
       else if (e.key === "e" || e.key === "E") cameraApi.rotateBy(TURN);
@@ -545,11 +547,20 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
     }
   });
 
+  // Drei reconnects controls when this callback changes. Keep it stable so a live
+  // game update cannot dispose the document listeners in the middle of a drag.
+  const startDrag = useCallback(() => {
+    if (!riding()) cutscene.current = null;
+    touched.current = true;
+    homing.current = false;
+    focusing.current = null;
+  }, []);
+
   return (
     <MapControls
       ref={controls}
       camera={camera}
-      enabled={!resting}
+      enabled={!resting&&!inspecting}
       makeDefault
       enableDamping
       dampingFactor={0.14}
@@ -561,13 +572,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       minPolarAngle={MIN_TILT}
       maxPolarAngle={MAX_TILT}
       target={TARGET}
-      onStart={() => {
-        // The camera is the cutscene's while the car rides, so a drag then is ignored; on the way back it takes over.
-        if (!riding()) cutscene.current = null;
-        touched.current = true;
-        homing.current = false;
-        focusing.current = null;
-      }}
+      onStart={startDrag}
     />
   );
 }

@@ -435,6 +435,9 @@ export type Action =
   | { type:"complete_campaign" }
   | { type:"accept_scaling_risk" }
   | { type:"run_promotion" }
+  | { type: "begin_introduction" }
+  | { type: "acknowledge_introduction"; equipment: EquipmentId }
+  | { type: "complete_introduction"; handoff?: "opening" }
   | { type: "pick_launch_tech"; tech: "caching" | "autoscaling" }
   | { type: "enter_reliability" }
   | { type: "unlock_reliability"; tech: "health_checks" | "standby" | "auto_failover" }

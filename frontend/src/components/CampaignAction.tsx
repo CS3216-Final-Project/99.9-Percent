@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
+import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode } from "react";
 import { isPhoneEdition } from "@/phone/edition";
 import { createPortal } from "react-dom";
 import type { Action, EquipmentId } from "@/sim";
@@ -13,13 +13,13 @@ import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { pendingStop } from "@/sim/step";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
-import { Act } from "./ui";
+import { Modal, Act } from "./ui";
 import { Icon } from "./icons";
 import { confirmationRoomArea } from "./roomArea";
 import { confirmingAction, setConfirming, subscribeConfirming } from "./actionConfirmation";
 import { guidanceActionId } from "@/game/campaignAttention";
 import { milestoneBlocks } from "@/game/campaignGuidance";
-import { useCampaignAttention } from "./useCampaignAttention";
+import { InspectionPurchaseContext, useCampaignAttention } from "./useCampaignAttention";
 
 /** Equipment roles shown in the quote's supporting facts. */
 const MACHINES: Partial<Record<EquipmentId, { name: string; does: string }>> = {
@@ -47,6 +47,7 @@ const PURCHASE_DESCRIPTIONS: Record<string,string> = {
 /** Asks before dispatching; the parent's disabled predicate and dispatcher stay authoritative. */
 export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: Action }) {
   const { game, selectedAppId } = useGame();
+  const inspection=useContext(InspectionPurchaseContext);
   const c = game.campaign!, id = useId(), card = useRef<HTMLDivElement>(null);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
   const { confirmationGold } = useCampaignAttention();
@@ -171,6 +172,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     setReviewedQuote(signature(preview));
     dispatched.current = false;
     setChanged(false);
+    if (inspection) return;
     const s = useGame.getState(), floor = floorOf(affected[0]);
     if (s.floor !== floor) s.goToFloor(floor, "action");
     s.focusCamera(anchor);
@@ -178,9 +180,9 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey} data-campaign-action={label} data-guidance-action={props.decision ? guidanceActionId(props.decision) : undefined}
     onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)}
     onFocus={() => setPointing(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPointing(false); }}>
-    <Act {...props} disabled={props.disabled || preview?.ok === false} onClick={toggle} />
+    <Act {...props} icon={inspection ? undefined : props.icon} price={inspection ? undefined : props.price} note={inspection ? undefined : props.note} disabled={props.disabled || preview?.ok === false} onClick={toggle} />
     {!open && (props.disabled || preview?.ok === false) && <p className="campaign-action-reason" id={id} tabIndex={0}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
-    {open && <ActionPopover anchor={anchor}>
+    {open && <ActionPopover anchor={anchor} inspection={inspection} onClose={cancel}>
       <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); cancel(); } }}>
         <div className="campaign-purchase-body" role="region" aria-label="Purchase preview" tabIndex={0}>
           <div className="campaign-purchase-essential">
@@ -204,7 +206,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
             }}>
               <dl className="purchase-facts">
                 {machine && <div className="campaign-action-machine"><dt>{machine.name}</dt><dd>{machine.does}</dd></div>}
-                {!isAdd && props.tip && props.tip !== description && <div><dt>Effect</dt><dd>{props.tip}</dd></div>}
+                {!isAdd && props.tip && props.tip !== description && <div><dt>Effect</dt><dd>{props.tip}{inspection&&props.note?` ${props.note}.`:null}</dd></div>}
                 <div><dt>Timing</dt><dd>Time advances while running. Upkeep starts on activation.</dd></div>
                 {preview?.ok && preview.forecast && <div><dt>Forecast</dt><dd>Based on recent earnings; future traffic and costs may change.</dd></div>}
               </dl>
@@ -236,12 +238,12 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
 }
 
 /** Keep desktop decisions on the room's left, following the selected marker vertically. */
-function ActionPopover({ anchor, children }: { anchor: string; children: ReactNode }) {
+function ActionPopover({ anchor, children, inspection=false, onClose }: { anchor: string; children: ReactNode; inspection?:boolean; onClose:()=>void }) {
   const pop = useRef<HTMLDivElement>(null);
   const stage = document.querySelector<HTMLElement>("main.stage");
   useLayoutEffect(() => {
     const el = pop.current;
-    if (!el || !stage) return;
+    if (inspection || !el || !stage) return;
     let frame = 0;
     const place = () => {
       const s = stage.getBoundingClientRect();
@@ -299,7 +301,8 @@ function ActionPopover({ anchor, children }: { anchor: string; children: ReactNo
       window.removeEventListener("resize", place);
       viewport?.removeEventListener("resize", place);
     };
-  }, [anchor, stage]);
+  }, [anchor, stage, inspection]);
+  if (inspection) return <Modal title="Purchase preview" onClose={onClose} initialFocus=".campaign-purchase-footer button:not(:disabled)" className="component-purchase">{children}</Modal>;
   const body = <div className="campaign-action-popover" ref={pop}>{children}</div>;
   return stage ? createPortal(body, stage) : body;
 }

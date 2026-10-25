@@ -1,3 +1,4 @@
+import { closeInspection, followHintComponent } from "./componentInspection";
 import { test, expect, savedGame } from "./fixtures";
 import { chapter6Preparation, bootChapter6 } from "./chapter6Guidance";
 import { act, tick, combinedCompany, finishedCompany, finishRound } from "../src/sim/__tests__/combinedFixture";
@@ -20,7 +21,7 @@ test("Chapter 6 guidance: wave and recovery use real boundaries without repeatin
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   const recover = page.getByRole("dialog", { name: "Chapter 6: Recover at full demand", exact: true });
   await expectCueColours(recover, "recovery"); await recover.getByRole("button", { name: "Got it", exact: true }).click();
-  await page.getByRole("button", { name: "Hint", exact: true }).click();
+  await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).click();
   const hint = page.getByRole("dialog", { name: "Hint", exact: true }); await expect(hint).toContainText("full-demand");
   await hint.getByRole("button", { name: "Got it", exact: true }).click();
   await expect(page.locator(".campaign-gold-attention")).toHaveAccessibleName("Run");
@@ -54,11 +55,11 @@ test("Chapter 6 guidance: post-review restoration precedes replacement capacity 
   await cue.getByRole("button", { name: "Got it", exact: true }).click();
   const gold = page.locator(".campaign-gold-attention");
   const accept = async (name: RegExp) => {
-    await page.getByRole("button", { name: "Hint", exact: true }).click();
+    await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).click();
     await page.getByRole("dialog", { name: "Hint", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
-    await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(name);
+    await followHintComponent(page);await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(name);
   };
-  await accept(/^Restore App 3/); await gold.click();
+  await accept(/^Restore App 3/); await gold.click();await expect(gold).toHaveAccessibleName("Confirm");await gold.click();
   expect((await savedGame(page)).campaign!.pending.some(a => a.type === "restore-app")).toBe(true);
   await accept(/^Run$/); await gold.click(); await page.clock.runFor(3000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();

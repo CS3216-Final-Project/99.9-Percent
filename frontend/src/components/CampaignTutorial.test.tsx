@@ -1,3 +1,4 @@
+import InspectionReveal from "./InspectionReveal";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useGame, WALKTHROUGH_STEPS } from "@/game/store";
@@ -14,18 +15,17 @@ import { ViewTabs, type ViewTab } from "./ViewSheet";
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }); });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 function start() { useGame.getState().boot(); useGame.getState().play(); }
-function renderCompany() { return render(<><CampaignHeader /><CampaignPanel /><CampaignControls /><CampaignOverlays /><Tutorial /></>); }
-it("opens a new company on the Launch Week letter, not a lesson walkthrough", () => {
+function renderCompany() { return render(<><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /><CampaignOverlays /><Tutorial /></>); }
+it("opens a new company on the safe component introduction", () => {
   start(); renderCompany();
   expect(useGame.getState().tour).toBeNull();
-  const letter = screen.getByRole("dialog", { name: "Launch week" });
-  expect(letter.textContent).toContain("database");
-  fireEvent.click(within(letter).getByRole("button", { name: "Open the doors" }));
-  expect(screen.queryByRole("dialog")).toBeNull();
-  // The clock is free to run from the first second.
-  act(() => { useGame.getState().setRunning(true); useGame.getState().tick(1); });
-  expect(useGame.getState().game.campaign!.step).toBe(1);
-  expect(useGame.getState().game.campaign!.launchWeek).not.toBeNull();
+  expect(screen.queryByRole("dialog", { name: "Launch week" })).toBeNull();
+  expect(screen.getByRole("region", { name: "Introduction Progress" }).textContent).toContain("0/4");
+  expect(screen.getByRole("button", { name: "Complete Introduction" })).toHaveProperty("disabled",true);
+  expect(screen.queryByRole("button", { name: /^Upgrade database/ })).toBeNull();
+  act(() => { useGame.getState().setRunning(true); useGame.getState().tick(100); });
+  expect(useGame.getState().game.campaign!.step).toBe(0);
+  expect(useGame.getState().game.campaign!.incident).toBeNull();
 });
 
 it("replays Launch Week on a practice company and returns to the paused original", () => {
@@ -42,9 +42,9 @@ it("replays Launch Week on a practice company and returns to the paused original
   expect(state.tour).toBeNull();
   expect(state.meta.walkthroughStep).toBe(0);
   renderCompany();
-  // Nothing holds the practice company's clock.
+  // Practice uses the same safe introduction as a fresh company.
   act(() => { useGame.getState().setRunning(true); useGame.getState().tick(3); });
-  expect(useGame.getState().game.campaign!.step).toBe(3);
+  expect(useGame.getState().game.campaign!.step).toBe(0);
   act(() => useGame.getState().endTour(false));
   expect(useGame.getState().game.campaign).toEqual(saved.campaign);
   expect(useGame.getState().tutorialCompany).toBeNull();
@@ -85,7 +85,8 @@ it("waits through an incident on a resumed company without holding its clock", (
   saveGame(advanceSteps(newGame(1, "resumed-incident"), 6).state);
   saveMeta({ ...DEFAULT_META, tutorialDone: true });
   start(); renderCompany();
-  openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Database" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
   expect(screen.getByRole("button", { name: "Confirm" })).toHaveProperty("disabled", false);
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   act(() => { useGame.getState().setRunning(true); useGame.getState().tick(1); });
@@ -175,4 +176,3 @@ it("explains the first settled week with a one-card tip on Cash", () => {
 });
 
 /** Purchases live on the panel's Actions tab. */
-function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }

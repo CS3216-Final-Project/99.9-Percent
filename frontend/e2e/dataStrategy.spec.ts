@@ -1,4 +1,5 @@
-import { advanceCampaignStep, openPanelTab } from "./fixtures";
+import { infrastructureAction, closeInspection, inspectEquipment } from "./componentInspection";
+import { advanceCampaignStep } from "./fixtures";
 import {test,expect,seedSave,savedGame} from "./fixtures";
 import {newGame,applyAction,type Action,type GameState} from "../src/sim";
 import {advanceSteps} from "../src/sim/step";
@@ -32,14 +33,15 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  await page.getByRole("button",{name:"Next: Continue to Data Strategy",exact:true}).click();
  await expect(chapters.getByLabel("Current chapter",{exact:true})).toHaveText("Data Strategy");
  await expect(chapters.getByLabel("Current objective")).toHaveText("Goal: Compare workload, cache hits and database pressure as demand grows.");
- await openPanelTab(page,"Actions");
- await expect(page.getByRole("region",{name:"Data strategy"})).toContainText("Waiting for workload growth");
+ await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("region",{name:"Data strategy"})).toHaveCount(0);
+ await inspectEquipment(page,"cache",true);await expect(page.getByRole("region",{name:"Data strategy"})).toContainText("Waiting for workload growth");
+ await closeInspection(page);
  expect((await savedGame(page)).campaign!.dataStage!.profile).toBe("read-heavy");
  await advanceCampaignStep(page,{seconds:6});
  expect((await savedGame(page)).campaign!.incident!.primaryComponent).toBe("db");
  const data=page.getByRole("region",{name:"Data strategy"});
- if(strategy==="cache")await data.getByRole("button",{name:/Deploy Read Cache/}).click();
- else await page.getByRole("button",{name:/Upgrade database/}).click();
+ if(strategy==="cache")await (await infrastructureAction(page,/Deploy Read Cache/)).click();
+ else await (await infrastructureAction(page,/Upgrade database/)).click();
  await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await page.getByRole("button",{name:"Run",exact:true}).click();await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
  let c=(await savedGame(page)).campaign!;expect(c.runId).toBe("data-browser");
@@ -49,16 +51,14 @@ for(const strategy of ["cache","database"] as const)test(`data strategy: ${strat
  } else expect(c.dbCapacity).toBe(3000);
  await page.getByRole("button",{name:"Continue company",exact:true}).click();
  if(strategy==="cache") {
-  await openPanelTab(page,"Analysis");
   await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Read Cache",exact:true}).click();
   await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");
-  await openPanelTab(page,"Actions");
-  await data.locator("summary").filter({hasText:"Observe another workload"}).click();
-  await data.getByRole("button",{name:"Observe contrasting workload",exact:true}).click();
+  await inspectEquipment(page,"cache",true);await data.locator("summary").filter({hasText:"Observe another workload"}).click();
+  await data.getByRole("button",{name:"Observe contrasting workload",exact:true}).click();await expect(data).toContainText("write-heavy");await closeInspection(page);
   await page.getByRole("button",{name:"Run",exact:true}).click();await expect.poll(async()=>(await savedGame(page)).campaign!.snapshot.db.demand).toBe(2112);
   await expect.poll(async()=>!!(await savedGame(page)).campaign!.incident).toBe(true);await page.getByRole("button",{name:"Pause",exact:true}).click();
-  await expect(data).toContainText("write-heavy");expect((await savedGame(page)).campaign!.snapshot.data!.writes).toBe(1920);
-  await page.getByRole("button",{name:/Upgrade database/}).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await page.getByRole("button",{name:"Run",exact:true}).click();
+  await inspectEquipment(page,"cache",true);await expect(data).toContainText("write-heavy");expect((await savedGame(page)).campaign!.snapshot.data!.writes).toBe(1920);await closeInspection(page);
+  await (await infrastructureAction(page,/Upgrade database/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await page.getByRole("button",{name:"Run",exact:true}).click();
   await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:30000});
   expect((await savedGame(page)).campaign!.dbCapacity).toBe(3000);await page.getByRole("button",{name:"Continue company",exact:true}).click();
  }

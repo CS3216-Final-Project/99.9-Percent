@@ -3,7 +3,8 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import App from "./App";
 import { useGame } from "./game/store";
-import { DEFAULT_META, saveMeta } from "./game/persist";
+import { DEFAULT_META, saveMeta, saveGame } from "./game/persist";
+import { newGame } from "./sim";
 vi.mock("./components/scene/Facility", () => ({ default: () => <div data-testid="facility" /> }));
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -85,18 +86,26 @@ describe("opening UI", () => {
     expect(screen.getByRole("complementary", { name: "System metrics" })).toBeTruthy();
     // Tech and History wait in the bottom bar's view tabs, where Classic keeps them; later stage controls do not appear yet.
     expect(within(screen.getByRole("navigation", { name: "Views" })).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Tech", "History"]);
-    // The tools Launch Week's first incident calls for are already present; later stages' are not.
-    openActions();
-    expect(screen.getByRole("region", { name: "Scaling controls" })).toBeTruthy();
+    const panel=within(screen.getByRole("complementary", { name: "System metrics" }));
+    expect(panel.getByRole("region", { name: "Introduction Progress" }).textContent).toContain("0/4");
+    expect(panel.queryByRole("region", { name: "Scaling controls" })).toBeNull();
+    for(const name of ["Network","App Server","Database","Monitoring"])expect(panel.getByRole("button",{name})).toBeTruthy();
+    fireEvent.click(panel.getByRole("button", { name: "Network" }));
+    const network=within(screen.getByRole("dialog", { name: "Network inspected" }));
+    expect(network.queryByRole("button", { name: /Limit to|Deploy load balancer/ })).toBeNull();
+    fireEvent.click(network.getByRole("button", { name: "Inspect details" }));
+    expect(network.getByRole("region", { name: "Network readings" })).toBeTruthy();
+    fireEvent.click(network.getByRole("button", { name: "Got it" }));
     expect(screen.queryByRole("region", { name: "Data strategy" })).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: /^Analysis/ }));
+    expect(screen.queryByRole("tab", { name: /^Analysis/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
     expect(useGame.getState().game.campaign!.step).toBe(0);
     expect(useGame.getState().meta.runsStarted).toBe(1);
   });
   it("advances once and cleans up the shared clock on pause/unmount", () => {
+    saveGame(newGame(1,"clock-resume",2));
     vi.useFakeTimers(); const view = render(<StrictMode><App /></StrictMode>);
-    fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(1000)); expect(useGame.getState().game.campaign!.step).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
@@ -104,7 +113,8 @@ describe("opening UI", () => {
     view.unmount(); act(() => vi.advanceTimersByTime(5000)); expect(useGame.getState().game.campaign!.step).toBe(1);
   });
   it("visible interventions lead to review and the same company", () => {
-    vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+    saveGame(newGame(1,"incident-resume",2));
+    vi.useFakeTimers(); render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
     fireEvent.click(screen.getByRole("button", { name: "Open the doors" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(6000));
@@ -116,8 +126,9 @@ describe("opening UI", () => {
     expect(recovery.textContent).toContain("Latency below 500 ms");
     expect(recovery.textContent).toContain("Service errors below 1%");
     expect(recovery.textContent).toContain("Traffic is being accepted and requests are completing");
-    // Launch Week's one incident is the database: the upgrade fixes it.
-    openActions(); fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
+    // Launch Week's one incident is the database: its inspection hosts the upgrade.
+    fireEvent.click(screen.getByRole("button", { name: "Database" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Upgrade database/ }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     fireEvent.click(screen.getByRole("button", { name: "Run" }));
     act(() => vi.advanceTimersByTime(20000));
@@ -136,7 +147,8 @@ describe("opening UI", () => {
 
   });
   it("hidden-page pause does not resume or catch up", () => {
-    render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" })); fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    saveGame(newGame(1,"visibility-resume",2));
+    render(<App />); fireEvent.click(screen.getByRole("button", { name: "Continue company" })); fireEvent.click(screen.getByRole("button", { name: "Run" }));
     Object.defineProperty(document, "hidden", { configurable: true, value: true }); fireEvent(document, new Event("visibilitychange"));
     expect(useGame.getState().running).toBe(false);
     Object.defineProperty(document, "hidden", { configurable: true, value: false }); fireEvent(document, new Event("visibilitychange"));
@@ -269,7 +281,8 @@ it("forgets a pending Start over confirmation when the player leaves its tab", (
 });
 
 it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", () => {
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+  saveGame(newGame(1,"operating-resume",2));
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
   vi.useFakeTimers();
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   act(() => vi.advanceTimersByTime(1000));
@@ -291,7 +304,8 @@ it("opens Campaign's Tech and History in Classic's sheet from the bottom bar", (
 });
 
 it("asks once before New company replaces the campaign, as Classic's Start over does", () => {
-  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
+  saveGame(newGame(1,"operating-resume",2));
+  render(<App />); fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
   vi.useFakeTimers();
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   act(() => vi.advanceTimersByTime(1000));
@@ -324,7 +338,6 @@ it("exits directly after saving the current progress and shows four matching Run
 it("keeps an unsaved run open through cancellation and failed save retries, then saves before exiting", () => {
   render(<StrictMode><App /></StrictMode>);
   fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
-  fireEvent.click(screen.getByRole("button", { name: "Open the doors" }));
   const menu = openMenu();
   const raw = localStorage.getItem("nn.campaign.save.v1");
   const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("Full", "QuotaExceededError"); });
@@ -376,4 +389,3 @@ it("wraps the week clock without losing the total elapsed counter", () => {
 });
 
 /** Purchases live on the panel's Actions tab. */
-function openActions() { fireEvent.click(screen.getByRole("tab", { name: /^Actions/ })); }
