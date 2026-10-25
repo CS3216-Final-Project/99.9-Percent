@@ -69,7 +69,7 @@ export function campaignGuidance(g: GameState) {
   add("healthy","Applications healthy and service stable",c.apps.every(a=>a.health!=="failed")&&qualifiesForRecovery(c.snapshot));
   add("pending","Accepted deployments and routing finished",!c.pending.length);
   add("promotion","Optional promotion ended",!c.promotion||c.step>=c.promotion.endStep);
-  if(r?.fault)add("restored","Failed server restored",r.fault.restoredStep!==null);
+  add("restored","No failed server awaiting restoration",!r?.fault||r.fault.restoredStep!==null);
   const checks=r?r.stableSteps:d.nextRoundIndex===3?d.finalStableSteps:d.readinessSteps;
   add("checks",`${r?"Wave stability":d.nextRoundIndex===3?"Final stability":"Full-demand readiness"}: ${checks} / 5`,checks===5);
   finalGoals.push({id:"rounds",label:`Growth outcomes acknowledged: ${d.completedRounds.length} / 3`,met:d.completedRounds.length===3},
@@ -81,7 +81,7 @@ export function campaignGuidance(g: GameState) {
   else if(r)waiting=r.startedStep===null?"The next growth wave is announced. Prepare and resume when ready.":r.pressureEndedStep===null?"Observe the current workload and healthy routed capacity; use evidence to respond.":`Pressure ended. Restore all apps, acknowledge reports and serve full baseline demand. Stable service: ${r.stableSteps} / 5.`;
   else waiting=d.nextRoundIndex===3?`Final stable service: ${d.finalStableSteps} / 5. Keep serving full baseline demand after acknowledging the last outcome.`:`Readiness: ${d.readinessSteps} / 5 stable full-demand seconds. Finish any promotion before the next wave.`;
   optional="Promotion is optional and temporarily adds demand. Registration is growth opportunity; rejected requests do not earn revenue.";
- } else if(c.reliabilityStage){const d=c.reliabilityStage;add("cash","Positive company cash",c.cashCents>0);add("management","Management resumed after any report",g.phase==="management");add("incident","No active incident",!c.incident);add("queues","All retained Application and Database queues empty",queuesEmpty);add("healthy","Measured healthy latency and service errors",qualifiesForRecovery(c.snapshot));if(!d.fault)add("pending","Accepted actions finish before arming",c.pending.length===0);add("armed","Reliability test started",!!d.fault);add("observed","Application failure observed",d.fault?.startedStep!==null&&!!d.fault);add("restored","Failed application restored",d.fault?.restoredStep!==null&&!!d.fault);add("reports","Recovered reports acknowledged",reportsAcknowledged);add("observations",`Stable service: ${d.stableSteps} / 5`,d.completedStep!==null);add("recognition","Reliability outcome acknowledged",d.acknowledged);if(pendingReliability(c))pendingAction={label:"Review reliability outcome"};else if(!d.fault)pendingAction={label:"Start reliability test",action:{type:"arm_reliability"}};else waiting=d.fault.startedStep===null?"Reliability test scheduled. Run to observe it.":d.fault.restoredStep===null?"Inspect actual health and surviving capacity. Manual restoration, routing or admission relief remain available.":"Observe stable service after restoration and acknowledge actual reports.";if(d.acknowledged){waiting=null;if(canEnterCombined(g)){notice="Stay Online completed. Continue the same company into Grow the Company through Next in the chapter bar.";pendingAction={label:"Continue to Grow the Company",action:{type:"enter_combined"}};}else notice=waitsFor("Grow the Company",entryBlockers(false,combinedEntryGates(g),"Stay Online"));}optional="Reliability purchases are optional; natural and free manual restoration remain available.";} else if(c.spikeStage) {
+ } else if(c.reliabilityStage){const d=c.reliabilityStage;add("cash","Positive company cash",c.cashCents>0);add("management","Management resumed after any report",g.phase==="management");add("incident","No active incident",!c.incident);add("queues","All retained Application and Database queues empty",queuesEmpty);add("healthy","Measured healthy latency and service errors",qualifiesForRecovery(c.snapshot));add("pending","Accepted actions finish before arming",!!d.fault||c.pending.length===0);add("armed","Reliability test started",!!d.fault);add("observed","Application failure observed",d.fault?.startedStep!==null&&!!d.fault);add("restored","Failed application restored",d.fault?.restoredStep!==null&&!!d.fault);add("reports","Recovered reports acknowledged",reportsAcknowledged);add("observations",`Stable service: ${d.stableSteps} / 5`,d.completedStep!==null);add("recognition","Reliability outcome acknowledged",d.acknowledged);if(pendingReliability(c))pendingAction={label:"Review reliability outcome"};else if(!d.fault)pendingAction={label:"Start reliability test",action:{type:"arm_reliability"}};else waiting=d.fault.startedStep===null?"Reliability test scheduled. Run to observe it.":d.fault.restoredStep===null?"Inspect actual health and surviving capacity. Manual restoration, routing or admission relief remain available.":"Observe stable service after restoration and acknowledge actual reports.";if(d.acknowledged){waiting=null;if(canEnterCombined(g)){notice="Stay Online completed. Continue the same company into Grow the Company through Next in the chapter bar.";pendingAction={label:"Continue to Grow the Company",action:{type:"enter_combined"}};}else notice=waitsFor("Grow the Company",entryBlockers(false,combinedEntryGates(g),"Stay Online"));}optional="Reliability purchases are optional; natural and free manual restoration remain available.";} else if(c.spikeStage) {
   const d=c.spikeStage;
   add("pulses","Both traffic pulses completed",c.step>=d.deadlines[3]);
   add("management","Operating in management, not a pending review",g.phase==="management");
@@ -119,7 +119,7 @@ export function campaignGuidance(g: GameState) {
  } else if(openingDone) {
   add("opening","Opening completed",openingDone);
   add("stage","Scaling stage active",!!c.scaling);
-  if(!c.scaling?.consumed)add("headroom",`Database headroom: ${c.dbCapacity.toLocaleString("en-US")} / ${P.dbCapacity.toLocaleString("en-US")} ops/s`,c.dbCapacity>=P.dbCapacity||!!c.scalingConsent);
+  add("headroom",`Database headroom: ${c.dbCapacity.toLocaleString("en-US")} / ${P.dbCapacity.toLocaleString("en-US")} ops/s`,!!c.scaling?.consumed||c.dbCapacity>=P.dbCapacity||!!c.scalingConsent);
   add("management","Operating in management, not a pending review",g.phase==="management");
   add("incident","No active incident",!c.incident);
   add("queues","Application and Database queues empty",queuesEmpty);
@@ -130,8 +130,9 @@ export function campaignGuidance(g: GameState) {
  } else if(prevention) {
   const r=preventionRequirements(c);
   const check=(id:string,label:string,met:boolean)=>preventionChecks.push({id,label,met});
+  const reviewed=!!c.openingPrevention?.outcome?.acknowledged;
   add("growth","Opening growth occurred",r.growth);
-  add("outcome","Verified prevention outcome or recovered incident acknowledged",!!c.openingPrevention?.outcome?.acknowledged);
+  add("outcome","Verified prevention outcome or recovered incident acknowledged",reviewed);
   add("milestone","Opening milestone acknowledged",openingDone);
   check("incident","No Opening incident opened",r.noIncident);
   check("cash","Positive company cash",r.positiveCash);
@@ -141,7 +142,7 @@ export function campaignGuidance(g: GameState) {
   check("app-inspection","Application inspected after growth",r.applicationInspected);
   check("db-inspection","Database inspected after growth",r.databaseInspected);
   check("observations",`Stable observations: ${c.openingPrevention?.stableSteps??0} / 5`,!!c.openingPrevention?.outcome);
-  check("review","Prevention outcome acknowledged",!!c.openingPrevention?.outcome?.acknowledged);
+  check("review","Prevention outcome acknowledged",reviewed);
   optional="Verified prevention and incident recovery are both valid paths. For prevention, meet every requirement, acknowledge the outcome, then complete the Opening recognition to continue.";
   if(c.limit!==null)notice="Traffic limiting prevents full-demand qualification. Remove the limit and serve the full 800 req/s to continue the prevention path.";
   else if(Object.values(r).every(Boolean)&&!c.openingPrevention?.outcome)waiting="Observe five consecutive new game seconds. Pausing adds no observations; a failing game second resets the streak.";

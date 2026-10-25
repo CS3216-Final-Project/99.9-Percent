@@ -4,6 +4,8 @@ import {newGame,applyAction,type GameState,type Action} from "../sim";
 import {advanceSteps,canEnterData} from "../sim/step";
 import {canEnterSpikes} from "../sim/autoscaling";
 import {dataCompany,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
+import {reliabilityCompany} from "../sim/__tests__/reliabilityFixture";
+import {combinedCompany,finishRound} from "../sim/__tests__/combinedFixture";
 function decision(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 function recovered(){return advanceSteps(decision(advanceSteps(newGame(),6).state,{type:"start_db_upgrade"}),30).state;}
 function scaling(){return decision(decision(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"});}
@@ -37,6 +39,29 @@ it("keeps the Opening at three chapter requirements from launch through growth a
  let g=newGame();const seen=new Set<number>();
  for(let i=0;i<10;i++){seen.add(campaignGuidance(g).requirements.length);g=advanceSteps(g,1).state;}
  expect([...seen]).toEqual([3]);
+});
+/** The requirement counts a company shows over `steps` game seconds, acting on the way as a player would. */
+function counts(g:GameState,steps:number,play:(g:GameState,i:number)=>GameState=g=>g){
+ const seen=new Set<number>();
+ for(let i=0;i<steps&&g.phase!=="ended";i++){g=play(g,i);if(g.phase==="review")g=decision(g,{type:"acknowledge_review"});seen.add(campaignGuidance(g).requirements.length);g=tick(g);}
+ return [...seen];
+}
+it("keeps Scaling's headroom row, met, once its growth has arrived",()=>{
+ expect(counts(scaling(),40,(g,i)=>i===2?decision(g,{type:"start_db_upgrade"}):g)).toEqual([8]);
+ const grown=advanceSteps(decision(scaling(),{type:"start_db_upgrade"}),20).state;
+ expect(grown.campaign!.scaling!.consumed).toBe(true);expect(row(grown,"headroom").met).toBe(true);
+});
+it("keeps Stay Online's arming row, met, once the test has started",()=>{
+ expect(counts(reliabilityCompany(),20,(g,i)=>i===3?decision(g,{type:"arm_reliability"}):g)).toEqual([12]);
+ expect(row(decision(reliabilityCompany(),{type:"arm_reliability"}),"pending").met).toBe(true);
+});
+it("keeps Grow the Company's restoration row whether or not a wave has failed a server",{timeout:30_000},()=>{
+ let g=combinedCompany();const calm=campaignGuidance(g).requirements.length;expect(row(g,"restored").met).toBe(true);
+ for(let i=0;i<2;i++){g=tick(g,5);g=decision(g,{type:"start_growth_wave"});g=finishRound(g);g=decision(g,{type:"acknowledge_growth"});}
+ // The third wave fails a server under load.
+ g=decision(tick(g,5),{type:"start_growth_wave"});
+ expect(g.campaign!.combinedStage!.currentRound!.fault!.restoredStep).toBeNull();
+ expect(campaignGuidance(g).requirements).toHaveLength(calm);expect(row(g,"restored").met).toBe(false);
 });
 it("nests the prevention path's checks under its single chapter requirement",()=>{
  const m=campaignGuidance(prevented());
