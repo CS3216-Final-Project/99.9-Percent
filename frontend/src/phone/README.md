@@ -56,7 +56,7 @@ Replace a region's body without touching the others.
 | --- | --- | --- | --- |
 | Top strip | `regions/PhoneTopStrip.tsx`, `layout/PhoneChapterRow.tsx` | One row: logo (from 400 px), Cash, App Health or Health, Users and revenue behind one tap, sound, Menu; Guided Mode's one-line chapter row | Layout |
 | Room | `PhoneGameLayout.tsx` (`main.stage` with `Room`) | Shared 3D room, filling the space between the top strip and the dock at a fixed size | Shared; layout sizing by Layout |
-| Sheet | `regions/PhoneSheet.tsx`, `layout/sheetState.ts` | Bottom sheet over the room (peek, half, full) holding `CampaignPanel` (its Analysis and Actions tabs), or `SidePanel` and `OperationsRail`; Challenge Mode's `ClassicViewSheet` | Layout |
+| Sheet | `regions/PhoneSheet.tsx`, `layout/sheetState.ts` | Bottom sheet over the room (peek, half, full) holding `CampaignPanel`, or `SidePanel` and `OperationsRail`; Challenge Mode's `ClassicViewSheet` | Layout |
 | Dock | `regions/PhoneDock.tsx` | One row: views (or a Views menu), Navigation, clock, speed menu (with +1s and +5s in Guided Mode), Run/Pause or Next week | Layout |
 | Coach | `regions/PhoneCoach.tsx`, `tutorial/` | One fixed-size coach strip above the dock for every guide: Chapter 0's lessons (`PhoneChapterZeroGuide`), chapter guides and tips | Tutorial |
 | Overlays | `PhoneOverlays.tsx`, `PhoneHome.tsx`, `PhoneMenu.tsx`, `PhoneCampaignComplete.tsx` | Phone home, menu, completion; shared dialogs | Foundation (this seam) |

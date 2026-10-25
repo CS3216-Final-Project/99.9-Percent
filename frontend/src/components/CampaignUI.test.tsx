@@ -155,5 +155,3 @@ it("keeps normal Campaign infrastructure controls in inspections and retains the
  const grown=advanceSteps(game,6).state;act(()=>useGame.setState({game:grown}));
  expect(screen.getByRole("region",{name:"Data strategy"}).textContent).toContain(c.dataStage!.profile);
 });
-
-/** Purchases live on the panel's Actions tab. */

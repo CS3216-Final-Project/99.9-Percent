@@ -1,7 +1,7 @@
 import { introductionActive } from "@/sim/introduction";
 import { equipmentInfo } from "@/sim";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { componentInspectionEnabled, inspectInRoom, useGame } from "@/game/store";
+import { inspectInRoom, useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { EQUIPMENT_ICON, STATE_META } from "./presentation";
 import { InspectionPurchaseContext } from "./useCampaignAttention";
@@ -23,9 +23,8 @@ export default function InspectionReveal() {
   const inspection = useGame((s) => s.roomInspection);
   const game = useGame((s) => s.game);
   const dismiss = useGame((s) => s.dismissRoomInspection);
-  const componentMode = useGame(componentInspectionEnabled);
   if (!inspection) return null;
-  if (componentMode && ["db","app","gateway","cache","monitoring"].includes(inspection.equipment))
+  if (game.campaign && ["db","app","gateway","cache","monitoring"].includes(inspection.equipment))
     return <ComponentInspection key={inspection.seq} />;
   const info = equipmentInfo(game, inspection.equipment);
   const state = STATE_META[info.state];

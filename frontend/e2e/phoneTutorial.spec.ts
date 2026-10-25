@@ -159,7 +159,9 @@ test("a chapter guide uses the same coach strip above the dock", async ({ page }
   const got = guide.getByRole("button", { name: "Got it", exact: true });
   await expect(got).toBeInViewport({ ratio: 1 });
   expect((await box(got)).height).toBeGreaterThanOrEqual(44);
-  await expect(page.getByRole("region", { name: "Scaling controls" })).toBeVisible();
+  // The guide points at the App Server shortcut, whose inspection holds the scaling controls; the panel keeps no tabs.
+  await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("tablist")).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "App Server", exact: true })).toBeVisible();
   expect(overlaps(strip, await box(page.locator(".tour-hole")))).toBe(false);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.screenshot({ path: `${SHOTS}/phone-coach-chapter-guide-390x844.png` });

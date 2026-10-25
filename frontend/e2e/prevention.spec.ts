@@ -17,11 +17,13 @@ test("Opening prevention: fresh player verifies prevention and explicitly unlock
  await advanceCampaignStep(page,{seconds:4-(await savedGame(page)).campaign!.step,resumeClock:false});
  let c=(await savedGame(page)).campaign!;expect(c.consumedEvents).toContain("opening-growth");expect(c.incident).toBeNull();expect(c.reports).toEqual([]);
  const guidance=page.getByRole("region",{name:"Guided Mode requirements"}),progress=page.getByRole("region",{name:"Opening prevention progress"});
- await expect(progress).toContainText("Stable service: 0 / 5");await expect(guidance.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","false");
+ await expect(progress).toContainText("Stable service: 0 / 5");await expect(progress.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","false");
+ // The prevention checks sit under their one chapter requirement, so the chapter keeps its three.
+ await expect(guidance.locator("[data-requirement]")).toHaveCount(3);await expect(guidance.locator('[data-requirement="admission"]')).toHaveCount(0);
  await (await infrastructureAction(page,/Remove traffic limit/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await progress.getByRole("button",{name:"Inspect Application"}).click();await closeInspection(page);await progress.getByRole("button",{name:"Inspect Database"}).click();await closeInspection(page);
  await advanceCampaignStep(page,{seconds:2});
- await expect(progress).toContainText("Stable service: 2 / 5");await expect(guidance.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","true");c=(await savedGame(page)).campaign!;
+ await expect(progress).toContainText("Stable service: 2 / 5");await expect(progress.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","true");c=(await savedGame(page)).campaign!;
  await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);await expect(progress).toContainText("Stable service: 2 / 5");
  await advanceCampaignStep(page,{seconds:3});
  const outcome=page.getByRole("dialog",{name:"Prevention review"});await expect(outcome).toContainText("First growth prevented");

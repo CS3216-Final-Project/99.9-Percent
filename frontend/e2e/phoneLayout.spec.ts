@@ -3,7 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 import { reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
-import { expect, expectRoom, openPanelTab, seedClassicSave, seedSave, test, unlockChallenge } from "./fixtures";
+import { expect, expectRoom, seedClassicSave, seedSave, test, unlockChallenge } from "./fixtures";
 
 /*
  * The phone edition's layout regions on a touch phone (Pixel 7): the top strip, the System metrics sheet, the dock
@@ -119,7 +119,6 @@ test("Guided Mode incident: the sheet stays at least half open with every respon
 
   const panel = page.getByRole("complementary", { name: "System metrics" });
   await expect(panel.getByRole("region", { name: "Incident recovery" })).toBeVisible();
-  await openPanelTab(page, "Actions");
   for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
     const response = await infrastructureAction(page,name);
     await response.scrollIntoViewIfNeeded();

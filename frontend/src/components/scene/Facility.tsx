@@ -20,7 +20,7 @@ import {
 } from "@/sim";
 import type { GameMode, GraphicsQuality } from "@/game/persist";
 import { loadExploration, saveExploration, type SavedCameraView } from "@/game/exploration";
-import { canInspectEquipment, componentInspectionEnabled, inspectInRoom, trafficViewOn, useGame } from "@/game/store";
+import { canInspectEquipment, inspectInRoom, trafficViewOn, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { nextViewpoint } from "@/game/viewpoints";
 import { isPhoneEdition } from "@/phone/edition";
@@ -237,7 +237,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
   });
   // The overview's controls rest while a view from the avatar is on.
   const resting = useGame((s) => s.walking && s.viewpoint !== "overview");
-  const inspecting = useGame(s=>!!s.roomInspection&&componentInspectionEnabled(s));
+  const inspecting = useGame(s=>!!s.roomInspection&&!!s.game.campaign);
   /** The player has panned, zoomed or dragged the view, so it no longer follows the facility. */
   const touched = useRef(false);
   /** Turning back to the starting angle after Reset view. */

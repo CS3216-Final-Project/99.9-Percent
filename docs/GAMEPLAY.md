@@ -75,6 +75,9 @@ There are two ways to complete the Opening; both award the same `opening-stabili
   A failing step resets the streak; pausing, reading and reloading add no observations.
   The player reviews the prevention outcome and presses Continue company.
 
+The panel lists three chapter requirements for the whole Opening: growth, a verified prevention outcome or recovered incident, and the milestone.
+While prevention is still possible, its own checks are listed under Opening prevention progress rather than as extra chapter requirements.
+
 The prevention rules are in `frontend/src/sim/openingPrevention.ts`.
 
 ### Chapter 2: Scaling & Routing
@@ -158,6 +161,7 @@ Guidance never changes the rules; it reads the same state the engine uses.
 - A company that stays after Launch Week or the Opening remains in that finished chapter: none of Scaling & Routing's controls or requirements appear until Next enters it.
 - An Opening the player stays in is remembered for that company in the browser's profile, so the next Play does not move it into Scaling & Routing; a company loaded without that record, such as an older save, an import or a cloud restore, still continues into Scaling & Routing on Play.
 - Chapter requirements list each gate as met or unmet, without revealing future deadlines.
+- Each chapter keeps the same requirement rows for its whole length, so its count never changes mid-chapter; a row that stops applying, such as Scaling's database headroom after its growth wave, stays listed as met.
 - Hint is player-requested and points at an existing control; optional attention cues for Run and Next defer to required reviews and guides.
 - Each chapter opens with an optional Company Message from a colleague (Maya, Alex, Jordan, Sam, Taylor, then Alex) stating its mission.
   The colleague speaks a few short lines in their own voice, which the player reads one at a time, and the last line carries the mission.

@@ -47,5 +47,3 @@ it("keeps the recorded reliability outcome available after acknowledgement",()=>
  fireEvent.click(screen.getByRole("tab",{name:/^Incidents/}));
  expect(screen.getByRole("region",{name:"Historical reliability outcome"}).textContent).toContain("App 3");
 });
-
-/** Purchases live on the panel's Actions tab. */

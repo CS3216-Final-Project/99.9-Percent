@@ -4,11 +4,13 @@ import {newGame,applyAction,type GameState,type Action} from "../sim";
 import {advanceSteps,canEnterData} from "../sim/step";
 import {canEnterSpikes} from "../sim/autoscaling";
 import {dataCompany,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
+import {reliabilityCompany} from "../sim/__tests__/reliabilityFixture";
+import {combinedCompany,finishRound} from "../sim/__tests__/combinedFixture";
 function decision(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 function recovered(){return advanceSteps(decision(advanceSteps(newGame(),6).state,{type:"start_db_upgrade"}),30).state;}
 function scaling(){return decision(decision(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"});}
 function prevented(){return advanceSteps(decision(decision(newGame(),{type:"set_traffic_limit",enabled:true}),{type:"start_db_upgrade"}),4).state;}
-function row(g:GameState,id:string){return campaignGuidance(g).requirements.find(r=>r.id===id)!;}
+function row(g:GameState,id:string){const m=campaignGuidance(g);return [...m.requirements,...m.preventionChecks].find(r=>r.id===id)!;}
 it("objectives follow actual phase before chapter without replacing required actions",()=>{
  const g=scaling();
  expect(campaignObjective(g)).toBe("Prepare the system for the next growth wave.");
@@ -32,6 +34,40 @@ it("reactive report then milestone actions require explicit acknowledgement",()=
  let g=recovered();expect(campaignGuidance(g).pendingAction?.label).toBe("Review postmortem");expect(row(g,"recovery").met).toBe(true);expect(row(g,"review").met).toBe(false);
  g=decision(g,{type:"acknowledge_review"});expect(campaignGuidance(g).pendingAction?.label).toBe("Complete Opening");expect(row(g,"review").met).toBe(true);expect(g.campaign!.scaling).toBeNull();
  g=decision(g,{type:"acknowledge_milestone"});expect(campaignGuidance(g).stage).toBe("Scaling & Routing");
+});
+it("keeps the Opening at three chapter requirements from launch through growth and the incident",()=>{
+ let g=newGame();const seen=new Set<number>();
+ for(let i=0;i<10;i++){seen.add(campaignGuidance(g).requirements.length);g=advanceSteps(g,1).state;}
+ expect([...seen]).toEqual([3]);
+});
+/** The requirement counts a company shows over `steps` game seconds, acting on the way as a player would. */
+function counts(g:GameState,steps:number,play:(g:GameState,i:number)=>GameState=g=>g){
+ const seen=new Set<number>();
+ for(let i=0;i<steps&&g.phase!=="ended";i++){g=play(g,i);if(g.phase==="review")g=decision(g,{type:"acknowledge_review"});seen.add(campaignGuidance(g).requirements.length);g=tick(g);}
+ return [...seen];
+}
+it("keeps Scaling's headroom row, met, once its growth has arrived",()=>{
+ expect(counts(scaling(),40,(g,i)=>i===2?decision(g,{type:"start_db_upgrade"}):g)).toEqual([8]);
+ const grown=advanceSteps(decision(scaling(),{type:"start_db_upgrade"}),20).state;
+ expect(grown.campaign!.scaling!.consumed).toBe(true);expect(row(grown,"headroom").met).toBe(true);
+});
+it("keeps Stay Online's arming row, met, once the test has started",()=>{
+ expect(counts(reliabilityCompany(),20,(g,i)=>i===3?decision(g,{type:"arm_reliability"}):g)).toEqual([12]);
+ expect(row(decision(reliabilityCompany(),{type:"arm_reliability"}),"pending").met).toBe(true);
+});
+it("keeps Grow the Company's restoration row whether or not a wave has failed a server",{timeout:30_000},()=>{
+ let g=combinedCompany();const calm=campaignGuidance(g).requirements.length;expect(row(g,"restored").met).toBe(true);
+ for(let i=0;i<2;i++){g=tick(g,5);g=decision(g,{type:"start_growth_wave"});g=finishRound(g);g=decision(g,{type:"acknowledge_growth"});}
+ // The third wave fails a server under load.
+ g=decision(tick(g,5),{type:"start_growth_wave"});
+ expect(g.campaign!.combinedStage!.currentRound!.fault!.restoredStep).toBeNull();
+ expect(campaignGuidance(g).requirements).toHaveLength(calm);expect(row(g,"restored").met).toBe(false);
+});
+it("nests the prevention path's checks under its single chapter requirement",()=>{
+ const m=campaignGuidance(prevented());
+ expect(m.requirements.map(r=>r.id)).toEqual(["growth","outcome","milestone"]);
+ expect(m.preventionChecks.map(r=>r.id)).toEqual(["incident","cash","admission","queues","healthy","app-inspection","db-inspection","observations","review"]);
+ expect(campaignGuidance(newGame()).preventionChecks).toEqual([]);
 });
 it("preventive limit explains full-demand qualification and leaves removal actionable",()=>{
  const g=prevented(),m=campaignGuidance(g);expect(m.prevention).toBe(true);expect(m.notice).toBe("Traffic limiting prevents full-demand qualification. Remove the limit and serve the full 800 req/s to continue the prevention path.");expect(row(g,"admission").met).toBe(false);expect(row(g,"app-inspection").met).toBe(false);expect(applyAction(g,{type:"set_traffic_limit",enabled:false}).ok).toBe(true);

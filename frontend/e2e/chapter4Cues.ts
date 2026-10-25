@@ -1,6 +1,6 @@
 import { closeInspection, followHintComponent, expectInspectionsOnly } from "./componentInspection";
 import type { Locator, Page } from "@playwright/test";
-import { expect, expectRoom, openPanelTab, savedGame, seedSave } from "./fixtures";
+import { expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { act, tick, spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 
 export async function expectCueColours(cue: Locator, tone: "prepare" | "pressure" | "recovery") {
@@ -51,7 +51,6 @@ export async function chapter4TrafficTarget(page: Page, touch = false) {
   await press(page.getByRole("button", { name: "Pause", exact: true }));
   const after = (await savedGame(page)).campaign!;
   expect(after.limit).toBeNull(); expect(after.snapshot.app.demand).toBeLessThanOrEqual(after.snapshot.app.capacity);
-  await openPanelTab(page, "Analysis");
   await press(page.locator(".campaign-panel").getByRole("button", { name: "Monitoring", exact: true }));
   await closeInspection(page);await accept(/^Run$/); expect((await savedGame(page)).campaign!.pending).toHaveLength(0);
 }
