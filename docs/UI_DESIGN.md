@@ -10,6 +10,8 @@ Use the existing warm gold spotlight and inspection host. Automatically spotligh
 
 The normal Database-inspired popup layout is reused. Purchases are absent during the introduction; live readings stay available through Inspect details. Time is paused, with no incident, financial or research requirements. Inspection progress survives reloads through replayable inputs. Replay Launch Week runs this introduction on a practice company and restores the original on completion or Exit. Existing saved Launch Week runs retain their legacy simulation and score-card presentation. Complete Introduction enters Chapter 1 Opening and shows its existing starting conditions and Company Message. The tutorial does not award Opening recognition. The chapter header, overview, saved-company summary and Hint use the canonical Opening (1), Scaling & Routing (2), Data Strategy (3), Spikes (4), Reliability (5) and Grow the Company (6) identities. Historical companies keep their recorded state while using these chapter numbers.
 
+Maya uses the existing Company Message dialogue before the component introduction in both fresh and replayed Chapter 0 sessions. Each practice company has its own message receipt; resuming the same practice does not repeat the dialogue or alter the original company's receipts.
+
 Practice in progress resumes after reload or Save and exit; the paused original company remains preserved.
 
 ## Approved Warm Classic patterns

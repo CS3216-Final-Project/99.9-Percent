@@ -3,6 +3,12 @@
 .stat-action:focus-visible { outline: 2px solid var(--on-night); outline-offset: 2px; }
 .stat-action-label { display: flex; justify-content: space-between; gap: 8px; }
 .finance-overview { padding-bottom: 4px; }
+.company-finances h3 { margin-top: 0; }
+.company-finances p { margin: 8px 0; }
+.finance-costs { padding: 12px; border-radius: var(--radius); background: var(--control-inset); }
+.finance-costs .rows { margin-bottom: 0; }
+.finance-costs .row:last-child { border-bottom: 0; font-weight: 700; }
+.finance-takeaway { color: var(--text-soft); font-size: var(--text-sm); }
 .finance-warning { border-left: 3px solid var(--warn); padding-left: 10px; }
 .finance-advanced { margin-top: 16px; }
 .finance-cash-compact { display: none; }

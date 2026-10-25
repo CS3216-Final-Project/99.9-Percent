@@ -44,6 +44,24 @@ async function expectFullyVisibleGold(page: Page) {
 }
 
 const scaling = () => act(act(tick(act(tick(newGame(), 6), { type: "start_db_upgrade" }), 30), { type: "acknowledge_review" }), { type: "acknowledge_milestone" });
+test("Chapter 2 scaling Hint spotlights App Servers and allows cancelling the purchase",async({page,installClock})=>{
+  await installClock();
+  const game=advanceSteps(act(scaling(),{type:"start_db_upgrade"}),9).state;
+  expect(game.campaign!.scaling?.consumed).toBe(true);
+  await boot(page,game);
+  const before=await savedGame(page);
+  await page.getByRole("button",{name:"Hint",exact:true}).click();
+  await page.getByRole("dialog",{name:"Hint",exact:true}).getByRole("button",{name:"Got it",exact:true}).click();
+  await expect(gold(page)).toHaveAttribute("data-tutorial","inspect-app");
+  await expect(gold(page)).toBeInViewport({ratio:1});
+  await followHintComponent(page);
+  await expect(gold(page)).toHaveAccessibleName(/^Scale up App 1/);
+  await gold(page).click();await expect(gold(page)).toHaveAccessibleName("Confirm");
+  await page.getByRole("button",{name:"Cancel",exact:true}).click();
+  await expectInspectionsOnly(page,before);
+  await closeInspection(page);
+  await expect(await infrastructureAction(page,/Limit to/)).toBeEnabled();
+});
 test("guidance Chapter 4 baseline: Run advances a real qualifying observation", async ({ page, installClock }) => {
   await installClock(); const game = untilOffset(tick(act(spikeCompany(false), { type: "set_traffic_limit", enabled: true })), 68);
   await boot(page, game); const beforeGame=await savedGame(page),before=beforeGame.campaign!;

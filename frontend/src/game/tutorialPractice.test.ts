@@ -14,6 +14,18 @@ function incident() {
   return game;
 }
 
+it("completes the component replay without advancing or replacing the saved Campaign", () => {
+  const company=incident();
+  useGame.getState().startTour("campaign");
+  for(const equipment of ["gateway","app","db","monitoring"] as const) {
+    expect(useGame.getState().act({type:"incident_inspect",equipment})).toBe(true);
+    expect(useGame.getState().act({type:"acknowledge_introduction",equipment})).toBe(true);
+  }
+  expect(useGame.getState().act({type:"complete_introduction"})).toBe(true);
+  expect(useGame.getState()).toMatchObject({game:company,tutorialCompany:null,running:false});
+  expect(loadGame()).toMatchObject({status:"ok",game:company,remainderMs:400});
+});
+
 it("replays Launch Week on a fresh practice company and returns the untouched incident", () => {
   const company = incident();
   useGame.getState().startTour("campaign");

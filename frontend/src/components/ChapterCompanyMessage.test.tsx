@@ -10,6 +10,7 @@ import { preventedOpening, recoveredOpening } from "@/game/__fixtures__/openingO
 import { chapterCompanyMessage } from "@/game/chapterCompanyMessage";
 import { makeEnvelope, decodeSave } from "@/game/saveEnvelope";
 import { useGame } from "@/game/store";
+import { DEFAULT_META, loadGame, saveGame, saveMeta } from "@/game/persist";
 import { ChapterCompanyMessage } from "./ChapterCompanyMessage";
 import { CampaignAttentionHost } from "./CampaignAttention";
 import { CampaignHeader, CampaignPanel, CampaignControls } from "./CampaignUI";
@@ -28,6 +29,32 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); setConfirming(null); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const host = () => <CampaignAttentionHost><CampaignHeader/><CampaignPanel/><CampaignControls/></CampaignAttentionHost>;
+
+it("shows the same Maya dialogue in fresh and replayed Chapter 0 without replacing the saved company", () => {
+  const fresh = decide(newGame(1,"first-introduction",2),{type:"begin_introduction"});
+  const first = chapterCompanyMessage(fresh)!;
+  expect(first).toMatchObject({chapter:0,speaker:"maya",lines:chapterCompanyMessage(newGame())!.lines});
+  render(<StrictMode><ChapterCompanyMessage model={first} enabled/></StrictMode>);
+  expect(within(message()!).getByRole("img",{name:/^Maya,/}).getAttribute("src")).toBe("/characters/maya.webp");
+  readThrough(); cleanup();
+
+  const company = tick(newGame(1,"kept-company"),6);
+  saveGame(company,400);saveMeta({...DEFAULT_META,tutorialDone:true});
+  useGame.getState().boot();useGame.getState().play();
+  useGame.getState().startTour("campaign");
+  const replay = chapterCompanyMessage(useGame.getState().game)!;
+  expect(replay.lines).toEqual(first.lines);expect(replay.key).not.toBe(first.key);
+  render(host());
+  expect(message()!.textContent).toContain(first.lines[0]);
+  expect(within(message()!).getByRole("img",{name:/^Maya,/}).getAttribute("src")).toBe("/characters/maya.webp");
+  readThrough();cleanup();
+  useGame.getState().endSession();useGame.setState(useGame.getInitialState(),true);
+  useGame.getState().boot();useGame.getState().play();render(host());
+  expect(message()).toBeNull(); // Reloading the same practice does not repeat the message.
+  act(()=>useGame.getState().endTour(false));
+  expect(useGame.getState().game).toEqual(company);
+  expect(loadGame()).toMatchObject({status:"ok",game:company,remainderMs:400});
+});
 
 it.each(companies.map((game, i) => [i + 1, game] as const))("shows the actual chapter %i colleague and mission once in StrictMode", (chapter, game) => {
   const before = JSON.stringify(makeEnvelope(game, 0, 1)), model = chapterCompanyMessage(game)!;

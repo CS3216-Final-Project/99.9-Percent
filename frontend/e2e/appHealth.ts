@@ -38,8 +38,15 @@ export async function appHealthJourney(page: Page, width: number, height: number
     }
     const dialog = page.getByRole("dialog", { name: "App Health", exact: true });
     await expect(dialog).toBeVisible();
-    await expect(dialog.locator(".app-health-uptime-card")).toContainText("100%");
-    await expect(dialog.getByText(/across this company/)).toBeVisible();
+    const measurements=dialog.getByLabel("App measurements");
+    await expect(measurements.locator(".row")).toHaveCount(4);
+    await expect(measurements.locator(".row").filter({has:page.getByText("Uptime",{exact:true})})).toContainText("100%");
+    await expect(dialog.getByText(/across this company/)).toBeHidden();
+    expect(await measurements.evaluate(el=>{
+        const rows=[...el.querySelectorAll<HTMLElement>(".row")],styles=rows.map(row=>getComputedStyle(row));
+        const values=rows.map(row=>row.querySelector("dd")!.getBoundingClientRect().top);
+        return rows.every(row=>row.scrollWidth<=row.clientWidth)&&styles.every(style=>style.backgroundColor===styles[0].backgroundColor&&style.padding===styles[0].padding)&&values[0]===values[1]&&values[2]===values[3];
+    })).toBe(true);
     await expect(dialog.getByRole("heading", { name: "Healthy", exact: true })).toBeVisible();
     await expect(dialog).toContainText("100 ms (estimated)"); await expect(dialog).toContainText("0.00%");
     await expect(dialog.getByText(/Rejected requests:/)).toBeHidden();
@@ -55,6 +62,7 @@ export async function appHealthJourney(page: Page, width: number, height: number
     await page.keyboard.press("Tab"); await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeFocused();
     if (touch) await details.tap(); else { await details.focus(); await page.keyboard.press("Enter"); }
     await expect(dialog.getByText(/Rejected requests:/)).toBeVisible();
+    await expect(dialog.getByText(/across this company/)).toBeVisible();
     await expect(dialog.getByText("500 ms is a target for this game, not a rule for every real app.")).toBeVisible();
     await expect(dialog).toContainText("separate from failed requests");
     await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeInViewport({ ratio: 1 });
@@ -81,7 +89,7 @@ export async function appHealthJourney(page: Page, width: number, height: number
     await page.getByRole("button", { name: "Continue company", exact: true }).click();
     await expectRoom(page);
     await entry.click();
-    await expect(dialog.locator(".app-health-uptime-card")).toContainText("100%");
+    await expect(dialog.getByLabel("App measurements").locator(".row").filter({has:page.getByText("Uptime",{exact:true})})).toContainText("100%");
     await expect(entry).not.toContainText("Uptime");
 }
 

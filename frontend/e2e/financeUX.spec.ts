@@ -13,9 +13,14 @@ test("finance explains actual accounting, purchase risk and accessible unavailab
     const before=await savedGame(page);
     await page.getByRole("button",{name:"View finances"}).click();
     const finance=page.getByRole("dialog",{name:"Company finances"});
-    await expect(finance).toContainText("$0.20");await expect(finance).toContainText("not yet received");
-    await expect(finance).toContainText("Last period's result does not include purchases.");
+    await expect(finance.getByRole("heading").nth(1)).toHaveText("Where your money goes");
+    await expect(finance.getByText(/Each successfully completed request earns/)).toBeHidden();
+    await finance.getByText("How your company makes money",{exact:true}).click();
+    await expect(finance.getByText(/Each successfully completed request earns/)).toContainText("$0.20");
+    await finance.getByText("How your company makes money",{exact:true}).click();
+    await expect(finance.getByText("Last period's result does not include purchases.")).toBeHidden();
     await finance.getByText("Advanced details",{exact:true}).click();await finance.getByText("Detailed running costs",{exact:true}).click();await expect(finance.getByRole("table")).toContainText("Employee salaries");
+    await expect(finance.getByText("Last period's result does not include purchases.")).toBeVisible();
     await page.screenshot({path:"test-results/finance-desktop.png"});
     await finance.getByText("How estimates work",{exact:true}).click();
     await finance.getByText(/This is a budget estimate, not a bankruptcy deadline/).scrollIntoViewIfNeeded();
@@ -57,6 +62,7 @@ test("Cash card supports keyboard access without enlarging neighbouring status c
     const finance=page.getByRole("dialog",{name:"Company finances"});
     await expect(finance.getByText("Advanced details",{exact:true})).toBeVisible();
     await expect(finance.getByText("Costs waiting to be paid",{exact:true})).toBeHidden();
+    await page.keyboard.press("Tab");await expect(finance.getByText("How your company makes money",{exact:true})).toBeFocused();
     await page.keyboard.press("Tab");await expect(finance.getByText("Advanced details",{exact:true})).toBeFocused();
     await page.keyboard.press("Enter");await expect(finance.getByText("Costs waiting to be paid",{exact:true})).toBeVisible();
     await page.keyboard.press("Enter");await expect(finance.getByText("Costs waiting to be paid",{exact:true})).toBeHidden();
