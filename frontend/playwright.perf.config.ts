@@ -13,6 +13,7 @@ const dist = process.env.PERF_DIST ?? 'dist';
 
 export default defineConfig({
   testDir: './perf',
+  testMatch: 'probe.spec.ts',
   tsconfig: './tsconfig.app.json',
   fullyParallel: false,
   workers: 1,

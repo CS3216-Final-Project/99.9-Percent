@@ -828,6 +828,21 @@ let inCampaign = false;
 let inSpikes = false;
 let campaignAppIds: string[] = [];
 
+const SPARE_OUTLINE: [number, number, number][] = [[0, 0, 0], [1, 0, 0]];
+
+/**
+ * A pad's outline, dashed and solid, never shown: pads appear only once the player lands on their floor, so without
+ * these the shader preparation would not find the outline's shaders and the first landing would build them.
+ */
+function SpareOutlines() {
+  return (
+    <group visible={false}>
+      <Line points={SPARE_OUTLINE} lineWidth={1} transparent opacity={0.7} />
+      <Line points={SPARE_OUTLINE} lineWidth={1} dashed dashSize={0.32} gapSize={0.22} transparent opacity={0.7} />
+    </group>
+  );
+}
+
 function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprint> }) {
   const apps = useGame((s) => s.game.campaign?.apps);
   const spikes = useGame((s) => !!s.game.campaign?.spikeStage);
@@ -1158,16 +1173,37 @@ function pieces(o: THREE.Object3D): THREE.Object3D[] {
   return size <= PREPARE_PIECE ? [o] : o.children.flatMap(pieces);
 }
 
+/** Whether a texture has a picture to send: photos still downloading are sent when they first draw. */
+const ready = (t: THREE.Texture) => !!t.image && (t.image as { complete?: boolean }).complete !== false && !(t as THREE.VideoTexture).isVideoTexture;
+
+/** The textures a piece's materials draw with that are not yet in `sent`, which they are added to. */
+function texturesOf(piece: THREE.Object3D, sent: Set<THREE.Texture>): THREE.Texture[] {
+  const out: THREE.Texture[] = [];
+  piece.traverse((o) => {
+    const material = (o as THREE.Mesh).material;
+    if (!material) return;
+    for (const m of Array.isArray(material) ? material : [material])
+      for (const value of Object.values(m))
+        if ((value as THREE.Texture | null)?.isTexture && !sent.has(value) && ready(value)) {
+          sent.add(value);
+          out.push(value);
+        }
+  });
+  return out;
+}
+
 /**
  * Prepares the shaders of both floors for how the room is drawn: through the effects pass, into its buffer with
  * linear colour and no tone mapping, or straight to the screen in sRGB with the renderer's tone mapping. three keys
  * each material's shader on where it draws, and the effects pass turns the renderer's tone mapping off, so outside
  * a frame the screen with no tone mapping would be prepared, a way nothing ever draws. With effects the pass's
- * buffer is set here instead; without them the screen is already right. Building them all at once would hold the
- * page up, so the room is prepared a piece at a time, a few milliseconds a frame.
+ * buffer is set here instead; without them the screen is already right. Their textures are sent to the graphics card
+ * too, so the first sight of the other floor does not stall on uploads. Building them all at once would hold the page
+ * up, so the room is prepared a piece at a time, a few milliseconds a frame.
  */
 async function prepareShaders(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, effects: boolean, signal: AbortSignal): Promise<void> {
   const buffer = effects ? new THREE.WebGLRenderTarget(1, 1) : null;
+  const sent = new Set<THREE.Texture>();
   try {
     let started = performance.now();
     // three prepares every object in a piece, shown or not, so the floor out of view is included.
@@ -1181,6 +1217,7 @@ async function prepareShaders(gl: THREE.WebGLRenderer, scene: THREE.Scene, camer
       try {
         gl.setRenderTarget(buffer);
         gl.compile(piece, camera, scene);
+        for (const t of texturesOf(piece, sent)) gl.initTexture(t);
       } catch {
         // Only a head start: the shaders build when first drawn anyway.
       } finally {
@@ -1304,7 +1341,7 @@ function Effects() {
   );
 }
 
-function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Floor | null; warm: boolean }) {
+function Scene({ quality, landed }: { quality: QualityProfile; landed: Floor | null }) {
   const effects = quality.effects;
   const m = useSceneModel();
   const game = useGame(s => s.game);
@@ -1345,17 +1382,17 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
     return f;
   }, [game, m]);
   // Once the room has loaded, prepare the floor out of view as well, so the first ride does not stall on new shaders.
-  // Only on a graphics card: drawing on the CPU, compiling everything at once would stall the page for longer.
+  // Drawing on the CPU too: a piece at a time it costs a few short frames while the room stands still, where left to
+  // the ride every new shader is built at once and the car freezes for most of a second.
   const { gl, scene, camera } = useThree();
   useEffect(() => {
-    if (!warm) return;
     const job = new AbortController();
     const id = window.setTimeout(() => void prepareShaders(gl, scene, camera, effects, job.signal), WARM_MS);
     return () => {
       window.clearTimeout(id);
       job.abort();
     };
-  }, [gl, scene, camera, warm, effects]);
+  }, [gl, scene, camera, effects]);
   const sym = (id: EquipmentId) => m.symptomatic.includes(id);
   const racks = useMemo(() => racksOf(m), [m]);
 
@@ -1491,6 +1528,7 @@ function Scene({ quality, landed, warm }: { quality: QualityProfile; landed: Flo
         <SpotBeams floor="servers" footprints={m.footprints} layout={trafficLayout} />
       </group>
       <LabelAnchors footprints={m.footprints} />
+      <SpareOutlines />
 
       {/* First, so the camera drawing has moved before the overview's rig places the labels for it. */}
       <ViewRig />
@@ -1940,7 +1978,7 @@ export default function Facility() {
         {/* The room waits until the renderer is known, so a GPU never compiles the basic materials only to replace them. */}
         {renderer !== "unknown" && (
           <DetailContext.Provider value={quality.detail}>
-            <Scene quality={quality} landed={landed} warm={renderer === "gpu"} />
+            <Scene quality={quality} landed={landed} />
           </DetailContext.Provider>
         )}
         {quality.fps !== null && <FrameLimiter fps={quality.fps} />}
