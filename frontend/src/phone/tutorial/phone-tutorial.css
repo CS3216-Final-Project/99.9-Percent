@@ -90,6 +90,13 @@ body:has(.phone-app[data-edition="phone"] .phone-dock details.time-menu[open]) .
   [data-edition="phone"] { --phone-coach-height: 136px; }
 }
 
+/* Keep the coach readable and at least 40% of a short screen available to the room.
+   The collapsed metrics handle remains larger than the 44px touch target. */
+@media (max-height: 600px) {
+  .phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial),
+  body:has(> .tour-card.launch-tutorial) .phone-app[data-edition="phone"] { --phone-sheet-peek: 48px; }
+}
+
 /* The dock's menus open above the strip, so a guide never covers the speed or Navigation menu it points at. */
 .phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial) .phone-dock .dock-panel {
   bottom: calc(100% + 10px + var(--phone-coach));
