@@ -13,6 +13,7 @@ import { TooltipLayer } from "./Tooltip";
 import { act as decide, tick, dataCompany } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
 import { combinedCompany } from "@/sim/__tests__/combinedFixture";
+import { INTRODUCTION_COMPONENTS } from "@/sim/introduction";
 
 beforeEach(() => {
   localStorage.clear(); useGame.setState(useGame.getInitialState(), true);
@@ -33,6 +34,13 @@ function acceptHint() {
 }
 
 const scaling = () => decide(decide(tick(decide(tick(newGame(), 6), { type: "start_db_upgrade" }), 30), { type: "acknowledge_review" }), { type: "acknowledge_milestone" });
+function introducedOpening() {
+  let game = decide(newGame(7, "opening-guidance", 2), { type: "begin_introduction" });
+  for (const equipment of INTRODUCTION_COMPONENTS) {
+    game = decide(decide(game, { type: "incident_inspect", equipment }), { type: "acknowledge_introduction", equipment });
+  }
+  return decide(game, { type: "complete_introduction", handoff: "opening" });
+}
 it("uses the shared ten-second deadline for the growth explanation, then a fresh Run interval after consent", () => {
   show(scaling()); act(() => vi.advanceTimersByTime(9999)); expect(gold()).toHaveLength(0);
   act(() => useGame.setState({ game: structuredClone(useGame.getState().game) }));
@@ -297,4 +305,60 @@ it("teaches Launch Week with spotlighted tutorial steps instead of the Hint butt
   fireEvent.click(within(metrics).getByRole("button", { name: "Next" }));
   // The fix is in the shared Database inspection, already open after reading metrics.
   spotOn(/^Upgrade database/);
+});
+
+it("continues the introduction with Run, service analytics, readings and a real upgrade", () => {
+  show(introducedOpening());
+  const message = screen.getByRole("dialog", { name: "Company Message" });
+  fireEvent.click(within(message).getByRole("button", { name: "Dismiss company message" }));
+  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Run, then observe");
+  spotOn("Run");
+  fireEvent.click(lit()[0]);
+  act(() => useGame.setState({ game: tick(useGame.getState().game, 1), running: true }));
+  const analytics = screen.getByRole("region", { name: "Chapter 1 guide" });
+  expect(analytics.textContent).toContain("Watch your service");
+  expect(lit()[0].classList.contains("incident-symptoms")).toBe(true);
+  const beforeReading = useGame.getState().game;
+  fireEvent.click(within(analytics).getByRole("button", { name: "Next" }));
+  expect(useGame.getState().game).toBe(beforeReading);
+  act(() => useGame.setState({ game: tick(useGame.getState().game, 5), running: false }));
+  spotOn(/Database/);
+  fireEvent.click(lit()[0]);
+  const metrics = screen.getByRole("region", { name: "Chapter 1 guide" });
+  expect(metrics.textContent).toContain("Read the metrics");
+  expect(lit()[0].classList.contains("component-inspection-summary")).toBe(true);
+  fireEvent.click(within(metrics).getByRole("button", { name: "Next" }));
+  spotOn(/^Upgrade database/);
+  fireEvent.click(lit()[0]);
+  expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
+  expect(gold()[0].textContent).toBe("Confirm");
+  const step = useGame.getState().game.campaign!.step;
+  fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+  expect(useGame.getState().game.campaign!.pending.some(action => action.type === "upgrade-db")).toBe(true);
+  expect(useGame.getState().game.campaign!.step).toBe(step);
+  expect(screen.queryByRole("dialog", { name: "Database inspected" })).toBeNull();
+  spotOn("Run");
+  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Installing");
+});
+
+it("gives manual Hint and obstructing views priority over the Opening coach", () => {
+  const game = tick(introducedOpening(), 1);
+  show(game);
+  const message = screen.queryByRole("dialog", { name: "Company Message" });
+  if (message) fireEvent.click(within(message).getByRole("button", { name: "Dismiss company message" }));
+  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Watch your service");
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  expect(screen.getByRole("dialog", { name: "Hint" })).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Close Hint" }));
+  act(() => useGame.getState().openView("history"));
+  expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
+  expect(useGame.getState().game).toBe(game);
+});
+
+it("does not replay the new introduction handoff on historical Opening companies", () => {
+  show(newGame());
+  expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
+  act(() => vi.advanceTimersByTime(10_000));
+  expect(gold()[0].getAttribute("aria-label")).toBe("Run");
 });

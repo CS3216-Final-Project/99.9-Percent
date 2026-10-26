@@ -321,6 +321,8 @@ export function ViewRig() {
       // The interactive Campaign dialog owns Escape, including during pointer release.
       if (document.querySelector(".component-inspection")) return;
       const state = useGame.getState();
+      // The workspace owns Escape even when opening it released the mouse from walk mode.
+      if (state.view === "tech" || state.view === "history") return;
       if (state.roomInspection) {
         e.stopImmediatePropagation();
         state.dismissRoomInspection();
@@ -346,6 +348,8 @@ export function ViewRig() {
     };
     const keys = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
+      const view = useGame.getState().view;
+      if (view === "tech" || view === "history") return;
       if (!looking() || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable || el.closest('[role="dialog"], [role="menu"], [role="listbox"]'))) return;
       // As in the overview, where Q swings the camera round to the right and E to the left.

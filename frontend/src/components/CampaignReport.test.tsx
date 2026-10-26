@@ -37,7 +37,8 @@ it("preserves growth review evidence and explicit acknowledgement", () => {
   const game = finishRound(act(tick(combinedCompany(), 5), { type: "start_growth_wave" }));
   useGame.setState({ game, ready: true, started: true, onboarding: false }); render(<CampaignOverlays/>);
   const details = checkReport();
-  expect(details.textContent).toContain(JSON.stringify(game.campaign!.combinedStage!.currentRound, null, 2));
+  expect(details.querySelector("pre")).toBeNull();
+  expect(within(details).getByText("Started game second")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
   expect(useGame.getState().game.campaign!.combinedStage!.completedRounds.at(-1)!.acknowledged).toBe(true);
   expect(useGame.getState().game.campaign!.cashCents).toBe(game.campaign!.cashCents);

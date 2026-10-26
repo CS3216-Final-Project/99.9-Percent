@@ -25,6 +25,33 @@ async function open(page: Page) {
   await expectRoom(page);
 }
 
+test("focused workspaces ignore hidden room keyboard shortcuts", async ({ page }) => {
+  await open(page);
+  // The opening auto-fit saves its first camera asynchronously. Choose a real zoom to establish a
+  // player-owned view, which stops auto-framing, before comparing exact saved camera coordinates.
+  await expect.poll(async () => (await exploration(page))?.camera ?? null).not.toBeNull();
+  const initialZoom = (await exploration(page)).camera.zoom;
+  const cameraMenu = page.locator(".camera-menu > summary");
+  await cameraMenu.click();
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await cameraMenu.click();
+  await expect.poll(async () => (await exploration(page))?.camera?.zoom ?? 0).toBeGreaterThan(initialZoom);
+  const before = await exploration(page);
+  for (const [name, title] of [["Tech", "Tech tree"], ["History", "History"]]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    const workspace = page.getByRole("region", { name: title, exact: true });
+    await expect(workspace).toBeVisible();
+    await workspace.getByRole("heading", { name: title, exact: true }).focus();
+    for (const key of ["PageUp", "PageDown", "v", "q", "e"]) await page.keyboard.press(key);
+    await workspace.getByRole("button", { name: "Back to room", exact: true }).click();
+    await expect(stage(page)).toHaveAttribute("data-camera", "overview");
+    const after = await exploration(page);
+    expect(after.floor).toBe(before.floor);
+    expect(after.viewpoint).toBe(before.viewpoint);
+    expect(after.camera).toEqual(before.camera);
+  }
+});
+
 /** The round map starts folded: unfold it from its Map button. */
 async function showMap(page: Page) {
   await page.locator(".room-map.is-closed").getByRole("button", { name: "Map", exact: true }).click();

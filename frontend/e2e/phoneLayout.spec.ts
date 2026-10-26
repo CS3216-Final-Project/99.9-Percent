@@ -272,9 +272,11 @@ test("Challenge Mode: equipment and weekly operations share the sheet, and the v
   const tree = page.getByRole("region", { name: "Tech tree" });
   await expect(tree).toBeVisible();
   const view = await box(tree);
-  expect(view.y).toBeGreaterThanOrEqual((await box(page.locator(".phone-top"))).height);
-  expect(view.y + view.height).toBeLessThanOrEqual((await box(dock(page))).y);
-  await tree.getByRole("button", { name: "Close", exact: true }).tap();
+  expect(view.x).toBe(0);
+  expect(view.y).toBe(0);
+  expect(view.width).toBe(page.viewportSize()!.width);
+  expect(view.y + view.height).toBeCloseTo((await box(dock(page))).y, 0);
+  await tree.getByRole("button", { name: "Back to room", exact: true }).tap();
   await expect(tree).toBeHidden();
   await expectNoHorizontalOverflow(page);
 });

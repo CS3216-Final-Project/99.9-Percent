@@ -19,7 +19,7 @@ beforeEach(()=>{
   vi.spyOn(HTMLElement.prototype,"getBoundingClientRect").mockReturnValue({x:10,y:10,top:10,left:10,right:54,bottom:54,width:44,height:44,toJSON:()=>({})});
   vi.useFakeTimers({toFake:["setTimeout","clearTimeout","performance"]});
 });
-afterEach(()=>{cleanup();setConfirming(null);vi.useRealTimers();vi.restoreAllMocks();});
+afterEach(()=>{cleanup();setConfirming(null);vi.useRealTimers();vi.restoreAllMocks();vi.unstubAllGlobals();});
 function show(game:GameState=advanceSteps(newGame(),6).state) {
   useGame.setState({game,ready:true,started:true,onboarding:false,tour:null,running:false});
   render(<CampaignAttentionHost><CampaignHeader/><CampaignPanel/><CampaignControls/><InspectionReveal/></CampaignAttentionHost>);
@@ -198,7 +198,7 @@ it("describes a failed server's zero available capacity and shows that instance'
  expect(popup.querySelector(".component-inspection-metric")?.textContent).toContain("0 available /");
  expect(popup.textContent).not.toMatch(/operating at full capacity|using all available capacity/);
  fireEvent.click(dialog("Servers").getByText("Technical Details"));
- const evidence=screen.getByRole("region",{name:"Servers readings"}),instance=game.campaign!.snapshot.instances!.find(a=>a.id===id)!;
+ const evidence=screen.getByRole("region",{name:`App ${id.slice(4)} readings`}),instance=game.campaign!.snapshot.instances!.find(a=>a.id===id)!;
  expect(evidence.querySelectorAll(".evidence-rows dd")[0].textContent).toBe(`${instance.demand.toLocaleString("en-US")} requests/s`);
  expect(dialog("Servers").getByRole("button",{name:new RegExp(`^Restore App ${id.slice(4)}`)}).hasAttribute("disabled")).toBe(false);
 });
@@ -254,6 +254,48 @@ it("returns keyboard focus to the shortcut after initial and nested inspection d
  fireEvent.click(shortcut);open("Server management");
  fireEvent.keyDown(screen.getByRole("dialog",{name:"App Servers"}),{key:"Escape"});
  expect(document.activeElement).toBe(shortcut);
+});
+
+it("keeps fleet comparison and selected actions in one desktop modal, returning focus to its original opener",async()=>{
+ vi.stubGlobal("matchMedia",(query:string)=>({matches:query==="(min-width: 901px)",addEventListener:()=>{},removeEventListener:()=>{}}));
+ const game=tick(decide(spikeCompany(false),{type:"add_server"}),2);
+ show(game);
+ const shortcut=screen.getByRole("button",{name:"App Server"});shortcut.focus();fireEvent.click(shortcut);
+ const popup=screen.getByRole("dialog",{name:"App Servers"});open("Server management");
+ const fleet=within(popup).getByRole("region",{name:"Server management"});
+ const third=within(fleet).getByRole("button",{name:/^App 3:/});fireEvent.click(third);
+ expect(screen.getByRole("dialog",{name:"App Servers"})).toBe(popup);
+ expect(screen.getAllByRole("dialog")).toHaveLength(1);
+ expect(fleet.hidden).toBe(false);
+ expect(within(fleet).getByLabelText("Server counts").textContent).toContain("Installed3");
+ expect(third.getAttribute("aria-pressed")).toBe("true");
+ const detail=within(popup).getByRole("region",{name:"App 3 details"});
+ const scale=within(detail).getByRole("button",{name:/^Scale up App 3/});fireEvent.click(scale);await act(async()=>{});
+ open("Cancel");await act(async()=>{});
+ expect(screen.getByRole("dialog",{name:"App Servers"})).toBe(popup);
+ expect(document.activeElement).toBe(scale);
+ expect(useGame.getState().game.campaign!.pending).toHaveLength(0);
+ fireEvent.click(within(fleet).getByRole("button",{name:/^App 1:/}));
+ expect(screen.getByRole("dialog",{name:"App Servers"})).toBe(popup);
+ expect(within(popup).getByRole("region",{name:"App 1 details"})).toBeTruthy();
+ expect(useGame.getState().selectedAppId).toBe("app-1");
+ fireEvent.keyDown(popup,{key:"Escape"});expect(document.activeElement).toBe(shortcut);
+});
+
+it("keeps phone server inspection sequential and preserves direct room-instance focus return",async()=>{
+ show(spikeCompany(false));
+ const shortcut=screen.getByRole("button",{name:"App Server"});shortcut.focus();
+ act(()=>inspectInRoom("app","app-2"));await act(async()=>{});
+ const popup=screen.getByRole("dialog",{name:"App Servers"});
+ expect(within(popup).getByRole("region",{name:"App 2 details"})).toBeTruthy();
+ const fleet=popup.querySelector<HTMLElement>(".inspection-fleet-pane")!;
+ expect(fleet.hidden).toBe(true);
+ expect(within(popup).queryByRole("button",{name:/^App 1:/})).toBeNull();
+ open("Back to Server management");expect(fleet.hidden).toBe(false);
+ fireEvent.click(within(fleet).getByRole("button",{name:/^App 1:/}));
+ expect(screen.getByRole("dialog",{name:"App Servers"})).toBe(popup);
+ expect(within(popup).getByRole("region",{name:"App 1 details"})).toBeTruthy();
+ fireEvent.keyDown(popup,{key:"Escape"});expect(document.activeElement).toBe(shortcut);
 });
 
 it("keeps legacy Launch Week incident inspections and upgrades usable after the week ends",()=>{

@@ -280,3 +280,23 @@ it("does not mention reviewing the spike response before there is one", () => {
   expect(campaignGuidance(spikeCompany(false)).notice).toBeNull();
   expect(campaignGuidance(spikeRecognition()).notice).toBe("Stay Online opens after you review the spike response.");
 });
+
+it("shows four nines and copies the correctly named game from the chapter-end score card", async () => {
+  const game = finishedLaunchWeek();
+  game.campaign!.cumulative = { ...game.campaign!.cumulative, successful: 19998, failed: 2, rejected: 0 };
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  try {
+    show(game);
+    const card = screen.getByRole("dialog", { name: "Launch Week complete" });
+    expect(within(card).getByText("four nines")).toBeTruthy();
+    await act(async () => { fireEvent.click(button(card, "Copy result")); });
+    expect(writeText).toHaveBeenCalledWith("Launch Week: 99.990% uptime (four nines), 2 requests lost - 99.99%");
+    expect(button(card, "Stay in this chapter")).toBeTruthy();
+    expect(button(card, "Continue to Scaling & Routing")).toBeTruthy();
+  } finally {
+    if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
+});

@@ -41,7 +41,11 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   const report = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
   await expect(report).toBeVisible(); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
   await expect(report.getByRole("heading", { name: "What happened?", exact: true })).toBeInViewport();
-  await expect(report.locator(".report-metrics dt")).toHaveCount(3);
+  await expect(report.locator(".report-metrics dt")).toHaveText([
+    "Incident window", "Final response time", "Traffic status",
+    ...(!limited ? ["Spending in this evidence window"] : []),
+  ]);
+  if (!limited) await expect(report.locator(".report-metrics dd").last()).toHaveText("$3,000.00");
   await expect(report.locator(".report-technical")).not.toHaveAttribute("open");
   await expect(report.getByText(limited ? /Recorded responses included a traffic limit/ : /Recorded responses included a database upgrade/)).toBeVisible();
   await expect(report.locator(".report-metrics")).toContainText(limited ? "Recovered with traffic limited" : "Recovered at full incoming demand");
@@ -50,13 +54,19 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   const summary = report.locator("summary", { hasText: "View Technical Details" });
   await page.keyboard.press("Tab"); await expect(summary).toBeFocused();
   await page.keyboard.press("Shift+Tab"); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
-  await press(summary); await expect(report.getByRole("table")).toBeVisible();
+  await press(summary); await expect(report.getByRole("table", { name: "Recorded incident evidence by game second", exact: true })).toBeVisible();
   for (const explanation of recovered.campaign!.reports.at(-1)!.explanations) await expect(report).toContainText(explanation);
-  await expect(report).toContainText("recovery-streak");
+  const recoveredReport = recovered.campaign!.reports.at(-1)!;
+  const recoveryEvents = recoveredReport.events.filter(event => event.type === "recovery-streak");
+  expect(recoveryEvents.length).toBeGreaterThan(0);
+  await expect(report.locator(".report-events li").filter({ hasText: "Recovery progress" })).toHaveCount(recoveryEvents.length);
+  await expect(report.locator(".report-events")).toContainText("Stable seconds 4 to 5");
+  expect((await savedGame(page)).campaign!.reports.at(-1)!.events).toEqual(recoveredReport.events);
   expect(await report.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await reloadReview();
   await expect(notice).toHaveCount(0); await expect(report).toBeVisible();
   expect((await savedGame(page)).campaign!.inputs).toEqual(recovered.campaign!.inputs);
+  expect((await savedGame(page)).campaign!.reports.at(-1)!.events).toEqual(recoveredReport.events);
   await press(report.getByRole("button", { name: "Continue company", exact: true }));
   await expect(page.getByRole("dialog", { name: "First growth challenge handled" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "First growth challenge handled" })).toContainText("You diagnosed an outage and restored your service.");
@@ -68,7 +78,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   await expect(notice).toHaveCount(0); await expect(report).toHaveCount(0);
   await press(page.getByRole("button", { name: "History", exact: true }));
   await press(page.getByRole("tab", { name: "Incidents (1)", exact: true }));
-  await press(page.getByRole("button", { name: /Game seconds.*Service slowdown/ }));
+  await press(page.getByRole("button", { name: /Database overloaded.*Game seconds/ }));
   await expect(page.getByText("What happened?", { exact: true })).toBeVisible();
   await expect(notice).toHaveCount(0);
 }

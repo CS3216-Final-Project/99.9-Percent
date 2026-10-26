@@ -373,7 +373,8 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.closest('[role="dialog"], [role="menu"], [role="listbox"]'))) return;
       if (document.querySelector(".modal-backdrop, .company-message-backdrop")) return;
-      if (e.ctrlKey || e.metaKey || e.altKey || !useGame.getState().started || lookingFromAvatar()) return;
+      const current = useGame.getState();
+      if (e.ctrlKey || e.metaKey || e.altKey || !current.started || current.view === "tech" || current.view === "history" || lookingFromAvatar()) return;
       if (e.key === "q" || e.key === "Q") cameraApi.rotateBy(-TURN);
       else if (e.key === "e" || e.key === "E") cameraApi.rotateBy(TURN);
     };
@@ -1618,6 +1619,8 @@ function WalkControls() {
     }
     const down = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
+      const view = useGame.getState().view;
+      if (view === "tech" || view === "history") return;
       if (typing(el) || inOverlay(el) || e.ctrlKey || e.metaKey || e.altKey) return;
       const arrow = e.code.startsWith("Arrow");
       const steering = movesAvatar(e.code) || e.code === "ShiftLeft" || e.code === "ShiftRight";
@@ -1868,14 +1871,15 @@ export default function Facility() {
   const ghost = useGame(s => s.previewAction && s.game.campaign ? changeOf(s.previewAction, s.game.campaign)?.kind ?? null : null);
   const landed = useLanded();
   // Page Up and Page Down ride between the floors, and V changes the view, unless the player is typing or in a
-  // dialog or a menu.
+  // dialog, menu or focused workspace. Page keys retain their normal reading behavior there.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const view = e.key === "v" || e.key === "V";
       if (e.key !== "PageUp" && e.key !== "PageDown" && !view) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable || el.closest('[role="dialog"], [role="menu"], [role="listbox"]'))) return;
-      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !useGame.getState().started) return;
+      const current = useGame.getState();
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !current.started || current.view === "tech" || current.view === "history") return;
       e.preventDefault();
       if (view) {
         const s = useGame.getState();

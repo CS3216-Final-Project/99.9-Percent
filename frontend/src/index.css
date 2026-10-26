@@ -2616,14 +2616,21 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(320px, 22vw, 420px);
   height: 100%;
+  min-height: 0;
 }
+
+.tree-navigation { display: none; }
+.tree-arrow-back { transform: rotate(180deg); }
 
 .tree-scroll {
   container-type: inline-size;
   display: flex;
   overflow: auto;
-  padding: clamp(16px, 2vw, 40px);
+  min-height: 0;
+  padding: clamp(16px, 2vw, 32px);
 }
+
+.tree-scroll:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 
 .tree-map {
   flex: none;
@@ -2637,7 +2644,7 @@ button:disabled {
 .tree-canvas {
   position: relative;
   width: 100%;
-  height: clamp(420px, 60dvh, 800px);
+  height: clamp(320px, 52dvh, 640px);
 }
 
 .lane {
@@ -2881,7 +2888,8 @@ button:disabled {
 }
 
 .tree-detail {
-  border-left: 3px solid var(--ink);
+  min-height: 0;
+  border-left: 1px solid var(--control-edge);
   padding: clamp(16px, 1.5vw, 28px);
   font-size: clamp(0.98rem, 0.5vw + 0.5rem, 1.12rem);
   overflow-y: auto;
@@ -2908,6 +2916,12 @@ button:disabled {
 .tree-detail .act {
   margin-top: 14px;
 }
+
+.tree-facts { margin: 16px 0; }
+.tree-facts > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--control-edge); }
+.tree-facts dt { color: var(--text-soft); }
+.tree-facts dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tree-ownership-note { color: var(--text-soft); font-size: var(--text-sm); }
 
 /* Team */
 .eng {
@@ -4972,6 +4986,13 @@ button:disabled {
   }
 }
 
+@media (min-width: 901px) and (max-width: 1100px) {
+  .tree { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .tree-scroll { min-height: 390px; }
+  .tree-canvas { height: 340px; }
+  .tree-detail { border-left: 0; border-top: 1px solid var(--control-edge); overflow: visible; }
+}
+
 @media (max-width: 900px) {
   body {
     font-size: var(--text-sm);
@@ -5079,19 +5100,34 @@ button:disabled {
   }
   .tree-detail {
     border-left: 0;
-    border-bottom: 3px solid var(--ink);
-    order: -1;
+    border-top: 1px solid var(--control-edge);
+    order: 0;
+    overflow: visible;
   }
+  .tree-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px 0;
+    color: var(--on-night-soft);
+    font-size: var(--text-sm);
+  }
+  .tree-navigation > div { display: flex; flex: none; gap: 8px; }
+  .tree-navigation .icon-btn { min-width: 44px; min-height: 44px; }
   .tree-scroll {
     display: block;
-    padding: 16px;
+    padding: 12px 16px 16px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
   }
   .tree-map {
-    min-width: 848px;
+    min-width: 760px;
   }
   .tree-canvas {
-    height: 380px;
+    height: 300px;
   }
+  .tree-legend { gap: 8px 16px; margin-top: 8px; }
   .lane-label {
     padding: 8px;
   }
@@ -5247,6 +5283,11 @@ button:disabled {
 .history-notes > .more { padding-top: 12px; }
 .history-card { padding-top: 12px; }
 .history-incidents { display: grid; gap: 10px; }
+
+@media (max-width: 480px) {
+  .history-tabset .segment { padding-inline: 4px; }
+  .history-tabset .segment .icon { display: none; }
+}
 .campaign-feed .feed-item { grid-template-columns: 28px 76px 1fr; }
 .request-path { margin: 0 0 4px; font-size: var(--text-xs); }
 .modal select, .modal textarea { display: block; width: 100%; padding: 8px; margin: 8px 0; }

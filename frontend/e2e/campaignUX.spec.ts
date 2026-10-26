@@ -22,5 +22,5 @@ test("Campaign option comparison, confirmation, Run/Pause and pause-to-investiga
   await page.clock.runFor(3000); expect((await savedGame(page)).campaign!.step).toBe(stopped);
   await expect(page.getByRole("button",{name:"Run",exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Tech",exact:true}).click(); await expect(page.getByRole("region",{name:"Tech tree"})).toContainText("Owned does not mean deployed");
-  await page.getByRole("button",{name:"Close",exact:true}).click(); await page.clock.runFor(2000); expect((await savedGame(page)).campaign!.step).toBe(stopped);
+  await page.getByRole("button",{name:"Back to room",exact:true}).click(); await page.clock.runFor(2000); expect((await savedGame(page)).campaign!.step).toBe(stopped);
 });

@@ -7,7 +7,7 @@ export async function reliabilityClarity(page: Page, info: TestInfo, touch = fal
   await page.route("**/api/**", route => route.abort()); await seedSave(page, game); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
   const outcome = page.getByRole("dialog", { name: "Reliability outcome", exact: true });
-  await expect(outcome.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "How did you respond?", "What could be improved?", "Key takeaway"]);
+  await expect(outcome.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "Capacity after the failure", "How did you respond?", "What could be improved?", "Key takeaway"]);
   await expect(outcome).toContainText("requested a free server restore");
   await expect(outcome.getByText("Application failure", { exact: true })).toBeHidden();
   await page.screenshot({ path: info.outputPath("reliability-summary.png") });
@@ -16,7 +16,7 @@ export async function reliabilityClarity(page: Page, info: TestInfo, touch = fal
   await expect(outcome.getByText("Application failure", { exact: true })).toBeVisible();
   await expect(outcome.getByText("Company setup spending at completion", { exact: true })).toBeVisible();
   await page.reload(); await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expect(outcome.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "How did you respond?", "What could be improved?", "Key takeaway"]);
+  await expect(outcome.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "Capacity after the failure", "How did you respond?", "What could be improved?", "Key takeaway"]);
   const button = outcome.getByRole("button", { name: "Stay in this chapter", exact: true });
   if (touch) await button.tap(); else await button.click();
   const after = (await savedGame(page)).campaign!;

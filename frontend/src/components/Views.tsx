@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { BALANCE, metrics, type EventKind, type GameState, type Postmortem } from "@/sim";
 import { compact, money, moneyFull, num, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
 import { CHART_COLORS, EVENT_STYLE, OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
-import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow } from "./ui";
+import { Act, Callout, Chip, Concept, Gauge, ReleaseRow, TaskRow, Tabs } from "./ui";
 
 /* ------------------------------------------------------------------ */
 /* Engineer allocation                                                 */
@@ -346,24 +346,13 @@ export function PostmortemBody({ pm }: { pm: Postmortem }) {
 
 export type HistoryTab = "charts" | "events" | "postmortems";
 
-/** History's three tabs, the same in both modes. */
-export function HistoryTabs({ tab, onChange, incidents }: { tab: HistoryTab; onChange: (tab: HistoryTab) => void; incidents: number }) {
-  return (
-    <div className="tabs" role="tablist">
-      {(
-        [
-          ["charts", "Charts"],
-          ["events", "Events"],
-          ["postmortems", `Incidents (${incidents})`],
-        ] as [HistoryTab, string][]
-      ).map(([id, label]) => (
-        <button type="button" key={id} role="tab" aria-selected={tab === id} className={tab === id ? "is-active" : ""} onClick={() => onChange(id)}>
-          <Icon name={id === "charts" ? "history" : id === "events" ? "week" : "incident"} size={16} />
-          {label}
-        </button>
-      ))}
-    </div>
-  );
+/** The same keyboard-operable three-part selector and labelled panel in both modes. */
+export function HistoryTabs({ tab, onChange, incidents, children }: { tab: HistoryTab; onChange: (tab: HistoryTab) => void; incidents: number; children: ReactNode }) {
+  return <Tabs label="History sections" tabs={[
+    { id: "charts", label: "Charts", icon: "history" },
+    { id: "events", label: "Events", icon: "week" },
+    { id: "postmortems", label: `Incidents (${incidents})`, icon: "incident" },
+  ]} value={tab} onChange={onChange} variant="segmented" className="history-tabset">{children}</Tabs>;
 }
 
 export interface FeedEntry {
@@ -399,7 +388,7 @@ export function HistoryView() {
 
   return (
     <div className="history">
-      <HistoryTabs tab={tab} onChange={setTab} incidents={game.postmortems.length} />
+      <HistoryTabs tab={tab} onChange={setTab} incidents={game.postmortems.length}>
 
       {tab === "charts" && <RunCharts game={game} />}
 
@@ -427,6 +416,7 @@ export function HistoryView() {
             ))}
           </ul>
         ))}
+      </HistoryTabs>
     </div>
   );
 }

@@ -337,7 +337,7 @@ test("reliability: inspection and effective recipients remain clear on narrow to
  await tree.getByRole("button",{name:"Automatic Failover: Owned",exact:true}).tap();
  await expect(tree.getByRole("heading",{name:"Automatic Failover",exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
- await tree.getByRole("button",{name:"Close",exact:true}).tap();
+ await tree.getByRole("button",{name:"Back to room",exact:true}).tap();
  await page.getByRole("button",{name:"Menu",exact:true}).tap();
  await expect(page.getByRole("dialog",{name:"Menu"}).getByRole("tab",{name:/Graphics/})).toBeVisible();
 });
@@ -358,7 +358,7 @@ test("inspects evidence and advances a physical step on touch", async ({ page , 
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeInViewport({ratio:1});
   await page.getByRole("button", { name: "History", exact: true }).tap();
   await expect(page.getByRole("region", { name: "History" })).toBeVisible();
-  await page.getByRole("button", { name: "Close", exact: true }).tap();
+  await page.getByRole("region", { name: "History" }).getByRole("button", { name: "Back to room", exact: true }).tap();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
 });
 

@@ -61,6 +61,9 @@ test("inspecting equipment keeps the compact dashboard and opens live readings",
   await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();
   const side=page.locator("aside.side.campaign-panel");
   for(const [component,readings] of [["gateway","Network"],["app","Servers"],["db","Database"],["monitoring","Monitoring"]] as const) {
+    // Reveal the shortcut before recording the player's reading position; clicking an off-screen
+    // shortcut may legitimately scroll the dashboard before the inspection opens.
+    await side.locator(`[data-tutorial="inspect-${component}"]`).scrollIntoViewIfNeeded();
     const before=await side.evaluate(el=>el.scrollTop);
     const popup=await inspectEquipment(page,component,true);
     const evidence=popup.getByRole("region",{name:`${readings} readings`});

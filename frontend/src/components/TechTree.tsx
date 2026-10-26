@@ -1,10 +1,16 @@
 "use client";
-import { pendingStop } from "@/sim/step";
+import { useLayoutEffect, useRef, useState } from "react";
+import { databaseUpgrade, pendingStop } from "@/sim/step";
+import { openingTuning } from "@/sim/launchWeek";
+import { APPLICATION_SCALING } from "@/sim/scenarios/applicationScaling";
+import { DATA_STRATEGY } from "@/sim/scenarios/dataStrategy";
+import { TRAFFIC_SPIKES } from "@/sim/scenarios/trafficSpikes";
+import { APPLICATION_RELIABILITY } from "@/sim/scenarios/applicationReliability";
 import { researchBalance } from "@/sim/reliability";
 
-import { BALANCE, BRANCHES, missingPrerequisites, TECH, TECH_ORDER, techStatus, type GameState, type TechId, type TechStatus } from "@/sim";
-import { moneyFull, pct } from "@/game/format";
-import { useGame } from "@/game/store";
+import { BALANCE, BRANCHES, costs, missingPrerequisites, TECH, TECH_ORDER, techStatus, type EquipmentId, type GameState, type TechId, type TechStatus } from "@/sim";
+import { moneyFull, num, pct } from "@/game/format";
+import { canInspectEquipment, inspectInRoom, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { tipProps } from "./tips";
 import { TECH_ICON } from "./presentation";
@@ -64,7 +70,7 @@ function statusLine(game: GameState, id: TechId, status: TechStatus): string {
     return task ? `Building ${pct(task.progress / task.effort)}` : "Building";
   }
   if (status === "locked") return "Locked";
-  if(game.campaign)return "Available";
+  if(game.campaign)return campaignAvailability(id);
   return moneyFull(id === "larger_database" ? BALANCE.db.tiers[game.infra.dbTier + 1]?.cost ?? 0 : TECH[id].cost);
 }
 
@@ -132,6 +138,27 @@ function Detail({ game, id }: { game: GameState; id: TechId }) {
 }
 
 export default function TechTree() {
+  const scroll = useRef<HTMLDivElement>(null);
+  const [scrollPosition, setScrollPosition] = useState({ left: 0, atEnd: false });
+  useLayoutEffect(() => {
+    const element = scroll.current;
+    if (!element) return;
+    const update = () => setScrollPosition(previous => {
+      const left = element.scrollLeft;
+      const atEnd = left + element.clientWidth >= element.scrollWidth - 1;
+      return previous.left === left && previous.atEnd === atEnd ? previous : { left, atEnd };
+    });
+    update();
+    element.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(element);
+    return () => {
+      element.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      observer?.disconnect();
+    };
+  }, []);
   const game = useGame((s) => s.game);
   const focus = useGame((s) => s.techFocus);
   const focusTech = useGame((s) => s.focusTech);
@@ -139,7 +166,14 @@ export default function TechTree() {
 
   return (
     <div className="tree">
-      <div className="tree-scroll">
+      <div className="tree-navigation" aria-label="Technology map navigation">
+        <span>Three branches. Swipe or use the arrows for later upgrades.</span>
+        <div>
+          <button type="button" className="icon-btn" aria-label="Earlier technologies" disabled={scrollPosition.left <= 0} onClick={() => scroll.current?.scrollBy({ left: -COL_GAP })}><Icon name="next" className="tree-arrow-back" /></button>
+          <button type="button" className="icon-btn" aria-label="Later technologies" disabled={scrollPosition.atEnd} onClick={() => scroll.current?.scrollBy({ left: COL_GAP })}><Icon name="next" /></button>
+        </div>
+      </div>
+      <div className="tree-scroll" ref={scroll} tabIndex={0} aria-label="Technology branches, scroll horizontally to explore">
         <div className="tree-map">
           <div className="tree-canvas">
             {LANES.map((lane, i) => {
@@ -197,7 +231,7 @@ export default function TechTree() {
                   style={{ left: `${p.x / WIDTH * 100}%`, top: `${p.y / HEIGHT * 100}%`, width: `${NODE_W / WIDTH * 100}%`, height: `${NODE_H / HEIGHT * 100}%` }}
                   onClick={() => focusTech(id)}
                   aria-pressed={selected === id}
-                  aria-label={`${TECH[id].name}: ${game.campaign&&status==="done"?"Owned":STATUS_WORD[status]}`}
+                  aria-label={`${TECH[id].name}: ${game.campaign ? status === "done" ? "Owned" : status === "available" ? campaignAvailability(id) : STATUS_WORD[status] : STATUS_WORD[status]}`}
                   {...tipProps(missing ? `Needs ${missing}` : game.campaign ? campaignTechText(game,id) : TECH[id].description)}
                 >
                   <span className="node-mark" aria-hidden="true">
@@ -227,6 +261,10 @@ export default function TechTree() {
   );
 }
 
+function campaignAvailability(id: TechId): string {
+  return ["health_checks", "standby", "auto_failover", "autoscaling"].includes(id) ? "Research available" : "Equipment upgrade";
+}
+
 const CAMPAIGN_ACTION: Partial<Record<TechId, string>> = { larger_servers: "scale-up", larger_database: "upgrade-db", load_balancing: "deploy-lb", caching: "cache", cache_tuning: "cache-tuning", autoscaling: "deploy-autoscaler", health_checks: "health-checks", standby: "create-spare", auto_failover: "failover" };
 
 /** What is installed for this node right now, where the campaign tracks it separately from ownership. */
@@ -241,26 +279,37 @@ function deployment(c: NonNullable<GameState["campaign"]>, id: TechId): string |
 
 /** The Classic detail panel's layout, with the campaign's research points and physical-step costs. */
 function CampaignDetail({game,id}:{game:GameState;id:TechId}) {
-  const { act, select, openView, focusTech } = useGame();
+  const { act, openView, focusTech } = useGame();
   const c = game.campaign!, status = techStatus(game, id);
   const reliability = ["health_checks", "standby", "auto_failover"].includes(id);
   const blocked = researchBalance(c) < 1 || pendingStop(c) !== null || game.phase === "review" || game.phase === "ended";
-  const choose = () => { select(id === "larger_database" ? "db" : id === "caching" || id === "cache_tuning" ? "cache" : "app"); openView(null); };
+  const equipment: EquipmentId = id === "larger_database" ? "db" : id === "load_balancing" || id === "auto_failover" ? "gateway" : id === "caching" || id === "cache_tuning" ? "cache" : id === "health_checks" ? "monitoring" : "app";
+  const equipmentName = equipment === "db" ? "Database" : equipment === "gateway" ? "Network" : equipment === "cache" ? "Cache" : equipment === "monitoring" ? "Monitoring" : "App Servers";
+  const choose = () => {
+    if (!canInspectEquipment(game, equipment)) return;
+    openView(null);
+    inspectInRoom(equipment);
+  };
+  const facts = campaignTechFacts(game, id);
   const pending = c.pending.filter((a) => CAMPAIGN_ACTION[id] === a.type);
   const installed = deployment(c, id);
   return (
     <div className="tree-detail">
       <span className={`tag tag-${status === "done" ? "ok" : status === "locked" ? "plain" : "accent"}`}>
         <Icon name={STATUS_ICON[status]} size={12} />
-        {status === "done" ? "Owned" : STATUS_WORD[status]}
+        {status === "done" ? "Owned" : status === "available" ? campaignAvailability(id) : STATUS_WORD[status]}
       </span>
       <div className="tree-detail-head">
         <Concept kind={status === "locked" ? "muted" : "tech"} icon={TECH_ICON[id] ?? "tree"} />
         <h3>{TECH[id].name}</h3>
       </div>
-      <p>{campaignTechText(game, id)}</p>
+      <p>{facts.effect}</p>
+      <dl className="tree-facts">
+        {facts.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+        {(reliability || id === "autoscaling") && <div><dt>Research balance</dt><dd>{researchBalance(c)} points</dd></div>}
+      </dl>
+      {(reliability || id === "autoscaling") && <p className="tree-ownership-note">{status === "done" ? "Capability owned. Deployment is a separate equipment purchase." : "Research unlocks the capability. Deployment is a separate equipment purchase."}</p>}
       <div className="chips">
-        <Chip icon="bulb" tip="Research points unlock reliability and autoscaling capabilities. Deploying them is a separate purchase.">Research available: {researchBalance(c)}</Chip>
         {installed && <Chip icon={installed.startsWith("Not") || installed.startsWith("No ") ? "minus" : "check"}>{installed}</Chip>}
         {pending.map((a) => <Chip key={a.id} icon="latency">Pending activation: {a.activationStep - c.step} game seconds</Chip>)}
       </div>
@@ -281,13 +330,42 @@ function CampaignDetail({game,id}:{game:GameState;id:TechId}) {
       {reliability && status === "available" && <Act primary tour="primary" icon="plus" label={`Unlock ${TECH[id].name}`} note="1 research point" noteIcon="bulb" disabled={blocked} onClick={() => act({ type: "unlock_reliability", tech: id as "health_checks" | "standby" | "auto_failover" })} />}
       {id === "autoscaling" && status === "available" && <Act primary icon="plus" label="Unlock autoscaling" note="1 research point" noteIcon="bulb" disabled={blocked} onClick={() => act({ type: "unlock_autoscaling" })} />}
       {status === "available" && (reliability || id === "autoscaling") && <CampaignUnavailable disabled={blocked} action={reliability ? {type:"unlock_reliability",tech:id as "health_checks"|"standby"|"auto_failover"} : {type:"unlock_autoscaling"}} />}
-      {!reliability && <Act icon="next" label="View existing actions" tip="Close the tree and select the equipment this capability acts on." onClick={choose} />}
+      <Act icon="next" label={`Inspect ${equipmentName}`} tip="Open this equipment’s existing inspection and deployment actions." disabled={!canInspectEquipment(game, equipment) || game.phase === "review" || game.phase === "ended"} onClick={choose} />
     </div>
   );
 }
 
-function campaignTechText(game:GameState,id:TechId):string {
- const c=game.campaign!;
- const effect:Partial<Record<TechId,string>>={larger_servers:"Scale a selected base app to 1,600 req/s. $2,000; 3 game seconds; $1,100/week for that app.",load_balancing:"Deploy for $1,000; 2 game seconds; $300/week. Installed apps still need routing.",autoscaling:"Unlock for 1 research point; deploy for $1,000; 2 game seconds; $100/week including disabled periods. Provisioning and routing take time.",larger_database:c.dbCapacity>=3000?"Current capacity: 3,000 ops/s. Owned. Maximum available DB tier; $3,500/week upkeep.":`Owned from 1,000 ops/s. Current capacity: ${c.dbCapacity} ops/s. Next upgrade costs $${c.dbCapacity===2000?"4,000":"3,000"}; ${c.dbCapacity===2000?4:3} game seconds. DB upkeep: $500/$1,500/$2,500/$3,500 per week by tier.`,caching:"$1,500; 2 game seconds; $400/week. Eligible reads warm toward 60%; writes still reach DB.",cache_tuning:"$1,000; 2 game seconds. Raises ceiling to 75%; further warm-up required. No extra upkeep.",health_checks:"Unlock: 1 research point. Deployment $500; 2 game seconds; $100/week. Detects changes after one game second; load balancing is required for exclusion. Creates no capacity.",standby:"Unlock: 1 research point. Install a base spare for $1,000; 2 game seconds; $700/week, or reserve an existing healthy unrouted app free in 1 game second. Spare receives no traffic until promoted.",auto_failover:"Unlock: 1 research point; requires Health Checks, Spare Application and deployed Load Balancing. Deployment $1,000; 2 game seconds; $100/week. Promotes a real spare after detection in 1 game second; creates no capacity."};
- return effect[id]??TECH[id].description;
+/** Facts are presentation of the same scenario tuning and next-upgrade query used by the engine. */
+function campaignTechFacts(game: GameState, id: TechId): { effect: string; rows: [string, string][] } {
+  const c = game.campaign!;
+  const scaling = APPLICATION_SCALING, data = DATA_STRATEGY, spikes = TRAFFIC_SPIKES, reliability = APPLICATION_RELIABILITY;
+  const opening = openingTuning(c);
+  const dollars = (cents: number) => moneyFull(cents / 100);
+  const purchase = (cost: number, delay: number, upkeep?: number): [string, string][] => [
+    ["Deployment cost", dollars(cost)], ["Activation time", `${delay} game seconds`],
+    ...(upkeep === undefined ? [] : [["Weekly upkeep", `${dollars(upkeep)}/week`] as [string, string]]),
+  ];
+  switch (id) {
+    case "larger_servers": return { effect: `Scale a selected base app to ${num(scaling.appCapacity)} requests/s.`, rows: purchase(scaling.appCostCents, scaling.appDelay, scaling.appWeeklyCents) };
+    case "load_balancing": return { effect: "Spread traffic across routed apps. Installed apps still need routing.", rows: purchase(scaling.lbCostCents, scaling.lbDelay, scaling.lbWeeklyCents) };
+    case "larger_database": {
+      const next = databaseUpgrade(c);
+      return { effect: "Increase the database’s processing capacity.", rows: [
+        ["Current capacity", `${num(c.dbCapacity)} operations/s`],
+        ["Current upkeep", `${moneyFull(costs(game).database)}/week`],
+        ...(next ? [["Next capacity", `${num(next.capacity)} operations/s`], ["Upgrade cost", dollars(next.costCents)], ["Activation time", `${next.delay} game seconds`], ["Upkeep after upgrade", `${moneyFull(costs({ ...game, campaign: { ...c, dbCapacity: next.capacity, upgraded: true } }).database)}/week`]] as [string, string][] : [["Next upgrade", c.dbCapacity >= data.dbCapacity ? "Maximum capacity reached" : "Continue Guided Mode to unlock"]] as [string, string][]),
+      ] };
+    }
+    case "caching": return { effect: `Eligible reads warm toward ${pct(data.baseTarget / 10000)} cache hits. Writes still reach the database.`, rows: purchase(data.cacheCostCents, data.cacheDelay, data.cacheWeeklyCents) };
+    case "cache_tuning": return { effect: `Raise the cache-hit ceiling to ${pct(data.tunedTarget / 10000)}. Further warm-up is required.`, rows: [["Tuning cost", dollars(data.tuningCostCents)], ["Activation time", `${data.tuningDelay} game seconds`], ["Extra upkeep", "None"]] };
+    case "autoscaling": return { effect: "Provision and route apps as demand changes. Each step takes time.", rows: [["Unlock cost", "1 research point"], ...purchase(spikes.controllerCostCents, spikes.controllerDelay, spikes.controllerWeeklyCents), ["Billing", "Controller upkeep continues while disabled"]] };
+    case "health_checks": return { effect: "Detect changes in app health. Load balancing is required to exclude unhealthy apps; checks add no capacity.", rows: [["Unlock cost", "1 research point"], ...purchase(reliability.checksCostCents, reliability.checksDelay, reliability.checksWeeklyCents)] };
+    case "standby": return { effect: "Keep a real spare ready for promotion. It receives no traffic until promoted.", rows: [["Unlock cost", "1 research point"], ...purchase(reliability.spareCostCents, reliability.spareDelay, opening.appWeeklyCents), ["Existing healthy unrouted app", "Reserve free in 1 game second"]] };
+    case "auto_failover": return { effect: "Promote a real spare after failure detection. Requires Health Checks, a Spare Application and deployed Load Balancing; adds no new capacity.", rows: [["Unlock cost", "1 research point"], ...purchase(reliability.failoverCostCents, reliability.failoverDelay, reliability.failoverWeeklyCents), ["Promotion time", `${reliability.promotionDelay} game second`]] };
+    default: return { effect: TECH[id].description, rows: [] };
+  }
+}
+
+function campaignTechText(game: GameState, id: TechId): string {
+  return campaignTechFacts(game, id).effect;
 }

@@ -14,8 +14,15 @@
   --phone-coach-gap: 6px;
   --phone-coach-inset: max(8px, env(safe-area-inset-left), env(safe-area-inset-right));
 }
-.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial) {
+.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial),
+body:has(> .tour-card.launch-tutorial) .phone-app[data-edition="phone"] {
   --phone-coach: calc(var(--phone-coach-height) + var(--phone-coach-gap));
+}
+
+/* Full-page workspaces reach the dock, but their last action must scroll above the coach strip. */
+.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card) .sheet:is(.sheet-tech, .sheet-history) .sheet-body {
+  padding-bottom: calc(var(--phone-coach) + var(--phone-coach-gap));
+  scroll-padding-bottom: calc(var(--phone-coach) + var(--phone-coach-gap));
 }
 
 /* ---- Launch Week's spotlight steps ---- */
@@ -33,7 +40,7 @@
   pointer-events: auto;
 }
 [data-edition="phone"] .tour-card.launch-tutorial h3 { font-size: 1.0625rem; line-height: 22px; margin-bottom: 2px; }
-[data-edition="phone"] .tour-card.launch-tutorial .tour-prompt { margin-top: 4px; }
+[data-edition="phone"] .tour-card.launch-tutorial .tour-prompt { margin-top: 4px !important; }
 [data-edition="phone"] .tour-card.launch-tutorial .tour-explanation { margin-top: 4px; }
 [data-edition="phone"] .tour-card.launch-tutorial .tour-foot { position: sticky; bottom: 0; margin-top: 4px; padding-bottom: 6px; background: var(--paper); }
 [data-edition="phone"] .tour-card.launch-tutorial .tour-foot .btn { min-height: 44px; min-inline-size: 6.5rem; justify-content: center; }
@@ -81,6 +88,13 @@ body:has(.phone-app[data-edition="phone"] .phone-dock details.time-menu[open]) .
 /* Short screens: the same strip, a little tighter. */
 @media (max-height: 700px) {
   [data-edition="phone"] { --phone-coach-height: 136px; }
+}
+
+/* Keep the coach readable and at least 40% of a short screen available to the room.
+   The collapsed metrics handle remains larger than the 44px touch target. */
+@media (max-height: 600px) {
+  .phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial),
+  body:has(> .tour-card.launch-tutorial) .phone-app[data-edition="phone"] { --phone-sheet-peek: 48px; }
 }
 
 /* The dock's menus open above the strip, so a guide never covers the speed or Navigation menu it points at. */
