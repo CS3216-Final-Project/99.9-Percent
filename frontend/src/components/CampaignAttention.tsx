@@ -422,6 +422,7 @@ const LAUNCH_STEP_TITLES: Record<string, string> = {
   "launch-open": "Open the doors", "launch-week": "Keep the week running", "launch-first-incident": "Your servers are overloading",
   "launch-db-incident": "Your database is overloading", "launch-end-week": "Skip to the end of the week", "launch-research": "Spend your research point",
   database: "Upgrade the database", recovery: "Recovering", draining: "Recovering", investigate: "Check the readings", failure: "A server failed",
+  "prevention-inspection": "Verify the upgrade", "prevention-stability": "Observe stable service",
 };
 function launchStepTitle(reason: string, action?: string): string {
   if (reason === "application") return action === "add_server" ? "Buy a second server" : action === "scale_up" ? "Keep up with traffic" : "Spread the load";
