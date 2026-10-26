@@ -86,6 +86,9 @@ Increment it in `productAnalytics.ts` when the set or meaning of chapters or wal
 | `gameplay_tutorial_started` | A walkthrough begins, once until it ends | `tutorial_track`, `tutorial_step`, `tutorial_from` |
 | `gameplay_tutorial_completed` | The walkthrough reaches its last step | `tutorial_track`, `tutorial_step` |
 | `gameplay_tutorial_skipped` | The walkthrough ends unfinished | `tutorial_track`, `tutorial_step`, `reason` |
+| `gameplay_launch_beat` | Launch Week reaches a new beat | `beat`, `previous_seconds` (wall-clock seconds the previous beat held) |
+| `gameplay_launch_pick` | The Launch Week research choice is made | `tech` |
+| `gameplay_launch_score` | Launch Week finishes | `nines`, `uptime` |
 
 Guided Mode completion means chapters 1 to 5, the same set that unlocks Challenge Mode.
 Chapter 0 and chapter 6, Grow the Company, are not reported as chapters, and once a run is complete the observer stops measuring it, so chapter 6 play produces no session or duration events.
