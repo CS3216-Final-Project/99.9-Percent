@@ -14,7 +14,8 @@
 .report-technical { overflow-wrap: anywhere; }
 .report-technical > summary { min-height: 44px; align-content: center; }
 .report-table-scroll { max-width: 100%; overflow-x: auto; }
-.report-table-scroll table { min-width: 640px; }
+.report-table-scroll table { min-width: 640px; overflow-wrap: normal; }
+.report-table-scroll td { white-space: nowrap; }
 .report-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 /* A fixed game-second column keeps every event's text on one left edge. */
 .report-events li { display: grid; grid-template-columns: 3.5em minmax(0, 1fr); gap: 10px; line-height: 1.4; }

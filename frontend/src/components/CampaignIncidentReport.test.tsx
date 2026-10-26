@@ -8,6 +8,7 @@ import { CampaignOverlays } from "./CampaignUI";
 import { CampaignIncidentReport, CapacityAfterFailure } from "./CampaignIncidentReport";
 import { reliabilityOutcome } from "@/game/__fixtures__/reliabilityOutcome";
 import { describeEvents, reportWindowStart } from "@/game/reportEvents";
+import { dataCompany } from "@/sim/__tests__/dataFixture";
 
 let serial = 0;
 function recovery() {
@@ -62,11 +63,24 @@ it("retains every explanation, observation and event behind one collapsed techni
 it("consolidates missing workload details and does not render an empty evidence table", () => {
   const r = structuredClone(recovery().campaign!.reports[0]); for (const s of r.snapshots) delete s.data;
   const view = render(<CampaignIncidentReport report={r} />);
-  // Without any workload readings the section is left out rather than explained.
   expect(screen.queryByText("Workload and cache evidence")).toBeNull();
-  expect(screen.queryByText(/workload and cache details were not recorded/)).toBeNull();
+  expect(screen.getByText(/workload and cache details were not recorded/)).toBeTruthy();
   view.rerender(<CampaignIncidentReport report={{ ...r, snapshots: [], events: [] }} />);
   expect(screen.queryByRole("table", { hidden: true })).toBeNull(); expect(screen.getByText("No historical observations were retained.")).toBeTruthy();
+});
+it("retains cache warmth before and after each observation and database read/write demand", () => {
+  let game = decide(tick(dataCompany(), 6), { type: "deploy_cache" });
+  for (let i = 0; i < 100 && game.phase !== "review"; i++) game = tick(game);
+  const report = game.campaign!.reports.at(-1)!;
+  render(<CampaignIncidentReport report={report} />);
+  fireEvent.click(screen.getByText("View Technical Details"));
+  const table = screen.getByRole("table", { name: "Workload and cache readings, shown when they change" });
+  expect(within(table).getByRole("columnheader", { name: "Warmth used / after" })).toBeTruthy();
+  expect(within(table).getByRole("columnheader", { name: "Database read / write demand ops/s" })).toBeTruthy();
+  const warming = report.snapshots.find(m => m.data && m.data.warmthUsed === 0 && m.data.warmthAfterStep > 0)!;
+  const row = within(table).getByRole("rowheader", { name: String(warming.step) }).closest("tr")!;
+  expect(within(row).getByRole("cell", { name: "0% / 12%" })).toBeTruthy();
+  expect(within(row).getByRole("cell", { name: `${warming.data!.databaseReadDemand.toLocaleString("en-US")} / ${warming.data!.databaseWriteDemand.toLocaleString("en-US")}` })).toBeTruthy();
 });
 it("preserves the existing practice report instead of the new flow", () => {
   const game = recovery(); useGame.setState({ game, started: true, tutorialCompany: { game, remainderMs: 0, measurement: useGame.getState().measurement } });
