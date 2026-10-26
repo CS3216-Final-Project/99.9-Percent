@@ -16,6 +16,8 @@ Each rebuilds only when its own folder or `shared/` changed (`ignoreCommand` in 
 Merges to `main` deploy both projects to production, and every pull request gets preview URLs.
 Changing a domain or setting does not update a running deployment; redeploy after changing environment variables.
 
+The game's canonical URL and Open Graph/Twitter link-preview metadata live in `frontend/index.html`, so crawlers can read them without JavaScript. `frontend/public/social-preview.jpg` is the same 1280×720 banner as the [landing page](https://github.com/CS3216-Final-Project/99.9-Percent-Landing-Page/blob/main/assets/social-preview.jpg), bundled with the game and served at `/social-preview.jpg`. Update the absolute canonical, page and image URLs together if the production domain changes.
+
 ## Environment variables
 
 Every `VITE_*` value is compiled into the public bundle, so never put a secret in one.
