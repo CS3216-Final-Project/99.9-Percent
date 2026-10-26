@@ -1,6 +1,7 @@
 import { challengeAvailable, useGame } from "@/game/store";
 import { AnalyticsConsentPanel, ModeCard, UptimeMark } from "@/components/HomeScreen";
 import { MODES, useModeLauncher, useModeSummaries, type ModeInfo } from "@/components/homeModes";
+import { Icon } from "@/components/icons";
 import { BALANCE } from "@/sim";
 import { PHONE_CHAPTERS, phoneCampaignSummary } from "./phoneSummary";
 import "@/components/HomeScreen.css";
@@ -16,7 +17,7 @@ const PHONE_MODES: Record<"campaign" | "classic", ModeInfo> = {
 
 /**
  * The phone edition's home screen: one card per mode and the analytics notice. Accounts, avatars and feedback stay
- * on the desktop edition.
+ * on the desktop edition, and a one-line note points there for the full game.
  */
 export function PhoneHome() {
   const mode = useGame((s) => s.mode);
@@ -32,6 +33,7 @@ export function PhoneHome() {
       <header className="home-head">
         <UptimeMark />
         <p className="title-tag">Grow a startup. Keep it online.</p>
+        <p className="phone-home-laptop"><Icon name="laptop" size={18} />For the full experience, play on a laptop.</p>
       </header>
       <section className="mode-selection" aria-label="Choose how you want to play">
         <div className="mode-options">

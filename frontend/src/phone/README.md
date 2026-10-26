@@ -9,7 +9,7 @@ The desktop edition's code paths and rendering are unchanged by it.
 - Guided Mode: Chapter 0 (walkthrough), Opening, and Scaling & Routing.
 - Challenge Mode (Classic): the full 26-week game, unlocked once the phone's Guided Mode is complete.
 - Menu: run card, Resume, the few run controls a mode needs (How to play, Exit, Tutorial, New game), the mode switch, and the Sound and Graphics tabs.
-- Home screen: the two mode cards and the anonymous analytics notice (OK / Opt out).
+- Home screen: a one-line note under the tagline that the full experience is on a laptop, the two mode cards and the anonymous analytics notice (OK / Opt out).
 - Not on a phone: Account, sign-in and cloud saves, the Saves tab and save import/export, the avatar picker, the Playtest tab, Give feedback and observer notes, Save now (autosave still runs).
 
 ## The seam
