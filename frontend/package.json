@@ -15,7 +15,8 @@
     "test:e2e:ui": "playwright test --ui",
     "balance": "vitest run src/sim/__tests__/balance",
     "perf:probe": "playwright test --config playwright.perf.config.ts",
-    "models:compress": "node scripts/compress-models.mjs"
+    "models:compress": "node scripts/compress-models.mjs",
+    "perf:browsers": "playwright test --config playwright.browsers.config.ts"
   },
   "dependencies": {
     "@fontsource/pixelify-sans": "^5.3.0",

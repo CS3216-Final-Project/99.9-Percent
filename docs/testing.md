@@ -25,6 +25,8 @@ Locally, `npm run test:e2e` runs the whole suite on one worker.
 
 The frame-time probe measures what the room costs to draw on the machine's own graphics card: `cd frontend && npm run build && npm run perf:probe` opens a headed Chromium, opens a saved company at each graphics quality (`PERF_MODES=low,high` to pick some, `PERF_SECONDS` for how long each window runs, `PERF_DIST=dist-perf` after `npx vite build --minify false --outDir dist-perf` for readable CPU profiles), writes `test-results/perf/<quality>.json`, and prints rendered fps, frame-time percentiles, hitches, GPU waits (shader compiles), draw calls, texture uploads, a scene census and CPU hotspots. It is run by hand, never in CI.
 
+The cross-browser playtest times the same room by animation frames alone, so it runs in every engine: `cd frontend && npm run build && npm run perf:browsers` opens Chromium, Firefox and WebKit headed (`PERF_BROWSERS=chrome,msedge,firefox,webkit` for the installed branded browsers; `npx playwright install firefox webkit` first), opens a saved company at each graphics quality and records the room standing still, running, the camera turning, the ride to the office and the office. It prints rendered fps, frame-time percentiles, hitches over 50, 100 and 250 ms with when the worst fell, the renderer and console errors, and writes `test-results/perf/browsers-<browser>.json`. Run it on each operating system to compare; on a machine with no graphics card every browser draws on the CPU and the numbers show that path, not real hardware. WebKit on Linux reports its renderer as "Apple GPU", so Auto there cannot tell it is drawing in software.
+
 ## What is covered
 
 | Layer | Evidence | Boundaries |
@@ -93,4 +95,4 @@ Google OIDC, email and password accounts and optional account-owned snapshots ar
 
 ## Known gaps
 
-Still needed as the product grows: Firefox/WebKit and real-device checks, broader keyboard/screen-reader accessibility review, performance budgets, and integration tests for any new server-backed gameplay. The frame-time probe runs on one desktop GPU, so real laptop and phone numbers remain unmeasured. Add these when their features or support commitments exist; do not label the current suite comprehensive.
+Still needed as the product grows: real-device checks on macOS, Windows and phones, broader keyboard/screen-reader accessibility review, performance budgets, and integration tests for any new server-backed gameplay. The frame-time probe runs on one desktop GPU, so real laptop and phone numbers remain unmeasured. Add these when their features or support commitments exist; do not label the current suite comprehensive.
