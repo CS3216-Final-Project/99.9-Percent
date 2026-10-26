@@ -63,8 +63,7 @@ for (const phone of [false, true]) test.describe(phone ? "phone focused workspac
     const summary = inspector.locator(".component-inspection-summary");
     const portrait = (await summary.locator(".inspection-scanner").boundingBox())!;
     const health = (await summary.locator(".inspection-status").boundingBox())!;
-    expect(health.y - (portrait.y + portrait.height)).toBeGreaterThanOrEqual(12);
-    expect(health.y - (portrait.y + portrait.height)).toBeLessThanOrEqual(16);
+    expect(health.y - (portrait.y + portrait.height)).toBeCloseTo(12, 1);
     await expect(summary.locator(".inspection-status")).toHaveText("Healthy");
     await inspector.getByRole("button", { name: "Server management", exact: true }).click();
     await inspector.locator('[data-guidance-app="app-1"]').click();
@@ -72,8 +71,7 @@ for (const phone of [false, true]) test.describe(phone ? "phone focused workspac
     await expect(summary.locator(".inspection-status")).toHaveText("Healthy");
     const serverPortrait = (await summary.locator(".inspection-scanner").boundingBox())!;
     const serverHealth = (await summary.locator(".inspection-status").boundingBox())!;
-    expect(serverHealth.y - (serverPortrait.y + serverPortrait.height)).toBeGreaterThanOrEqual(12);
-    expect(serverHealth.y - (serverPortrait.y + serverPortrait.height)).toBeLessThanOrEqual(16);
+    expect(serverHealth.y - (serverPortrait.y + serverPortrait.height)).toBeCloseTo(12, 1);
     await page.screenshot({ path: testInfo.outputPath("machine-health-spacing.png") });
   });
 });

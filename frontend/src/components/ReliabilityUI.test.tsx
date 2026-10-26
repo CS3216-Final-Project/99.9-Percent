@@ -19,10 +19,14 @@ it("exposes actual and detected health and surviving capacity",()=>{
  show(tick(act(preparedReliability(),{type:"arm_reliability"}),8));fireEvent.click(screen.getByRole("button",{name:"App Server"}));fireEvent.click(screen.getByRole("button",{name:"Server management"}));expect(useGame.getState().game.campaign!.apps[1].detectedHealth).toBe("healthy");fireEvent.click(document.querySelector<HTMLElement>('[data-guidance-app="app-2"]')!);const panel=screen.getByRole("dialog",{name:"App Servers"});
  expect(panel.textContent).toContain("failed");expect(panel.textContent).toContain("detected unhealthy");
  fireEvent.click(within(panel).getByText("Technical Details"));
+ const individual=within(panel).getByRole("region",{name:"App 2 readings"});
+ expect(individual.textContent).not.toContain("Routed capacity");
+ expect(within(panel).getByRole("button",{name:"Restore App 2 · free · 3 game seconds"})).toBeTruthy();
+ fireEvent.click(within(panel).getByRole("button",{name:"Back to Server management"}));
+ fireEvent.click(within(panel).getByText("Fleet Technical Details"));
  const readings=within(panel).getByRole("region",{name:"Servers readings"});
  expect(within(readings).getByText("Routed capacity").parentElement?.querySelector("dd")?.textContent).toBe("1,600 req/s");
  expect(within(readings).getByText("Spare capacity").parentElement?.querySelector("dd")?.textContent).toBe("1,600 req/s");
- expect(within(panel).getByRole("button",{name:"Restore App 2 · free · 3 game seconds"})).toBeTruthy();
 });
 it("uses effective routing for labels and selects an inspected application",()=>{
  show(tick(act(preparedReliability(),{type:"arm_reliability"}),9));

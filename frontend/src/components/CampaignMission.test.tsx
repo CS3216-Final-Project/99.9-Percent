@@ -6,7 +6,7 @@ import { campaignGuidance } from "@/game/campaignGuidance";
 import { campaignAttention } from "@/game/campaignAttention";
 import { spikeCompany, untilOffset, act as decide, tick } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "@/sim/__tests__/reliabilityFixture";
-import { combinedCompany, finishedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
+import { combinedCompany, completedReliability, finishedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
 import { CampaignPanel } from "./CampaignUI";
 import InspectionReveal from "./InspectionReveal";
 
@@ -25,6 +25,7 @@ function requirements(game:GameState) {
     expect(row.textContent).toContain(r.label);expect(row.getAttribute("data-met")).toBe(String(r.met));
   }
   expect(disclosure.querySelectorAll("[data-requirement]")).toHaveLength(model.requirements.length+model.finalGoals.length);
+  expect(disclosure.querySelectorAll("summary")).toHaveLength(1);
 }
 for(const [offset,stage] of [[0,"Preparing"],[8,"Spike 1 active"],[28,"Between spikes"],[48,"Spike 2 active"],[68,"Review / stability verification"]] as const)
   it(`projects Chapter 4 ${stage} from consumed events with the complete authoritative checklist`,()=>{
@@ -49,6 +50,21 @@ it("keeps reliability arming actionable and derives its next scheduled stage",()
   fireEvent.click(screen.getByRole("button",{name:"Start reliability test"}));
   expect(useGame.getState().game.campaign!.reliabilityStage!.fault).toBeTruthy();
   expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("Failure scheduled");
+});
+it("shows a completed reliability accomplishment and explicit chapter continuation with no unmet-condition warning",()=>{
+ const game=completedReliability();show(game);
+ expect(screen.queryByRole("region",{name:"Current unmet condition"})).toBeNull();
+ expect(screen.getByRole("region",{name:"Chapter accomplished"}).textContent).toContain("Reliability test completed and outcome acknowledged.");
+ expect(screen.getByRole("region",{name:"Next step"}).textContent).toContain("Continue to Grow the Company using Next in the chapter bar.");
+ expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("12 / 12 current requirements met");
+ requirements(game);
+});
+it("keeps the finished campaign inspectable without presenting completion as an unmet condition",()=>{
+ const game=decide(finishedCompany(),{type:"complete_campaign"});show(game);
+ expect(screen.queryByRole("region",{name:"Current unmet condition"})).toBeNull();
+ expect(screen.getByRole("region",{name:"Chapter accomplished"}).textContent).toContain("Campaign completed.");
+ expect(screen.getByRole("region",{name:"Next step"}).textContent).toContain("Inspect the scorecard and final company");
+ requirements(game);
 });
 for(const automatic of [false,true]) it(`shows actual ${automatic?"failover":"manual"} failure/recovery state without obsolete chapter metrics`,()=>{
   const game=tick(decide(automatic?preparedReliability():reliabilityCompany(),{type:"arm_reliability"}),10);

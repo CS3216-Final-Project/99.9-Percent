@@ -118,6 +118,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const [growthChoice, setGrowthChoice] = useState<{ key: string; risk: boolean } | null>(null);
   // Launch Week teaches with spotlighted tutorial steps instead of the Hint button.
   const [launchDone, setLaunchDone] = useState<string | null>(null), [metricsSeen, setMetricsSeen] = useState<string | null>(null);
+  const [analyticsSeen, setAnalyticsSeen] = useState<string | null>(null);
   const [spotBox, setSpotBox] = useState<Box | null>(null), [introOpen, setIntroOpen] = useState(false);
   const litTarget = useRef<HTMLElement | null>(null);
   const [pauseOffer, updatePauseOffer] = useState<string | null>(null);
@@ -146,10 +147,16 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const lw = game.campaign?.launchWeek;
   // The research step outlives the week's end: the score card waits for the pick.
   const launchTutorial = !!lw && !lw.introduction && (lw.completedStep === null || !!lw.researchEarned && !lw.tech);
+  // The introduction teaches the equipment; Opening then teaches observation and a real upgrade.
+  // Historical companies retain the guidance they already completed instead of replaying this handoff.
+  const openingTutorial = decision.chapter === 1 && !!game.campaign?.completedIntroduction && !lw && !game.campaign.openingMilestone?.acknowledged;
+  const automaticTutorial = launchTutorial || openingTutorial;
+  const analyticsKey = `${generation}:${game.campaign?.runId}:opening-metrics`;
+  const analyticsStep = openingTutorial && game.campaign!.step > 0 && analyticsSeen !== analyticsKey && !inspection && !game.campaign!.pending.length;
   const lwIncident = lw && lw.completedStep === null ? game.campaign!.incident : null;
-  const metricsKey = lwIncident ? `${lwIncident.id}:${decision.reason}` : "";
+  const metricsKey = lwIncident ? `${lwIncident.id}:${decision.reason}` : openingTutorial ? `${generation}:${game.campaign!.runId}:${game.campaign!.incident?.id ?? "prevention"}:${decision.reason}` : "";
   // After inspecting the overloaded machine, its readings come first, then its fix.
-  const metricsStep = !!lwIncident && metricsSeen !== metricsKey &&
+  const metricsStep = (!!lwIncident || openingTutorial && !!inspection) && metricsSeen !== metricsKey &&
     (decision.reason === "application" && selected === "app" || decision.reason === "database" && selected === "db");
 
   const equipment = recommendedAction ? actionEquipment(recommendedAction.action) :
@@ -157,7 +164,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const equipmentEntry = equipment ? `.campaign-panel [data-tutorial="inspect-${equipment}"]` : "";
   const inEquipment = !!equipment && inspection?.equipment === equipment;
   const actionControl = `${actionSelector}.campaign-action-card > button.act, button${actionSelector}`;
-  const targetSelector = intro ? equipment ? equipmentEntry : "[data-introduction-complete]" : metricsStep ? ".component-inspection .component-inspection-summary" : inEquipment ? recommendedAction ? actionControl : '.component-inspection-controls > button' : equipment ? equipmentEntry : recommendedAction ? actionControl : guidanceTarget ? TARGETS[guidanceTarget] : "";
+  const targetSelector = intro ? equipment ? equipmentEntry : "[data-introduction-complete]" : analyticsStep ? ".campaign-panel .incident-symptoms" : metricsStep ? ".component-inspection .component-inspection-summary" : inEquipment ? recommendedAction ? actionControl : '.component-inspection-controls > button' : equipment ? equipmentEntry : recommendedAction ? actionControl : guidanceTarget ? TARGETS[guidanceTarget] : "";
   const acceptedNow = accepted === key;
   const spotlightSelector = riskConfirmation ? '[data-guidance="accept_scaling_risk"]' : targetSelector;
   const openNow = opened === key && available && !blocked;
@@ -165,10 +172,10 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const pauseDiagnosis = incidentNeedsPause(game, decision);
   const pauseGold = !inspection && available && !pauseBlocked && !view && !openNow && !acceptedNow && running && clockAvailable && pauseDiagnosis && pauseOffer === incidentKey;
   const timerKey = `${key}:${view}:${selected}:${panel}:${floor}:${running}`;
-  const launchStep = intro ? available&&!blocked&&!view&&!inspection&&!openNow&&!acceptedNow&&!introOpen : launchTutorial && available && !blocked && !view && !pauseGold && !introOpen && launchDone !== key && decision.attention !== null &&
-    LAUNCH_FLOW.test(decision.reason) && !(decision.attention === "run" && (running || !clockAvailable));
-  const machines = useMemo(() => launchStep ? spotlightMachines(decision, recommendedAction?.action, game.campaign ?? null) : [], [launchStep, decision, recommendedAction, game.campaign]);
-  const candidate = !intro && !inspection && !launchTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && (decision.attention === "progression" || decision.attention === "hint" || decision.attention === "run" && !running && clockAvailable);
+  const launchStep = intro ? available&&!blocked&&!view&&!inspection&&!openNow&&!acceptedNow&&!introOpen : automaticTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !introOpen && (analyticsStep || launchDone !== key) && decision.attention !== null &&
+    (analyticsStep || (openingTutorial ? OPENING_FLOW : LAUNCH_FLOW).test(decision.reason)) && (analyticsStep || !(decision.attention === "run" && (running || !clockAvailable)));
+  const machines = useMemo(() => launchStep && !analyticsStep ? spotlightMachines(decision, recommendedAction?.action, game.campaign ?? null) : [], [launchStep, analyticsStep, decision, recommendedAction, game.campaign]);
+  const candidate = !intro && !inspection && !automaticTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && (decision.attention === "progression" || decision.attention === "hint" || decision.attention === "run" && !running && clockAvailable);
 
   useLayoutEffect(() => { manual.current = { accepted, opened, key, pauseBlocked, equipment }; }, [accepted, opened, key, pauseBlocked, equipment]);
   useEffect(() => {
@@ -279,16 +286,17 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(() => { revealedTarget.current = node; reveal(node); });
       }
-      const target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
-        (!intro && guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research" ? visibleControl(".panel-reopen") : null);
+      const target = (guidanceTarget === "run" && !clockAvailable && !analyticsStep ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
+        (!intro && (analyticsStep || guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research") ? visibleControl(PANEL_ENTRY) : null);
       if (target) {
         setSpotBox(padBox(target.getBoundingClientRect()));
         target.dataset.spotlight = "true";
         target.classList.add("campaign-gold-attention");
         litTarget.current = target;
-      } else if (node&&!intro) setSpotBox(padBox(node.getBoundingClientRect()));
+      } else if (node&&!intro&&!openingTutorial) setSpotBox(padBox(node.getBoundingClientRect()));
     };
     const used = (event: Event) => {
+      if (analyticsStep) return;
       const lit = litTarget.current, el = event.target instanceof Element ? event.target : null;
       if (lit && el && lit.contains(el) && lit.matches(spotlightSelector) && !lit.matches(".equipment-readings, .component-inspection-summary, [data-tutorial^=inspect-], [data-inspection-entry], [data-inspection-back], [data-guidance-app]")) setLaunchDone(key);
     };
@@ -298,7 +306,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true);
     document.addEventListener("click", used, true);
     return () => { clear(); cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
-  }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable, game, equipment, inEquipment, equipmentEntry, intro]);
+  }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable, game, equipment, inEquipment, equipmentEntry, intro, analyticsStep, openingTutorial]);
   // The room's beams and dimmed racks follow the same spotlight.
   useEffect(() => {
     useGame.getState().setSpotlight(machines);
@@ -371,6 +379,13 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold: candidate && idle === timerKey && decision.attention === "hint", opened: openNow, button, riskOpen,
     openHint: () => { if (!blocked) { setPauseOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
   const close = () => { setOpened(null); button.current?.focus(); };
+  const compactOpeningPrompt = openingTutorial && isPhoneEdition() ? analyticsStep
+    ? "Compare latency, errors and backlog. Pause to inspect."
+    : metricsStep ? "Demand exceeds capacity. Next shows the matching upgrade."
+    : decision.reason === "opening-growth" ? "Press Run to advance time and watch customer demand."
+    : decision.reason.startsWith("activation-") ? "Press Run to finish the install, then check the readings."
+    : decision.reason === "database" ? "Inspect Database, then choose an upgrade to handle more work."
+    : null : null;
   return <CampaignAttentionContext.Provider value={context}>{children}
     {companyMessage && <ChapterCompanyMessage key={companyMessage.key} model={companyMessage} onOpen={setIntroOpen} enabled={!inspection && (launchTutorial
       // Launch Week's colleague introduction comes once, before the first Run.
@@ -382,10 +397,10 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       <Chapter4StagePopup key={`${spikeStage.key}:${spikeStage.stage}`} model={spikeStage} />}
     </ChapterCompanyMessage>}
     {launchStep && spotBox && createPortal(<Spotlight box={spotBox} track="guidance" />, document.body)}
-    {launchStep && !intro && createPortal(<LaunchTutorialCard box={spotBox} place={guidanceTarget === "run" || guidanceTarget === "menu" ? "top" : "left"} title={metricsStep ? "Read the metrics" : launchStepTitle(decision.reason, recommendedAction?.action.type)}
-      prompt={metricsStep ? decision.reason === "database" ? "Database demand is above its capacity, so work queues up and requests fail. That is the overload." : "App Server demand is above its capacity, so requests pile up as backlog and fail. That is the overload." : decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : decision.message}
-      why={metricsStep ? "Press Next to see how to fix it." : decision.observation !== decision.message ? decision.observation : undefined}
-      doneLabel={metricsStep ? "Next" : undefined} onDone={() => metricsStep ? setMetricsSeen(metricsKey) : setLaunchDone(key)} />, document.body)}
+    {launchStep && !intro && createPortal(<LaunchTutorialCard box={spotBox} label={openingTutorial ? "Chapter 1 guide" : undefined} place={!analyticsStep && (guidanceTarget === "run" || guidanceTarget === "menu") ? "top" : "left"} title={analyticsStep ? "Watch your service" : metricsStep ? "Read the metrics" : openingTutorial && decision.reason === "opening-growth" ? "Run, then observe" : launchStepTitle(decision.reason, recommendedAction?.action.type)}
+      prompt={compactOpeningPrompt ?? (analyticsStep ? "Latency: response time. Errors: failed requests. Backlog: waiting work. Pause to inspect these readings." : metricsStep ? decision.reason === "database" ? "Database demand is above its capacity, so work queues up and requests fail. That is the overload." : "App Server demand is above its capacity, so requests pile up as backlog and fail. That is the overload." : openingTutorial && decision.reason === "opening-growth" ? "Press Run to advance game time. Customers bring requests; compare their demand with your equipment's capacity." : decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : decision.message)}
+      why={compactOpeningPrompt || analyticsStep ? undefined : metricsStep ? "Press Next to see how to fix it. Review the price and activation delay before confirming." : decision.observation !== decision.message ? decision.observation : undefined}
+      doneLabel={analyticsStep || metricsStep ? "Next" : undefined} onDone={() => analyticsStep ? setAnalyticsSeen(analyticsKey) : metricsStep ? setMetricsSeen(metricsKey) : setLaunchDone(key)} />, document.body)}
     {openNow && createPortal(<div ref={card} id="campaign-hint-card" className="campaign-hint-card" role="dialog" aria-modal="false" aria-label="Hint" tabIndex={-1} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
       <div className="campaign-hint-heading"><h3><Icon name="bulb" />Hint</h3><button type="button" className="icon-btn" aria-label="Close Hint" onClick={close}><Icon name="close" /></button></div>
       <div className="campaign-hint-copy" role="region" aria-label="Hint explanation" tabIndex={0}><p>{decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : decision.message}</p></div>
@@ -402,6 +417,7 @@ export function CampaignHintButton() {
 
 /** The Launch Week tutorial's steps: run, walk the incident through its fix, then skip the settled week. */
 const LAUNCH_FLOW = /^(launch-open|launch-week|launch-research|launch-first-incident|launch-db-incident|launch-end-week|application|unrouted|database|recovery|draining|investigate|failure|activation-.+)$/;
+const OPENING_FLOW = /^(opening-growth|prevention-inspection|prevention-stability|application|unrouted|database|recovery|draining|investigate|failure|activation-.+)$/;
 const LAUNCH_STEP_TITLES: Record<string, string> = {
   "launch-open": "Open the doors", "launch-week": "Keep the week running", "launch-first-incident": "Your servers are overloading",
   "launch-db-incident": "Your database is overloading", "launch-end-week": "Skip to the end of the week", "launch-research": "Spend your research point",
@@ -414,8 +430,20 @@ function launchStepTitle(reason: string, action?: string): string {
 }
 
 /** A Launch Week tutorial step, in the step tours' card, beside the control its spotlight frames. */
-function LaunchTutorialCard({ box, place, title, prompt, why, doneLabel = "Got it", onDone }: { box: Box | null; place: Place; title: string; prompt: string; why?: string; doneLabel?: string; onDone: () => void }) {
+function LaunchTutorialCard({ box, place, title, prompt, why, label = "Launch Week tutorial", doneLabel = "Got it", onDone }: { box: Box | null; place: Place; title: string; prompt: string; why?: string; label?: string; doneLabel?: string; onDone: () => void }) {
   const [vp, setVp] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  const card = useRef<HTMLElement>(null);
+  const [height, setHeight] = useState(240);
+  useLayoutEffect(() => {
+    const read = () => {
+      const measured = card.current?.getBoundingClientRect().height;
+      if (measured) setHeight(previous => previous === measured ? previous : measured);
+    };
+    read();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(read);
+    if (card.current) observer?.observe(card.current);
+    return () => observer?.disconnect();
+  }, [title, prompt, why]);
   useEffect(() => {
     const read = () => setVp({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", read);
@@ -423,8 +451,8 @@ function LaunchTutorialCard({ box, place, title, prompt, why, doneLabel = "Got i
   }, []);
   const topInset = (document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0) + 8;
   // A phone docks the step in its coach strip above the dock, like every other guide there.
-  const style = isPhoneEdition() ? undefined : cardStyle(box, place, vp.w, vp.h, undefined, undefined, undefined, topInset);
-  return <section className="tour-card launch-tutorial" aria-label="Launch Week tutorial" style={style}>
+  const style = isPhoneEdition() ? undefined : cardStyle(box, place, vp.w, vp.h, undefined, height, undefined, topInset);
+  return <section ref={card} className="tour-card launch-tutorial" aria-label={label} style={style}>
     <h3>{title}</h3>
     <p className="tour-prompt" role="status">{prompt}</p>
     {why && <p className="muted tour-explanation">{why}</p>}
