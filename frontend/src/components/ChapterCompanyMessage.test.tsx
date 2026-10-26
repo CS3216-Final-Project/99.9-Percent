@@ -123,6 +123,26 @@ it("uses a different receipt for a new company and actual stage entry", () => {
   expect(chapterCompanyMessage(decide(recognised, {type:"enter_scaling"}))!.chapter).toBe(2);
 });
 
+it("welcomes a new company from Maya before its introduction, and Opening then skips her greeting", () => {
+  const begun = decide(newGame(7, "welcome", 2), { type: "begin_introduction" });
+  const welcome = chapterCompanyMessage(begun)!;
+  expect(welcome.chapter).toBe(0); expect(welcome.speaker).toBe("maya");
+  expect(welcome.lines[0]).toContain("Welcome to your company");
+  expect(welcome.lines.join(" ")).toContain("check out the machines you have");
+  useGame.setState({ game: begun, ready: true, started: true, onboarding: false, tour: null });
+  render(host());
+  expect(message()!.textContent).toContain("Welcome to your company");
+  readThrough(); expect(message()).toBeNull();
+
+  let explored = begun;
+  for (const equipment of ["gateway", "app", "db", "monitoring"] as const) explored = decide(decide(explored, { type: "incident_inspect", equipment }), { type: "acknowledge_introduction", equipment });
+  const opening = chapterCompanyMessage(decide(explored, { type: "complete_introduction", handoff: "opening" }))!;
+  expect(opening.chapter).toBe(1); expect(opening.key).not.toBe(welcome.key);
+  expect(opening.lines.join(" ")).not.toContain("I'm Maya");
+  expect(opening.lines.at(-1)).toContain("slow it down");
+  expect(chapterCompanyMessage(newGame())!.lines[0]).toContain("I'm Maya");
+});
+
 it("uses truthful Opening copy and the actual final target", () => {
   const said = (game: Parameters<typeof chapterCompanyMessage>[0]) => chapterCompanyMessage(game)!.lines.join(" ");
   const healthy = newGame(); expect(said(healthy)).not.toContain("reporting");

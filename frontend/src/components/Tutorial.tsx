@@ -222,8 +222,8 @@ function fits(track: TourTrack, s: Snapshot, step: Pick<Step, "inTech">): boolea
 
 /** Whether a box on screen lies in the part of the room the panel leaves open. */
 function inOpenRoom(r: DOMRect, stage: DOMRect): boolean {
-  const { right, bottom } = openRoomArea(stage);
-  return r.left >= stage.left + EDGE && r.top >= stage.top + EDGE && r.right <= stage.left + right && r.bottom <= stage.top + bottom;
+  const { top, right, bottom } = openRoomArea(stage);
+  return r.left >= stage.left + EDGE && r.top >= stage.top + Math.max(EDGE, top) && r.right <= stage.left + right && r.bottom <= stage.top + bottom;
 }
 
 /**
@@ -335,7 +335,7 @@ function SpotlightTutorial() {
         const stage = document.querySelector("main.stage")?.getBoundingClientRect();
         if (stage) {
           const area = openRoomArea(stage);
-          const layout = `${sel}:${Math.round(stage.width)}:${Math.round(stage.height)}:${Math.round(area.right)}:${Math.round(area.bottom)}`;
+          const layout = `${sel}:${Math.round(stage.width)}:${Math.round(stage.height)}:${Math.round(area.top)}:${Math.round(area.right)}:${Math.round(area.bottom)}`;
           if (focusedFor !== layout) {
             focusedFor = layout;
             if (!inOpenRoom(el.getBoundingClientRect(), stage)) useGame.getState().focusCamera(eq);
@@ -354,10 +354,10 @@ function SpotlightTutorial() {
       const k = isPhoneEdition() || window.innerWidth < 900 ? 0.45 : 1;
       const [pt, pr, pb, pl] = sel.startsWith(".eq-label") ? [10 * k, 46 * k, 120 * k, 46 * k] : [5, 5, 5, 5];
       const x = Math.max(4, r.left - pl);
-      const y = Math.max(4, r.top - pt);
-      // A phone's guide is docked above the dock; the lit window of a control above the strip ends where the strip
-      // starts. A control in the dock, below the strip, keeps its own height.
+      // A phone's guide is docked in a strip (below the top strip, or above the dock in a full-page workspace); the
+      // lit window of a control on either side of it stops at the strip's edge rather than reaching over it.
       const strip = isPhoneEdition() ? card.current?.getBoundingClientRect() : undefined;
+      const y = Math.max(4, r.top - pt, strip && r.top >= strip.bottom - 1 ? Math.min(r.top, strip.bottom + 6) : 0);
       const bottom = strip && r.top < strip.top ? Math.max(y, strip.top - 6) : window.innerHeight - 4;
       const next = {
         x,
