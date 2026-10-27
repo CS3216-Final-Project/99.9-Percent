@@ -4,6 +4,7 @@ import { CHAPTER_TOURS, DEFAULT_META, type Meta } from '../src/game/persist';
 import { decodeSave, makeEnvelope } from '../src/game/saveEnvelope';
 
 const controlledPages = new WeakSet<Page>();
+const roomlessTargets = new WeakSet<Page | BrowserContext>();
 type ClockOptions = Parameters<Page["clock"]["install"]>[0];
 
 // Unhandled browser errors fail each case. Journeys that call withoutRoom() skip the WebGL scene; the rest draw it.
@@ -86,6 +87,7 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
     let stubbed = 0;
     await provide(async (target = page) => {
       skipped = true;
+      roomlessTargets.add(target);
       await target.route('**/assets/Facility-*.js', route => {
         stubbed++;
         return route.fulfill({ contentType: 'text/javascript', body: 'export default function Facility() { return null; }' });
@@ -140,6 +142,11 @@ export async function savedGame(page: Page): Promise<GameState> {
 
 export async function expectRoom(page: Page, timeout?: number) {
   const room = page.getByRole('main');
+  if (roomlessTargets.has(page) || roomlessTargets.has(page.context())) {
+    // withoutRoom() stubbed the scene: the shell's main landmark still proves the journey entered the game.
+    await expect(room).toBeVisible({ timeout });
+    return;
+  }
   const canvas = room.locator('canvas');
   await expect(canvas).toBeVisible({ timeout });
   // A visible canvas alone does not prove that WebGL initialized successfully.

@@ -14,10 +14,58 @@ concurrency:
 permissions:
   contents: read
 
-# No `paths:` filters on purpose: both jobs are required checks, and a skipped
-# required check stays "pending" and blocks the merge.
+# No `paths:` filters on purpose: a filtered workflow never reports its
+# required checks, and a required check that stays pending blocks the merge.
+# Instead the `changes` job detects the touched areas and the real suites
+# skip themselves; the required `frontend`/`backend` gate jobs still always
+# run and report a result, so branch protection sees a decision either way.
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.areas.outputs.frontend }}
+      backend: ${{ steps.areas.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the base commit for the diff
+        run: git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+      - name: Decide which areas this PR touches
+        id: areas
+        run: |
+          files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD)
+          echo "$files"
+          hits() { grep -q -e "$1" -e "$2" -e "$3" -e "$4" <<< "$files" && echo true || echo false; }
+          {
+            echo "frontend=$(hits '^frontend/' '^shared/' '^\.github/workflows/ci\.yml$' '^\.nvmrc$')"
+            echo "backend=$(hits '^backend/' '^shared/' '^\.github/workflows/ci\.yml$' '^\.nvmrc$')"
+          } >> "$GITHUB_OUTPUT"
+
+  # One build feeds every browser shard; each shard used to repeat it.
+  frontend-build:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 1
+
   frontend-checks:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,6 +92,8 @@ jobs:
           retention-days: 14
 
   frontend-balance:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -59,12 +109,14 @@ jobs:
       - run: npm run balance
 
   frontend-browser:
+    needs: [changes, frontend-build]
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     strategy:
       # Collect failures from every shard instead of cancelling the others.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
     defaults:
       run:
         working-directory: frontend
@@ -76,7 +128,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-      - run: npm run build
+      - name: Download the shared production build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
       - name: Read the locked Playwright version
         id: playwright
         run: node -e "process.stdout.write('version=' + require('@playwright/test/package.json').version + '\n')" >> "$GITHUB_OUTPUT"
@@ -104,24 +160,34 @@ jobs:
           retention-days: 14
 
   # Keep the existing branch-protection check, including every browser shard.
-  # always() makes a failed/skipped dependency fail this gate instead of skipping it.
+  # always() makes a failed/skipped dependency fail this gate instead of skipping it —
+  # except when the area was never touched, where a skipped suite is the intent.
   frontend:
-    needs: [frontend-checks, frontend-balance, frontend-browser]
+    needs: [changes, frontend-checks, frontend-balance, frontend-browser]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Require static checks, coverage, balance and all browser shards
         env:
+          FRONTEND_TOUCHED: ${{ needs.changes.outputs.frontend }}
           CHECKS_RESULT: ${{ needs.frontend-checks.result }}
           BALANCE_RESULT: ${{ needs.frontend-balance.result }}
           BROWSER_RESULT: ${{ needs.frontend-browser.result }}
         run: |
+          if [ "$FRONTEND_TOUCHED" != "true" ]; then
+            echo "No frontend files changed; frontend suite skipped by design."
+            exit 0
+          fi
           if [ "$CHECKS_RESULT" != "success" ] || [ "$BALANCE_RESULT" != "success" ] || [ "$BROWSER_RESULT" != "success" ]; then
             echo "::error::Frontend checks: $CHECKS_RESULT; balance: $BALANCE_RESULT; browser journeys: $BROWSER_RESULT"
             exit 1
           fi
 
-  backend:
+  # The real backend suite. The required `backend` check below gates it, the
+  # same way `frontend` gates the frontend jobs.
+  backend-checks:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -153,3 +219,22 @@ jobs:
           path: backend/coverage/
           if-no-files-found: ignore
           retention-days: 14
+
+  backend:
+    needs: [changes, backend-checks]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require static checks, coverage and migration consistency
+        env:
+          BACKEND_TOUCHED: ${{ needs.changes.outputs.backend }}
+          CHECKS_RESULT: ${{ needs.backend-checks.result }}
+        run: |
+          if [ "$BACKEND_TOUCHED" != "true" ]; then
+            echo "No backend files changed; backend suite skipped by design."
+            exit 0
+          fi
+          if [ "$CHECKS_RESULT" != "success" ]; then
+            echo "::error::Backend checks: $CHECKS_RESULT"
+            exit 1
+          fi

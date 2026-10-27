@@ -4,11 +4,13 @@ import { recoveredOpening } from "../src/game/__fixtures__/openingOutcome";
 import { newGame } from "../src/sim";
 
 test.use({reviewCompanyMessage:false,reviewRecoveryNotice:false});
-for (const chapter of [1,2,3,4,5,6]) test(`company message: Chapter ${chapter} sender, dismissal and reload`, async ({page}, info) => {
+for (const chapter of [1,2,3,4,5,6]) test(`company message: Chapter ${chapter} sender, dismissal and reload`, async ({page, withoutRoom}, info) => {
+  await withoutRoom();
   await companyMessageJourney(page, info, chapter);
 });
 
-test("company message: review and recognition take priority, then actual Chapter 2 entry introduces Alex", async ({page}) => {
+test("company message: review and recognition take priority, then actual Chapter 2 entry introduces Alex", async ({page, withoutRoom}) => {
+  await withoutRoom();
   await page.route("**/api/**", r=>r.abort()); await seedSave(page,recoveredOpening()); await page.goto("/");
   await page.getByRole("button",{name:"Continue company",exact:true}).click(); await expectRoom(page);
   const story=page.getByRole("dialog",{name:"Company Message",exact:true});
@@ -21,7 +23,8 @@ test("company message: review and recognition take priority, then actual Chapter
   expect((await savedGame(page)).campaign!.scaling).not.toBeNull();
 });
 
-test("company message: reload before dismissal still deduplicates the shown introduction", async ({page}) => {
+test("company message: reload before dismissal still deduplicates the shown introduction", async ({page, withoutRoom}) => {
+  await withoutRoom();
   await page.route("**/api/**",r=>r.abort()); await seedSave(page,newGame()); await page.goto("/");
   await page.getByRole("button",{name:"Continue company",exact:true}).click(); await expectRoom(page);
   await expect(page.getByRole("dialog",{name:"Company Message"})).toBeVisible();

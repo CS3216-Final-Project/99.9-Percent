@@ -26,18 +26,21 @@ test.use({ edition: "desktop" });
 
 test.describe("Company messages on touch", () => {
   test.use({reviewCompanyMessage:false});
-  for (const width of [390,320]) test(`company message: Chapter 4 queues stage guidance at ${width}px touch`, async ({page}, info) => {
+  for (const width of [390,320]) test(`company message: Chapter 4 queues stage guidance at ${width}px touch`, async ({page, withoutRoom}, info) => {
+  await withoutRoom();
     await page.setViewportSize({width,height:width===320?568:844});
     await companyMessageJourney(page,info,4,true);
   });
 });
 
-test("Chapter 4 traffic target: safe removal and confirmation stay actionable on 320px touch", async ({ page, installClock }) => {
+test("Chapter 4 traffic target: safe removal and confirmation stay actionable on 320px touch", async ({ page, installClock, withoutRoom}) => {
+  await withoutRoom();
   await installClock(); await page.setViewportSize({ width: 320, height: 568 }); await chapter4TrafficTarget(page, true);
 });
 
 for (const [offset, name, tone] of [[0, "Prepare", "prepare"], [8, "Spike 1", "pressure"], [8, "Respond", "pressure"], [28, "Between spikes", "recovery"], [48, "Spike 2", "pressure"], [68, "Recover", "recovery"]] as const)
-  test(`Chapter 4 colours: ${name} remains readable and dismissible on 320px touch`, async ({ page, installClock }, info) => {
+  test(`Chapter 4 colours: ${name} remains readable and dismissible on 320px touch`, async ({ page, installClock, withoutRoom}, info) => {
+  await withoutRoom();
     await installClock(); await page.setViewportSize({ width: 320, height: 568 });
     const initial = spikeCompany(false);
     const game = offset ? untilOffset(name === "Respond" ? initial : tick(act(initial, { type: "set_traffic_limit", enabled: true })), offset) : initial;
@@ -51,7 +54,8 @@ for (const [offset, name, tone] of [[0, "Prepare", "prepare"], [8, "Spike 1", "p
     expect((await savedGame(page)).campaign!.step).toBe(before);
   });
 
-for (const width of [390, 320]) test(`Phase 1 Hint and accepted control remain usable by touch at ${width}px`, async ({ page, installClock }, info) => {
+for (const width of [390, 320]) test(`Phase 1 Hint and accepted control remain usable by touch at ${width}px`, async ({ page, installClock, withoutRoom}, info) => {
+  await withoutRoom();
   await installClock(); await page.setViewportSize({ width, height: width === 320 ? 568 : 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("**/api/**", route => route.abort());
@@ -212,7 +216,8 @@ test("purchase details keyboard navigation handles overflow and fitting content"
 });
 
 
-test("Opening prevention recognition unlocks Scaling after touch review and reload",async({ page })=>{
+test("Opening prevention recognition unlocks Scaling after touch review and reload",async({ page , withoutRoom})=>{
+  await withoutRoom();
  let g=newGame(0,"touch-prevention");
  g=act(g,{type:"set_traffic_limit",enabled:true});g=act(g,{type:"start_db_upgrade"});g=advanceSteps(g,4).state;
  g=act(g,{type:"incident_inspect",equipment:"app"});g=act(g,{type:"incident_inspect",equipment:"db"});
@@ -298,7 +303,8 @@ for (const next of [false,true]) test(`compact chapter bar keeps goal and naviga
   }
 });
 
-test("new players can compare both modes and start Challenge Mode on touch", async ({ page }) => {
+test("new players can compare both modes and start Challenge Mode on touch", async ({ page, withoutRoom}) => {
+  await withoutRoom();
   await unlockChallenge(page);
   await page.goto("/");
   const choices = page.getByRole("region", { name: "Choose how you want to play" });
@@ -342,7 +348,8 @@ test("reliability: inspection and effective recipients remain clear on narrow to
  await expect(page.getByRole("dialog",{name:"Menu"}).getByRole("tab",{name:/Graphics/})).toBeVisible();
 });
 
-test("inspects evidence and advances a physical step on touch", async ({ page , installClock}) => {
+test("inspects evidence and advances a physical step on touch", async ({ page , installClock, withoutRoom}) => {
+  await withoutRoom();
  await installClock();
   // This journey checks evidence and the dock; full Chapter 0 is covered separately.
   await seedSave(page, newGame(1, "touch-evidence"));
@@ -362,7 +369,8 @@ test("inspects evidence and advances a physical step on touch", async ({ page , 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
 });
 
-test("investigates and responds through the incident panel on touch", async ({ page }) => {
+test("investigates and responds through the incident panel on touch", async ({ page, withoutRoom}) => {
+  await withoutRoom();
   await seedSave(page, advanceSteps(newGame(1, "touch-incident"), 6).state);
   await page.goto("/"); await page.getByRole("button", { name: "Continue company" }).tap();
   await expectRoom(page);
@@ -443,7 +451,8 @@ test("selects scaling instances through room and evidence on touch",async({page}
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
 });
 
-test('account controls remain usable on touch while accounts are offline',async({page})=>{
+test('account controls remain usable on touch while accounts are offline',async({page, withoutRoom})=>{
+  await withoutRoom();
   await page.route('**/api/session',route=>route.fulfill({status:503,json:{error:'offline'}}));
   await page.goto('/');await page.getByRole('button',{name:/Sign in/}).tap();
   const dialog=page.getByRole('dialog',{name:'Account'});
@@ -558,16 +567,18 @@ test("purchase sheet keeps warnings and decisions reachable on 390px touch",asyn
 test("App Health dashboard and overlays work on narrow touch screens", async ({page}) => {
  await appHealthJourney(page,390,844,true);
 });
-test("Chapter 0 inspections and App Health work on touch", async ({page}) => {
+test("Chapter 0 inspections and App Health work on touch", async ({page, withoutRoom}) => {
+  await withoutRoom();
  await page.setViewportSize({width:390,height:844}); await page.emulateMedia({reducedMotion:"reduce"});
  await appHealthDuringOpening(page);
 });
-test("App Health explains problem evidence on touch", async ({page}) => { await appHealthProblem(page,true); });
+test("App Health explains problem evidence on touch", async ({page, withoutRoom}) => { await withoutRoom(); await appHealthProblem(page,true); });
 
 test("App Health remains compact at 320px touch", async ({page}) => { await appHealthJourney(page,320,844,true); });
 
 
-test("menu actions and unsaved exit confirmation are reachable by touch", async ({ page }) => {
+test("menu actions and unsaved exit confirmation are reachable by touch", async ({ page, withoutRoom}) => {
+  await withoutRoom();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/**", route => route.abort());
   await seedSave(page, newGame(1, "touch-exit"));
@@ -597,7 +608,8 @@ test("menu actions and unsaved exit confirmation are reachable by touch", async 
 
 test.describe('Campaign recovery feedback on touch', () => {
   test.use({ reviewRecoveryNotice: false });
-  for (const width of [390, 320]) test(`recovery report: touch acknowledgement, evidence and reload at ${width}px`, async ({ page, installClock }, info) => {
+  for (const width of [390, 320]) test(`recovery report: touch acknowledgement, evidence and reload at ${width}px`, async ({ page, installClock, withoutRoom}, info) => {
+  await withoutRoom();
     await page.setViewportSize({ width, height: width === 320 ? 568 : 844 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await installClock(); await recoveryJourney(page, info, true, width === 320);
@@ -630,21 +642,24 @@ for (const width of [390, 320]) test(`progression choice: visible growth explana
   expect((await savedGame(page)).campaign!.inputs).toEqual(game.campaign!.inputs);
 });
 
-for (const width of [390, 320]) test(`incident Pause: immediate touch attention at ${width}px`, async ({ page, installClock }, info) => {
+for (const width of [390, 320]) test(`incident Pause: immediate touch attention at ${width}px`, async ({ page, installClock, withoutRoom}, info) => {
+  await withoutRoom();
   await installClock(); await page.setViewportSize({ width, height: width === 320 ? 568 : 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await pauseArrival(page, info, width === 320 ? 5 : 2, true);
 });
 
 
-test("Chapter 6 guidance: 320px touch preparation, actionable routing and safe removal", async ({ page, installClock }) => {
+test("Chapter 6 guidance: 320px touch preparation, actionable routing and safe removal", async ({ page, installClock, withoutRoom}) => {
+  await withoutRoom();
   await installClock(); await page.setViewportSize({ width: 320, height: 568 });
   await chapter6Preparation(page, true);
 });
 
 
 for (const milestone of ["wave", "recovery", "final"] as const)
-  test(`Chapter 6 guidance: 320px touch ${milestone} milestone colours`, async ({ page, installClock }, info) => {
+  test(`Chapter 6 guidance: 320px touch ${milestone} milestone colours`, async ({ page, installClock, withoutRoom}, info) => {
+  await withoutRoom();
     await installClock(); await page.setViewportSize({ width: 320, height: 568 });
     const wave = chapter6Act(chapter6Tick(chapter6Company(), 5), { type: "start_growth_wave" });
     const game = milestone === "wave" ? wave : milestone === "recovery" ? chapter6Tick(wave, 24) : promotionRiskCompany();
@@ -660,24 +675,28 @@ for (const milestone of ["wave", "recovery", "final"] as const)
   });
 
 
-test("Chapter 5 clarity: outcome and details remain usable on 320px touch", async ({ page, installClock }, info) => {
+test("Chapter 5 clarity: outcome and details remain usable on 320px touch", async ({ page, installClock, withoutRoom}, info) => {
+  await withoutRoom();
   await installClock(); await page.setViewportSize({ width: 320, height: 568 });
   await reliabilityClarity(page, info, true);
 });
 
 for (const kind of ["spikes", "completion"] as const) {
-  test(`Campaign report: ${kind} summary and acknowledgement on 320px touch`, async ({ page, installClock }, info) => {
+  test(`Campaign report: ${kind} summary and acknowledgement on 320px touch`, async ({ page, installClock, withoutRoom}, info) => {
+  await withoutRoom();
     await installClock(); await page.setViewportSize({ width: 320, height: 568 });
     await campaignReportJourney(page, info, kind, true);
   });
 }
 
-test("Chapter 6 finances: funding warning and existing cash spotlight on 320px touch", async ({ page, installClock }, info) => {
+test("Chapter 6 finances: funding warning and existing cash spotlight on 320px touch", async ({ page, installClock, withoutRoom}, info) => {
+  await withoutRoom();
   await installClock(); await page.setViewportSize({ width: 320, height: 568 });
   await chapter6FinanceJourney(page, info, true);
 });
 
-test("Launch Week cold open and research sheet remain usable by touch at 390px", async ({ page }, info) => {
+test("Launch Week cold open and research sheet remain usable by touch at 390px", async ({ page, withoutRoom}, info) => {
+  await withoutRoom();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/**", r => r.abort());
   // A company whose database incident was fixed, with the research point earned and unspent.
@@ -696,7 +715,8 @@ test("Launch Week cold open and research sheet remain usable by touch at 390px",
   expect((await savedGame(page)).campaign!.launchWeek?.tech).toBe("autoscaling");
 });
 
-for (const width of [390, 320]) test(`the Launch Week score card's three actions stay reachable and right-aligned at ${width}px`, async ({ page }, info) => {
+for (const width of [390, 320]) test(`the Launch Week score card's three actions stay reachable and right-aligned at ${width}px`, async ({ page, withoutRoom}, info) => {
+  await withoutRoom();
   await page.setViewportSize({ width, height: 844 });
   await page.route("**/api/**", r => r.abort());
   await seedSave(page, finishedLaunchWeek()); await page.goto("/");

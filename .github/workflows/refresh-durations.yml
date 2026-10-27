@@ -1,0 +1,72 @@
+name: Refresh browser shard durations
+
+# The shard packer (frontend/scripts/browser-shards.mjs) splits browser
+# journeys by the durations recorded in frontend/e2e/browser-durations.json.
+# Newly added tests only get the flat 30s fallback until someone re-records,
+# so this job re-records from the most recent passing CI run weekly (or on
+# demand) and opens a PR when the ledger actually changed.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '22 3 * * 1' # Mondays 03:22 UTC
+
+permissions:
+  contents: write      # push the refresh branch
+  pull-requests: write # open the update PR
+  actions: read        # download artifacts from the last CI run
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Download browser timing reports from the latest passing CI run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p reports
+          found=""
+          for run_id in $(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?status=success&per_page=15" --jq '.workflow_runs[].id'); do
+            names=$(gh api "repos/${{ github.repository }}/actions/runs/$run_id/artifacts?per_page=50" --jq -r '.artifacts[] | select(.name | startswith("browser-results-")) | .name')
+            if [ -n "$names" ]; then
+              echo "Using CI run $run_id"
+              for name in $names; do
+                gh run download "$run_id" --name "$name" --dir "reports/$name"
+              done
+              found="$run_id"
+              break
+            fi
+          done
+          if [ -z "$found" ]; then
+            echo "::error::No recent passing CI run had browser-results artifacts"
+            exit 1
+          fi
+          ls reports/*/test-results/browser-timings.json | wc -l
+      - name: Re-record durations
+        working-directory: frontend
+        run: node scripts/browser-shards.mjs --record ../reports/*/test-results/browser-timings.json
+      - name: Open a PR when the ledger changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet frontend/e2e/browser-durations.json; then
+            echo "Durations already current"
+            exit 0
+          fi
+          branch="chore/browser-durations-$(date +%Y%m%d)"
+          git checkout -b "$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/e2e/browser-durations.json
+          git commit -m "chore(ci): refresh browser shard durations"
+          git push -f origin "$branch"
+          existing=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Refreshed existing PR #$existing"
+          else
+            gh pr create --title "chore(ci): refresh browser shard durations" --body "Re-records \`frontend/e2e/browser-durations.json\` from the most recent passing CI run so the browser shard packer balances by measured durations instead of the 30s fallback. Opened by the refresh-durations workflow."
+          fi
