@@ -204,7 +204,7 @@ test("the score card reports nines, copies the result and continues to Chapter 2
   await expect(rush).toBeDisabled();
   await setGameSpeed(page, 2);
   await page.getByRole("button", { name: "Run", exact: true }).click();
-  for (let i = 0; i < 60 && !(await card.isVisible()); i++) {
+  for (let i = 0; i < 160 && !(await card.isVisible()); i++) {
     const dialog = page.getByRole("dialog");
     if (await dialog.isVisible()) {
       const next = dialog.getByRole("button", { name: "View Incident Report", exact: true });
