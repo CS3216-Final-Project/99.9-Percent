@@ -114,9 +114,10 @@ These are saved deadlines; pausing and reloading do not move them.
 The optional controller needs the unlock, deployed load balancing, balanced routing to at least two apps, a free slot and cash.
 It watches routed processed work divided by routed capacity:
 
-- Above 80% for three observations, it requests one base app, which installs in three steps and joins routing one step later.
+- Above 80% for three observations, it requests one base app, which installs in three steps and joins routing one step later. When all four app slots are taken, it instead upgrades the busiest eligible controller-created base app to the larger tier.
 - Below 60% for six safe observations, it retires an eligible controller-created app, never leaving fewer than two.
-- At most four apps are installed, with a four-step cooldown after each join or retirement.
+- At most four apps are installed, with a four-step cooldown after each join, upgrade or retirement.
+- New apps take the lowest free number, so a retirement never leaves a numbering gap; the controller's decisions, pending actions and completions are announced in the event log and as notifications.
 
 Manually installed or vertically upgraded apps are never retired, and there are no refunds.
 After both pulses, five stable baseline steps complete the chapter, which the player then acknowledges.

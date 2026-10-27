@@ -29,15 +29,16 @@ export interface ReportEvent { id: number; step: number; title: string; detail: 
  * One readable line per recorded event, never raw engine fields. Per-second metrics are dropped because the
  * evidence table already shows them.
  */
-export function describeEvents(events: TraceEvent[]): ReportEvent[] {
-  const requested = new Map(events.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.type]));
+export function describeEvents(events: TraceEvent[], context: TraceEvent[] = events): ReportEvent[] {
+  const requested = new Map(context.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.type]));
   return events.flatMap(e => {
     const d = e.data;
+    const automatic = d.source === "autoscaler" ? "Autoscaling " : "";
     const line = (title: string, ...parts: (string | null | false | undefined)[]) => [{ id: e.id, step: e.step, title, detail: parts.filter(Boolean).join(" · ") || null }];
     switch (e.type) {
       case "metrics": return [];
-      case "action-requested": return line(`${actionName(d.type)} requested`, Number(d.costCents) > 0 && `Setup ${dollars(d.costCents)}`, d.targetId ? app(d.targetId) : null, routing(d.routing) ? `Route to ${routing(d.routing)}` : null, d.activationStep != null && `Activates at game second ${d.activationStep}`);
-      case "action-activated": return line(`${actionName(requested.get(d.actionId))} activated`,
+      case "action-requested": return line(`${automatic}${actionName(d.type)} requested`, Number(d.costCents) > 0 && `Setup ${dollars(d.costCents)}`, d.targetId ? app(d.targetId) : null, routing(d.routing) ? `Route to ${routing(d.routing)}` : null, d.activationStep != null && `Activates at game second ${d.activationStep}`);
+      case "action-activated": return line(`${automatic}${actionName(requested.get(d.actionId))} activated`,
         change("Database capacity", d.dbBefore, d.dbAfter, " ops/s"), change("Application capacity", d.appBefore, d.appAfter, " req/s"),
         change("Admitted traffic", d.admittedBefore, d.admittedAfter, " req/s"), change("Routed capacity", d.effectiveBefore, d.effectiveAfter, " req/s"),
         d.routingAfter && routing(d.routingAfter) !== routing(d.routingBefore) ? `Route now ${routing(d.routingAfter)}` : null,
@@ -59,12 +60,35 @@ export function describeEvents(events: TraceEvent[]): ReportEvent[] {
       case "traffic-spike-ended": return line("Traffic spike ended", `Incoming ${num(d.to)} req/s`);
       case "workload-changed": return line("Workload changed", d.profile ? `${String(d.profile).replaceAll("-", " ")} workload` : null, typeof d.to === "number" && `${num(d.to)} req/s`);
       case "autoscale-scale-out-decided": return line("Autoscaling requested a server", d.targetId ? app(d.targetId) : null);
+      case "autoscale-scale-up-decided": return line("Autoscaling requested an upgrade", d.targetId ? app(d.targetId) : null);
+      case "autoscale-scale-in-eligible": return line("Autoscaling scheduled a retirement", d.targetId ? app(d.targetId) : null);
+      case "autoscale-instance-retired": return line("Autoscaling retired a server", d.targetId ? app(d.targetId) : null);
+      case "autoscale-retirement-cancelled": return line("Autoscaling cancelled a retirement", d.targetId ? app(d.targetId) : null, d.reason ? String(d.reason) : null);
       case "autoscaler-blocked": return line("Autoscaling blocked", d.reason ? String(d.reason) : null);
       case "scenario-started": return line(`Growth wave ${Number(d.index) + 1} started`, d.template ? `${String(d.template).replaceAll("-", " ")}` : null, `Peak ${num(d.peak)} req/s`);
       case "scenario-pressure-ended": return line("Growth wave eased", `Back to ${num(d.baseline)} req/s`);
       case "promotion-started": return line("Promotion started", d.increment ? `+${num(d.increment)} req/s` : null, `Until game second ${d.endStep}`);
       case "promotion-ended": return line("Promotion ended", `Back to ${num(d.baseline)} req/s`);
       default: { const text = e.type.replaceAll("-", " "); return line(text.charAt(0).toUpperCase() + text.slice(1)); }
+    }
+  });
+}
+
+/** Player-facing notices for the autoscaler's moves appended to the trace after `before`. */
+export function autoscalerActivity(before: TraceEvent[], after: TraceEvent[]): string[] {
+  const base = before.length ? before[before.length - 1].id : 0;
+  const typeOf = new Map(after.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.type]));
+  return after.filter(e => e.id > base).flatMap(e => {
+    const d = e.data;
+    switch (e.type) {
+      case "autoscale-scale-out-decided": return [`Autoscaling decided to add ${app(d.targetId)}`];
+      case "autoscale-scale-up-decided": return [`Autoscaling decided to upgrade ${app(d.targetId)}`];
+      case "autoscale-scale-in-eligible": return [`Autoscaling decided to retire ${app(d.targetId)}`];
+      case "autoscale-instance-retired": return [`Autoscaling retired ${app(d.targetId)}`];
+      case "autoscale-retirement-cancelled": return [`Autoscaling cancelled the ${app(d.targetId)} retirement`];
+      case "autoscaler-blocked": return [`Autoscaling paused — ${String(d.reason ?? "unknown")}`];
+      case "action-activated": return d.source === "autoscaler" ? [`Autoscaling completed: ${actionName(typeOf.get(d.actionId))}${d.targetId ? ` — ${app(d.targetId)}` : ""}`] : [];
+      default: return [];
     }
   });
 }

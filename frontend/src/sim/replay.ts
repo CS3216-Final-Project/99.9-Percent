@@ -17,7 +17,7 @@ export const MAX_REPLAY_INPUTS = 100_000;
  * deterministic, so the result equals the state the inputs were recorded from.
  * Throws when the inputs could not have been recorded by a real run.
  */
-export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number, legacyMilestones = false, foundation?: {step:number;inputs:number}, legacyPrevention = false, legacyPreventionInputs = 0, serviceMeasurementStart?: Pick<ServiceMeasurement,"fromStep"|"scope">, scenarioVersion: 1 | 2 = 1, legacyIncidentStep = 0): GameState {
+export function replayCampaign(seed: number, runId: string, inputs: readonly CampaignInput[], finalStep: number, legacyMilestones = false, foundation?: {step:number;inputs:number}, legacyPrevention = false, legacyPreventionInputs = 0, serviceMeasurementStart?: Pick<ServiceMeasurement,"fromStep"|"scope">, scenarioVersion: 1 | 2 = 1, legacyIncidentStep = 0, legacyScalingStep = 0): GameState {
     if (!Number.isSafeInteger(finalStep) || finalStep < 0 || finalStep > MAX_REPLAY_STEPS)
         throw new Error("Replay step is out of range");
     if (inputs.length > MAX_REPLAY_INPUTS)
@@ -31,6 +31,9 @@ export function replayCampaign(seed: number, runId: string, inputs: readonly Cam
     if (!Number.isSafeInteger(legacyIncidentStep) || legacyIncidentStep < 0 || legacyIncidentStep > finalStep)
         throw new Error("Legacy incident boundary is out of range");
     if (legacyIncidentStep) s.campaign!.legacyIncidentStep = legacyIncidentStep;
+    if (!Number.isSafeInteger(legacyScalingStep) || legacyScalingStep < 0 || legacyScalingStep > finalStep)
+        throw new Error("Legacy scaling boundary is out of range");
+    if (legacyScalingStep) s.campaign!.legacyScalingStep = legacyScalingStep;
     if(foundation)s.campaign!.foundation={...foundation};
     let inputIndex=0;
     for (const input of inputs) {
