@@ -30,6 +30,16 @@ it("lists each scheduled deployment with its remaining game seconds", () => {
   expect(screen.getByRole("button", { name: /Deploy now/ })).toBeTruthy();
 });
 
+it("fills each deployment's progress bar as its activation delay elapses", () => {
+  show(pendingGame(10, dataCompany()));
+  const name = { name: "Add server (App 2) deployment" };
+  const bar = screen.getByRole("progressbar", name);
+  expect(bar.getAttribute("aria-valuenow")).toBe("0");
+  expect(bar.getAttribute("aria-valuetext")).toBe("in 10 s");
+  act(() => { useGame.setState({ running: true }); useGame.getState().tick(1); });
+  expect(screen.getByRole("progressbar", name).getAttribute("aria-valuenow")).toBe("10");
+});
+
 it("stays hidden when nothing is scheduled", () => {
   show(newGame());
   expect(screen.queryByRole("complementary", { name: "Pending deployments" })).toBeNull();

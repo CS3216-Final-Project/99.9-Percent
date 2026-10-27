@@ -175,13 +175,13 @@
 :is(.campaign-panel, .component-inspection) .instance-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--text-soft); background: transparent; }
 :is(.campaign-panel, .component-inspection) .instance-status[data-receiving="true"] { color: var(--ok-ink); }
 :is(.campaign-panel, .component-inspection) .instance-status[data-receiving="true"] .instance-dot { border-color: var(--ok-ink); background: var(--ok); }
-:is(.campaign-panel, .component-inspection) .instance-bar { display: block; height: 8px; overflow: hidden; border-radius: 4px; border: 1px solid var(--paper-3); background: var(--paper-2); }
-:is(.campaign-panel, .component-inspection) .instance-bar > span { display: block; height: 100%; background: var(--ok); transition: width .25s ease-out; }
-:is(.campaign-panel, .component-inspection) .instance-bar[data-tone="warn"] > span { background: var(--warn); }
-:is(.campaign-panel, .component-inspection) .instance-bar[data-tone="critical"] > span { background: var(--critical); }
+:is(.campaign-panel, .component-inspection, .pending-deployments) .instance-bar { display: block; height: 8px; overflow: hidden; border-radius: 4px; border: 1px solid var(--paper-3); background: var(--paper-2); }
+:is(.campaign-panel, .component-inspection, .pending-deployments) .instance-bar > span { display: block; height: 100%; background: var(--ok); transition: width .25s ease-out; }
+:is(.campaign-panel, .component-inspection, .pending-deployments) .instance-bar[data-tone="warn"] > span { background: var(--warn); }
+:is(.campaign-panel, .component-inspection, .pending-deployments) .instance-bar[data-tone="critical"] > span { background: var(--critical); }
 :is(.campaign-panel, .component-inspection) .instance-figures { display: flex; flex-wrap: wrap; gap: 2px 8px; color: var(--text-soft); font-variant-numeric: tabular-nums; }
 :is(.campaign-panel, .component-inspection) .instance-figures b { color: var(--ink); font-family: var(--font-num); }
-@media (prefers-reduced-motion: reduce) { :is(.campaign-panel, .component-inspection) .instance-bar > span { transition: none; } }
+@media (prefers-reduced-motion: reduce) { :is(.campaign-panel, .component-inspection, .pending-deployments) .instance-bar > span { transition: none; } }
 
 /* Purchase quote tiles on the paper pop-up: red spending, green cash left, amber upkeep, blue timing. */
 :is(.campaign-action-popover, .component-purchase) .purchase-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0 8px; }
