@@ -139,6 +139,9 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   // Capturing the room's mouse blocks optional help, not an urgent Pause invitation.
   const pauseBlocked = covered || !!confirming || risk || !!tour || !!practice&&!intro || hidden || !focused;
   const blocked = pauseBlocked || locked;
+  // Only a real takeover dismisses a colleague dialog: a hidden tab, unfocused window or captured
+  // pointer suspends presentation but must not drop the message or its queued stage cues.
+  const narrativeBlocked = covered || !!confirming || risk || !!tour || !!practice && !intro;
   const key = `${generation}:${decision.key}`;
   const choices = decision.growthChoices;
   const chooseRisk = choices && (growthChoice?.key === key ? growthChoice.risk : !choices.upgrade);
@@ -396,8 +399,8 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   return <CampaignAttentionContext.Provider value={context}>{children}
     {companyMessage && <ChapterCompanyMessage key={companyMessage.key} model={companyMessage} onOpen={setIntroOpen} enabled={!inspection && (launchTutorial
       // Launch Week's colleague introduction comes once, before the first Run.
-      ? available && !blocked && !view && !running && game.phase === "management" && !game.campaign!.incident && game.campaign!.step === 0
-      : available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && !game.campaign?.incident && game.phase === "management" && !decision.reason.match(/^(review|next)$/))}>
+      ? available && !narrativeBlocked && !view && !running && game.phase === "management" && !game.campaign!.incident && game.campaign!.step === 0
+      : available && !narrativeBlocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && !game.campaign?.incident && game.phase === "management" && !decision.reason.match(/^(review|next)$/))}>
     {growthStage &&
       <Chapter6StagePopup key={`${growthStage.key}:${growthStage.stage}`} model={growthStage} />}
     {spikeStage &&
