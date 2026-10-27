@@ -149,6 +149,7 @@ function ComponentInspection() {
   const overview=page==="overview";
   const appManagement=place==="app"&&page==="management";
   const server=place==="app"&&page==="server";
+  const back=<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page!=="management"?"management":"overview")}>{place==="app"?(page==="management"?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>;
   const title=place==="app"?"App Servers":`${info.name} inspected`;
   const summary=<div className="component-inspection-summary">
       <div className="inspection-scanner" aria-hidden="true"><Icon name={EQUIPMENT_ICON[place]} size={56}/></div>
@@ -162,7 +163,7 @@ function ComponentInspection() {
     :overloaded?.length?"A routed server is overloaded. Inspect its demand and available capacity.":null;
   return <Modal title={title} icon={{kind:state.tone,name:EQUIPMENT_ICON[place]}} onClose={confirming?undefined:dismiss} className={`component-inspection component-inspection-${place}`}>
     <div className="inspection-subview" data-inspection-view={page} ref={subview} tabIndex={-1}>
-    {!overview&&<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page!=="management"?"management":"overview")}>{place==="app"?(page==="management"?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>}
+    {!overview&&place!=="gateway"&&back}
     {appManagement?<>
       <h3 className="inspection-management-heading"><Icon name="server" size={20}/>Server management</h3>
       <dl className="inspection-fleet-summary" aria-label="Server counts"><Row label="Installed" value={c.apps.length}/><Row label="Healthy" value={c.apps.filter(a=>a.health!=="failed").length}/><Row label="Currently routed" value={routes.length}/></dl>
@@ -178,7 +179,10 @@ function ComponentInspection() {
       <h3>Autoscaling</h3><p>Controller: {c.spikeStage?.controller?"Deployed":c.spikeStage?.researchSpent?"Available":"Locked"}. Automatically adjusts application capacity when sustained utilisation crosses its thresholds.</p>
       {controls("autoscaling")}
     </>:place==="gateway"&&!overview?<>
-      <h3 className="inspection-management-heading"><Icon name="network" size={20}/>Network management</h3>
+      <div className="inspection-management-header">
+        <h3 className="inspection-management-heading"><Icon name="network" size={20}/>Network management</h3>
+        {back}
+      </div>
       {!c.openingMilestone?.acknowledged&&!c.launchWeek?<p>Complete Opening recognition to manage load balancing and routing.</p>:<>
         <section aria-label="Load balancing"><h4>Load balancing</h4>{controls("balancing")}</section>
         <section aria-label="Routing"><h4>Routing</h4>{controls("routing")}</section>
