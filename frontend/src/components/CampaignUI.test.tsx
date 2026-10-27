@@ -7,11 +7,21 @@ import {CampaignChapters} from "./CampaignChapters";
 import {inspectOrSelect,useGame} from "../game/store";
 import {dataCompany} from "../sim/__tests__/dataFixture";
 import {protectedCombined} from "../sim/__tests__/combinedFixture";
+import {pauseTransition} from "../sim/__tests__/pauseFixture";
 import {advanceSteps} from "../sim/step";
 import {applyAction,newGame,type GameState} from "../sim";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});
 afterEach(cleanup);
 function show(game:GameState){useGame.setState({game,ready:true,started:true,onboarding:false});render(<><CampaignChapters/><CampaignPanel/><InspectionReveal/></>);}
+// Construct engine-heavy companies once outside each UI interaction deadline.
+const incidentTransitions=new Map([1,2,3,4,5,6].map(chapter=>[chapter,pauseTransition(chapter)]));
+it.each([1,2,3,4,5,6])("keeps the incident banner and recovery affordances visible during a Chapter %i incident",chapter=>{
+ show(structuredClone(incidentTransitions.get(chapter)!).incident);
+ expect(useGame.getState().game.phase).toBe("incident");
+ expect(screen.getByRole("region",{name:"Incident"})).toBeTruthy();
+ expect(screen.getByRole("heading",{name:"Service slowdown"})).toBeTruthy();
+ expect(screen.getByRole("region",{name:"Incident recovery"})).toBeTruthy();
+});
 it("shows all Opening requirements without a disclosure or generic growth-waiting message",()=>{
  show(newGame());const requirements=screen.getByRole("region",{name:"Guided Mode requirements"});
  expect(within(requirements).getByRole("heading",{name:/Chapter requirements/})).toBeTruthy();
