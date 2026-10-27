@@ -184,7 +184,7 @@ function ComponentInspection() {
       </>}
     </>:<>
       {summary}
-      <div className="component-inspection-controls"><button className="btn" data-inspection-details aria-expanded={details} onClick={()=>setDetails(!details)}>Inspect details</button>{place!=="monitoring"&&controls(place==="gateway"?"network":place==="app"?"fleet":undefined)}{place==="app"&&entry("management","Server management")}{place==="gateway"&&entry("management","Network management")}</div>
+      <div className="component-inspection-controls"><button className="btn" data-inspection-details aria-expanded={details} onClick={()=>setDetails(!details)}><Icon name="search" size={14} />Inspect details</button>{place!=="monitoring"&&controls(place==="gateway"?"network":place==="app"?"fleet":undefined)}{place==="app"&&entry("management","Server management")}{place==="gateway"&&entry("management","Network management")}</div>
       {details&&<>{reading()}{place==="cache"&&<CampaignDataDetails disabled={mandatory}/>}{place==="monitoring"&&controls()}</>}
     </>}
     {introductionActive(c)&&<button className="btn btn-primary" onClick={dismiss}>Got it</button>}
