@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import { newGame } from "@/sim";
+import type { TraceEvent } from "@/sim/campaignTypes";
 import { captureScorecard } from "@/sim/campaignScorecard";
 import { act, tick, dataCompany, spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { combinedCompany, finishRound, finishedCompany } from "@/sim/__tests__/combinedFixture";
@@ -81,4 +82,14 @@ it("does not attribute a same-second pre-entry action to the spike stage", () =>
 it("directs the last wave's takeaway to final goals rather than an invented fourth wave", () => {
   const c = finishedCompany().campaign!, round = c.combinedStage!.completedRounds[2];
   expect(outcomeSummary(c, "growth", round).improve).toBe("Compare service at full demand with your final Campaign goals.");
+});
+
+it("credits servers the autoscaler bought to autoscaling, never to the player", () => {
+  const events: TraceEvent[] = [
+    { id: 1, step: 4, type: "action-requested", data: { actionId: "auto", type: "add-app", source: "autoscaler" } },
+    { id: 2, step: 7, type: "action-activated", data: { actionId: "auto" } },
+  ];
+  const lesson = incidentSummary({ id: "auto", openedStep: 4, recoveredStep: 12, snapshots: [], events, explanations: [], limited: false, setupCents: 0 });
+  expect(lesson.response).toBe("Autoscaling added servers and routed traffic to them.");
+  expect(lesson.responseTitle).toBe("What resolved it?");
 });

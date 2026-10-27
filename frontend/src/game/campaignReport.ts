@@ -10,11 +10,16 @@ const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** The player's own changes and the automatic ones, kept apart so the report credits each truthfully. */
 function recordedResponses(events: TraceEvent[], from: number, end: number, firstEventId = 0) {
-  const requested = new Map(events.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.type]));
+  const requested = new Map(events.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data]));
   const during = events.filter(e => e.step >= from && e.step <= end && e.id >= firstEventId);
   const player = new Set<string>(), automatic = new Set<string>();
   for (const e of during) {
-    if (e.type === "action-activated") { const type = requested.get(e.data.actionId); if (typeof type === "string" && names[type]) player.add(names[type]); }
+    if (e.type === "action-activated") {
+      const request = requested.get(e.data.actionId), type = request?.type;
+      // The autoscaler and failover schedule their own changes; only the player's requests are "your" response.
+      if (request?.source === "autoscaler") automatic.add("autoscaling added servers and routed traffic to them");
+      else if (request?.source !== "failover" && typeof type === "string" && names[type]) player.add(names[type]);
+    }
     if (e.type === "failover-activated") automatic.add("Automatic Failover moved traffic to a spare");
     if (e.type === "instance-restored") {
       if (e.data.source === "manual") player.add(names["restore-app"]);

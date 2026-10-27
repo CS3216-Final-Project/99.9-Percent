@@ -202,7 +202,8 @@ test("the score card reports nines, copies the result and continues to Chapter 2
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
   await rush.click();
   for (let i = 0; i < 60 && !(await card.isVisible()); i++) {
-    const dialog = page.getByRole("dialog");
+    // Only the modal in the way: the score card can appear mid-loop beside Maya's Company Message, which never blocks.
+    const dialog = page.locator('.modal[role="dialog"]:not([aria-label="Launch Week complete"])');
     if (await dialog.isVisible()) {
       const next = dialog.getByRole("button", { name: "View Incident Report", exact: true });
       const go = dialog.getByRole("button", { name: "Continue company", exact: true });

@@ -29,13 +29,16 @@ export interface ReportEvent { id: number; step: number; title: string; detail: 
  */
 export function describeEvents(events: TraceEvent[]): ReportEvent[] {
   const requested = new Map(events.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.type]));
+  const sources = new Map(events.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.source]));
+  // A change the autoscaler or failover scheduled says so, so the player is never read as having made it.
+  const by = (source: unknown) => source === "autoscaler" ? " by autoscaling" : source === "failover" ? " by failover" : "";
   return events.flatMap(e => {
     const d = e.data;
     const line = (title: string, ...parts: (string | null | false | undefined)[]) => [{ id: e.id, step: e.step, title, detail: parts.filter(Boolean).join(" · ") || null }];
     switch (e.type) {
       case "metrics": return [];
-      case "action-requested": return line(`${actionName(d.type)} requested`, Number(d.costCents) > 0 && `Setup ${dollars(d.costCents)}`, d.targetId ? app(d.targetId) : null, routing(d.routing) ? `Route to ${routing(d.routing)}` : null, d.activationStep != null && `Activates at game second ${d.activationStep}`);
-      case "action-activated": return line(`${actionName(requested.get(d.actionId))} activated`,
+      case "action-requested": return line(`${actionName(d.type)} requested${by(d.source)}`, Number(d.costCents) > 0 && `Setup ${dollars(d.costCents)}`, d.targetId ? app(d.targetId) : null, routing(d.routing) ? `Route to ${routing(d.routing)}` : null, d.activationStep != null && `Activates at game second ${d.activationStep}`);
+      case "action-activated": return line(`${actionName(requested.get(d.actionId))} activated${by(sources.get(d.actionId))}`,
         change("Database capacity", d.dbBefore, d.dbAfter, " ops/s"), change("Application capacity", d.appBefore, d.appAfter, " req/s"),
         change("Admitted traffic", d.admittedBefore, d.admittedAfter, " req/s"), change("Routed capacity", d.effectiveBefore, d.effectiveAfter, " req/s"),
         d.routingAfter && routing(d.routingAfter) !== routing(d.routingBefore) ? `Route now ${routing(d.routingAfter)}` : null,
