@@ -22,6 +22,22 @@ it.each([1,2,3,4,5,6])("keeps the incident banner and recovery affordances visib
  expect(screen.getByRole("heading",{name:"Service slowdown"})).toBeTruthy();
  expect(screen.getByRole("region",{name:"Incident recovery"})).toBeTruthy();
 });
+it("pins the stable-service countdown with the incident banner only once counting starts",()=>{
+ const game=structuredClone(incidentTransitions.get(1)!).incident;
+ show(game);
+ const head=()=>screen.getByRole("region",{name:"Incident"}).querySelector(".panel-head")! as HTMLElement;
+ // At zero stable seconds only the banner is pinned; the counter stays in the recovery card.
+ expect(head().querySelector(".incident-pin-clock")).toBeNull();
+ expect(within(screen.getByRole("region",{name:"Incident recovery"})).getByRole("heading",{name:"Recovery progress"})).toBeTruthy();
+ // Once counting, the counter renders inside the pinned banner, not duplicated in the card.
+ cleanup();
+ game.campaign!.incident!.stableSteps=2;
+ show(game);
+ expect(within(head()).getByText("2/5 s")).toBeTruthy();
+ expect(within(head()).getByRole("heading",{name:"Recovery progress"})).toBeTruthy();
+ expect(within(screen.getByRole("region",{name:"Incident recovery"})).queryByRole("heading",{name:"Recovery progress"})).toBeNull();
+ expect(screen.getAllByRole("heading",{name:"Recovery progress"})).toHaveLength(1);
+});
 it("shows all Opening requirements without a disclosure or generic growth-waiting message",()=>{
  show(newGame());const requirements=screen.getByRole("region",{name:"Guided Mode requirements"});
  expect(within(requirements).getByRole("heading",{name:/Chapter requirements/})).toBeTruthy();
