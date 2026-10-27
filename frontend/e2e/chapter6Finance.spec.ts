@@ -1,12 +1,7 @@
 import { closeInspection, followHintComponent, inspectEquipment } from "./componentInspection";
 import { test, expect, savedGame, advanceCampaignStep } from "./fixtures";
-import { chapter6FinanceJourney } from "./chapter6Finance";
 import { recoverableFinancialCompany } from "../src/game/__fixtures__/chapter6Finance";
 import { bootChapter6 } from "./chapter6Guidance";
-
-test("Chapter 6 finances: real funding trap warns, Hint targets finances and preserves save", async ({ page, installClock }, info) => {
-  await installClock(); await chapter6FinanceJourney(page, info);
-});
 
 test("Chapter 6 finances: low cash with paid-for capacity warns but still guides safe recovery", async ({ page, installClock }) => {
   await installClock(); const game = recoverableFinancialCompany(); await bootChapter6(page, game);

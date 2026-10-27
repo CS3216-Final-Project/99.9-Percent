@@ -56,9 +56,10 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  await expect(page.getByRole("dialog")).toContainText("provisioning and routing");await page.getByRole("button",{name:"Continue company",exact:true}).click();
  await clockTo(page,n+40);c=(await savedGame(page)).campaign!;expect(c.apps.some(a=>a.id==="app-4")).toBe(false);expect(c.trace.some(t=>t.type==="autoscale-instance-retired")).toBe(true);
  await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Incident postmortem");await page.getByRole("button",{name:"Continue company",exact:true}).click();
- await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Spike response handled");
- await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(page.getByRole("dialog",{name:"Spike response handled"})).toBeVisible();
- await page.getByRole("button",{name:"Stay in this chapter",exact:true}).click();expect((await savedGame(page)).campaign!.runId).toBe(before.runId);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
+ // The default controller reacts after each pulse arrives, so Traffic Spikes goes over its error budget.
+ await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Traffic Spikes over error budget");
+ await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expect(page.getByRole("dialog",{name:"Traffic Spikes over error budget"})).toBeVisible();
+ await page.getByRole("button",{name:"Retry Traffic Spikes",exact:true}).click();expect((await savedGame(page)).campaign!.spikeStage!.budget!.attempt).toBe(2);expect((await savedGame(page)).campaign!.runId).toBe(before.runId);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
 test("spikes: manual planning installs, scales and routes capacity through room controls",async({page, installClock})=>{
  await installClock();

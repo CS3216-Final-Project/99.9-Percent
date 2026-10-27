@@ -1,9 +1,10 @@
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, expectRoom, seedSave, savedGame } from "./fixtures";
-import { reliabilityOutcome } from "../src/game/__fixtures__/reliabilityOutcome";
+import { completedReliabilityOutcome } from "../src/game/__fixtures__/reliabilityOutcome";
 
 export async function reliabilityClarity(page: Page, info: TestInfo, touch = false) {
-  const game = reliabilityOutcome(true);
+  // Health Checks keep the test within its error budget; the restore is still requested by hand.
+  const game = completedReliabilityOutcome(true);
   await page.route("**/api/**", route => route.abort()); await seedSave(page, game); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
   const outcome = page.getByRole("dialog", { name: "Reliability outcome", exact: true });

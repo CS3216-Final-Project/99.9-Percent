@@ -5,7 +5,7 @@ import { newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 import { act, tick, spikeCompany, dataCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "../src/sim/__tests__/reliabilityFixture";
-import { combinedCompany } from "../src/sim/__tests__/combinedFixture";
+import { checkedCombined, combinedCompany } from "../src/sim/__tests__/combinedFixture";
 import { dataCompany as enteredDataCompany } from "../src/sim/__tests__/dataFixture";
 
 async function boot(page: Page, game: GameState) {
@@ -372,7 +372,8 @@ test("action guidance restoration confirms the existing free action",async ({pag
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="restore-app")).toBe(true);
 });
 
-for (const [chapter,label,company] of [[2,"Upgrade database",scaling],[6,"Add server",combinedCompany]] as const)
+// Three routed apps leave Grow the Company a free slot for a fourth.
+for (const [chapter,label,company] of [[2,"Upgrade database",scaling],[6,"Add server",checkedCombined]] as const)
   test(`action confirmation chapter ${chapter}: ${label}`,async ({page,installClock})=>{
     await installClock(); await boot(page,company());
     await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));

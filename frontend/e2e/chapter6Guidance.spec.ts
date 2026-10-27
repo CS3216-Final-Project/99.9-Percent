@@ -1,7 +1,7 @@
 import { closeInspection, followHintComponent } from "./componentInspection";
 import { test, expect, savedGame } from "./fixtures";
 import { chapter6Preparation, bootChapter6 } from "./chapter6Guidance";
-import { act, tick, combinedCompany, finishedCompany, finishRound } from "../src/sim/__tests__/combinedFixture";
+import { act, tick, checkedCombined, combinedCompany, finishedCompany, sequence } from "../src/sim/__tests__/combinedFixture";
 import { expectCueColours } from "./chapter4Cues";
 
 test("Chapter 6 guidance: capacity before removal, Confirm, Run, readiness and reload", async ({ page, installClock }) => {
@@ -43,11 +43,11 @@ test("Chapter 6 guidance: final review owns completion and is never bypassed", a
 });
 
 test("Chapter 6 guidance: post-review restoration precedes replacement capacity and useful Run", async ({ page, installClock }) => {
-  await installClock(); let game = combinedCompany();
-  for (let i = 0; i < 2; i++) game = act(finishRound(act(tick(game, 5), { type: "start_growth_wave" })), { type: "acknowledge_growth" });
-  game = tick(act(tick(game, 5), { type: "start_growth_wave" }), 10);
+  // Health Checks route around the failed App 3, but the two survivors cannot carry the failure wave: limiting relieves
+  // the incident, whose review arrives before App 3 returns on its own.
+  await installClock(); let game = checkedCombined([sequence[2], sequence[0], sequence[1]]);
+  game = tick(act(tick(game, 5), { type: "start_growth_wave" }), 11);
   game = act(game, { type: "set_traffic_limit", enabled: true });
-  game = act(game, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2"] });
   for (let i = 0; i < 15 && game.phase !== "review"; i++) game = tick(game);
   expect(game.phase).toBe("review"); await bootChapter6(page, game);
   await page.getByRole("dialog", { name: "Incident postmortem", exact: true }).getByRole("button", { name: "Continue company", exact: true }).click();
@@ -64,9 +64,6 @@ test("Chapter 6 guidance: post-review restoration precedes replacement capacity 
   await accept(/^Run$/); await gold.click(); await page.clock.runFor(3000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   expect((await savedGame(page)).campaign!.combinedStage!.currentRound!.fault!.restoredStep).not.toBeNull();
-  await accept(/^All apps$/); await gold.click();
-  await accept(/^Run$/); await gold.click(); await page.clock.runFor(1000);
-  await page.getByRole("button", { name: "Pause", exact: true }).click();
   await accept(/^Remove traffic limit/); await gold.click(); await expect(gold).toHaveAccessibleName("Confirm");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
 });

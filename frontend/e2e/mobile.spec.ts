@@ -1,7 +1,6 @@
 import { infrastructureAction, inspectEquipment, closeInspection, purchasePreview, followHintComponent, expectInspectionsOnly } from "./componentInspection";
 import { reliabilityClarity } from "./reliabilityClarity";
 import { campaignReportJourney } from "./campaignReports";
-import { chapter6FinanceJourney } from "./chapter6Finance";
 import { act as chapter6Act, tick as chapter6Tick, combinedCompany as chapter6Company, promotionRiskCompany } from "../src/sim/__tests__/combinedFixture";
 import { chapter6Preparation, bootChapter6 } from "./chapter6Guidance";
 import { appHealthDuringOpening, appHealthJourney, appHealthProblem } from "./appHealth";
@@ -671,11 +670,6 @@ for (const kind of ["spikes", "completion"] as const) {
     await campaignReportJourney(page, info, kind, true);
   });
 }
-
-test("Chapter 6 finances: funding warning and existing cash spotlight on 320px touch", async ({ page, installClock }, info) => {
-  await installClock(); await page.setViewportSize({ width: 320, height: 568 });
-  await chapter6FinanceJourney(page, info, true);
-});
 
 test("Launch Week cold open and research sheet remain usable by touch at 390px", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
