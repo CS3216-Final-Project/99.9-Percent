@@ -196,10 +196,13 @@ function ComponentInspection() {
       <h3>Autoscaling</h3><p>Controller: {c.spikeStage?.controller?"Deployed":c.spikeStage?.researchSpent?"Available":"Locked"}. Automatically adjusts application capacity when sustained utilisation crosses its thresholds.</p>
       {controls("autoscaling")}
     </>:place==="gateway"&&!overview?<>
-      <h3>{page==="management"?"Network management":page==="balancing"?"Load balancing":page==="routing"?"Routing":"Automatic failover"}</h3>
-      {page==="management"?<div className="inspection-management-entries">{entry("balancing","Load balancing")}{entry("routing","Routing")}{entry("failover","Automatic failover")}</div>:<>
-        {page==="failover"&&!c.reliabilityStage?<p>Automatic failover becomes available in Stay Online.</p>:!c.openingMilestone?.acknowledged&&!c.launchWeek?<p>Complete Opening recognition to manage load balancing and routing.</p>:controls(page as EquipmentActionView)}
+      <h3 className="inspection-management-heading"><Icon name="network" size={20}/>Network management</h3>
+      {!c.openingMilestone?.acknowledged&&!c.launchWeek?<p>Complete Opening recognition to manage load balancing and routing.</p>:<>
+        <section aria-label="Load balancing"><h4>Load balancing</h4>{controls("balancing")}</section>
+        <section aria-label="Routing"><h4>Routing</h4>{controls("routing")}</section>
       </>}
+      <section aria-label="Automatic failover"><h4>Automatic failover</h4>
+        {!c.reliabilityStage?<p>Automatic failover becomes available in Stay Online.</p>:controls("failover")}</section>
     </>:<>
       {summary}
       <div className="component-inspection-controls"><button className="btn" data-inspection-details aria-expanded={details} onClick={()=>setDetails(!details)}>Inspect details</button>{place!=="monitoring"&&controls(place==="gateway"?"network":place==="app"?"fleet":undefined)}{place==="app"&&entry("management","Server management")}{place==="gateway"&&entry("management","Network management")}</div>

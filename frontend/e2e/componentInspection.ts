@@ -67,10 +67,10 @@ export async function infrastructureAction(page:Page,name:string|RegExp,componen
     }
   }
   if(component==="gateway") {
-    const view=/failover/i.test(label)?"failover":/balanc/i.test(label)?"balancing":/routing|All apps|App \d+ only/i.test(label)?"routing":"overview";
+    const view=/failover|balanc|routing|All apps|App \d+ only/i.test(label)?"management":"overview";
     if(await scope.locator('.inspection-subview').getAttribute('data-inspection-view')!==view) {
       for(let i=0;i<2&&await scope.locator('[data-inspection-back]').isVisible();i++)await scope.locator('[data-inspection-back]').click();
-      if(view!=="overview") {await scope.locator('[data-inspection-entry="management"]').click();await scope.locator(`[data-inspection-entry="${view}"]`).click();}
+      if(view!=="overview") await scope.locator('[data-inspection-entry="management"]').click();
     }
   }
   if(component==="gateway" && /All apps|App \d+ only/i.test(typeof name==="string"?name:name.source)) {
