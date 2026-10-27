@@ -59,12 +59,12 @@ export function canRetire(c:Campaign,id:string,preview=false):boolean {
  if(currentFault(c)?.targetId===id&&currentFault(c)?.restoredStep===null)return false;
  if(target?.health==="failed"||target?.role==="spare")return false;
  if(!a || !target || !a.managedAppIds.includes(id)||target.tier!=="base"||target.backlog || c.incident || c.dbBacklog || c.apps.some(x=>x.backlog) ||
- !qualifiesForRecovery(c.snapshot)||c.routing.mode!=="balanced"||c.apps.length-1<T.minimum)return false;
- const targets=c.routing.targets.filter(x=>x!==id);if(targets.length<T.minimum||targets.length===c.routing.targets.length)return false;
+ !qualifiesForRecovery(c.snapshot)||c.routing.mode!=="balanced"||c.apps.length-1<a.minimum)return false;
+ const targets=c.routing.targets.filter(x=>x!==id);if(targets.length<a.minimum||targets.length===c.routing.targets.length)return false;
  let limit=c.limit;
  if(preview)for(const p of c.pending.filter(x=>x.activationStep===c.step)){if(p.type==="limit")limit=Q.admissionLimit;if(p.type==="unlimit")limit=null;}
  const demand=Math.min(preview?spikeInput(c):c.incomingRate,limit??Infinity),allocation=allocateTraffic(demand,targets);
- return targets.every(id=>c.apps.find(x=>x.id===id)?.health!=="failed"&&allocation[id]*10000<=c.apps.find(x=>x.id===id)!.capacity*T.high);
+ return targets.every(id=>c.apps.find(x=>x.id===id)?.health!=="failed"&&allocation[id]*10000<=c.apps.find(x=>x.id===id)!.capacity*a.targetBasisPoints);
 }
 export function activateRetirement(c:Campaign,action:ScheduledAction):boolean {
  const a=c.spikeStage!.controller!;
@@ -74,6 +74,13 @@ export function activateRetirement(c:Campaign,action:ScheduledAction):boolean {
  c.apps=c.apps.filter(x=>x.id!==action.targetId);c.routing.targets=c.routing.targets.filter(x=>x!==action.targetId);
  delete c.overload[action.targetId!];a.managedAppIds=a.managedAppIds.filter(x=>x!==action.targetId);a.expectedRouting=JSON.stringify(c.routing);
  trace(c,"autoscale-instance-retired",{actionId:action.id,targetId:action.targetId!,installed:c.apps.length});return true;
+}
+/** Healthy routed apps the controller counts toward its minimum. */
+const routedServing=(c:Campaign)=>c.routing.targets.filter(id=>{const x=c.apps.find(a=>a.id===id);return !!x&&x.health!=="failed"&&x.role!=="spare";}).length;
+function provision(c:Campaign,event:string,data:Record<string,string|number|boolean|null>):void {
+ const a=c.spikeStage!.controller!,id=`app-${c.nextAppNumber++}`;trace(c,event,{...data,targetId:id});
+ a.joiningAppId=id;a.expectedRouting=JSON.stringify(c.routing);a.highSteps=0;a.lowSteps=0;
+ schedule(c,"add-app",T.provisionDelay,Q.appCostCents,{targetId:id});
 }
 export function runAutoscaler(s:GameState):void {
  const c=s.campaign!,d=c.spikeStage,a=d?.controller;if(!d)return;
@@ -94,20 +101,21 @@ export function runAutoscaler(s:GameState):void {
    const o=spikeObservation(c);
    // Integer cross products preserve strict threshold boundaries without rounding.
    const xs=c.snapshot.instances!.filter(x=>x.routed&&(!c.combinedStage||x.health!=="failed")),capacity=xs.reduce((n,x)=>n+x.capacity,0),work=xs.reduce((n,x)=>n+x.processed,0);
+   const high=a.targetBasisPoints,low=high-T.scaleInGap,below=routedServing(c)<a.minimum;
    if(c.combinedStage&&capacity===0)blocked(c,"No healthy routed capacity");
-   else if(work*10000>capacity*T.high&&(c.apps.length>=T.maximum||c.cashCents<=Q.appCostCents))blocked(c,c.apps.length>=T.maximum?"Maximum four instances reached":"Insufficient cash for provisioning");
+   else if((below||work*10000>capacity*high)&&(c.apps.length>=T.maximum||c.cashCents<=Q.appCostCents))blocked(c,c.apps.length>=T.maximum?"Maximum four instances reached":"Insufficient cash for provisioning");
+   // Below its minimum, the controller adds an app without waiting for high utilisation.
+   else if(below){blocked(c,null);provision(c,"autoscale-minimum-decided",{...o,incoming:c.incomingRate,minimum:a.minimum});}
    else {blocked(c,null);
-   a.highSteps=work*10000>capacity*T.high?a.highSteps+1:0;
+   a.highSteps=work*10000>capacity*high?a.highSteps+1:0;
    const candidates=a.managedAppIds.filter(id=>canRetire(c,id)).sort((x,y)=>Number(y.slice(4))-Number(x.slice(4)));
-   a.lowSteps=work*10000<capacity*T.low&&candidates.length?a.lowSteps+1:0;
+   a.lowSteps=work*10000<capacity*low&&candidates.length?a.lowSteps+1:0;
    if(a.highSteps>=T.highSteps){
     if(c.apps.length>=T.maximum)blocked(c,"Maximum four instances reached");
     else if(c.cashCents<=Q.appCostCents)blocked(c,"Insufficient cash for provisioning");
-    else {const id=`app-${c.nextAppNumber++}`;trace(c,"autoscale-scale-out-decided",{...o,incoming:c.incomingRate,highThresholdBasisPoints:T.high,highSteps:a.highSteps,targetId:id});
-     a.joiningAppId=id;a.expectedRouting=JSON.stringify(c.routing);a.highSteps=0;a.lowSteps=0;
-     schedule(c,"add-app",T.provisionDelay,Q.appCostCents,{targetId:id});}
+    else provision(c,"autoscale-scale-out-decided",{...o,incoming:c.incomingRate,highThresholdBasisPoints:high,highSteps:a.highSteps});
    } else if(a.lowSteps>=T.lowSteps){
-    trace(c,"autoscale-scale-in-eligible",{...o,incoming:c.incomingRate,lowThresholdBasisPoints:T.low,lowSteps:a.lowSteps,targetId:candidates[0]});a.expectedRouting=JSON.stringify(c.routing);a.highSteps=0;a.lowSteps=0;
+    trace(c,"autoscale-scale-in-eligible",{...o,incoming:c.incomingRate,lowThresholdBasisPoints:low,lowSteps:a.lowSteps,targetId:candidates[0]});a.expectedRouting=JSON.stringify(c.routing);a.highSteps=0;a.lowSteps=0;
     schedule(c,"retire-app",1,0,{targetId:candidates[0]});
    }
    }
@@ -124,7 +132,7 @@ export function runAutoscaler(s:GameState):void {
 type Rejection=Extract<ActionResult,{ok:false}>;
 /** Applies a spike decision to `s` in place. `undefined` means the action belongs elsewhere; checks precede mutation. */
 export function spikeAction(s:GameState,action:Action):Rejection|null|undefined {
- if(!["enter_spikes","unlock_autoscaling","deploy_autoscaler","set_autoscaling","acknowledge_spikes"].includes(action.type))return undefined;
+ if(!["enter_spikes","unlock_autoscaling","deploy_autoscaler","set_autoscaling","set_autoscaler_policy","acknowledge_spikes"].includes(action.type))return undefined;
  const fail=(message:string):Rejection=>({ok:false,reason:"invalid",message});
  if(s.phase==="review"||s.phase==="ended")return fail("Finish review before changing progression.");
  const c=s.campaign!,d=c.spikeStage;
@@ -143,6 +151,11 @@ export function spikeAction(s:GameState,action:Action):Rejection|null|undefined 
  } else if(action.type==="deploy_autoscaler"){
   if(!d.researchSpent||d.controller||infraBusy(c)||!c.loadBalancer||c.routing.mode!=="balanced"||c.routing.targets.length<T.minimum||c.cashCents<=T.controllerCostCents)return fail("Requires unlock, balanced routing to two apps, free infrastructure slot and cash.");
   schedule(c,"deploy-autoscaler",T.controllerDelay,T.controllerCostCents,{source:"player"});
+ } else if(action.type==="set_autoscaler_policy"){
+  const a=d.controller;
+  if(!a||!T.targets.includes(action.targetBasisPoints)||!T.minimums.includes(action.minimum)||(a.targetBasisPoints===action.targetBasisPoints&&a.minimum===action.minimum))return fail("Deploy the controller, then choose a listed target and minimum.");
+  a.targetBasisPoints=action.targetBasisPoints;a.minimum=action.minimum;a.highSteps=0;a.lowSteps=0;
+  trace(c,"autoscaler-policy-changed",{targetBasisPoints:a.targetBasisPoints,minimum:a.minimum});
  } else if(action.type==="set_autoscaling"){
   if(typeof action.enabled!=="boolean"||!d.controller||d.controller.enabled===action.enabled)return fail("Controller is unavailable or already set.");
   d.controller.enabled=action.enabled;d.controller.highSteps=0;d.controller.lowSteps=0;d.controller.cooldownUntil=c.step+T.cooldown;

@@ -52,6 +52,8 @@ export interface SpikeObservation {
 export interface Autoscaler {
  activatedStep: number; enabled: boolean; highSteps: number; lowSteps: number; cooldownUntil: number;
  managedAppIds: string[]; joiningAppId: string | null; expectedRouting: string; blockedReason: string | null;
+ /** Player policy: scale out above this routed utilisation, and keep at least this many routed apps. */
+ targetBasisPoints: number; minimum: number;
 }
 export interface SpikeStage {
  id: "traffic-spikes"; version: 1; configuration: string; enteredStep: number;

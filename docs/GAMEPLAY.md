@@ -114,9 +114,14 @@ These are saved deadlines; pausing and reloading do not move them.
 The optional controller needs the unlock, deployed load balancing, balanced routing to at least two apps, a free slot and cash.
 It watches routed processed work divided by routed capacity:
 
-- Above 80% for three observations, it requests one base app, which installs in three steps and joins routing one step later.
-- Below 60% for six safe observations, it retires an eligible controller-created app, never leaving fewer than two.
+- Above its target utilisation for three observations, it requests one base app, which installs in three steps and joins routing one step later.
+- With fewer healthy routed apps than its minimum, it requests one at once, without waiting for high utilisation.
+- Below the target minus 20 percentage points for six safe observations, it retires an eligible controller-created app, never leaving fewer than its minimum.
 - At most four apps are installed, with a four-step cooldown after each join or retirement.
+
+The player sets the policy on the deployed controller, free and immediately: a target of 50%, 60%, 70% or 80% (default 80%) and a minimum of 2, 3 or 4 apps (default 2).
+Only one deployment installs at a time, so no policy has four apps routed before the first pulse: the default controller goes over the error budget with an incident in each pulse, while a target of 50% or a minimum of four stays within it and handles the second pulse without one.
+Balanced routing splits demand equally, so a minimum of three still overloads the smaller automatic app during a pulse.
 
 Manually installed or vertically upgraded apps are never retired, and there are no refunds.
 After both pulses, five stable baseline steps complete the chapter, which the player then acknowledges, provided the chapter stayed within its error budget (see Error budgets).

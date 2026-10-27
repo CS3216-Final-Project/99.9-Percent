@@ -211,3 +211,16 @@
 .purchase-facts dt { color: var(--text-soft); font-size: var(--text-xs); font-weight: 600; }
 .purchase-facts dd { margin: 0; color: var(--ink); line-height: 1.4; }
 :is(.campaign-action-popover, .component-purchase) .campaign-purchase-refund { color: var(--text-soft); font-size: var(--text-xs); margin-bottom: 6px; }
+
+/* Autoscaler policy: two rows of pill choices, applied as soon as one is picked. */
+.autoscaler-policy { display: grid; gap: 6px; margin-top: 12px; }
+.autoscaler-policy + p { margin-top: 12px; }
+.autoscaler-policy-label { font-size: var(--text-sm); font-weight: 600; color: var(--ink); }
+.autoscaler-policy-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.autoscaler-policy-options label { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 56px; min-height: 44px; padding: 0 14px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); color: var(--ink); font-family: var(--font-display); font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+.autoscaler-policy-options label:hover { background: #fff; }
+.autoscaler-policy-options label.is-on { background: var(--go); }
+.autoscaler-policy-options label.is-on:hover { background: var(--go-hover); }
+.autoscaler-policy-options label:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+.autoscaler-policy-options label:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+.autoscaler-policy-options input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: inherit; }
