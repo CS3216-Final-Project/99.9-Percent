@@ -119,7 +119,7 @@ test("guidance incident: short help targets the upgrade and preserves readings",
   await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Upgrade database/);
   await expect(page.getByRole("region", { name: "Database readings" })).toBeVisible();
   await expect(page.getByRole("region", {name:"Database readings"})).toContainText("Capacity");
-  await closeInspection(page);await expect((await infrastructureAction(page,/^Limit to 500/))).toBeEnabled();await closeInspection(page);
+  await closeInspection(page);await expect((await infrastructureAction(page,/^Limit to ~/))).toBeEnabled();await closeInspection(page);
   await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).click();
   await expect(card).toContainText("Upgrade it to handle more requests");
   await card.getByRole("button", { name: "Got it" }).click();

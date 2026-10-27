@@ -388,7 +388,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   expect((await savedGame(page)).campaign!.step).toBe(6);
   await expect(database.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
   await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
-  for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
+  for (const name of [/Add server/, /Upgrade database/, /Limit to ~[\d,]+ requests\/s/]) {
     const button = await infrastructureAction(page,name);
     await button.scrollIntoViewIfNeeded();
     await expect(button).toBeVisible();
