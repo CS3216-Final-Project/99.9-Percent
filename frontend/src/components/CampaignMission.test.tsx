@@ -92,7 +92,7 @@ for(const state of ["readiness","wave","outcome","final","complete"] as const) i
   expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain(`Growth outcomes acknowledged: ${game.campaign!.combinedStage!.completedRounds.length} / 3`);
   expect(screen.queryByRole("region",{name:"Stay Online"})).toBeNull();
   expect(screen.queryByText("Scaling growth recorded: 1,400 requests/s before data growth.")).toBeNull();
-  expect(screen.getByRole("button",{name:/Run promotion/}).hasAttribute("disabled")).toBe(state!=="readiness");
+  expect(screen.queryByRole("button",{name:/Run promotion/})).toBeNull();
 });
 it("shows the actual pending deployment and recalculates after its activation",()=>{
   const game=decide(combinedCompany(),{type:"add_server"});show(game);
