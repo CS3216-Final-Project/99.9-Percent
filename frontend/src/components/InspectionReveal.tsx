@@ -156,6 +156,7 @@ function ComponentInspection() {
   const appManagement=place==="app"&&page==="management";
   const server=place==="app"&&page==="server";
   const appWorkspace=appManagement||server;
+  const back=<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page==="management"||server&&desktop?"overview":"management")}>{place==="app"?(page==="management"||server&&desktop?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>;
   const selectServer=(id:string)=>{
     // Keep the modal and its original focus-return target mounted while the
     // shared inspection action records evidence for this particular server.
@@ -175,7 +176,7 @@ function ComponentInspection() {
     :overloaded?.length?"A routed server is overloaded. Inspect its demand and available capacity.":null;
   return <Modal title={title} icon={{kind:state.tone,name:EQUIPMENT_ICON[place]}} onClose={confirming?undefined:dismiss} className={`component-inspection component-inspection-${place}${appWorkspace?" inspection-app-workspace":""}`}>
     <div className="inspection-subview" data-inspection-view={page} ref={subview} tabIndex={-1}>
-    {!overview&&<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page==="management"||server&&desktop?"overview":"management")}>{place==="app"?(page==="management"||server&&desktop?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>}
+    {!overview&&place!=="gateway"&&back}
     {appWorkspace?<div className="inspection-app-layout">
       <section className="inspection-fleet-pane" aria-label="Server management" hidden={server&&!desktop}>
       <h3 className="inspection-management-heading"><Icon name="server" size={20}/>Server management</h3>
@@ -196,7 +197,10 @@ function ComponentInspection() {
       <h3>Autoscaling</h3><p>Controller: {c.spikeStage?.controller?"Deployed":c.spikeStage?.researchSpent?"Available":"Locked"}. Automatically adjusts application capacity when sustained utilisation crosses its thresholds.</p>
       {controls("autoscaling")}
     </>:place==="gateway"&&!overview?<>
-      <h3 className="inspection-management-heading"><Icon name="network" size={20}/>Network management</h3>
+      <div className="inspection-management-header">
+        <h3 className="inspection-management-heading"><Icon name="network" size={20}/>Network management</h3>
+        {back}
+      </div>
       {!c.openingMilestone?.acknowledged&&!c.launchWeek?<p>Complete Opening recognition to manage load balancing and routing.</p>:<>
         <section aria-label="Load balancing"><h4>Load balancing</h4>{controls("balancing")}</section>
         <section aria-label="Routing"><h4>Routing</h4>{controls("routing")}</section>
