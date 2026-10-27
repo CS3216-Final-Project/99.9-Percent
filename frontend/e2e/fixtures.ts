@@ -239,6 +239,8 @@ export async function completeTutorial(page: Page, {keepChapterGuide=false}: {ke
       await page.locator(".component-inspection").getByRole("button",{name:"Got it",exact:true}).click();
     }
     await complete.click();
+    const tip=page.getByRole("dialog",{name:"Tip, step 1 of 1"});
+    if(await tip.waitFor({state:"visible",timeout:2_000}).then(()=>true).catch(()=>false))await tip.getByRole("button",{name:"Got it",exact:true}).click();
     const guide=page.getByRole("dialog",{name:"Chapter guide, step 1 of 1"});
     if(!keepChapterGuide&&await guide.isVisible())await guide.getByRole("button",{name:"Got it",exact:true}).click();
   } else if(await doors.isVisible())await doors.click();
