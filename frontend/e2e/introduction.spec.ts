@@ -69,6 +69,8 @@ for(const width of [1440,390])test.describe(`infrastructure introduction ${width
    const panel=page.getByRole("complementary",{name:"System metrics"});
    for(const name of ["Network","App Server","Database","Monitoring"]){await panel.getByRole("button",{name,exact:true}).click();await page.locator(".component-inspection").getByRole("button",{name:"Got it",exact:true}).click();}
    await panel.getByRole("button",{name:"Complete Introduction",exact:true}).click();
+   // The chapter opens with a one-card tip pointing at the Hint button; dismiss it to reach the company message.
+   await page.getByRole("dialog",{name:"Tip, step 1 of 1",exact:true}).getByRole("button",{name:"Got it",exact:true}).click();
    await expect(message).toContainText("Customers want our website to stay fast");await expect(message).not.toContainText("I'm Maya");
   });
  });
