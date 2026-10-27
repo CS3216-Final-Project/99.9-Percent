@@ -41,6 +41,15 @@ it("limits suppress triggers, and manual capacity can prevent incidents without 
  g=spikeCompany(false);g=tick(act(g,{type:"add_server"}),2);g=tick(act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}));g=tick(act(g,{type:"scale_up",appId:"app-3"}),3);
  g=untilOffset(g,27);expect(g.campaign!.incident).toBeNull();expect(g.campaign!.apps).toHaveLength(3);expect(g.campaign!.actions.some(a=>a.source==="autoscaler")).toBe(false);
 });
+it("keeps a self-healing spike incident open until a response is recorded",()=>{
+ let g=untilOffset(spikeCompany(false,"write-heavy"),24);expect(g.campaign!.incident).not.toBeNull();
+ for(let i=0;i<120&&g.campaign!.incident&&g.campaign!.incident!.stableSteps<5;i++)g=tick(g);
+ expect(g.campaign!.incident).not.toBeNull();expect(g.phase).toBe("incident");
+ expect(g.campaign!.incident!.stableSteps).toBeGreaterThanOrEqual(5);
+ expect(g.campaign!.spikeStage!.completedStep).toBeNull();
+ g=act(g,{type:"set_traffic_limit",enabled:true});
+ while(g.phase!=="review")g=tick(g);expect(g.campaign!.incident).toBeNull();
+});
 it("autoscaling leaves write-heavy DB capacity and cache effectiveness unchanged",()=>{
  let g=untilOffset(spikeCompany(true,"write-heavy"),24);expect(g.campaign!.dbCapacity).toBe(3000);expect(g.campaign!.readCache!.target).toBe(6000);expect(g.campaign!.snapshot.data!.effectiveHitRateUsed).toBe(6000);
  expect(g.campaign!.snapshot.db.demand).toBeGreaterThan(3000);expect(g.campaign!.incident).not.toBeNull();

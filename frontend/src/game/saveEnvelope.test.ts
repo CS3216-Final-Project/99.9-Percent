@@ -43,13 +43,32 @@ describe("input-log saves", () => {
     expect(decodeSave(JSON.stringify({ ...e, schemaVersion: 99 })).status).toBe("unsupported");
     expect(decodeSave(JSON.stringify({ ...e, schemaVersion: 0 })).status).toBe("unsupported");
   });
+  it("self-resolves incidents replayed from older saves but gates new ones", () => {
+    const s = advanceSteps(newGame(4, "legacy-incident"), 6).state;
+    expect(s.campaign!.incident).not.toBeNull();
+    const prior = validateEnvelope(json({ ...makeEnvelope(s), schemaVersion: 8 }) as SaveEnvelope);
+    expect(prior.status).toBe("ok");
+    if (prior.status === "ok") expect(prior.game.campaign!.incident!.responseDueFrom).toBeUndefined();
+    const current = validateEnvelope(makeEnvelope(s));
+    expect(current.status).toBe("ok");
+    if (current.status === "ok") {
+      expect(current.game.campaign!.incident!.responseDueFrom).toBe(6);
+      expect(current.envelope.legacyIncidentStep).toBeUndefined();
+    }
+  });
   it("replays a prior-schema version-1 save byte-identically", () => {
     const s = applyCampaignInput(playedRun(), { type: "add_server" }).state;
     const e = makeEnvelope(s);
     const prior = json({ ...e, schemaVersion: 7 }) as SaveEnvelope;
     const result = validateEnvelope(prior);
     expect(result.status).toBe("ok");
-    if (result.status === "ok") expect(json(result.game)).toEqual(json(s));
+    if (result.status === "ok") {
+      // Replayed history stays byte-identical; the compat marker that preserves the
+      // pre-response-rule boundary only exists on the replayed campaign.
+      const g = json(result.game) as { campaign: { legacyIncidentStep?: number } };
+      delete g.campaign.legacyIncidentStep;
+      expect(g).toEqual(json(s));
+    }
   });
   it("accepts version-2 envelopes and replays them on their own rule set", () => {
     const v2 = newGame(4, "launch-week", 2);
