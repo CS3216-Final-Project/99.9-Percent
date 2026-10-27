@@ -95,7 +95,7 @@ it("keeps App scaling and adding together and routing prerequisites with Network
   fireEvent.click(dialog("Servers").getByRole("button",{name:"Close"}));open("Network");
   networkView("Load balancing");expect(dialog("Network").getByRole("button",{name:/Deploy load balancing/}).hasAttribute("disabled")).toBe(true);
   networkView("Routing");expect(dialog("Network").getByText(/Configure routing/)).toBeTruthy();
-  open("Back to Network management");open("Back to Network");expect(dialog("Network").getByRole("button",{name:/Limit to 500/})).toBeTruthy();
+  open("Back to Network management");open("Back to Network");expect(dialog("Network").getByRole("button",{name:/Limit to ~/})).toBeTruthy();
 });
 it.each([4,6])("routes Chapter %s traffic-limit advice to its real Network action, not About",async chapter=>{
   let game=chapter===4?spikeCompany(false):combinedCompany();
@@ -123,7 +123,7 @@ it("a mandatory modal supersedes the accepted inspection spotlight",async()=>{
 it("lets the player choose another valid strategy without a competing equipment spotlight",async()=>{
  show();await accept();expect(gold()[0].textContent).toBe("Database");
  open("Network");await act(async()=>{});expect(gold()).toHaveLength(0);
- fireEvent.click(dialog("Network").getByRole("button",{name:/Limit to 500/}));await act(async()=>{});
+ fireEvent.click(dialog("Network").getByRole("button",{name:/Limit to ~/}));await act(async()=>{});
  expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("Confirm");open("Confirm");await act(async()=>{});
  expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="limit")).toBe(true);
  expect(campaignAttention(useGame.getState().game).attention).toBe("run");

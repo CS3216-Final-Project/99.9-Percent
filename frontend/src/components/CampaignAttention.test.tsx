@@ -246,7 +246,7 @@ it("shows one short explanation, no choices and an immediately enabled acknowled
   expect(screen.getByRole("button",{name:"Got it"}).hasAttribute("disabled")).toBe(false);
   expect(useGame.getState().game).toBe(before);
   acceptHint(); expect(gold()[0].textContent).toContain("Upgrade database");
-  expect(inspectionAction(/^Limit to 500/).hasAttribute("disabled")).toBe(false);
+  expect(inspectionAction(/^Limit to ~/).hasAttribute("disabled")).toBe(false);
 });
 
 it("offers both real growth strategies and transfers accepted risk without dispatching until confirmation", () => {
