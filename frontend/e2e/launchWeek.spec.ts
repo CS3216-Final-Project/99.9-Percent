@@ -1,5 +1,5 @@
 import {infrastructureAction,purchasePreview} from "./componentInspection";
-import { test, expect, seedSave, savedGame, expectRoom, openCameraControls } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, openCameraControls, setGameSpeed } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { applyCampaignInput, step } from "../src/sim/step";
@@ -200,7 +200,10 @@ test("the score card reports nines, copies the result and continues to Chapter 2
   await boot(page, nearlyDone());
   const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
-  await rush.click();
+  // The week rush is unavailable, so the week ends by running the clock at the highest speed.
+  await expect(rush).toBeDisabled();
+  await setGameSpeed(page, 2);
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   for (let i = 0; i < 60 && !(await card.isVisible()); i++) {
     const dialog = page.getByRole("dialog");
     if (await dialog.isVisible()) {
@@ -210,7 +213,7 @@ test("the score card reports nines, copies the result and continues to Chapter 2
       if (await next.isVisible()) await next.click();
       else if (await go.isVisible()) await go.click();
       else if (await close.isVisible()) await close.click();
-    } else if (await rush.isEnabled() && (await rush.getAttribute("aria-pressed")) !== "true") await rush.click({ timeout: 1000 }).catch(() => {}); // the week can end between the check and the click
+    }
     await page.waitForTimeout(150);
   }
   await expect(card).toBeVisible();
