@@ -110,6 +110,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const view = useGame(s => s.view), selected = useGame(s => s.selected), panel = useGame(s => s.panelOpen), floor = useGame(s => s.floor);
   const inspection=useGame(s=>s.roomInspection);
   const clockAvailable = useGame(campaignClockAvailable);
+  const resumeSignal = useGame(s => s.resumeOffer);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
   const [covered, setCovered] = useState(false), [hidden, setHidden] = useState(document.hidden);
   const [risk, setRisk] = useState(false), [locked, setLocked] = useState(false), [idle, setIdle] = useState<string | null>(null);
@@ -124,6 +125,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const [pauseOffer, updatePauseOffer] = useState<string | null>(null);
   const pauseToken = useRef<string | null>(null);
   const setPauseOffer = useCallback((offer: string | null) => { pauseToken.current = offer; updatePauseOffer(offer); }, []);
+  const [resumeOffer, setResumeOffer] = useState<number | null>(null);
   const manual = useRef({ accepted, opened, key: "", pauseBlocked: false, equipment: null as string|null });
   const button = useRef<HTMLButtonElement>(null), card = useRef<HTMLDivElement>(null);
   const revealedTarget = useRef<HTMLElement | null>(null);
@@ -171,11 +173,13 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const incidentKey = `${generation}:${game.campaign?.runId}:${game.campaign?.incident?.id}`;
   const pauseDiagnosis = incidentNeedsPause(game, decision);
   const pauseGold = !inspection && available && !pauseBlocked && !view && !openNow && !acceptedNow && running && clockAvailable && pauseDiagnosis && pauseOffer === incidentKey;
+  /** The mirror of a new incident's Pause invitation: a decision that paused a resumable company lights Run until it restarts. */
+  const resumeGold = !inspection && available && !pauseBlocked && !view && !openNow && !acceptedNow && !running && clockAvailable && resumeOffer !== null && resumeOffer === resumeSignal;
   const timerKey = `${key}:${view}:${selected}:${panel}:${floor}:${running}`;
-  const launchStep = intro ? available&&!blocked&&!view&&!inspection&&!openNow&&!acceptedNow&&!introOpen : automaticTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !introOpen && (analyticsStep || launchDone !== key) && decision.attention !== null &&
+  const launchStep = intro ? available&&!blocked&&!view&&!inspection&&!openNow&&!acceptedNow&&!introOpen : automaticTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && !introOpen && (analyticsStep || launchDone !== key) && decision.attention !== null &&
     (analyticsStep || (openingTutorial ? OPENING_FLOW : LAUNCH_FLOW).test(decision.reason)) && (analyticsStep || !(decision.attention === "run" && (running || !clockAvailable)));
   const machines = useMemo(() => launchStep && !analyticsStep ? spotlightMachines(decision, recommendedAction?.action, game.campaign ?? null) : [], [launchStep, analyticsStep, decision, recommendedAction, game.campaign]);
-  const candidate = !intro && !inspection && !automaticTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && (decision.attention === "progression" || decision.attention === "hint" || decision.attention === "run" && !running && clockAvailable);
+  const candidate = !intro && !inspection && !automaticTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && (decision.attention === "progression" || decision.attention === "hint" || decision.attention === "run" && !running && clockAvailable);
 
   useLayoutEffect(() => { manual.current = { accepted, opened, key, pauseBlocked, equipment }; }, [accepted, opened, key, pauseBlocked, equipment]);
   useEffect(() => {
@@ -193,7 +197,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   }, [pauseGold, setPauseOffer]);
 
   useLayoutEffect(() => {
-    const clear = () => { setOpened(null); setAccepted(null); setPauseOffer(null); };
+    const clear = () => { setOpened(null); setAccepted(null); setPauseOffer(null); setResumeOffer(null); };
     const update = () => {
       const modal = blockingModal();
       setCovered(modal);
@@ -226,6 +230,9 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
         } else if (incidentNeedsPause(s.game, next) && !confirmingAction() && !document.querySelector(".modal-backdrop"))
           setPauseOffer(`${s.generation}:${c.runId}:${c.incident.id}`);
       }
+      // The same one-time offer as a new incident's, arming only where the offer can show immediately.
+      if (s.resumeOffer !== before.resumeOffer && s.started && !s.running && !s.tour && !s.tutorialCompany && !s.view && !manual.current.pauseBlocked && !document.hidden && document.hasFocus() && !confirmingAction() && !document.querySelector(".modal-backdrop"))
+        setResumeOffer(s.resumeOffer);
       // Choosing a different component is a deliberate alternative; never force it closed.
       if (s.roomInspection !== before.roomInspection && s.roomInspection && manual.current.equipment && s.roomInspection.equipment !== manual.current.equipment)
         setAccepted(null);
@@ -244,7 +251,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("blur", blur); window.addEventListener("focus", focus);
     update();
     return () => { unsubscribe(); unconfirm(); observer.disconnect(); document.removeEventListener("visibilitychange", update); document.removeEventListener("pointerlockchange", update); window.removeEventListener("blur", blur); window.removeEventListener("focus", focus); };
-  }, [setPauseOffer]);
+  }, [setPauseOffer, setResumeOffer]);
   useEffect(() => {
     if (!candidate) return;
     return watchIdleAttention(active => setIdle(active && (decision.attention === "progression" || visibleControl(decision.attention === "run" ? ".campaign-play" : ".campaign-hint")) ? timerKey : null));
@@ -312,7 +319,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     useGame.getState().setSpotlight(machines);
     return () => useGame.getState().setSpotlight([]);
   }, [machines]);
-  const riskOpen = useCallback((open: boolean) => { setRisk(open); if (open) { setOpened(null); setAccepted(null); setPauseOffer(null); } }, [setPauseOffer]);
+  const riskOpen = useCallback((open: boolean) => { setRisk(open); if (open) { setOpened(null); setAccepted(null); setPauseOffer(null); setResumeOffer(null); } }, [setPauseOffer]);
 
   // Remove accepted gold before a higher-priority Confirm can paint. Reveal itself
   // stays passive so the inspector's existing selection reset runs first.
@@ -376,8 +383,8 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("resize", place); document.addEventListener("pointerdown", outside, true);
     return () => { window.removeEventListener("resize", place); document.removeEventListener("pointerdown", outside, true); };
   }, [openNow]);
-  const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold: candidate && idle === timerKey && decision.attention === "hint", opened: openNow, button, riskOpen,
-    openHint: () => { if (!blocked) { setPauseOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
+  const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, resumeGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold: candidate && idle === timerKey && decision.attention === "hint", opened: openNow, button, riskOpen,
+    openHint: () => { if (!blocked) { setPauseOffer(null); setResumeOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
   const close = () => { setOpened(null); button.current?.focus(); };
   const compactOpeningPrompt = openingTutorial && isPhoneEdition() ? analyticsStep
     ? "Compare latency, errors and backlog. Pause to inspect."
@@ -390,7 +397,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     {companyMessage && <ChapterCompanyMessage key={companyMessage.key} model={companyMessage} onOpen={setIntroOpen} enabled={!inspection && (launchTutorial
       // Launch Week's colleague introduction comes once, before the first Run.
       ? available && !blocked && !view && !running && game.phase === "management" && !game.campaign!.incident && game.campaign!.step === 0
-      : available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !game.campaign?.incident && game.phase === "management" && !decision.reason.match(/^(review|next)$/))}>
+      : available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && !game.campaign?.incident && game.phase === "management" && !decision.reason.match(/^(review|next)$/))}>
     {growthStage &&
       <Chapter6StagePopup key={`${growthStage.key}:${growthStage.stage}`} model={growthStage} />}
     {spikeStage &&

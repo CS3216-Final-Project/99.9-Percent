@@ -64,6 +64,36 @@ it.each([
   act(() => vi.advanceTimersByTime(10000)); expect(gold()).toHaveLength(1);
   expect(gold()[0]).toBe(screen.getByRole("button", { name })); expect(useGame.getState().game).toBe(before);
 });
+it("lights Run after a decision pauses a company that could keep running, clearing when it restarts", () => {
+  show(tick(combinedCompany(), 5));
+  act(() => useGame.getState().setRunning(true));
+  expect(useGame.getState().running).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  expect(useGame.getState().running).toBe(false);
+  expect(gold()).toHaveLength(1);
+  expect(gold()[0]).toBe(screen.getByRole("button", { name: "Run" }));
+  fireEvent.click(gold()[0] as HTMLElement);
+  expect(useGame.getState().running).toBe(true);
+  expect(gold()).toHaveLength(0);
+});
+it("shows no Run invitation for a decision that pauses an already-paused company", () => {
+  show(tick(combinedCompany(), 5));
+  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  expect(useGame.getState().running).toBe(false);
+  expect(gold()).toHaveLength(0);
+});
+it("shows no Run invitation when a modal owns the pause, and does not replay it afterwards", async () => {
+  show(tick(combinedCompany(), 5));
+  act(() => useGame.getState().setRunning(true));
+  const modal = document.createElement("div");
+  modal.className = "modal-backdrop";
+  document.body.append(modal);
+  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  expect(useGame.getState().running).toBe(false);
+  expect(gold()).toHaveLength(0);
+  await act(async () => { modal.remove(); });
+  expect(gold()).toHaveLength(0);
+});
 it("keeps database preparation available and switches to Run after actual headroom activation", () => {
   show(scaling()); act(() => vi.advanceTimersByTime(10000));
   fireEvent.click(inspectionAction(/^Upgrade database/));
