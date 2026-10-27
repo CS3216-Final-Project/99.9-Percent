@@ -13,6 +13,7 @@ import { useGame } from "@/game/store";
 import { ChapterCompanyMessage } from "./ChapterCompanyMessage";
 import { CampaignAttentionHost } from "./CampaignAttention";
 import { CampaignHeader, CampaignPanel, CampaignControls } from "./CampaignUI";
+import Tutorial from "./Tutorial";
 import { setConfirming } from "./actionConfirmation";
 
 const companies = [newGame(), dataCompany("read-heavy", false), dataCompany(), spikeCompany(false), preparedReliability(), combinedCompany()];
@@ -175,6 +176,19 @@ it("defers without consuming a receipt and sequences the Chapter 4 cue after dis
   expect(screen.queryByRole("dialog",{name:/^Chapter 4:/})).toBeNull();
   readThrough();
   expect(message()).toBeNull(); expect(screen.getByRole("dialog",{name:"Chapter 4: Prepare"})).toBeTruthy();
+});
+
+it("shows Jordan's caching scene before the Data Strategy guide, which then follows it", () => {
+  const guide = () => screen.queryByRole("dialog", { name: /Chapter guide/ });
+  useGame.setState({ game: companies[2], ready: true, started: true, onboarding: false, tour: {track:"data",step:0} });
+  render(<CampaignAttentionHost><Tutorial/></CampaignAttentionHost>);
+  // The colleague explains caching first; the guide that points at Read Cache waits behind the scene.
+  expect(message()).not.toBeNull(); expect(message()!.textContent).toContain("Jordan");
+  expect(guide()).toBeNull();
+  readThrough();
+  expect(message()).toBeNull(); expect(guide()).not.toBeNull();
+  // The consumed receipt keeps the scene from re-firing while the guide is up.
+  expect(message()).toBeNull(); expect(localStorage.getItem(chapterCompanyMessage(companies[2])!.key)).not.toBeNull();
 });
 
 it("keeps the open dialogue and its queued stage cue in order across tab hide, window blur and pointer lock", () => {
