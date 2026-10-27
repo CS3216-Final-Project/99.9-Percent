@@ -7,7 +7,7 @@ import { spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
 import { combinedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
-import { incidentLesson, incidentTitle, survivingCapacity } from "./campaignPostmortem";
+import { errorsLed, incidentCause, incidentImpact, incidentLesson, incidentTitle, survivingCapacity } from "./campaignPostmortem";
 
 export function recovered(game: GameState) {
   for (let i = 0; i < 120 && game.phase !== "review"; i++) game = tick(game);
@@ -163,4 +163,29 @@ it("names the actual overload when the announced failed server was already outsi
   expect(opening.reliability!.failedDeliveries).toBe(0);
   expect(incidentLesson(report).wrong).toContain("Application work exceeded");
   expect(incidentTitle(report)).toBe("Application overloaded");
+});
+
+describe("the postmortem summary in the simulation's own numbers", () => {
+  const failure = (c = reliabilityOutcome(true).campaign!) => c.reports.find(r => r.snapshots.some(m => m.reliability?.faultId === c.reliabilityStage!.fault!.id))!;
+  it("tells a database overload as one cause-and-effect chain with the recorded readings", () => {
+    const report = upgradeRecovery().campaign!.reports[0];
+    const opening = report.snapshots.find(s => s.step === report.openedStep)!, impact = incidentImpact(report);
+    const rise = report.events.find(e => e.type === "traffic-change")!;
+    // Failed requests carry the story once they reach 1%; this company dropped a quarter of them.
+    expect(errorsLed(impact)).toBe(true);
+    expect(incidentCause(report)).toBe(`Traffic rose from ${rise.data.from} to ${rise.data.to} req/s at game second ${rise.step}. Your database had ${opening.db.demand} operations per second of work but could handle ${opening.db.capacity}, so work queued up and up to ${Math.round(impact.peakErrorRate * 100)}% of requests failed.`);
+    const slow = structuredClone(report); for (const s of slow.snapshots) s.serviceErrorRate = 0;
+    expect(incidentCause(slow)).toMatch(new RegExp(`so work queued up and response time peaked at ${Math.round(incidentImpact(slow).peakLatencyMs!).toLocaleString("en-US")} ms\\.$`));
+    expect(impact.seconds).toBe(report.recoveredStep - report.openedStep);
+  });
+  it("names the failed server and the traffic still routed to it", () => {
+    expect(incidentCause(failure())).toMatch(/^App 3 failed at game second \d+\. The load balancer kept sending it 800 req\/s, and every one of those requests failed, so up to \d+% of requests failed\.$/);
+  });
+  it("explains only the incident and its lead-in, in names a player recognises", () => {
+    const report = failure(reliabilityOutcome().campaign!), text = report.explanations.join(" ");
+    expect(text).not.toMatch(/app-\d|traffic-spike-started|\bunlimit\b|\bstep \d/);
+    // Earlier setup (servers added and routed long before) is part of the opening readings, not this incident's story.
+    const earliest = Math.min(report.openedStep - 3, ...report.events.filter(e => e.type === "reliability-failure-started").map(e => e.step));
+    for (const [, second] of text.matchAll(/game second (\d+)/g)) expect(Number(second)).toBeGreaterThanOrEqual(earliest);
+  });
 });

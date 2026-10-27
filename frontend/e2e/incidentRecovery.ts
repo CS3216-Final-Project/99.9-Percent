@@ -41,20 +41,17 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   const report = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
   await expect(report).toBeVisible(); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
   await expect(report.getByRole("heading", { name: "What happened?", exact: true })).toBeInViewport();
-  await expect(report.locator(".report-metrics dt")).toHaveText([
-    "Incident window", "Final response time", "Traffic status",
-    ...(!limited ? ["Spending in this evidence window"] : []),
-  ]);
-  if (!limited) await expect(report.locator(".report-metrics dd").last()).toHaveText("$3,000.00");
+  await expect(report.locator(".report-impact dt")).toHaveText(["Recovery time", /^Peak (response time|failed requests)$/, "Spent on fixes"]);
+  await expect(report.locator(".report-impact dd").last()).toHaveText(limited ? "$0" : "$3,000");
   await expect(report.locator(".report-technical")).not.toHaveAttribute("open");
-  await expect(report.getByText(limited ? /Recorded responses included a traffic limit/ : /Recorded responses included a database upgrade/)).toBeVisible();
-  await expect(report.locator(".report-metrics")).toContainText(limited ? "Recovered with traffic limited" : "Recovered at full incoming demand");
+  await expect(report.getByText(limited ? /You responded with a traffic limit/ : /You responded with a database upgrade/)).toBeVisible();
+  await expect(report.locator(".report-outcome")).toContainText(limited ? "Service restored, with traffic still limited" : /You resolved your first incident|You restored the service/);
   expect((await savedGame(page)).campaign!.inputs).toEqual(recovered.campaign!.inputs);
   await page.screenshot({ path: info.outputPath("postmortem.png") });
-  const summary = report.locator("summary", { hasText: "View Technical Details" });
+  const summary = report.locator("summary", { hasText: "Show the evidence" });
   await page.keyboard.press("Tab"); await expect(summary).toBeFocused();
   await page.keyboard.press("Shift+Tab"); await expect(report.getByRole("button", { name: "Continue company" })).toBeFocused();
-  await press(summary); await expect(report.getByRole("table", { name: "Recorded incident evidence by game second", exact: true })).toBeVisible();
+  await press(summary); await expect(report.getByRole("table", { name: /^Recorded incident evidence by game second/ })).toBeVisible();
   for (const explanation of recovered.campaign!.reports.at(-1)!.explanations) await expect(report).toContainText(explanation);
   const recoveredReport = recovered.campaign!.reports.at(-1)!;
   const recoveryEvents = recoveredReport.events.filter(event => event.type === "recovery-streak");

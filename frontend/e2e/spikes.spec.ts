@@ -53,7 +53,7 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  await clockTo(page,n+14);expect((await savedGame(page)).campaign!.snapshot.app.capacity).toBe(4200);
  await setGameSpeed(page,2);await page.getByRole("button",{name:"Run",exact:true}).click();
  await clockUntilDialog(page,"Incident postmortem");
- await expect(page.getByRole("dialog")).toContainText("provisioning and routing");await page.getByRole("button",{name:"Continue company",exact:true}).click();
+ await expect(page.getByRole("dialog")).toContainText("still has to be installed and routed");await page.getByRole("button",{name:"Continue company",exact:true}).click();
  await clockTo(page,n+40);c=(await savedGame(page)).campaign!;expect(c.apps.some(a=>a.id==="app-4")).toBe(false);expect(c.trace.some(t=>t.type==="autoscale-instance-retired")).toBe(true);
  await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Incident postmortem");await page.getByRole("button",{name:"Continue company",exact:true}).click();
  await page.getByRole("button",{name:"Run",exact:true}).click();await clockUntilDialog(page,"Spike response handled");
@@ -107,7 +107,7 @@ test("spikes: write-heavy DB constraint remains after automatic app routing",asy
  await inspectEquipment(page,"app");await page.getByRole("button",{name:"Server management",exact:true}).click();await page.getByRole("button",{name:"Autoscaling",exact:true}).click();const control=page.getByRole("region",{name:"Autoscaling",exact:true});await control.getByText("Technical Details",{exact:true}).click();await expect(control).toContainText("cannot increase DB capacity");await closeInspection(page);
  expect((await savedGame(page)).campaign!.snapshot.db.demand).toBeGreaterThan(3000);
  await (await infrastructureAction(page,"Limit to 500 requests/s")).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await setGameSpeed(page,2);await page.getByRole("button",{name:"Run",exact:true}).click();
- await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});await expect(page.getByRole("dialog")).toContainText("does not increase database capacity");
+ await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});await expect(page.getByRole("dialog")).toContainText("does not add database capacity");
  const c=(await savedGame(page)).campaign!;expect(c.dbCapacity).toBe(3000);expect(c.readCache!.target).toBe(6000);expect(c.limit).toBe(500);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
 

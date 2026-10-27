@@ -75,6 +75,56 @@ export function incidentLesson(report: CampaignPostmortem) {
   };
 }
 
+const num = (n: number) => Math.round(n).toLocaleString("en-US");
+const app = (id: string) => id.replace("app-", "App ");
+
+/** The incident's own readings: how long recovery took and the worst latency and error rate while it was open. */
+export function incidentImpact(report: CampaignPostmortem) {
+  const during = report.snapshots.filter(s => s.step >= report.openedStep && s.step <= report.recoveredStep);
+  return {
+    seconds: report.recoveredStep - report.openedStep,
+    peakLatencyMs: during.length ? Math.max(...during.map(s => s.latencyMs)) : undefined,
+    peakErrorRate: Math.max(0, ...during.map(s => s.serviceErrorRate ?? 0)),
+  };
+}
+/** Errors carry the story once at least 1% of requests failed; otherwise the slowdown does. */
+export const errorsLed = (impact: ReturnType<typeof incidentImpact>) => impact.peakErrorRate >= .01;
+
+/**
+ * "What happened?" as one cause-and-effect chain in the simulation's own numbers: what changed, which component
+ * could not keep up, and what the player saw. Falls back to the plain lesson when the evidence was not retained.
+ */
+export function incidentCause(report: CampaignPostmortem) {
+  const lesson = incidentLesson(report);
+  const o = report.snapshots.find(s => s.step === report.openedStep);
+  if (!o) return lesson.wrong;
+  const impact = incidentImpact(report);
+  const effect = errorsLed(impact) ? `up to ${Math.round(impact.peakErrorRate * 100)}% of requests failed`
+    : impact.peakLatencyMs !== undefined ? `response time peaked at ${num(impact.peakLatencyMs)} ms` : "requests slowed down";
+  const before = report.events.filter(e => e.step <= report.openedStep);
+  const rise = before.filter(e => e.type === "traffic-change" && Number(e.data.to) > Number(e.data.from)).at(-1);
+  const spike = before.filter(e => e.type === "traffic-spike-started").at(-1);
+  const trigger = spike && (!rise || spike.step > rise.step) ? `A traffic spike raised incoming traffic to ${num(Number(spike.data.to))} req/s at game second ${spike.step}. `
+    : rise ? `Traffic rose from ${num(Number(rise.data.from))} to ${num(Number(rise.data.to))} req/s at game second ${rise.step}. ` : "";
+  const failed = o.instances?.find(a => a.health === "failed");
+  if (failed) {
+    const started = before.filter(e => e.type === "reliability-failure-started").at(-1);
+    const name = app(failed.id), at = started ? ` at game second ${started.step}` : "";
+    const toFailed = sentToFailed(o);
+    return toFailed > 0 ? `${name} failed${at}. The load balancer kept sending it ${num(toFailed)} req/s, and every one of those requests failed, so ${effect}.`
+      : `${name} failed${at}, leaving less capacity to serve requests, so ${effect}.`;
+  }
+  const db = o.db.demand > o.db.capacity;
+  const server = o.instances?.find(a => a.demand > a.capacity);
+  const servers = server ? `${app(server.id)} received ${num(server.demand)} req/s but could serve ${num(server.capacity)} req/s`
+    : o.app.demand > o.app.capacity ? `Your application servers received ${num(o.app.demand)} req/s but could serve ${num(o.app.capacity)} req/s` : "";
+  const database = `your database had ${num(o.db.demand)} operations per second of work but could handle ${num(o.db.capacity)}`;
+  if (db && servers) return `${trigger}${servers}, and ${database}, so work queued up and ${effect}.`;
+  if (db) return `${trigger}${database.charAt(0).toUpperCase()}${database.slice(1)}, so work queued up and ${effect}.`;
+  if (servers) return `${trigger}${servers}, so requests queued up and ${effect}.`;
+  return lesson.wrong;
+}
+
 /** A short list title naming what broke, read from the report's own opening evidence. */
 export function incidentTitle(report: CampaignPostmortem) {
   const opening = report.snapshots.find(s => s.step === report.openedStep) ?? report.snapshots[0];

@@ -54,5 +54,5 @@ it("records actual drainage when upgrading the overloaded database", () => {
   if (!action.ok) throw Error(action.message);
   s = advanceSteps(action.state, 30).state;
   expect(s.phase).toBe("review");
-  expect(s.campaign!.reports[0].explanations.join(" ")).toContain("backlog fell from 600 to 400 at activation (step 9)");
+  expect(s.campaign!.reports[0].explanations.join(" ")).toContain("backlog fell from 600 to 400 at activation (game second 9)");
 });

@@ -8,7 +8,7 @@ import { useGame } from "@/game/store";
 import { CampaignOverlays } from "./CampaignUI";
 import CampaignScorecard from "./CampaignScorecard";
 
-const titles = ["What happened?", "How did you respond?", "What could be improved?", "Key takeaway"];
+const titles = ["What happened?", "How did you respond?", "What to improve next"];
 beforeEach(() => { localStorage.clear(); useGame.setState(useGame.getInitialState(), true); });
 afterEach(cleanup);
 function checkReport() {
@@ -16,7 +16,8 @@ function checkReport() {
   const disclosures = document.querySelectorAll("details");
   expect(disclosures).toHaveLength(1);
   expect(disclosures[0].open).toBe(false);
-  expect(disclosures[0].querySelector("summary")!.textContent).toBe("View Technical Details");
+  expect(disclosures[0].querySelector("summary")!.textContent).toBe("Show the evidence");
+  expect(document.querySelector(".report-takeaway .callout-kicker")!.textContent).toBe("Key takeaway");
   return disclosures[0];
 }
 
@@ -48,7 +49,7 @@ it("keeps final review explicit and resets the single accordion on completion", 
   const game = finishedCompany();
   useGame.setState({ game, ready: true, started: true, onboarding: false }); render(<CampaignOverlays/>);
   const details = checkReport();
-  fireEvent.click(within(details).getByText("View Technical Details"));
+  fireEvent.click(within(details).getByText("Show the evidence"));
   expect(details.textContent).toContain("50,000");
   expect(useGame.getState().game.outcome).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Complete campaign" }));

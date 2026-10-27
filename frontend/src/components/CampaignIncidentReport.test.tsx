@@ -10,6 +10,12 @@ import { reliabilityOutcome } from "@/game/__fixtures__/reliabilityOutcome";
 import { describeEvents, reportWindowStart } from "@/game/reportEvents";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
 
+/** Every game second the evidence table covers, expanding rows that share identical readings ("274-293"). */
+const covered = (table: HTMLElement) => within(table).getAllByRole("rowheader").flatMap(th => {
+  const [from, to = from] = th.textContent!.split("-").map(Number);
+  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+});
+
 let serial = 0;
 function recovery() {
   let g = decide(tick(newGame(1, `recovery-ui-${++serial}`), 6), { type: "start_db_upgrade" });
@@ -41,7 +47,8 @@ it("shows one acknowledgement, focuses the report button, and leaves acknowledge
   fireEvent.keyDown(button, { key: "Escape" }); expect(screen.getByRole("dialog", { name: "System Recovered!" })).toBeTruthy();
   fireEvent.click(button); const report = screen.getByRole("dialog", { name: "Incident postmortem" });
   expect(useGame.getState().game).toBe(game); expect(document.activeElement).toBe(within(report).getByRole("button", { name: "Continue company" }));
-  expect(within(report).getAllByRole("heading", { level: 3 }).filter(n => !n.closest("details")).map(e => e.textContent)).toEqual(["What happened?", "How did you respond?", "What could be improved?", "Key takeaway"]);
+  expect(within(report).getAllByRole("heading", { level: 3 }).filter(n => !n.closest("details")).map(e => e.textContent)).toEqual(["What happened?", "How it unfolded", "How did you respond?", "What to improve next"]);
+  expect(within(report).getByText("You resolved your first incident")).toBeTruthy();
   view.unmount(); show(game); expect(screen.queryByRole("dialog", { name: "System Recovered!" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
   const after = useGame.getState().game;
@@ -51,20 +58,20 @@ it("shows one acknowledgement, focuses the report button, and leaves acknowledge
 });
 it("retains every explanation, observation and event behind one collapsed technical disclosure", () => {
   const r = recovery().campaign!.reports[0]; render(<CampaignIncidentReport report={r} />);
-  const detail = screen.getByText("View Technical Details").closest("details")!;
-  expect(detail.open).toBe(false); expect(screen.getByLabelText("Recovery summary").querySelectorAll("dt").length).toBeGreaterThanOrEqual(3);
-  fireEvent.click(screen.getByText("View Technical Details"));
+  const detail = screen.getByText("Show the evidence").closest("details")!;
+  expect(detail.open).toBe(false); expect(screen.getByLabelText("Incident impact").querySelectorAll("dt")).toHaveLength(3);
+  fireEvent.click(screen.getByText("Show the evidence"));
   for (const explanation of r.explanations) expect(detail.textContent).toContain(explanation);
   const from = reportWindowStart(r);
-  for (const m of r.snapshots.filter(m => m.step >= from)) expect(within(screen.getByRole("table", { name: "Recorded incident evidence by game second" })).getByRole("rowheader", { name: String(m.step) })).toBeTruthy();
+  expect(covered(screen.getByRole("table", { name: /^Recorded incident evidence by game second/ }))).toEqual(r.snapshots.filter(m => m.step >= from).map(m => m.step));
   expect(detail.querySelectorAll(".report-events li")).toHaveLength(describeEvents(r.events).filter(e => e.step >= from && e.step <= r.recoveredStep).length);
   expect(detail.querySelector("pre")).toBeNull();
 });
 it("consolidates missing workload details and does not render an empty evidence table", () => {
   const r = structuredClone(recovery().campaign!.reports[0]); for (const s of r.snapshots) delete s.data;
   const view = render(<CampaignIncidentReport report={r} />);
-  expect(screen.queryByText("Workload and cache evidence")).toBeNull();
-  expect(screen.getByText(/workload and cache details were not recorded/)).toBeTruthy();
+  expect(screen.queryByText("Workload and cache readings")).toBeNull();
+  expect(screen.getByText(/some seconds have no workload or cache details/)).toBeTruthy();
   view.rerender(<CampaignIncidentReport report={{ ...r, snapshots: [], events: [] }} />);
   expect(screen.queryByRole("table", { hidden: true })).toBeNull(); expect(screen.getByText("No historical observations were retained.")).toBeTruthy();
 });
@@ -73,10 +80,10 @@ it("retains cache warmth before and after each observation and database read/wri
   for (let i = 0; i < 100 && game.phase !== "review"; i++) game = tick(game);
   const report = game.campaign!.reports.at(-1)!;
   render(<CampaignIncidentReport report={report} />);
-  fireEvent.click(screen.getByText("View Technical Details"));
+  fireEvent.click(screen.getByText("Show the evidence"));
   const table = screen.getByRole("table", { name: "Workload and cache readings, shown when they change" });
-  expect(within(table).getByRole("columnheader", { name: "Warmth used / after" })).toBeTruthy();
-  expect(within(table).getByRole("columnheader", { name: "Database read / write demand ops/s" })).toBeTruthy();
+  expect(within(table).getByRole("columnheader", { name: "Cache warmth used / after" })).toBeTruthy();
+  expect(within(table).getByRole("columnheader", { name: "Database reads / writes per second" })).toBeTruthy();
   const warming = report.snapshots.find(m => m.data && m.data.warmthUsed === 0 && m.data.warmthAfterStep > 0)!;
   const row = within(table).getByRole("rowheader", { name: String(warming.step) }).closest("tr")!;
   expect(within(row).getByRole("cell", { name: "0% / 12%" })).toBeTruthy();
@@ -107,13 +114,13 @@ it("says the load balancer kept sending traffic to a failed server instead of cl
   const block = screen.getByRole("region", { name: "Capacity after the failure" });
   expect(within(block).getByText("Sent to the failed App 3").nextSibling?.textContent).toBe("800 req/s, all failed");
   expect(block.textContent).toContain(`every request the load balancer sent to App 3 failed until it was restored at game second ${f.restoredStep}.`);
-  expect(block.textContent).toContain("The healthy servers could serve their own 1,600 req/s; the errors came from the failed server staying in the route.");
+  expect(block.textContent).toContain("The 1,600 req/s sent to the healthy servers was within their 3,200 req/s capacity; the errors came from the failed server staying in the route.");
   expect(block.textContent).not.toContain("enough capacity");
   // A failed server does no work, so the evidence table never credits it with capacity.
-  fireEvent.click(screen.getByText("View Technical Details", { exact: true }));
-  const evidence = screen.getByRole("table", { name: "Recorded incident evidence by game second" });
-  expect(evidence.textContent).toContain("App 3: 800 / 0 · 0 (failed)");
-  expect(evidence.textContent).not.toMatch(/App 3: [\d,]+ \/ 1,600 · [\d,]+ \(failed/);
+  fireEvent.click(screen.getByText("Show the evidence", { exact: true }));
+  const evidence = screen.getByRole("table", { name: /^Recorded incident evidence by game second/ });
+  expect(evidence.textContent).toContain("App 3: 800 / 0, queue 0 (failed)");
+  expect(evidence.textContent).not.toMatch(/App 3: [\d,]+ \/ 1,600, queue [\d,]+ \(failed/);
 });
 
 it.each([

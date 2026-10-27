@@ -8,11 +8,62 @@
 .campaign-incident-report > section h3 { margin-bottom: 4px; }
 .campaign-incident-report > section p { margin-block: 0; line-height: 1.5; }
 .campaign-recovery-report .campaign-report-shell { display: flex; min-height: 0; }
-.campaign-recovery-report .modal-foot { padding-top: 10px; }
-.campaign-incident-report .report-metrics .row { flex-wrap: wrap; gap: 4px 12px; }
-.campaign-incident-report .report-metrics dd { max-width: 100%; }
+/* The footer sits on the report's one thin divider, so the gap above it is the divider, not dead space. */
+.campaign-recovery-report .modal-foot { margin-top: 0; padding-top: 12px; border-top: 1px solid var(--paper-3); }
+.campaign-recovery-report .modal-foot .btn .icon { width: 18px; height: 18px; }
+
+/* The payoff: the outcome said first, on a green wash that means "it worked" everywhere in the game. */
+.report-outcome { display: flex; align-items: center; gap: 12px; margin: 2px 0 12px; padding: 10px 14px 10px 10px; background: var(--tile-green); color: var(--ink); border: 1px solid var(--control-edge); border-radius: var(--radius); }
+.report-outcome.is-limited { background: var(--tile-orange); }
+.report-outcome .concept { flex: none; width: 40px; height: 40px; background: var(--paper); }
+.report-outcome p { display: grid; gap: 2px; margin: 0; min-width: 0; }
+.report-outcome strong { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; line-height: 1.2; text-wrap: balance; }
+.report-outcome span { color: var(--tile-green-ink); font-size: var(--text-sm); line-height: 1.4; }
+.report-outcome.is-limited span { color: var(--tile-orange-ink); }
+/* One authored moment: the tick settles into its tile as the report opens. */
+@keyframes report-outcome-settle { from { opacity: 0; transform: scale(.55) rotate(-12deg); } }
+.report-outcome .concept .icon { animation: report-outcome-settle .5s cubic-bezier(.16, 1, .3, 1) .12s both; }
+@media (prefers-reduced-motion: reduce) { .report-outcome .concept .icon { animation: none; } }
+
+/* Impact tiles reuse Classic's number tiles; labels may wrap so three fit side by side on a phone. */
+.report-impact { margin: 0 0 4px; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+.report-impact dt { white-space: normal; line-height: 1.25; }
+/* On a phone each tile stacks its icon, value and label, so "725 ms" and "$3,000" never truncate. */
+@media (max-width: 540px) {
+  .report-impact > div { grid-template-columns: minmax(0, 1fr); row-gap: 4px; align-content: start; }
+  .report-impact .concept { grid-row: 1; width: 24px; height: 24px; }
+  .report-impact .concept .icon { width: 14px; height: 14px; }
+  .report-impact dd { grid-column: 1; grid-row: 2; font-size: var(--text-md); }
+  .report-impact dt { grid-row: 3; margin-top: 0; }
+  /* The acknowledgement keeps one line on a phone; the note is secondary to the report above it. */
+  .campaign-recovery-report .modal-foot { justify-content: flex-end; }
+  .campaign-recovery-report .modal-foot .muted { display: none; }
+}
+.history-report .report-impact, .history-report .report-takeaway, .history-report .report-outcome { max-width: 75ch; }
+
+/* The incident in a few beats: a thin rail with one marker per beat, coloured by what the beat means. */
+.report-moments-section { margin-block: 10px; }
+.report-moments-section h3 { margin-bottom: 6px; }
+.report-moments { list-style: none; margin: 0; padding: 0; display: grid; }
+.report-moments li { position: relative; display: grid; grid-template-columns: 2.25em 14px minmax(0, 1fr); column-gap: 10px; align-items: baseline; padding-block: 3px; line-height: 1.4; }
+.report-moments li::before { content: ""; grid-column: 2; grid-row: 1; justify-self: center; align-self: center; width: 10px; height: 10px; border-radius: 50%; background: var(--paper); border: 2px solid var(--selection-edge); box-sizing: border-box; z-index: 1; }
+.report-moments li::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(2.25em + 10px + 6px); width: 2px; background: var(--paper-3); }
+.report-moments li:first-child::after { top: 50%; }
+.report-moments li:last-child::after { bottom: 50%; }
+.report-moments li > .report-event-step { grid-column: 1; grid-row: 1; }
+.report-moments li > span:last-child { grid-column: 3; grid-row: 1; }
+.report-moments li[data-tone="critical"]::before { background: var(--critical); border-color: var(--critical); }
+.report-moments li[data-tone="ok"]::before { background: var(--ok); border-color: var(--ok-ink); }
+.report-moments li[data-tone="done"]::before { background: var(--ink); border-color: var(--ink); }
+.report-moments li[data-tone="ok"] > span:last-child { color: var(--ok-ink); font-weight: 600; }
+
+.report-takeaway { margin-top: 12px; }
+
+/* The evidence disclosure is a real control: ink text at reading size, on the same thin divider as the footer. */
+.campaign-incident-report > .report-technical { margin-top: 12px; padding-top: 2px; border-top: 1px solid var(--paper-3); }
 .report-technical { overflow-wrap: anywhere; }
-.report-technical > summary { min-height: 44px; align-content: center; }
+.report-technical > summary { min-height: 44px; align-content: center; color: var(--ink); font-size: var(--text-md); }
+.report-technical > summary:hover { color: var(--primary-hover); }
 .report-table-scroll { max-width: 100%; overflow-x: auto; }
 .report-table-scroll table { min-width: 640px; overflow-wrap: normal; }
 .report-table-scroll td { white-space: nowrap; }
@@ -25,13 +76,13 @@
 .recorded-fields { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 2px 12px; margin: 4px 0 0; font-size: var(--text-xs); line-height: 1.4; }
 .recorded-fields dt { color: var(--text-soft); }
 .recorded-fields dd { margin: 0; font-variant-numeric: tabular-nums; }
-.report-table-scroll th[scope="row"] { font-weight: 600; text-align: left; }
+.report-table-scroll th[scope="row"] { font-weight: 600; text-align: left; white-space: nowrap; }
 /* Edge shadows appear only where the table can still scroll, so a clipped column reads as more to see. */
 .report-table-scroll {
   background: linear-gradient(to right, var(--report-surface, var(--paper-2)) 30%, transparent) left / 24px 100% no-repeat local,
     linear-gradient(to left, var(--report-surface, var(--paper-2)) 30%, transparent) right / 24px 100% no-repeat local,
-    radial-gradient(farthest-side at 0 50%, rgb(29 24 52 / .18), transparent) left / 10px 100% no-repeat scroll,
-    radial-gradient(farthest-side at 100% 50%, rgb(29 24 52 / .18), transparent) right / 10px 100% no-repeat scroll;
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--ink) 18%, transparent), transparent) left / 10px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--ink) 18%, transparent), transparent) right / 10px 100% no-repeat scroll;
 }
 .report-capacity { margin-block: 10px; }
 .report-capacity h3 { margin-bottom: 4px; }

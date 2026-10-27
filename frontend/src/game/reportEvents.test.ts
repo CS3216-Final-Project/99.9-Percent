@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CampaignPostmortem, TraceEvent } from "@/sim/campaignTypes";
-import { describeEvents, reportWindowStart, windowSpending } from "./reportEvents";
+import { describeEvents, keyMoments, reportWindowStart, windowSpending } from "./reportEvents";
 
 const event = (id: number, step: number, type: string, data: TraceEvent["data"] = {}): TraceEvent => ({ id, step, type, data });
 
@@ -33,5 +33,22 @@ describe("readable recorded events", () => {
     report.events = [event(1, 0, "action-requested", { costCents: 100 }), event(2, 18, "action-requested", { costCents: 200 }), event(3, 20, "action-activated")];
     expect(reportWindowStart(report)).toBe(17);
     expect(windowSpending(report, 17)).toBe(200);
+  });
+});
+
+describe("key moments", () => {
+  it("drops traffic changes that changed nothing and says which way traffic moved", () => {
+    expect(describeEvents([event(1, 4, "traffic-change", { from: 450, to: 450 })])).toEqual([]);
+    expect(describeEvents([event(1, 4, "traffic-change", { from: 300, to: 450 })])[0].title).toBe("Traffic rose");
+    expect(describeEvents([event(1, 4, "traffic-change", { from: 450, to: 300 })])[0].title).toBe("Traffic fell");
+  });
+  it("keeps the trigger, the opening and the recovery, and caps the beats in between", () => {
+    const events = [event(1, 4, "traffic-change", { from: 300, to: 450 }), event(2, 6, "incident-opened", { component: "db" }),
+      ...Array.from({ length: 8 }, (_, i) => event(3 + i, 7, "action-requested", { actionId: `a${i}`, type: "limit" })), event(20, 13, "incident-recovered")];
+    const report: CampaignPostmortem = { id: "beats", openedStep: 6, recoveredStep: 13, snapshots: [], events, explanations: [], limited: false, setupCents: 0 };
+    const beats = keyMoments(report).map(b => b.title);
+    expect(beats).toHaveLength(6);
+    expect(beats.slice(0, 2)).toEqual(["Traffic rose", "Incident opened"]);
+    expect(beats.at(-1)).toBe("Incident recovered");
   });
 });
