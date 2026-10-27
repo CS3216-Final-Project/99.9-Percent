@@ -184,7 +184,8 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const machines = useMemo(() => launchStep ? spotlightMachines(decision, recommendedAction?.action, game.campaign ?? null) : [], [launchStep, decision, recommendedAction, game.campaign]);
   const candidate = !intro && !inspection && !launchTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && (decision.attention === "progression" || decision.attention === "hint" || decision.attention === "run" && !running && clockAvailable);
 
-  useLayoutEffect(() => { manual.current = { accepted, opened, key, pauseBlocked, equipment }; }, [accepted, opened, key, pauseBlocked, equipment]);
+  // The consent's own overlay (risk) must not eat the offers it produces: it closes right after its action.
+  useLayoutEffect(() => { manual.current = { accepted, opened, key, pauseBlocked: pauseBlocked && !risk, equipment }; }, [accepted, opened, key, pauseBlocked, risk, equipment]);
   useEffect(() => {
     if (!pauseGold) return;
     // Any deliberate interaction acknowledges this one-time invitation; ordinary hover does not.
