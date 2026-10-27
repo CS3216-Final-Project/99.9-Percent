@@ -181,7 +181,7 @@ These rules are shared by every Guided Mode chapter and live in `frontend/src/si
 - Latency is `100 ms + 1,000 * (largest per-instance backlog / capacity + database backlog / capacity)`.
 - Service error rate is failed outcomes over successful plus failed outcomes; deliberate rejections are reported separately.
 - Demand strictly above a component's capacity for three consecutive steps opens an incident; with several components, app order then database picks the primary.
-- Recovery needs five consecutive observations with latency under 500 ms, errors under 1%, positive admissions and completed outcomes. Buying, deploying or waiting is not recovery.
+- Recovery needs five consecutive observations with latency under 500 ms, errors under 1%, positive admissions and completed outcomes, plus a recorded response: an uncancelled capacity, routing, admission or restoration action engaged at or after the step the cause began (the fault's start for a failed application, the incident's opening otherwise). Waiting for the problem to pass on its own never closes the incident. Buying, deploying or waiting is not recovery. Saves written before the response requirement keep their original self-resolving incidents.
 - Bankruptcy is checked after settlement and takes precedence over recovery in that step.
 
 ## Economy
