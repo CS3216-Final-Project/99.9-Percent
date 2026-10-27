@@ -163,7 +163,7 @@ function IncidentRecovery({ campaign: c }: { campaign: Campaign }) {
   const fault = currentFault(c);
   const failedAppActive = fault && fault.startedStep !== null && fault.restoredStep === null;
   return <section className="incident-clock campaign-stability" aria-label="Incident recovery">
-    {c.incident!.stableSteps === 0 && <RecoveryClock campaign={c} />}
+    {c.incident!.stableSteps === 0 ? <RecoveryClock campaign={c} /> : <Meter value={c.incident!.stableSteps / Q.stableSteps} tone="ok" label="Recovery progress" />}
     <p>Meet every condition for <b>{Q.stableSteps} consecutive game seconds</b>:</p>
     <ul className="recovery-conditions">
       <li><Icon name="latency" size={16} /><span>Latency below <b>{Q.latencyThresholdMs} ms</b></span></li>
