@@ -43,6 +43,22 @@ it("disables failover deployment without a reserved spare and purchases that exh
  for(const name of ["Deploy Automatic Failover","Deploy Health Checks","Install spare"])
   expect((inspectionAction(new RegExp(name)) as HTMLButtonElement).disabled).toBe(true);
 });
+it("shows the incident treatment while a Stay Online failure is active without an open incident",()=>{
+ const armed=tick(act(preparedReliability(),{type:"arm_reliability"}),9);
+ // The failover isolates the failed app, so no incident ever opens and the phase stays management.
+ expect(armed.phase).toBe("management");expect(armed.campaign!.incident).toBeNull();
+ expect(armed.campaign!.reliabilityStage!.fault!.startedStep).not.toBeNull();
+ show(armed);
+ expect(document.querySelector(".topbar")!.className).toContain("is-incident");
+ const dashboard=screen.getByRole("region",{name:"Campaign mission dashboard"});
+ expect(dashboard.querySelector(".mission-condition")!.className).toContain("is-failure");
+ const status=within(dashboard).getByText(/failed and is not restored/).closest("p")!;
+ expect(status.querySelector(".state-critical")!.textContent).toContain("Incident");
+ expect(document.querySelector(".week")!.className).toContain("is-incident");
+ cleanup();
+ show(tick(armed,20));
+ expect(document.querySelector(".topbar")!.className).not.toContain("is-incident");
+});
 it("keeps the recorded reliability outcome available after acknowledgement",()=>{
  const completed=tick(act(preparedReliability(),{type:"arm_reliability"}),35);
  show(completed);expect(screen.getByRole("dialog",{name:"Reliability outcome"}).textContent).toContain("Spare promotion");

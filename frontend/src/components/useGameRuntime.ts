@@ -8,6 +8,7 @@ import { createSfx } from "@/game/sfx";
 import { createSpeech } from "@/game/speech";
 import { useGame } from "@/game/store";
 import { fromAvatar } from "@/game/viewpoints";
+import { incidentActive } from "@/sim/step";
 import { daylightNow } from "./scene/dayClock";
 import { entryGap, nextGap, viewFocus, ZONE_SOUNDS, zoneLevel, type ZoneSound } from "./scene/zoneSounds";
 import { DOORS, FLOOR_Y, RIDE_SECONDS } from "./scene/levels";
@@ -262,6 +263,8 @@ export function useAppClassName(): string {
   const campaign = useGame((s) => !!s.game.campaign);
   const started = useGame((s) => s.started);
   const phase = useGame((s) => s.game.phase);
+  const incident = useGame((s) => incidentActive(s.game));
   const touring = useGame((s) => s.tour?.track ?? null);
-  return `app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`;
+  // A Guided Mode failure can burn while the phase stays "management"; the panel still takes the alert border.
+  return `app phase-${phase}${incident && phase !== "incident" ? " phase-incident" : ""}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`;
 }
