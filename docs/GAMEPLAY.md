@@ -170,6 +170,7 @@ Guidance never changes the rules; it reads the same state the engine uses.
   The colleague speaks a few short lines in their own voice, which the player reads one at a time, and the last line carries the mission.
   Dismissing it at any line counts as reading it.
 - A new diagnostic incident that keeps running shows one Pause invitation.
+- A decision that pauses a company the player can still run shows one Run invitation, which lasts until the clock restarts or another prompt owns attention.
 - Every report (incident postmortem, prevention review, chapter outcome, growth review, scorecard) uses four short sections and one collapsed View Technical Details disclosure.
   Reports are built from recorded snapshots, trace and actual activations, never from later company state.
 
