@@ -6,6 +6,10 @@
 .inspection-fleet-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 0; }
 /* Shared Server Management cards; live counts, routing and actions remain authoritative. */
 :is(.component-inspection-app,.component-inspection-gateway) .inspection-management-heading { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--tile-purple); color: var(--tile-purple-ink); font-size: var(--text-md); }
+/* Network management keeps its title and back control on one header row above the action sections. */
+.component-inspection-gateway .inspection-management-header { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--paper-3); }
+.component-inspection-gateway .inspection-management-header .inspection-management-heading { flex: 1; min-width: 0; }
+.component-inspection-gateway .inspection-management-header .inspection-back { flex: none; }
 .inspection-fleet-summary .row { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 6px; border: 0; border-radius: 12px; text-align: center; background: var(--tile-purple); }
 .inspection-fleet-summary .row:nth-child(2) { background: var(--tile-green); }
 .inspection-fleet-summary .row:nth-child(3) { background: var(--tile-blue); }
