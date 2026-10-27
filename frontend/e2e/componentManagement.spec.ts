@@ -88,12 +88,9 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     await closeInspection(page);const network=await inspectEquipment(page,"gateway");
     await expect(network.getByText(/Configure routing/)).toHaveCount(0);
     await network.getByRole("button",{name:"Network management",exact:true}).click();
-    await network.getByRole("button",{name:"Load balancing",exact:true}).click();
     await expect(network.getByRole("button",{name:"Deploy load balancing",exact:true})).toBeEnabled();
     await network.getByRole("button",{name:"Deploy load balancing",exact:true}).click();
     await quote.getByRole("button",{name:"Cancel",exact:true}).click();
-    await network.getByRole("button",{name:"Back to Network management",exact:true}).click();
-    await network.getByRole("button",{name:"Routing",exact:true}).click();
     await network.getByText(/Configure routing/).click();
     await expect(network.getByRole("button",{name:"All apps",exact:true})).toBeDisabled();
     await expect(network.getByText("Deploy load balancing before configuring routing.")).toBeVisible();

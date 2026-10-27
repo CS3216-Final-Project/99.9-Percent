@@ -19,8 +19,8 @@ export function inspectionAction(name:RegExp):HTMLElement {
     }
   }
   if(equipment==="Network"&&/routing|balanc|failover/i.test(text)) {
-    fireEvent.click(screen.getByRole("button",{name:"Network management"}));
-    fireEvent.click(screen.getByRole("button",{name:/failover/i.test(text)?"Automatic failover":/balanc/i.test(text)?"Load balancing":"Routing"}));
+    const management=screen.queryByRole("button",{name:"Network management"});
+    if(management)fireEvent.click(management);
   }
   return screen.getByRole("button",{name});
 }

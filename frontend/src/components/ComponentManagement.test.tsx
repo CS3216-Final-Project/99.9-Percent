@@ -71,9 +71,11 @@ it("keeps Network admission separate from routing, balancing and failover",()=>{
   expect(within(popup).getByRole("button",{name:/Limit to/})).toBeTruthy();
   expect(within(popup).queryByText(/Configure routing/)).toBeNull();
   expect(within(popup).queryByRole("button",{name:/Deploy Automatic Failover/})).toBeNull();
-  press("Network management");press("Routing");expect(within(popup).getByText(/Configure routing/)).toBeTruthy();
-  press("Back to Network management");press("Automatic failover");expect(within(popup).getByRole("button",{name:"Disable failover"})).toBeTruthy();
-  press("Back to Network management");press("Back to Network");expect(within(popup).getByRole("button",{name:"Inspect details"})).toBeTruthy();
+  press("Network management");
+  for(const section of ["Load balancing","Routing","Automatic failover"]) expect(within(popup).getByRole("heading",{name:section})).toBeTruthy();
+  expect(within(popup).getByText(/Configure routing/)).toBeTruthy();
+  expect(within(popup).getByRole("button",{name:"Disable failover"})).toBeTruthy();
+  press("Back to Network");expect(within(popup).getByRole("button",{name:"Inspect details"})).toBeTruthy();
 });
 
 it("routes a failed-server Hint through its card and valid Confirm to free restoration",async()=>{

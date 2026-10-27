@@ -5,7 +5,7 @@
 .inspection-back { justify-self: start; }
 .inspection-fleet-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 0; }
 /* Shared Server Management cards; live counts, routing and actions remain authoritative. */
-.component-inspection-app .inspection-management-heading { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--tile-purple); color: var(--tile-purple-ink); font-size: var(--text-md); }
+:is(.component-inspection-app,.component-inspection-gateway) .inspection-management-heading { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--tile-purple); color: var(--tile-purple-ink); font-size: var(--text-md); }
 .inspection-fleet-summary .row { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 6px; border: 0; border-radius: 12px; text-align: center; background: var(--tile-purple); }
 .inspection-fleet-summary .row:nth-child(2) { background: var(--tile-green); }
 .inspection-fleet-summary .row:nth-child(3) { background: var(--tile-blue); }
@@ -30,7 +30,9 @@
 .component-inspection-app [data-inspection-view="management"] > .more > summary { padding: 9px 10px; color: var(--ink); font-size: var(--text-sm); }
 .component-inspection-app [data-inspection-view="management"] > .more[open] { padding-bottom: 8px; }
 .component-inspection-app [data-inspection-view="management"] > .more > .equipment-readings { margin: 0 10px; }
-.inspection-management-entries { display: grid; gap: 8px; }
+.component-inspection-gateway .inspection-subview > section { display: grid; gap: 8px; }
+.component-inspection-gateway .inspection-subview > section > :is(h4,p) { margin: 0; }
+.component-inspection-gateway .inspection-subview > section > h4 { font-size: var(--text-md); }
 .inspection-subview .scaling-controls { margin: 0; padding: 0; border: 0; background: transparent; }
 /* Compact missions project existing requirements; equipment owns technical detail. */
 .mission-dashboard .panel-section { display: grid; gap: 12px; }

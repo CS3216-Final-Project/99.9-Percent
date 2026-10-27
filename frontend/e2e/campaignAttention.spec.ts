@@ -323,7 +323,7 @@ test("action guidance routing disclosure transfers to All apps without applying 
   const card=page.getByRole("dialog",{name:"Hint",exact:true});
   await card.getByRole("button",{name:"Got it", exact:true}).click();
   // Verify each navigation step before opening the routing disclosure ourselves.
-  for (const [attribute,value] of [["data-tutorial","inspect-gateway"],["data-inspection-entry","management"],["data-inspection-entry","routing"]]) {
+  for (const [attribute,value] of [["data-tutorial","inspect-gateway"],["data-inspection-entry","management"]]) {
     await expect(gold(page)).toHaveCount(1);
     await expect(gold(page)).toHaveAttribute(attribute,value);
     await gold(page).click();

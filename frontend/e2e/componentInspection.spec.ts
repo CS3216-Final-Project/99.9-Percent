@@ -79,11 +79,11 @@ test("component actions: App Server adding, Network prerequisite and read-only c
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="scale-up"&&a.targetId==="app-2")).toBe(true);
   await page.locator('.campaign-panel [data-tutorial="inspect-gateway"]').click();
   const network=page.getByRole("dialog",{name:"Network inspected",exact:true});
-  await network.getByRole("button",{name:"Network management",exact:true}).click();await network.getByRole("button",{name:"Load balancing",exact:true}).click();await expect(network.getByRole("button",{name:/Deploy load balancing/})).toBeVisible();await network.getByRole("button",{name:"Back to Network management",exact:true}).click();await network.getByRole("button",{name:"Routing",exact:true}).click();
+  await network.getByRole("button",{name:"Network management",exact:true}).click();await expect(network.getByRole("button",{name:/Deploy load balancing/})).toBeVisible();
   await network.getByText(/Configure routing/).click();
   await expect(network.getByText("Deploy load balancing before configuring routing.")).toBeVisible();
   await expect(network.getByRole("button",{name:"App 1 only",exact:true})).toBeDisabled();
-  await network.getByRole("button",{name:"Back to Network management",exact:true}).click();await network.getByRole("button",{name:"Back to Network",exact:true}).click();await network.getByRole("button",{name:/Limit to 500/}).click();
+  await network.getByRole("button",{name:"Back to Network",exact:true}).click();await network.getByRole("button",{name:/Limit to 500/}).click();
   await expect(page.locator(".campaign-gold-attention")).toHaveAccessibleName("Confirm");
   await page.getByRole("dialog",{name:"Purchase preview"}).getByRole("button",{name:"Confirm",exact:true}).click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="limit")).toBe(true);
