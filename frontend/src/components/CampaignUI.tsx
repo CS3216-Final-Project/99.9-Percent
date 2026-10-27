@@ -200,7 +200,7 @@ export function CampaignPanel() {
       <LaunchResearch/>
       {unlocked&&!c.launchWeek&&!c.scaling?.consumed&&<p className="muted">{c.dbCapacity<P.dbCapacity&&!c.scalingConsent?"Next growth waits for a paid database upgrade to 2,000 ops/s.":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Growth waits until the incident and backlogs clear.":c.scaling?.dueStep?`Growth due at game second ${c.scaling.dueStep} while ready.`:"Growth readiness is checked on the next game second."}</p>}
       {c.pending.map(a => <div className="working campaign-working" role="status" key={a.id}>
-        <span>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
+        <span>{a.source==="autoscaler"?"Autoscaler · ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
       </div>)}
       {c.apps.some(a=>!a.routed) && <p className="muted">{c.apps.filter(a=>!a.routed).map(a=>appName(a.id)).join(", ")}: Installed, not receiving traffic</p>}
@@ -307,7 +307,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         {fault?.startedStep!=null&&fault.restoredStep===null&&<p role="status"><span className="state state-critical"><Icon name="alert" size={12} />Incident</span> {appName(fault.targetId)} failed and is not restored. Service recovery and server restoration are separate requirements.</p>}
         {showMetrics&&<dl className="rows"><Row label="Latency" value={`${m.latencyMs.toFixed(0)} ms`}/><Row label="Service errors" value={m.serviceErrorRate===null?"Not yet measured":`${(m.serviceErrorRate*100).toFixed(2)}%`}/><Row label="Queued requests" value={num(m.app.backlog+m.db.backlog)}/></dl>}
         {c.incident&&<IncidentRecovery campaign={c}/>}
-        {c.pending.map(a=><p role="status" key={a.id}>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep-c.step} game second(s)</p>)}
+        {c.pending.map(a=><p role="status" key={a.id}>{a.source==="autoscaler"?"Autoscaler · ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep-c.step} game second(s)</p>)}
       </section>
       <EquipmentShortcuts disabled={disabled}/>
       <details className="more mission-requirements"><summary>View all requirements</summary>
