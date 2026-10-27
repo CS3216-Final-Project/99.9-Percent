@@ -28,7 +28,7 @@ const gold=()=>document.querySelectorAll<HTMLElement>(".campaign-gold-attention"
 const open=(name:string)=>fireEvent.click(screen.getByRole("button",{name}));
 const titleOf=(name:string)=>name==="Servers"?"App Servers":`${name} inspected`;
 const dialog=(name:string)=>within(screen.getByRole("dialog",{name:titleOf(name)}));
-const networkView=(name:string)=>{const back=screen.queryByRole("button",{name:"Back to Network management"});if(back)fireEvent.click(back);if(screen.queryByRole("button",{name:"Network management"}))open("Network management");open(name);};
+const networkView=(name:string)=>{if(screen.queryByRole("button",{name:"Network management"}))open("Network management");expect(dialog("Network").getByRole("heading",{name})).toBeTruthy();};
 async function accept() {
   open("Hint");fireEvent.click(within(screen.getByRole("dialog",{name:"Hint"})).getByRole("button",{name:/Got it|Upgrade database/}));
   await act(async()=>{});
@@ -95,7 +95,7 @@ it("keeps App scaling and adding together and routing prerequisites with Network
   fireEvent.click(dialog("Servers").getByRole("button",{name:"Close"}));open("Network");
   networkView("Load balancing");expect(dialog("Network").getByRole("button",{name:/Deploy load balancing/}).hasAttribute("disabled")).toBe(true);
   networkView("Routing");expect(dialog("Network").getByText(/Configure routing/)).toBeTruthy();
-  open("Back to Network management");open("Back to Network");expect(dialog("Network").getByRole("button",{name:/Limit to 500/})).toBeTruthy();
+  open("Back to Network");expect(dialog("Network").getByRole("button",{name:/Limit to 500/})).toBeTruthy();
 });
 it.each([4,6])("routes Chapter %s traffic-limit advice to its real Network action, not About",async chapter=>{
   let game=chapter===4?spikeCompany(false):combinedCompany();
@@ -224,7 +224,7 @@ it("walks Chapter 6 routing through its disclosure and real choice before pendin
  game=tick(decide(game,{type:"set_routing",mode:"single",targets:["app-1"]}));
  expect(campaignAttention(game).action?.action.type).toBe("set_routing");show(game);
  await accept();expect(gold()[0].textContent).toBe("Network");fireEvent.click(gold()[0]);await act(async()=>{});
- expect(gold()[0].textContent).toContain("Network management");fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()[0].textContent).toContain("Routing");fireEvent.click(gold()[0]);await act(async()=>{});
+ expect(gold()[0].textContent).toContain("Network management");fireEvent.click(gold()[0]);await act(async()=>{});
  expect(gold()[0].tagName).toBe("SUMMARY");expect(gold()[0].textContent).toContain("Configure routing");
  fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()[0].textContent).toBe("All apps");
  fireEvent.click(gold()[0]);await act(async()=>{});
