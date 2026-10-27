@@ -309,7 +309,8 @@ test("the first-person view picks up again after a reload, with walk mode", asyn
   await expect(page.locator(".view-dot")).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: "Continue week 2" }).click();
-  await expectRoom(page);
+  // A first-person room after a reload can take longer than the default to mount on a CI runner's software WebGL.
+  await expectRoom(page, 30_000);
   await expect(page.locator(".view-dot")).toBeVisible();
   await expect(stage(page)).toHaveAttribute("data-camera", "perspective");
 });

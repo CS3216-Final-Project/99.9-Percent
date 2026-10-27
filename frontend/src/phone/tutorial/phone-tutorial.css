@@ -1,13 +1,15 @@
 /*
  * The phone's coach strip: every guide (Launch Week's spotlight steps, chapter guides, tips and Challenge Mode's
- * first week) docks in one fixed-size strip directly above the dock, so the room and the step's real control stay
- * in view.
+ * first week) docks in one fixed-size strip directly below the top strip, so the sheet, its actions and the dock
+ * stay in view under it.
  *
  * Tokens:
  * - --phone-coach-height: the strip's fixed height.
- * - --phone-coach: on the phone app root, the height the strip takes while a guide shows (0 otherwise). The sheet
- *   and room keep clear of it: bottom: calc(var(--phone-dock) + var(--phone-coach, 0px)).
- * - --phone-coach-bottom: on <html>, the dock's measured height; the strip's bottom edge (set by PhoneCoach).
+ * - --phone-coach: on the phone app root, the height the strip takes while a guide shows (0 otherwise). The room's
+ *   open part and the sheet's half and full heights keep clear of it through --phone-room.
+ * - --phone-coach-top: on <html>, the top strip's measured bottom edge; the strip's top edge (set by PhoneCoach).
+ * - --phone-coach-bottom: on <html>, the dock's measured height; the strip's bottom edge while a full-page workspace
+ *   (Tech, History) covers the top strip (set by PhoneCoach).
  */
 [data-edition="phone"] {
   --phone-coach-height: 144px;
@@ -19,17 +21,12 @@ body:has(> .tour-card.launch-tutorial) .phone-app[data-edition="phone"] {
   --phone-coach: calc(var(--phone-coach-height) + var(--phone-coach-gap));
 }
 
-/* Full-page workspaces reach the dock, but their last action must scroll above the coach strip. */
-.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card) .sheet:is(.sheet-tech, .sheet-history) .sheet-body {
-  padding-bottom: calc(var(--phone-coach) + var(--phone-coach-gap));
-  scroll-padding-bottom: calc(var(--phone-coach) + var(--phone-coach-gap));
-}
+/* ---- One strip for every guide ---- */
 
-/* ---- Launch Week's spotlight steps ---- */
-
-[data-edition="phone"] .tour-card.launch-tutorial {
+[data-edition="phone"] .tour-card.launch-tutorial,
+[data-edition="phone"] .tour[data-docked] .tour-card {
   position: fixed;
-  inset: auto var(--phone-coach-inset) calc(var(--phone-coach-bottom, 0px) + var(--phone-coach-gap));
+  inset: calc(var(--phone-coach-top, 0px) + var(--phone-coach-gap)) var(--phone-coach-inset) auto;
   box-sizing: border-box;
   width: auto;
   max-width: none;
@@ -39,38 +36,33 @@ body:has(> .tour-card.launch-tutorial) .phone-app[data-edition="phone"] {
   overscroll-behavior: contain;
   pointer-events: auto;
 }
-[data-edition="phone"] .tour-card.launch-tutorial h3 { font-size: 1.0625rem; line-height: 22px; margin-bottom: 2px; }
-[data-edition="phone"] .tour-card.launch-tutorial .tour-prompt { margin-top: 4px !important; }
-[data-edition="phone"] .tour-card.launch-tutorial .tour-explanation { margin-top: 4px; }
-[data-edition="phone"] .tour-card.launch-tutorial .tour-foot { position: sticky; bottom: 0; margin-top: 4px; padding-bottom: 6px; background: var(--paper); }
-[data-edition="phone"] .tour-card.launch-tutorial .tour-foot .btn { min-height: 44px; min-inline-size: 6.5rem; justify-content: center; }
 
-/* An open dock menu opens over the strip; the step returns when it closes. Other guides keep their strip over the
-   Views menu, whose tabs they can point at, and give way only to the speed menu. */
-body:has(.phone-app[data-edition="phone"] .phone-dock details[open]) .tour-card.launch-tutorial,
-body:has(.phone-app[data-edition="phone"] .phone-dock details.time-menu[open]) .tour[data-docked] .tour-card { visibility: hidden; }
-
-/* ---- Chapter guides, tips and Challenge Mode's first week ---- */
-
-[data-edition="phone"] .tour[data-docked] .tour-card {
-  position: fixed;
+/* A full-page workspace covers the top strip with its own header and close button, so there the strip docks above
+   the dock instead, and the workspace's last action scrolls clear of it. */
+body:has(.phone-app[data-edition="phone"] .sheet:is(.sheet-tech, .sheet-history)) .tour-card.launch-tutorial,
+.phone-app[data-edition="phone"]:has(.sheet:is(.sheet-tech, .sheet-history)) > .tour[data-docked] .tour-card {
   inset: auto var(--phone-coach-inset) calc(var(--phone-coach-bottom, 0px) + var(--phone-coach-gap));
-  box-sizing: border-box;
-  height: var(--phone-coach-height);
-  padding: 8px 12px 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
+.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card) .sheet:is(.sheet-tech, .sheet-history) .sheet-body {
+  padding-bottom: calc(var(--phone-coach) + var(--phone-coach-gap));
+  scroll-padding-bottom: calc(var(--phone-coach) + var(--phone-coach-gap));
+}
+
 [data-edition="phone"] .tour[data-docked] .tour-dots { margin-bottom: 4px; }
 [data-edition="phone"] .tour[data-docked] .tour-dots i { height: 4px; }
-[data-edition="phone"] .tour[data-docked] .tour-card h3 { font-size: 1.0625rem; line-height: 22px; margin-bottom: 2px; }
-[data-edition="phone"] .tour[data-docked] .tour-prompt { margin-top: 4px !important; }
-[data-edition="phone"] .tour[data-docked] .tour-explanation { margin-top: 4px; }
+[data-edition="phone"] :is(.tour-card.launch-tutorial, .tour[data-docked] .tour-card) h3 { font-size: 1.0625rem; line-height: 22px; margin-bottom: 2px; }
+[data-edition="phone"] :is(.tour-card.launch-tutorial, .tour[data-docked]) .tour-prompt { margin-top: 4px !important; }
+[data-edition="phone"] :is(.tour-card.launch-tutorial, .tour[data-docked]) .tour-explanation { margin-top: 4px; }
 /* Skip and Next stay in the same place while the strip's text scrolls. */
-[data-edition="phone"] .tour[data-docked] .tour-foot { position: sticky; bottom: 0; margin-top: 4px; padding-bottom: 6px; background: var(--paper); }
-[data-edition="phone"] .tour[data-docked] .tour-foot .btn,
+[data-edition="phone"] :is(.tour-card.launch-tutorial, .tour[data-docked]) .tour-foot { position: sticky; bottom: 0; margin-top: 4px; padding-bottom: 6px; background: var(--paper); }
+[data-edition="phone"] :is(.tour-card.launch-tutorial, .tour[data-docked]) .tour-foot .btn,
 [data-edition="phone"] .tour[data-docked] .tour-skip { min-height: 44px; }
-[data-edition="phone"] .tour[data-docked] .tour-foot .btn { min-inline-size: 6.5rem; justify-content: center; }
+[data-edition="phone"] :is(.tour-card.launch-tutorial, .tour[data-docked]) .tour-foot .btn { min-inline-size: 6.5rem; justify-content: center; }
+
+/* An open dock menu opens over the room and may reach the strip; the step returns when it closes. Other guides keep
+   their strip over the Views menu, whose tabs they can point at, and give way only to the speed menu. */
+body:has(.phone-app[data-edition="phone"] .phone-dock details[open]) .tour-card.launch-tutorial,
+body:has(.phone-app[data-edition="phone"] .phone-dock details.time-menu[open]) .tour[data-docked] .tour-card { visibility: hidden; }
 
 /* ---- The room stays in view while a guide shows ---- */
 
@@ -97,8 +89,8 @@ body:has(.phone-app[data-edition="phone"] .phone-dock details.time-menu[open]) .
   body:has(> .tour-card.launch-tutorial) .phone-app[data-edition="phone"] { --phone-sheet-peek: 48px; }
 }
 
-/* The dock's menus open above the strip, so a guide never covers the speed or Navigation menu it points at. */
+/* The dock's menus open above the dock and stop short of the strip, so a guide never covers the speed or Navigation
+   menu it points at. */
 .phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card, .tour-card.launch-tutorial) .phone-dock .dock-panel {
-  bottom: calc(100% + 10px + var(--phone-coach));
   max-height: min(440px, calc(100dvh - var(--phone-top) - var(--phone-dock) - var(--phone-coach) - 16px));
 }

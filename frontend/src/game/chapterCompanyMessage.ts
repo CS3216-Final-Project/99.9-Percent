@@ -3,6 +3,7 @@ import type { GameState } from "@/sim";
 import { COLLEAGUES, type ColleagueId } from "./colleagues";
 
 const CHAPTERS = {
+  0: { speaker: "maya", lines: ["Hi! I'm Maya from Customer Support. Welcome to your company!", "I keep an eye on every ticket. Well, several eyes.", "Before customers arrive, check out the machines you have. Each one keeps our website online."], mission: "Explore Network, App Servers, Database and Monitoring, then complete the introduction." },
   1: { speaker: "maya", lines: ["Hi! I'm Maya from Customer Support. I keep an eye on every ticket. Well, several eyes.", "Customers want our website to stay fast, and they notice the moment it isn't.", "Can you find what might slow it down before they do?"], mission: "Compare demand and capacity to prevent or recover from a bottleneck." },
   2: { speaker: "alex", lines: ["Alex. I run this company, and I didn't build it to stay small.", "Our company is growing! More users are coming, and we need to make sure our infrastructure can handle them.", "Get us ready. I'll be watching the numbers."], mission: "Prepare capacity and route traffic to the servers that can handle it." },
   3: { speaker: "jordan", lines: ["Jordan, software engineering. I've been reading the database logs.", "Our database needs to keep up as we grow. Every request asks it for something, and it is starting to feel the weight.", "Let's find a smarter way to handle all these requests. Measure first, then build."], mission: "Compare database workloads and use caching where it helps." },
@@ -14,13 +15,15 @@ const CHAPTERS = {
 /** Identity comes from the actual entered stage, never a timer or an unlocked Next button. */
 export function chapterCompanyMessage(game: GameState) {
   const c = game.campaign;
-  if (!c || introductionActive(c) || game.phase === "ended") return null;
-  const chapter = c.combinedStage ? 6 : c.reliabilityStage ? 5 : c.spikeStage ? 4 : c.dataStage ? 3 : c.scaling ? 2 : 1;
+  if (!c || game.phase === "ended") return null;
+  // A new company's introduction (entry 0) opens with Maya's welcome before its first spotlight.
+  const chapter = introductionActive(c) ? 0 : c.combinedStage ? 6 : c.reliabilityStage ? 5 : c.spikeStage ? 4 : c.dataStage ? 3 : c.scaling ? 2 : 1;
   const enteredStep = (c.combinedStage ?? c.reliabilityStage ?? c.spikeStage ?? c.dataStage ?? c.scaling)?.enteredStep ?? 0;
   const { speaker, lines, mission } = CHAPTERS[chapter];
   const slow = c.snapshot.latencyMs >= 500 || c.snapshot.app.backlog > 0 || c.snapshot.db.backlog > 0;
   const target = c.combinedStage?.finalUserTarget ?? 0;
-  const told = lines.map(line => typeof line === "string" ? line : line(target.toLocaleString("en-US")));
+  // Maya already introduced herself in the introduction's welcome, so Opening skips her greeting.
+  const told = lines.slice(chapter === 1 && c.completedIntroduction ? 1 : 0).map(line => typeof line === "string" ? line : line(target.toLocaleString("en-US")));
   const said: readonly string[] = chapter === 1 && slow ? ["Maya from Customer Support here. My inbox is lighting up!", "Customers are reporting that our website is getting slower. Can you find out what's causing it?"]
     : chapter === 6 && c.combinedStage!.users >= target ? [told[0], "We've hit our user target. Let's keep our service reliable and finish the final Campaign checks."] : told;
   return { ...COLLEAGUES[speaker], speaker, lines: said, mission, chapter, key: `99.99.company-messages:${c.runId}:${chapter}:${enteredStep}` };

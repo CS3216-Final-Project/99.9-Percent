@@ -26,7 +26,7 @@ import { PhoneTopStrip } from "./regions/PhoneTopStrip";
  * The room fills everything between the top strip and the dock and keeps that size: the sheet, the coach and the
  * menus open over it. The root publishes the layout as CSS custom properties (see layout/phone-layout.css):
  * `--phone-top`, `--phone-dock`, `--phone-sheet` (the sheet's current height) and `--phone-safe-bottom`; guides set
- * `--phone-coach` while their strip shows, and the sheet stands above it.
+ * `--phone-coach` while their strip shows below the top strip, and the sheet stops below it.
  */
 export function PhoneGameLayout() {
   const className = useAppClassName();
