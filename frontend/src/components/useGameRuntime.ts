@@ -34,7 +34,8 @@ const effectsLevel = (a: AudioSettings) => (a.muted ? 0 : a.effects);
 function useMusic(): void {
   const level = useGame((s) => musicLevel(s.audio));
   const started = useGame((s) => s.started);
-  const incident = useGame((s) => s.game.phase === "incident");
+  // The same signal as the incident visuals: a Guided Mode failure can burn while the phase stays "management".
+  const incident = useGame((s) => incidentActive(s.game));
   const music = useRef<Music | null>(null);
   useEffect(() => {
     const m = createMusic(() => musicLevel(useGame.getState().audio) > 0);
