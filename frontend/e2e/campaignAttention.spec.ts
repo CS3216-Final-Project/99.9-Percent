@@ -12,7 +12,7 @@ async function boot(page: Page, game: GameState) {
   await page.route("**/api/**", r => r.abort());
   await seedSave(page, game); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
-  await expectRoom(page); await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => document.fonts.ready);
 }
 async function idle(page: Page, milliseconds = 10_000) {
   test.slow(); // Ten virtual seconds render every animation frame on software WebGL.
@@ -47,6 +47,7 @@ const scaling = () => act(act(tick(act(tick(newGame(), 6), { type: "start_db_upg
 test("guidance Chapter 4 baseline: Run advances a real qualifying observation", async ({ page, installClock }) => {
   await installClock(); const game = untilOffset(tick(act(spikeCompany(false), { type: "set_traffic_limit", enabled: true })), 68);
   await boot(page, game); const beforeGame=await savedGame(page),before=beforeGame.campaign!;
+  await expectRoom(page);
   await idle(page, 9999); await expect(gold(page)).toHaveCount(0);
   await page.clock.runFor(1); await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Run");
   expect((await savedGame(page)).campaign!.step).toBe(before.step);
@@ -58,6 +59,7 @@ test("guidance Chapter 4 investigation: Hint owns idle attention and transfers t
   await installClock(); let game = spikeCompany(false);
   game = tick(game, game.campaign!.spikeStage!.deadlines[0] - game.campaign!.step);
   await boot(page, game); const beforeGame=await savedGame(page),before=beforeGame.campaign!;
+  await expectRoom(page);
   await idle(page, 9999); await expect(gold(page)).toHaveCount(0);
   await page.clock.runFor(1); await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toHaveAccessibleName("Hint");
   await gold(page).click(); const card = page.getByRole("dialog", { name: "Hint", exact: true });
@@ -77,7 +79,8 @@ for (const [chapter, company, expected] of [
   [4, () => spikeCompany(false), "Hint"], [5, reliabilityCompany, "Start reliability test"], [6, combinedCompany, "Run"],
   ["2 accepted risk", () => act(scaling(), { type: "accept_scaling_risk" }), "Run"],
   ["3 workload", enteredDataCompany, "Run"],
-] as const) test(`guidance Chapter ${chapter}: authoritative idle priority`, async ({ page, installClock }) => {
+] as const) test(`guidance Chapter ${chapter}: authoritative idle priority`, async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock(); await boot(page, company());
   await expect(page.getByRole("button", { name: "Hint", exact: true })).toBeVisible();
   await idle(page, 9999); await expect(gold(page)).toHaveCount(0);
@@ -86,7 +89,8 @@ for (const [chapter, company, expected] of [
   else await expect(gold(page)).toHaveCount(0);
 });
 
-test("guidance incident: ten idle seconds offer Hint without changing company state", async ({ page, installClock }, info) => {
+test("guidance incident: ten idle seconds offer Hint without changing company state", async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom();
   await installClock(); const game = advanceSteps(newGame(), 6).state; await boot(page, game);
   await idle(page); await expect(gold(page)).toHaveAccessibleName("Hint");
   await page.screenshot({ path: info.outputPath("hint-gold.png") });
@@ -94,7 +98,8 @@ test("guidance incident: ten idle seconds offer Hint without changing company st
   expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step);
 });
 
-test("guidance incident: short help targets the upgrade and preserves readings", async ({ page, installClock }, info) => {
+test("guidance incident: short help targets the upgrade and preserves readings", async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom();
   // Every step draws the room and two steps screenshot it, which takes about a minute under CI's software rendering.
   test.setTimeout(120_000);
   await installClock(); await boot(page, advanceSteps(newGame(), 6).state);
@@ -124,7 +129,8 @@ test("guidance incident: short help targets the upgrade and preserves readings",
   await page.getByRole("button",{name:"Cancel",exact:true}).click(); await expect(gold(page)).toHaveCount(0);
 });
 
-test("guidance accepted installation justifies Run after ten idle seconds", async ({ page, installClock }, info) => {
+test("guidance accepted installation justifies Run after ten idle seconds", async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom();
   await installClock();
   const pending = act(advanceSteps(newGame(), 6).state, { type: "start_db_upgrade" });
   await boot(page, pending); await idle(page); await expect(gold(page)).toHaveAccessibleName("Run");
@@ -133,7 +139,8 @@ test("guidance accepted installation justifies Run after ten idle seconds", asyn
   expect((await savedGame(page)).campaign!.step).toBe(pending.campaign!.step);
 });
 
-test("guidance accepted installation activates through the public clock", async ({ page, installClock }) => {
+test("guidance accepted installation activates through the public clock", async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock(); const pending = act(advanceSteps(newGame(), 6).state, { type: "start_db_upgrade" });
   await boot(page, pending); await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
   await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).click();
@@ -152,14 +159,16 @@ function measuredRecoveryCompany() {
   expect(game.campaign!.incident!.stableSteps).toBeGreaterThan(0);
   return game;
 }
-test("guidance measured incident recovery justifies Run after ten idle seconds", async ({ page, installClock }) => {
+test("guidance measured incident recovery justifies Run after ten idle seconds", async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock(); const game = measuredRecoveryCompany(); await boot(page, game); await setGameSpeed(page, 2);
   await idle(page); await expect(gold(page)).toHaveAccessibleName("Run");
   expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step);
 });
 test.describe("guidance measured recovery review", () => {
   test.use({ reviewRecoveryNotice: false });
-  test("guidance measured incident recovery yields to the recovery notice and postmortem", async ({ page, installClock }) => {
+  test("guidance measured incident recovery yields to the recovery notice and postmortem", async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
     await installClock(); await boot(page, measuredRecoveryCompany()); await setGameSpeed(page, 2);
     await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
     await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).click();
@@ -174,7 +183,8 @@ test.describe("guidance measured recovery review", () => {
   });
 });
 
-test("guidance pending postmortem retains priority through ten idle seconds", async ({ page, installClock }) => {
+test("guidance pending postmortem retains priority through ten idle seconds", async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock();
   const game = tick(act(advanceSteps(newGame(), 6).state, { type: "start_db_upgrade" }), 30);
   expect(game.phase).toBe("review");
@@ -183,7 +193,8 @@ test("guidance pending postmortem retains priority through ten idle seconds", as
   expect((await savedGame(page)).phase).toBe("review");
 });
 
-test("guidance free admission relief activates and exposes measured drainage without buying capacity", async ({ page, installClock }) => {
+test("guidance free admission relief activates and exposes measured drainage without buying capacity", async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock();
   const game = act(advanceSteps(newGame(), 6).state, { type: "set_traffic_limit", enabled: true });
   await boot(page, game); await idle(page); await expect(gold(page)).toHaveAccessibleName("Run");
@@ -201,13 +212,14 @@ test("guidance queued reliability failover needs Run rather than another investi
   await installClock();
   const game = tick(act(preparedReliability(), { type: "arm_reliability" }), 9);
   expect(game.campaign!.pending.some(a => a.type === "promote-spare")).toBe(true);
-  await boot(page, game); await idle(page); await expect(gold(page)).toHaveAccessibleName("Run");
+  await boot(page, game); await expectRoom(page); await idle(page); await expect(gold(page)).toHaveAccessibleName("Run");
   await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
   expect((await savedGame(page)).campaign!.reliabilityStage!.fault!.promoted).toBe(true);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
 });
 
-test("guidance collapsed entry, keyboard tooltip and reduced motion", async ({ page, installClock }) => {
+test("guidance collapsed entry, keyboard tooltip and reduced motion", async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock(); await page.emulateMedia({ reducedMotion: "reduce" });
   await boot(page, advanceSteps(newGame(), 6).state);
   await page.getByRole("button", { name: "Hide equipment and actions" }).click();
@@ -222,7 +234,8 @@ test("guidance collapsed entry, keyboard tooltip and reduced motion", async ({ p
   await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Database", exact: true })).toBeVisible();
 });
 
-test("guidance confirmation ownership suppresses both spotlights", async ({ page, installClock }) => {
+test("guidance confirmation ownership suppresses both spotlights", async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock(); await boot(page, newGame());
   await (await infrastructureAction(page,/^Add server/)).click();
   await expect(gold(page)).toHaveAccessibleName("Confirm");
@@ -230,22 +243,25 @@ test("guidance confirmation ownership suppresses both spotlights", async ({ page
   await page.getByRole("button", { name: "Cancel", exact: true }).click(); await expect(gold(page)).toHaveCount(0);
 });
 
-test("guidance local modal ownership suppresses both spotlights", async ({ page, installClock }) => {
+test("guidance local modal ownership suppresses both spotlights", async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock(); await boot(page, newGame());
   await page.getByRole("button", { name: "View app health", exact: true }).click();
   await idle(page); await expect(gold(page)).toHaveCount(0);
 });
 
-test("the Launch Week letter keeps the original header and owns all attention", async ({ page, installClock }) => {
+test("the Launch Week letter keeps the original header and owns all attention", async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock(); await seedSave(page, newGame(undefined, undefined, 2));
-  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+  await page.goto("/"); await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Launch week" })).toBeVisible(); await idle(page);
   await expect(page.getByRole("button", { name: "Hint", exact: true })).toHaveCount(0);
   await expect(page.locator("[data-spotlight]")).toHaveCount(0); await expect(gold(page)).toHaveCount(0);
   expect((await savedGame(page)).campaign!.step).toBe(0);
 });
 
-for (const limited of [false, true]) test(`guidance header preserves original indicators and dock at all widths, limited=${limited}`, async ({ page }, info) => {
+for (const limited of [false, true]) test(`guidance header preserves original indicators and dock at all widths, limited=${limited}`, async ({ page, withoutRoom }, info) => {
+  await withoutRoom();
   await boot(page, limited ? tick(act(newGame(), { type: "set_traffic_limit", enabled: true }), 1) : newGame());
   for (const width of [1440, 1366, 1100, 1024, 901, 900, 768, 390, 320]) {
     await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
@@ -271,7 +287,8 @@ for (const limited of [false, true]) test(`guidance header preserves original in
   await page.getByRole("button", { name: "View finances", exact: true }).click(); await expect(page.getByRole("dialog", { name: "Company finances" })).toBeVisible();
 });
 
-for (const width of [1440, 1366]) test(`action guidance nested DB purchase and immediate Confirm at ${width}px`, async ({ page, installClock }, info) => {
+for (const width of [1440, 1366]) test(`action guidance nested DB purchase and immediate Confirm at ${width}px`, async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom();
   await installClock(); await page.setViewportSize({width,height:900});
   await boot(page, advanceSteps(newGame(), 6).state);
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
@@ -298,7 +315,8 @@ for (const width of [1440, 1366]) test(`action guidance nested DB purchase and i
   await card.getByRole("button",{name:"Got it", exact:true}).click(); await expect(gold(page)).toHaveAccessibleName("Run");
 });
 
-test("action guidance routing disclosure transfers to All apps without applying it automatically", async ({page,installClock}) => {
+test("action guidance routing disclosure transfers to All apps without applying it automatically", async ({page,installClock,withoutRoom}) => {
+  await withoutRoom();
   await installClock(); const game=tick(act(dataCompany(),{type:"set_routing",mode:"single",targets:["app-1"]}),2);
   await boot(page,game); await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
   await closeInspection(page); await page.getByRole("button",{name:"Hint",exact:true}).click();
@@ -318,7 +336,8 @@ test("action guidance routing disclosure transfers to All apps without applying 
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="routing")).toBe(true);
 });
 
-test("action guidance selects the overloaded App 3 before its exact scaling control", async ({page,installClock}) => {
+test("action guidance selects the overloaded App 3 before its exact scaling control", async ({page,installClock,withoutRoom}) => {
+  await withoutRoom();
   await installClock();
   let game=tick(act(spikeCompany(false),{type:"add_server"}),2);
   game=tick(act(game,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}),1);
@@ -339,7 +358,8 @@ test("action guidance selects the overloaded App 3 before its exact scaling cont
 for (const [label,company] of [
   ["Add server",newGame], ["Deploy Read Cache",enteredDataCompany],
   ["Unlock autoscaling",()=>spikeCompany(false)], ["Deploy Health Checks",()=>act(reliabilityCompany(),{type:"unlock_reliability",tech:"health_checks"})],
-] as const) test(`action confirmation shared immediate gold: ${label}`,async ({page,installClock})=>{
+] as const) test(`action confirmation shared immediate gold: ${label}`,async ({page,installClock,withoutRoom})=>{
+  await withoutRoom();
   await installClock(); await boot(page,company());
   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
   const control=await infrastructureAction(page,new RegExp(`^${label}`)); await control.click();
@@ -351,7 +371,8 @@ for (const [label,company] of [
 for (const [name,company] of [
   ["Start next growth wave",()=>tick(combinedCompany(),5)],
   ["Start reliability test",reliabilityCompany],
-] as const) test(`action guidance mandatory control: ${name}`,async ({page,installClock})=>{
+] as const) test(`action guidance mandatory control: ${name}`,async ({page,installClock,withoutRoom})=>{
+  await withoutRoom();
   await installClock(); await boot(page,company());
   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
   await closeInspection(page); await page.getByRole("button",{name:"Hint",exact:true}).click();
@@ -360,7 +381,8 @@ for (const [name,company] of [
   await expect(gold(page)).toBeInViewport({ratio:1});
 });
 
-test("action guidance restoration confirms the existing free action",async ({page,installClock})=>{
+test("action guidance restoration confirms the existing free action",async ({page,installClock,withoutRoom})=>{
+  await withoutRoom();
   await installClock(); const game=tick(act(reliabilityCompany(),{type:"arm_reliability"}),8);
   await boot(page,game); await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
   await closeInspection(page); await page.getByRole("button",{name:"Hint",exact:true}).click();
@@ -373,7 +395,8 @@ test("action guidance restoration confirms the existing free action",async ({pag
 });
 
 for (const [chapter,label,company] of [[2,"Upgrade database",scaling],[6,"Add server",combinedCompany]] as const)
-  test(`action confirmation chapter ${chapter}: ${label}`,async ({page,installClock})=>{
+  test(`action confirmation chapter ${chapter}: ${label}`,async ({page,installClock,withoutRoom})=>{
+  await withoutRoom();
     await installClock(); await boot(page,company());
     await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
     await (await infrastructureAction(page,new RegExp(`^${label}`))).click();
@@ -381,7 +404,8 @@ for (const [chapter,label,company] of [[2,"Upgrade database",scaling],[6,"Add se
     await page.getByRole("button",{name:"Cancel",exact:true}).click(); await expect(gold(page)).toHaveCount(0);
   });
 
-test("action guidance preparation: required risk choice retains ownership and never accepts itself",async ({page,installClock})=>{
+test("action guidance preparation: required risk choice retains ownership and never accepts itself",async ({page,installClock,withoutRoom})=>{
+  await withoutRoom();
   await installClock(); await boot(page,scaling());
   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
   await closeInspection(page); await page.getByRole("button",{name:"Hint",exact:true}).click();
@@ -397,7 +421,8 @@ for(const [chapter,company,target] of [
   [1,newGame,"Run"],[2,scaling,"Upgrade database"],
   [3,enteredDataCompany,"Run"],[4,()=>spikeCompany(false),"App Server"],
   [5,reliabilityCompany,"Start reliability test"],[6,combinedCompany,"Run"],
-] as const) test(`simple Hint Chapter ${chapter}: one explanation and valid next choices`,async ({page,installClock},info)=>{
+] as const) test(`simple Hint Chapter ${chapter}: one explanation and valid next choices`,async ({page,installClock,withoutRoom},info)=>{
+  await withoutRoom();
   await installClock(); await boot(page,company());
   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
   const before=(await savedGame(page)).campaign!.inputs;
@@ -417,6 +442,7 @@ for(const [chapter,company,target] of [
 // These journeys use the same real-time idle clock as Run and Hint, never a chapter timer.
 test('progression choice: opening the growth explanation never accepts risk', async ({ page, installClock }, info) => {
   await installClock(); await boot(page, scaling());
+  await expectRoom(page);
   const beforeGame=await savedGame(page);
   await idle(page, 9999); await expect(gold(page)).toHaveCount(0);
   await page.clock.runFor(1); await expect(gold(page)).toHaveCount(1);
@@ -439,7 +465,8 @@ test('progression choice: opening the growth explanation never accepts risk', as
   expect((await savedGame(page)).campaign!.scalingConsent).toBeFalsy();
 });
 
-test('progression choice: actual database preparation replaces the risk spotlight with Run', async ({ page, installClock }) => {
+test('progression choice: actual database preparation replaces the risk spotlight with Run', async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock(); await boot(page, scaling());
   // Keep scene frames frozen while making paused decisions, as in other public purchase journeys.
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
@@ -457,7 +484,8 @@ test('progression choice: actual database preparation replaces the risk spotligh
   expect((await savedGame(page)).campaign!.scalingConsent).toBeFalsy();
 });
 
-test("Chapter 2 chosen risk: only the real confirmation records consent", async ({ page, installClock }) => {
+test("Chapter 2 chosen risk: only the real confirmation records consent", async ({ page, installClock, withoutRoom }) => {
+  await withoutRoom();
   await installClock(); await boot(page, scaling());
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
   const beforeGame=await savedGame(page),before=beforeGame.campaign!;

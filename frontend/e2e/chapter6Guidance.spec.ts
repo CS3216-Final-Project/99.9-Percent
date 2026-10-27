@@ -4,14 +4,16 @@ import { chapter6Preparation, bootChapter6 } from "./chapter6Guidance";
 import { act, tick, combinedCompany, finishedCompany, finishRound } from "../src/sim/__tests__/combinedFixture";
 import { expectCueColours } from "./chapter4Cues";
 
-test("Chapter 6 guidance: capacity before removal, Confirm, Run, readiness and reload", async ({ page, installClock }) => {
+test("Chapter 6 guidance: capacity before removal, Confirm, Run, readiness and reload", async ({ page, installClock , withoutRoom}) => {
+  await withoutRoom();
   // The virtual clock renders every animation frame of the 2.5s readiness run at 1440x900 in software: about 20s of
   // the 55-65s this takes on CI. The 320px touch variant in mobile.spec.ts finishes the same steps in half the time.
   test.setTimeout(120_000);
   await installClock(); await chapter6Preparation(page);
 });
 
-test("Chapter 6 guidance: wave and recovery use real boundaries without repeating on pause", async ({ page, installClock }) => {
+test("Chapter 6 guidance: wave and recovery use real boundaries without repeating on pause", async ({ page, installClock , withoutRoom}) => {
+  await withoutRoom();
   await installClock();
   const game = act(tick(combinedCompany(), 5), { type: "start_growth_wave" });
   await bootChapter6(page, tick(game, 23));
@@ -33,7 +35,8 @@ test("Chapter 6 guidance: wave and recovery use real boundaries without repeatin
   expect((await savedGame(page)).campaign!.combinedStage!.completedRounds).toHaveLength(1);
 });
 
-test("Chapter 6 guidance: final review owns completion and is never bypassed", async ({ page, installClock }) => {
+test("Chapter 6 guidance: final review owns completion and is never bypassed", async ({ page, installClock , withoutRoom}) => {
+  await withoutRoom();
   await installClock(); const game = finishedCompany(); await bootChapter6(page, game);
   await expect(page.getByRole("dialog", { name: "Final campaign review", exact: true })).toBeVisible();
   await expect(page.getByRole("dialog", { name: /^Chapter 6:/ })).toHaveCount(0);
@@ -42,7 +45,8 @@ test("Chapter 6 guidance: final review owns completion and is never bypassed", a
   expect((await savedGame(page)).outcome).toBe("won");
 });
 
-test("Chapter 6 guidance: post-review restoration precedes replacement capacity and useful Run", async ({ page, installClock }) => {
+test("Chapter 6 guidance: post-review restoration precedes replacement capacity and useful Run", async ({ page, installClock , withoutRoom}) => {
+  await withoutRoom();
   await installClock(); let game = combinedCompany();
   for (let i = 0; i < 2; i++) game = act(finishRound(act(tick(game, 5), { type: "start_growth_wave" })), { type: "acknowledge_growth" });
   game = tick(act(tick(game, 5), { type: "start_growth_wave" }), 10);

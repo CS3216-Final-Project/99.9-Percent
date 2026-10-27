@@ -12,10 +12,12 @@ async function boot(page: Page, game: GameState) {
 }
 const gold = (page: Page) => page.locator(".campaign-gold-attention");
 
-test("Chapter 4 traffic target: open Network transfers to Remove, Cancel, Confirm and Run", async ({ page, installClock }) => {
+test("Chapter 4 traffic target: open Network transfers to Remove, Cancel, Confirm and Run", async ({ page, installClock , withoutRoom}) => {
+  await withoutRoom();
   await installClock(); await chapter4TrafficTarget(page);
 });
-test("Chapter 4 cues: centered 320px Prepare, manual Hint targeting and reload receipt", async ({ page, installClock }, info) => {
+test("Chapter 4 cues: centered 320px Prepare, manual Hint targeting and reload receipt", async ({ page, installClock , withoutRoom}, info) => {
+  await withoutRoom();
   await installClock(); await page.setViewportSize({ width: 320, height: 568 }); await boot(page, spikeCompany(false));
   const cue = page.getByRole("dialog", { name: "Chapter 4: Prepare", exact: true });
   await expect(cue).toHaveAttribute("aria-modal", "false"); await expect(cue).toBeInViewport({ ratio: 1 });
@@ -36,7 +38,8 @@ test("Chapter 4 cues: centered 320px Prepare, manual Hint targeting and reload r
 });
 
 for (const [offset, name, tone] of [[7, "Spike 1", "pressure"], [27, "Between spikes", "recovery"], [47, "Spike 2", "pressure"], [67, "Recover", "recovery"]] as const)
-  test(`Chapter 4 cues: engine boundary enters ${name} and targets stage-appropriate guidance`, async ({ page, installClock }) => {
+  test(`Chapter 4 cues: engine boundary enters ${name} and targets stage-appropriate guidance`, async ({ page, installClock , withoutRoom}) => {
+  await withoutRoom();
     await installClock(); await boot(page, untilOffset(act(spikeCompany(false), { type: "set_traffic_limit", enabled: true }), offset));
     await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
     await page.getByRole("button", { name: "Pause", exact: true }).click();
@@ -51,7 +54,8 @@ for (const [offset, name, tone] of [[7, "Spike 1", "pressure"], [27, "Between sp
     expect((await savedGame(page)).campaign!.step).toBe(spikeCompany(false).campaign!.spikeStage!.enteredStep + offset + 1);
   });
 
-test("Chapter 4 cues: Respond yields to immediate incident Pause and action Confirm", async ({ page, installClock }) => {
+test("Chapter 4 cues: Respond yields to immediate incident Pause and action Confirm", async ({ page, installClock , withoutRoom}) => {
+  await withoutRoom();
   await installClock(); await boot(page, untilOffset(spikeCompany(false), 7));
   await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
   await expectCueColours(page.getByRole("dialog", { name: "Chapter 4: Spike 1", exact: true }), "pressure");
@@ -68,7 +72,8 @@ test("Chapter 4 cues: Respond yields to immediate incident Pause and action Conf
 });
 
 
-test("Chapter 4 decisions: evaluate rejected traffic, optional improvement, Cancel and keep strategy", async ({ page, installClock }) => {
+test("Chapter 4 decisions: evaluate rejected traffic, optional improvement, Cancel and keep strategy", async ({ page, installClock , withoutRoom}) => {
+  await withoutRoom();
   await installClock(); const game = untilOffset(act(spikeCompany(false), { type: "set_traffic_limit", enabled: true }), 28);
   await boot(page, game);
   const cue = page.getByRole("dialog", { name: "Chapter 4: Between spikes", exact: true });
