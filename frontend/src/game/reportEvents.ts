@@ -11,6 +11,30 @@ const dollars = (cents: unknown) => new Intl.NumberFormat("en-US", { style: "cur
 const app = (id: unknown) => typeof id === "string" ? id.replace("app-", "App ") : "Unknown server";
 const component = (id: unknown) => id === "db" ? "Database" : id === "app" ? "Application" : app(id);
 const actionName = (type: unknown) => ACTION_NAMES[type as Intervention] ?? (typeof type === "string" ? type.replaceAll("-", " ") : "Infrastructure change");
+/** One glanceable label for each reason the controller pauses; an empty reason means it resumed observing. */
+const BLOCKED_LABELS: Record<string, string> = {
+  "Reliability test in progress": "reliability test",
+  "Controller disabled": "off",
+  "Balanced routing to two apps required": "needs two balanced apps",
+  Provisioning: "joining new app",
+  "Routing pending": "routing pending",
+  "Routing pool changed; inspect installed capacity": "routing changed",
+  Cooldown: "cooldown",
+  "Deployment or routing channel busy": "deploy in progress",
+  "No healthy routed capacity": "no healthy capacity",
+  "Maximum four instances reached": "fleet full",
+  "Insufficient cash for provisioning": "insufficient cash",
+};
+export const blockedLabel = (reason: unknown) =>
+  typeof reason === "string" && reason ? (BLOCKED_LABELS[reason] ?? reason) : null;
+/** Apps added to the routing pool by an activated routing change. */
+const routedTargets = (before: unknown, after: unknown) => {
+  try {
+    const b = new Set((JSON.parse(String(before)) as { targets?: string[] }).targets ?? []);
+    const added = ((JSON.parse(String(after)) as { targets?: string[] }).targets ?? []).filter(t => !b.has(t));
+    return added.length ? added.map(app).join(", ") : null;
+  } catch { return null; }
+};
 function routing(json: unknown) {
   try {
     const r = JSON.parse(String(json)) as { mode?: string; targets?: string[] };
@@ -33,7 +57,7 @@ export function describeEvents(events: TraceEvent[], context: TraceEvent[] = eve
   const requested = new Map(context.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.type]));
   return events.flatMap(e => {
     const d = e.data;
-    const automatic = d.source === "autoscaler" ? "Autoscaling " : "";
+    const automatic = d.source === "autoscaler" ? "Autoscaler: " : "";
     const line = (title: string, ...parts: (string | null | false | undefined)[]) => [{ id: e.id, step: e.step, title, detail: parts.filter(Boolean).join(" · ") || null }];
     switch (e.type) {
       case "metrics": return [];
@@ -59,12 +83,12 @@ export function describeEvents(events: TraceEvent[], context: TraceEvent[] = eve
       case "traffic-spike-started": return line("Traffic spike started", `Incoming ${num(d.to)} req/s`);
       case "traffic-spike-ended": return line("Traffic spike ended", `Incoming ${num(d.to)} req/s`);
       case "workload-changed": return line("Workload changed", d.profile ? `${String(d.profile).replaceAll("-", " ")} workload` : null, typeof d.to === "number" && `${num(d.to)} req/s`);
-      case "autoscale-scale-out-decided": return line("Autoscaling requested a server", d.targetId ? app(d.targetId) : null);
-      case "autoscale-scale-up-decided": return line("Autoscaling requested an upgrade", d.targetId ? app(d.targetId) : null);
-      case "autoscale-scale-in-eligible": return line("Autoscaling scheduled a retirement", d.targetId ? app(d.targetId) : null);
-      case "autoscale-instance-retired": return line("Autoscaling retired a server", d.targetId ? app(d.targetId) : null);
-      case "autoscale-retirement-cancelled": return line("Autoscaling cancelled a retirement", d.targetId ? app(d.targetId) : null, d.reason ? String(d.reason) : null);
-      case "autoscaler-blocked": return line("Autoscaling blocked", d.reason ? String(d.reason) : null);
+      case "autoscale-scale-out-decided": return line(`Autoscaler: +${app(d.targetId)}`);
+      case "autoscale-scale-up-decided": return line(`Autoscaler: ↑${app(d.targetId)}`);
+      case "autoscale-scale-in-eligible": return line(`Autoscaler: -${app(d.targetId)}`, "retiring");
+      case "autoscale-instance-retired": return line(`Autoscaler: -${app(d.targetId)}`, "retired");
+      case "autoscale-retirement-cancelled": return line(`Autoscaler: kept ${app(d.targetId)}`, d.reason ? String(d.reason) : null);
+      case "autoscaler-blocked": return d.reason ? line("Autoscaler: paused", blockedLabel(d.reason)) : line("Autoscaler: observing");
       case "scenario-started": return line(`Growth wave ${Number(d.index) + 1} started`, d.template ? `${String(d.template).replaceAll("-", " ")}` : null, `Peak ${num(d.peak)} req/s`);
       case "scenario-pressure-ended": return line("Growth wave eased", `Back to ${num(d.baseline)} req/s`);
       case "promotion-started": return line("Promotion started", d.increment ? `+${num(d.increment)} req/s` : null, `Until game second ${d.endStep}`);
@@ -81,13 +105,23 @@ export function autoscalerActivity(before: TraceEvent[], after: TraceEvent[]): s
   return after.filter(e => e.id > base).flatMap(e => {
     const d = e.data;
     switch (e.type) {
-      case "autoscale-scale-out-decided": return [`Autoscaling decided to add ${app(d.targetId)}`];
-      case "autoscale-scale-up-decided": return [`Autoscaling decided to upgrade ${app(d.targetId)}`];
-      case "autoscale-scale-in-eligible": return [`Autoscaling decided to retire ${app(d.targetId)}`];
-      case "autoscale-instance-retired": return [`Autoscaling retired ${app(d.targetId)}`];
-      case "autoscale-retirement-cancelled": return [`Autoscaling cancelled the ${app(d.targetId)} retirement`];
-      case "autoscaler-blocked": return [`Autoscaling paused — ${String(d.reason ?? "unknown")}`];
-      case "action-activated": return d.source === "autoscaler" ? [`Autoscaling completed: ${actionName(typeOf.get(d.actionId))}${d.targetId ? ` — ${app(d.targetId)}` : ""}`] : [];
+      case "autoscale-scale-out-decided": return [`Autoscaler: +${app(d.targetId)}`];
+      case "autoscale-scale-up-decided": return [`Autoscaler: ↑${app(d.targetId)}`];
+      case "autoscale-scale-in-eligible": return [`Autoscaler: -${app(d.targetId)} retiring`];
+      case "autoscale-instance-retired": return [`Autoscaler: -${app(d.targetId)}`];
+      case "autoscale-retirement-cancelled": return [`Autoscaler: kept ${app(d.targetId)}`];
+      case "autoscaler-blocked": return d.reason ? [`Autoscaler paused: ${blockedLabel(d.reason)}`] : [`Autoscaler: observing`];
+      case "action-activated": {
+        if (d.source !== "autoscaler") return [];
+        const type = typeOf.get(d.actionId);
+        if (type === "retire-app") return []; // The retired/cancelled event already announced it.
+        const joined = type === "routing" ? routedTargets(d.routingBefore, d.routingAfter) : null;
+        const text = type === "add-app" ? `${app(d.targetId)} installed`
+          : type === "routing" ? (joined ? `${joined} routed` : "routing updated")
+          : type === "scale-up" ? `${app(d.targetId)} upgraded`
+          : `${actionName(type)} done${d.targetId ? ` — ${app(d.targetId)}` : ""}`;
+        return [`Autoscaler: ${text}`];
+      }
       default: return [];
     }
   });
