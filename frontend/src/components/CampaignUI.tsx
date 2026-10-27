@@ -287,6 +287,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const spike=chapter4Stage(game);
   const reviewing=!!action&&!action.action;
   const actionReady=!!action?.action&&!disabled&&previewCampaignAction(game,action.action).ok;
+  const waveReadiness=!!combined&&!combined.currentRound&&combined.nextRoundIndex<3&&!combined.finalReview&&!combined.acknowledged&&game.phase!=="ended";
   const priority=c.incident?"incident":c.pending.length?"pending":fault?.startedStep!=null&&fault.restoredStep===null?"restored":combined&&c.limit!==null?"admission":m.app.backlog+m.db.backlog>0?"queues":null;
   const unmet=model.incomplete.find(r=>r.id===priority)??model.incomplete[0];
   const condition=game.phase==="ended"&&game.outcome!=="won"?model.notice:unmet?`Still needed: ${unmet.label}`:null;
@@ -317,6 +318,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
       {condition?<section aria-label="Current unmet condition" className={`mission-condition${incident||game.phase==="ended"&&game.outcome!=="won"?" is-failure":""}`}><h4>Current unmet condition</h4><p>{condition}</p></section>:<section aria-label="Chapter accomplished" className="mission-accomplished"><h4>Chapter accomplished</h4><p>{accomplishment}</p></section>}
       <section aria-label="Next step" className="mission-next"><h4>Next step</h4>
         <p>{game.phase==="ended"&&game.outcome==="won"?"Inspect the scorecard and final company, or start a new company from the Menu.":running&&incidentNeedsPause(game,decision)?"Pause the company to inspect the incident.":reviewing?"Open the recorded review to continue.":actionReady&&action?.action&&!isChapterEntry(action.action)?"The company is ready for the next action.":actionReady&&action?.action?`${action.label} using Next in the chapter bar.`:nextAdvice}</p>
+        {combined&&waveReadiness&&<><p className="mission-readiness">Full-demand readiness: {combined.readinessSteps} / 5</p><Meter value={combined.readinessSteps/5} label="Full-demand readiness progress" tone="ok"/></>}
         {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={disabled||!previewCampaignAction(game,action.action).ok} onClick={()=>act(action.action!)}>{action.label}<Icon name="next"/></button>}
         {reviewing&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next"/></button>}
         {!reviewing&&!actionReady&&hint.available&&<button className="btn" onClick={hint.openHint}>Show next action<Icon name="bulb"/></button>}
