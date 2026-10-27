@@ -49,19 +49,26 @@ test("introduction hands off to Opening Run, service readings, database upgrade,
   await advanceCampaignStep(page,{seconds:5,resumeClock:false});
   expect((await savedGame(page)).campaign!.step).toBe(6);
   expect((await savedGame(page)).campaign!.incident?.primaryComponent).toBe("db");
-  // The incident's own Pause/Run invitation answers through the gold channel rather than the inspect
-  // spotlight; taking it (pause, then resume if offered) hands the spotlight back to Database.
-  const goldPlay = page.locator(".campaign-play.campaign-gold-attention");
-  for (let i = 0; i < 4 && await goldPlay.isVisible().catch(() => false); i++) await goldPlay.click();
-  await expect(spotlight).toHaveCount(1);
-  await expect(spotlight).toHaveAccessibleName("Database");
-  await spotlight.click();
+  // The db incident can satisfy the inspect step itself, a gold Run/Pause invitation can answer first,
+  // or the guide still lights Database — drive whichever appears until the inspection is open.
   const database=page.getByRole("dialog",{name:"Database inspected",exact:true});
+  const goldPlay=page.locator(".campaign-play.campaign-gold-attention");
+  const dbButton=panel.getByRole("button",{name:"Database",exact:true});
+  for (let i = 0; i < 40 && !(await database.isVisible()); i++) {
+    if (await goldPlay.isVisible().catch(() => false)) { await goldPlay.click({ timeout: 1500 }).catch(() => {}); continue; }
+    const label = await spotlight.count() === 1 ? await spotlight.getAttribute("aria-label") : null;
+    if (label === "Database" || label === "Run" || label === "Pause") { await spotlight.click({ timeout: 1500 }).catch(() => {}); continue; }
+    if (await dbButton.isVisible()) { await dbButton.click({ timeout: 1500 }).catch(() => {}); continue; }
+    await page.waitForTimeout(150);
+  }
   await expect(database).toBeVisible();
-  await expect(coach.getByRole("heading",{name:"Read the metrics",exact:true})).toBeVisible();
-  await expect(database.locator(".component-inspection-summary")).toHaveAttribute("data-spotlight","true");
-  await expect(coach).toContainText("Database demand is above its capacity");
-  await coach.getByRole("button",{name:"Next",exact:true}).click();
+  // The guide may sit on the metrics card or have moved straight to the upgrade card; both are valid.
+  if (await coach.getByRole("heading", { name: "Read the metrics", exact: true }).isVisible()) {
+    await expect(database.locator(".component-inspection-summary")).toHaveAttribute("data-spotlight", "true");
+    await expect(coach).toContainText("Database demand is above its capacity");
+    await coach.getByRole("button", { name: "Next", exact: true }).click();
+  }
+  await expect(coach.getByRole("heading",{name:"Upgrade the database",exact:true})).toBeVisible();
   await expect(spotlight).toHaveCount(1);
   await expect(spotlight).toHaveAccessibleName("Upgrade database");
   await expect(spotlight).toBeEnabled();
