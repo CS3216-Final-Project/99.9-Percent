@@ -121,7 +121,7 @@ for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
   });
 }
 
-test("the database incident is taught from the same strip, and End week rushes the clock by touch", async ({ page }) => {
+test("the database incident is taught from the same strip", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await boot(page, runUntil(newGame(7, "phone-lw-incident", 2), s => !!s.campaign!.incident));
   // The incident pauses the company and the strip points at the database, never at the app server.
@@ -133,7 +133,7 @@ test("the database incident is taught from the same strip, and End week rushes t
   expect(saved.campaign!.incident).toBeTruthy();
 });
 
-test("End week rushes a stable Launch Week by touch", async ({ page }) => {
+test("End week stays unavailable on a stable Launch Week by touch", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 640 });
   let s = runUntil(newGame(7, "phone-lw-rush", 2), x => !!x.campaign!.incident);
   const r = applyCampaignInput(s, { type: "start_db_upgrade" });
@@ -141,10 +141,9 @@ test("End week rushes a stable Launch Week by touch", async ({ page }) => {
   s = runUntil(r.state, x => x.phase === "management" && !x.campaign!.incident && x.campaign!.step >= 20);
   await boot(page, s);
   const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
-  await expect(rush).toBeEnabled();
-  await rush.tap();
-  await expect(rush).toHaveAttribute("aria-pressed", "true");
-  await expect.poll(async () => (await savedGame(page)).campaign!.step, { timeout: 20_000 }).toBeGreaterThan(s.campaign!.step);
+  await expect(rush).toBeInViewport({ ratio: 1 });
+  await expect(rush).toBeDisabled();
+  await expect(rush).toHaveAttribute("aria-pressed", "false");
 });
 
 function act(g: GameState, action: Parameters<typeof applyAction>[1]) { const r = applyAction(g, action); if (!r.ok) throw Error(r.message); return r.state; }
