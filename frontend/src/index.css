@@ -5341,7 +5341,7 @@ button:disabled {
 .component-inspection:not(.component-inspection-db) .component-inspection-controls .campaign-action-card { display: flex; flex-direction: column; }
 .component-inspection:not(.component-inspection-db) .component-inspection-controls .act { flex: 1; }
 
-.component-inspection .act { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; min-height: 44px; margin: 0; padding: 10px; }
+.component-inspection .act { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; min-height: 44px; margin: 0; padding: 10px; }
 .component-inspection .act-label { min-width: 0; }
 .component-inspection .actions { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 

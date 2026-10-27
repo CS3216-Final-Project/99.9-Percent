@@ -36,7 +36,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       await expect(dbReveal.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
       await expect(dbReveal.getByText("Live", { exact: true })).toBeVisible();
       await expect(dbReveal.getByText("Full system evidence", { exact: true })).toHaveCount(0);
-      for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
+      for (const name of [/Add server/, /Upgrade database/, /Limit to ~[\d,]+ requests\/s/]) {
         const action = await infrastructureAction(page,name);
         await action.scrollIntoViewIfNeeded();
         await expect(action).toBeInViewport();
@@ -56,7 +56,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       await page.getByRole("button", { name: "Pause", exact: true }).click();
       expect((await savedGame(page)).campaign!.dbCapacity).toBe(600);
     }
-    await (await infrastructureAction(page,path === "limit" ? /Limit to 500 requests\/s/ : /Upgrade database/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
+    await (await infrastructureAction(page,path === "limit" ? /Limit to ~[\d,]+ requests\/s/ : /Upgrade database/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
     if (path === "upgrade") {
       await expect(page.getByRole("status").filter({ hasText: "Database upgrade:" })).toContainText("activates in 3 game second(s)");
       await expect((await infrastructureAction(page,/Add server/))).toBeDisabled();

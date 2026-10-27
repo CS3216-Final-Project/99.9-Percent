@@ -119,7 +119,7 @@ test("Guided Mode incident: the sheet stays at least half open with every respon
 
   const panel = page.getByRole("complementary", { name: "System metrics" });
   await expect(panel.getByRole("region", { name: "Incident recovery" })).toBeVisible();
-  for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
+  for (const name of [/Add server/, /Upgrade database/, /Limit to ~[\d,]+ requests\/s/]) {
     const response = await infrastructureAction(page,name);
     await response.scrollIntoViewIfNeeded();
     // The existing action is reachable in its component dialog.

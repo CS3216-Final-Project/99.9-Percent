@@ -52,7 +52,7 @@ export async function purchaseLayout(page:Page,width:number,height:number,touch=
     let before=await savedGame(page);
     const panel=page.getByRole("complementary",{name:"System metrics"});
     // Each component opens the same centered quote and its own equipment highlight.
-    for(const [label,equipment] of [[/^Upgrade database/,"db"],[/^Limit to 500/,"gateway"]] as const){
+    for(const [label,equipment] of [[/^Upgrade database/,"db"],[/^Limit to ~/,"gateway"]] as const){
         const action=await infrastructureAction(page,label);
         const beforeCancel=await savedGame(page);
         if(touch)await action.tap();else await action.click();
