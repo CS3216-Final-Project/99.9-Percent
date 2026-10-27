@@ -180,7 +180,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey} data-campaign-action={label} data-guidance-action={props.decision ? guidanceActionId(props.decision) : undefined}
     onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)}
     onFocus={() => setPointing(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPointing(false); }}>
-    <Act {...props} icon={inspection ? undefined : props.icon} price={inspection ? undefined : props.price} note={inspection ? undefined : props.note} disabled={props.disabled || preview?.ok === false} onClick={toggle} />
+    <Act {...props} price={inspection ? undefined : props.price} note={inspection ? undefined : props.note} disabled={props.disabled || preview?.ok === false} onClick={toggle} />
     {!open && (props.disabled || preview?.ok === false) && <p className="campaign-action-reason" id={id} tabIndex={0}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
     {open && <ActionPopover anchor={anchor} inspection={inspection} onClose={cancel}>
       <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); cancel(); } }}>
