@@ -278,7 +278,10 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const spike=chapter4Stage(game);
   const reviewing=!!action&&!action.action;
   const actionReady=!!action?.action&&!disabled&&previewCampaignAction(game,action.action).ok;
-  const waveReadiness=!!combined&&!combined.currentRound&&combined.nextRoundIndex<3&&!combined.finalReview&&!combined.acknowledged&&game.phase!=="ended";
+  const checksProgress=combined&&!combined.acknowledged&&!combined.finalReview&&game.phase!=="ended"
+    ?combined.currentRound?{label:"Wave stability",steps:combined.currentRound.stableSteps}
+    :combined.nextRoundIndex===3?{label:"Final stability",steps:combined.finalStableSteps}
+    :{label:"Full-demand readiness",steps:combined.readinessSteps}:null;
   const priority=c.incident?"incident":c.pending.length?"pending":fault?.startedStep!=null&&fault.restoredStep===null?"restored":combined&&c.limit!==null?"admission":m.app.backlog+m.db.backlog>0?"queues":null;
   const unmet=model.incomplete.find(r=>r.id===priority)??model.incomplete[0];
   const condition=game.phase==="ended"&&game.outcome!=="won"?model.notice:unmet?`Still needed: ${unmet.label}`:null;
@@ -286,7 +289,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const stage=combined?(combined.acknowledged?"Campaign complete":combined.finalReview?"Final review":pendingCombined(c)?"Growth outcome review":combined.currentRound?`Growth wave ${combined.currentRound.index+1} ${combined.currentRound.startedStep===null?"scheduled":combined.currentRound.pressureEndedStep===null?"active":"recovery"}`:combined.nextRoundIndex===3?"Final checks":"Prepare for full demand")
     :reliability?(reliability.acknowledged?"Outcome acknowledged":pendingReliability(c)?"Outcome review":!reliability.fault?"Preparation":reliability.fault.startedStep===null?"Failure scheduled":reliability.fault.restoredStep===null?"Failure / recovery":"Stability verification")
     :c.spikeStage!.acknowledged?"Outcome acknowledged":pendingSpikeAcknowledgement(c)?"Spike outcome review":({prepare:"Preparing",spike1:"Spike 1 active",between:"Between spikes",spike2:"Spike 2 active",recover:"Review / stability verification"}[spike?.stage??"recover"]);
-  const objectiveIds=combined?["checks"]:reliability?["armed","observed","restored","observations","recognition"]:["pulses","observations","recognition"];
+  const objectiveIds=combined?[]:reliability?["armed","observed","restored","observations","recognition"]:["pulses","observations","recognition"];
   const objectives=[...model.requirements.filter(r=>objectiveIds.includes(r.id)),...(combined?model.finalGoals.filter(r=>r.id==="completion"):[])];
   const nextAdvice=decision.attention==="run"?decision.message:decision.reason==="spike-plan"?decision.recommendation:decision.action?`Suggested action: ${decision.action.label}.`:decision.recommendation;
   const showMetrics=!!c.incident||m.app.backlog+m.db.backlog>0||spike?.stage==="spike1"||spike?.stage==="spike2"||!!combined?.currentRound;
@@ -309,7 +312,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
       {condition?<section aria-label="Current unmet condition" className={`mission-condition${incident||game.phase==="ended"&&game.outcome!=="won"?" is-failure":""}`}><h4>Current unmet condition</h4><p>{condition}</p></section>:<section aria-label="Chapter accomplished" className="mission-accomplished"><h4>Chapter accomplished</h4><p>{accomplishment}</p></section>}
       <section aria-label="Next step" className="mission-next"><h4>Next step</h4>
         <p>{game.phase==="ended"&&game.outcome==="won"?"Inspect the scorecard and final company, or start a new company from the Menu.":running&&incidentNeedsPause(game,decision)?"Pause the company to inspect the incident.":reviewing?"Open the recorded review to continue.":actionReady&&action?.action&&!isChapterEntry(action.action)?"The company is ready for the next action.":actionReady&&action?.action?`${action.label} using Next in the chapter bar.`:nextAdvice}</p>
-        {combined&&waveReadiness&&<><p className="mission-readiness">Full-demand readiness: {combined.readinessSteps} / 5</p><Meter value={combined.readinessSteps/5} label="Full-demand readiness progress" tone="ok"/></>}
+        {checksProgress&&<><p className="mission-readiness">{checksProgress.label}: {checksProgress.steps} / 5</p><Meter value={checksProgress.steps/5} label={`${checksProgress.label} progress`} tone="ok"/></>}
         {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={disabled||!previewCampaignAction(game,action.action).ok} onClick={()=>act(action.action!)}>{action.label}<Icon name="next"/></button>}
         {reviewing&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next"/></button>}
         {!reviewing&&!actionReady&&hint.available&&<button className="btn" onClick={hint.openHint}>Show next action<Icon name="bulb"/></button>}

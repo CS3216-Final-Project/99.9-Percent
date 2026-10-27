@@ -97,9 +97,11 @@ for(const state of ["readiness","wave","outcome","final","complete"] as const) i
 it("fills a readiness progress bar toward enabling the next growth wave",()=>{
   const bar=()=>screen.getByRole("progressbar",{name:"Full-demand readiness progress"});
   const nextStep=()=>within(screen.getByRole("region",{name:"Next step"}));
+  const progress=()=>within(screen.getByRole("region",{name:"Chapter Progress"}));
   const game=combinedCompany();
   show(game);
   expect(nextStep().getByText("Full-demand readiness: 0 / 5")).toBeTruthy();
+  expect(progress().queryByText(/Full-demand readiness/)).toBeNull();
   expect(bar().getAttribute("aria-valuenow")).toBe("0");
   act(()=>useGame.setState({game:tick(game,3)}));
   expect(nextStep().getByText("Full-demand readiness: 3 / 5")).toBeTruthy();
@@ -110,6 +112,18 @@ it("fills a readiness progress bar toward enabling the next growth wave",()=>{
   expect(screen.getByRole("button",{name:"Start next growth wave"}).hasAttribute("disabled")).toBe(false);
   act(()=>useGame.setState({game:decide(useGame.getState().game,{type:"start_growth_wave"})}));
   expect(screen.queryByRole("progressbar",{name:"Full-demand readiness progress"})).toBeNull();
+});
+it("fills a wave stability progress bar while a growth wave runs",()=>{
+  const bar=()=>screen.getByRole("progressbar",{name:"Wave stability progress"});
+  const nextStep=()=>within(screen.getByRole("region",{name:"Next step"}));
+  let game=combinedCompany();
+  game=decide(tick(game,5),{type:"start_growth_wave"});
+  show(game);
+  expect(nextStep().getByText("Wave stability: 0 / 5")).toBeTruthy();
+  expect(bar().getAttribute("aria-valuenow")).toBe("0");
+  act(()=>useGame.setState({game:finishRound(game)}));
+  expect(nextStep().getByText("Wave stability: 5 / 5")).toBeTruthy();
+  expect(bar().getAttribute("aria-valuenow")).toBe("100");
 });
 it("shows the actual pending deployment and recalculates after its activation",()=>{
   const game=decide(combinedCompany(),{type:"add_server"});show(game);
