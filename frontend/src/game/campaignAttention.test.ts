@@ -86,6 +86,16 @@ it("does not spotlight Run for an untreated actual failure", () => {
   const game = tick(act(reliabilityCompany(), { type: "arm_reliability" }), 8);
   expect(guidance(game)).toMatchObject({ attention: "hint", target: "app" });
 });
+it("guides a stable but still-offline failure to Restore App, not to Run", { timeout: 30_000 }, () => {
+  let game = tick(act(preparedReliability(), { type: "arm_reliability" }), 8);
+  for (let i = 0; i < 25 && guidance(game).reason !== "isolated-failure"; i++) game = tick(game);
+  const decision = guidance(game);
+  expect(decision).toMatchObject({ reason: "isolated-failure", attention: "hint", target: "app" });
+  expect(decision.action?.action).toEqual({ type: "restore_app", appId: "app-2" });
+  expect(decision.message).toContain("Restore");
+  expect(decision.message).not.toContain("Press Run");
+  expect(decision.recommendation).toContain("Restore App");
+});
 it("recognises a queued valid failover and rejects it when its recorded route is stale", () => {
   const game = tick(act(preparedReliability(), { type: "arm_reliability" }), 9);
   expect(game.campaign!.pending.some(a => a.type === "promote-spare")).toBe(true);

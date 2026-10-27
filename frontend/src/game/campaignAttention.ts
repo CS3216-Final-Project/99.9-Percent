@@ -95,7 +95,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
     return { ...decision, attention: upgrade || risk ? "hint" : null, message, growthChoices: { upgrade, risk }, key: `${decision.key}:${!!upgrade}:${risk}` };
   }
   if (c?.combinedStage) return chapter6Attention(game, decision);
-  if (!c || decision.attention === "run" || !["database", "application", "unrouted", "failure", "round-restoration", "full-demand"].includes(decision.reason)) return decision;
+  if (!c || decision.attention === "run" || !["database", "application", "unrouted", "failure", "round-restoration", "isolated-failure", "full-demand"].includes(decision.reason)) return decision;
   const actions: GuidanceAction[] = [];
   const offer = (action: Action, label: string, evidence: string) => {
     if (previewCampaignAction(game, action).ok) actions.push({ action, label, evidence });
@@ -128,7 +128,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
     }
     if (!c.loadBalancer) offer({ type: "deploy_load_balancer" }, "Deploy load balancing", "An installed serving app is unrouted. Installation enables routing choices; you must configure traffic separately afterward.");
   }
-  if (["failure", "round-restoration"].includes(decision.reason))
+  if (["failure", "round-restoration", "isolated-failure"].includes(decision.reason))
     for (const app of c.apps) if (app.health === "failed") offer({ type: "restore_app", appId: app.id }, `Restore App ${app.id.slice(4)}`, "This server is currently failed. Restoration is free and takes three game seconds; service recovery still requires observations.");
   // Launch Week never recommends turning traffic away: the lesson is capacity, and limiting costs uptime.
   const launchLive = !!c.launchWeek && c.launchWeek.completedStep === null;
@@ -163,7 +163,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
     if (!action && c.snapshot.app.demand < c.snapshot.app.capacity + Q.appCapacity) action = find("add_server");
     if (!action && launchLive) action = find("add_server");
   } else if (decision.reason === "unrouted") action = find("set_routing") ?? find("scale_up") ?? find("deploy_load_balancer");
-  else if (decision.reason === "failure" || decision.reason === "round-restoration") action = find("restore_app");
+  else if (["failure", "round-restoration", "isolated-failure"].includes(decision.reason)) action = find("restore_app");
   else if (decision.reason === "full-demand") action = find("set_traffic_limit");
   if (!action && !launchLive && c.limit === null && c.snapshot.admitted > admissionCeiling(c) && admissionReliefFits(game)) action = find("set_traffic_limit");
   const message = decision.reason === "unrouted" && action?.action.type === "scale_up"
@@ -220,7 +220,7 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     "final-requirements": "Some company requirements are unfinished. Open View chapters to see what's missing.",
     arm: "Your company is ready. Choose Start reliability test to see how it handles a failure.",
     "arm-requirements": "Your company isn't ready for the reliability test. Open View chapters to see what's needed.",
-    "isolated-failure": "Service is stable, but a server is still offline. Press Run to let it return.",
+    "isolated-failure": "Service is stable, but a server is still offline. Check App Server and choose Restore App.",
     "scaling-choice": "Growth needs preparation. Upgrade your database, or review the optional risk with Consider growth with current capacity.",
     "prevention-recorded": "Your prevention result is recorded. Review its verification and complete the Opening recognition to continue.",
     requirements: "Open View chapters to see what your company needs next.",
@@ -379,7 +379,8 @@ function baseAttention(game: GameState): AttentionDecision {
       return hint("arm-requirements", "The reliability test is not ready to start.", "Use View chapters to review the journey, and compare Chapter requirements before starting the test.", "requirements");
     }
     if (fault.startedStep === null) return run("scheduled-failure", "The reliability test is armed; the failure has not happened yet.");
-    if (fault.restoredStep === null) return run("isolated-failure", "Service is stable with the failed app isolated. The application must still return before chapter stability can complete.");
+    if (fault.restoredStep === null)
+      return hint("isolated-failure", "Service is stable with the failed app isolated. The application must still be restored before chapter stability can complete.", "Inspect App Server health and choose Restore App. Chapter stability requires restoration.", "app");
     if (d.completedStep === null) return run("reliability-stability", `The application is restored. Stable chapter observations: ${d.stableSteps} / 5.`);
   }
   if (c.spikeStage) {
