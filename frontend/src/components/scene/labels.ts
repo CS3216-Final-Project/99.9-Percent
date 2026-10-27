@@ -21,14 +21,32 @@ export const LABEL_TAIL = 9;
 /** Breathing room between two labels stacked on the same machine. */
 export const LABEL_GAP = 4;
 
+/** Where a label's marker naturally sits: its projected anchor's centre x and y, and the label's rendered size. */
+export interface LabelSpot {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 /**
- * Y offsets that fan a row of anchored labels out downward so no two cover each other, given each label's real
- * height: the first keeps `first`, and every next one starts clear of the label above plus its tail. Works for any
- * count, and for labels of mixed heights (a status note or a load bar makes one taller than another).
+ * Y positions that pack a row of anchored labels tightly downward so no two cover each other. Each label keeps
+ * `spots[i].y + first` unless a label already placed horizontally overlaps it, in which case it drops just clear
+ * of that label's tail. Checking real overlap, not a fixed pitch, keeps the stack compact however many machines
+ * there are and however far apart their anchors already sit — labels whose marks never collide simply stay put.
+ * Works for labels of mixed heights too (a status note or a load bar makes one taller than another).
  */
-export function stackDown(heights: number[], first = 0): number[] {
-  const out = [first];
-  for (let i = 1; i < heights.length; i++) out.push(out[i - 1] + heights[i] + LABEL_TAIL + LABEL_GAP);
+export function stackDown(spots: LabelSpot[], first = 0): number[] {
+  const out = new Array<number>(spots.length);
+  for (let i = 0; i < spots.length; i++) {
+    let bottom = spots[i].y + first;
+    for (let j = 0; j < i; j++) {
+      if (Math.abs(spots[j].x - spots[i].x) < (spots[j].w + spots[i].w) / 2) {
+        bottom = Math.max(bottom, out[j] + spots[i].h + LABEL_TAIL + LABEL_GAP);
+      }
+    }
+    out[i] = bottom;
+  }
   return out;
 }
 
