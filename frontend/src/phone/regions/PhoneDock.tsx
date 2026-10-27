@@ -2,7 +2,7 @@ import { introductionActive } from "@/sim/introduction";
 import { useSyncExternalStore } from "react";
 import { BALANCE, completedTechIds, metrics, TECH_ORDER } from "@/sim";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
-import { pendingStop } from "@/sim/step";
+import { incidentActive, pendingStop } from "@/sim/step";
 import { clock } from "@/game/format";
 import { milestoneBlocks } from "@/game/campaignGuidance";
 import { useGame } from "@/game/store";
@@ -66,7 +66,7 @@ function GuidedDock() {
   const cancelWeekRush = useGame((s) => s.cancelWeekRush);
   const started = useGame((s) => s.started);
   const c = game.campaign!;
-  const incident = game.phase === "incident";
+  const incident = incidentActive(game);
   const active = started && !introductionActive(c) && pendingStop(c) === null && !milestoneBlocks(game) && (game.phase === "management" || incident);
   const second = c.step % Q.periodSteps;
   const tabs: ViewTab[] = [
