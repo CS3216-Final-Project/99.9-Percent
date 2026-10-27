@@ -26,7 +26,7 @@ import { admissionCeiling, canEnterData, databaseUpgrade, incidentActive, pendin
 import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
-import { campaignAttention, incidentNeedsPause } from "@/game/campaignAttention";
+import { campaignAttention, guidanceActionId, incidentNeedsPause } from "@/game/campaignAttention";
 import { chapter4Stage } from "@/game/chapter4Guidance";
 import { previewCampaignAction } from "@/game/campaignFinance";
 import { campaignGuidance, milestoneBlocks, type Requirement } from "@/game/campaignGuidance";
@@ -65,6 +65,7 @@ import { SoundButton } from "./SoundButton";
 import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { Campaign, CampaignPostmortem, ScheduledAction } from "@/sim/campaignTypes";
+import type { Action } from "@/sim";
 import { completedTechIds, TECH_ORDER, type EventKind, type EquipmentId } from "@/sim";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
@@ -86,17 +87,6 @@ const OFFICE_EVIDENCE = {
   growth: { name: "Growth", text: "Growth stages increase demand on the system." },
 } as const;
 const appName = (id: string) => `App ${id.slice(4)}`;
-const sameTargets = (a: string[], b: string[]) => a.length === b.length && b.every(id => a.includes(id));
-/** Where the load balancer can send traffic: every installed app, or one of them. A reserved spare is not a choice. */
-function routeOptions(c: Campaign) {
-  const apps = routableApps(c).map(a => a.id);
-  const one = apps.map(id => ({ label: `${appName(id)} only`, targets: [id], tip: `Send every request to ${appName(id)}. The other apps stay installed and keep their running costs.` }));
-  return apps.length > 1 ? [{ label: "All apps", targets: apps, tip: "The load balancer spreads requests across every installed app." }, ...one] : one;
-}
-function routeName(c: Campaign) {
-  const t = c.routing.targets, apps = routableApps(c).map(a => a.id);
-  return apps.length > 1 && sameTargets(t, apps) ? "all apps" : t.length === 1 ? `${appName(t[0])} only` : t.map(appName).join(", ");
-}
 function RequirementList({items}:{items:Requirement[]}) {
   return <ul className="progression-requirements">{items.map(r=><li key={r.id} data-requirement={r.id} data-met={r.met}><Icon name={r.met?"check":"close"} size={12} /> {r.label}</li>)}</ul>;
 }
@@ -373,6 +363,7 @@ export function CampaignEquipmentActions({equipment,actionView}:{equipment:Equip
   const dbUpgrade=databaseUpgrade(c);
   const selectedApp=c.apps.find(a=>a.id===selectedAppId)??c.apps[0];
   const disabled=pendingStop(c)!==null||milestoneBlocks(game)||game.phase==="review"||game.phase==="ended";
+  const routingAdvice=campaignAttention(game).action?.action;
   const admissionPending=c.pending.some(a=>a.type==="limit"||a.type==="unlimit");
   const at=(...places:EquipmentId[])=>places.includes(equipment);
   const show=(section:EquipmentActionView)=>!actionView||section===actionView;
@@ -389,10 +380,14 @@ export function CampaignEquipmentActions({equipment,actionView}:{equipment:Equip
           {at("app")&&show("server")&&<li><Act icon={scaleLocked?"lock":"scaleUp"} label={`Scale up ${appName(selectedApp.id)}`} price={P.appCostCents/100} note={scaleLocked?"After load balancing":`${P.appDelay} game seconds`} disabled={disabled||busy||scaleLocked||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip={scaleLocked?"Locked until a load balancer shares traffic across two app servers. Launch Week teaches spreading load first.":"Increases only the selected application's capacity. Database capacity stays unchanged."} decision={{type:"scale_up",appId:selectedApp.id}} onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>}
           {at("gateway")&&show("balancing")&&<li><Act icon="shuffle" label="Deploy load balancing" price={P.lbCostCents/100} note={`${P.lbDelay} game seconds`} disabled={disabled||busy||c.loadBalancer||c.cashCents<=P.lbCostCents} tip="Installs a load balancer. Traffic changes only after you explicitly configure routing." decision={{type:"deploy_load_balancer"}} onClick={()=>act({type:"deploy_load_balancer"})}/></li>}
         </ul>
-        {at("gateway")&&show("routing")&&<details className="more"><summary>Configure routing · {routeName(c)}</summary>
-        <fieldset className="route-choice" disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Send traffic to · changes next game second</legend>
-          {routeOptions(c).map(o=>{const on=sameTargets(c.routing.targets,o.targets);return <CampaignDecisionButton decision={{type:"set_routing",mode:"balanced",targets:o.targets}} key={o.label} type="button" className={on?"is-active":""} aria-pressed={on} onClick={()=>{if(!on)act({type:"set_routing",mode:"balanced",targets:o.targets});}} {...tipProps(o.tip)}>{o.label}</CampaignDecisionButton>;})}
-        </fieldset><CampaignUnavailable action={{type:"set_routing",mode:"balanced",targets:routableApps(c).map(a=>a.id)}} disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")} />{!c.loadBalancer&&<p role="note">Deploy load balancing before configuring routing.</p>}{c.pending.some(a=>a.type==="routing"||a.type==="retire-app")&&<p role="note">A routing or retirement change is pending; wait for activation.</p>}</details>}
+        {at("gateway")&&show("routing")&&<><fieldset className="route-choice route-checks" disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Send traffic to · changes next game second</legend>
+          {routableApps(c).map(a=>{const routed=c.routing.targets.includes(a.id),last=routed&&c.routing.targets.length===1;
+            const targets=(routed?c.routing.targets.filter(t=>t!==a.id):[...c.routing.targets,a.id]).sort((x,y)=>Number(x.split("-")[1])-Number(y.split("-")[1]));
+            const decision:Action={type:"set_routing",mode:"balanced",targets};
+            const advised=routingAdvice?.type==="set_routing"&&routingAdvice.mode==="balanced"&&routingAdvice.targets.includes(a.id)!==routed?routingAdvice:undefined;
+            return <button type="button" role="checkbox" aria-checked={routed} key={a.id} className="route-check" disabled={last} data-guidance-action={guidanceActionId(advised??decision)} onClick={()=>{if(!last)act(decision);}} {...tipProps(last?"At least one app must keep receiving traffic.":routed?`Stop sending traffic to ${appName(a.id)}.`:`Send traffic to ${appName(a.id)}.`)}><span className="route-box" aria-hidden="true"><Icon name="check" size={12}/></span>{appName(a.id)}</button>;})}
+        </fieldset>
+        <CampaignUnavailable action={{type:"set_routing",mode:"balanced",targets:routableApps(c).map(a=>a.id)}} disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")} />{!c.loadBalancer&&<p role="note">Deploy load balancing before configuring routing.</p>}{c.pending.some(a=>a.type==="routing"||a.type==="retire-app")&&<p role="note">A routing or retirement change is pending; wait for activation.</p>}</>}
       </section>}
       {c.dataStage&&at("cache")&&<section aria-label="Read Cache actions" className="scaling-controls">
         <ul className="actions">

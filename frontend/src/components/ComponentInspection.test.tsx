@@ -83,8 +83,9 @@ it("keeps Monitoring research prerequisites discoverable without an invalid purc
   show(reliabilityCompany());open("Monitoring");open("Inspect details");
   const action=dialog("Monitoring").getByRole("button",{name:"Deploy Health Checks"});
   expect(action.hasAttribute("disabled")).toBe(true);
+  expect(action.querySelector(".act-affordance-locked")).not.toBeNull();
+  expect(action.getAttribute("aria-description")).toMatch(/research|unlock/i);
   fireEvent.click(action);expect(screen.queryByRole("dialog",{name:"Purchase preview"})).toBeNull();
-  expect(screen.getByRole("dialog",{name:"Monitoring inspected"}).textContent).toMatch(/research|unlock/i);
   expect(gold()).toHaveLength(0);
 });
 it("keeps App scaling and adding together and routing prerequisites with Network",()=>{
@@ -94,7 +95,7 @@ it("keeps App scaling and adding together and routing prerequisites with Network
   expect(dialog("Servers").getByRole("button",{name:/Scale up App/})).toBeTruthy();
   fireEvent.click(dialog("Servers").getByRole("button",{name:"Close"}));open("Network");
   networkView("Load balancing");expect(dialog("Network").getByRole("button",{name:/Deploy load balancing/}).hasAttribute("disabled")).toBe(true);
-  networkView("Routing");expect(dialog("Network").getByText(/Configure routing/)).toBeTruthy();
+  networkView("Routing");expect(dialog("Network").getByRole("group",{name:/Send traffic to/})).toBeTruthy();
   open("Back to Network");expect(dialog("Network").getByRole("button",{name:/Limit to ~/})).toBeTruthy();
 });
 it.each([4,6])("routes Chapter %s traffic-limit advice to its real Network action, not About",async chapter=>{
@@ -171,7 +172,7 @@ it.each([4,5,6])("keeps Chapter %s summaries outside component inspections",chap
  open("Network");const network=screen.getByRole("dialog",{name:"Network inspected"});
  expect(network.textContent).not.toMatch(/Stay online|Stable after restoration|Workload:|Normal demand|Opening campaign/);
  expect(dialog("Network").getByRole("button",{name:/traffic limit|Limit to/})).toBeTruthy();
- networkView("Routing");expect(dialog("Network").getByText(/Configure routing/)).toBeTruthy();
+ networkView("Routing");expect(dialog("Network").getByRole("group",{name:/Send traffic to/})).toBeTruthy();
  if(chapter>=5) {networkView("Automatic failover");expect(dialog("Network").getByRole("button",{name:/Deploy Automatic Failover/})).toBeTruthy();}
  fireEvent.click(dialog("Network").getByRole("button",{name:"Close"}));open("Read Cache");
  expect(screen.getByRole("dialog",{name:"Read Cache inspected"}).textContent).not.toMatch(/Workload:|Growth due|Waiting for workload growth/);
@@ -219,18 +220,16 @@ it("transfers a specific server recommendation through instance selection before
  fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()[0].textContent).toBe("Scale up App 3");
  fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("Confirm");
 });
-it("walks Chapter 6 routing through its disclosure and real choice before pending Run",async()=>{
+it("walks Chapter 6 routing through its checklist before pending Run",async()=>{
  let game=tick(decide(combinedCompany(),{type:"set_traffic_limit",enabled:true}));
  game=tick(decide(game,{type:"set_routing",mode:"single",targets:["app-1"]}));
- expect(campaignAttention(game).action?.action.type).toBe("set_routing");show(game);
+ expect(campaignAttention(game).action?.action).toEqual({type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]});show(game);
  await accept();expect(gold()[0].textContent).toBe("Network");fireEvent.click(gold()[0]);await act(async()=>{});
  expect(gold()[0].textContent).toContain("Network management");fireEvent.click(gold()[0]);await act(async()=>{});
- expect(gold()[0].tagName).toBe("SUMMARY");expect(gold()[0].textContent).toContain("Configure routing");
- fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()[0].textContent).toBe("All apps");
+ expect(gold()[0].getAttribute("role")).toBe("checkbox");expect(gold()[0].textContent).toBe("App 2");
  fireEvent.click(gold()[0]);await act(async()=>{});
  expect(screen.queryByRole("dialog",{name:"Network inspected"})).toBeNull();
- expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="routing")).toBe(true);
- expect(campaignAttention(useGame.getState().game).attention).toBe("run");
+ expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1","app-2"]});
 });
 
 it("summarises a failed fleet without exposing server cards until management",()=>{

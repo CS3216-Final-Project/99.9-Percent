@@ -1857,6 +1857,16 @@ button:disabled {
   background: var(--go-hover);
 }
 
+/* A disabled action's state: a check when already done, a lock while gated. */
+.act-affordance {
+  margin-left: auto;
+  flex: none;
+}
+
+.act-affordance-done {
+  color: var(--ok-ink);
+}
+
 .btn-row .act {
   width: auto;
   flex: 1 1 auto;
@@ -5251,6 +5261,7 @@ button:disabled {
 /* The panel is narrow: every response shows its name, then its cost and delay, so the rows line up. */
 .campaign-panel .act-label { min-width: 0; grid-column: 1; grid-row: 1; white-space: normal; }
 .campaign-panel .act-meta { display: grid; grid-column: 2; grid-row: 1; justify-items: end; gap: 4px; margin-left: 0; }
+.campaign-panel .act-affordance { grid-column: 3; grid-row: 1; align-self: center; justify-self: end; margin-left: 0; }
 /* A one-line header keeps the responses and the stage guidance in view without scrolling. */
 .campaign-panel .panel-head { gap: 10px; padding-block: 8px; }
 .campaign-panel .panel-icon { width: 40px; height: 40px; }
@@ -5305,6 +5316,14 @@ button:disabled {
 .route-choice button:hover:not(:disabled):not(.is-active) { background: var(--paper-2); }
 .route-choice button.is-active { background: var(--go); }
 .route-choice:disabled button { opacity: .55; box-shadow: none; }
+/* Routing is a checklist: one row per routable app, checked means it receives traffic. */
+.route-choice.route-checks { grid-template-columns: 1fr; }
+.route-check { display: flex; align-items: center; gap: 8px; text-align: left; }
+.route-check .route-box { display: grid; place-items: center; width: 18px; height: 18px; flex: none; border: 2px solid var(--control-edge); border-radius: 4px; }
+.route-check .route-box .icon { width: 12px; height: 12px; opacity: 0; }
+.route-check[aria-checked="true"] .route-box { border-color: var(--ink); background: var(--go); }
+.route-check[aria-checked="true"] .route-box .icon { opacity: 1; }
+.route-check:disabled { opacity: .55; box-shadow: none; }
 .scaling-controls legend { font-size: var(--text-xs); }
 .scaling-controls .btn { white-space: normal; }
 
