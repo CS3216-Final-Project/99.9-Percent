@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { screenPoint } from "./labels";
+import { LABEL_GAP, LABEL_TAIL, screenPoint, stackDown, stackUnder } from "./labels";
 
 const WIDTH = 1280;
 const HEIGHT = 720;
@@ -63,6 +63,27 @@ describe("label placement", () => {
     const at = screenPoint(ANCHOR, camera, WIDTH, HEIGHT, new THREE.Vector2());
     expect(at.x).toBeCloseTo(expected.x, 6);
     expect(at.y).toBeCloseTo(expected.y, 6);
+  });
+
+  it("spaces stacked labels far enough that none covers the next, for any count and height", () => {
+    // Each label hangs its tail 9px below its anchor; the next label's top must clear it.
+    for (const heights of [[34, 34, 34, 23], [23], [40, 23, 34, 34, 45, 30, 34, 23]]) {
+      const offs = stackDown(heights, -10);
+      expect(offs[0]).toBe(-10);
+      for (let i = 1; i < heights.length; i++) {
+        expect(offs[i] - heights[i]).toBeGreaterThanOrEqual(offs[i - 1] + LABEL_TAIL + LABEL_GAP);
+      }
+    }
+  });
+
+  it("stacks labels under a ceiling with the same clearance", () => {
+    const heights = [34, 34, 23];
+    const out = stackUnder(heights, 300);
+    expect(out[2]).toBe(300);
+    for (let i = heights.length - 2; i >= 0; i--) {
+      expect(out[i] + LABEL_TAIL + LABEL_GAP).toBeLessThanOrEqual(out[i + 1] - heights[i + 1]);
+    }
+    expect(stackUnder([], 300)).toEqual([]);
   });
 
   it("is what separates a steady label from one a frame behind: projecting without it misses by pixels", () => {
