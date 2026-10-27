@@ -205,12 +205,18 @@ const TIPS = {
     "Keep enough cash for next week's bill before you buy.",
     ".stat-cash",
   ),
+  hint: chapter(
+    "Hint is always nearby",
+    "The Hint button repeats the current step and points at what to try next.",
+    "It keeps working in later chapters, not just this tutorial.",
+    ".campaign-hint",
+  ),
 } satisfies Record<string, Step[]>;
 
 const TRACKS: Partial<Record<TourTrack, Step[]>> = { basics: BASICS, incident: INCIDENT, ...CHAPTERS, ...TIPS };
 export const BASICS_STEPS = BASICS.length;
 
-const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", incident: "Incident guide", settlement: "Tip" };
+const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", incident: "Incident guide", settlement: "Tip", hint: "Tip" };
 
 /** Where a track's steps make sense: Guided Mode's also wait for any review or milestone and for open views. */
 function fits(track: TourTrack, s: Snapshot, step: Pick<Step, "inTech">): boolean {

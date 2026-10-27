@@ -196,3 +196,21 @@ it("explains the first settled week with a one-card tip on Cash", () => {
   fireEvent.click(within(tip).getByRole("button", { name: "Got it" }));
   expect(useGame.getState().tour).toBeNull();
 });
+
+it("points at the Hint button once when the introduction hands off to the Opening", () => {
+  start(); renderCompany();
+  for (const equipment of ["gateway", "app", "db", "monitoring"] as const) {
+    act(() => useGame.getState().act({ type: "incident_inspect", equipment }));
+    act(() => useGame.getState().act({ type: "acknowledge_introduction", equipment }));
+  }
+  act(() => useGame.getState().act({ type: "complete_introduction" }));
+  const tip = screen.getByRole("dialog", { name: "Tip, step 1 of 1" });
+  expect(tip.textContent).toContain("Hint");
+  expect(tip.textContent).toContain("later chapters");
+  expect(useGame.getState().meta.tipsSeen).toContain("hint");
+  fireEvent.click(within(tip).getByRole("button", { name: "Got it" }));
+  // Once ever: the flag persisted, so no later commit replays it.
+  expect(useGame.getState().tour).toBeNull();
+  act(() => { useGame.getState().setRunning(true); useGame.getState().tick(100); });
+  expect(useGame.getState().tour).toBeNull();
+});

@@ -563,14 +563,17 @@ export const useGame = create<Store>()((set, get) => {
           Object.assign(patch,{meta,tour:{track:chapter,step:0},running:false});
         }
       }
+      // Completing the introduction spotlights the Hint button once: it keeps helping in later chapters.
       // The first settled operating week explains itself once, paused, at the first calm moment in the Opening
       // (its incident can still be running when the week settles), unless another guide is already showing.
       const tips=(patch.meta??get().meta).tipsSeen??[];
-      if(was?.runId===c.runId&&c.settlements.length>0&&!tips.includes("settlement")&&!chapterTourOf(c)&&!get().tutorialCompany
+      const tip:GuidedTip|null=!was?.completedIntroduction?.completed&&c.completedIntroduction?.completed&&!tips.includes("hint")?"hint"
+        :c.settlements.length>0&&!tips.includes("settlement")?"settlement":null;
+      if(was?.runId===c.runId&&tip&&!chapterTourOf(c)&&!get().tutorialCompany
         &&!get().tour&&!patch.tour&&next.phase==="management"&&!awaitingAcknowledgement(next)) {
-        const meta={...(patch.meta??get().meta),tipsSeen:[...tips,"settlement" as const]};
+        const meta={...(patch.meta??get().meta),tipsSeen:[...tips,tip]};
         saveMeta(meta);
-        Object.assign(patch,{meta,tour:{track:"settlement",step:0},running:false});
+        Object.assign(patch,{meta,tour:{track:tip,step:0},running:false});
       }
       get().measureTime();
       patch.measurement=projectEvents(get().measurement,next,new Date().toISOString());
