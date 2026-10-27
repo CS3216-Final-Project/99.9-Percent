@@ -1,4 +1,4 @@
-import { infrastructureAction } from "./componentInspection";
+import { infrastructureAction, routeAllApps } from "./componentInspection";
 import type { Page } from "@playwright/test";
 import { test, expect, seedSave, savedGame, expectRoom, advanceCampaignStep } from "./fixtures";
 import { newGame, applyAction, type GameState, type Action } from "../src/sim";
@@ -83,8 +83,7 @@ for (const path of ["vertical", "horizontal"] as const) {
       await confirm(page, /Deploy load balancing/);
       await advanceCampaignStep(page, { seconds: 2, resumeClock: false });
       expect((await savedGame(page)).campaign!.routing.mode).toBe("single");
-      await infrastructureAction(page,"All apps");
-      await (await infrastructureAction(page,"All apps")).click();
+      await routeAllApps(page);
     } else await confirm(page, /Scale up App 1/);
     // Validate the handoff as well as the controls: recovery seeds this very configuration.
     expect((await savedGame(page)).campaign).toEqual(pendingRecovery(path).campaign);

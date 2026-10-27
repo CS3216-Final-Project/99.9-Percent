@@ -73,13 +73,37 @@ export async function infrastructureAction(page:Page,name:string|RegExp,componen
       if(view!=="overview") await scope.locator('[data-inspection-entry="management"]').click();
     }
   }
-  if(component==="gateway" && /All apps|App \d+ only/i.test(typeof name==="string"?name:name.source)) {
-    const routes=scope.locator("details").filter({hasText:/Configure routing/});
-    if(await routes.getAttribute("open")===null) await routes.locator("summary").click();
-  }
   const action=scope.getByRole("button",{name,exact:typeof name==="string"});
   await expect(action).toBeVisible();
   return action;
+}
+
+/** Open the gateway's management view, where the "Send traffic to" checkboxes live. */
+export async function openGatewayManagement(page:Page,scope?:Locator):Promise<Locator> {
+  const panel=scope??await inspectEquipment(page,"gateway");
+  if(await panel.locator('.inspection-subview').getAttribute('data-inspection-view')!=="management") {
+    for(let i=0;i<2&&await panel.locator('[data-inspection-back]').isVisible();i++)await panel.locator('[data-inspection-back]').click();
+    await panel.locator('[data-inspection-entry="management"]').click();
+  }
+  return panel;
+}
+
+/**
+ * Route every app: tick each unchecked "Send traffic to" checkbox in the gateway management view.
+ * Each pick queues a routing change that activates on the next game second, so `advance` (a caller
+ * that delivers one game second, e.g. `advanceCampaignStep`) runs between picks — the fieldset is
+ * disabled while a routing change is pending.
+ */
+export async function routeAllApps(page:Page,scope?:Locator,advance?:()=>Promise<void>):Promise<Locator> {
+  const panel=await openGatewayManagement(page,scope);
+  for(let i=0;i<8;i++) {
+    const next=panel.locator(".route-check[aria-checked='false']").first();
+    if(await next.count()===0)break;
+    await next.click();
+    if(!advance)break;
+    await advance();
+  }
+  return panel;
 }
 
 /** Follow only inspection navigation; the caller still checks/clicks the actual recommended action. */

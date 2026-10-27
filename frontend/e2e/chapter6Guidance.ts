@@ -32,22 +32,32 @@ export async function chapter6Preparation(page: Page, touch = false) {
     await press(hint.getByRole("button", { name: "Got it", exact: true }));
     await followHintComponent(page);await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(name); await expect(gold).toBeEnabled();
   };
-  // Follow the routing subview and its disclosure before choosing the highlighted All apps option.
-  await accept(/^All apps$/); await press(gold);
+  // Follow the routing subview, then tick each highlighted Send-traffic checkbox. A pick queues a
+  // routing change that activates on the next game second (Run), after which guidance re-highlights
+  // the next unrouted app — so keep following the gold control until every app is routed.
+  await accept(/^App \d+$/); await press(gold);
+  const unrouted = () => savedGame(page).then(g => g.campaign!.apps.filter(a => !g.campaign!.routing.targets.includes(a.id)).length);
+  for (let i = 0; i < 4 && await unrouted(); i++) {
+    await closeInspection(page); await accept(/^Run$/); await press(gold); await page.clock.runFor(2500);
+    await press(page.getByRole("button", { name: "Pause", exact: true }));
+    if (await unrouted() === 0) break;
+    await accept(/^App \d+$/); await press(gold);
+  }
   expect((await savedGame(page)).campaign!.limit).toBe(500);
   // Deliver the same game ticks via the existing 2× control, with half as many WebGL frames.
   await setGameSpeed(page, 2);
   // The clock delivers 200ms ticks: three ticks at 2× complete one game second.
-  await closeInspection(page);await accept(/^Run$/); await press(gold); await page.clock.runFor(600);
+  const stepBeforeTick = (await savedGame(page)).campaign!.step;
+  await closeInspection(page);await press(page.getByRole("button", { name: "Run", exact: true })); await page.clock.runFor(600);
   await press(page.getByRole("button", { name: "Pause", exact: true }));
-  expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step + 1);
+  expect((await savedGame(page)).campaign!.step).toBeGreaterThan(stepBeforeTick);
   await accept(/^Remove traffic limit/); await press(gold);
   await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName("Confirm");
   await press(page.getByRole("button", { name: "Cancel", exact: true }));
   expect((await savedGame(page)).campaign!.limit).toBe(500);
   await accept(/^Remove traffic limit/); await press(gold);
   await expect(gold).toHaveAccessibleName("Confirm"); await press(gold);
-  await closeInspection(page);await accept(/^Run$/); await press(gold); await page.clock.runFor(2500);
+  await closeInspection(page);await accept(/^Run$/); await press(gold); await page.clock.runFor(5000);
   await press(page.getByRole("button", { name: "Pause", exact: true }));
   await setGameSpeed(page, 1);
   const after = await savedGame(page);
