@@ -78,7 +78,7 @@ import { bindViewFade, bothFloors, cameras, lookApi, lookingFromAvatar, viewNow 
 import { Ceiling } from "./Ceiling";
 import { ViewOverlay } from "./ViewOverlay";
 import { Minimap } from "./Minimap";
-import { screenPoint } from "./labels";
+import { screenPoint, stackDown, stackUnder } from "./labels";
 import { EQUIPMENT, ROOM_PALETTE } from "./palette";
 import { trafficModel } from "./traffic";
 import { CampaignTraffic, Gate } from "./TrafficFlow";
@@ -875,6 +875,11 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
  */
 function placeLabels(camera: THREE.Camera, size: { width: number; height: number }) {
   const deep = (camera as THREE.PerspectiveCamera).isPerspectiveCamera === true;
+  // Fan the app labels out from their true heights, not a fixed pitch: routed ones carry a load bar and a status
+  // note that make them taller than the spacing a constant assumes, so they covered each other.
+  const appHeights = campaignAppIds.map((id) => labelEls.get(id)?.offsetHeight ?? 0);
+  const appDrops = stackDown(appHeights, -10);
+  const appCeilings = inSpikes && size.width <= 900 ? stackUnder(appHeights, size.height * 0.4) : null;
   anchors.forEach((pos, key) => {
     const el = labelEls.get(key);
     if (!el) return;
@@ -892,13 +897,13 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
     let { x, y } = labelAt;
     // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
     const slot = campaignAppIds.indexOf(key);
-    y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : slot >= 0 ? slot * 22 - 10 : 0;
+    y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : slot >= 0 ? appDrops[slot] : 0;
     // The In gate stands just west of the gateway: lift its count clear of the Network label.
     if (key === TRAFFIC_IN) y -= 38;
     // The mobile bottom panel occupies at most 56% of the room. Spread the
     // growing pool above it by slot order, even when permanent IDs have gaps.
-    if (inSpikes && slot >= 0 && size.width <= 900) {
-      y = Math.min(y, size.height * 0.40 - (campaignAppIds.length - 1 - slot) * 26);
+    if (appCeilings && slot >= 0) {
+      y = Math.min(y, appCeilings[slot]);
       x = Math.max(size.width * 0.78, Math.min(size.width - 65, x));
     }
     if (key === "cache" && inCampaign && size.width <= 900) {
