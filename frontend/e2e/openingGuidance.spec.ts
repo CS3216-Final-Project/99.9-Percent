@@ -49,12 +49,10 @@ test("introduction hands off to Opening Run, service readings, database upgrade,
   await advanceCampaignStep(page,{seconds:5,resumeClock:false});
   expect((await savedGame(page)).campaign!.step).toBe(6);
   expect((await savedGame(page)).campaign!.incident?.primaryComponent).toBe("db");
-  // The incident pausing the clock can light Run instead of the inspect target; pressing it resumes and hands the spotlight back.
-  for (let i = 0; i < 3; i++) {
-    await expect(spotlight).toHaveCount(1);
-    if (await spotlight.getAttribute("aria-label") !== "Run") break;
-    await spotlight.click();
-  }
+  // The incident's own Pause/Run invitation answers through the gold channel rather than the inspect
+  // spotlight; taking it (pause, then resume if offered) hands the spotlight back to Database.
+  const goldPlay = page.locator(".campaign-play.campaign-gold-attention");
+  for (let i = 0; i < 4 && await goldPlay.isVisible().catch(() => false); i++) await goldPlay.click();
   await expect(spotlight).toHaveCount(1);
   await expect(spotlight).toHaveAccessibleName("Database");
   await spotlight.click();
