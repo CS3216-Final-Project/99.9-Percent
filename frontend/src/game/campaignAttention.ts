@@ -190,7 +190,7 @@ function actionMessage({action}: GuidanceAction, c: Campaign): string {
     case "add_server": return c.launchWeek && c.launchWeek.completedStep === null
       ? "One App Server can't keep up with this traffic. Buy a second server to share it."
       : "Your app servers need more capacity. Add a server, then connect it after installation.";
-    case "set_routing": return "Your new server isn't receiving traffic. Send traffic to All apps in Configure routing.";
+    case "set_routing": return "Your new server isn't receiving traffic. Check every app in Send traffic to.";
     case "deploy_load_balancer": return c.apps.length > 1 ? "Your new server isn't receiving traffic. Install load balancing so you can connect it."
       : "One app server can't absorb this spike. Install load balancing so a second server can share the traffic.";
     case "deploy_cache": return "Repeated lookups are overloading your database. Deploy Read Cache to reduce that work as it warms up.";
