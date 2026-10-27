@@ -169,6 +169,7 @@ Guidance never changes the rules; it reads the same state the engine uses.
   A new company's introduction opens with Maya's welcome first, asking the player to check out the machines; Opening's message then skips her greeting.
   The colleague speaks a few short lines in their own voice, which the player reads one at a time, and the last line carries the mission.
   Dismissing it at any line counts as reading it.
+  A hidden tab, blurred window or pointer lock only suspends the scene in place — it is not dismissed, and the stage cue queued behind it still follows in order.
 - A new diagnostic incident that keeps running shows one Pause invitation.
 - Every report (incident postmortem, prevention review, chapter outcome, growth review, scorecard) uses four short sections and one collapsed View Technical Details disclosure.
   Reports are built from recorded snapshots, trace and actual activations, never from later company state.
