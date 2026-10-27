@@ -94,7 +94,13 @@ export function campaignGuidance(g: GameState) {
   // Stay Online's entry also checks cash, so the requirements name it with the rest.
   add("cash","Positive company cash",c.cashCents>0);
   notice=canEnterReliability(g)?"Stay Online is available through Next in the chapter bar.":d.acknowledged?waitsFor("Stay Online",entryBlockers(false,reliabilityEntryGates(g),"Traffic Spikes")):d.completedStep!==null?"Stay Online opens after you review the spike response.":null;
-  optional="Autoscaling is optional; it lives in Server management under App Server. Manual capacity, admission relief and hybrid responses remain valid.";
+  optional=d.controller?.enabled
+    ?"Autoscaling is enabled; Server management shows what it provisions and retires. Manual capacity, admission relief and hybrid responses remain valid."
+    :d.controller
+    ?"Autoscaling is deployed but disabled; Server management holds its switch. Manual capacity, admission relief and hybrid responses remain valid."
+    :d.researchSpent
+    ?"Autoscaling is unlocked; deployment is a separate optional purchase in Server management. Manual capacity, admission relief and hybrid responses remain valid."
+    :"Autoscaling is optional; it lives in Server management under App Server. Manual capacity, admission relief and hybrid responses remain valid.";
   if(c.step<d.deadlines[3])waiting="Waiting for both announced traffic pulses to end.";
   else if(d.completedStep===null&&!c.incident&&queuesEmpty&&reportsAcknowledged&&g.phase==="management"&&qualifiesForRecovery(c.snapshot))waiting="Observe new stable baseline game seconds with Run. Pausing adds no observations.";
   if(pendingSpikeAcknowledgement(c))pendingAction={label:"Review spike recognition"};

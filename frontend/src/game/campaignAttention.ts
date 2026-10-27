@@ -1,7 +1,7 @@
 import { introductionActive } from "@/sim/introduction";
 import { introductionInstruction } from "./introduction";
 import type { Action, GameState } from "@/sim";
-import type { Campaign } from "@/sim/campaignTypes";
+import type { Autoscaler, Campaign, ScheduledAction } from "@/sim/campaignTypes";
 import { admissionCeiling, allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData, incidentAwaitingResponse } from "@/sim/step";
 import { recoverySafe, reportsAcknowledged } from "@/sim/reliability";
 import { currentFault, finalRequirements, stableManagement, canStartGrowth } from "@/sim/combinedCampaign";
@@ -239,6 +239,18 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
   return target === "db" ? "Work is building up. Check Database to see what needs attention." : target === "network" ? "Check Network to understand which traffic your company is serving." : "Check App Server to see what needs attention.";
 }
 
+/** Narrates the controller's queued work as its own action, in the Server management vocabulary. */
+function autoscalerPendingMessage(a: ScheduledAction, controller: Autoscaler | null | undefined): string {
+  const name = (id: string | undefined) => (id ? `App ${id.slice(4)}` : "a server");
+  switch (a.type) {
+    case "add-app": return `Autoscaling is installing ${name(a.targetId)} for the extra load; it joins routing next. Press Run to watch it finish.`;
+    case "scale-up": return `Autoscaling is scaling up ${name(a.targetId)} for the extra load. Press Run to watch it finish.`;
+    case "retire-app": return `Autoscaling is retiring ${name(a.targetId)} now that demand is low. Press Run to watch it finish.`;
+    case "routing": return `Autoscaling is connecting ${name(controller?.joiningAppId ?? a.routing?.targets.at(-1))} to traffic. Press Run to watch it finish.`;
+    default: return "Autoscaling is changing capacity. Press Run to watch it finish.";
+  }
+}
+
 /** Read-only interpretation of recorded state. Never advances or repairs a company. */
 function baseAttention(game: GameState): AttentionDecision {
   const c = game.campaign;
@@ -308,7 +320,13 @@ function baseAttention(game: GameState): AttentionDecision {
     return false;
   });
   const scalingChoice = c.scaling && !c.scaling.consumed && c.dbCapacity < P.dbCapacity && !c.scalingConsent;
-  if (relevant && (!scalingChoice || relevant.type === "upgrade-db")) return run(`activation-${relevant.type}`, "An accepted change is still waiting to activate. Activation alone does not guarantee recovery.");
+  if (relevant && (!scalingChoice || relevant.type === "upgrade-db")) {
+    const advice = run(`activation-${relevant.type}`, "An accepted change is still waiting to activate. Activation alone does not guarantee recovery.");
+    // The controller's own queued work reads as something it is doing, not the player's next task.
+    if (relevant.source === "autoscaler") return { ...advice, message: autoscalerPendingMessage(relevant, c.spikeStage?.controller) };
+    if (relevant.type === "deploy-autoscaler") return { ...advice, message: "The autoscaling controller is installing. Press Run to finish deployment; it enables itself and starts watching routed load." };
+    return advice;
+  }
   // Launch Week says nothing before an incident: no upgrade or limit prompts while the week simply runs.
   if (c.launchWeek && c.launchWeek.completedStep === null && !c.incident) {
     const lw = c.launchWeek, week = Math.floor(c.step / LW.periodSteps);
@@ -404,13 +422,62 @@ function baseAttention(game: GameState): AttentionDecision {
         ? offer({ type: "deploy_autoscaler" }, "Deploy autoscaling", "The optional controller watches routed demand and provisions or retires servers itself; Server management deploys it.")
         : offer({ type: "unlock_autoscaling" }, "Unlock autoscaling", "The chapter's free research point unlocks the controller inside Server management; deployment is a separate optional purchase.");
     };
-    if (stage?.stage === "prepare" && !inspected("app"))
-      return inspection("app", limited ? "Check App Server capacity before the spike. Your traffic limit protects service by rejecting requests." : "Check App Server capacity before the spike. Upgrades are optional; Run when you are ready.");
-    if (stage?.stage === "prepare" && !d.controller?.enabled && !c.pending.some(a => a.type === "deploy-autoscaler")) {
+    // The unlock -> deploy -> enable -> observe arc resumes wherever it stopped once the
+    // optional path is begun; the research point alone does not push it past Prepare.
+    const autoscalingStep = (): AttentionDecision => {
       const autoscale = autoscaling();
       const advice = hint("spike-autoscaling", "Autoscaling, this chapter's optional controller, lives inside Server management.", "Open Server management under App Server to find Autoscaling. Manual capacity stays a valid response.", "app");
       return { ...advice, ...(autoscale ? { action: autoscale } : {}), message: "Autoscaling is this chapter's option; it lives in Server management under App Server. Manual capacity stays a valid response.", key: `${advice.key}:${autoscale ? guidanceActionId(autoscale.action) : "unavailable"}` };
-    }
+    };
+    const deployPending = pending.some(a => a.type === "deploy-autoscaler");
+    // Once enabled, the arc becomes observation: narrate the controller's own work until
+    // the player looks at its result in Server management.
+    const appName = (id: string | undefined) => (id ? `App ${id.slice(4)}` : "a server");
+    const lastAct = [...c.trace].reverse().find(t => t.step >= d.enteredStep && t.type.startsWith("autoscale-"));
+    const actSeen = !lastAct || c.trace.some(t => t.type === "inspection" && t.id > lastAct.id && t.data.component === "app");
+    const describeAct = (t: NonNullable<typeof lastAct>): string => {
+      const target = typeof t.data.targetId === "string" ? appName(t.data.targetId) : "a server";
+      switch (t.type) {
+        case "autoscale-scale-out-decided": return `Autoscaling provisioned ${target} for the extra load`;
+        case "autoscale-scale-up-decided": return `Autoscaling scaled up ${target} for the extra load`;
+        case "autoscale-scale-in-eligible": return `Autoscaling started retiring ${target} now that demand is low`;
+        case "autoscale-instance-retired": return `Autoscaling retired ${target} now that demand is low`;
+        case "autoscale-retirement-cancelled": return `Autoscaling cancelled retiring ${target} when conditions changed`;
+        default: return "Autoscaling adjusted capacity";
+      }
+    };
+    const autoscalingObserve = (): AttentionDecision | null => {
+      if (!d.controller?.enabled) return null;
+      const working = pending.find(a => a.source === "autoscaler");
+      if (working || d.controller.joiningAppId) {
+        const message = working ? autoscalerPendingMessage(working, d.controller)
+          : `Autoscaling provisioned ${appName(d.controller.joiningAppId ?? undefined)}; it joins routing next. Press Run to watch it finish.`;
+        return { ...run("spike-autoscale-acting", message), message };
+      }
+      if (lastAct && !actSeen) {
+        const advice = hint("spike-autoscale-acted", `${describeAct(lastAct)}.`, "Open Server management under App Server to see the change it made.", "app");
+        return { ...advice, message: `${describeAct(lastAct)}. Open Server management under App Server to see the change it made.` };
+      }
+      if (stage?.stage === "between" && !lastAct) {
+        const reason = limited ? "your traffic limit caps the demand it can see" : "demand never crossed its thresholds";
+        const advice = hint("spike-autoscale-idle", `Autoscaling is enabled and watched Spike 1; ${reason}, so it stayed idle.`, "Server management under App Server shows its thresholds, cooldowns and what it does next.", "app");
+        return { ...advice, message: `Autoscaling is enabled and watched Spike 1; ${reason}, so it stayed idle. Server management under App Server shows its thresholds and cooldowns.` };
+      }
+      return null;
+    };
+    // The arc only resumes where it stopped: a spent research point keeps its next step
+    // available between pulses and during the closing baseline, but mid-pulse stays clean.
+    const resumeAutoscaling = (): AttentionDecision | null => {
+      if (d.controller?.enabled || !d.researchSpent) return null;
+      if (stage?.stage !== "between" && stage?.stage !== "recover") return null;
+      const advice = autoscalingStep();
+      return advice.action ? advice : null;
+    };
+    if (stage?.stage === "prepare" && !inspected("app"))
+      return inspection("app", limited ? "Check App Server capacity before the spike. Your traffic limit protects service by rejecting requests." : "Check App Server capacity before the spike. Upgrades are optional; Run when you are ready.");
+    if (stage?.stage === "prepare" && !d.controller?.enabled && !deployPending) return autoscalingStep();
+    if (deployPending)
+      return { ...run("spike-autoscale-deploy", "The autoscaling controller is installing."), message: "The autoscaling controller is installing. Press Run to finish deployment; it enables itself and starts watching routed load." };
     if (!limited && (stage?.stage === "spike1" || stage?.stage === "spike2")) {
       if (!inspected("monitoring")) return inspection("monitoring", "The spike is active. Check Monitoring to see whether latency, errors and queues remain healthy.");
     }
@@ -464,9 +531,15 @@ function baseAttention(game: GameState): AttentionDecision {
       }
       const evaluated = c.trace.some(t => t.type === "inspection" && t.step >= d.deadlines[0] && t.data.component === "monitoring");
       if (!evaluated) return inspection("monitoring", `${performance.summary}${tradeoff} Check Monitoring to evaluate errors, queues and your strategy before Spike 2; changes are optional.`);
+      // After the player has evaluated the first pulse, narrate what the controller did
+      // with it or resume the unfinished arc.
+      const observing = autoscalingObserve() ?? resumeAutoscaling();
+      if (observing) return observing;
       const advice = run("spike-pulses", performance.summary);
       return { ...advice, message: `${performance.summary}${tradeoff} Keep your strategy or make an optional change. Press Run to test it during Spike 2.` };
     }
+    const observing = autoscalingObserve() ?? resumeAutoscaling();
+    if (observing) return observing;
     const pulsePending = d.deadlines.some((deadline, i) => deadline > c.step &&
       !d.consumed.includes(`spike-${Math.floor(i / 2) + 1}-${i % 2 ? "end" : "start"}`));
     if (d.completedStep === null && pulsePending) {
