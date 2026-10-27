@@ -17,6 +17,7 @@ const PROPERTY_ALLOWLIST = new Set([
   "device_category", "chapter_id", "progress_step", "session_active_ms", "run_active_ms",
   "active_delta_ms", "eligible_started_run", "entry_type", "replay", "reason", "outcome",
   "tutorial_track", "tutorial_step", "tutorial_from",
+  "beat", "previous_seconds", "tech", "nines", "uptime",
 ]);
 
 /** Only deliberate gameplay events/properties leave the browser; no URLs, account data or raw saves. */

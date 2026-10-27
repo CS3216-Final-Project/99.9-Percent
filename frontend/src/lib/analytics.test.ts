@@ -82,6 +82,15 @@ it("drops automatic events and any properties outside the gameplay allowlist", (
     run_id: "run-1", tutorial_track: "campaign", tutorial_step: 2, tutorial_from: "home", reason: "player", tutorial_title: "Read the evidence",
   } });
   expect(tutorial?.properties).toEqual({ run_id: "run-1", tutorial_track: "campaign", tutorial_step: 2, tutorial_from: "home", reason: "player" });
+  // Launch Week's events keep the beat reached, the research pick and the final score.
+  for (const [event, properties] of [
+    ["gameplay_launch_beat", { beat: "launch-traffic", previous_seconds: 12 }],
+    ["gameplay_launch_pick", { tech: "autoscaling" }],
+    ["gameplay_launch_score", { nines: 3, uptime: 0.9991 }],
+  ] as const) {
+    expect(filter({ uuid: event, event, properties: { run_id: "run-1", ...properties, label: "private" } })?.properties)
+      .toEqual({ run_id: "run-1", ...properties });
+  }
 });
 
 it("installs no observers, timers or storage writes when unconfigured", () => {
