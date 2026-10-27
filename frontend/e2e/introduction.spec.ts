@@ -1,8 +1,11 @@
 import {test,expect,expectRoom,savedGame} from "./fixtures";
 for(const width of [1440,390])test.describe(`infrastructure introduction ${width}px`,()=>{
  test.use({viewport:{width,height:width<900?844:900},isMobile:width<900,hasTouch:width<900,edition:width<900?"phone":"desktop"});
- test("fresh introduction supports Hint, exploration, dismissal, halfway reload and Chapter 1",async({page},info)=>{await page.route("**/api/**",r=>r.abort());await page.goto("/");
-  await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await expectRoom(page);
+ test("fresh introduction supports Hint, exploration, dismissal, halfway reload and Chapter 1",async({page},info)=>{
+  // Maya's welcome and Opening's message are dismissed along the way; software WebGL makes each dismissal slow.
+  test.setTimeout(120_000);
+  await page.route("**/api/**",r=>r.abort());await page.goto("/");
+  await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await expectRoom(page,30_000);
   const panel=page.getByRole("complementary",{name:"System metrics"}),gold=page.locator(".campaign-gold-attention");
   await expect(panel.getByRole("region",{name:"Introduction Progress"})).toContainText("0/4");
   await expect(panel.getByRole("button",{name:"Complete Introduction",exact:true})).toBeDisabled();
@@ -46,5 +49,25 @@ for(const width of [1440,390])test.describe(`infrastructure introduction ${width
   await expect(chapters.getByRole("listitem").filter({has:page.getByRole("heading",{name:"Opening",exact:true})})).toContainText("Current");
   await chapters.getByRole("button",{name:"Back to company",exact:true}).click();
   await expect(panel.getByRole("region",{name:"Introduction Progress"})).toHaveCount(0);
+ });
+ test.describe("welcome",()=>{
+  test.use({reviewCompanyMessage:false});
+  test("Maya welcomes a new company before the first spotlight, and Opening skips her greeting",async({page},info)=>{await page.route("**/api/**",r=>r.abort());await page.goto("/");
+   await page.getByRole("button",{name:"Start Guided Mode",exact:true}).click();await expectRoom(page);
+   const message=page.getByRole("dialog",{name:"Company Message",exact:true}),gold=page.locator(".campaign-gold-attention");
+   await expect(message).toContainText("Maya");await expect(message).toContainText("Welcome to your company!");
+   await expect(gold).toHaveCount(0);
+   await page.screenshot({path:info.outputPath(`introduction-welcome-${width}.png`)});
+   while(await message.getByRole("button",{name:"Next",exact:true}).count())await message.getByRole("button",{name:"Next",exact:true}).click();
+   await expect(message).toContainText("check out the machines you have");await expect(message).toContainText("Your mission:");
+   await message.getByRole("button",{name:"Got it",exact:true}).click();
+   await expect(message).toHaveCount(0);await expect(gold).toHaveAccessibleName("Network");
+   await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
+   await expect(gold).toHaveAccessibleName("Network");await expect(message).toHaveCount(0);
+   const panel=page.getByRole("complementary",{name:"System metrics"});
+   for(const name of ["Network","App Server","Database","Monitoring"]){await panel.getByRole("button",{name,exact:true}).click();await page.locator(".component-inspection").getByRole("button",{name:"Got it",exact:true}).click();}
+   await panel.getByRole("button",{name:"Complete Introduction",exact:true}).click();
+   await expect(message).toContainText("Customers want our website to stay fast");await expect(message).not.toContainText("I'm Maya");
+  });
  });
 });

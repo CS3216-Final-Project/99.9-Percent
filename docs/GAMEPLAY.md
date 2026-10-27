@@ -166,6 +166,7 @@ Guidance never changes the rules; it reads the same state the engine uses.
 - Once a mission has no unmet requirements, its summary shows the recorded accomplishment and the next review, growth action or chapter continuation. The complete engine-derived checklist remains available under View all requirements.
 - Hint is player-requested and points at an existing control; optional attention cues for Run and Next defer to required reviews and guides.
 - Each chapter opens with an optional Company Message from a colleague (Maya, Alex, Jordan, Sam, Taylor, then Alex) stating its mission.
+  A new company's introduction opens with Maya's welcome first, asking the player to check out the machines; Opening's message then skips her greeting.
   The colleague speaks a few short lines in their own voice, which the player reads one at a time, and the last line carries the mission.
   Dismissing it at any line counts as reading it.
 - A new diagnostic incident that keeps running shows one Pause invitation.

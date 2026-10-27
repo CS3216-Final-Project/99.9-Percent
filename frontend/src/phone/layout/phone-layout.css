@@ -9,9 +9,9 @@
  * - --phone-safe-bottom: the bottom safe-area inset
  * - --phone-sheet: the System metrics sheet's current height (peek, half or full)
  * - --phone-sheet-peek: the sheet's height when only its handle shows
- * - --phone-room: the height between the top strip and the dock (or the coach strip, while it shows)
+ * - --phone-room: the height between the top strip (or the coach strip, while it shows) and the dock
  *
- * A guide sets --phone-coach on the root to the height its strip takes above the dock; the sheet stands above it.
+ * A guide sets --phone-coach on the root to the height its strip takes below the top strip; the sheet stops below it.
  * The room's canvas fills the space between the top strip and the dock and never resizes with the sheet.
  */
 
@@ -257,8 +257,8 @@
 /* Room                                                                */
 /* ------------------------------------------------------------------ */
 
-/* The room's own controls in its bottom corner stand clear of the sheet's handle and any guide's strip. */
-.phone-app[data-edition="phone"] .stage .room-map { bottom: calc(var(--phone-sheet-peek) + var(--phone-coach, 0px) + 10px); left: max(10px, var(--phone-safe-left)); }
+/* The room's own controls in its bottom corner stand clear of the sheet's handle. */
+.phone-app[data-edition="phone"] .stage .room-map { bottom: calc(var(--phone-sheet-peek) + 10px); left: max(10px, var(--phone-safe-left)); }
 
 /* ------------------------------------------------------------------ */
 /* Sheet                                                               */
@@ -268,7 +268,7 @@
   position: absolute;
   left: var(--phone-safe-left);
   right: var(--phone-safe-right);
-  bottom: calc(var(--phone-dock) + var(--phone-coach, 0px));
+  bottom: var(--phone-dock);
   z-index: 29;
   display: flex;
   flex-direction: column;

@@ -4,9 +4,9 @@ import { applyAction, newGame, type GameState } from "../src/sim";
 import { advanceSteps, applyCampaignInput, step } from "../src/sim/step";
 
 /*
- * The phone edition's coach strip (Pixel 7, touch). Launch Week's spotlight steps dock in one fixed-size strip above
- * the dock, so the room keeps at least 40% of the screen and each step's real control stays in view and uncovered.
- * The dock carries the speed menu and End week beside Run.
+ * The phone edition's coach strip (Pixel 7, touch). Launch Week's spotlight steps dock in one fixed-size strip below
+ * the top strip, so the sheet and the dock stay clear, the room keeps at least 40% of the screen and each step's real
+ * control stays in view and uncovered. The dock carries the speed menu and End week beside Run.
  */
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -44,6 +44,18 @@ function uncovered(locator: Locator) {
 
 const launchStep = (page: Page) => page.getByRole("region", { name: "Launch Week tutorial" });
 const dockBox = (page: Page) => box(page.locator(".phone-dock").first());
+const topBox = (page: Page) => box(page.locator(".phone-top").first());
+
+/** The strip sits directly below the top strip, at the strip's fixed height, clear of the sheet and the dock. */
+async function expectBelowTop(page: Page, strip: Box) {
+  const top = await topBox(page);
+  const dock = await dockBox(page);
+  expect(strip.height).toBeLessThanOrEqual(150);
+  expect(strip.y).toBeGreaterThanOrEqual(top.y + top.height - 1);
+  expect(strip.y - (top.y + top.height)).toBeLessThanOrEqual(12);
+  expect(overlaps(strip, dock)).toBe(false);
+  expect(overlaps(strip, await box(page.locator(".phone-sheet-handle").first()))).toBe(false);
+}
 
 /** Advance a Launch Week company in the simulation until `cond` holds. */
 function runUntil(s: GameState, cond: (s: GameState) => boolean, cap = 200): GameState {
@@ -63,13 +75,10 @@ async function boot(page: Page, game: GameState) {
   await expectRoom(page);
 }
 
-/** The strip sits directly above the dock, at the strip's fixed height, and never covers the lit control. */
+/** The strip docks below the top strip and never covers the lit control. */
 async function expectDocked(page: Page, width: number) {
   const strip = await box(launchStep(page));
-  const dock = await dockBox(page);
-  expect(strip.height).toBeLessThanOrEqual(150);
-  expect(strip.y + strip.height).toBeLessThanOrEqual(dock.y + 1);
-  expect(dock.y - (strip.y + strip.height)).toBeLessThanOrEqual(12);
+  await expectBelowTop(page, strip);
   expect(strip.x).toBeGreaterThanOrEqual(0);
   expect(strip.x + strip.width).toBeLessThanOrEqual(width + 0.5);
   const lit = page.locator("[data-spotlight]").first();
@@ -81,7 +90,7 @@ async function expectDocked(page: Page, width: number) {
 }
 
 for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
-  test(`Launch Week docks its spotlight steps above the dock, with speeds and End week in the dock, at ${width}x${height}`, async ({ page }) => {
+  test(`Launch Week docks its spotlight steps below the top strip, with speeds and End week in the dock, at ${width}x${height}`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await boot(page, newGame(7, `phone-lw-${width}`, 2));
     await page.getByRole("button", { name: "Open the doors", exact: true }).tap();
@@ -140,7 +149,7 @@ test("End week rushes a stable Launch Week by touch", async ({ page }) => {
 
 function act(g: GameState, action: Parameters<typeof applyAction>[1]) { const r = applyAction(g, action); if (!r.ok) throw Error(r.message); return r.state; }
 
-test("a chapter guide uses the same coach strip above the dock", async ({ page }) => {
+test("a chapter guide uses the same coach strip below the top strip", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("**/api/**", route => route.abort());
@@ -152,10 +161,7 @@ test("a chapter guide uses the same coach strip above the dock", async ({ page }
   const guide = page.getByRole("dialog", { name: "Chapter guide, step 1 of 1" });
   await expect(guide).toContainText("Scale and route");
   const strip = await box(guide);
-  const dock = await box(page.locator(".phone-dock, .bottombar").first());
-  expect(strip.height).toBeLessThanOrEqual(150);
-  expect(strip.y + strip.height).toBeLessThanOrEqual(dock.y + 1);
-  expect(dock.y - (strip.y + strip.height)).toBeLessThanOrEqual(12);
+  await expectBelowTop(page, strip);
   const got = guide.getByRole("button", { name: "Got it", exact: true });
   await expect(got).toBeInViewport({ ratio: 1 });
   expect((await box(got)).height).toBeGreaterThanOrEqual(44);

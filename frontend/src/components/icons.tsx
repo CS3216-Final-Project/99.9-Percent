@@ -19,7 +19,7 @@ const ICONS = {
   overview: LayoutDashboard, panelClose: PanelRightClose, panelOpen: PanelRightOpen, error: CircleAlert, backlog: Layers, timer: Timer, week: CalendarDays, time: Clock, goal: Trophy,
   server: Server, database: Database, network: Globe, bolt: Zap, copy: Copy,
   save: Save, download: Download, upload: Upload, monitor: Monitor, plug: Plug,
-  ship: Ship, megaphone: Megaphone, team: Laptop,
+  ship: Ship, megaphone: Megaphone, team: Laptop, laptop: Laptop,
   load: Gauge, latency: Hourglass, debt: Bug, smile: Smile, meh: Meh, frown: Frown,
   incident: Siren, alarm: AlarmClock, alert: TriangleAlert, fire: Flame, skull: Skull,
   tree: Network, scaleUp: ArrowBigUp, shuffle: Shuffle, scale: Scale,

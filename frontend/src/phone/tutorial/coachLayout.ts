@@ -65,26 +65,33 @@ export function useCoachFrame(strip: RefObject<HTMLElement | null>): CoachFrame 
 }
 
 /**
- * Publishes the dock's measured height as `--phone-coach-bottom` on the document, so every guide's strip docks
- * directly above the dock, whatever height the dock has.
+ * Publishes the top strip's measured bottom edge as `--phone-coach-top` and the dock's measured height as
+ * `--phone-coach-bottom` on the document, so every guide's strip docks directly below the top strip (or above the
+ * dock while a full-page workspace covers the top strip), whatever height either has.
  */
-export function useDockOffset() {
+export function useCoachOffsets() {
   useLayoutEffect(() => {
     const root = document.documentElement;
-    let last = -1;
+    let last = "";
     const read = () => {
-      const dockEl = document.querySelector(DOCK);
+      const dockEl = document.querySelector(DOCK), topEl = document.querySelector(TOP);
       const vh = window.innerHeight;
-      const offset = Math.max(0, Math.round(vh - (dockEl && dockEl.getClientRects().length ? dockEl.getBoundingClientRect().top : vh)));
-      if (offset !== last) { last = offset; root.style.setProperty("--phone-coach-bottom", `${offset}px`); }
+      const bottom = Math.max(0, Math.round(vh - (dockEl && dockEl.getClientRects().length ? dockEl.getBoundingClientRect().top : vh)));
+      const top = Math.max(0, Math.round(topEl && topEl.getClientRects().length ? topEl.getBoundingClientRect().bottom : 0));
+      if (`${top}:${bottom}` === last) return;
+      last = `${top}:${bottom}`;
+      root.style.setProperty("--phone-coach-top", `${top}px`);
+      root.style.setProperty("--phone-coach-bottom", `${bottom}px`);
     };
     read();
-    const dockEl = document.querySelector(DOCK);
-    const observer = typeof ResizeObserver === "undefined" || !dockEl ? null : new ResizeObserver(read);
-    if (dockEl) observer?.observe(dockEl);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(read);
+    for (const el of [document.querySelector(DOCK), document.querySelector(TOP)]) if (el) observer?.observe(el);
     const id = window.setInterval(read, 250);
     window.addEventListener("resize", read);
-    return () => { observer?.disconnect(); window.clearInterval(id); window.removeEventListener("resize", read); root.style.removeProperty("--phone-coach-bottom"); };
+    return () => {
+      observer?.disconnect(); window.clearInterval(id); window.removeEventListener("resize", read);
+      root.style.removeProperty("--phone-coach-top"); root.style.removeProperty("--phone-coach-bottom");
+    };
   }, []);
 }
 

@@ -8,5 +8,22 @@
 [data-edition="phone"] .phone-home .home-head {
   grid-template-areas:
     "title title"
-    "tag tag";
+    "tag tag"
+    "laptop laptop";
+}
+
+/* The phone plays a smaller scope, so one quiet line under the tagline points to the full game on a laptop. */
+[data-edition="phone"] .phone-home-laptop {
+  grid-area: laptop;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: var(--on-night-soft);
+}
+
+[data-edition="phone"] .phone-home-laptop .icon {
+  flex: none;
 }

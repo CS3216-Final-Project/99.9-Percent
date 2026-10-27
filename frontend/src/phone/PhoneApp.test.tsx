@@ -38,6 +38,7 @@ describe("phone edition", () => {
     expect(useGame.getState().scope).toBe(PHONE_SCOPE);
     expect(document.documentElement.dataset.edition).toBe("phone");
     expect(document.querySelector('.app[data-edition="phone"]')).not.toBeNull();
+    expect(screen.getByText("For the full experience, play on a laptop.")).toBeTruthy();
 
     const guided = within(choices).getByRole("region", { name: "Guided Mode" });
     expect(guided.textContent).toContain("Launch Week and 2 guided chapters");
@@ -113,5 +114,6 @@ describe("desktop edition", () => {
     expect(screen.getByRole("region", { name: "Choose how you want to play" }).textContent).toContain("Unlocks after Chapter 5: Stay Online.");
     // The same check that finds nothing on the phone finds the desktop's account, avatar and feedback controls.
     expect(screen.queryAllByRole("button", { name: desktopOnly }).length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByText(/play on a laptop/)).toBeNull();
   });
 });

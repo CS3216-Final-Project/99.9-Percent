@@ -146,9 +146,9 @@ function frameBox(box: THREE.Box3, dir: THREE.Vector3, width: number, height: nu
 }
 
 /** The part of the canvas the panels leave open, in pixels from its top left. */
-function openArea(width: number, height: number): { right: number; bottom: number } {
+function openArea(width: number, height: number): { top: number; right: number; bottom: number } {
   const stage = document.querySelector("main.stage")?.getBoundingClientRect();
-  return stage ? openRoomArea(stage) : { right: width, bottom: height };
+  return stage ? openRoomArea(stage) : { top: 0, right: width, bottom: height };
 }
 
 /**
@@ -158,7 +158,7 @@ function openArea(width: number, height: number): { right: number; bottom: numbe
 function centreOn(p: THREE.Vector3, dir: THREE.Vector3, zoom: number, width: number, height: number, floorY: number): THREE.Vector3 {
   const open = openArea(width, height);
   const ox = open.right / 2 - width / 2;
-  const oy = open.bottom / 2 - height / 2;
+  const oy = (open.top + open.bottom) / 2 - height / 2;
   const right = new THREE.Vector3().crossVectors(dir, UP).normalize();
   const up = new THREE.Vector3().crossVectors(right, dir).normalize();
   const c = p.clone().addScaledVector(right, -ox / zoom).addScaledVector(up, oy / zoom);
@@ -179,7 +179,7 @@ const shotPoint = new THREE.Vector3();
 /** The cutscene's shot of the car with the view at height `y`: the zoom that fits the shaft and the floor point that centres the cabin. */
 function shotOf(dir: THREE.Vector3, width: number, height: number, y: number): { zoom: number; target: THREE.Vector3 } {
   const open = openArea(width, height);
-  const zoom = THREE.MathUtils.clamp(Math.min(open.right, open.bottom) / SHOT_FIT, 40, 90);
+  const zoom = THREE.MathUtils.clamp(Math.min(open.right, open.bottom - open.top) / SHOT_FIT, 40, 90);
   shotPoint.set(SHAFT_X, y + CAR_EYE, SHAFT_Z);
   return { zoom, target: centreOn(shotPoint, dir, zoom, width, height, y) };
 }

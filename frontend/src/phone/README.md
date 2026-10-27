@@ -9,7 +9,7 @@ The desktop edition's code paths and rendering are unchanged by it.
 - Guided Mode: Chapter 0 (walkthrough), Opening, and Scaling & Routing.
 - Challenge Mode (Classic): the full 26-week game, unlocked once the phone's Guided Mode is complete.
 - Menu: run card, Resume, the few run controls a mode needs (How to play, Exit, Tutorial, New game), the mode switch, and the Sound and Graphics tabs.
-- Home screen: the two mode cards and the anonymous analytics notice (OK / Opt out).
+- Home screen: a one-line note under the tagline that the full experience is on a laptop, the two mode cards and the anonymous analytics notice (OK / Opt out).
 - Not on a phone: Account, sign-in and cloud saves, the Saves tab and save import/export, the avatar picker, the Playtest tab, Give feedback and observer notes, Save now (autosave still runs).
 
 ## The seam
@@ -58,7 +58,7 @@ Replace a region's body without touching the others.
 | Room | `PhoneGameLayout.tsx` (`main.stage` with `Room`) | Shared 3D room, filling the space between the top strip and the dock at a fixed size | Shared; layout sizing by Layout |
 | Sheet | `regions/PhoneSheet.tsx`, `layout/sheetState.ts` | Bottom sheet over the room (peek, half, full) holding `CampaignPanel`, or `SidePanel` and `OperationsRail`; Challenge Mode's `ClassicViewSheet` | Layout |
 | Dock | `regions/PhoneDock.tsx` | One row: views (or a Views menu), Navigation, clock, speed menu (with +1s and +5s in Guided Mode), Run/Pause or Next week | Layout |
-| Coach | `regions/PhoneCoach.tsx`, `tutorial/` | One fixed-size coach strip above the dock for every guide: Chapter 0's lessons (`PhoneChapterZeroGuide`), chapter guides and tips | Tutorial |
+| Coach | `regions/PhoneCoach.tsx`, `tutorial/` | One fixed-size coach strip below the top strip for every guide: Launch Week's spotlight steps, chapter guides and tips | Tutorial |
 | Overlays | `PhoneOverlays.tsx`, `PhoneHome.tsx`, `PhoneMenu.tsx`, `PhoneCampaignComplete.tsx` | Phone home, menu, completion; shared dialogs | Foundation (this seam) |
 
 Two shared components already ask the edition: `Tutorial.tsx` keeps its compact spotlight reach and `CampaignAction.tsx` keeps the purchase sheet on a phone in landscape.
@@ -75,7 +75,7 @@ Two shared components already ask the edition: `Tutorial.tsx` keeps its compact 
 | `--phone-sheet` | The sheet's current height; `--phone-sheet-peek` is its height at peek. |
 | `--phone-room` | The height between the top strip and the dock, less `--phone-coach`. |
 
-A guide sets `--phone-coach` on the root while its strip shows above the dock; the sheet stands above the strip.
+A guide sets `--phone-coach` on the root while its strip shows below the top strip; the sheet's half and full heights stop below the strip.
 The room's canvas never resizes with the sheet: the sheet, guides and menus open over it.
 
 The sheet's state lives in `layout/sheetState.ts`: `useSheetState`, `getSheetState` and `setSheetState("peek" | "half" | "full")`.
@@ -85,21 +85,15 @@ A guide that restricts controls keeps that handle usable.
 
 ## Coach
 
-Every guide on a phone docks in one coach strip directly above the dock, so the room and the lesson's real control stay in view.
+Every guide on a phone docks in one coach strip directly below the top strip, so the sheet, its actions and the dock stay in view under it.
 `tutorial/phone-tutorial.css` fixes its height (`--phone-coach-height`) and sets `--phone-coach` on the app root while a strip shows.
-`PhoneCoach` measures the dock and publishes its height as `--phone-coach-bottom` on `<html>`.
+`PhoneCoach` measures the top strip and the dock and publishes them as `--phone-coach-top` and `--phone-coach-bottom` on `<html>` (`useCoachOffsets`).
 
-- Chapter 0 renders `PhoneChapterZeroGuide` through `Tutorial`'s `chapterZero` slot.
-  It shares the lesson rules with the desktop card through `components/useChapterZeroLesson.ts`, so the exercises, spotlight, input boundary and saved progress are the same.
-- The strip shows Walkthrough (or Practice) and progress, its title, a one-line task and Back, Learn more and Next (Finish), always in the same places.
-  The first lesson's Back is invisible but keeps its slot.
-- Learn more opens a non-modal reading layer with the reason, the labelled example and the longer explanation.
-  It sits in the larger gap above or below the lesson's control, never over it or the top strip, and Escape closes it and returns focus to Learn more.
+- Launch Week's spotlight steps (`LaunchTutorialCard` in `components/CampaignAttention.tsx`), chapter guides and tips (`components/Tutorial.tsx`) all dock in the strip; Skip and Next stay pinned while its text scrolls.
+- In the full-page Tech and History workspaces, which cover the top strip, the strip docks above the dock instead and the workspace keeps scroll clearance above it.
+- A lit control on either side of the strip keeps its window up to the strip's edge, and `components/roomArea.ts` starts the room's open part below the strip, so a lit equipment label is brought between the strip and the sheet.
 - Live readings stay in the real panel and top strip; the strip does not repeat them.
-- `tutorial/phoneLessons.ts` holds each lesson's touch wording and how far it opens the sheet (`setSheetState`).
-  While a guide shows, half never takes the room below 40% of the screen, except that the sheet keeps its header and one row of controls (or an inspection's readings) on screens under about 700 px tall.
-- During Chapter 0 the chapter row is hidden (`--phone-chapter: 0`), as the desktop hides its chapter bar.
-- Chapter guides and tips keep their card's content and dock it in the same strip; Skip and Next stay pinned while its text scrolls.
+- While a guide shows, half never takes the room below 40% of the screen, except that the sheet keeps its header and one row of controls (or an inspection's readings) on screens under about 700 px tall.
 - The purchase quote (`confirmationRoomArea`) and the dock's menus keep clear of the strip.
 
 ## Tests
@@ -108,5 +102,5 @@ Every guide on a phone docks in one coach strip directly above the dock, so the 
 - `../game/scope.test.ts`: scope rules and the store's gating and unlock, with the real store.
 - `PhoneApp.test.tsx`: the phone home screen, menu tabs and completion flow through `App`.
 - Browser: `e2e/phoneLayout.spec.ts` covers the top strip, sheet and dock in both modes.
-- Browser: `e2e/phoneTutorial.spec.ts` walks Chapter 0 by touch at 390x844, 360x640 and 320x568 and checks the coach strip, the room's share, each lit control and the reading layer, plus a replay and a chapter guide.
+- Browser: `e2e/phoneTutorial.spec.ts` walks Launch Week by touch at 390x844, 360x640 and 320x568 and checks the coach strip below the top strip, the room's share and each lit control, plus a chapter guide and Challenge Mode's first week.
 - Browser: `e2e/mobile.spec.ts` runs on Pixel 7, which is now the phone edition; see the coordinator's notes for the journeys that need moving to phone expectations or to `?edition=desktop`.
