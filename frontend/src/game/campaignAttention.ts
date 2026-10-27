@@ -393,8 +393,24 @@ function baseAttention(game: GameState): AttentionDecision {
     const inspected = (component: string) => !!stage && c.trace.some(t => t.type === "inspection" && t.id > stage.eventId && t.step >= stage.since && t.data.component === component);
     const inspection = (component: "app" | "network" | "monitoring", message: string) => ({ ...hint(`spike-${stage?.stage}-inspect`, "Inspect current evidence for this traffic stage.", message, component), message });
     const limited = c.limit !== null;
+    // The chapter's headline option lives inside App Server > Server management; a validated unlock,
+    // deploy or enable action lets the spotlight walk into it instead of leaving players hunting.
+    const autoscaling = (): GuidanceAction | null => {
+      const offer = (action: Action, label: string, evidence: string): GuidanceAction | null =>
+        previewCampaignAction(game, action).ok ? { action, label, evidence } : null;
+      if (d.controller?.enabled) return null;
+      if (d.controller) return offer({ type: "set_autoscaling", enabled: true }, "Enable autoscaling", "The deployed controller only adjusts capacity while enabled; Server management holds the switch.");
+      return d.researchSpent
+        ? offer({ type: "deploy_autoscaler" }, "Deploy autoscaling", "The optional controller watches routed demand and provisions or retires servers itself; Server management deploys it.")
+        : offer({ type: "unlock_autoscaling" }, "Unlock autoscaling", "The chapter's free research point unlocks the controller inside Server management; deployment is a separate optional purchase.");
+    };
     if (stage?.stage === "prepare" && !inspected("app"))
       return inspection("app", limited ? "Check App Server capacity before the spike. Your traffic limit protects service by rejecting requests." : "Check App Server capacity before the spike. Upgrades are optional; Run when you are ready.");
+    if (stage?.stage === "prepare" && !d.controller?.enabled && !c.pending.some(a => a.type === "deploy-autoscaler")) {
+      const autoscale = autoscaling();
+      const advice = hint("spike-autoscaling", "Autoscaling, this chapter's optional controller, lives inside Server management.", "Open Server management under App Server to find Autoscaling. Manual capacity stays a valid response.", "app");
+      return { ...advice, ...(autoscale ? { action: autoscale } : {}), message: "Autoscaling is this chapter's option; it lives in Server management under App Server. Manual capacity stays a valid response.", key: `${advice.key}:${autoscale ? guidanceActionId(autoscale.action) : "unavailable"}` };
+    }
     if (!limited && (stage?.stage === "spike1" || stage?.stage === "spike2")) {
       if (!inspected("monitoring")) return inspection("monitoring", "The spike is active. Check Monitoring to see whether latency, errors and queues remain healthy.");
     }
@@ -434,6 +450,15 @@ function baseAttention(game: GameState): AttentionDecision {
         const allocation = allocateTraffic(peak, c.routing.targets);
         if (c.routing.targets.every(id => { const app = c.apps.find(a => a.id === id); return app && app.health !== "failed" && app.role !== "spare" && !app.backlog && app.capacity >= allocation[id]; })) {
           const advice = plan({ type: "set_traffic_limit", enabled: false }, "Prepared capacity fits the next spike. You may remove the traffic limit to test serving more users, or keep your strategy.");
+          if (advice) return advice;
+        }
+      }
+      // Fallback when the pulse exposed a constraint but no manual fix applies: the chapter's optional
+      // controller. The recommended action's selector chain walks into Server management.
+      if ((appStruggled || performance.rejected > 0) && (!d.controller?.enabled || limited)) {
+        const autoscale = autoscaling();
+        if (autoscale) {
+          const advice = plan(autoscale.action, autoscale.evidence);
           if (advice) return advice;
         }
       }

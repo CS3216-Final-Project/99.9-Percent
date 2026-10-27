@@ -71,9 +71,9 @@ it("uses Data's real scheduling eligibility and preserves explicit continuation"
   expect(guidance(game)).toMatchObject({ chapter: 3, attention: "progression", target: "next" });
   expect(guidance(enteredDataCompany())).toMatchObject({ attention: "run", reason: "data-growth" });
 });
-it("recognises traffic pulse time without requiring autoscaling", () => {
+it("points Prepare's inspected company at Server management's optional autoscaling controller", () => {
   const game = act(spikeCompany(false), { type: "incident_inspect", equipment: "app" });
-  expect(guidance(game)).toMatchObject({ chapter: 4, attention: "run", reason: "spike-pulses" });
+  expect(guidance(game)).toMatchObject({ chapter: 4, attention: "hint", reason: "spike-autoscaling", action: { action: { type: "unlock_autoscaling" } } });
 });
 it("reliability requires explicit arming; pending setup is not a mandatory arm blocker", { timeout: 30_000 }, () => {
   const game = reliabilityCompany();
