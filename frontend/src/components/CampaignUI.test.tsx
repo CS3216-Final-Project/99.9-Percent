@@ -35,6 +35,7 @@ it("pins the stable-service countdown with the incident banner only once countin
  show(game);
  expect(within(head()).getByText("2/5 s")).toBeTruthy();
  expect(within(head()).getByRole("heading",{name:"Recovery progress"})).toBeTruthy();
+ expect(within(screen.getByRole("region",{name:"Incident recovery"})).getByRole("progressbar",{name:"Recovery progress"}).getAttribute("aria-valuenow")).toBe("40");
  expect(within(screen.getByRole("region",{name:"Incident recovery"})).queryByRole("heading",{name:"Recovery progress"})).toBeNull();
  expect(screen.getAllByRole("heading",{name:"Recovery progress"})).toHaveLength(1);
 });
