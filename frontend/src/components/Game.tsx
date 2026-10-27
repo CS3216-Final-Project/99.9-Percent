@@ -2,6 +2,7 @@
 import { CampaignAttentionHost } from "./CampaignAttention";
 import { RoomControlsHost, RoomControlsSlot } from "./RoomControlsHost";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
+import { PendingDeployments } from "./PendingDeployments";
 import "./ControlsDock.css";
 
 import { lazy, Suspense, useEffect } from "react";
@@ -228,7 +229,7 @@ export default function Game() {
       <main className="stage">
         <Room />
       </main>
-      {campaign ? <>{started && <CampaignPanel />}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ClassicViewSheet /><BottomBar /></>}
+      {campaign ? <>{started && <><CampaignPanel /><PendingDeployments /></>}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ClassicViewSheet /><BottomBar /></>}
       <ToastHost />
       {!campaign && !started && <HomeScreen />}
       {!campaign && started && view === "menu" && <Menu />}
