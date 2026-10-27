@@ -151,6 +151,7 @@ export function Act({
   primary,
   tour,
   tip,
+  affordance,
 }: {
   icon?: IconName;
   label: string;
@@ -164,10 +165,12 @@ export function Act({
   tour?: string;
   /** What it does, and why it may be unavailable. Shown in the tooltip, also while disabled. */
   tip?: string;
+  /** A disabled action's state at the right edge: a check when it is already done, a lock while gated. */
+  affordance?: "done" | "locked";
 }) {
   return (
     <button type="button" className={`act${primary ? " act-primary" : ""}`} onClick={onClick} disabled={disabled} data-tour={tour} {...tipProps(tip)}>
-      {icon && <Icon name={icon} />}
+      {icon && !(icon === "lock" && affordance === "locked") && <Icon name={icon} />}
       <span className="act-label">{label}</span>
       {(price !== undefined || note) && (
         <span className="act-meta">
@@ -185,6 +188,7 @@ export function Act({
           )}
         </span>
       )}
+      {affordance && <Icon name={affordance === "done" ? "check" : "lock"} size={16} className={`act-affordance act-affordance-${affordance}`} />}
     </button>
   );
 }

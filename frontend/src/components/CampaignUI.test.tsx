@@ -81,7 +81,7 @@ it("keeps the selected workload hidden until actual growth and enters through th
 });
 it("shows the current stage cap instead of advertising a locked database tier",()=>{
  show(dataCompany("read-heavy",false));const button=inspectionAction(/Upgrade database/);
- expect(button.hasAttribute("disabled")).toBe(true);expect(button.closest(".campaign-action-card")!.textContent).toContain("The database is already upgraded.");expect(button.closest(".campaign-action-card")!.textContent).not.toContain("3,000");
+ expect(button.hasAttribute("disabled")).toBe(true);expect(button.querySelector(".act-affordance-done")).not.toBeNull();expect(button.closest(".campaign-action-card")!.textContent).not.toContain("3,000");
  fireEvent.click(screen.getByRole("button",{name:"Close"}));
  fireEvent.click(screen.getByRole("button",{name:/Continue to Data Strategy/}));
  act(()=>useGame.getState().endTour(true));
@@ -137,30 +137,33 @@ it("labels the last completed profile separately from an immediate contrast",()=
  expect(readings.textContent).toContain("Reads / writes");
  expect(readings.textContent).toContain(`${g.campaign!.snapshot.data!.reads.toLocaleString("en-US")} / ${g.campaign!.snapshot.data!.writes.toLocaleString("en-US")}`);
 });
-it("offers each routing choice once and marks the one in use",()=>{
- show(dataCompany("read-heavy",false));fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));fireEvent.click(screen.getByText(/Configure routing/));let route=screen.getByRole("group",{name:/Send traffic to/});
- expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All apps","App 1 only","App 2 only"]);
- expect(within(route).getByRole("button",{name:"All apps"}).getAttribute("aria-pressed")).toBe("true");
- const before=useGame.getState().game;
- fireEvent.click(within(route).getByRole("button",{name:"All apps"}));
- expect(useGame.getState().game).toBe(before);
- expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
- fireEvent.click(within(route).getByRole("button",{name:"App 2 only"}));
- expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-2"]});
- fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));fireEvent.click(screen.getByText(/Configure routing/));route=screen.getByRole("group",{name:/Send traffic to/});
+it("routes each app through its checkbox and keeps the last routed one checked",()=>{
+ show(dataCompany("read-heavy",false));fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));let route=screen.getByRole("group",{name:/Send traffic to/});
+ const boxes=within(route).getAllByRole("checkbox");
+ expect(boxes.map(b=>b.textContent)).toEqual(["App 1","App 2"]);
+ expect(boxes.map(b=>b.getAttribute("aria-checked"))).toEqual(["true","true"]);
+ fireEvent.click(within(route).getByRole("checkbox",{name:"App 2"}));
+ expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1"]});
+ fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));route=screen.getByRole("group",{name:/Send traffic to/});
  const reason=screen.getByText("Routing requires deployed load balancing, valid active targets and a changed configuration.");
  expect(reason.getAttribute("tabindex")).toBe("0");
  expect(reason.closest("fieldset")).toBeNull();
  expect(route.hasAttribute("disabled")).toBe(true);
+ act(()=>useGame.setState({game:advanceSteps(useGame.getState().game,3).state}));
+ fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));route=screen.getByRole("group",{name:/Send traffic to/});
+ const only=within(route).getByRole("checkbox",{name:"App 1"});
+ expect(only.getAttribute("aria-checked")).toBe("true");expect(only.hasAttribute("disabled")).toBe(true);
+ fireEvent.click(only);
+ expect(useGame.getState().game.campaign!.routing.targets).toEqual(["app-1"]);
 });
-it("leaves a reserved spare out of the routing choices, so the apps in use still read as all apps",()=>{
+it("leaves a reserved spare out of the routing checklist",()=>{
  const g=protectedCombined();expect(g.campaign!.apps.find(a=>a.id==="app-2")!.role).toBe("spare");
- show(g);fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));fireEvent.click(screen.getByText(/Configure routing/));const route=screen.getByRole("group",{name:/Send traffic to/});
- expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All apps","App 1 only","App 3 only"]);
- expect(within(route).getByRole("button",{name:"All apps"}).getAttribute("aria-pressed")).toBe("true");
- expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
- fireEvent.click(within(route).getByRole("button",{name:"App 3 only"}));
- expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-3"]});
+ show(g);fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));const route=screen.getByRole("group",{name:/Send traffic to/});
+ const boxes=within(route).getAllByRole("checkbox");
+ expect(boxes.map(b=>b.textContent)).toEqual(["App 1","App 3"]);
+ expect(boxes.map(b=>b.getAttribute("aria-checked"))).toEqual(["true","true"]);
+ fireEvent.click(within(route).getByRole("checkbox",{name:"App 3"}));
+ expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1"]});
 },15_000);
 
 it("opens shared equipment readings and dismisses without advancing or purchasing",()=>{
