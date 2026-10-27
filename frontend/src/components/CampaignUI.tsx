@@ -262,6 +262,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const priority=c.incident?"incident":c.pending.length?"pending":fault?.startedStep!=null&&fault.restoredStep===null?"restored":combined&&c.limit!==null?"admission":m.app.backlog+m.db.backlog>0?"queues":null;
   const unmet=model.incomplete.find(r=>r.id===priority)??model.incomplete[0];
   const condition=game.phase==="ended"?model.notice:reviewing?action.label:unmet?`Still needed: ${unmet.label}`:(action?`Ready: ${action.label}`:"All current requirements met.");
+  const incident=game.phase==="incident";
   const stage=combined?(combined.acknowledged?"Campaign complete":combined.finalReview?"Final review":pendingCombined(c)?"Growth outcome review":combined.currentRound?`Growth wave ${combined.currentRound.index+1} ${combined.currentRound.startedStep===null?"scheduled":combined.currentRound.pressureEndedStep===null?"active":"recovery"}`:combined.nextRoundIndex===3?"Final checks":"Prepare for full demand")
     :reliability?(reliability.acknowledged?"Outcome acknowledged":pendingReliability(c)?"Outcome review":!reliability.fault?"Preparation":reliability.fault.startedStep===null?"Failure scheduled":reliability.fault.restoredStep===null?"Failure / recovery":"Stability verification")
     :c.spikeStage!.acknowledged?"Outcome acknowledged":pendingSpikeAcknowledgement(c)?"Spike outcome review":({prepare:"Preparing",spike1:"Spike 1 active",between:"Between spikes",spike2:"Spike 2 active",recover:"Review / stability verification"}[spike?.stage??"recover"]);
@@ -271,7 +272,13 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const nextAdvice=decision.attention==="run"?decision.message:decision.reason==="spike-plan"?decision.recommendation:decision.action?`Suggested action: ${decision.action.label}.`:decision.recommendation;
   const showMetrics=!!c.incident||m.app.backlog+m.db.backlog>0||spike?.stage==="spike1"||spike?.stage==="spike2"||!!combined?.currentRound;
   return <EquipmentPanel className="campaign-panel mission-dashboard" label="System metrics">
-    <section className="panel-section" aria-label="Campaign mission dashboard">
+    <section className={`panel-section${incident ? " incident" : ""}`} aria-label={incident ? "Incident" : "Campaign mission dashboard"}>
+      {incident && <header className="panel-head">
+        <span className="panel-icon state-critical"><Icon name="incident" /></span>
+        <div><h2>Service slowdown</h2>
+          <span className="state state-critical"><Icon name="alert" size={12} />Incident</span>
+        </div>
+      </header>}
       <section aria-label="Chapter Progress" className="mission-progress">
         <h3>{combined?"Grow the Company":reliability?"Stay Online":"Chapter Progress"}</h3>
         <p className="mission-stage">{stage}</p>
@@ -292,7 +299,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         {c.limit!==null&&<Callout compact tone="warn" icon="network" kicker="Traffic limit active">{num(m.admitted)} admitted / {num(m.rejected)} rejected req/s. Rejected requests earn no revenue; operating costs remain.</Callout>}
         {fault?.startedStep!=null&&fault.restoredStep===null&&<p role="status">{appName(fault.targetId)} failed and is not restored. Service recovery and server restoration are separate requirements.</p>}
         {showMetrics&&<dl className="rows"><Row label="Latency" value={`${m.latencyMs.toFixed(0)} ms`}/><Row label="Service errors" value={m.serviceErrorRate===null?"Not yet measured":`${(m.serviceErrorRate*100).toFixed(2)}%`}/><Row label="Queued requests" value={num(m.app.backlog+m.db.backlog)}/></dl>}
-        {c.incident&&<p role="status">Recovery progress: {c.incident.stableSteps} / {Q.stableSteps} consecutive game seconds. Needs latency below {Q.latencyThresholdMs} ms, errors below {Q.errorThreshold*100}% and successful requests. Unhealthy service resets this counter.</p>}
+        {c.incident&&<IncidentRecovery campaign={c}/>}
         {c.pending.map(a=><p role="status" key={a.id}>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep-c.step} game second(s)</p>)}
       </section>
       <EquipmentShortcuts disabled={disabled}/>
