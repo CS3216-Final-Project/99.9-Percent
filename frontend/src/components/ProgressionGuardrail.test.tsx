@@ -6,7 +6,7 @@ import {CampaignPanel,CampaignOverlays} from "./CampaignUI";
 import {useGame} from "../game/store";
 import {newGame,applyAction,type GameState,type Action} from "../sim";
 import {advanceSteps} from "../sim/step";
-import {dataCompany,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
+import {dataCompany,preparedSpikes,untilOffset,tick} from "../sim/__tests__/spikeFixtures";
 function decision(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 function show(g:GameState){useGame.setState({game:g,started:true,ready:true,onboarding:false});render(<><CampaignPanel/><InspectionReveal/><CampaignOverlays/></>);}
 const guidance=()=>screen.getByRole("region",{name:"Guided Mode requirements"});
@@ -24,7 +24,7 @@ it("shows unmet Data requirements and keeps workload contrast optional",()=>{
  expect(screen.queryByRole("button",{name:/Continue to Traffic Spikes/})).toBeNull();
 });
 it("counts stable spike observations and waits for an explicit acknowledgement",()=>{
- let g=act(spikeCompany(false),{type:"set_traffic_limit",enabled:true});g=untilOffset(g,68);show(g);
+ let g=untilOffset(preparedSpikes(),68);show(g);
  fireEvent.click(screen.getByText("View all requirements"));
  expect(guidance().textContent).toContain("Stable baseline observations: 1 / 5");expect(screen.getByRole("region",{name:"Campaign mission dashboard"}).textContent).toContain("Autoscaling is optional");
  renderAct(()=>useGame.setState({game:tick(g,4)}));

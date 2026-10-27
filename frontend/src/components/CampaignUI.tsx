@@ -2,6 +2,8 @@ import { introductionActive } from "@/sim/introduction";
 import { introductionInstruction } from "@/game/introduction";
 import { outcomeSummary, scorecardSummary } from "@/game/campaignReport";
 import { CampaignReport } from "./CampaignReport";
+import { activeBudget, budgetLesson, budgetName } from "@/game/budgetReport";
+import { budgetUsed, pendingRetry } from "@/sim/errorBudget";
 import { RecordedFields } from "./RecordedFields";
 import { useMediaQuery } from "./useMediaQuery";
 import { incidentTitle, survivingCapacity } from "@/game/campaignPostmortem";
@@ -217,7 +219,7 @@ export function CampaignPanel() {
       <div className="incident-symptoms">
         <dl className="impact">
           <div><Concept kind={m.latencyMs >= Q.latencyThresholdMs ? "critical" : "users"} icon="timer" /><dt>Latency · ms</dt><dd>{m.latencyMs.toFixed(0)}</dd></div>
-          <div><Concept kind={m.serviceErrorRate !== null && m.serviceErrorRate >= Q.errorThreshold ? "critical" : "muted"} icon="error" /><dt>Errors · %</dt><dd>{m.serviceErrorRate === null ? "—" : (m.serviceErrorRate * 100).toFixed(2)}</dd></div>
+          <div><Concept kind={m.serviceErrorRate !== null && m.serviceErrorRate >= Q.errorThreshold ? "critical" : "muted"} icon="error" /><dt>Errors · %</dt><dd>{m.serviceErrorRate === null ? "n/a" : (m.serviceErrorRate * 100).toFixed(2)}</dd></div>
           <div><Concept kind="tech" icon="backlog" /><dt>Backlog</dt><dd>{num(m.app.backlog + m.db.backlog)}</dd></div>
         </dl>
       </div>
@@ -252,7 +254,7 @@ function IntroductionPanel() {
  return <EquipmentPanel className="campaign-panel mission-dashboard" label="System metrics">
   <section className="panel-section" aria-label="Infrastructure introduction">
    <section className="mission-progress" aria-label="Introduction Progress">
-    <h3>Introduction Progress — {intro.explored.length}/4 components explored</h3>
+    <h3>Introduction Progress: {intro.explored.length}/4 components explored</h3>
     <Meter value={intro.explored.length/4} label="Components explored" tone="ok"/>
    </section>
    <section className="mission-next" aria-label="Next step"><h4>{step.equipment?`Inspect ${step.name}`:"Request flow"}</h4><p>{step.description}</p><p>{step.message}</p></section>
@@ -284,7 +286,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const model=campaignGuidance(game),decision=campaignAttention(game),hint=useCampaignAttention();
   const action=model.pendingAction,combined=c.combinedStage,reliability=c.reliabilityStage;
   const fault=currentFault(c),financialRisk=chapter6FinancialRisk(game);
-  const spike=chapter4Stage(game);
+  const spike=chapter4Stage(game),budget=activeBudget(c);
   const reviewing=!!action&&!action.action;
   const actionReady=!!action?.action&&!disabled&&previewCampaignAction(game,action.action).ok;
   const priority=c.incident?"incident":c.pending.length?"pending":fault?.startedStep!=null&&fault.restoredStep===null?"restored":combined&&c.limit!==null?"admission":m.app.backlog+m.db.backlog>0?"queues":null;
@@ -306,6 +308,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         {combined&&<><p>Registered users: {num(combined.users)} / {num(combined.finalUserTarget)}</p><Meter value={combined.users/combined.finalUserTarget} label="Registered users progress" tone="ok"/><p>Growth outcomes acknowledged: {combined.completedRounds.length} / 3</p></>}
         <Meter value={model.completed.length/Math.max(1,model.requirements.length)} label="Chapter requirements progress" tone="ok"/>
         <p className="mission-complete">{model.completed.length} / {model.requirements.length} current requirements met</p>
+        {budget&&<><p>Error budget: {num(budgetUsed(c,budget))} / {num(budget.allowance)} requests lost</p><Meter value={budgetUsed(c,budget)/budget.allowance} label="Error budget spent" tone={budgetUsed(c,budget)>budget.allowance?"critical":budgetUsed(c,budget)*2>budget.allowance?"warn":"ok"}/></>}
         {unmet&&<StepList items={objectives}/>}
       </section>
       {condition?<section aria-label="Current unmet condition" className={`mission-condition${c.incident||game.phase==="ended"&&game.outcome!=="won"?" is-failure":""}`}><h4>Current unmet condition</h4><p>{condition}</p></section>:<section aria-label="Chapter accomplished" className="mission-accomplished"><h4>Chapter accomplished</h4><p>{accomplishment}</p></section>}
@@ -572,6 +575,11 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
   // waits for copies the company, so it is worked out once per game state rather than on every store update.
   const end = useMemo(() => chapterEnd(game, scope), [game, scope]);
   if(view==="scorecard"&&(c.scorecard||c.combinedStage?.finalReview))return <Modal title="Company scorecard" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={(c.scorecard??c.combinedStage!.finalReview)!} pendingReview={!c.scorecard}/></Modal>;
+  const retry=pendingRetry(c);
+  if(retry&&!["menu","history"].includes(view??""))return <Modal title={`${budgetName(c,retry)} over error budget`} className="campaign-recovery-report" tone="alert" icon={{ kind: "critical", name: "health" }}>
+    <CampaignReport lesson={budgetLesson(c,retry)}><RecordedFields data={retry}/></CampaignReport>
+    <div className="modal-foot"><span className="muted">Attempt {retry.attempt}. Same company.</span><button className="btn btn-primary" onClick={()=>act({type:"retry_scenario"})}>Retry {budgetName(c,retry)}<Icon name="refresh" /></button></div>
+  </Modal>;
   if(pendingCombined(c)&&!["guidance","menu","history"].includes(view??"")){
     const d=c.combinedStage!,r=d.currentRound;
     return <Modal title={d.finalReview?"Final campaign review":"Growth outcome"} className="campaign-recovery-report" onClose={()=>openView("guidance")}>

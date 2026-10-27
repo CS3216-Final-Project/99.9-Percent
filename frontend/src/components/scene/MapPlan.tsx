@@ -16,7 +16,7 @@ import { zoneAreas, type ZoneArea } from "./places";
 /*
  * The plan both maps are drawn from: a floor's zones, furniture, glass, shaft and walls, in world metres. The round
  * minimap turns and clips it; the menu's map pans and zooms it. Drawn again only when the floor or the machines
- * change, so the moving parts — avatar, crew, marks — never make it redraw.
+ * change, so the moving parts - avatar, crew, marks - never make it redraw.
  */
 
 const shape = (o: Obstacle, key: string) =>

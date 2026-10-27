@@ -42,12 +42,15 @@ test("reliability: manual restoration, measured report, outcome and paused reloa
  await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});
  await page.getByRole("button",{name:"Continue company",exact:true}).click();
  await advance(page,5);
- await expect(page.getByRole("dialog",{name:"Reliability outcome"})).toBeVisible();
+ // Without Health Checks the failed app kept receiving traffic until restored: the test goes over its error budget.
+ const retry=page.getByRole("dialog",{name:"Stay Online test over error budget"});
+ await expect(retry).toBeVisible();
  await page.reload();
  await page.getByRole("button",{name:"Continue company",exact:true}).click();
- await expect(page.getByRole("dialog",{name:"Reliability outcome"})).toBeVisible();
- await page.getByRole("button",{name:"Stay in this chapter",exact:true}).click();
- expect((await savedGame(page)).campaign!.reliabilityStage!.acknowledged).toBe(true);
+ await expect(retry).toContainText("Without Health Checks");
+ await retry.getByRole("button",{name:"Retry Stay Online test",exact:true}).click();
+ expect((await savedGame(page)).campaign!.reliabilityStage!.fault).toBeNull();
+ await expect(page.getByRole("button",{name:"Start reliability test",exact:true})).toBeVisible();
 });
 test("reliability: one-step detection and delayed real spare promotion",async({page, installClock})=>{
  // Retain the existing budget for both boots and the final promotion.

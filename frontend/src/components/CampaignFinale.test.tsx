@@ -26,8 +26,9 @@ it("only celebrates a won campaign, with every colleague in order and true numbe
   expect(model.lines.every(l => l.mood === "celebrating")).toBe(true);
   expect(model.lines.at(-1)!.text).toContain(won.campaign!.scorecard!.users.toLocaleString("en-US"));
   expect(model.stats.find(s => s.label === "Users")!.value).toBe("50,000");
+  expect(model.stats.map(s => s.label)).toEqual(["Users", "Final week uptime", "Incidents"]);
   const quiet = structuredClone(won), once = structuredClone(won), unknown = structuredClone(won);
-  quiet.campaign!.scorecard!.incidentCount = 0; once.campaign!.scorecard!.incidentCount = 1; unknown.campaign!.scorecard!.wholeRunUptime = null;
+  quiet.campaign!.scorecard!.incidentCount = 0; once.campaign!.scorecard!.incidentCount = 1; unknown.campaign!.scorecard!.finalWeekUptime = null;
   expect(campaignFinale(quiet)!.lines[3].text).toContain("Not a single incident");
   expect(campaignFinale(once)!.lines[3].text).toMatch(/^1 incident,/);
   expect(campaignFinale(unknown)!.stats.map(s => s.label)).toEqual(["Users", "Incidents"]);

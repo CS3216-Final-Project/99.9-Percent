@@ -38,7 +38,7 @@ export function CampaignFinance({onClose}:{onClose:()=>void}) {
             <Row label="Money earned, not yet received" value={money(pendingRevenue)} />
             {last && <Row label="Money earned last period" value={money(last.revenueCents)} />}
             <Row label="Current running costs per period" value={money(totalCharges(installed))} />
-            {last && <Row label="Money earned minus running costs — last period" value={money(last.netCents)} />}
+            {last && <Row label="Money earned minus running costs, last period" value={money(last.netCents)} />}
         </dl><p className="muted">{last ? "Last period's result does not include purchases." : "No completed period yet."}</p></section>
         <section aria-labelledby="finance-earnings"><h3 id="finance-earnings">How your company makes money</h3>
             <p>Your company earns {money(Q.revenueCents)} for each customer request completed successfully. Failed or rejected requests earn nothing. Queued requests earn money only when completed successfully.</p>

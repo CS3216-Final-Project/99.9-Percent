@@ -323,7 +323,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
   }, []);
 
   // The latest steady view is written on the way out: hiding the page or the rig unmounting. A view mid-ride or
-  // from before a run started is never written — the title screen's framing behind it is not the player's.
+  // from before a run started is never written - the title screen's framing behind it is not the player's.
   useEffect(() => {
     const flush = () => {
       const p = persisting.current;
@@ -532,7 +532,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
     if (!viewNow.perspective) updateWalls(dir.copy(c.target).sub(camera.position).normalize());
     // Last, so the labels follow the camera drawing as it ends up this frame.
     placeLabels(state.camera, size);
-    // And the view as it ended up is worth remembering — but only the player's own, never while the title
+    // And the view as it ended up is worth remembering - but only the player's own, never while the title
     // screen is up, the elevator is between floors or the cutscene has the camera.
     const p = persisting.current;
     if (useGame.getState().started && !riding() && !cutscene.current) {
@@ -1006,7 +1006,7 @@ function GateCounts({ c }: { c: Campaign }) {
     <>
       <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.incoming)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}`}>
         <b>In</b> {num(m.incoming)}/s
-        {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away — no revenue, counts against uptime</span>}
+        {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away: no revenue, counts against uptime</span>}
       </span>
       <span className="wall-tag gate-tag gate-out" ref={bindLabel(TRAFFIC_OUT)} aria-label={`Out: ${num(m.successful)} requests per second served`}>
         <b>Out</b> {num(m.successful)}/s

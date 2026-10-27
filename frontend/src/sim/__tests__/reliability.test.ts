@@ -5,6 +5,8 @@ import {readyReliability,reliabilityCompany,preparedReliability,act,tick,replay}
 import {researchBalance,pendingReliability,reliabilityEntryGates,canEnterReliability} from "../reliability";
 import {spikeCompany,untilOffset} from "./spikeFixtures";
 import {has,completedTechIds,techStatus} from "../tech";
+import {step} from "../step";
+import {pendingRetry} from "../errorBudget";
 it("entry preserves company and grants the bounded research once",()=>{
  const before=readyReliability(),s=act(before,{type:"enter_reliability"}),c=s.campaign!;
  expect(c.runId).toBe(before.campaign!.runId);expect(c.cashCents).toBe(before.campaign!.cashCents);expect(c.snapshot).toEqual(before.campaign!.snapshot);expect(c.pending).toEqual(before.campaign!.pending);expect(c.reliabilityStage!.owned).toEqual([]);expect(researchBalance(c)).toBe(4);expect(applyAction(s,{type:"enter_reliability"}).ok).toBe(false);
@@ -37,7 +39,11 @@ it("manual inspection detects only the selected actual app without time or hidde
  const s=tick(act(reliabilityCompany(),{type:"arm_reliability"}),8),n=act(s,{type:"incident_inspect",equipment:"app",appId:"app-3"});expect(n.campaign!.step).toBe(s.campaign!.step);expect(n.campaign!.apps[2].detectedHealth).toBe("unhealthy");expect(n.campaign!.apps[1].detectedHealth).toBe("unknown");expect(n.campaign!.routing).toEqual(s.campaign!.routing);
 });
 it("manual restoration remains free and measured report/outcome acknowledgement is mandatory",()=>{
- let s=tick(act(reliabilityCompany(),{type:"arm_reliability"}),10);expect(s.phase).toBe("incident");const cash=s.campaign!.cashCents;s=act(s,{type:"restore_app",appId:"app-3"});expect(s.campaign!.cashCents).toBe(cash);s=tick(s,3);expect(s.phase).toBe("incident");expect(s.campaign!.apps[2].health).toBe("healthy");for(let i=0;i<10&&s.phase!=="review";i++)s=tick(s);expect(s.phase).toBe("review");expect(s.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("creates no capacity");s=act(s,{type:"acknowledge_review"});s=tick(s,5);expect(pendingReliability(s.campaign)).toBe(true);expect(tick(s)).toEqual(s);s=act(s,{type:"acknowledge_reliability"});expect(s.campaign!.reliabilityStage!.acknowledged).toBe(true);
+ let s=tick(act(reliabilityCompany(),{type:"arm_reliability"}),10);expect(s.phase).toBe("incident");const cash=s.campaign!.cashCents;s=act(s,{type:"restore_app",appId:"app-3"});expect(s.campaign!.cashCents).toBe(cash);s=tick(s,3);expect(s.phase).toBe("incident");expect(s.campaign!.apps[2].health).toBe("healthy");for(let i=0;i<10&&s.phase!=="review";i++)s=tick(s);expect(s.phase).toBe("review");expect(s.campaign!.reports.at(-1)!.explanations.join(" ")).toContain("creates no capacity");s=act(s,{type:"acknowledge_review"});
+ // Without Health Checks the failed app kept receiving traffic until restored, so the test goes over its error budget.
+ for(let i=0;i<5;i++)s=step(s).state;expect(pendingReliability(s.campaign)).toBe(false);expect(pendingRetry(s.campaign)?.scenario).toBe("reliability");expect(step(s).state).toBe(s);
+ expect(applyAction(s,{type:"arm_reliability"}).ok).toBe(false);s=act(s,{type:"retry_scenario"});expect(s.campaign!.reliabilityStage!.fault).toBeNull();
+ s=act(s,{type:"arm_reliability"});expect(s.campaign!.reliabilityStage!.budget!.attempt).toBe(2);
 });
 it("conserves failed deliveries and charges existing installed infrastructure",()=>{
  let s=act(reliabilityCompany(),{type:"arm_reliability"});for(let i=0;i<13;i++){s=tick(s);const c=s.campaign!;expect(c.cumulative.admitted).toBe(c.cumulative.successful+c.cumulative.failed+c.dbBacklog+c.apps.reduce((n,a)=>n+a.backlog,0));}expect(s.campaign!.ledger.appNumerator).toBeGreaterThan(0);

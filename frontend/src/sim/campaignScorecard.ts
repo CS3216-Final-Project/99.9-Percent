@@ -1,9 +1,11 @@
-import type { Campaign, CampaignScorecard, ServiceMeasurement, Snapshot } from "./campaignTypes";
+import type { Campaign, CampaignScorecard, ErrorBudget, ServiceMeasurement, Snapshot } from "./campaignTypes";
 import type { GameState } from "./types";
 import { openingTuning } from "./launchWeek";
 import { clone } from "./state";
 import { completedTechIds } from "./tech";
 import { qualifiesForRecovery } from "./step";
+import { budgetUsed, requestUptime, windowUptime } from "./errorBudget";
+import { ERROR_BUDGET as B } from "./scenarios/errorBudget";
 import { APPLICATION_SCALING as P } from "./scenarios/applicationScaling";
 import { DATA_STRATEGY as D } from "./scenarios/dataStrategy";
 import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
@@ -26,6 +28,14 @@ export function recurringCost(c:Campaign):number {
  (c.loadBalancer?P.lbWeeklyCents:0)+(c.readCache?D.cacheWeeklyCents:0)+(c.spikeStage?.controller?T.controllerWeeklyCents:0)+
  (c.reliabilityStage?.checksStep!=null?R.checksWeeklyCents:0)+(c.reliabilityStage?.failover?R.failoverWeeklyCents:0);
 }
+/** The final attempt of every judged scenario, with how many attempts it took. */
+function judgedBudgets(c:Campaign):CampaignScorecard["budgets"] {
+ const out:CampaignScorecard["budgets"]=[];
+ const add=(b:ErrorBudget|null|undefined)=>{if(b)out.push({scenario:b.scenario,allowance:b.allowance,lost:budgetUsed(c,b),attempts:b.attempt});};
+ add(c.spikeStage?.budget);add(c.reliabilityStage?.budget);
+ for(const r of c.combinedStage?.completedRounds??[])add(r.budget);
+ return out;
+}
 export function captureScorecard(s:GameState,outcome:"won"|"bankrupt"):CampaignScorecard {
  const c=s.campaign!,m=c.serviceMeasurement??emptyServiceMeasurement(c.step+1,"since-upgrade"),d=c.reliabilityStage;
  const promotions=c.actions.filter(a=>a.type==="promotion").reduce((n,a)=>n+a.costCents,0);
@@ -43,7 +53,9 @@ export function captureScorecard(s:GameState,outcome:"won"|"bankrupt"):CampaignS
  salaryCents:c.settlements.reduce((n,x)=>n+x.salaryCents,0),rejectedDemand:c.cumulative.rejected,
  opportunityCents:c.cumulative.rejected*openingTuning(c).revenueCents,failedDemand:c.cumulative.failed,incidentCount:c.trace.filter(t=>t.type==="incident-opened").length,
  recurringCents:recurringCost(c),measurement:clone(m),combinedMeasurement:c.combinedStage?clone(c.combinedStage.service):null,
- wholeRunUptime:m.scope==="full-run"&&m.eligibleSteps?m.healthySteps/m.eligibleSteps:null,
+ wholeRunUptime:requestUptime(c.cumulative.successful,c.cumulative.failed,c.cumulative.rejected),
+ finalWeekUptime:c.combinedStage?.finalWeekFromStep!=null&&c.step-c.combinedStage.finalWeekFromStep>=B.finalWeekSteps?windowUptime(c.recent,B.finalWeekSteps):null,
+ budgets:judgedBudgets(c),
  wholeRunLargestOutage:m.scope==="full-run"?m.longestDegradedSteps:null,ownedTechIds:completedTechIds(s),deployedTechIds:deployed,
  architecture:clone({apps:c.apps,routing:c.routing,loadBalancer:c.loadBalancer,dbCapacity:c.dbCapacity,readCache:c.readCache,
  controller:c.spikeStage?.controller??null,checksStep:d?.checksStep??null,failover:d?.failover??null})};

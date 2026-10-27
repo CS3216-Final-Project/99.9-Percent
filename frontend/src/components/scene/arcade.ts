@@ -6,7 +6,7 @@ import { avatar, endBusyAt, held } from "./walk";
  * The brick-breaker session while the avatar plays the red arcade cabinet (see breakout.ts for the game itself
  * and Office.tsx's ArcadeScreen, which drives and draws it): the live game, what the on-page panel's hold buttons
  * add to the keys, the best score kept in the browser, and the sounds, score pops and ending each event causes.
- * Pure wiring — nothing here changes the simulation or a save.
+ * Pure wiring - nothing here changes the simulation or a save.
  */
 
 /** What the panel hears: only when the score, lives, phase or best changes, never every frame. */
@@ -117,7 +117,7 @@ export function serveArcade(): void {
 }
 
 /**
- * One frame of the session: read the held keys and the panel's buttons into the game, then act on its events —
+ * One frame of the session: read the held keys and the panel's buttons into the game, then act on its events -
  * a blip and a score pop for a brick, a pop for a lost ball, a dance and stars for a win, and the busy ending
  * shortly after the game does.
  */

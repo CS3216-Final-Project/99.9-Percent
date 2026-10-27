@@ -5,6 +5,7 @@ import { APPLICATION_RELIABILITY as R } from "./scenarios/applicationReliability
 import { clone } from "./state";
 import { trace } from "./trace";
 import { qualifiesForRecovery } from "./step";
+import { judgeBudget, pendingRetry, reliabilityScheduledDemand, startBudget } from "./errorBudget";
 export const reportsAcknowledged=(c:Campaign)=>c.reports.every(r=>c.trace.some(t=>t.type==="review-acknowledged"&&t.data.incidentId===r.id));
 export const healthy=(a:AppInstance)=>a.health!=="failed";
 export const serving=(a:AppInstance)=>a.role!=="spare";
@@ -80,10 +81,11 @@ export function observeReliability(s:GameState):void {
   const spare=c.apps.find(a=>a.id===d.spareId);
   if(spare&&healthy(spare)&&!spare.backlog)schedule(c,"promote-spare",1,0,{source:"failover",targetId:spare.id,expectedRouting:JSON.stringify(c.routing),failureId:f.id});
  }
- if(!c.combinedStage&&f?.restoredStep!==null&&f&&d.completedStep===null){
+ if(!c.combinedStage&&f?.restoredStep!==null&&f&&d.completedStep===null&&!pendingRetry(c)){
   const ready=s.phase==="management"&&c.cashCents>0&&!c.incident&&!c.dbBacklog&&c.apps.every(a=>!a.backlog)&&reportsAcknowledged(c)&&qualifiesForRecovery(c.snapshot);
   d.stableSteps=ready?d.stableSteps+1:0;
-  if(d.stableSteps===5){d.completedStep=c.step;trace(c,"reliability-stage-completed",{eventId:f.id,restoredStep:f.restoredStep!,limited:c.limit!==null,rejected:c.cumulative.rejected,setupCents:c.investedCents,incidentOccurred:c.trace.some(t=>t.type==="incident-opened"&&t.step>=f.startStep)});}
+  if(d.stableSteps===5&&!judgeBudget(c,d.budget))d.stableSteps=0;
+  else if(d.stableSteps===5){d.completedStep=c.step;trace(c,"reliability-stage-completed",{eventId:f.id,restoredStep:f.restoredStep!,limited:c.limit!==null,rejected:c.cumulative.rejected,setupCents:c.investedCents,incidentOccurred:c.trace.some(t=>t.type==="incident-opened"&&t.step>=f.startStep)});}
  }
 }
 type Rejection=Extract<ActionResult,{ok:false}>;
@@ -112,7 +114,7 @@ export function reliabilityAction(s:GameState,action:Action):Rejection|null|unde
  if(action.type==="arm_reliability"){
   if(d.fault||s.phase!=="management"||c.incident||c.cashCents<=0||c.pending.length||c.dbBacklog||c.apps.some(a=>a.backlog)||!reportsAcknowledged(c)||!qualifiesForRecovery(c.snapshot))return fail("The test requires stable management, empty queues and finished pending actions.");
   const target=c.apps.filter(a=>c.routing.targets.includes(a.id)&&healthy(a)&&serving(a)).sort((a,b)=>Number(b.id.slice(4))-Number(a.id.slice(4)))[0];if(!target)return fail("A healthy serving routing target is required.");
-  d.fault={id:`failure-${c.nextEventId}`,targetId:target.id,armedStep:c.step,startStep:c.step+8,naturalStep:c.step+28,startedStep:null,restoredStep:null,restoreSource:null,promoted:false};trace(c,"reliability-failure-armed",{eventId:d.fault.id,appId:target.id,startStep:d.fault.startStep,naturalStep:d.fault.naturalStep});return null;
+  d.fault={id:`failure-${c.nextEventId}`,targetId:target.id,armedStep:c.step,startStep:c.step+8,naturalStep:c.step+28,startedStep:null,restoredStep:null,restoreSource:null,promoted:false};d.budget=startBudget(c,"reliability",reliabilityScheduledDemand(c.incomingRate),(d.budget?.attempt??0)+1);trace(c,"reliability-failure-armed",{eventId:d.fault.id,appId:target.id,startStep:d.fault.startStep,naturalStep:d.fault.naturalStep});return null;
  }
  if(action.type==="set_failover"){if(!d.failover||d.failover.enabled===action.enabled)return fail("Failover is unavailable or already set.");d.failover.enabled=action.enabled;trace(c,action.enabled?"failover-enabled":"failover-disabled");return null;}
  const type=action.type==="deploy_health_checks"?"health-checks":action.type==="install_spare"?"create-spare":action.type==="reserve_spare"?"reserve-spare":action.type==="release_spare"?"release-spare":action.type==="deploy_failover"?"failover":"restore-app";

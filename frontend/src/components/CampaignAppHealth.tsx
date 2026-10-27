@@ -33,7 +33,7 @@ export function CampaignAppHealth({ onClose }: { onClose: () => void }) {
             <p className="muted app-health-snapshot">{health.step === 0 ? "Starting readings" : `Latest readings · Step ${health.step}`}</p>
         </section>
         <dl className="rows" aria-label="App measurements">
-            <div className="row app-health-uptime-card"><dt>Uptime</dt><dd>{uptime === null ? "\u2014 / Not enough data" : uptimePct(uptime)}</dd></div>
+            <div className="row app-health-uptime-card"><dt>Uptime</dt><dd>{uptime === null ? "Not enough data" : uptimePct(uptime)}</dd></div>
             <Row label="Response time" value={health.responseMs === null ? "Unavailable" : `${health.responseMs.toFixed(0)} ms (estimated)`} />
             <Row label="Failed requests (%)" value={health.failedRate === null ? "Unavailable" : `${(health.failedRate * 100).toFixed(2)}%`} />
             <Row label="Requests waiting" value={health.waiting === null ? "Unavailable" : num(health.waiting)} />

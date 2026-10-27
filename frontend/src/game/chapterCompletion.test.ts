@@ -2,11 +2,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyAction, type Action, type GameState } from "@/sim";
 import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
-import { act, dataCompany, spikeCompany, tick } from "@/sim/__tests__/spikeFixtures";
+import { act, dataCompany, preparedSpikes, tick } from "@/sim/__tests__/spikeFixtures";
 import { finishingScaling } from "@/sim/__tests__/dataFixture";
 import { step } from "@/sim/step";
 import { finishedLaunchWeek, recoveredOpening } from "./__fixtures__/openingOutcome";
-import { reliabilityOutcome, reliabilityOutcomeWithQueuedChange } from "./__fixtures__/reliabilityOutcome";
+import { completedReliabilityOutcome as reliabilityOutcome, reliabilityOutcomeWithQueuedChange } from "./__fixtures__/reliabilityOutcome";
 import { chapterAdvance, chapterEnd } from "./chapterCompletion";
 import { PHONE_SCOPE } from "./scope";
 
@@ -15,7 +15,7 @@ vi.setConfig({ testTimeout: 20_000 });
 
 const apply = (g: GameState, actions: Action[]) => actions.reduce(act, g);
 function spikeRecognition() {
-  let g = spikeCompany(false);
+  let g = preparedSpikes();
   for (let i = 0; i < 300 && !pendingSpikeAcknowledgement(g.campaign!); i++) g = g.phase === "review" ? act(g, { type: "acknowledge_review" }) : tick(g);
   expect(pendingSpikeAcknowledgement(g.campaign!)).toBe(true);
   return g;

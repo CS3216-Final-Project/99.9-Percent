@@ -57,6 +57,12 @@ export interface SpikeStage {
  id: "traffic-spikes"; version: 1; configuration: string; enteredStep: number;
  deadlines: number[]; consumed: string[]; researchEarned: 1; researchSpent: 0 | 1;
  controller: Autoscaler | null; baselineStableSteps: number; completedStep: number | null; acknowledged: boolean;
+ budget?: ErrorBudget | null;
+}
+/** A judged scenario's allowance of failed or rejected requests, a share of the demand it schedules. */
+export interface ErrorBudget {
+ scenario: "spikes" | "reliability" | "growth"; fromStep: number; scheduledDemand: number; allowance: number;
+ lostBefore: number; attempt: number; judged: null | { step: number; lost: number; within: boolean }; retriedStep: number | null;
 }
 export interface ReadCache { activatedStep: number; warmth: number; target: number; tuned: boolean }
 export interface Routing { mode: "single" | "balanced"; targets: string[] }
@@ -154,7 +160,9 @@ export interface CampaignScorecard {
  infrastructureSetupCents:number; infrastructureOperatingCents:number; salaryCents:number; promotionCents:number;
  rejectedDemand:number; opportunityCents:number; failedDemand:number; incidentCount:number; recurringCents:number;
  measurement:ServiceMeasurement; combinedMeasurement:ServiceMeasurement|null;
- wholeRunUptime:number|null; wholeRunLargestOutage:number|null;
+ /** Request uptime over the whole run, and over Grow the Company's final operating week. */
+ wholeRunUptime:number|null; wholeRunLargestOutage:number|null; finalWeekUptime:number|null;
+ budgets:{scenario:ErrorBudget["scenario"];allowance:number;lost:number;attempts:number}[];
  ownedTechIds:string[]; deployedTechIds:string[];
  architecture:{apps:AppInstance[];routing:Routing;loadBalancer:boolean;dbCapacity:number;readCache:ReadCache|null;
   controller:Autoscaler|null;checksStep:number|null;failover:ReliabilityStage["failover"]};
@@ -164,13 +172,15 @@ export interface CombinedRound {
  scheduledStep:number;startStep:number;endStep:number;users:number;baseline:number;
  startedStep:number|null;pressureEndedStep:number|null;fault:ReliabilityFault|null;
  stableSteps:number;completedStep:number|null;acknowledged:boolean;
- rejectedBefore:number;setupBefore:number;observations:Snapshot[];
+ rejectedBefore:number;setupBefore:number;observations:Snapshot[];budget?:ErrorBudget|null;
 }
 export interface CombinedStage {
  id:"combined-campaign";version:1;configuration:string;enteredStep:number;source:"seeded"|"evaluation";
  finalUserTarget:number;users:number;sequence:import("./scenarios/combinedCampaign").CombinedScenario[];
  nextRoundIndex:number;currentRound:CombinedRound|null;completedRounds:CombinedRound[];
  readinessSteps:number;finalStableSteps:number;targetReachedStep:number|null;
+ /** Step the final operating week began, once the last growth outcome was acknowledged. */
+ finalWeekFromStep?:number|null;retriedRounds?:CombinedRound[];
  finalReview:CampaignScorecard|null;acknowledged:boolean;service:ServiceMeasurement;
 }
 export interface CampaignPromotion {
@@ -278,6 +288,7 @@ export interface ReliabilityStage {
  researchEarned:3; owned:ReliabilityTech[]; checksStep:number|null;
  failover:null|{activatedStep:number;enabled:boolean}; spareId:string|null; fault:ReliabilityFault|null;
  failureSteps:number; stableSteps:number; completedStep:number|null; acknowledged:boolean;
+ budget?:ErrorBudget|null;
 }
 export interface ReliabilityObservation {
  configured:string[]; effective:string[]; healthyCapacity:number; healthyRoutedCapacity:number; spareCapacity:number;

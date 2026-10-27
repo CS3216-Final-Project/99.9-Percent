@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { chapter4Stage, chapter4Performance } from "./chapter4Guidance";
 import { campaignAttention } from "./campaignAttention";
-import { act, tick, spikeCompany, untilOffset } from "@/sim/__tests__/spikeFixtures";
+import { act, tick, preparedSpikes, spikeCompany, untilOffset } from "@/sim/__tests__/spikeFixtures";
 import { newGame, newLegacyGame } from "@/sim";
 
 const initial = spikeCompany(false);
@@ -18,7 +18,7 @@ it("offers Respond only when an observed pulse bottleneck exists", () => {
 });
 it("leaves other chapters and modes outside the stage model", () => {
   expect(chapter4Stage(newGame())).toBeNull(); expect(chapter4Stage(newLegacyGame())).toBeNull();
-  expect(chapter4Stage(act(untilOffset(limited, 72), { type: "acknowledge_spikes" }))).toBeNull();
+  expect(chapter4Stage(act(untilOffset(preparedSpikes(), 72), { type: "acknowledge_spikes" }))).toBeNull();
 });
 it("transfers Prepare inspection to genuine scheduled Run without forcing an upgrade", () => {
   expect(campaignAttention(initial)).toMatchObject({ attention: "hint", target: "app" });

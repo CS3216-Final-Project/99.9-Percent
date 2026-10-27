@@ -2,13 +2,13 @@ import { expect, it } from "vitest";
 import { campaignAttention } from "./campaignAttention";
 import { campaignGuidance } from "./campaignGuidance";
 import { chapter6Stage } from "./chapter6Guidance";
-import { act, tick, combinedCompany, strategyPredecessor, protectedCombined, sequence, finishRound } from "@/sim/__tests__/combinedFixture";
+import { act, tick, combinedCompany, baseAppPredecessor, protectedCombined, sequence } from "@/sim/__tests__/combinedFixture";
 import { canStartGrowth, pendingCombined } from "@/sim/combinedCampaign";
 import type { GameState } from "@/sim";
 
 const prepared = combinedCompany();
 function cappedSingle() {
-  let s = tick(act(strategyPredecessor(true), { type: "set_traffic_limit", enabled: true }));
+  let s = tick(act(baseAppPredecessor(), { type: "set_traffic_limit", enabled: true }));
   s = tick(act(s, { type: "set_routing", mode: "single", targets: ["app-1"] }));
   return act(s, { type: "enter_combined", sequence });
 }
@@ -106,7 +106,7 @@ it("reports current counters separately from final goals and exposes real blocke
 });
 
 it("prepares announced peak capacity before removing a cap during a quiet warning interval", () => {
-  let s = act(strategyPredecessor(true), { type: "enter_combined", sequence });
+  let s = act(baseAppPredecessor(), { type: "enter_combined", sequence });
   s = act(tick(s, 5), { type: "start_growth_wave" });
   s = tick(act(s, { type: "set_traffic_limit", enabled: true }));
   expect(s.campaign!.snapshot.incoming).toBe(2400);
@@ -118,7 +118,7 @@ it("prepares announced peak capacity before removing a cap during a quiet warnin
 });
 
 it("uses the accepted write-wave profile rather than baseline cache savings for removal safety", () => {
-  let s = act(strategyPredecessor(true), { type: "enter_combined", sequence: [sequence[1], sequence[0], sequence[2]] });
+  let s = act(baseAppPredecessor(), { type: "enter_combined", sequence: [sequence[1], sequence[0], sequence[2]] });
   s = act(tick(s, 5), { type: "start_growth_wave" });
   s = tick(act(s, { type: "set_traffic_limit", enabled: true }));
   expect(s.campaign!.combinedStage!.currentRound!.startedStep).toBeNull();
@@ -126,8 +126,8 @@ it("uses the accepted write-wave profile rather than baseline cache savings for 
 });
 
 it("repairs an observed failed server after recovery review before prescribing replacement capacity", () => {
-  let s = prepared;
-  for (let i = 0; i < 2; i++) s = act(finishRound(act(tick(s, 5), { type: "start_growth_wave" })), { type: "acknowledge_growth" });
+  // Without Health Checks the failed App 3 stays routed; the failure wave leads.
+  let s = act(baseAppPredecessor(), { type: "enter_combined", sequence: [sequence[2], sequence[0], sequence[1]] });
   s = tick(act(tick(s, 5), { type: "start_growth_wave" }), 10);
   s = act(s, { type: "set_traffic_limit", enabled: true });
   s = act(s, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2"] });
@@ -138,7 +138,8 @@ it("repairs an observed failed server after recovery review before prescribing r
   expect(fault.restoredStep).toBeNull();
   expect(nextAction(s)).toEqual({ type: "restore_app", appId: fault.targetId });
   expect(campaignAttention(act(s, nextAction(s)!)).attention).toBe("run");
-  expect(nextAction(tick(act(s, nextAction(s)!), 3))).toEqual({ type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] });
+  // Even all three routed, base apps cannot carry the 3,600 req/s peak, so capacity comes next.
+  expect(nextAction(tick(act(s, nextAction(s)!), 3))).toEqual({ type: "scale_up", appId: "app-1" });
 });
 
 it("traces all three actual waves, mandatory acknowledgements, final promotion and Campaign completion", () => {
@@ -164,7 +165,8 @@ it("traces all three actual waves, mandatory acknowledgements, final promotion a
   expect(chapter6Stage(s)?.cues[0].title).toBe("Final checks");
   s = tick(act(s, { type: "run_promotion" }), 1);
   expect(campaignAttention(s)).toMatchObject({ attention: "run", reason: "combined-promotion" });
-  s = tick(s, 17);
+  // The final review follows a full operating week after the last growth outcome.
+  for (let i = 0; i < 70 && !s.campaign!.combinedStage!.finalReview; i++) s = tick(s);
   expect(s.campaign!.combinedStage!.finalReview).not.toBeNull();
   expect(campaignAttention(s)).toMatchObject({ attention: null, reason: "review" });
   s = act(s, { type: "complete_campaign" });

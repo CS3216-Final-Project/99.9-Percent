@@ -1,7 +1,7 @@
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, expectRoom, savedGame, seedSave } from "./fixtures";
 import { newGame } from "../src/sim";
-import { act, tick, spikeCompany } from "../src/sim/__tests__/spikeFixtures";
+import { act, tick, preparedSpikes } from "../src/sim/__tests__/spikeFixtures";
 import { combinedCompany, finishRound, finishedCompany } from "../src/sim/__tests__/combinedFixture";
 
 export type ReportCase = "prevention" | "spikes" | "growth" | "completion";
@@ -9,7 +9,7 @@ function fixture(kind: ReportCase) {
   if (kind === "completion") return finishedCompany();
   if (kind === "growth") return finishRound(act(tick(combinedCompany(), 5), { type: "start_growth_wave" }));
   if (kind === "spikes") {
-    let game = act(spikeCompany(false), { type: "set_traffic_limit", enabled: true });
+    let game = preparedSpikes();
     for (let i = 0; i < 100 && game.campaign!.spikeStage!.completedStep == null; i++) game = tick(game);
     expect(game.campaign!.spikeStage!.completedStep).not.toBeNull(); return game;
   }
@@ -29,7 +29,7 @@ export async function campaignReportJourney(page: Page, info: TestInfo, kind: Re
   const button = dialog.getByRole("button", { name: kind === "completion" ? "Complete campaign" : kind === "spikes" ? "Stay in this chapter" : "Continue company", exact: true });
   await expect(button).toBeInViewport({ ratio: 1 });
   await expect(dialog.getByRole("heading", { name: "What happened?", exact: true })).toBeInViewport();
-  if (kind === "spikes") await expect(dialog.locator(".campaign-incident-report > section")).toContainText(["Both traffic spikes ended", "rejected"]);
+  if (kind === "spikes") await expect(dialog.locator(".campaign-incident-report > section")).toContainText(["Both traffic spikes ended", "an added server"]);
   await page.evaluate(async () => { await document.fonts.ready; });
   await page.screenshot({ path: info.outputPath(`${kind}-summary.png`) });
   const disclosure = dialog.getByText("View Technical Details", { exact: true });

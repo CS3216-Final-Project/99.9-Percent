@@ -75,7 +75,7 @@ it("keeps uptime in the detailed panel and leaves only status in the header", ()
     expect(entry.textContent).not.toContain("Uptime");
     fireEvent.click(entry);
     const dialog = screen.getByRole("dialog", { name: "App Health" });
-    expect(within(dialog).getByText("\u2014 / Not enough data")).toBeTruthy();
+    expect(within(dialog).getByText("Not enough data")).toBeTruthy();
     const game = structuredClone(useGame.getState().game);
     Object.assign(game.campaign!.cumulative, { successful: 9999, failed: 1, rejected: 0 });
     act(() => useGame.setState({ game }));

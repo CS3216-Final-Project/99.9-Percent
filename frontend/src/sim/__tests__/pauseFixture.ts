@@ -2,7 +2,7 @@ import { newGame, type GameState } from "../index";
 import { act, tick, spikeCompany } from "./spikeFixtures";
 import { dataCompany } from "./dataFixture";
 import { reliabilityCompany } from "./reliabilityFixture";
-import { combinedCompany, finishRound } from "./combinedFixture";
+import { checkedCombined, sequence } from "./combinedFixture";
 
 export function nextIncident(g: GameState) {
   for (let i = 0; i < 150; i++) {
@@ -30,10 +30,7 @@ export function pauseTransition(chapter: number, runId?: string) {
   } else if (chapter === 3) g = dataCompany();
   else if (chapter === 4) g = spikeCompany(false);
   else if (chapter === 5) g = act(reliabilityCompany(), { type: "arm_reliability" });
-  else {
-    g = combinedCompany();
-    for (let i = 0; i < 2; i++) g = act(finishRound(act(tick(g, 5), { type: "start_growth_wave" })), { type: "acknowledge_growth" });
-    g = act(tick(g, 5), { type: "start_growth_wave" });
-  }
+  // Health Checks alone leave two apps to carry the failure-under-load wave, which overloads them.
+  else g = act(tick(checkedCombined([sequence[2], sequence[0], sequence[1]]), 5), { type: "start_growth_wave" });
   return nextIncident(g);
 }

@@ -164,7 +164,7 @@ export interface LastIntro {
 }
 
 /**
- * An inspection started in the 3D room itself — a model or label clicked, or the avatar's prompt — waiting for
+ * An inspection started in the 3D room itself - a model or label clicked, or the avatar's prompt - waiting for
  * its diagnostic card. Panels keep calling `inspectOrSelect`, which never sets this. Never saved.
  */
 export interface RoomInspection {
@@ -370,6 +370,7 @@ const ACKNOWLEDGEMENTS = {
   "reliability-review": "acknowledge_reliability",
   "prevention-review": "acknowledge_prevention_review",
   "spike-acknowledgement": "acknowledge_spikes",
+  "budget-retry": "retry_scenario",
 } as const;
 /** The only action accepted while a recognition or milestone awaits the player; time stays paused meanwhile. */
 function requiredAcknowledgement(g: GameState): Action["type"] | null {
@@ -1476,7 +1477,7 @@ export function inspectOrSelect(id: EquipmentId, appId?: string): void {
 
 let roomInspectionSeq = 0;
 /**
- * An inspection the player starts in the 3D room — clicking a model or label, or the avatar's prompt: the shared
+ * An inspection the player starts in the 3D room - clicking a model or label, or the avatar's prompt: the shared
  * gameplay action runs, then the diagnostic reveal opens. Campaign shortcuts use this same entry;
  * Classic panels keep their existing inline `inspectOrSelect` flow.
  */

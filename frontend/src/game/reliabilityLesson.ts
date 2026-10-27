@@ -5,9 +5,12 @@ export interface ReliabilityLesson { happened: string; recovered: string; improv
 export function reliabilityLesson(c: Campaign, report?: CampaignPostmortem): ReliabilityLesson | undefined {
   const d = c.reliabilityStage, f = d?.fault;
   if (!d || !f || f.startedStep === null) return;
-  const end = report?.recoveredStep ?? d.completedStep;
+  // A test that went over its error budget ends where it was judged, awaiting a retry.
+  const end = report?.recoveredStep ?? d.completedStep ?? d.budget?.judged?.step ?? null;
   if (end == null || report && (f.startedStep > report.recoveredStep || f.restoredStep !== null && f.restoredStep < report.openedStep || !report.snapshots.some(m => m.reliability?.faultId === f.id))) return;
-  const completion = c.trace.find(t => t.type === "reliability-stage-completed" && t.data.eventId === f.id);
+  const judged = d.budget?.judged;
+  const completion = c.trace.find(t => t.type === "reliability-stage-completed" && t.data.eventId === f.id)
+    ?? (judged ? c.trace.find(t => t.type === "error-budget-exceeded" && t.data.scenario === "reliability" && t.step === judged.step) : undefined);
   const events = (report?.events ?? c.trace.filter(t => !completion || t.id <= completion.id)).filter(t => t.step >= f.startedStep! && t.step <= end);
   const restored = events.find(t => t.type === "instance-restored" && t.data.eventId === f.id);
   const promoted = events.find(t => t.type === "failover-activated" && t.data.eventId === f.id);

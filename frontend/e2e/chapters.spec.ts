@@ -5,7 +5,7 @@ import { newGame } from "../src/sim";
 import { readyReliability, act, tick } from "../src/sim/__tests__/reliabilityFixture";
 import { canEnterReliability } from "../src/sim/reliability";
 import { pendingSpikeAcknowledgement } from "../src/sim/autoscaling";
-import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
+import { preparedSpikes } from "../src/sim/__tests__/spikeFixtures";
 
 // These journeys exercise panels and persistence; room interaction has dedicated browser coverage.
 test.beforeEach(async ({ withoutRoom }) => { await withoutRoom(); });
@@ -63,7 +63,8 @@ test("disabled Next explains its actual readiness gate to keyboard users",async(
 
 test("the spike response offers Stay or Continue, and Continue takes the same company into Stay Online", async ({ page }) => {
   await page.route("**/api/**", route => route.abort());
-  let game = spikeCompany(false);
+  // A third large app keeps both pulses within the error budget.
+  let game = preparedSpikes();
   for (let i = 0; i < 300 && !pendingSpikeAcknowledgement(game.campaign!); i++) game = game.phase === "review" ? act(game, { type: "acknowledge_review" }) : tick(game);
   expect(pendingSpikeAcknowledgement(game.campaign!)).toBe(true);
   await seedSave(page, game);

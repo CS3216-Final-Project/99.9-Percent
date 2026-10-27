@@ -15,7 +15,7 @@ export interface QualityProfile {
   shadowRadius: number;
   /** Pixels drawn per CSS pixel: one number, or the range the display's own density is clamped to. */
   dpr: number | [number, number];
-  /** Frames a second when capped — only for drawing on the CPU, where every frame is expensive — or null to draw as often as the display asks. */
+  /** Frames a second when capped - only for drawing on the CPU, where every frame is expensive - or null to draw as often as the display asks. */
   fps: number | null;
 }
 
