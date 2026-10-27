@@ -20,7 +20,8 @@ import "../layout/phone-layout.css";
  * Region: dock. One row along the bottom edge: the views (Tech, History and, in Challenge Mode, Team) and Navigation
  * on the left, then the clock, the speed menu and the one primary time control on the right, under the thumb.
  * Guided Mode adds End week beside the speed menu: a 20x rush to the week boundary that slows back down when an
- * incident happens. Where the views do not fit beside the
+ * incident happens. End week is unavailable for now; the button stays visible so it can be re-enabled later.
+ * Where the views do not fit beside the
  * time controls they fold into one Views menu. Every menu opens above the dock.
  */
 export function PhoneDock() {
@@ -85,8 +86,8 @@ function GuidedDock() {
       </div>
       <TimeMenu />
       <button type="button" className={`dock-speed dock-rush phone-rush${weekRush ? " is-on" : ""}`} aria-pressed={weekRush} aria-label="End the week at 20 times speed"
-        {...tipProps("Fast-forward to the end of the week (20×). Slows back down if an incident happens.")}
-        disabled={!active} onClick={() => weekRush ? cancelWeekRush() : endWeek()}><Icon name="stepMany" size={18} /><span>End week</span></button>
+        {...tipProps("Ending the week early is unavailable.")}
+        disabled onClick={() => weekRush ? cancelWeekRush() : endWeek()}><Icon name="stepMany" size={18} /><span>End week</span></button>
       <button type="button" className={`btn btn-primary campaign-play dock-primary${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"}
         {...tipProps("Run or pause the company (P)")} disabled={!active} onClick={() => setRunning(!running)}>
         <Icon name={running ? "pause" : "play"} /><span>{running ? "Pause" : "Run"}</span>

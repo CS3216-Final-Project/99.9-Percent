@@ -40,7 +40,7 @@ test("staying in a completed chapter leaves the player's clock paused", async ({
   expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step + 1);
 });
 
-test("speed buttons set the rate and the week rush stops at the boundary", async ({ page, installClock }) => {
+test("speed buttons set the rate and the week rush stays unavailable", async ({ page, installClock }) => {
   await installClock();
   const game = dataCompany(), start = game.campaign!.step;
   await seedSave(page, game);
@@ -53,25 +53,26 @@ test("speed buttons set the rate and the week rush stops at the boundary", async
   await page.clock.runFor(2000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   expect((await savedGame(page)).campaign!.step).toBeGreaterThan(start + 2);
-  // The week rush fast-forwards at 20x and hands the clock back at the boundary.
-  await speeds.getByRole("button", { name: /End the week/ }).click();
-  await page.clock.runFor(30_000);
-  const after = await savedGame(page);
-  expect(after.turn).toBeGreaterThan(game.turn);
-  await expect(speeds.getByRole("button", { name: /End the week/ })).toHaveAttribute("aria-pressed", "false");
+  // The week rush stays visible but unavailable; the picked speed keeps the pressed state.
+  const rush = speeds.getByRole("button", { name: /End the week/ });
+  await expect(rush).toBeDisabled();
+  await expect(rush).toHaveAttribute("aria-pressed", "false");
   await expect(speeds.getByRole("button", { name: "2×", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
-test("the week rush returns to normal speed when an incident opens", async ({ page, installClock }) => {
+test("the week rush stays unavailable when an incident opens", async ({ page, installClock }) => {
   await installClock();
   await seedSave(page, advanceSteps(newGame(1, "rush-incident"), 6).state);
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   const speeds = page.getByRole("group", { name: "Game speed" });
-  await speeds.getByRole("button", { name: /End the week/ }).click();
+  const rush = speeds.getByRole("button", { name: /End the week/ });
+  await expect(rush).toBeDisabled();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   await page.clock.runFor(30_000);
   expect((await savedGame(page)).campaign!.incident).toBeTruthy();
-  // The rush is off and the picked speed owns the pressed state again.
-  await expect(speeds.getByRole("button", { name: /End the week/ })).toHaveAttribute("aria-pressed", "false");
+  // The rush stays off and the picked speed owns the pressed state.
+  await expect(rush).toBeDisabled();
+  await expect(rush).toHaveAttribute("aria-pressed", "false");
   await expect(speeds.getByRole("button", { name: "1×", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
