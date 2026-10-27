@@ -121,6 +121,10 @@ export interface CampaignIncident {
     kind?: "application-failure"; failureId?: string;
     id: string;
     openedStep: number;
+    /** An uncancelled scheduled action engaged at or after this step is the incident's recorded
+     * response; stability alone cannot close the incident until one exists. Undefined only for
+     * incidents replayed from saves recorded before the requirement, which still self-resolve. */
+    responseDueFrom?: number;
     stableSteps: number;
     snapshots: Snapshot[];
     components?: string[];
@@ -260,6 +264,9 @@ export interface Campaign {
     openingPrevention?: OpeningPrevention;
     /** Input prefix recorded under schema 6's former prevention progression rule. */
     legacyPreventionInputs?: number;
+    /** Incidents opened at or before this step keep their original self-resolving behaviour, so a
+     * run recorded before the response requirement still replays and continues faithfully. */
+    legacyIncidentStep?: number;
     openingRecovered: boolean;
     firstPauseConsumed: boolean;
     snapshot: Snapshot;

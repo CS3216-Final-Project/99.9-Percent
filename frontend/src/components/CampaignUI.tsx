@@ -132,6 +132,7 @@ function IncidentRecovery({ campaign: c }: { campaign: Campaign }) {
       <li><Icon name="error" size={16} /><span>Service errors below <b>{Q.errorThreshold * 100}%</b></span></li>
       <li><Icon name="revenue" size={16} /><span>Traffic is being accepted and requests are completing</span></li>
       {failedAppActive && <li><Icon name="server" size={16} /><span>Failed server restored, or removed from traffic with an empty queue</span></li>}
+      {c.incident!.responseDueFrom !== undefined && <li><Icon name="wrench" size={16} /><span>A recorded response: a capacity, routing, admission or restoration action since the incident began</span></li>}
     </ul>
     <p className="recovery-note">An unhealthy second resets progress. Pausing freezes it.</p>
   </section>;

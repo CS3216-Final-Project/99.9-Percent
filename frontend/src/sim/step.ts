@@ -164,6 +164,17 @@ export function qualifiesForRecovery(m: Snapshot): boolean {
         m.serviceErrorRate < Q.errorThreshold && m.admitted > 0 && m.successful + m.failed > 0;
 }
 /**
+ * The open incident still lacks its recorded response: an uncancelled capacity, routing,
+ * admission or restoration decision engaged at or after the step its cause began. Stability
+ * alone never closes such an incident, so a player who does nothing sees no recovery.
+ * Incidents replayed from saves written before the rule (no `responseDueFrom`) never await one.
+ */
+export function incidentAwaitingResponse(c: Campaign): boolean {
+    const due = c.incident?.responseDueFrom;
+    return due !== undefined &&
+        !c.actions.some(a => a.cancelledStep === undefined && (a.activatedStep ?? a.requestedStep) >= due);
+}
+/**
  * Whether the incident presentation applies: the phase is "incident", a campaign incident object is
  * open, or a chapter failure test (Stay Online's fault, or a combined-stage failure) has started and
  * not yet been restored. A fault can burn for its whole duration while the phase stays "management",
@@ -390,7 +401,7 @@ export function stepInPlace(s: GameState): StopReason {
         c.incident.stableSteps = qualifiesForRecovery(c.snapshot)&&recoverySafe(c) ? prior + 1 : 0;
         if (prior !== c.incident.stableSteps)
             trace(c, "recovery-streak", { from: prior, to: c.incident.stableSteps });
-        if (c.incident.stableSteps >= Q.stableSteps) {
+        if (c.incident.stableSteps >= Q.stableSteps && !incidentAwaitingResponse(c)) {
             trace(c, "incident-recovered", { incidentId: c.incident.id });
             c.reports.push(causalPostmortem(c));
             c.incident = null;
@@ -408,7 +419,12 @@ export function stepInPlace(s: GameState): StopReason {
         const failedIncident=(c.reliabilityStage?.failureSteps??0)>=3&&!!failure;
         if(failedIncident&&!components.includes(failure!.targetId))components.unshift(failure!.targetId);
         if (components.length) {
-            c.incident = { id: `incident-${c.nextEventId}`, openedStep: c.step, stableSteps: 0, snapshots: c.recent.slice(-3), components, primaryComponent:components[0],...(failedIncident?{kind:"application-failure" as const,failureId:failure!.id}:{}) };
+            // Fault responses count from the failure's start, since a failover can already be in
+            // flight when the failure threshold formally opens the incident. Saves replayed past
+            // the rule's introduction (the legacy prefix) keep self-resolving incidents.
+            const responseDueFrom = c.step <= (c.legacyIncidentStep ?? -1) ? undefined
+                : failedIncident ? (failure!.startedStep ?? c.step) : c.step;
+            c.incident = { id: `incident-${c.nextEventId}`, openedStep: c.step, responseDueFrom, stableSteps: 0, snapshots: c.recent.slice(-3), components, primaryComponent:components[0],...(failedIncident?{kind:"application-failure" as const,failureId:failure!.id}:{}) };
             s.phase = "incident";
             trace(c, "incident-opened", { incidentId: c.incident.id, component: components[0], components: JSON.stringify(components) });
             // Launch Week's tutorial walks through each incident, so every one of its incidents pauses.
