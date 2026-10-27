@@ -51,7 +51,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import { TimeMenu } from "./TimeMenu";
 import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
-import { CampaignIncidentReport, CampaignRecoveryReview, CapacityAfterFailure } from "./CampaignIncidentReport";
+import { CampaignIncidentReport, CampaignRecoveryReview, CapacityAfterFailure, IncidentPostmortemModal } from "./CampaignIncidentReport";
 import { inspectInRoom, useGame } from "@/game/store";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
@@ -64,7 +64,7 @@ import { SaveFiles } from "./SaveFiles";
 import { SoundButton } from "./SoundButton";
 import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
-import type { Campaign, CampaignPostmortem, ScheduledAction } from "@/sim/campaignTypes";
+import type { Campaign, ScheduledAction } from "@/sim/campaignTypes";
 import { completedTechIds, TECH_ORDER, type EventKind, type EquipmentId } from "@/sim";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
@@ -464,10 +464,6 @@ export function CampaignControls() {
   </footer>;
 }
 
-function Report({ report }: { report: CampaignPostmortem }) {
-  return <CampaignIncidentReport report={report}/>;
-}
-
 /** The campaign menu: the same run card, Resume, tabs and tiles as Classic's, with the company's own actions. */
 function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
   const { game, openView, newRun, saveNow, saveBlocked, saveStatus, measurement, tutorialCompany } = useGame();
@@ -591,8 +587,8 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
   if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_prevention_review"})} /></Modal>;
   if (game.phase === "review") {
     const report = c.reports[c.reports.length - 1];
-    if (!tutorialCompany) return <CampaignRecoveryReview key={`${c.runId}:${report.id}:${report.recoveredStep}`} runId={c.runId} report={report} reliability={!c.combinedStage ? reliabilityLesson(c, report) : undefined} onContinue={() => act({ type: "acknowledge_review" })} />;
-    return <Modal title="Incident postmortem" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "incident" }}><Report report={report} /><ContinueFoot label="Continue company" onClick={() => act({ type: "acknowledge_review" })} /></Modal>;
+    if (!tutorialCompany) return <CampaignRecoveryReview key={`${c.runId}:${report.id}:${report.recoveredStep}`} runId={c.runId} report={report} first={c.reports.length === 1} reliability={!c.combinedStage ? reliabilityLesson(c, report) : undefined} onContinue={() => act({ type: "acknowledge_review" })} />;
+    return <IncidentPostmortemModal report={report} first={c.reports.length === 1} onContinue={() => act({ type: "acknowledge_review" })} />;
   }
   if(milestoneBlocks(game)&&c.launchWeek&&end?.chapter==="opening")return <LaunchScore campaign={c} end={end} onClose={stay} />;
   if(c.openingMilestone&&!c.openingMilestone.acknowledged&&!c.launchWeek&&end)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={stay}>
@@ -649,7 +645,6 @@ const eventKind = (type: string): EventKind =>
 /** History uses Classic's tabs: charts, the event log and the incident reports, with the step as the time unit. */
 function CampaignHistory() {
   const c = useGame(s => s.game.campaign!);
-  const legacy = useGame(s => !!s.tutorialCompany);
   const [tab, setTab] = useState<HistoryTab>("charts");
   const [open, setOpen] = useState<string | null>(null);
   const steps = c.recent.map(m => m.step);
@@ -659,7 +654,7 @@ function CampaignHistory() {
   const entries: ReportEntry[] = [
     ...[...c.reports].reverse().map((report): ReportEntry => ({ id: report.id, group: "incident", title: incidentTitle(report), when: `Game seconds ${report.openedStep}-${report.recoveredStep}`, label: "Incident report",
       tag: report.limited ? <span className="tag tag-warn"><Icon name="alert" size={12} />Recovered under traffic limit</span> : <span className="tag tag-ok"><Icon name="check" size={12} />Recovered</span>,
-      body: legacy ? <Report report={report} /> : <CampaignIncidentReport report={report} /> })),
+      body: <CampaignIncidentReport report={report} /> })),
     ...(c.reliabilityStage?.completedStep != null ? [{ id: "reliability-outcome", group: "outcome" as const, title: "Stay Online outcome", when: `Game second ${c.reliabilityStage.completedStep}`, label: "Historical reliability outcome", tag: done, body: <ReliabilityOutcome campaign={c} /> }] : []),
     ...(c.openingPrevention?.outcome ? [{ id: "prevention-outcome", group: "outcome" as const, title: "Opening prevention outcome", when: `Game second ${c.openingPrevention.outcome.qualifiedStep}`, label: "Historical Opening prevention outcome", tag: done, body: <PreventionOutcome campaign={c} /> }] : []),
   ];

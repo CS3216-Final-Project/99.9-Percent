@@ -40,6 +40,6 @@ it("does not retell the restored Stay Online failure in a later, unrelated incid
  s=act(s,{type:"set_traffic_limit",enabled:true});
  for(let i=0;i<200&&s.phase!=="review";i++)s=tick(s);
  const report=s.campaign!.reports.at(-1)!;
- expect(report.explanations.join(" ")).not.toMatch(/failed at step/);
+ expect(report.explanations.join(" ")).not.toMatch(/failed at game second/);
  expect(report.explanations.join(" ")).toMatch(/Promotion activated/);
 },30000);

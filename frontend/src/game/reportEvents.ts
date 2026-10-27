@@ -1,9 +1,7 @@
 import type { CampaignPostmortem, Intervention, TraceEvent } from "@/sim/campaignTypes";
-const REPORT_LEAD_SECONDS = 3;
-export const ACTION_NAMES: Record<Intervention, string> = {
-  "add-app": "Add server", "upgrade-db": "Database upgrade", limit: "Traffic limit", unlimit: "Remove traffic limit", "scale-up": "Application scale up", "deploy-lb": "Load balancer deployment", routing: "Routing change", cache: "Read Cache deployment", "cache-tuning": "Cache tuning",
-  "deploy-autoscaler": "Autoscaling controller deployment", "retire-app": "Safe application retirement", "health-checks": "Health Checks deployment", "create-spare": "Spare application install", "reserve-spare": "Reserve spare", "release-spare": "Release spare", failover: "Automatic Failover deployment", "promote-spare": "Promote spare", "restore-app": "Restore application", promotion: "Promotion",
-};
+import { ACTION_NAMES } from "@/sim/actionNames";
+import { REPORT_LEAD_SECONDS } from "@/sim/trace";
+export { ACTION_NAMES };
 
 
 const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v.toLocaleString("en-US") : "not recorded";
@@ -53,7 +51,7 @@ export function describeEvents(events: TraceEvent[]): ReportEvent[] {
       case "failover-activated": return line(`Failover moved traffic to ${app(d.appId)}`, "No capacity added");
       case "failover-cancelled": return line("Failover cancelled", d.reason ? String(d.reason) : null);
       case "settlement": return line(`Week ${d.period} settled`, `Revenue ${dollars(d.revenueCents)}`, `Net ${dollars(d.netCents)}`);
-      case "traffic-change": return line("Traffic changed", `${num(d.from)} to ${num(d.to)} req/s`);
+      case "traffic-change": return d.from === d.to ? [] : line(Number(d.to) > Number(d.from) ? "Traffic rose" : "Traffic fell", `${num(d.from)} to ${num(d.to)} req/s`);
       case "traffic-scheduled": return line("More traffic scheduled", `Arrives at game second ${d.dueStep}`);
       case "traffic-spike-started": return line("Traffic spike started", `Incoming ${num(d.to)} req/s`);
       case "traffic-spike-ended": return line("Traffic spike ended", `Incoming ${num(d.to)} req/s`);
@@ -67,6 +65,21 @@ export function describeEvents(events: TraceEvent[]): ReportEvent[] {
       default: { const text = e.type.replaceAll("-", " "); return line(text.charAt(0).toUpperCase() + text.slice(1)); }
     }
   });
+}
+
+const KEY_MOMENTS = new Set(["traffic-change", "traffic-spike-started", "reliability-failure-started", "incident-opened", "action-requested", "action-activated", "failover-activated", "instance-restored", "incident-recovered"]);
+/**
+ * The incident in a few beats: what set it off, when it opened, what changed and when it recovered. The first and
+ * last beats always stay; the middle is capped so the summary never turns into the full event log.
+ */
+export function keyMoments(report: CampaignPostmortem, limit = 6): ReportEvent[] {
+  const from = reportWindowStart(report);
+  const types = new Map(report.events.map(e => [e.id, e.type]));
+  const moments = describeEvents(report.events.filter(e => e.step >= from && e.step <= report.recoveredStep && KEY_MOMENTS.has(e.type)));
+  if (moments.length <= limit) return moments;
+  const opened = moments.findIndex(m => types.get(m.id) === "incident-opened");
+  const head = moments.slice(0, Math.max(1, opened + 1)), tail = moments.at(-1)!;
+  return [...head, ...moments.slice(head.length, -1).slice(0, Math.max(0, limit - head.length - 1)), tail];
 }
 
 /** The game second a report's evidence starts: a short lead-in before the incident, never before the previous report. */

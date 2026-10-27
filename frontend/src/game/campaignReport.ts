@@ -1,23 +1,40 @@
 import type { Campaign, CampaignPostmortem, CampaignScorecard, CombinedRound, Snapshot, TraceEvent } from "@/sim/campaignTypes";
-import { incidentLesson } from "./campaignPostmortem";
+import { incidentCause, incidentLesson } from "./campaignPostmortem";
 import { verifiedPrevention } from "@/sim/openingPrevention";
 
-export interface ReportLesson { happened: string; response: string; improve?: string; takeaway: string }
-const names: Record<string, string> = { "upgrade-db": "a database upgrade", "scale-up": "server scaling", "add-app": "an added server", routing: "a routing change", limit: "a traffic limit", unlimit: "traffic limit removal", cache: "a read cache", "cache-tuning": "cache tuning", "restore-app": "a requested server restore", "deploy-autoscaler": "an autoscaling controller deployment" };
+/** `responseTitle` replaces "How did you respond?" when the recovery was not the player's doing. */
+export interface ReportLesson { happened: string; response: string; responseTitle?: string; improve?: string; takeaway: string }
+const names: Record<string, string> = { "upgrade-db": "a database upgrade", "scale-up": "server scaling", "add-app": "an added server", routing: "a routing change", limit: "a traffic limit", unlimit: "removing the traffic limit", cache: "a read cache", "cache-tuning": "cache tuning", "restore-app": "a server restore", "deploy-autoscaler": "an autoscaling controller" };
+const list = (items: string[]) => items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-/** Report observed actions, never infer a purchase from installed equipment. */
-function responses(events: TraceEvent[], from: number, end: number, firstEventId = 0) {
+/** The player's own changes and the automatic ones, kept apart so the report credits each truthfully. */
+function recordedResponses(events: TraceEvent[], from: number, end: number, firstEventId = 0) {
   const requested = new Map(events.filter(e => e.type === "action-requested").map(e => [e.data.actionId, e.data.type]));
   const during = events.filter(e => e.step >= from && e.step <= end && e.id >= firstEventId);
-  const labels = new Set<string>();
+  const player = new Set<string>(), automatic = new Set<string>();
   for (const e of during) {
-    if (e.type === "action-activated") { const type = requested.get(e.data.actionId); if (typeof type === "string" && names[type]) labels.add(names[type]); }
-    if (e.type === "failover-activated") labels.add("automatic spare failover");
-    if (e.type === "instance-restored") labels.add(e.data.source === "manual" ? "a requested server restore" : "the server's natural return");
+    if (e.type === "action-activated") { const type = requested.get(e.data.actionId); if (typeof type === "string" && names[type]) player.add(names[type]); }
+    if (e.type === "failover-activated") automatic.add("Automatic Failover moved traffic to a spare");
+    if (e.type === "instance-restored") {
+      if (e.data.source === "manual") player.add(names["restore-app"]);
+      else automatic.add("the failed server returned on its own");
+    }
   }
   // Put lasting capacity/recovery changes before temporary admission toggles.
-  const ordered = [...labels].sort((a, b) => Number(/traffic limit/.test(a)) - Number(/traffic limit/.test(b)));
-  return ordered.length ? `Recorded responses included ${ordered.slice(0, 3).join(", ")}${ordered.length > 3 ? "; other changes are in the details" : ""}.` : "No new corrective action is established by the retained evidence.";
+  const ordered = [...player].sort((a, b) => Number(/traffic limit/.test(a)) - Number(/traffic limit/.test(b)));
+  return { player: ordered, automatic: [...automatic] };
+}
+/** Report observed actions, never infer a purchase from installed equipment. */
+function responses(events: TraceEvent[], from: number, end: number, firstEventId = 0) {
+  const { player, automatic } = recordedResponses(events, from, end, firstEventId);
+  const yours = player.length ? `You responded with ${list(player.slice(0, 3))}${player.length > 3 ? "; other changes are in the evidence" : ""}.` : "";
+  const auto = automatic.length ? `${player.length ? " Meanwhile, " + list(automatic) : sentence(list(automatic))}.` : "";
+  return yours || auto ? (yours + auto).trim() : "No new corrective action was recorded.";
+}
+/** "How did you respond?" only when the player actually changed something during the window. */
+export function responseTitle(events: TraceEvent[], from: number, end: number) {
+  return recordedResponses(events, from, end).player.length ? undefined : "What resolved it?";
 }
 function tradeoff(samples: Snapshot[]) {
   const incoming = samples.reduce((n, m) => n + m.incoming, 0), rejected = samples.reduce((n, m) => n + m.rejected, 0);
@@ -25,7 +42,8 @@ function tradeoff(samples: Snapshot[]) {
 }
 export function incidentSummary(report: CampaignPostmortem): ReportLesson {
   const lesson = incidentLesson(report);
-  return { happened: lesson.wrong, response: responses(report.events, report.openedStep, report.recoveredStep) + tradeoff(report.snapshots),
+  return { happened: incidentCause(report), response: responses(report.events, report.openedStep, report.recoveredStep) + tradeoff(report.snapshots),
+    responseTitle: responseTitle(report.events, report.openedStep, report.recoveredStep),
     improve: report.limited ? "Check capacity before removing the limit; rejected requests earn no revenue." : lesson.remember,
     takeaway: lesson.learned };
 }

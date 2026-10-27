@@ -44,8 +44,8 @@ it("uses observed failover and rejected traffic without inventing a manual resto
   const report = { ...c.reports[0], openedStep: fault.startedStep!, recoveredStep: fault.restoredStep!,
     events: c.trace, snapshots: c.recent };
   const lesson = incidentSummary(report);
-  expect(lesson.response).toContain("automatic spare failover");
-  expect(lesson.response).not.toContain("a requested server restore");
+  expect(lesson.response).toContain("Automatic Failover moved traffic to a spare");
+  expect(lesson.response).not.toContain("server restore");
   expect(lesson.response).toContain("rejected");
 });
 

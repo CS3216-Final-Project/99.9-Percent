@@ -23,7 +23,7 @@ export async function campaignReportJourney(page: Page, info: TestInfo, kind: Re
   await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
   const title = { prevention: "Prevention review", spikes: "Spike response handled", growth: "Growth outcome", completion: "Final campaign review" }[kind];
   const dialog = page.getByRole("dialog", { name: title, exact: true });
-  await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "How did you respond?", "What could be improved?", "Key takeaway"]);
+  await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "How did you respond?", "What to improve next"]);
   const details = dialog.locator("details");
   await expect(details).toHaveCount(1); await expect(details).not.toHaveAttribute("open");
   const button = dialog.getByRole("button", { name: kind === "completion" ? "Complete campaign" : kind === "spikes" ? "Stay in this chapter" : "Continue company", exact: true });
@@ -32,7 +32,7 @@ export async function campaignReportJourney(page: Page, info: TestInfo, kind: Re
   if (kind === "spikes") await expect(dialog.locator(".campaign-incident-report > section")).toContainText(["Both traffic spikes ended", "rejected"]);
   await page.evaluate(async () => { await document.fonts.ready; });
   await page.screenshot({ path: info.outputPath(`${kind}-summary.png`) });
-  const disclosure = dialog.getByText("View Technical Details", { exact: true });
+  const disclosure = dialog.getByText("Show the evidence", { exact: true });
   if (touch) await disclosure.tap(); else await disclosure.click();
   await expect(details).toHaveAttribute("open", "");
   await expect(button).toBeInViewport({ ratio: 1 });
