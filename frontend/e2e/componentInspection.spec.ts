@@ -80,9 +80,8 @@ test("component actions: App Server adding, Network prerequisite and read-only c
   await page.locator('.campaign-panel [data-tutorial="inspect-gateway"]').click();
   const network=page.getByRole("dialog",{name:"Network inspected",exact:true});
   await network.getByRole("button",{name:"Network management",exact:true}).click();await expect(network.getByRole("button",{name:/Deploy load balancing/})).toBeVisible();
-  await network.getByText(/Configure routing/).click();
   await expect(network.getByText("Deploy load balancing before configuring routing.")).toBeVisible();
-  await expect(network.getByRole("button",{name:"App 1 only",exact:true})).toBeDisabled();
+  await expect(network.locator(".route-check").first()).toBeDisabled();
   await network.getByRole("button",{name:"Back to Network",exact:true}).click();await network.getByRole("button",{name:/Limit to ~[\d,]+/}).click();
   await expect(page.locator(".campaign-gold-attention")).toHaveAccessibleName("Confirm");
   await page.getByRole("dialog",{name:"Purchase preview"}).getByRole("button",{name:"Confirm",exact:true}).click();

@@ -315,7 +315,7 @@ for (const width of [1440, 1366]) test(`action guidance nested DB purchase and i
   await card.getByRole("button",{name:"Got it", exact:true}).click(); await expect(gold(page)).toHaveAccessibleName("Run");
 });
 
-test("action guidance routing disclosure transfers to All apps without applying it automatically", async ({page,installClock,withoutRoom}) => {
+test("action guidance reaches the routing checkboxes without applying them automatically", async ({page,installClock,withoutRoom}) => {
   await withoutRoom();
   await installClock(); const game=tick(act(dataCompany(),{type:"set_routing",mode:"single",targets:["app-1"]}),2);
   await boot(page,game); await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
@@ -328,11 +328,10 @@ test("action guidance routing disclosure transfers to All apps without applying 
     await expect(gold(page)).toHaveAttribute(attribute,value);
     await gold(page).click();
   }
-  await expect(gold(page)).toHaveText(/Configure routing/);
-  await gold(page).click(); await expect(gold(page)).toHaveAccessibleName("All apps");
+  await expect(gold(page)).toHaveAccessibleName(/^App \d+$/);
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toBeInViewport({ratio:1});
   expect((await savedGame(page)).campaign!.routing.targets).toEqual(["app-1"]);
-  await gold(page).click(); await expect(gold(page)).toHaveCount(0);
+  await gold(page).click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="routing")).toBe(true);
 });
 

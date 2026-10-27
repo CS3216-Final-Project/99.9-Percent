@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import type { SavedCameraView } from "../src/game/exploration";
 import { test, expect, expectRoom, seedSave, openCameraControls } from "./fixtures";
-import { inspectEquipment, closeInspection, infrastructureAction } from "./componentInspection";
+import { inspectEquipment, closeInspection, infrastructureAction, openGatewayManagement } from "./componentInspection";
 import { newGame } from "../src/sim";
 import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 import { reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
@@ -94,7 +94,7 @@ for(const chapter of [4,5,6]) test(`inspection content: Chapter ${chapter} keeps
   const network=await inspectEquipment(page,"gateway");
   await expect(network).not.toContainText(/Stay online|Stable after restoration|Workload:|Normal demand|Opening campaign/);
   await expect(network.getByRole("button",{name:/Limit to|Remove traffic limit/})).toBeEnabled();
-  await infrastructureAction(page,"All apps");await expect(network.getByText(/Configure routing/)).toBeVisible();
+  await openGatewayManagement(page,network);await expect(network.locator(".route-check").first()).toBeVisible();
   await inspectEquipment(page,"gateway",true);await expect(network.getByRole("region",{name:"Network readings"})).toContainText("Admitted");
   if(chapter>=5)await expect(await infrastructureAction(page,"Deploy Automatic Failover")).toBeVisible();
   const cache=await inspectEquipment(page,"cache",true);
