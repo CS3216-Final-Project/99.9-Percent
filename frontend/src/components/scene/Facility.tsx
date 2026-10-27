@@ -875,11 +875,20 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
  */
 function placeLabels(camera: THREE.Camera, size: { width: number; height: number }) {
   const deep = (camera as THREE.PerspectiveCamera).isPerspectiveCamera === true;
-  // Fan the app labels out from their true heights, not a fixed pitch: routed ones carry a load bar and a status
-  // note that make them taller than the spacing a constant assumes, so they covered each other.
-  const appHeights = campaignAppIds.map((id) => labelEls.get(id)?.offsetHeight ?? 0);
-  const appDrops = stackDown(appHeights, -10);
-  const appCeilings = inSpikes && size.width <= 900 ? stackUnder(appHeights, size.height * 0.4) : null;
+  // Pack the app labels from their true spots and sizes, not a fixed pitch: routed ones carry a load bar and a
+  // status note that make them taller than a constant assumes, and machines spread across the floor already keep
+  // some marks apart, so a label drops only below the ones it really overlaps.
+  const appSpots = campaignAppIds.map((id) => {
+    const el = labelEls.get(id);
+    const pos = anchors.get(id);
+    const h = el?.offsetHeight ?? 0;
+    // Behind a view from the avatar an anchor can project mirrored, so those views keep a plain stack.
+    if (deep || !pos) return { x: 0, y: 0, w: 1, h };
+    screenPoint(pos, camera, size.width, size.height, labelAt);
+    return { x: labelAt.x, y: labelAt.y, w: el?.offsetWidth ?? 0, h };
+  });
+  const appBottoms = stackDown(appSpots, -10);
+  const appCeilings = inSpikes && size.width <= 900 ? stackUnder(appSpots.map((s) => s.h), size.height * 0.4) : null;
   anchors.forEach((pos, key) => {
     const el = labelEls.get(key);
     if (!el) return;
@@ -897,7 +906,9 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
     let { x, y } = labelAt;
     // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
     const slot = campaignAppIds.indexOf(key);
-    y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : slot >= 0 ? appDrops[slot] : 0;
+    if (labelEls.has("app-1") && key === "app") y -= 100;
+    else if (labelEls.has("app-1") && key === "gateway") y -= 30;
+    else if (slot >= 0) y = appBottoms[slot];
     // The In gate stands just west of the gateway: lift its count clear of the Network label.
     if (key === TRAFFIC_IN) y -= 38;
     // The mobile bottom panel occupies at most 56% of the room. Spread the
