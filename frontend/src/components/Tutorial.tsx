@@ -142,7 +142,7 @@ const CHAPTERS = {
   spikes: chapter(
     "Traffic spikes",
     "Two short bursts of traffic are coming.",
-    "Inspect App Server to compare manual capacity with autoscaling.",
+    "Inspect App Server, then open Server management to compare manual capacity with autoscaling.",
     shortcut("app"),
   ),
   reliability: [
