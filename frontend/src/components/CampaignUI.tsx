@@ -5,7 +5,7 @@ import { CampaignReport } from "./CampaignReport";
 import { RecordedFields } from "./RecordedFields";
 import { useMediaQuery } from "./useMediaQuery";
 import { incidentTitle, survivingCapacity } from "@/game/campaignPostmortem";
-import { ACTION_NAMES, describeEvents } from "@/game/reportEvents";
+import { ACTION_NAMES, blockedLabel, describeEvents } from "@/game/reportEvents";
 import { chapter6FinancialRisk } from "@/game/chapter6Finance";
 import { reliabilityLesson } from "@/game/reliabilityLesson";
 import { saveTextFile as download } from "@/lib/download";
@@ -64,7 +64,7 @@ import { SaveFiles } from "./SaveFiles";
 import { SoundButton } from "./SoundButton";
 import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
-import type { Campaign, CampaignPostmortem, ScheduledAction } from "@/sim/campaignTypes";
+import type { Campaign, CampaignPostmortem, ScheduledAction, TraceEvent } from "@/sim/campaignTypes";
 import type { Action } from "@/sim";
 import { completedTechIds, TECH_ORDER, type EventKind, type EquipmentId } from "@/sim";
 import { AnalyticsSettings } from "./AnalyticsSettings";
@@ -113,6 +113,7 @@ function CampaignGuidance() {
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}><Icon name="goal" size={16} />View run scorecard</button>}
     {model.prevention&&!c.openingPrevention?.outcome&&<section className="prevention-guidance" aria-label="Opening prevention progress">
       <p role="status">Stable service: {c.openingPrevention?.stableSteps??0} / {Q.stableSteps} game seconds. Pausing adds no time; unhealthy service restarts the counter.</p>
+      <Meter value={(c.openingPrevention?.stableSteps??0)/Q.stableSteps} tone="ok" label="Stable service progress"/>
       <RequirementList items={model.preventionChecks}/>
       <div className="btn-row"><button className="btn btn-small" onClick={()=>inspectInRoom("app","app-1")}><Icon name="server" size={16} />Inspect Application</button><button className="btn btn-small" onClick={()=>inspectInRoom("db")}><Icon name="database" size={16} />Inspect Database</button></div>
     </section>}
@@ -200,7 +201,7 @@ export function CampaignPanel() {
       <LaunchResearch/>
       {unlocked&&!c.launchWeek&&!c.scaling?.consumed&&<p className="muted">{c.dbCapacity<P.dbCapacity&&!c.scalingConsent?"Next growth waits for a paid database upgrade to 2,000 ops/s.":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Growth waits until the incident and backlogs clear.":c.scaling?.dueStep?`Growth due at game second ${c.scaling.dueStep} while ready.`:"Growth readiness is checked on the next game second."}</p>}
       {c.pending.map(a => <div className="working campaign-working" role="status" key={a.id}>
-        <span>{a.source==="autoscaler"?"Autoscaler · ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
+        <span>{a.source==="autoscaler"?"Autoscaler: ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
       </div>)}
       {c.apps.some(a=>!a.routed) && <p className="muted">{c.apps.filter(a=>!a.routed).map(a=>appName(a.id)).join(", ")}: Installed, not receiving traffic</p>}
@@ -261,10 +262,13 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const spike=chapter4Stage(game);
   const reviewing=!!action&&!action.action;
   const actionReady=!!action?.action&&!disabled&&previewCampaignAction(game,action.action).ok;
-  const checksProgress=combined&&!combined.acknowledged&&!combined.finalReview&&game.phase!=="ended"
+  const checksProgress=game.phase==="ended"?null:combined&&!combined.acknowledged&&!combined.finalReview
     ?combined.currentRound?{label:"Wave stability",steps:combined.currentRound.stableSteps}
     :combined.nextRoundIndex===3?{label:"Final stability",steps:combined.finalStableSteps}
-    :{label:"Full-demand readiness",steps:combined.readinessSteps}:null;
+    :{label:"Full-demand readiness",steps:combined.readinessSteps}
+    :reliability?.fault?.restoredStep!=null&&reliability.completedStep===null?{label:"Stable service",steps:reliability.stableSteps}
+    :spike?.stage==="recover"&&c.spikeStage!.completedStep===null?{label:"Stable baseline",steps:c.spikeStage!.baselineStableSteps}
+    :null;
   const priority=c.incident?"incident":c.pending.length?"pending":fault?.startedStep!=null&&fault.restoredStep===null?"restored":combined&&c.limit!==null?"admission":m.app.backlog+m.db.backlog>0?"queues":null;
   const unmet=model.incomplete.find(r=>r.id===priority)??model.incomplete[0];
   const condition=game.phase==="ended"?model.notice:reviewing?action.label:unmet?`Still needed: ${unmet.label}`:(action?`Ready: ${action.label}`:"All current requirements met.");
@@ -307,7 +311,10 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         {fault?.startedStep!=null&&fault.restoredStep===null&&<p role="status"><span className="state state-critical"><Icon name="alert" size={12} />Incident</span> {appName(fault.targetId)} failed and is not restored. Service recovery and server restoration are separate requirements.</p>}
         {showMetrics&&<dl className="rows"><Row label="Latency" value={`${m.latencyMs.toFixed(0)} ms`}/><Row label="Service errors" value={m.serviceErrorRate===null?"Not yet measured":`${(m.serviceErrorRate*100).toFixed(2)}%`}/><Row label="Queued requests" value={num(m.app.backlog+m.db.backlog)}/></dl>}
         {c.incident&&<IncidentRecovery campaign={c}/>}
-        {c.pending.map(a=><p role="status" key={a.id}>{a.source==="autoscaler"?"Autoscaler · ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep-c.step} game second(s)</p>)}
+        {c.pending.map(a=><div className="working campaign-working" role="status" key={a.id}>
+          <span>{a.source==="autoscaler"?"Autoscaler: ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep-c.step} game second(s)</span>
+          <Meter value={(c.step-a.requestedStep)/(a.activationStep-a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`}/>
+        </div>)}
       </section>
       <EquipmentShortcuts disabled={disabled}/>
       <details className="more mission-requirements"><summary>View all requirements</summary>
@@ -393,7 +400,7 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
  const missing=[!d.researchSpent?"Unlock autoscaling":"",!c.loadBalancer?"Deploy load balancing":"",c.routing.mode!=="balanced"||c.routing.targets.length<T.minimum?`Balance traffic across at least ${T.minimum} apps`:"",busy?"Finish the pending deployment":"",c.cashCents<=T.controllerCostCents?"Keep enough available cash for deployment":""].filter(Boolean);
  return <section className="panel-section scaling-controls" aria-label="Autoscaling">
   {!a&&missing.length>0&&<p role="note">Before deployment: {missing.join("; ")}.</p>}
-  <p role="status">Controller: {a?(a.enabled?"Enabled":"Disabled"):"Not deployed"}. {a?.blockedReason??""}</p>
+  <p role="status">Controller: {a?<span className={`state${!a.enabled?" state-absent":a.blockedReason?" state-warn":""}`}><Icon name={!a.enabled?"close":a.blockedReason?"pause":"eyes"} size={12}/>{!a.enabled?"Off":a.blockedReason?`Paused — ${blockedLabel(a.blockedReason)}`:"Observing"}</span>:"Not deployed"}</p>
   <ul className="actions">
    {!d.researchSpent&&<li><Act icon="lock" label="Unlock autoscaling" note="1 research point" noteIcon="bulb" disabled={disabled} tip="Spend the data-readiness point to unlock this capability. Deployment is a separate purchase." decision={{type:"unlock_autoscaling"}} onClick={()=>act({type:"unlock_autoscaling"})}/></li>}
    {!a&&<li><Act icon="scale" label="Deploy autoscaling" price={T.controllerCostCents/100} note={`${T.controllerDelay} game seconds`} disabled={disabled||busy||!d.researchSpent||!c.loadBalancer||c.routing.mode!=="balanced"||c.routing.targets.length<2||c.cashCents<=T.controllerCostCents} tip="Requires balanced routing to at least two apps. Controller upkeep is $100 per operating week, including while disabled." decision={{type:"deploy_autoscaler"}} onClick={()=>act({type:"deploy_autoscaler"})}/></li>}
@@ -402,8 +409,11 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
   <details className="more"><summary>Technical Details</summary>
    <p>Research: {researchBalance(c)} point(s) available. Autoscaling {d.researchSpent?"unlocked":"locked"}.</p>
    <p>Installed {c.apps.length} / maximum {T.maximum}; routed {c.routing.targets.length}. Automatic apps cost {dollars(Q.appCostCents)} setup and {dollars(Q.appWeeklyCents)}/week after installation. Controller upkeep: {dollars(T.controllerWeeklyCents)}/week, including while disabled.</p>
-   <p>Observed routed busy utilisation: {o?`${(o.routedBusyBasisPoints/100).toFixed(2)}%`:"No controller observation yet"}. High-utilization observations: {a?.highSteps??0} / 3; low-utilization observations: {a?.lowSteps??0} / 6.</p>
+   <p>Observed routed busy utilisation: {o?`${(o.routedBusyBasisPoints/100).toFixed(2)}%`:"No controller observation yet"}. High-utilization observations: {a?.highSteps??0} / {T.highSteps}; low-utilization observations: {a?.lowSteps??0} / {T.lowSteps}.</p>
+   <Meter value={(a?.highSteps??0)/T.highSteps} tone="warn" label="High-utilization observations toward scaling out"/>
+   <Meter value={(a?.lowSteps??0)/T.lowSteps} tone="ok" label="Low-utilization observations toward retirement"/>
    <p>Scale out above {T.high/100}% for {T.highSteps} game seconds. Empty controller apps may retire below {T.low/100}% for {T.lowSteps} safe game seconds; minimum {T.minimum}. Cooldown remaining: {Math.max(0,(a?.cooldownUntil??0)-c.step)} game seconds.</p>
+   <Meter value={a?1-Math.max(0,a.cooldownUntil-c.step)/T.cooldown:1} tone="accent" label="Controller cooldown progress"/>
    <p>Automatic provisioning takes {T.provisionDelay} game seconds, followed by {T.routingDelay} routing game second. {a?.joiningAppId?`Joining ${a.joiningAppId.replace("app-","App ")}; installed capacity may still be unrouted.`:"No automatic app awaiting routing."}</p>
    <p>Application automation cannot increase DB capacity, cache effectiveness or admitted traffic. Manual investments and traffic limiting remain available.</p>
   </details>
@@ -628,14 +638,18 @@ function ContinueFoot({ label, onClick }: { label: string; onClick: () => void }
   return <div className="modal-foot"><span className="muted">The same company continues.</span><button className="btn btn-primary" onClick={onClick}>{label}<Icon name="next" /></button></div>;
 }
 
-const eventKind = (type: string): EventKind =>
-  type === "settlement" ? "finance"
+const eventKind = (e: TraceEvent | undefined): EventKind => {
+  const type = e?.type ?? "";
+  if (type === "autoscaler-blocked") return e?.data.reason ? "warning" : "success";
+  if (type.startsWith("autoscale-")) return type.includes("cancelled") ? "warning" : "decision";
+  return type === "settlement" ? "finance"
   : /incident-opened|failure-started|bankruptcy/.test(type) ? "incident"
   : /rejected|blocked|cancelled|superseded/.test(type) ? "warning"
   : /recovered|restored|qualified|completed/.test(type) ? "success"
   : /milestone|awarded|stage-entered|unlocked/.test(type) ? "milestone"
   : /action-|acknowledged|enabled|reserved|decided/.test(type) ? "decision"
   : "info";
+};
 /** History uses Classic's tabs: charts, the event log and the incident reports, with the step as the time unit. */
 function CampaignHistory() {
   const c = useGame(s => s.game.campaign!);
@@ -643,7 +657,7 @@ function CampaignHistory() {
   const [tab, setTab] = useState<HistoryTab>("charts");
   const [open, setOpen] = useState<string | null>(null);
   const steps = c.recent.map(m => m.step);
-  const eventTypes = new Map(c.trace.map(e => [e.id, e.type]));
+  const eventTypes = new Map(c.trace.map(e => [e.id, e]));
   // Chapter outcomes are not incidents; they are listed after the incident reports, newest report first.
   const done = <span className="tag tag-ok"><Icon name="check" size={12} />Completed</span>;
   const entries: ReportEntry[] = [
@@ -666,7 +680,7 @@ function CampaignHistory() {
         <details className="more"><summary>Financial settlements</summary>{c.settlements.length ? c.settlements.map(p => <p key={p.period}>Week {p.period}: revenue {dollars(p.revenueCents)}, net {dollars(p.netCents)}</p>) : <p>No operating week has settled yet.</p>}</details>
       </div>
     </>}
-    {tab === "events" && <EventFeed className="campaign-feed" entries={describeEvents(c.trace).reverse().map(e => ({ id: e.id, kind: eventKind(eventTypes.get(e.id) ?? "info"), when: `Game second ${e.step}`, text: [e.title, e.detail].filter(Boolean).join(" · ") }))} />}
+    {tab === "events" && <EventFeed className="campaign-feed" entries={describeEvents(c.trace).reverse().map(e => ({ id: e.id, kind: eventKind(eventTypes.get(e.id)), when: `Game second ${e.step}`, text: [e.title, e.detail].filter(Boolean).join(" · ") }))} />}
     {tab === "postmortems" && <ReportIndex entries={entries} incidents={c.reports.length} open={open} onOpen={setOpen} />}
     </HistoryTabs>
   </div>;
