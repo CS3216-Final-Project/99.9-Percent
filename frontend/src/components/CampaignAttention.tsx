@@ -141,7 +141,9 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const blocked = pauseBlocked || locked;
   // Only a real takeover dismisses a colleague dialog: a hidden tab, unfocused window or captured
   // pointer suspends presentation but must not drop the message or its queued stage cues.
-  const narrativeBlocked = covered || !!confirming || risk || !!tour || !!practice && !intro;
+  // Data Strategy's guide waits for Jordan's caching scene, which explains it first.
+  const narrativeBlocked = covered || !!confirming || risk || !!practice && !intro ||
+    (!!tour && !(tour.track === "data" && companyMessage?.chapter === 3));
   const key = `${generation}:${decision.key}`;
   const choices = decision.growthChoices;
   const chooseRisk = choices && (growthChoice?.key === key ? growthChoice.risk : !choices.upgrade);
@@ -386,7 +388,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("resize", place); document.addEventListener("pointerdown", outside, true);
     return () => { window.removeEventListener("resize", place); document.removeEventListener("pointerdown", outside, true); };
   }, [openNow]);
-  const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, resumeGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold: candidate && idle === timerKey && decision.attention === "hint", opened: openNow, button, riskOpen,
+  const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, resumeGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold: candidate && idle === timerKey && decision.attention === "hint", opened: openNow, dialogueOpen: introOpen, button, riskOpen,
     openHint: () => { if (!blocked) { setPauseOffer(null); setResumeOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
   const close = () => { setOpened(null); button.current?.focus(); };
   const compactOpeningPrompt = openingTutorial && isPhoneEdition() ? analyticsStep

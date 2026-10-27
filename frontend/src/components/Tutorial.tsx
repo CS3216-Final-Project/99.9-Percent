@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { isPhoneEdition } from "@/phone/edition";
 import { useGame, type TourTrack } from "@/game/store";
+import { useCampaignAttention } from "./useCampaignAttention";
 import { floorOf, selectedInView } from "@/game/floors";
 import { num } from "@/game/format";
 import type { EquipmentId } from "@/sim";
@@ -269,7 +270,9 @@ function SpotlightTutorial() {
   const step = tour ? steps[tour.step] : undefined;
   const track = tour?.track;
   const index = tour?.step ?? -1;
-  const visible = !!step && !!track && fits(track, s, step) && !covered && !s.onboarding && s.view !== "menu";
+  // A colleague scene (e.g. Jordan explaining caching) owns the stage; the guide follows it.
+  const { dialogueOpen } = useCampaignAttention();
+  const visible = !!step && !!track && fits(track, s, step) && !covered && !dialogueOpen && !s.onboarding && s.view !== "menu";
 
   const advance = () => {
     const now = useGame.getState();
