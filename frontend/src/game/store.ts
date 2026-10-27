@@ -287,6 +287,8 @@ interface Store {
   techFocus: TechId | null;
   /** Management: auto-advance is on. Incident: the crisis clock is running. */
   running: boolean;
+  /** The accepted decision that paused a company whose clock could still run; Run emphasizes itself until it resumes. */
+  resumeOffer: number;
   speed: Speed;
   /** Fast-forward to the end of the current operating week (20x). Clears on incident or the week boundary. */
   weekRush: boolean;
@@ -951,6 +953,7 @@ export const useGame = create<Store>()((set, get) => {
     view: null,
     techFocus: null,
     running: false,
+    resumeOffer: 0,
     speed: 1,
     weekRush: false,
     deployRush: false,
@@ -1031,6 +1034,7 @@ export const useGame = create<Store>()((set, get) => {
       if (c) {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
+        const wasRunning = get().running;
         if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","enter_combined","start_growth_wave","acknowledge_growth","complete_campaign","accept_scaling_risk"].includes(action.type)) set({running:false});
         record(result.ok);
         commit(state);
@@ -1039,6 +1043,8 @@ export const useGame = create<Store>()((set, get) => {
           if(get().tutorialCompany)get().endTour(true);
           else {const meta={...get().meta,tutorialDone:true};set({meta,running:false});saveMeta(meta);persist();}
         }
+        // A decision that paused a company the player can still run offers Run until the clock restarts.
+        if (result.ok && wasRunning && !get().running && campaignClockAvailable(get())) set({ resumeOffer: get().lastAction?.id ?? 0 });
         return result.ok;
       }
       const result = applyAction(get().game, action);
