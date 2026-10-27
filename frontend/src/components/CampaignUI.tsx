@@ -148,12 +148,22 @@ function CampaignGuidance() {
   </section>;
 }
 
+function RecoveryClock({ campaign: c }: { campaign: Campaign }) {
+  return <><div className="clock-row"><h3><Icon name="health" size={20} />Recovery progress</h3><strong>{c.incident!.stableSteps}/{Q.stableSteps} s</strong></div>
+    <Meter value={c.incident!.stableSteps / Q.stableSteps} tone="ok" label="Recovery progress" /></>;
+}
+
+/** The countdown joins the pinned banner once stable seconds start; at zero it stays in the recovery card. */
+function PinnedRecovery({ campaign: c }: { campaign: Campaign }) {
+  if (!c.incident || c.incident.stableSteps === 0) return null;
+  return <div className="incident-clock campaign-stability incident-pin-clock"><RecoveryClock campaign={c} /></div>;
+}
+
 function IncidentRecovery({ campaign: c }: { campaign: Campaign }) {
   const fault = currentFault(c);
   const failedAppActive = fault && fault.startedStep !== null && fault.restoredStep === null;
   return <section className="incident-clock campaign-stability" aria-label="Incident recovery">
-    <div className="clock-row"><h3><Icon name="health" size={20} />Recovery progress</h3><strong>{c.incident!.stableSteps}/{Q.stableSteps} s</strong></div>
-    <Meter value={c.incident!.stableSteps / Q.stableSteps} tone="ok" label="Recovery progress" />
+    {c.incident!.stableSteps === 0 && <RecoveryClock campaign={c} />}
     <p>Meet every condition for <b>{Q.stableSteps} consecutive game seconds</b>:</p>
     <ul className="recovery-conditions">
       <li><Icon name="latency" size={16} /><span>Latency below <b>{Q.latencyThresholdMs} ms</b></span></li>
@@ -203,6 +213,7 @@ export function CampaignPanel() {
         <div><h2>{incident ? "Service slowdown" : "System overview"}</h2>
           {incident && <span className="state state-critical"><Icon name="alert" size={12} />Incident</span>}
         </div>
+        <PinnedRecovery campaign={c} />
       </header>}
       <CampaignGuidance />
       <div className="incident-symptoms">
@@ -300,6 +311,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         <div><h2>Service slowdown</h2>
           <span className="state state-critical"><Icon name="alert" size={12} />Incident</span>
         </div>
+        <PinnedRecovery campaign={c} />
       </header>}
       <section aria-label="Chapter Progress" className="mission-progress">
         <h3>{combined?"Grow the Company":reliability?"Stay Online":"Chapter Progress"}</h3>
