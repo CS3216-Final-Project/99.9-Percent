@@ -292,6 +292,10 @@ interface Store {
   weekRush: boolean;
   endWeek: () => void;
   cancelWeekRush: () => void;
+  /** Fast-forward until the last scheduled deployment activates (20x). Clears on a stop, a new incident or an empty queue. */
+  deployRush: boolean;
+  rushDeploy: () => void;
+  cancelDeployRush: () => void;
   toast: Toast | null;
   onboarding: boolean;
   tour: Tour | null;
@@ -664,6 +668,7 @@ export const useGame = create<Store>()((set, get) => {
       meta,
       running: false,
       weekRush: false,
+      deployRush: false,
       floor: urlFloor ?? exploration.floor,
       // Only a Challenge Mode run opens here: Guided Mode's starts at the title screen, and Play picks the view.
       walking: false,
@@ -948,6 +953,7 @@ export const useGame = create<Store>()((set, get) => {
     running: false,
     speed: 1,
     weekRush: false,
+    deployRush: false,
     toast: null,
     onboarding: false,
     tour: null,
@@ -1064,7 +1070,7 @@ export const useGame = create<Store>()((set, get) => {
       const { game, running, speed } = get();
       if(game.campaign) {
         if(!get().started || awaitingAcknowledgement(game) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
-        const credit=get().remainderMs+Math.round(dt*1000*(get().weekRush?20:speed));
+        const credit=get().remainderMs+Math.round(dt*1000*(get().weekRush||get().deployRush?20:speed));
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
         if(whole===0)return;
@@ -1078,6 +1084,8 @@ export const useGame = create<Store>()((set, get) => {
           if(!result.stopReason&&result.state.turn!==game.turn)patch.running=false;
           set(patch);
         }
+        // The deployment rush ends when the queue drains and keeps running at the chosen speed.
+        if(get().deployRush&&(result.stopReason||newIncident||!result.state.campaign?.pending.length))set({deployRush:false});
         commit(result.state);
         return;
       }
@@ -1094,7 +1102,7 @@ export const useGame = create<Store>()((set, get) => {
       const s = get(), { game } = s;
       if (!game.campaign || !campaignClockAvailable(s) || !Number.isSafeInteger(count) || count <= 0) return;
       // A manual step replaces auto-run, and any part-second credit belongs to the run it came from.
-      if (s.running) set({ running: false, weekRush: false });
+      if (s.running) set({ running: false, weekRush: false, deployRush: false });
       set({ remainderMs: 0 });
       commit(advanceSteps(game, count).state);
     },
@@ -1128,12 +1136,14 @@ export const useGame = create<Store>()((set, get) => {
       if (id && get().game.campaign) get().setRunning(false);
     },
     setRunning: (running) => {
-      set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase), ...(running ? {} : { weekRush: false }) });
+      set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase), ...(running ? {} : { weekRush: false, deployRush: false }) });
       if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
-    setSpeed: (speed) => set({ speed, weekRush: false }),
+    setSpeed: (speed) => set({ speed, weekRush: false, deployRush: false }),
     endWeek: () => { set({ weekRush: true }); get().setRunning(true); },
     cancelWeekRush: () => set({ weekRush: false }),
+    rushDeploy: () => { set({ deployRush: true }); get().setRunning(true); },
+    cancelDeployRush: () => set({ deployRush: false }),
 
     newRun: (opts = {}) => {
       if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return;}
@@ -1192,6 +1202,7 @@ export const useGame = create<Store>()((set, get) => {
         techFocus: null,
         running: false,
         weekRush: false,
+        deployRush: false,
         rating: null,
         onboarding: false,
         tour: null,
@@ -1240,7 +1251,7 @@ export const useGame = create<Store>()((set, get) => {
       const measurement = campaign.status === "ok" ? beginSession(campaign.envelope.runtime.measurement, game, crypto.randomUUID(), new Date().toISOString()) : emptyMeasurement();
       const saved = mode === "campaign" ? saveGame(game, remainderMs, true, measurement) && archiveEvents(measurement.pending) : saveClassicGame(game);
       saveMode(mode);
-      set({ tutorialCompany: null, mode, importGeneration: get().importGeneration + 1, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, weekRush: false, view: null,
+      set({ tutorialCompany: null, mode, importGeneration: get().importGeneration + 1, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, weekRush: false, deployRush: false, view: null,
         selected: null, hovered: null, affected: [], previewAction: null, spotlight: [], started: true, tour: null, chapterComplete: null, onboarding: false, techFocus: null, rating: null });
       track("save_imported", { mode, step: game.campaign?.step ?? game.turn });
       get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
@@ -1290,7 +1301,7 @@ export const useGame = create<Store>()((set, get) => {
         }
         const meta = practiceAt(s.meta, true);
         set({ game, measurement, tutorialCompany: company, meta, activeMark: document.hidden ? null : performance.now(), generation: s.generation + 1, remainderMs: 0,
-          tour: null, view: null, started: true, running: false, weekRush: false, onboarding: false, tutorialAttempt: s.tutorialAttempt + 1,
+          tour: null, view: null, started: true, running: false, weekRush: false, deployRush: false, onboarding: false, tutorialAttempt: s.tutorialAttempt + 1,
           lastAction: null, lastIntro: null, chapterComplete: null, selectedAppId: null, roomInspection: null,
           affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, techFocus: null, rating: null, toast: null });
         persist();
@@ -1349,7 +1360,7 @@ export const useGame = create<Store>()((set, get) => {
         persist(); clearTutorialPractice();
         set({ ...company, tutorialCompany: null, meta: practiceAt(meta, false), generation: get().generation + 1, selected: null, selectedAppId: null,
           roomInspection: null, affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, view: null, techFocus: null,
-          tour: null, running: false, weekRush: false, lastAction: null, toast: null, activeMark: document.hidden ? null : performance.now() });
+          tour: null, running: false, weekRush: false, deployRush: false, lastAction: null, toast: null, activeMark: document.hidden ? null : performance.now() });
         return;
       }
       if (!tour) return;
