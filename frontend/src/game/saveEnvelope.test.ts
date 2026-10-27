@@ -65,8 +65,9 @@ describe("input-log saves", () => {
     if (result.status === "ok") {
       // Replayed history stays byte-identical; the compat marker that preserves the
       // pre-response-rule boundary only exists on the replayed campaign.
-      const g = json(result.game) as { campaign: { legacyIncidentStep?: number } };
+      const g = json(result.game) as { campaign: { legacyIncidentStep?: number; legacyScalingStep?: number } };
       delete g.campaign.legacyIncidentStep;
+      delete g.campaign.legacyScalingStep;
       expect(g).toEqual(json(s));
     }
   });

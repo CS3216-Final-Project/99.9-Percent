@@ -2,6 +2,7 @@
 import { introductionActive, nextIntroductionComponent } from "@/sim/introduction";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
+import { autoscalerActivity } from "./reportEvents";
 import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { finishedChapter } from "./campaignChapters";
 import { chapterEnd } from "./chapterCompletion";
@@ -1096,6 +1097,9 @@ export const useGame = create<Store>()((set, get) => {
         // The deployment rush ends when the queue drains and keeps running at the chosen speed.
         if(get().deployRush&&(result.stopReason||newIncident||!result.state.campaign?.pending.length))set({deployRush:false});
         commit(result.state);
+        // Surface the autoscaler's moves so servers never appear or change silently.
+        const activity=autoscalerActivity(game.campaign.trace,result.state.campaign?.trace??[]);
+        if(activity.length)get().notify(activity.join(" · "));
         return;
       }
       if (game.phase !== "incident" || !running) return;
@@ -1113,7 +1117,10 @@ export const useGame = create<Store>()((set, get) => {
       // A manual step replaces auto-run, and any part-second credit belongs to the run it came from.
       if (s.running) set({ running: false, weekRush: false, deployRush: false });
       set({ remainderMs: 0 });
-      commit(advanceSteps(game, count).state);
+      const result=advanceSteps(game, count);
+      commit(result.state);
+      const activity=autoscalerActivity(game.campaign.trace,result.state.campaign?.trace??[]);
+      if(activity.length)get().notify(activity.join(" · "));
     },
 
     // Choosing equipment asks to read it, so the panel brings its readings forward.

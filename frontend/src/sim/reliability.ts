@@ -4,7 +4,7 @@ import type { Campaign, AppInstance, ScheduledAction } from "./campaignTypes";
 import { APPLICATION_RELIABILITY as R } from "./scenarios/applicationReliability";
 import { clone } from "./state";
 import { trace } from "./trace";
-import { qualifiesForRecovery } from "./step";
+import { allocateAppId, qualifiesForRecovery } from "./step";
 export const reportsAcknowledged=(c:Campaign)=>c.reports.every(r=>c.trace.some(t=>t.type==="review-acknowledged"&&t.data.incidentId===r.id));
 export const healthy=(a:AppInstance)=>a.health!=="failed";
 export const serving=(a:AppInstance)=>a.role!=="spare";
@@ -127,5 +127,5 @@ export function reliabilityAction(s:GameState,action:Action):Rejection|null|unde
  if(type==="restore-app"&&(!target||healthy(target)||target.id!==currentFault(c)?.targetId))return fail("Select the actually failed application to restore.");
  const cost=type==="health-checks"?R.checksCostCents:type==="create-spare"?R.spareCostCents:type==="failover"?R.failoverCostCents:0;
  if(c.cashCents<=cost)return fail("This purchase would exhaust company cash.");
- schedule(c,type,type==="restore-app"?3:["reserve-spare","release-spare"].includes(type)?1:2,cost,{...(target?{targetId:target.id}:{}),...(type==="create-spare"?{targetId:`app-${c.nextAppNumber++}`}:{})});return null;
+ schedule(c,type,type==="restore-app"?3:["reserve-spare","release-spare"].includes(type)?1:2,cost,{...(target?{targetId:target.id}:{}),...(type==="create-spare"?{targetId:allocateAppId(c)}:{})});return null;
 }
