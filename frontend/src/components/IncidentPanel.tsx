@@ -8,6 +8,16 @@ import { EQUIPMENT_ICON } from "./presentation";
 import { Callout, Concept, Meter, Tip, type CalloutTone } from "./ui";
 import { tipProps } from "./tips";
 
+const RECOVERY_ICON: Record<string, IconName> = {
+  scale_out: "plus",
+  db_upgrade: "scaleUp",
+  rollback: "rotateLeft",
+  failover: "plug",
+  rate_limit: "limit",
+  replace_instance: "refresh",
+  restart: "wrench",
+};
+
 const ATTEMPT: Record<string, { tone: CalloutTone; icon: IconName; word: string }> = {
   fixed: { tone: "success", icon: "check", word: "Fixed" },
   mitigated: { tone: "warn", icon: "alert", word: "Contained" },
@@ -155,6 +165,7 @@ export default function IncidentPanel() {
         {usable.map((o) => (
           <li key={o.id}>
             <button type="button" className="action" {...tipProps(o.description)} disabled={!!pending} onClick={() => act({ type: "incident_action", recovery: o.id })}>
+              <Icon name={RECOVERY_ICON[o.id]} size={16} />
               <span className="action-title">{o.label}</span>
               <span className="act-meta"><span className="price">
                 <Icon name="cash" size={12} />
