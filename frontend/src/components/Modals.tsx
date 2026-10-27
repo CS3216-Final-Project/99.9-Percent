@@ -94,7 +94,7 @@ export function PostmortemModal() {
       <div className="modal-foot">
         <span />
         <button type="button" className="btn btn-primary" autoFocus onClick={() => act({ type: "acknowledge_review" })}>
-          Continue
+          <Icon name="next" size={20} />Continue
         </button>
       </div>
     </Modal>
@@ -419,7 +419,7 @@ export function Menu() {
               </dl>
               <div className="btn-row">
                 <button type="button" className="btn" onClick={copy} disabled={events.length === 0}>
-                  Copy as JSON
+                  <Icon name="copy" size={16} />Copy as JSON
                 </button>
                 <button
                   type="button"
