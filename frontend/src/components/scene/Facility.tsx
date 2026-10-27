@@ -1016,12 +1016,12 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
 }
 
 /** In and Out, with this second's requests: the gap between the two is what the company is losing. */
-function GateCounts({ c }: { c: Campaign }) {
+export function GateCounts({ c }: { c: Campaign }) {
   const m = c.snapshot;
   return (
     <>
-      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.incoming)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}`}>
-        <b>In</b> {num(m.incoming)}/s
+      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.admitted)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}`}>
+        <b>In</b> {num(m.admitted)}/s
         {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away — no revenue, counts against uptime</span>}
       </span>
       <span className="wall-tag gate-tag gate-out" ref={bindLabel(TRAFFIC_OUT)} aria-label={`Out: ${num(m.successful)} requests per second served`}>
