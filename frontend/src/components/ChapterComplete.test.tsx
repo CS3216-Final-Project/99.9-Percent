@@ -9,9 +9,9 @@ import { finishingScaling } from "@/sim/__tests__/dataFixture";
 import { dataCompany as finishedData } from "@/sim/__tests__/spikeFixtures";
 import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { campaignGuidance } from "@/game/campaignGuidance";
-import { act as decide, spikeCompany, tick } from "@/sim/__tests__/spikeFixtures";
+import { act as decide, preparedSpikes, spikeCompany, tick } from "@/sim/__tests__/spikeFixtures";
 import { finishedLaunchWeek, recoveredOpening } from "@/game/__fixtures__/openingOutcome";
-import { reliabilityOutcome, reliabilityOutcomeWithQueuedChange } from "@/game/__fixtures__/reliabilityOutcome";
+import { completedReliabilityOutcome as reliabilityOutcome, reliabilityOutcomeWithQueuedChange } from "@/game/__fixtures__/reliabilityOutcome";
 import { CampaignChapters } from "./CampaignChapters";
 import { CampaignHeader, CampaignOverlays, CampaignPanel } from "./CampaignUI";
 
@@ -137,7 +137,7 @@ it("does not announce a company loaded already finished after an incident and re
 
 /** A Traffic Spikes company whose spike response awaits the player. */
 function spikeRecognition(): GameState {
-  let g = spikeCompany(false);
+  let g = preparedSpikes();
   for (let i = 0; i < 300 && !pendingSpikeAcknowledgement(g.campaign!); i++) g = g.phase === "review" ? decide(g, { type: "acknowledge_review" }) : tick(g);
   return g;
 }

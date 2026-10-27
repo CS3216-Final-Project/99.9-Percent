@@ -7,6 +7,7 @@ import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
 import { allocateTraffic, qualifiesForRecovery } from "./step";
 import { clone } from "./state";
 import { trace } from "./trace";
+import { judgeBudget, pendingRetry, spikeScheduledDemand, startBudget } from "./errorBudget";
 
 export function pendingSpikeAcknowledgement(c:Campaign|undefined):boolean {
  return !!c?.spikeStage && c.spikeStage.completedStep!==null && !c.spikeStage.acknowledged;
@@ -112,10 +113,11 @@ export function runAutoscaler(s:GameState):void {
    }
   }
  }
- if(s.phase==="management"&&!pendingSpikeAcknowledgement(c)&&d.completedStep===null&&c.step>=d.deadlines[3]) {
+ if(s.phase==="management"&&!pendingSpikeAcknowledgement(c)&&!pendingRetry(c)&&d.completedStep===null&&c.step>=d.deadlines[3]) {
   const ready=c.incomingRate===T.baseline&&!c.incident&&!c.dbBacklog&&c.apps.every(x=>!x.backlog)&&qualifiesForRecovery(c.snapshot)&&c.reports.every(r=>c.trace.some(t=>t.type==="review-acknowledged"&&t.data.incidentId===r.id));
   d.baselineStableSteps=ready?d.baselineStableSteps+1:0;
-  if(d.baselineStableSteps>=5){d.completedStep=c.step;trace(c,"traffic-spike-stage-completed",{recognitionId:"spike-response",physicalDuration:c.step-d.enteredStep,cashCents:c.cashCents,investedCents:c.investedCents,settledCostCents:c.costsCents,controllerExposure:c.ledger.controllerNumerator??0,controllerRemainder:c.remainders.controller??0,limitActive:c.limit!==null,rejected:c.cumulative.rejected,installed:c.apps.length,routed:c.routing.targets.length,manualRequests:c.actions.filter(x=>x.requestedStep>=d.enteredStep&&x.source!=="autoscaler").length,automaticRequests:c.actions.filter(x=>x.requestedStep>=d.enteredStep&&x.source==="autoscaler").length});}
+  if(d.baselineStableSteps>=5&&!judgeBudget(c,d.budget))d.baselineStableSteps=0;
+  else if(d.baselineStableSteps>=5){d.completedStep=c.step;trace(c,"traffic-spike-stage-completed",{recognitionId:"spike-response",physicalDuration:c.step-d.enteredStep,cashCents:c.cashCents,investedCents:c.investedCents,settledCostCents:c.costsCents,controllerExposure:c.ledger.controllerNumerator??0,controllerRemainder:c.remainders.controller??0,limitActive:c.limit!==null,rejected:c.cumulative.rejected,installed:c.apps.length,routed:c.routing.targets.length,manualRequests:c.actions.filter(x=>x.requestedStep>=d.enteredStep&&x.source!=="autoscaler").length,automaticRequests:c.actions.filter(x=>x.requestedStep>=d.enteredStep&&x.source==="autoscaler").length});}
  }
  c.snapshot.spikes=spikeObservation(c);
 }
@@ -129,6 +131,7 @@ export function spikeAction(s:GameState,action:Action):Rejection|null|undefined 
  if(action.type==="enter_spikes"){
   if(!canEnterSpikes(s))return fail("Requires consumed data growth, stable service, drained work and acknowledged reports.");
   c.spikeStage={id:T.id,version:T.version,configuration:JSON.stringify(T),enteredStep:c.step,deadlines:T.offsets.map(x=>c.step+x),consumed:[],researchEarned:1,researchSpent:c.launchWeek?.tech==="autoscaling"?1:0,controller:null,baselineStableSteps:0,completedStep:null,acknowledged:false};
+  c.spikeStage.budget=startBudget(c,"spikes",spikeScheduledDemand(),1);
   trace(c,"spike-stage-entered",{stageId:T.id,stageVersion:T.version,configuration:JSON.stringify(T),cashCents:c.cashCents,investedCents:c.investedCents,settledCostCents:c.costsCents,rejected:c.cumulative.rejected});
   trace(c,"progression-awarded",{recognitionId:"data-readiness",research:1});trace(c,"traffic-spikes-announced",{deadlines:JSON.stringify(c.spikeStage.deadlines),baseline:T.baseline,peak:T.peak});
  } else if(!d)return fail("Enter Traffic Spikes & Autoscaling first.");

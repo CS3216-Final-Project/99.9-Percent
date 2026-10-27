@@ -900,7 +900,7 @@ function Steam({ position }: { position: V3 }) {
   );
 }
 
-/** An arcade cabinet's screen playing its attract mode, eight frames a second — except the red cabinet, which runs the real brick breaker while the avatar plays it. */
+/** An arcade cabinet's screen playing its attract mode, eight frames a second - except the red cabinet, which runs the real brick breaker while the avatar plays it. */
 function ArcadeScreen({ variant, x }: { variant: string; x: number }) {
   const game = useMemo(() => arcadeScreen(variant), [variant]);
   useEffect(() => () => game.texture.dispose(), [game]);
@@ -935,10 +935,10 @@ function ArcadeScreen({ variant, x }: { variant: string; x: number }) {
 
 /**
  * The first nap pod's reading light: always mounted so nothing recompiles, its glow only ramped up with the
- * lie-down blend while the avatar sleeps — warming the pillow and the hood's underside in both views.
+ * lie-down blend while the avatar sleeps - warming the pillow and the hood's underside in both views.
  * It lives at the scene's root rather than inside the office floor's group: three collects lights from visible
  * subtrees only, so a light inside a floor's group would change the light count when the floor hides, and every
- * material's shader would be rebuilt on the first ride — a freeze of several seconds.
+ * material's shader would be rebuilt on the first ride - a freeze of several seconds.
  */
 export function NapPodLight() {
   const light = useRef<THREE.PointLight>(null);

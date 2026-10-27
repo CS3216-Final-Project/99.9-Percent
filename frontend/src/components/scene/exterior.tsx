@@ -532,8 +532,8 @@ function lampMaterial(): THREE.MeshBasicMaterial {
 
 /**
  * Shared materials: plain vertex colours, tinted per instance where needed, the bright ones that glow, and
- * vehicles. Each is made once per way it is drawn — plain meshes, instanced meshes, and instanced meshes tinted
- * per instance — because the renderer refetches a material's program each time it is drawn instanced after plain
+ * vehicles. Each is made once per way it is drawn - plain meshes, instanced meshes, and instanced meshes tinted
+ * per instance - because the renderer refetches a material's program each time it is drawn instanced after plain
  * or tinted after untinted. The variants are made by the same factory call, never `clone()`, which would drop
  * `onBeforeCompile` and `customProgramCacheKey`.
  */

@@ -121,7 +121,7 @@ function copyOf(s: ExplorationState): ExplorationState {
 /**
  * The mode's remembered exploration state, or the defaults when none was stored, the record is unreadable, or
  * storage is unavailable. A successfully read `null` or corrupt record clears this visit's memory too, so a
- * cleared store is honoured — unless the memory is ahead of storage because a write just failed, in which case
+ * cleared store is honoured - unless the memory is ahead of storage because a write just failed, in which case
  * it still applies for the rest of this visit. A read that throws keeps what memory already holds.
  */
 export function loadExploration(mode: GameMode): ExplorationState {

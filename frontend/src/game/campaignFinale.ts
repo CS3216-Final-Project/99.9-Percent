@@ -1,5 +1,6 @@
 import type { GameState } from "@/sim";
 import type { ColleagueId, DialogueLine } from "./colleagues";
+import { uptimePct } from "./format";
 
 /** The colleagues' celebration after a won campaign, built from the recorded scorecard so every line is true. */
 export function campaignFinale(game: GameState) {
@@ -16,7 +17,7 @@ export function campaignFinale(game: GameState) {
   ];
   const stats = [
     { label: "Users", value: users },
-    ...card.wholeRunUptime === null ? [] : [{ label: "Uptime", value: `${(card.wholeRunUptime * 100).toFixed(2)}%` }],
+    ...card.finalWeekUptime === null ? [] : [{ label: "Final week uptime", value: uptimePct(card.finalWeekUptime) }],
     { label: "Incidents", value: incidents.toLocaleString("en-US") },
   ];
   return { lines, stats, key: `99.99.campaign-finale:${card.runId}` };

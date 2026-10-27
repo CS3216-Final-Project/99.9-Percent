@@ -115,7 +115,7 @@ it("keeps actual results separate from current costs and hides accounting behind
     const overview=screen.getByRole("region",{name:"Company finances overview"});
     const last=game.campaign!.settlements.at(-1)!;
     expect(within(overview).getByText("Money earned last period").nextElementSibling?.textContent).toBe(financeMoney(last.revenueCents));
-    expect(within(overview).getByText("Money earned minus running costs — last period").nextElementSibling?.textContent).toBe(financeMoney(last.netCents));
+    expect(within(overview).getByText("Money earned minus running costs, last period").nextElementSibling?.textContent).toBe(financeMoney(last.netCents));
     expect(within(overview).getByText("Current running costs per period").nextElementSibling?.textContent).toBe(financeMoney(totalCharges(operatingCharges(game.campaign!))));
     const advanced=screen.getByText("Advanced details").closest("details")!;
     expect(advanced.open).toBe(false);

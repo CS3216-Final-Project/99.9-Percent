@@ -66,7 +66,7 @@ it("disable preserves accepted provisioning and prevents hidden routing",()=>{
  expect(g.campaign!.apps[2].routed).toBe(false);expect(g.campaign!.cashCents).toBe(paid);expect(g.campaign!.pending.some(a=>a.type==="routing")).toBe(false);expect(validateEnvelope(makeEnvelope(g)).status).toBe("ok");
 });
 it("completion and acknowledgement preserve identity and never re-award opening",()=>{
- let g=spikeCompany(false);g=tick(act(g,{type:"set_traffic_limit",enabled:true}));g=untilOffset(g,72);expect(pendingSpikeAcknowledgement(g.campaign!)).toBe(true);expect(step(g).state).toBe(g);
+ let g=spikeCompany(false);g=tick(act(g,{type:"add_server"}),2);g=tick(act(g,{type:"scale_up",appId:"app-3"}),3);g=tick(act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}),1);g=untilOffset(g,72);expect(pendingSpikeAcknowledgement(g.campaign!)).toBe(true);expect(step(g).state).toBe(g);
  const m=beginSession(emptyMeasurement(),g,"session","2026-10-10T00:00:00Z"),events=projectEvents(m,g,"2026-10-10T00:01:00Z");expect(events.pending.filter(e=>e.name==="run_completed_opening")).toHaveLength(1);expect(events.pending.filter(e=>e.name==="traffic_spike_stage_completed")).toHaveLength(1);
  const before=g.campaign!.cashCents,id=g.campaign!.runId;g=act(g,{type:"acknowledge_spikes"});expect(g.campaign!.cashCents).toBe(before);expect(g.campaign!.runId).toBe(id);expect(applyAction(g,{type:"acknowledge_spikes"}).ok).toBe(false);
 });

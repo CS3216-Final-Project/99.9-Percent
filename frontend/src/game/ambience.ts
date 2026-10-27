@@ -96,7 +96,7 @@ export function mix(dark: number): { day: number; night: number } {
 
 /**
  * How loud the day, the night and the server hall play. Indoors the city is only what faintly reaches through the
- * walls, at `CITY_INDOOR_LEVEL` of itself — the lowest-priority bed — and it fades out entirely as the hall takes
+ * walls, at `CITY_INDOOR_LEVEL` of itself - the lowest-priority bed - and it fades out entirely as the hall takes
  * over; the hall itself is never subdued.
  */
 export function blend(dark: number, hall: number): { day: number; night: number; hall: number } {

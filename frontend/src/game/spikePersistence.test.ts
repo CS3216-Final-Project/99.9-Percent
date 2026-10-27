@@ -1,7 +1,7 @@
 import {it,expect,beforeEach,afterEach,vi} from "vitest";
 import {makeEnvelope,validateEnvelope,CAMPAIGN_SAVE_KEY} from "./saveEnvelope";
 import {loadGame,saveGame} from "./persist";
-import {dataCompany,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
+import {dataCompany,preparedSpikes,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
 import {useGame} from "./store";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});
 afterEach(()=>vi.restoreAllMocks());
@@ -40,7 +40,7 @@ it("replays pending provisioning, disabled policy and protected upgrades exactly
  const loaded=loadGame();if(loaded.status!=="ok")throw Error("load");expect(loaded.game).toEqual(g);
 });
 it("pending completion blocks the shared clock after reload until explicit acknowledgement",()=>{
- let g=act(spikeCompany(false),{type:"set_traffic_limit",enabled:true});g=untilOffset(g,72);expect(saveGame(g)).toBe(true);
+ let g=untilOffset(preparedSpikes(),72);expect(saveGame(g)).toBe(true);
  useGame.getState().boot();useGame.getState().play();
  const step=useGame.getState().game.campaign!.step;useGame.getState().setRunning(true);useGame.getState().tick(10);useGame.getState().advance();
  expect(useGame.getState().game.campaign!.step).toBe(step);
@@ -49,7 +49,7 @@ it("pending completion blocks the shared clock after reload until explicit ackno
 });
 
 it("rejects a replay that advances past unacknowledged spike completion",()=>{
- const g=untilOffset(act(spikeCompany(false),{type:"set_traffic_limit",enabled:true}),72);
+ const g=untilOffset(preparedSpikes(),72);
  const e=makeEnvelope(g);expect(validateEnvelope({...e,step:e.step+1}).status).toBe("corrupt");
  const acknowledged=act(g,{type:"acknowledge_spikes"});const next=tick(acknowledged);
  const result=validateEnvelope(makeEnvelope(next));expect(result.status).toBe("ok");

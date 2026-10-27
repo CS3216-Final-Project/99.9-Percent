@@ -276,7 +276,7 @@ export function WalkDriver({ walking, footprints, names, racks }: { walking: boo
     return () => {
       window.removeEventListener("pagehide", onHide);
       offRide();
-      // The spot is always worth remembering; whether the walk itself was is the store's own record — an explicit
+      // The spot is always worth remembering; whether the walk itself was is the store's own record - an explicit
       // stop already wrote walking:false, and the title screen's automatic stop kept walking:true.
       flush(false);
       persisting.current = null;

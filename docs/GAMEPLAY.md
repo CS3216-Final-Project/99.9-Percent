@@ -119,14 +119,15 @@ It watches routed processed work divided by routed capacity:
 - At most four apps are installed, with a four-step cooldown after each join or retirement.
 
 Manually installed or vertically upgraded apps are never retired, and there are no refunds.
-After both pulses, five stable baseline steps complete the chapter, which the player then acknowledges.
+After both pulses, five stable baseline steps complete the chapter, which the player then acknowledges, provided the chapter stayed within its error budget (see Error budgets).
 
 ### Chapter 5: Stay Online
 
 The player explicitly starts a temporary app failure test.
 The target app fails eight steps later and restores itself after twenty failed steps, unless the free three-step manual restoration finishes first.
 Health Checks detect the failure on a later step, and a reserved spare is promoted after a delay; failover reroutes traffic but adds no capacity.
-Actual reports and five stable observations after restoration precede the explicit reliability acknowledgement.
+Actual reports and five stable observations after restoration precede the explicit reliability acknowledgement, provided the test stayed within its error budget.
+Failover promotes the spare but does not route the restored app back; the player fails back by routing it again.
 
 ### Chapter 6: Grow the Company
 
@@ -136,16 +137,40 @@ Baseline demand is `2400 + floor((users - 2000) * 600 / (target - 2000))`, so 2,
 
 The seeded pool holds one read-heavy pulse (3,800/4,000 req/s), one write-heavy pressure (3,000 req/s) and one failure under load (3,400/3,600 req/s with one temporary app fault).
 Five stable full-demand observations make Start next growth wave available, and each wave is announced eight steps ahead.
-After each wave, queues must drain, apps must be healthy, reports must be acknowledged and five stable full-demand observations must follow before the player reviews the growth outcome.
-After all three reviews, five more full-demand steps qualify the final review, and Complete campaign ends the run, freezes the clock and keeps the company inspectable.
+After each wave, queues must drain, apps must be healthy, reports must be acknowledged and five stable full-demand observations must follow before the player reviews the growth outcome, provided the wave stayed within its error budget.
+After all three reviews, the company runs one full operating week (60 steps) at the final user count.
+Once that week has passed and the last five steps were stable at full demand, the final review qualifies, and Complete campaign ends the run, freezes the clock and keeps the company inspectable.
 Before the final scorecard, the five colleagues celebrate once per run: Maya, Jordan, Sam, Taylor, then Alex each speak one line built from the recorded scorecard, and the last line shows users, uptime (when known) and incidents.
 Skipping it at any line counts as seeing it; leaving it part way, for example by reloading, plays it again from the start.
 
 An optional promotion costs $500, activates next step, adds 400 req/s for twelve steps and has a thirty-step cooldown.
 
 The final scorecard separates settled and pending revenue, setup and operating costs, salaries and promotion spending.
-It reports rejected demand separately from service errors, plus architecture, technologies, incident count, service-health uptime and the longest degraded span.
+It reports the final operating week's uptime against the 99.99% objective, whole-run uptime, each judged scenario's error budget and attempts, rejected demand separately from service errors, architecture, technologies, incident count and the longest degraded span.
 Confirmed replay archives the old company and scorecard and starts a new run ID and seed.
+
+### Error budgets
+
+The company's service-level objective is 99.99% uptime.
+Uptime is always the share of decided requests that were served: failed and turned-away requests count against it, and requests still queued are not yet decided.
+The top bar, App Health, the Launch Week score, the scorecard and the finale all show this one measure.
+
+Traffic Spikes, the Stay Online test and each growth wave are judged scenarios with an error budget of 2% of the demand they schedule.
+Even a well-prepared company loses requests for one health-check interval when an app fails, so planned drills and surges cannot be held to 0.01%.
+Normal operation is held to the full objective in Grow the Company's final operating week.
+
+| Scenario | Budget starts | Scheduled demand |
+| --- | --- | --- |
+| Traffic Spikes | Chapter entry | Both pulses and the baseline steps until five stable steps can follow the second pulse (239,200 requests, so 4,784 may be lost) |
+| Stay Online test | Start reliability test | Eight lead steps, twenty failure steps and five stable steps at current demand |
+| Growth wave | Start next growth wave | Eight announced steps at current demand, the wave's peak for its duration, then five stable steps at the new baseline |
+
+The chapter checklist shows requests lost against the running budget.
+When a scenario would otherwise complete but lost more than its budget, time stops and the player retries it with the same company: Traffic Spikes reschedules both pulses, Stay Online waits for a new test, and a growth wave returns to the previous user count and must be started again.
+A spent budget is frozen when its scenario is judged, so later losses never count against it.
+
+For example, doing nothing in Traffic Spikes or relying on the default autoscaler goes over budget, while routing a third large app before the first pulse does not.
+In Stay Online, Health Checks with enough surviving capacity stay within budget, while manual restoration alone does not.
 
 ### Guidance
 

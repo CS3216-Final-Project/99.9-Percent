@@ -192,7 +192,7 @@ const inside = (a: LabelBox, b: LabelBox) => a.x >= b.x && a.y >= b.y && a.x + a
  * and left of its marker in turn, taking the first that fits inside `bounds` and covers nothing already placed
  * or any pin's marker (a box outside the bounds is only used when no candidate fits). Pins off the frame get no
  * label, though their markers still block. Zone names are `fixed`: a pin's label avoids them when it can, and
- * otherwise covers them — and a marker always covers them — so the zone names hidden either way come back in
+ * otherwise covers them - and a marker always covers them - so the zone names hidden either way come back in
  * `hidden` for the caller to leave out.
  */
 export function placeLabels(

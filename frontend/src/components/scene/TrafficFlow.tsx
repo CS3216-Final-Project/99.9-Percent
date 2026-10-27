@@ -55,7 +55,7 @@ function FlowCable({ points, rate, kind, speed }: { points: P2[]; rate: number; 
   );
 }
 
-/** Lost requests: dots tipping off the machine that lost them — red when shed, orange when turned away at the door. */
+/** Lost requests: dots tipping off the machine that lost them - red when shed, orange when turned away at the door. */
 function Drops({ at, rate, color = TRAFFIC.dropped }: { at: P2; rate: number; color?: string }) {
   const mesh = useRef<THREE.InstancedMesh>(null);
   const count = Math.min(24, dots(rate));

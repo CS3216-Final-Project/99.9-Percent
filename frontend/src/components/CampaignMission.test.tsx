@@ -6,7 +6,7 @@ import { campaignGuidance } from "@/game/campaignGuidance";
 import { campaignAttention } from "@/game/campaignAttention";
 import { spikeCompany, untilOffset, act as decide, tick } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "@/sim/__tests__/reliabilityFixture";
-import { combinedCompany, completedReliability, finishedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
+import { checkedCombined, combinedCompany, completedReliability, finishedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
 import { CampaignPanel } from "./CampaignUI";
 import InspectionReveal from "./InspectionReveal";
 
@@ -56,7 +56,7 @@ it("shows a completed reliability accomplishment and explicit chapter continuati
  expect(screen.queryByRole("region",{name:"Current unmet condition"})).toBeNull();
  expect(screen.getByRole("region",{name:"Chapter accomplished"}).textContent).toContain("Reliability test completed and outcome acknowledged.");
  expect(screen.getByRole("region",{name:"Next step"}).textContent).toContain("Continue to Grow the Company using Next in the chapter bar.");
- expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("12 / 12 current requirements met");
+ expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("13 / 13 current requirements met");
  requirements(game);
 });
 it("keeps the finished campaign inspectable without presenting completion as an unmet condition",()=>{
@@ -95,7 +95,8 @@ for(const state of ["readiness","wave","outcome","final","complete"] as const) i
   expect(screen.getByRole("button",{name:/Run promotion/}).hasAttribute("disabled")).toBe(state!=="readiness");
 });
 it("shows the actual pending deployment and recalculates after its activation",()=>{
-  const game=decide(combinedCompany(),{type:"add_server"});show(game);
+  // Three apps leave a free slot for a fourth.
+  const game=decide(checkedCombined(),{type:"add_server"});show(game);
   expect(screen.getByRole("region",{name:"Essential live status"}).textContent).toContain("Add server (App 4): activates in");
   const advanced=tick(game,2);act(()=>useGame.setState({game:advanced}));
   expect(screen.getByRole("region",{name:"Essential live status"}).textContent).not.toContain("Add server (App 4): activates in");

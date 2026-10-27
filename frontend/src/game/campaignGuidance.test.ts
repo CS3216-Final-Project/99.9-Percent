@@ -3,7 +3,7 @@ import {campaignGuidance,campaignObjective} from "./campaignGuidance";
 import {newGame,applyAction,type GameState,type Action} from "../sim";
 import {advanceSteps,canEnterData} from "../sim/step";
 import {canEnterSpikes} from "../sim/autoscaling";
-import {dataCompany,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
+import {dataCompany,preparedSpikes,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
 import {reliabilityCompany} from "../sim/__tests__/reliabilityFixture";
 import {combinedCompany,finishRound} from "../sim/__tests__/combinedFixture";
 function decision(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
@@ -52,7 +52,7 @@ it("keeps Scaling's headroom row, met, once its growth has arrived",()=>{
  expect(grown.campaign!.scaling!.consumed).toBe(true);expect(row(grown,"headroom").met).toBe(true);
 });
 it("keeps Stay Online's arming row, met, once the test has started",()=>{
- expect(counts(reliabilityCompany(),20,(g,i)=>i===3?decision(g,{type:"arm_reliability"}):g)).toEqual([12]);
+ expect(counts(reliabilityCompany(),20,(g,i)=>i===3?decision(g,{type:"arm_reliability"}):g)).toEqual([13]);
  expect(row(decision(reliabilityCompany(),{type:"arm_reliability"}),"pending").met).toBe(true);
 });
 it("keeps Grow the Company's restoration row whether or not a wave has failed a server",{timeout:30_000},()=>{
@@ -114,7 +114,7 @@ it("Data omits generic waiting copy but explains blocked readiness",()=>{
  g.campaign!.dbBacklog=1;expect(campaignGuidance(g).waiting).toBeNull();expect(campaignGuidance(g).notice).toContain("empty queues");
 });
 it("Spikes observes completion and acknowledgement without requiring automation",()=>{
- let g=spikeCompany(false);g=act(g,{type:"set_traffic_limit",enabled:true});g=untilOffset(g,68);
+ let g=untilOffset(preparedSpikes(),68);
  expect(row(g,"pulses").met).toBe(true);expect(row(g,"observations").label).toBe("Stable baseline observations: 1 / 5");expect(campaignGuidance(g).pendingAction).toBeNull();expect(campaignGuidance(g).optional).toContain("optional");
  g=tick(g,4);expect(campaignGuidance(g).pendingAction?.label).toBe("Review spike recognition");expect(g.campaign!.spikeStage!.acknowledged).toBe(false);
  g=act(g,{type:"acknowledge_spikes"});expect(row(g,"recognition").met).toBe(true);expect(campaignGuidance(g).notice).toContain("available through Next in the chapter bar");

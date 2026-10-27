@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { pendingCombined } from "../combinedCampaign";
-import { act, tick, finishRound, completedReliability } from "./combinedFixture";
+import { act, tick, finishRound, finishFinalWeek, completedReliability } from "./combinedFixture";
 
 /** Each order lives in its own file so Vitest can distribute this CPU-bound work. */
 export function checkCombinedBounds(order: readonly number[]) {
@@ -18,7 +18,7 @@ export function checkCombinedBounds(order: readonly number[]) {
         state = finishRound(act(state, { type: "start_growth_wave" }));
         state = act(state, { type: "acknowledge_growth" });
       }
-      state = tick(state, 5);
+      state = finishFinalWeek(state);
       expect(pendingCombined(state.campaign)).toBe(true);
       expect(act(state, { type: "complete_campaign" }).outcome).toBe("won");
     }

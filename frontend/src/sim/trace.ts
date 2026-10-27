@@ -33,8 +33,9 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
             `The incident followed an admission or capacity change at step ${demandEvent?.step ?? start?.step}; compare its recorded effect with the opening metrics.`,
     ];
     const fault=currentFault(c);
-    // Only a fault that was still unrestored during this episode explains it.
-    if(fault?.startedStep!==null&&fault&&fault.startedStep<=c.step&&(fault.restoredStep===null||fault.restoredStep>=episodeStart)) {
+    // Only a fault still unrestored when this incident's overload began explains it. The episode since the last
+    // report can reach back to a long-restored drill when that drill opened no incident of its own.
+    if(fault?.startedStep!==null&&fault&&fault.startedStep<=c.step&&(fault.restoredStep===null||fault.restoredStep>=start.step)) {
         const name=(id:string)=>`App ${id.slice(4)}`;
         explanations.push(`${name(fault.targetId)} failed at step ${fault.startedStep}. Failed recipients process no work; retained queues remain until restoration. Health checking detects failure but creates no capacity. A spare helps only when routed.`);
         for(const e of events.filter(e=>e.step>=fault.startedStep!)) {

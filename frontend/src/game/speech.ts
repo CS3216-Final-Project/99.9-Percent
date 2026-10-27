@@ -3,9 +3,9 @@ import { loudness } from "./synth";
 /*
  * The crew's spoken words through the browser's own speech (the Web Speech API): each line a creature says is
  * read aloud in a voice picked per species, louder the nearer the avatar stands. A fresh line cuts the one
- * before it off, unless it would be heard at less than half the level — then it is dropped, since cutting a
- * louder voice short for a distant murmur sounds worse. Where the browser cannot speak — no speech synthesis,
- * no voices yet, or an engine that has failed — `say` says false and the caller falls back to the synth bark.
+ * before it off, unless it would be heard at less than half the level - then it is dropped, since cutting a
+ * louder voice short for a distant murmur sounds worse. Where the browser cannot speak - no speech synthesis,
+ * no voices yet, or an engine that has failed - `say` says false and the caller falls back to the synth bark.
  */
 
 /** How a crew member's lines are spoken: pitch and rate as the Web Speech API takes them (1 is the voice's own), and a seed that picks which of the browser's voices it uses. */
@@ -22,7 +22,7 @@ export interface SpeechApi {
 }
 
 export interface Speech {
-  /** Say `text` in `timbre`, `near` (0..1, 1 beside the avatar) scaling the effects volume; a new line cuts off the one before it. Returns whether it will be heard: false where the browser cannot speak (no speech, no voice yet, or its engine has failed), muted, or `near` is 0 — a caller may play something else then. */
+  /** Say `text` in `timbre`, `near` (0..1, 1 beside the avatar) scaling the effects volume; a new line cuts off the one before it. Returns whether it will be heard: false where the browser cannot speak (no speech, no voice yet, or its engine has failed), muted, or `near` is 0 - a caller may play something else then. */
   say(text: string, timbre: Timbre, near: number): boolean;
   /** Cut off whatever is being said. */
   hush(): void;

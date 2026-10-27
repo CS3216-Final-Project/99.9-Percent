@@ -42,7 +42,7 @@ import "./MenuMap.css";
 /*
  * The menu's Map tab: a top-down plan of the building the way a pause-menu map works, beside the corner minimap.
  * Floor tabs switch the plan and badge the other floor when it needs the player; a line says where the avatar is.
- * The plan drags and zooms about the cursor, and its pins — labelled equipment, fun things, the crew, the avatar —
+ * The plan drags and zooms about the cursor, and its pins - labelled equipment, fun things, the crew, the avatar -
  * keep their size on screen at any zoom, so they read like map blips rather than room furniture. Everything on a
  * floor can be found through the search or the directory beneath, and picking one opens a card that can take the
  * room's view to it or send the walking avatar there, both only when the run is free to follow (not mid-guide).

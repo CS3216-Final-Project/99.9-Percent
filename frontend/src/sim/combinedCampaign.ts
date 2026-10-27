@@ -4,6 +4,8 @@ type Rejection = Extract<ActionResult, { ok: false }>;
 import { clone } from "./state";
 import { rand } from "./rng";
 import { trace } from "./trace";
+import { judgeBudget, pendingRetry, startBudget, waveScheduledDemand } from "./errorBudget";
+import { ERROR_BUDGET as B } from "./scenarios/errorBudget";
 import { healthy, reportsAcknowledged } from "./reliability";
 import { qualifiesForRecovery } from "./step";
 import { captureScorecard, emptyServiceMeasurement } from "./campaignScorecard";
@@ -72,6 +74,11 @@ export function advanceCombinedTraffic(c:Campaign):void {
  const from=c.incomingRate;c.incomingRate=combinedInput(c);
  if(from!==c.incomingRate)trace(c,"workload-changed",{from,to:c.incomingRate,profile:combinedProfile(c),eventId:r?.id??p?.actionId??"combined-baseline"});
 }
+/** Game seconds of Grow the Company's final operating week observed so far. */
+export function finalWeekSteps(c:Campaign):number {
+ const from=c.combinedStage?.finalWeekFromStep;return from==null?0:Math.min(B.finalWeekSteps,c.step-from);
+}
+export const finalWeekElapsed=(c:Campaign)=>finalWeekSteps(c)>=B.finalWeekSteps;
 export function finalRequirements(s:GameState):boolean {
  const c=s.campaign!,d=c.combinedStage;
  return !!d&&d.users>=d.finalUserTarget&&d.completedRounds.length===3&&d.completedRounds.every(r=>r.acknowledged)&&
@@ -79,17 +86,18 @@ export function finalRequirements(s:GameState):boolean {
  (!c.promotion||c.step>=c.promotion.endStep)&&c.incomingRate===baselineDemand(d.users,d.finalUserTarget);
 }
 export function observeCombined(s:GameState):void {
- const c=s.campaign!,d=c.combinedStage;if(!d||s.phase==="ended"||d.finalReview||pendingCombined(c))return;
+ const c=s.campaign!,d=c.combinedStage;if(!d||s.phase==="ended"||d.finalReview||pendingCombined(c)||pendingRetry(c))return;
  const r=d.currentRound,ready=stableManagement(s,true);
  if(r){
   if(r.startedStep!==null)r.observations.push(clone(c.snapshot));
   const finished=r.pressureEndedStep!==null&&(!r.fault||r.fault.restoredStep!==null);
   r.stableSteps=finished&&ready?Math.min(5,r.stableSteps+1):0;
-  if(r.stableSteps===5){r.completedStep=c.step;trace(c,"scenario-completed",{roundId:r.id,template:r.scenario.template,rejected:c.cumulative.rejected-r.rejectedBefore,setupCents:c.investedCents-r.setupBefore});}
+  if(r.stableSteps===5&&!judgeBudget(c,r.budget))r.stableSteps=0;
+  else if(r.stableSteps===5){r.completedStep=c.step;trace(c,"scenario-completed",{roundId:r.id,template:r.scenario.template,rejected:c.cumulative.rejected-r.rejectedBefore,setupCents:c.investedCents-r.setupBefore});}
  } else if(d.nextRoundIndex<3){d.readinessSteps=ready&&!promotionActive(c)?Math.min(5,d.readinessSteps+1):0;}
  else {
   d.finalStableSteps=finalRequirements(s)?Math.min(5,d.finalStableSteps+1):0;
-  if(d.finalStableSteps===5){d.finalReview=captureScorecard(s,"won");trace(c,"campaign-completion-qualified",{users:d.users,finalUserTarget:d.finalUserTarget});}
+  if(d.finalStableSteps===5&&finalWeekElapsed(c)){d.finalReview=captureScorecard(s,"won");trace(c,"campaign-completion-qualified",{users:d.users,finalUserTarget:d.finalUserTarget});}
  }
 }
 /** Every check runs before the first mutation, so a rejection leaves `s` untouched. */
@@ -116,6 +124,7 @@ export function combinedAction(s:GameState,action:Action):Rejection|null|undefin
  if(action.type==="acknowledge_growth"){
   const r=d.currentRound;if(!r||r.completedStep===null||r.acknowledged)return fail("No growth outcome awaits acknowledgement.");
   r.acknowledged=true;d.completedRounds.push(clone(r));d.currentRound=null;d.nextRoundIndex++;d.readinessSteps=0;d.finalStableSteps=0;
+  if(d.nextRoundIndex===3)d.finalWeekFromStep=c.step;
   trace(c,"scenario-acknowledged",{roundId:r.id});return null;
  }
  if(action.type==="complete_campaign"){
@@ -133,7 +142,9 @@ export function combinedAction(s:GameState,action:Action):Rejection|null|undefin
    if(!target)return fail("A healthy serving application is required.");
    r.fault={id:`combined-failure-${c.nextEventId}`,targetId:target.id,armedStep:c.step,startStep:start,naturalStep:start+20,startedStep:null,restoredStep:null,restoreSource:null,promoted:false};
   }
-  d.currentRound=r;d.readinessSteps=0;trace(c,"scenario-scheduled",{roundId:r.id,index,template:scenario.template,startStep:start,endStep:r.endStep});return null;
+  d.currentRound=r;d.readinessSteps=0;
+  r.budget=startBudget(c,"growth",waveScheduledDemand(c.incomingRate,scenario.peak,scenario.duration,r.baseline),(d.retriedRounds??[]).filter(x=>x.index===index).length+1);
+  trace(c,"scenario-scheduled",{roundId:r.id,index,template:scenario.template,startStep:start,endStep:r.endStep});return null;
  }
  if(action.type==="run_promotion"){
   if(!canPromote(s))return fail("Promotion requires stable baseline management between growth rounds, available cash and no pending work or cooldown.");

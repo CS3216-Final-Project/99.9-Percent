@@ -19,7 +19,7 @@ import "./ServerInspection.css";
 
 /**
  * The diagnostic card an inspection started in the 3D room opens: the equipment's scanner on the left, the
- * reading on the right. It changes nothing about the selection — closing it returns to the same inspector.
+ * reading on the right. It changes nothing about the selection - closing it returns to the same inspector.
  */
 export default function InspectionReveal() {
   const inspection = useGame((s) => s.roomInspection);

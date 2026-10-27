@@ -6,7 +6,7 @@ import { act, tick } from "@/sim/__tests__/spikeFixtures";
 import { spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
-import { combinedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
+import { checkedCombined, finishRound, sequence } from "@/sim/__tests__/combinedFixture";
 import { incidentLesson, incidentTitle, survivingCapacity } from "./campaignPostmortem";
 
 export function recovered(game: GameState) {
@@ -34,9 +34,8 @@ describe("recorded incident lessons", () => {
       g = incident(act(reliabilityCompany(), { type: "arm_reliability" }));
       g = recovered(act(g, { type: "restore_app", appId: g.campaign!.reliabilityStage!.fault!.targetId }));
     } else {
-      g = combinedCompany();
-      for (let i = 0; i < 2; i++) g = act(finishRound(act(tick(g, 5), { type: "start_growth_wave" })), { type: "acknowledge_growth" });
-      g = recovered(incident(act(tick(g, 5), { type: "start_growth_wave" })));
+      // Health Checks alone leave two apps to carry the failure-under-load wave, which overloads them.
+      g = recovered(incident(act(tick(checkedCombined([sequence[2], sequence[0], sequence[1]]), 5), { type: "start_growth_wave" })));
     }
     const r = g.campaign!.reports.at(-1)!; const before = JSON.stringify(r); const lesson = incidentLesson(r);
     expect(lesson.wrong).not.toContain("does not establish"); expect(lesson.changed).toContain("recovery was confirmed");
@@ -149,7 +148,7 @@ describe("capacity after a server failure", () => {
 });
 
 it("names the actual overload when the announced failed server was already outside the route", () => {
-  let g=combinedCompany();
+  let g=checkedCombined();
   for(let i=0;i<2;i++){
     g=act(tick(g,5),{type:"start_growth_wave"});
     g=act(finishRound(g),{type:"acknowledge_growth"});

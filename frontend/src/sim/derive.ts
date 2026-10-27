@@ -2,6 +2,7 @@ import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "./scenarios/dataStrategy";
 import { APPLICATION_SCALING as S } from "./scenarios/applicationScaling";
 import { openingTuning } from "./launchWeek";
+import { requestUptime } from "./errorBudget";
 import { BALANCE, PROMOS } from "./balance";
 import { has, TECH } from "./tech";
 import type { EquipmentId, GameState, PromoId, Release, TechId, Warning } from "./types";
@@ -274,7 +275,7 @@ export function churnRate(satisfaction: number): number {
 
 /** Overall availability across the run, as a fraction (0.9995 = 99.95%). */
 export function uptime(s: GameState): number {
-  if(s.campaign){const c=s.campaign.cumulative;return c.successful+c.failed?c.successful/(c.successful+c.failed):1;}
+  if(s.campaign){const c=s.campaign.cumulative;return requestUptime(c.successful,c.failed,c.rejected)??1;}
   if (s.totals.weeks === 0) return 1;
   return clamp(1 - s.totals.downtimeMinutes / (s.totals.weeks * BALANCE.minutesPerWeek), 0, 1);
 }

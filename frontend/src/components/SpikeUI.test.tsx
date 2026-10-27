@@ -3,7 +3,7 @@ import {render,screen,within,cleanup,fireEvent} from "@testing-library/react";
 import {CampaignHeader,CampaignPanel,CampaignOverlays,CampaignControls} from "./CampaignUI";
 import InspectionReveal from "./InspectionReveal";
 import {useGame} from "../game/store";
-import {dataCompany,spikeCompany,untilOffset,act} from "../sim/__tests__/spikeFixtures";
+import {dataCompany,preparedSpikes,spikeCompany,untilOffset} from "../sim/__tests__/spikeFixtures";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});afterEach(cleanup);
 function show(g:ReturnType<typeof dataCompany>){useGame.setState({game:g,started:true,ready:true,onboarding:false});render(<><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/><InspectionReveal/></>);}
 function chapter(name:string) {
@@ -26,7 +26,7 @@ it("shows live provisioning, counters, delayed routing and per-instance shared s
  expect(screen.getAllByRole("status").some(x=>x.textContent?.includes("Routing change: activates in 1"))).toBe(true);
 });
 it("pending recognition stays visible after saved-state presentation and acknowledgement",()=>{
- let g=spikeCompany(false);g=act(g,{type:"set_traffic_limit",enabled:true});show(untilOffset(g,72));
+ let g=preparedSpikes();show(untilOffset(g,72));
  expect(screen.getByRole("dialog",{name:"Spike response handled"})).toBeTruthy();expect(screen.getByRole("button",{name:"Run"}).hasAttribute("disabled")).toBe(true);
  fireEvent.click(screen.getByRole("button",{name:"Stay in this chapter"}));expect(chapter("Traffic Spikes")).toContain("Completed");expect(chapter("Stay Online")).toContain("Available next");
 });

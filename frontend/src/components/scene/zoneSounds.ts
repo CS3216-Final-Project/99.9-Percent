@@ -6,7 +6,7 @@ import { RALLY } from "./rally";
 /*
  * The sounds of the office's zones: foosball clacks, a table-tennis rally, arcade bleeps, the espresso machine,
  * kitchen clinks, the television, typing at the open desks, a phone call, a presentation, chat groups murmuring
- * and a sleeper breathing. Each plays now and then, quietly, near where the camera looks — or, while the player
+ * and a sleeper breathing. Each plays now and then, quietly, near where the camera looks - or, while the player
  * walks the office, near where the avatar stands, however far out the camera is zoomed. Kept free of React and
  * audio so the levels can be tested.
  */

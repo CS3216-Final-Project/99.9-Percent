@@ -269,7 +269,7 @@ function tyre(x: number, { z, r }: Wheel, width: number, segments: number): THRE
   const tread = part(new THREE.CylinderGeometry(r, r, width, segments, 1, true, phase).rotateZ(Math.PI / 2).translate(x, r, z), TYRE, FINISH.trim);
   (tread.attributes.aWheel as THREE.BufferAttribute).array.fill(2);
   const face = part(new THREE.CircleGeometry(r, segments, phase).rotateY((out * Math.PI) / 2).translate(x + (out * width) / 2, r, z), TYRE, FINISH.trim);
-  // A circle's first vertex is its middle — the hub's cap — and the rest lie on the rim.
+  // A circle's first vertex is its middle - the hub's cap - and the rest lie on the rim.
   const radial = face.attributes.aWheel as THREE.BufferAttribute;
   radial.array.fill(2);
   radial.setX(0, 1);

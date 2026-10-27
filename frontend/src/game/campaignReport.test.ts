@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { newGame } from "@/sim";
 import { captureScorecard } from "@/sim/campaignScorecard";
-import { act, tick, dataCompany, spikeCompany } from "@/sim/__tests__/spikeFixtures";
+import { act, tick, dataCompany, preparedSpikes } from "@/sim/__tests__/spikeFixtures";
 import { combinedCompany, finishRound, finishedCompany } from "@/sim/__tests__/combinedFixture";
 import { reliabilityOutcome } from "./__fixtures__/reliabilityOutcome";
 import { incidentSummary, outcomeSummary, scorecardSummary } from "./campaignReport";
@@ -69,12 +69,12 @@ it("does not invent incidents or recovery actions for a no-incident scorecard re
 });
 
 it("does not attribute a same-second pre-entry action to the spike stage", () => {
-  let g = act(spikeCompany(false), { type: "set_traffic_limit", enabled: true });
+  // The Data Strategy company removed its limit in the same second it entered Traffic Spikes.
+  let g = preparedSpikes();
   for (let i = 0; i < 100 && g.campaign!.spikeStage!.completedStep == null; i++) g = tick(g);
   expect(g.campaign!.spikeStage!.completedStep).not.toBeNull();
   const summary = outcomeSummary(g.campaign!, "spikes");
-  expect(summary.response).toContain("a traffic limit");
-  expect(summary.response).toContain("Many incoming requests were rejected");
+  expect(summary.response).toContain("an added server");
   expect(summary.response).not.toContain("traffic limit removal");
 });
 

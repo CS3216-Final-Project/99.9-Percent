@@ -129,7 +129,7 @@ export const resetGreetings = () => {
 /**
  * Whether something `distance` metres from the avatar greets it now. Fires on coming within NOTICE_REACH; not again
  * until it has gone beyond NOTICE_LEAVE and come back, and GREET_AGAIN has passed; and never within GREET_SPACING of
- * anyone else's greeting — in that case it is NOT marked inside, so it tries again next frame and the hellos come
+ * anyone else's greeting - in that case it is NOT marked inside, so it tries again next frame and the hellos come
  * one after another rather than in a chorus.
  */
 export function notices(state: Notice, distance: number, now: number): boolean {

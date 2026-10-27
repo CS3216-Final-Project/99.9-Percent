@@ -4,7 +4,7 @@ import { avatar } from "./walk";
 
 /*
  * How each of the office's fun things plays out while the avatar is busy with it (see FUN_PROPS in floorplan.ts):
- * pure timelines in the activity's progress `f` (0 to 1), plus the poses the view eases to while it watches —
+ * pure timelines in the activity's progress `f` (0 to 1), plus the poses the view eases to while it watches -
  * lying in the nap pod, or drawn up to the red arcade cabinet's screen. Kept free of React and three.js so the
  * choreography can be tested; the drawings that read these are in activities.tsx, Avatar.tsx and ViewRig.tsx.
  */
@@ -200,7 +200,7 @@ export function scriptedPose(prop: string, _f: number, view: "first" | "follow",
     return followPose(avatar.x, floorY, avatar.z, avatar.yaw + w.turn, w.pitch, w.distance);
   }
   if (prop === "arcade" && view === "first") {
-    // In front of the red cabinet, looking up at its tilted screen — close, but with the field clear of the HUD.
+    // In front of the red cabinet, looking up at its tilted screen - close, but with the field clear of the HUD.
     return { x: SCREEN.x + 0.1, y: 1.3, z: SCREEN.z + 0.9, lx: SCREEN.x + 0.1, ly: SCREEN.y, lz: SCREEN.z, fov: 38 };
   }
   if (prop === "arcade" && view === "follow") {

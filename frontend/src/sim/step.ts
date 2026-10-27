@@ -17,6 +17,7 @@ import type { DataSnapshot } from "./campaignTypes";
 import { APPLICATION_SCALING as P } from "./scenarios/applicationScaling";
 import { emptyLedger, accruePeriod, settlePeriod } from "./settlement";
 import { trace, causalPostmortem, retainFoundationTrace } from "./trace";
+import { pendingRetry, retryAction } from "./errorBudget";
 export function processWork(backlog: number, demand: number, capacity: number, limit: number): ComponentSnapshot {
     const processed = Math.min(backlog + demand, capacity);
     const unfinished = backlog + demand - processed;
@@ -38,7 +39,7 @@ export function routableApps(c: Campaign): AppInstance[] {
 }
 /**
  * The strongest admission a limit can hold right now: 90% of the capacity the serving path could sustain at
- * this step — routed, healthy application capacity bounded by the database tier. It moves with the
+ * this step - routed, healthy application capacity bounded by the database tier. It moves with the
  * infrastructure, so the cap on a version-2 company follows purchases rather than staying a fixed number.
  */
 export function admissionCeiling(c: Campaign): number {
@@ -163,7 +164,7 @@ export function qualifiesForRecovery(m: Snapshot): boolean {
     return m.latencyMs < Q.latencyThresholdMs && m.serviceErrorRate !== null &&
         m.serviceErrorRate < Q.errorThreshold && m.admitted > 0 && m.successful + m.failed > 0;
 }
-export type StopReason = "introduction" | "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | "reliability-review" | "combined-review" | null;
+export type StopReason = "introduction" | "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | "reliability-review" | "combined-review" | "budget-retry" | null;
 export function step(prev: GameState): {
     state: GameState;
     stopReason: StopReason;
@@ -181,8 +182,8 @@ export function step(prev: GameState): {
     return { state: projectCampaign(s), stopReason };
 }
 /** A recognition the player must acknowledge before time can advance again. */
-export function pendingStop(c: Campaign | undefined): "reliability-review" | "prevention-review" | "spike-acknowledgement" | "combined-review" | null {
-    return pendingCombined(c) ? "combined-review" : pendingReliability(c) ? "reliability-review" : pendingPreventionReview(c) ? "prevention-review" : pendingSpikeAcknowledgement(c) ? "spike-acknowledgement" : null;
+export function pendingStop(c: Campaign | undefined): "reliability-review" | "prevention-review" | "spike-acknowledgement" | "combined-review" | "budget-retry" | null {
+    return pendingRetry(c) ? "budget-retry" : pendingCombined(c) ? "combined-review" : pendingReliability(c) ? "reliability-review" : pendingPreventionReview(c) ? "prevention-review" : pendingSpikeAcknowledgement(c) ? "spike-acknowledgement" : null;
 }
 /**
  * Advance one physical step by mutating `s`. The caller owns `s`, rules out
@@ -413,6 +414,7 @@ export function stepInPlace(s: GameState): StopReason {
     if(pendingCombined(c))stopReason="combined-review";
     if(pendingReliability(c))stopReason="reliability-review";
     if(pendingSpikeAcknowledgement(c))stopReason="spike-acknowledgement";
+    if(pendingRetry(c))stopReason="budget-retry";
     trace(c, "metrics", { snapshotStep: c.step, ...(data?{profile:data.profile,hits:data.hits,eligibleMisses:data.eligibleMisses,effectiveHitRate:data.effectiveHitRateUsed,dbDemand:db.demand,dbCapacity:db.capacity}: {}) });
     if(c.foundation && c.step<=c.foundation.step)retainFoundationTrace(c,traceStart);
     return stopReason;
@@ -487,6 +489,12 @@ function actInPlace(s: GameState, action: Action, legacyPreventionMilestone: boo
       }
       return introduction;
     }
+    const retry = retryAction(s, action);
+    if (retry !== undefined) {
+        if (!retry) projectCampaign(s);
+        return retry;
+    }
+    if (pendingRetry(c0)) return fail("Retry the scenario that went over its error budget first.");
     const combined = combinedAction(s, action);
     if (combined !== undefined) {
         if (!combined) projectCampaign(s);

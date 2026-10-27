@@ -112,7 +112,7 @@ function limb(a: V, b: V, r0: number, r1: number, sides: number): THREE.BufferGe
  * A palm frond from `origin`, heading out at `azimuth` and up at `elevation`, sagging under its own weight. Its
  * leaflets fan out either side of the midrib and droop, wide in the middle of the frond and narrow at each end.
  * Returns the frond and, for each vertex, how far along the frond it is. Each vertex also carries its place on the
- * frond in `aFrond` — how far along it and which side of the midrib — for the HD material's leaflet cut-out.
+ * frond in `aFrond` - how far along it and which side of the midrib - for the HD material's leaflet cut-out.
  */
 function frond(origin: V, azimuth: number, elevation: number, length: number, sag: number, segs: number, width: number): { g: THREE.BufferGeometry; along: number[] } {
   const dir = vec(Math.cos(azimuth) * Math.cos(elevation), Math.sin(elevation), Math.sin(azimuth) * Math.cos(elevation));

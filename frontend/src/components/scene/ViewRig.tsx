@@ -479,7 +479,7 @@ export function ViewRig() {
       eyelidsWere.current = 0;
       return;
     }
-    // Busy with a thing that frames itself in this view — the nap or the arcade anywhere, a held thing in follow — looking round is frozen.
+    // Busy with a thing that frames itself in this view - the nap or the arcade anywhere, a held thing in follow - looking round is frozen.
     const lookingLocked = avatar.busy !== null && lookLocked(avatar.busy.prop, showing === "first" ? "first" : "follow");
     if (!lookingLocked) turnFor(dt, instant);
 

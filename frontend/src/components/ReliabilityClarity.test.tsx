@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
-import { reliabilityOutcome } from "@/game/__fixtures__/reliabilityOutcome";
+import { completedReliabilityOutcome, reliabilityOutcome } from "@/game/__fixtures__/reliabilityOutcome";
 import { describeEvents, reportWindowStart } from "@/game/reportEvents";
 import { reliabilityLesson } from "@/game/reliabilityLesson";
 import { useGame } from "@/game/store";
@@ -12,7 +12,7 @@ afterEach(cleanup);
 const titles = ["What happened?", "How did you respond?", "What could be improved?", "Key takeaway"];
 
 it("keeps outcome evidence collapsed and preserves explicit same-company acknowledgement", () => {
-  const game = reliabilityOutcome(true);
+  const game = completedReliabilityOutcome(true);
   useGame.setState({ game, ready: true, started: true, onboarding: false, tour: null });
   render(<CampaignOverlays/>);
   const dialog = screen.getByRole("dialog", { name: "Reliability outcome" });

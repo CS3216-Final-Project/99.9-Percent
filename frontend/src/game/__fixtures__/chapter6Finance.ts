@@ -1,17 +1,22 @@
 import { newGame, type GameState } from "@/sim";
 import { act, tick } from "@/sim/__tests__/spikeFixtures";
-import { advanceSteps, canEnterData } from "@/sim/step";
+import { advanceSteps, canEnterData, step } from "@/sim/step";
+import { pendingRetry } from "@/sim/errorBudget";
 import { canEnterSpikes } from "@/sim/autoscaling";
 import { combinedCompany } from "@/sim/__tests__/combinedFixture";
 import { operatingCharges } from "@/sim/settlement";
 
-/** Public decisions only: keep the original equipment and rely on admission relief. */
-export function cappedFinancialPredecessor() {
+/**
+ * Public decisions only: keep the original equipment and rely on admission relief. Error budgets close this route at
+ * Traffic Spikes, so by default the fixture lifts only those two budget gates, keeping a company with no capacity
+ * headroom to test Chapter 6's financial guidance against. `withBudgets` plays the route as it now ends.
+ */
+export function cappedFinancialPredecessor(withBudgets = false) {
   let s = act(tick(newGame(0, "chapter6-financial-trap"), 11), { type: "set_traffic_limit", enabled: true });
   const until = (done: (s: GameState) => boolean) => {
     for (let i = 0; i < 200 && !done(s); i++) {
       if (s.phase === "review") s = act(s, { type: "acknowledge_review" });
-      s = tick(s);
+      s = step(s).state;
     }
     if (!done(s)) throw Error("Financial fixture failed to reach its actual stage");
   };
@@ -19,9 +24,11 @@ export function cappedFinancialPredecessor() {
   s = act(act(s, { type: "acknowledge_review" }), { type: "acknowledge_milestone" });
   s = act(s, { type: "accept_scaling_risk" }); until(canEnterData);
   s = act(s, { type: "enter_data", profile: "read-heavy" }); until(canEnterSpikes);
-  s = act(s, { type: "enter_spikes" }); until(s => s.campaign!.spikeStage!.completedStep !== null);
+  s = act(s, { type: "enter_spikes" });
+  if (withBudgets) { until(s => !!pendingRetry(s.campaign)); return s; }
+  s.campaign!.spikeStage!.budget = null; until(s => s.campaign!.spikeStage!.completedStep !== null);
   s = act(act(s, { type: "acknowledge_spikes" }), { type: "enter_reliability" });
-  s = act(s, { type: "arm_reliability" }); until(s => s.campaign!.reliabilityStage!.completedStep !== null);
+  s = act(s, { type: "arm_reliability" }); s.campaign!.reliabilityStage!.budget = null; until(s => s.campaign!.reliabilityStage!.completedStep !== null);
   return act(s, { type: "acknowledge_reliability" });
 }
 

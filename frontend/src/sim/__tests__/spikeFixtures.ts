@@ -1,10 +1,12 @@
 import {newGame,applyAction,replayCampaign,type GameState,type Action} from "../index";
 import {step} from "../step";
 import {pendingSpikeAcknowledgement} from "../autoscaling";
+import {pendingRetry} from "../errorBudget";
 export function act(g:GameState,a:Action):GameState {const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 /** The state a save would reload: the run rebuilt from its recorded inputs. */
 export function replay(g:GameState):GameState {const c=g.campaign!;return JSON.parse(JSON.stringify(replayCampaign(g.seed,c.runId,c.inputs,c.step,false,c.foundation)));}
-export function tick(g:GameState,n=1):GameState {for(let i=0;i<n;i++)g=step(g).state;return g;}
+/** Fails fast on an over-budget scenario: time cannot pass until it is retried, so a fixture loop would never end. */
+export function tick(g:GameState,n=1):GameState {for(let i=0;i<n;i++){const r=step(g);if(r.stopReason==="budget-retry"&&r.state===g)throw Error(`Over error budget at step ${g.campaign!.step}: ${JSON.stringify(pendingRetry(r.state.campaign))}`);g=r.state;}return g;}
 /** Public decisions create a solvent, warm Data Strategy company; no Phase 5 state injection. */
 export function dataCompany(profile:"read-heavy"|"write-heavy"="read-heavy"):GameState {
  let g=tick(newGame(0,"spike-fixture"),6);g=act(g,{type:"start_db_upgrade"});
@@ -22,6 +24,11 @@ export function dataCompany(profile:"read-heavy"|"write-heavy"="read-heavy"):Gam
 }
 export function spikeCompany(auto=true,profile:"read-heavy"|"write-heavy"="read-heavy"):GameState {
  let g=act(dataCompany(profile),{type:"enter_spikes"});if(auto){g=act(g,{type:"unlock_autoscaling"});g=tick(act(g,{type:"deploy_autoscaler"}),2);}return g;
+}
+/** Traffic Spikes with a third large app routed before the first pulse, enough to stay within the error budget. */
+export function preparedSpikes(profile:"read-heavy"|"write-heavy"="read-heavy"):GameState {
+ let g=spikeCompany(false,profile);g=tick(act(g,{type:"add_server"}),2);g=tick(act(g,{type:"scale_up",appId:"app-3"}),3);
+ return tick(act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}),1);
 }
 export function untilOffset(g:GameState,offset:number):GameState {
  const target=g.campaign!.spikeStage!.enteredStep+offset;

@@ -1,6 +1,8 @@
 import type { Campaign, CampaignPostmortem, CampaignScorecard, CombinedRound, Snapshot, TraceEvent } from "@/sim/campaignTypes";
 import { incidentLesson } from "./campaignPostmortem";
 import { verifiedPrevention } from "@/sim/openingPrevention";
+import { ERROR_BUDGET } from "@/sim/scenarios/errorBudget";
+import { uptimePct } from "./format";
 
 export interface ReportLesson { happened: string; response: string; improve?: string; takeaway: string }
 const names: Record<string, string> = { "upgrade-db": "a database upgrade", "scale-up": "server scaling", "add-app": "an added server", routing: "a routing change", limit: "a traffic limit", unlimit: "traffic limit removal", cache: "a read cache", "cache-tuning": "cache tuning", "restore-app": "a requested server restore", "deploy-autoscaler": "an autoscaling controller deployment" };
@@ -68,7 +70,8 @@ export function outcomeSummary(c: Campaign, kind: OutcomeKind, round?: CombinedR
 
 export function scorecardSummary(card: CampaignScorecard, pending: boolean): ReportLesson {
   const won = card.outcome === "won";
-  return { happened: won ? pending ? "The Campaign objectives are ready for your final review." : "The Campaign objectives were completed." : "The company ran out of cash.",
+  const week = card.finalWeekUptime === null ? "" : ` Final operating week uptime was ${uptimePct(card.finalWeekUptime)}, ${card.finalWeekUptime >= ERROR_BUDGET.objective ? "meeting" : "short of"} the 99.99% objective.`;
+  return { happened: (won ? pending ? "The Campaign objectives are ready for your final review." : "The Campaign objectives were completed." : "The company ran out of cash.") + week,
     response: `${card.incidentCount ? "The recorded journey included service incidents." : "No incidents appear in the retained record."}${card.rejectedDemand ? " Some incoming requests were rejected instead of served." : ""}`,
     improve: won ? "Compare service reliability, rejected traffic and costs when planning your next company." : "Compare operating costs with earned revenue before expanding.",
     takeaway: "Growth, reliable service and sustainable spending must work together." };

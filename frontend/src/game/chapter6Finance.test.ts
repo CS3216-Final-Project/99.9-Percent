@@ -7,11 +7,18 @@ import { canEnterCombined } from "@/sim/combinedCampaign";
 import { act, tick, combinedCompany, protectedCombined } from "@/sim/__tests__/combinedFixture";
 import { applyAction, type Action } from "@/sim";
 import { chapter6FinancialRisk } from "./chapter6Finance";
+import { pendingRetry } from "@/sim/errorBudget";
 import { campaignAttention } from "./campaignAttention";
 
 const trapped = financiallyTrappedCompany();
 
-it("reproduces the legal inherited $560 company with public engine actions", () => {
+it("closes the limit-only route at Traffic Spikes: turned-away requests exceed its error budget", () => {
+  const s = cappedFinancialPredecessor(true);
+  expect(pendingRetry(s.campaign)?.scenario).toBe("spikes");
+  expect(s.campaign!.combinedStage).toBeFalsy();
+});
+
+it("reproduces the inherited $560 company with public engine actions once its budget gates are lifted", () => {
   const s = trapped, c = s.campaign!;
   expect(c.cashCents).toBe(56000);
   expect(c.apps).toHaveLength(1);
@@ -63,7 +70,7 @@ it("distinguishes a low-cash company with free routing recovery from the closed 
   // Cash-only boundary: keep the public fixture's usable equipment and existing earnings.
   s.campaign!.cashCents = 56000;
   expect(chapter6FinancialRisk(s)?.kind).not.toBe("blocked");
-  expect(campaignAttention(s).action?.action).toEqual({ type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] });
+  expect(campaignAttention(s).action?.action).toEqual({ type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3", "app-4"] });
   s = tick(act(s, campaignAttention(s).action!.action));
   expect(campaignAttention(s).action?.action).toEqual({ type: "set_traffic_limit", enabled: false });
   s = tick(act(s, campaignAttention(s).action!.action), 5);

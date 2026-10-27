@@ -1,9 +1,10 @@
 import { expect, it } from "vitest";
 import { campaignAttention } from "./campaignAttention";
-import { act, tick, spikeCompany, untilOffset } from "@/sim/__tests__/spikeFixtures";
+import { act, tick, preparedSpikes, spikeCompany, untilOffset } from "@/sim/__tests__/spikeFixtures";
 
 const initial = spikeCompany(false);
-const baseline = untilOffset(tick(act(initial, { type: "set_traffic_limit", enabled: true })), 68);
+// A third large app keeps the pulses within the error budget, so the chapter can complete.
+const baseline = untilOffset(preparedSpikes(), 68);
 
 it("only recommends scheduled pulse time while a future pulse event remains", () => {
   expect(campaignAttention(initial)).toMatchObject({ chapter: 4, attention: "hint", target: "app" });
