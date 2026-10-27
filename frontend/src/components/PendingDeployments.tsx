@@ -21,10 +21,20 @@ export function PendingDeployments() {
   return <aside className="pending-deployments" aria-label="Pending deployments">
     <h3><Icon name="time" size={16} />Deployments</h3>
     <ul>
-      {c.pending.map(a => <li key={a.id}>
-        <span className="pending-name">{ACTION_NAMES[a.type]}{a.targetId ? ` (${appName(a.targetId)})` : ""}</span>
-        <span className="pending-when">in {a.activationStep - c.step} s</span>
-      </li>)}
+      {c.pending.map(a => {
+        const name = `${ACTION_NAMES[a.type]}${a.targetId ? ` (${appName(a.targetId)})` : ""}`;
+        const remaining = a.activationStep - c.step;
+        const delay = a.activationStep - a.requestedStep;
+        const progress = delay > 0 ? Math.min(1, Math.max(0, (c.step - a.requestedStep) / delay)) : 1;
+        return <li key={a.id}>
+          <span className="pending-name">{name}</span>
+          <span className="pending-when">in {remaining} s</span>
+          <span className="instance-bar" role="progressbar" aria-label={`${name} deployment`} aria-valuemin={0} aria-valuemax={100}
+            aria-valuenow={Math.round(progress * 100)} aria-valuetext={`in ${remaining} s`}>
+            <span style={{ width: `${progress * 100}%` }} />
+          </span>
+        </li>;
+      })}
     </ul>
     <button type="button" className="btn btn-small pending-skip" aria-pressed={deployRush} disabled={disabled}
       {...tipProps("Fast-forward time until every scheduled deployment activates (20×). Stops early if something needs you.")}

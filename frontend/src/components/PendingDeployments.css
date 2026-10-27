@@ -36,9 +36,15 @@
 
 .pending-deployments li {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
-  gap: 8px;
+  gap: 4px 8px;
+}
+
+/* Same thin fill as the evidence .instance-bar (styles shared via CampaignUX.css). */
+.pending-deployments .instance-bar {
+  flex-basis: 100%;
 }
 
 .pending-deployments .pending-name {
