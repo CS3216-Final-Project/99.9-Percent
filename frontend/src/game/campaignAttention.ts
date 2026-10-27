@@ -2,7 +2,7 @@ import { introductionActive } from "@/sim/introduction";
 import { introductionInstruction } from "./introduction";
 import type { Action, GameState } from "@/sim";
 import type { Campaign } from "@/sim/campaignTypes";
-import { admissionCeiling, allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData } from "@/sim/step";
+import { admissionCeiling, allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData, incidentAwaitingResponse } from "@/sim/step";
 import { recoverySafe, reportsAcknowledged } from "@/sim/reliability";
 import { currentFault, finalRequirements, stableManagement, canStartGrowth } from "@/sim/combinedCampaign";
 import { preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
@@ -325,7 +325,11 @@ function baseAttention(game: GameState): AttentionDecision {
       return run("launch-week", `Launch week ${Math.min(LW.weeks, Math.floor(c.step / LW.periodSteps) + 1)} of ${LW.weeks}. The launch campaign surge arrives in week 3 - keep the service up.`);
     }
   }
-  if (c.incident && qualifies && !appOver && !dbOver) return run("recovery", `The latest readings meet recovery conditions. Healthy observations: ${c.incident.stableSteps} / ${Q.stableSteps}. Pausing adds no observations.`);
+  if (c.incident && qualifies && !appOver && !dbOver) {
+    if (incidentAwaitingResponse(c))
+      return hint("incident-response", "The readings meet recovery conditions, but the incident has no recorded response yet.", "Take a capacity, routing, admission or restoration action for the incident to record before it can close.", c.incident.primaryComponent === "db" ? "db" : "app");
+    return run("recovery", `The latest readings meet recovery conditions. Healthy observations: ${c.incident.stableSteps} / ${Q.stableSteps}. Pausing adds no observations.`);
+  }
   if (!safe || fault?.startedStep != null && fault.restoredStep === null && !qualifies)
     return hint("failure", "Service has a server-health problem. Check the observed health and surviving capacity.", "Open App Server to inspect health. Restoration, routing and admission relief are different available strategies.", "app");
   if (appOver && c.apps.some(a => !a.routed && a.role !== "spare" && a.health !== "failed"))

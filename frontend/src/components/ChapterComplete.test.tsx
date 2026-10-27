@@ -11,6 +11,9 @@ import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { campaignGuidance } from "@/game/campaignGuidance";
 import { act as decide, spikeCompany, tick } from "@/sim/__tests__/spikeFixtures";
 import { finishedLaunchWeek, recoveredOpening } from "@/game/__fixtures__/openingOutcome";
+import { respondToIncident } from "@/sim/__tests__/reliabilityFixture";
+import { incidentAwaitingResponse } from "@/sim/step";
+import { installPending } from "@/sim/reliability";
 import { reliabilityOutcome, reliabilityOutcomeWithQueuedChange } from "@/game/__fixtures__/reliabilityOutcome";
 import { CampaignChapters } from "./CampaignChapters";
 import { CampaignHeader, CampaignOverlays, CampaignPanel } from "./CampaignUI";
@@ -138,7 +141,10 @@ it("does not announce a company loaded already finished after an incident and re
 /** A Traffic Spikes company whose spike response awaits the player. */
 function spikeRecognition(): GameState {
   let g = spikeCompany(false);
-  for (let i = 0; i < 300 && !pendingSpikeAcknowledgement(g.campaign!); i++) g = g.phase === "review" ? decide(g, { type: "acknowledge_review" }) : tick(g);
+  for (let i = 0; i < 300 && !pendingSpikeAcknowledgement(g.campaign!); i++) {
+    const c = g.campaign!;
+    g = g.phase === "review" ? decide(g, { type: "acknowledge_review" }) : c.incident && incidentAwaitingResponse(c) && !installPending(c) ? respondToIncident(g) : tick(g);
+  }
   return g;
 }
 const button = (dialog: HTMLElement, name: string | RegExp) => within(dialog).getByRole("button", { name });

@@ -10,11 +10,12 @@ it("upgrades schema 4 replay saves without entering spikes and backs up exact so
  localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);
  for(const key of ["nn.save.v1","nn.meta.v1","nn.analytics.v1"])localStorage.setItem(key,"legacy bytes");
  const loaded=loadGame();if(loaded.status!=="ok")throw Error("load");
- expect(loaded.game).toEqual(g);expect(loaded.game.campaign!.spikeStage).toBeNull();
+ const gameJson=JSON.parse(JSON.stringify(loaded.game));delete gameJson.campaign.legacyIncidentStep;
+ expect(gameJson).toEqual(JSON.parse(JSON.stringify(g)));expect(loaded.game.campaign!.spikeStage).toBeNull();
  expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBe(raw);
  expect(saveGame(loaded.game,loaded.remainderMs,false,loaded.measurement)).toBe(true);
  expect(localStorage.getItem(`${CAMPAIGN_SAVE_KEY}.backup.v4.${old.runId}.1`)).toBe(raw);
- expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(8);
+ expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(9);
  for(const key of ["nn.save.v1","nn.meta.v1","nn.analytics.v1"])expect(localStorage.getItem(key)).toBe("legacy bytes");
 });
 it.each(["backup","replacement"])("preserves schema 4 source when %s fails",failure=>{
@@ -27,7 +28,7 @@ it.each(["backup","replacement"])("preserves schema 4 source when %s fails",fail
 });
 it("rejects Phase 5 decisions in old replay contracts and unsupported future versions",()=>{
  const e=makeEnvelope(spikeCompany());
- for(const schemaVersion of [1,2,3,4,9])expect(validateEnvelope({...e,schemaVersion}).status).not.toBe("ok");
+ for(const schemaVersion of [1,2,3,4,10])expect(validateEnvelope({...e,schemaVersion}).status).not.toBe("ok");
 });
 it("replays pending provisioning, disabled policy and protected upgrades exactly",()=>{
  let g=act(untilOffset(spikeCompany(),13),{type:"scale_up",appId:"app-3"});
