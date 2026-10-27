@@ -50,7 +50,7 @@ it("shows the incident treatment while a Stay Online failure is active without a
  expect(armed.campaign!.reliabilityStage!.fault!.startedStep).not.toBeNull();
  show(armed);
  expect(document.querySelector(".topbar")!.className).toContain("is-incident");
- const dashboard=screen.getByRole("region",{name:"Campaign mission dashboard"});
+ const dashboard=screen.getByRole("region",{name:"Incident"});
  expect(dashboard.querySelector(".mission-condition")!.className).toContain("is-failure");
  const status=within(dashboard).getByText(/failed and is not restored/).closest("p")!;
  expect(status.querySelector(".state-critical")!.textContent).toContain("Incident");
