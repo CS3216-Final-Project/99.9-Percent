@@ -7,7 +7,11 @@ const baseline = untilOffset(tick(act(initial, { type: "set_traffic_limit", enab
 
 it("only recommends scheduled pulse time while a future pulse event remains", () => {
   expect(campaignAttention(initial)).toMatchObject({ chapter: 4, attention: "hint", target: "app" });
-  expect(campaignAttention(act(initial, { type: "incident_inspect", equipment: "app" }))).toMatchObject({ chapter: 4, attention: "run", reason: "spike-pulses" });
+  const inspected = act(initial, { type: "incident_inspect", equipment: "app" });
+  // Prepare's inspected company is pointed at Server management's optional controller before Run.
+  expect(campaignAttention(inspected)).toMatchObject({ chapter: 4, attention: "hint", reason: "spike-autoscaling", action: { action: { type: "unlock_autoscaling" } } });
+  const deployed = tick(act(act(inspected, { type: "unlock_autoscaling" }), { type: "deploy_autoscaler" }), 2);
+  expect(campaignAttention(deployed)).toMatchObject({ chapter: 4, attention: "run", reason: "spike-pulses" });
   // Conservative handling of contradictory saved scheduling evidence: all four
   // recorded events already happened, even if a stale deadline remains ahead.
   const stale = structuredClone(baseline);
