@@ -22,7 +22,7 @@ import { combinedProfile, currentFault, pendingCombined } from "@/sim/combinedCa
 import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 import { DATA_STRATEGY as D } from "@/sim/scenarios/dataStrategy";
-import { admissionCeiling, canEnterData, databaseUpgrade, pendingStop, routableApps } from "@/sim/step";
+import { admissionCeiling, canEnterData, databaseUpgrade, incidentActive, pendingStop, routableApps } from "@/sim/step";
 import { pendingReliability, effectiveTargets, researchBalance, installPending } from "@/sim/reliability";
 import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
@@ -177,7 +177,7 @@ function IncidentRecovery({ campaign: c }: { campaign: Campaign }) {
 
 export function CampaignHeader() {
   const { game, openView, started } = useGame(), c = game.campaign!;
-  const incident = game.phase === "incident";
+  const incident = incidentActive(game);
   const guidance = useCampaignAttention();
   return <><header className={`topbar${incident ? " is-incident" : ""}${guidance.available ? " has-global-hint" : ""}`}>
     <div className="brand"><span className="brand-mark">99.99%</span>
@@ -200,7 +200,7 @@ export function CampaignHeader() {
 
 export function CampaignPanel() {
   const { game } = useGame(), c = game.campaign!, m = c.snapshot;
-  const incident = game.phase === "incident";
+  const incident = incidentActive(game);
   const unlocked = !!c.openingMilestone?.acknowledged || !!c.launchWeek;
   const disabled = pendingStop(c) !== null || milestoneBlocks(game) || game.phase === "review" || game.phase === "ended";
   if(introductionActive(c))return <IntroductionPanel/>;
@@ -283,7 +283,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const {game,act,running}=useGame(),c=game.campaign!,m=c.snapshot;
   const model=campaignGuidance(game),decision=campaignAttention(game),hint=useCampaignAttention();
   const action=model.pendingAction,combined=c.combinedStage,reliability=c.reliabilityStage;
-  const fault=currentFault(c),financialRisk=chapter6FinancialRisk(game);
+  const fault=currentFault(c),financialRisk=chapter6FinancialRisk(game),incident=incidentActive(game);
   const spike=chapter4Stage(game);
   const reviewing=!!action&&!action.action;
   const actionReady=!!action?.action&&!disabled&&previewCampaignAction(game,action.action).ok;
@@ -291,7 +291,6 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const unmet=model.incomplete.find(r=>r.id===priority)??model.incomplete[0];
   const condition=game.phase==="ended"&&game.outcome!=="won"?model.notice:unmet?`Still needed: ${unmet.label}`:null;
   const accomplishment=combined?(combined.acknowledged?"Campaign completed.":pendingCombined(c)?"Growth wave stabilized.":combined.finalReview?"Final service stability verified.":"Full-demand readiness verified."):reliability?"Reliability test completed and outcome acknowledged.":"Both traffic spikes handled and outcome acknowledged.";
-  const incident=game.phase==="incident";
   const stage=combined?(combined.acknowledged?"Campaign complete":combined.finalReview?"Final review":pendingCombined(c)?"Growth outcome review":combined.currentRound?`Growth wave ${combined.currentRound.index+1} ${combined.currentRound.startedStep===null?"scheduled":combined.currentRound.pressureEndedStep===null?"active":"recovery"}`:combined.nextRoundIndex===3?"Final checks":"Prepare for full demand")
     :reliability?(reliability.acknowledged?"Outcome acknowledged":pendingReliability(c)?"Outcome review":!reliability.fault?"Preparation":reliability.fault.startedStep===null?"Failure scheduled":reliability.fault.restoredStep===null?"Failure / recovery":"Stability verification")
     :c.spikeStage!.acknowledged?"Outcome acknowledged":pendingSpikeAcknowledgement(c)?"Spike outcome review":({prepare:"Preparing",spike1:"Spike 1 active",between:"Between spikes",spike2:"Spike 2 active",recover:"Review / stability verification"}[spike?.stage??"recover"]);
@@ -315,7 +314,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         <p className="mission-complete">{model.completed.length} / {model.requirements.length} current requirements met</p>
         {unmet&&<StepList items={objectives}/>}
       </section>
-      {condition?<section aria-label="Current unmet condition" className={`mission-condition${c.incident||game.phase==="ended"&&game.outcome!=="won"?" is-failure":""}`}><h4>Current unmet condition</h4><p>{condition}</p></section>:<section aria-label="Chapter accomplished" className="mission-accomplished"><h4>Chapter accomplished</h4><p>{accomplishment}</p></section>}
+      {condition?<section aria-label="Current unmet condition" className={`mission-condition${incident||game.phase==="ended"&&game.outcome!=="won"?" is-failure":""}`}><h4>Current unmet condition</h4><p>{condition}</p></section>:<section aria-label="Chapter accomplished" className="mission-accomplished"><h4>Chapter accomplished</h4><p>{accomplishment}</p></section>}
       <section aria-label="Next step" className="mission-next"><h4>Next step</h4>
         <p>{game.phase==="ended"&&game.outcome==="won"?"Inspect the scorecard and final company, or start a new company from the Menu.":running&&incidentNeedsPause(game,decision)?"Pause the company to inspect the incident.":reviewing?"Open the recorded review to continue.":actionReady&&action?.action&&!isChapterEntry(action.action)?"The company is ready for the next action.":actionReady&&action?.action?`${action.label} using Next in the chapter bar.`:nextAdvice}</p>
         {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={disabled||!previewCampaignAction(game,action.action).ok} onClick={()=>act(action.action!)}>{action.label}<Icon name="next"/></button>}
@@ -326,7 +325,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
       <section aria-label="Essential live status" className="mission-status">
         {financialRisk&&<Callout compact tone="warn" icon="cash" kicker={financialRisk.kind==="blocked"?"Capacity funding blocked":"Money at risk"}><span role="note">{financialRisk.message}</span></Callout>}
         {c.limit!==null&&<Callout compact tone="warn" icon="network" kicker="Traffic limit active">{num(m.admitted)} admitted / {num(m.rejected)} rejected req/s. Rejected requests earn no revenue; operating costs remain.</Callout>}
-        {fault?.startedStep!=null&&fault.restoredStep===null&&<p role="status">{appName(fault.targetId)} failed and is not restored. Service recovery and server restoration are separate requirements.</p>}
+        {fault?.startedStep!=null&&fault.restoredStep===null&&<p role="status"><span className="state state-critical"><Icon name="alert" size={12} />Incident</span> {appName(fault.targetId)} failed and is not restored. Service recovery and server restoration are separate requirements.</p>}
         {showMetrics&&<dl className="rows"><Row label="Latency" value={`${m.latencyMs.toFixed(0)} ms`}/><Row label="Service errors" value={m.serviceErrorRate===null?"Not yet measured":`${(m.serviceErrorRate*100).toFixed(2)}%`}/><Row label="Queued requests" value={num(m.app.backlog+m.db.backlog)}/></dl>}
         {c.incident&&<IncidentRecovery campaign={c}/>}
         {c.pending.map(a=><p role="status" key={a.id}>{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep-c.step} game second(s)</p>)}
@@ -451,7 +450,7 @@ export function CampaignControls() {
     ]} />
     <RoomControlsSlot />
     <div className="time-controls" role="group" aria-label="Time">
-      <div className={`week${game.phase === "incident" ? " is-incident" : ""}`}>
+      <div className={`week${incidentActive(game) ? " is-incident" : ""}`}>
         <span className="brand-week"><Icon name="week" size={16} /><span>Week <strong>{game.turn}</strong></span></span>
         <span className="dock-second"><Icon name="time" size={14} /><span>{game.campaign!.step % Q.periodSteps} / {Q.periodSteps} s</span></span>
         <Meter value={(game.campaign!.step % Q.periodSteps) / Q.periodSteps} label="Operating week progress" />

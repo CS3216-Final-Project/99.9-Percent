@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { BALANCE, metrics } from "@/sim";
+import { incidentActive } from "@/sim/step";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { compact, money, num, signedMoney, uptimePct } from "@/game/format";
 import { useGame } from "@/game/store";
@@ -21,7 +22,7 @@ import "../layout/phone-layout.css";
 export function PhoneTopStrip() {
   const campaign = useGame((s) => !!s.game.campaign);
   const started = useGame((s) => s.started);
-  const incident = useGame((s) => s.game.phase === "incident");
+  const incident = useGame((s) => incidentActive(s.game));
   const openView = useGame((s) => s.openView);
   const [statsOpen, setStatsOpen] = useState(false);
   const statsId = useId();
