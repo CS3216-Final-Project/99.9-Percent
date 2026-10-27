@@ -31,6 +31,8 @@ test("introduction hands off to Opening Run, service readings, database upgrade,
   expect(opening.completedIntroduction?.completed).toBe(true);
   expect(opening.step).toBe(0);
   expect(opening.runId).toBe(game.campaign!.runId);
+  // The chapter opens with a one-card tip pointing at the Hint button; dismiss it to reach the guided step.
+  await page.getByRole("dialog",{name:"Tip, step 1 of 1",exact:true}).getByRole("button",{name:"Got it",exact:true}).click();
   const coach=page.getByRole("region",{name:"Chapter 1 guide",exact:true});
   const spotlight=page.locator('[data-spotlight="true"]');
   await expect(coach.getByRole("heading",{name:"Run, then observe",exact:true})).toBeVisible();
