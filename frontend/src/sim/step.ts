@@ -163,6 +163,19 @@ export function qualifiesForRecovery(m: Snapshot): boolean {
     return m.latencyMs < Q.latencyThresholdMs && m.serviceErrorRate !== null &&
         m.serviceErrorRate < Q.errorThreshold && m.admitted > 0 && m.successful + m.failed > 0;
 }
+/**
+ * Whether the incident presentation applies: the phase is "incident", a campaign incident object is
+ * open, or a chapter failure test (Stay Online's fault, or a combined-stage failure) has started and
+ * not yet been restored. A fault can burn for its whole duration while the phase stays "management",
+ * so callers must not rely on the phase alone.
+ */
+export function incidentActive(s: GameState): boolean {
+    if (s.phase === "incident") return true;
+    const c = s.campaign;
+    if (!c) return false;
+    const f = currentFault(c);
+    return !!c.incident || (f !== null && f.startedStep !== null && f.restoredStep === null);
+}
 export type StopReason = "introduction" | "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | "reliability-review" | "combined-review" | null;
 export function step(prev: GameState): {
     state: GameState;

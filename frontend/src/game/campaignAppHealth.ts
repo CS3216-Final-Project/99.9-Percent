@@ -1,11 +1,12 @@
 import type { GameState } from "@/sim";
+import { incidentActive } from "@/sim/step";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 
 /** Presentation of the existing Campaign header rules, never a second simulation. */
 export function campaignAppHealth(game: GameState) {
     const c = game.campaign!;
     const m = c.snapshot;
-    const incident = game.phase === "incident";
+    const incident = incidentActive(game);
     const atRisk = m.latencyMs >= Q.latencyThresholdMs;
     const word = incident ? "Incident" : game.phase === "ended" ? game.outcome === "won" ? "Campaign complete" : "Bankrupt" : game.phase === "review" ? "Recovered" : atRisk ? "At risk" : c.limit !== null ? "Traffic limited" : "Healthy";
     const tone = incident || (game.phase === "ended" && game.outcome !== "won") ? "critical" : atRisk ? "warn" : "health";
