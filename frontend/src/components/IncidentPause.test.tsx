@@ -123,7 +123,7 @@ it("offers Pause for a later distinct incident in the same company after a free 
   show(pauseTransition(1, "pause-repeat").before); startIncident();
   const first = useGame.getState().game.campaign!.incident!.id;
   fireEvent.click(screen.getByRole("button", { name: "Pause" }));
-  fireEvent.click(inspectionAction(/^Limit to 500/));
+  fireEvent.click(inspectionAction(/^Limit to ~/));
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   fireEvent.click(screen.getByRole("button", { name: "Run" }));
   for (let i = 0; i < 40 && useGame.getState().game.phase !== "review"; i++) act(() => useGame.getState().tick(1));
