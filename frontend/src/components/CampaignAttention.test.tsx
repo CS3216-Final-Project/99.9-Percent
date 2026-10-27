@@ -337,7 +337,7 @@ it("teaches Launch Week with spotlighted tutorial steps instead of the Hint butt
   spotOn(/^Upgrade database/);
 });
 
-it("continues the introduction with Run, service analytics, readings and a real upgrade", () => {
+it("spotlights only the Opening's first Run, then guides through the Hint flow", () => {
   show(introducedOpening());
   const message = screen.getByRole("dialog", { name: "Company Message" });
   fireEvent.click(within(message).getByRole("button", { name: "Dismiss company message" }));
@@ -345,30 +345,30 @@ it("continues the introduction with Run, service analytics, readings and a real 
   spotOn("Run");
   fireEvent.click(lit()[0]);
   act(() => useGame.setState({ game: tick(useGame.getState().game, 1), running: true }));
-  const analytics = screen.getByRole("region", { name: "Chapter 1 guide" });
-  expect(analytics.textContent).toContain("Watch your service");
-  expect(lit()[0].classList.contains("incident-symptoms")).toBe(true);
-  const beforeReading = useGame.getState().game;
-  fireEvent.click(within(analytics).getByRole("button", { name: "Next" }));
-  expect(useGame.getState().game).toBe(beforeReading);
-  act(() => useGame.setState({ game: tick(useGame.getState().game, 5), running: false }));
-  spotOn(/Database/);
-  fireEvent.click(lit()[0]);
-  const metrics = screen.getByRole("region", { name: "Chapter 1 guide" });
-  expect(metrics.textContent).toContain("Read the metrics");
-  expect(lit()[0].classList.contains("component-inspection-summary")).toBe(true);
-  fireEvent.click(within(metrics).getByRole("button", { name: "Next" }));
-  spotOn(/^Upgrade database/);
-  fireEvent.click(lit()[0]);
+  // The first Run was the only spotlighted step; the coach never returns.
+  noSpot();
   expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
+  act(() => useGame.setState({ game: tick(useGame.getState().game, 5), running: false }));
+  noSpot();
+  // The database incident is taught by the same Hint flow the later chapters use.
+  act(() => vi.advanceTimersByTime(10_000));
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  expect(screen.getByRole("dialog", { name: "Hint" }).textContent).toContain("Your database is overloaded. Upgrade it to handle more requests.");
+  acceptHint();
+  expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Upgrade database");
+  fireEvent.click(gold()[0]);
   expect(gold()[0].textContent).toBe("Confirm");
   const step = useGame.getState().game.campaign!.step;
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   expect(useGame.getState().game.campaign!.pending.some(action => action.type === "upgrade-db")).toBe(true);
   expect(useGame.getState().game.campaign!.step).toBe(step);
   expect(screen.queryByRole("dialog", { name: "Database inspected" })).toBeNull();
-  spotOn("Run");
-  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Installing");
+  // The pending install is a Run hint, not another spotlight.
+  noSpot();
+  expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
+  act(() => vi.advanceTimersByTime(10_000));
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
 });
 
 it("gives manual Hint and obstructing views priority over the Opening coach", () => {
@@ -376,7 +376,7 @@ it("gives manual Hint and obstructing views priority over the Opening coach", ()
   show(game);
   const message = screen.queryByRole("dialog", { name: "Company Message" });
   if (message) fireEvent.click(within(message).getByRole("button", { name: "Dismiss company message" }));
-  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Watch your service");
+  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Run, then observe");
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   expect(screen.getByRole("dialog", { name: "Hint" })).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
