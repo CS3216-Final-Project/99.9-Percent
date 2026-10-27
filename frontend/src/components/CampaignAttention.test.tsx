@@ -292,6 +292,13 @@ it("offers both real growth strategies and transfers accepted risk without dispa
   fireEvent.click(gold()[0]); expect(useGame.getState().game.campaign!.scalingConsent).toEqual({ policyVersion: 1, acceptedStep: before.campaign!.step });
   expect(gold()).toHaveLength(0);
 });
+it("lights Run after accepting the growth risk pauses a running company", () => {
+  show(scaling()); act(() => useGame.getState().setRunning(true));
+  fireEvent.click(screen.getByRole("button", { name: "Consider growth with current capacity" }));
+  fireEvent.click(screen.getByRole("button", { name: "Accept growth risk" }));
+  expect(useGame.getState().running).toBe(false);
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
+});
 it("offers only the valid risk strategy when database preparation is unaffordable", () => {
   const game = scaling(); game.campaign!.cashCents = 1; show(game);
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
