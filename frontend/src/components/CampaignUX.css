@@ -137,16 +137,16 @@
 .campaign-panel .act:disabled > .icon { background: var(--paper-2); }
 
 /* Equipment readings lead with icon rows and a load bar (CampaignReadings.tsx). Exact figures stay on the right. */
-.campaign-panel .evidence-rows { margin: 0; display: grid; }
-.campaign-panel .evidence-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--paper-3); font-size: var(--text-sm); line-height: 1.3; }
-.campaign-panel .evidence-rows .evidence-row:last-child { border-bottom: 0; }
-.campaign-panel .evidence-row dt { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-soft); }
-.campaign-panel .evidence-row dt .icon { flex: none; }
-.campaign-panel .evidence-row dd { margin: 0; text-align: right; font-family: var(--font-num); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
-.campaign-panel .evidence-row[data-tone="ok"] dt .icon, .campaign-panel .evidence-row[data-tone="ok"] dd { color: var(--ok-ink); }
-.campaign-panel .evidence-row[data-tone="warn"] dt .icon, .campaign-panel .evidence-row[data-tone="warn"] dd { color: var(--warn-ink); }
-.campaign-panel .evidence-row[data-tone="critical"] dt .icon, .campaign-panel .evidence-row[data-tone="critical"] dd { color: var(--critical-ink); }
-.campaign-panel .evidence-row[data-tone="muted"] dd { color: var(--text-soft); font-weight: 500; }
+:is(.campaign-panel, .equipment-readings) .evidence-rows { margin: 0; display: grid; }
+:is(.campaign-panel, .equipment-readings) .evidence-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--paper-3); font-size: var(--text-sm); line-height: 1.3; }
+:is(.campaign-panel, .equipment-readings) .evidence-rows .evidence-row:last-child { border-bottom: 0; }
+:is(.campaign-panel, .equipment-readings) .evidence-row dt { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-soft); }
+:is(.campaign-panel, .equipment-readings) .evidence-row dt .icon { flex: none; }
+:is(.campaign-panel, .equipment-readings) .evidence-row dd { margin: 0; text-align: right; font-family: var(--font-num); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+:is(.campaign-panel, .equipment-readings) .evidence-row[data-tone="ok"] dt .icon, :is(.campaign-panel, .equipment-readings) .evidence-row[data-tone="ok"] dd { color: var(--ok-ink); }
+:is(.campaign-panel, .equipment-readings) .evidence-row[data-tone="warn"] dt .icon, :is(.campaign-panel, .equipment-readings) .evidence-row[data-tone="warn"] dd { color: var(--warn-ink); }
+:is(.campaign-panel, .equipment-readings) .evidence-row[data-tone="critical"] dt .icon, :is(.campaign-panel, .equipment-readings) .evidence-row[data-tone="critical"] dd { color: var(--critical-ink); }
+:is(.campaign-panel, .equipment-readings) .evidence-row[data-tone="muted"] dd { color: var(--text-soft); font-weight: 500; }
 .campaign-panel .evidence-load .meter { height: 12px; }
 .campaign-panel .evidence-note { margin: 4px 0 0; color: var(--text-soft); font-size: var(--text-xs); line-height: 1.4; }
 
