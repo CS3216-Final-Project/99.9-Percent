@@ -39,7 +39,13 @@ it("opens finance from Cash, pauses and restores focus without changing company 
     const entry=screen.getByRole("button",{name:"View finances"});entry.focus();fireEvent.click(entry);
     const dialog=screen.getByRole("dialog",{name:"Company finances"});
     expect(dialog.textContent).toContain("$0.20");expect(dialog.textContent).toContain("not yet received");
-    expect(dialog.textContent).toContain("No completed period yet");
+    expect(dialog.textContent).not.toContain("No completed period yet");
+    for(const label of ["Money available","Money earned, not yet received","Current running costs per period"]) {
+        expect(within(dialog).queryByText(label,{exact:true})).toBeNull();
+    }
+    expect(dialog.querySelector(".modal-body h3")!.textContent).toBe("Where your money goes");
+    expect([...within(dialog).getByRole("region",{name:"Where your money goes"}).querySelectorAll("dt")].map(node=>node.textContent)).toEqual(["Employee salaries","Server running costs","Database running costs","Total running costs"]);
+    expect(within(dialog).getByText("How your company makes money").closest("details")!.open).toBe(false);
     expect(useGame.getState().running).toBe(false);expect(useGame.getState().game).toEqual(before);
     fireEvent.keyDown(within(dialog).getByRole("button",{name:"Close"}),{key:"Escape"});
     expect(screen.queryByRole("dialog")).toBeNull();expect(document.activeElement).toBe(entry);
@@ -112,13 +118,14 @@ it("closes an open purchase confirmation when the view leaves its machine's floo
 it("keeps actual results separate from current costs and hides accounting behind disclosures",()=>{
     const game=tick(newGame(),60);
     act(()=>useGame.setState({game}));render(<CampaignFinance onClose={()=>{}}/>);
-    const overview=screen.getByRole("region",{name:"Company finances overview"});
+    const overview=screen.getByRole("region",{name:"Company finances overview",hidden:true});
     const last=game.campaign!.settlements.at(-1)!;
     expect(within(overview).getByText("Money earned last period").nextElementSibling?.textContent).toBe(financeMoney(last.revenueCents));
     expect(within(overview).getByText("Money earned minus running costs — last period").nextElementSibling?.textContent).toBe(financeMoney(last.netCents));
-    expect(within(overview).getByText("Current running costs per period").nextElementSibling?.textContent).toBe(financeMoney(totalCharges(operatingCharges(game.campaign!))));
+    expect(within(screen.getByRole("region",{name:"Where your money goes"})).getByText("Total running costs").nextElementSibling?.textContent).toBe(financeMoney(totalCharges(operatingCharges(game.campaign!))));
     const advanced=screen.getByText("Advanced details").closest("details")!;
     expect(advanced.open).toBe(false);
+    expect(advanced.contains(overview)).toBe(true);
     expect(advanced.contains(screen.getByText("Costs waiting to be paid"))).toBe(true);
     expect(advanced.contains(screen.getByText("Purchase history"))).toBe(true);
     expect(screen.getByText("Cash update history").closest("details")!.querySelector("summary")!.textContent).toBe("Cash update history");

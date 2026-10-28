@@ -76,9 +76,7 @@ for (const path of ["vertical", "horizontal"] as const) {
       await page.getByRole("main").getByRole("button", { name: "App 2", exact: true }).click();
       const reveal = page.getByRole("dialog", { name: "App Servers" });
       await expect(reveal).toContainText("App 2");
-      await expect(reveal.getByRole("region", { name: "Application instances" })).toBeVisible();
-      await expect(reveal.getByRole("region", { name: "Application instances" }).getByRole("button", { name: /App 2:/ })).toHaveAttribute("aria-pressed", "true");
-      await expect(reveal.getByRole("region", { name: "App 2 details", exact: true })).toBeVisible();
+      await reveal.getByRole("button",{name:"Back to Server management",exact:true}).click();await expect(reveal.getByRole("region", { name: "Application instances" }).getByRole("button", { name: /App 2:/ })).toHaveAttribute("aria-pressed", "true");
       await reveal.getByRole("button", { name: "Close",exact:true }).click();
       await confirm(page, /Deploy load balancing/);
       await advanceCampaignStep(page, { seconds: 2, resumeClock: false });

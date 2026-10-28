@@ -10,44 +10,7 @@ import { pendingPreventionReview, preventionAvailable, preventionRequirements } 
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
 
-export interface Requirement { id: string; label: string; met: boolean; kind?: "check" | "step"; hint?: string; wait?: boolean }
-/** Presentation metadata only: the engine-derived rows, predicates and progress totals stay intact. */
-function requirementDetails(id: string, g: GameState): Pick<Requirement, "kind" | "hint" | "wait"> {
- const c=g.campaign!;
- if(introductionActive(c))return {kind:"step"};
- const hints:Record<string,string>={
-  cash:"Review running costs and cash. Earned revenue reaches cash at weekly settlement.",
-  admission:"Remove the traffic limit once capacity can serve full demand.",
-  management:"Finish the open report to return to the company.",
-  incident:"Restore healthy service and follow Recovery progress until the incident closes.",
-  queues:"Let retained requests drain, or add capacity at the overloaded component.",
-  reports:"Read and acknowledge each recovered incident's postmortem.",
-  healthy:"Inspect the Application and Database for overload or failed servers.",
-  pending:"Let accepted deployments and routing changes finish.",
-  promotion:"Let the optional promotion finish before starting the next wave.",
-  baseline:"Normal traffic returns after the second announced spike.",
-  headroom:"Upgrade the Database, or explicitly accept the growth risk.",
-  growth:"Press Run to observe the chapter's growth in demand.",
-  outcome:"Prevent an outage, or recover from one and acknowledge its report.",
-  recovery:"Inspect the overloaded component and restore healthy service.",
-  review:"Read the recorded outcome before continuing the company.",
-  milestone:"Complete the chapter recognition when it becomes available.",
-  armed:"Start the reliability test when the company is ready.",
-  observed:"Press Run to observe the scheduled application failure.",
-  restored:"Inspect the failed server to restore it, or let its natural restoration finish.",
-  observations:"Press Run with healthy service. Pausing adds no time; an unhealthy second resets the count.",
-  checks:"Serve full demand with healthy service for five new game seconds.",
-  pulses:"Press Run through both announced traffic spikes.",
-  recognition:"Review the recorded chapter outcome.",
-  research:"Spend the free research pick when it becomes available.",
-  launch:"Press Run to finish Launch Week.",
-  "app-inspection":"Inspect the Application after growth.",
-  "db-inspection":"Inspect the Database after growth.",
- };
- const check=["cash","admission","management","incident","queues","reports","healthy","pending","promotion","baseline","opening","stage"].includes(id)||id==="milestone"&&!!c.dataStage;
- const wait=["growth","observed","observations","checks","pulses","launch"].includes(id);
- return {kind:check?"check":"step",hint:hints[id],...(wait?{wait:true}:{})};
-}
+export interface Requirement { id: string; label: string; met: boolean }
 /**
  * The opening milestone gates time only once it can be acknowledged: Launch Week defers it until completion, and an
  * incident or postmortem still open when the week ends comes first, since the engine accepts the milestone only then.
@@ -92,7 +55,7 @@ export function campaignGuidance(g: GameState) {
  const finalGoals:Requirement[]=[];
  /** The prevention path's own checks, nested under its one chapter requirement so the chapter's count stays put. */
  const preventionChecks:Requirement[]=[];
- const add=(id:string,label:string,met:boolean)=>requirements.push({id,label,met,...requirementDetails(id,g)});
+ const add=(id:string,label:string,met:boolean)=>requirements.push({id,label,met});
  let waiting:string|null=null,notice:string|null=null,optional:string|null=null;
  let pendingAction:GuidanceAction|null=null;
  const nextStage=c.combinedStage?"Campaign complete":c.reliabilityStage?"Combined campaign":c.spikeStage?"Stay Online":c.dataStage?"Survive Traffic Spikes":openingDone?"Data Bottlenecks":"Scale Your App";
@@ -166,7 +129,7 @@ export function campaignGuidance(g: GameState) {
   if(dataAvailable)pendingAction={label:"Continue to Data Strategy",action:{type:"enter_data"}};
  } else if(prevention) {
   const r=preventionRequirements(c);
-  const check=(id:string,label:string,met:boolean)=>preventionChecks.push({id,label,met,...requirementDetails(id,g)});
+  const check=(id:string,label:string,met:boolean)=>preventionChecks.push({id,label,met});
   const reviewed=!!c.openingPrevention?.outcome?.acknowledged;
   add("growth","Opening growth occurred",r.growth);
   add("outcome","Verified prevention outcome or recovered incident acknowledged",reviewed);

@@ -82,6 +82,9 @@ it("keeps uptime in the detailed panel and leaves only status in the header", ()
     expect(within(dialog).getByText("99.990%")).toBeTruthy();
     expect(entry.querySelector("strong")!.textContent).toBe("Healthy");
     expect(within(entry).queryByText(/Uptime/)).toBeNull();
-    expect(within(dialog).getByText(/across this company/)).toBeTruthy();
+    expect(within(dialog).getByText(/across this company/).closest("details")!.open).toBe(false);
+    const measurements=within(dialog).getByLabelText("App measurements");
+    expect([...measurements.querySelectorAll(".row")].map(row=>row.querySelector("dt")!.textContent)).toEqual(["Uptime","Response time","Failed requests (%)","Requests waiting"]);
+    expect(dialog.querySelector(".app-health-uptime-card")).toBeNull();
     expect(document.querySelector(".stat-uptime")).toBeNull();
 });

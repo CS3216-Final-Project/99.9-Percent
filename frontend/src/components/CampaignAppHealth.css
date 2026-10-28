@@ -1,6 +1,10 @@
 .app-health-dashboard h3 { margin-top: 0; }
 .app-health-dashboard p { margin: 8px 0; }
 .app-health-snapshot { font-size: 0.9em; }
+.app-health-measurements { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.app-health-measurements .row { display: grid; grid-template-rows: subgrid; grid-row: span 2; row-gap: 4px; min-width: 0; padding: 10px 12px; border: 0; border-radius: 10px; background: var(--control-inset); }
+.app-health-measurements dt { color: var(--text-soft); font-size: var(--text-sm); }
+.app-health-measurements dd { margin: 0; text-align: left; font-size: var(--text-md); font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .app-health-interpretation { border-left: 3px solid var(--night-line); padding-left: 10px; }
 .app-health-details { margin-top: 12px; }
 .stat-action[aria-label="View app health"] .stat-body { min-width: 0; }
@@ -14,6 +18,3 @@
 @media (max-width: 360px) {
     .stat-action[aria-label="View app health"] strong { font-size: var(--text-sm); }
 }
-
-.app-health-dashboard .app-health-uptime-card { border: 0; padding: 8px 10px; border-radius: 10px; background: var(--tile-blue); }
-.app-health-uptime-note { font-size: var(--text-sm); }
