@@ -23,23 +23,6 @@ function show(game: GameState = newGame(), state: Partial<ReturnType<typeof useG
 const panel = () => screen.getByRole("complementary", { name: "System metrics" });
 const gold = () => document.querySelectorAll(".campaign-gold-attention");
 
-it("preserves dashboard scroll while equipment opens in a separate inspection", () => {
-  show(advanceSteps(newGame(), 6).state);
-  const dashboard = panel();
-  const scroll = vi.fn(({ top }: ScrollToOptions) => { dashboard.scrollTop = Number(top); });
-  Object.defineProperty(dashboard, "scrollTo", { configurable: true, value: scroll });
-  dashboard.scrollTop = 64;
-  fireEvent.click(within(dashboard).getByRole("button", { name: "App Server" }));
-  expect(screen.getByRole("dialog", { name: "App Servers" })).toBeTruthy();
-  expect(dashboard.scrollTop).toBe(64);
-  expect(scroll).not.toHaveBeenCalled();
-  fireEvent.click(within(screen.getByRole("dialog", { name: "App Servers" })).getByRole("button", { name: "Close" }));
-  fireEvent.click(within(dashboard).getByRole("button", { name: "Database" }));
-  expect(screen.getByRole("dialog", { name: "Database inspected" })).toBeTruthy();
-  expect(dashboard.scrollTop).toBe(64);
-  expect(scroll).not.toHaveBeenCalled();
-});
-
 it.each([
   ["a chapter guide", { tour: { track: "scaling" as const, step: 0 } }],
   ["a historical practice company", { tutorialCompany: { game: newGame(1, "original"), remainderMs: 0, measurement: useGame.getInitialState().measurement } }],

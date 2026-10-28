@@ -11,14 +11,11 @@ export function EquipmentPanel({ children, label, className = "" }: { children: 
   const open = useGame(s => s.panelOpen), setOpen = useGame(s => s.setPanelOpen);
   const phase = useGame(s => s.game.phase), tour = useGame(s => s.tour), generation = useGame(s => s.generation);
   const selected = useGame(s => s.selected), selectedApp = useGame(s => s.selectedAppId);
-  const campaign = useGame(s => !!s.game.campaign);
   const content = useRef<HTMLElement>(null);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
   const collapse = useRef<HTMLButtonElement>(null), expand = useRef<HTMLButtonElement>(null), focusOnChange = useRef(false);
   const id = useId();
-  // Guided Mode keeps its dashboard in place while a separate dialog owns the readings.
-  // Challenge Mode still replaces the panel content when equipment changes.
-  useEffect(() => { if (!campaign) content.current?.scrollTo?.({ top: 0 }); }, [selected, selectedApp, campaign]);
+  useEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [selected, selectedApp]);
   useEffect(() => { content.current?.scrollTo?.({ top: 0 }); }, [phase]);
   useEffect(() => { setOpen(true); }, [generation, setOpen]);
   useEffect(() => { if (phase === "incident" || tour) setOpen(true); }, [phase, tour, generation, setOpen]);

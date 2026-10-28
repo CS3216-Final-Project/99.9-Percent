@@ -32,30 +32,28 @@ export function CampaignFinance({onClose}:{onClose:()=>void}) {
         : forecast && forecast.burnCents <= 0 ? "Your recent earnings cover your current running costs."
         : forecast && forecast.runwayPeriods! <= 3 ? "Your company may run short of money soon."
         : "Your current running costs exceed your recent earnings.";
-    return createPortal(<Modal title="Company finances" icon={{kind:"cash",name:"cash"}} onClose={onClose}>
-        <section className="finance-overview" aria-label="Company finances overview"><dl className="rows">
-            <Row label="Money available" value={money(c.cashCents)} />
-            <Row label="Money earned, not yet received" value={money(pendingRevenue)} />
-            {last && <Row label="Money earned last period" value={money(last.revenueCents)} />}
-            <Row label="Current running costs per period" value={money(totalCharges(installed))} />
-            {last && <Row label="Money earned minus running costs — last period" value={money(last.netCents)} />}
-        </dl><p className="muted">{last ? "Last period's result does not include purchases." : "No completed period yet."}</p></section>
-        <section aria-labelledby="finance-earnings"><h3 id="finance-earnings">How your company makes money</h3>
-            <p>Your company earns {money(Q.revenueCents)} for each customer request completed successfully. Failed or rejected requests earn nothing. Queued requests earn money only when completed successfully.</p>
-            <p>Earned money becomes available at the next cash update, when running costs are also paid.</p>
+    return createPortal(<Modal title="Company finances" icon={{kind:"cash",name:"cash"}} onClose={onClose} className="company-finances">
+        <section className="finance-costs" aria-labelledby="finance-costs"><h3 id="finance-costs">Where your money goes</h3>
+            <p className="muted">Per period ({Q.periodSteps*Q.stepSeconds} game seconds), at the current setup.</p>
+            <dl className="rows">{costs.filter(([label,value])=>label!=="Other equipment costs"||value!==0).map(([label,value])=><Row key={label} label={label} value={money(value)} />)}<Row label="Total running costs" value={money(totalCharges(installed))} /></dl>
         </section>
-        <section aria-labelledby="finance-costs"><h3 id="finance-costs">Where your money goes</h3>
-            <p className="muted">For one full period: {Q.periodSteps*Q.stepSeconds} game seconds, using your currently installed equipment.</p>
-            <dl className="rows">{costs.filter(([,value])=>value!==0).map(([label,value])=><Row key={label} label={label} value={money(value)} />)}<Row label="Total running costs" value={money(totalCharges(installed))} /></dl>
-            <p className="muted">Salaries and equipment costs continue even when equipment is idle.</p>
-        </section>
-        <section aria-labelledby="finance-health"><h3 id="finance-health">Financial health</h3>
+        <p className="finance-takeaway">Rejected requests earn no revenue, but running costs still continue.</p>
+        {(last || closed || c.pending.length > 0 || risk || c.cashCents<=totalCharges(accrued)) && <section aria-labelledby="finance-health"><h3 id="finance-health">Financial health</h3>
             {risk&&<p className="finance-warning" role="note">{risk.message}{risk.kind==="blocked"&&" Close finances and open Menu to export your save or start a new company."}</p>}
             <p className={forecast && forecast.burnCents>0 ? "finance-warning" : ""}>{health}</p>
             {!closed && c.cashCents<=totalCharges(accrued) && <p className="finance-warning" role="note">Money available does not cover costs already waiting to be paid. Earnings awaiting the cash update may help cover them.</p>}
             {forecast && forecast.runwayPeriods!==null && <p>How long your money might last: at this rate, your available money covers about {forecast.runwayPeriods.toFixed(1)} full periods. Cash updates may leave you short sooner.</p>}
-        </section>
+        </section>}
+        <details className="more finance-earnings"><summary>How your company makes money</summary>
+            <p>Each successfully completed request earns {money(Q.revenueCents)}. Failed or rejected requests earn nothing; queued requests earn money only when completed successfully.</p>
+            <p>Earnings become available at the next cash update, when running costs are also paid.</p>
+        </details>
         <details className="more finance-advanced"><summary>Advanced details</summary>
+            {last && <section className="finance-overview" aria-label="Company finances overview"><dl className="rows">
+                <Row label="Money earned last period" value={money(last.revenueCents)} />
+                <Row label="Money earned minus running costs — last period" value={money(last.netCents)} />
+            </dl><p className="muted">Last period's result does not include purchases.</p></section>}
+            {!last && <p>{health}</p>}
             <dl className="rows"><Row label="Costs waiting to be paid" value={money(totalCharges(accrued))} /><Row label="Next cash update" value={`In ${Q.periodSteps-c.step%Q.periodSteps} game seconds; time must run`} /></dl>
             <p>{c.ledger.successes.toLocaleString("en-US")} successful completed requests × {money(Q.revenueCents)} = {money(pendingRevenue)} earned, not yet received.</p>
             <details className="more"><summary>Detailed running costs</summary>

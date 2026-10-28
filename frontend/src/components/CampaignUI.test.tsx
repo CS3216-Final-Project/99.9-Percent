@@ -19,41 +19,6 @@ it("shows all Opening requirements without a disclosure or generic growth-waitin
  expect(requirements.querySelector("summary")).toBeNull();
  expect(screen.queryByText(/Waiting for the next company growth event/)).toBeNull();
 });
-it("distinguishes the current clock-driven step from upcoming actions without advancing the company",()=>{
- const game=newGame(),before=JSON.stringify(game);show(game);
- const steps=screen.getByRole("list",{name:"Chapter steps"});
- const rows=within(steps).getAllByRole("listitem");
- expect(rows.map(row=>row.getAttribute("data-state"))).toEqual(["current","upcoming","upcoming"]);
- expect(rows[0].getAttribute("aria-current")).toBe("step");
- expect(within(rows[0]).getByText("Press Run")).toBeTruthy();
- expect(rows[0].textContent).toContain("Press Run to observe the chapter's growth in demand.");
- act(()=>useGame.setState({running:true}));
- expect(within(rows[0]).getByText("Running")).toBeTruthy();
- expect(JSON.stringify(useGame.getState().game)).toBe(before);
-});
-it("summarizes passing company checks while retaining every requirement and its original total",()=>{
- const game=dataCompany();show(game);
- const requirements=screen.getByRole("region",{name:"Guided Mode requirements"});
- const checks=within(requirements).getByRole("region",{name:"Company checks"});
- expect(checks.textContent).toContain("company checks pass");
- const disclosure=checks.querySelector("details")!;
- expect(disclosure.open).toBe(false);
- fireEvent.click(within(checks).getByText(/View .* passing checks/));
- expect(disclosure.open).toBe(true);
- expect(requirements.querySelectorAll("[data-requirement]")).toHaveLength(8);
- expect(within(requirements).getByRole("heading").textContent).toContain("7/8");
-});
-it("keeps a failing company check and recovery advice visible beside the chapter steps",()=>{
- const game=dataCompany();game.campaign!.cashCents=0;show(game);
- const requirements=screen.getByRole("region",{name:"Guided Mode requirements"});
- const checks=within(requirements).getByRole("region",{name:"Company checks"});
- const row=checks.querySelector('[data-requirement="cash"]')!;
- expect(row.getAttribute("data-met")).toBe("false");
- expect(row.closest("details")).toBeNull();
- expect(row.textContent).toContain("Earned revenue reaches cash at weekly settlement.");
- expect(checks.textContent).toContain("1 of 7 company checks need attention");
- expect(requirements.querySelectorAll("[data-requirement]")).toHaveLength(8);
-});
 it("keeps the selected workload hidden until actual growth and enters through the paused store",()=>{
  show(dataCompany("read-heavy",false));const guide=screen.getByRole("region",{name:"Guided Mode guidance"});
  expect(screen.getByLabelText("Current objective").textContent).toContain("Prepare the system for the next growth wave.");

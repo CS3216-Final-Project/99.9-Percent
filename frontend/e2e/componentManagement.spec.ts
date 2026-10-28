@@ -68,39 +68,11 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     }
     await expect(popup.locator(".inspection-autoscaling-info")).toBeVisible();
     await expect(popup.locator(".inspection-autoscaling-info")).toHaveCSS("background-color","rgb(220, 234, 246)");
-    const fleet=popup.getByRole("region",{name:"Server management",exact:true});
-    const fleetDetails=fleet.locator("details").filter({has:page.getByText("Fleet Technical Details",{exact:true})});
-    await expect(fleetDetails).not.toHaveAttribute("open");
+    await expect(popup.locator('[data-inspection-view="management"] > .more')).not.toHaveAttribute("open");
     expect(await popup.locator(".modal-body").evaluate(node=>node.scrollHeight<=node.clientHeight)).toBe(true);
     await page.screenshot({path:info.outputPath(`server-management-${width}.png`)});
-    const originalModal=await popup.elementHandle();
     await popup.locator('[data-guidance-app="app-2"]').click();
     await expect(popup.getByRole("heading",{name:"App 2",exact:true})).toBeVisible();
-    if(width>=901) {
-      await expect(fleet).toBeVisible();
-      const detail=popup.getByRole("region",{name:"App 2 details",exact:true});
-      await expect(detail).toBeVisible();
-      const fleetBounds=(await fleet.boundingBox())!,detailBounds=(await detail.boundingBox())!;
-      expect(detailBounds.x).toBeGreaterThanOrEqual(fleetBounds.x+fleetBounds.width);
-      await fleet.getByText("Fleet Technical Details",{exact:true}).click();
-      await expect(fleet.getByRole("region",{name:"Servers readings",exact:true})).toContainText("Routed capacity");
-      await detail.getByText("Technical Details",{exact:true}).click();
-      await expect(detail.getByRole("region",{name:"App 2 readings",exact:true})).toBeVisible();
-      await expect(detail.getByRole("region",{name:"App 2 readings",exact:true})).not.toContainText("Routed capacity");
-      await fleet.getByRole("button",{name:/^App 1:/}).click();
-      await expect(popup.getByRole("region",{name:"App 1 details",exact:true})).toBeVisible();
-      await expect(fleet.getByRole("button",{name:/^App 1:/})).toHaveAttribute("aria-pressed","true");
-      await expect(fleet.getByRole("button",{name:/^App 2:/})).toHaveAttribute("aria-pressed","false");
-      await expect(fleetDetails).toHaveAttribute("open","");
-      expect(await popup.evaluate((node,original)=>node===original,originalModal)).toBe(true);
-      await fleet.getByRole("button",{name:/^App 2:/}).click();
-      await expect(popup.getByRole("region",{name:"App 2 details",exact:true})).toBeVisible();
-      expect(await popup.evaluate((node,original)=>node===original,originalModal)).toBe(true);
-      await fleet.getByText("Fleet Technical Details",{exact:true}).click();
-    } else {
-      await expect(fleet).toBeHidden();
-      await expect(popup.getByRole("button",{name:"Back to Server management",exact:true})).toBeVisible();
-    }
     await expect(popup.getByRole("button",{name:"Add server",exact:true})).toHaveCount(0);
     await popup.getByRole("button",{name:"Scale up App 2",exact:true}).click();
     const quote=page.getByRole("dialog",{name:"Purchase preview",exact:true});
@@ -111,15 +83,8 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     await page.keyboard.press("Escape");await expect(popup.getByRole("button",{name:"Scale up App 2",exact:true})).toBeFocused();
     expect(await savedGame(page)).toEqual(before);
     await page.screenshot({path:info.outputPath(`server-${width}.png`)});
-    await popup.getByRole("button",{name:width>=901?"Back to Servers":"Back to Server management",exact:true}).click();
-    if(width>=901) {
-      await expect(popup.getByRole("button",{name:"Server management",exact:true})).toBeVisible();
-      await expect(popup.locator('[data-guidance-app]')).toHaveCount(0);
-    } else {
-      await expect(fleet).toBeVisible();
-      await expect(popup.locator('[data-guidance-app]')).toHaveCount(game.campaign!.apps.length);
-      await expect(fleet.getByRole("button",{name:/^App 2:/})).toHaveAttribute("aria-pressed","true");
-    }
+    await popup.getByRole("button",{name:"Back to Server management",exact:true}).click();
+    await expect(popup.locator('[data-guidance-app]')).toHaveCount(game.campaign!.apps.length);
     await closeInspection(page);const network=await inspectEquipment(page,"gateway");
     await expect(network.getByText(/Configure routing/)).toHaveCount(0);
     await network.getByRole("button",{name:"Network management",exact:true}).click();

@@ -100,34 +100,6 @@ function routeName(c: Campaign) {
 function RequirementList({items}:{items:Requirement[]}) {
   return <ul className="progression-requirements">{items.map(r=><li key={r.id} data-requirement={r.id} data-met={r.met}><Icon name={r.met?"check":"close"} size={12} /> {r.label}</li>)}</ul>;
 }
-/** Number the actual sequence, keeping clock-driven steps distinct from player actions. */
-function StepList({items,label="Chapter steps"}:{items:Requirement[];label?:string}) {
-  const running=useGame(s=>s.running),current=items.find(r=>!r.met);
-  return <ol className="progression-steps" aria-label={label}>{items.map((r,i)=>{
-    const state=r.met?"done":r===current?"current":"upcoming";
-    return <li key={r.id} data-requirement={r.id} data-met={r.met} data-state={state} aria-current={state==="current"?"step":undefined}>
-      <span className="progression-marker" aria-hidden="true">{r.met?<Icon name="check" size={12}/>:i+1}</span>
-      <span className="progression-text"><span className="visually-hidden">Step {i+1}, {state==="done"?"done":state==="current"?"current step":"not yet"}: </span>{r.label}
-        {r.wait&&state==="current"&&<span className="progression-wait"><Icon name="time" size={12}/>{running?"Running":"Press Run"}</span>}
-        {state==="current"&&r.hint&&<small>{r.hint}</small>}
-      </span>
-    </li>;
-  })}</ol>;
-}
-/** All standing conditions remain accessible, while only failing checks need immediate space. */
-function CompanyChecks({items}:{items:Requirement[]}) {
-  if(!items.length)return null;
-  const failing=items.filter(r=>!r.met),passing=items.filter(r=>r.met);
-  return <section className="company-checks" aria-label="Company checks">
-    <p><Icon name={failing.length?"alert":"check"} size={14}/>{failing.length?`${failing.length} of ${items.length} company checks need attention`:`All ${items.length} company checks pass`}</p>
-    {!!failing.length&&<ul className="progression-requirements">{failing.map(r=><li key={r.id} data-requirement={r.id} data-met="false"><Icon name="close" size={12}/><span>{r.label}{r.hint&&<small>{r.hint}</small>}</span></li>)}</ul>}
-    {!!passing.length&&<details className="company-passing"><summary>View {passing.length} passing {passing.length===1?"check":"checks"}</summary><RequirementList items={passing}/></details>}
-  </section>;
-}
-function RequirementChecklist({items}:{items:Requirement[]}) {
-  const steps=items.filter(r=>r.kind!=="check"),checks=items.filter(r=>r.kind==="check");
-  return <>{steps.length>0&&<StepList items={steps}/>}<CompanyChecks items={checks}/></>;
-}
 
 // Progress is derived from the engine; reading this panel never advances the run.
 function CampaignGuidance() {
@@ -139,7 +111,7 @@ function CampaignGuidance() {
     {financialRisk&&<Callout compact tone="warn" icon="cash" kicker={financialRisk.kind==="blocked"?"Capacity funding blocked":"Money at risk"}><span role="note">{financialRisk.message}</span></Callout>}
     {c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
     {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">{c.combinedStage?"Current growth requirements":"Chapter requirements"}<span> · {model.completed.length}/{model.requirements.length}</span></h3>
-      <RequirementChecklist items={model.requirements}/>
+      <RequirementList items={c.combinedStage?model.requirements.filter(r=>!r.met||r.id==="checks"):model.requirements}/>
       {!c.combinedStage&&model.waiting&&<p role="status">{model.waiting}</p>}
       {model.notice&&<p role="note">{model.notice}</p>}
       {model.optional&&<p className="muted">{model.optional}</p>}
@@ -151,7 +123,7 @@ function CampaignGuidance() {
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}>View run scorecard</button>}
     {model.prevention&&!c.openingPrevention?.outcome&&<section className="prevention-guidance" aria-label="Opening prevention progress">
       <p role="status">Stable service: {c.openingPrevention?.stableSteps??0} / {Q.stableSteps} game seconds. Pausing adds no time; unhealthy service restarts the counter.</p>
-      <RequirementChecklist items={model.preventionChecks}/>
+      <RequirementList items={model.preventionChecks}/>
       <div className="btn-row"><button className="btn btn-small" onClick={()=>inspectInRoom("app","app-1")}>Inspect Application</button><button className="btn btn-small" onClick={()=>inspectInRoom("db")}>Inspect Database</button></div>
     </section>}
 
@@ -281,7 +253,7 @@ function EquipmentShortcuts({disabled}:{disabled:boolean}) {
 /** A compact projection of existing gates and advice. No new progression or saved state. */
 function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const {game,act,running}=useGame(),c=game.campaign!,m=c.snapshot;
-  const model=campaignGuidance(game),decision=campaignAttention(game),hint=useCampaignAttention();
+  const model=campaignGuidance(game),decision=campaignAttention(game);
   const action=model.pendingAction,combined=c.combinedStage,reliability=c.reliabilityStage;
   const fault=currentFault(c),financialRisk=chapter6FinancialRisk(game);
   const spike=chapter4Stage(game);
@@ -289,13 +261,13 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const actionReady=!!action?.action&&!disabled&&previewCampaignAction(game,action.action).ok;
   const priority=c.incident?"incident":c.pending.length?"pending":fault?.startedStep!=null&&fault.restoredStep===null?"restored":combined&&c.limit!==null?"admission":m.app.backlog+m.db.backlog>0?"queues":null;
   const unmet=model.incomplete.find(r=>r.id===priority)??model.incomplete[0];
-  const condition=game.phase==="ended"&&game.outcome!=="won"?model.notice:unmet?`Still needed: ${unmet.label}`:null;
-  const accomplishment=combined?(combined.acknowledged?"Campaign completed.":pendingCombined(c)?"Growth wave stabilized.":combined.finalReview?"Final service stability verified.":"Full-demand readiness verified."):reliability?"Reliability test completed and outcome acknowledged.":"Both traffic spikes handled and outcome acknowledged.";
+  const condition=game.phase==="ended"?model.notice:reviewing?action.label:unmet?`Still needed: ${unmet.label}`:(action?`Ready: ${action.label}`:"All current requirements met.");
   const stage=combined?(combined.acknowledged?"Campaign complete":combined.finalReview?"Final review":pendingCombined(c)?"Growth outcome review":combined.currentRound?`Growth wave ${combined.currentRound.index+1} ${combined.currentRound.startedStep===null?"scheduled":combined.currentRound.pressureEndedStep===null?"active":"recovery"}`:combined.nextRoundIndex===3?"Final checks":"Prepare for full demand")
     :reliability?(reliability.acknowledged?"Outcome acknowledged":pendingReliability(c)?"Outcome review":!reliability.fault?"Preparation":reliability.fault.startedStep===null?"Failure scheduled":reliability.fault.restoredStep===null?"Failure / recovery":"Stability verification")
     :c.spikeStage!.acknowledged?"Outcome acknowledged":pendingSpikeAcknowledgement(c)?"Spike outcome review":({prepare:"Preparing",spike1:"Spike 1 active",between:"Between spikes",spike2:"Spike 2 active",recover:"Review / stability verification"}[spike?.stage??"recover"]);
   const objectiveIds=combined?["checks"]:reliability?["armed","observed","restored","observations","recognition"]:["pulses","observations","recognition"];
   const objectives=[...model.requirements.filter(r=>objectiveIds.includes(r.id)),...(combined?model.finalGoals.filter(r=>r.id==="completion"):[])];
+  const currentObjective=objectives.find(r=>!r.met)?.id;
   const nextAdvice=decision.attention==="run"?decision.message:decision.reason==="spike-plan"?decision.recommendation:decision.action?`Suggested action: ${decision.action.label}.`:decision.recommendation;
   const showMetrics=!!c.incident||m.app.backlog+m.db.backlog>0||spike?.stage==="spike1"||spike?.stage==="spike2"||!!combined?.currentRound;
   return <EquipmentPanel className="campaign-panel mission-dashboard" label="System metrics">
@@ -306,14 +278,13 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         {combined&&<><p>Registered users: {num(combined.users)} / {num(combined.finalUserTarget)}</p><Meter value={combined.users/combined.finalUserTarget} label="Registered users progress" tone="ok"/><p>Growth outcomes acknowledged: {combined.completedRounds.length} / 3</p></>}
         <Meter value={model.completed.length/Math.max(1,model.requirements.length)} label="Chapter requirements progress" tone="ok"/>
         <p className="mission-complete">{model.completed.length} / {model.requirements.length} current requirements met</p>
-        {unmet&&<StepList items={objectives}/>}
+        <ol className="mission-objectives">{objectives.map(r=><li key={r.id} data-state={r.met?"completed":r.id===currentObjective?"current":"upcoming"} aria-current={r.id===currentObjective?"step":undefined}><Icon name={r.met?"check":r.id===currentObjective?"next":"time"} size={12}/><span>{r.label}</span><span className="visually-hidden">{r.met?"Completed":r.id===currentObjective?"Current":"Upcoming"}</span></li>)}</ol>
       </section>
-      {condition?<section aria-label="Current unmet condition" className={`mission-condition${c.incident||game.phase==="ended"&&game.outcome!=="won"?" is-failure":""}`}><h4>Current unmet condition</h4><p>{condition}</p></section>:<section aria-label="Chapter accomplished" className="mission-accomplished"><h4>Chapter accomplished</h4><p>{accomplishment}</p></section>}
+      <section aria-label="Current unmet condition" className={`mission-condition${c.incident||game.phase==="ended"&&game.outcome!=="won"?" is-failure":""}`}><h4>Current unmet condition</h4><p>{condition}</p></section>
       <section aria-label="Next step" className="mission-next"><h4>Next step</h4>
-        <p>{game.phase==="ended"&&game.outcome==="won"?"Inspect the scorecard and final company, or start a new company from the Menu.":running&&incidentNeedsPause(game,decision)?"Pause the company to inspect the incident.":reviewing?"Open the recorded review to continue.":actionReady&&action?.action&&!isChapterEntry(action.action)?"The company is ready for the next action.":actionReady&&action?.action?`${action.label} using Next in the chapter bar.`:nextAdvice}</p>
+        <p>{running&&incidentNeedsPause(game,decision)?"Pause the company to inspect the incident.":reviewing?action.label:actionReady&&action?.action&&!isChapterEntry(action.action)?action.label:actionReady&&action?.action?"Use Next in the chapter bar to continue.":nextAdvice}</p>
         {action?.action&&!isChapterEntry(action.action)&&<button className="btn btn-primary" data-guidance={action.action.type} disabled={disabled||!previewCampaignAction(game,action.action).ok} onClick={()=>act(action.action!)}>{action.label}<Icon name="next"/></button>}
         {reviewing&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next"/></button>}
-        {!reviewing&&!actionReady&&hint.available&&<button className="btn" onClick={hint.openHint}>Show next action<Icon name="bulb"/></button>}
         {combined&&<CombinedControls disabled={disabled}/>}
         {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}>View run scorecard</button>}
       </section>

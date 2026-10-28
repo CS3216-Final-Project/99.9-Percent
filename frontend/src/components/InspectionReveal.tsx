@@ -1,7 +1,7 @@
 import { introductionActive } from "@/sim/introduction";
 import { equipmentInfo } from "@/sim";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { inspectOrSelect, useGame } from "@/game/store";
+import { inspectInRoom, useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { EQUIPMENT_ICON, STATE_META } from "./presentation";
 import { InspectionPurchaseContext } from "./useCampaignAttention";
@@ -14,8 +14,6 @@ import { num } from "@/game/format";
 import { campaignAppHealth } from "@/game/campaignAppHealth";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { Modal, Row } from "./ui";
-import { useMediaQuery } from "./useMediaQuery";
-import "./ServerInspection.css";
 
 /**
  * The diagnostic card an inspection started in the 3D room opens: the equipment's scanner on the left, the
@@ -70,21 +68,18 @@ export default function InspectionReveal() {
 /** Both the room and keyboard-accessible shortcuts open this same live inspection. */
 function ComponentInspection() {
   const {game,roomInspection:inspection,dismissRoomInspection:dismiss,selectedAppId,view,chapterComplete}=useGame();
-  const desktop=useMediaQuery("(min-width: 901px)");
   const [details,setDetails]=useState(false);
   const [page,setPage]=useState<"overview"|"management"|EquipmentActionView>(()=>inspection?.equipment==="app"&&inspection.appId?"server":"overview");
   const subview=useRef<HTMLDivElement>(null);
   const navigate=(next:typeof page)=>{setDetails(false);setPage(next);};
   const previousPage=useRef(page);
-  const previousApp=useRef(selectedAppId);
   useLayoutEffect(()=>{
     // Let Modal capture the opener before focusing its initial control. Only
     // internal navigation moves focus here; otherwise Escape restores a removed node.
-    if(previousPage.current!==page||page==="server"&&previousApp.current!==selectedAppId)subview.current?.focus({preventScroll:true});
+    if(previousPage.current!==page)subview.current?.focus({preventScroll:true});
     previousPage.current=page;
-    previousApp.current=selectedAppId;
     subview.current?.closest(".modal-body")?.scrollTo?.({top:0});
-  },[page,selectedAppId]);
+  },[page]);
   const confirming=useSyncExternalStore(subscribeConfirming,confirmingAction);
   const c=game.campaign!;
   const mandatory=pendingStop(c)!==null||milestoneBlocks(game)||!!chapterComplete;
@@ -97,9 +92,8 @@ function ComponentInspection() {
   if (!inspection || mandatory || view || game.phase==="review" || game.phase==="ended") return null;
   const place=inspection.equipment as "db"|"app"|"gateway"|"cache"|"monitoring";
   const info=equipmentInfo(game,place),m=c.snapshot;
-  const appId=selectedAppId??inspection.appId;
-  const instance=place==="app"&&page==="server"&&appId?m.instances?.find(a=>a.id===appId):undefined;
-  const installed=place==="app"&&page==="server"&&appId?c.apps.find(a=>a.id===appId):undefined;
+  const instance=place==="app"&&page==="server"&&inspection.appId?m.instances?.find(a=>a.id===inspection.appId):undefined;
+  const installed=place==="app"&&page==="server"&&inspection.appId?c.apps.find(a=>a.id===inspection.appId):undefined;
   const component=place==="db"?m.db:place==="app"?instance??m.app:null;
   const failed=instance?.health==="failed"||installed?.health==="failed";
   const noCapacity=!!component&&component.capacity<=0;
@@ -155,17 +149,10 @@ function ComponentInspection() {
   const overview=page==="overview";
   const appManagement=place==="app"&&page==="management";
   const server=place==="app"&&page==="server";
-  const appWorkspace=appManagement||server;
-  const selectServer=(id:string)=>{
-    // Keep the modal and its original focus-return target mounted while the
-    // shared inspection action records evidence for this particular server.
-    inspectOrSelect("app",id);
-    navigate("server");
-  };
   const title=place==="app"?"App Servers":`${info.name} inspected`;
   const summary=<div className="component-inspection-summary">
       <div className="inspection-scanner" aria-hidden="true"><Icon name={EQUIPMENT_ICON[place]} size={56}/></div>
-      <p className="inspection-status"><span className={`state state-${stateKey}`}><Icon name={state.icon} size={12}/>{word}</span></p>
+      <p className="inspection-status"><span className={`state state-${stateKey}`}><Icon name={state.icon} size={12}/>{word}</span>{server&&<span>App {selected.id.slice(4)}</span>}</p>
       <p className="component-inspection-metric">{metric}</p><p>{description}</p>
     </div>;
   const failedApps=c.apps.filter(a=>a.health==="failed"),unrouted=c.apps.filter(a=>!routes.includes(a.id)&&a.role!=="spare"&&a.health!=="failed");
@@ -173,26 +160,21 @@ function ComponentInspection() {
   const warning=failedApps.length?`${failedApps.map(a=>`App ${a.id.slice(4)}`).join(", ")} failed. Check surviving capacity and recovery options.`
     :unrouted.length?`${unrouted.map(a=>`App ${a.id.slice(4)}`).join(", ")}: installed capacity does not receive traffic until Network routing includes ${unrouted.length===1?"this app":"these apps"}.`
     :overloaded?.length?"A routed server is overloaded. Inspect its demand and available capacity.":null;
-  return <Modal title={title} icon={{kind:state.tone,name:EQUIPMENT_ICON[place]}} onClose={confirming?undefined:dismiss} className={`component-inspection component-inspection-${place}${appWorkspace?" inspection-app-workspace":""}`}>
+  return <Modal title={title} icon={{kind:state.tone,name:EQUIPMENT_ICON[place]}} onClose={confirming?undefined:dismiss} className={`component-inspection component-inspection-${place}`}>
     <div className="inspection-subview" data-inspection-view={page} ref={subview} tabIndex={-1}>
-    {!overview&&<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page==="management"||server&&desktop?"overview":"management")}>{place==="app"?(page==="management"||server&&desktop?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>}
-    {appWorkspace?<div className="inspection-app-layout">
-      <section className="inspection-fleet-pane" aria-label="Server management" hidden={server&&!desktop}>
+    {!overview&&<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page!=="management"?"management":"overview")}>{place==="app"?(page==="management"?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>}
+    {appManagement?<>
       <h3 className="inspection-management-heading"><Icon name="server" size={20}/>Server management</h3>
       <dl className="inspection-fleet-summary" aria-label="Server counts"><Row label="Installed" value={c.apps.length}/><Row label="Healthy" value={c.apps.filter(a=>a.health!=="failed").length}/><Row label="Currently routed" value={routes.length}/></dl>
-      <section aria-label="Application instances" className="inspection-server-cards">{c.apps.map(a=><button type="button" key={a.id} data-guidance-app={a.id} className="inspection-server-card" data-health={a.health??"healthy"} disabled={!!confirming} aria-pressed={selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}: ${a.health??"healthy"}; ${a.role==="spare"?"Standby spare":routes.includes(a.id)?"Receiving traffic":"Installed - not receiving traffic"}`} onClick={()=>selectServer(a.id)}><strong><Icon name="server" size={16}/>App {a.id.slice(4)}</strong><span className="inspection-server-health">{a.health??"healthy"}</span><span className="inspection-server-route" data-routed={routes.includes(a.id)}>{a.role==="spare"?"Standby spare":routes.includes(a.id)?"Receiving traffic":"Not receiving traffic"}</span></button>)}</section>
+      <section aria-label="Application instances" className="inspection-server-cards">{c.apps.map(a=><button type="button" key={a.id} data-guidance-app={a.id} className="inspection-server-card" data-health={a.health??"healthy"} aria-pressed={selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}: ${a.health??"healthy"}; ${routes.includes(a.id)?"Receiving traffic":"Installed - not receiving traffic"}`} onClick={()=>inspectInRoom("app",a.id)}><strong><Icon name="server" size={16}/>App {a.id.slice(4)}</strong><span className="inspection-server-health">{a.health??"healthy"}</span><span className="inspection-server-route" data-routed={routes.includes(a.id)}>{a.role==="spare"?"Standby spare":routes.includes(a.id)?"Receiving traffic":"Not receiving traffic"}</span></button>)}</section>
       {warning&&<p role="note" className="inspection-warning">{warning}</p>}
       <div className="component-inspection-controls">{c.spikeStage?entry("autoscaling","Autoscaling"):<p className="inspection-autoscaling-info"><Icon name="info" size={16}/><span>Autoscaling becomes available in Traffic Spikes.</span></p>}</div>
-      <details className="more"><summary>Fleet Technical Details</summary>{reading()}</details>
-      </section>
-      <section className={`inspection-server-pane${server?"":" is-empty"}`} aria-label={server?`App ${selected.id.slice(4)} details`:"Server details"} hidden={!server&&!desktop}>
-      {server?<>
+      {technical()}
+    </>:server?<>
       <h3 tabIndex={-1}>App {selected.id.slice(4)}</h3>{summary}
       <dl className="rows"><Row label="Installed capacity" value={`${num(selected.capacity)} requests/s`}/><Row label="Current demand" value={instance?`${num(instance.demand)} requests/s`:"Not yet observed"}/><Row label="Routing" value={routes.includes(selected.id)?"Receiving traffic":selected.role==="spare"?"Standby spare":"Not receiving traffic"}/></dl>
       {controls("server")}{technical(selected.id)}
-      </>:<><Icon name="server" size={32}/><h3>Select a server</h3><p>Compare its health, traffic and capacity, then choose an action.</p></>}
-      </section>
-    </div>:place==="app"&&page==="autoscaling"?<>
+    </>:place==="app"&&page==="autoscaling"?<>
       <h3>Autoscaling</h3><p>Controller: {c.spikeStage?.controller?"Deployed":c.spikeStage?.researchSpent?"Available":"Locked"}. Automatically adjusts application capacity when sustained utilisation crosses its thresholds.</p>
       {controls("autoscaling")}
     </>:place==="gateway"&&!overview?<>
