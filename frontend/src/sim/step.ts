@@ -208,7 +208,7 @@ export function stepInPlace(s: GameState): StopReason {
         if(["health-checks","create-spare","reserve-spare","release-spare","failover","promote-spare","restore-app"].includes(action.type)&&!activateReliability(c,action))continue;
         if(action.type==="retire-app"&&!activateRetirement(c,action))continue;
         if(action.type==="deploy-autoscaler") {
-          c.spikeStage!.controller={activatedStep:c.step,enabled:true,highSteps:0,lowSteps:0,cooldownUntil:c.step,managedAppIds:[],joiningAppId:null,expectedRouting:JSON.stringify(c.routing),blockedReason:null};
+          c.spikeStage!.controller={activatedStep:c.step,enabled:true,highSteps:0,lowSteps:0,cooldownUntil:c.step,managedAppIds:[],joiningAppId:null,expectedRouting:JSON.stringify(c.routing),blockedReason:null,targetBasisPoints:T.high,minimum:T.minimum};
           trace(c,"autoscaling-enabled",{activationStep:c.step});
         }
         if(action.type=== "add-app"&&action.source==="autoscaler")c.spikeStage!.controller!.managedAppIds.push(action.targetId!);

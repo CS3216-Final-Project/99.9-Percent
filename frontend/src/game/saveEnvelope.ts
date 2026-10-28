@@ -60,7 +60,7 @@ export function validateEnvelope(value: unknown): Validation {
     const dataActions = ["enter_data", "contrast_workload", "deploy_cache", "tune_cache"];
     if ((legacy || phase2 || phase3) && e.inputs.some(i => dataActions.includes(i.action.type)))
         return {status:"corrupt"};
-    const spikeActions = ["enter_spikes", "unlock_autoscaling", "deploy_autoscaler", "set_autoscaling", "acknowledge_spikes"];
+    const spikeActions = ["enter_spikes", "unlock_autoscaling", "deploy_autoscaler", "set_autoscaling", "set_autoscaler_policy", "acknowledge_spikes"];
     if ((legacy || phase2 || phase3 || phase4) && e.inputs.some(i => spikeActions.includes(i.action.type))) return {status:"corrupt"};
     const reliabilityActions = ["acknowledge_prevention_review", "enter_reliability", "unlock_reliability", "deploy_health_checks", "install_spare", "reserve_spare",
         "release_spare", "deploy_failover", "set_failover", "restore_app", "arm_reliability", "acknowledge_reliability"];

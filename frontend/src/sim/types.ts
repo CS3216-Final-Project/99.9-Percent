@@ -436,6 +436,7 @@ export type Action =
   | { type:"accept_scaling_risk" }
   | { type:"run_promotion" }
   | { type:"retry_scenario" }
+  | { type:"set_autoscaler_policy"; targetBasisPoints:number; minimum:number }
   | { type: "begin_introduction" }
   | { type: "acknowledge_introduction"; equipment: EquipmentId }
   | { type: "complete_introduction"; handoff?: "opening" }

@@ -49,7 +49,7 @@ import { exportPlaytest, type AnnouncedChapter } from "@/game/persist";
 import { chapterEnd, type ChapterEnd } from "@/game/chapterCompletion";
 import { ChapterEndFoot } from "./ChapterEndFoot";
 import { money, num } from "@/game/format";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { TimeMenu } from "./TimeMenu";
 import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
@@ -402,6 +402,14 @@ export function CampaignEquipmentActions({equipment,actionView}:{equipment:Equip
   </div>;
 }
 
+/** One autoscaler policy setting: a labelled row of choices, applied as soon as one is picked. */
+function PolicyChoice({label,options,value,disabled,onChoose}:{label:string;options:{value:number;label:string}[];value:number;disabled:boolean;onChoose:(value:number)=>void}) {
+ const name=useId();
+ return <div className="autoscaler-policy" role="radiogroup" aria-label={label}><span className="autoscaler-policy-label">{label}</span>
+  <div className="autoscaler-policy-options">{options.map(o=><label key={o.value} className={o.value===value?"is-on":undefined}>
+   <input type="radio" name={name} checked={o.value===value} disabled={disabled} onChange={()=>onChoose(o.value)}/>{o.label}</label>)}</div>
+ </div>;
+}
 function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
  const {game,act}=useGame(),c=game.campaign!,d=c.spikeStage!,a=d.controller,o=c.snapshot.spikes;
  const missing=[!d.researchSpent?"Unlock autoscaling":"",!c.loadBalancer?"Deploy load balancing":"",c.routing.mode!=="balanced"||c.routing.targets.length<T.minimum?`Balance traffic across at least ${T.minimum} apps`:"",busy?"Finish the pending deployment":"",c.cashCents<=T.controllerCostCents?"Keep enough available cash for deployment":""].filter(Boolean);
@@ -413,11 +421,16 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
    {!a&&<li><Act icon="scale" label="Deploy autoscaling" price={T.controllerCostCents/100} note={`${T.controllerDelay} game seconds`} disabled={disabled||busy||!d.researchSpent||!c.loadBalancer||c.routing.mode!=="balanced"||c.routing.targets.length<2||c.cashCents<=T.controllerCostCents} tip="Requires balanced routing to at least two apps. Controller upkeep is $100 per operating week, including while disabled." decision={{type:"deploy_autoscaler"}} onClick={()=>act({type:"deploy_autoscaler"})}/></li>}
    {a&&<li><button className="btn" disabled={disabled} aria-pressed={a.enabled} onClick={()=>act({type:"set_autoscaling",enabled:!a.enabled})}>{a.enabled?"Disable autoscaling":"Enable autoscaling"}</button></li>}
   </ul>
+  {a&&<>
+   <PolicyChoice label="Scale out when routed apps are busier than" disabled={disabled} options={T.targets.map(t=>({value:t,label:`${t/100}%`}))} value={a.targetBasisPoints} onChoose={t=>act({type:"set_autoscaler_policy",targetBasisPoints:t,minimum:a.minimum})}/>
+   <PolicyChoice label="Keep at least this many apps routed" disabled={disabled} options={T.minimums.map(m=>({value:m,label:String(m)}))} value={a.minimum} onChoose={m=>act({type:"set_autoscaler_policy",targetBasisPoints:a.targetBasisPoints,minimum:m})}/>
+   <p className="muted">A lower target or a higher minimum adds apps before demand peaks, at {dollars(Q.appCostCents)} setup and {dollars(Q.appWeeklyCents)}/week each. Each new app takes {T.provisionDelay+T.routingDelay} game seconds to serve, and only one installs at a time.</p>
+  </>}
   <details className="more"><summary>Technical Details</summary>
    <p>Research: {researchBalance(c)} point(s) available. Autoscaling {d.researchSpent?"unlocked":"locked"}.</p>
    <p>Installed {c.apps.length} / maximum {T.maximum}; routed {c.routing.targets.length}. Automatic apps cost {dollars(Q.appCostCents)} setup and {dollars(Q.appWeeklyCents)}/week after installation. Controller upkeep: {dollars(T.controllerWeeklyCents)}/week, including while disabled.</p>
    <p>Observed routed busy utilisation: {o?`${(o.routedBusyBasisPoints/100).toFixed(2)}%`:"No controller observation yet"}. High-utilization observations: {a?.highSteps??0} / 3; low-utilization observations: {a?.lowSteps??0} / 6.</p>
-   <p>Scale out above {T.high/100}% for {T.highSteps} game seconds. Empty controller apps may retire below {T.low/100}% for {T.lowSteps} safe game seconds; minimum {T.minimum}. Cooldown remaining: {Math.max(0,(a?.cooldownUntil??0)-c.step)} game seconds.</p>
+   <p>Scale out above {(a?.targetBasisPoints??T.high)/100}% for {T.highSteps} game seconds, or at once below the minimum. Empty controller apps may retire below {((a?.targetBasisPoints??T.high)-T.scaleInGap)/100}% for {T.lowSteps} safe game seconds; minimum {a?.minimum??T.minimum}. Cooldown remaining: {Math.max(0,(a?.cooldownUntil??0)-c.step)} game seconds.</p>
    <p>Automatic provisioning takes {T.provisionDelay} game seconds, followed by {T.routingDelay} routing game second. {a?.joiningAppId?`Joining ${a.joiningAppId.replace("app-","App ")}; installed capacity may still be unrouted.`:"No automatic app awaiting routing."}</p>
    <p>Application automation cannot increase DB capacity, cache effectiveness or admitted traffic. Manual investments and traffic limiting remain available.</p>
   </details>
