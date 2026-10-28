@@ -40,7 +40,7 @@ describe('password helpers',()=>{
 it('creates an email account with a hashed password and an HttpOnly session',async()=>{
   const r=await register({email:' Ada@Example.com ',password:'analytical-engine',name:'Ada'});
   expect(r.status).toBe(201);expect(r.headers['cache-control']).toBe('private, no-store');
-  expect(r.body).toEqual({account:{id:expect.any(String),displayName:'Ada'},csrfToken:expect.any(String)});
+  expect(r.body).toEqual({account:{id:expect.any(String),displayName:'Ada'},csrfToken:expect.any(String),newAccount:true});
   expect(sessionCookie(r)).toMatch(/HttpOnly; Secure; SameSite=Lax/);
   const [account]=await db.select().from(gameAccounts);expect(account).toMatchObject({issuer:'email',subject:'ada@example.com'});
   const [credential]=await db.select().from(gameEmailCredentials);expect(credential.passwordHash).not.toContain('analytical');
@@ -65,9 +65,17 @@ it('signs in, returns the session and rotates the browser’s previous session',
   const previous=sessionCookie(first).split(';')[0];
   const r=await login({email:'Ada@example.com',password:'analytical-engine'},previous);
   expect(r.status).toBe(200);expect(r.body.account).toEqual(first.body.account);expect(r.body.csrfToken).not.toBe(first.body.csrfToken);
+  // Signing in to an account that already exists is never a sign-up, even with no cloud saves yet.
+  expect(r.body.newAccount).toBe(false);
   expect(await db.select().from(gameSessions)).toHaveLength(1);
   expect((await request(app).get('/api/session').set('Cookie',previous)).status).toBe(401);
-  expect((await request(app).get('/api/session').set('Cookie',sessionCookie(r).split(';')[0])).status).toBe(200);
+  const restored=await request(app).get('/api/session').set('Cookie',sessionCookie(r).split(';')[0]);
+  expect(restored.status).toBe(200);expect(restored.body.newAccount).toBe(false);
+});
+it('completes an interrupted registration as a new account',async()=>{
+  await db.insert(gameAccounts).values({issuer:'email',subject:'ada@example.com',displayName:'ada'});
+  const r=await register({email:'ada@example.com',password:'analytical-engine'});
+  expect(r.status).toBe(201);expect(r.body.newAccount).toBe(true);
 });
 it('gives the same answer for a wrong password and an unknown email',async()=>{
   await register({email:'ada@example.com',password:'analytical-engine'});

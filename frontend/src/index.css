@@ -4945,7 +4945,8 @@ button:disabled {
   transform: translateX(-50%);
   width: max-content;
   max-width: min(500px, calc(100vw - 28px));
-  z-index: 120;
+  /* Above the home screen (200), which reports sign-in and save results too; below tooltips (300). */
+  z-index: 250;
   cursor: pointer;
 }
 
