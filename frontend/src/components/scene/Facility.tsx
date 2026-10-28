@@ -1599,6 +1599,39 @@ function isSoftwareRenderer(gl: THREE.WebGLRenderer): boolean {
   return /swiftshader|llvmpipe|software|softpipe|basic render/i.test(name);
 }
 
+/**
+ * Holds the room's first frame until every shader it starts with has compiled. Drawn at once, that first frame
+ * builds them all on the page's only thread, and a first visit freezes the page for up to seconds; compileAsync
+ * lets the browser build them in the background (KHR_parallel_shader_compile) while the page keeps responding.
+ * Shaders are keyed on where they draw, so with effects they are compiled for the effects pass's buffer, as in
+ * prepareShaders. If compiling fails the room draws anyway and builds them as it goes.
+ */
+function ShaderGate({ effects, onReady }: { effects: boolean; onReady: () => void }) {
+  const { gl, scene, camera } = useThree();
+  useLayoutEffect(() => {
+    let live = true;
+    const buffer = effects ? new THREE.WebGLRenderTarget(1, 1) : null;
+    new Promise<unknown>((resolve) => {
+      const target = gl.getRenderTarget();
+      gl.setRenderTarget(buffer);
+      try {
+        resolve(gl.compileAsync(scene, camera));
+      } finally {
+        gl.setRenderTarget(target);
+      }
+    })
+      .catch(() => {})
+      .finally(() => {
+        buffer?.dispose();
+        if (live) onReady();
+      });
+    return () => {
+      live = false;
+    };
+  }, [gl, scene, camera, effects, onReady]);
+  return null;
+}
+
 /** In on-demand mode, ask for a new frame `fps` times a second. */
 function FrameLimiter({ fps }: { fps: number }) {
   const invalidate = useThree((s) => s.invalidate);
@@ -1938,6 +1971,9 @@ export default function Facility() {
   // instead (see the menu).
   const profile = resolveQuality(chosen, renderer, override);
   const capped = profile.fps !== null;
+  // The quality whose canvas has compiled its shaders; a new canvas waits for its own (see ShaderGate).
+  const [compiled, setCompiled] = useState<GraphicsQuality | null>(null);
+  const onCompiled = useCallback(() => setCompiled(chosen), [chosen]);
   // Auto on a graphics card watches the frame rate and, if it falls, draws fewer pixels (see adapt in quality.ts).
   // A quality the player chose is left exactly as chosen.
   const [load, setLoad] = useState<{ quality: GraphicsQuality; factor: number }>({ quality: chosen, factor: 1 });
@@ -1954,7 +1990,7 @@ export default function Facility() {
         orthographic
         shadows={quality.shadows ? "percentage" : false}
         dpr={quality.dpr}
-        frameloop={capped ? "demand" : "always"}
+        frameloop={compiled !== chosen ? "never" : capped ? "demand" : "always"}
         // How strongly the HD environment lights materials; without one it has no effect.
         scene={{ environmentIntensity: HD_REFLECTIONS }}
         events={roomEvents}
@@ -1981,6 +2017,7 @@ export default function Facility() {
             <Scene quality={quality} landed={landed} />
           </DetailContext.Provider>
         )}
+        {renderer !== "unknown" && compiled !== chosen && <ShaderGate effects={quality.effects} onReady={onCompiled} />}
         {quality.fps !== null && <FrameLimiter fps={quality.fps} />}
         {adaptive && (
           <PerformanceMonitor
