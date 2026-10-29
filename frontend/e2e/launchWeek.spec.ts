@@ -207,7 +207,8 @@ test("the score card reports nines, copies the result and continues to Chapter 2
   await page.getByRole("button", { name: "Run", exact: true }).click();
   // Bound the wait by time, not iterations: a slow runner spends longer on each pass.
   for (const deadline = Date.now() + 90_000; Date.now() < deadline && !(await card.isVisible());) {
-    const dialog = page.getByRole("dialog");
+    // The score card can open between checks, beside the Company Message its fixture dismisses.
+    const dialog = page.locator('[role="dialog"]:not([aria-label="Launch Week complete"])').first();
     if (await dialog.isVisible()) {
       const next = dialog.getByRole("button", { name: "View Incident Report", exact: true });
       const go = dialog.getByRole("button", { name: "Continue company", exact: true });
