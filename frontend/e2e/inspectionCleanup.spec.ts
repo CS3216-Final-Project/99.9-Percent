@@ -74,7 +74,10 @@ test("inspection modal: blocks camera input and restores dragging and scene clic
   await page.mouse.move(header.x+header.width/2,header.y+header.height/2);await page.mouse.down();
   await page.mouse.move(header.x+header.width/2+40,header.y+header.height/2,{steps:12});await page.mouse.up();
   await page.keyboard.press("q");const covered=await camera();await expect(popup).toBeVisible();
-  expect(covered.target).toEqual(blocked.target);expect(covered.offset).toEqual(blocked.offset);expect(covered.zoom).toBe(blocked.zoom);
+  // Blocked input would move the framing by whole units (see the drag after close); allow only the last rounded
+  // digit of the earlier drag's easing to settle.
+  const settled=(a:{x:number;z:number},b:{x:number;z:number})=>{expect(a.x).toBeCloseTo(b.x,3);expect(a.z).toBeCloseTo(b.z,3);};
+  settled(covered.target,blocked.target);expect(covered.offset).toEqual(blocked.offset);expect(covered.zoom).toBe(blocked.zoom);
   await closeInspection(page);
   await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+80,y+30,{steps:12});await page.mouse.up();
   const after=await camera();
