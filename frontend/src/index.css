@@ -5374,6 +5374,6 @@ button:disabled {
 .component-inspection .act-label { min-width: 0; }
 .component-inspection .act-affordance { grid-column: 3; grid-row: 1; margin-left: 0; }
 .component-inspection .act-meta { justify-content: center; }
-.component-inspection .actions { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.component-inspection .actions { grid-template-columns: minmax(min-content, 1fr); gap: 8px; }
 
 @media (max-width: 359px) { .component-inspection .readings-grid { grid-template-columns: 1fr; } }
