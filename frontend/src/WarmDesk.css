@@ -334,6 +334,15 @@
 .topbar .icon-btn:active:not(:disabled), .account-chip:active { background: var(--night); }
 .app .controls-dock .dock-primary:hover:not(:disabled) { background: var(--primary-hover); }
 .app .controls-dock .dock-primary:active:not(:disabled) { background: var(--primary-active); }
+/* Run/Pause wears the clock's state: green while the company runs, desk-lamp gold while it waits on a pause. */
+.app .controls-dock .dock-primary:is(.is-running, .is-paused):not(:disabled) { color: var(--ink); }
+.app .controls-dock .dock-primary:is(.is-running, .is-paused):not(:disabled) > .icon { color: var(--ink); }
+.app .controls-dock .dock-primary.is-running:not(:disabled) { background: var(--ok); border-color: var(--ok); }
+.app .controls-dock .dock-primary.is-running:hover:not(:disabled) { background: var(--ok-hover); }
+.app .controls-dock .dock-primary.is-running:active:not(:disabled) { background: var(--ok-active); }
+.app .controls-dock .dock-primary.is-paused:not(:disabled) { background: var(--go); border-color: var(--go); }
+.app .controls-dock .dock-primary.is-paused:hover:not(:disabled) { background: var(--go-hover); }
+.app .controls-dock .dock-primary.is-paused:active:not(:disabled) { background: var(--go-active); }
 .app .controls-dock .camera-buttons button:hover, .app .controls-dock .floor-button:hover,
 .app .controls-dock .speed button:hover { background: var(--control-hover); }
 .app .controls-dock .camera-buttons button:active, .app .controls-dock .floor-button:active,

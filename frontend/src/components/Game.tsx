@@ -151,7 +151,7 @@ export function BottomBar() {
       <div className="time-controls" role="group" aria-label="Time">
         <WeekClock />
         <TimeMenu automatic={management} />
-        <button type="button" className="btn btn-primary advance dock-primary" disabled={!management && !incident} onClick={incident ? () => setRunning(!running) : advance} aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : undefined}>
+        <button type="button" className={`btn btn-primary advance dock-primary${incident ? (running ? " is-running" : " is-paused") : ""}`} disabled={!management && !incident} onClick={incident ? () => setRunning(!running) : advance} aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : undefined}>
           {management && running && <span key={`${game.turn}-${speed}`} className="advance-timer" style={{ animationDuration: `${AUTO_SECONDS / speed}s` }} />}
           <Icon name={incident ? (running ? "pause" : "play") : "next"} />
           <span className="advance-label">{incident ? (running ? "Pause" : "Resume") : game.phase === "ended" ? "Run over" : "Next week"}</span>
