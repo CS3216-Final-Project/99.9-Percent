@@ -267,8 +267,8 @@ export interface Campaign {
     /** Incidents opened at or before this step keep their original self-resolving behaviour, so a
      * run recorded before the response requirement still replays and continues faithfully. */
     legacyIncidentStep?: number;
-    /** Steps at or before this replay the pre-schema-10 scaling rules — monotonically allocated
-     * app ids and no automatic scale-up — so a run recorded before them stays faithful. */
+    /** Steps at or before this replay the pre-schema-10 scaling rules - monotonically allocated
+     * app ids and no automatic scale-up - so a run recorded before them stays faithful. */
     legacyScalingStep?: number;
     openingRecovered: boolean;
     firstPauseConsumed: boolean;

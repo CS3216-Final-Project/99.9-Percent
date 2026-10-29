@@ -9,7 +9,7 @@ afterEach(cleanup);
 
 describe("GateCounts", () => {
   // While a limit turns demand away, the In tag must show the effective admitted
-  // rate — the same figure the management surfaces report — not the raw demand.
+  // rate - the same figure the management surfaces report - not the raw demand.
   it("shows the admitted in-rate the management view reports, not the raw demand", () => {
     const applied = applyAction(newGame(1, "gate-limit"), { type: "set_traffic_limit", enabled: true });
     if (!applied.ok) throw Error(applied.message);

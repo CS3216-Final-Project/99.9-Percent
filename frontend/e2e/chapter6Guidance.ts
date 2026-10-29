@@ -34,7 +34,7 @@ export async function chapter6Preparation(page: Page, touch = false) {
   };
   // Follow the routing subview, then tick each highlighted Send-traffic checkbox. A pick queues a
   // routing change that activates on the next game second (Run), after which guidance re-highlights
-  // the next unrouted app — so keep following the gold control until every app is routed.
+  // the next unrouted app - so keep following the gold control until every app is routed.
   await accept(/^App \d+$/); await press(gold);
   const unrouted = () => savedGame(page).then(g => g.campaign!.apps.filter(a => !g.campaign!.routing.targets.includes(a.id)).length);
   for (let i = 0; i < 4 && await unrouted(); i++) {

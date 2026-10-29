@@ -33,7 +33,7 @@ export interface LabelSpot {
  * Y positions that pack a row of anchored labels tightly downward so no two cover each other. Each label keeps
  * `spots[i].y + first` unless a label already placed horizontally overlaps it, in which case it drops just clear
  * of that label's tail. Checking real overlap, not a fixed pitch, keeps the stack compact however many machines
- * there are and however far apart their anchors already sit — labels whose marks never collide simply stay put.
+ * there are and however far apart their anchors already sit - labels whose marks never collide simply stay put.
  * Works for labels of mixed heights too (a status note or a load bar makes one taller than another).
  */
 export function stackDown(spots: LabelSpot[], first = 0): number[] {

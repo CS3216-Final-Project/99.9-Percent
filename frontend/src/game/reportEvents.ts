@@ -119,7 +119,7 @@ export function autoscalerActivity(before: TraceEvent[], after: TraceEvent[]): s
         const text = type === "add-app" ? `${app(d.targetId)} installed`
           : type === "routing" ? (joined ? `${joined} routed` : "routing updated")
           : type === "scale-up" ? `${app(d.targetId)} upgraded`
-          : `${actionName(type)} done${d.targetId ? ` — ${app(d.targetId)}` : ""}`;
+          : `${actionName(type)} done${d.targetId ? ` - ${app(d.targetId)}` : ""}`;
         return [`Autoscaler: ${text}`];
       }
       default: return [];

@@ -10,7 +10,7 @@ async function boot(page:Page,g=combinedCompany()){await page.route("**/api/**",
 async function move(page:Page,n:number){await pause(page);await advanceCampaignStep(page,{seconds:n});}
 async function operateUntil(page:Page,predicate:(g:Awaited<ReturnType<typeof savedGame>>)=>boolean,budget=160,stopAtReport=false){let limitToggled=false;for(let i=0;i<budget;i++){const s=await savedGame(page);if(predicate(s))return;if(s.phase==="ended")throw Error("Unexpected bankruptcy");const notice=page.getByRole("dialog",{name:"System Recovered!",exact:true});if(await notice.isVisible()){await expect(page.getByRole("dialog",{name:"Incident postmortem",exact:true})).toBeVisible();continue;}const report=page.getByRole("dialog",{name:"Incident postmortem"});if(await report.isVisible()){if(stopAtReport)return;await report.getByRole("button",{name:"Continue company",exact:true}).click();continue;}
    // Incidents now hold out for a recorded capacity/routing/admission/restoration decision made after
-   // their cause began. Answer with an admission toggle, then undo it on the next pass — both requests
+   // their cause began. Answer with an admission toggle, then undo it on the next pass - both requests
    // count as the response and a set cap would keep rejected requests blocking recovery.
    const c=s.campaign,due=c?.incident?.responseDueFrom;
    if(c&&due!==undefined&&!c.actions.some(a=>a.cancelledStep===undefined&&(a.activatedStep??a.requestedStep)>=due)){

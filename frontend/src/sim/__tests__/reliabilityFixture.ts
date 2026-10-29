@@ -26,7 +26,7 @@ export function preparedReliability():GameState {
  s=act(s,{type:"unlock_reliability",tech:"auto_failover"});s=tick(act(s,{type:"deploy_failover"}),2);return s;
 }
 /** Accepted responses for an incident demanding one: restore the current failure, then generic
- * headroom or admission relief — never inventing actions the fixture's stage does not allow. */
+ * headroom or admission relief - never inventing actions the fixture's stage does not allow. */
 export function respondToIncident(s:GameState):GameState {
  const c=s.campaign!, d=c.reliabilityStage, attempts:Action[]=[];
  const fault=currentFault(c);

@@ -91,7 +91,7 @@ export async function openGatewayManagement(page:Page,scope?:Locator):Promise<Lo
 /**
  * Route every app: tick each unchecked "Send traffic to" checkbox in the gateway management view.
  * Each pick queues a routing change that activates on the next game second, so `advance` (a caller
- * that delivers one game second, e.g. `advanceCampaignStep`) runs between picks — the fieldset is
+ * that delivers one game second, e.g. `advanceCampaignStep`) runs between picks - the fieldset is
  * disabled while a routing change is pending.
  */
 export async function routeAllApps(page:Page,scope?:Locator,advance?:()=>Promise<void>):Promise<Locator> {

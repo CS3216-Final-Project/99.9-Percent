@@ -169,7 +169,7 @@ Guidance never changes the rules; it reads the same state the engine uses.
   The colleague speaks a few short lines in their own voice, which the player reads one at a time, and the last line carries the mission.
   Dismissing it at any line counts as reading it.
   Data Strategy's scene explains caching before its chapter guide points at Read Cache.
-  A hidden tab, blurred window or pointer lock only suspends the scene in place — it is not dismissed, and the stage cue queued behind it still follows in order.
+  A hidden tab, blurred window or pointer lock only suspends the scene in place - it is not dismissed, and the stage cue queued behind it still follows in order.
 - A new diagnostic incident that keeps running shows one Pause invitation.
 - A decision that pauses a company the player can still run shows one Run invitation, which lasts until the clock restarts or another prompt owns attention.
 - Every report (incident postmortem, prevention review, chapter outcome, growth review, scorecard) uses four short sections and one collapsed View Technical Details disclosure.
