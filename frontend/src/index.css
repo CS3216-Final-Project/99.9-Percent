@@ -5353,10 +5353,12 @@ button:disabled {
 }
 
 .component-inspection:not(.component-inspection-db) .component-inspection-controls { flex-wrap: wrap; }
-.component-inspection:not(.component-inspection-db) .component-inspection-controls > * { min-width: 0; flex: 1 1 0; }
-.component-inspection:not(.component-inspection-db) .component-inspection-controls > .btn { padding: 10px; gap: 4px; }
+/* Controls size to their content and wrap as whole buttons, so an icon never strays from its text. */
+.component-inspection:not(.component-inspection-db) .component-inspection-controls > * { min-width: 0; flex: 1 1 auto; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls > .btn { padding: 10px; gap: 6px; white-space: nowrap; }
 @media (max-width: 359px) {
  .component-inspection:not(.component-inspection-db) .component-inspection-controls > * { flex-basis: 40%; }
+ .component-inspection:not(.component-inspection-db) .component-inspection-controls > .btn { white-space: normal; }
 }
 .component-inspection:not(.component-inspection-db) .component-actions { width: 100%; }
 .component-inspection:not(.component-inspection-db) .component-inspection-controls > .component-actions { display: grid; }
@@ -5364,8 +5366,11 @@ button:disabled {
 .component-inspection:not(.component-inspection-db) .component-inspection-controls .campaign-action-card { display: flex; flex-direction: column; }
 .component-inspection:not(.component-inspection-db) .component-inspection-controls .act { flex: 1; }
 
-.component-inspection .act { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; min-height: 44px; margin: 0; padding: 10px; }
+/* Icon, label and done/locked mark share the first row; cost and timing sit centred beneath them. */
+.component-inspection .act { display: grid; grid-template-columns: auto minmax(0, max-content) auto; align-items: center; justify-content: center; gap: 4px 8px; min-height: 44px; margin: 0; padding: 10px; }
 .component-inspection .act-label { min-width: 0; }
+.component-inspection .act-affordance { grid-column: 3; grid-row: 1; margin-left: 0; }
+.component-inspection .act-meta { justify-content: center; }
 .component-inspection .actions { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 
 @media (max-width: 359px) { .component-inspection .readings-grid { grid-template-columns: 1fr; } }
