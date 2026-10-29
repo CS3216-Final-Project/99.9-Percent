@@ -22,7 +22,7 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     for(const component of ["db","app","gateway","monitoring"] as const) {
       const popup=await inspectEquipment(page,component);
       const summary=popup.locator(".component-inspection-summary");
-      await expect(summary.locator(".inspection-scanner")).toBeVisible();
+      await expect(summary.locator(".inspection-disc")).toBeVisible();
       await expect(summary.locator(".inspection-status")).toBeVisible();
       await expect(summary.locator(".component-inspection-metric")).not.toBeEmpty();
       await expect(popup.getByRole("button",{name:"Inspect details",exact:true})).toHaveAttribute("aria-expanded","false");

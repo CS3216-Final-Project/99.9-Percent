@@ -61,7 +61,7 @@ for (const phone of [false, true]) test.describe(phone ? "phone focused workspac
   test("machine health has a readable gap below its portrait", async ({ page }, testInfo) => {
     const inspector = await inspectEquipment(page, "app");
     const summary = inspector.locator(".component-inspection-summary");
-    const portrait = (await summary.locator(".inspection-scanner").boundingBox())!;
+    const portrait = (await summary.locator(".inspection-disc").boundingBox())!;
     const health = (await summary.locator(".inspection-status").boundingBox())!;
     expect(health.y - (portrait.y + portrait.height)).toBeCloseTo(12, 1);
     await expect(summary.locator(".inspection-status")).toHaveText("Healthy");
@@ -69,7 +69,7 @@ for (const phone of [false, true]) test.describe(phone ? "phone focused workspac
     await inspector.locator('[data-guidance-app="app-1"]').click();
     await expect(inspector.getByRole("heading", { name: "App 1", exact: true })).toBeVisible();
     await expect(summary.locator(".inspection-status > span")).toHaveText(["Healthy", "App 1"]);
-    const serverPortrait = (await summary.locator(".inspection-scanner").boundingBox())!;
+    const serverPortrait = (await summary.locator(".inspection-disc").boundingBox())!;
     const serverHealth = (await summary.locator(".inspection-status").boundingBox())!;
     expect(serverHealth.y - (serverPortrait.y + serverPortrait.height)).toBeCloseTo(12, 1);
     await page.screenshot({ path: testInfo.outputPath("machine-health-spacing.png") });

@@ -21,7 +21,7 @@ for(const width of [1440,390])test.describe(`infrastructure introduction ${width
    const hint=page.getByRole("dialog",{name:"Hint",exact:true});await expect(hint).toContainText(name==="App Server"?"App Servers":name);
    await hint.getByRole("button",{name:"Got it",exact:true}).click();await panel.getByRole("button",{name,exact:true}).click();
    const popup=page.locator(".component-inspection");await expect(popup).toBeVisible();await expect(gold).toHaveCount(0);
-   await expect(popup.locator(".component-inspection-summary .inspection-scanner")).toBeVisible();
+   await expect(popup.locator(".component-inspection-summary .inspection-disc")).toBeVisible();
    await expect(popup.getByRole("button",{name:/Add server|Upgrade database|Limit to/})).toHaveCount(0);
    await popup.getByRole("button",{name:"Inspect details",exact:true}).click();
    await popup.getByRole("button",{name:"Got it",exact:true}).click();
