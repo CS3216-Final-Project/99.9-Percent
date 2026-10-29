@@ -51,7 +51,7 @@ it("accepting the same hint again restores component guidance after inspection d
     fireEvent.click(within(screen.getByRole("dialog", { name: "Hint" })).getByRole("button", { name: "Got it" }));
   };
   accept(); enterHighlightedInspection();
-  fireEvent.click(within(screen.getByRole("dialog", { name: "Database", exact: true })).getByRole("button", { name: "Close" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Database" })).getByRole("button", { name: "Close" }));
   accept();
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Database");
 });

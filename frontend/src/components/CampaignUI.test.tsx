@@ -58,7 +58,7 @@ it("keeps the selected workload hidden until actual growth and enters through th
  act(()=>useGame.getState().endTour(true));
  expect(screen.queryByRole("region",{name:"Data strategy"})).toBeNull();
  fireEvent.click(screen.getByRole("button",{name:"Read Cache"}));fireEvent.click(screen.getByRole("button",{name:"Inspect details"}));
- const data=within(screen.getByRole("dialog",{name:"Read Cache", exact: true})).getByRole("region",{name:"Data strategy"});expect(data.textContent).toContain("Waiting for workload growth");
+ const data=within(screen.getByRole("dialog",{name:"Read Cache"})).getByRole("region",{name:"Data strategy"});expect(data.textContent).toContain("Waiting for workload growth");
  expect(data.textContent).not.toMatch(/read-heavy|write-heavy|80%|20%/);expect(useGame.getState().running).toBe(false);
 });
 it("shows the current stage cap instead of advertising a locked database tier",()=>{
@@ -112,7 +112,7 @@ it("labels the last completed profile separately from an immediate contrast",()=
  fireEvent.click(screen.getByRole("button",{name:"Observe contrasting workload"}));
  expect(useGame.getState().game.campaign!.dataStage).toEqual(contrast.state.campaign!.dataStage);
  expect(useGame.getState().game.campaign!.step).toBe(before.campaign!.step);
- const data=within(screen.getByRole("dialog",{name:"Read Cache", exact: true})).getByRole("region",{name:"Data strategy"});
+ const data=within(screen.getByRole("dialog",{name:"Read Cache"})).getByRole("region",{name:"Data strategy"});
  expect(data.textContent).toContain("Workload: write-heavy");
  const readings=screen.getByRole("region",{name:"Read Cache readings"});
  expect(readings.textContent).toContain("read-heavy");

@@ -203,16 +203,19 @@ function ComponentInspection() {
   const back=<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page!=="management"?"management":"overview")}>{place==="app"?(page==="management"?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>;
   const title=place==="app"?"App Servers":info.name;
   const lens=details?"zoomOut":"zoomIn";
-  // The disc is the machine and the way into its readings: pressing it opens them below the actions, and again closes them.
+  // The disc is the machine and the way into its readings: it turns over to a magnifier under the pointer, and pressing it
+  // opens the readings below the actions, and again closes them.
   const summary=<div className="component-inspection-summary">
       <button type="button" ref={disc} className={`inspection-disc tone-${state.tone}`} data-inspection-details aria-expanded={details} aria-controls="inspection-details" aria-label="Inspect details" onClick={()=>setDetails(!details)}>
-        <Icon name={EQUIPMENT_ICON[place]} size={48} className="inspection-disc-machine"/>
-        <Icon name={lens} size={44} className="inspection-disc-lens"/>
+        <span className="inspection-disc-turn">
+          <span className="inspection-disc-face"><Icon name={EQUIPMENT_ICON[place]} size={48}/></span>
+          <span className="inspection-disc-face inspection-disc-back"><Icon name={lens} size={44}/></span>
+        </span>
         <span className="inspection-disc-badge"><Icon name={lens} size={16}/></span>
       </button>
       <p className="inspection-status"><span className={`state state-${stateKey}`}><Icon name={state.icon} size={12}/>{word}</span>{server&&<span>App {selected.id.slice(4)}</span>}</p>
       <p className="component-inspection-metric">{metric}</p>
-      {component&&component.capacity>0&&<Meter value={component.demand/component.capacity} tone={state.tone} label={`${place==="db"?"Database":"Server"} load`}/>}
+      {component&&component.capacity>0&&<Meter value={component.demand/component.capacity} tone={state.tone==="muted"?"accent":state.tone} label={`${place==="db"?"Database":"Server"} load`}/>}
       <p>{description}</p>
     </div>;
   const detailsArea=(content:ReactNode)=>details&&<div id="inspection-details" className="inspection-details">{content}</div>;

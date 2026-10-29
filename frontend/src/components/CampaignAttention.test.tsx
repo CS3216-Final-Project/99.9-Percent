@@ -257,7 +257,7 @@ it("a blocking local modal takes priority over an actual valid purchase quote", 
 it("removes gold from a control clipped by its scrolling inspector without discarding acceptance", () => {
   show(advanceSteps(newGame(), 6).state);
   fireEvent.click(screen.getByRole("button", { name: "Hint" })); acceptHint();
-  const inspector = screen.getByRole("dialog", { name: "Database", exact: true });
+  const inspector = screen.getByRole("dialog", { name: "Database" });
   inspector.style.overflowY = "auto";
   Object.defineProperty(inspector, "getBoundingClientRect", { configurable:true, value:()=>({ x:10,y:10,top:10,left:10,right:54,bottom:35,width:44,height:25,toJSON:()=>({}) }) });
   fireEvent.scroll(inspector); expect(gold()).toHaveLength(0);
@@ -370,7 +370,7 @@ it("spotlights only the Opening's first Run, then guides through the Hint flow",
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   expect(useGame.getState().game.campaign!.pending.some(action => action.type === "upgrade-db")).toBe(true);
   expect(useGame.getState().game.campaign!.step).toBe(step);
-  expect(screen.queryByRole("dialog", { name: "Database", exact: true })).toBeNull();
+  expect(screen.queryByRole("dialog", { name: "Database" })).toBeNull();
   // The pending install is a Run hint, not another spotlight.
   noSpot();
   expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
