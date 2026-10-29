@@ -5342,7 +5342,8 @@ button:disabled {
 .component-inspection-controls > .component-actions { flex: 1; min-width: 0; }
 .component-inspection-controls:empty { display: none; }
 
-/* The machine's disc: the machine in its health's pastel on its face, a magnifier on its back, turned over under the pointer. */
+/* The machine's disc: the machine in its health's pastel. Under the pointer it lightens and shows a magnifier; open,
+   it is turned over to its lavender back, where the magnifier closes the readings. */
 .inspection-disc {
   position: relative;
   width: 104px;
@@ -5354,11 +5355,9 @@ button:disabled {
   background: transparent;
   cursor: pointer;
   perspective: 520px;
-  outline: 3px solid transparent;
-  outline-offset: 3px;
-  transition: outline-color 0.16s ease-out;
 }
 .inspection-disc-turn { display: grid; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+.inspection-disc[aria-expanded="true"] .inspection-disc-turn { transform: rotateY(180deg); }
 .inspection-disc-face {
   grid-area: 1 / 1;
   display: grid;
@@ -5368,14 +5367,17 @@ button:disabled {
   background: var(--tile-green);
   color: var(--tile-green-ink);
   backface-visibility: hidden;
+  transition: filter 0.16s ease-out;
 }
+.inspection-disc-face > .icon { grid-area: 1 / 1; transition: opacity 0.16s ease-out, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+.inspection-disc-face > .inspection-disc-lens { opacity: 0; transform: scale(0.7); }
 .inspection-disc.tone-warn .inspection-disc-face { background: var(--tile-orange); color: var(--tile-orange-ink); }
 .inspection-disc.tone-critical .inspection-disc-face { background: var(--tile-pink); color: var(--critical-ink); }
 .inspection-disc.tone-muted .inspection-disc-face { background: var(--tile-purple); color: var(--tile-purple-ink); }
 .inspection-disc .inspection-disc-back { transform: rotateY(180deg); background: var(--selection); border-color: var(--selection-edge); color: var(--ink); }
-.inspection-disc:is(:hover, :focus-visible) .inspection-disc-turn { transform: rotateY(180deg); }
-.inspection-disc:hover { outline-color: var(--selection-edge); }
-.inspection-disc[aria-expanded="true"] .inspection-disc-face:not(.inspection-disc-back) { border-color: var(--selection-edge); }
+.inspection-disc:is(:hover, :focus-visible) .inspection-disc-face { filter: brightness(1.07); }
+.inspection-disc:is(:hover, :focus-visible) .inspection-disc-machine { opacity: 0; transform: scale(0.7); }
+.inspection-disc:is(:hover, :focus-visible) .inspection-disc-lens { opacity: 1; transform: none; }
 /* Touch has no hover, so a small lens on the rim always says the disc opens the readings. */
 .inspection-disc-badge {
   position: absolute;
@@ -5390,18 +5392,18 @@ button:disabled {
   background: var(--paper);
   color: var(--ink);
 }
-/* The disc's copy that flies from the pressed icon while the card opens (InspectionReveal.tsx). */
-.inspection-disc-ghost { position: fixed; z-index: 1000; margin: 0; pointer-events: none; }
+/* The shell that grows from the pressed button onto the card while it opens (InspectionReveal.tsx). */
+.inspection-morph { position: fixed; box-sizing: border-box; margin: 0; border: 1px solid var(--control-edge); box-shadow: var(--lift); pointer-events: none; }
 .inspection-details { display: grid; gap: 10px; animation: inspection-details-open 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes inspection-details-open {
   from { opacity: 0; transform: translateY(-6px); }
 }
 /* Without motion the disc swaps faces in place instead of turning over. */
 @media (prefers-reduced-motion: reduce) {
-  .inspection-disc, .inspection-disc-turn { transition: none; }
-  .inspection-disc:is(:hover, :focus-visible) .inspection-disc-turn { transform: none; }
+  .inspection-disc-turn, .inspection-disc-face, .inspection-disc-face > .icon { transition: none; }
+  .inspection-disc[aria-expanded="true"] .inspection-disc-turn { transform: none; }
   .inspection-disc .inspection-disc-back { transform: none; visibility: hidden; }
-  .inspection-disc:is(:hover, :focus-visible) .inspection-disc-back { visibility: visible; }
+  .inspection-disc[aria-expanded="true"] .inspection-disc-back { visibility: visible; }
   .inspection-details { animation: none; }
 }
 .component-inspection .actions { margin: 0; }

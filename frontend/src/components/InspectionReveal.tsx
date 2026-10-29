@@ -66,52 +66,38 @@ export default function InspectionReveal() {
 }
 
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-const GENIE = { duration: 480, easing: "cubic-bezier(0.22, 1, 0.36, 1)" };
+const MORPH = { duration: 460, easing: "cubic-bezier(0.22, 1, 0.36, 1)" };
 
 /**
- * Opens the card the way a window leaves the dock: it pours out of the icon that was pressed, narrow at first and
- * widening as it lands, while the machine's disc flies from that icon into its place. Opened from anywhere else
- * (another dialog, or after a reload) the card simply appears.
+ * Opens the card out of the control that was pressed: a paper shell starts on that button's four edges, with its
+ * corners and colour, and grows onto the card's four edges, where the card fades in over it. Opened from another
+ * dialog, after a reload or with reduced motion, the card simply appears.
  */
-function useGenie(anchor: RefObject<HTMLElement | null>, disc: RefObject<HTMLElement | null>) {
+function useMorph(anchor: RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
     const origin = takeOrigin();
     const card = anchor.current?.closest<HTMLElement>(".modal");
     if (!origin || !card || reducedMotion() || typeof card.animate !== "function") return;
-    const ox = origin.x + origin.width / 2, oy = origin.y + origin.height / 2;
-    const box = card.getBoundingClientRect();
-    const dx = ox - (box.x + box.width / 2), dy = oy - (box.y + box.height / 2);
-    const sx = Math.max(origin.width / box.width, 0.04), sy = Math.max(origin.height / box.height, 0.04);
-    const running = [card.animate([
-      { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, opacity: 0 },
-      { transform: `translate(${dx * 0.3}px, ${dy * 0.3}px) scale(${Math.max(sx, 0.32)}, 0.9)`, opacity: 1, offset: 0.45 },
-      { transform: "none", opacity: 1 },
-    ], GENIE)];
-    const real = disc.current, target = real?.getBoundingClientRect();
-    let ghost: HTMLElement | null = null;
-    if (real && target && target.width > 0) {
-      ghost = real.cloneNode(true) as HTMLElement;
-      ghost.classList.add("inspection-disc-ghost");
-      ghost.setAttribute("aria-hidden", "true");
-      ghost.removeAttribute("data-inspection-details");
-      ghost.inert = true;
-      Object.assign(ghost.style, { left: `${target.x}px`, top: `${target.y}px`, width: `${target.width}px`, height: `${target.height}px` });
-      document.body.append(ghost);
-      // The real disc waits out the flight unseen, and shows again on its own when the flight lands.
-      running.push(real.animate([{ opacity: 0 }, { opacity: 0 }], GENIE));
-      const scale = Math.max(origin.width, origin.height) / target.width;
-      const flight = ghost.animate([
-        { transform: `translate(${ox - (target.x + target.width / 2)}px, ${oy - (target.y + target.height / 2)}px) scale(${scale})` },
-        { transform: "none" },
-      ], GENIE);
-      running.push(flight);
-      flight.finished.then(() => ghost?.remove(), () => undefined);
-    }
+    const to = card.getBoundingClientRect(), style = getComputedStyle(card);
+    const edges = (r: { x: number; y: number; width: number; height: number }, radius: string, background: string) =>
+      ({ left: `${r.x}px`, top: `${r.y}px`, width: `${r.width}px`, height: `${r.height}px`, borderRadius: radius, backgroundColor: background });
+    const shell = document.createElement("div");
+    shell.className = "inspection-morph";
+    shell.setAttribute("aria-hidden", "true");
+    card.before(shell);
+    const morph = shell.animate([
+      { ...edges(origin, origin.radius, origin.background ?? style.backgroundColor), opacity: 1 },
+      { opacity: 1, offset: 0.6 },
+      { ...edges(to, style.borderRadius, style.backgroundColor), opacity: 0 },
+    ], MORPH);
+    const reveal = card.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1 }], MORPH);
+    morph.finished.then(() => shell.remove(), () => undefined);
     return () => {
-      for (const a of running) a.cancel();
-      ghost?.remove();
+      morph.cancel();
+      reveal.cancel();
+      shell.remove();
     };
-  }, [anchor, disc]);
+  }, [anchor]);
 }
 
 /** Both the room and keyboard-accessible shortcuts open this same live inspection. */
@@ -120,8 +106,7 @@ function ComponentInspection() {
   const [details,setDetails]=useState(false);
   const [page,setPage]=useState<"overview"|"management"|EquipmentActionView>(()=>inspection?.equipment==="app"&&inspection.appId?"server":"overview");
   const subview=useRef<HTMLDivElement>(null);
-  const disc=useRef<HTMLButtonElement>(null);
-  useGenie(subview,disc);
+  useMorph(subview);
   const navigate=(next:typeof page)=>{setDetails(false);setPage(next);};
   const previousPage=useRef(page);
   useLayoutEffect(()=>{
@@ -203,13 +188,16 @@ function ComponentInspection() {
   const back=<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page!=="management"?"management":"overview")}>{place==="app"?(page==="management"?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>;
   const title=place==="app"?"App Servers":info.name;
   const lens=details?"zoomOut":"zoomIn";
-  // The disc is the machine and the way into its readings: it turns over to a magnifier under the pointer, and pressing it
-  // opens the readings below the actions, and again closes them.
+  // The disc is the machine and the way into its readings: under the pointer it lightens and shows a magnifier, and pressing
+  // it turns it over to close the magnifier, opening the readings below the actions; pressing again turns it back.
   const summary=<div className="component-inspection-summary">
-      <button type="button" ref={disc} className={`inspection-disc tone-${state.tone}`} data-inspection-details aria-expanded={details} aria-controls="inspection-details" aria-label="Inspect details" onClick={()=>setDetails(!details)}>
+      <button type="button" className={`inspection-disc tone-${state.tone}`} data-inspection-details aria-expanded={details} aria-controls="inspection-details" aria-label="Inspect details" onClick={()=>setDetails(!details)}>
         <span className="inspection-disc-turn">
-          <span className="inspection-disc-face"><Icon name={EQUIPMENT_ICON[place]} size={48}/></span>
-          <span className="inspection-disc-face inspection-disc-back"><Icon name={lens} size={44}/></span>
+          <span className="inspection-disc-face">
+            <Icon name={EQUIPMENT_ICON[place]} size={48} className="inspection-disc-machine"/>
+            <Icon name="zoomIn" size={44} className="inspection-disc-lens"/>
+          </span>
+          <span className="inspection-disc-face inspection-disc-back"><Icon name="zoomOut" size={44}/></span>
         </span>
         <span className="inspection-disc-badge"><Icon name={lens} size={16}/></span>
       </button>
