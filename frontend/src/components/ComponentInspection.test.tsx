@@ -270,3 +270,12 @@ it("keeps legacy Launch Week incident inspections and upgrades usable after the 
  expect(screen.getByRole("region",{name:"Confirm Upgrade database"})).toBeTruthy();
  expect(screen.getByRole("button",{name:"Confirm"}).hasAttribute("disabled")).toBe(false);
 });
+it("leaves a collapsed side panel collapsed when a machine is inspected from the room",async()=>{
+  show();useGame.getState().setPanelOpen(false);
+  act(()=>inspectInRoom("db"));await act(async()=>{});
+  expect(screen.getByRole("dialog",{name:"Database"})).toBeTruthy();
+  expect(useGame.getState().panelOpen).toBe(false);
+  fireEvent.click(dialog("Database").getByRole("button",{name:"Close"}));
+  act(()=>inspectInRoom("app","app-1"));await act(async()=>{});
+  expect(useGame.getState().panelOpen).toBe(false);
+});

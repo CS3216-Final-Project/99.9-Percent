@@ -1513,9 +1513,17 @@ let roomInspectionSeq = 0;
  * Classic panels keep their existing inline `inspectOrSelect` flow.
  */
 export function inspectInRoom(id: EquipmentId, appId?: string): void {
-  if (!canInspectEquipment(useGame.getState().game, id)) return;
+  const { game, panelOpen } = useGame.getState();
+  if (!canInspectEquipment(game, id)) return;
   inspectOrSelect(id, appId);
-  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) } });
+  // A Guided Mode machine's dialog holds its readings and actions, so the side panel stays as the player left it;
+  // Challenge Mode's reveal points to the panel's inspector, which selecting opens.
+  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) }, ...(opensComponentDialog(game, id) ? { panelOpen } : {}) });
+}
+
+/** Whether inspecting this machine opens Guided Mode's component dialog rather than Challenge Mode's reveal. */
+export function opensComponentDialog(game: GameState, id: EquipmentId): boolean {
+  return !!game.campaign && (["db", "app", "gateway", "cache", "monitoring"] as EquipmentId[]).includes(id);
 }
 
 function loadMetaSafe(): Meta {
