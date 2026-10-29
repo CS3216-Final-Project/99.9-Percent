@@ -20,7 +20,7 @@ import {
 } from "@/sim";
 import type { GameMode, GraphicsQuality } from "@/game/persist";
 import { loadExploration, saveExploration, type SavedCameraView } from "@/game/exploration";
-import { canInspectEquipment, inspectInRoom, trafficViewOn, useGame } from "@/game/store";
+import { canInspectEquipment, inspectInRoom, roomPaused, trafficViewOn, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { nextViewpoint } from "@/game/viewpoints";
 import { isPhoneEdition } from "@/phone/edition";
@@ -67,6 +67,7 @@ import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
 import { Exterior } from "./exterior";
 import { daylightNow, holdDay } from "./dayClock";
+import { holdWorld, worldNow } from "./worldClock";
 import { sunStep, sunSteps, type Vec3 } from "./sky";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
@@ -685,10 +686,10 @@ function Cable({ points, speed, alert }: { points: P2[]; speed: number; alert: b
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = alert ? "#ff4d5e" : "#4cb8ff";
 
-  useFrame(({ clock }) => {
+  useFrame(() => {
     const mesh = packets.current;
     if (!mesh || segments.total <= 0) return;
-    const t = clock.elapsedTime * (0.9 + speed * 2.2);
+    const t = worldNow() * (0.9 + speed * 2.2);
     for (let i = 0; i < count; i++) {
       const d = (t + (i * segments.total) / count) % segments.total;
       const seg = segments.list.find((s) => d >= s.start && d <= s.start + s.len) ?? segments.list[0];
@@ -737,8 +738,8 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
   useFrame(({ clock }) => {
     if (!fill.current) return;
     const base = alerting ? 0.16 : affected ? 0.14 : selected ? 0.13 : hovered ? 0.07 : 0;
-    // The machine an action would change breathes gently; an alert pulses faster.
-    fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4.2))
+    // The machine an action would change breathes gently; an alert pulses faster, and holds with the paused room.
+    fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(worldNow() * 4.2))
       : affected ? base + 0.12 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 3)) : base;
   });
 
@@ -1366,11 +1367,17 @@ function Scene({ quality, landed }: { quality: QualityProfile; landed: Floor | n
   const mode = useGame((s) => s.mode);
   const walking = useGame((s) => s.walking && s.started);
   const trafficView = useGame(trafficViewOn);
-  // The traffic view holds the sun still, so no shadow sweeps across the floor while the player reads the traffic.
+  const paused = useGame(roomPaused);
+  // Paused, the whole room holds still: the crew, the city, the machines and the traffic (worldClock.ts).
   useEffect(() => {
-    holdDay(trafficView);
+    holdWorld(paused);
+    return () => holdWorld(false);
+  }, [paused]);
+  // The traffic view holds the sun still too, so no shadow sweeps across the floor while the player reads the traffic.
+  useEffect(() => {
+    holdDay(trafficView || paused);
     return () => holdDay(false);
-  }, [trafficView]);
+  }, [trafficView, paused]);
   const office = useRef<THREE.Group>(null);
   const servers = useRef<THREE.Group>(null);
   const outside = useRef<THREE.Group>(null);

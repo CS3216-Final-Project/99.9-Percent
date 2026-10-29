@@ -10,7 +10,8 @@ import { memberRotation, turnAt, type Group, type Turn } from "./conversations";
 import { Creature } from "./creatures";
 import { asideLine, captionLine, earshot, fresh, glance, GREET_SECONDS, greetingLine, nearness, notices } from "./greetings";
 import { overhear } from "./overheard";
-import { now, riding } from "./ride";
+import { riding } from "./ride";
+import { worldNow } from "./worldClock";
 import { heading, wrapAngle } from "./routes";
 import { avatar } from "./walk";
 import { sceneSpeech } from "./sceneSounds";
@@ -41,13 +42,13 @@ export function Conversation({ group, incident }: { group: Group; incident: bool
 
   useEffect(() => () => overhear(group.name, null), [group.name]);
 
-  useFrame(({ clock }) => {
-    const t = now();
+  useFrame(() => {
+    const t = worldNow();
     const walking = useGame.getState().walking && avatar.floor === "office" && !riding();
     const d = walking ? Math.hypot(avatar.x - group.centre[0], avatar.z - group.centre[1]) : Infinity;
     heard.current = d;
 
-    const next = turnAt(group, clock.elapsedTime, incident);
+    const next = turnAt(group, t, incident);
     if (walking && next.line && (next.speaker !== shown.current.speaker || next.line !== shown.current.line)) {
       // Each new line is spoken in the speaker's voice.
       const near = nearness(d);

@@ -386,7 +386,6 @@ function requiredAcknowledgement(g: GameState): Action["type"] | null {
   return milestoneBlocks(g) ? "acknowledge_milestone" : null;
 }
 const awaitingAcknowledgement = (g: GameState) => !!g.campaign && requiredAcknowledgement(g) !== null;
-/** Whether Guided Mode's clock may move now, by Run or by a manual step: never behind a guide, a pause-only view or an acknowledgement. */
 /**
  * Whether the server floor shows only the request path. It is Guided Mode's alone, and the player's choice.
  */
@@ -395,6 +394,12 @@ export function trafficViewOn(s: { game: GameState; meta: Meta }): boolean {
   return !!c && !!s.meta.trafficView;
 }
 
+/** Whether the room holds still: whenever Guided Mode's clock is paused, and while Challenge Mode's incident clock is. */
+export function roomPaused(s: { game: GameState; started: boolean; running: boolean }): boolean {
+  return s.started && !s.running && (!!s.game.campaign || s.game.phase === "incident");
+}
+
+/** Whether Guided Mode's clock may move now, by Run or by a manual step: never behind a guide, a pause-only view or an acknowledgement. */
 export function campaignClockAvailable(s: { game: GameState; started: boolean; tour: Tour | null; view: View }): boolean {
   const c = s.game.campaign;
   return !!c && !introductionActive(c) && s.started && !awaitingAcknowledgement(s.game) && !["menu", "tech", "scorecard"].includes(s.view ?? "")

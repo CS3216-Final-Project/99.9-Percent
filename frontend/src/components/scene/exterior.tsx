@@ -71,6 +71,7 @@ import { vehicleBody, vehicleLights, vehicleSeams } from "./vehicleModels";
 import { HIP, HAIR, SHOULDER, SKIN, STATURE, stature, TROUSERS, walkerModel } from "./walkerModels";
 import { adsTexture, logoSign } from "./textures";
 import { shownFloor } from "./ride";
+import { worldNow } from "./worldClock";
 
 /*
  * Draws the city round the office (see city.ts) at whatever time of day it is (see sky.ts). Nothing out here takes
@@ -1433,8 +1434,8 @@ function Beacons({ list }: { list: Building[] }) {
     return parts.length ? merge(parts) : null;
   }, [list]);
   const ref = useRef<THREE.Mesh>(null);
-  useFrame(({ clock }) => {
-    if (ref.current) ref.current.visible = clock.elapsedTime % 1.6 < 0.55;
+  useFrame(() => {
+    if (ref.current) ref.current.visible = worldNow() % 1.6 < 0.55;
   });
   useEffect(() => () => geometry?.dispose(), [geometry]);
   return geometry ? <mesh ref={ref} geometry={geometry} material={M.glow} frustumCulled={false} /> : null;
@@ -1739,14 +1740,14 @@ function Fleet({ vehicles, body, lights, material, shade, size }: { vehicles: Ve
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     // A new body or material makes a new mesh, which needs its colours again.
   }, [vehicles, body, material]);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     const b = bodies.current;
     const l = lamps.current;
     if (!b || !l) return;
     const s = shadows.current;
     for (let k = 0; k < vehicles.length; k++) {
       const lane = LANES[vehicles[k].lane];
-      const at = vehicleAt(lane, vehicles[k].slot, clock.elapsedTime);
+      const at = vehicleAt(lane, vehicles[k].slot, worldNow());
       place.set(at.x, GROUND_Y + 0.01, at.z);
       spin.setFromAxisAngle(UP, heading(lane.axis, lane.dir));
       turned.compose(place, spin, unit);
@@ -1885,10 +1886,10 @@ function Crowd({ share, lite }: { share: number; lite: boolean }) {
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
     // A new body makes a new mesh, which needs its colours again.
   }, [people, body]);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     const m = mesh.current;
     if (!m) return;
-    const t = clock.elapsedTime;
+    const t = worldNow();
     walkClock.value = t;
     for (let k = 0; k < people.length; k++) {
       const p = people[k];
