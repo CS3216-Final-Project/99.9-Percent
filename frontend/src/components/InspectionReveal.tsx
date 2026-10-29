@@ -188,8 +188,9 @@ function ComponentInspection() {
   const back=<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page!=="management"?"management":"overview")}>{place==="app"?(page==="management"?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>;
   const title=place==="app"?"App Servers":info.name;
   const lens=details?"zoomOut":"zoomIn";
-  // The disc is the machine and the way into its readings: under the pointer it lightens and shows a magnifier, and pressing
-  // it turns it over to close the magnifier, opening the readings below the actions; pressing again turns it back.
+  // The disc is the machine and the way into its readings: under the pointer a glowing magnifier lies over the machine, and
+  // pressing it turns it over, opening the readings below the actions. Its back is the machine again, with a closing
+  // magnifier under the pointer; pressing again turns it back.
   const summary=<div className="component-inspection-summary">
       <button type="button" className={`inspection-disc tone-${state.tone}`} data-inspection-details aria-expanded={details} aria-controls="inspection-details" aria-label="Inspect details" onClick={()=>setDetails(!details)}>
         <span className="inspection-disc-turn">
@@ -197,7 +198,10 @@ function ComponentInspection() {
             <Icon name={EQUIPMENT_ICON[place]} size={48} className="inspection-disc-machine"/>
             <Icon name="zoomIn" size={44} className="inspection-disc-lens"/>
           </span>
-          <span className="inspection-disc-face inspection-disc-back"><Icon name="zoomOut" size={44}/></span>
+          <span className="inspection-disc-face inspection-disc-back">
+            <Icon name={EQUIPMENT_ICON[place]} size={48} className="inspection-disc-machine"/>
+            <Icon name="zoomOut" size={44} className="inspection-disc-lens"/>
+          </span>
         </span>
         <span className="inspection-disc-badge"><Icon name={lens} size={16}/></span>
       </button>

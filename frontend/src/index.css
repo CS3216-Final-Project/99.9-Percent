@@ -5342,8 +5342,9 @@ button:disabled {
 .component-inspection-controls > .component-actions { flex: 1; min-width: 0; }
 .component-inspection-controls:empty { display: none; }
 
-/* The machine's disc: the machine in its health's pastel. Under the pointer it lightens and shows a magnifier; open,
-   it is turned over to its lavender back, where the magnifier closes the readings. */
+/* The machine's disc: the machine in its health's pastel on both faces. Under the pointer it lightens and a glowing white
+   magnifier lies over the faded machine, a plus on its face and a minus on its back, which it is turned over to while
+   the readings are open. */
 .inspection-disc {
   position: relative;
   width: 104px;
@@ -5370,13 +5371,18 @@ button:disabled {
   transition: filter 0.16s ease-out;
 }
 .inspection-disc-face > .icon { grid-area: 1 / 1; transition: opacity 0.16s ease-out, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
-.inspection-disc-face > .inspection-disc-lens { opacity: 0; transform: scale(0.7); }
+.inspection-disc-face > .inspection-disc-lens {
+  opacity: 0;
+  transform: scale(0.7);
+  color: #fff;
+  filter: drop-shadow(0 1px 1px rgb(29 24 52 / 0.45)) drop-shadow(0 0 6px rgb(255 255 255 / 0.95));
+}
 .inspection-disc.tone-warn .inspection-disc-face { background: var(--tile-orange); color: var(--tile-orange-ink); }
 .inspection-disc.tone-critical .inspection-disc-face { background: var(--tile-pink); color: var(--critical-ink); }
 .inspection-disc.tone-muted .inspection-disc-face { background: var(--tile-purple); color: var(--tile-purple-ink); }
-.inspection-disc .inspection-disc-back { transform: rotateY(180deg); background: var(--selection); border-color: var(--selection-edge); color: var(--ink); }
+.inspection-disc .inspection-disc-back { transform: rotateY(180deg); }
 .inspection-disc:is(:hover, :focus-visible) .inspection-disc-face { filter: brightness(1.07); }
-.inspection-disc:is(:hover, :focus-visible) .inspection-disc-machine { opacity: 0; transform: scale(0.7); }
+.inspection-disc:is(:hover, :focus-visible) .inspection-disc-machine { opacity: 0.35; }
 .inspection-disc:is(:hover, :focus-visible) .inspection-disc-lens { opacity: 1; transform: none; }
 /* Touch has no hover, so a small lens on the rim always says the disc opens the readings. */
 .inspection-disc-badge {
