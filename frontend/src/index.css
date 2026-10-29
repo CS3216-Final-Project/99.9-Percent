@@ -39,11 +39,10 @@
   /* Actions and status */
   --go: #ffd84a;
   --go-hover: #ffe680;
+  --go-active: #f2c624;
   --focus: #2d79ad;
   --ok: #3ddc84;
   --ok-ink: #0f7a45;
-  --ok-hover: #72e6a6;
-  --ok-active: #2cc471;
   --warn: #ff9f1a;
   --warn-ink: #a65400;
   --critical: #ff4d5e;
