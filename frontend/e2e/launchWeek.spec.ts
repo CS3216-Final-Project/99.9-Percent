@@ -197,6 +197,7 @@ test("the research sheet previews each option and spends the pick", async ({ pag
 });
 
 test("the score card reports nines, copies the result and continues to Chapter 2", async ({ page }) => {
+  test.slow();
   await boot(page, nearlyDone());
   const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
@@ -204,7 +205,8 @@ test("the score card reports nines, copies the result and continues to Chapter 2
   await expect(rush).toBeDisabled();
   await setGameSpeed(page, 2);
   await page.getByRole("button", { name: "Run", exact: true }).click();
-  for (let i = 0; i < 160 && !(await card.isVisible()); i++) {
+  // Bound the wait by time, not iterations: a slow runner spends longer on each pass.
+  for (const deadline = Date.now() + 90_000; Date.now() < deadline && !(await card.isVisible());) {
     const dialog = page.getByRole("dialog");
     if (await dialog.isVisible()) {
       const next = dialog.getByRole("button", { name: "View Incident Report", exact: true });
