@@ -5353,13 +5353,16 @@ button:disabled {
 }
 
 .component-inspection:not(.component-inspection-db) .component-inspection-controls { flex-wrap: wrap; }
-/* Controls size to their content and wrap as whole buttons, so an icon never strays from its text. */
-.component-inspection:not(.component-inspection-db) .component-inspection-controls > * { min-width: 0; flex: 1 1 auto; }
-.component-inspection:not(.component-inspection-db) .component-inspection-controls > .btn { padding: 10px; gap: 6px; white-space: nowrap; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls > * { flex: 1 1 0; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls > .btn { padding: 10px; gap: 6px; }
 @media (max-width: 359px) {
  .component-inspection:not(.component-inspection-db) .component-inspection-controls > * { flex-basis: 40%; }
- .component-inspection:not(.component-inspection-db) .component-inspection-controls > .btn { white-space: normal; }
 }
+/* Controls share rows but never shrink below their content, so an icon never strays from its text:
+   short buttons stay on one line and action labels wrap beside their icon, never under their longest word. */
+.component-inspection .component-inspection-controls { flex-wrap: wrap; }
+.component-inspection .component-inspection-controls > * { min-width: min-content; }
+.component-inspection .component-inspection-controls > .btn { white-space: nowrap; max-width: 100%; }
 .component-inspection:not(.component-inspection-db) .component-actions { width: 100%; }
 .component-inspection:not(.component-inspection-db) .component-inspection-controls > .component-actions { display: grid; }
 .component-inspection:not(.component-inspection-db) .component-inspection-controls .actions > li { display: grid; }
@@ -5367,7 +5370,7 @@ button:disabled {
 .component-inspection:not(.component-inspection-db) .component-inspection-controls .act { flex: 1; }
 
 /* Icon, label and done/locked mark share the first row; cost and timing sit centred beneath them. */
-.component-inspection .act { display: grid; grid-template-columns: auto minmax(0, max-content) auto; align-items: center; justify-content: center; gap: 4px 8px; min-height: 44px; margin: 0; padding: 10px; }
+.component-inspection .act { display: grid; grid-template-columns: auto minmax(min-content, max-content) auto; align-items: center; justify-content: center; gap: 4px 8px; min-height: 44px; margin: 0; padding: 10px; }
 .component-inspection .act-label { min-width: 0; }
 .component-inspection .act-affordance { grid-column: 3; grid-row: 1; margin-left: 0; }
 .component-inspection .act-meta { justify-content: center; }
