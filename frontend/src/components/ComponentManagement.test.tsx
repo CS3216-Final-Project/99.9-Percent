@@ -68,7 +68,7 @@ it("retains deployed controller configuration and costs without mixing server co
 });
 
 it("keeps Network admission separate from routing, balancing and failover",()=>{
-  show(preparedReliability());press("Network");const popup=screen.getByRole("dialog",{name:"Network inspected"});
+  show(preparedReliability());press("Network");const popup=screen.getByRole("dialog",{name:"Network", exact: true});
   expect(within(popup).getByRole("button",{name:/Limit to/})).toBeTruthy();
   expect(within(popup).queryByRole("group",{name:/Send traffic to/})).toBeNull();
   expect(within(popup).queryByRole("button",{name:/Deploy Automatic Failover/})).toBeNull();

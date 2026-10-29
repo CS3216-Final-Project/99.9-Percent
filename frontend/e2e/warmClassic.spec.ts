@@ -45,7 +45,7 @@ for (const width of [1440, 390, 320]) test(`Warm Classic equipment workspace and
   await page.getByRole("button", { name: "Hide equipment and actions", exact: true }).click();
   // Even selecting the already-selected machine in the room reveals its inspector again.
   await page.getByRole("main").getByRole("button", { name: "Monitoring", exact: true }).click();
-  await page.getByRole("dialog", { name: "Monitoring inspected" }).getByRole("button", { name: "Close" }).click();
+  await page.getByRole("dialog", { name: "Monitoring", exact: true }).getByRole("button", { name: "Close" }).click();
   await expect(panel).toBeVisible();
   await expect(page.locator(".dock-second")).toContainText(`${before % 60} / 60 s`);
   await expect(page.locator(".dock-primary > .icon")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");

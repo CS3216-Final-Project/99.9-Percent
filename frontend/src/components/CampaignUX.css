@@ -72,6 +72,7 @@
 .campaign-panel .campaign-requirements p { margin: 6px 0 0; font-size: var(--text-sm); line-height: 1.45; }
 .campaign-panel .campaign-action-card { border-bottom: 1px solid var(--paper-3); padding-bottom: 8px; }
 :is(.campaign-panel, .component-inspection) .campaign-action-reason { margin: 4px 0; font-size: var(--text-xs); color: var(--warn-ink); }
+.component-inspection .campaign-action-reason.is-done { color: var(--ok-ink); text-align: center; }
 /* An action's confirmation floats beside the machine it changes; shared paper surfaces and action states come from WarmDesk.css. */
 .campaign-action-popover { position: absolute; left: 0; top: 0; z-index: 6; width: min(320px, calc(100% - 24px)); border: 1px solid var(--control-edge); border-radius: var(--radius); background: var(--night-2); color: var(--on-night); box-shadow: var(--lift); font-size: var(--text-xs); line-height: 1.35; display: flex; overflow: hidden; opacity: 0; transition: opacity .12s ease-out; }
 .campaign-action-popover.is-placed { opacity: 1; }

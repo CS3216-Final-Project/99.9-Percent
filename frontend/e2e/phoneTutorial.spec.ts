@@ -208,7 +208,7 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     await shot("01-servers");
     await servers.tap();
     // Inspecting from the room always opens its reveal first.
-    await page.getByRole("dialog", { name: "Servers inspected" }).getByRole("button", { name: "Return to room" }).tap();
+    await page.getByRole("dialog", { name: "Servers", exact: true }).getByRole("button", { name: "Return to room" }).tap();
     await page.getByRole("button", { name: /Add server/ }).tap();
 
     // 2. Explore Scale Up: the Tech tab is in the dock, or folded into its Views menu on the narrowest phones.
@@ -239,7 +239,7 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     await expect.poll(() => uncovered(growthLabel), "the Growth label is above the sheet").toBe(true);
     await shot("03-growth");
     await growthLabel.tap();
-    await page.getByRole("dialog", { name: "Growth inspected" }).getByRole("button", { name: "Return to room" }).tap();
+    await page.getByRole("dialog", { name: "Growth", exact: true }).getByRole("button", { name: "Return to room" }).tap();
     await page.getByRole("button", { name: /^Launch/ }).first().tap();
 
     // 4. Play the week: Next week is in the dock, below the coach strip.

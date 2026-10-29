@@ -24,7 +24,7 @@ it("renders nothing without a room inspection", () => {
 
 it("reads the equipment and returns to the room, keeping the selection", () => {
   show(newLegacyGame(1), { seq: 1, equipment: "monitoring" }, { selected: "monitoring" });
-  const dialog = screen.getByRole("dialog", { name: "Monitoring inspected" });
+  const dialog = screen.getByRole("dialog", { name: "Monitoring", exact: true });
   expect(dialog.textContent).toContain("Healthy");
   expect(dialog.textContent).toContain("dashboards");
   expect(dialog.textContent).toContain("Shows what the system is doing.");
@@ -36,7 +36,7 @@ it("reads the equipment and returns to the room, keeping the selection", () => {
 
 it("names the application instance beside the equipment's name", () => {
   show(newLegacyGame(1), { seq: 1, equipment: "app", appId: "app-1" });
-  const dialog = screen.getByRole("dialog", { name: "Servers inspected" });
+  const dialog = screen.getByRole("dialog", { name: "Servers", exact: true });
   expect(dialog.textContent).toContain("App 1");
 });
 

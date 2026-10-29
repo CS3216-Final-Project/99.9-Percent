@@ -82,7 +82,7 @@ test("inspection modal: blocks camera input and restores dragging and scene clic
   await openCameraControls(page);await page.getByRole("button",{name:"Reset view",exact:true}).click();
   await page.keyboard.press("Escape");await camera();
   await page.getByRole("main").getByRole("button",{name:"Database",exact:true}).click();
-  await expect(page.getByRole("dialog",{name:"Database inspected",exact:true})).toBeVisible();
+  await expect(page.getByRole("dialog",{name:"Database", exact: true})).toBeVisible();
 });
 
 for(const chapter of [4,5,6]) test(`inspection content: Chapter ${chapter} keeps live component diagnostics and actions without legacy lessons`,async({page})=>{
@@ -132,7 +132,7 @@ test.describe("touch inspection camera",()=>{
       await expect.poll(async()=>{const now=await camera();return Math.hypot(now.target.x-before.target.x,now.target.z-before.target.z);}).toBeGreaterThan(.2);
     };
     await pan();await inspectEquipment(page,"db");const beforeClose=await settledCamera(page);
-    await page.getByRole("dialog",{name:"Database inspected",exact:true}).getByRole("button",{name:"Close",exact:true}).tap();
+    await page.getByRole("dialog",{name:"Database", exact: true}).getByRole("button",{name:"Close",exact:true}).tap();
     await pan(beforeClose);await input.detach();
   });
 });

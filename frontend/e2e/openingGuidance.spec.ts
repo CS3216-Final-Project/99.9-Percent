@@ -50,7 +50,7 @@ test("introduction hands off to one Opening Run spotlight, then Hint-flow upgrad
   await expect(spotlight).toHaveCount(0);
   // The db incident is taught by the same Hint flow as the later chapters. A gold Run/Pause
   // invitation can still answer first - drive whichever appears until the inspection is open.
-  const database=page.getByRole("dialog",{name:"Database inspected",exact:true});
+  const database=page.getByRole("dialog",{name:"Database", exact: true});
   const hintButton=page.getByRole("button",{name:"Hint",exact:true});
   const hintCard=page.getByRole("dialog",{name:"Hint",exact:true});
   const gold=page.locator(".campaign-gold-attention");

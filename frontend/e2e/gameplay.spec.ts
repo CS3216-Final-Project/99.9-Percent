@@ -26,7 +26,7 @@ for (const path of ["upgrade", "limit", "app-then-upgrade"] as const) {
       const panel = page.getByRole("complementary", { name: "System metrics" });
       await page.getByRole("main").getByRole("button", { name: "Database", exact: true }).click();
       // Clicking in the room opens the diagnostic card; the panel's inspection behind it is unchanged.
-      const dbReveal = page.getByRole("dialog", { name: "Database inspected" });
+      const dbReveal = page.getByRole("dialog", { name: "Database", exact: true });
       await expect(dbReveal).toBeVisible();
       await dbReveal.getByRole("button", { name: "Inspect details",exact:true }).click();
       await expect(panel.getByRole("button", { name: "Database", exact: true })).toHaveAttribute("aria-pressed", "true");

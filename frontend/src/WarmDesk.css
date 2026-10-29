@@ -62,7 +62,8 @@
 }
 .sheet-head h2:focus { outline: none; }
 .sheet-return { flex: none; }
-.component-inspection-summary { display: grid; justify-items: center; gap: 12px; }
+.component-inspection-summary { display: grid; justify-items: center; gap: 10px; }
+.component-inspection-summary > .meter { width: min(240px, 100%); }
 .component-inspection-summary > p { margin: 0; }
 .sheet-history .charts { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
 .sheet-history .tabs { flex-wrap: wrap; }

@@ -172,7 +172,7 @@ const CHAPTERS = {
             : checksStep(s) === "inspect"
               ? "Click Monitoring."
               : checksStep(s) === "details"
-                ? "Press Inspect details."
+                ? "Press the Monitoring disc to inspect details."
                 : s.game.campaign && installPending(s.game.campaign)
                   ? "Run until the current install finishes, then press Deploy Health Checks."
                   : "Press Deploy Health Checks.",

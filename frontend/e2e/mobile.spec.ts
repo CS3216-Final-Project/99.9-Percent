@@ -479,7 +479,7 @@ test("cache selection, paid activation and warmth reload on touch",async({page, 
  await advanceCampaignStep(page,{seconds:2});
  const roomCache=page.getByRole("main").getByRole("button",{name:/Read Cache/});
  await roomCache.tap();await expect(roomCache).toHaveAttribute("aria-pressed","true");await expect(panel.getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");
- await page.getByRole("dialog",{name:"Read Cache inspected"}).getByRole("button",{name:"Close"}).tap();
+ await page.getByRole("dialog",{name:"Read Cache", exact: true}).getByRole("button",{name:"Close"}).tap();
  await advanceCampaignStep(page);
  const before=(await savedGame(page)).campaign!;expect(before.readCache).not.toBeNull();expect(before.readCache!.warmth).toBe(0);
  await advanceCampaignStep(page);

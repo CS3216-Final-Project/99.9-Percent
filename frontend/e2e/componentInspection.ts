@@ -17,7 +17,7 @@ export async function closeInspection(page: Page) {
 
 /** Only public controls: works when the rack is off-screen, on another floor or the sheet is folded. */
 export async function inspectEquipment(page: Page, component: Component, details=false): Promise<Locator> {
-  const modal=page.getByRole("dialog",{name:component==="app"?"App Servers":`${TITLES[component]} inspected`,exact:true});
+  const modal=page.getByRole("dialog",{name:component==="app"?"App Servers":TITLES[component],exact:true});
   if (!await modal.isVisible()) {
     await closeInspection(page);
     const folded=page.locator('.panel-reopen, .phone-sheet-handle[aria-expanded="false"]');

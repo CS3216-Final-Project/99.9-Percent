@@ -18,7 +18,7 @@ it("shows the stage and a legal way to start the test",()=>{
 it("exposes actual and detected health and surviving capacity",()=>{
  show(tick(act(preparedReliability(),{type:"arm_reliability"}),8));fireEvent.click(screen.getByRole("button",{name:"App Server"}));fireEvent.click(screen.getByRole("button",{name:"Server management"}));expect(useGame.getState().game.campaign!.apps[1].detectedHealth).toBe("healthy");fireEvent.click(document.querySelector<HTMLElement>('[data-guidance-app="app-2"]')!);const panel=screen.getByRole("dialog",{name:"App Servers"});
  expect(panel.textContent).toContain("failed");expect(panel.textContent).toContain("detected unhealthy");
- fireEvent.click(within(panel).getByText("Technical Details"));
+ fireEvent.click(within(panel).getByRole("button",{name:"Inspect details"}));
  const readings=within(panel).getByRole("region",{name:"Servers readings"});
  expect(within(readings).getByText("Routed capacity").parentElement?.querySelector("dd")?.textContent).toBe("1,600 req/s");
  expect(within(readings).getByText("Spare capacity").parentElement?.querySelector("dd")?.textContent).toBe("1,600 req/s");

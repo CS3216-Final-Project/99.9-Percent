@@ -31,9 +31,9 @@ it("guides each component, repeats Hint at every step and explicitly enters Chap
  expect(screen.queryByRole("region",{name:"Introduction Progress"})).toBeNull();expect(next.completedIntroduction!.completed).toBe(true);expect(screen.getByLabelText("Current chapter").textContent).toBe("Opening");
 });
 it("lets players explore other components and close with Escape without skipping the current step",async()=>{
- start();press("Monitoring");fireEvent.keyDown(screen.getByRole("dialog",{name:"Monitoring inspected"}),{key:"Escape"});await act(async()=>{});
+ start();press("Monitoring");fireEvent.keyDown(screen.getByRole("dialog",{name:"Monitoring", exact: true}),{key:"Escape"});await act(async()=>{});
  expect(useGame.getState().game.campaign!.launchWeek!.introduction!.explored).toEqual([]);
- expect(screen.queryByRole("dialog",{name:"Monitoring inspected"})).toBeNull();expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("Network");
+ expect(screen.queryByRole("dialog",{name:"Monitoring", exact: true})).toBeNull();expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("Network");
  press("Network");press("Close");await act(async()=>{});expect(gold()[0].textContent).toBe("App Server");
  expect(useGame.getState().game.campaign!.step).toBe(0);
 });

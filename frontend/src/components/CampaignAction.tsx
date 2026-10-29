@@ -188,7 +188,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)}
     onFocus={() => setPointing(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPointing(false); }}>
     <Act {...props} price={inspection ? undefined : props.price} note={inspection ? undefined : props.note} disabled={unavailable} affordance={affordance} tip={actionTip} onClick={toggle} />
-    {!open && unavailable && !affordance && <p className="campaign-action-reason" id={id} tabIndex={0}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
+    {!open && unavailable && (!affordance || inspection && affordance === "done") && <p className={`campaign-action-reason${affordance === "done" ? " is-done" : ""}`} id={id} tabIndex={0}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
     {open && <ActionPopover anchor={anchor} inspection={inspection} onClose={cancel}>
       <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); cancel(); } }}>
         <div className="campaign-purchase-body" role="region" aria-label="Purchase preview" tabIndex={0}>

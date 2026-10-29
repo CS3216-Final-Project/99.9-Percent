@@ -12,7 +12,7 @@ for(const width of [1440,390])test.describe(`infrastructure introduction ${width
   await expect(panel.getByRole("button",{name:"Complete Introduction",exact:true})).toBeDisabled();
   await expect(page.getByRole("button",{name:"Run",exact:true})).toBeDisabled();
   await panel.getByRole("button",{name:"Monitoring",exact:true}).click();
-  const wrong=page.getByRole("dialog",{name:"Monitoring inspected",exact:true});
+  const wrong=page.getByRole("dialog",{name:"Monitoring", exact: true});
   await wrong.getByRole("button",{name:"Close",exact:true}).click();
   await expect(panel.getByRole("region",{name:"Introduction Progress"})).toContainText("0/4");
   for(const [i,name] of ["Network","App Server","Database","Monitoring"].entries()) {

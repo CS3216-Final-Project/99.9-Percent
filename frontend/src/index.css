@@ -5335,12 +5335,63 @@ button:disabled {
 /* Shared Campaign equipment dialog: both room and shortcut entries use this card. */
 .component-inspection { width: min(460px, 100%); }
 .component-inspection-summary { text-align: center; }
-.component-inspection-summary .inspection-scanner { margin-inline: auto; }
 .component-inspection-summary .inspection-status { justify-content: center; }
 .component-inspection-metric { font-weight: 700; font-variant-numeric: tabular-nums; }
 .component-inspection-controls { display: flex; gap: 12px; align-items: stretch; }
 .component-inspection-controls > .btn { flex: 1; min-height: 44px; }
 .component-inspection-controls > .component-actions { flex: 1; min-width: 0; }
+.component-inspection-controls:empty { display: none; }
+
+/* The machine's disc: the machine in its health's pastel, and the press that opens its readings below. */
+.inspection-disc {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--control-edge);
+  border-radius: 50%;
+  background: var(--tile-green);
+  color: var(--tile-green-ink);
+  cursor: pointer;
+  outline: 3px solid transparent;
+  outline-offset: 3px;
+  transition: outline-color 0.16s ease-out, border-color 0.16s ease-out;
+}
+.inspection-disc.tone-warn { background: var(--tile-orange); color: var(--tile-orange-ink); }
+.inspection-disc.tone-critical { background: var(--tile-pink); color: var(--critical-ink); }
+.inspection-disc.tone-muted { background: var(--tile-purple); color: var(--tile-purple-ink); }
+.inspection-disc > .icon { grid-area: 1 / 1; transition: opacity 0.16s ease-out, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+.inspection-disc > .inspection-disc-lens { opacity: 0; transform: scale(0.7); }
+.inspection-disc:hover { border-color: var(--selection-edge); outline-color: var(--selection-edge); }
+.inspection-disc:is(:hover, :focus-visible) > .inspection-disc-machine { opacity: 0; transform: scale(0.7); }
+.inspection-disc:is(:hover, :focus-visible) > .inspection-disc-lens { opacity: 1; transform: none; }
+.inspection-disc[aria-expanded="true"] { border-color: var(--selection-edge); }
+/* Touch has no hover, so a small lens on the rim always says the disc opens the readings. */
+.inspection-disc-badge {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--control-edge);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+}
+/* The disc's copy that flies from the pressed icon while the card opens (InspectionReveal.tsx). */
+.inspection-disc-ghost { position: fixed; z-index: 1000; margin: 0; pointer-events: none; }
+.inspection-details { display: grid; gap: 10px; animation: inspection-details-open 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes inspection-details-open {
+  from { opacity: 0; transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inspection-disc, .inspection-disc > .icon { transition: none; }
+  .inspection-details { animation: none; }
+}
 .component-inspection .actions { margin: 0; }
 .component-inspection .actions:empty { display: none; }
 .component-inspection .component-actions h4 { margin-top: 8px; }
