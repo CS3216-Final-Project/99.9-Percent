@@ -1,4 +1,4 @@
-import { infrastructureAction, inspectEquipment, closeInspection } from "./componentInspection";
+import { infrastructureAction, inspectEquipment, closeInspection, routeAllApps } from "./componentInspection";
 import { setGameSpeed } from "./fixtures";
 import { advanceCampaignStep } from "./fixtures";
 import {test,expect,expectRoom,seedSave,savedGame} from "./fixtures";
@@ -69,7 +69,7 @@ test("spikes: manual planning installs, scales and routes capacity through room 
  // Render the installed rack while physical game time stays paused.
  await page.clock.runFor(1000);
  await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();const scaleReveal=page.getByRole("dialog",{name:"App Servers"});await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Close"}).click();await (await infrastructureAction(page,/Scale up App 3/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3,resumeClock:false});
- await (await infrastructureAction(page,"All apps")).click();await advanceCampaignStep(page,{resumeClock:false});
+ await routeAllApps(page,undefined,()=>advanceCampaignStep(page,{resumeClock:false}));
  const c=(await savedGame(page)).campaign!,expected=manualSpikePlan().campaign!;
  expect(c.step).toBe(n+6);
  expect(c.apps.map(({id,tier,capacity,routed})=>({id,tier,capacity,routed}))).toEqual(expected.apps.map(({id,tier,capacity,routed})=>({id,tier,capacity,routed})));
@@ -106,7 +106,7 @@ test("spikes: write-heavy DB constraint remains after automatic app routing",asy
  test.setTimeout(90000);const api=await blockedGuest(page,untilOffset(spikeCompany(true,"write-heavy"),24),false);
  await inspectEquipment(page,"app");await page.getByRole("button",{name:"Server management",exact:true}).click();await page.getByRole("button",{name:"Autoscaling",exact:true}).click();const control=page.getByRole("region",{name:"Autoscaling",exact:true});await control.getByText("Technical Details",{exact:true}).click();await expect(control).toContainText("cannot increase DB capacity");await closeInspection(page);
  expect((await savedGame(page)).campaign!.snapshot.db.demand).toBeGreaterThan(3000);
- await (await infrastructureAction(page,"Limit to 500 requests/s")).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await setGameSpeed(page,2);await page.getByRole("button",{name:"Run",exact:true}).click();
+ await (await infrastructureAction(page,/Limit to ~[\d,]+ requests\/s/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await setGameSpeed(page,2);await page.getByRole("button",{name:"Run",exact:true}).click();
  await expect(page.getByRole("dialog",{name:"Incident postmortem"})).toBeVisible({timeout:25000});await expect(page.getByRole("dialog")).toContainText("does not increase database capacity");
  const c=(await savedGame(page)).campaign!;expect(c.dbCapacity).toBe(3000);expect(c.readCache!.target).toBe(6000);expect(c.limit).toBe(500);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });
@@ -118,6 +118,6 @@ test("spikes: disabling keeps paid installation and allows an explicit manual ro
  const idle=(await savedGame(page)).campaign!;expect(idle.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(idle.cashCents).toBe(before.cashCents);expect(idle.pending.some(a=>a.type==="routing")).toBe(false);
  await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await expect(page.getByRole("dialog",{name:"App Servers"})).toContainText("Not receiving traffic");
  const idleReveal=page.getByRole("dialog",{name:"App Servers"});await expect(idleReveal).toBeVisible();await idleReveal.getByRole("button",{name:"Close"}).click();
- await (await infrastructureAction(page,"All apps")).click();await runTo(page,(await savedGame(page)).campaign!.step+1);
+ await routeAllApps(page,undefined,async()=>{await runTo(page,(await savedGame(page)).campaign!.step+1)});
  const routed=(await savedGame(page)).campaign!;expect(routed.apps.find(a=>a.id==="app-3")!.routed).toBe(true);expect(routed.spikeStage!.controller!.enabled).toBe(false);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);
 });

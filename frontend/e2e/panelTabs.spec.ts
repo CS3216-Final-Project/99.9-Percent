@@ -18,7 +18,7 @@ test("the Guided Mode panel opens equipment by pointer and keyboard without dupl
   await expect(panel(page).getByRole("button", { name: /^Add server/ })).toHaveCount(0);
   const database=panel(page).getByRole("button", { name: "Database", exact: true });
   await database.click();
-  const popup=page.getByRole("dialog", { name: "Database inspected", exact: true });
+  const popup=page.getByRole("dialog", { name: "Database", exact: true });
   await expect(popup).toBeVisible();
   await page.keyboard.press("Escape");await expect(database).toBeFocused();
   await database.press("Enter");await expect(popup).toBeVisible();
@@ -30,7 +30,7 @@ test("the Guided Mode panel opens equipment by pointer and keyboard without dupl
 test("choosing equipment in the room uses the same popup as its shortcut", async ({ page }) => {
   await boot(page);
   await page.getByRole("main").getByRole("button", { name: "Database", exact: true }).click();
-  const popup=page.getByRole("dialog", { name: "Database inspected", exact: true });
+  const popup=page.getByRole("dialog", { name: "Database", exact: true });
   await popup.getByRole("button", { name: "Inspect details", exact: true }).click();
   await expect(popup.getByRole("region", { name: "Database readings" })).toBeVisible();
   await popup.getByRole("button", { name: "Close", exact: true }).click();

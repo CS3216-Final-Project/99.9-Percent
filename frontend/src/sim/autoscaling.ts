@@ -4,7 +4,8 @@ import type { Action, ActionResult, GameState } from "./types";
 import type { Campaign, ScheduledAction, SpikeObservation } from "./campaignTypes";
 import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
 import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
-import { allocateTraffic, qualifiesForRecovery } from "./step";
+import { APPLICATION_SCALING as P } from "./scenarios/applicationScaling";
+import { allocateAppId, allocateTraffic, qualifiesForRecovery } from "./step";
 import { clone } from "./state";
 import { trace } from "./trace";
 
@@ -93,18 +94,25 @@ export function runAutoscaler(s:GameState):void {
    const o=spikeObservation(c);
    // Integer cross products preserve strict threshold boundaries without rounding.
    const xs=c.snapshot.instances!.filter(x=>x.routed&&(!c.combinedStage||x.health!=="failed")),capacity=xs.reduce((n,x)=>n+x.capacity,0),work=xs.reduce((n,x)=>n+x.processed,0);
+   const legacy=c.step<=(c.legacyScalingStep??-1);
+   const upgrades=legacy?[]:a.managedAppIds.filter(id=>{const t=c.apps.find(x=>x.id===id);return !!t&&t.tier==="base"&&t.health!=="failed"&&t.role!=="spare"&&c.routing.targets.includes(id);})
+    .sort((x,y)=>(xs.find(i=>i.id===y)?.processed??0)-(xs.find(i=>i.id===x)?.processed??0)||Number(x.slice(4))-Number(y.slice(4)));
+   const canScaleOut=c.apps.length<T.maximum&&c.cashCents>Q.appCostCents,canScaleUp=upgrades.length>0&&c.cashCents>P.appCostCents;
+   const saturated=work*10000>capacity*T.high;
    if(c.combinedStage&&capacity===0)blocked(c,"No healthy routed capacity");
-   else if(work*10000>capacity*T.high&&(c.apps.length>=T.maximum||c.cashCents<=Q.appCostCents))blocked(c,c.apps.length>=T.maximum?"Maximum four instances reached":"Insufficient cash for provisioning");
+   else if(saturated&&!canScaleOut&&!canScaleUp)blocked(c,!upgrades.length&&c.apps.length>=T.maximum?"Maximum four instances reached":"Insufficient cash for provisioning");
    else {blocked(c,null);
-   a.highSteps=work*10000>capacity*T.high?a.highSteps+1:0;
+   a.highSteps=saturated?a.highSteps+1:0;
    const candidates=a.managedAppIds.filter(id=>canRetire(c,id)).sort((x,y)=>Number(y.slice(4))-Number(x.slice(4)));
    a.lowSteps=work*10000<capacity*T.low&&candidates.length?a.lowSteps+1:0;
    if(a.highSteps>=T.highSteps){
-    if(c.apps.length>=T.maximum)blocked(c,"Maximum four instances reached");
-    else if(c.cashCents<=Q.appCostCents)blocked(c,"Insufficient cash for provisioning");
-    else {const id=`app-${c.nextAppNumber++}`;trace(c,"autoscale-scale-out-decided",{...o,incoming:c.incomingRate,highThresholdBasisPoints:T.high,highSteps:a.highSteps,targetId:id});
+    if(canScaleOut){const id=allocateAppId(c);trace(c,"autoscale-scale-out-decided",{...o,incoming:c.incomingRate,highThresholdBasisPoints:T.high,highSteps:a.highSteps,targetId:id});
      a.joiningAppId=id;a.expectedRouting=JSON.stringify(c.routing);a.highSteps=0;a.lowSteps=0;
      schedule(c,"add-app",T.provisionDelay,Q.appCostCents,{targetId:id});}
+    else if(canScaleUp){const target=upgrades[0];trace(c,"autoscale-scale-up-decided",{...o,incoming:c.incomingRate,highThresholdBasisPoints:T.high,highSteps:a.highSteps,targetId:target});
+     a.managedAppIds=a.managedAppIds.filter(x=>x!==target);a.expectedRouting=JSON.stringify(c.routing);a.highSteps=0;a.lowSteps=0;a.cooldownUntil=c.step+P.appDelay+T.cooldown;
+     schedule(c,"scale-up",P.appDelay,P.appCostCents,{targetId:target,capacityAfter:P.appCapacity});}
+    else blocked(c,!upgrades.length&&c.apps.length>=T.maximum?"Maximum four instances reached":"Insufficient cash for provisioning");
    } else if(a.lowSteps>=T.lowSteps){
     trace(c,"autoscale-scale-in-eligible",{...o,incoming:c.incomingRate,lowThresholdBasisPoints:T.low,lowSteps:a.lowSteps,targetId:candidates[0]});a.expectedRouting=JSON.stringify(c.routing);a.highSteps=0;a.lowSteps=0;
     schedule(c,"retire-app",1,0,{targetId:candidates[0]});

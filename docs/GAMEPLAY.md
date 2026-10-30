@@ -114,9 +114,10 @@ These are saved deadlines; pausing and reloading do not move them.
 The optional controller needs the unlock, deployed load balancing, balanced routing to at least two apps, a free slot and cash.
 It watches routed processed work divided by routed capacity:
 
-- Above 80% for three observations, it requests one base app, which installs in three steps and joins routing one step later.
+- Above 80% for three observations, it requests one base app, which installs in three steps and joins routing one step later. When all four app slots are taken, it instead upgrades the busiest eligible controller-created base app to the larger tier.
 - Below 60% for six safe observations, it retires an eligible controller-created app, never leaving fewer than two.
-- At most four apps are installed, with a four-step cooldown after each join or retirement.
+- At most four apps are installed, with a four-step cooldown after each join, upgrade or retirement.
+- New apps take the lowest free number, so a retirement never leaves a numbering gap; the controller's decisions, pending actions and completions are announced in the event log and as notifications.
 
 Manually installed or vertically upgraded apps are never retired, and there are no refunds.
 After both pulses, five stable baseline steps complete the chapter, which the player then acknowledges.
@@ -167,7 +168,10 @@ Guidance never changes the rules; it reads the same state the engine uses.
   A new company's introduction opens with Maya's welcome first, asking the player to check out the machines; Opening's message then skips her greeting.
   The colleague speaks a few short lines in their own voice, which the player reads one at a time, and the last line carries the mission.
   Dismissing it at any line counts as reading it.
+  Data Strategy's scene explains caching before its chapter guide points at Read Cache.
+  A hidden tab, blurred window or pointer lock only suspends the scene in place - it is not dismissed, and the stage cue queued behind it still follows in order.
 - A new diagnostic incident that keeps running shows one Pause invitation.
+- A decision that pauses a company the player can still run shows one Run invitation, which lasts until the clock restarts or another prompt owns attention.
 - Every report (incident postmortem, prevention review, chapter outcome, growth review, scorecard) uses four short sections and one collapsed View Technical Details disclosure.
   Reports are built from recorded snapshots, trace and actual activations, never from later company state.
 
@@ -181,7 +185,7 @@ These rules are shared by every Guided Mode chapter and live in `frontend/src/si
 - Latency is `100 ms + 1,000 * (largest per-instance backlog / capacity + database backlog / capacity)`.
 - Service error rate is failed outcomes over successful plus failed outcomes; deliberate rejections are reported separately.
 - Demand strictly above a component's capacity for three consecutive steps opens an incident; with several components, app order then database picks the primary.
-- Recovery needs five consecutive observations with latency under 500 ms, errors under 1%, positive admissions and completed outcomes. Buying, deploying or waiting is not recovery.
+- Recovery needs five consecutive observations with latency under 500 ms, errors under 1%, positive admissions and completed outcomes, plus a recorded response: an uncancelled capacity, routing, admission or restoration action engaged at or after the step the cause began (the fault's start for a failed application, the incident's opening otherwise). Waiting for the problem to pass on its own never closes the incident. Buying, deploying or waiting is not recovery. Saves written before the response requirement keep their original self-resolving incidents.
 - Bankruptcy is checked after settlement and takes precedence over recovery in that step.
 
 ## Economy

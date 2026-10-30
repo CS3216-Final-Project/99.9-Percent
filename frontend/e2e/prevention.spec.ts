@@ -12,7 +12,7 @@ test("Opening prevention: fresh player verifies prevention and explicitly unlock
  const id=(await savedGame(page)).campaign!.runId;
  await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
  await setGameSpeed(page,2);
- await (await infrastructureAction(page,/Limit to 500 requests\/s/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
+ await (await infrastructureAction(page,/Limit to ~[\d,]+ requests\/s/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await (await infrastructureAction(page,/Upgrade database/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await advanceCampaignStep(page,{seconds:4-(await savedGame(page)).campaign!.step,resumeClock:false});
  let c=(await savedGame(page)).campaign!;expect(c.consumedEvents).toContain("opening-growth");expect(c.incident).toBeNull();expect(c.reports).toEqual([]);

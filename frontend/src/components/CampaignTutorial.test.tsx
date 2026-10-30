@@ -114,9 +114,9 @@ it("walks Stay Online through unlocking Health Checks in Tech and deploying it f
   fireEvent.click(screen.getByRole("button", { name: "Tech" }));
   expect(guide(3).textContent).toContain("Click Monitoring.");
   fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
-  const monitoring = screen.getByRole("dialog", { name: "Monitoring inspected" });
+  const monitoring = screen.getByRole("dialog", { name: "Monitoring" });
   // The inspection holds the step's control, so the guide stays up over it.
-  expect(guide(3).textContent).toContain("Press Inspect details.");
+  expect(guide(3).textContent).toContain("Press the Monitoring disc to inspect details.");
   fireEvent.click(within(monitoring).getByRole("button", { name: "Inspect details" }));
   await vi.waitFor(() => expect(guide(3).textContent).toContain("Press Deploy Health Checks."));
   fireEvent.click(within(monitoring).getByRole("button", { name: /^Deploy Health Checks/ }));
@@ -151,7 +151,7 @@ it("keeps the Deploy Health Checks step on its own action when the player buys s
   expect(guide().textContent).not.toContain("Press Confirm.");
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
-  fireEvent.click(within(screen.getByRole("dialog", { name: "Monitoring inspected" })).getByRole("button", { name: "Inspect details" }));
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Monitoring" })).getByRole("button", { name: "Inspect details" }));
   expect(screen.getByRole("button", { name: /^Deploy Health Checks/ })).toHaveProperty("disabled", true);
   await vi.waitFor(() => expect(guide().textContent).toContain("Run until the current install finishes, then press Deploy Health Checks."));
 });
@@ -177,7 +177,7 @@ it.each([
   expect(useGame.getState().tour).toBeNull();
   expect(screen.queryByRole("dialog", { name: /^Chapter guide/ })).toBeNull();
   expect(document.querySelector(".tour")).toBeNull();
-  expect(screen.getByRole("dialog", { name: "Database inspected" })).toBeTruthy();
+  expect(screen.getByRole("dialog", { name: "Database" })).toBeTruthy();
 });
 
 it("keeps a chapter guide up when an inspection was already open as it began", () => {
@@ -194,5 +194,23 @@ it("explains the first settled week with a one-card tip on Cash", () => {
   const tip = screen.getByRole("dialog", { name: "Tip, step 1 of 1" });
   expect(tip.textContent).toContain("Your first week settled");
   fireEvent.click(within(tip).getByRole("button", { name: "Got it" }));
+  expect(useGame.getState().tour).toBeNull();
+});
+
+it("points at the Hint button once when the introduction hands off to the Opening", () => {
+  start(); renderCompany();
+  for (const equipment of ["gateway", "app", "db", "monitoring"] as const) {
+    act(() => useGame.getState().act({ type: "incident_inspect", equipment }));
+    act(() => useGame.getState().act({ type: "acknowledge_introduction", equipment }));
+  }
+  act(() => useGame.getState().act({ type: "complete_introduction" }));
+  const tip = screen.getByRole("dialog", { name: "Tip, step 1 of 1" });
+  expect(tip.textContent).toContain("Hint");
+  expect(tip.textContent).toContain("later chapters");
+  expect(useGame.getState().meta.tipsSeen).toContain("hint");
+  fireEvent.click(within(tip).getByRole("button", { name: "Got it" }));
+  // Once ever: the flag persisted, so no later commit replays it.
+  expect(useGame.getState().tour).toBeNull();
+  act(() => { useGame.getState().setRunning(true); useGame.getState().tick(100); });
   expect(useGame.getState().tour).toBeNull();
 });

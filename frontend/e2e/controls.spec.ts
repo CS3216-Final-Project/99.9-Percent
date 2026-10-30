@@ -15,6 +15,8 @@ for (const width of [1440, 390, 320]) {
     const dock = page.locator(".controls-dock");
     const run = dock.getByRole("button", { name: "Run", exact: true });
     const before = (await run.boundingBox())!;
+    // Hold the page clock so slow rendering cannot carry the company into its first-incident stop between clicks.
+    await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
     await run.click();
     const pause = dock.getByRole("button", { name: "Pause", exact: true });
     const after = (await pause.boundingBox())!;
@@ -34,7 +36,6 @@ for (const width of [1440, 390, 320]) {
     else await expect(speeds.getByRole("button", { name: "0.5×", exact: true })).toHaveAttribute("aria-pressed", "true");
     const changedSize = (await speeds.boundingBox())!;
     expect([changedSize.width, changedSize.height]).toEqual([speedSize.width, speedSize.height]);
-    await expect(dock.getByRole("button", { name: /End the week/ })).toBeInViewport({ ratio: 1 });
     await openCameraControls(page);
     const cameraPanel = dock.locator(".dock-menu[open] > .dock-panel");
     await expect(cameraPanel.getByRole("button", { name: "Zoom in", exact: true })).toBeInViewport({ ratio: 1 });

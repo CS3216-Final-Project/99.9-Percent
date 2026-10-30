@@ -2,6 +2,7 @@
 import { CampaignAttentionHost } from "./CampaignAttention";
 import { RoomControlsHost, RoomControlsSlot } from "./RoomControlsHost";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
+import { PendingDeployments } from "./PendingDeployments";
 import "./ControlsDock.css";
 
 import { lazy, Suspense, useEffect } from "react";
@@ -150,7 +151,7 @@ export function BottomBar() {
       <div className="time-controls" role="group" aria-label="Time">
         <WeekClock />
         <TimeMenu automatic={management} />
-        <button type="button" className="btn btn-primary advance dock-primary" disabled={!management && !incident} onClick={incident ? () => setRunning(!running) : advance} aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : undefined}>
+        <button type="button" className={`btn btn-primary advance dock-primary${incident ? (running ? " is-running" : " is-paused") : ""}`} disabled={!management && !incident} onClick={incident ? () => setRunning(!running) : advance} aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : undefined}>
           {management && running && <span key={`${game.turn}-${speed}`} className="advance-timer" style={{ animationDuration: `${AUTO_SECONDS / speed}s` }} />}
           <Icon name={incident ? (running ? "pause" : "play") : "next"} />
           <span className="advance-label">{incident ? (running ? "Pause" : "Resume") : game.phase === "ended" ? "Run over" : "Next week"}</span>
@@ -228,7 +229,7 @@ export default function Game() {
       <main className="stage">
         <Room />
       </main>
-      {campaign ? <>{started && <CampaignPanel />}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ClassicViewSheet /><BottomBar /></>}
+      {campaign ? <>{started && <><CampaignPanel /><PendingDeployments /></>}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ClassicViewSheet /><BottomBar /></>}
       <ToastHost />
       {!campaign && !started && <HomeScreen />}
       {!campaign && started && view === "menu" && <Menu />}

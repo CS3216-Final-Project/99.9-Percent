@@ -2,6 +2,7 @@
 import { introductionActive, nextIntroductionComponent } from "@/sim/introduction";
 import { beginSession, emptyMeasurement, event, projectEvents, type Measurement } from "./telemetry";
 import { archiveEvents } from "./persist";
+import { autoscalerActivity } from "./reportEvents";
 import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { finishedChapter } from "./campaignChapters";
 import { chapterEnd } from "./chapterCompletion";
@@ -287,11 +288,13 @@ interface Store {
   techFocus: TechId | null;
   /** Management: auto-advance is on. Incident: the crisis clock is running. */
   running: boolean;
+  /** The accepted decision that paused a company whose clock could still run; Run emphasizes itself until it resumes. */
+  resumeOffer: number;
   speed: Speed;
-  /** Fast-forward to the end of the current operating week (20x). Clears on incident or the week boundary. */
-  weekRush: boolean;
-  endWeek: () => void;
-  cancelWeekRush: () => void;
+  /** Fast-forward until the last scheduled deployment activates (20x). Clears on a stop, a new incident or an empty queue. */
+  deployRush: boolean;
+  rushDeploy: () => void;
+  cancelDeployRush: () => void;
   toast: Toast | null;
   onboarding: boolean;
   tour: Tour | null;
@@ -379,7 +382,6 @@ function requiredAcknowledgement(g: GameState): Action["type"] | null {
   return milestoneBlocks(g) ? "acknowledge_milestone" : null;
 }
 const awaitingAcknowledgement = (g: GameState) => !!g.campaign && requiredAcknowledgement(g) !== null;
-/** Whether Guided Mode's clock may move now, by Run or by a manual step: never behind a guide, a pause-only view or an acknowledgement. */
 /**
  * Whether the server floor shows only the request path. It is Guided Mode's alone, and the player's choice.
  */
@@ -388,6 +390,12 @@ export function trafficViewOn(s: { game: GameState; meta: Meta }): boolean {
   return !!c && !!s.meta.trafficView;
 }
 
+/** Whether the room holds still: whenever Guided Mode's clock is paused, and while Challenge Mode's incident clock is. */
+export function roomPaused(s: { game: GameState; started: boolean; running: boolean }): boolean {
+  return s.started && !s.running && (!!s.game.campaign || s.game.phase === "incident");
+}
+
+/** Whether Guided Mode's clock may move now, by Run or by a manual step: never behind a guide, a pause-only view or an acknowledgement. */
 export function campaignClockAvailable(s: { game: GameState; started: boolean; tour: Tour | null; view: View }): boolean {
   const c = s.game.campaign;
   return !!c && !introductionActive(c) && s.started && !awaitingAcknowledgement(s.game) && !["menu", "tech", "scorecard"].includes(s.view ?? "")
@@ -559,14 +567,17 @@ export const useGame = create<Store>()((set, get) => {
           Object.assign(patch,{meta,tour:{track:chapter,step:0},running:false});
         }
       }
+      // Completing the introduction spotlights the Hint button once: it keeps helping in later chapters.
       // The first settled operating week explains itself once, paused, at the first calm moment in the Opening
       // (its incident can still be running when the week settles), unless another guide is already showing.
       const tips=(patch.meta??get().meta).tipsSeen??[];
-      if(was?.runId===c.runId&&c.settlements.length>0&&!tips.includes("settlement")&&!chapterTourOf(c)&&!get().tutorialCompany
+      const tip:GuidedTip|null=!was?.completedIntroduction?.completed&&c.completedIntroduction?.completed&&!tips.includes("hint")?"hint"
+        :c.settlements.length>0&&!tips.includes("settlement")?"settlement":null;
+      if(was?.runId===c.runId&&tip&&!chapterTourOf(c)&&!get().tutorialCompany
         &&!get().tour&&!patch.tour&&next.phase==="management"&&!awaitingAcknowledgement(next)) {
-        const meta={...(patch.meta??get().meta),tipsSeen:[...tips,"settlement" as const]};
+        const meta={...(patch.meta??get().meta),tipsSeen:[...tips,tip]};
         saveMeta(meta);
-        Object.assign(patch,{meta,tour:{track:"settlement",step:0},running:false});
+        Object.assign(patch,{meta,tour:{track:tip,step:0},running:false});
       }
       get().measureTime();
       patch.measurement=projectEvents(get().measurement,next,new Date().toISOString());
@@ -663,7 +674,7 @@ export const useGame = create<Store>()((set, get) => {
       lastIntro: null,
       meta,
       running: false,
-      weekRush: false,
+      deployRush: false,
       floor: urlFloor ?? exploration.floor,
       // Only a Challenge Mode run opens here: Guided Mode's starts at the title screen, and Play picks the view.
       walking: false,
@@ -946,8 +957,9 @@ export const useGame = create<Store>()((set, get) => {
     view: null,
     techFocus: null,
     running: false,
+    resumeOffer: 0,
     speed: 1,
-    weekRush: false,
+    deployRush: false,
     toast: null,
     onboarding: false,
     tour: null,
@@ -1025,6 +1037,7 @@ export const useGame = create<Store>()((set, get) => {
       if (c) {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
+        const wasRunning = get().running;
         if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","enter_combined","start_growth_wave","acknowledge_growth","complete_campaign","accept_scaling_risk"].includes(action.type)) set({running:false});
         record(result.ok);
         commit(state);
@@ -1033,6 +1046,8 @@ export const useGame = create<Store>()((set, get) => {
           if(get().tutorialCompany)get().endTour(true);
           else {const meta={...get().meta,tutorialDone:true};set({meta,running:false});saveMeta(meta);persist();}
         }
+        // A decision that paused a company the player can still run offers Run until the clock restarts.
+        if (result.ok && wasRunning && !get().running && campaignClockAvailable(get())) set({ resumeOffer: get().lastAction?.id ?? 0 });
         return result.ok;
       }
       const result = applyAction(get().game, action);
@@ -1064,21 +1079,20 @@ export const useGame = create<Store>()((set, get) => {
       const { game, running, speed } = get();
       if(game.campaign) {
         if(!get().started || awaitingAcknowledgement(game) || !running||!Number.isFinite(dt)||dt<=0||game.phase==="review"||game.phase==="ended")return;
-        const credit=get().remainderMs+Math.round(dt*1000*(get().weekRush?20:speed));
+        const credit=get().remainderMs+Math.round(dt*1000*(get().deployRush?20:speed));
         const whole=Math.floor(credit/1000);
         set({remainderMs:credit%1000});
         if(whole===0)return;
         const result=advanceSteps(game,whole);
         if(result.stopReason)set({running:false});
-        // A rush reverts to the chosen speed the moment a new incident opens or the week boundary lands;
+        // The deployment rush ends on a stop, a new incident or an empty queue, and keeps running at the chosen speed;
         // an incident already open when the rush started does not block re-engaging it.
         const newIncident = result.state.campaign?.incident && result.state.campaign.incident.id !== game.campaign?.incident?.id;
-        if(get().weekRush&&(result.stopReason||newIncident||result.state.turn!==game.turn)) {
-          const patch:{weekRush:boolean;running?:boolean}={weekRush:false};
-          if(!result.stopReason&&result.state.turn!==game.turn)patch.running=false;
-          set(patch);
-        }
+        if(get().deployRush&&(result.stopReason||newIncident||!result.state.campaign?.pending.length))set({deployRush:false});
         commit(result.state);
+        // Surface the autoscaler's moves so servers never appear or change silently.
+        const activity=autoscalerActivity(game.campaign.trace,result.state.campaign?.trace??[]);
+        if(activity.length)get().notify(activity.join(" · "));
         return;
       }
       if (game.phase !== "incident" || !running) return;
@@ -1094,9 +1108,12 @@ export const useGame = create<Store>()((set, get) => {
       const s = get(), { game } = s;
       if (!game.campaign || !campaignClockAvailable(s) || !Number.isSafeInteger(count) || count <= 0) return;
       // A manual step replaces auto-run, and any part-second credit belongs to the run it came from.
-      if (s.running) set({ running: false, weekRush: false });
+      if (s.running) set({ running: false, deployRush: false });
       set({ remainderMs: 0 });
-      commit(advanceSteps(game, count).state);
+      const result=advanceSteps(game, count);
+      commit(result.state);
+      const activity=autoscalerActivity(game.campaign.trace,result.state.campaign?.trace??[]);
+      if(activity.length)get().notify(activity.join(" · "));
     },
 
     // Choosing equipment asks to read it, so the panel brings its readings forward.
@@ -1128,12 +1145,12 @@ export const useGame = create<Store>()((set, get) => {
       if (id && get().game.campaign) get().setRunning(false);
     },
     setRunning: (running) => {
-      set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase), ...(running ? {} : { weekRush: false }) });
+      set({ running: running && (!get().game.campaign || (get().started && !awaitingAcknowledgement(get().game))) && get().view!=="menu" && !(get().game.campaign && ["tech","scorecard"].includes(get().view??"")) && !document.hidden && !["review","ended"].includes(get().game.phase), ...(running ? {} : { deployRush: false }) });
       if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
-    setSpeed: (speed) => set({ speed, weekRush: false }),
-    endWeek: () => { set({ weekRush: true }); get().setRunning(true); },
-    cancelWeekRush: () => set({ weekRush: false }),
+    setSpeed: (speed) => set({ speed, deployRush: false }),
+    rushDeploy: () => { set({ deployRush: true }); get().setRunning(true); },
+    cancelDeployRush: () => set({ deployRush: false }),
 
     newRun: (opts = {}) => {
       if(get().cloudBusy){get().notify("Wait for the cloud operation before replacing this company.","info");return;}
@@ -1191,7 +1208,7 @@ export const useGame = create<Store>()((set, get) => {
         view: null,
         techFocus: null,
         running: false,
-        weekRush: false,
+        deployRush: false,
         rating: null,
         onboarding: false,
         tour: null,
@@ -1240,7 +1257,7 @@ export const useGame = create<Store>()((set, get) => {
       const measurement = campaign.status === "ok" ? beginSession(campaign.envelope.runtime.measurement, game, crypto.randomUUID(), new Date().toISOString()) : emptyMeasurement();
       const saved = mode === "campaign" ? saveGame(game, remainderMs, true, measurement) && archiveEvents(measurement.pending) : saveClassicGame(game);
       saveMode(mode);
-      set({ tutorialCompany: null, mode, importGeneration: get().importGeneration + 1, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, weekRush: false, view: null,
+      set({ tutorialCompany: null, mode, importGeneration: get().importGeneration + 1, hasRun: mode === "campaign", measurement, activeMark: mode === "campaign" && !document.hidden ? performance.now() : null, meta: loadMeta(mode), game, generation: get().generation + 1, lastAction: null, lastIntro: null, remainderMs, saveBlocked: false, running: false, deployRush: false, view: null,
         selected: null, hovered: null, affected: [], previewAction: null, spotlight: [], started: true, tour: null, chapterComplete: null, onboarding: false, techFocus: null, rating: null });
       track("save_imported", { mode, step: game.campaign?.step ?? game.turn });
       get().notify(saved ? "Save imported" : "Imported. Could not save; play continues in memory.", saved ? "success" : "error");
@@ -1290,7 +1307,7 @@ export const useGame = create<Store>()((set, get) => {
         }
         const meta = practiceAt(s.meta, true);
         set({ game, measurement, tutorialCompany: company, meta, activeMark: document.hidden ? null : performance.now(), generation: s.generation + 1, remainderMs: 0,
-          tour: null, view: null, started: true, running: false, weekRush: false, onboarding: false, tutorialAttempt: s.tutorialAttempt + 1,
+          tour: null, view: null, started: true, running: false, deployRush: false, onboarding: false, tutorialAttempt: s.tutorialAttempt + 1,
           lastAction: null, lastIntro: null, chapterComplete: null, selectedAppId: null, roomInspection: null,
           affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, techFocus: null, rating: null, toast: null });
         persist();
@@ -1349,7 +1366,7 @@ export const useGame = create<Store>()((set, get) => {
         persist(); clearTutorialPractice();
         set({ ...company, tutorialCompany: null, meta: practiceAt(meta, false), generation: get().generation + 1, selected: null, selectedAppId: null,
           roomInspection: null, affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, view: null, techFocus: null,
-          tour: null, running: false, weekRush: false, lastAction: null, toast: null, activeMark: document.hidden ? null : performance.now() });
+          tour: null, running: false, deployRush: false, lastAction: null, toast: null, activeMark: document.hidden ? null : performance.now() });
         return;
       }
       if (!tour) return;
@@ -1481,9 +1498,17 @@ let roomInspectionSeq = 0;
  * Classic panels keep their existing inline `inspectOrSelect` flow.
  */
 export function inspectInRoom(id: EquipmentId, appId?: string): void {
-  if (!canInspectEquipment(useGame.getState().game, id)) return;
+  const { game, panelOpen } = useGame.getState();
+  if (!canInspectEquipment(game, id)) return;
   inspectOrSelect(id, appId);
-  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) } });
+  // A Guided Mode machine's dialog holds its readings and actions, so the side panel stays as the player left it;
+  // Challenge Mode's reveal points to the panel's inspector, which selecting opens.
+  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) }, ...(opensComponentDialog(game, id) ? { panelOpen } : {}) });
+}
+
+/** Whether inspecting this machine opens Guided Mode's component dialog rather than Challenge Mode's reveal. */
+export function opensComponentDialog(game: GameState, id: EquipmentId): boolean {
+  return !!game.campaign && (["db", "app", "gateway", "cache", "monitoring"] as EquipmentId[]).includes(id);
 }
 
 function loadMetaSafe(): Meta {

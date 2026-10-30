@@ -373,7 +373,7 @@ export function MenuMap() {
                     store.openView(null);
                   }}
                 >
-                  Show in room
+                  <Icon name="camera" size={16} />Show in room
                 </button>
               )}
               {place.kind !== "equipment" && place.floor !== roomFloor && (
@@ -385,7 +385,7 @@ export function MenuMap() {
                     store.openView(null);
                   }}
                 >
-                  Show in room
+                  <Icon name="camera" size={16} />Show in room
                 </button>
               )}
               <button
@@ -399,7 +399,7 @@ export function MenuMap() {
                   } else useGame.getState().notify("There is no way to walk there.", "info");
                 }}
               >
-                Walk here
+                <Icon name="walk" size={16} />Walk here
               </button>
             </span>
             {(!canWalk || place.floor !== floor) && <span className="menu-map-card-note muted">Turn on Walk mode on this floor to walk here.</span>}

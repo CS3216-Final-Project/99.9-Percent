@@ -76,7 +76,7 @@ it("backs up schema-6 bytes and preserves an already-entered company's architect
  const loaded=loadGame();if(loaded.status!=="ok")throw Error(loaded.status);
  const c=loaded.game.campaign!;expect(c.scaling?.id).toBe("application-scaling");expect(c.runId).toBe(e.runId);expect(c.openingRecovered).toBe(false);
  expect(c.legacyPreventionInputs).toBe(e.inputs.length);
- const historical=replayCampaign(e.seed,e.runId,e.inputs,e.step,false,undefined,false,e.inputs.length);
+ const historical=replayCampaign(e.seed,e.runId,e.inputs,e.step,false,undefined,false,e.inputs.length,undefined,e.scenarioVersion,e.step,e.step);
  expect(loaded.game).toEqual(historical);
  let g=act(loaded.game,{type:"start_db_upgrade"});g=advanceSteps(g,3).state;expect(g.campaign!.dbCapacity).toBe(2000);
  expect(saveGame(g)).toBe(true);expect(localStorage.getItem(CAMPAIGN_SAVE_KEY+".backup.v6."+e.runId+"."+e.savedAt)).toBe(raw);

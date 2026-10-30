@@ -12,11 +12,12 @@ it("loads schema 3 without data entry, preserves history and backs up exact byte
  const g=dataCompany("read-heavy",false),source={...makeEnvelope(g,321,1),schemaVersion:3},raw=JSON.stringify(source,null,2);
  localStorage.setItem(CAMPAIGN_SAVE_KEY,raw);
  const loaded=loadGame();if(loaded.status!=="ok")throw Error("load failed");
- expect(loaded.game).toEqual(g);expect(loaded.game.campaign!.dataStage).toBeNull();
+ const gameJson=JSON.parse(JSON.stringify(loaded.game));delete gameJson.campaign.legacyIncidentStep;delete gameJson.campaign.legacyScalingStep;
+ expect(gameJson).toEqual(JSON.parse(JSON.stringify(g)));expect(loaded.game.campaign!.dataStage).toBeNull();
  expect(localStorage.getItem(CAMPAIGN_SAVE_KEY)).toBe(raw);
  expect(saveGame(loaded.game,loaded.remainderMs,false,loaded.measurement)).toBe(true);
  expect(localStorage.getItem(`${CAMPAIGN_SAVE_KEY}.backup.v3.${source.runId}.1`)).toBe(raw);
- expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(8);
+ expect(JSON.parse(localStorage.getItem(CAMPAIGN_SAVE_KEY)!).schemaVersion).toBe(10);
 });
 it.each(["backup","replacement","conflicting backup"])("preserves schema 3 source on %s failure",boundary=>{
  const g=dataCompany("read-heavy",false),raw=JSON.stringify({...makeEnvelope(g,0,1),schemaVersion:3});

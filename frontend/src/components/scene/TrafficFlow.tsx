@@ -5,6 +5,7 @@ import type { Campaign } from "@/sim/campaignTypes";
 import { TRAFFIC } from "./palette";
 import { trafficModel, type TrafficKind } from "./traffic";
 import { dots, edgePath, INTERNET_RUN, nodePoint, packetSpeed, pathLength, pointAt, type FloorLayout, type P2 } from "./trafficLayout";
+import { worldNow } from "./worldClock";
 
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -17,10 +18,10 @@ function FlowCable({ points, rate, kind, speed }: { points: P2[]; rate: number; 
   const still = useMemo(() => reducedMotion(), []);
   const color = kind === "idle" ? TRAFFIC.idle : TRAFFIC[kind];
 
-  useFrame(({ clock }) => {
+  useFrame(() => {
     const m = mesh.current;
     if (!m || !count || total <= 0) return;
-    const run = still ? 0 : clock.elapsedTime * speed;
+    const run = still ? 0 : worldNow() * speed;
     for (let i = 0; i < count; i++) {
       let d = (run + (i * total) / count) % (kind === "turned" ? 2 * total : total);
       // Turned-away requests reach the gateway and bounce back out.
@@ -61,11 +62,11 @@ function Drops({ at, rate, color = TRAFFIC.dropped }: { at: P2; rate: number; co
   const count = Math.min(24, dots(rate));
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const still = useMemo(() => reducedMotion(), []);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     const m = mesh.current;
     if (!m) return;
     for (let i = 0; i < count; i++) {
-      const p = still ? 0.5 : (clock.elapsedTime * 0.7 + i / count) % 1;
+      const p = still ? 0.5 : (worldNow() * 0.7 + i / count) % 1;
       const a = (i * 2.399) % (Math.PI * 2);
       dummy.position.set(at[0] + Math.cos(a) * 0.55 * p, 0.95 * (1 - p * p) + 0.04, at[1] + Math.sin(a) * 0.55 * p);
       dummy.scale.setScalar(1 - 0.7 * p);

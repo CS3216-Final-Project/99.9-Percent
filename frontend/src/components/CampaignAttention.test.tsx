@@ -27,6 +27,8 @@ function show(game: GameState = newGame()) {
   render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost><TooltipLayer /></StrictMode>);
 }
 const gold = () => document.querySelectorAll(".campaign-gold-attention");
+const incidentGuide = () => screen.queryByRole("region", { name: "Incident guide" });
+const dismissIncidentGuide = () => fireEvent.click(within(screen.getByRole("region", { name: "Incident guide" })).getByRole("button", { name: "Got it" }));
 function acceptHint() {
   const card = within(screen.getByRole("dialog", { name: "Hint" }));
   fireEvent.click(card.queryByRole("button", { name: "Got it" }) ?? card.queryByRole("button", { name: "Upgrade database" }) ?? card.getByRole("button", { name: "Accept risk" }));
@@ -64,6 +66,36 @@ it.each([
   act(() => vi.advanceTimersByTime(10000)); expect(gold()).toHaveLength(1);
   expect(gold()[0]).toBe(screen.getByRole("button", { name })); expect(useGame.getState().game).toBe(before);
 });
+it("lights Run after a decision pauses a company that could keep running, clearing when it restarts", () => {
+  show(tick(combinedCompany(), 5));
+  act(() => useGame.getState().setRunning(true));
+  expect(useGame.getState().running).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  expect(useGame.getState().running).toBe(false);
+  expect(gold()).toHaveLength(1);
+  expect(gold()[0]).toBe(screen.getByRole("button", { name: "Run" }));
+  fireEvent.click(gold()[0] as HTMLElement);
+  expect(useGame.getState().running).toBe(true);
+  expect(gold()).toHaveLength(0);
+});
+it("shows no Run invitation for a decision that pauses an already-paused company", () => {
+  show(tick(combinedCompany(), 5));
+  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  expect(useGame.getState().running).toBe(false);
+  expect(gold()).toHaveLength(0);
+});
+it("shows no Run invitation when a modal owns the pause, and does not replay it afterwards", async () => {
+  show(tick(combinedCompany(), 5));
+  act(() => useGame.getState().setRunning(true));
+  const modal = document.createElement("div");
+  modal.className = "modal-backdrop";
+  document.body.append(modal);
+  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  expect(useGame.getState().running).toBe(false);
+  expect(gold()).toHaveLength(0);
+  await act(async () => { modal.remove(); });
+  expect(gold()).toHaveLength(0);
+});
 it("keeps database preparation available and switches to Run after actual headroom activation", () => {
   show(scaling()); act(() => vi.advanceTimersByTime(10000));
   fireEvent.click(inspectionAction(/^Upgrade database/));
@@ -96,7 +128,7 @@ it("one host lights only Run after ten seconds; passive metrics do not restart i
   act(() => useGame.getState().setRunning(true)); expect(gold()).toHaveLength(0);
 });
 it("incident Hint is read-only, then Got it targets Database until interaction", () => {
-  show(advanceSteps(newGame(), 6).state); act(() => vi.advanceTimersByTime(10_000));
+  show(advanceSteps(newGame(), 6).state); dismissIncidentGuide(); act(() => vi.advanceTimersByTime(10_000));
   expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
   const before = useGame.getState().game;
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
@@ -227,7 +259,7 @@ it("a blocking local modal takes priority over an actual valid purchase quote", 
 it("removes gold from a control clipped by its scrolling inspector without discarding acceptance", () => {
   show(advanceSteps(newGame(), 6).state);
   fireEvent.click(screen.getByRole("button", { name: "Hint" })); acceptHint();
-  const inspector = screen.getByRole("dialog", { name: "Database inspected" });
+  const inspector = screen.getByRole("dialog", { name: "Database" });
   inspector.style.overflowY = "auto";
   Object.defineProperty(inspector, "getBoundingClientRect", { configurable:true, value:()=>({ x:10,y:10,top:10,left:10,right:54,bottom:35,width:44,height:25,toJSON:()=>({}) }) });
   fireEvent.scroll(inspector); expect(gold()).toHaveLength(0);
@@ -246,7 +278,7 @@ it("shows one short explanation, no choices and an immediately enabled acknowled
   expect(screen.getByRole("button",{name:"Got it"}).hasAttribute("disabled")).toBe(false);
   expect(useGame.getState().game).toBe(before);
   acceptHint(); expect(gold()[0].textContent).toContain("Upgrade database");
-  expect(inspectionAction(/^Limit to 500/).hasAttribute("disabled")).toBe(false);
+  expect(inspectionAction(/^Limit to ~/).hasAttribute("disabled")).toBe(false);
 });
 
 it("offers both real growth strategies and transfers accepted risk without dispatching until confirmation", () => {
@@ -261,6 +293,13 @@ it("offers both real growth strategies and transfers accepted risk without dispa
   expect(useGame.getState().game).toEqual(before);
   fireEvent.click(gold()[0]); expect(useGame.getState().game.campaign!.scalingConsent).toEqual({ policyVersion: 1, acceptedStep: before.campaign!.step });
   expect(gold()).toHaveLength(0);
+});
+it("lights Run after accepting the growth risk pauses a running company", () => {
+  show(scaling()); act(() => useGame.getState().setRunning(true));
+  fireEvent.click(screen.getByRole("button", { name: "Consider growth with current capacity" }));
+  fireEvent.click(screen.getByRole("button", { name: "Accept growth risk" }));
+  expect(useGame.getState().running).toBe(false);
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
 });
 it("offers only the valid risk strategy when database preparation is unaffordable", () => {
   const game = scaling(); game.campaign!.cashCents = 1; show(game);
@@ -295,6 +334,8 @@ it("teaches Launch Week with spotlighted tutorial steps instead of the Hint butt
   // The week's one incident frames the Database inspection straight away.
   show(advanceSteps(newGame(7, "lw", 2), 20).state);
   expect(screen.queryByRole("dialog", { name: "Company Message" })).toBeNull();
+  // The first incident's card on Run comes before the week's own incident steps.
+  spotOn("Run"); dismissIncidentGuide();
   expect(screen.getByRole("region", { name: "Launch Week tutorial" }).textContent).toContain("Your database is overloading");
   spotOn(/Database/);
   // Inspecting shows the metrics first; Next moves the spotlight to the fix.
@@ -307,7 +348,7 @@ it("teaches Launch Week with spotlighted tutorial steps instead of the Hint butt
   spotOn(/^Upgrade database/);
 });
 
-it("continues the introduction with Run, service analytics, readings and a real upgrade", () => {
+it("spotlights only the Opening's first Run, then guides through the Hint flow", () => {
   show(introducedOpening());
   const message = screen.getByRole("dialog", { name: "Company Message" });
   fireEvent.click(within(message).getByRole("button", { name: "Dismiss company message" }));
@@ -315,30 +356,76 @@ it("continues the introduction with Run, service analytics, readings and a real 
   spotOn("Run");
   fireEvent.click(lit()[0]);
   act(() => useGame.setState({ game: tick(useGame.getState().game, 1), running: true }));
-  const analytics = screen.getByRole("region", { name: "Chapter 1 guide" });
-  expect(analytics.textContent).toContain("Watch your service");
-  expect(lit()[0].classList.contains("incident-symptoms")).toBe(true);
-  const beforeReading = useGame.getState().game;
-  fireEvent.click(within(analytics).getByRole("button", { name: "Next" }));
-  expect(useGame.getState().game).toBe(beforeReading);
-  act(() => useGame.setState({ game: tick(useGame.getState().game, 5), running: false }));
-  spotOn(/Database/);
-  fireEvent.click(lit()[0]);
-  const metrics = screen.getByRole("region", { name: "Chapter 1 guide" });
-  expect(metrics.textContent).toContain("Read the metrics");
-  expect(lit()[0].classList.contains("component-inspection-summary")).toBe(true);
-  fireEvent.click(within(metrics).getByRole("button", { name: "Next" }));
-  spotOn(/^Upgrade database/);
-  fireEvent.click(lit()[0]);
+  // The first Run was the only spotlighted step; the coach never returns.
+  noSpot();
   expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
+  act(() => useGame.setState({ game: tick(useGame.getState().game, 5), running: false }));
+  // The first incident's one card frames Run; after it the incident is taught by the same Hint flow the later chapters use.
+  expect(incidentGuide()?.textContent).toContain("Your first incident");
+  spotOn("Run"); dismissIncidentGuide();
+  noSpot();
+  act(() => vi.advanceTimersByTime(10_000));
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  expect(screen.getByRole("dialog", { name: "Hint" }).textContent).toContain("Your database is overloaded. Upgrade it to handle more requests.");
+  acceptHint();
+  expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Upgrade database");
+  fireEvent.click(gold()[0]);
   expect(gold()[0].textContent).toBe("Confirm");
   const step = useGame.getState().game.campaign!.step;
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   expect(useGame.getState().game.campaign!.pending.some(action => action.type === "upgrade-db")).toBe(true);
   expect(useGame.getState().game.campaign!.step).toBe(step);
-  expect(screen.queryByRole("dialog", { name: "Database inspected" })).toBeNull();
-  spotOn("Run");
-  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Installing");
+  expect(screen.queryByRole("dialog", { name: "Database" })).toBeNull();
+  // The pending install is a Run hint, not another spotlight.
+  noSpot();
+  expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
+  act(() => vi.advanceTimersByTime(10_000));
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
+});
+
+it("frames Run with the first incident's loop until Run retires it", () => {
+  show(advanceSteps(newGame(), 6).state);
+  const guide = incidentGuide()!;
+  expect(guide.textContent).toContain("you can pause the company too");
+  expect(guide.textContent).toContain("Inspect what caused this problem and fix it, then press Run");
+  expect(guide.textContent).toContain("If it doesn't work, fix something else and let it run again.");
+  spotOn("Run"); expect(gold()).toHaveLength(1);
+  // An obstructing view hides it for a moment; idle Hint gold waits for it.
+  act(() => useGame.getState().openView("history")); expect(incidentGuide()).toBeNull();
+  act(() => useGame.getState().openView(null)); expect(incidentGuide()).toBeTruthy();
+  act(() => vi.advanceTimersByTime(10_000)); expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
+  // Running is the loop's last step: the card never returns for this incident.
+  fireEvent.click(lit()[0]); expect(useGame.getState().running).toBe(true);
+  expect(incidentGuide()).toBeNull(); noSpot();
+  act(() => useGame.getState().setRunning(false)); expect(incidentGuide()).toBeNull();
+});
+it.each([
+  ["Hint", () => fireEvent.click(screen.getByRole("button", { name: "Hint" })), () => fireEvent.click(screen.getByRole("button", { name: "Close Hint" }))],
+  ["an inspection", () => fireEvent.click(inspectionAction(/^Database$/)), () => fireEvent.click(screen.getByRole("button", { name: "Close" }))],
+])("retires the first incident's card once the player opens %s", (_, open, close) => {
+  show(advanceSteps(newGame(), 6).state);
+  expect(incidentGuide()).toBeTruthy();
+  open(); expect(incidentGuide()).toBeNull();
+  close(); expect(incidentGuide()).toBeNull();
+});
+it("keeps the first incident's card to the first incident's untouched stop, even after a reload", () => {
+  const game = advanceSteps(newGame(), 6).state, c = game.campaign!;
+  show({ ...game, campaign: { ...c, incident: { ...c.incident!, id: "incident-later" } } });
+  expect(incidentGuide()).toBeNull();
+  cleanup(); show(tick(game, 1));
+  expect(incidentGuide()).toBeNull();
+  cleanup(); show(decide(game, { type: "start_db_upgrade" }));
+  expect(incidentGuide()).toBeNull();
+});
+it("waits behind an inspection already open when the first incident stops the clock", () => {
+  show(advanceSteps(newGame(), 5).state);
+  fireEvent.click(inspectionAction(/^Database$/));
+  act(() => useGame.setState({ game: advanceSteps(useGame.getState().game, 1).state }));
+  expect(useGame.getState().game.campaign!.incident).toBeTruthy();
+  expect(incidentGuide()).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  expect(incidentGuide()?.textContent).toContain("Your first incident");
 });
 
 it("gives manual Hint and obstructing views priority over the Opening coach", () => {
@@ -346,7 +433,7 @@ it("gives manual Hint and obstructing views priority over the Opening coach", ()
   show(game);
   const message = screen.queryByRole("dialog", { name: "Company Message" });
   if (message) fireEvent.click(within(message).getByRole("button", { name: "Dismiss company message" }));
-  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Watch your service");
+  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Run, then observe");
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   expect(screen.getByRole("dialog", { name: "Hint" })).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();

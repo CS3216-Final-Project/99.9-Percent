@@ -26,11 +26,31 @@ it("requires three high observations then three installation and one routing ste
  g=tick(g);expect(g.campaign!.snapshot.app.capacity).toBe(4200);expect(g.campaign!.spikeStage!.controller!.cooldownUntil).toBe(n+18);
  g=tick(g,2);expect(g.campaign!.actions.filter(a=>a.source==="autoscaler"&&a.type==="add-app")).toHaveLength(1);
 });
-it("retirement needs six low safe observations, protects manual apps and never reuses IDs",()=>{
+it("retirement needs six low safe observations, protects manual apps and reuses freed numbers",()=>{
  let g=untilOffset(spikeCompany(),38);const c=g.campaign!,n=c.spikeStage!.enteredStep;expect(c.spikeStage!.controller!.lowSteps).toBe(5);expect(c.pending.some(a=>a.type==="retire-app")).toBe(false);
  expect(canRetire(c,"app-1")).toBe(false);g=tick(g);expect(g.campaign!.pending[0]).toMatchObject({type:"retire-app",targetId:"app-4",activationStep:n+40});
  const appCost=g.campaign!.ledger.appNumerator;g=tick(g);expect(g.campaign!.apps.map(a=>a.id)).toEqual(["app-1","app-2","app-3"]);expect(g.campaign!.ledger.appNumerator-appCost).toBe(290000);
- expect(validateEnvelope(makeEnvelope(g)).status).toBe("ok");g=untilOffset(g,54);expect(g.campaign!.apps.map(a=>a.id)).toContain("app-5");expect(g.campaign!.nextAppNumber).toBe(6);
+ expect(validateEnvelope(makeEnvelope(g)).status).toBe("ok");g=untilOffset(g,54);expect(g.campaign!.apps.map(a=>a.id)).toContain("app-4");expect(g.campaign!.nextAppNumber).toBe(5);
+});
+it("a replayed legacy save keeps monotonic numbering through its recorded steps",()=>{
+ let g=untilOffset(spikeCompany(),54);expect(g.campaign!.apps.map(a=>a.id)).toContain("app-4");
+ // A save recorded under pre-schema-10 rules decodes with its recorded step as the boundary.
+ const e=makeEnvelope(g),loaded=validateEnvelope({...e,schemaVersion:9});
+ expect(loaded.status).toBe("ok");if(loaded.status!=="ok")throw Error("Save could not be replayed");
+ expect(loaded.game.campaign!.legacyScalingStep).toBe(e.step);
+ expect(loaded.game.campaign!.apps.map(a=>a.id)).toContain("app-5");expect(loaded.game.campaign!.nextAppNumber).toBe(6);
+});
+it("upgrades the busiest managed base app when every slot is taken under sustained load",async()=>{
+ const {runAutoscaler}=await import("../autoscaling");
+ let g=untilOffset(spikeCompany(),56);const c=g.campaign!,a=c.spikeStage!.controller!;
+ expect(c.apps).toHaveLength(4);expect(a.managedAppIds).toContain("app-3");
+ c.cashCents=1_000_000;c.step=a.cooldownUntil;
+ // Controlled completed observations isolate the decision; no production scenario retuning.
+ for(let i=0;i<3;i++){c.step++;c.snapshot.instances!.forEach(x=>{if(x.routed)x.processed=x.capacity;});runAutoscaler(g);}
+ const p=c.pending.find(x=>x.type==="scale-up")!;
+ expect(p).toMatchObject({source:"autoscaler",targetId:"app-3",costCents:200000});
+ expect(a.managedAppIds).not.toContain("app-3");expect(c.trace.some(t=>t.type==="autoscale-scale-up-decided")).toBe(true);
+ g=tick(g,3);expect(g.campaign!.apps.find(x=>x.id==="app-3")).toMatchObject({tier:"large",capacity:1600});
 });
 it("refuses retirement with unfinished work and protects an accepted manual upgrade",()=>{
  let g=untilOffset(spikeCompany(),28);g.campaign!.apps[2].backlog=1;expect(canRetire(g.campaign!,"app-3")).toBe(false);
@@ -40,6 +60,15 @@ it("limits suppress triggers, and manual capacity can prevent incidents without 
  let g=spikeCompany();g=tick(act(g,{type:"set_traffic_limit",enabled:true}));g=untilOffset(g,20);expect(g.campaign!.actions.some(a=>a.source==="autoscaler"&&a.type==="add-app")).toBe(false);
  g=spikeCompany(false);g=tick(act(g,{type:"add_server"}),2);g=tick(act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}));g=tick(act(g,{type:"scale_up",appId:"app-3"}),3);
  g=untilOffset(g,27);expect(g.campaign!.incident).toBeNull();expect(g.campaign!.apps).toHaveLength(3);expect(g.campaign!.actions.some(a=>a.source==="autoscaler")).toBe(false);
+});
+it("keeps a self-healing spike incident open until a response is recorded",()=>{
+ let g=untilOffset(spikeCompany(false,"write-heavy"),24);expect(g.campaign!.incident).not.toBeNull();
+ for(let i=0;i<120&&g.campaign!.incident&&g.campaign!.incident!.stableSteps<5;i++)g=tick(g);
+ expect(g.campaign!.incident).not.toBeNull();expect(g.phase).toBe("incident");
+ expect(g.campaign!.incident!.stableSteps).toBeGreaterThanOrEqual(5);
+ expect(g.campaign!.spikeStage!.completedStep).toBeNull();
+ g=act(g,{type:"set_traffic_limit",enabled:true});
+ while(g.phase!=="review")g=tick(g);expect(g.campaign!.incident).toBeNull();
 });
 it("autoscaling leaves write-heavy DB capacity and cache effectiveness unchanged",()=>{
  let g=untilOffset(spikeCompany(true,"write-heavy"),24);expect(g.campaign!.dbCapacity).toBe(3000);expect(g.campaign!.readCache!.target).toBe(6000);expect(g.campaign!.snapshot.data!.effectiveHitRateUsed).toBe(6000);

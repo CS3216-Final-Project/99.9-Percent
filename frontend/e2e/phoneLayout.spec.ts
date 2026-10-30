@@ -119,7 +119,7 @@ test("Guided Mode incident: the sheet stays at least half open with every respon
 
   const panel = page.getByRole("complementary", { name: "System metrics" });
   await expect(panel.getByRole("region", { name: "Incident recovery" })).toBeVisible();
-  for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
+  for (const name of [/Add server/, /Upgrade database/, /Limit to ~[\d,]+ requests\/s/]) {
     const response = await infrastructureAction(page,name);
     await response.scrollIntoViewIfNeeded();
     // The existing action is reachable in its component dialog.
@@ -246,7 +246,6 @@ for (const mode of ["Guided", "Challenge"] as const) {
     const panel = await box(dock(page).locator(".time-menu .dock-panel"));
     expect(panel.y + panel.height).toBeLessThanOrEqual(bar.y);
     expect(await box(speed)).toEqual(before);
-    if (mode === "Guided") await expect(dock(page).getByRole("button", { name: "End the week at 20 times speed", exact: true })).toBeInViewport({ ratio: 1 });
     await speeds.getByRole("button", { name: "2×", exact: true }).tap();
     await expect(speed).toContainText("2×");
     await expect(speed).toHaveJSProperty("offsetWidth", Math.round(before.width));

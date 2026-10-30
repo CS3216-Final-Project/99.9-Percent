@@ -47,8 +47,9 @@ it("selects exactly one server and keeps Back, technical metrics and Cancel read
 it("keeps locked autoscaling prerequisites visible in its dedicated screen",()=>{
   show(spikeCompany(false));press("App Server");press("Server management");press("Autoscaling");
   expect(app().textContent).toContain("Controller: Locked");
-  expect(within(app()).getByRole("button",{name:"Deploy autoscaling"}).hasAttribute("disabled")).toBe(true);
-  expect([...app().querySelectorAll(".campaign-action-reason")].map(n=>n.textContent).join(" ")).toMatch(/Requires unlock, balanced routing to two apps/);
+  const deploy=within(app()).getByRole("button",{name:"Deploy autoscaling"});
+  expect(deploy.hasAttribute("disabled")).toBe(true);expect(deploy.querySelector(".act-affordance-locked")).not.toBeNull();
+  expect(deploy.getAttribute("aria-description")).toMatch(/Requires unlock, balanced routing to two apps/);
   const detail=within(app()).getByText("Technical Details").closest("details")!;
   expect(detail.open).toBe(false);fireEvent.click(within(app()).getByText("Technical Details"));
   expect(detail.textContent).toContain("Scale out above 80% for 3 game seconds");
@@ -67,13 +68,15 @@ it("retains deployed controller configuration and costs without mixing server co
 });
 
 it("keeps Network admission separate from routing, balancing and failover",()=>{
-  show(preparedReliability());press("Network");const popup=screen.getByRole("dialog",{name:"Network inspected"});
+  show(preparedReliability());press("Network");const popup=screen.getByRole("dialog",{name:"Network"});
   expect(within(popup).getByRole("button",{name:/Limit to/})).toBeTruthy();
-  expect(within(popup).queryByText(/Configure routing/)).toBeNull();
+  expect(within(popup).queryByRole("group",{name:/Send traffic to/})).toBeNull();
   expect(within(popup).queryByRole("button",{name:/Deploy Automatic Failover/})).toBeNull();
-  press("Network management");press("Routing");expect(within(popup).getByText(/Configure routing/)).toBeTruthy();
-  press("Back to Network management");press("Automatic failover");expect(within(popup).getByRole("button",{name:"Disable failover"})).toBeTruthy();
-  press("Back to Network management");press("Back to Network");expect(within(popup).getByRole("button",{name:"Inspect details"})).toBeTruthy();
+  press("Network management");
+  for(const section of ["Load balancing","Routing","Automatic failover"]) expect(within(popup).getByRole("heading",{name:section})).toBeTruthy();
+  expect(within(popup).getByRole("group",{name:/Send traffic to/})).toBeTruthy();
+  expect(within(popup).getByRole("button",{name:"Disable failover"})).toBeTruthy();
+  press("Back to Network");expect(within(popup).getByRole("button",{name:"Inspect details"})).toBeTruthy();
 });
 
 it("routes a failed-server Hint through its card and valid Confirm to free restoration",async()=>{

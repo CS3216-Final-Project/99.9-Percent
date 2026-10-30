@@ -1,7 +1,7 @@
 import { introductionActive } from "@/sim/introduction";
 import { equipmentInfo } from "@/sim";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { inspectInRoom, useGame } from "@/game/store";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { inspectInRoom, opensComponentDialog, useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { EQUIPMENT_ICON, STATE_META } from "./presentation";
 import { InspectionPurchaseContext } from "./useCampaignAttention";
@@ -13,7 +13,8 @@ import { effectiveTargets } from "@/sim/reliability";
 import { num } from "@/game/format";
 import { campaignAppHealth } from "@/game/campaignAppHealth";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
-import { Modal, Row } from "./ui";
+import { Meter, Modal, Row } from "./ui";
+import { takeOrigin } from "./inspectionOrigin";
 
 /**
  * The diagnostic card an inspection started in the 3D room opens: the equipment's scanner on the left, the
@@ -24,7 +25,7 @@ export default function InspectionReveal() {
   const game = useGame((s) => s.game);
   const dismiss = useGame((s) => s.dismissRoomInspection);
   if (!inspection) return null;
-  if (game.campaign && ["db","app","gateway","cache","monitoring"].includes(inspection.equipment))
+  if (opensComponentDialog(game, inspection.equipment))
     return <ComponentInspection key={inspection.seq} />;
   const info = equipmentInfo(game, inspection.equipment);
   const state = STATE_META[info.state];
@@ -32,8 +33,7 @@ export default function InspectionReveal() {
   const investigating = !game.campaign && game.phase === "incident" && game.incident?.inspecting?.equipment === inspection.equipment;
   return (
     <Modal
-      title={investigating ? `${info.name} investigation started` : `${info.name} inspected`}
-      icon={{ kind: state.tone, name: EQUIPMENT_ICON[info.id] }}
+      title={investigating ? `${info.name} investigation started` : info.name}
       onClose={dismiss}
       className="inspection-reveal"
     >
@@ -65,12 +65,48 @@ export default function InspectionReveal() {
   );
 }
 
+const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+const MORPH = { duration: 460, easing: "cubic-bezier(0.22, 1, 0.36, 1)" };
+
+/**
+ * Opens the card out of the control that was pressed: a paper shell starts on that button's four edges, with its
+ * corners and colour, and grows onto the card's four edges, where the card fades in over it. Opened from another
+ * dialog, after a reload or with reduced motion, the card simply appears.
+ */
+function useMorph(anchor: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const origin = takeOrigin();
+    const card = anchor.current?.closest<HTMLElement>(".modal");
+    if (!origin || !card || reducedMotion() || typeof card.animate !== "function") return;
+    const to = card.getBoundingClientRect(), style = getComputedStyle(card);
+    const edges = (r: { x: number; y: number; width: number; height: number }, radius: string, background: string) =>
+      ({ left: `${r.x}px`, top: `${r.y}px`, width: `${r.width}px`, height: `${r.height}px`, borderRadius: radius, backgroundColor: background });
+    const shell = document.createElement("div");
+    shell.className = "inspection-morph";
+    shell.setAttribute("aria-hidden", "true");
+    card.before(shell);
+    const morph = shell.animate([
+      { ...edges(origin, origin.radius, origin.background ?? style.backgroundColor), opacity: 1 },
+      { opacity: 1, offset: 0.6 },
+      { ...edges(to, style.borderRadius, style.backgroundColor), opacity: 0 },
+    ], MORPH);
+    const reveal = card.animate([{ opacity: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1 }], MORPH);
+    morph.finished.then(() => shell.remove(), () => undefined);
+    return () => {
+      morph.cancel();
+      reveal.cancel();
+      shell.remove();
+    };
+  }, [anchor]);
+}
+
 /** Both the room and keyboard-accessible shortcuts open this same live inspection. */
 function ComponentInspection() {
   const {game,roomInspection:inspection,dismissRoomInspection:dismiss,selectedAppId,view,chapterComplete}=useGame();
   const [details,setDetails]=useState(false);
   const [page,setPage]=useState<"overview"|"management"|EquipmentActionView>(()=>inspection?.equipment==="app"&&inspection.appId?"server":"overview");
   const subview=useRef<HTMLDivElement>(null);
+  useMorph(subview);
   const navigate=(next:typeof page)=>{setDetails(false);setPage(next);};
   const previousPage=useRef(page);
   useLayoutEffect(()=>{
@@ -149,12 +185,32 @@ function ComponentInspection() {
   const overview=page==="overview";
   const appManagement=place==="app"&&page==="management";
   const server=place==="app"&&page==="server";
-  const title=place==="app"?"App Servers":`${info.name} inspected`;
+  const back=<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page!=="management"?"management":"overview")}>{place==="app"?(page==="management"?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>;
+  const title=place==="app"?"App Servers":info.name;
+  const lens=details?"zoomOut":"zoomIn";
+  // The disc is the machine and the way into its readings: under the pointer a glowing magnifier lies over the machine, and
+  // pressing it turns it over, opening the readings below the actions. Its back is the machine again, with a closing
+  // magnifier under the pointer; pressing again turns it back.
   const summary=<div className="component-inspection-summary">
-      <div className="inspection-scanner" aria-hidden="true"><Icon name={EQUIPMENT_ICON[place]} size={56}/></div>
+      <button type="button" className={`inspection-disc tone-${state.tone}`} data-inspection-details aria-expanded={details} aria-controls="inspection-details" aria-label="Inspect details" onClick={()=>setDetails(!details)}>
+        <span className="inspection-disc-turn">
+          <span className="inspection-disc-face">
+            <Icon name={EQUIPMENT_ICON[place]} size={48} className="inspection-disc-machine"/>
+            <Icon name="zoomIn" size={44} className="inspection-disc-lens"/>
+          </span>
+          <span className="inspection-disc-face inspection-disc-back">
+            <Icon name={EQUIPMENT_ICON[place]} size={48} className="inspection-disc-machine"/>
+            <Icon name="zoomOut" size={44} className="inspection-disc-lens"/>
+          </span>
+        </span>
+        <span className="inspection-disc-badge"><Icon name={lens} size={16}/></span>
+      </button>
       <p className="inspection-status"><span className={`state state-${stateKey}`}><Icon name={state.icon} size={12}/>{word}</span>{server&&<span>App {selected.id.slice(4)}</span>}</p>
-      <p className="component-inspection-metric">{metric}</p><p>{description}</p>
+      <p className="component-inspection-metric">{metric}</p>
+      {component&&component.capacity>0&&<Meter value={component.demand/component.capacity} tone={state.tone==="muted"?"accent":state.tone} label={`${place==="db"?"Database":"Server"} load`}/>}
+      <p>{description}</p>
     </div>;
+  const detailsArea=(content:ReactNode)=>details&&<div id="inspection-details" className="inspection-details">{content}</div>;
   const failedApps=c.apps.filter(a=>a.health==="failed"),unrouted=c.apps.filter(a=>!routes.includes(a.id)&&a.role!=="spare"&&a.health!=="failed");
   const overloaded=m.instances?.filter(a=>a.routed&&a.demand>a.capacity);
   const warning=failedApps.length?`${failedApps.map(a=>`App ${a.id.slice(4)}`).join(", ")} failed. Check surviving capacity and recovery options.`
@@ -162,7 +218,7 @@ function ComponentInspection() {
     :overloaded?.length?"A routed server is overloaded. Inspect its demand and available capacity.":null;
   return <Modal title={title} icon={{kind:state.tone,name:EQUIPMENT_ICON[place]}} onClose={confirming?undefined:dismiss} className={`component-inspection component-inspection-${place}`}>
     <div className="inspection-subview" data-inspection-view={page} ref={subview} tabIndex={-1}>
-    {!overview&&<button type="button" className="btn btn-small inspection-back" data-inspection-back disabled={!!confirming} onClick={()=>navigate(page!=="management"?"management":"overview")}>{place==="app"?(page==="management"?"Back to Servers":"Back to Server management"):page==="management"?"Back to Network":"Back to Network management"}</button>}
+    {!overview&&place!=="gateway"&&back}
     {appManagement?<>
       <h3 className="inspection-management-heading"><Icon name="server" size={20}/>Server management</h3>
       <dl className="inspection-fleet-summary" aria-label="Server counts"><Row label="Installed" value={c.apps.length}/><Row label="Healthy" value={c.apps.filter(a=>a.health!=="failed").length}/><Row label="Currently routed" value={routes.length}/></dl>
@@ -173,19 +229,25 @@ function ComponentInspection() {
     </>:server?<>
       <h3 tabIndex={-1}>App {selected.id.slice(4)}</h3>{summary}
       <dl className="rows"><Row label="Installed capacity" value={`${num(selected.capacity)} requests/s`}/><Row label="Current demand" value={instance?`${num(instance.demand)} requests/s`:"Not yet observed"}/><Row label="Routing" value={routes.includes(selected.id)?"Receiving traffic":selected.role==="spare"?"Standby spare":"Not receiving traffic"}/></dl>
-      {controls("server")}{technical(selected.id)}
+      {controls("server")}{detailsArea(reading(selected.id))}
     </>:place==="app"&&page==="autoscaling"?<>
       <h3>Autoscaling</h3><p>Controller: {c.spikeStage?.controller?"Deployed":c.spikeStage?.researchSpent?"Available":"Locked"}. Automatically adjusts application capacity when sustained utilisation crosses its thresholds.</p>
       {controls("autoscaling")}
     </>:place==="gateway"&&!overview?<>
-      <h3>{page==="management"?"Network management":page==="balancing"?"Load balancing":page==="routing"?"Routing":"Automatic failover"}</h3>
-      {page==="management"?<div className="inspection-management-entries">{entry("balancing","Load balancing")}{entry("routing","Routing")}{entry("failover","Automatic failover")}</div>:<>
-        {page==="failover"&&!c.reliabilityStage?<p>Automatic failover becomes available in Stay Online.</p>:!c.openingMilestone?.acknowledged&&!c.launchWeek?<p>Complete Opening recognition to manage load balancing and routing.</p>:controls(page as EquipmentActionView)}
+      <div className="inspection-management-header">
+        <h3 className="inspection-management-heading"><Icon name="network" size={20}/>Network management</h3>
+        {back}
+      </div>
+      {!c.openingMilestone?.acknowledged&&!c.launchWeek?<p>Complete Opening recognition to manage load balancing and routing.</p>:<>
+        <section aria-label="Load balancing"><h4>Load balancing</h4>{controls("balancing")}</section>
+        <section aria-label="Routing"><h4>Routing</h4>{controls("routing")}</section>
       </>}
+      <section aria-label="Automatic failover"><h4>Automatic failover</h4>
+        {!c.reliabilityStage?<p>Automatic failover becomes available in Stay Online.</p>:controls("failover")}</section>
     </>:<>
       {summary}
-      <div className="component-inspection-controls"><button className="btn" data-inspection-details aria-expanded={details} onClick={()=>setDetails(!details)}>Inspect details</button>{place!=="monitoring"&&controls(place==="gateway"?"network":place==="app"?"fleet":undefined)}{place==="app"&&entry("management","Server management")}{place==="gateway"&&entry("management","Network management")}</div>
-      {details&&<>{reading()}{place==="cache"&&<CampaignDataDetails disabled={mandatory}/>}{place==="monitoring"&&controls()}</>}
+      <div className="component-inspection-controls">{place!=="monitoring"&&controls(place==="gateway"?"network":place==="app"?"fleet":undefined)}{place==="app"&&entry("management","Server management")}{place==="gateway"&&entry("management","Network management")}</div>
+      {detailsArea(<>{reading()}{place==="cache"&&<CampaignDataDetails disabled={mandatory}/>}{place==="monitoring"&&controls()}</>)}
     </>}
     {introductionActive(c)&&<button className="btn btn-primary" onClick={dismiss}>Got it</button>}
     {c.pending.length>0&&<p role="status">{c.pending.length} change(s) awaiting activation. Advance time when ready to observe deployment.</p>}

@@ -18,6 +18,7 @@ import { DetailedProps } from "./props";
 import { ball, bx, cy, place, type Prim, type V3 } from "./shapes";
 import { puffTexture } from "./textures";
 import { OnWall } from "./walls";
+import { worldNow } from "./worldClock";
 
 /*
  * The server floor, one storey below the office, drawn in its own frame (Facility.tsx stands it at its height). The
@@ -257,13 +258,13 @@ function ChillerFans() {
   const blades = useRef<THREE.InstancedMesh>(null);
   const fans = useMemo(() => CHILLERS.flatMap(([x, z]) => [-CHILLER.fanZ, CHILLER.fanZ].map((dz): V3 => [x, CHILLER.h + 0.2, z + dz])), []);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     const mesh = blades.current;
     if (!mesh) return;
     fans.forEach((p, i) => {
       for (let b = 0; b < 3; b++) {
         dummy.position.set(p[0], p[1], p[2]);
-        dummy.rotation.set(0, clock.elapsedTime * (5 + i * 0.7) + (b * Math.PI * 2) / 3, 0);
+        dummy.rotation.set(0, worldNow() * (5 + i * 0.7) + (b * Math.PI * 2) / 3, 0);
         dummy.updateMatrix();
         mesh.setMatrixAt(i * 3 + b, dummy.matrix);
       }
@@ -287,11 +288,11 @@ function ColdAir() {
   );
   useEffect(() => () => materials.forEach((m) => m.dispose()), [materials]);
   const sprites = useRef<(THREE.Sprite | null)[]>([]);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     sprites.current.forEach((sprite, i) => {
       if (!sprite) return;
       const [x, z] = VENTS[i >> 1];
-      const phase = (clock.elapsedTime / 4.5 + (i % 2) * 0.5 + (i >> 1) * 0.13) % 1;
+      const phase = (worldNow() / 4.5 + (i % 2) * 0.5 + (i >> 1) * 0.13) % 1;
       sprite.position.set(x + Math.sin(phase * 4 + i) * 0.12, 0.1 + phase * 1.3, z + Math.cos(phase * 3 + i) * 0.12);
       const size = 0.35 + phase * 0.7;
       sprite.scale.set(size, size * 0.8, 1);
@@ -345,7 +346,7 @@ function Responder({ index }: { index: number }) {
   useFrame(() => {
     const g = group.current;
     if (!g) return;
-    const now = performance.now() / 1000;
+    const now = worldNow();
     if (start.current < 0) start.current = now;
     const t = now - start.current - index * RESPONSE.stagger;
     g.visible = t >= 0;

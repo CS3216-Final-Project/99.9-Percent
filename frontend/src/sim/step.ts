@@ -32,6 +32,23 @@ export function allocateTraffic(demand: number, targets: string[]): Record<strin
     const ordered = [...targets].sort((a, b) => Number(a.split("-")[1]) - Number(b.split("-")[1]));
     return Object.fromEntries(ordered.map((id, i) => [id, Math.floor(demand / ordered.length) + (i < demand % ordered.length ? 1 : 0)]));
 }
+/**
+ * The id the next installed app receives. Steps replayed at or before `legacyScalingStep`
+ * keep the original monotonic numbering so recorded inputs still name the same apps; later
+ * steps take the lowest unused number, so a retirement never leaves a misleading gap.
+ * `nextAppNumber` stays the high-water mark the legacy rule and the infra projection use.
+ */
+export function allocateAppId(c: Campaign): string {
+    if (c.step <= (c.legacyScalingStep ?? -1)) return `app-${c.nextAppNumber++}`;
+    const used = new Set(c.apps.map(a => a.id));
+    for (const p of c.pending) if (p.targetId) used.add(p.targetId);
+    const joining = c.spikeStage?.controller?.joiningAppId;
+    if (joining) used.add(joining);
+    for (let n = 2; ; n++) {
+        const id = `app-${n}`;
+        if (!used.has(id)) { c.nextAppNumber = Math.max(c.nextAppNumber, n + 1); return id; }
+    }
+}
 /** Apps the load balancer may send traffic to: installed and serving, so not a reserved spare. */
 export function routableApps(c: Campaign): AppInstance[] {
     return c.apps.filter(a => a.state === "active" && a.role !== "spare");
@@ -162,6 +179,30 @@ export function projectCampaign(s: GameState): GameState {
 export function qualifiesForRecovery(m: Snapshot): boolean {
     return m.latencyMs < Q.latencyThresholdMs && m.serviceErrorRate !== null &&
         m.serviceErrorRate < Q.errorThreshold && m.admitted > 0 && m.successful + m.failed > 0;
+}
+/**
+ * The open incident still lacks its recorded response: an uncancelled capacity, routing,
+ * admission or restoration decision engaged at or after the step its cause began. Stability
+ * alone never closes such an incident, so a player who does nothing sees no recovery.
+ * Incidents replayed from saves written before the rule (no `responseDueFrom`) never await one.
+ */
+export function incidentAwaitingResponse(c: Campaign): boolean {
+    const due = c.incident?.responseDueFrom;
+    return due !== undefined &&
+        !c.actions.some(a => a.cancelledStep === undefined && (a.activatedStep ?? a.requestedStep) >= due);
+}
+/**
+ * Whether the incident presentation applies: the phase is "incident", a campaign incident object is
+ * open, or a chapter failure test (Stay Online's fault, or a combined-stage failure) has started and
+ * not yet been restored. A fault can burn for its whole duration while the phase stays "management",
+ * so callers must not rely on the phase alone.
+ */
+export function incidentActive(s: GameState): boolean {
+    if (s.phase === "incident") return true;
+    const c = s.campaign;
+    if (!c) return false;
+    const f = currentFault(c);
+    return !!c.incident || (f !== null && f.startedStep !== null && f.restoredStep === null);
 }
 export type StopReason = "introduction" | "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | "reliability-review" | "combined-review" | null;
 export function step(prev: GameState): {
@@ -377,7 +418,7 @@ export function stepInPlace(s: GameState): StopReason {
         c.incident.stableSteps = qualifiesForRecovery(c.snapshot)&&recoverySafe(c) ? prior + 1 : 0;
         if (prior !== c.incident.stableSteps)
             trace(c, "recovery-streak", { from: prior, to: c.incident.stableSteps });
-        if (c.incident.stableSteps >= Q.stableSteps) {
+        if (c.incident.stableSteps >= Q.stableSteps && !incidentAwaitingResponse(c)) {
             trace(c, "incident-recovered", { incidentId: c.incident.id });
             c.reports.push(causalPostmortem(c));
             c.incident = null;
@@ -395,7 +436,12 @@ export function stepInPlace(s: GameState): StopReason {
         const failedIncident=(c.reliabilityStage?.failureSteps??0)>=3&&!!failure;
         if(failedIncident&&!components.includes(failure!.targetId))components.unshift(failure!.targetId);
         if (components.length) {
-            c.incident = { id: `incident-${c.nextEventId}`, openedStep: c.step, stableSteps: 0, snapshots: c.recent.slice(-3), components, primaryComponent:components[0],...(failedIncident?{kind:"application-failure" as const,failureId:failure!.id}:{}) };
+            // Fault responses count from the failure's start, since a failover can already be in
+            // flight when the failure threshold formally opens the incident. Saves replayed past
+            // the rule's introduction (the legacy prefix) keep self-resolving incidents.
+            const responseDueFrom = c.step <= (c.legacyIncidentStep ?? -1) ? undefined
+                : failedIncident ? (failure!.startedStep ?? c.step) : c.step;
+            c.incident = { id: `incident-${c.nextEventId}`, openedStep: c.step, responseDueFrom, stableSteps: 0, snapshots: c.recent.slice(-3), components, primaryComponent:components[0],...(failedIncident?{kind:"application-failure" as const,failureId:failure!.id}:{}) };
             s.phase = "incident";
             trace(c, "incident-opened", { incidentId: c.incident.id, component: components[0], components: JSON.stringify(components) });
             // Launch Week's tutorial walks through each incident, so every one of its incidents pauses.
@@ -605,7 +651,7 @@ function actInPlace(s: GameState, action: Action, legacyPreventionMilestone: boo
     const n = s.campaign!;
     const delay = type === "add-app" ? openingTuning(c).appDelay : type === "upgrade-db" ? databaseUpgrade(c)!.delay : type === "scale-up" ? P.appDelay : type === "deploy-lb" ? P.lbDelay : type==="cache"?D.cacheDelay:type==="cache-tuning"?D.tuningDelay:openingTuning(c).admissionDelay;
     const scheduled: ScheduledAction = { id: `action-${n.nextEventId}`, type, requestedStep: n.step, activationStep: n.step + delay, costCents, activatedStep: null,
-        ...(type === "add-app" ? {targetId:`app-${n.nextAppNumber++}`} : {}), ...(target ? {targetId:target.id,capacityAfter:P.appCapacity} : {}),
+        ...(type === "add-app" ? {targetId:allocateAppId(n)} : {}), ...(target ? {targetId:target.id,capacityAfter:P.appCapacity} : {}),
         ...(type === "upgrade-db" ? {capacityAfter:databaseUpgrade(c)!.capacity} : {}), ...(routing ? {routing} : {}) };
     if(target&&n.spikeStage?.controller)n.spikeStage.controller.managedAppIds=n.spikeStage.controller.managedAppIds.filter(id=>id!==target.id);
     if(routing){for(const p of n.pending.filter(a=>a.type==="promote-spare")){n.actions.find(a=>a.id===p.id)!.cancelledStep=n.step;trace(n,"failover-cancelled",{actionId:p.id,reason:"Superseded by explicit manual routing"});}n.pending=n.pending.filter(a=>a.type!=="promote-spare");}

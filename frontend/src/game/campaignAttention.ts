@@ -1,8 +1,8 @@
 import { introductionActive } from "@/sim/introduction";
 import { introductionInstruction } from "./introduction";
 import type { Action, GameState } from "@/sim";
-import type { Campaign } from "@/sim/campaignTypes";
-import { admissionCeiling, allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData } from "@/sim/step";
+import type { Autoscaler, Campaign, ScheduledAction } from "@/sim/campaignTypes";
+import { admissionCeiling, allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData, incidentAwaitingResponse } from "@/sim/step";
 import { recoverySafe, reportsAcknowledged } from "@/sim/reliability";
 import { currentFault, finalRequirements, stableManagement, canStartGrowth } from "@/sim/combinedCampaign";
 import { preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
@@ -17,7 +17,7 @@ import { previewCampaignAction } from "./campaignFinance";
 import { chapter4Stage, chapter4Performance } from "./chapter4Guidance";
 import { chapter6Attention, combinedDatabaseDemand } from "./chapter6Guidance";
 
-export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "growth" | "risk" | "menu" | "finance" | "endweek" | "research";
+export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "growth" | "risk" | "menu" | "finance" | "research";
 export interface AttentionDecision {
   chapter: number;
   key: string;
@@ -74,6 +74,16 @@ export function incidentNeedsPause(game: GameState, decision = campaignAttention
     !(c.incident.stableSteps > 0 && qualifiesForRecovery(c.snapshot) && recoverySafe(c));
 }
 
+/**
+ * The company's first incident has just stopped the clock: no game time has run and the player has recorded nothing,
+ * not even an inspection, since it opened. Recorded state, so a reload or import derives the same answer.
+ */
+export function firstIncidentStop(game: GameState): boolean {
+  const c = game.campaign, incident = c?.incident;
+  return !!incident && c.step === incident.openedStep && !c.inputs.some(input => input.step >= incident.openedStep) &&
+    c.trace.find(t => t.type === "incident-opened")?.data.incidentId === incident.id;
+}
+
 /** Keep technical candidates internal; present one justified, validated next interaction. */
 export function campaignAttention(game: GameState): AttentionDecision {
   if(introductionActive(game.campaign)) {
@@ -95,7 +105,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
     return { ...decision, attention: upgrade || risk ? "hint" : null, message, growthChoices: { upgrade, risk }, key: `${decision.key}:${!!upgrade}:${risk}` };
   }
   if (c?.combinedStage) return chapter6Attention(game, decision);
-  if (!c || decision.attention === "run" || !["database", "application", "unrouted", "failure", "round-restoration", "full-demand"].includes(decision.reason)) return decision;
+  if (!c || decision.attention === "run" || !["database", "application", "unrouted", "failure", "round-restoration", "isolated-failure", "full-demand"].includes(decision.reason)) return decision;
   const actions: GuidanceAction[] = [];
   const offer = (action: Action, label: string, evidence: string) => {
     if (previewCampaignAction(game, action).ok) actions.push({ action, label, evidence });
@@ -128,7 +138,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
     }
     if (!c.loadBalancer) offer({ type: "deploy_load_balancer" }, "Deploy load balancing", "An installed serving app is unrouted. Installation enables routing choices; you must configure traffic separately afterward.");
   }
-  if (["failure", "round-restoration"].includes(decision.reason))
+  if (["failure", "round-restoration", "isolated-failure"].includes(decision.reason))
     for (const app of c.apps) if (app.health === "failed") offer({ type: "restore_app", appId: app.id }, `Restore App ${app.id.slice(4)}`, "This server is currently failed. Restoration is free and takes three game seconds; service recovery still requires observations.");
   // Launch Week never recommends turning traffic away: the lesson is capacity, and limiting costs uptime.
   const launchLive = !!c.launchWeek && c.launchWeek.completedStep === null;
@@ -163,7 +173,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
     if (!action && c.snapshot.app.demand < c.snapshot.app.capacity + Q.appCapacity) action = find("add_server");
     if (!action && launchLive) action = find("add_server");
   } else if (decision.reason === "unrouted") action = find("set_routing") ?? find("scale_up") ?? find("deploy_load_balancer");
-  else if (decision.reason === "failure" || decision.reason === "round-restoration") action = find("restore_app");
+  else if (["failure", "round-restoration", "isolated-failure"].includes(decision.reason)) action = find("restore_app");
   else if (decision.reason === "full-demand") action = find("set_traffic_limit");
   if (!action && !launchLive && c.limit === null && c.snapshot.admitted > admissionCeiling(c) && admissionReliefFits(game)) action = find("set_traffic_limit");
   const message = decision.reason === "unrouted" && action?.action.type === "scale_up"
@@ -190,7 +200,7 @@ function actionMessage({action}: GuidanceAction, c: Campaign): string {
     case "add_server": return c.launchWeek && c.launchWeek.completedStep === null
       ? "One App Server can't keep up with this traffic. Buy a second server to share it."
       : "Your app servers need more capacity. Add a server, then connect it after installation.";
-    case "set_routing": return "Your new server isn't receiving traffic. Send traffic to All apps in Configure routing.";
+    case "set_routing": return "Your new server isn't receiving traffic. Check every app in Send traffic to.";
     case "deploy_load_balancer": return c.apps.length > 1 ? "Your new server isn't receiving traffic. Install load balancing so you can connect it."
       : "One app server can't absorb this spike. Install load balancing so a second server can share the traffic.";
     case "deploy_cache": return "Repeated lookups are overloading your database. Deploy Read Cache to reduce that work as it warms up.";
@@ -220,13 +230,13 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     "final-requirements": "Some company requirements are unfinished. Open View chapters to see what's missing.",
     arm: "Your company is ready. Choose Start reliability test to see how it handles a failure.",
     "arm-requirements": "Your company isn't ready for the reliability test. Open View chapters to see what's needed.",
-    "isolated-failure": "Service is stable, but a server is still offline. Press Run to let it return.",
+    "isolated-failure": "Service is stable, but a server is still offline. Check App Server and choose Restore App.",
     "scaling-choice": "Growth needs preparation. Upgrade your database, or review the optional risk with Consider growth with current capacity.",
     "prevention-recorded": "Your prevention result is recorded. Review its verification and complete the Opening recognition to continue.",
     requirements: "Open View chapters to see what your company needs next.",
     "launch-first-incident": "Your App Server is overloading. Inspect it to see its status turn red, then fix the cause.",
     "launch-db-incident": "Your database is overloading. Inspect it to see the work piling up.",
-    "launch-end-week": "Everything is stable again. Use End week to skip to the end of the week.",
+    "launch-settled": "Everything is stable again. Press Run to finish the week.",
     "launch-open": "Your launch week starts now. Press Run - the first customers are arriving.",
     "launch-week-report": "A launch week settled. Lost or turned-away requests so far are counted.",
     "launch-research": "You earned a research point. Spend it on Caching or Autoscaling; each carries into later chapters.",
@@ -237,6 +247,18 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
   if (messages[reason]) return messages[reason];
   if (["opening-growth", "scaling-growth", "data-growth", "spike-pulses", "scheduled-failure", "growth-wave", "growth-readiness"].includes(reason)) return "Press Run to see what happens next.";
   return target === "db" ? "Work is building up. Check Database to see what needs attention." : target === "network" ? "Check Network to understand which traffic your company is serving." : "Check App Server to see what needs attention.";
+}
+
+/** Narrates the controller's queued work as its own action, in the Server management vocabulary. */
+function autoscalerPendingMessage(a: ScheduledAction, controller: Autoscaler | null | undefined): string {
+  const name = (id: string | undefined) => (id ? `App ${id.slice(4)}` : "a server");
+  switch (a.type) {
+    case "add-app": return `Autoscaling is installing ${name(a.targetId)} for the extra load; it joins routing next. Press Run to watch it finish.`;
+    case "scale-up": return `Autoscaling is scaling up ${name(a.targetId)} for the extra load. Press Run to watch it finish.`;
+    case "retire-app": return `Autoscaling is retiring ${name(a.targetId)} now that demand is low. Press Run to watch it finish.`;
+    case "routing": return `Autoscaling is connecting ${name(controller?.joiningAppId ?? a.routing?.targets.at(-1))} to traffic. Press Run to watch it finish.`;
+    default: return "Autoscaling is changing capacity. Press Run to watch it finish.";
+  }
 }
 
 /** Read-only interpretation of recorded state. Never advances or repairs a company. */
@@ -308,15 +330,21 @@ function baseAttention(game: GameState): AttentionDecision {
     return false;
   });
   const scalingChoice = c.scaling && !c.scaling.consumed && c.dbCapacity < P.dbCapacity && !c.scalingConsent;
-  if (relevant && (!scalingChoice || relevant.type === "upgrade-db")) return run(`activation-${relevant.type}`, "An accepted change is still waiting to activate. Activation alone does not guarantee recovery.");
+  if (relevant && (!scalingChoice || relevant.type === "upgrade-db")) {
+    const advice = run(`activation-${relevant.type}`, "An accepted change is still waiting to activate. Activation alone does not guarantee recovery.");
+    // The controller's own queued work reads as something it is doing, not the player's next task.
+    if (relevant.source === "autoscaler") return { ...advice, message: autoscalerPendingMessage(relevant, c.spikeStage?.controller) };
+    if (relevant.type === "deploy-autoscaler") return { ...advice, message: "The autoscaling controller is installing. Press Run to finish deployment; it enables itself and starts watching routed load." };
+    return advice;
+  }
   // Launch Week says nothing before an incident: no upgrade or limit prompts while the week simply runs.
   if (c.launchWeek && c.launchWeek.completedStep === null && !c.incident) {
     const lw = c.launchWeek, week = Math.floor(c.step / LW.periodSteps);
     const settled = c.trace.some(t => t.type === "incident-opened" && Math.floor(t.step / LW.periodSteps) === week);
-    // The free research point is explained before the week is skipped past it.
+    // The free research point is explained before the week runs past it.
     if (lw.researchEarned && !lw.tech) return result("launch-research", "hint", "Research points buy technology. This one is free; it is billed at the week's settlement.", "Pick Caching or Autoscaling. Hover each to preview it in the room.", "research");
     if (settled && qualifies && !appOver && !dbOver && !c.dbBacklog && c.apps.every(a => !a.backlog) && !pending.length && reportsAcknowledged(c) && game.phase === "management")
-      return progression("launch-end-week", "The incident is settled and service is stable.", "Use End week to skip to the end of this week.", "endweek");
+      return result("launch-settled", "run", "The incident is settled and service is stable.", "Press Run to finish the week.", "run");
     {
       if (c.step < LW.spikeStep) return run("launch-open", "Your company opens its doors this week; the first traffic arrives now.");
       const report = c.settlements.at(-1);
@@ -325,7 +353,11 @@ function baseAttention(game: GameState): AttentionDecision {
       return run("launch-week", `Launch week ${Math.min(LW.weeks, Math.floor(c.step / LW.periodSteps) + 1)} of ${LW.weeks}. The launch campaign surge arrives in week 3 - keep the service up.`);
     }
   }
-  if (c.incident && qualifies && !appOver && !dbOver) return run("recovery", `The latest readings meet recovery conditions. Healthy observations: ${c.incident.stableSteps} / ${Q.stableSteps}. Pausing adds no observations.`);
+  if (c.incident && qualifies && !appOver && !dbOver) {
+    if (incidentAwaitingResponse(c))
+      return hint("incident-response", "The readings meet recovery conditions, but the incident has no recorded response yet.", "Take a capacity, routing, admission or restoration action for the incident to record before it can close.", c.incident.primaryComponent === "db" ? "db" : "app");
+    return run("recovery", `The latest readings meet recovery conditions. Healthy observations: ${c.incident.stableSteps} / ${Q.stableSteps}. Pausing adds no observations.`);
+  }
   if (!safe || fault?.startedStep != null && fault.restoredStep === null && !qualifies)
     return hint("failure", "Service has a server-health problem. Check the observed health and surviving capacity.", "Open App Server to inspect health. Restoration, routing and admission relief are different available strategies.", "app");
   if (appOver && c.apps.some(a => !a.routed && a.role !== "spare" && a.health !== "failed"))
@@ -379,7 +411,8 @@ function baseAttention(game: GameState): AttentionDecision {
       return hint("arm-requirements", "The reliability test is not ready to start.", "Use View chapters to review the journey, and compare Chapter requirements before starting the test.", "requirements");
     }
     if (fault.startedStep === null) return run("scheduled-failure", "The reliability test is armed; the failure has not happened yet.");
-    if (fault.restoredStep === null) return run("isolated-failure", "Service is stable with the failed app isolated. The application must still return before chapter stability can complete.");
+    if (fault.restoredStep === null)
+      return hint("isolated-failure", "Service is stable with the failed app isolated. The application must still be restored before chapter stability can complete.", "Inspect App Server health and choose Restore App. Chapter stability requires restoration.", "app");
     if (d.completedStep === null) return run("reliability-stability", `The application is restored. Stable chapter observations: ${d.stableSteps} / 5.`);
   }
   if (c.spikeStage) {
@@ -388,8 +421,73 @@ function baseAttention(game: GameState): AttentionDecision {
     const inspected = (component: string) => !!stage && c.trace.some(t => t.type === "inspection" && t.id > stage.eventId && t.step >= stage.since && t.data.component === component);
     const inspection = (component: "app" | "network" | "monitoring", message: string) => ({ ...hint(`spike-${stage?.stage}-inspect`, "Inspect current evidence for this traffic stage.", message, component), message });
     const limited = c.limit !== null;
+    // The chapter's headline option lives inside App Server > Server management; a validated unlock,
+    // deploy or enable action lets the spotlight walk into it instead of leaving players hunting.
+    const autoscaling = (): GuidanceAction | null => {
+      const offer = (action: Action, label: string, evidence: string): GuidanceAction | null =>
+        previewCampaignAction(game, action).ok ? { action, label, evidence } : null;
+      if (d.controller?.enabled) return null;
+      if (d.controller) return offer({ type: "set_autoscaling", enabled: true }, "Enable autoscaling", "The deployed controller only adjusts capacity while enabled; Server management holds the switch.");
+      return d.researchSpent
+        ? offer({ type: "deploy_autoscaler" }, "Deploy autoscaling", "The optional controller watches routed demand and provisions or retires servers itself; Server management deploys it.")
+        : offer({ type: "unlock_autoscaling" }, "Unlock autoscaling", "The chapter's free research point unlocks the controller inside Server management; deployment is a separate optional purchase.");
+    };
+    // The unlock -> deploy -> enable -> observe arc resumes wherever it stopped once the
+    // optional path is begun; the research point alone does not push it past Prepare.
+    const autoscalingStep = (): AttentionDecision => {
+      const autoscale = autoscaling();
+      const advice = hint("spike-autoscaling", "Autoscaling, this chapter's optional controller, lives inside Server management.", "Open Server management under App Server to find Autoscaling. Manual capacity stays a valid response.", "app");
+      return { ...advice, ...(autoscale ? { action: autoscale } : {}), message: "Autoscaling is this chapter's option; it lives in Server management under App Server. Manual capacity stays a valid response.", key: `${advice.key}:${autoscale ? guidanceActionId(autoscale.action) : "unavailable"}` };
+    };
+    const deployPending = pending.some(a => a.type === "deploy-autoscaler");
+    // Once enabled, the arc becomes observation: narrate the controller's own work until
+    // the player looks at its result in Server management.
+    const appName = (id: string | undefined) => (id ? `App ${id.slice(4)}` : "a server");
+    const lastAct = [...c.trace].reverse().find(t => t.step >= d.enteredStep && t.type.startsWith("autoscale-"));
+    const actSeen = !lastAct || c.trace.some(t => t.type === "inspection" && t.id > lastAct.id && t.data.component === "app");
+    const describeAct = (t: NonNullable<typeof lastAct>): string => {
+      const target = typeof t.data.targetId === "string" ? appName(t.data.targetId) : "a server";
+      switch (t.type) {
+        case "autoscale-scale-out-decided": return `Autoscaling provisioned ${target} for the extra load`;
+        case "autoscale-scale-up-decided": return `Autoscaling scaled up ${target} for the extra load`;
+        case "autoscale-scale-in-eligible": return `Autoscaling started retiring ${target} now that demand is low`;
+        case "autoscale-instance-retired": return `Autoscaling retired ${target} now that demand is low`;
+        case "autoscale-retirement-cancelled": return `Autoscaling cancelled retiring ${target} when conditions changed`;
+        default: return "Autoscaling adjusted capacity";
+      }
+    };
+    const autoscalingObserve = (): AttentionDecision | null => {
+      if (!d.controller?.enabled) return null;
+      const working = pending.find(a => a.source === "autoscaler");
+      if (working || d.controller.joiningAppId) {
+        const message = working ? autoscalerPendingMessage(working, d.controller)
+          : `Autoscaling provisioned ${appName(d.controller.joiningAppId ?? undefined)}; it joins routing next. Press Run to watch it finish.`;
+        return { ...run("spike-autoscale-acting", message), message };
+      }
+      if (lastAct && !actSeen) {
+        const advice = hint("spike-autoscale-acted", `${describeAct(lastAct)}.`, "Open Server management under App Server to see the change it made.", "app");
+        return { ...advice, message: `${describeAct(lastAct)}. Open Server management under App Server to see the change it made.` };
+      }
+      if (stage?.stage === "between" && !lastAct) {
+        const reason = limited ? "your traffic limit caps the demand it can see" : "demand never crossed its thresholds";
+        const advice = hint("spike-autoscale-idle", `Autoscaling is enabled and watched Spike 1; ${reason}, so it stayed idle.`, "Server management under App Server shows its thresholds, cooldowns and what it does next.", "app");
+        return { ...advice, message: `Autoscaling is enabled and watched Spike 1; ${reason}, so it stayed idle. Server management under App Server shows its thresholds and cooldowns.` };
+      }
+      return null;
+    };
+    // The arc only resumes where it stopped: a spent research point keeps its next step
+    // available between pulses and during the closing baseline, but mid-pulse stays clean.
+    const resumeAutoscaling = (): AttentionDecision | null => {
+      if (d.controller?.enabled || !d.researchSpent) return null;
+      if (stage?.stage !== "between" && stage?.stage !== "recover") return null;
+      const advice = autoscalingStep();
+      return advice.action ? advice : null;
+    };
     if (stage?.stage === "prepare" && !inspected("app"))
       return inspection("app", limited ? "Check App Server capacity before the spike. Your traffic limit protects service by rejecting requests." : "Check App Server capacity before the spike. Upgrades are optional; Run when you are ready.");
+    if (stage?.stage === "prepare" && !d.controller?.enabled && !deployPending) return autoscalingStep();
+    if (deployPending)
+      return { ...run("spike-autoscale-deploy", "The autoscaling controller is installing."), message: "The autoscaling controller is installing. Press Run to finish deployment; it enables itself and starts watching routed load." };
     if (!limited && (stage?.stage === "spike1" || stage?.stage === "spike2")) {
       if (!inspected("monitoring")) return inspection("monitoring", "The spike is active. Check Monitoring to see whether latency, errors and queues remain healthy.");
     }
@@ -432,11 +530,26 @@ function baseAttention(game: GameState): AttentionDecision {
           if (advice) return advice;
         }
       }
+      // Fallback when the pulse exposed a constraint but no manual fix applies: the chapter's optional
+      // controller. The recommended action's selector chain walks into Server management.
+      if ((appStruggled || performance.rejected > 0) && (!d.controller?.enabled || limited)) {
+        const autoscale = autoscaling();
+        if (autoscale) {
+          const advice = plan(autoscale.action, autoscale.evidence);
+          if (advice) return advice;
+        }
+      }
       const evaluated = c.trace.some(t => t.type === "inspection" && t.step >= d.deadlines[0] && t.data.component === "monitoring");
       if (!evaluated) return inspection("monitoring", `${performance.summary}${tradeoff} Check Monitoring to evaluate errors, queues and your strategy before Spike 2; changes are optional.`);
+      // After the player has evaluated the first pulse, narrate what the controller did
+      // with it or resume the unfinished arc.
+      const observing = autoscalingObserve() ?? resumeAutoscaling();
+      if (observing) return observing;
       const advice = run("spike-pulses", performance.summary);
       return { ...advice, message: `${performance.summary}${tradeoff} Keep your strategy or make an optional change. Press Run to test it during Spike 2.` };
     }
+    const observing = autoscalingObserve() ?? resumeAutoscaling();
+    if (observing) return observing;
     const pulsePending = d.deadlines.some((deadline, i) => deadline > c.step &&
       !d.consumed.includes(`spike-${Math.floor(i / 2) + 1}-${i % 2 ? "end" : "start"}`));
     if (d.completedStep === null && pulsePending) {

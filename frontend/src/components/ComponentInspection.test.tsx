@@ -26,9 +26,9 @@ function show(game:GameState=advanceSteps(newGame(),6).state) {
 }
 const gold=()=>document.querySelectorAll<HTMLElement>(".campaign-gold-attention");
 const open=(name:string)=>fireEvent.click(screen.getByRole("button",{name}));
-const titleOf=(name:string)=>name==="Servers"?"App Servers":`${name} inspected`;
+const titleOf=(name:string)=>name==="Servers"?"App Servers":name;
 const dialog=(name:string)=>within(screen.getByRole("dialog",{name:titleOf(name)}));
-const networkView=(name:string)=>{const back=screen.queryByRole("button",{name:"Back to Network management"});if(back)fireEvent.click(back);if(screen.queryByRole("button",{name:"Network management"}))open("Network management");open(name);};
+const networkView=(name:string)=>{if(screen.queryByRole("button",{name:"Network management"}))open("Network management");expect(dialog("Network").getByRole("heading",{name})).toBeTruthy();};
 async function accept() {
   open("Hint");fireEvent.click(within(screen.getByRole("dialog",{name:"Hint"})).getByRole("button",{name:/Got it|Upgrade database/}));
   await act(async()=>{});
@@ -46,16 +46,16 @@ it("routes accepted database help through inspection and valid immediate Confirm
   open("Confirm");await act(async()=>{});
   expect(gold()).toHaveLength(0);expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="upgrade-db")).toBe(true);
   expect(campaignAttention(useGame.getState().game).attention).toBe("run");
-  expect(screen.queryByRole("dialog",{name:"Database inspected"})).toBeNull();
+  expect(screen.queryByRole("dialog",{name:"Database"})).toBeNull();
   act(()=>vi.advanceTimersByTime(10000));expect(gold()).toHaveLength(1);expect(gold()[0].getAttribute("aria-label")).toBe("Run");
 });
 it("shares identical live metrics and actions between room and shortcut without unrelated controls",async()=>{
-  show();open("Database");const first=screen.getByRole("dialog",{name:"Database inspected"}).textContent;
+  show();open("Database");const first=screen.getByRole("dialog",{name:"Database"}).textContent;
   expect(dialog("Database").queryByRole("button",{name:/Add server|Limit to/})).toBeNull();
   open("Inspect details");expect(screen.getByRole("region",{name:"Database readings"}).textContent).toContain("Demand");
   fireEvent.click(dialog("Database").getByRole("button",{name:"Close"}));
   act(()=>inspectInRoom("db"));await act(async()=>{});
-  expect(screen.getByRole("dialog",{name:"Database inspected"}).textContent).toBe(first);
+  expect(screen.getByRole("dialog",{name:"Database"}).textContent).toBe(first);
   expect(useGame.getState().game.campaign!.trace.filter(e=>e.type==="inspection").length).toBeGreaterThanOrEqual(2);
 });
 it("keeps Cancel read-only and contains keyboard focus in the existing preview",async()=>{
@@ -83,8 +83,9 @@ it("keeps Monitoring research prerequisites discoverable without an invalid purc
   show(reliabilityCompany());open("Monitoring");open("Inspect details");
   const action=dialog("Monitoring").getByRole("button",{name:"Deploy Health Checks"});
   expect(action.hasAttribute("disabled")).toBe(true);
+  expect(action.querySelector(".act-affordance-locked")).not.toBeNull();
+  expect(action.getAttribute("aria-description")).toMatch(/research|unlock/i);
   fireEvent.click(action);expect(screen.queryByRole("dialog",{name:"Purchase preview"})).toBeNull();
-  expect(screen.getByRole("dialog",{name:"Monitoring inspected"}).textContent).toMatch(/research|unlock/i);
   expect(gold()).toHaveLength(0);
 });
 it("keeps App scaling and adding together and routing prerequisites with Network",()=>{
@@ -94,8 +95,8 @@ it("keeps App scaling and adding together and routing prerequisites with Network
   expect(dialog("Servers").getByRole("button",{name:/Scale up App/})).toBeTruthy();
   fireEvent.click(dialog("Servers").getByRole("button",{name:"Close"}));open("Network");
   networkView("Load balancing");expect(dialog("Network").getByRole("button",{name:/Deploy load balancing/}).hasAttribute("disabled")).toBe(true);
-  networkView("Routing");expect(dialog("Network").getByText(/Configure routing/)).toBeTruthy();
-  open("Back to Network management");open("Back to Network");expect(dialog("Network").getByRole("button",{name:/Limit to 500/})).toBeTruthy();
+  networkView("Routing");expect(dialog("Network").getByRole("group",{name:/Send traffic to/})).toBeTruthy();
+  open("Back to Network");expect(dialog("Network").getByRole("button",{name:/Limit to ~/})).toBeTruthy();
 });
 it.each([4,6])("routes Chapter %s traffic-limit advice to its real Network action, not About",async chapter=>{
   let game=chapter===4?spikeCompany(false):combinedCompany();
@@ -123,7 +124,7 @@ it("a mandatory modal supersedes the accepted inspection spotlight",async()=>{
 it("lets the player choose another valid strategy without a competing equipment spotlight",async()=>{
  show();await accept();expect(gold()[0].textContent).toBe("Database");
  open("Network");await act(async()=>{});expect(gold()).toHaveLength(0);
- fireEvent.click(dialog("Network").getByRole("button",{name:/Limit to 500/}));await act(async()=>{});
+ fireEvent.click(dialog("Network").getByRole("button",{name:/Limit to ~/}));await act(async()=>{});
  expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("Confirm");open("Confirm");await act(async()=>{});
  expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="limit")).toBe(true);
  expect(campaignAttention(useGame.getState().game).attention).toBe("run");
@@ -168,13 +169,13 @@ it("completes accepted Monitoring inspection and recalculates without a stale sp
 it.each([4,5,6])("keeps Chapter %s summaries outside component inspections",chapter=>{
  show(chapter===4?spikeCompany(false):chapter===5?reliabilityCompany():combinedCompany());
  if(chapter>=5) expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain(chapter===5?"Stay Online":"Grow the Company");
- open("Network");const network=screen.getByRole("dialog",{name:"Network inspected"});
+ open("Network");const network=screen.getByRole("dialog",{name:"Network"});
  expect(network.textContent).not.toMatch(/Stay online|Stable after restoration|Workload:|Normal demand|Opening campaign/);
  expect(dialog("Network").getByRole("button",{name:/traffic limit|Limit to/})).toBeTruthy();
- networkView("Routing");expect(dialog("Network").getByText(/Configure routing/)).toBeTruthy();
+ networkView("Routing");expect(dialog("Network").getByRole("group",{name:/Send traffic to/})).toBeTruthy();
  if(chapter>=5) {networkView("Automatic failover");expect(dialog("Network").getByRole("button",{name:/Deploy Automatic Failover/})).toBeTruthy();}
  fireEvent.click(dialog("Network").getByRole("button",{name:"Close"}));open("Read Cache");
- expect(screen.getByRole("dialog",{name:"Read Cache inspected"}).textContent).not.toMatch(/Workload:|Growth due|Waiting for workload growth/);
+ expect(screen.getByRole("dialog",{name:"Read Cache"}).textContent).not.toMatch(/Workload:|Growth due|Waiting for workload growth/);
  expect(dialog("Read Cache").getByRole("button",{name:/Tune cache ceiling/})).toBeTruthy();
  fireEvent.click(dialog("Read Cache").getByRole("button",{name:"Close"}));open("App Server");
  expect(screen.getByRole("dialog",{name:"App Servers"}).textContent).not.toMatch(/Stay online|Stable after restoration|Normal demand|spike demand/);
@@ -186,7 +187,7 @@ it("distinguishes saturation from overload without inventing an incident",()=>{
  m.demand=m.capacity;m.demandRatio=1;m.backlog=0;show(game);open("Database");
  expect(dialog("Database").getByText("At capacity",{exact:true})).toBeTruthy();
  expect(dialog("Database").queryByText("Overloaded",{exact:true})).toBeNull();
- expect(screen.getByRole("dialog",{name:"Database inspected"}).textContent).toContain("using all available capacity");
+ expect(screen.getByRole("dialog",{name:"Database"}).textContent).toContain("using all available capacity");
 });
 
 it("describes a failed server's zero available capacity and shows that instance's diagnostics",async()=>{
@@ -197,7 +198,7 @@ it("describes a failed server's zero available capacity and shows that instance'
  expect(dialog("Servers").getByText("Down",{exact:true})).toBeTruthy();
  expect(popup.querySelector(".component-inspection-metric")?.textContent).toContain("0 available /");
  expect(popup.textContent).not.toMatch(/operating at full capacity|using all available capacity/);
- fireEvent.click(dialog("Servers").getByText("Technical Details"));
+ fireEvent.click(dialog("Servers").getByRole("button",{name:"Inspect details"}));
  const evidence=screen.getByRole("region",{name:"Servers readings"}),instance=game.campaign!.snapshot.instances!.find(a=>a.id===id)!;
  expect(evidence.querySelectorAll(".evidence-rows dd")[0].textContent).toBe(`${instance.demand.toLocaleString("en-US")} requests/s`);
  expect(dialog("Servers").getByRole("button",{name:new RegExp(`^Restore App ${id.slice(4)}`)}).hasAttribute("disabled")).toBe(false);
@@ -219,18 +220,16 @@ it("transfers a specific server recommendation through instance selection before
  fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()[0].textContent).toBe("Scale up App 3");
  fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("Confirm");
 });
-it("walks Chapter 6 routing through its disclosure and real choice before pending Run",async()=>{
+it("walks Chapter 6 routing through its checklist before pending Run",async()=>{
  let game=tick(decide(combinedCompany(),{type:"set_traffic_limit",enabled:true}));
  game=tick(decide(game,{type:"set_routing",mode:"single",targets:["app-1"]}));
- expect(campaignAttention(game).action?.action.type).toBe("set_routing");show(game);
+ expect(campaignAttention(game).action?.action).toEqual({type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]});show(game);
  await accept();expect(gold()[0].textContent).toBe("Network");fireEvent.click(gold()[0]);await act(async()=>{});
- expect(gold()[0].textContent).toContain("Network management");fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()[0].textContent).toContain("Routing");fireEvent.click(gold()[0]);await act(async()=>{});
- expect(gold()[0].tagName).toBe("SUMMARY");expect(gold()[0].textContent).toContain("Configure routing");
- fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()[0].textContent).toBe("All apps");
+ expect(gold()[0].textContent).toContain("Network management");fireEvent.click(gold()[0]);await act(async()=>{});
+ expect(gold()[0].getAttribute("role")).toBe("checkbox");expect(gold()[0].textContent).toBe("App 2");
  fireEvent.click(gold()[0]);await act(async()=>{});
- expect(screen.queryByRole("dialog",{name:"Network inspected"})).toBeNull();
- expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="routing")).toBe(true);
- expect(campaignAttention(useGame.getState().game).attention).toBe("run");
+ expect(screen.queryByRole("dialog",{name:"Network"})).toBeNull();
+ expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1","app-2"]});
 });
 
 it("summarises a failed fleet without exposing server cards until management",()=>{
@@ -264,10 +263,19 @@ it("keeps legacy Launch Week incident inspections and upgrades usable after the 
  expect(game.campaign!.launchWeek!.completedStep).not.toBeNull();
  expect(game.campaign!.openingMilestone!.acknowledged).toBe(false);
  show(game);open("Database");
- const popup=screen.getByRole("dialog",{name:"Database inspected"});
+ const popup=screen.getByRole("dialog",{name:"Database"});
  const upgrade=within(popup).getByRole("button",{name:/Upgrade database/});
  expect(upgrade.hasAttribute("disabled")).toBe(false);
  fireEvent.click(upgrade);
  expect(screen.getByRole("region",{name:"Confirm Upgrade database"})).toBeTruthy();
  expect(screen.getByRole("button",{name:"Confirm"}).hasAttribute("disabled")).toBe(false);
+});
+it("leaves a collapsed side panel collapsed when a machine is inspected from the room",async()=>{
+  show();useGame.getState().setPanelOpen(false);
+  act(()=>inspectInRoom("db"));await act(async()=>{});
+  expect(screen.getByRole("dialog",{name:"Database"})).toBeTruthy();
+  expect(useGame.getState().panelOpen).toBe(false);
+  fireEvent.click(dialog("Database").getByRole("button",{name:"Close"}));
+  act(()=>inspectInRoom("app","app-1"));await act(async()=>{});
+  expect(useGame.getState().panelOpen).toBe(false);
 });

@@ -20,9 +20,14 @@ it("leaves other chapters and modes outside the stage model", () => {
   expect(chapter4Stage(newGame())).toBeNull(); expect(chapter4Stage(newLegacyGame())).toBeNull();
   expect(chapter4Stage(act(untilOffset(limited, 72), { type: "acknowledge_spikes" }))).toBeNull();
 });
-it("transfers Prepare inspection to genuine scheduled Run without forcing an upgrade", () => {
+it("transfers Prepare inspection to the Server management autoscaling pointer without forcing it", () => {
   expect(campaignAttention(initial)).toMatchObject({ attention: "hint", target: "app" });
-  expect(campaignAttention(act(initial, { type: "incident_inspect", equipment: "app" }))).toMatchObject({ attention: "run", target: "run" });
+  const inspected = act(initial, { type: "incident_inspect", equipment: "app" });
+  expect(campaignAttention(inspected)).toMatchObject({ attention: "hint", reason: "spike-autoscaling", target: "app", action: { action: { type: "unlock_autoscaling" } } });
+  const unlocked = act(inspected, { type: "unlock_autoscaling" });
+  expect(campaignAttention(unlocked)).toMatchObject({ attention: "hint", reason: "spike-autoscaling", action: { action: { type: "deploy_autoscaler" } } });
+  const deployed = tick(act(unlocked, { type: "deploy_autoscaler" }), 2);
+  expect(campaignAttention(deployed)).toMatchObject({ attention: "run", target: "run" });
 });
 it("keeps a protective cap for an undersized spike and uses Monitoring for a healthy uncapped spike", () => {
   const capped = untilOffset(limited, 8);
@@ -93,7 +98,8 @@ it("uses the first pulse's observed weakness for optional preparation between pu
   game = untilOffset(act(game, { type: "acknowledge_review" }), 28);
   expect(campaignAttention(game)).toMatchObject({ reason: "spike-plan", attention: "hint", action: { action: { type: "add_server" } } });
   const broke = structuredClone(game); broke.campaign!.cashCents = 100000;
-  expect(campaignAttention(broke).action).toBeUndefined();
+  // A company that cannot afford capacity still hears about the chapter's free unlock.
+  expect(campaignAttention(broke).action?.action).toEqual({ type: "unlock_autoscaling" });
   game = tick(act(game, { type: "add_server" }), 2);
   expect(campaignAttention(game).action?.action).toEqual({ type: "scale_up", appId: "app-3" });
   game = tick(act(game, { type: "scale_up", appId: "app-3" }), 3);
@@ -114,8 +120,11 @@ it("explains served/rejected trade-offs from deduplicated observations and honou
   expect(performance.incidents).toBe(0);
   expect(campaignAttention(game).message).toContain(performance.summary);
   const poor = structuredClone(game); poor.campaign!.cashCents = 1;
-  expect(campaignAttention(poor)).toMatchObject({ attention: "hint", target: "monitoring" });
-  const evaluated = act(poor, { type: "incident_inspect", equipment: "monitoring" });
+  expect(campaignAttention(poor)).toMatchObject({ attention: "hint", target: "app", action: { action: { type: "unlock_autoscaling" } } });
+  // Once the free unlock is spent, deployment unaffordable, the optional-change hint returns to Monitoring.
+  const spent = act(poor, { type: "unlock_autoscaling" });
+  expect(campaignAttention(spent)).toMatchObject({ attention: "hint", target: "monitoring" });
+  const evaluated = act(spent, { type: "incident_inspect", equipment: "monitoring" });
   expect(campaignAttention(evaluated)).toMatchObject({ attention: "run", target: "run" });
   expect(campaignAttention(evaluated).message).toContain("Keep your strategy");
   expect(tick(evaluated).campaign!.limit).toBe(500);

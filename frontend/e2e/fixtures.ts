@@ -99,6 +99,15 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
 });
 export { expect };
 
+/** The first incident's one-time card, which frames Run with the incident loop. */
+export const incidentGuide = (page: Page) => page.getByRole('region', { name: 'Incident guide' });
+
+/** Retires the first incident's card through its own Got it, so a journey can reach the idle Hint flow. */
+export async function dismissIncidentGuide(page: Page) {
+  await incidentGuide(page).getByRole('button', { name: 'Got it', exact: true }).click();
+  await expect(incidentGuide(page)).toHaveCount(0);
+}
+
 /** The dialog that announces a finished Scaling & Routing or Data Strategy chapter. */
 export const chapterComplete = (page: Page) => page.getByRole('dialog', { name: /^(Scaling & Routing|Data Strategy) complete$/ });
 
@@ -239,6 +248,8 @@ export async function completeTutorial(page: Page, {keepChapterGuide=false}: {ke
       await page.locator(".component-inspection").getByRole("button",{name:"Got it",exact:true}).click();
     }
     await complete.click();
+    const tip=page.getByRole("dialog",{name:"Tip, step 1 of 1"});
+    if(await tip.waitFor({state:"visible",timeout:2_000}).then(()=>true).catch(()=>false))await tip.getByRole("button",{name:"Got it",exact:true}).click();
     const guide=page.getByRole("dialog",{name:"Chapter guide, step 1 of 1"});
     if(!keepChapterGuide&&await guide.isVisible())await guide.getByRole("button",{name:"Got it",exact:true}).click();
   } else if(await doors.isVisible())await doors.click();

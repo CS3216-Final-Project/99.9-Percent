@@ -63,6 +63,7 @@
 .sheet-head h2:focus { outline: none; }
 .sheet-return { flex: none; }
 .component-inspection-summary { display: grid; justify-items: center; gap: 12px; }
+.component-inspection-summary > .meter { width: min(240px, 100%); }
 .component-inspection-summary > p { margin: 0; }
 .sheet-history .charts { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
 .sheet-history .tabs { flex-wrap: wrap; }
@@ -334,6 +335,15 @@
 .topbar .icon-btn:active:not(:disabled), .account-chip:active { background: var(--night); }
 .app .controls-dock .dock-primary:hover:not(:disabled) { background: var(--primary-hover); }
 .app .controls-dock .dock-primary:active:not(:disabled) { background: var(--primary-active); }
+/* Run/Pause wears the clock's state: Pause in the dock's cream like its other buttons while the company runs, Run in desk-lamp gold while paused. */
+.app .controls-dock .dock-primary:is(.is-running, .is-paused):not(:disabled) { color: var(--ink); }
+.app .controls-dock .dock-primary:is(.is-running, .is-paused):not(:disabled) > .icon { color: var(--ink); }
+.app .controls-dock .dock-primary.is-running:not(:disabled) { background: var(--control-inset); border-color: var(--control-edge); }
+.app .controls-dock .dock-primary.is-running:hover:not(:disabled) { background: var(--control-hover); }
+.app .controls-dock .dock-primary.is-running:active:not(:disabled) { background: var(--control-active); }
+.app .controls-dock .dock-primary.is-paused:not(:disabled) { background: var(--go); border-color: var(--go); }
+.app .controls-dock .dock-primary.is-paused:hover:not(:disabled) { background: var(--go-hover); }
+.app .controls-dock .dock-primary.is-paused:active:not(:disabled) { background: var(--go-active); }
 .app .controls-dock .camera-buttons button:hover, .app .controls-dock .floor-button:hover,
 .app .controls-dock .speed button:hover { background: var(--control-hover); }
 .app .controls-dock .camera-buttons button:active, .app .controls-dock .floor-button:active,

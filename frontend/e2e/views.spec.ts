@@ -200,7 +200,7 @@ test("Escape closes an inspection quietly before Escape shows the paused mouse c
   await page.keyboard.press("v");
   await expect.poll(() => lockedTo(page)).toBe("CANVAS");
   await equipmentLabel(page, "Monitoring").evaluate((button) => (button as HTMLButtonElement).click());
-  const reveal = page.getByRole("dialog", { name: "Monitoring inspected" });
+  const reveal = page.getByRole("dialog", { name: "Monitoring", exact: true });
   await expect(reveal).toBeVisible({ timeout: 40_000 });
   await page.keyboard.press("Escape");
   await expect(reveal).toHaveCount(0);

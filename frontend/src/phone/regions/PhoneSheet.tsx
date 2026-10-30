@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { equipmentInfo, metrics, type EquipmentId } from "@/sim";
+import { incidentActive } from "@/sim/step";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { clock, num } from "@/game/format";
 import { selectedInView } from "@/game/floors";
@@ -34,7 +35,7 @@ const SWIPE = 24;
 
 function MetricsSheet({ campaign }: { campaign: boolean }) {
   const state = useSheetState();
-  const incident = useGame((s) => s.game.phase === "incident");
+  const incident = useGame((s) => incidentActive(s.game));
   const shown = shownSheetState(state, incident);
   const selected = useGame((s) => s.selected);
   const selectedAppId = useGame((s) => s.selectedAppId);

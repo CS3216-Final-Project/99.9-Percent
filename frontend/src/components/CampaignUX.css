@@ -5,7 +5,11 @@
 .inspection-back { justify-self: start; }
 .inspection-fleet-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 0; }
 /* Shared Server Management cards; live counts, routing and actions remain authoritative. */
-.component-inspection-app .inspection-management-heading { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--tile-purple); color: var(--tile-purple-ink); font-size: var(--text-md); }
+:is(.component-inspection-app,.component-inspection-gateway) .inspection-management-heading { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--tile-purple); color: var(--tile-purple-ink); font-size: var(--text-md); }
+/* Network management keeps its title and back control on one header row above the action sections. */
+.component-inspection-gateway .inspection-management-header { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--paper-3); }
+.component-inspection-gateway .inspection-management-header .inspection-management-heading { flex: 1; min-width: 0; }
+.component-inspection-gateway .inspection-management-header .inspection-back { flex: none; }
 .inspection-fleet-summary .row { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 6px; border: 0; border-radius: 12px; text-align: center; background: var(--tile-purple); }
 .inspection-fleet-summary .row:nth-child(2) { background: var(--tile-green); }
 .inspection-fleet-summary .row:nth-child(3) { background: var(--tile-blue); }
@@ -30,7 +34,9 @@
 .component-inspection-app [data-inspection-view="management"] > .more > summary { padding: 9px 10px; color: var(--ink); font-size: var(--text-sm); }
 .component-inspection-app [data-inspection-view="management"] > .more[open] { padding-bottom: 8px; }
 .component-inspection-app [data-inspection-view="management"] > .more > .equipment-readings { margin: 0 10px; }
-.inspection-management-entries { display: grid; gap: 8px; }
+.component-inspection-gateway .inspection-subview > section { display: grid; gap: 8px; }
+.component-inspection-gateway .inspection-subview > section > :is(h4,p) { margin: 0; }
+.component-inspection-gateway .inspection-subview > section > h4 { font-size: var(--text-md); }
 .inspection-subview .scaling-controls { margin: 0; padding: 0; border: 0; background: transparent; }
 /* Compact missions project existing requirements; equipment owns technical detail. */
 .mission-dashboard .panel-section { display: grid; gap: 12px; }
@@ -161,13 +167,13 @@
 :is(.campaign-panel, .component-inspection) .instance-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--text-soft); background: transparent; }
 :is(.campaign-panel, .component-inspection) .instance-status[data-receiving="true"] { color: var(--ok-ink); }
 :is(.campaign-panel, .component-inspection) .instance-status[data-receiving="true"] .instance-dot { border-color: var(--ok-ink); background: var(--ok); }
-:is(.campaign-panel, .component-inspection) .instance-bar { display: block; height: 8px; overflow: hidden; border-radius: 4px; border: 1px solid var(--paper-3); background: var(--paper-2); }
-:is(.campaign-panel, .component-inspection) .instance-bar > span { display: block; height: 100%; background: var(--ok); transition: width .25s ease-out; }
-:is(.campaign-panel, .component-inspection) .instance-bar[data-tone="warn"] > span { background: var(--warn); }
-:is(.campaign-panel, .component-inspection) .instance-bar[data-tone="critical"] > span { background: var(--critical); }
+:is(.campaign-panel, .component-inspection, .pending-deployments) .instance-bar { display: block; height: 8px; overflow: hidden; border-radius: 4px; border: 1px solid var(--paper-3); background: var(--paper-2); }
+:is(.campaign-panel, .component-inspection, .pending-deployments) .instance-bar > span { display: block; height: 100%; background: var(--ok); transition: width .25s ease-out; }
+:is(.campaign-panel, .component-inspection, .pending-deployments) .instance-bar[data-tone="warn"] > span { background: var(--warn); }
+:is(.campaign-panel, .component-inspection, .pending-deployments) .instance-bar[data-tone="critical"] > span { background: var(--critical); }
 :is(.campaign-panel, .component-inspection) .instance-figures { display: flex; flex-wrap: wrap; gap: 2px 8px; color: var(--text-soft); font-variant-numeric: tabular-nums; }
 :is(.campaign-panel, .component-inspection) .instance-figures b { color: var(--ink); font-family: var(--font-num); }
-@media (prefers-reduced-motion: reduce) { :is(.campaign-panel, .component-inspection) .instance-bar > span { transition: none; } }
+@media (prefers-reduced-motion: reduce) { :is(.campaign-panel, .component-inspection, .pending-deployments) .instance-bar > span { transition: none; } }
 
 /* Purchase quote tiles on the paper pop-up: red spending, green cash left, amber upkeep, blue timing. */
 :is(.campaign-action-popover, .component-purchase) .purchase-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0 8px; }

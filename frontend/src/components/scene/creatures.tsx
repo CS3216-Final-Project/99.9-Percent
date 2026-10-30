@@ -9,7 +9,8 @@ import { useDetail, type Detail } from "./detail";
 import { loadCrew, type Crew } from "./creatureCatalog";
 import { heading, poseAt, wrapAngle, type Plan } from "./routes";
 import { avatar, gridHere } from "./walk";
-import { now, riding } from "./ride";
+import { riding } from "./ride";
+import { worldDelta, worldNow } from "./worldClock";
 import { FLOOR_Y } from "./levels";
 import { sceneSpeech } from "./sceneSounds";
 import { fresh, glance, GREET_SECONDS, greetingLine, nearness, notices } from "./greetings";
@@ -255,12 +256,13 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
     [model],
   );
 
-  useFrame(({ clock }, dt) => {
+  useFrame((_, frame) => {
+    const dt = worldDelta(frame);
     const action = current.current;
     if (beat && action) {
       // Play the clip once per beat, easing in from the idle and back out to it.
       const duration = action.getClip().duration;
-      const since = (((clock.elapsedTime - beat.at) % beat.period) + beat.period) % beat.period;
+      const since = (((worldNow() - beat.at) % beat.period) + beat.period) % beat.period;
       action.time = Math.min(since, duration - 0.001);
       const w = rest.current ? smooth(since < duration ? Math.min(1, since / BEAT_EASE, (duration - since) / BEAT_EASE) : 0) : 1;
       action.setEffectiveWeight(w);
@@ -270,7 +272,7 @@ function CreatureModel({ gltf, species, activity, pose = "stand", position, rota
       model.mixer.update(Math.min(dt, 0.1));
     }
 
-    const t = now();
+    const t = worldNow();
     const g = greeted.current;
     if (g && t - g.at >= GREET_SECONDS) {
       greeted.current = null;
@@ -333,10 +335,10 @@ export function Walker({ from, to, speed, species, phase = 0 }: { from: [number,
   const dx = to[0] - from[0];
   const dz = to[1] - from[1];
   const len = Math.hypot(dx, dz);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     if (!g.current) return;
     const walk = len / speed;
-    const t = (clock.elapsedTime + phase) % (2 * walk + 2 * TURN);
+    const t = (worldNow() + phase) % (2 * walk + 2 * TURN);
     const out = Math.atan2(-dx, -dz);
     let f: number;
     let yaw: number;
@@ -390,9 +392,10 @@ export function Wanderer({ plan, species, offset = 0 }: { plan: Plan; species: S
   const spacing = useRef({ x: 0, z: 0 });
   const stuck = useRef(0);
   const radius = radiusOf(species);
-  useFrame(({ clock }, dt) => {
+  useFrame((_, frame) => {
+    const dt = worldDelta(frame);
     const step = Math.min(dt, 0.1);
-    const pose = poseAt(plan, clock.elapsedTime + offset - lag.current);
+    const pose = poseAt(plan, worldNow() + offset - lag.current);
     const target = { x: pose.x + spacing.current.x, z: pose.z + spacing.current.z };
     const previous = g.current ? [g.current.position.x, g.current.position.z] as [number, number] : [target.x, target.z] as [number, number];
     const world = gridHere("office").world;
