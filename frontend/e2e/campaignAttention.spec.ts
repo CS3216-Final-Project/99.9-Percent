@@ -1,5 +1,5 @@
 import { infrastructureAction, closeInspection, followHintComponent, inspectEquipment, expectInspectionsOnly } from "./componentInspection";
-import { test, expect, seedSave, savedGame, expectRoom, setGameSpeed, advanceCampaignStep } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, setGameSpeed, advanceCampaignStep, dismissIncidentGuide } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -92,6 +92,7 @@ for (const [chapter, company, expected] of [
 test("guidance incident: ten idle seconds offer Hint without changing company state", async ({ page, installClock, withoutRoom }, info) => {
   await withoutRoom();
   await installClock(); const game = advanceSteps(newGame(), 6).state; await boot(page, game);
+  await dismissIncidentGuide(page);
   await idle(page); await expect(gold(page)).toHaveAccessibleName("Hint");
   await page.screenshot({ path: info.outputPath("hint-gold.png") });
   expect((await savedGame(page)).campaign!.inputs).toEqual(game.campaign!.inputs);

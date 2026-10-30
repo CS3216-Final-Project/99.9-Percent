@@ -1,7 +1,7 @@
 import { introductionActive } from "@/sim/introduction";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { campaignAttention, guidanceActionId, incidentNeedsPause, spotlightMachines, type GuidanceTarget } from "@/game/campaignAttention";
+import { campaignAttention, firstIncidentOpen, guidanceActionId, incidentNeedsPause, spotlightMachines, type GuidanceTarget } from "@/game/campaignAttention";
 import { previewCampaignAction } from "@/game/campaignFinance";
 import type { Action, EquipmentId } from "@/sim";
 import { campaignClockAvailable, useGame } from "@/game/store";
@@ -119,6 +119,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   // Launch Week teaches with spotlighted tutorial steps instead of the Hint button.
   const [launchDone, setLaunchDone] = useState<string | null>(null), [metricsSeen, setMetricsSeen] = useState<string | null>(null);
   const [spotBox, setSpotBox] = useState<Box | null>(null), [introOpen, setIntroOpen] = useState(false);
+  const [incidentSeen, setIncidentSeen] = useState<string | null>(null);
   const litTarget = useRef<HTMLElement | null>(null);
   const [pauseOffer, updatePauseOffer] = useState<string | null>(null);
   const pauseToken = useRef<string | null>(null);
@@ -177,11 +178,17 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   /** The mirror of a new incident's Pause invitation: a decision that paused a resumable company lights Run until it restarts. */
   const resumeGold = !inspection && available && !pauseBlocked && !view && !openNow && !acceptedNow && !running && clockAvailable && resumeOffer !== null && resumeOffer === resumeSignal;
   const timerKey = `${key}:${view}:${selected}:${panel}:${floor}:${running}`;
-  const launchStep = intro ? available&&!blocked&&!view&&!inspection&&!openNow&&!acceptedNow&&!introOpen : available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && !introOpen && launchDone !== key && decision.attention !== null &&
+  // The first incident stops the clock; one card on Run teaches the loop: pause, inspect, fix, Run, and fix again if
+  // needed. Obstructing views hide it for a moment; Got it, Run, Hint or an inspection retire it.
+  const firstIncident = !intro && firstIncidentOpen(game) ? incidentKey : null;
+  if (firstIncident && incidentSeen !== firstIncident && (running || opened === key || inspection)) setIncidentSeen(firstIncident);
+  const incidentStep = !!firstIncident && incidentSeen !== firstIncident && available && !blocked && !view && !inspection &&
+    !openNow && !acceptedNow && !introOpen && !running && clockAvailable;
+  const launchStep = intro ? available&&!blocked&&!view&&!inspection&&!openNow&&!acceptedNow&&!introOpen : !incidentStep && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && !introOpen && launchDone !== key && decision.attention !== null &&
     (launchTutorial ? LAUNCH_FLOW.test(decision.reason) : openingTutorial && decision.reason === "opening-growth") &&
     !(decision.attention === "run" && (running || !clockAvailable));
   const machines = useMemo(() => launchStep ? spotlightMachines(decision, recommendedAction?.action, game.campaign ?? null) : [], [launchStep, decision, recommendedAction, game.campaign]);
-  const candidate = !intro && !inspection && !launchTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && (decision.attention === "progression" || decision.attention === "hint" || decision.attention === "run" && !running && clockAvailable);
+  const candidate = !intro && !inspection && !launchTutorial && !incidentStep && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && (decision.attention === "progression" || decision.attention === "hint" || decision.attention === "run" && !running && clockAvailable);
 
   // The consent's own overlay (risk) must not eat the offers it produces: it closes right after its action.
   useLayoutEffect(() => { manual.current = { accepted, opened, key, pauseBlocked: pauseBlocked && !risk, equipment }; }, [accepted, opened, key, pauseBlocked, risk, equipment]);
@@ -316,6 +323,27 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     document.addEventListener("click", used, true);
     return () => { clear(); cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
   }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable, game, equipment, inEquipment, equipmentEntry, intro, openingTutorial]);
+  useLayoutEffect(() => {
+    if (!incidentStep) return;
+    let target: HTMLElement | null = null;
+    const clear = () => {
+      if (target) { delete target.dataset.spotlight; target.classList.remove("campaign-gold-attention"); target = null; }
+      setSpotBox(null);
+    };
+    const update = () => {
+      clear();
+      target = visibleControl(".campaign-play");
+      if (!target) return;
+      setSpotBox(padBox(target.getBoundingClientRect()));
+      target.dataset.spotlight = "true";
+      target.classList.add("campaign-gold-attention");
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "disabled", "hidden"] });
+    window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true);
+    return () => { clear(); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); };
+  }, [incidentStep]);
   // The room's beams and dimmed racks follow the same spotlight.
   useEffect(() => {
     useGame.getState().setSpotlight(machines);
@@ -402,6 +430,10 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       <Chapter4StagePopup key={`${spikeStage.key}:${spikeStage.stage}`} model={spikeStage} />}
     </ChapterCompanyMessage>}
     {launchStep && spotBox && createPortal(<Spotlight box={spotBox} track="guidance" />, document.body)}
+    {incidentStep && spotBox && createPortal(<Spotlight box={spotBox} track="guidance" />, document.body)}
+    {incidentStep && createPortal(<LaunchTutorialCard box={spotBox} label="Incident guide" place="top" title="Your first incident"
+      prompt="The company paused for you. Whenever an incident happens, you can pause the company too. Inspect what caused this problem and fix it, then press Run to let your fix work."
+      why="If it doesn't work, fix something else and let it run again." onDone={() => setIncidentSeen(firstIncident)} />, document.body)}
     {launchStep && !intro && createPortal(<LaunchTutorialCard box={spotBox} label={openingTutorial ? "Chapter 1 guide" : undefined} place={guidanceTarget === "run" || guidanceTarget === "menu" ? "top" : "left"} title={metricsStep ? "Read the metrics" : openingTutorial ? "Run, then observe" : launchStepTitle(decision.reason, recommendedAction?.action.type)}
       prompt={compactOpeningPrompt ?? (metricsStep ? decision.reason === "database" ? "Database demand is above its capacity, so work queues up and requests fail. That is the overload." : "App Server demand is above its capacity, so requests pile up as backlog and fail. That is the overload." : openingTutorial ? "Press Run to advance game time. Customers bring requests; compare their demand with your equipment's capacity." : decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : decision.message)}
       why={compactOpeningPrompt ? undefined : metricsStep ? "Press Next to see how to fix it. Review the price and activation delay before confirming." : decision.observation !== decision.message ? decision.observation : undefined}

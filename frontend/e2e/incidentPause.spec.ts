@@ -1,5 +1,5 @@
 import { closeInspection, followHintComponent, expectInspectionsOnly } from "./componentInspection";
-import { test, expect, savedGame } from "./fixtures";
+import { test, expect, savedGame, incidentGuide } from "./fixtures";
 import { newGame } from "../src/sim";
 import { act, tick } from "../src/sim/__tests__/spikeFixtures";
 import { pauseTransition } from "../src/sim/__tests__/pauseFixture";
@@ -17,9 +17,12 @@ test("incident Pause: preserves the first-incident stop and paused-save resume",
   await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
   expect((await savedGame(page)).phase).toBe("incident");
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
-  await expect(page.locator(".campaign-gold-attention")).toHaveCount(0);
+  // The stop's only invitation is the first incident's card on Run, which Run itself retires.
+  await expect(incidentGuide(page)).toContainText("Your first incident");
+  await expect(page.locator(".campaign-gold-attention")).toHaveAccessibleName("Run");
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+  await expect(incidentGuide(page)).toHaveCount(0);
   await expect(page.locator(".campaign-gold-attention")).toHaveCount(0);
 });
 

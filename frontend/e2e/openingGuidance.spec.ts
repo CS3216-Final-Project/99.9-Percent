@@ -1,4 +1,4 @@
-import { test, expect, seedSave, savedGame, advanceCampaignStep } from "./fixtures";
+import { test, expect, seedSave, savedGame, advanceCampaignStep, dismissIncidentGuide, incidentGuide } from "./fixtures";
 import { followHintComponent } from "./componentInspection";
 import { applyAction, newGame, type Action, type GameState } from "../src/sim";
 import { INTRODUCTION_COMPONENTS } from "../src/sim/introduction";
@@ -47,6 +47,11 @@ test("introduction hands off to one Opening Run spotlight, then Hint-flow upgrad
   expect((await savedGame(page)).campaign!.step).toBe(6);
   expect((await savedGame(page)).campaign!.incident?.primaryComponent).toBe("db");
   await expect(coach).toHaveCount(0);
+  // The first incident frames Run once with the incident loop: pause, inspect, fix, then Run again.
+  await expect(incidentGuide(page)).toContainText("Inspect what caused this problem and fix it, then press Run");
+  await expect(spotlight).toHaveAccessibleName("Run");
+  await page.screenshot({path:info.outputPath("opening-first-incident-guide.png")});
+  await dismissIncidentGuide(page);
   await expect(spotlight).toHaveCount(0);
   // The db incident is taught by the same Hint flow as the later chapters. A gold Run/Pause
   // invitation can still answer first - drive whichever appears until the inspection is open.

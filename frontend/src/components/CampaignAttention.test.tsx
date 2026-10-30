@@ -27,6 +27,8 @@ function show(game: GameState = newGame()) {
   render(<StrictMode><CampaignAttentionHost><CampaignHeader /><CampaignPanel /><InspectionReveal /><CampaignControls /></CampaignAttentionHost><TooltipLayer /></StrictMode>);
 }
 const gold = () => document.querySelectorAll(".campaign-gold-attention");
+const incidentGuide = () => screen.queryByRole("region", { name: "Incident guide" });
+const dismissIncidentGuide = () => fireEvent.click(within(screen.getByRole("region", { name: "Incident guide" })).getByRole("button", { name: "Got it" }));
 function acceptHint() {
   const card = within(screen.getByRole("dialog", { name: "Hint" }));
   fireEvent.click(card.queryByRole("button", { name: "Got it" }) ?? card.queryByRole("button", { name: "Upgrade database" }) ?? card.getByRole("button", { name: "Accept risk" }));
@@ -126,7 +128,7 @@ it("one host lights only Run after ten seconds; passive metrics do not restart i
   act(() => useGame.getState().setRunning(true)); expect(gold()).toHaveLength(0);
 });
 it("incident Hint is read-only, then Got it targets Database until interaction", () => {
-  show(advanceSteps(newGame(), 6).state); act(() => vi.advanceTimersByTime(10_000));
+  show(advanceSteps(newGame(), 6).state); dismissIncidentGuide(); act(() => vi.advanceTimersByTime(10_000));
   expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
   const before = useGame.getState().game;
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
@@ -332,6 +334,8 @@ it("teaches Launch Week with spotlighted tutorial steps instead of the Hint butt
   // The week's one incident frames the Database inspection straight away.
   show(advanceSteps(newGame(7, "lw", 2), 20).state);
   expect(screen.queryByRole("dialog", { name: "Company Message" })).toBeNull();
+  // The first incident's card on Run comes before the week's own incident steps.
+  spotOn("Run"); dismissIncidentGuide();
   expect(screen.getByRole("region", { name: "Launch Week tutorial" }).textContent).toContain("Your database is overloading");
   spotOn(/Database/);
   // Inspecting shows the metrics first; Next moves the spotlight to the fix.
@@ -356,8 +360,10 @@ it("spotlights only the Opening's first Run, then guides through the Hint flow",
   noSpot();
   expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
   act(() => useGame.setState({ game: tick(useGame.getState().game, 5), running: false }));
+  // The first incident's one card frames Run; after it the incident is taught by the same Hint flow the later chapters use.
+  expect(incidentGuide()?.textContent).toContain("Your first incident");
+  spotOn("Run"); dismissIncidentGuide();
   noSpot();
-  // The database incident is taught by the same Hint flow the later chapters use.
   act(() => vi.advanceTimersByTime(10_000));
   expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
@@ -376,6 +382,37 @@ it("spotlights only the Opening's first Run, then guides through the Hint flow",
   expect(screen.queryByRole("region", { name: "Chapter 1 guide" })).toBeNull();
   act(() => vi.advanceTimersByTime(10_000));
   expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
+});
+
+it("frames Run with the first incident's loop until Run retires it", () => {
+  show(advanceSteps(newGame(), 6).state);
+  const guide = incidentGuide()!;
+  expect(guide.textContent).toContain("you can pause the company too");
+  expect(guide.textContent).toContain("Inspect what caused this problem and fix it, then press Run");
+  expect(guide.textContent).toContain("If it doesn't work, fix something else and let it run again.");
+  spotOn("Run"); expect(gold()).toHaveLength(1);
+  // An obstructing view hides it for a moment; idle Hint gold waits for it.
+  act(() => useGame.getState().openView("history")); expect(incidentGuide()).toBeNull();
+  act(() => useGame.getState().openView(null)); expect(incidentGuide()).toBeTruthy();
+  act(() => vi.advanceTimersByTime(10_000)); expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
+  // Running is the loop's last step: the card never returns for this incident.
+  fireEvent.click(lit()[0]); expect(useGame.getState().running).toBe(true);
+  expect(incidentGuide()).toBeNull(); noSpot();
+  act(() => useGame.getState().setRunning(false)); expect(incidentGuide()).toBeNull();
+});
+it.each([
+  ["Hint", () => fireEvent.click(screen.getByRole("button", { name: "Hint" })), () => fireEvent.click(screen.getByRole("button", { name: "Close Hint" }))],
+  ["an inspection", () => fireEvent.click(inspectionAction(/^Database$/)), () => fireEvent.click(screen.getByRole("button", { name: "Close" }))],
+])("retires the first incident's card once the player opens %s", (_, open, close) => {
+  show(advanceSteps(newGame(), 6).state);
+  expect(incidentGuide()).toBeTruthy();
+  open(); expect(incidentGuide()).toBeNull();
+  close(); expect(incidentGuide()).toBeNull();
+});
+it("keeps the first incident's card to the first incident", () => {
+  const game = advanceSteps(newGame(), 6).state, c = game.campaign!;
+  show({ ...game, campaign: { ...c, incident: { ...c.incident!, id: "incident-later" } } });
+  expect(incidentGuide()).toBeNull();
 });
 
 it("gives manual Hint and obstructing views priority over the Opening coach", () => {

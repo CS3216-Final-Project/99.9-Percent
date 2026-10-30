@@ -49,8 +49,11 @@ it.each([1, 2, 3, 4, 5, 6])("gives the running Chapter %i transition immediate s
 it("preserves the actual first-incident automatic stop and does not nag on resuming an existing incident", () => {
   show(tick(newGame(), 5)); startIncident();
   expect(useGame.getState().game.phase).toBe("incident"); expect(useGame.getState().running).toBe(false);
-  expect(gold()).toHaveLength(0);
+  // The stop's only invitation is the first incident's card on Run, which Run itself dismisses.
+  expect(screen.getByRole("region", { name: "Incident guide" })).toBeTruthy();
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
   fireEvent.click(screen.getByRole("button", { name: "Run" })); expect(gold()).toHaveLength(0);
+  expect(screen.queryByRole("region", { name: "Incident guide" })).toBeNull();
 });
 it("Pause leads to a fresh ten-second Hint, accepted action, immediate Confirm and eventual Run", () => {
   show(transition(1).before); startIncident();

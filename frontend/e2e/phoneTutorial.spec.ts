@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { test, expect, expectRoom, seedSave, savedGame, savedClassicGame, unlockChallenge } from "./fixtures";
+import { test, expect, expectRoom, seedSave, savedGame, savedClassicGame, unlockChallenge, incidentGuide } from "./fixtures";
 import { applyAction, newGame, type GameState } from "../src/sim";
 import { advanceSteps, applyCampaignInput, step } from "../src/sim/step";
 
@@ -124,6 +124,14 @@ for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
 test("the database incident is taught from the same strip", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await boot(page, runUntil(newGame(7, "phone-lw-incident", 2), s => !!s.campaign!.incident));
+  // The first incident's card comes first in the same strip, framing Run with the incident loop.
+  const guide = incidentGuide(page);
+  await expect(guide).toContainText("Your first incident");
+  await expect(page.locator("[data-spotlight]")).toHaveAccessibleName("Run");
+  await expectBelowTop(page, await box(guide));
+  expect(overlaps(await box(guide), await box(page.locator("[data-spotlight]")))).toBe(false);
+  await page.screenshot({ path: `${SHOTS}/phone-first-incident-390x844.png` });
+  await guide.getByRole("button", { name: "Got it", exact: true }).tap();
   // The incident pauses the company and the strip points at the database, never at the app server.
   await expect(launchStep(page)).toBeVisible();
   await expect(launchStep(page)).toContainText(/database/i);

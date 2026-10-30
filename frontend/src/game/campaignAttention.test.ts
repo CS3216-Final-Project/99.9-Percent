@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { newGame, newLegacyGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
-import { campaignAttention as guidance, spotlightMachines } from "./campaignAttention";
+import { campaignAttention as guidance, firstIncidentOpen, spotlightMachines } from "./campaignAttention";
 import { act, tick, dataCompany, spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "@/sim/__tests__/reliabilityFixture";
 import { combinedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
@@ -254,4 +254,11 @@ it("holds the Launch Week score card until the research point is spent", () => {
   expect(guidance(s)).toMatchObject({ reason: "launch-research", target: "research" });
   s = act(s, { type: "pick_launch_tech", tech: "caching" });
   expect(guidance(s)).toMatchObject({ reason: "launch-score", target: "next" });
+});
+it("recognizes only the company's first incident", () => {
+  expect(firstIncidentOpen(advanceSteps(newGame(), 5).state)).toBe(false);
+  const first = advanceSteps(newGame(), 6).state;
+  expect(firstIncidentOpen(first)).toBe(true);
+  const c = first.campaign!;
+  expect(firstIncidentOpen({ ...first, campaign: { ...c, incident: { ...c.incident!, id: "incident-later" } } })).toBe(false);
 });
