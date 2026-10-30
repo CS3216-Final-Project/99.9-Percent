@@ -17,7 +17,7 @@ import { previewCampaignAction } from "./campaignFinance";
 import { chapter4Stage, chapter4Performance } from "./chapter4Guidance";
 import { chapter6Attention, combinedDatabaseDemand } from "./chapter6Guidance";
 
-export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "growth" | "risk" | "menu" | "finance" | "endweek" | "research";
+export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "growth" | "risk" | "menu" | "finance" | "research";
 export interface AttentionDecision {
   chapter: number;
   key: string;
@@ -226,7 +226,7 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     requirements: "Open View chapters to see what your company needs next.",
     "launch-first-incident": "Your App Server is overloading. Inspect it to see its status turn red, then fix the cause.",
     "launch-db-incident": "Your database is overloading. Inspect it to see the work piling up.",
-    "launch-end-week": "Everything is stable again. Use End week to skip to the end of the week.",
+    "launch-settled": "Everything is stable again. Press Run to finish the week.",
     "launch-open": "Your launch week starts now. Press Run - the first customers are arriving.",
     "launch-week-report": "A launch week settled. Lost or turned-away requests so far are counted.",
     "launch-research": "You earned a research point. Spend it on Caching or Autoscaling; each carries into later chapters.",
@@ -331,10 +331,10 @@ function baseAttention(game: GameState): AttentionDecision {
   if (c.launchWeek && c.launchWeek.completedStep === null && !c.incident) {
     const lw = c.launchWeek, week = Math.floor(c.step / LW.periodSteps);
     const settled = c.trace.some(t => t.type === "incident-opened" && Math.floor(t.step / LW.periodSteps) === week);
-    // The free research point is explained before the week is skipped past it.
+    // The free research point is explained before the week runs past it.
     if (lw.researchEarned && !lw.tech) return result("launch-research", "hint", "Research points buy technology. This one is free; it is billed at the week's settlement.", "Pick Caching or Autoscaling. Hover each to preview it in the room.", "research");
     if (settled && qualifies && !appOver && !dbOver && !c.dbBacklog && c.apps.every(a => !a.backlog) && !pending.length && reportsAcknowledged(c) && game.phase === "management")
-      return progression("launch-end-week", "The incident is settled and service is stable.", "Use End week to skip to the end of this week.", "endweek");
+      return result("launch-settled", "run", "The incident is settled and service is stable.", "Press Run to finish the week.", "run");
     {
       if (c.step < LW.spikeStep) return run("launch-open", "Your company opens its doors this week; the first traffic arrives now.");
       const report = c.settlements.at(-1);

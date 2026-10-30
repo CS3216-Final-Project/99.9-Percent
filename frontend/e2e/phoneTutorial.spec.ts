@@ -6,7 +6,7 @@ import { advanceSteps, applyCampaignInput, step } from "../src/sim/step";
 /*
  * The phone edition's coach strip (Pixel 7, touch). Launch Week's spotlight steps dock in one fixed-size strip below
  * the top strip, so the sheet and the dock stay clear, the room keeps at least 40% of the screen and each step's real
- * control stays in view and uncovered. The dock carries the speed menu and End week beside Run.
+ * control stays in view and uncovered. The dock carries the speed menu beside Run.
  */
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -90,7 +90,7 @@ async function expectDocked(page: Page, width: number) {
 }
 
 for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
-  test(`Launch Week docks its spotlight steps below the top strip, with speeds and End week in the dock, at ${width}x${height}`, async ({ page }) => {
+  test(`Launch Week docks its spotlight steps below the top strip, with speeds in the dock, at ${width}x${height}`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await boot(page, newGame(7, `phone-lw-${width}`, 2));
     await page.getByRole("button", { name: "Open the doors", exact: true }).tap();
@@ -101,17 +101,17 @@ for (const [width, height] of [[390, 844], [360, 640], [320, 568]]) {
     await expect(run).toBeInViewport({ ratio: 1 });
     expect(await uncovered(run)).toBe(true);
     await expectDocked(page, width);
-    // The dock shows End week beside Run; the three speeds are one tap away in the speed menu.
-    const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
-    await expect(rush).toBeInViewport({ ratio: 1 });
-    expect((await box(rush)).height).toBeGreaterThanOrEqual(44);
+    // The three speeds are one tap away in the speed menu beside Run.
+    const menu = page.locator(".phone-dock .time-menu > summary");
+    await expect(menu).toBeInViewport({ ratio: 1 });
+    expect((await box(menu)).height).toBeGreaterThanOrEqual(44);
     const dock = await dockBox(page);
-    expect((await box(rush)).y).toBeGreaterThanOrEqual(dock.y - 1);
-    await page.locator(".phone-dock .time-menu > summary").tap();
+    expect((await box(menu)).y).toBeGreaterThanOrEqual(dock.y - 1);
+    await menu.tap();
     const speeds = page.getByRole("group", { name: "Game speed" });
     for (const label of ["0.5×", "1×", "2×"]) await expect(speeds.getByRole("button", { name: label, exact: true })).toBeVisible();
     await speeds.getByRole("button", { name: "2×", exact: true }).tap();
-    await page.locator(".phone-dock .time-menu > summary").tap();
+    await menu.tap();
     await page.screenshot({ path: `${SHOTS}/phone-launch-run-${width}x${height}.png` });
     await expect.poll(() => roomShare(page)).toBeGreaterThanOrEqual(0.4);
     // Run follows the spotlight; the step clears while the clock runs.
@@ -131,19 +131,6 @@ test("the database incident is taught from the same strip", async ({ page }) => 
   await page.screenshot({ path: `${SHOTS}/phone-launch-incident-390x844.png` });
   const saved = await savedGame(page);
   expect(saved.campaign!.incident).toBeTruthy();
-});
-
-test("End week stays unavailable on a stable Launch Week by touch", async ({ page }) => {
-  await page.setViewportSize({ width: 360, height: 640 });
-  let s = runUntil(newGame(7, "phone-lw-rush", 2), x => !!x.campaign!.incident);
-  const r = applyCampaignInput(s, { type: "start_db_upgrade" });
-  if (!r.result.ok) throw Error(r.result.message);
-  s = runUntil(r.state, x => x.phase === "management" && !x.campaign!.incident && x.campaign!.step >= 20);
-  await boot(page, s);
-  const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
-  await expect(rush).toBeInViewport({ ratio: 1 });
-  await expect(rush).toBeDisabled();
-  await expect(rush).toHaveAttribute("aria-pressed", "false");
 });
 
 function act(g: GameState, action: Parameters<typeof applyAction>[1]) { const r = applyAction(g, action); if (!r.ok) throw Error(r.message); return r.state; }

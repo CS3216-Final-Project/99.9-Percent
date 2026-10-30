@@ -36,8 +36,6 @@
 .controls-dock .dock-speed:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 0 var(--ink); }
 .controls-dock .dock-speed:disabled { opacity: .5; box-shadow: none; cursor: not-allowed; }
 .controls-dock .dock-speed.is-on { background: var(--go); }
-.controls-dock .dock-rush { margin-left: 4px; }
-.controls-dock .dock-rush span { font-size: var(--text-xs); }
 .controls-dock .dock-step {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
   width: 52px; height: 48px; padding: 2px; cursor: pointer;
@@ -152,7 +150,6 @@
 }
 @media (max-width: 360px) {
   .campaign-clock.controls-dock .time-controls { grid-template-columns: minmax(0, 1fr) auto 80px; }
-  .controls-dock .dock-rush { margin-left: 0; padding-inline: 4px; }
 }
 
 /* The walkthrough narrows the dock without narrowing the window. */

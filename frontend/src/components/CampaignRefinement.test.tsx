@@ -20,7 +20,7 @@ function renderCompany(game?: GameState) {
 }
 function perform(game:GameState, action:Parameters<typeof applyAction>[1]) { const r=applyAction(game,action); if(!r.ok) throw Error(r.message); return r.state; }
 
-it("makes Run/Pause primary, with visible speed choices and an end-of-week rush", () => {
+it("makes Run/Pause primary, with visible speed choices", () => {
   start(); renderCompany(); const run=screen.getByRole("button",{name:"Run"});
   expect(run.className).toContain("btn-primary");
   expect(screen.queryByRole("group",{name:"Step time"})).toBeNull();
@@ -29,10 +29,7 @@ it("makes Run/Pause primary, with visible speed choices and an end-of-week rush"
   const speeds=within(screen.getByRole("group",{name:"Game speed"}));
   fireEvent.click(speeds.getByRole("button",{name:"0.5×"})); expect(useGame.getState().speed).toBe(0.5);
   fireEvent.click(speeds.getByRole("button",{name:"2×"})); expect(useGame.getState().speed).toBe(2);
-  // End week is unavailable for now: the button stays visible but disabled, with the reason in its tooltip.
-  const rush=speeds.getByRole("button",{name:"End the week at 20 times speed"});
-  expect(rush).toHaveProperty("disabled",true); expect(rush.getAttribute("aria-pressed")).toBe("false");
-  expect(rush.getAttribute("aria-description")).toContain("unavailable");
+  expect(speeds.queryByRole("button",{name:/End the week/})).toBeNull();
 });
 it("shows inspected evidence as labelled rows and a load bar", () => {
   renderCompany(advanceSteps(newGame(1,"evidence"),6).state);

@@ -199,10 +199,8 @@ test("the research sheet previews each option and spends the pick", async ({ pag
 test("the score card reports nines, copies the result and continues to Chapter 2", async ({ page }) => {
   test.slow();
   await boot(page, nearlyDone());
-  const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
-  // The week rush is unavailable, so the week ends by running the clock at the highest speed.
-  await expect(rush).toBeDisabled();
+  // The week ends by running the clock at the highest speed.
   await setGameSpeed(page, 2);
   await page.getByRole("button", { name: "Run", exact: true }).click();
   // Bound the wait by time, not iterations: a slow runner spends longer on each pass.

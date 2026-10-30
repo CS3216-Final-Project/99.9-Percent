@@ -420,7 +420,7 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
  </section>;
 }
 
-/** The three visible game speeds beside Run: the end-week rush is a separate 20x toggle, not a speed. */
+/** The three visible game speeds beside Run. */
 const SPEEDS = [{ v: 0.5, label: "0.5×" }, { v: 1, label: "1×" }, { v: 2, label: "2×" }] as const;
 
 const NARROW_DOCK = "(max-width: 640px)";
@@ -433,7 +433,7 @@ const watchNarrowDock = (change: () => void) => {
 const useNarrowDock = () => useSyncExternalStore(watchNarrowDock, () => window.matchMedia?.(NARROW_DOCK).matches ?? false, () => false);
 
 export function CampaignControls() {
-  const { game, running, setRunning, speed, setSpeed, weekRush, endWeek, cancelWeekRush } = useGame();
+  const { game, running, setRunning, speed, setSpeed } = useGame();
   const narrow = useNarrowDock();
   const { runGold, pauseGold, resumeGold } = useCampaignAttention();
   const active = useGame(s=>s.started) && !introductionActive(game.campaign) && pendingStop(game.campaign) === null && !milestoneBlocks(game) && (game.phase === "management" || game.phase === "incident");
@@ -451,12 +451,8 @@ export function CampaignControls() {
         <span className="visually-hidden" aria-hidden="true" data-testid="physical-step">{game.campaign!.step}</span>
       </div>
       <div className="dock-speeds" {...(narrow ? {} : { role: "group", "aria-label": "Game speed" })}>
-        {narrow ? <TimeMenu /> : SPEEDS.map(({ v, label }) => <button type="button" key={v} className={`dock-speed${speed === v && !weekRush ? " is-on" : ""}`} aria-pressed={speed === v && !weekRush}
+        {narrow ? <TimeMenu /> : SPEEDS.map(({ v, label }) => <button type="button" key={v} className={`dock-speed${speed === v ? " is-on" : ""}`} aria-pressed={speed === v}
           {...tipProps(`Run at ${label} speed`)} onClick={() => setSpeed(v)}>{label}</button>)}
-        {/* End week is unavailable for now; the button stays visible so it can be re-enabled later. */}
-        <button type="button" className={`dock-speed dock-rush${weekRush ? " is-on" : ""}`} aria-pressed={weekRush} aria-label="End the week at 20 times speed"
-          {...tipProps("Ending the week early is unavailable.")}
-          disabled onClick={() => weekRush ? cancelWeekRush() : endWeek()}><Icon name="stepMany" size={16} /><span>End week</span></button>
       </div>
       <button type="button" className={`btn btn-primary campaign-play dock-primary${running ? " is-running" : " is-paused"}${runGold || pauseGold || resumeGold ? " campaign-gold-attention" : ""}`} aria-label={running ? "Pause" : "Run"} {...tipProps("Run or pause the company (P)")} disabled={!active} onClick={() => setRunning(!running)}><Icon name={running ? "pause" : "play"} /><span>{running ? "Pause" : "Run"}</span></button>
       <span className="visually-hidden" role="status">{running ? "Running" : "Paused"}</span>

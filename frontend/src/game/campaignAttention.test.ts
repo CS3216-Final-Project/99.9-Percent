@@ -228,7 +228,7 @@ it("names the machines the room spotlight lights for each decision", () => {
   expect(spotlightMachines(running, running.action?.action, fresh.campaign!)).toEqual([]);
 });
 
-it("teaches Launch Week's one database incident, then End week", () => {
+it("teaches Launch Week's one database incident, then finishing the week", () => {
   const fresh = newGame(7, "lw", 2);
   expect(guidance(fresh)).toMatchObject({ reason: "launch-open", target: "run" });
   let s = advanceSteps(newGame(7, "lw", 2), 20).state;
@@ -240,8 +240,8 @@ it("teaches Launch Week's one database incident, then End week", () => {
   s = act(s, { type: "start_db_upgrade" });
   for (let i = 0; i < 60 && s.phase !== "review"; i++) s = tick(s);
   s = act(s, { type: "acknowledge_review" });
-  for (let i = 0; i < 20 && guidance(s).reason !== "launch-end-week"; i++) s = tick(s);
-  expect(guidance(s)).toMatchObject({ reason: "launch-end-week", target: "endweek" });
+  for (let i = 0; i < 20 && guidance(s).reason !== "launch-settled"; i++) s = tick(s);
+  expect(guidance(s)).toMatchObject({ reason: "launch-settled", target: "run" });
   for (let i = 0; i < 40 && !s.campaign!.launchWeek!.researchEarned; i++) s = tick(s);
   expect(guidance(s)).toMatchObject({ reason: "launch-research", target: "research" });
 });

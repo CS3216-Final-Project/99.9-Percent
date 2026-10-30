@@ -59,7 +59,6 @@ const TARGETS: Record<GuidanceTarget, string> = {
   risk: '[aria-label="Scaling growth risk"] > button',
   menu: ".menu-btn",
   finance: '[aria-label="View finances"]',
-  endweek: ".dock-rush",
   research: '[aria-label="Launch Week research"]',
 };
 
@@ -298,7 +297,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
         frame = requestAnimationFrame(() => { revealedTarget.current = node; reveal(node); });
       }
       const target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
-        (!intro && guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research" ? visibleControl(PANEL_ENTRY) : null);
+        (!intro && guidanceTarget !== "run" && guidanceTarget !== "research" ? visibleControl(PANEL_ENTRY) : null);
       if (target) {
         setSpotBox(padBox(target.getBoundingClientRect()));
         target.dataset.spotlight = "true";
@@ -421,11 +420,11 @@ export function CampaignHintButton() {
   return available ? <button ref={button} type="button" className={`icon-btn campaign-hint${hintGold ? " campaign-gold-attention" : ""}`} aria-label="Hint" aria-haspopup="dialog" aria-expanded={opened} aria-controls={opened ? "campaign-hint-card" : undefined} {...tipProps("Need help? See what to try next.", "below")} data-tip-title="Hint" onClick={openHint}><Icon name="bulb" /></button> : null;
 }
 
-/** The Launch Week tutorial's steps: run, walk the incident through its fix, then skip the settled week. */
-const LAUNCH_FLOW = /^(launch-open|launch-week|launch-research|launch-first-incident|launch-db-incident|launch-end-week|application|unrouted|database|recovery|draining|investigate|failure|activation-.+)$/;
+/** The Launch Week tutorial's steps: run, walk the incident through its fix, then finish the settled week. */
+const LAUNCH_FLOW = /^(launch-open|launch-week|launch-research|launch-first-incident|launch-db-incident|launch-settled|application|unrouted|database|recovery|draining|investigate|failure|activation-.+)$/;
 const LAUNCH_STEP_TITLES: Record<string, string> = {
   "launch-open": "Open the doors", "launch-week": "Keep the week running", "launch-first-incident": "Your servers are overloading",
-  "launch-db-incident": "Your database is overloading", "launch-end-week": "Skip to the end of the week", "launch-research": "Spend your research point",
+  "launch-db-incident": "Your database is overloading", "launch-settled": "Finish the week", "launch-research": "Spend your research point",
   database: "Upgrade the database", recovery: "Recovering", draining: "Recovering", investigate: "Check the readings", failure: "A server failed",
 };
 function launchStepTitle(reason: string, action?: string): string {
