@@ -432,7 +432,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     {launchStep && spotBox && createPortal(<Spotlight box={spotBox} track="guidance" />, document.body)}
     {incidentStep && spotBox && createPortal(<Spotlight box={spotBox} track="guidance" />, document.body)}
     {incidentStep && createPortal(<LaunchTutorialCard box={spotBox} label="Incident guide" place="top" title="Your first incident"
-      prompt={isPhoneEdition() ? "Pause whenever an incident happens. Inspect the cause, fix it, then Run. Still failing? Fix something else and Run again."
+      prompt={isPhoneEdition() ? "Pause, inspect the cause, fix it, then Run. Not fixed? Try another fix."
         : "The company paused for you. Whenever an incident happens, you can pause the company too. Inspect what caused this problem and fix it, then press Run to let your fix work."}
       why={isPhoneEdition() ? undefined : "If it doesn't work, fix something else and let it run again."} onDone={() => setIncidentSeen(firstIncident)} />, document.body)}
     {launchStep && !intro && createPortal(<LaunchTutorialCard box={spotBox} label={openingTutorial ? "Chapter 1 guide" : undefined} place={guidanceTarget === "run" || guidanceTarget === "menu" ? "top" : "left"} title={metricsStep ? "Read the metrics" : openingTutorial ? "Run, then observe" : launchStepTitle(decision.reason, recommendedAction?.action.type)}
