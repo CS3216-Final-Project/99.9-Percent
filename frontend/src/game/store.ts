@@ -1208,7 +1208,7 @@ export const useGame = create<Store>()((set, get) => {
         view: null,
         techFocus: null,
         running: false,
-          deployRush: false,
+        deployRush: false,
         rating: null,
         onboarding: false,
         tour: null,
