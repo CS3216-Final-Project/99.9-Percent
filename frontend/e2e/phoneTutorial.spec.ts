@@ -130,6 +130,8 @@ test("the database incident is taught from the same strip", async ({ page }) => 
   await expect(page.locator("[data-spotlight]")).toHaveAccessibleName("Run");
   await expectBelowTop(page, await box(guide));
   expect(overlaps(await box(guide), await box(page.locator("[data-spotlight]")))).toBe(false);
+  // The phone's short copy fits the fixed strip without scrolling.
+  expect(await guide.evaluate(node => node.scrollHeight <= node.clientHeight)).toBe(true);
   await page.screenshot({ path: `${SHOTS}/phone-first-incident-390x844.png` });
   await guide.getByRole("button", { name: "Got it", exact: true }).tap();
   // The incident pauses the company and the strip points at the database, never at the app server.

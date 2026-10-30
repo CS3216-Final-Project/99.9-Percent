@@ -409,10 +409,23 @@ it.each([
   open(); expect(incidentGuide()).toBeNull();
   close(); expect(incidentGuide()).toBeNull();
 });
-it("keeps the first incident's card to the first incident", () => {
+it("keeps the first incident's card to the first incident's untouched stop, even after a reload", () => {
   const game = advanceSteps(newGame(), 6).state, c = game.campaign!;
   show({ ...game, campaign: { ...c, incident: { ...c.incident!, id: "incident-later" } } });
   expect(incidentGuide()).toBeNull();
+  cleanup(); show(tick(game, 1));
+  expect(incidentGuide()).toBeNull();
+  cleanup(); show(decide(game, { type: "start_db_upgrade" }));
+  expect(incidentGuide()).toBeNull();
+});
+it("waits behind an inspection already open when the first incident stops the clock", () => {
+  show(advanceSteps(newGame(), 5).state);
+  fireEvent.click(inspectionAction(/^Database$/));
+  act(() => useGame.setState({ game: advanceSteps(useGame.getState().game, 1).state }));
+  expect(useGame.getState().game.campaign!.incident).toBeTruthy();
+  expect(incidentGuide()).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  expect(incidentGuide()?.textContent).toContain("Your first incident");
 });
 
 it("gives manual Hint and obstructing views priority over the Opening coach", () => {

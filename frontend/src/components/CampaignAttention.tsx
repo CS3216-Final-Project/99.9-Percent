@@ -1,7 +1,7 @@
 import { introductionActive } from "@/sim/introduction";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { campaignAttention, firstIncidentOpen, guidanceActionId, incidentNeedsPause, spotlightMachines, type GuidanceTarget } from "@/game/campaignAttention";
+import { campaignAttention, firstIncidentStop, guidanceActionId, incidentNeedsPause, spotlightMachines, type GuidanceTarget } from "@/game/campaignAttention";
 import { previewCampaignAction } from "@/game/campaignFinance";
 import type { Action, EquipmentId } from "@/sim";
 import { campaignClockAvailable, useGame } from "@/game/store";
@@ -179,11 +179,11 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const resumeGold = !inspection && available && !pauseBlocked && !view && !openNow && !acceptedNow && !running && clockAvailable && resumeOffer !== null && resumeOffer === resumeSignal;
   const timerKey = `${key}:${view}:${selected}:${panel}:${floor}:${running}`;
   // The first incident stops the clock; one card on Run teaches the loop: pause, inspect, fix, Run, and fix again if
-  // needed. Obstructing views hide it for a moment; Got it, Run, Hint or an inspection retire it.
-  const firstIncident = !intro && firstIncidentOpen(game) ? incidentKey : null;
-  if (firstIncident && incidentSeen !== firstIncident && (running || opened === key || inspection)) setIncidentSeen(firstIncident);
+  // needed. Obstructing views hide it for a moment; Got it, Run, Hint, an inspection or any recorded input retire it.
+  const firstIncident = !intro && firstIncidentStop(game) ? incidentKey : null;
+  if (firstIncident && incidentSeen !== firstIncident && (running || opened === key)) setIncidentSeen(firstIncident);
   const incidentStep = !!firstIncident && incidentSeen !== firstIncident && available && !blocked && !view && !inspection &&
-    !openNow && !acceptedNow && !introOpen && !running && clockAvailable;
+    !openNow && !acceptedNow && !introOpen && !running && !pauseGold && !resumeGold && clockAvailable;
   const launchStep = intro ? available&&!blocked&&!view&&!inspection&&!openNow&&!acceptedNow&&!introOpen : !incidentStep && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && !introOpen && launchDone !== key && decision.attention !== null &&
     (launchTutorial ? LAUNCH_FLOW.test(decision.reason) : openingTutorial && decision.reason === "opening-growth") &&
     !(decision.attention === "run" && (running || !clockAvailable));
@@ -432,8 +432,9 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     {launchStep && spotBox && createPortal(<Spotlight box={spotBox} track="guidance" />, document.body)}
     {incidentStep && spotBox && createPortal(<Spotlight box={spotBox} track="guidance" />, document.body)}
     {incidentStep && createPortal(<LaunchTutorialCard box={spotBox} label="Incident guide" place="top" title="Your first incident"
-      prompt="The company paused for you. Whenever an incident happens, you can pause the company too. Inspect what caused this problem and fix it, then press Run to let your fix work."
-      why="If it doesn't work, fix something else and let it run again." onDone={() => setIncidentSeen(firstIncident)} />, document.body)}
+      prompt={isPhoneEdition() ? "Pause whenever an incident happens. Inspect the cause, fix it, then Run. Still failing? Fix something else and Run again."
+        : "The company paused for you. Whenever an incident happens, you can pause the company too. Inspect what caused this problem and fix it, then press Run to let your fix work."}
+      why={isPhoneEdition() ? undefined : "If it doesn't work, fix something else and let it run again."} onDone={() => setIncidentSeen(firstIncident)} />, document.body)}
     {launchStep && !intro && createPortal(<LaunchTutorialCard box={spotBox} label={openingTutorial ? "Chapter 1 guide" : undefined} place={guidanceTarget === "run" || guidanceTarget === "menu" ? "top" : "left"} title={metricsStep ? "Read the metrics" : openingTutorial ? "Run, then observe" : launchStepTitle(decision.reason, recommendedAction?.action.type)}
       prompt={compactOpeningPrompt ?? (metricsStep ? decision.reason === "database" ? "Database demand is above its capacity, so work queues up and requests fail. That is the overload." : "App Server demand is above its capacity, so requests pile up as backlog and fail. That is the overload." : openingTutorial ? "Press Run to advance game time. Customers bring requests; compare their demand with your equipment's capacity." : decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : decision.message)}
       why={compactOpeningPrompt ? undefined : metricsStep ? "Press Next to see how to fix it. Review the price and activation delay before confirming." : decision.observation !== decision.message ? decision.observation : undefined}

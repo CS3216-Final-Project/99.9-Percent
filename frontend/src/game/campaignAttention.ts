@@ -74,10 +74,14 @@ export function incidentNeedsPause(game: GameState, decision = campaignAttention
     !(c.incident.stableSteps > 0 && qualifiesForRecovery(c.snapshot) && recoverySafe(c));
 }
 
-/** The company's first incident is open: the one whose opening first paused the clock. */
-export function firstIncidentOpen(game: GameState): boolean {
-  const c = game.campaign;
-  return !!c?.incident && c.trace.find(t => t.type === "incident-opened")?.data.incidentId === c.incident.id;
+/**
+ * The company's first incident has just stopped the clock: no game time has run and the player has recorded nothing,
+ * not even an inspection, since it opened. Recorded state, so a reload or import derives the same answer.
+ */
+export function firstIncidentStop(game: GameState): boolean {
+  const c = game.campaign, incident = c?.incident;
+  return !!incident && c.step === incident.openedStep && !c.inputs.some(input => input.step >= incident.openedStep) &&
+    c.trace.find(t => t.type === "incident-opened")?.data.incidentId === incident.id;
 }
 
 /** Keep technical candidates internal; present one justified, validated next interaction. */
