@@ -11,7 +11,7 @@ const SERVICES: readonly [equipment: string, service: string][] = [
 
 const DIAGRAM = "/aws-reference.svg";
 
-/** The menu's AWS tab: a player reference that maps the building's machines onto real AWS services. */
+/** The menu's Info tab: a player reference that maps the building's machines onto real AWS services. */
 export function MenuReference() {
   return (
     <section className="menu-reference" aria-label="Your machines on AWS">

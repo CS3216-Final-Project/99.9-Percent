@@ -58,7 +58,7 @@ It shows the floor in view with each zone in its own colour, the crew and any in
 A line under it says where the avatar is, its tabs change floor, and in walk mode a click on it walks there.
 Its close button hides it, and on a phone it starts folded.
 The menu's Map tab shows the full plan of both floors, with search, layers and Show in room.
-The AWS tab beside it maps the building's machines onto real AWS services: Network is an Application Load Balancer, Servers are Amazon EC2 under EC2 Auto Scaling, Read Cache is Amazon ElastiCache, Database is Amazon RDS and the Monitoring wall is Amazon CloudWatch.
+The Info tab beside it maps the building's machines onto real AWS services: Network is an Application Load Balancer, Servers are Amazon EC2 under EC2 Auto Scaling, Read Cache is Amazon ElastiCache, Database is Amazon RDS and the Monitoring wall is Amazon CloudWatch.
 
 ## Crew
 

@@ -13,7 +13,7 @@ import { Callout, Modal } from "@/components/ui";
 import { MenuReference } from "@/components/MenuReference";
 
 /** The phone menu keeps the run and the two settings a phone player needs; accounts, saves and playtest tools stay on the desktop. */
-export const PHONE_MENU_TABS = ["run", "aws", "sound", "graphics"] as const satisfies readonly MenuTab[];
+export const PHONE_MENU_TABS = ["run", "info", "sound", "graphics"] as const satisfies readonly MenuTab[];
 export type PhoneMenuTab = (typeof PHONE_MENU_TABS)[number];
 
 const PHONE_ABOUT = {
@@ -37,7 +37,7 @@ export function PhoneMenu({ initialTab = "run" }: { initialTab?: MenuTab }) {
     {campaign ? <GuidedRun /> : <ChallengeRun />}
     <MenuTabs value={tab} onChange={(next) => setTab(next as PhoneMenuTab)} only={PHONE_MENU_TABS}>
       {tab === "run" && (campaign ? <GuidedActions onResume={close} exit={exit} /> : <ChallengeActions onResume={close} />)}
-      {tab === "aws" && <MenuReference />}
+      {tab === "info" && <MenuReference />}
       {tab === "sound" && <SoundSettings />}
       {tab === "graphics" && <GraphicsSettings />}
     </MenuTabs>

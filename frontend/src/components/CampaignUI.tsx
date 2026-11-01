@@ -482,7 +482,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
         <ModeSwitch to="classic" />
       </>}
       {tab === "map" && <MenuMap />}
-      {tab === "aws" && <MenuReference />}
+      {tab === "info" && <MenuReference />}
       {tab === "sound" && <SoundSettings />}
       {tab === "graphics" && <GraphicsSettings />}
       {tab === "controls" && <ControlSettings />}

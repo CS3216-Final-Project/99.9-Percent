@@ -52,19 +52,19 @@ describe("phone edition", () => {
     expect(screen.queryAllByRole("button", { name: desktopOnly })).toEqual([]);
   });
 
-  it("offers the AWS reference and only Sound and Graphics settings in the menu, with Resume and the mode switch", async () => {
+  it("offers the Info reference and only Sound and Graphics settings in the menu, with Resume and the mode switch", async () => {
     await renderPhone();
     fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
     const menu = openMenu();
-    expect(within(menu).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Run", "AWS", "Sound", "Graphics"]);
-    expect(PHONE_MENU_TABS).toEqual(["run", "aws", "sound", "graphics"]);
+    expect(within(menu).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Run", "Info", "Sound", "Graphics"]);
+    expect(PHONE_MENU_TABS).toEqual(["run", "info", "sound", "graphics"]);
     expect(within(menu).getByRole("button", { name: "Resume" })).toBeTruthy();
     expect(within(menu).queryByRole("button", { name: "Save now" })).toBeNull();
     expect(within(menu).queryAllByRole("button", { name: desktopOnly })).toEqual([]);
     const mode = within(menu).getByRole("region", { name: "Game mode" });
     expect(mode.textContent).toContain(PHONE_SCOPE.challengeLocked);
 
-    fireEvent.click(within(menu).getByRole("tab", { name: "AWS" }));
+    fireEvent.click(within(menu).getByRole("tab", { name: "Info" }));
     expect(within(menu).getByRole("img", { name: /Application Load Balancer/ })).toBeTruthy();
     fireEvent.click(within(menu).getByRole("tab", { name: "Sound" }));
     expect(within(menu).getByRole("tabpanel").textContent).toMatch(/Music/);

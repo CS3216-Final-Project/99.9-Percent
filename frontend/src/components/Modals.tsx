@@ -355,7 +355,7 @@ export function Menu() {
         )}
 
         {tab === "map" && <MenuMap />}
-        {tab === "aws" && <MenuReference />}
+        {tab === "info" && <MenuReference />}
 
         {tab === "sound" && <SoundSettings />}
 

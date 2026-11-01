@@ -408,6 +408,8 @@
   border-radius: 0;
   box-shadow: none;
   background: transparent;
+  /* The sheet moves itself; its contents do not slide in again. */
+  animation: none;
 }
 .phone-app[data-edition="phone"] .phone-sheet .side .panel-section { padding: 12px 14px 16px; }
 .phone-app[data-edition="phone"] .phone-sheet .campaign-panel .incident-investigate > .chips { gap: 6px; }
