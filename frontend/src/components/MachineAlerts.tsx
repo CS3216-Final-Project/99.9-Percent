@@ -2,6 +2,7 @@ import { deadMachines } from "@/sim";
 import { inspectOrSelect, useGame } from "@/game/store";
 import { Icon } from "./icons";
 import "./MachineAlerts.css";
+import { serverName } from "@/sim";
 
 /**
  * Challenge Mode's only standing alerts: one red card per dead machine, at the room's left edge.
@@ -18,7 +19,7 @@ export default function MachineAlerts() {
         <button type="button" key={machine.hostId} className="machine-alert" onClick={() => inspectOrSelect(machine.equipment)}>
           <Icon name="skull" size={20} />
           <span>
-            <strong>{machine.equipment === "db" ? "Database machine is dead" : `Server ${machine.hostId} is dead`}</strong>
+            <strong>{machine.equipment === "db" ? "Database machine is dead" : `${serverName(machine.hostId)} is dead`}</strong>
             <span>{machine.equipment === "db" ? "Inspect Database" : "Inspect Servers"}</span>
           </span>
         </button>

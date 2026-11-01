@@ -63,12 +63,12 @@ test("Chapter 6 guidance: post-review restoration precedes replacement capacity 
     await page.getByRole("dialog", { name: "Hint", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
     await followHintComponent(page);await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(name);
   };
-  await accept(/^Restore App 3/); await gold.click();await expect(gold).toHaveAccessibleName("Confirm");await gold.click();
+  await accept(/^Restore Server 3/); await gold.click();await expect(gold).toHaveAccessibleName("Confirm");await gold.click();
   expect((await savedGame(page)).campaign!.pending.some(a => a.type === "restore-app")).toBe(true);
   await accept(/^Run$/); await gold.click(); await page.clock.runFor(3000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   expect((await savedGame(page)).campaign!.combinedStage!.currentRound!.fault!.restoredStep).not.toBeNull();
-  await accept(/^All apps$/); await gold.click();
+  await accept(/^All servers$/); await gold.click();
   await accept(/^Run$/); await gold.click(); await page.clock.runFor(1000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await accept(/^Remove traffic limit/); await gold.click(); await expect(gold).toHaveAccessibleName("Confirm");

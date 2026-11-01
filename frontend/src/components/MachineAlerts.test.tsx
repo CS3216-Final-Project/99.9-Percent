@@ -22,11 +22,10 @@ it("shows one red alert per dead machine and inspects it when pressed", () => {
   render(<MachineAlerts />);
   const region = screen.getByRole("region", { name: "Machine alerts" });
   expect(region.children).toHaveLength(0);
-  const appId = useGame.getState().game.infra.appHosts[0].id;
   act(() => { useGame.setState({ game: kill(kill(useGame.getState().game, "app"), "db") }); });
   expect(region.children).toHaveLength(2);
   expect(screen.getByText("Database machine is dead")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: new RegExp(`Server ${appId} is dead`) }));
+  fireEvent.click(screen.getByRole("button", { name: /Server 1 is dead/ }));
   expect(useGame.getState().selected).toBe("app");
   // Replacing the machine clears its alert.
   act(() => { useGame.setState({ game: newLegacyGame(1) }); });

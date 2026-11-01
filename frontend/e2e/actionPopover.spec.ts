@@ -39,7 +39,7 @@ for(const [width,height] of [[1440,900],[1366,768]]) {
 test("scaling and load balancing confirmations stay centered and highlight their equipment",async({page})=>{
   let g=tick(newGame(3,"scaling-layout"),6);g=tick(act(g,{type:"start_db_upgrade"}),30);
   g=act(act(g,{type:"acknowledge_review"}),{type:"acknowledge_milestone"});
-  await purchaseActions(page,g,[[/^Scale up App 1/,"app"],[/^Deploy load balancing/,"gateway"]]);
+  await purchaseActions(page,g,[[/^Scale up Server 1/,"app"],[/^Deploy load balancing/,"gateway"]]);
 });
 
 test("Read Cache confirmation stays centered and highlights the cache",async({page})=>{

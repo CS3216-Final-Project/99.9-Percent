@@ -12,6 +12,7 @@ import {
 import { revertDeploy, rollbackTarget } from "./releases";
 import { addAppHost, logEvent, newId } from "./state";
 import { has } from "./tech";
+import { serverName } from "./names";
 import type {
   ActiveIncident,
   AttemptOutcome,
@@ -304,8 +305,8 @@ function buildEvidence(s: GameState, inc: ActiveIncident, equipment: EquipmentId
           : "Servers are fine. The same error repeats in the log.";
       } else if (appDown) {
         text = precise
-          ? `${c.hostId}: no response. The others are healthy.${selfHealingFleet(s) ? "" : " Traffic still goes to it."}`
-          : `${c.hostId} does not respond.${n > 1 ? " The others do." : ""}`;
+          ? `${serverName(c.hostId!)}: no response. The others are healthy.${selfHealingFleet(s) ? "" : " Traffic still goes to it."}`
+          : `${serverName(c.hostId!)} does not respond.${n > 1 ? " The others do." : ""}`;
       } else {
         text = precise ? "CPU 10%. Cannot connect to the database." : "Servers are fine but cannot get any data.";
       }
@@ -350,7 +351,7 @@ function buildEvidence(s: GameState, inc: ActiveIncident, equipment: EquipmentId
       if (inc.type === "app_overload") alerts.push("server CPU");
       if (inc.type === "db_saturation") alerts.push("response time", "database CPU");
       if (inc.type === "deploy_regression") alerts.push("error log volume");
-      if (appDown) alerts.push(has(s, "health_checks") ? `${c.hostId} heartbeat` : "server errors");
+      if (appDown) alerts.push(has(s, "health_checks") ? `${serverName(c.hostId!)} heartbeat` : "server errors");
       if (dbDown) alerts.push("database heartbeat");
       text = `Alerts: ${alerts.join(", ")}.`;
       if (level === 2) {
@@ -362,7 +363,7 @@ function buildEvidence(s: GameState, inc: ActiveIncident, equipment: EquipmentId
               : inc.type === "deploy_regression"
                 ? "requests fail inside app code."
                 : appDown
-                  ? `requests to ${c.hostId} never return.`
+                  ? `requests to ${serverName(c.hostId!)} never return.`
                   : "every database call fails.";
         text += ` Trace: ${trace}`;
       }

@@ -94,13 +94,13 @@ it("labels the last completed profile separately from an immediate contrast",()=
 });
 it("offers each routing choice once and marks the one in use",()=>{
  show(dataCompany("read-heavy",false));fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));fireEvent.click(screen.getByRole("button",{name:"Routing"}));fireEvent.click(screen.getByText(/Configure routing/));let route=screen.getByRole("group",{name:/Send traffic to/});
- expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All apps","App 1 only","App 2 only"]);
- expect(within(route).getByRole("button",{name:"All apps"}).getAttribute("aria-pressed")).toBe("true");
+ expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All servers","Server 1 only","Server 2 only"]);
+ expect(within(route).getByRole("button",{name:"All servers"}).getAttribute("aria-pressed")).toBe("true");
  const before=useGame.getState().game;
- fireEvent.click(within(route).getByRole("button",{name:"All apps"}));
+ fireEvent.click(within(route).getByRole("button",{name:"All servers"}));
  expect(useGame.getState().game).toBe(before);
- expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
- fireEvent.click(within(route).getByRole("button",{name:"App 2 only"}));
+ expect(screen.getByText("Configure routing · all servers")).toBeTruthy();
+ fireEvent.click(within(route).getByRole("button",{name:"Server 2 only"}));
  expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-2"]});
  fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));fireEvent.click(screen.getByRole("button",{name:"Routing"}));fireEvent.click(screen.getByText(/Configure routing/));route=screen.getByRole("group",{name:/Send traffic to/});
  const reason=screen.getByText("Routing requires deployed load balancing, valid active targets and a changed configuration.");
@@ -108,13 +108,13 @@ it("offers each routing choice once and marks the one in use",()=>{
  expect(reason.closest("fieldset")).toBeNull();
  expect(route.hasAttribute("disabled")).toBe(true);
 });
-it("leaves a reserved spare out of the routing choices, so the apps in use still read as all apps",()=>{
+it("leaves a reserved spare out of the routing choices, so the apps in use still read as all servers",()=>{
  const g=protectedCombined();expect(g.campaign!.apps.find(a=>a.id==="app-2")!.role).toBe("spare");
  show(g);fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));fireEvent.click(screen.getByRole("button",{name:"Routing"}));fireEvent.click(screen.getByText(/Configure routing/));const route=screen.getByRole("group",{name:/Send traffic to/});
- expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All apps","App 1 only","App 3 only"]);
- expect(within(route).getByRole("button",{name:"All apps"}).getAttribute("aria-pressed")).toBe("true");
- expect(screen.getByText("Configure routing · all apps")).toBeTruthy();
- fireEvent.click(within(route).getByRole("button",{name:"App 3 only"}));
+ expect(within(route).getAllByRole("button").map(b=>b.textContent)).toEqual(["All servers","Server 1 only","Server 3 only"]);
+ expect(within(route).getByRole("button",{name:"All servers"}).getAttribute("aria-pressed")).toBe("true");
+ expect(screen.getByText("Configure routing · all servers")).toBeTruthy();
+ fireEvent.click(within(route).getByRole("button",{name:"Server 3 only"}));
  expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-3"]});
 },15_000);
 

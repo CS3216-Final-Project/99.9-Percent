@@ -63,7 +63,7 @@ test("component actions: App Server adding, Network prerequisite and read-only c
   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+1000));
   await page.locator('.campaign-panel [data-tutorial="inspect-app"]').click();
   const app=page.getByRole("dialog",{name:"App Servers",exact:true});
-  await app.getByRole("button",{name:"Server management",exact:true}).click();await app.locator('[data-guidance-app="app-1"]').click();await expect(app.getByRole("button",{name:/Scale up App 1/})).toBeEnabled();await app.getByRole("button",{name:"Back to Server management",exact:true}).click();await app.getByRole("button",{name:"Back to Servers",exact:true}).click();
+  await app.getByRole("button",{name:"Server management",exact:true}).click();await app.locator('[data-guidance-app="app-1"]').click();await expect(app.getByRole("button",{name:/Scale up Server 1/})).toBeEnabled();await app.getByRole("button",{name:"Back to Server management",exact:true}).click();await app.getByRole("button",{name:"Back to Servers",exact:true}).click();
   await app.getByRole("button",{name:/Add server/}).click();
   const before=await savedGame(page);await page.getByRole("dialog",{name:"Purchase preview"}).getByRole("button",{name:"Cancel",exact:true}).click();
   expect(await savedGame(page)).toEqual(before);await expect(app).toBeVisible();
@@ -72,8 +72,8 @@ test("component actions: App Server adding, Network prerequisite and read-only c
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="add-app")).toBe(true);
   await advanceCampaignStep(page,{seconds:2,resumeClock:false});
   await page.locator('.campaign-panel [data-tutorial="inspect-app"]').click();
-  await app.getByRole("button",{name:"Server management",exact:true}).click();await app.getByRole("button",{name:/^App 2:/}).click();
-  await app.getByRole("button",{name:/Scale up App 2/}).click();
+  await app.getByRole("button",{name:"Server management",exact:true}).click();await app.getByRole("button",{name:/^Server 2:/}).click();
+  await app.getByRole("button",{name:/Scale up Server 2/}).click();
   await expect(page.locator(".campaign-gold-attention")).toHaveAccessibleName("Confirm");
   await page.getByRole("dialog",{name:"Purchase preview"}).getByRole("button",{name:"Confirm",exact:true}).click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="scale-up"&&a.targetId==="app-2")).toBe(true);
@@ -82,7 +82,7 @@ test("component actions: App Server adding, Network prerequisite and read-only c
   await network.getByRole("button",{name:"Network management",exact:true}).click();await network.getByRole("button",{name:"Load balancing",exact:true}).click();await expect(network.getByRole("button",{name:/Deploy load balancing/})).toBeVisible();await network.getByRole("button",{name:"Back to Network management",exact:true}).click();await network.getByRole("button",{name:"Routing",exact:true}).click();
   await network.getByText(/Configure routing/).click();
   await expect(network.getByText("Deploy load balancing before configuring routing.")).toBeVisible();
-  await expect(network.getByRole("button",{name:"App 1 only",exact:true})).toBeDisabled();
+  await expect(network.getByRole("button",{name:"Server 1 only",exact:true})).toBeDisabled();
   await network.getByRole("button",{name:"Back to Network management",exact:true}).click();await network.getByRole("button",{name:"Back to Network",exact:true}).click();await network.getByRole("button",{name:/Limit to 500/}).click();
   await expect(page.locator(".campaign-gold-attention")).toHaveAccessibleName("Confirm");
   await page.getByRole("dialog",{name:"Purchase preview"}).getByRole("button",{name:"Confirm",exact:true}).click();

@@ -23,8 +23,8 @@ describe("readable recorded events", () => {
     const result = describeEvents([event(1, 3, "action-requested", { actionId: "r", type: "routing", routing: route }),
       event(2, 5, "reliability-failure-started", { appId: "app-3" }),
       event(3, 6, "health-change-detected", { appId: "app-3", detectedHealth: "unhealthy", source: "probe", delay: 1 })]);
-    expect(result[0].detail).toBe("Route to App 1, App 2 (balanced)");
-    expect(result[1].title).toBe("App 3 failed");
+    expect(result[0].detail).toBe("Route to Server 1, Server 2 (balanced)");
+    expect(result[1].title).toBe("Server 3 failed");
     expect(result[2].detail).toBe("By Health Checks · 1 s after the change");
     expect(JSON.stringify(result)).not.toContain("targets");
   });

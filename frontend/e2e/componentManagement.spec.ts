@@ -50,7 +50,7 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     await installClock();const game=tick(finishingScaling(),3);await boot(page,game);
     const popup=await inspectEquipment(page,"app");await expect(popup).toHaveAccessibleName("App Servers");
     await expect(popup.locator('[data-guidance-app]')).toHaveCount(0);
-    await expect(popup.getByRole("button",{name:/Scale up App/})).toHaveCount(0);
+    await expect(popup.getByRole("button",{name:/Scale up Server/})).toHaveCount(0);
     expect(game.campaign!.apps.length).toBe(Q.maxApps);
     await expect(popup.getByRole("button",{name:"Add server",exact:true})).toBeDisabled();
     await expect(popup.locator(".campaign-action-reason").first()).toHaveText("Two application instances are already installed.");
@@ -72,15 +72,15 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     expect(await popup.locator(".modal-body").evaluate(node=>node.scrollHeight<=node.clientHeight)).toBe(true);
     await page.screenshot({path:info.outputPath(`server-management-${width}.png`)});
     await popup.locator('[data-guidance-app="app-2"]').click();
-    await expect(popup.getByRole("heading",{name:"App 2",exact:true})).toBeVisible();
+    await expect(popup.getByRole("heading",{name:"Server 2",exact:true})).toBeVisible();
     await expect(popup.getByRole("button",{name:"Add server",exact:true})).toHaveCount(0);
-    await popup.getByRole("button",{name:"Scale up App 2",exact:true}).click();
+    await popup.getByRole("button",{name:"Scale up Server 2",exact:true}).click();
     const quote=page.getByRole("dialog",{name:"Purchase preview",exact:true});
     const before=await savedGame(page);await expect(quote.getByRole("button",{name:"Confirm",exact:true})).toBeEnabled();
     await expect(page.locator('.campaign-gold-attention')).toHaveAccessibleName("Confirm");
     await quote.getByRole("button",{name:"Cancel",exact:true}).focus();await page.keyboard.press("Tab");
     expect(await quote.evaluate(node=>node.contains(document.activeElement))).toBe(true);
-    await page.keyboard.press("Escape");await expect(popup.getByRole("button",{name:"Scale up App 2",exact:true})).toBeFocused();
+    await page.keyboard.press("Escape");await expect(popup.getByRole("button",{name:"Scale up Server 2",exact:true})).toBeFocused();
     expect(await savedGame(page)).toEqual(before);
     await page.screenshot({path:info.outputPath(`server-${width}.png`)});
     await popup.getByRole("button",{name:"Back to Server management",exact:true}).click();
@@ -95,7 +95,7 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     await network.getByRole("button",{name:"Back to Network management",exact:true}).click();
     await network.getByRole("button",{name:"Routing",exact:true}).click();
     await network.getByText(/Configure routing/).click();
-    await expect(network.getByRole("button",{name:"All apps",exact:true})).toBeDisabled();
+    await expect(network.getByRole("button",{name:"All servers",exact:true})).toBeDisabled();
     await expect(network.getByText("Deploy load balancing before configuring routing.")).toBeVisible();
     await page.screenshot({path:info.outputPath(`routing-${width}.png`)});
     expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step);
@@ -131,7 +131,7 @@ test("failed server management: Hint visits its card, queues free restoration, t
   await expect(gold).toHaveCount(1);await expect(gold).toHaveAccessibleName("App Server");await gold.click();
   await expect(gold).toHaveCount(1);await expect(gold).toHaveAccessibleName("Server management");await gold.click();
   await expect(gold).toHaveCount(1);await expect(gold).toHaveAttribute("data-guidance-app",id);await gold.click();
-  await expect(gold).toHaveCount(1);await expect(gold).toHaveAccessibleName(new RegExp(`^Restore App ${id.slice(4)}`));await gold.click();
+  await expect(gold).toHaveCount(1);await expect(gold).toHaveAccessibleName(new RegExp(`^Restore Server ${id.slice(4)}`));await gold.click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="restore-app")).toBe(false);
   await expect(gold).toHaveCount(1);await expect(gold).toHaveAccessibleName("Confirm");await gold.click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="restore-app"&&a.targetId===id)).toBe(true);

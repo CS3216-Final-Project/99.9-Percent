@@ -37,7 +37,7 @@ it("reads the equipment and returns to the room, keeping the selection", () => {
 it("names the application instance beside the equipment's name", () => {
   show(newLegacyGame(1), { seq: 1, equipment: "app", appId: "app-1" });
   const dialog = screen.getByRole("dialog", { name: "Servers inspected" });
-  expect(dialog.textContent).toContain("App 1");
+  expect(dialog.textContent).toContain("Server 1");
 });
 
 it("calls a Challenge Mode incident inspection an investigation", () => {

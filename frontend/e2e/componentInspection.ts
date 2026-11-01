@@ -39,7 +39,7 @@ export function actionComponent(name:string|RegExp):Component {
   if (/database/i.test(label)) return "db";
   if (/cache/i.test(label)) return "cache";
   if (/health checks/i.test(label)) return "monitoring";
-  if (/limit|routing|balanc|failover|All apps|App \d+ only/i.test(label)) return "gateway";
+  if (/limit|routing|balanc|failover|All servers|Server \d+ only/i.test(label)) return "gateway";
   return "app";
 }
 
@@ -67,13 +67,13 @@ export async function infrastructureAction(page:Page,name:string|RegExp,componen
     }
   }
   if(component==="gateway") {
-    const view=/failover/i.test(label)?"failover":/balanc/i.test(label)?"balancing":/routing|All apps|App \d+ only/i.test(label)?"routing":"overview";
+    const view=/failover/i.test(label)?"failover":/balanc/i.test(label)?"balancing":/routing|All servers|Server \d+ only/i.test(label)?"routing":"overview";
     if(await scope.locator('.inspection-subview').getAttribute('data-inspection-view')!==view) {
       for(let i=0;i<2&&await scope.locator('[data-inspection-back]').isVisible();i++)await scope.locator('[data-inspection-back]').click();
       if(view!=="overview") {await scope.locator('[data-inspection-entry="management"]').click();await scope.locator(`[data-inspection-entry="${view}"]`).click();}
     }
   }
-  if(component==="gateway" && /All apps|App \d+ only/i.test(typeof name==="string"?name:name.source)) {
+  if(component==="gateway" && /All servers|Server \d+ only/i.test(typeof name==="string"?name:name.source)) {
     const routes=scope.locator("details").filter({hasText:/Configure routing/});
     if(await routes.getAttribute("open")===null) await routes.locator("summary").click();
   }

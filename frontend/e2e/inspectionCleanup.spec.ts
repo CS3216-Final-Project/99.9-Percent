@@ -94,7 +94,7 @@ for(const chapter of [4,5,6]) test(`inspection content: Chapter ${chapter} keeps
   const network=await inspectEquipment(page,"gateway");
   await expect(network).not.toContainText(/Stay online|Stable after restoration|Workload:|Normal demand|Opening campaign/);
   await expect(network.getByRole("button",{name:/Limit to|Remove traffic limit/})).toBeEnabled();
-  await infrastructureAction(page,"All apps");await expect(network.getByText(/Configure routing/)).toBeVisible();
+  await infrastructureAction(page,"All servers");await expect(network.getByText(/Configure routing/)).toBeVisible();
   await inspectEquipment(page,"gateway",true);await expect(network.getByRole("region",{name:"Network readings"})).toContainText("Admitted");
   if(chapter>=5)await expect(await infrastructureAction(page,"Deploy Automatic Failover")).toBeVisible();
   const cache=await inspectEquipment(page,"cache",true);

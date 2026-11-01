@@ -120,7 +120,7 @@ describe("recorded incident lessons", () => {
 });
 
 describe("capacity after a server failure", () => {
-  /** Health Checks are live before the failure, so the load balancer drops App 3 once they detect it. */
+  /** Health Checks are live before the failure, so the load balancer drops Server 3 once they detect it. */
   function checkedFailure() {
     let g = act(reliabilityCompany(), { type: "unlock_reliability", tech: "health_checks" });
     g = act(tick(act(g, { type: "deploy_health_checks" }), 2), { type: "arm_reliability" });
@@ -132,7 +132,7 @@ describe("capacity after a server failure", () => {
   it("counts the traffic balanced routing still sent to the failed server until it was restored", () => {
     const c = reliabilityOutcome(true).campaign!, f = c.reliabilityStage!.fault!;
     const report = c.reports.find(r => r.snapshots.some(m => m.reliability?.faultId === f.id))!;
-    // Three balanced servers share 2,400 req/s, so the failed App 3 still receives a third of it.
+    // Three balanced servers share 2,400 req/s, so the failed Server 3 still receives a third of it.
     expect(survivingCapacity(report.snapshots)).toEqual({ step: f.startedStep, admitted: 2400, capacity: 3200, failed: ["app-3"], toFailed: 800,
       stopped: { step: f.restoredStep, by: "restored", admitted: 2400, capacity: 4800 } });
     expect(incidentLesson(report).wrong).toBe("A server failed, but traffic was still routed to it, and every request it received failed.");

@@ -105,15 +105,15 @@ it("says the load balancer kept sending traffic to a failed server instead of cl
   const c = reliabilityOutcome(true).campaign!, f = c.reliabilityStage!.fault!;
   render(<CampaignIncidentReport report={c.reports.find(r => r.snapshots.some(m => m.reliability?.faultId === f.id))!} />);
   const block = screen.getByRole("region", { name: "Capacity after the failure" });
-  expect(within(block).getByText("Sent to the failed App 3").nextSibling?.textContent).toBe("800 req/s, all failed");
-  expect(block.textContent).toContain(`every request the load balancer sent to App 3 failed until it was restored at game second ${f.restoredStep}.`);
+  expect(within(block).getByText("Sent to the failed Server 3").nextSibling?.textContent).toBe("800 req/s, all failed");
+  expect(block.textContent).toContain(`every request the load balancer sent to Server 3 failed until it was restored at game second ${f.restoredStep}.`);
   expect(block.textContent).toContain("The healthy servers could serve their own 1,600 req/s; the errors came from the failed server staying in the route.");
   expect(block.textContent).not.toContain("enough capacity");
   // A failed server does no work, so the evidence table never credits it with capacity.
   fireEvent.click(screen.getByText("View Technical Details", { exact: true }));
   const evidence = screen.getByRole("table", { name: "Recorded incident evidence by game second" });
-  expect(evidence.textContent).toContain("App 3: 800 / 0 · 0 (failed)");
-  expect(evidence.textContent).not.toMatch(/App 3: [\d,]+ \/ 1,600 · [\d,]+ \(failed/);
+  expect(evidence.textContent).toContain("Server 3: 800 / 0 · 0 (failed)");
+  expect(evidence.textContent).not.toMatch(/Server 3: [\d,]+ \/ 1,600 · [\d,]+ \(failed/);
 });
 
 it.each([
@@ -126,5 +126,5 @@ it.each([
   render(<CapacityAfterFailure step={20} admitted={2400} capacity={3200} failed={["app-3"]} {...props} />);
   const block = screen.getByRole("region", { name: "Capacity after the failure" });
   expect(block.textContent).toContain(first); expect(block.textContent).toContain(second);
-  expect(!!within(block).queryByText("Sent to the failed App 3")).toBe(props.toFailed > 0);
+  expect(!!within(block).queryByText("Sent to the failed Server 3")).toBe(props.toFailed > 0);
 });

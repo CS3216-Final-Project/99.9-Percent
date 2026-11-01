@@ -73,17 +73,17 @@ for (const path of ["vertical", "horizontal"] as const) {
       expect(installed.incident).not.toBeNull();
       // Paint the installed rack with the physical game still paused.
       await page.clock.runFor(200);
-      await page.getByRole("main").getByRole("button", { name: "App 2", exact: true }).click();
+      await page.getByRole("main").getByRole("button", { name: "Server 2", exact: true }).click();
       const reveal = page.getByRole("dialog", { name: "App Servers" });
-      await expect(reveal).toContainText("App 2");
-      await reveal.getByRole("button",{name:"Back to Server management",exact:true}).click();await expect(reveal.getByRole("region", { name: "Application instances" }).getByRole("button", { name: /App 2:/ })).toHaveAttribute("aria-pressed", "true");
+      await expect(reveal).toContainText("Server 2");
+      await reveal.getByRole("button",{name:"Back to Server management",exact:true}).click();await expect(reveal.getByRole("region", { name: "Application instances" }).getByRole("button", { name: /Server 2:/ })).toHaveAttribute("aria-pressed", "true");
       await reveal.getByRole("button", { name: "Close",exact:true }).click();
       await confirm(page, /Deploy load balancing/);
       await advanceCampaignStep(page, { seconds: 2, resumeClock: false });
       expect((await savedGame(page)).campaign!.routing.mode).toBe("single");
-      await infrastructureAction(page,"All apps");
-      await (await infrastructureAction(page,"All apps")).click();
-    } else await confirm(page, /Scale up App 1/);
+      await infrastructureAction(page,"All servers");
+      await (await infrastructureAction(page,"All servers")).click();
+    } else await confirm(page, /Scale up Server 1/);
     // Validate the handoff as well as the controls: recovery seeds this very configuration.
     expect((await savedGame(page)).campaign).toEqual(pendingRecovery(path).campaign);
     expect(api.every(url => new URL(url).pathname === "/api/session")).toBe(true);

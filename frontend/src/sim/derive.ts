@@ -5,6 +5,7 @@ import { openingTuning } from "./launchWeek";
 import { BALANCE, PROMOS } from "./balance";
 import { has, TECH } from "./tech";
 import type { EquipmentId, GameState, PromoId, Release, TechId, Warning } from "./types";
+import { serverName } from "./names";
 
 /* ------------------------------------------------------------------ */
 /* Capacity                                                            */
@@ -438,7 +439,7 @@ export function currentWarnings(s: GameState): Warning[] {
         code: "host_degraded",
         level: "warn",
         equipment: "app",
-        text: named ? `${h.id} is failing. Replace it.` : "A server keeps rebooting. Replace it.",
+        text: named ? `${serverName(h.id)} is failing. Replace it.` : "A server keeps rebooting. Replace it.",
         detail: faultDetail,
       });
     }

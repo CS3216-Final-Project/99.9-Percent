@@ -32,6 +32,7 @@ import { tipProps } from "./tips";
 import { EQUIPMENT_ICON, moodIcon, STATE_META, TECH_ICON, utilTone } from "./presentation";
 import IncidentPanel from "./IncidentPanel";
 import { Act, Chip, Gauge, ReleaseRow, Row, TaskRow } from "./ui";
+import { serverName } from "@/sim";
 
 function loadGauge(label: string, util: number, m: Metrics, tip: string) {
   return <Gauge icon="load" label={label} value={util} text={m.hasMonitoring ? pct(util) : loadBand(util)} tone={utilTone(util)} tip={tip} />;
@@ -116,7 +117,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
             <Act primary tour="primary" icon="plus" label="Add server" price={BALANCE.server.setupCost} disabled={locked || atLimit} onClick={() => act({ type: "add_server" })} />
           )}
           {sick.map((h) => (
-            <Act key={h.id} icon="refresh" label={`Replace ${h.id}`} price={BALANCE.server.replaceCost} disabled={locked} onClick={() => act({ type: "replace_host", hostId: h.id })} />
+            <Act key={h.id} icon="refresh" label={`Replace ${serverName(h.id)}`} price={BALANCE.server.replaceCost} disabled={locked} onClick={() => act({ type: "replace_host", hostId: h.id })} />
           ))}
           <More>
             <p className="muted">{info.about}</p>

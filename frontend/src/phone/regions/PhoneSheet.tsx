@@ -11,6 +11,7 @@ import { EQUIPMENT_ICON } from "@/components/presentation";
 import SidePanel from "@/components/SidePanel";
 import { getSheetState, setSheetState, SHEET_STATES, shownSheetState, useSheetState, type SheetState } from "../layout/sheetState";
 import "../layout/phone-layout.css";
+import { serverName } from "@/sim";
 
 /**
  * Region: sheet. A bottom sheet over the room with Guided Mode's System metrics, or Challenge Mode's equipment panel.
@@ -127,7 +128,7 @@ function GuidedPeek() {
   const slow = m.latencyMs >= Q.latencyThresholdMs;
   const failing = m.serviceErrorRate !== null && m.serviceErrorRate >= Q.errorThreshold;
   const name = shown ? GUIDED_NAMES[shown] : undefined;
-  const app = shown === "app" && c.apps.length > 1 && appId ? ` · App ${appId.slice(4)}` : "";
+  const app = shown === "app" && c.apps.length > 1 && appId ? ` · ${serverName(appId)}` : "";
   return <>
     {c.incident ? <PeekTitle icon="incident" tone="critical" short={`${c.incident.stableSteps}/${Q.stableSteps} s`}>Incident · {c.incident.stableSteps}/{Q.stableSteps} s<span className="visually-hidden"> stable</span></PeekTitle>
       : name && shown ? <PeekTitle icon={EQUIPMENT_ICON[shown]}>{name}{app}</PeekTitle>

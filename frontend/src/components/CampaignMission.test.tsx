@@ -80,9 +80,9 @@ for(const state of ["readiness","wave","outcome","final","complete"] as const) i
 });
 it("shows the actual pending deployment and recalculates after its activation",()=>{
   const game=decide(combinedCompany(),{type:"add_server"});show(game);
-  expect(screen.getByRole("region",{name:"Essential live status"}).textContent).toContain("Add server (App 4): activates in");
+  expect(screen.getByRole("region",{name:"Essential live status"}).textContent).toContain("Add server (Server 4): activates in");
   const advanced=tick(game,2);act(()=>useGame.setState({game:advanced}));
-  expect(screen.getByRole("region",{name:"Essential live status"}).textContent).not.toContain("Add server (App 4): activates in");
+  expect(screen.getByRole("region",{name:"Essential live status"}).textContent).not.toContain("Add server (Server 4): activates in");
   const decision=campaignAttention(advanced);expect(screen.getByRole("region",{name:"Next step"}).textContent).toContain(decision.attention==="run"?decision.message:decision.reason==="spike-plan"?decision.recommendation:decision.action?.label??decision.recommendation);
 });
 it("does not hide a low-cash capacity warning in the requirement disclosure",()=>{

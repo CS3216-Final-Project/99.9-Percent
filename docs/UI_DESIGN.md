@@ -145,9 +145,11 @@ Use [Jakob Nielsen’s 10 usability heuristics](https://www.nngroup.com/articles
   The selected chip is highlighted, and equipment in a critical or down state gets a red icon and border.
   The selected equipment's details, or the incident panel, open below the picker.
   Each dead machine (a failed server or database machine) shows a translucent red alert with a darker red border at the room's top-left, below the top strip on phones; pressing it inspects that equipment, and it stays until the machine is replaced or recovered.
+  On phones the picker scrolls with the sheet instead of sticking, so it never covers the control a step reveals.
   Task progress shows a percentage beside its bar, rounded down, with the weeks left at the current staffing.
   Hiring has no headcount limit and a task takes any number of free engineers; the office draws its eight desks and anyone hired beyond them works off-screen.
   Deploy risk is a rounded status pill with an icon: a check for low risk, a warning sign for medium and high, in green, orange and red.
+- **Server names:** Both modes name each app server "Server 1", "Server 2" and so on, through one helper (`serverName`); the internal ids stay `app-1`, `app-2`, so saves are unaffected. The equipment itself keeps its group name.
 
 ## Player feedback
 

@@ -8,6 +8,7 @@ import type { ReliabilityLesson } from "@/game/reliabilityLesson";
 import { Modal, Row } from "./ui";
 import { describeEvents, reportWindowStart, windowSpending } from "@/game/reportEvents";
 import "./CampaignIncidentReport.css";
+import { serverName } from "@/sim";
 
 const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(c / 100);
 
@@ -17,7 +18,7 @@ export function CampaignIncidentReport({ report, reliability }: { report: Campai
   return <CampaignReport lesson={lesson} summary={capacity && <CapacityAfterFailure {...capacity} />}><IncidentEvidence report={report}/></CampaignReport>;
 }
 const num = (n: number) => n.toLocaleString("en-US");
-const appNames = (ids: string[]) => ids.map(id => id.replace("app-", "App ")).join(" and ");
+const appNames = (ids: string[]) => ids.map(serverName).join(" and ");
 /**
  * The Stay Online lesson in numbers: what was admitted, what the route still sent to the failed server, and what the
  * healthy routed servers could serve. "Enough capacity" is said only when no traffic reached a failed server.
@@ -72,7 +73,7 @@ export function IncidentEvidence({ report }: { report: CampaignPostmortem }) {
       {!report.snapshots.length && <p>No historical observations were retained.</p>}
       {snapshots.length > 0 && <div className="report-table-scroll" tabIndex={technicalOpen ? 0 : undefined} role="region" aria-label="Recorded incident evidence">
         <table className="campaign-table"><caption>Recorded incident evidence by game second</caption><thead><tr><th scope="col">Game second</th><th scope="col">Applications: demand / capacity req/s · queue</th><th scope="col">Routing</th><th scope="col">Database: demand / capacity ops/s · queue</th><th scope="col">Latency</th><th scope="col">Service errors</th></tr></thead>
-          <tbody>{snapshots.map(m => <tr key={m.step}><th scope="row">{m.step}</th><td>{m.instances ? m.instances.map(a => <div key={a.id}>{a.id.replace("app-", "App ")}: {num(a.demand)} / {a.health === "failed" ? "0" : num(a.capacity)} · {num(a.backlog)}{a.health === "failed" ? " (failed)" : ""}</div>) : `${num(m.app.demand)} / ${num(m.app.capacity)} · ${num(m.app.backlog)} (all apps)`}</td><td>{m.routing ? `${m.routing.targets.map(t => t.replace("app-", "App ")).join(", ")} (${m.routing.mode})` : "Not recorded"}</td><td>{num(m.db.demand)} / {num(m.db.capacity)} · {num(m.db.backlog)}</td><td>{num(Math.round(m.latencyMs))} ms</td><td>{m.serviceErrorRate === null ? "No completed requests" : `${(m.serviceErrorRate * 100).toFixed(2)}%`}</td></tr>)}</tbody></table>
+          <tbody>{snapshots.map(m => <tr key={m.step}><th scope="row">{m.step}</th><td>{m.instances ? m.instances.map(a => <div key={a.id}>{serverName(a.id)}: {num(a.demand)} / {a.health === "failed" ? "0" : num(a.capacity)} · {num(a.backlog)}{a.health === "failed" ? " (failed)" : ""}</div>) : `${num(m.app.demand)} / ${num(m.app.capacity)} · ${num(m.app.backlog)} (all servers)`}</td><td>{m.routing ? `${m.routing.targets.map(serverName).join(", ")} (${m.routing.mode})` : "Not recorded"}</td><td>{num(m.db.demand)} / {num(m.db.capacity)} · {num(m.db.backlog)}</td><td>{num(Math.round(m.latencyMs))} ms</td><td>{m.serviceErrorRate === null ? "No completed requests" : `${(m.serviceErrorRate * 100).toFixed(2)}%`}</td></tr>)}</tbody></table>
       </div>}
       <h4>What happened, second by second</h4>
       {events.length ? <ol className="report-events">{events.map(e => <li key={e.id}><span className="report-event-step">{e.step}</span><span><b>{e.title}</b>{e.detail && <small>{e.detail}</small>}</span></li>)}</ol> : <p>No event history was retained.</p>}

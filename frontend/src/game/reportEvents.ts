@@ -1,4 +1,5 @@
 import type { CampaignPostmortem, Intervention, TraceEvent } from "@/sim/campaignTypes";
+import { serverName } from "@/sim";
 const REPORT_LEAD_SECONDS = 3;
 export const ACTION_NAMES: Record<Intervention, string> = {
   "add-app": "Add server", "upgrade-db": "Database upgrade", limit: "Traffic limit", unlimit: "Remove traffic limit", "scale-up": "Application scale up", "deploy-lb": "Load balancer deployment", routing: "Routing change", cache: "Read Cache deployment", "cache-tuning": "Cache tuning",
@@ -8,7 +9,7 @@ export const ACTION_NAMES: Record<Intervention, string> = {
 
 const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v.toLocaleString("en-US") : "not recorded";
 const dollars = (cents: unknown) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(cents) / 100);
-const app = (id: unknown) => typeof id === "string" ? id.replace("app-", "App ") : "Unknown server";
+const app = (id: unknown) => typeof id === "string" ? serverName(id) : "Unknown server";
 const component = (id: unknown) => id === "db" ? "Database" : id === "app" ? "Application" : app(id);
 const actionName = (type: unknown) => ACTION_NAMES[type as Intervention] ?? (typeof type === "string" ? type.replaceAll("-", " ") : "Infrastructure change");
 function routing(json: unknown) {

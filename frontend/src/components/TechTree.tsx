@@ -16,6 +16,7 @@ import { tipProps } from "./tips";
 import { TECH_ICON } from "./presentation";
 import { CampaignUnavailable } from "./CampaignInfrastructure";
 import { Act, Chip, Concept, ReleaseRow, TaskRow } from "./ui";
+import { serverName } from "@/sim";
 
 const NODE_W = 204;
 const NODE_H = 60;
@@ -271,7 +272,7 @@ const CAMPAIGN_ACTION: Partial<Record<TechId, string>> = { larger_servers: "scal
 function deployment(c: NonNullable<GameState["campaign"]>, id: TechId): string | null {
   const r = c.reliabilityStage;
   if (id === "health_checks") return r?.checksStep !== null && r?.checksStep !== undefined ? "Deployed" : "Not deployed";
-  if (id === "standby") return r?.spareId ? `Standing by: App ${r.spareId.slice(4)}` : "No reserved spare";
+  if (id === "standby") return r?.spareId ? `Standing by: ${serverName(r.spareId)}` : "No reserved spare";
   if (id === "auto_failover") return r?.failover ? (r.failover.enabled ? "Deployed and enabled" : "Deployed and disabled") : "Not deployed";
   if (id === "autoscaling") return c.spikeStage?.controller ? (c.spikeStage.controller.enabled ? "Deployed and enabled" : "Deployed and disabled") : "Not deployed";
   return null;

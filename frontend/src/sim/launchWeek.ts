@@ -79,7 +79,7 @@ export function launchWeekAction(s: GameState, action: Action): Rejection | null
     return null;
 }
 /**
- * Launch Week's first lesson is load balancing: a bigger App 1 would absorb the week-1 spike alone, so scaling up
+ * Launch Week's first lesson is load balancing: a bigger Server 1 would absorb the week-1 spike alone, so scaling up
  * stays locked until a load balancer shares traffic across two app servers, however early the second was bought.
  */
 export function launchWeekScalingOpen(c: Pick<Campaign, "launchWeek" | "loadBalancer" | "routing">): boolean {
