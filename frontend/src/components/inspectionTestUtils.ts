@@ -14,7 +14,7 @@ export function inspectionAction(name:RegExp):HTMLElement {
     if(/autoscal|Scale up|Restore|Reserve|Release|Install spare/i.test(text)) fireEvent.click(screen.getByRole("button",{name:"Server management"}));
     if(/autoscal/i.test(text))fireEvent.click(screen.getByRole("button",{name:"Autoscaling"}));
     else if(/Scale up|Restore|Reserve|Release|Install spare/i.test(text)) {
-      const id=text.match(/App (\d+)/)?.[1];
+      const id=text.match(/Server (\d+)/)?.[1];
       fireEvent.click(document.querySelector<HTMLElement>(id?`[data-guidance-app="app-${id}"]`:'[data-guidance-app]')!);
     }
   }

@@ -54,7 +54,7 @@ export async function infrastructureAction(page:Page,name:string|RegExp,componen
   if(component==="app") {
     const view=/autoscal/i.test(label)?"autoscaling":/Scale up|Restore|Reserve|Release|Install spare/i.test(label)?"server":"overview";
     if(view==="server") {
-      const id=label.match(/App (\d+)/)?.[1];
+      const id=label.match(/Server (\d+)/)?.[1];
       const target=id?scope.locator(`[data-guidance-app="app-${id}"]`):/Release spare/i.test(label)?scope.locator('[data-guidance-app]').filter({hasText:"Standby spare"}).first():scope.locator('[data-guidance-app]').first();
       if(!await scope.getByRole("button",{name,exact:typeof name==="string"}).isVisible()) {
         for(let i=0;i<3&&await scope.locator('[data-inspection-back]').isVisible();i++)await scope.locator('[data-inspection-back]').click();
