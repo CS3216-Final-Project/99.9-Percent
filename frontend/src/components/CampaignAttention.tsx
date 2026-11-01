@@ -303,9 +303,10 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     update();
     const observer = new MutationObserver(update);
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "disabled", "hidden"] });
-    window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true);
+    // Disclosures and the panel tween open, so a target first measured mid-tween is measured again once it lands.
+    window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true); document.addEventListener("animationend", update, true);
     document.addEventListener("click", used, true);
-    return () => { clear(); cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
+    return () => { clear(); cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("animationend", update, true); document.removeEventListener("click", used, true); };
   }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable, game, equipment, inEquipment, equipmentEntry, intro, analyticsStep, openingTutorial]);
   // The room's beams and dimmed racks follow the same spotlight.
   useEffect(() => {
@@ -354,9 +355,10 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     update();
     const observer = new MutationObserver(update);
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "disabled", "hidden"] });
-    window.addEventListener("resize", update); document.addEventListener("scroll", update, true);
+    // As above: re-measure once a disclosure or the panel finishes tweening open.
+    window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true); document.addEventListener("animationend", update, true);
     document.addEventListener("click", interact, true);
-    return () => { clear(); observer.disconnect(); document.querySelectorAll('[data-guidance-step]').forEach(n => n.removeAttribute('data-guidance-step')); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("click", interact, true); };
+    return () => { clear(); observer.disconnect(); document.querySelectorAll('[data-guidance-step]').forEach(n => n.removeAttribute('data-guidance-step')); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("animationend", update, true); document.removeEventListener("click", interact, true); };
   }, [acceptedNow, available, blocked, guidanceTarget, spotlightSelector, key, panel, view, running, clockAvailable, selected, recommendedAction, riskConfirmation, equipment, inEquipment, equipmentEntry, inspection, game, intro]);
 
   useLayoutEffect(() => {
