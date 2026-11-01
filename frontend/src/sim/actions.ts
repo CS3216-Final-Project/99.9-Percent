@@ -3,6 +3,7 @@ import { BALANCE, PROMOS } from "./balance";
 import {
   clamp,
   freeEngineers,
+  maxTaskStaff,
   maxServers,
   promoCooldownLeft,
   promoCost,
@@ -171,7 +172,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (broke) return broke;
       s.cash -= def.cost;
       s.totals.invested += def.cost;
-      const assigned = Math.min(freeEngineers(s), 2);
+      const assigned = Math.min(freeEngineers(s), 2, maxTaskStaff(def));
       s.tasks.push({
         id: newId(s, "task"),
         kind: "tech",
@@ -203,7 +204,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (broke) return broke;
       s.cash -= def.cost;
       s.totals.invested += def.cost;
-      const assigned = Math.min(freeEngineers(s), 2);
+      const assigned = Math.min(freeEngineers(s), 2, maxTaskStaff(def));
       const title = releaseTitle("db_upgrade", { dbTier: tier });
       s.tasks.push({
         id: newId(s, "task"),
@@ -243,6 +244,8 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (!task) return fail("not_found", "That task no longer exists.");
       const count = Math.round(action.count);
       if (!Number.isFinite(count) || count < 0) return fail("invalid", "Engineer count must be zero or more.");
+      const most = maxTaskStaff(task);
+      if (count > most) return fail("limit_reached", `${task.title} takes at most ${most} engineer${most === 1 ? "" : "s"}, one per week of work.`);
       const delta = count - task.assigned;
       if (delta > freeEngineers(s)) return fail("no_engineers", "No engineers are free. Take someone off another task or hire.");
       task.assigned = count;

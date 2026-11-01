@@ -14,6 +14,7 @@ import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
 import { MenuActions, MenuRun, MenuTile } from "./MenuRun";
 import { MenuMap } from "./MenuMap";
+import { MenuReference } from "./MenuReference";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { ModeSwitch } from "./ModeSwitch";
 import { SaveFiles } from "./SaveFiles";
@@ -354,6 +355,7 @@ export function Menu() {
         )}
 
         {tab === "map" && <MenuMap />}
+        {tab === "aws" && <MenuReference />}
 
         {tab === "sound" && <SoundSettings />}
 

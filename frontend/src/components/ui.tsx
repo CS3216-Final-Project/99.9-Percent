@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
-import { releaseRisk, taskEta, taskPercent, testEffort, type GameState, type Release, type Task } from "@/sim";
+import { maxTaskStaff, releaseRisk, taskEta, taskPercent, testEffort, type GameState, type Release, type Task } from "@/sim";
 import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
@@ -243,7 +243,7 @@ export function TaskRow({ game, task }: { game: GameState; task: Task }) {
           <Icon name={eta === null ? "alert" : "latency"} size={12} />
           {eta === null ? "No engineers" : `${eta} wk left`}
         </span>
-        <div className="stepper" role="group" aria-label={`Engineers on ${task.title}`} {...tipProps("More engineers finish sooner.")}>
+        <div className="stepper" role="group" aria-label={`Engineers on ${task.title}`} {...tipProps(task.assigned >= maxTaskStaff(task) ? `At most ${maxTaskStaff(task)}: one engineer per week of work.` : "More engineers finish sooner.")}>
           <button type="button" disabled={locked || task.assigned <= 0} onClick={() => act({ type: "assign_engineers", taskId: task.id, count: task.assigned - 1 })} aria-label="Remove an engineer">
             −
           </button>
@@ -253,7 +253,7 @@ export function TaskRow({ game, task }: { game: GameState; task: Task }) {
           </span>
           <button
             type="button"
-            disabled={locked}
+            disabled={locked || task.assigned >= maxTaskStaff(task)}
             onClick={() => act({ type: "assign_engineers", taskId: task.id, count: task.assigned + 1 })}
             aria-label="Add an engineer"
           >

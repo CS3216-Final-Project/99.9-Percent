@@ -7,7 +7,9 @@ import {
   buildReport,
   currentWarnings,
   forecast,
+  freeEngineers,
   incidentTick,
+  maxTaskStaff,
   metrics,
   newLegacyGame,
   recoveryOptions,
@@ -95,7 +97,7 @@ describe("tech tree", () => {
     s = must(s, { type: "start_tech", tech: "larger_servers" });
     const before = metrics(s).appCapacity;
     expect(techStatus(s, "larger_servers")).toBe("in_progress");
-    s = must(s, { type: "assign_engineers", taskId: s.tasks[0].id, count: 3 });
+    s = must(s, { type: "assign_engineers", taskId: s.tasks[0].id, count: 2 });
     s = advanceTurn(s);
     expect(techStatus(s, "larger_servers")).toBe("ready");
     expect(metrics(s).appCapacity).toBe(before);
@@ -114,18 +116,20 @@ describe("actions", () => {
     expect(s.cash).toBe(1_000_000 - 20 * BALANCE.engineer.hireCost);
   });
 
-  it("staffs one task with every free engineer, with no per-task cap", () => {
+  it("staffs a task with at most one engineer per week of its effort", () => {
     let s: GameState = { ...newLegacyGame(1), cash: 1_000_000 };
     for (let i = 0; i < 4; i++) s = must(s, { type: "hire_engineer" });
     s = must(s, { type: "start_tech", tech: "load_balancing" });
     const task = s.tasks[0];
-    s = must(s, { type: "assign_engineers", taskId: task.id, count: s.engineers });
-    expect(s.tasks[0].assigned).toBe(s.engineers);
-    expect(s.engineers).toBeGreaterThan(3);
+    expect(task.effort).toBe(3);
+    expect(maxTaskStaff(task)).toBe(3);
+    s = must(s, { type: "assign_engineers", taskId: task.id, count: 3 });
     expect(taskEta(s, s.tasks[0])).toBe(1);
-    const r = applyAction(s, { type: "assign_engineers", taskId: task.id, count: s.engineers + 1 });
+    expect(freeEngineers(s)).toBeGreaterThan(0);
+    const r = applyAction(s, { type: "assign_engineers", taskId: task.id, count: 4 });
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("no_engineers");
+    if (!r.ok) expect(r.reason).toBe("limit_reached");
+    expect(s.tasks[0].assigned).toBe(3);
   });
 
   it("rejects invalid requests without changing state", () => {

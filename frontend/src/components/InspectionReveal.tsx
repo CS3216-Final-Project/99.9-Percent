@@ -57,7 +57,6 @@ export default function InspectionReveal() {
         </div>
       </div>
       <div className="modal-foot">
-        <span className="muted">The inspector keeps the details.</span>
         <button type="button" className="btn btn-primary" onClick={dismiss}>
           Return to room
         </button>

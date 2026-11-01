@@ -57,6 +57,7 @@ import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
 import { MenuMap } from "./MenuMap";
+import { MenuReference } from "./MenuReference";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { MenuActions, MenuRun, MenuTile } from "./MenuRun";
 import { useMenuExit } from "./MenuExit";
@@ -481,6 +482,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
         <ModeSwitch to="classic" />
       </>}
       {tab === "map" && <MenuMap />}
+      {tab === "aws" && <MenuReference />}
       {tab === "sound" && <SoundSettings />}
       {tab === "graphics" && <GraphicsSettings />}
       {tab === "controls" && <ControlSettings />}

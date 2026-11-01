@@ -147,9 +147,10 @@ Use [Jakob Nielsen’s 10 usability heuristics](https://www.nngroup.com/articles
   Each dead machine (a failed server or database machine) shows a translucent red alert with a darker red border at the room's top-left, below the top strip on phones; pressing it inspects that equipment, and it stays until the machine is replaced or recovered.
   On phones the picker scrolls with the sheet instead of sticking, so it never covers the control a step reveals.
   Task progress shows a percentage beside its bar, rounded down, with the weeks left at the current staffing.
-  Hiring has no headcount limit and a task takes any number of free engineers; the office draws its eight desks and anyone hired beyond them works off-screen.
+  Hiring has no headcount limit; a task takes at most one engineer per week of its effort, and the stepper's + stops there and says why; the office draws its eight desks and anyone hired beyond them works off-screen.
   Deploy risk is a rounded status pill with an icon: a check for low risk, a warning sign for medium and high, in green, orange and red.
 - **Server names:** Both modes name each app server "Server 1", "Server 2" and so on, through one helper (`serverName`); the internal ids stay `app-1`, `app-2`, so saves are unaffected. The equipment itself keeps its group name.
+- **Panel motion:** the selected equipment's details fold open and closed under the picker with a short height tween, keeping their contents while they close; More disclosures tween the same way where the browser can animate to an auto height. Reduced motion turns both off.
 
 ## Player feedback
 
@@ -205,7 +206,7 @@ The phone edition is gameplay only.
 Guided Mode covers Chapter 0 and the first two chapters, Opening and Scaling & Routing, and then shows a phone campaign complete dialog while the company keeps running.
 Finishing those chapters unlocks Challenge Mode, which plays in full.
 The home screen holds the two mode cards and the analytics notice; there is no account, avatar, feedback, save files or playtest export.
-The Menu holds the run card, Resume, the mode switch and only the Run, Sound and Graphics tabs, and the game autosaves silently.
+The Menu holds the run card, Resume, the mode switch and only the Run, AWS, Sound and Graphics tabs, and the game autosaves silently.
 
 The room gets most of the screen.
 A 52 px top strip shows Cash and App Health with their icons, sound and Menu; Users and pending revenue sit behind one tap, with pending revenue still marked as not cash yet.

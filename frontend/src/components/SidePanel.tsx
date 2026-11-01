@@ -1,7 +1,7 @@
 "use client";
 import { EquipmentPanel } from "./EquipmentPanel";
 
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   BALANCE,
   churnRate,
@@ -28,6 +28,7 @@ import { moneyFull, num, pct } from "@/game/format";
 import { inspectOrSelect, useGame } from "@/game/store";
 import { floorOf, FLOOR_NAME, selectedInView, type Floor } from "@/game/floors";
 import { Icon } from "./icons";
+import { Reveal } from "./Reveal";
 import { tipProps } from "./tips";
 import { EQUIPMENT_ICON, moodIcon, STATE_META, TECH_ICON, utilTone } from "./presentation";
 import IncidentPanel from "./IncidentPanel";
@@ -442,8 +443,11 @@ export default function SidePanel() {
   const phase = useGame(s => s.game.phase);
   // A machine's details stay with its floor, however the view left it.
   const shown = useGame(s => selectedInView(s.selected, s.floor));
+  // The details keep the last machine while they fold away.
+  const [kept, setKept] = useState(shown);
+  if (shown && shown !== kept) setKept(shown);
   return <EquipmentPanel label="Details">
     <EquipmentChoices shown={shown} />
-    {phase === "incident" ? <IncidentPanel /> : shown && <Inspector id={shown} />}
+    {phase === "incident" ? <IncidentPanel /> : <Reveal open={!!shown}>{kept && <Inspector id={kept} />}</Reveal>}
   </EquipmentPanel>;
 }
