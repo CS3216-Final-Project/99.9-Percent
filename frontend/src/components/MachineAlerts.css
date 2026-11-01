@@ -1,0 +1,85 @@
+/* Dead-machine alerts sit at the room's top-left, opposite the equipment panel, and never take its width. */
+.machine-alerts {
+  grid-area: stage;
+  justify-self: start;
+  align-self: start;
+  position: relative;
+  z-index: 28;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(300px, calc(100% - 24px));
+  margin: 12px;
+  pointer-events: none;
+}
+
+.machine-alerts:empty {
+  display: none;
+}
+
+.machine-alert {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  color: #fff;
+  background: rgb(176 18 40 / 0.62);
+  border: 2px solid #7d0b1d;
+  border-radius: var(--radius-panel);
+  box-shadow: var(--lift);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  animation: machine-alert-in 0.2s ease-out;
+}
+
+.machine-alert:hover {
+  background: rgb(176 18 40 / 0.78);
+}
+
+.machine-alert:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.machine-alert > .icon {
+  flex: none;
+  color: var(--critical-caption);
+}
+
+.machine-alert > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.machine-alert strong {
+  font-size: var(--text-md);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.machine-alert > span > span {
+  font-size: var(--text-sm);
+  color: #ffe3e6;
+}
+
+@keyframes machine-alert-in {
+  from { opacity: 0; transform: translateX(-8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .machine-alert { animation: none; }
+}
+
+/* On phones the alerts sit just under the top strip, above the room. */
+.phone-app[data-edition="phone"] .machine-alerts {
+  position: fixed;
+  top: calc(var(--phone-top) + 8px);
+  left: calc(var(--phone-safe-left) + 8px);
+  z-index: 32;
+  margin: 0;
+  width: min(300px, calc(100vw - 16px - var(--phone-safe-left) - var(--phone-safe-right)));
+}

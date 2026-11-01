@@ -39,11 +39,11 @@ body:has(> .tour-card.launch-tutorial) .phone-app[data-edition="phone"] {
 
 /* A full-page workspace covers the top strip with its own header and close button, so there the strip docks above
    the dock instead, and the workspace's last action scrolls clear of it. */
-body:has(.phone-app[data-edition="phone"] .sheet:is(.sheet-tech, .sheet-history)) .tour-card.launch-tutorial,
-.phone-app[data-edition="phone"]:has(.sheet:is(.sheet-tech, .sheet-history)) > .tour[data-docked] .tour-card {
+body:has(.phone-app[data-edition="phone"] .sheet) .tour-card.launch-tutorial,
+.phone-app[data-edition="phone"]:has(.sheet) > .tour[data-docked] .tour-card {
   inset: auto var(--phone-coach-inset) calc(var(--phone-coach-bottom, 0px) + var(--phone-coach-gap));
 }
-.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card) .sheet:is(.sheet-tech, .sheet-history) .sheet-body {
+.phone-app[data-edition="phone"]:has(> .tour[data-docked] .tour-card) .sheet .sheet-body {
   padding-bottom: calc(var(--phone-coach) + var(--phone-coach-gap));
   scroll-padding-bottom: calc(var(--phone-coach) + var(--phone-coach-gap));
 }

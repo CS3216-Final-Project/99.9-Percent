@@ -203,7 +203,7 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     };
 
     // 1. Add a server, from the room's Servers label and then the panel.
-    await expect(card).toHaveAccessibleName("Tutorial, step 1 of 5");
+    await expect(card).toHaveAccessibleName("Tutorial, step 1 of 4");
     const servers = page.getByRole("main").getByRole("button", { name: "Servers", exact: true });
     await expect.poll(() => lit(page, servers), "the Servers label is lit").toBe(true);
     await shot("01-servers");
@@ -213,7 +213,7 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     await page.getByRole("button", { name: /Add server/ }).tap();
 
     // 2. Explore Scale Up: the Tech tab is in the dock, or folded into its Views menu on the narrowest phones.
-    await expect(card).toHaveAccessibleName("Tutorial, step 2 of 5");
+    await expect(card).toHaveAccessibleName("Tutorial, step 2 of 4");
     const techTab = page.locator(".phone-dock").getByRole("button", { name: /^Tech/ });
     const views = page.locator(".phone-views-menu > summary");
     if (width < 360) {
@@ -234,7 +234,7 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     await start.tap();
 
     // 3. Get more users: the Growth label starts under the sheet, so the room brings it into the open part.
-    await expect(card).toHaveAccessibleName("Tutorial, step 3 of 5");
+    await expect(card).toHaveAccessibleName("Tutorial, step 3 of 4");
     const growthLabel = page.getByRole("main").getByRole("button", { name: "Growth", exact: true });
     await expect.poll(() => lit(page, growthLabel), "the Growth label is lit").toBe(true);
     await expect.poll(() => uncovered(growthLabel), "the Growth label is above the sheet").toBe(true);
@@ -244,15 +244,14 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     await page.getByRole("button", { name: /^Launch/ }).first().tap();
 
     // 4. Play the week: Next week is in the dock, below the coach strip.
-    await expect(card).toHaveAccessibleName("Tutorial, step 4 of 5");
+    await expect(card).toHaveAccessibleName("Tutorial, step 4 of 4");
     const next = page.getByRole("button", { name: "Next week", exact: true });
     await expect.poll(() => lit(page, next), "Next week is lit").toBe(true);
     expect(overlaps(await box(page.locator(".tour-hole")), await box(card))).toBe(false);
     await shot("04-next-week");
     await next.tap();
 
-    await expect(card).toHaveAccessibleName("Tutorial, step 5 of 5");
-    await card.getByRole("button", { name: "Got it", exact: true }).tap();
+    // Playing the week is the last step: the guide closes by itself.
     await expect(card).toBeHidden();
     const after = await savedClassicGame(page);
     expect(after.turn).toBe(2);

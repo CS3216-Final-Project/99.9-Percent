@@ -1,11 +1,8 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
-import { useGame, type View } from "@/game/store";
+import { useGame, type SheetView } from "@/game/store";
 import { Icon, type IconName } from "./icons";
 import { tipProps } from "./tips";
 import { Concept, type ConceptKind } from "./ui";
-
-/** The views that open over the room from the bottom bar. */
-export type SheetView = Extract<View, "tech" | "engineers" | "history">;
 
 const VIEW_TITLES: Record<SheetView, string> = { tech: "Tech tree", engineers: "Team", history: "History" };
 const VIEW_ICONS: Record<SheetView, [ConceptKind, IconName]> = {
@@ -44,7 +41,6 @@ export function ViewTabs({ tabs }: { tabs: ViewTab[] }) {
 /** A workspace above the persistent dock; returning restores the view control's focus. */
 export function ViewSheet({ view, children }: { view: SheetView; children: ReactNode }) {
   const openView = useGame((s) => s.openView);
-  const workspace = view === "tech" || view === "history";
   const heading = useRef<HTMLHeadingElement>(null);
   useLayoutEffect(() => {
     // Closing the phone's Views menu can move focus to the body before this view mounts.
@@ -68,9 +64,9 @@ export function ViewSheet({ view, children }: { view: SheetView; children: React
           <Concept kind={VIEW_ICONS[view][0]} icon={VIEW_ICONS[view][1]} />
           {VIEW_TITLES[view]}
         </h2>
-        <button type="button" className={workspace ? "btn sheet-return" : "icon-btn"} data-return-to-room onClick={() => openView(null)} aria-label={workspace ? undefined : "Close"}>
+        <button type="button" className="btn sheet-return" data-return-to-room onClick={() => openView(null)}>
           <Icon name="close" />
-          {workspace && "Back to room"}
+          Back to room
         </button>
       </header>
       <div className="sheet-body">{children}</div>

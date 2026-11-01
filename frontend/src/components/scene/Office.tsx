@@ -3,7 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { deskSlot, POS, ROOM } from "./layout";
+import { deskSlot, POS, ROOM, TEAM_DESKS } from "./layout";
 import { creature, standsAtDesk, type Activity, type Species } from "./cast";
 import { daylightNow } from "./dayClock";
 import { Creature, Wanderer } from "./creatures";
@@ -1042,7 +1042,7 @@ function Staff({ crew }: { crew: Crew }) {
   const loungeTv = tvPicture(LOUNGE_TV);
   return (
     <group>
-      {Array.from({ length: 8 }, (_, i) => {
+      {Array.from({ length: TEAM_DESKS }, (_, i) => {
         const slot = deskSlot(i);
         const hired = i < crew.engineers;
         // During an incident the first engineers are down on the server floor (see ServerFloor.tsx).

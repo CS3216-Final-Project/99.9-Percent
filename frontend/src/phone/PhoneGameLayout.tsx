@@ -1,6 +1,7 @@
 import { CampaignAttentionHost } from "@/components/CampaignAttention";
 import { RoomControlsHost } from "@/components/RoomControlsHost";
 import { Room } from "@/components/Game";
+import MachineAlerts from "@/components/MachineAlerts";
 import { useAppClassName } from "@/components/useGameRuntime";
 import { useGame } from "@/game/store";
 import { shownSheetState, useSheetState } from "./layout/sheetState";
@@ -37,6 +38,7 @@ export function PhoneGameLayout() {
     <main className="stage">
       <Room />
     </main>
+    <MachineAlerts />
     <PhoneSheet />
     <PhoneDock />
     <PhoneOverlays />

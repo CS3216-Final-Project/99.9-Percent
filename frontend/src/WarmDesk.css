@@ -11,7 +11,7 @@
 .act, .action { border-width: 1px; }
 .concept, .tab-icon { border-radius: 11px; box-shadow: none; border-width: 1px; }
 .concept-tech { background: var(--tech-tile); color: var(--tech-ink); }
-.modal, .tour, .sheet { border: 1px solid var(--control-edge); border-radius: var(--radius-panel); box-shadow: var(--lift); }
+.modal, .tour { border: 1px solid var(--control-edge); border-radius: var(--radius-panel); box-shadow: var(--lift); }
 .side { border: 1px solid var(--control-edge); border-radius: var(--radius-panel); }
 .panel-head { border-bottom: 1px solid var(--control-edge); }
 .topbar .icon-btn, .account-chip { border-color: #584866; background: #352c48; color: var(--paper); }
@@ -35,30 +35,34 @@
 .topbar .icon-btn { width: 44px; height: 44px; }
 .topbar .meter { background: var(--paper-3); }
 
-/* Team retains its sheet; Tech and History are focused workspaces above the dock. */
-.sheet { margin: 16px; min-width: 0; overflow: hidden; }
+/* Tech, Team and History are focused workspaces above the dock. */
 .sheet-head { flex: none; }
 .sheet-body { min-width: 0; }
-.app .sheet:is(.sheet-tech, .sheet-history) {
+.app .sheet {
   position: relative;
   inset: auto;
   grid-column: 1 / -1;
   grid-row: 1 / -2;
   align-self: stretch;
   z-index: 40;
+  min-width: 0;
+  overflow: hidden;
   margin: 0;
   border: 0;
   border-radius: 0;
   box-shadow: none;
   background: var(--night);
 }
-.app:has(.sheet-tech, .sheet-history) > :is(.topbar, .chapter-bar, .stage, .side, .operations-rail, .phone-top, .phone-sheet, .phone-coach) { visibility: hidden; }
-.app:has(.sheet-tech, .sheet-history) .controls-dock .room-controls { display: none; }
-.app:has(.sheet-tech, .sheet-history) .controls-dock { grid-template-columns: auto 1fr; z-index: 41; }
-.app:has(.sheet-tech, .sheet-history) .controls-dock .time-controls { justify-content: flex-end; }
+.app:has(.sheet) > :is(.chapter-bar, .stage, .side, .machine-alerts, .phone-sheet, .phone-coach) { visibility: hidden; }
+/* Campaign's header gives way to the workspace. Challenge Mode keeps its top bar, so logo, cash and settings stay in reach. */
+.app:not(.is-classic):has(.sheet) > :is(.topbar, .phone-top) { visibility: hidden; }
+.app.is-classic .sheet { grid-row: 2 / -2; }
+.app:has(.sheet) .controls-dock .room-controls { display: none; }
+.app:has(.sheet) .controls-dock { grid-template-columns: auto 1fr; z-index: 41; }
+.app:has(.sheet) .controls-dock .time-controls { justify-content: flex-end; }
 @media (min-width: 641px) {
-  .app:has(.sheet-tech, .sheet-history) .controls-dock > .view-tabs { grid-column: 1; grid-row: 1; }
-  .app:has(.sheet-tech, .sheet-history) .controls-dock > .time-controls { grid-column: 2; grid-row: 1; }
+  .app:has(.sheet) .controls-dock > .view-tabs { grid-column: 1; grid-row: 1; }
+  .app:has(.sheet) .controls-dock > .time-controls { grid-column: 2; grid-row: 1; }
 }
 .sheet-head h2:focus { outline: none; }
 .sheet-return { flex: none; }
@@ -73,7 +77,6 @@
   .topbar .stats-strip { padding: 3px; border-radius: var(--radius); }
   .topbar .stat { min-height: 44px; padding: 3px 6px; gap: 6px; }
   .topbar .stat + .stat::before { inset-block: 8px; }
-  .sheet { margin: 8px; }
 }
 
 /* The purple dock matches the HUD shell; paper controls and pastel icons stay distinct. */
@@ -409,6 +412,14 @@
 .campaign-panel .incident-investigate > .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .campaign-panel .incident-investigate .chip { min-height: 40px; padding: 5px 8px; gap: 6px; font-size: var(--text-sm); }
 .campaign-panel .step-head { margin: 14px 0 8px; }
+/* Challenge Mode's equipment picker stays pinned at the top of the panel while details scroll beneath it. */
+.equipment-choices { position: sticky; top: 0; z-index: 1; padding: 10px 12px; background: var(--paper); border-bottom: 1px solid var(--control-edge); }
+.equipment-choices .step-head { margin: 0 0 8px; font-size: var(--text-md); }
+.equipment-choices .chips { gap: 6px; margin: 0; }
+.equipment-choices .chips + .chips { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--control-edge); }
+.equipment-choices .chip { min-height: 34px; padding: 3px 9px 3px 3px; gap: 5px; }
+.equipment-choices .chip-icon { width: 26px; height: 26px; border-radius: 8px; }
+.equipment-choices .chip.is-alert:not(.is-selected) { border-color: var(--critical-ink); }
 .act, .campaign-panel .act, .action { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; padding: 12px; min-height: 64px; }
 .act-label, .campaign-panel .act-label, .action-title { grid-column: 1 / -1; grid-row: auto; font-size: var(--text-md); white-space: normal; }
 .act:has(> .icon) .act-label { grid-column: 2; }
@@ -456,22 +467,20 @@
 .eq-label.is-affected { outline: 3px solid var(--focus); }
 .eq-label:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
-.operations-rail { border-right: 1px solid var(--control-edge); }
-.operations-title, .operations-toggle { background: var(--paper-2); color: var(--ink); border-bottom: 1px solid var(--control-edge); }
-.operations-toggle > span { color: var(--text-soft); }
-.work-tracker-heading .badge { background: var(--selection); color: var(--ink); }
 .tag-ok { background: var(--tile-green); color: var(--tile-green-ink); border-color: transparent; }
 .tag-warn { background: #ffe3ba; color: var(--warn-ink); border-color: transparent; }
 .tag-critical { background: #fbdce0; color: var(--critical-ink); border-color: transparent; }
 .tag-accent { background: var(--tile-gold); color: var(--tile-gold-ink); border-color: transparent; }
 .rating-buttons button { width: 44px; height: 44px; }
 .rating-buttons button.is-on { background: var(--selection); border-color: var(--selection-edge); }
-@media (max-width: 900px) { .operations-rail { border-right: 0; border-top: 1px solid var(--control-edge); } }
 
 .topbar .stat-action:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
+/* Deploy risk is a status pill: its icon and words carry the band, and the tint reinforces it on the plum button. */
+.act .price.risk { gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px; font-size: var(--text-xs); line-height: 1.3; }
+.act .price.risk .icon { width: 13px; height: 13px; }
 .price.risk-ok { background: var(--tile-green); color: var(--tile-green-ink); }
-.price.risk-warn { background: #ffe3ba; color: var(--warn-ink); }
+.price.risk-warn { background: #ffecd0; color: var(--warn-ink); }
 .price.risk-critical { background: #fbdce0; color: var(--critical-ink); }
 
 .btn[aria-pressed="true"]:not(.btn-primary):not(.btn-danger),

@@ -53,6 +53,9 @@ export const AISLE_Z = -4.9;
  * Engineers sit in pods of four: two desks facing two, monitors back to back.
  * `rot` turns the desk; at 0 the engineer sits on the +z side facing -z.
  */
+/** The office has two pods of engineer desks. Headcount is unlimited; hires beyond these desks are not drawn. */
+export const TEAM_DESKS = 8;
+
 export function deskSlot(index: number): { x: number; z: number; rot: number } {
   const pod = Math.floor(index / 4);
   const k = index % 4;
@@ -112,7 +115,7 @@ export function footprint(s: GameState, id: EquipmentId): Footprint {
     case "deploy":
       return { x: POS.deploy.x, z: POS.deploy.z, w: 2, d: 1.6, h: 1.5 };
     case "team": {
-      const n = Math.max(1, s.engineers);
+      const n = Math.min(TEAM_DESKS, Math.max(1, s.engineers));
       const slots = Array.from({ length: n }, (_, i) => deskSlot(i));
       return box(slots.map((p) => p.x), slots.map((p) => p.z), 2.1, 2.0, 1.5);
     }

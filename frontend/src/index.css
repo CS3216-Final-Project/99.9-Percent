@@ -2324,6 +2324,26 @@ button:disabled {
   gap: 6px;
 }
 
+.task-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-progress .meter {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-pct {
+  flex: none;
+  min-width: 4ch;
+  text-align: right;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .task-top .muted {
   font-size: var(--text-xs);
   text-align: right;
@@ -2635,7 +2655,7 @@ button:disabled {
 .tree-map {
   flex: none;
   width: 100%;
-  /* Narrow enough that all nine nodes fit beside the detail panel next to Classic's Operations rail. */
+  /* Narrow enough that all nine nodes fit beside the detail panel. */
   min-width: 760px;
   max-width: 2200px;
   margin: auto;
@@ -5087,11 +5107,6 @@ button:disabled {
     min-width: 0;
     padding: 8px 14px;
     font-size: var(--text-lg);
-  }
-  .sheet {
-    position: fixed;
-    inset: 0;
-    z-index: 90;
   }
   .tree,
   .eng {

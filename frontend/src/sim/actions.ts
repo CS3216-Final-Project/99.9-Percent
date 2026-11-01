@@ -171,7 +171,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (broke) return broke;
       s.cash -= def.cost;
       s.totals.invested += def.cost;
-      const assigned = Math.min(freeEngineers(s), 2, BALANCE.engineer.maxPerTask);
+      const assigned = Math.min(freeEngineers(s), 2);
       s.tasks.push({
         id: newId(s, "task"),
         kind: "tech",
@@ -203,7 +203,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (broke) return broke;
       s.cash -= def.cost;
       s.totals.invested += def.cost;
-      const assigned = Math.min(freeEngineers(s), 2, BALANCE.engineer.maxPerTask);
+      const assigned = Math.min(freeEngineers(s), 2);
       const title = releaseTitle("db_upgrade", { dbTier: tier });
       s.tasks.push({
         id: newId(s, "task"),
@@ -243,9 +243,6 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (!task) return fail("not_found", "That task no longer exists.");
       const count = Math.round(action.count);
       if (!Number.isFinite(count) || count < 0) return fail("invalid", "Engineer count must be zero or more.");
-      if (count > BALANCE.engineer.maxPerTask) {
-        return fail("limit_reached", `At most ${BALANCE.engineer.maxPerTask} engineers can work on one task.`);
-      }
       const delta = count - task.assigned;
       if (delta > freeEngineers(s)) return fail("no_engineers", "No engineers are free. Take someone off another task or hire.");
       task.assigned = count;
@@ -266,7 +263,6 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
     }
 
     case "hire_engineer": {
-      if (s.engineers >= BALANCE.engineer.max) return fail("limit_reached", `The office seats ${BALANCE.engineer.max} engineers.`);
       const broke = needCash(s, BALANCE.engineer.hireCost);
       if (broke) return broke;
       s.cash -= BALANCE.engineer.hireCost;

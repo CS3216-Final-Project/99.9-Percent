@@ -263,5 +263,5 @@ export function useAppClassName(): string {
   const started = useGame((s) => s.started);
   const phase = useGame((s) => s.game.phase);
   const touring = useGame((s) => s.tour?.track ?? null);
-  return `app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`;
+  return `app phase-${phase}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " is-classic" : ""}`;
 }

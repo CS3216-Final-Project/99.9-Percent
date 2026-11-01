@@ -1,7 +1,6 @@
 import {
   advanceTurn,
   applyAction,
-  BALANCE,
   forecast,
   freeEngineers,
   has,
@@ -78,6 +77,9 @@ export const promoOnly: Strategy = (start) => {
   return s;
 };
 
+/** The balanced bot staffs at most this many engineers on one task; the game itself has no limit. */
+const BOT_TASK_STAFF = 3;
+
 const BUILD_ORDER: TechId[] = [
   "larger_servers",
   "caching",
@@ -139,12 +141,12 @@ export const balanced: Strategy = (start) => {
   });
   for (const t of order) s = act(s, { type: "assign_engineers", taskId: t.id, count: 0 });
   for (const t of order) {
-    const want = Math.min(BALANCE.engineer.maxPerTask, freeEngineers(s), t.kind === "test_release" ? 1 : 2);
+    const want = Math.min(BOT_TASK_STAFF, freeEngineers(s), t.kind === "test_release" ? 1 : 2);
     if (want > 0) s = act(s, { type: "assign_engineers", taskId: t.id, count: want });
   }
   for (const t of order) {
     const cur = s.tasks.find((x) => x.id === t.id);
-    if (cur && freeEngineers(s) > 0 && cur.assigned < BALANCE.engineer.maxPerTask) {
+    if (cur && freeEngineers(s) > 0 && cur.assigned < BOT_TASK_STAFF) {
       s = act(s, { type: "assign_engineers", taskId: t.id, count: cur.assigned + 1 });
     }
   }
