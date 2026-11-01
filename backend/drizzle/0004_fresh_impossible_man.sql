@@ -1,0 +1,1 @@
+ALTER TABLE "game_sessions" ADD COLUMN "created_account" boolean DEFAULT false NOT NULL;

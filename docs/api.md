@@ -44,7 +44,7 @@ Called only through the `/api` proxy, never through `VITE_API_URL`.
 | GET | `/api/auth/google/callback` | Validate the callback, create or resolve the account and issue an app session |
 | POST | `/api/auth/email/register` | `{ email, password, name? }` to `AppSession` (201) and session cookie; 409 when the email has an account |
 | POST | `/api/auth/email/login` | `{ email, password }` to `AppSession` and session cookie; 401 for a wrong email or password, 429 while locked |
-| GET | `/api/session` | Current `AppSession`, or 401 when signed out |
+| GET | `/api/session` | Current `AppSession`, or 401 when signed out; `newAccount` is true while this session created the account and it has no cloud saves (see [AUTHENTICATION.md](AUTHENTICATION.md#cloud-saves)) |
 | POST | `/api/auth/logout` | Revoke the app session and clear the cookie; CSRF token required |
 | GET | `/api/runs` | The account's Guided Mode cloud saves (`RunSummary[]`) |
 | GET / PUT | `/api/runs/:runId` | Load, or save with an expected revision (`CloudRun`; 409 `SaveConflict`) |

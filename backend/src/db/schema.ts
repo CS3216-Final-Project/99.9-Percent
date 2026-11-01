@@ -4,6 +4,7 @@
 
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   index,
   integer,
@@ -102,6 +103,8 @@ export const gameAccounts = pgTable('game_accounts', {
 export const gameSessions = pgTable('game_sessions', {
   tokenHash: text().primaryKey(), accountId: uuid().notNull().references(() => gameAccounts.id, {onDelete:'cascade'}),
   csrfToken: text().notNull(), expiresAt: timestamp({withTimezone:true}).notNull(), createdAt: createdAt(),
+  /** This sign-in created the account, so the browser's guest company may be saved to it unasked. */
+  createdAccount: boolean().notNull().default(false),
 }, t => [index('game_sessions_account_idx').on(t.accountId)]);
 /** Password sign-in for accounts whose identity is issuer `email` with the normalised email as subject. */
 export const gameEmailCredentials = pgTable('game_email_credentials', {

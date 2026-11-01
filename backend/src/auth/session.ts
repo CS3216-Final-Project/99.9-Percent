@@ -3,7 +3,7 @@ import {and, eq, gt} from 'drizzle-orm';
 import type {Request, Response, NextFunction} from 'express';
 import type {AppSession} from '../../../shared/campaign.ts';
 import {getDb, isDbConfigured} from '../db/client.js';
-import {gameSessions, gameAccounts} from '../db/schema.js';
+import {gameSessions, gameAccounts, gameRuns} from '../db/schema.js';
 export const randomToken=() => randomBytes(32).toString('base64url');
 export const hash=(value:string) => createHash('sha256').update(value).digest('hex');
 export function appOrigin():string {
@@ -27,20 +27,27 @@ export function databaseReady(_req:Request,res:Response,next:NextFunction) {
 }
 export async function readSession(req:Request):Promise<AppSession|null> {
   const token=cookie(req,'nn_session'); if(!/^[A-Za-z0-9_-]{43}$/.test(token))return null;
-  const [row]=await getDb().select({id:gameAccounts.id,displayName:gameAccounts.displayName,csrfToken:gameSessions.csrfToken})
+  const db=getDb();
+  const [row]=await db.select({id:gameAccounts.id,displayName:gameAccounts.displayName,csrfToken:gameSessions.csrfToken,createdAccount:gameSessions.createdAccount})
     .from(gameSessions).innerJoin(gameAccounts,eq(gameAccounts.id,gameSessions.accountId))
     .where(and(eq(gameSessions.tokenHash,hash(token)),gt(gameSessions.expiresAt,new Date())));
-  return row?{account:{id:row.id,displayName:row.displayName},csrfToken:row.csrfToken}:null;
+  if(!row)return null;
+  // The first cloud save ends the new-account window, so no later page load uploads unasked.
+  const newAccount=row.createdAccount&&!(await db.select({runId:gameRuns.runId}).from(gameRuns).where(eq(gameRuns.accountId,row.id)).limit(1)).length;
+  return {account:{id:row.id,displayName:row.displayName},csrfToken:row.csrfToken,newAccount};
 }
 const SESSION_MS=30*86400_000;
-/** Issue a fresh app session for this browser, revoking the one it held, and return what the client needs. */
-export async function startSession(req:Request,res:Response,account:{id:string;displayName:string}):Promise<AppSession> {
+/**
+ * Issue a fresh app session for this browser, revoking the one it held, and return what the client needs.
+ * `createdAccount` marks the sign-in that created the account: only that session may receive the guest company unasked.
+ */
+export async function startSession(req:Request,res:Response,account:{id:string;displayName:string},createdAccount=false):Promise<AppSession> {
   const db=getDb(),token=randomToken(),csrfToken=randomToken();
-  await db.insert(gameSessions).values({tokenHash:hash(token),accountId:account.id,csrfToken,expiresAt:new Date(Date.now()+SESSION_MS)});
+  await db.insert(gameSessions).values({tokenHash:hash(token),accountId:account.id,csrfToken,expiresAt:new Date(Date.now()+SESSION_MS),createdAccount});
   const previous=cookie(req,'nn_session');
   if(previous)await db.delete(gameSessions).where(eq(gameSessions.tokenHash,hash(previous)));
   setCookie(res,'nn_session',token,SESSION_MS);
-  return {account:{id:account.id,displayName:account.displayName},csrfToken};
+  return {account:{id:account.id,displayName:account.displayName},csrfToken,newAccount:createdAccount};
 }
 export async function requireSession(req:Request,res:Response,next:NextFunction) {
   const session=await readSession(req); if(!session){res.status(401).json({error:'Sign in to access cloud saves.'});return;}

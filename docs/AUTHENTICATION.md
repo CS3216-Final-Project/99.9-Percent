@@ -57,7 +57,12 @@ Add verification and reset, which need an email provider, before relying on emai
 
 ## Cloud saves
 
-- Sign-in never uploads a guest run; the player chooses Save to cloud.
+- Signing up saves the guest run to the new account without asking, because a new account has no cloud saves and no other owner.
+  The session that created the account, by Google or email registration, is marked `created_account` and answers `AppSession.newAccount: true` until the account holds a cloud save.
+  While that is true, the open Guided Mode company is uploaded once per page: right after email registration, after the Google redirect reloads the page, or when a Guided Mode company opens later.
+  The player sees "Your progress is saved to your account." A failed upload keeps the local save, shows a toast and the reason in Account, and leaves Save to cloud to retry; the next page load tries once more.
+- Signing in to an existing account never uploads a guest run: the player chooses Save to cloud. A returning sign-in in any browser is never marked new.
+- Neither path uploads a run bound to another account in this browser, and a first upload never overwrites a cloud save: a run ID held by another account is refused with 409.
 - Cloud saves are Guided Mode compact replay envelopes (schemas 3 to 7), at most 1 MiB; oversized or incompatible saves stay local and exportable. Challenge Mode stays local.
 - The frontend fully validates a cloud save through the engine before loading it. The API stores envelopes; it is not an anti-cheat engine.
 - Account bindings live in `nn.campaign.cloud.v1` and survive sign-out. Pending snapshots stay local during errors or expiry, and Save to cloud retries.
