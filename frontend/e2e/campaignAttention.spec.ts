@@ -333,7 +333,10 @@ test("action guidance reaches the routing checkboxes without applying them autom
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toBeInViewport({ratio:1});
   expect((await savedGame(page)).campaign!.routing.targets).toEqual(["app-1"]);
   await gold(page).click();
-  expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="routing")).toBe(true);
+  // The pick is a draft until the Network window closes.
+  expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="routing")).toBe(false);
+  await closeInspection(page);
+  await expect.poll(async()=>(await savedGame(page)).campaign!.pending.some(a=>a.type==="routing")).toBe(true);
 });
 
 test("action guidance selects the overloaded Server 3 before its exact scaling control", async ({page,installClock,withoutRoom}) => {

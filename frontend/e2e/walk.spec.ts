@@ -21,6 +21,18 @@ async function chooseWalkMode(page: Page) {
   await menu.locator(":scope > summary").click();
   await walk(page).click();
 }
+/** Waits until the room draws steadily again (no frame gap over half a second): a view change can hold the main thread for seconds on software WebGL. */
+async function steadyFrames(page: Page) {
+  await expect.poll(() => page.evaluate(() => new Promise<boolean>((done) => {
+    let last = performance.now(), n = 0;
+    const frame = (now: number) => {
+      if (now - last > 500) return done(false);
+      last = now;
+      if (++n === 5) done(true); else requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  })), { timeout: 20_000 }).toBe(true);
+}
 /** The stored camera view, once its exact JSON has stayed unchanged for a beat longer than the write throttle. */
 async function settledView(page: Page): Promise<{ target: { x: number; z: number }; offset: { x: number; y: number; z: number }; zoom: number }> {
   let lastJson = "";
@@ -582,6 +594,8 @@ test("naps in first person: eyes close and open", async ({ page }) => {
   await page.keyboard.press("v");
   await expect(page.locator(".view-overlay")).toHaveAttribute("data-viewpoint", "first", { timeout: 20_000 });
   await expect(prompt(page)).toContainText("Rest in a nap pod", { timeout: 20_000 });
+  // The lids are sampled by the room's frames, so the view must be drawing steadily before the nap starts.
+  await steadyFrames(page);
   const eyelids = page.locator(".view-eyelids");
   await page.keyboard.press("Space");
   // The lids close over the view as the avatar settles, then open again as it wakes.
