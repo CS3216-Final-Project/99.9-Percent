@@ -5365,6 +5365,8 @@ button:disabled {
 .history-notes > .more { padding-top: 12px; }
 .history-card { padding-top: 12px; }
 .history-incidents { display: grid; gap: 10px; }
+/* The tab bar sits clearly apart from the charts, events or incidents under it. */
+.history-tabset > .tab-panel { padding-top: 16px; }
 
 @media (max-width: 480px) {
   .history-tabset .segment { padding-inline: 4px; }

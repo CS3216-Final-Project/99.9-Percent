@@ -121,9 +121,9 @@ function RecoveryCount({ campaign: c }: { campaign: Campaign }) {
 
 const RecoveryBar = ({ campaign: c }: { campaign: Campaign }) => <Meter value={c.incident!.stableSteps / Q.stableSteps} tone="ok" label="Recovery progress" />;
 
-/** The bar joins the pinned banner once stable seconds start; the count stays in the recovery card. */
+/** The bar always sits in the pinned banner, empty until stable seconds start; the count stays in the recovery card. */
 function PinnedRecovery({ campaign: c }: { campaign: Campaign }) {
-  if (!c.incident || c.incident.stableSteps === 0) return null;
+  if (!c.incident) return null;
   return <div className="incident-pin-clock"><RecoveryBar campaign={c} /></div>;
 }
 
@@ -132,7 +132,6 @@ function IncidentRecovery({ campaign: c }: { campaign: Campaign }) {
   const failedAppActive = fault && fault.startedStep !== null && fault.restoredStep === null;
   return <section className="incident-clock campaign-stability" aria-label="Incident recovery">
     <RecoveryCount campaign={c} />
-    {c.incident!.stableSteps === 0 && <RecoveryBar campaign={c} />}
     <p>Meet every condition for <b>{Q.stableSteps} consecutive game seconds</b>:</p>
     <ul className="recovery-conditions">
       <li><Icon name="latency" size={16} /><span>Latency below <b>{Q.latencyThresholdMs} ms</b></span></li>
