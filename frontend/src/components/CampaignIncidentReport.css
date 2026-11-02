@@ -7,6 +7,16 @@
 .campaign-incident-report > section { margin-block: 10px; }
 .campaign-incident-report > section h3 { margin-bottom: 4px; }
 .campaign-incident-report > section p { margin-block: 0; line-height: 1.5; }
+/* Answers sit on the right, as replies to the questions on the left. */
+.campaign-incident-report > section p { text-align: right; }
+/* As the report pops up, each question and then its answer rises into place like a chat message. */
+@media (prefers-reduced-motion: no-preference) {
+  .campaign-recovery-report .campaign-incident-report > section > :is(h3, p) {
+    animation: report-line-rise .36s cubic-bezier(.16, 1, .3, 1) both;
+    animation-delay: calc(.15s + var(--turn, 0) * .12s);
+  }
+}
+@keyframes report-line-rise { from { opacity: 0; transform: translateY(12px); } }
 .campaign-recovery-report .campaign-report-shell { display: flex; min-height: 0; }
 .campaign-recovery-report .modal-foot { padding-top: 10px; }
 .campaign-incident-report .report-metrics .row { flex-wrap: wrap; gap: 4px 12px; }

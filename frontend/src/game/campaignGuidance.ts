@@ -111,7 +111,6 @@ export function campaignGuidance(g: GameState) {
   add("queues","Application and Database queues empty",queuesEmpty);
   add("reports","All recovered incident reports acknowledged",reportsAcknowledged);
   add("healthy","Healthy latency and service errors with completed requests",qualifiesForRecovery(c.snapshot));
-  optional="Workload contrast is optional; cache purchase and database upgrades are not required for continuation.";
   if(!c.dataStage.consumed&&!canEnterData(g))notice="Data growth waits for management, empty queues, no active incident and acknowledged reports.";
   if(spikesAvailable)pendingAction={label:"Continue to Traffic Spikes",action:{type:"enter_spikes"}};
  } else if(openingDone&&!c.scaling) {

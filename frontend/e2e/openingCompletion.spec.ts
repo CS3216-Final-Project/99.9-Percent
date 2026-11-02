@@ -23,6 +23,15 @@ test("Opening legacy prevention: later history survives and recognition unlocks 
   await expectRoom(page);
   const recognition = page.getByRole("dialog", { name: "First growth challenge handled" });
   await expect(recognition).toContainText("You spotted the bottleneck early and prevented an outage.");
+  // Like a chat: each question then its answer rises in turn, and the answers sit on the right.
+  const lines = recognition.locator(".campaign-incident-report > section > :is(h3, p)");
+  const rise = await lines.evaluateAll(els => els.map(el => { const a = el.getAnimations()[0], s = getComputedStyle(el); return { tag: el.tagName, align: s.textAlign, delay: Number(a?.effect?.getTiming().delay ?? -1) }; }));
+  expect(rise.length).toBeGreaterThanOrEqual(4);
+  for (const [i, line] of rise.entries()) {
+    expect(line.align).toBe(line.tag === "P" ? "right" : "start");
+    if (i) expect(line.delay).toBeGreaterThan(rise[i - 1].delay);
+  }
+  await expect.poll(() => lines.evaluateAll(els => els.every(el => getComputedStyle(el).opacity === "1"))).toBe(true);
   await expect(page.locator(".campaign-gold-attention")).toHaveCount(0);
   await expect(recognition.locator("details")).toHaveCount(1);
   await expect(recognition.locator("details")).not.toHaveAttribute("open");
