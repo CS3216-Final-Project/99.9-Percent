@@ -353,6 +353,7 @@ it("spotlights only the Opening's first Run, then guides through the Hint flow",
   const message = screen.getByRole("dialog", { name: "Company Message" });
   fireEvent.click(within(message).getByRole("button", { name: "Dismiss company message" }));
   expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).toContain("Run, then observe");
+  expect(screen.getByRole("region", { name: "Chapter 1 guide" }).textContent).not.toContain("scheduled growth");
   spotOn("Run");
   fireEvent.click(lit()[0]);
   act(() => useGame.setState({ game: tick(useGame.getState().game, 1), running: true }));
