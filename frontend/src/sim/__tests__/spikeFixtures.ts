@@ -1,6 +1,6 @@
 import {newGame,applyAction,replayCampaign,type GameState,type Action} from "../index";
 import {step} from "../step";
-import {pendingSpikeAcknowledgement} from "../autoscaling";
+import {pendingSpikeAcknowledgement,pendingSpikeDebrief} from "../autoscaling";
 export function act(g:GameState,a:Action):GameState {const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 /** The state a save would reload: the run rebuilt from its recorded inputs. */
 export function replay(g:GameState):GameState {const c=g.campaign!;return JSON.parse(JSON.stringify(replayCampaign(g.seed,c.runId,c.inputs,c.step,false,c.foundation)));}
@@ -20,10 +20,13 @@ export function dataCompany(profile:"read-heavy"|"write-heavy"="read-heavy"):Gam
  g=act(g,{type:"enter_data",profile});install({type:"start_db_upgrade"},4);install({type:"deploy_cache"},2);g=tick(g,6);
  install({type:"set_traffic_limit",enabled:false},1);return g;
 }
-export function spikeCompany(auto=true,profile:"read-heavy"|"write-heavy"="read-heavy"):GameState {
- let g=act(dataCompany(profile),{type:"enter_spikes"});if(auto){g=act(g,{type:"unlock_autoscaling"});g=tick(act(g,{type:"deploy_autoscaler"}),2);}return g;
+/** Version 1 is the original timed chapter that recorded saves replay; version 2 is the graded chapter new companies enter. */
+export function spikeCompany(auto=true,profile:"read-heavy"|"write-heavy"="read-heavy",version:1|2=1):GameState {
+ let g=act(dataCompany(profile),version===2?{type:"enter_spikes",version}:{type:"enter_spikes"});if(auto){g=act(g,{type:"unlock_autoscaling"});g=tick(act(g,{type:"deploy_autoscaler"}),2);}return g;
 }
-export function untilOffset(g:GameState,offset:number):GameState {
+/** Advances to a step offset from chapter entry, reading postmortems and, when `debriefs` is set, failed spike debriefs. */
+export function untilOffset(g:GameState,offset:number,debriefs=false):GameState {
  const target=g.campaign!.spikeStage!.enteredStep+offset;
- while(g.campaign!.step<target){if(g.phase==="ended")throw Error("Company became insolvent before target step");if(pendingSpikeAcknowledgement(g.campaign!))throw Error("Recognition prevents target advancement");if(g.phase==="review")g=act(g,{type:"acknowledge_review"});g=tick(g);}return g;
+ while(g.campaign!.step<target){if(g.phase==="ended")throw Error("Company became insolvent before target step");if(pendingSpikeAcknowledgement(g.campaign!))throw Error("Recognition prevents target advancement");
+  if(pendingSpikeDebrief(g.campaign!)){if(!debriefs)throw Error("A spike debrief prevents target advancement");g=act(g,{type:"acknowledge_spike_attempt"});}if(g.phase==="review")g=act(g,{type:"acknowledge_review"});g=tick(g);}return g;
 }

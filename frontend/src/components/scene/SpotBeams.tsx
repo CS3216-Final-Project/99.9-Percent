@@ -2,6 +2,7 @@ import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "@/game/store";
+import { autoscaleSpot } from "@/game/autoscaleSpotlight";
 import type { Floor } from "@/game/floors";
 import type { EquipmentId } from "@/sim";
 import type { Footprint } from "./layout";
@@ -34,10 +35,11 @@ function Beam({ at }: { at: BeamTarget }) {
   );
 }
 
-/** The light beams and pad rings the guidance spotlight drops on the machines it names. */
+/** The light beams and pad rings the guidance spotlight, and the autoscaler's latest move, drop on the machines they name. */
 export function SpotBeams({ floor, footprints, layout }: { floor: Floor; footprints: Record<EquipmentId, Footprint>; layout: FloorLayout }) {
   const spot = useGame(s => s.spotlight);
-  const targets = useMemo(() => beamTargets(spot, footprints, layout).filter(t => t.floor === floor), [spot, footprints, layout, floor]);
+  const autoscaled = useGame(s => autoscaleSpot(s.game.campaign)?.appId ?? null);
+  const targets = useMemo(() => beamTargets(autoscaled && !spot.includes(autoscaled) ? [...spot, autoscaled] : spot, footprints, layout).filter(t => t.floor === floor), [spot, autoscaled, footprints, layout, floor]);
   return <>{targets.map((t, i) => <Beam key={`${t.x}:${t.z}:${i}`} at={t} />)}</>;
 }
 

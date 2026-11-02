@@ -42,7 +42,7 @@ The +1s and +5s buttons (and `N`) advance exactly that many seconds and stop ear
 Speed changes real-time pacing, not the work modelled per step.
 
 The first incident pauses automatically.
-Pending recovery reviews, milestones, spike recognition and bankruptcy stop advancement.
+Pending recovery reviews, milestones, spike recognition, failed spike test debriefs and bankruptcy stop advancement.
 Opening the menu or hiding the browser tab pauses play; there is no offline catch-up.
 
 ### Chapter 0: Guided infrastructure introduction
@@ -108,8 +108,20 @@ Observe contrasting workload optionally switches the profile once after growth.
 ### Chapter 4: Traffic Spikes & Autoscaling
 
 Entry requires consumed data growth, positive cash, stable management, empty queues and acknowledged reports, and grants one research point for the autoscaling technology.
-For entry at step `n`, demand is 4,000 req/s during `[n+8, n+28)` and `[n+48, n+68)` and 2,400 req/s otherwise.
+For entry at step `n`, demand rises to the spike peak during `[n+8, n+28)` and `[n+48, n+68)` and is 2,400 req/s otherwise.
 These are saved deadlines; pausing and reloading do not move them.
+
+The chapter is a graded test.
+The spike peak is 4,000 req/s for a read-heavy company and 3,400 req/s for a write-heavy one, the most the 3,000 ops/s database can serve with a warm cache.
+The first spike is practice and is not graded.
+The second spike, and every retry, passes when at least 95% of its incoming requests succeed.
+Rejected requests count as unserved, so a traffic limit cannot pass the test.
+When a test fails, the clock stops on a debrief showing the served share, the main cause (traffic limit, database, autoscaling delay, a small server in an evenly split pool, or too little server capacity) and what to change.
+Another spike of the same size starts 20 game seconds after the failed one ended, and retries continue until one passes.
+Incidents during the chapter close after five stable seconds without a recorded response, because the spike tests judge the response instead.
+
+Companies that entered Traffic Spikes before the graded test keep the original rules: two spikes of 4,000 req/s, completion after both, and incidents that need a recorded response.
+The difference is recorded in the entry input, so their saves replay unchanged.
 
 The optional controller needs the unlock, deployed load balancing, balanced routing to at least two apps, a free slot and cash.
 It watches routed processed work divided by routed capacity:
@@ -118,9 +130,12 @@ It watches routed processed work divided by routed capacity:
 - Below 60% for six safe observations, it retires an eligible controller-created app, never leaving fewer than two.
 - At most four apps are installed, with a four-step cooldown after each join, upgrade or retirement.
 - New apps take the lowest free number, so a retirement never leaves a numbering gap; the controller's decisions, pending actions and completions are announced in the event log and as notifications.
+- For four game seconds after each decision, install, routing join, upgrade or retirement, a beam lights the affected server in the room and a note beside its label explains the move; the note never pauses the game and can be dismissed.
 
 Manually installed or vertically upgraded apps are never retired, and there are no refunds.
-After both pulses, five stable baseline steps complete the chapter, which the player then acknowledges.
+After a passed test, five stable baseline steps complete the chapter, which the player then acknowledges.
+The completion dialog scores the passed spike's served share, the number of graded spikes taken, setup spending, the share of routed capacity idle between spikes, and the changes made by the player and by autoscaling.
+The score never affects completion.
 
 ### Chapter 5: Stay Online
 

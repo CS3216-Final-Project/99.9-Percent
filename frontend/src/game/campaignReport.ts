@@ -60,6 +60,11 @@ export function outcomeSummary(c: Campaign, kind: OutcomeKind, round?: CombinedR
   }
   if (kind === "growth" && round?.index === 2) improve = "Compare service at full demand with your final Campaign goals.";
   if (kind === "spikes" && !samples.some(m => m.rejected > 0)) takeaway = "Prepare capacity for peaks, then compare service during and after each spike.";
+  if (kind === "spikes" && c.spikeStage?.version === 2) {
+    happened = "A graded spike was served well enough to pass, and baseline service then passed its stability checks.";
+    improve = "Compare idle capacity between spikes with what the spike needed: capacity that only waits still costs money.";
+    takeaway = "Capacity must already be serving when a spike arrives; autoscaling helps only after it has seen the load and installed servers.";
+  }
   let response = responses(events, from, end, entry?.id);
   if (kind === "prevention" && response.startsWith("No new")) response = "Existing capacity handled the increase; no new corrective activation was recorded.";
   if (kind === "growth" && response.startsWith("No new")) response = "Existing infrastructure served the wave; no new corrective activation was recorded.";

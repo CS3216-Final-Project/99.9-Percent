@@ -5,7 +5,8 @@ import { canEnterReliability, pendingReliability, reliabilityEntryGates } from "
 import { entryBlockers, waitsFor } from "./entryGates";
 import type { GameState, Action } from "@/sim";
 import { canEnterData, qualifiesForRecovery } from "@/sim/step";
-import { canEnterSpikes, pendingSpikeAcknowledgement } from "@/sim/autoscaling";
+import { canEnterSpikes, gradedSpikes, pendingSpikeAcknowledgement, pendingSpikeDebrief, spikeTestPassed } from "@/sim/autoscaling";
+import { PASS_SHARE, servedShare } from "./chapter4Guidance";
 import { pendingPreventionReview, preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
@@ -35,7 +36,7 @@ export function campaignObjective(g: GameState) {
  if(c.launchWeek&&milestoneBlocks(g)) return "Review your Launch Week score, then stay or continue to Scaling & Routing.";
  if(c.combinedStage) return "Serve growing demand, manage costs and review each outcome.";
  if(c.reliabilityStage) return "Keep service stable through an application failure, then review the evidence.";
- if(c.spikeStage) return "Handle changing demand while managing capacity costs.";
+ if(c.spikeStage) return gradedSpikes(c.spikeStage)&&!spikeTestPassed(c.spikeStage)?`Pass the spike test: serve at least ${PASS_SHARE} of a graded spike's requests.`:"Handle changing demand while managing capacity costs.";
  if(c.dataStage) return "Compare workload, cache hits and database pressure as demand grows.";
  if(c.openingMilestone?.acknowledged) return c.scaling?"Prepare the system for the next growth wave.":"Keep operating, then continue to Scaling & Routing with Next.";
  if(preventionAvailable(c)) return "Inspect the Application and Database; keep service healthy at full demand.";
@@ -81,8 +82,9 @@ export function campaignGuidance(g: GameState) {
   else waiting=d.nextRoundIndex===3?`Final stable service: ${d.finalStableSteps} / 5. Keep serving full baseline demand after acknowledging the last outcome.`:`Readiness: ${d.readinessSteps} / 5 stable full-demand seconds. Finish any promotion before the next wave.`;
   optional="Registration is growth opportunity; rejected requests do not earn revenue.";
  } else if(c.reliabilityStage){const d=c.reliabilityStage;add("cash","Positive company cash",c.cashCents>0);add("management","Management resumed after any report",g.phase==="management");add("incident","No active incident",!c.incident);add("queues","All retained Application and Database queues empty",queuesEmpty);add("healthy","Measured healthy latency and service errors",qualifiesForRecovery(c.snapshot));add("pending","Accepted actions finish before arming",!!d.fault||c.pending.length===0);add("armed","Reliability test started",!!d.fault);add("observed","Application failure observed",d.fault?.startedStep!==null&&!!d.fault);add("restored","Failed application restored",d.fault?.restoredStep!==null&&!!d.fault);add("reports","Recovered reports acknowledged",reportsAcknowledged);add("observations",`Stable service: ${d.stableSteps} / 5`,d.completedStep!==null);add("recognition","Reliability outcome acknowledged",d.acknowledged);if(pendingReliability(c))pendingAction={label:"Review reliability outcome"};else if(!d.fault)pendingAction={label:"Start reliability test",action:{type:"arm_reliability"}};else waiting=d.fault.startedStep===null?"Reliability test scheduled. Run to observe it.":d.fault.restoredStep===null?"Inspect actual health and surviving capacity. Manual restoration, routing or admission relief remain available.":"Observe stable service after restoration and acknowledge actual reports.";if(d.acknowledged){waiting=null;if(canEnterCombined(g)){notice="Stay Online completed. Continue the same company into Grow the Company through Next in the chapter bar.";pendingAction={label:"Continue to Grow the Company",action:{type:"enter_combined"}};}else notice=waitsFor("Grow the Company",entryBlockers(false,combinedEntryGates(g),"Stay Online"));}optional="Reliability purchases are optional; natural and free manual restoration remain available.";} else if(c.spikeStage) {
-  const d=c.spikeStage;
-  add("pulses","Both traffic pulses completed",c.step>=d.deadlines[3]);
+  const d=c.spikeStage,graded=gradedSpikes(d),last=d.pulses?.filter(p=>p.graded&&p.result!==null).at(-1);
+  if(graded)add("test",`A graded spike served at least ${PASS_SHARE} of its requests${last?` (last test: ${servedShare(last)})`:""}`,spikeTestPassed(d));
+  else add("pulses","Both traffic pulses completed",c.step>=d.deadlines[3]);
   add("management","Operating in management, not a pending review",g.phase==="management");
   add("incident","No active incident",!c.incident);
   add("queues","Application and Database queues empty",queuesEmpty);
@@ -94,16 +96,19 @@ export function campaignGuidance(g: GameState) {
   // Stay Online's entry also checks cash, so the requirements name it with the rest.
   add("cash","Positive company cash",c.cashCents>0);
   notice=canEnterReliability(g)?"Stay Online is available through Next in the chapter bar.":d.acknowledged?waitsFor("Stay Online",entryBlockers(false,reliabilityEntryGates(g),"Traffic Spikes")):d.completedStep!==null?"Stay Online opens after you review the spike response.":null;
+  const responses=graded?"Manual capacity, autoscaling or both can pass the test; a traffic limit protects service, but its rejected requests count against the test."
+    :"Manual capacity, admission relief and hybrid responses remain valid.";
   optional=d.controller?.enabled
-    ?"Autoscaling is enabled; Server management shows what it provisions and retires. Manual capacity, admission relief and hybrid responses remain valid."
+    ?`Autoscaling is enabled; Server management shows what it provisions and retires. ${responses}`
     :d.controller
-    ?"Autoscaling is deployed but disabled; Server management holds its switch. Manual capacity, admission relief and hybrid responses remain valid."
+    ?`Autoscaling is deployed but disabled; Server management holds its switch. ${responses}`
     :d.researchSpent
-    ?"Autoscaling is unlocked; deployment is a separate optional purchase in Server management. Manual capacity, admission relief and hybrid responses remain valid."
-    :"Autoscaling is optional; it lives in Server management under App Server. Manual capacity, admission relief and hybrid responses remain valid.";
-  if(c.step<d.deadlines[3])waiting="Waiting for both announced traffic pulses to end.";
+    ?`Autoscaling is unlocked; deployment is a separate optional purchase in Server management. ${responses}`
+    :`Autoscaling is optional; it lives in Server management under App Server. ${responses}`;
+  if(c.step<d.deadlines.at(-1)!)waiting=graded?"Waiting for the next traffic spike to start or end.":"Waiting for both announced traffic pulses to end.";
   else if(d.completedStep===null&&!c.incident&&queuesEmpty&&reportsAcknowledged&&g.phase==="management"&&qualifiesForRecovery(c.snapshot))waiting="Observe new stable baseline game seconds with Run. Pausing adds no observations.";
   if(pendingSpikeAcknowledgement(c))pendingAction={label:"Review spike recognition"};
+  else if(pendingSpikeDebrief(c))pendingAction={label:"Review spike test result"};
  } else if(c.dataStage) {
   add("growth","Data growth occurred",c.dataStage.consumed);
   add("cash","Positive company cash",c.cashCents>0);

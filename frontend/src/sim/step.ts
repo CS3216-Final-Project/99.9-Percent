@@ -5,7 +5,7 @@ import { activateReliability, advanceHealth, detect, effectiveTargets, initializ
 import { pendingPreventionReview, observePrevention, recordPreventionInspection, verifiedPrevention, awardPreventionMilestone } from "./openingPrevention";
 import type { GameState, Action, ActionResult } from "./types";
 import type { AppInstance, Campaign, Snapshot, ComponentSnapshot, Intervention, Routing, ScheduledAction, TraceEvent } from "./campaignTypes";
-import { pendingSpikeAcknowledgement, spikeAction, advanceSpikeTraffic, runAutoscaler, activateRetirement } from "./autoscaling";
+import { pendingSpikeAcknowledgement, pendingSpikeDebrief, spikeAction, advanceSpikeTraffic, runAutoscaler, activateRetirement, spikeIncidentsSelfResolve } from "./autoscaling";
 import { advanceLaunchWeek, launchWeekAction, launchWeekAutoscaleBonus, launchWeekCacheHits, launchWeekDbWork, launchWeekRate, launchWeekScalingOpen, openingTuning } from "./launchWeek";
 import { LAUNCH_WEEK as L } from "./scenarios/launchWeek";
 import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
@@ -212,7 +212,7 @@ export function incidentActive(s: GameState): boolean {
     const f = currentFault(c);
     return !!c.incident || (f !== null && f.startedStep !== null && f.restoredStep === null);
 }
-export type StopReason = "introduction" | "first-incident" | "review" | "ended" | "spike-acknowledgement" | "prevention-review" | "reliability-review" | "combined-review" | null;
+export type StopReason = "introduction" | "first-incident" | "review" | "ended" | "spike-acknowledgement" | "spike-debrief" | "prevention-review" | "reliability-review" | "combined-review" | null;
 export function step(prev: GameState): {
     state: GameState;
     stopReason: StopReason;
@@ -230,8 +230,8 @@ export function step(prev: GameState): {
     return { state: projectCampaign(s), stopReason };
 }
 /** A recognition the player must acknowledge before time can advance again. */
-export function pendingStop(c: Campaign | undefined): "reliability-review" | "prevention-review" | "spike-acknowledgement" | "combined-review" | null {
-    return pendingCombined(c) ? "combined-review" : pendingReliability(c) ? "reliability-review" : pendingPreventionReview(c) ? "prevention-review" : pendingSpikeAcknowledgement(c) ? "spike-acknowledgement" : null;
+export function pendingStop(c: Campaign | undefined): "reliability-review" | "prevention-review" | "spike-acknowledgement" | "spike-debrief" | "combined-review" | null {
+    return pendingCombined(c) ? "combined-review" : pendingReliability(c) ? "reliability-review" : pendingPreventionReview(c) ? "prevention-review" : pendingSpikeAcknowledgement(c) ? "spike-acknowledgement" : pendingSpikeDebrief(c) ? "spike-debrief" : null;
 }
 /**
  * Advance one physical step by mutating `s`. The caller owns `s`, rules out
@@ -446,8 +446,9 @@ export function stepInPlace(s: GameState): StopReason {
         if (components.length) {
             // Fault responses count from the failure's start, since a failover can already be in
             // flight when the failure threshold formally opens the incident. Saves replayed past
-            // the rule's introduction (the legacy prefix) keep self-resolving incidents.
-            const responseDueFrom = c.step <= (c.legacyIncidentStep ?? -1) ? undefined
+            // the rule's introduction (the legacy prefix) keep self-resolving incidents, and so does the
+            // graded Traffic Spikes chapter, whose spike tests judge the response instead.
+            const responseDueFrom = c.step <= (c.legacyIncidentStep ?? -1) || spikeIncidentsSelfResolve(c) ? undefined
                 : failedIncident ? (failure!.startedStep ?? c.step) : c.step;
             c.incident = { id: `incident-${c.nextEventId}`, openedStep: c.step, responseDueFrom, stableSteps: 0, snapshots: c.recent.slice(-3), components, primaryComponent:components[0],...(failedIncident?{kind:"application-failure" as const,failureId:failure!.id}:{}) };
             s.phase = "incident";
@@ -467,6 +468,7 @@ export function stepInPlace(s: GameState): StopReason {
     if(pendingCombined(c))stopReason="combined-review";
     if(pendingReliability(c))stopReason="reliability-review";
     if(pendingSpikeAcknowledgement(c))stopReason="spike-acknowledgement";
+    if(pendingSpikeDebrief(c))stopReason="spike-debrief";
     trace(c, "metrics", { snapshotStep: c.step, ...(data?{profile:data.profile,hits:data.hits,eligibleMisses:data.eligibleMisses,effectiveHitRate:data.effectiveHitRateUsed,dbDemand:db.demand,dbCapacity:db.capacity}: {}) });
     if(c.foundation && c.step<=c.foundation.step)retainFoundationTrace(c,traceStart);
     return stopReason;
