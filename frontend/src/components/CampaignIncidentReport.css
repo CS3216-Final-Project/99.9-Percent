@@ -4,9 +4,11 @@
 .campaign-recovery-report > .modal-body { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .campaign-recovery-report .campaign-incident-report { min-height: 0; overflow-y: auto; }
 .campaign-recovery-report .modal-foot { flex: none; }
-/* A report reads as a chat: each question is a bubble from the left, its answer a reply bubble on the right. */
-.campaign-incident-report > section { display: flex; flex-direction: column; gap: 6px; margin-block: 14px; }
-.campaign-incident-report > section > :is(h3, p) {
+/* A report reads as a chat: each question is a bubble from the left, its answer a reply bubble on the right.
+   The summary after the first answer (capacity after a failure) joins the conversation, its readings as a reply too. */
+:is(.campaign-incident-report, .report-lesson-summary) > section { display: flex; flex-direction: column; gap: 6px; margin-block: 14px; }
+.report-lesson-summary { display: contents; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > :is(h3, p, dl) {
   /* Neither side ever reaches past 60% of the report, so the left/right conversation stays readable. */
   max-width: 60%;
   margin: 0;
@@ -15,7 +17,7 @@
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
-.campaign-incident-report > section h3 {
+:is(.campaign-incident-report, .report-lesson-summary) > section h3 {
   align-self: flex-start;
   border: 1px solid var(--control-edge);
   border-bottom-left-radius: 3px;
@@ -24,7 +26,7 @@
   font-weight: 700;
   transform-origin: bottom left;
 }
-.campaign-incident-report > section p {
+:is(.campaign-incident-report, .report-lesson-summary) > section > :is(p, dl) {
   align-self: flex-end;
   border-bottom-right-radius: 3px;
   background: var(--ink);
@@ -32,12 +34,20 @@
   box-shadow: 0 2px 6px rgb(29 24 52 / .14);
   transform-origin: bottom right;
 }
+/* A table of readings fills its bubble, with its rules and labels light against the ink. */
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl { width: 60%; padding-block: 2px; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl .row { border-bottom-color: rgb(255 247 232 / .2); }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl .row:last-child { border-bottom: 0; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl dt { color: var(--on-night-soft); }
 /* As the report pops up, each question and then its answer pops up from its side like a chat message. */
 @media (prefers-reduced-motion: no-preference) {
-  .campaign-recovery-report .campaign-incident-report > section > :is(h3, p) {
+  .campaign-recovery-report :is(.campaign-incident-report, .report-lesson-summary) > section > :is(h3, p, dl) {
     animation: report-line-rise .36s cubic-bezier(.16, 1, .3, 1) both;
-    animation-delay: calc(.15s + var(--turn, 0) * .12s);
+    animation-delay: calc(.15s + (var(--turn, 0) + var(--step, 0)) * .12s);
   }
+  /* The summary takes its turn as one block; its readings and story follow its heading. */
+  .report-lesson-summary > section > dl { --step: 1; }
+  .report-lesson-summary > section > p { --step: 2; }
 }
 @keyframes report-line-rise { from { opacity: 0; transform: translateY(12px) scale(.94); } }
 .campaign-recovery-report .campaign-report-shell { display: flex; min-height: 0; }
@@ -103,3 +113,5 @@
 .history-report > header h3:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
 .history-report > header p { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 4px 0 0; font-size: var(--text-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
 .history-report p, .history-report h4, .history-report dl.rows { max-width: 75ch; }
+/* A report's lone action, such as Continue company, sits on the right like every other dialog's primary action. */
+.campaign-recovery-report .modal-foot > .btn:only-child { margin-left: auto; }
