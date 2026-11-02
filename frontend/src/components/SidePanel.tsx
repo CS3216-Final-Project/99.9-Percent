@@ -450,6 +450,6 @@ export default function SidePanel() {
   const [kept, setKept] = useState(shown);
   if (shown && shown !== kept) setKept(shown);
   return <EquipmentPanel label="Details">
-    {phase === "incident" ? <IncidentPanel /> : <><EquipmentChoices shown={shown} /><Reveal open={!!shown}>{kept && <Inspector id={kept} />}</Reveal></>}
+    {phase === "incident" ? <IncidentPanel /> : <><EquipmentChoices shown={shown} /><Reveal open={!!shown} contentKey={kept}>{kept && <Inspector id={kept} />}</Reveal></>}
   </EquipmentPanel>;
 }

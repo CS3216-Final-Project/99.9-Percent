@@ -332,7 +332,8 @@ button:disabled {
 .app.is-title .eq-labels,
 .app.is-title .camera-buttons,
 .app.is-title .floor-menu,
-.app.is-title .side {
+.app.is-title .side,
+.app.is-title .equipment-shell {
   display: none;
 }
 
