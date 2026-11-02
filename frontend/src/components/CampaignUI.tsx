@@ -111,12 +111,6 @@ function CampaignGuidance() {
     {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
     {c.scaling&&!c.dataStage&&!c.scaling.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}><Icon name="goal" size={16} />View run scorecard</button>}
-    {model.prevention&&!c.openingPrevention?.outcome&&<section className="prevention-guidance" aria-label="Opening prevention progress">
-      <p role="status">Stable service: {c.openingPrevention?.stableSteps??0} / {Q.stableSteps} game seconds. Pausing adds no time; unhealthy service restarts the counter.</p>
-      <Meter value={(c.openingPrevention?.stableSteps??0)/Q.stableSteps} tone="ok" label="Stable service progress"/>
-      <RequirementList items={model.preventionChecks}/>
-      <div className="btn-row"><button className="btn btn-small" onClick={()=>inspectInRoom("app","app-1")}><Icon name="server" size={16} />Inspect Application</button><button className="btn btn-small" onClick={()=>inspectInRoom("db")}><Icon name="database" size={16} />Inspect Database</button></div>
-    </section>}
 
   </section>;
 }

@@ -12,15 +12,14 @@ const qualified=()=>advanceSteps(inspected(),5).state;
 const ui=()=><><CampaignHeader/><CampaignPanel/><CampaignControls/><CampaignOverlays/></>;
 function show(g:GameState){useGame.setState({game:g,ready:true,started:true,onboarding:false});return render(ui());}
 const guidance=()=>screen.getByRole("region",{name:"Guided Mode requirements"});
-const requirement=(id:string)=>(screen.queryByRole("region",{name:"Opening prevention progress"})?.querySelector(`[data-requirement="${id}"]`)??guidance().querySelector(`[data-requirement="${id}"]`))!;
+const requirement=(id:string)=>guidance().querySelector(`[data-requirement="${id}"]`)!;
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});afterEach(cleanup);
-it("lists outstanding prevention requirements and inspects components without advancing time",()=>{
+it("keeps prevention out of the panel: three chapter requirements and no prevention checks or counter",()=>{
  show(prevented());
- expect(guidance().textContent).toContain("1/3");expect(guidance().querySelector('[data-requirement="admission"]')).toBeNull();
- expect(requirement("admission").getAttribute("data-met")).toBe("false");expect(requirement("app-inspection").getAttribute("data-met")).toBe("false");
- expect(screen.getByRole("region",{name:"Opening prevention progress"}).textContent).toContain("Stable service: 0 / 5");
- fireEvent.click(screen.getByRole("button",{name:"Inspect Application"}));expect(requirement("app-inspection").getAttribute("data-met")).toBe("true");
- fireEvent.click(screen.getByRole("button",{name:"Inspect Database"}));expect(requirement("db-inspection").getAttribute("data-met")).toBe("true");
+ expect(guidance().textContent).toContain("1/3");expect(guidance().querySelectorAll("[data-requirement]")).toHaveLength(3);
+ expect(screen.queryByRole("region",{name:"Opening prevention progress"})).toBeNull();
+ expect(document.body.textContent).not.toMatch(/both valid paths|Stable service:|Traffic limiting prevents/);
+ expect(screen.queryByRole("button",{name:"Inspect Application"})).toBeNull();
  expect(useGame.getState().game.campaign!.step).toBe(4);
 });
 it("recognises prevention accurately and continues to Scaling after both acknowledgements",()=>{
@@ -43,7 +42,7 @@ it.each(["streak","outcome","acknowledged"])("reload preserves prevention %s wit
  if(kind==="acknowledged")g=act(g,{type:"acknowledge_prevention_review"});
  expect(saveGame(g)).toBe(true);saveMeta({...DEFAULT_META});useGame.getState().boot();useGame.getState().play();
  render(ui());expect(useGame.getState().running).toBe(false);
- if(kind==="streak")expect(screen.getByRole("region",{name:"Opening prevention progress"}).textContent).toContain("Stable service: 2 / 5");
+ if(kind==="streak")expect(useGame.getState().game.campaign!.openingPrevention!.stableSteps).toBe(2);
  if(kind==="outcome")expect(screen.getByRole("dialog",{name:"Prevention review"})).toBeTruthy();
  if(kind==="acknowledged")expect(screen.getByRole("dialog",{name:"First growth challenge handled"})).toBeTruthy();
  expect(useGame.getState().game.campaign).toEqual(g.campaign);
