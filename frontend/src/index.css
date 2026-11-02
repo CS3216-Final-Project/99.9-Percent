@@ -5318,10 +5318,12 @@ button:disabled {
 .incident .campaign-guidance { margin-top: 10px; }
 /* Tighter rhythm than the shared defaults so the whole overview fits a laptop-height panel. */
 .campaign-panel .panel-head { margin-bottom: 10px; }
-/* The banner (plus the recovery countdown once it starts) pins inside the panel's own scroll box;
-   top cancels the head's -14px bleed margin so it still sticks flush to the panel's top edge. */
-.campaign-panel .panel-head { position: sticky; top: -14px; z-index: 5; flex-wrap: wrap; }
-.campaign-panel .incident-pin-clock { flex: 1 1 100%; margin-top: 8px; }
+/* The banner (plus the recovery bar once it starts) pins inside the panel's own scroll box. Its bleed margin already
+   puts it flush with the panel's top edge, so it sticks from the first pixel of scroll and never slides. */
+.campaign-panel .panel-head { position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+/* The pinned recovery bar spans the banner under its title, on a paper track that reads against the stripes. */
+.campaign-panel .panel-head > .incident-pin-clock { display: block; flex: 1 1 100%; margin-top: 2px; }
+.campaign-panel .incident-pin-clock .meter { height: 12px; background: var(--paper); border-color: var(--paper); border-radius: 4px; }
 .campaign-panel .incident-symptoms { margin-top: 10px; }
 .campaign-panel .impact { margin: 8px 0; }
 .campaign-panel .step-head { margin-bottom: 6px; }

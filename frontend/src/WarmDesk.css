@@ -392,7 +392,8 @@
 .modal-menu .menu-grid > div { display: flex; }
 .modal-menu .menu-grid > div > .menu-tile { width: 100%; }
 .equipment-shell { grid-area: stage; justify-self: end; align-self: start; position: relative; z-index: 28; display: flex; flex-direction: column; min-height: 0; width: var(--side-w); max-width: calc(100% - 24px); max-height: calc(100% - 24px); margin: 12px; pointer-events: none; }
-.equipment-shell > .side { pointer-events: auto; width: 100%; margin: 0; max-height: 100%; min-height: 0; flex: 0 1 auto; box-shadow: var(--lift); }
+/* No elastic overscroll: a fast flick at either end would pull the pinned banner away and show the ground behind it. */
+.equipment-shell > .side { overscroll-behavior: none; pointer-events: auto; width: 100%; margin: 0; max-height: 100%; min-height: 0; flex: 0 1 auto; box-shadow: var(--lift); }
 .equipment-shell > .side[hidden] { display: none; }
 .panel-toggle { position: absolute; left: -48px; top: 8px; background: var(--paper); pointer-events: auto; box-shadow: var(--lift); }
 /* The label clips rather than wraps while the button grows into it from the hide button's size. */
