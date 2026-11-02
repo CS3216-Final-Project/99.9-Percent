@@ -235,10 +235,10 @@ function ComponentInspection() {
       {controls("autoscaling")}
     </>:place==="gateway"&&!overview?<>
       {!c.openingMilestone?.acknowledged&&!c.launchWeek?<p>Complete Opening recognition to manage load balancing and routing.</p>:<>
-        <section aria-label="Load balancing"><h4>Load balancing</h4>{controls("balancing")}</section>
-        <section aria-label="Routing"><h4>Routing</h4>{controls("routing")}</section>
+        <section aria-label="Load balancing"><h3>Load balancing</h3>{controls("balancing")}</section>
+        <section aria-label="Routing"><h3>Routing</h3>{controls("routing")}</section>
       </>}
-      <section aria-label="Automatic failover"><h4>Automatic failover</h4>
+      <section aria-label="Automatic failover"><h3>Automatic failover</h3>
         {!c.reliabilityStage?<p>Automatic failover becomes available in Stay Online.</p>:controls("failover")}</section>
     </>:<>
       {summary}
