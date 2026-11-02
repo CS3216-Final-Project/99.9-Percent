@@ -1,5 +1,5 @@
 import { infrastructureAction, closeInspection, followHintComponent, inspectEquipment, expectInspectionsOnly } from "./componentInspection";
-import { test, expect, seedSave, savedGame, expectRoom, setGameSpeed, advanceCampaignStep } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, setGameSpeed, advanceCampaignStep, dismissIncidentGuide } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
@@ -92,6 +92,7 @@ for (const [chapter, company, expected] of [
 test("guidance incident: ten idle seconds offer Hint without changing company state", async ({ page, installClock, withoutRoom }, info) => {
   await withoutRoom();
   await installClock(); const game = advanceSteps(newGame(), 6).state; await boot(page, game);
+  await dismissIncidentGuide(page);
   await idle(page); await expect(gold(page)).toHaveAccessibleName("Hint");
   await page.screenshot({ path: info.outputPath("hint-gold.png") });
   expect((await savedGame(page)).campaign!.inputs).toEqual(game.campaign!.inputs);
@@ -119,7 +120,7 @@ test("guidance incident: short help targets the upgrade and preserves readings",
   await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Upgrade database/);
   await expect(page.getByRole("region", { name: "Database readings" })).toBeVisible();
   await expect(page.getByRole("region", {name:"Database readings"})).toContainText("Capacity");
-  await closeInspection(page);await expect((await infrastructureAction(page,/^Limit to 500/))).toBeEnabled();await closeInspection(page);
+  await closeInspection(page);await expect((await infrastructureAction(page,/^Limit to ~/))).toBeEnabled();await closeInspection(page);
   await closeInspection(page); await page.getByRole("button", { name: "Hint", exact: true }).click();
   await expect(card).toContainText("Upgrade it to handle more requests");
   await card.getByRole("button", { name: "Got it" }).click();
@@ -315,7 +316,7 @@ for (const width of [1440, 1366]) test(`action guidance nested DB purchase and i
   await card.getByRole("button",{name:"Got it", exact:true}).click(); await expect(gold(page)).toHaveAccessibleName("Run");
 });
 
-test("action guidance routing disclosure transfers to All apps without applying it automatically", async ({page,installClock,withoutRoom}) => {
+test("action guidance reaches the routing checkboxes without applying them automatically", async ({page,installClock,withoutRoom}) => {
   await withoutRoom();
   await installClock(); const game=tick(act(dataCompany(),{type:"set_routing",mode:"single",targets:["app-1"]}),2);
   await boot(page,game); await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+60_000));
@@ -323,20 +324,19 @@ test("action guidance routing disclosure transfers to All apps without applying 
   const card=page.getByRole("dialog",{name:"Hint",exact:true});
   await card.getByRole("button",{name:"Got it", exact:true}).click();
   // Verify each navigation step before opening the routing disclosure ourselves.
-  for (const [attribute,value] of [["data-tutorial","inspect-gateway"],["data-inspection-entry","management"],["data-inspection-entry","routing"]]) {
+  for (const [attribute,value] of [["data-tutorial","inspect-gateway"],["data-inspection-entry","management"]]) {
     await expect(gold(page)).toHaveCount(1);
     await expect(gold(page)).toHaveAttribute(attribute,value);
     await gold(page).click();
   }
-  await expect(gold(page)).toHaveText(/Configure routing/);
-  await gold(page).click(); await expect(gold(page)).toHaveAccessibleName("All apps");
+  await expect(gold(page)).toHaveAccessibleName(/^Server \d+$/);
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toBeInViewport({ratio:1});
   expect((await savedGame(page)).campaign!.routing.targets).toEqual(["app-1"]);
-  await gold(page).click(); await expect(gold(page)).toHaveCount(0);
+  await gold(page).click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="routing")).toBe(true);
 });
 
-test("action guidance selects the overloaded App 3 before its exact scaling control", async ({page,installClock,withoutRoom}) => {
+test("action guidance selects the overloaded Server 3 before its exact scaling control", async ({page,installClock,withoutRoom}) => {
   await withoutRoom();
   await installClock();
   let game=tick(act(spikeCompany(false),{type:"add_server"}),2);
@@ -348,8 +348,8 @@ test("action guidance selects the overloaded App 3 before its exact scaling cont
   await card.getByRole("button",{name:"Got it", exact:true}).click();
   await expect(gold(page)).toHaveAccessibleName("App Server"); await gold(page).click();
   await expect(gold(page)).toHaveAccessibleName("Server management");await gold(page).click();
-  await expect(gold(page)).toHaveAccessibleName(/^App 3:/); await gold(page).click();
-  await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Scale up App 3/); await expect(gold(page)).toBeInViewport({ratio:1});
+  await expect(gold(page)).toHaveAccessibleName(/^Server 3:/); await gold(page).click();
+  await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Scale up Server 3/); await expect(gold(page)).toBeInViewport({ratio:1});
   await gold(page).click(); await expect(gold(page)).toHaveAccessibleName("Confirm");
   await gold(page).click(); await expect(gold(page)).toHaveCount(0);
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="scale-up" && a.targetId==="app-3")).toBe(true);
@@ -388,7 +388,7 @@ test("action guidance restoration confirms the existing free action",async ({pag
   await closeInspection(page); await page.getByRole("button",{name:"Hint",exact:true}).click();
   const card=page.getByRole("dialog",{name:"Hint",exact:true});
   await card.getByRole("button",{name:"Got it", exact:true}).click();
-  await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Restore App/); await expect(gold(page)).toBeInViewport({ratio:1});
+  await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Restore Server/); await expect(gold(page)).toBeInViewport({ratio:1});
   await gold(page).click();await expect(gold(page)).toHaveAccessibleName("Confirm");
   await gold(page).click();await expect(gold(page)).toHaveCount(0);
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="restore-app")).toBe(true);

@@ -91,7 +91,7 @@ describe("opening UI", () => {
     expect(panel.queryByRole("region", { name: "Scaling controls" })).toBeNull();
     for(const name of ["Network","App Server","Database","Monitoring"])expect(panel.getByRole("button",{name})).toBeTruthy();
     fireEvent.click(panel.getByRole("button", { name: "Network" }));
-    const network=within(screen.getByRole("dialog", { name: "Network inspected" }));
+    const network=within(screen.getByRole("dialog", { name: "Network" }));
     expect(network.queryByRole("button", { name: /Limit to|Deploy load balancer/ })).toBeNull();
     fireEvent.click(network.getByRole("button", { name: "Inspect details" }));
     expect(network.getByRole("region", { name: "Network readings" })).toBeTruthy();
@@ -185,10 +185,10 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   render(<StrictMode><App /></StrictMode>); fireEvent.click(screen.getByRole("button", { name: "Start Guided Mode" }));
   const campaignMenu = openMenu();
   const labels = (menu: HTMLElement) => within(within(menu).getByRole("tablist", { name: "Menu sections" })).getAllByRole("tab").map((t) => t.textContent);
-  expect(labels(campaignMenu)).toEqual(["Run", "Map", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]);
+  expect(labels(campaignMenu)).toEqual(["Run", "Map", "Info", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]);
   // The summary stays above the tabs; matching action buttons live in Run.
   expect(within(campaignMenu).getByRole("tab", { name: "Run" }).getAttribute("aria-selected")).toBe("true");
-  for (const tab of ["Run", "Map", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]) {
+  for (const tab of ["Run", "Map", "Info", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]) {
     openTab(campaignMenu, tab);
     expect(within(campaignMenu).getByRole("region", { name: "At a glance" })).toBeTruthy();
     expect(within(campaignMenu).queryByText(/Time is paused/)).toBeNull();
@@ -219,9 +219,9 @@ it("splits both menus into the same tabs and keeps every earlier control on one 
   fireEvent.click(within(campaignMenu).getByRole("button", { name: "Switch to Challenge Mode" }));
 
   const classicMenu = openMenu();
-  expect(labels(classicMenu)).toEqual(["Run", "Map", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]);
+  expect(labels(classicMenu)).toEqual(["Run", "Map", "Info", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]);
   // The run summary stays above the tabs whichever one is open.
-  for (const tab of ["Run", "Map", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]) {
+  for (const tab of ["Run", "Map", "Info", "Sound", "Graphics", "Controls", "Avatar", "Saves", "Account", "Playtest"]) {
     openTab(classicMenu, tab);
     expect(within(classicMenu).getByRole("region", { name: "At a glance" })).toBeTruthy();
     expect(within(classicMenu).queryByRole("button", { name: "Resume" }) !== null).toBe(tab === "Run");

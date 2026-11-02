@@ -76,13 +76,44 @@ for(const state of ["readiness","wave","outcome","final","complete"] as const) i
   expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain(`Growth outcomes acknowledged: ${game.campaign!.combinedStage!.completedRounds.length} / 3`);
   expect(screen.queryByRole("region",{name:"Stay Online"})).toBeNull();
   expect(screen.queryByText("Scaling growth recorded: 1,400 requests/s before data growth.")).toBeNull();
-  expect(screen.getByRole("button",{name:/Run promotion/}).hasAttribute("disabled")).toBe(state!=="readiness");
+  expect(screen.queryByRole("button",{name:/Run promotion/})).toBeNull();
+});
+it("fills a readiness progress bar toward enabling the next growth wave",()=>{
+  const bar=()=>screen.getByRole("progressbar",{name:"Full-demand readiness progress"});
+  const nextStep=()=>within(screen.getByRole("region",{name:"Next step"}));
+  const progress=()=>within(screen.getByRole("region",{name:"Chapter Progress"}));
+  const game=combinedCompany();
+  show(game);
+  expect(nextStep().getByText("Full-demand readiness: 0 / 5")).toBeTruthy();
+  expect(progress().queryByText(/Full-demand readiness/)).toBeNull();
+  expect(bar().getAttribute("aria-valuenow")).toBe("0");
+  act(()=>useGame.setState({game:tick(game,3)}));
+  expect(nextStep().getByText("Full-demand readiness: 3 / 5")).toBeTruthy();
+  expect(bar().getAttribute("aria-valuenow")).toBe("60");
+  act(()=>useGame.setState({game:tick(useGame.getState().game,2)}));
+  expect(nextStep().getByText("Full-demand readiness: 5 / 5")).toBeTruthy();
+  expect(bar().getAttribute("aria-valuenow")).toBe("100");
+  expect(screen.getByRole("button",{name:"Start next growth wave"}).hasAttribute("disabled")).toBe(false);
+  act(()=>useGame.setState({game:decide(useGame.getState().game,{type:"start_growth_wave"})}));
+  expect(screen.queryByRole("progressbar",{name:"Full-demand readiness progress"})).toBeNull();
+});
+it("fills a wave stability progress bar while a growth wave runs",()=>{
+  const bar=()=>screen.getByRole("progressbar",{name:"Wave stability progress"});
+  const nextStep=()=>within(screen.getByRole("region",{name:"Next step"}));
+  let game=combinedCompany();
+  game=decide(tick(game,5),{type:"start_growth_wave"});
+  show(game);
+  expect(nextStep().getByText("Wave stability: 0 / 5")).toBeTruthy();
+  expect(bar().getAttribute("aria-valuenow")).toBe("0");
+  act(()=>useGame.setState({game:finishRound(game)}));
+  expect(nextStep().getByText("Wave stability: 5 / 5")).toBeTruthy();
+  expect(bar().getAttribute("aria-valuenow")).toBe("100");
 });
 it("shows the actual pending deployment and recalculates after its activation",()=>{
   const game=decide(combinedCompany(),{type:"add_server"});show(game);
-  expect(screen.getByRole("region",{name:"Essential live status"}).textContent).toContain("Add server (App 4): activates in");
+  expect(screen.getByRole("region",{name:"Essential live status"}).textContent).toContain("Add server (Server 4): activates in");
   const advanced=tick(game,2);act(()=>useGame.setState({game:advanced}));
-  expect(screen.getByRole("region",{name:"Essential live status"}).textContent).not.toContain("Add server (App 4): activates in");
+  expect(screen.getByRole("region",{name:"Essential live status"}).textContent).not.toContain("Add server (Server 4): activates in");
   const decision=campaignAttention(advanced);expect(screen.getByRole("region",{name:"Next step"}).textContent).toContain(decision.attention==="run"?decision.message:decision.reason==="spike-plan"?decision.recommendation:decision.action?.label??decision.recommendation);
 });
 it("does not hide a low-cash capacity warning in the requirement disclosure",()=>{

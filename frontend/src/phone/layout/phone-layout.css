@@ -382,8 +382,23 @@
 @media (min-height: 701px) {
   .phone-app[data-edition="phone"] .phone-sheet-body:has(.campaign-panel) { scroll-padding-top: 64px; }
 }
+/* The sheet is short, so the equipment picker scrolls away with the rest instead of covering the control it reveals. */
+.phone-app[data-edition="phone"] .phone-sheet .equipment-choices { position: static; }
 /* Closed to its handle, the sheet's contents leave the page's focus order and accessibility tree. */
 .phone-app[data-edition="phone"] .phone-sheet[data-state="peek"] .phone-sheet-body { visibility: hidden; }
+
+/* Guided Mode's scheduled deployments lead the sheet as a plain section instead of floating over the room. */
+.phone-app[data-edition="phone"] .phone-sheet .pending-deployments {
+  width: auto;
+  max-height: none;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid var(--control-edge);
+  border-radius: 0;
+  box-shadow: none;
+}
+.phone-app[data-edition="phone"] .phone-sheet .pending-skip { min-height: 44px; }
 
 /* The desktop panel becomes the sheet's plain contents: no floating card, no hide and show of its own. */
 .phone-app[data-edition="phone"] .phone-sheet .equipment-shell {
@@ -406,44 +421,32 @@
   border-radius: 0;
   box-shadow: none;
   background: transparent;
+  /* The sheet moves itself; its contents do not slide in again. */
+  animation: none;
 }
 .phone-app[data-edition="phone"] .phone-sheet .side .panel-section { padding: 12px 14px 16px; }
 .phone-app[data-edition="phone"] .phone-sheet .campaign-panel .incident-investigate > .chips { gap: 6px; }
 .phone-app[data-edition="phone"] .phone-sheet .campaign-panel .incident-investigate .chip { min-height: 44px; }
 
-/* Challenge Mode's weekly operations follow the equipment in the same sheet, always expanded. */
-.phone-app[data-edition="phone"] .phone-sheet .operations-rail {
-  max-height: none;
-  margin: 0;
-  border: 0;
-  border-top: 1px solid var(--paper-3);
-  background: transparent;
-  color: var(--ink);
-  box-shadow: none;
-}
-.phone-app[data-edition="phone"] .phone-sheet .operations-toggle { display: none; }
-.phone-app[data-edition="phone"] .phone-sheet .operations-title { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 14px 0; font-size: var(--text-md); }
-.phone-app[data-edition="phone"] .phone-sheet .operations-body { display: block; max-height: none; }
 
 /* ------------------------------------------------------------------ */
 /* Views over the room (Tech, Team, History)                           */
 /* ------------------------------------------------------------------ */
 
-/* They leave the top strip and the dock in place, with the shared 8 px gap. */
+/* Focused views cover the top strip and room, ending exactly where the persistent clock dock starts. */
 .phone-app[data-edition="phone"] .sheet {
   position: fixed;
-  inset: var(--phone-top) var(--phone-safe-right) var(--phone-dock) var(--phone-safe-left);
-  z-index: 33;
-  margin: 8px;
-}
-
-/* Focused views cover the top strip and room, ending exactly where the persistent clock dock starts. */
-.phone-app[data-edition="phone"] .sheet:is(.sheet-tech, .sheet-history) {
-  position: fixed;
   inset: 0 0 var(--phone-dock);
+  z-index: 33;
   margin: 0;
   padding-top: var(--phone-safe-top);
   padding-inline: var(--phone-safe-left) var(--phone-safe-right);
+}
+
+/* Challenge Mode keeps its top strip (cash, health and settings) above the focused views. */
+.phone-app[data-edition="phone"].is-classic .sheet {
+  top: var(--phone-top);
+  padding-top: 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -608,10 +611,6 @@
 }
 .phone-app[data-edition="phone"] .phone-dock:not(.campaign-clock) .dock-primary { width: 116px; }
 
-/* Guided Mode's End week rush: an icon button beside the speed menu, named for assistive technology. */
-.phone-app[data-edition="phone"] .phone-dock .phone-rush { flex: none; width: 48px; height: 48px; margin: 0; padding: 0; justify-content: center; }
-.phone-app[data-edition="phone"] .phone-dock .phone-rush > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-
 /* The dock's menus open above it, inside the screen. */
 .phone-app[data-edition="phone"] .phone-dock .dock-panel { max-height: min(440px, calc(100dvh - var(--phone-top) - var(--phone-dock) - 16px)); }
 
@@ -620,7 +619,6 @@
   .phone-app[data-edition="phone"] .phone-dock .time-controls,
   .phone-app[data-edition="phone"] .campaign-clock.phone-dock .time-controls { gap: 3px; }
   .phone-app[data-edition="phone"] .phone-dock .time-menu > summary { width: 48px; }
-  .phone-app[data-edition="phone"] .phone-dock .phone-rush { width: 44px; }
   .phone-app[data-edition="phone"] .campaign-clock.phone-dock .dock-primary { width: 76px; }
   .phone-app[data-edition="phone"] .phone-dock:not(.campaign-clock) .dock-primary { width: 92px; }
   .phone-app[data-edition="phone"] .phone-dock:not(.campaign-clock) .dock-primary > .icon { display: none; }

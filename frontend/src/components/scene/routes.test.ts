@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GROUPS } from './conversations';
 import { CLOSED_ROOMS, deskSeat, ELEVATOR_SPOT, GLASS, OBSTACLES, RESPONDERS, SERVER_GLASS, SPOTS, type Obstacle } from './floorplan';
-import { ROOM } from './layout';
+import { ROOM, TEAM_DESKS } from './layout';
 import { heading, neighbours, PATHS, planLoop, poseAt, TURN_RATE, WAYPOINTS, wrapAngle, type WaypointId } from './routes';
 
 type P = [number, number];
@@ -67,7 +67,7 @@ const ids = Object.keys(WAYPOINTS) as WaypointId[];
 
 /** Everyone who stays put: the engineers at their desks, the crew in SPOTS and the groups chatting. */
 const stillCrew: { name: string; p: P }[] = [
-  ...Array.from({ length: 8 }, (_, i) => ({ name: `engineer ${i}`, p: [deskSeat(i).x, deskSeat(i).z] as P })),
+  ...Array.from({ length: TEAM_DESKS }, (_, i) => ({ name: `engineer ${i}`, p: [deskSeat(i).x, deskSeat(i).z] as P })),
   ...Object.entries(SPOTS).map(([name, s]) => ({ name, p: [s.x, s.z] as P })),
   ...GROUPS.flatMap((g) => g.members.map((m, i) => ({ name: `${g.name}, member ${i}`, p: [m.x, m.z] as P }))),
 ];

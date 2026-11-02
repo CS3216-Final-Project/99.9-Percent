@@ -18,7 +18,7 @@ export function clamp(v: number, lo: number, hi: number): number {
 export function placeFor(selector: string): Place {
   if (selector.startsWith(".eq-label") || selector.startsWith(".node")) return "right";
   if (selector.startsWith(".view-tabs") || selector.startsWith(".advance") || selector.startsWith(".campaign-clock") || selector.startsWith(".room-controls")) return "top";
-  if (selector.startsWith(".next-chip") || selector.startsWith(".topbar") || selector.startsWith(".stat-")) return "bottom";
+  if (selector.startsWith(".topbar") || selector.startsWith(".stat-")) return "bottom";
   return "left";
 }
 

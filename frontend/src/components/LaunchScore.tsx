@@ -5,6 +5,7 @@ import { ninesOf, uptimePct } from "@/game/format";
 import { num } from "@/game/format";
 import type { ChapterEnd } from "@/game/chapterCompletion";
 import { ChapterEndFoot } from "./ChapterEndFoot";
+import { Icon } from "./icons";
 import { Modal } from "./ui";
 
 /**
@@ -29,6 +30,6 @@ export default function LaunchScore({ campaign, end, onClose }: { campaign: Camp
       <div><dt>Score</dt><dd><strong>{text}</strong></dd></div>
       <div><dt>Requests lost</dt><dd><strong>{num(lost)}</strong></dd></div>
     </dl>
-    <ChapterEndFoot end={end} extra={<button className="btn btn-quiet" onClick={copy}>{copied ? "Copied" : "Copy result"}</button>} />
+    <ChapterEndFoot end={end} extra={<button className="btn btn-quiet" onClick={copy}><Icon name={copied ? "check" : "copy"} size={16} />{copied ? "Copied" : "Copy result"}</button>} />
   </Modal>;
 }

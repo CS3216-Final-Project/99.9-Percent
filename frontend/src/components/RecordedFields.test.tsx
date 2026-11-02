@@ -8,7 +8,7 @@ it("reads money, routes and cache percentages without turning a user target into
   expect(screen.getByText("Final user target").nextElementSibling?.textContent).toBe("50,000");
   expect(screen.getByText("Cache target").nextElementSibling?.textContent).toBe("60%");
   expect(screen.getByText("Cost").nextElementSibling?.textContent).toBe("$2,500.00");
-  expect(screen.getByText("Routing").nextElementSibling?.textContent).toBe("App 1, App 2 (balanced)");
+  expect(screen.getByText("Routing").nextElementSibling?.textContent).toBe("Server 1, Server 2 (balanced)");
   expect(container.textContent).not.toContain("internal");
   expect(container.querySelector("pre")).toBeNull();
 });

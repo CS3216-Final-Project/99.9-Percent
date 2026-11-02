@@ -14,6 +14,7 @@ import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
 import { MenuActions, MenuRun, MenuTile } from "./MenuRun";
 import { MenuMap } from "./MenuMap";
+import { MenuReference } from "./MenuReference";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { ModeSwitch } from "./ModeSwitch";
 import { SaveFiles } from "./SaveFiles";
@@ -94,7 +95,7 @@ export function PostmortemModal() {
       <div className="modal-foot">
         <span />
         <button type="button" className="btn btn-primary" autoFocus onClick={() => act({ type: "acknowledge_review" })}>
-          Continue
+          <Icon name="next" size={20} />Continue
         </button>
       </div>
     </Modal>
@@ -354,6 +355,7 @@ export function Menu() {
         )}
 
         {tab === "map" && <MenuMap />}
+        {tab === "info" && <MenuReference />}
 
         {tab === "sound" && <SoundSettings />}
 
@@ -419,7 +421,7 @@ export function Menu() {
               </dl>
               <div className="btn-row">
                 <button type="button" className="btn" onClick={copy} disabled={events.length === 0}>
-                  Copy as JSON
+                  <Icon name="copy" size={16} />Copy as JSON
                 </button>
                 <button
                   type="button"

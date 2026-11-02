@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import type { SavedCameraView } from "../src/game/exploration";
 import { test, expect, expectRoom, seedSave, openCameraControls } from "./fixtures";
-import { inspectEquipment, closeInspection, infrastructureAction } from "./componentInspection";
+import { inspectEquipment, closeInspection, infrastructureAction, openGatewayManagement } from "./componentInspection";
 import { newGame } from "../src/sim";
 import { spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 import { reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
@@ -74,7 +74,10 @@ test("inspection modal: blocks camera input and restores dragging and scene clic
   await page.mouse.move(header.x+header.width/2,header.y+header.height/2);await page.mouse.down();
   await page.mouse.move(header.x+header.width/2+40,header.y+header.height/2,{steps:12});await page.mouse.up();
   await page.keyboard.press("q");const covered=await camera();await expect(popup).toBeVisible();
-  expect(covered.target).toEqual(blocked.target);expect(covered.offset).toEqual(blocked.offset);expect(covered.zoom).toBe(blocked.zoom);
+  // Blocked input would move the framing by whole units (see the drag after close); allow only the last rounded
+  // digit of the earlier drag's easing to settle.
+  const settled=(a:{x:number;z:number},b:{x:number;z:number})=>{expect(a.x).toBeCloseTo(b.x,3);expect(a.z).toBeCloseTo(b.z,3);};
+  settled(covered.target,blocked.target);expect(covered.offset).toEqual(blocked.offset);expect(covered.zoom).toBe(blocked.zoom);
   await closeInspection(page);
   await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+80,y+30,{steps:12});await page.mouse.up();
   const after=await camera();
@@ -82,7 +85,7 @@ test("inspection modal: blocks camera input and restores dragging and scene clic
   await openCameraControls(page);await page.getByRole("button",{name:"Reset view",exact:true}).click();
   await page.keyboard.press("Escape");await camera();
   await page.getByRole("main").getByRole("button",{name:"Database",exact:true}).click();
-  await expect(page.getByRole("dialog",{name:"Database inspected",exact:true})).toBeVisible();
+  await expect(page.getByRole("dialog",{name:"Database", exact: true})).toBeVisible();
 });
 
 for(const chapter of [4,5,6]) test(`inspection content: Chapter ${chapter} keeps live component diagnostics and actions without legacy lessons`,async({page})=>{
@@ -94,7 +97,7 @@ for(const chapter of [4,5,6]) test(`inspection content: Chapter ${chapter} keeps
   const network=await inspectEquipment(page,"gateway");
   await expect(network).not.toContainText(/Stay online|Stable after restoration|Workload:|Normal demand|Opening campaign/);
   await expect(network.getByRole("button",{name:/Limit to|Remove traffic limit/})).toBeEnabled();
-  await infrastructureAction(page,"All apps");await expect(network.getByText(/Configure routing/)).toBeVisible();
+  await openGatewayManagement(page,network);await expect(network.locator(".route-check").first()).toBeVisible();
   await inspectEquipment(page,"gateway",true);await expect(network.getByRole("region",{name:"Network readings"})).toContainText("Admitted");
   if(chapter>=5)await expect(await infrastructureAction(page,"Deploy Automatic Failover")).toBeVisible();
   const cache=await inspectEquipment(page,"cache",true);
@@ -132,7 +135,7 @@ test.describe("touch inspection camera",()=>{
       await expect.poll(async()=>{const now=await camera();return Math.hypot(now.target.x-before.target.x,now.target.z-before.target.z);}).toBeGreaterThan(.2);
     };
     await pan();await inspectEquipment(page,"db");const beforeClose=await settledCamera(page);
-    await page.getByRole("dialog",{name:"Database inspected",exact:true}).getByRole("button",{name:"Close",exact:true}).tap();
+    await page.getByRole("dialog",{name:"Database", exact: true}).getByRole("button",{name:"Close",exact:true}).tap();
     await pan(beforeClose);await input.detach();
   });
 });

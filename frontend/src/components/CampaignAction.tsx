@@ -20,6 +20,7 @@ import { confirmingAction, setConfirming, subscribeConfirming } from "./actionCo
 import { guidanceActionId } from "@/game/campaignAttention";
 import { milestoneBlocks } from "@/game/campaignGuidance";
 import { InspectionPurchaseContext, useCampaignAttention } from "./useCampaignAttention";
+import { serverName } from "@/sim";
 
 /** Equipment roles shown in the quote's supporting facts. */
 const MACHINES: Partial<Record<EquipmentId, { name: string; does: string }>> = {
@@ -137,6 +138,13 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     setConfirming(null);
   },[open, floor, home]);
   if (props.decision && preview && !preview.ok && !introductionActive) reason = preview.reason;
+  const unavailable = props.disabled || preview?.ok === false;
+  // Completed and gated actions stay disabled but say it at the button's right edge
+  // (a check or a lock); the reason itself moves onto the control's tooltip.
+  const done = /already (deployed|tuned|unlocked|reserved|upgraded|selected|set|spent|recorded|owned)\b|largest tier|tier reached/i.test(reason) && !/pending|installed/i.test(reason);
+  const locked = !done && /^(unlock|requires|enter|reserve)\b|\b(first|required)\.$|unlocks (when|once)|before tuning/i.test(reason);
+  const affordance: "done" | "locked" | undefined = unavailable ? (done ? "done" : locked ? "locked" : undefined) : undefined;
+  const actionTip = affordance ? [reason.startsWith("See") ? "" : reason, props.tip ?? ""].filter(Boolean).join(" ") || undefined : props.tip;
   const highlight = open || pointing && confirming === null, affectedKey = affected.join();
   const decisionKey = props.decision ? JSON.stringify(props.decision) : "";
   useEffect(() => {
@@ -164,7 +172,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     : label.startsWith("Limit to") ? "Reduces incoming traffic to give your servers room to recover."
     : PURCHASE_DESCRIPTIONS[label] ?? props.tip;
   // A per-app action sits next to that app's marker; anything else next to the machine's own.
-  const anchor = isScale ? c.apps.find(a => `Scale up App ${a.id.slice(4)}` === label)?.id ?? "app" : affected[0];
+  const anchor = isScale ? c.apps.find(a => `Scale up ${serverName(a.id)}` === label)?.id ?? "app" : affected[0];
   const toggle = () => {
     if (open) { setConfirming(null); return; }
     setConfirming(label);
@@ -180,8 +188,8 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
   return <div className={`campaign-action-card${open ? " is-confirming" : ""}`} ref={card} data-affects={affectedKey} data-campaign-action={label} data-guidance-action={props.decision ? guidanceActionId(props.decision) : undefined}
     onPointerEnter={() => setPointing(true)} onPointerLeave={() => setPointing(false)}
     onFocus={() => setPointing(true)} onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPointing(false); }}>
-    <Act {...props} icon={inspection ? undefined : props.icon} price={inspection ? undefined : props.price} note={inspection ? undefined : props.note} disabled={props.disabled || preview?.ok === false} onClick={toggle} />
-    {!open && (props.disabled || preview?.ok === false) && <p className="campaign-action-reason" id={id} tabIndex={0}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
+    <Act {...props} price={inspection ? undefined : props.price} note={inspection ? undefined : props.note} disabled={unavailable} affordance={affordance} tip={actionTip} onClick={toggle} />
+    {!open && unavailable && !affordance && <p className="campaign-action-reason" id={id} tabIndex={0}>{reason}{reason.startsWith("See") && props.tip ? ` ${props.tip}` : ""}</p>}
     {open && <ActionPopover anchor={anchor} inspection={inspection} onClose={cancel}>
       <section className="campaign-action-confirm" aria-label={`Confirm ${label}`} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); cancel(); } }}>
         <div className="campaign-purchase-body" role="region" aria-label="Purchase preview" tabIndex={0}>

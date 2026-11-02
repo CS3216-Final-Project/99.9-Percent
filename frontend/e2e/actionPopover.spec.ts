@@ -39,7 +39,7 @@ for(const [width,height] of [[1440,900],[1366,768]]) {
 test("scaling and load balancing confirmations stay centered and highlight their equipment",async({page})=>{
   let g=tick(newGame(3,"scaling-layout"),6);g=tick(act(g,{type:"start_db_upgrade"}),30);
   g=act(act(g,{type:"acknowledge_review"}),{type:"acknowledge_milestone"});
-  await purchaseActions(page,g,[[/^Scale up App 1/,"app"],[/^Deploy load balancing/,"gateway"]]);
+  await purchaseActions(page,g,[[/^Scale up Server 1/,"app"],[/^Deploy load balancing/,"gateway"]]);
 });
 
 test("Read Cache confirmation stays centered and highlights the cache",async({page})=>{
@@ -83,8 +83,8 @@ test("Stay Online guide unlocks Health Checks in Tech and confirms its purchase"
   await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("tablist")).toHaveCount(0);
   await expect(guide(3)).toContainText("Click Monitoring.");
   await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Monitoring",exact:true}).click();
-  const monitoring=page.getByRole("dialog",{name:"Monitoring inspected",exact:true});
-  await expect(guide(3)).toContainText("Press Inspect details.");
+  const monitoring=page.getByRole("dialog",{name:"Monitoring", exact: true});
+  await expect(guide(3)).toContainText("Press the Monitoring disc to inspect details.");
   await monitoring.getByRole("button",{name:"Inspect details",exact:true}).click();
   await expect(guide(3)).toContainText("Press Deploy Health Checks.");
   await monitoring.getByRole("button",{name:/^Deploy Health Checks/}).click();

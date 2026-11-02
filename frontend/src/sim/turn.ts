@@ -22,6 +22,7 @@ import { pick, rand, randRange } from "./rng";
 import { addAppHost, clone, logEvent, newId } from "./state";
 import { has } from "./tech";
 import type { GameState, Task } from "./types";
+import { serverName } from "./names";
 
 function money(v: number): string {
   return `$${Math.round(v).toLocaleString("en-US")}`;
@@ -144,7 +145,7 @@ function resolveHostHealth(s: GameState): HostFailure | null {
           h.status = "degraded";
           h.degradedTurn = s.turn;
           marked = true;
-          logEvent(s, "warning", `${h.id} has started logging hardware errors.`);
+          logEvent(s, "warning", `${serverName(h.id)} has started logging hardware errors.`);
         }
       }
       if (!marked && db.status === "healthy" && rand(s) < dbHazard) {
@@ -171,22 +172,22 @@ function absorbFailure(s: GameState, failure: HostFailure, notes: string[]): { u
         autoPostmortem(
           s,
           "instance_failure",
-          `App server ${failure.hostId} stopped responding.`,
+          `${serverName(failure.hostId)} stopped responding.`,
           ["You had built a Standby Server and Automatic Failover."],
-          `Health checks noticed within seconds and promoted the standby as ${fresh.id}. A replacement standby cost ${money(BALANCE.server.replaceCost)}.`,
+          `Health checks noticed within seconds and promoted the standby as ${serverName(fresh.id)}. A replacement standby cost ${money(BALANCE.server.replaceCost)}.`,
           BALANCE.server.replaceCost,
         ),
       );
-      const text = `${failure.hostId} died; the spare took over automatically. Total application capacity is unchanged.`;
+      const text = `${serverName(failure.hostId)} died; the spare took over automatically. Total application capacity is unchanged.`;
       logEvent(s, "success", text);
       notes.push(text);
       return { unhandled: null };
     }
     if (selfHealingFleet(s)) {
-      const text = `${failure.hostId} died; the load balancer stopped sending it traffic. Capacity is down one server this week.`;
+      const text = `${serverName(failure.hostId)} died; the load balancer stopped sending it traffic. Capacity is down one server this week.`;
       logEvent(s, "warning", text);
       notes.push(text);
-      return { unhandled: null, capacityNote: `${failure.hostId} failed this week, removing one server's worth of capacity.` };
+      return { unhandled: null, capacityNote: `${serverName(failure.hostId)} failed this week, removing one server's worth of capacity.` };
     }
     return { unhandled: failure };
   }
@@ -378,7 +379,7 @@ function finishTurn(s: GameState): void {
       s.infra.appHosts = s.infra.appHosts.filter((x) => x.id !== h.id);
       addAppHost(s);
       s.cash -= BALANCE.server.replaceCost;
-      p.notes.push(`${h.id} was rebuilt automatically (${money(BALANCE.server.replaceCost)}).`);
+      p.notes.push(`${serverName(h.id)} was rebuilt automatically (${money(BALANCE.server.replaceCost)}).`);
     }
   }
 

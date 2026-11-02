@@ -7,10 +7,16 @@ import { spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
 import { combinedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
+import { respondToIncident } from "@/sim/__tests__/reliabilityFixture";
+import { incidentAwaitingResponse } from "@/sim/step";
+import { installPending } from "@/sim/reliability";
 import { incidentLesson, incidentTitle, survivingCapacity } from "./campaignPostmortem";
 
 export function recovered(game: GameState) {
-  for (let i = 0; i < 120 && game.phase !== "review"; i++) game = tick(game);
+  for (let i = 0; i < 120 && game.phase !== "review"; i++) {
+    const c = game.campaign!;
+    game = c.incident && incidentAwaitingResponse(c) && !installPending(c) ? respondToIncident(game) : tick(game);
+  }
   if (game.phase !== "review") throw Error("Fixture did not recover");
   return game;
 }
@@ -120,7 +126,7 @@ describe("recorded incident lessons", () => {
 });
 
 describe("capacity after a server failure", () => {
-  /** Health Checks are live before the failure, so the load balancer drops App 3 once they detect it. */
+  /** Health Checks are live before the failure, so the load balancer drops Server 3 once they detect it. */
   function checkedFailure() {
     let g = act(reliabilityCompany(), { type: "unlock_reliability", tech: "health_checks" });
     g = act(tick(act(g, { type: "deploy_health_checks" }), 2), { type: "arm_reliability" });
@@ -132,7 +138,7 @@ describe("capacity after a server failure", () => {
   it("counts the traffic balanced routing still sent to the failed server until it was restored", () => {
     const c = reliabilityOutcome(true).campaign!, f = c.reliabilityStage!.fault!;
     const report = c.reports.find(r => r.snapshots.some(m => m.reliability?.faultId === f.id))!;
-    // Three balanced servers share 2,400 req/s, so the failed App 3 still receives a third of it.
+    // Three balanced servers share 2,400 req/s, so the failed Server 3 still receives a third of it.
     expect(survivingCapacity(report.snapshots)).toEqual({ step: f.startedStep, admitted: 2400, capacity: 3200, failed: ["app-3"], toFailed: 800,
       stopped: { step: f.restoredStep, by: "restored", admitted: 2400, capacity: 4800 } });
     expect(incidentLesson(report).wrong).toBe("A server failed, but traffic was still routed to it, and every request it received failed.");
@@ -156,7 +162,7 @@ it("names the actual overload when the announced failed server was already outsi
   }
   g=act(tick(g,5),{type:"start_growth_wave"});
   g=act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2"]});
-  for(let i=0;i<100&&g.phase!=="review";i++)g=tick(g);
+  for(let i=0;i<100&&g.phase!=="review";i++){const c=g.campaign!;g=c.incident&&incidentAwaitingResponse(c)&&!installPending(c)?respondToIncident(g):tick(g);}
   expect(g.phase).toBe("review");
   const report=g.campaign!.reports.at(-1)!,opening=report.snapshots.find(s=>s.step===report.openedStep)!;
   expect(opening.instances!.find(a=>a.id==="app-3")).toMatchObject({health:"failed",routed:false,demand:0});

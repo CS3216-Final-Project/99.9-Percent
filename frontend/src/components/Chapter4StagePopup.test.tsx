@@ -87,7 +87,7 @@ it("transfers Hint to the small server's real Scale up, immediate Confirm, and a
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   fireEvent.click(within(screen.getByRole("dialog", { name: "Hint" })).getByRole("button", { name: "Got it" })); enterHighlightedInspection();
   await act(async()=>{});enterHighlightedInspection();
-  expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Scale up App 3");
+  expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Scale up Server 3");
   fireEvent.click(gold()[0]); expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toBe("Confirm");
   expect(useGame.getState().game.campaign!.step).toBe(game.campaign!.step);
   expect(useGame.getState().game.campaign!.cashCents).toBe(game.campaign!.cashCents);

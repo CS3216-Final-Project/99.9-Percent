@@ -2,6 +2,7 @@
 import { CampaignAttentionHost } from "./CampaignAttention";
 import { RoomControlsHost, RoomControlsSlot } from "./RoomControlsHost";
 import { CampaignHeader, CampaignPanel, CampaignControls, CampaignOverlays } from "./CampaignUI";
+import { PendingDeployments } from "./PendingDeployments";
 import "./ControlsDock.css";
 
 import { lazy, Suspense, useEffect } from "react";
@@ -15,12 +16,12 @@ import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
 import { HomeScreen } from "./HomeScreen";
 import InspectionReveal from "./InspectionReveal";
+import MachineAlerts from "./MachineAlerts";
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
 import Tutorial from "./Tutorial";
 import { Callout, Meter, Stat } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
-import OperationsRail from "./OperationsRail";
 import { ViewSheet, ViewTabs, type ViewTab } from "./ViewSheet";
 import { TimeMenu } from "./TimeMenu";
 import { AUTO_SECONDS, useAppClassName, useGameRuntime } from "./useGameRuntime";
@@ -150,7 +151,7 @@ export function BottomBar() {
       <div className="time-controls" role="group" aria-label="Time">
         <WeekClock />
         <TimeMenu automatic={management} />
-        <button type="button" className="btn btn-primary advance dock-primary" disabled={!management && !incident} onClick={incident ? () => setRunning(!running) : advance} aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : undefined}>
+        <button type="button" className={`btn btn-primary advance dock-primary${incident ? (running ? " is-running" : " is-paused") : ""}`} disabled={!management && !incident} onClick={incident ? () => setRunning(!running) : advance} aria-label={incident ? (running ? "Pause the incident clock" : "Resume the incident clock") : undefined}>
           {management && running && <span key={`${game.turn}-${speed}`} className="advance-timer" style={{ animationDuration: `${AUTO_SECONDS / speed}s` }} />}
           <Icon name={incident ? (running ? "pause" : "play") : "next"} />
           <span className="advance-label">{incident ? (running ? "Pause" : "Resume") : game.phase === "ended" ? "Run over" : "Next week"}</span>
@@ -224,11 +225,10 @@ export default function Game() {
   return (
     <RoomControlsHost><CampaignAttentionHost><div className={className}>
       {campaign ? <CampaignHeader /> : <TopBar />}
-      {started && !campaign && <OperationsRail />}
       <main className="stage">
         <Room />
       </main>
-      {campaign ? <>{started && <CampaignPanel />}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ClassicViewSheet /><BottomBar /></>}
+      {campaign ? <>{started && <><CampaignPanel /><PendingDeployments /></>}<CampaignControls /><CampaignOverlays /></> : <><MachineAlerts /><SidePanel /><ClassicViewSheet /><BottomBar /></>}
       <ToastHost />
       {!campaign && !started && <HomeScreen />}
       {!campaign && started && view === "menu" && <Menu />}

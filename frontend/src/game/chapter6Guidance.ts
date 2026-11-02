@@ -6,6 +6,7 @@ import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { previewCampaignAction } from "./campaignFinance";
 import type { AttentionDecision, GuidanceTarget } from "./campaignAttention";
 import { chapter6FinancialRisk } from "./chapter6Finance";
+import { serverName } from "@/sim";
 
 /** Use the engine's integer workload classification, including current cache warmth. */
 export function combinedDatabaseDemand(game: GameState, logical: number, rate?: number, profile = combinedProfile(game.campaign!)) {
@@ -64,13 +65,13 @@ export function chapter6Attention(game: GameState, decision: AttentionDecision):
   // Full incoming demand, not the capped admitted rate. Reserved spares stay reserved.
   if (!fits(routed)) {
     if (fits(serving) && serving.length > routed.length) {
-      const advice = advise({ type: "set_routing", mode: "balanced", targets: serving.map(a => a.id) }, "All apps", "Your installed serving servers can share full demand. Connect All apps, then Run to activate routing. Reserved spares are excluded.", "network")
-        ?? advise({ type: "deploy_load_balancer" }, "Deploy load balancing", "Install load balancing so your serving servers can share traffic. Then connect All apps.", "network");
+      const advice = advise({ type: "set_routing", mode: "balanced", targets: serving.map(a => a.id) }, "All servers", "Your installed serving servers can share full demand. Connect All servers, then Run to activate routing. Reserved spares are excluded.", "network")
+        ?? advise({ type: "deploy_load_balancer" }, "Deploy load balancing", "Install load balancing so your serving servers can share traffic. Then connect All servers.", "network");
       if (advice) return advice;
     }
     const allocation = serving.length ? allocateTraffic(demand, serving.map(a => a.id)) : {};
     const small = serving.find(a => a.tier === "base" && a.capacity < allocation[a.id] && allocation[a.id] <= P.appCapacity);
-    const advice = small ? advise({ type: "scale_up", appId: small.id }, "Scale up server", `App ${small.id.slice(4)} needs more capacity before full demand can be shared safely. Scale it up, then check routing.`, "app") : null;
+    const advice = small ? advise({ type: "scale_up", appId: small.id }, "Scale up server", `${serverName(small.id)} needs more capacity before full demand can be shared safely. Scale it up, then check routing.`, "app") : null;
     if (advice) return advice;
     const add = advise({ type: "add_server" }, "Add server", "Serving capacity is insufficient at full demand. Add a server, then prepare its capacity and connect it after installation.", "app");
     if (add) return add;

@@ -2,7 +2,7 @@ import { introductionActive } from "@/sim/introduction";
 import { useSyncExternalStore } from "react";
 import { BALANCE, completedTechIds, metrics, TECH_ORDER } from "@/sim";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
-import { pendingStop } from "@/sim/step";
+import { incidentActive, pendingStop } from "@/sim/step";
 import { clock } from "@/game/format";
 import { milestoneBlocks } from "@/game/campaignGuidance";
 import { useGame } from "@/game/store";
@@ -19,8 +19,7 @@ import "../layout/phone-layout.css";
 /**
  * Region: dock. One row along the bottom edge: the views (Tech, History and, in Challenge Mode, Team) and Navigation
  * on the left, then the clock, the speed menu and the one primary time control on the right, under the thumb.
- * Guided Mode adds End week beside the speed menu: a 20x rush to the week boundary that slows back down when an
- * incident happens. Where the views do not fit beside the
+ * Where the views do not fit beside the
  * time controls they fold into one Views menu. Every menu opens above the dock.
  */
 export function PhoneDock() {
@@ -61,12 +60,9 @@ function GuidedDock() {
   const game = useGame((s) => s.game);
   const running = useGame((s) => s.running);
   const setRunning = useGame((s) => s.setRunning);
-  const weekRush = useGame((s) => s.weekRush);
-  const endWeek = useGame((s) => s.endWeek);
-  const cancelWeekRush = useGame((s) => s.cancelWeekRush);
   const started = useGame((s) => s.started);
   const c = game.campaign!;
-  const incident = game.phase === "incident";
+  const incident = incidentActive(game);
   const active = started && !introductionActive(c) && pendingStop(c) === null && !milestoneBlocks(game) && (game.phase === "management" || incident);
   const second = c.step % Q.periodSteps;
   const tabs: ViewTab[] = [
@@ -84,10 +80,7 @@ function GuidedDock() {
         <span className="visually-hidden" aria-hidden="true" data-testid="physical-step">{c.step}</span>
       </div>
       <TimeMenu />
-      <button type="button" className={`dock-speed dock-rush phone-rush${weekRush ? " is-on" : ""}`} aria-pressed={weekRush} aria-label="End the week at 20 times speed"
-        {...tipProps("Fast-forward to the end of the week (20×). Slows back down if an incident happens.")}
-        disabled={!active} onClick={() => weekRush ? cancelWeekRush() : endWeek()}><Icon name="stepMany" size={18} /><span>End week</span></button>
-      <button type="button" className={`btn btn-primary campaign-play dock-primary${running ? " is-on" : ""}`} aria-label={running ? "Pause" : "Run"}
+      <button type="button" className={`btn btn-primary campaign-play dock-primary${running ? " is-running" : " is-paused"}`} aria-label={running ? "Pause" : "Run"}
         {...tipProps("Run or pause the company (P)")} disabled={!active} onClick={() => setRunning(!running)}>
         <Icon name={running ? "pause" : "play"} /><span>{running ? "Pause" : "Run"}</span>
       </button>
@@ -128,7 +121,7 @@ function ChallengeDock() {
         </>}
       </div>
       <TimeMenu automatic={management} />
-      <button type="button" className="btn btn-primary advance dock-primary" disabled={!management && !inc} onClick={inc ? () => setRunning(!running) : advance}
+      <button type="button" className={`btn btn-primary advance dock-primary${inc ? (running ? " is-running" : " is-paused") : ""}`} disabled={!management && !inc} onClick={inc ? () => setRunning(!running) : advance}
         aria-label={inc ? (running ? "Pause the incident clock" : "Resume the incident clock") : undefined}>
         {management && running && <span key={`${game.turn}-${speed}`} className="advance-timer" style={{ animationDuration: `${AUTO_SECONDS / speed}s` }} />}
         <Icon name={inc ? (running ? "pause" : "play") : "next"} />

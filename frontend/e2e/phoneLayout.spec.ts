@@ -2,7 +2,7 @@ import { infrastructureAction, closeInspection, followHintComponent, inspectEqui
 import type { Locator, Page } from "@playwright/test";
 import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
-import { reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
+import { act, reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
 import { expect, expectRoom, seedClassicSave, seedSave, test, unlockChallenge } from "./fixtures";
 
 /*
@@ -105,6 +105,18 @@ test("Guided Mode: choosing equipment in the room opens the sheet to half on tha
   await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "App Server", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
+test("Guided Mode: scheduled deployments lead the sheet and Deploy now fast-forwards them", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  const unlocked = act(reliabilityCompany(), { type: "unlock_reliability", tech: "health_checks" });
+  await openGuided(page, { width: 390, height: 844 }, act(unlocked, { type: "deploy_health_checks" }));
+  await handle(page).tap();
+  const deployments = sheet(page).getByRole("complementary", { name: "Pending deployments" });
+  await expect(deployments).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await deployments.getByRole("button", { name: "Deploy now" }).tap();
+  await expect(deployments).toBeHidden({ timeout: 15_000 });
+});
+
 test("Guided Mode incident: the sheet stays at least half open with every response and the quote's decision in reach", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await openGuided(page, { width: 390, height: 844 }, advanceSteps(newGame(1, "phone-layout-incident"), 6).state);
@@ -119,7 +131,7 @@ test("Guided Mode incident: the sheet stays at least half open with every respon
 
   const panel = page.getByRole("complementary", { name: "System metrics" });
   await expect(panel.getByRole("region", { name: "Incident recovery" })).toBeVisible();
-  for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
+  for (const name of [/Add server/, /Upgrade database/, /Limit to ~[\d,]+ requests\/s/]) {
     const response = await infrastructureAction(page,name);
     await response.scrollIntoViewIfNeeded();
     // The existing action is reachable in its component dialog.
@@ -246,7 +258,6 @@ for (const mode of ["Guided", "Challenge"] as const) {
     const panel = await box(dock(page).locator(".time-menu .dock-panel"));
     expect(panel.y + panel.height).toBeLessThanOrEqual(bar.y);
     expect(await box(speed)).toEqual(before);
-    if (mode === "Guided") await expect(dock(page).getByRole("button", { name: "End the week at 20 times speed", exact: true })).toBeInViewport({ ratio: 1 });
     await speeds.getByRole("button", { name: "2×", exact: true }).tap();
     await expect(speed).toContainText("2×");
     await expect(speed).toHaveJSProperty("offsetWidth", Math.round(before.width));
@@ -254,7 +265,7 @@ for (const mode of ["Guided", "Challenge"] as const) {
   });
 }
 
-test("Challenge Mode: equipment and weekly operations share the sheet, and the views open between the strip and the dock", async ({ page, withoutRoom }) => {
+test("Challenge Mode: equipment fills the sheet, and the views open between the strip and the dock", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await openChallenge(page, { width: 360, height: 640 });
   await expect(sheet(page)).toHaveAttribute("data-state", "peek");
@@ -262,7 +273,7 @@ test("Challenge Mode: equipment and weekly operations share the sheet, and the v
   await handle(page).tap();
   await expect(sheet(page)).toHaveAttribute("data-state", "half");
   await expect(page.getByRole("complementary", { name: "Details" })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "Operations" })).toBeAttached();
+  await expect(page.getByRole("complementary", { name: "Operations" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Next week", exact: true })).toBeInViewport({ ratio: 1 });
 
   // Tech, Team and History fold into Views where they do not fit beside the time controls.
@@ -273,7 +284,10 @@ test("Challenge Mode: equipment and weekly operations share the sheet, and the v
   await expect(tree).toBeVisible();
   const view = await box(tree);
   expect(view.x).toBe(0);
-  expect(view.y).toBe(0);
+  // The top strip stays above the view, so cash and settings remain in reach.
+  const strip = await box(page.locator(".phone-top"));
+  await expect(page.locator(".phone-top")).toBeVisible();
+  expect(view.y).toBeCloseTo(strip.y + strip.height, 0);
   expect(view.width).toBe(page.viewportSize()!.width);
   expect(view.y + view.height).toBeCloseTo((await box(dock(page))).y, 0);
   await tree.getByRole("button", { name: "Back to room", exact: true }).tap();

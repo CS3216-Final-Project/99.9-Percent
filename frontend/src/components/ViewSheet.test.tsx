@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { useGame } from "@/game/store";
+import { isSheetView, useGame } from "@/game/store";
 import { ViewSheet, ViewTabs } from "./ViewSheet";
 import { HistoryTabs, type HistoryTab } from "./Views";
 
@@ -13,7 +13,7 @@ function Workspace() {
   return <><ViewTabs tabs={[
     { id: "tech", label: "Tech", icon: "tree", badge: null },
     { id: "history", label: "History", icon: "history", badge: null },
-  ]}/>{(view === "tech" || view === "history") && <ViewSheet view={view}>Content</ViewSheet>}</>;
+  ]}/>{isSheetView(view) && <ViewSheet view={view}>Content</ViewSheet>}</>;
 }
 
 it("focuses a workspace heading and returns focus to its opener without changing the clock", () => {

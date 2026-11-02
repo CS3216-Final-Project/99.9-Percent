@@ -26,29 +26,38 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   await expect.poll(() => crew.size).toBe(14);
   await expect(page.getByRole('dialog', { name: /Tutorial, step 1/ })).toBeVisible();
   await page.getByRole('button', { name: 'Servers', exact: true }).click();
-  const reveal = page.getByRole('dialog', { name: 'Servers inspected' });
+  const reveal = page.getByRole('dialog', { name: 'Servers', exact: true });
   await expect(reveal).toBeVisible();
   await reveal.getByRole('button', { name: 'Return to room' }).click();
   await page.getByRole('button', { name: /Add server/ }).click();
   await expect(page.getByRole('dialog', { name: /Tutorial, step 2/ })).toBeVisible();
   await page.getByRole('button', { name: 'Tech', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Tech tree' }).locator('.node')).toHaveCount(9);
-  // Beside the Operations rail, the sheet is narrower than Campaign's; all nine still fit next to the detail panel.
+  // All nine technologies fit next to the detail panel.
   expect(await page.getByRole('region', { name: 'Tech tree' }).locator('[data-tech]').evaluateAll(nodes => nodes.every(node => {
     const box = node.getBoundingClientRect(), viewport = node.closest('.tree-scroll')!.getBoundingClientRect();
     return box.left >= viewport.left && box.right <= viewport.right;
   })), 'All nine technologies fit beside the detail panel on desktop').toBe(true);
+  // The top bar stays above the tree, so the logo, cash and settings remain in reach.
+  const topbar = page.locator('.topbar');
+  await expect(topbar).toBeVisible();
+  await expect(topbar.locator('.brand-mark')).toHaveText('99.99%');
+  await expect(topbar).toContainText('Cash');
+  await expect(topbar.getByRole('button', { name: 'Menu', exact: true })).toBeInViewport({ ratio: 1 });
+  const topbarBox = (await topbar.boundingBox())!;
+  expect((await page.getByRole('region', { name: 'Tech tree' }).boundingBox())!.y).toBeCloseTo(topbarBox.y + topbarBox.height, 0);
   await page.getByRole('button', { name: 'Scale Up: Available' }).click();
   await page.getByRole('button', { name: /^Start/ }).click();
   await expect(page.getByRole('dialog', { name: /Tutorial, step 3/ })).toBeVisible();
   await page.getByRole('button', { name: 'Growth', exact: true }).click();
-  const growthReveal = page.getByRole('dialog', { name: 'Growth inspected' });
+  const growthReveal = page.getByRole('dialog', { name: 'Growth', exact: true });
   await expect(growthReveal).toBeVisible();
   await growthReveal.getByRole('button', { name: 'Return to room' }).click();
   await page.getByRole('button', { name: /^Launch/ }).first().click();
   await expect(page.getByRole('dialog', { name: /Tutorial, step 4/ })).toBeVisible();
   await page.getByRole('button', { name: 'Next week', exact: true }).click();
-  await page.getByRole('button', { name: 'Got it', exact: true }).click();
+  // Playing the week is the last step: the guide closes by itself.
+  await expect(page.getByRole('dialog', { name: /Tutorial, step/ })).toBeHidden();
   const before = await savedGame(page);
   expect(before.turn).toBe(2);
   expect(before.infra.appHosts).toHaveLength(2);

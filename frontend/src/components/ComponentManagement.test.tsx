@@ -20,7 +20,7 @@ const app=()=>screen.getByRole("dialog",{name:"App Servers"});
 it("shows a compact fleet with authoritative counts and hides individual actions until selection",()=>{
   const game=preparedReliability();show(game);press("App Server");press("Server management");const popup=within(app());
   expect(app().querySelectorAll('[data-guidance-app]')).toHaveLength(game.campaign!.apps.length);
-  expect(popup.queryByRole("button",{name:/Scale up|Restore App|Install spare/})).toBeNull();
+  expect(popup.queryByRole("button",{name:/Scale up|Restore Server|Install spare/})).toBeNull();
   press("Back to Servers");
   expect(popup.getByRole("button",{name:"Add server"})).toBeTruthy();
   expect(app().querySelectorAll('[data-guidance-app]')).toHaveLength(0);
@@ -34,9 +34,9 @@ it("shows a compact fleet with authoritative counts and hides individual actions
 it("selects exactly one server and keeps Back, technical metrics and Cancel read-only",()=>{
   const game=tick(finishingScaling(),3);
   show(game);press("App Server");press("Server management");fireEvent.click(app().querySelector('[data-guidance-app="app-2"]')!);
-  expect(within(app()).getByRole("heading",{name:"App 2"})).toBeTruthy();
+  expect(within(app()).getByRole("heading",{name:"Server 2"})).toBeTruthy();
   expect(within(app()).queryByRole("button",{name:"Add server"})).toBeNull();
-  const before=useGame.getState().game;press("Scale up App 2");expect(screen.getByRole("dialog",{name:"Purchase preview"})).toBeTruthy();
+  const before=useGame.getState().game;press("Scale up Server 2");expect(screen.getByRole("dialog",{name:"Purchase preview"})).toBeTruthy();
   press("Cancel");expect(useGame.getState().game).toBe(before);
   press("Back to Server management");expect(app().querySelectorAll('[data-guidance-app]')).toHaveLength(game.campaign!.apps.length);
   press("Back to Servers");
@@ -47,8 +47,9 @@ it("selects exactly one server and keeps Back, technical metrics and Cancel read
 it("keeps locked autoscaling prerequisites visible in its dedicated screen",()=>{
   show(spikeCompany(false));press("App Server");press("Server management");press("Autoscaling");
   expect(app().textContent).toContain("Controller: Locked");
-  expect(within(app()).getByRole("button",{name:"Deploy autoscaling"}).hasAttribute("disabled")).toBe(true);
-  expect([...app().querySelectorAll(".campaign-action-reason")].map(n=>n.textContent).join(" ")).toMatch(/Requires unlock, balanced routing to two apps/);
+  const deploy=within(app()).getByRole("button",{name:"Deploy autoscaling"});
+  expect(deploy.hasAttribute("disabled")).toBe(true);expect(deploy.querySelector(".act-affordance-locked")).not.toBeNull();
+  expect(deploy.getAttribute("aria-description")).toMatch(/Requires unlock, balanced routing to two apps/);
   const detail=within(app()).getByText("Technical Details").closest("details")!;
   expect(detail.open).toBe(false);fireEvent.click(within(app()).getByText("Technical Details"));
   expect(detail.textContent).toContain("Scale out above 80% for 3 game seconds");
@@ -61,19 +62,21 @@ it("keeps locked autoscaling prerequisites visible in its dedicated screen",()=>
 it("retains deployed controller configuration and costs without mixing server controls",()=>{
   show(spikeCompany());press("App Server");press("Server management");press("Autoscaling");
   expect(app().textContent).toContain("Controller: Deployed");
-  expect(within(app()).queryByRole("button",{name:/Scale up App|Install spare/})).toBeNull();
+  expect(within(app()).queryByRole("button",{name:/Scale up Server|Install spare/})).toBeNull();
   press("Disable autoscaling");expect(useGame.getState().game.campaign!.spikeStage!.controller!.enabled).toBe(false);
   expect(app().textContent).toContain("Controller upkeep");
 });
 
 it("keeps Network admission separate from routing, balancing and failover",()=>{
-  show(preparedReliability());press("Network");const popup=screen.getByRole("dialog",{name:"Network inspected"});
+  show(preparedReliability());press("Network");const popup=screen.getByRole("dialog",{name:"Network"});
   expect(within(popup).getByRole("button",{name:/Limit to/})).toBeTruthy();
-  expect(within(popup).queryByText(/Configure routing/)).toBeNull();
+  expect(within(popup).queryByRole("group",{name:/Send traffic to/})).toBeNull();
   expect(within(popup).queryByRole("button",{name:/Deploy Automatic Failover/})).toBeNull();
-  press("Network management");press("Routing");expect(within(popup).getByText(/Configure routing/)).toBeTruthy();
-  press("Back to Network management");press("Automatic failover");expect(within(popup).getByRole("button",{name:"Disable failover"})).toBeTruthy();
-  press("Back to Network management");press("Back to Network");expect(within(popup).getByRole("button",{name:"Inspect details"})).toBeTruthy();
+  press("Network management");
+  for(const section of ["Load balancing","Routing","Automatic failover"]) expect(within(popup).getByRole("heading",{name:section})).toBeTruthy();
+  expect(within(popup).getByRole("group",{name:/Send traffic to/})).toBeTruthy();
+  expect(within(popup).getByRole("button",{name:"Disable failover"})).toBeTruthy();
+  press("Back to Network");expect(within(popup).getByRole("button",{name:"Inspect details"})).toBeTruthy();
 });
 
 it("routes a failed-server Hint through its card and valid Confirm to free restoration",async()=>{
@@ -85,7 +88,7 @@ it("routes a failed-server Hint through its card and valid Confirm to free resto
   expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("App Server");fireEvent.click(gold()[0]);await act(async()=>{});
   expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toContain("Server management");fireEvent.click(gold()[0]);await act(async()=>{});
   expect(gold()).toHaveLength(1);expect(gold()[0].getAttribute("data-guidance-app")).toBe(id);fireEvent.click(gold()[0]);await act(async()=>{});
-  expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toContain(`Restore App ${id.slice(4)}`);fireEvent.click(gold()[0]);await act(async()=>{});
+  expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toContain(`Restore Server ${id.slice(4)}`);fireEvent.click(gold()[0]);await act(async()=>{});
   const before=useGame.getState().game.campaign!;expect(before.pending.some(a=>a.type==="restore-app")).toBe(false);
   expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("Confirm");press("Confirm");
   expect(useGame.getState().game.campaign!.cashCents).toBe(before.cashCents);
@@ -102,14 +105,14 @@ it("releases and reserves the selected spare using the original delayed actions"
   show(preparedReliability());act(()=>inspectInRoom("app","app-3"));
   press(/Release spare/);expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="release-spare")).toBe(true);
   act(()=>useGame.setState({game:tick(useGame.getState().game)}));
-  act(()=>inspectInRoom("app","app-3"));press(/Reserve App 3 as spare/);
+  act(()=>inspectInRoom("app","app-3"));press(/Reserve Server 3 as spare/);
   expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="reserve-spare"&&a.targetId==="app-3")).toBe(true);
 });
 
 it("keeps unaffordable server scaling disabled with its real funding reason",()=>{
   const game=tick(finishingScaling(),3);game.campaign!.cashCents=1;show(game);
   act(()=>inspectInRoom("app","app-2"));
-  const scale=within(app()).getByRole("button",{name:"Scale up App 2"});
+  const scale=within(app()).getByRole("button",{name:"Scale up Server 2"});
   expect(scale.hasAttribute("disabled")).toBe(true);
   expect([...app().querySelectorAll('.campaign-action-reason')].map(n=>n.textContent).join(" ")).toMatch(/cash|fund/i);
   fireEvent.click(scale);expect(screen.queryByRole("dialog",{name:"Purchase preview"})).toBeNull();

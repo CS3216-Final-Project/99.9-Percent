@@ -3,6 +3,7 @@ import { maxServers, selfHealingFleet } from "./derive";
 import { newId } from "./state";
 import { has } from "./tech";
 import type { ActiveIncident, GameState, IncidentType, Postmortem } from "./types";
+import { serverName } from "./names";
 
 /**
  * Postmortems are written from recorded facts only: the incident's cause
@@ -40,7 +41,7 @@ function whatFailed(inc: ActiveIncident): string {
     case "deploy_regression":
       return `Release '${c.releaseTitle ?? "unknown"}' had a bug. ${pct(inc.initialSeverity)} of requests failed.`;
     case "instance_failure":
-      return c.target === "db" ? "The database machine died." : `Server ${c.hostId} died.`;
+      return c.target === "db" ? "The database machine died." : `${serverName(c.hostId!)} died.`;
   }
 }
 

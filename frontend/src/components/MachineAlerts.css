@@ -1,0 +1,190 @@
+/* Dead-machine alerts sit at the room's top-left, opposite the equipment panel, and never take its width. */
+.machine-alerts {
+  grid-area: stage;
+  justify-self: start;
+  align-self: start;
+  position: relative;
+  z-index: 28;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(300px, calc(100% - 24px));
+  margin: 12px;
+  pointer-events: none;
+}
+
+.machine-alert-list {
+  display: grid;
+  gap: 8px;
+}
+
+.machine-alert-list:empty {
+  display: none;
+}
+
+.machine-alert {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  color: #fff;
+  background: rgb(176 18 40 / 0.62);
+  border: 2px solid #7d0b1d;
+  border-radius: var(--radius-panel);
+  box-shadow: var(--lift);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  animation: machine-alert-in 0.2s ease-out;
+}
+
+div.machine-alert {
+  cursor: default;
+}
+
+button.machine-alert:hover {
+  background: rgb(176 18 40 / 0.78);
+}
+
+.machine-alert:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.machine-alert > .icon {
+  flex: none;
+  color: var(--critical-caption);
+}
+
+.machine-alert > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.machine-alert strong {
+  font-size: var(--text-md);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.machine-alert > span > span {
+  font-size: var(--text-sm);
+  color: #ffe3e6;
+}
+
+@keyframes machine-alert-in {
+  from { opacity: 0; transform: translateX(-8px); }
+}
+
+/* The week's warning signs: a folding card under the dead-machine alerts. */
+.machine-warnings {
+  pointer-events: auto;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--lift);
+  font-size: var(--text-sm);
+}
+
+.machine-warnings summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: inherit;
+}
+
+.machine-warnings summary::-webkit-details-marker {
+  display: none;
+}
+
+.machine-warnings summary > .icon:first-child {
+  color: var(--warn-ink);
+}
+
+.machine-warnings summary strong {
+  font-size: var(--text-md);
+}
+
+.machine-warnings-count {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--paper-3);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.machine-warnings-chevron {
+  margin-left: auto;
+  transition: transform 0.2s ease-out;
+}
+
+.machine-warnings[open] .machine-warnings-chevron {
+  transform: rotate(180deg);
+}
+
+.machine-warnings ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 12px 4px;
+}
+
+.machine-warnings li + li {
+  border-top: 1px solid var(--paper-3);
+}
+
+.machine-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font-size: var(--text-sm);
+}
+
+.machine-warning > .icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warn-ink);
+}
+
+.machine-warning.tone-critical > .icon {
+  color: var(--critical-ink);
+}
+
+.machine-warning > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.machine-warning:hover {
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .machine-alert { animation: none; }
+  .machine-warnings-chevron { transition: none; }
+}
+
+/* On phones the alerts sit just under the top strip, above the room. */
+.phone-app[data-edition="phone"] .machine-alerts {
+  position: fixed;
+  top: calc(var(--phone-top) + 8px);
+  left: calc(var(--phone-safe-left) + 8px);
+  z-index: 32;
+  margin: 0;
+  width: min(300px, calc(100vw - 16px - var(--phone-safe-left) - var(--phone-safe-right)));
+}
