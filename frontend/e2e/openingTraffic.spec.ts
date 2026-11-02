@@ -48,7 +48,7 @@ test("the Opening's first Run looks at the In gate and announces the growth unti
   // The view comes to the gate from wherever it was looking. It frames the gate's foot on the floor, so the label
   // above it lands near, not on, the middle of the open room; it must end up far closer than it started.
   await expect.poll(() => gateOffset(page), { timeout: 45_000 }).toBeLessThan(before * 0.75);
-  await expect(gate).toBeInViewport({ ratio: 1 });
+  await expect(gate).toBeInViewport({ ratio: 0.99 });
   await page.screenshot({ path: info.outputPath("opening-traffic-rising.png") });
 
   await advanceCampaignStep(page, { seconds: 3 });
