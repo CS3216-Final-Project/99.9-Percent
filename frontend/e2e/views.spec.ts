@@ -81,13 +81,17 @@ const lockedTo = (page: Page) => page.evaluate(() => document.pointerLockElement
 test.describe("a player who has not chosen a view", () => {
   test.use({ overviewChosen: false });
 
-  test("opens following the avatar with the mouse, keeps it through a reading but not a dialog, and opens as chosen once a view is chosen", async ({ page }) => {
+  test("opens in the overview, keeps a chosen follow view's mouse through a reading but not a dialog, and reopens in the overview", async ({ page }) => {
     await open(page);
+    // Opening the game never lands in follow, chosen or not.
+    await expect(stage(page)).toHaveAttribute("data-camera", "overview");
+    await expect(page.locator(".view-overlay")).toHaveCount(0);
+    await stage(page).focus();
+    await page.keyboard.press("v");
     await expect(page.locator(".view-overlay")).toHaveAttribute("data-viewpoint", "follow");
     await expect(option(page, "Follow")).toHaveAttribute("aria-pressed", "true");
-    // Continue's click took the mouse there and then. Opening there was not a choice, so none is remembered.
+    // V took the mouse there and then.
     await expect.poll(() => lockedTo(page)).toBe("CANVAS");
-    expect((await exploration(page))?.viewChosen ?? false).toBe(false);
     // An inspection's reading is the room answering a click: looking round carries on through it.
     await page.evaluate(() => {
       const reading = document.createElement("section");
@@ -109,10 +113,8 @@ test.describe("a player who has not chosen a view", () => {
     await expect.poll(() => lockedTo(page)).toBeNull();
     await expect(page.getByRole("group", { name: "Mouse look paused" })).toBeVisible();
     await page.evaluate(() => document.getElementById("arrived")?.remove());
-    // Ending the walk is a choice, so the next visit opens in the overview.
-    await page.getByRole("group", { name: "Mouse look paused" }).getByRole("button", { name: "Exit follow" }).click();
-    await expect(option(page, "Overview")).toHaveAttribute("aria-pressed", "true");
-    expect(await exploration(page)).toMatchObject({ walking: false, viewpoint: "overview", viewChosen: true });
+    // Left in follow, the next visit still opens in the overview.
+    expect(await exploration(page)).toMatchObject({ walking: true, viewpoint: "follow" });
     await page.reload();
     await page.getByRole("button", { name: "Continue week 2" }).click();
     await expectRoom(page);

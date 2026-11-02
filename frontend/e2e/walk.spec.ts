@@ -154,6 +154,8 @@ async function seedEavesdrop(page: Page) {
   await expect
     .poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 })
     .toBe(true);
+  // The game always opens in the overview; the remembered avatar picks up where it was once walk mode is on.
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
 }
 
@@ -415,6 +417,8 @@ test("walks straight across the server hall where no machine has been fitted yet
     ),
   );
   await open(page);
+  // The game always opens in the overview; the remembered avatar picks up where it was once walk mode is on.
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   await expect.poll(async () => (await exploration(page))?.avatar?.z).toBe(-2.3);
   // Up walks away from the camera, diagonally across the empty places, into the cold aisle in front of the server.
@@ -433,6 +437,8 @@ test("walking leaves the camera in place", async ({ page }) => {
     ),
   );
   await open(page);
+  // The game always opens in the overview; the remembered avatar picks up where it was once walk mode is on.
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   const before = await settledView(page);
   const start = (await exploration(page))?.avatar as { x: number; z: number };
@@ -507,6 +513,8 @@ test("makes a coffee by Space: the prompt says it is under way, sweeps for as lo
   const canvas = page.getByRole("main").locator("canvas");
   await expect(canvas).toBeVisible();
   await expect.poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 }).toBe(true);
+  // The game always opens in the overview; the remembered avatar picks up where it was once walk mode is on.
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   await expect(prompt(page)).toContainText("Make a coffee", { timeout: 20_000 });
   await page.keyboard.press("Space");
@@ -533,6 +541,8 @@ test("plays the arcade: a real brick breaker served and steered, left by Escape"
   const canvas = page.getByRole("main").locator("canvas");
   await expect(canvas).toBeVisible();
   await expect.poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 }).toBe(true);
+  // The game always opens in the overview; the remembered avatar picks up where it was once walk mode is on.
+  await chooseWalkMode(page);
   await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
   await expect(prompt(page)).toContainText("Play the arcade", { timeout: 20_000 });
   await page.keyboard.press("Space");
@@ -565,6 +575,11 @@ test("naps in first person: eyes close and open", async ({ page }) => {
   const canvas = page.getByRole("main").locator("canvas");
   await expect(canvas).toBeVisible();
   await expect.poll(() => canvas.evaluate((el) => { const gl = (el as HTMLCanvasElement).getContext("webgl2"); return !!gl && !gl.isContextLost(); }), { timeout: 20_000 }).toBe(true);
+  // The game always opens in the overview; V twice goes through follow to first person, from the remembered spot.
+  await expect(page.locator(".view-overlay")).toHaveCount(0);
+  await stage(page).focus();
+  await page.keyboard.press("v");
+  await page.keyboard.press("v");
   await expect(page.locator(".view-overlay")).toHaveAttribute("data-viewpoint", "first", { timeout: 20_000 });
   await expect(prompt(page)).toContainText("Rest in a nap pod", { timeout: 20_000 });
   const eyelids = page.locator(".view-eyelids");

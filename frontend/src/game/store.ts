@@ -495,28 +495,10 @@ export const useGame = create<Store>()((set, get) => {
     return { floor };
   }
   /**
-   * How the room is seen as the title screen gives way to a mode's run on `floor`. A `?floor=` address shows that
-   * floor from above. A player who has never chosen how to see the room starts in third person, unless a guide is
-   * about to point things out, which it does from above. Otherwise walk mode comes back as the last visit left it,
-   * with its view, when it was on this floor.
+   * How the room is seen as the title screen gives way to a run: always from above, with walk mode off. Follow and
+   * first person are the player's to choose once the run is on screen; opening the game never lands in them.
    */
-  function openingView(mode: GameMode, floor: Floor, guided: boolean): { walking: boolean; viewpoint: Viewpoint } {
-    const overview = { walking: false, viewpoint: "overview" as const };
-    if (typeof window !== "undefined" && floorFromSearch(window.location.search) !== null) return overview;
-    const exploration = loadExploration(mode);
-    // A phone opens from above, where its layout is made to be read, and has no first person to come back to.
-    const phone = isPhoneEdition();
-    const opened = !exploration.viewChosen
-      ? (guided || phone ? overview : { walking: true, viewpoint: "follow" as const })
-      : exploration.walking && exploration.floor === floor ? { walking: true, viewpoint: offeredViewpoint(exploration.viewpoint, phone) } : overview;
-    // The walk is timed from here, like one the player starts.
-    if (opened.walking) walkStart = performance.now();
-    return opened;
-  }
-  /** Guides point at the room from above: a walk the player never chose gives way to one, and is not remembered as left. */
-  function makeWayForGuide(): void {
-    if (get().walking && !loadExploration(get().mode).viewChosen) get().setWalking(false, false);
-  }
+  const openingView = () => ({ walking: false, viewpoint: "overview" as const });
   /** An event for the analytics, wherever this mode keeps them. */
   function record(name: "view_changed" | "map_toggled" | "map_walked", data: Record<string, string | number | boolean>) {
     if (get().game.campaign) uiEvent(name, data);
@@ -566,7 +548,6 @@ export const useGame = create<Store>()((set, get) => {
         if(open) patch.tour=null;
         const seen=(patch.meta??get().meta).chapterTours;
         if(!seen.includes(chapter)) {
-          makeWayForGuide();
           const meta={...(patch.meta??get().meta),chapterTours:[...seen,chapter]};
           saveMeta(meta);
           Object.assign(patch,{meta,tour:{track:chapter,step:0},running:false});
@@ -709,7 +690,7 @@ export const useGame = create<Store>()((set, get) => {
         track("save_resumed", { mode, week: loaded.game.turn, phase: loaded.game.phase });
         const tour: Tour | null = !meta.tutorialDone && isFreshRun(loaded.game) ? { track: "basics", step: 0 } : null;
         // A run resumed mid-incident starts paused so nothing burns while the player reorients.
-        set({ ...fresh, game: loaded.game, tour, ...(started ? openingView(mode, urlFloor ?? exploration.floor, !!tour) : {}) });
+        set({ ...fresh, game: loaded.game, tour, ...(started ? openingView() : {}) });
         if (tour) recordTour("started", tour, { from: "resume" });
         return;
       }
@@ -720,7 +701,7 @@ export const useGame = create<Store>()((set, get) => {
       track("run_started", { mode, seed: game.seed, run: nextMeta.runsStarted });
       const tour: Tour | null = meta.tutorialDone ? null : { track: "basics", step: 0 };
       // Switching into an empty classic mode starts a company; boot, which only shows the title, does not.
-      set({ ...fresh, game, meta: nextMeta, tour, lastIntro: started ? intro("begin") : null, ...(started ? openingView(mode, urlFloor ?? exploration.floor, !!tour) : {}) });
+      set({ ...fresh, game, meta: nextMeta, tour, lastIntro: started ? intro("begin") : null, ...(started ? openingView() : {}) });
       if (tour) recordTour("started", tour, { from: "first_visit" });
       if (!saved) get().notify("Could not save. Play continues in memory.", "error");
       else if (loaded.status === "corrupt") get().notify("Saved Challenge Mode run was unreadable. Started a new one.", "error");
@@ -985,7 +966,7 @@ export const useGame = create<Store>()((set, get) => {
     play: () => {
       if(get().started)return;
       // A fresh classic run says "Play" on the title screen and a resumed one "Continue", so only the first is a start.
-      if(get().mode === "classic") { set({started:true,...openingView("classic",get().floor,!!get().tour),...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
+      if(get().mode === "classic") { set({started:true,...openingView(),...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
       const state=get();
       // Practice resume is offered by the saved flag; a fresh visit plays the company itself.
       if (state.hasRun && state.meta.walkthroughStep !== null && !state.tutorialCompany) { get().startTour("campaign", "resume"); return; }
@@ -994,7 +975,7 @@ export const useGame = create<Store>()((set, get) => {
       if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended" && !chapterAnnounced(state.meta,game.campaign!.runId,"opening")) game=applyCampaignInput(game,{type:"enter_scaling"}).state;
       const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
       const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
-      set({game,hasRun:true,meta,measurement,started:true,running:false,...openingView("campaign",state.floor,!state.hasRun && !meta.tutorialDone),
+      set({game,hasRun:true,meta,measurement,started:true,running:false,...openingView(),
         // Starting a fresh company replaces the game, like a new run.
         ...(state.hasRun?{}:{generation:state.generation+1,lastAction:null,lastIntro:intro("begin")}),
         tour:null,activeMark:document.hidden?null:performance.now()});
@@ -1319,7 +1300,6 @@ export const useGame = create<Store>()((set, get) => {
         return;
       }
       if (track_ === "campaign") return;
-      makeWayForGuide();
       const campaign = !!get().game.campaign;
       const tour: Tour = { track: track_, step: 0 };
       const begins = get().tour?.track !== track_;
