@@ -230,8 +230,13 @@ it("walks Chapter 6 routing through its checklist before pending Run",async()=>{
  expect(gold()[0].textContent).toContain("Network management");fireEvent.click(gold()[0]);await act(async()=>{});
  expect(gold()[0].getAttribute("role")).toBe("checkbox");expect(gold()[0].textContent).toBe("Server 2");
  fireEvent.click(gold()[0]);await act(async()=>{});
+ // The window stays open for the rest of the checklist.
+ const network=screen.getByRole("dialog",{name:"Network"});
+ fireEvent.click(within(network).getByRole("checkbox",{name:"Server 3"}));await act(async()=>{});
+ expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="routing")).toBe(false);
+ fireEvent.click(within(screen.getByRole("dialog",{name:"Network"})).getByRole("button",{name:"Close"}));
  expect(screen.queryByRole("dialog",{name:"Network"})).toBeNull();
- expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1","app-2"]});
+ expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1","app-2","app-3"]});
 });
 
 it("summarises a failed fleet without exposing server cards until management",()=>{

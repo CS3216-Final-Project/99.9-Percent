@@ -122,6 +122,10 @@ it("routes each app through its checkbox and keeps the last routed one checked",
  expect(boxes.map(b=>b.textContent)).toEqual(["Server 1","Server 2"]);
  expect(boxes.map(b=>b.getAttribute("aria-checked"))).toEqual(["true","true"]);
  fireEvent.click(within(route).getByRole("checkbox",{name:"Server 2"}));
+ // Picks in the window wait for it to close, then go as one routing change.
+ expect(within(route).getByRole("checkbox",{name:"Server 2"}).getAttribute("aria-checked")).toBe("false");
+ expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="routing")).toBe(false);
+ fireEvent.click(screen.getByRole("button",{name:"Close"}));
  expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1"]});
  fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));route=screen.getByRole("group",{name:/Send traffic to/});
  const reason=screen.getByText("Routing requires deployed load balancing, valid active targets and a changed configuration.");
@@ -142,6 +146,7 @@ it("leaves a reserved spare out of the routing checklist",()=>{
  expect(boxes.map(b=>b.textContent)).toEqual(["Server 1","Server 3"]);
  expect(boxes.map(b=>b.getAttribute("aria-checked"))).toEqual(["true","true"]);
  fireEvent.click(within(route).getByRole("checkbox",{name:"Server 3"}));
+ fireEvent.click(screen.getByRole("button",{name:"Close"}));
  expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1"]});
 },15_000);
 

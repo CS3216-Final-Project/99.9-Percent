@@ -244,6 +244,12 @@ interface Store {
   selectApp: (id: string) => void;
   /** Ephemeral room or Campaign shortcut inspection asking for its reveal, or none. */
   roomInspection: RoomInspection | null;
+  /**
+   * Routing picked in an open inspection but not yet sent: the window would close on the first pending change, so the
+   * picks collect here and become one routing change when the player closes it. Never saved.
+   */
+  routingDraft: string[] | null;
+  setRoutingDraft: (targets: string[] | null) => void;
   dismissRoomInspection: () => void;
   /**
    * The floor of the building in view. Choosing a piece of equipment takes the view to its floor; an incident never
@@ -672,6 +678,7 @@ export const useGame = create<Store>()((set, get) => {
       selected: null,
       selectedAppId: null,
       roomInspection: null,
+      routingDraft: null,
       hovered: null,
       affected: [], previewAction: null, spotlight: [],
       cameraFocus: null,
@@ -852,15 +859,19 @@ export const useGame = create<Store>()((set, get) => {
     setPanelOpen: open => set({panelOpen: open}),
     selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({panelOpen:true,selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
     roomInspection: null,
+    routingDraft: null,
+    setRoutingDraft: targets => set({routingDraft: targets}),
     dismissRoomInspection: () => {
-      const inspection=get().roomInspection;
+      const inspection=get().roomInspection,draft=get().routingDraft,c=get().game.campaign;
       // Only acknowledging a popup actually opened by the player can complete a component step.
       if(inspection && introductionActive(get().game.campaign)) {
         const intro=get().game.campaign!.launchWeek!.introduction!;
         if(intro.inspected===inspection.equipment && nextIntroductionComponent(get().game.campaign!)===inspection.equipment)
           get().act({type:"acknowledge_introduction",equipment:inspection.equipment});
       }
-      set({roomInspection:null});
+      set({roomInspection:null,routingDraft:null});
+      // Closing the window sends the routing picked in it as one change.
+      if(draft&&c&&draft.join(",")!==c.routing.targets.join(","))get().act({type:"set_routing",mode:"balanced",targets:draft});
     },
     // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
     floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
@@ -1294,7 +1305,7 @@ export const useGame = create<Store>()((set, get) => {
         const meta = practiceAt(s.meta, true);
         set({ game, measurement, tutorialCompany: company, meta, activeMark: document.hidden ? null : performance.now(), generation: s.generation + 1, remainderMs: 0,
           tour: null, view: null, started: true, running: false, deployRush: false, onboarding: false, tutorialAttempt: s.tutorialAttempt + 1,
-          lastAction: null, lastIntro: null, chapterComplete: null, selectedAppId: null, roomInspection: null,
+          lastAction: null, lastIntro: null, chapterComplete: null, selectedAppId: null, roomInspection: null, routingDraft: null,
           affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, techFocus: null, rating: null, toast: null });
         persist();
         return;
@@ -1350,7 +1361,7 @@ export const useGame = create<Store>()((set, get) => {
       if (company) {
         persist(); clearTutorialPractice();
         set({ ...company, tutorialCompany: null, meta: practiceAt(meta, false), generation: get().generation + 1, selected: null, selectedAppId: null,
-          roomInspection: null, affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, view: null, techFocus: null,
+          roomInspection: null, routingDraft: null, affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, view: null, techFocus: null,
           tour: null, running: false, deployRush: false, lastAction: null, toast: null, activeMark: document.hidden ? null : performance.now() });
         return;
       }
@@ -1488,7 +1499,7 @@ export function inspectInRoom(id: EquipmentId, appId?: string): void {
   inspectOrSelect(id, appId);
   // A Guided Mode machine's dialog holds its readings and actions, so the side panel stays as the player left it;
   // Challenge Mode's reveal points to the panel's inspector, which selecting opens.
-  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) }, ...(opensComponentDialog(game, id) ? { panelOpen } : {}) });
+  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) }, routingDraft: null, ...(opensComponentDialog(game, id) ? { panelOpen } : {}) });
 }
 
 /** Whether inspecting this machine opens Guided Mode's component dialog rather than Challenge Mode's reveal. */

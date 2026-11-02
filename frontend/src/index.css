@@ -3719,6 +3719,11 @@ button:disabled {
   justify-content: flex-end;
 }
 
+/* A dialog that ends a chapter is wide enough for Stay and Continue to sit side by side; phones still wrap them. */
+.modal:has(.chapter-end-foot) {
+  width: min(560px, 100%);
+}
+
 .chapter-end-extra {
   margin-right: auto;
 }
