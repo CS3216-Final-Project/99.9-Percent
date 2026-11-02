@@ -18,9 +18,9 @@ it("shows the Scaling headroom blocker without disabling experimentation",()=>{
  expect(met("headroom")).toBe("false");expect(guidance().textContent).toContain("Database headroom: 1,000 / 2,000 ops/s");
  expect((inspectionAction(/Add server/) as HTMLButtonElement).disabled).toBe(false);expect(screen.queryByRole("button",{name:/Continue to Data Strategy/})).toBeNull();
 });
-it("shows unmet Data requirements and keeps workload contrast optional",()=>{
+it("shows unmet Data requirements without an optional-purchases note",()=>{
  const g=dataCompany();g.campaign!.dbBacklog=1;g.campaign!.snapshot.latencyMs=500;show(g);
- expect(met("queues")).toBe("false");expect(met("healthy")).toBe("false");expect(guidance().textContent).toContain("Workload contrast is optional");
+ expect(met("queues")).toBe("false");expect(met("healthy")).toBe("false");expect(guidance().textContent).not.toContain("Workload contrast is optional");
  expect(screen.queryByRole("button",{name:/Continue to Traffic Spikes/})).toBeNull();
 });
 it("counts stable spike observations and waits for an explicit acknowledgement",()=>{
