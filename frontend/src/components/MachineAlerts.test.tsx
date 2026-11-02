@@ -8,7 +8,8 @@ import { TaskRow } from "./ui";
 
 beforeEach(() => {
   localStorage.clear();
-  useGame.setState({ ...useGame.getInitialState(), game: newLegacyGame(1), mode: "classic", ready: true, started: true });
+  // A company that has said what it builds, with the original balance, so weeks move on.
+  useGame.setState({ ...useGame.getInitialState(), game: { ...newLegacyGame(1), appProfile: "general" }, mode: "classic", ready: true, started: true });
 });
 afterEach(cleanup);
 

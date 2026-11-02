@@ -1,4 +1,4 @@
-import { completeTutorial, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, unlockChallenge } from "./fixtures";
+import { chooseAppProfile, completeTutorial, test, expect, expectRoom, savedGame, savedClassicGame, seedSave, unlockChallenge } from "./fixtures";
 import { newGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 
@@ -38,6 +38,7 @@ test("switches between Guided Mode and unlocked Challenge Mode from the menu, ke
   // control so pointer hit-testing during that motion does not consume the journey budget.
   const skip = page.getByRole("button", { name: "Skip", exact: true });
   await expect(skip).toBeVisible(); await skip.press("Enter");
+  await chooseAppProfile(page);
   await expectRoom(page);
   await page.getByRole("button", { name: /Next week/ }).click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("nn.classic.save.v1")!).game.turn)).toBe(2);

@@ -10,11 +10,14 @@ import {
   freeEngineers,
   latencyFor,
   organicRate,
+  promoSpike,
   promoUsers,
+  rpsPerUser,
   selfHealingFleet,
   utilisation,
   velocity,
 } from "./derive";
+import { appProfile } from "./appProfiles";
 import { createIncident, tickIncident, type IncidentSeed } from "./incidents";
 import { autoPostmortem, buildPostmortem } from "./postmortem";
 import { releaseTitle } from "./releases";
@@ -250,7 +253,7 @@ export function advanceTurn(prev: GameState): GameState {
   for (const id of s.activePromos) {
     const n = promoUsers(s, id);
     gained += n;
-    spike *= 1 + PROMOS[id].spike;
+    spike *= 1 + promoSpike(s, id);
     notes.push(`${PROMOS[id].name} brought in ${num(n)} new users.`);
   }
   let surgeLabel: string | undefined;
@@ -266,7 +269,7 @@ export function advanceTurn(prev: GameState): GameState {
   s.users += gained;
 
   const noise = 1 + rand(s) * BALANCE.trafficNoise;
-  const peakRps = s.users * BALANCE.rpsPerUser * spike * surgeMult * noise;
+  const peakRps = s.users * rpsPerUser(s) * spike * surgeMult * noise;
 
   const failure = resolveHostHealth(s);
   let unhandled: HostFailure | null = null;
@@ -398,7 +401,9 @@ function finishTurn(s: GameState): void {
   s.totals.costs += c.total;
 
   const worstUtil = Math.min(1, Math.max(peakU.appUtil, peakU.dbUtil));
-  const latencyPenalty = clamp((worstUtil - 0.7) / 0.3, 0, 1) * BALANCE.growth.latencyPenaltyMax;
+  // Users start to notice slowness at the profile's knee, and the full penalty arrives at saturation.
+  const knee = appProfile(s).latencyKnee;
+  const latencyPenalty = clamp((worstUtil - knee) / (1 - knee), 0, 1) * BALANCE.growth.latencyPenaltyMax;
   const errorPenalty = Math.min(BALANCE.growth.errorPenaltyMax, sustainedError * BALANCE.growth.errorPenaltyMult);
   const repairPenalty = s.tasks.some((t) => t.repairCode === "data_repair") ? BALANCE.growth.dataRepairPenalty : 0;
   const target = BALANCE.growth.satisfactionCeiling - latencyPenalty - errorPenalty - repairPenalty;

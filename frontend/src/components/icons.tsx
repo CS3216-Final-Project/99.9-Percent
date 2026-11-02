@@ -10,7 +10,7 @@ import {
   UserRoundPlus, Users, Volume2, VolumeX, TriangleAlert, Zap, Layers, Compass,
   Footprints, Camera, Funnel, Ban, StepForward, FastForward, CreditCard,
   PiggyBank, Repeat, ArrowDownToLine, Video, ScanEye, Map as MapIcon, Mouse, MouseLeft,
-  Maximize, LocateFixed, Captions, ZoomIn, ZoomOut, type LucideIcon,
+  Maximize, LocateFixed, Captions, ZoomIn, ZoomOut, Gamepad2, ShoppingCart, Music, MessageCircleHeart, AppWindow, type LucideIcon,
 } from "lucide-react";
 
 /** Stable concept names shared by the HUD, room, panels and reports. */
@@ -37,6 +37,7 @@ const ICONS = {
   cost: CreditCard, cashLeft: PiggyBank, upkeep: Repeat, incoming: ArrowDownToLine,
   follow: Video, eyes: ScanEye, map: MapIcon, mouse: Mouse, mouseLeft: MouseLeft,
   fit: Maximize, locate: LocateFixed, captions: Captions, zoomIn: ZoomIn, zoomOut: ZoomOut,
+  appProfile: AppWindow, social: MessageCircleHeart, gaming: Gamepad2, ecommerce: ShoppingCart, streaming: Music,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

@@ -255,5 +255,14 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     expect(after.turn).toBe(2);
     expect(after.infra.appHosts).toHaveLength(2);
     expect(after.totals.promosRun).toBe(1);
+
+    // Then the company says what it builds: the cards stack, and Start building stays in reach.
+    const picker = page.getByRole("dialog", { name: "What are you building?" });
+    await picker.getByRole("radio", { name: "Music streaming" }).check();
+    const build = picker.getByRole("button", { name: "Start building", exact: true });
+    await expect(build).toBeInViewport();
+    await page.screenshot({ path: `${SHOTS}/phone-challenge-${width}x${height}-05-app-profile.png` });
+    await build.tap();
+    await expect(page.getByRole("button", { name: "Your app: Music streaming" })).toBeVisible();
   });
 }

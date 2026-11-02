@@ -4,6 +4,7 @@ import { APPLICATION_SCALING as S } from "./scenarios/applicationScaling";
 import { openingTuning } from "./launchWeek";
 import { BALANCE, PROMOS } from "./balance";
 import { has, TECH } from "./tech";
+import { appProfile } from "./appProfiles";
 import type { EquipmentId, GameState, PromoId, Release, TechId, Warning } from "./types";
 import { serverName } from "./names";
 
@@ -57,10 +58,11 @@ export function dbCapacity(s: GameState): number {
 /** Database queries generated per request that the app tier serves. */
 export function dbLoadFactor(s: GameState): number {
   if(s.campaign)return 1;
+  const profile = appProfile(s);
   const reduction = has(s, "cache_tuning") ? BALANCE.db.tunedCacheReduction : BALANCE.db.cacheReduction;
-  const eligibleReduction = Math.min(BALANCE.db.cacheEligibleShare, reduction);
+  const eligibleReduction = Math.min(profile.cacheEligibleShare, reduction);
   const warmth = clamp(s.cacheWarmth ?? 1, 0, 1);
-  return BALANCE.db.queriesPerRequest * (has(s, "caching") ? 1 - eligibleReduction * warmth : 1);
+  return BALANCE.db.queriesPerRequest * profile.dbLoad * (has(s, "caching") ? 1 - eligibleReduction * warmth : 1);
 }
 
 export interface Utilisation {
@@ -135,7 +137,7 @@ export function costs(s: GameState, tempServers = 0): CostBreakdown {
 }
 
 export function arpu(s: GameState): number {
-  return BALANCE.arpu * (has(s, "analytics") ? BALANCE.analyticsArpuBonus : 1);
+  return BALANCE.arpu * appProfile(s).revenue * (has(s, "analytics") ? BALANCE.analyticsArpuBonus : 1);
 }
 
 export function weeklyRevenue(s: GameState): number {
@@ -208,7 +210,17 @@ export function fixEffort(release: Pick<Release, "size">): number {
 
 export function promoUsers(s: GameState, id: PromoId): number {
   const quality = clamp(s.satisfaction / 80, 0.5, 1.1);
-  return Math.round(s.users * PROMOS[id].userGain * quality);
+  return Math.round(s.users * PROMOS[id].userGain * appProfile(s).promoGain[id] * quality);
+}
+
+/** Extra peak traffic a promotion brings this company in the week it runs (0.3 = +30%). */
+export function promoSpike(s: Pick<GameState, "appProfile">, id: PromoId): number {
+  return PROMOS[id].spike * appProfile(s).promoSpike[id];
+}
+
+/** Peak requests per second each of this company's users makes. */
+export function rpsPerUser(s: Pick<GameState, "appProfile">): number {
+  return BALANCE.rpsPerUser * appProfile(s).traffic;
 }
 
 export function promoCost(s: GameState, id: PromoId): number {
@@ -240,13 +252,13 @@ export function forecast(s: GameState): Forecast {
   let mult = 1;
   for (const id of s.activePromos) {
     users += promoUsers(s, id);
-    mult *= 1 + PROMOS[id].spike;
+    mult *= 1 + promoSpike(s, id);
   }
   if (s.upcomingSurge && s.upcomingSurge.turn === s.turn) {
     users += Math.round(s.users * s.upcomingSurge.users);
     mult *= s.upcomingSurge.mult;
   }
-  const peakLow = users * BALANCE.rpsPerUser * mult;
+  const peakLow = users * rpsPerUser(s) * mult;
   const peakHigh = peakLow * (1 + BALANCE.trafficNoise);
   const tempServers = autoscaleServers(s, peakHigh);
   const low = utilisation(s, peakLow, tempServers);

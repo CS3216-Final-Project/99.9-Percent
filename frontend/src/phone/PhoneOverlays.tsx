@@ -3,6 +3,7 @@ import { CampaignOverlays } from "@/components/CampaignUI";
 import { ToastHost } from "@/components/Game";
 import InspectionReveal from "@/components/InspectionReveal";
 import { EndReport, HowToPlay, PostmortemModal } from "@/components/Modals";
+import { AppProfilePicker } from "@/components/AppProfile";
 import { PhoneCampaignComplete } from "./PhoneCampaignComplete";
 import { PhoneHome } from "./PhoneHome";
 import { PhoneMenu } from "./PhoneMenu";
@@ -25,6 +26,7 @@ export function PhoneOverlays() {
         {!started && <PhoneHome />}
         {started && view === "menu" && <PhoneMenu />}
         {started && onboarding && <HowToPlay />}
+        <AppProfilePicker />
         {started && phase === "review" && <PostmortemModal />}
         {started && phase === "ended" && <EndReport />}
       </>}

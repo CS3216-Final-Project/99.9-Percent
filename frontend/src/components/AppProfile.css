@@ -1,0 +1,214 @@
+/* What the Challenge Mode company builds: the card picker after the first-week tutorial and the top bar's reminder. */
+
+/* Each kind of app wears one pastel tile family from the shared palette. */
+[data-profile="social"] { --profile-tile: var(--tile-pink); --profile-ink: var(--tile-pink-ink); --profile-accent: var(--c-growth); }
+[data-profile="gaming"] { --profile-tile: var(--tile-purple); --profile-ink: var(--tile-purple-ink); --profile-accent: var(--c-tech); }
+[data-profile="ecommerce"] { --profile-tile: var(--tile-orange); --profile-ink: var(--tile-orange-ink); --profile-accent: var(--c-team); }
+[data-profile="streaming"] { --profile-tile: var(--tile-green); --profile-ink: var(--tile-green-ink); --profile-accent: var(--c-revenue); }
+[data-profile="general"] { --profile-tile: var(--tile-blue); --profile-ink: var(--tile-blue-ink); --profile-accent: var(--c-users); }
+
+.app-profile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgb(14 11 30 / 0.82);
+  overflow-y: auto;
+}
+
+.app-profile-picker {
+  width: min(1120px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--on-night);
+  outline: none;
+}
+
+.app-profile-head { text-align: center; }
+.app-profile-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  color: var(--go);
+}
+.app-profile-head p {
+  max-width: 56ch;
+  margin: 6px auto 0;
+  font-size: var(--text-md);
+  color: var(--on-night-soft);
+}
+
+.app-profile-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.app-profile-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--control-edge);
+  border-radius: var(--radius-panel);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.app-profile-card:hover { border-color: var(--profile-accent); background: #fff; }
+.app-profile-card.is-on {
+  border-color: var(--go);
+  box-shadow: 0 0 0 3px var(--go), var(--lift);
+  background: #fff;
+}
+/* The radio covers the whole card, unseen, so the card is one large target (as the Graphics quality cards). */
+.app-profile-card > input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.app-profile-card:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+.app-profile-card-head {
+  padding: 12px 16px;
+  background: var(--profile-tile);
+  color: var(--profile-ink);
+  text-align: center;
+}
+.app-profile-card-head strong {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+}
+.app-profile-card.is-on .app-profile-card-head { background: var(--go); color: var(--ink); }
+
+.app-profile-art {
+  display: grid;
+  place-items: center;
+  height: 112px;
+  margin: 14px 14px 0;
+  border-radius: var(--radius);
+  color: var(--profile-ink);
+  background:
+    radial-gradient(circle at 30% 30%, rgb(255 255 255 / 0.65), transparent 55%),
+    repeating-linear-gradient(135deg, transparent 0 10px, rgb(255 255 255 / 0.28) 10px 20px),
+    var(--profile-tile);
+  border: 1px solid color-mix(in srgb, var(--profile-ink) 25%, transparent);
+}
+
+.app-profile-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 16px;
+}
+.app-profile-pitch {
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-align: center;
+}
+
+.app-profile-subhead {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+.app-profile-needs {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.app-profile-needs li { display: flex; gap: 6px; align-items: flex-start; }
+.app-profile-needs .icon, .app-profile-needs svg { flex: none; margin-top: 2px; color: var(--ok-ink); }
+.app-profile-risk {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: auto 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--control-edge);
+  font-size: var(--text-sm);
+  color: var(--warn-ink);
+}
+.app-profile-risk svg { flex: none; margin-top: 2px; }
+
+.app-profile-foot {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+.app-profile-note { color: var(--on-night-soft); font-size: var(--text-sm); }
+.app-profile-start { flex: none; min-width: 190px; gap: 8px; }
+
+/* The top bar's button sits where Guided Mode keeps Hint, in the profile's own tile colour. */
+.app-profile-btn { background: var(--profile-tile); color: var(--profile-ink); border-color: color-mix(in srgb, var(--profile-ink) 30%, transparent); }
+.app-profile-btn:hover:not(:disabled), .app-profile-btn.is-open { background: var(--paper); }
+
+.app-profile-popover {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  overflow-y: auto;
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--lift);
+  outline: none;
+}
+.app-profile-popover-head { display: flex; gap: 10px; align-items: flex-start; }
+.app-profile-popover-head > div { flex: 1; }
+.app-profile-popover-head h3 { margin: 0; font-family: var(--font-display); font-size: var(--text-lg); }
+.app-profile-popover-head p { margin: 2px 0 0; font-size: var(--text-sm); color: var(--text-soft); }
+.app-profile-popover-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: var(--radius);
+  background: var(--profile-tile);
+  color: var(--profile-ink);
+}
+.app-profile-popover .app-profile-risk { margin-top: 0; }
+.app-profile-effects { display: grid; gap: 2px; margin: 0; font-size: var(--text-sm); }
+.app-profile-effects > div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px dashed var(--control-edge); }
+.app-profile-effects dt { color: var(--text-soft); }
+.app-profile-effects dd { margin: 0; font-family: var(--font-num); font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+
+@media (max-width: 960px) {
+  .app-profile-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .app-profile-backdrop { place-items: start center; }
+  .app-profile-head h2 { font-size: var(--text-2xl); }
+  .app-profile-cards { grid-template-columns: 1fr; gap: 10px; }
+  .app-profile-art { display: none; }
+  .app-profile-card-head { text-align: left; }
+  .app-profile-pitch { text-align: left; }
+  .app-profile-foot { position: sticky; bottom: 0; flex-direction: column; align-items: stretch; padding: 12px 0 4px; background: rgb(14 11 30 / 0.95); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-profile-card { transition: none; }
+}

@@ -4,6 +4,7 @@
  */
 export * from "./types";
 export { BALANCE, PROMOS, PROMO_ORDER } from "./balance";
+export { APP_PROFILES, APP_PROFILE_CHOICES, APP_PROFILE_LAST_TURN, appProfile, needsAppProfile, type AppProfileDef } from "./appProfiles";
 export { BRANCHES, TECH, TECH_ORDER, has, isResearchTech, completedTechIds, techStatus, missingPrerequisites } from "./tech";
 export * from "./derive";
 export { serverName } from "./names";

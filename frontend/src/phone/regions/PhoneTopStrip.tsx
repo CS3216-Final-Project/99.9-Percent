@@ -9,6 +9,7 @@ import { FinanceEntry } from "@/components/CampaignFinance";
 import { healthOf } from "@/components/health";
 import { Icon } from "@/components/icons";
 import { SoundButton } from "@/components/SoundButton";
+import { AppProfileButton } from "@/components/AppProfile";
 import { tipProps } from "@/components/tips";
 import { Meter, Stat } from "@/components/ui";
 import { PhoneChapterRow } from "../layout/PhoneChapterRow";
@@ -63,6 +64,7 @@ export function PhoneTopStrip() {
           {statsOpen && (campaign ? <GuidedNumbers /> : <ClassicNumbers />)}
         </div>
       </div>
+      {!campaign && <AppProfileButton />}
       <SoundButton />
       <button type="button" className="icon-btn menu-btn" aria-label="Menu" {...tipProps("Menu")} onClick={() => openView("menu")}><Icon name="menu" /></button>
     </div>

@@ -168,7 +168,12 @@ export async function expectRoom(page: Page, timeout?: number) {
 }
 
 /** Classic keeps the weekly state in its own save slot. */
-export async function seedClassicSave(page: Page, game: GameState) {
+/**
+ * Seed a Challenge Mode run. A company that has not yet said what it builds is seeded as a general app, the original
+ * balance, so journeys about something else are not stopped by the choice; journeys about the choice start fresh.
+ */
+export async function seedClassicSave(page: Page, seeded: GameState) {
+  const game = seeded.appProfile === null ? { ...seeded, appProfile: "general" as const } : seeded;
   await page.addInitScript(({ game, meta }) => {
     if (localStorage.getItem('nn.classic.save.v1') === null) {
       localStorage.setItem('nn.classic.save.v1', JSON.stringify({ savedAt: 1, game }));
@@ -253,5 +258,14 @@ export async function completeTutorial(page: Page, {keepChapterGuide=false}: {ke
     const guide=page.getByRole("dialog",{name:"Chapter guide, step 1 of 1"});
     if(!keepChapterGuide&&await guide.isVisible())await guide.getByRole("button",{name:"Got it",exact:true}).click();
   } else if(await doors.isVisible())await doors.click();
-  else await skip.click();
+  else { await skip.click(); await chooseAppProfile(page); }
+}
+
+/** Answer Challenge Mode's "What are you building?" cards, which follow its first-week tutorial or a skipped one. */
+export async function chooseAppProfile(page: Page, name = "Social media") {
+  const picker = page.getByRole("dialog", { name: "What are you building?" });
+  await expect(picker).toBeVisible();
+  await picker.getByRole("radio", { name }).check();
+  await picker.getByRole("button", { name: "Start building", exact: true }).click();
+  await expect(picker).toBeHidden();
 }
