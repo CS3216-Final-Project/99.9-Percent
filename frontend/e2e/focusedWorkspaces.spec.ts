@@ -67,8 +67,8 @@ for (const phone of [false, true]) test.describe(phone ? "phone focused workspac
     await expect(summary.locator(".inspection-status")).toHaveText("Healthy");
     await inspector.getByRole("button", { name: "Server management", exact: true }).click();
     await inspector.locator('[data-guidance-app="app-1"]').click();
-    await expect(inspector.getByRole("heading", { name: "Server 1", exact: true })).toBeVisible();
-    await expect(summary.locator(".inspection-status > span")).toHaveText(["Healthy", "Server 1"]);
+    await expect(inspector).toHaveAccessibleName("Server 1");
+    await expect(summary.locator(".inspection-status")).toHaveText("Healthy");
     const serverPortrait = (await summary.locator(".inspection-disc").boundingBox())!;
     const serverHealth = (await summary.locator(".inspection-status").boundingBox())!;
     expect(serverHealth.y - (serverPortrait.y + serverPortrait.height)).toBeCloseTo(12, 1);

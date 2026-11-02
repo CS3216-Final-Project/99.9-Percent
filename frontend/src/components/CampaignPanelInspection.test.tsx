@@ -31,7 +31,7 @@ it.each([
   expect(within(panel()).queryByRole("tablist")).toBeNull();
   expect(within(panel()).queryByRole("button", { name: /^Add server/ })).toBeNull();
   fireEvent.click(within(panel()).getByRole("button", { name: "App Server" }));
-  expect(within(screen.getByRole("dialog", { name: "App Servers" })).getByRole("button", { name: /^Add server/ })).toBeTruthy();
+  expect(within(document.querySelector<HTMLElement>(".component-inspection-app")!).getByRole("button", { name: /^Add server/ })).toBeTruthy();
 });
 
 it("an accepted hint guides the player through the component to its purchase", () => {

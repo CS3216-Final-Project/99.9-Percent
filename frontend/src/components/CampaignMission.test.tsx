@@ -41,7 +41,7 @@ it("keeps optional autoscaling evidence in App Servers, not the mission",()=>{
   fireEvent.click(screen.getByRole("button",{name:"App Server"}));
   fireEvent.click(screen.getByRole("button",{name:"Server management"}));
   fireEvent.click(screen.getByRole("button",{name:"Autoscaling"}));
-  expect(within(screen.getByRole("dialog",{name:"App Servers"})).getByText("Technical Details")).toBeTruthy();
+  expect(within(document.querySelector<HTMLElement>(".component-inspection-app")!).getByText("Technical Details")).toBeTruthy();
 });
 
 it("keeps reliability arming actionable and derives its next scheduled stage",()=>{

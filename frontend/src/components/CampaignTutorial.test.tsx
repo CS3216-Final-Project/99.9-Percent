@@ -147,7 +147,7 @@ it("keeps the Deploy Health Checks step on its own action when the player buys s
   const guide = () => screen.getByRole("dialog", { name: "Chapter guide, step 3 of 3" });
   expect(guide().textContent).toContain("Click Monitoring.");
   fireEvent.click(screen.getByRole("button", { name: "App Server" }));
-  fireEvent.click(within(screen.getByRole("dialog", { name: "App Servers" })).getByRole("button", { name: /^Add server/ }));
+  fireEvent.click(within(document.querySelector<HTMLElement>(".component-inspection-app")!).getByRole("button", { name: /^Add server/ }));
   expect(guide().textContent).not.toContain("Press Confirm.");
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
   fireEvent.click(screen.getByRole("button", { name: "Monitoring" }));
