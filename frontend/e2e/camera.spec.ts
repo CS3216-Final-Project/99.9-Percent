@@ -1,8 +1,21 @@
 import type { Page } from "@playwright/test";
-import { test, expect, expectRoom, openCameraControls, seedClassicSave, unlockChallenge } from "./fixtures";
-import { advanceTurn, newLegacyGame } from "../src/sim";
+import { test, expect, expectRoom, openCameraControls, seedClassicSave, seedSave, unlockChallenge } from "./fixtures";
+import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
+import { advanceSteps } from "../src/sim/step";
 
 type Point = { x: number; y: number };
+
+/** Pairs of shown room labels whose boxes cover each other on screen, by name. */
+function coveredLabels(page: Page): Promise<string[]> {
+  return page.locator(".eq-labels > :not(.is-quiet)").evaluateAll(els => {
+    const shown = els.filter(el => getComputedStyle(el).visibility === "visible").map(el => ({ name: el.getAttribute("aria-label") ?? el.textContent ?? "", r: el.getBoundingClientRect() }));
+    const covered: string[] = [];
+    shown.forEach((a, i) => shown.slice(i + 1).forEach(b => {
+      if (a.r.left < b.r.right - 1 && b.r.left < a.r.right - 1 && a.r.top < b.r.bottom - 1 && b.r.top < a.r.bottom - 1) covered.push(`${a.name} / ${b.name}`);
+    }));
+    return covered;
+  });
+}
 
 /**
  * Presses a key and records where the equipment labels sit on average, relative to the middle of the room, on every
@@ -96,9 +109,28 @@ test("zooming out shrinks the equipment labels with the room, never below a clic
   for (const h of shrunk) expect(h.shown).toBeGreaterThanOrEqual(24 - 0.5);
   const small = (await database.boundingBox())!;
   expect(small.width).toBeLessThan(full.width * 0.9);
+  // Network and Servers stand side by side: the room moves one label clear rather than covering the other.
+  expect(await coveredLabels(page)).toEqual([]);
   await page.screenshot({ path: "test-results/camera-zoomed-out.png" });
 
   // A shrunk label is still the machine's control.
   await database.click();
   await expect(database).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Guided Mode's server floor labels never cover each other, framed or zoomed right out", async ({ page }) => {
+  test.slow();
+  await seedSave(page, advanceSteps(newGame(1), 7).state);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click();
+  await expectRoom(page, 30_000);
+  const room = page.locator(".eq-labels");
+  for (const name of ["Network", "Servers", "Database", "Monitoring"]) await expect(room.getByRole("button", { name, exact: true })).toBeVisible();
+  await expect(page.getByLabel(/^In: /)).toBeVisible();
+
+  await expect.poll(() => coveredLabels(page)).toEqual([]);
+  await openCameraControls(page);
+  for (let i = 0; i < 12; i++) await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await expect.poll(() => coveredLabels(page)).toEqual([]);
+  await page.screenshot({ path: "test-results/camera-guided-zoomed-out.png" });
 });

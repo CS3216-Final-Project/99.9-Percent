@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { LABEL_FULL_ZOOM, LABEL_GAP, LABEL_MIN_PX, LABEL_TAIL, screenPoint, stackDown, stackUnder, zoomScale, type LabelSpot } from "./labels";
+import { LABEL_FULL_ZOOM, LABEL_GAP, LABEL_MIN_PX, LABEL_TAIL, screenPoint, separate, stackDown, stackUnder, zoomScale, type LabelSpot } from "./labels";
 
 const WIDTH = 1280;
 const HEIGHT = 720;
@@ -143,6 +143,39 @@ describe("label placement", () => {
     }
     // A label already at or below the minimum, or none measured yet, keeps its full size.
     for (const shortest of [LABEL_MIN_PX, 20, 0]) expect(zoomScale(10, shortest)).toBe(1);
+  });
+
+  it("moves a label that covers an earlier one the shorter way clear of it, leaving the earlier label in place", () => {
+    // Guided Mode's Servers label lands just below and right of Network's, covering its icon.
+    const network = { x: 200, y: 140, w: 130, h: 34 };
+    const servers = { x: 230, y: 160, w: 150, h: 45 };
+    const [n, s] = separate([network, servers]);
+    expect(n).toBe(140);
+    expect(s - servers.h).toBe(n + LABEL_TAIL + LABEL_GAP);
+    // Mostly above it instead, the later label goes up.
+    const [, above] = separate([network, { ...servers, y: 120 }]);
+    expect(above).toBe(network.y - network.h - LABEL_TAIL - LABEL_GAP);
+  });
+
+  it("leaves labels that already clear each other where they are", () => {
+    const spots = [{ x: 100, y: 200, w: 120, h: 34 }, { x: 260, y: 205, w: 120, h: 34 }, { x: 100, y: 260, w: 120, h: 34 }];
+    expect(separate(spots)).toEqual([200, 205, 260]);
+    expect(separate([])).toEqual([]);
+  });
+
+  it("clears every label of every other in a crowd piled on one spot, at the clearance asked for", () => {
+    for (const clearance of [LABEL_TAIL + LABEL_GAP, 6]) {
+      // Drawn sizes are scaled for zoom, so they are rarely whole pixels.
+      const spots = Array.from({ length: 7 }, (_, i) => ({ x: 400 + (i % 3) * 20.3, y: 300.1 + (i % 2) * 8.7, w: 130 * 0.71, h: (i % 2 ? 45 : 34) * 0.71 }));
+      const ys = separate(spots, clearance);
+      for (const y of ys) expect(Number.isFinite(y)).toBe(true);
+      for (let i = 0; i < spots.length; i++) {
+        for (let j = 0; j < i; j++) {
+          const [lo, hi] = ys[i] > ys[j] ? [i, j] : [j, i];
+          expect(ys[lo] - spots[lo].h).toBeGreaterThanOrEqual(ys[hi] + clearance - 1e-6);
+        }
+      }
+    }
   });
 
   it("is what separates a steady label from one a frame behind: projecting without it misses by pixels", () => {

@@ -79,7 +79,7 @@ import { bindViewFade, bothFloors, cameras, lookApi, lookingFromAvatar, viewNow 
 import { Ceiling } from "./Ceiling";
 import { ViewOverlay } from "./ViewOverlay";
 import { Minimap } from "./Minimap";
-import { screenPoint, stackDown, stackUnder, zoomScale } from "./labels";
+import { LABEL_GAP, LABEL_TAIL, screenPoint, separate, stackDown, stackUnder, zoomScale } from "./labels";
 import { EQUIPMENT, ROOM_PALETTE } from "./palette";
 import { trafficModel } from "./traffic";
 import { CampaignTraffic, Gate } from "./TrafficFlow";
@@ -816,6 +816,8 @@ const TRAFFIC_OUT = "traffic-out";
 const labelAt = new THREE.Vector2();
 /** Where each label goes this frame, and how large, kept until overlapping ones are moved apart. */
 const placed = new Map<string, { x: number; y: number; scale: number }>();
+/** The shown labels, in the order they claim their places when moved apart. */
+const separating: string[] = [];
 /** Labels behind a view from the avatar, hidden this frame. */
 const behind = new Set<string>();
 const inView = new THREE.Vector3();
@@ -936,6 +938,19 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
     const h = (Math.max(cacheEl.offsetHeight, dbEl.offsetHeight) + 12) * fit;
     if (Math.abs(cache.x - db.x) < ((cacheEl.offsetWidth + dbEl.offsetWidth) / 2) * fit && Math.abs(cache.y - db.y) < h) cache.y = Math.min(cache.y, db.y - h);
   }
+  // Whatever still overlaps - neighbouring machines whose anchors sit closer than their labels are wide - is moved
+  // apart. Equipment buttons keep their places first, the room's tags give way to them; hidden empty bays take no room.
+  // A label's own top margin (offsetTop, as it sits at the layer's top) lifts its box off the placed point.
+  separating.length = 0;
+  placed.forEach((_, key) => {
+    if (!labelEls.get(key)!.classList.contains("is-quiet")) separating.push(key);
+  });
+  separating.sort((a, b) => Number(labelEls.get(b) instanceof HTMLButtonElement) - Number(labelEls.get(a) instanceof HTMLButtonElement));
+  const clear = separate(separating.map((key) => {
+    const p = placed.get(key)!, el = labelEls.get(key)!;
+    return { x: p.x, y: p.y + el.offsetTop, w: el.offsetWidth * p.scale, h: el.offsetHeight * p.scale };
+  }), (LABEL_TAIL + LABEL_GAP) * fit);
+  separating.forEach((key, i) => { placed.get(key)!.y = clear[i] - labelEls.get(key)!.offsetTop; });
   placed.forEach(({ x, y, scale }, key) => {
     const el = labelEls.get(key)!;
     el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)${scale < 1 ? ` scale(${scale.toFixed(3)})` : ""}`;

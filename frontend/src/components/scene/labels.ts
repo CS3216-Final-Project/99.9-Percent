@@ -65,6 +65,36 @@ export function stackDown(spots: LabelSpot[], first = 0): number[] {
   return out;
 }
 
+/**
+ * Y positions that keep every label clear of every earlier one, whatever placed them. `spots` carry each label's
+ * centre x, bottom y and drawn size, earliest first; an earlier label keeps its place and a later one that would
+ * cover it moves to the nearest height, up or down, where it clears all of them by the tail and gap of `clearance`.
+ * Taking the nearest free height keeps a label close to its machine and slides it smoothly as the view turns.
+ */
+export function separate(spots: LabelSpot[], clearance = LABEL_TAIL + LABEL_GAP): number[] {
+  const out = new Array<number>(spots.length);
+  for (let i = 0; i < spots.length; i++) {
+    const s = spots[i];
+    const near: number[] = [];
+    for (let j = 0; j < i; j++) if (Math.abs(spots[j].x - s.x) < (spots[j].w + s.w) / 2) near.push(j);
+    // A hair of slack, so a height computed to touch a neighbour exactly is not lost to rounding.
+    const free = (y: number) => near.every((j) => y - s.h >= out[j] + clearance - 1e-6 || y + clearance <= out[j] - spots[j].h + 1e-6);
+    // The free heights nearest the label's own lie just above or just below a label it would meet; past the
+    // highest or lowest of those there is always room.
+    let best = s.y;
+    if (!free(best)) {
+      best = Infinity;
+      for (const j of near) {
+        for (const y of [out[j] - spots[j].h - clearance, out[j] + s.h + clearance]) {
+          if (Math.abs(y - s.y) < Math.abs(best - s.y) && free(y)) best = y;
+        }
+      }
+    }
+    out[i] = best;
+  }
+  return out;
+}
+
 /** Same idea under a ceiling the labels must stay above: the last label sits at `ceiling`, each earlier one above it. */
 export function stackUnder(heights: number[], ceiling: number): number[] {
   const out = new Array<number>(heights.length);
