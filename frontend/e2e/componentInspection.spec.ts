@@ -78,7 +78,7 @@ test("component actions: App Server adding, Network prerequisite and read-only c
   await page.getByRole("dialog",{name:"Purchase preview"}).getByRole("button",{name:"Confirm",exact:true}).click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="scale-up"&&a.targetId==="app-2")).toBe(true);
   await page.locator('.campaign-panel [data-tutorial="inspect-gateway"]').click();
-  const network=page.getByRole("dialog",{name:"Network", exact: true});
+  const network=page.locator(".component-inspection-gateway");
   await network.getByRole("button",{name:"Network management",exact:true}).click();await expect(network.getByRole("button",{name:/Deploy load balancing/})).toBeVisible();
   await expect(network.getByText("Deploy load balancing before configuring routing.")).toBeVisible();
   await expect(network.locator(".route-check").first()).toBeDisabled();

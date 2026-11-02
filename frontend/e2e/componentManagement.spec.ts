@@ -57,7 +57,8 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     await expect(popup).toBeInViewport({ratio:1});await page.screenshot({path:info.outputPath(`fleet-${width}.png`)});
     await popup.getByRole("button",{name:"Server management",exact:true}).click();
     const heading=popup.getByRole("heading",{name:"Server management",exact:true});
-    await expect(heading).toHaveCSS("background-color","rgba(0, 0, 0, 0)");await expect(heading).toHaveCSS("border-bottom-style","solid");
+    // The view's name is the dialog title, not a second heading in the body.
+    await expect(popup).toHaveAccessibleName("Server management");await expect(heading).toHaveCount(1);
     await expect(heading.locator("svg")).toBeVisible();
     const counts=popup.getByLabel("Server counts").locator(".row");
     await expect(counts).toHaveCount(3);
