@@ -9,8 +9,8 @@
 :is(.campaign-incident-report, .report-lesson-summary) > section { display: flex; flex-direction: column; gap: 6px; margin-block: 14px; }
 .report-lesson-summary { display: contents; }
 :is(.campaign-incident-report, .report-lesson-summary) > section > :is(h3, p, dl) {
-  /* Neither side ever reaches past 60% of the report, so the left/right conversation stays readable. */
-  max-width: 60%;
+  /* Neither side ever reaches past 75% of the report, so the left/right conversation stays readable. */
+  max-width: 75%;
   margin: 0;
   padding: 8px 14px;
   border-radius: 10px;
@@ -35,7 +35,7 @@
   transform-origin: bottom right;
 }
 /* A table of readings fills its bubble, with its rules and labels light against the ink. */
-:is(.campaign-incident-report, .report-lesson-summary) > section > dl { width: 60%; padding-block: 2px; }
+:is(.campaign-incident-report, .report-lesson-summary) > section > dl { width: 75%; padding-block: 2px; }
 :is(.campaign-incident-report, .report-lesson-summary) > section > dl .row { border-bottom-color: rgb(255 247 232 / .2); }
 :is(.campaign-incident-report, .report-lesson-summary) > section > dl .row:last-child { border-bottom: 0; }
 :is(.campaign-incident-report, .report-lesson-summary) > section > dl dt { color: var(--on-night-soft); }

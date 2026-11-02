@@ -36,7 +36,7 @@ test("Opening legacy prevention: later history survives and recognition unlocks 
   for (const b of bubbles) {
     expect(b.fill).not.toBe("rgba(0, 0, 0, 0)");
     expect(Math.round(b.tag === "P" ? b.right : b.left)).toBe(0);
-    expect(b.share).toBeLessThanOrEqual(0.6);
+    expect(b.share).toBeLessThanOrEqual(0.75);
   }
   await expect(page.locator(".campaign-gold-attention")).toHaveCount(0);
   await expect(recognition.locator("details")).toHaveCount(1);

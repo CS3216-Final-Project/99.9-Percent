@@ -23,7 +23,7 @@ test("Chapter 5 clarity: incident report keeps its evidence and Continue company
   }));
   for (const [i, b] of turns.entries()) {
     if (i) expect(b.delay).toBeGreaterThan(turns[i - 1].delay);
-    expect(b.share).toBeLessThanOrEqual(0.6);
+    expect(b.share).toBeLessThanOrEqual(0.75);
     if (b.tag !== "H3") expect(Math.round(b.right)).toBe(0);
   }
   expect(turns.some(b => b.tag === "DL")).toBe(true);
