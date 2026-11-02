@@ -5,30 +5,36 @@
 .inspection-back { justify-self: start; }
 .inspection-fleet-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 0; }
 /* Shared Server Management cards; live counts, routing and actions remain authoritative. */
-:is(.component-inspection-app,.component-inspection-gateway) .inspection-management-heading { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--tile-purple); color: var(--tile-purple-ink); font-size: var(--text-md); }
+:is(.component-inspection-app,.component-inspection-gateway) .inspection-management-heading { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--ink); font-size: var(--text-md); }
+:is(.component-inspection-app,.component-inspection-gateway) .inspection-management-heading > .icon { flex: none; color: var(--text-soft); }
+/* A plain heading, not a filled bar, so it cannot read as a disabled button; colour stays with status. */
+.component-inspection-app .inspection-management-heading { padding: 4px 0 10px; border-bottom: 1px solid var(--paper-3); }
 /* Network management keeps its title and back control on one header row above the action sections. */
-.component-inspection-gateway .inspection-management-header { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--paper-3); }
-.component-inspection-gateway .inspection-management-header .inspection-management-heading { flex: 1; min-width: 0; }
+.component-inspection-gateway .inspection-management-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--paper-3); }
+/* On narrow phones the back control wraps below the title instead of clipping it. */
+.component-inspection-gateway .inspection-management-header .inspection-management-heading { flex: 1 1 auto; min-width: max-content; }
 .component-inspection-gateway .inspection-management-header .inspection-back { flex: none; }
-.inspection-fleet-summary .row { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 6px; border: 0; border-radius: 12px; text-align: center; background: var(--tile-purple); }
-.inspection-fleet-summary .row:nth-child(2) { background: var(--tile-green); }
-.inspection-fleet-summary .row:nth-child(3) { background: var(--tile-blue); }
-.inspection-fleet-summary .row dt { color: var(--text-soft); font-size: var(--text-xs); }
-.inspection-fleet-summary .row dd { margin: 0; text-align: center; width: 100%; color: var(--ink); font-size: var(--text-lg); font-weight: 700; }
+/* Count tiles share the cards' colour language: neutral for installed, green for health, blue for routing. */
+.inspection-fleet-summary .row { --tile-bg: var(--paper-2); --tile-ink: var(--text-soft); --tile-value: var(--ink); --tile-edge: var(--control-edge); display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 6px; border: 1px solid var(--tile-edge); border-radius: 12px; text-align: center; background: var(--tile-bg); }
+.inspection-fleet-summary .row:nth-child(2) { --tile-bg: var(--tile-green); --tile-ink: var(--tile-green-ink); --tile-value: var(--ok-ink); --tile-edge: color-mix(in srgb, var(--ok-ink) 28%, var(--tile-green)); }
+.inspection-fleet-summary .row:nth-child(3) { --tile-bg: var(--tile-blue); --tile-ink: var(--tile-blue-ink); --tile-value: var(--tile-blue-ink); --tile-edge: color-mix(in srgb, var(--tile-blue-ink) 28%, var(--tile-blue)); }
+.inspection-fleet-summary .row dt { color: var(--tile-ink); font-size: var(--text-xs); }
+.inspection-fleet-summary .row dd { margin: 0; text-align: center; width: 100%; color: var(--tile-value); font-size: var(--text-lg); font-weight: 700; }
 .inspection-server-cards { display: grid; grid-template-columns: repeat(auto-fit,minmax(112px,1fr)); gap: 8px; }
 .inspection-server-card { display: grid; justify-items: start; align-content: start; gap: 6px; padding: 10px; border: 1px solid var(--control-edge); border-radius: 12px; background: var(--paper); color: var(--ink); text-align: left; }
-.inspection-server-card:hover { background: var(--paper-2, var(--tile-purple)); }
-.inspection-server-card[aria-pressed="true"] { border-color: var(--tile-purple-ink); }
+.inspection-server-card:hover { background: var(--control-hover); }
+.inspection-server-card[aria-pressed="true"] { border-color: var(--selection-edge); }
 .inspection-server-card strong { display: flex; gap: 5px; align-items: center; }
 .inspection-server-card span { font-size: var(--text-xs); }
 .inspection-server-card .inspection-server-health { padding: 2px 7px; border-radius: 8px; background: var(--tile-green); color: var(--ok-ink); text-transform: capitalize; }
 .inspection-server-card[data-health="failed"] { border-color: var(--critical-ink); }
 .inspection-server-card[data-health="failed"] .inspection-server-health { background: var(--tile-pink); color: var(--critical-ink); }
 .inspection-server-route { display: flex; align-items: baseline; gap: 5px; color: var(--text-soft); }
-.inspection-server-route::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--tile-purple-ink); }
-.inspection-server-route[data-routed="true"]::before { background: var(--ok-ink); }
-.inspection-warning { margin: 0; border: 1px solid var(--control-edge); border-radius: 10px; background: var(--tile-gold); color: var(--warn-ink); padding: 8px 10px; font-size: var(--text-sm); }
-.inspection-autoscaling-info { display: flex; align-items: center; gap: 8px; margin: 0; padding: 9px 10px; border-radius: 10px; background: var(--tile-blue); color: var(--tile-blue-ink); font-size: var(--text-sm); }
+.inspection-server-route::before { content: ""; flex: none; width: 6px; height: 6px; box-sizing: border-box; border: 1.5px solid currentColor; border-radius: 50%; }
+.inspection-server-route[data-routed="true"] { color: var(--tile-blue-ink); }
+.inspection-server-route[data-routed="true"]::before { background: currentColor; }
+.inspection-warning { margin: 0; border: 1px solid color-mix(in srgb, var(--warn-ink) 30%, var(--tile-gold)); border-radius: 10px; background: var(--tile-gold); color: var(--warn-ink); padding: 8px 10px; font-size: var(--text-sm); }
+.inspection-autoscaling-info { display: flex; align-items: center; gap: 8px; margin: 0; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--tile-blue-ink) 28%, var(--tile-blue)); border-radius: 10px; background: var(--tile-blue); color: var(--tile-blue-ink); font-size: var(--text-sm); }
 .inspection-autoscaling-info > svg { flex: none; }
 .component-inspection-app [data-inspection-view="management"] > .more { margin: 0; padding: 0; border: 1px solid var(--control-edge); border-radius: 10px; }
 .component-inspection-app [data-inspection-view="management"] > .more > summary { padding: 9px 10px; color: var(--ink); font-size: var(--text-sm); }
@@ -197,7 +203,7 @@
 }
 
 /* A compact quote: one routing notice, then short supporting facts. */
-:is(.campaign-action-popover, .component-purchase) .campaign-purchase-note { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: var(--radius); background: var(--tile-blue); color: var(--tile-blue-ink); }
+:is(.campaign-action-popover, .component-purchase) .campaign-purchase-note { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--tile-blue-ink) 28%, var(--tile-blue)); border-radius: 10px; background: var(--tile-blue); color: var(--tile-blue-ink); }
 .campaign-purchase-note > .icon { flex: none; margin-top: 2px; }
 .campaign-purchase-note strong { display: block; font-family: var(--font-display); font-weight: 600; }
 :is(.campaign-action-popover, .component-purchase) .purchase-facts { display: grid; gap: 10px; margin: 4px 0 8px; }
