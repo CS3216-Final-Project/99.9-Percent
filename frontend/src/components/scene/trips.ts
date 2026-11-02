@@ -1,6 +1,7 @@
 import { otherFloor, type Floor } from "@/game/floors";
 import { DOORS, doorsAt, FLOOR_Y, RIDE_SECONDS, rideAt } from "./levels";
-import { doorsNow, now, ride, rideClock, riding } from "./ride";
+import { doorsNow, ride, rideClock, riding } from "./ride";
+import { worldNow } from "./worldClock";
 
 /*
  * The car's errands for the crew, between the player's own rides (ride.ts). The car rests at the floor in view.
@@ -8,6 +9,9 @@ import { doorsNow, now, ride, rideClock, riding } from "./ride";
  * it on an errand: the doors shut, it travels there, stands with its doors open while they get on and off, and
  * comes back, so it is home again for the player. The player's own ride always comes first: it ends an errand at
  * once, wherever the car is.
+ *
+ * Errands and calls run on the world's clock (worldClock.ts), so they hold while the company is paused; the
+ * player's own ride runs on the page's clock and is read without `at`.
  *
  * Plain arithmetic on the clock, kept free of React and three.js so it can be tested; the room reads the car's
  * height and doors from here rather than from the ride.
@@ -20,7 +24,7 @@ export interface Errand {
   home: Floor;
   away: Floor;
   phase: ErrandPhase;
-  /** Seconds on the page's clock when this phase began. */
+  /** Seconds on the world's clock when this phase began. */
   since: number;
   /** How far open the doors at home were as it set off; they close from there. */
   closing: number;
@@ -51,8 +55,8 @@ export function onErrandEnd(listener: (e: Errand, at: number) => void): () => vo
 }
 
 /** How far open a floor's doors are now: for the player's ride, an errand, or a call where the car rests. */
-export function carDoors(floor: Floor, at = now()): number {
-  if (riding()) return doorsNow(floor, at);
+export function carDoors(floor: Floor, at = worldNow()): number {
+  if (riding()) return doorsNow(floor);
   if (errand) {
     const e = errand;
     const t = at - e.since;
@@ -64,12 +68,12 @@ export function carDoors(floor: Floor, at = now()): number {
     if (e.phase === "home") return floor === e.home ? doorsAt(t) : 0;
     return 0;
   }
-  const open = doorsNow(floor, at);
+  const open = doorsNow(floor);
   return call && call.floor === floor ? Math.max(open, doorsAt(at - call.at)) : open;
 }
 
 /** The height of the car's floor now. */
-export function carY(at = now()): number {
+export function carY(at = worldNow()): number {
   if (riding() || !errand) return ride.y;
   const e = errand;
   const [home, away] = [FLOOR_Y[e.home], FLOOR_Y[e.away]];
@@ -90,9 +94,9 @@ export function carStandsAt(): Floor | null {
 }
 
 /** What the floor indicators show now: the floor the car is at or passing, and which way it is going. */
-export function carIndicator(at = now()): { floor: Floor; arrow: "up" | "down" | null } {
+export function carIndicator(at = worldNow()): { floor: Floor; arrow: "up" | "down" | null } {
   const toward = (from: Floor, to: Floor) => (FLOOR_Y[to] > FLOOR_Y[from] ? "up" : "down");
-  if (riding()) return { floor: rideAt(rideClock(at)).arrived ? ride.to : ride.from, arrow: toward(ride.from, ride.to) };
+  if (riding()) return { floor: rideAt(rideClock()).arrived ? ride.to : ride.from, arrow: toward(ride.from, ride.to) };
   if (!errand) return { floor: ride.to, arrow: null };
   const e = errand;
   const half = rideAt(at - e.since).arrived;
@@ -114,7 +118,7 @@ export function carBound(): Floor | null {
 export const carMoving = () => carStandsAt() === null;
 
 /** Open the doors where the car rests for whoever waits there, or keep them open while someone is still getting on. */
-export function holdDoors(floor: Floor, at = now()): void {
+export function holdDoors(floor: Floor, at = worldNow()): void {
   if (riding() || errand || ride.to !== floor) return;
   // Once open, a call is kept open by starting it again, as far along as the doors fully open.
   const open = carDoors(floor, at);
@@ -122,7 +126,7 @@ export function holdDoors(floor: Floor, at = now()): void {
 }
 
 /** Send the car from where it rests to the other floor and back. False if it is busy. */
-export function sendCar(at = now()): boolean {
+export function sendCar(at = worldNow()): boolean {
   if (riding() || errand) return false;
   const home = ride.to;
   errand = { home, away: otherFloor(home), phase: "closing", since: at, closing: carDoors(home, at), leaving: null };
@@ -134,7 +138,7 @@ export function sendCar(at = now()): boolean {
  * Move an errand along: doors shut, out, a stop at the far floor until `settled` says nobody is still getting on
  * or off there (or STOP.most runs out), back, and the doors at home opening and closing again before it ends.
  */
-export function stepErrand(settled: (floor: Floor) => boolean, at = now()): void {
+export function stepErrand(settled: (floor: Floor) => boolean, at = worldNow()): void {
   const e = errand;
   if (!e || riding()) return;
   const t = at - e.since;
@@ -155,7 +159,7 @@ function finish(at: number): void {
 }
 
 /** End any errand at once, the car home, as the player's ride sets off. */
-export function settleErrand(at = now()): void {
+export function settleErrand(at = worldNow()): void {
   call = null;
   finish(at);
 }

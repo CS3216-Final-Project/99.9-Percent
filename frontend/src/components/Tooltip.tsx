@@ -18,7 +18,8 @@ function triggerOf(target: EventTarget | null): HTMLElement | null {
   return target instanceof Element ? target.closest<HTMLElement>(`[${TIP_ATTR}]`) : null;
 }
 
-const textOf = (el: HTMLElement) => el.getAttribute(TIP_ATTR)?.trim() ?? "";
+/** A spotlighted control is already explained by its guide card, whose own buttons the bubble would cover. */
+const textOf = (el: HTMLElement) => el.dataset.spotlight ? "" : el.getAttribute(TIP_ATTR)?.trim() ?? "";
 
 /** Keyboard focus shows a tip; a mouse or finger focusing a button does not. Text terms with an explicit tabindex always do, so a tap works. */
 function showsOnFocus(el: HTMLElement): boolean {

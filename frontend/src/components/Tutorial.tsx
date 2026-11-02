@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { isPhoneEdition } from "@/phone/edition";
 import { useGame, type TourTrack } from "@/game/store";
+import { useCampaignAttention } from "./useCampaignAttention";
 import { floorOf, selectedInView } from "@/game/floors";
 import { num } from "@/game/format";
 import type { EquipmentId } from "@/sim";
@@ -141,7 +142,7 @@ const CHAPTERS = {
   spikes: chapter(
     "Traffic spikes",
     "Two short bursts of traffic are coming.",
-    "Inspect App Server to compare manual capacity with autoscaling.",
+    "Inspect App Server, then open Server management to compare manual capacity with autoscaling.",
     shortcut("app"),
   ),
   reliability: [
@@ -171,7 +172,7 @@ const CHAPTERS = {
             : checksStep(s) === "inspect"
               ? "Click Monitoring."
               : checksStep(s) === "details"
-                ? "Press Inspect details."
+                ? "Press the Monitoring disc to inspect details."
                 : s.game.campaign && installPending(s.game.campaign)
                   ? "Run until the current install finishes, then press Deploy Health Checks."
                   : "Press Deploy Health Checks.",
@@ -205,12 +206,18 @@ const TIPS = {
     "Keep enough cash for next week's bill before you buy.",
     ".stat-cash",
   ),
+  hint: chapter(
+    "Hint is always nearby",
+    "The Hint button repeats the current step and points at what to try next.",
+    "It keeps working in later chapters, not just this tutorial.",
+    ".campaign-hint",
+  ),
 } satisfies Record<string, Step[]>;
 
 const TRACKS: Partial<Record<TourTrack, Step[]>> = { basics: BASICS, incident: INCIDENT, ...CHAPTERS, ...TIPS };
 export const BASICS_STEPS = BASICS.length;
 
-const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", incident: "Incident guide", settlement: "Tip" };
+const TRACK_NAMES: Partial<Record<TourTrack, string>> = { basics: "Tutorial", incident: "Incident guide", settlement: "Tip", hint: "Tip" };
 
 /** Where a track's steps make sense: Guided Mode's also wait for any review or milestone and for open views. */
 function fits(track: TourTrack, s: Snapshot, step: Pick<Step, "inTech">): boolean {
@@ -263,7 +270,9 @@ function SpotlightTutorial() {
   const step = tour ? steps[tour.step] : undefined;
   const track = tour?.track;
   const index = tour?.step ?? -1;
-  const visible = !!step && !!track && fits(track, s, step) && !covered && !s.onboarding && s.view !== "menu";
+  // A colleague scene (e.g. Jordan explaining caching) owns the stage; the guide follows it.
+  const { dialogueOpen } = useCampaignAttention();
+  const visible = !!step && !!track && fits(track, s, step) && !covered && !dialogueOpen && !s.onboarding && s.view !== "menu";
 
   const advance = () => {
     const now = useGame.getState();

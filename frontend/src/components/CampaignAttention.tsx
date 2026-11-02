@@ -1,7 +1,7 @@
 import { introductionActive } from "@/sim/introduction";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { campaignAttention, guidanceActionId, incidentNeedsPause, spotlightMachines, type GuidanceTarget } from "@/game/campaignAttention";
+import { campaignAttention, firstIncidentStop, guidanceActionId, incidentNeedsPause, spotlightMachines, type GuidanceTarget } from "@/game/campaignAttention";
 import { previewCampaignAction } from "@/game/campaignFinance";
 import type { Action, EquipmentId } from "@/sim";
 import { campaignClockAvailable, useGame } from "@/game/store";
@@ -59,7 +59,6 @@ const TARGETS: Record<GuidanceTarget, string> = {
   risk: '[aria-label="Scaling growth risk"] > button',
   menu: ".menu-btn",
   finance: '[aria-label="View finances"]',
-  endweek: ".dock-rush",
   research: '[aria-label="Launch Week research"]',
 };
 
@@ -110,6 +109,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const view = useGame(s => s.view), selected = useGame(s => s.selected), panel = useGame(s => s.panelOpen), floor = useGame(s => s.floor);
   const inspection=useGame(s=>s.roomInspection);
   const clockAvailable = useGame(campaignClockAvailable);
+  const resumeSignal = useGame(s => s.resumeOffer);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
   const [covered, setCovered] = useState(false), [hidden, setHidden] = useState(document.hidden);
   const [risk, setRisk] = useState(false), [locked, setLocked] = useState(false), [idle, setIdle] = useState<string | null>(null);
@@ -118,12 +118,13 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const [growthChoice, setGrowthChoice] = useState<{ key: string; risk: boolean } | null>(null);
   // Launch Week teaches with spotlighted tutorial steps instead of the Hint button.
   const [launchDone, setLaunchDone] = useState<string | null>(null), [metricsSeen, setMetricsSeen] = useState<string | null>(null);
-  const [analyticsSeen, setAnalyticsSeen] = useState<string | null>(null);
   const [spotBox, setSpotBox] = useState<Box | null>(null), [introOpen, setIntroOpen] = useState(false);
+  const [incidentSeen, setIncidentSeen] = useState<string | null>(null);
   const litTarget = useRef<HTMLElement | null>(null);
   const [pauseOffer, updatePauseOffer] = useState<string | null>(null);
   const pauseToken = useRef<string | null>(null);
   const setPauseOffer = useCallback((offer: string | null) => { pauseToken.current = offer; updatePauseOffer(offer); }, []);
+  const [resumeOffer, setResumeOffer] = useState<number | null>(null);
   const manual = useRef({ accepted, opened, key: "", pauseBlocked: false, equipment: null as string|null });
   const button = useRef<HTMLButtonElement>(null), card = useRef<HTMLDivElement>(null);
   const revealedTarget = useRef<HTMLElement | null>(null);
@@ -137,6 +138,11 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   // Capturing the room's mouse blocks optional help, not an urgent Pause invitation.
   const pauseBlocked = covered || !!confirming || risk || !!tour || !!practice&&!intro || hidden || !focused;
   const blocked = pauseBlocked || locked;
+  // Only a real takeover dismisses a colleague dialog: a hidden tab, unfocused window or captured
+  // pointer suspends presentation but must not drop the message or its queued stage cues.
+  // Data Strategy's guide waits for Jordan's caching scene, which explains it first.
+  const narrativeBlocked = covered || !!confirming || risk || !!practice && !intro ||
+    (!!tour && !(tour.track === "data" && companyMessage?.chapter === 3));
   const key = `${generation}:${decision.key}`;
   const choices = decision.growthChoices;
   const chooseRisk = choices && (growthChoice?.key === key ? growthChoice.risk : !choices.upgrade);
@@ -147,16 +153,14 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const lw = game.campaign?.launchWeek;
   // The research step outlives the week's end: the score card waits for the pick.
   const launchTutorial = !!lw && !lw.introduction && (lw.completedStep === null || !!lw.researchEarned && !lw.tech);
-  // The introduction teaches the equipment; Opening then teaches observation and a real upgrade.
+  // The introduction teaches the equipment; Opening spotlights only its first Run - every later
+  // Chapter 1 step uses the same on-demand Hint flow as the following chapters.
   // Historical companies retain the guidance they already completed instead of replaying this handoff.
   const openingTutorial = decision.chapter === 1 && !!game.campaign?.completedIntroduction && !lw && !game.campaign.openingMilestone?.acknowledged;
-  const automaticTutorial = launchTutorial || openingTutorial;
-  const analyticsKey = `${generation}:${game.campaign?.runId}:opening-metrics`;
-  const analyticsStep = openingTutorial && game.campaign!.step > 0 && analyticsSeen !== analyticsKey && !inspection && !game.campaign!.pending.length;
   const lwIncident = lw && lw.completedStep === null ? game.campaign!.incident : null;
-  const metricsKey = lwIncident ? `${lwIncident.id}:${decision.reason}` : openingTutorial ? `${generation}:${game.campaign!.runId}:${game.campaign!.incident?.id ?? "prevention"}:${decision.reason}` : "";
+  const metricsKey = lwIncident ? `${lwIncident.id}:${decision.reason}` : "";
   // After inspecting the overloaded machine, its readings come first, then its fix.
-  const metricsStep = (!!lwIncident || openingTutorial && !!inspection) && metricsSeen !== metricsKey &&
+  const metricsStep = !!lwIncident && metricsSeen !== metricsKey &&
     (decision.reason === "application" && selected === "app" || decision.reason === "database" && selected === "db");
 
   const equipment = recommendedAction ? actionEquipment(recommendedAction.action) :
@@ -164,20 +168,30 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const equipmentEntry = equipment ? `.campaign-panel [data-tutorial="inspect-${equipment}"]` : "";
   const inEquipment = !!equipment && inspection?.equipment === equipment;
   const actionControl = `${actionSelector}.campaign-action-card > button.act, button${actionSelector}`;
-  const targetSelector = intro ? equipment ? equipmentEntry : "[data-introduction-complete]" : analyticsStep ? ".campaign-panel .incident-symptoms" : metricsStep ? ".component-inspection .component-inspection-summary" : inEquipment ? recommendedAction ? actionControl : '.component-inspection-controls > button' : equipment ? equipmentEntry : recommendedAction ? actionControl : guidanceTarget ? TARGETS[guidanceTarget] : "";
+  const targetSelector = intro ? equipment ? equipmentEntry : "[data-introduction-complete]" : metricsStep ? ".component-inspection .component-inspection-summary" : inEquipment ? recommendedAction ? actionControl : '.component-inspection-controls > button' : equipment ? equipmentEntry : recommendedAction ? actionControl : guidanceTarget ? TARGETS[guidanceTarget] : "";
   const acceptedNow = accepted === key;
   const spotlightSelector = riskConfirmation ? '[data-guidance="accept_scaling_risk"]' : targetSelector;
   const openNow = opened === key && available && !blocked;
   const incidentKey = `${generation}:${game.campaign?.runId}:${game.campaign?.incident?.id}`;
   const pauseDiagnosis = incidentNeedsPause(game, decision);
   const pauseGold = !inspection && available && !pauseBlocked && !view && !openNow && !acceptedNow && running && clockAvailable && pauseDiagnosis && pauseOffer === incidentKey;
+  /** The mirror of a new incident's Pause invitation: a decision that paused a resumable company lights Run until it restarts. */
+  const resumeGold = !inspection && available && !pauseBlocked && !view && !openNow && !acceptedNow && !running && clockAvailable && resumeOffer !== null && resumeOffer === resumeSignal;
   const timerKey = `${key}:${view}:${selected}:${panel}:${floor}:${running}`;
-  const launchStep = intro ? available&&!blocked&&!view&&!inspection&&!openNow&&!acceptedNow&&!introOpen : automaticTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !introOpen && (analyticsStep || launchDone !== key) && decision.attention !== null &&
-    (analyticsStep || (openingTutorial ? OPENING_FLOW : LAUNCH_FLOW).test(decision.reason)) && (analyticsStep || !(decision.attention === "run" && (running || !clockAvailable)));
-  const machines = useMemo(() => launchStep && !analyticsStep ? spotlightMachines(decision, recommendedAction?.action, game.campaign ?? null) : [], [launchStep, analyticsStep, decision, recommendedAction, game.campaign]);
-  const candidate = !intro && !inspection && !automaticTutorial && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && (decision.attention === "progression" || decision.attention === "hint" || decision.attention === "run" && !running && clockAvailable);
+  // The first incident stops the clock; one card on Run teaches the loop: pause, inspect, fix, Run, and fix again if
+  // needed. Obstructing views hide it for a moment; Got it, Run, Hint, an inspection or any recorded input retire it.
+  const firstIncident = !intro && firstIncidentStop(game) ? incidentKey : null;
+  if (firstIncident && incidentSeen !== firstIncident && (running || opened === key)) setIncidentSeen(firstIncident);
+  const incidentStep = !!firstIncident && incidentSeen !== firstIncident && available && !blocked && !view && !inspection &&
+    !openNow && !acceptedNow && !introOpen && !running && !pauseGold && !resumeGold && clockAvailable;
+  const launchStep = intro ? available&&!blocked&&!view&&!inspection&&!openNow&&!acceptedNow&&!introOpen : !incidentStep && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && !introOpen && launchDone !== key && decision.attention !== null &&
+    (launchTutorial ? LAUNCH_FLOW.test(decision.reason) : openingTutorial && decision.reason === "opening-growth") &&
+    !(decision.attention === "run" && (running || !clockAvailable));
+  const machines = useMemo(() => launchStep ? spotlightMachines(decision, recommendedAction?.action, game.campaign ?? null) : [], [launchStep, decision, recommendedAction, game.campaign]);
+  const candidate = !intro && !inspection && !launchTutorial && !incidentStep && available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && (decision.attention === "progression" || decision.attention === "hint" || decision.attention === "run" && !running && clockAvailable);
 
-  useLayoutEffect(() => { manual.current = { accepted, opened, key, pauseBlocked, equipment }; }, [accepted, opened, key, pauseBlocked, equipment]);
+  // The consent's own overlay (risk) must not eat the offers it produces: it closes right after its action.
+  useLayoutEffect(() => { manual.current = { accepted, opened, key, pauseBlocked: pauseBlocked && !risk, equipment }; }, [accepted, opened, key, pauseBlocked, risk, equipment]);
   useEffect(() => {
     if (!pauseGold) return;
     // Any deliberate interaction acknowledges this one-time invitation; ordinary hover does not.
@@ -193,7 +207,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   }, [pauseGold, setPauseOffer]);
 
   useLayoutEffect(() => {
-    const clear = () => { setOpened(null); setAccepted(null); setPauseOffer(null); };
+    const clear = () => { setOpened(null); setAccepted(null); setPauseOffer(null); setResumeOffer(null); };
     const update = () => {
       const modal = blockingModal();
       setCovered(modal);
@@ -226,6 +240,9 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
         } else if (incidentNeedsPause(s.game, next) && !confirmingAction() && !document.querySelector(".modal-backdrop"))
           setPauseOffer(`${s.generation}:${c.runId}:${c.incident.id}`);
       }
+      // The same one-time offer as a new incident's, arming only where the offer can show immediately.
+      if (s.resumeOffer !== before.resumeOffer && s.started && !s.running && !s.tour && !s.tutorialCompany && !s.view && !manual.current.pauseBlocked && !document.hidden && document.hasFocus() && !confirmingAction() && !document.querySelector(".modal-backdrop"))
+        setResumeOffer(s.resumeOffer);
       // Choosing a different component is a deliberate alternative; never force it closed.
       if (s.roomInspection !== before.roomInspection && s.roomInspection && manual.current.equipment && s.roomInspection.equipment !== manual.current.equipment)
         setAccepted(null);
@@ -244,7 +261,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("blur", blur); window.addEventListener("focus", focus);
     update();
     return () => { unsubscribe(); unconfirm(); observer.disconnect(); document.removeEventListener("visibilitychange", update); document.removeEventListener("pointerlockchange", update); window.removeEventListener("blur", blur); window.removeEventListener("focus", focus); };
-  }, [setPauseOffer]);
+  }, [setPauseOffer, setResumeOffer]);
   useEffect(() => {
     if (!candidate) return;
     return watchIdleAttention(active => setIdle(active && (decision.attention === "progression" || visibleControl(decision.attention === "run" ? ".campaign-play" : ".campaign-hint")) ? timerKey : null));
@@ -286,8 +303,8 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(() => { revealedTarget.current = node; reveal(node); });
       }
-      const target = (guidanceTarget === "run" && !clockAvailable && !analyticsStep ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
-        (!intro && (analyticsStep || guidanceTarget !== "run" && guidanceTarget !== "endweek" && guidanceTarget !== "research") ? visibleControl(PANEL_ENTRY) : null);
+      const target = (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node && controlVisible(node) ? node : null) ??
+        (!intro && guidanceTarget !== "run" && guidanceTarget !== "research" ? visibleControl(PANEL_ENTRY) : null);
       if (target) {
         setSpotBox(padBox(target.getBoundingClientRect()));
         target.dataset.spotlight = "true";
@@ -296,7 +313,6 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       } else if (node&&!intro&&!openingTutorial) setSpotBox(padBox(node.getBoundingClientRect()));
     };
     const used = (event: Event) => {
-      if (analyticsStep) return;
       const lit = litTarget.current, el = event.target instanceof Element ? event.target : null;
       if (lit && el && lit.contains(el) && lit.matches(spotlightSelector) && !lit.matches(".equipment-readings, .component-inspection-summary, [data-tutorial^=inspect-], [data-inspection-entry], [data-inspection-back], [data-guidance-app]")) setLaunchDone(key);
     };
@@ -306,13 +322,34 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true);
     document.addEventListener("click", used, true);
     return () => { clear(); cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("click", used, true); };
-  }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable, game, equipment, inEquipment, equipmentEntry, intro, analyticsStep, openingTutorial]);
+  }, [launchStep, guidanceTarget, recommendedAction, spotlightSelector, key, view, clockAvailable, game, equipment, inEquipment, equipmentEntry, intro, openingTutorial]);
+  useLayoutEffect(() => {
+    if (!incidentStep) return;
+    let target: HTMLElement | null = null;
+    const clear = () => {
+      if (target) { delete target.dataset.spotlight; target.classList.remove("campaign-gold-attention"); target = null; }
+      setSpotBox(null);
+    };
+    const update = () => {
+      clear();
+      target = visibleControl(".campaign-play");
+      if (!target) return;
+      setSpotBox(padBox(target.getBoundingClientRect()));
+      target.dataset.spotlight = "true";
+      target.classList.add("campaign-gold-attention");
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "disabled", "hidden"] });
+    window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true);
+    return () => { clear(); observer.disconnect(); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); };
+  }, [incidentStep]);
   // The room's beams and dimmed racks follow the same spotlight.
   useEffect(() => {
     useGame.getState().setSpotlight(machines);
     return () => useGame.getState().setSpotlight([]);
   }, [machines]);
-  const riskOpen = useCallback((open: boolean) => { setRisk(open); if (open) { setOpened(null); setAccepted(null); setPauseOffer(null); } }, [setPauseOffer]);
+  const riskOpen = useCallback((open: boolean) => { setRisk(open); if (open) { setOpened(null); setAccepted(null); setPauseOffer(null); setResumeOffer(null); } }, [setPauseOffer]);
 
   // Remove accepted gold before a higher-priority Confirm can paint. Reveal itself
   // stays passive so the inspector's existing selection reset runs first.
@@ -376,31 +413,32 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("resize", place); document.addEventListener("pointerdown", outside, true);
     return () => { window.removeEventListener("resize", place); document.removeEventListener("pointerdown", outside, true); };
   }, [openNow]);
-  const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold: candidate && idle === timerKey && decision.attention === "hint", opened: openNow, button, riskOpen,
-    openHint: () => { if (!blocked) { setPauseOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
+  const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, resumeGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold: candidate && idle === timerKey && decision.attention === "hint", opened: openNow, dialogueOpen: introOpen, button, riskOpen,
+    openHint: () => { if (!blocked) { setPauseOffer(null); setResumeOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
   const close = () => { setOpened(null); button.current?.focus(); };
-  const compactOpeningPrompt = openingTutorial && isPhoneEdition() ? analyticsStep
-    ? "Compare latency, errors and backlog. Pause to inspect."
-    : metricsStep ? "Demand exceeds capacity. Next shows the matching upgrade."
-    : decision.reason === "opening-growth" ? "Press Run to advance time and watch customer demand."
-    : decision.reason.startsWith("activation-") ? "Press Run to finish the install, then check the readings."
-    : decision.reason === "database" ? "Inspect Database, then choose an upgrade to handle more work."
-    : null : null;
+  const compactOpeningPrompt = openingTutorial && isPhoneEdition() && decision.reason === "opening-growth"
+    ? "Press Run to advance time and watch customer demand."
+    : null;
   return <CampaignAttentionContext.Provider value={context}>{children}
     {companyMessage && <ChapterCompanyMessage key={companyMessage.key} model={companyMessage} onOpen={setIntroOpen} enabled={!inspection && (launchTutorial
       // Launch Week's colleague introduction comes once, before the first Run.
-      ? available && !blocked && !view && !running && game.phase === "management" && !game.campaign!.incident && game.campaign!.step === 0
-      : available && !blocked && !view && !openNow && !acceptedNow && !pauseGold && !game.campaign?.incident && game.phase === "management" && !decision.reason.match(/^(review|next)$/))}>
+      ? available && !narrativeBlocked && !view && !running && game.phase === "management" && !game.campaign!.incident && game.campaign!.step === 0
+      : available && !narrativeBlocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && !game.campaign?.incident && game.phase === "management" && !decision.reason.match(/^(review|next)$/))}>
     {growthStage &&
       <Chapter6StagePopup key={`${growthStage.key}:${growthStage.stage}`} model={growthStage} />}
     {spikeStage &&
       <Chapter4StagePopup key={`${spikeStage.key}:${spikeStage.stage}`} model={spikeStage} />}
     </ChapterCompanyMessage>}
     {launchStep && spotBox && createPortal(<Spotlight box={spotBox} track="guidance" />, document.body)}
-    {launchStep && !intro && createPortal(<LaunchTutorialCard box={spotBox} label={openingTutorial ? "Chapter 1 guide" : undefined} place={!analyticsStep && (guidanceTarget === "run" || guidanceTarget === "menu") ? "top" : "left"} title={analyticsStep ? "Watch your service" : metricsStep ? "Read the metrics" : openingTutorial && decision.reason === "opening-growth" ? "Run, then observe" : launchStepTitle(decision.reason, recommendedAction?.action.type)}
-      prompt={compactOpeningPrompt ?? (analyticsStep ? "Latency: response time. Errors: failed requests. Backlog: waiting work. Pause to inspect these readings." : metricsStep ? decision.reason === "database" ? "Database demand is above its capacity, so work queues up and requests fail. That is the overload." : "App Server demand is above its capacity, so requests pile up as backlog and fail. That is the overload." : openingTutorial && decision.reason === "opening-growth" ? "Press Run to advance game time. Customers bring requests; compare their demand with your equipment's capacity." : decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : decision.message)}
-      why={compactOpeningPrompt || analyticsStep ? undefined : metricsStep ? "Press Next to see how to fix it. Review the price and activation delay before confirming." : decision.observation !== decision.message ? decision.observation : undefined}
-      doneLabel={analyticsStep || metricsStep ? "Next" : undefined} onDone={() => analyticsStep ? setAnalyticsSeen(analyticsKey) : metricsStep ? setMetricsSeen(metricsKey) : setLaunchDone(key)} />, document.body)}
+    {incidentStep && spotBox && createPortal(<Spotlight box={spotBox} track="guidance" />, document.body)}
+    {incidentStep && createPortal(<LaunchTutorialCard box={spotBox} label="Incident guide" place="top" title="Your first incident"
+      prompt={isPhoneEdition() ? "Pause, inspect the cause, fix it, then Run. Not fixed? Try another fix."
+        : "The company paused for you. Whenever an incident happens, you can pause the company too. Inspect what caused this problem and fix it, then press Run to let your fix work."}
+      why={isPhoneEdition() ? undefined : "If it doesn't work, fix something else and let it run again."} onDone={() => setIncidentSeen(firstIncident)} />, document.body)}
+    {launchStep && !intro && createPortal(<LaunchTutorialCard box={spotBox} label={openingTutorial ? "Chapter 1 guide" : undefined} place={guidanceTarget === "run" || guidanceTarget === "menu" ? "top" : "left"} title={metricsStep ? "Read the metrics" : openingTutorial ? "Run, then observe" : launchStepTitle(decision.reason, recommendedAction?.action.type)}
+      prompt={compactOpeningPrompt ?? (metricsStep ? decision.reason === "database" ? "Database demand is above its capacity, so work queues up and requests fail. That is the overload." : "App Server demand is above its capacity, so requests pile up as backlog and fail. That is the overload." : openingTutorial ? "Press Run to advance game time. Customers bring requests; compare their demand with your equipment's capacity." : decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : decision.message)}
+      why={compactOpeningPrompt ? undefined : metricsStep ? "Press Next to see how to fix it. Review the price and activation delay before confirming." : decision.observation !== decision.message ? decision.observation : undefined}
+      doneLabel={metricsStep ? "Next" : undefined} onDone={() => metricsStep ? setMetricsSeen(metricsKey) : setLaunchDone(key)} />, document.body)}
     {openNow && createPortal(<div ref={card} id="campaign-hint-card" className="campaign-hint-card" role="dialog" aria-modal="false" aria-label="Hint" tabIndex={-1} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
       <div className="campaign-hint-heading"><h3><Icon name="bulb" />Hint</h3><button type="button" className="icon-btn" aria-label="Close Hint" onClick={close}><Icon name="close" /></button></div>
       <div className="campaign-hint-copy" role="region" aria-label="Hint explanation" tabIndex={0}><p>{decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : decision.message}</p></div>
@@ -415,14 +453,12 @@ export function CampaignHintButton() {
   return available ? <button ref={button} type="button" className={`icon-btn campaign-hint${hintGold ? " campaign-gold-attention" : ""}`} aria-label="Hint" aria-haspopup="dialog" aria-expanded={opened} aria-controls={opened ? "campaign-hint-card" : undefined} {...tipProps("Need help? See what to try next.", "below")} data-tip-title="Hint" onClick={openHint}><Icon name="bulb" /></button> : null;
 }
 
-/** The Launch Week tutorial's steps: run, walk the incident through its fix, then skip the settled week. */
-const LAUNCH_FLOW = /^(launch-open|launch-week|launch-research|launch-first-incident|launch-db-incident|launch-end-week|application|unrouted|database|recovery|draining|investigate|failure|activation-.+)$/;
-const OPENING_FLOW = /^(opening-growth|prevention-inspection|prevention-stability|application|unrouted|database|recovery|draining|investigate|failure|activation-.+)$/;
+/** The Launch Week tutorial's steps: run, walk the incident through its fix, then finish the settled week. */
+const LAUNCH_FLOW = /^(launch-open|launch-week|launch-research|launch-first-incident|launch-db-incident|launch-settled|application|unrouted|database|recovery|draining|investigate|failure|activation-.+)$/;
 const LAUNCH_STEP_TITLES: Record<string, string> = {
   "launch-open": "Open the doors", "launch-week": "Keep the week running", "launch-first-incident": "Your servers are overloading",
-  "launch-db-incident": "Your database is overloading", "launch-end-week": "Skip to the end of the week", "launch-research": "Spend your research point",
+  "launch-db-incident": "Your database is overloading", "launch-settled": "Finish the week", "launch-research": "Spend your research point",
   database: "Upgrade the database", recovery: "Recovering", draining: "Recovering", investigate: "Check the readings", failure: "A server failed",
-  "prevention-inspection": "Verify the upgrade", "prevention-stability": "Observe stable service",
 };
 function launchStepTitle(reason: string, action?: string): string {
   if (reason === "application") return action === "add_server" ? "Buy a second server" : action === "scale_up" ? "Keep up with traffic" : "Spread the load";

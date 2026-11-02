@@ -9,7 +9,8 @@ type Point = { x: number; y: number };
  * frame that moves them, until they have been still for a while. The scene projects each label from its equipment.
  */
 async function trackLabels(page: Page, key?: string): Promise<Point[]> {
-  const recording = page.evaluate(() => new Promise<Point[]>(resolve => {
+  // Install the observer before pressing, and give a slow software renderer time to draw the first moving frame.
+  await page.evaluate(firstFrameMs => { (window as unknown as { labelTrack: Promise<Point[]> }).labelTrack = new Promise<Point[]>(resolve => {
     const canvas = document.querySelector("main canvas")!.getBoundingClientRect();
     const layer = document.querySelector(".eq-labels")!;
     const centre = () => {
@@ -30,10 +31,10 @@ async function trackLabels(page: Page, key?: string): Promise<Point[]> {
       still = window.setTimeout(done, 800);
     });
     observer.observe(layer, { subtree: true, attributeFilter: ["style"] });
-    still = window.setTimeout(done, 800);
-  }));
+    still = window.setTimeout(done, firstFrameMs);
+  }); }, key ? 5_000 : 800);
   if (key) await page.keyboard.press(key);
-  return recording;
+  return page.evaluate(() => (window as unknown as { labelTrack: Promise<Point[]> }).labelTrack);
 }
 
 const spread = (points: Point[], from: Point) => Math.max(...points.map(p => Math.hypot(p.x - from.x, p.y - from.y)));

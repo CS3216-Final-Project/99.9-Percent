@@ -17,7 +17,7 @@ export async function closeInspection(page: Page) {
 
 /** Only public controls: works when the rack is off-screen, on another floor or the sheet is folded. */
 export async function inspectEquipment(page: Page, component: Component, details=false): Promise<Locator> {
-  const modal=page.getByRole("dialog",{name:component==="app"?"App Servers":`${TITLES[component]} inspected`,exact:true});
+  const modal=page.getByRole("dialog",{name:component==="app"?"App Servers":TITLES[component],exact:true});
   if (!await modal.isVisible()) {
     await closeInspection(page);
     const folded=page.locator('.panel-reopen, .phone-sheet-handle[aria-expanded="false"]');
@@ -67,19 +67,43 @@ export async function infrastructureAction(page:Page,name:string|RegExp,componen
     }
   }
   if(component==="gateway") {
-    const view=/failover/i.test(label)?"failover":/balanc/i.test(label)?"balancing":/routing|All apps|App \d+ only/i.test(label)?"routing":"overview";
+    const view=/failover|balanc|routing|All apps|App \d+ only/i.test(label)?"management":"overview";
     if(await scope.locator('.inspection-subview').getAttribute('data-inspection-view')!==view) {
       for(let i=0;i<2&&await scope.locator('[data-inspection-back]').isVisible();i++)await scope.locator('[data-inspection-back]').click();
-      if(view!=="overview") {await scope.locator('[data-inspection-entry="management"]').click();await scope.locator(`[data-inspection-entry="${view}"]`).click();}
+      if(view!=="overview") await scope.locator('[data-inspection-entry="management"]').click();
     }
-  }
-  if(component==="gateway" && /All apps|App \d+ only/i.test(typeof name==="string"?name:name.source)) {
-    const routes=scope.locator("details").filter({hasText:/Configure routing/});
-    if(await routes.getAttribute("open")===null) await routes.locator("summary").click();
   }
   const action=scope.getByRole("button",{name,exact:typeof name==="string"});
   await expect(action).toBeVisible();
   return action;
+}
+
+/** Open the gateway's management view, where the "Send traffic to" checkboxes live. */
+export async function openGatewayManagement(page:Page,scope?:Locator):Promise<Locator> {
+  const panel=scope??await inspectEquipment(page,"gateway");
+  if(await panel.locator('.inspection-subview').getAttribute('data-inspection-view')!=="management") {
+    for(let i=0;i<2&&await panel.locator('[data-inspection-back]').isVisible();i++)await panel.locator('[data-inspection-back]').click();
+    await panel.locator('[data-inspection-entry="management"]').click();
+  }
+  return panel;
+}
+
+/**
+ * Route every app: tick each unchecked "Send traffic to" checkbox in the gateway management view.
+ * Each pick queues a routing change that activates on the next game second, so `advance` (a caller
+ * that delivers one game second, e.g. `advanceCampaignStep`) runs between picks - the fieldset is
+ * disabled while a routing change is pending.
+ */
+export async function routeAllApps(page:Page,scope?:Locator,advance?:()=>Promise<void>):Promise<Locator> {
+  const panel=await openGatewayManagement(page,scope);
+  for(let i=0;i<8;i++) {
+    const next=panel.locator(".route-check[aria-checked='false']").first();
+    if(await next.count()===0)break;
+    await next.click();
+    if(!advance)break;
+    await advance();
+  }
+  return panel;
 }
 
 /** Follow only inspection navigation; the caller still checks/clicks the actual recommended action. */

@@ -3,14 +3,24 @@ import { act, tick } from "@/sim/__tests__/spikeFixtures";
 import { advanceSteps, canEnterData } from "@/sim/step";
 import { canEnterSpikes } from "@/sim/autoscaling";
 import { combinedCompany } from "@/sim/__tests__/combinedFixture";
+import { incidentAwaitingResponse } from "@/sim/step";
+import { installPending } from "@/sim/reliability";
+import { currentFault } from "@/sim/combinedCampaign";
 import { operatingCharges } from "@/sim/settlement";
 
 /** Public decisions only: keep the original equipment and rely on admission relief. */
 export function cappedFinancialPredecessor() {
   let s = act(tick(newGame(0, "chapter6-financial-trap"), 11), { type: "set_traffic_limit", enabled: true });
   const until = (done: (s: GameState) => boolean) => {
-    for (let i = 0; i < 200 && !done(s); i++) {
+    for (let i = 0; i < 200 && !(done(s) && s.campaign!.limit !== null); i++) {
       if (s.phase === "review") s = act(s, { type: "acknowledge_review" });
+      else if (s.campaign!.incident && incidentAwaitingResponse(s.campaign!) && !installPending(s.campaign!)) {
+        // Answer just-in-time so the manual restore lands on the natural step and keeps this pinned trajectory.
+        const f = currentFault(s.campaign!);
+        if (f && f.restoredStep === null && s.campaign!.step + 3 >= (f.naturalStep ?? s.campaign!.step)) s = act(s, { type: "restore_app", appId: f.targetId });
+        else if (!f) s = act(s, { type: "set_traffic_limit", enabled: s.campaign!.limit === null });
+      }
+      else if (!s.campaign!.incident && s.campaign!.limit === null && !s.campaign!.pending.some(a => a.type === "limit")) s = act(s, { type: "set_traffic_limit", enabled: true });
       s = tick(s);
     }
     if (!done(s)) throw Error("Financial fixture failed to reach its actual stage");

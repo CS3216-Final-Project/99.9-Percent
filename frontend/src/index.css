@@ -39,6 +39,7 @@
   /* Actions and status */
   --go: #ffd84a;
   --go-hover: #ffe680;
+  --go-active: #f2c624;
   --focus: #2d79ad;
   --ok: #3ddc84;
   --ok-ink: #0f7a45;
@@ -1855,6 +1856,16 @@ button:disabled {
 
 .act-primary:hover:not(:disabled) {
   background: var(--go-hover);
+}
+
+/* A disabled action's state: a check when already done, a lock while gated. */
+.act-affordance {
+  margin-left: auto;
+  flex: none;
+}
+
+.act-affordance-done {
+  color: var(--ok-ink);
 }
 
 .btn-row .act {
@@ -5251,6 +5262,7 @@ button:disabled {
 /* The panel is narrow: every response shows its name, then its cost and delay, so the rows line up. */
 .campaign-panel .act-label { min-width: 0; grid-column: 1; grid-row: 1; white-space: normal; }
 .campaign-panel .act-meta { display: grid; grid-column: 2; grid-row: 1; justify-items: end; gap: 4px; margin-left: 0; }
+.campaign-panel .act-affordance { grid-column: 3; grid-row: 1; align-self: center; justify-self: end; margin-left: 0; }
 /* A one-line header keeps the responses and the stage guidance in view without scrolling. */
 .campaign-panel .panel-head { gap: 10px; padding-block: 8px; }
 .campaign-panel .panel-icon { width: 40px; height: 40px; }
@@ -5260,6 +5272,10 @@ button:disabled {
 .incident .campaign-guidance { margin-top: 10px; }
 /* Tighter rhythm than the shared defaults so the whole overview fits a laptop-height panel. */
 .campaign-panel .panel-head { margin-bottom: 10px; }
+/* The banner (plus the recovery countdown once it starts) pins inside the panel's own scroll box;
+   top cancels the head's -14px bleed margin so it still sticks flush to the panel's top edge. */
+.campaign-panel .panel-head { position: sticky; top: -14px; z-index: 5; flex-wrap: wrap; }
+.campaign-panel .incident-pin-clock { flex: 1 1 100%; margin-top: 8px; }
 .campaign-panel .incident-symptoms { margin-top: 10px; }
 .campaign-panel .impact { margin: 8px 0; }
 .campaign-panel .step-head { margin-bottom: 6px; }
@@ -5305,18 +5321,97 @@ button:disabled {
 .route-choice button:hover:not(:disabled):not(.is-active) { background: var(--paper-2); }
 .route-choice button.is-active { background: var(--go); }
 .route-choice:disabled button { opacity: .55; box-shadow: none; }
+/* Routing is a checklist: one row per routable app, checked means it receives traffic. */
+.route-choice.route-checks { grid-template-columns: 1fr; }
+.route-check { display: flex; align-items: center; gap: 8px; text-align: left; }
+.route-check .route-box { display: grid; place-items: center; width: 18px; height: 18px; flex: none; border: 2px solid var(--control-edge); border-radius: 4px; }
+.route-check .route-box .icon { width: 12px; height: 12px; opacity: 0; }
+.route-check[aria-checked="true"] .route-box { border-color: var(--ink); background: var(--go); }
+.route-check[aria-checked="true"] .route-box .icon { opacity: 1; }
+.route-check:disabled { opacity: .55; box-shadow: none; }
 .scaling-controls legend { font-size: var(--text-xs); }
 .scaling-controls .btn { white-space: normal; }
 
 /* Shared Campaign equipment dialog: both room and shortcut entries use this card. */
 .component-inspection { width: min(460px, 100%); }
 .component-inspection-summary { text-align: center; }
-.component-inspection-summary .inspection-scanner { margin-inline: auto; }
 .component-inspection-summary .inspection-status { justify-content: center; }
 .component-inspection-metric { font-weight: 700; font-variant-numeric: tabular-nums; }
 .component-inspection-controls { display: flex; gap: 12px; align-items: stretch; }
 .component-inspection-controls > .btn { flex: 1; min-height: 44px; }
 .component-inspection-controls > .component-actions { flex: 1; min-width: 0; }
+.component-inspection-controls:empty { display: none; }
+
+/* The machine's disc: the machine in its health's pastel on both faces. Under the pointer it lightens and a glowing white
+   magnifier lies over the faded machine, a plus on its face and a minus on its back, which it is turned over to while
+   the readings are open. */
+.inspection-disc {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  display: grid;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  perspective: 520px;
+}
+.inspection-disc-turn { display: grid; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+.inspection-disc[aria-expanded="true"] .inspection-disc-turn { transform: rotateY(180deg); }
+.inspection-disc-face {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--control-edge);
+  border-radius: 50%;
+  background: var(--tile-green);
+  color: var(--tile-green-ink);
+  backface-visibility: hidden;
+  transition: filter 0.16s ease-out;
+}
+.inspection-disc-face > .icon { grid-area: 1 / 1; transition: opacity 0.16s ease-out, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+.inspection-disc-face > .inspection-disc-lens {
+  opacity: 0;
+  transform: scale(0.7);
+  color: #fff;
+  filter: drop-shadow(0 1px 1px rgb(29 24 52 / 0.45)) drop-shadow(0 0 6px rgb(255 255 255 / 0.95));
+}
+.inspection-disc.tone-warn .inspection-disc-face { background: var(--tile-orange); color: var(--tile-orange-ink); }
+.inspection-disc.tone-critical .inspection-disc-face { background: var(--tile-pink); color: var(--critical-ink); }
+.inspection-disc.tone-muted .inspection-disc-face { background: var(--tile-purple); color: var(--tile-purple-ink); }
+.inspection-disc .inspection-disc-back { transform: rotateY(180deg); }
+.inspection-disc:is(:hover, :focus-visible) .inspection-disc-face { filter: brightness(1.07); }
+.inspection-disc:is(:hover, :focus-visible) .inspection-disc-machine { opacity: 0.35; }
+.inspection-disc:is(:hover, :focus-visible) .inspection-disc-lens { opacity: 1; transform: none; }
+/* Touch has no hover, so a small lens on the rim always says the disc opens the readings. */
+.inspection-disc-badge {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--control-edge);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+}
+/* The shell that grows from the pressed button onto the card while it opens (InspectionReveal.tsx). */
+.inspection-morph { position: fixed; box-sizing: border-box; margin: 0; border: 1px solid var(--control-edge); box-shadow: var(--lift); pointer-events: none; }
+.inspection-details { display: grid; gap: 10px; animation: inspection-details-open 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes inspection-details-open {
+  from { opacity: 0; transform: translateY(-6px); }
+}
+/* Without motion the disc swaps faces in place instead of turning over. */
+@media (prefers-reduced-motion: reduce) {
+  .inspection-disc-turn, .inspection-disc-face, .inspection-disc-face > .icon { transition: none; }
+  .inspection-disc[aria-expanded="true"] .inspection-disc-turn { transform: none; }
+  .inspection-disc .inspection-disc-back { transform: none; visibility: hidden; }
+  .inspection-disc[aria-expanded="true"] .inspection-disc-back { visibility: visible; }
+  .inspection-details { animation: none; }
+}
 .component-inspection .actions { margin: 0; }
 .component-inspection .actions:empty { display: none; }
 .component-inspection .component-actions h4 { margin-top: 8px; }
@@ -5330,19 +5425,27 @@ button:disabled {
 }
 
 .component-inspection:not(.component-inspection-db) .component-inspection-controls { flex-wrap: wrap; }
-.component-inspection:not(.component-inspection-db) .component-inspection-controls > * { min-width: 0; flex: 1 1 0; }
-.component-inspection:not(.component-inspection-db) .component-inspection-controls > .btn { padding: 10px; gap: 4px; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls > * { flex: 1 1 0; }
+.component-inspection:not(.component-inspection-db) .component-inspection-controls > .btn { padding: 10px; gap: 6px; }
 @media (max-width: 359px) {
  .component-inspection:not(.component-inspection-db) .component-inspection-controls > * { flex-basis: 40%; }
 }
+/* Controls share rows but never shrink below their content, so an icon never strays from its text:
+   short buttons stay on one line and action labels wrap beside their icon, never under their longest word. */
+.component-inspection .component-inspection-controls { flex-wrap: wrap; }
+.component-inspection .component-inspection-controls > * { min-width: min-content; }
+.component-inspection .component-inspection-controls > .btn { white-space: nowrap; max-width: 100%; }
 .component-inspection:not(.component-inspection-db) .component-actions { width: 100%; }
 .component-inspection:not(.component-inspection-db) .component-inspection-controls > .component-actions { display: grid; }
 .component-inspection:not(.component-inspection-db) .component-inspection-controls .actions > li { display: grid; }
 .component-inspection:not(.component-inspection-db) .component-inspection-controls .campaign-action-card { display: flex; flex-direction: column; }
 .component-inspection:not(.component-inspection-db) .component-inspection-controls .act { flex: 1; }
 
-.component-inspection .act { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; min-height: 44px; margin: 0; padding: 10px; }
+/* Icon, label and done/locked mark share the first row; cost and timing sit centred beneath them. */
+.component-inspection .act { display: grid; grid-template-columns: auto minmax(min-content, max-content) auto; align-items: center; justify-content: center; gap: 4px 8px; min-height: 44px; margin: 0; padding: 10px; }
 .component-inspection .act-label { min-width: 0; }
-.component-inspection .actions { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.component-inspection .act-affordance { grid-column: 3; grid-row: 1; margin-left: 0; }
+.component-inspection .act-meta { justify-content: center; }
+.component-inspection .actions { grid-template-columns: minmax(min-content, 1fr); gap: 8px; }
 
 @media (max-width: 359px) { .component-inspection .readings-grid { grid-template-columns: 1fr; } }

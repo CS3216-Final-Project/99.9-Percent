@@ -68,8 +68,15 @@ test("Chapter 6 guidance: post-review restoration precedes replacement capacity 
   await accept(/^Run$/); await gold.click(); await page.clock.runFor(3000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   expect((await savedGame(page)).campaign!.combinedStage!.currentRound!.fault!.restoredStep).not.toBeNull();
-  await accept(/^All apps$/); await gold.click();
-  await accept(/^Run$/); await gold.click(); await page.clock.runFor(1000);
+  await accept(/^App \d+$/); await gold.click();
+  const unrouted = () => savedGame(page).then(g => g.campaign!.apps.filter(a => !g.campaign!.routing.targets.includes(a.id)).length);
+  for (let i = 0; i < 4 && await unrouted(); i++) {
+    await closeInspection(page); await accept(/^Run$/); await gold.click(); await page.clock.runFor(2500);
+    await page.getByRole("button", { name: "Pause", exact: true }).click();
+    if (await unrouted() === 0) break;
+    await accept(/^App \d+$/); await gold.click();
+  }
+  await page.getByRole("button", { name: "Run", exact: true }).click(); await page.clock.runFor(1000);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await accept(/^Remove traffic limit/); await gold.click(); await expect(gold).toHaveAccessibleName("Confirm");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();

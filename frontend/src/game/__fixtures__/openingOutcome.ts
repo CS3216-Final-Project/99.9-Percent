@@ -1,6 +1,9 @@
 import { newGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
 import { act, tick } from "@/sim/__tests__/spikeFixtures";
+import { respondToIncident } from "@/sim/__tests__/reliabilityFixture";
+import { incidentAwaitingResponse } from "@/sim/step";
+import { installPending } from "@/sim/reliability";
 
 /** Proactive upgrade, real growth, both inspections and five new full-demand observations. */
 export function preventedOpening() {
@@ -15,6 +18,8 @@ export function finishedLaunchWeek(pick = true) {
   for (let i = 0; i < 200 && s.campaign!.launchWeek!.completedStep === null; i++) {
     if (s.phase === "review") s = act(s, { type: "acknowledge_review" });
     else if (pick && s.campaign!.launchWeek!.researchEarned && !s.campaign!.launchWeek!.tech) s = act(s, { type: "pick_launch_tech", tech: "caching" });
+    else if (s.campaign!.incident && incidentAwaitingResponse(s.campaign!) && !installPending(s.campaign!)) s = respondToIncident(s);
+    else if (s.campaign!.limit !== null && !s.campaign!.incident && !s.campaign!.pending.some(a => a.type === "unlimit")) s = act(s, { type: "set_traffic_limit", enabled: false });
     else s = tick(s);
   }
   if (s.campaign!.launchWeek!.completedStep === null) throw Error("Launch Week did not complete");

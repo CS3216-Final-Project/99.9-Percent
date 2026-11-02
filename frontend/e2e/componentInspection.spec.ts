@@ -16,7 +16,7 @@ for (const width of [1440,390,320]) test.describe(width===1440?"desktop componen
     expect(game.campaign!.completedIntroduction).toBeUndefined();
     await expect(page.getByRole("region",{name:"Chapter 1 guide",exact:true})).toHaveCount(0);
     await page.getByRole("main").getByRole("button",{name:"Database",exact:true}).click();
-    const inspect=page.getByRole("dialog",{name:"Database inspected",exact:true});
+    const inspect=page.getByRole("dialog",{name:"Database", exact: true});
     await expect(inspect).toBeVisible();
     const run=page.getByRole("button",{name:"Run",exact:true});
     expect(await run.evaluate(el=>{const b=el.getBoundingClientRect();return el.contains(document.elementFromPoint(b.x+b.width/2,b.y+b.height/2));})).toBe(false);
@@ -78,12 +78,11 @@ test("component actions: App Server adding, Network prerequisite and read-only c
   await page.getByRole("dialog",{name:"Purchase preview"}).getByRole("button",{name:"Confirm",exact:true}).click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="scale-up"&&a.targetId==="app-2")).toBe(true);
   await page.locator('.campaign-panel [data-tutorial="inspect-gateway"]').click();
-  const network=page.getByRole("dialog",{name:"Network inspected",exact:true});
-  await network.getByRole("button",{name:"Network management",exact:true}).click();await network.getByRole("button",{name:"Load balancing",exact:true}).click();await expect(network.getByRole("button",{name:/Deploy load balancing/})).toBeVisible();await network.getByRole("button",{name:"Back to Network management",exact:true}).click();await network.getByRole("button",{name:"Routing",exact:true}).click();
-  await network.getByText(/Configure routing/).click();
+  const network=page.getByRole("dialog",{name:"Network", exact: true});
+  await network.getByRole("button",{name:"Network management",exact:true}).click();await expect(network.getByRole("button",{name:/Deploy load balancing/})).toBeVisible();
   await expect(network.getByText("Deploy load balancing before configuring routing.")).toBeVisible();
-  await expect(network.getByRole("button",{name:"App 1 only",exact:true})).toBeDisabled();
-  await network.getByRole("button",{name:"Back to Network management",exact:true}).click();await network.getByRole("button",{name:"Back to Network",exact:true}).click();await network.getByRole("button",{name:/Limit to 500/}).click();
+  await expect(network.locator(".route-check").first()).toBeDisabled();
+  await network.getByRole("button",{name:"Back to Network",exact:true}).click();await network.getByRole("button",{name:/Limit to ~[\d,]+/}).click();
   await expect(page.locator(".campaign-gold-attention")).toHaveAccessibleName("Confirm");
   await page.getByRole("dialog",{name:"Purchase preview"}).getByRole("button",{name:"Confirm",exact:true}).click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="limit")).toBe(true);
@@ -103,7 +102,7 @@ test("Monitoring Hint completes its inspection and recalculates useful Run witho
   const hint=page.getByRole("dialog",{name:"Hint",exact:true});await expect(hint).toContainText("Check Monitoring");
   await hint.getByRole("button",{name:"Got it",exact:true}).click();
   const gold=page.locator(".campaign-gold-attention");await expect(gold).toHaveCount(1);await expect(gold).toHaveAccessibleName("Monitoring");
-  await gold.click();const modal=page.getByRole("dialog",{name:"Monitoring inspected",exact:true});
+  await gold.click();const modal=page.getByRole("dialog",{name:"Monitoring", exact: true});
   await expect(modal).toBeVisible();await expect(gold).toHaveCount(0);
   await modal.getByRole("button",{name:"Inspect details",exact:true}).click();
   await expect(modal.getByRole("region",{name:"Monitoring readings"})).toBeVisible();

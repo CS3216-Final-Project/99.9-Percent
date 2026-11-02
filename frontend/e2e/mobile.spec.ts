@@ -388,7 +388,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   expect((await savedGame(page)).campaign!.step).toBe(6);
   await expect(database.getByRole("region", { name: "Database readings" })).toContainText("133.33%");
   await expect(panel.getByText("Full system evidence", { exact: true })).toHaveCount(0);
-  for (const name of [/Add server/, /Upgrade database/, /Limit to 500 requests\/s/]) {
+  for (const name of [/Add server/, /Upgrade database/, /Limit to ~[\d,]+ requests\/s/]) {
     const button = await infrastructureAction(page,name);
     await button.scrollIntoViewIfNeeded();
     await expect(button).toBeVisible();
@@ -479,7 +479,7 @@ test("cache selection, paid activation and warmth reload on touch",async({page, 
  await advanceCampaignStep(page,{seconds:2});
  const roomCache=page.getByRole("main").getByRole("button",{name:/Read Cache/});
  await roomCache.tap();await expect(roomCache).toHaveAttribute("aria-pressed","true");await expect(panel.getByRole("button",{name:"Read Cache",exact:true})).toHaveAttribute("aria-pressed","true");
- await page.getByRole("dialog",{name:"Read Cache inspected"}).getByRole("button",{name:"Close"}).tap();
+ await page.getByRole("dialog",{name:"Read Cache", exact: true}).getByRole("button",{name:"Close"}).tap();
  await advanceCampaignStep(page);
  const before=(await savedGame(page)).campaign!;expect(before.readCache).not.toBeNull();expect(before.readCache!.warmth).toBe(0);
  await advanceCampaignStep(page);
@@ -490,15 +490,15 @@ test("cache selection, paid activation and warmth reload on touch",async({page, 
  expect((await savedGame(page)).campaign).toEqual(saved);
 });
 
-test("traffic spikes: touch selects an instance after retirement leaves an ID gap",async({page})=>{
+test("traffic spikes: touch selects an instance after retirement and re-provisioning",async({page})=>{
  const {spikeCompany,untilOffset}=await import("../src/sim/__tests__/spikeFixtures");
- const g=untilOffset(spikeCompany(),54);expect(g.campaign!.apps.map(a=>a.id)).toContain("app-5");
+ const g=untilOffset(spikeCompany(),54);expect(g.campaign!.apps.map(a=>a.id)).toContain("app-4");
  await page.route("**/api/**",r=>r.abort());await seedSave(page,g);await page.goto("/");
  await page.getByRole("button",{name:"Continue company",exact:true}).tap();await expectRoom(page);
- const room=page.getByRole("main"),app=room.getByRole("button",{name:"App 5",exact:true});
+ const room=page.getByRole("main"),app=room.getByRole("button",{name:"App 4",exact:true});
  await app.tap();await expect(app).toHaveAttribute("aria-pressed","true");
- await expect(page.getByRole("dialog",{name:"App Servers"}).getByRole("heading",{name:"App 5",exact:true})).toBeVisible();await page.getByRole("button",{name:"Back to Server management",exact:true}).tap();
- await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 5:/})).toHaveAttribute("aria-pressed","true");
+ await expect(page.getByRole("dialog",{name:"App Servers"}).getByRole("heading",{name:"App 4",exact:true})).toBeVisible();await page.getByRole("button",{name:"Back to Server management",exact:true}).tap();
+ await expect(page.getByRole("region",{name:"Application instances"}).getByRole("button",{name:/App 4:/})).toHaveAttribute("aria-pressed","true");
  await page.getByRole("dialog",{name:"App Servers"}).getByRole("button",{name:"Close"}).tap();
  await inspectEquipment(page,"app");await page.getByRole("button",{name:"Server management",exact:true}).tap();await page.getByRole("button",{name:"Autoscaling",exact:true}).tap();await page.getByRole("region",{name:"Autoscaling",exact:true}).scrollIntoViewIfNeeded();
  await page.screenshot({path:"test-results/phase5-mobile.png"});await closeInspection(page);

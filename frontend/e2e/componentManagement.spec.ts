@@ -22,7 +22,7 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     for(const component of ["db","app","gateway","monitoring"] as const) {
       const popup=await inspectEquipment(page,component);
       const summary=popup.locator(".component-inspection-summary");
-      await expect(summary.locator(".inspection-scanner")).toBeVisible();
+      await expect(summary.locator(".inspection-disc")).toBeVisible();
       await expect(summary.locator(".inspection-status")).toBeVisible();
       await expect(summary.locator(".component-inspection-metric")).not.toBeEmpty();
       await expect(popup.getByRole("button",{name:"Inspect details",exact:true})).toHaveAttribute("aria-expanded","false");
@@ -86,16 +86,12 @@ for(const width of [1440,390,320]) test.describe(`component management ${width}p
     await popup.getByRole("button",{name:"Back to Server management",exact:true}).click();
     await expect(popup.locator('[data-guidance-app]')).toHaveCount(game.campaign!.apps.length);
     await closeInspection(page);const network=await inspectEquipment(page,"gateway");
-    await expect(network.getByText(/Configure routing/)).toHaveCount(0);
+    await expect(network.locator(".route-check")).toHaveCount(0);
     await network.getByRole("button",{name:"Network management",exact:true}).click();
-    await network.getByRole("button",{name:"Load balancing",exact:true}).click();
     await expect(network.getByRole("button",{name:"Deploy load balancing",exact:true})).toBeEnabled();
     await network.getByRole("button",{name:"Deploy load balancing",exact:true}).click();
     await quote.getByRole("button",{name:"Cancel",exact:true}).click();
-    await network.getByRole("button",{name:"Back to Network management",exact:true}).click();
-    await network.getByRole("button",{name:"Routing",exact:true}).click();
-    await network.getByText(/Configure routing/).click();
-    await expect(network.getByRole("button",{name:"All apps",exact:true})).toBeDisabled();
+    await expect(network.locator(".route-check").first()).toBeDisabled();
     await expect(network.getByText("Deploy load balancing before configuring routing.")).toBeVisible();
     await page.screenshot({path:info.outputPath(`routing-${width}.png`)});
     expect((await savedGame(page)).campaign!.step).toBe(game.campaign!.step);

@@ -20,7 +20,7 @@ import {
 } from "@/sim";
 import type { GameMode, GraphicsQuality } from "@/game/persist";
 import { loadExploration, saveExploration, type SavedCameraView } from "@/game/exploration";
-import { canInspectEquipment, inspectInRoom, trafficViewOn, useGame } from "@/game/store";
+import { canInspectEquipment, inspectInRoom, roomPaused, trafficViewOn, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { nextViewpoint } from "@/game/viewpoints";
 import { isPhoneEdition } from "@/phone/edition";
@@ -67,6 +67,7 @@ import { applyDaylight } from "./cityLight";
 import { viewFocus } from "./zoneSounds";
 import { Exterior } from "./exterior";
 import { daylightNow, holdDay } from "./dayClock";
+import { holdWorld, worldNow } from "./worldClock";
 import { sunStep, sunSteps, type Vec3 } from "./sky";
 import { OnWall, Wall } from "./walls";
 import { updateWalls } from "./wallState";
@@ -78,7 +79,7 @@ import { bindViewFade, bothFloors, cameras, lookApi, lookingFromAvatar, viewNow 
 import { Ceiling } from "./Ceiling";
 import { ViewOverlay } from "./ViewOverlay";
 import { Minimap } from "./Minimap";
-import { screenPoint } from "./labels";
+import { screenPoint, stackDown, stackUnder } from "./labels";
 import { EQUIPMENT, ROOM_PALETTE } from "./palette";
 import { trafficModel } from "./traffic";
 import { CampaignTraffic, Gate } from "./TrafficFlow";
@@ -685,10 +686,10 @@ function Cable({ points, speed, alert }: { points: P2[]; speed: number; alert: b
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = alert ? "#ff4d5e" : "#4cb8ff";
 
-  useFrame(({ clock }) => {
+  useFrame(() => {
     const mesh = packets.current;
     if (!mesh || segments.total <= 0) return;
-    const t = clock.elapsedTime * (0.9 + speed * 2.2);
+    const t = worldNow() * (0.9 + speed * 2.2);
     for (let i = 0; i < count; i++) {
       const d = (t + (i * segments.total) / count) % segments.total;
       const seg = segments.list.find((s) => d >= s.start && d <= s.start + s.len) ?? segments.list[0];
@@ -737,8 +738,8 @@ function Pad({ id, f, built, symptomatic, inspecting }: { id: EquipmentId; f: Fo
   useFrame(({ clock }) => {
     if (!fill.current) return;
     const base = alerting ? 0.16 : affected ? 0.14 : selected ? 0.13 : hovered ? 0.07 : 0;
-    // The machine an action would change breathes gently; an alert pulses faster.
-    fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 4.2))
+    // The machine an action would change breathes gently; an alert pulses faster, and holds with the paused room.
+    fill.current.opacity = alerting ? base + 0.1 * (0.5 + 0.5 * Math.sin(worldNow() * 4.2))
       : affected ? base + 0.12 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 3)) : base;
   });
 
@@ -875,6 +876,20 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
  */
 function placeLabels(camera: THREE.Camera, size: { width: number; height: number }) {
   const deep = (camera as THREE.PerspectiveCamera).isPerspectiveCamera === true;
+  // Pack the app labels from their true spots and sizes, not a fixed pitch: routed ones carry a load bar and a
+  // status note that make them taller than a constant assumes, and machines spread across the floor already keep
+  // some marks apart, so a label drops only below the ones it really overlaps.
+  const appSpots = campaignAppIds.map((id) => {
+    const el = labelEls.get(id);
+    const pos = anchors.get(id);
+    const h = el?.offsetHeight ?? 0;
+    // Behind a view from the avatar an anchor can project mirrored, so those views keep a plain stack.
+    if (deep || !pos) return { x: 0, y: 0, w: 1, h };
+    screenPoint(pos, camera, size.width, size.height, labelAt);
+    return { x: labelAt.x, y: labelAt.y, w: el?.offsetWidth ?? 0, h };
+  });
+  const appBottoms = stackDown(appSpots, -10);
+  const appCeilings = inSpikes && size.width <= 900 ? stackUnder(appSpots.map((s) => s.h), size.height * 0.4) : null;
   anchors.forEach((pos, key) => {
     const el = labelEls.get(key);
     if (!el) return;
@@ -892,13 +907,15 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
     let { x, y } = labelAt;
     // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
     const slot = campaignAppIds.indexOf(key);
-    y += labelEls.has("app-1") && key === "app" ? -100 : labelEls.has("app-1") && key === "gateway" ? -30 : slot >= 0 ? slot * 22 - 10 : 0;
+    if (labelEls.has("app-1") && key === "app") y -= 100;
+    else if (labelEls.has("app-1") && key === "gateway") y -= 30;
+    else if (slot >= 0) y = appBottoms[slot];
     // The In gate stands just west of the gateway: lift its count clear of the Network label.
     if (key === TRAFFIC_IN) y -= 38;
     // The mobile bottom panel occupies at most 56% of the room. Spread the
     // growing pool above it by slot order, even when permanent IDs have gaps.
-    if (inSpikes && slot >= 0 && size.width <= 900) {
-      y = Math.min(y, size.height * 0.40 - (campaignAppIds.length - 1 - slot) * 26);
+    if (appCeilings && slot >= 0) {
+      y = Math.min(y, appCeilings[slot]);
       x = Math.max(size.width * 0.78, Math.min(size.width - 65, x));
     }
     if (key === "cache" && inCampaign && size.width <= 900) {
@@ -1000,12 +1017,12 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
 }
 
 /** In and Out, with this second's requests: the gap between the two is what the company is losing. */
-function GateCounts({ c }: { c: Campaign }) {
+export function GateCounts({ c }: { c: Campaign }) {
   const m = c.snapshot;
   return (
     <>
-      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.incoming)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}`}>
-        <b>In</b> {num(m.incoming)}/s
+      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.admitted)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}`}>
+        <b>In</b> {num(m.admitted)}/s
         {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away — no revenue, counts against uptime</span>}
       </span>
       <span className="wall-tag gate-tag gate-out" ref={bindLabel(TRAFFIC_OUT)} aria-label={`Out: ${num(m.successful)} requests per second served`}>
@@ -1350,11 +1367,17 @@ function Scene({ quality, landed }: { quality: QualityProfile; landed: Floor | n
   const mode = useGame((s) => s.mode);
   const walking = useGame((s) => s.walking && s.started);
   const trafficView = useGame(trafficViewOn);
-  // The traffic view holds the sun still, so no shadow sweeps across the floor while the player reads the traffic.
+  const paused = useGame(roomPaused);
+  // Paused, the whole room holds still: the crew, the city, the machines and the traffic (worldClock.ts).
   useEffect(() => {
-    holdDay(trafficView);
+    holdWorld(paused);
+    return () => holdWorld(false);
+  }, [paused]);
+  // The traffic view holds the sun still too, so no shadow sweeps across the floor while the player reads the traffic.
+  useEffect(() => {
+    holdDay(trafficView || paused);
     return () => holdDay(false);
-  }, [trafficView]);
+  }, [trafficView, paused]);
   const office = useRef<THREE.Group>(null);
   const servers = useRef<THREE.Group>(null);
   const outside = useRef<THREE.Group>(null);

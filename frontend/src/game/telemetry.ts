@@ -55,7 +55,7 @@ export function projectEvents(previous:Measurement,g:GameState,now:string):Measu
       "spike-stage-entered":"traffic_spike_stage_entered","progression-awarded":"progression_awarded","autoscaling-unlocked":"autoscaling_unlocked",
       "traffic-spikes-announced":"traffic_spikes_announced","traffic-spike-started":"traffic_spike_started","traffic-spike-ended":"traffic_spike_ended",
       "autoscaling-enabled":"autoscaling_enabled","autoscaling-disabled":"autoscaling_disabled","autoscaler-blocked":"autoscaling_blocked",
-      "autoscale-scale-out-decided":"autoscale_scale_out_decided","autoscale-scale-in-eligible":"autoscale_scale_in_eligible",
+      "autoscale-scale-out-decided":"autoscale_scale_out_decided","autoscale-scale-up-decided":"autoscale_scale_up_decided","autoscale-scale-in-eligible":"autoscale_scale_in_eligible",
       "autoscale-retirement-cancelled":"autoscale_retirement_cancelled","autoscale-instance-retired":"autoscale_instance_retired",
       "traffic-spike-stage-completed":"traffic_spike_stage_completed","spike-stage-acknowledged":"traffic_spike_stage_acknowledged"};
     if(spikeNames[t.type])emit(spikeNames[t.type],{...t.data,...(t.type==="traffic-spike-stage-completed"?timing():{})});
@@ -81,14 +81,14 @@ export function projectEvents(previous:Measurement,g:GameState,now:string):Measu
       case "action-requested": {
         const a=c.actions.find(a=>a.id===t.data.actionId)!;
         const names:Record<typeof a.type,string>={promotion:"promotion_requested","health-checks":"health_checks_requested","create-spare":"create_spare_requested","reserve-spare":"reserve_spare_requested","release-spare":"release_spare_requested","failover":"failover_requested","promote-spare":"promote_spare_requested","restore-app":"restore_app_requested","add-app":"app_instance_requested","upgrade-db":"database_upgrade_requested",limit:"traffic_limit_requested",unlimit:"traffic_limit_requested","scale-up":"vertical_scale_requested","deploy-lb":"load_balancer_requested",routing:"routing_requested",cache:"cache_requested","cache-tuning":"cache_tuning_requested","deploy-autoscaler":"autoscaler_requested","retire-app":"autoscale_retirement_requested"};
-        emit(a.source==="autoscaler"&&a.type==="add-app"?"autoscale_provisioning_started":names[a.type],
+        emit(a.source==="autoscaler"&&a.type==="add-app"?"autoscale_provisioning_started":a.source==="autoscaler"&&a.type==="scale-up"?"autoscale_scale_up_requested":names[a.type],
           {...t.data,actionSource:a.source??"player",action_requested_step:a.requestedStep});
         if(!a.source||a.source==="player")emit("gameplay_decision",{actionId:a.id,replayOf:m.replayOf},":decision");break;
       }
       case "action-activated": {
         const a=c.actions.find(a=>a.id===t.data.actionId)!;
         const names:Record<typeof a.type,string>={promotion:"promotion_started","health-checks":"health_checks_activated","create-spare":"create_spare_activated","reserve-spare":"reserve_spare_activated","release-spare":"release_spare_activated","failover":"failover_activated","promote-spare":"promote_spare_activated","restore-app":"restore_app_activated","add-app":"app_instance_activated","upgrade-db":c.dataStage&&inData?"database_upgrade_activated":"action_activated",limit:"traffic_limit_applied",unlimit:"traffic_limit_removed","scale-up":"vertical_scale_activated","deploy-lb":"load_balancer_deployed",cache:"cache_activated","cache-tuning":"cache_tuning_activated","deploy-autoscaler":"autoscaler_activated","retire-app":"autoscale_retirement_activated",routing:t.data.routingFirstEnabled?"routing_enabled":"routing_changed"};
-        emit(a.source==="autoscaler"&&a.type==="add-app"?"autoscale_instance_activated":a.source==="autoscaler"&&a.type==="routing"?"autoscale_routing_completed":names[a.type],
+        emit(a.source==="autoscaler"&&a.type==="add-app"?"autoscale_instance_activated":a.source==="autoscaler"&&a.type==="scale-up"?"autoscale_scale_up_activated":a.source==="autoscaler"&&a.type==="routing"?"autoscale_routing_completed":names[a.type],
           {...t.data,actionSource:a.source??"player",action_requested_step:a.requestedStep,action_activated_step:a.activatedStep});
         break;
       }

@@ -8,7 +8,8 @@ import type { Activity } from "./cast";
 import { Creature } from "./creatures";
 import { bodiesOn, standing } from "./crewSpots";
 import { FLOOR_Y } from "./levels";
-import { now, shownFloor } from "./ride";
+import { shownFloor } from "./ride";
+import { worldDelta, worldNow } from "./worldClock";
 import { carY, onErrandEnd } from "./trips";
 import { bothFloors, SHAFT_CLIP } from "./viewState";
 import { errandEnded, PACE, populate, stepVisitors, visitors, type Visitor } from "./crowd";
@@ -36,7 +37,7 @@ export function Visitors({ count }: { count: number }) {
   useEffect(() => onErrandEnd(errandEnded), []);
   useFrame((_, dt) => {
     const s = useGame.getState();
-    stepVisitors(dt, now(), s.walking && s.started, (floor) => bodiesOn(floor, taggedVisitor));
+    stepVisitors(worldDelta(dt), worldNow(), s.walking && s.started, (floor) => bodiesOn(floor, taggedVisitor));
   });
   return (
     <>

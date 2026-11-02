@@ -18,7 +18,7 @@ it("shows the stage and a legal way to start the test",()=>{
 it("exposes actual and detected health and surviving capacity",()=>{
  show(tick(act(preparedReliability(),{type:"arm_reliability"}),8));fireEvent.click(screen.getByRole("button",{name:"App Server"}));fireEvent.click(screen.getByRole("button",{name:"Server management"}));expect(useGame.getState().game.campaign!.apps[1].detectedHealth).toBe("healthy");fireEvent.click(document.querySelector<HTMLElement>('[data-guidance-app="app-2"]')!);const panel=screen.getByRole("dialog",{name:"App Servers"});
  expect(panel.textContent).toContain("failed");expect(panel.textContent).toContain("detected unhealthy");
- fireEvent.click(within(panel).getByText("Technical Details"));
+ fireEvent.click(within(panel).getByRole("button",{name:"Inspect details"}));
  const readings=within(panel).getByRole("region",{name:"Servers readings"});
  expect(within(readings).getByText("Routed capacity").parentElement?.querySelector("dd")?.textContent).toBe("1,600 req/s");
  expect(within(readings).getByText("Spare capacity").parentElement?.querySelector("dd")?.textContent).toBe("1,600 req/s");
@@ -38,6 +38,22 @@ it("disables failover deployment without a reserved spare and purchases that exh
  show(g);
  for(const name of ["Deploy Automatic Failover","Deploy Health Checks","Install spare"])
   expect((inspectionAction(new RegExp(name)) as HTMLButtonElement).disabled).toBe(true);
+});
+it("shows the incident treatment while a Stay Online failure is active without an open incident",()=>{
+ const armed=tick(act(preparedReliability(),{type:"arm_reliability"}),9);
+ // The failover isolates the failed app, so no incident ever opens and the phase stays management.
+ expect(armed.phase).toBe("management");expect(armed.campaign!.incident).toBeNull();
+ expect(armed.campaign!.reliabilityStage!.fault!.startedStep).not.toBeNull();
+ show(armed);
+ expect(document.querySelector(".topbar")!.className).toContain("is-incident");
+ const dashboard=screen.getByRole("region",{name:"Incident"});
+ expect(dashboard.querySelector(".mission-condition")!.className).toContain("is-failure");
+ const status=within(dashboard).getByText(/failed and is not restored/).closest("p")!;
+ expect(status.querySelector(".state-critical")!.textContent).toContain("Incident");
+ expect(document.querySelector(".week")!.className).toContain("is-incident");
+ cleanup();
+ show(tick(armed,20));
+ expect(document.querySelector(".topbar")!.className).not.toContain("is-incident");
 });
 it("keeps the recorded reliability outcome available after acknowledgement",()=>{
  const completed=tick(act(preparedReliability(),{type:"arm_reliability"}),35);

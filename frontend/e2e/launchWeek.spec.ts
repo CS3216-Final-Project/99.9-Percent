@@ -1,5 +1,5 @@
 import {infrastructureAction,purchasePreview} from "./componentInspection";
-import { test, expect, seedSave, savedGame, expectRoom, openCameraControls } from "./fixtures";
+import { test, expect, seedSave, savedGame, expectRoom, openCameraControls, setGameSpeed } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { newGame, type GameState } from "../src/sim";
 import { applyCampaignInput, step } from "../src/sim/step";
@@ -197,12 +197,16 @@ test("the research sheet previews each option and spends the pick", async ({ pag
 });
 
 test("the score card reports nines, copies the result and continues to Chapter 2", async ({ page }) => {
+  test.slow();
   await boot(page, nearlyDone());
-  const rush = page.getByRole("button", { name: "End the week at 20 times speed" });
   const card = page.getByRole("dialog", { name: "Launch Week complete" });
-  await rush.click();
-  for (let i = 0; i < 60 && !(await card.isVisible()); i++) {
-    const dialog = page.getByRole("dialog");
+  // The week ends by running the clock at the highest speed.
+  await setGameSpeed(page, 2);
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  // Bound the wait by time, not iterations: a slow runner spends longer on each pass.
+  for (const deadline = Date.now() + 90_000; Date.now() < deadline && !(await card.isVisible());) {
+    // The score card can open between checks, beside the Company Message its fixture dismisses.
+    const dialog = page.locator('[role="dialog"]:not([aria-label="Launch Week complete"])').first();
     if (await dialog.isVisible()) {
       const next = dialog.getByRole("button", { name: "View Incident Report", exact: true });
       const go = dialog.getByRole("button", { name: "Continue company", exact: true });
@@ -210,7 +214,7 @@ test("the score card reports nines, copies the result and continues to Chapter 2
       if (await next.isVisible()) await next.click();
       else if (await go.isVisible()) await go.click();
       else if (await close.isVisible()) await close.click();
-    } else if (await rush.isEnabled() && (await rush.getAttribute("aria-pressed")) !== "true") await rush.click({ timeout: 1000 }).catch(() => {}); // the week can end between the check and the click
+    }
     await page.waitForTimeout(150);
   }
   await expect(card).toBeVisible();

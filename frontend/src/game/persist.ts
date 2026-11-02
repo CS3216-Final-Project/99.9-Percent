@@ -74,7 +74,7 @@ export interface Meta {
   trafficView?: boolean;
 }
 
-export const GUIDED_TIPS = ["settlement"] as const;
+export const GUIDED_TIPS = ["settlement", "hint"] as const;
 export type GuidedTip = (typeof GUIDED_TIPS)[number];
 
 /** Stored walkthrough records from before Launch Week are finished: their lesson indices no longer exist. */

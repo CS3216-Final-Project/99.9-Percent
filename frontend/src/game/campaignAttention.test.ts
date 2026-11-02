@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { newGame, newLegacyGame } from "@/sim";
 import { advanceSteps } from "@/sim/step";
-import { campaignAttention as guidance, spotlightMachines } from "./campaignAttention";
+import { campaignAttention as guidance, firstIncidentStop, spotlightMachines } from "./campaignAttention";
 import { act, tick, dataCompany, spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "@/sim/__tests__/reliabilityFixture";
 import { combinedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
@@ -71,9 +71,9 @@ it("uses Data's real scheduling eligibility and preserves explicit continuation"
   expect(guidance(game)).toMatchObject({ chapter: 3, attention: "progression", target: "next" });
   expect(guidance(enteredDataCompany())).toMatchObject({ attention: "run", reason: "data-growth" });
 });
-it("recognises traffic pulse time without requiring autoscaling", () => {
+it("points Prepare's inspected company at Server management's optional autoscaling controller", () => {
   const game = act(spikeCompany(false), { type: "incident_inspect", equipment: "app" });
-  expect(guidance(game)).toMatchObject({ chapter: 4, attention: "run", reason: "spike-pulses" });
+  expect(guidance(game)).toMatchObject({ chapter: 4, attention: "hint", reason: "spike-autoscaling", action: { action: { type: "unlock_autoscaling" } } });
 });
 it("reliability requires explicit arming; pending setup is not a mandatory arm blocker", { timeout: 30_000 }, () => {
   const game = reliabilityCompany();
@@ -85,6 +85,16 @@ it("reliability requires explicit arming; pending setup is not a mandatory arm b
 it("does not spotlight Run for an untreated actual failure", () => {
   const game = tick(act(reliabilityCompany(), { type: "arm_reliability" }), 8);
   expect(guidance(game)).toMatchObject({ attention: "hint", target: "app" });
+});
+it("guides a stable but still-offline failure to Restore App, not to Run", { timeout: 30_000 }, () => {
+  let game = tick(act(preparedReliability(), { type: "arm_reliability" }), 8);
+  for (let i = 0; i < 25 && guidance(game).reason !== "isolated-failure"; i++) game = tick(game);
+  const decision = guidance(game);
+  expect(decision).toMatchObject({ reason: "isolated-failure", attention: "hint", target: "app" });
+  expect(decision.action?.action).toEqual({ type: "restore_app", appId: "app-2" });
+  expect(decision.message).toContain("Restore");
+  expect(decision.message).not.toContain("Press Run");
+  expect(decision.recommendation).toContain("Restore App");
 });
 it("recognises a queued valid failover and rejects it when its recorded route is stale", () => {
   const game = tick(act(preparedReliability(), { type: "arm_reliability" }), 9);
@@ -218,7 +228,7 @@ it("names the machines the room spotlight lights for each decision", () => {
   expect(spotlightMachines(running, running.action?.action, fresh.campaign!)).toEqual([]);
 });
 
-it("teaches Launch Week's one database incident, then End week", () => {
+it("teaches Launch Week's one database incident, then finishing the week", () => {
   const fresh = newGame(7, "lw", 2);
   expect(guidance(fresh)).toMatchObject({ reason: "launch-open", target: "run" });
   let s = advanceSteps(newGame(7, "lw", 2), 20).state;
@@ -230,8 +240,8 @@ it("teaches Launch Week's one database incident, then End week", () => {
   s = act(s, { type: "start_db_upgrade" });
   for (let i = 0; i < 60 && s.phase !== "review"; i++) s = tick(s);
   s = act(s, { type: "acknowledge_review" });
-  for (let i = 0; i < 20 && guidance(s).reason !== "launch-end-week"; i++) s = tick(s);
-  expect(guidance(s)).toMatchObject({ reason: "launch-end-week", target: "endweek" });
+  for (let i = 0; i < 20 && guidance(s).reason !== "launch-settled"; i++) s = tick(s);
+  expect(guidance(s)).toMatchObject({ reason: "launch-settled", target: "run" });
   for (let i = 0; i < 40 && !s.campaign!.launchWeek!.researchEarned; i++) s = tick(s);
   expect(guidance(s)).toMatchObject({ reason: "launch-research", target: "research" });
 });
@@ -244,4 +254,14 @@ it("holds the Launch Week score card until the research point is spent", () => {
   expect(guidance(s)).toMatchObject({ reason: "launch-research", target: "research" });
   s = act(s, { type: "pick_launch_tech", tech: "caching" });
   expect(guidance(s)).toMatchObject({ reason: "launch-score", target: "next" });
+});
+it("recognizes the first incident's stop until time runs or the player records anything", () => {
+  expect(firstIncidentStop(advanceSteps(newGame(), 5).state)).toBe(false);
+  const first = advanceSteps(newGame(), 6).state;
+  expect(firstIncidentStop(first)).toBe(true);
+  const c = first.campaign!;
+  expect(firstIncidentStop({ ...first, campaign: { ...c, incident: { ...c.incident!, id: "incident-later" } } })).toBe(false);
+  expect(firstIncidentStop(act(first, { type: "incident_inspect", equipment: "db" }))).toBe(false);
+  expect(firstIncidentStop(act(first, { type: "start_db_upgrade" }))).toBe(false);
+  expect(firstIncidentStop(tick(first, 1))).toBe(false);
 });
