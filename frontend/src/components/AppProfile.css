@@ -207,7 +207,19 @@
   .app-profile-art { display: none; }
   .app-profile-card-head { text-align: left; }
   .app-profile-pitch { text-align: left; }
-  .app-profile-foot { position: sticky; bottom: 0; flex-direction: column; align-items: stretch; padding: 12px 0 4px; background: rgb(14 11 30 / 0.95); }
+  /* The room's own panels must not read through behind the stacked cards. */
+  .app-profile-backdrop { background: rgb(14 11 30 / 0.94); }
+  /* Start building stays pinned to the bottom edge, edge to edge, with the cards fading out above it. */
+  .app-profile-foot {
+    position: sticky;
+    bottom: -18px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin: 0 -18px -18px;
+    padding: 28px 18px 18px;
+    background: linear-gradient(to bottom, rgb(14 11 30 / 0), rgb(14 11 30) 24px);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .app-profile-card { transition: none; }
