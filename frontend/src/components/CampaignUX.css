@@ -5,15 +5,6 @@
 .inspection-back { justify-self: start; }
 .inspection-fleet-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 0; }
 /* Shared Server Management cards; live counts, routing and actions remain authoritative. */
-:is(.component-inspection-app,.component-inspection-gateway) .inspection-management-heading { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--ink); font-size: var(--text-md); }
-:is(.component-inspection-app,.component-inspection-gateway) .inspection-management-heading > .icon { flex: none; color: var(--text-soft); }
-/* A plain heading, not a filled bar, so it cannot read as a disabled button; colour stays with status. */
-.component-inspection-app .inspection-management-heading { padding: 4px 0 10px; border-bottom: 1px solid var(--paper-3); }
-/* Network management keeps its title and back control on one header row above the action sections. */
-.component-inspection-gateway .inspection-management-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--paper-3); }
-/* On narrow phones the back control wraps below the title instead of clipping it. */
-.component-inspection-gateway .inspection-management-header .inspection-management-heading { flex: 1 1 auto; min-width: max-content; }
-.component-inspection-gateway .inspection-management-header .inspection-back { flex: none; }
 /* Count tiles share the cards' colour language: neutral for installed, green for health, blue for routing. */
 .inspection-fleet-summary .row { --tile-bg: var(--paper-2); --tile-ink: var(--text-soft); --tile-value: var(--ink); --tile-edge: var(--control-edge); display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 6px; border: 1px solid var(--tile-edge); border-radius: 12px; text-align: center; background: var(--tile-bg); }
 .inspection-fleet-summary .row:nth-child(2) { --tile-bg: var(--tile-green); --tile-ink: var(--tile-green-ink); --tile-value: var(--ok-ink); --tile-edge: color-mix(in srgb, var(--ok-ink) 28%, var(--tile-green)); }

@@ -131,7 +131,7 @@ test("failed server management: Hint visits its card, queues free restoration, t
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="restore-app")).toBe(false);
   await expect(gold).toHaveCount(1);await expect(gold).toHaveAccessibleName("Confirm");await gold.click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="restore-app"&&a.targetId===id)).toBe(true);
-  await expect(page.getByRole("dialog",{name:"App Servers",exact:true})).toHaveCount(0);
+  await expect(page.locator(".component-inspection-app")).toHaveCount(0);
   await page.getByRole("button",{name:"Hint",exact:true}).click();await page.getByRole("dialog",{name:"Hint",exact:true}).getByRole("button",{name:"Got it",exact:true}).click();
   await expect(gold).toHaveCount(1);await expect(gold).toHaveAccessibleName("Run");
 });

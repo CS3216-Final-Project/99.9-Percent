@@ -15,8 +15,24 @@ beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),
 afterEach(()=>{cleanup();setConfirming(null);vi.restoreAllMocks();});
 function show(game:GameState) {useGame.setState({game,ready:true,started:true,onboarding:false,tour:null,running:false});render(<CampaignAttentionHost><CampaignHeader/><CampaignPanel/><CampaignControls/><InspectionReveal/></CampaignAttentionHost>);}
 const press=(name:string|RegExp)=>fireEvent.click(screen.getByRole("button",{name}));
-const app=()=>screen.getByRole("dialog",{name:"App Servers"});
+const app=()=>document.querySelector<HTMLElement>(".component-inspection-app")!;
 
+it("titles each popup by the view on screen and names it once",()=>{
+  show(preparedReliability());press("App Server");
+  const title=()=>app().getAttribute("aria-label"),named=(name:string)=>within(app()).getAllByText(name,{exact:true});
+  expect(title()).toBe("App Servers");
+  press("Server management");expect(title()).toBe("Server management");expect(named("Server management")).toHaveLength(1);
+  fireEvent.click(app().querySelector<HTMLElement>('[data-guidance-app="app-2"]')!);expect(title()).toBe("Server 2");
+  expect(within(app()).getAllByRole("heading",{name:"Server 2"})).toHaveLength(1);
+  press("Back to Server management");press("Autoscaling");expect(title()).toBe("Autoscaling");expect(within(app()).getAllByRole("heading",{name:"Autoscaling"})).toHaveLength(1);
+  press("Back to Server management");press("Back to Servers");expect(title()).toBe("App Servers");
+  press("Close");press("Network");
+  const network=()=>document.querySelector<HTMLElement>(".component-inspection-gateway")!;
+  expect(network().getAttribute("aria-label")).toBe("Network");
+  press("Network management");expect(network().getAttribute("aria-label")).toBe("Network management");
+  expect(within(network()).getAllByText("Network management",{exact:true})).toHaveLength(1);
+  press("Back to Network");expect(network().getAttribute("aria-label")).toBe("Network");
+});
 it("shows a compact fleet with authoritative counts and hides individual actions until selection",()=>{
   const game=preparedReliability();show(game);press("App Server");press("Server management");const popup=within(app());
   expect(app().querySelectorAll('[data-guidance-app]')).toHaveLength(game.campaign!.apps.length);
@@ -93,7 +109,7 @@ it("routes a failed-server Hint through its card and valid Confirm to free resto
   expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("Confirm");press("Confirm");
   expect(useGame.getState().game.campaign!.cashCents).toBe(before.cashCents);
   expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="restore-app"&&a.targetId===id)).toBe(true);
-  expect(screen.queryByRole("dialog",{name:"App Servers"})).toBeNull();
+  expect(document.querySelector(".component-inspection-app")).toBeNull();
 });
 
 it("shares the focused server view between its card and the room entry",()=>{

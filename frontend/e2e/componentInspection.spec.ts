@@ -62,7 +62,7 @@ test("component actions: App Server adding, Network prerequisite and read-only c
   await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
   await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now())+1000));
   await page.locator('.campaign-panel [data-tutorial="inspect-app"]').click();
-  const app=page.getByRole("dialog",{name:"App Servers",exact:true});
+  const app=page.locator(".component-inspection-app");
   await app.getByRole("button",{name:"Server management",exact:true}).click();await app.locator('[data-guidance-app="app-1"]').click();await expect(app.getByRole("button",{name:/Scale up Server 1/})).toBeEnabled();await app.getByRole("button",{name:"Back to Server management",exact:true}).click();await app.getByRole("button",{name:"Back to Servers",exact:true}).click();
   await app.getByRole("button",{name:/Add server/}).click();
   const before=await savedGame(page);await page.getByRole("dialog",{name:"Purchase preview"}).getByRole("button",{name:"Cancel",exact:true}).click();

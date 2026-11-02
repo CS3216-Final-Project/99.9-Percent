@@ -26,8 +26,10 @@ function show(game:GameState=advanceSteps(newGame(),6).state) {
 }
 const gold=()=>document.querySelectorAll<HTMLElement>(".campaign-gold-attention");
 const open=(name:string)=>fireEvent.click(screen.getByRole("button",{name}));
+// Inspection titles follow the open view, so find each dialog by its equipment.
 const titleOf=(name:string)=>name==="Servers"?"App Servers":name;
-const dialog=(name:string)=>within(screen.getByRole("dialog",{name:titleOf(name)}));
+const PLACE:Record<string,string>={Servers:"app",Network:"gateway",Database:"db","Read Cache":"cache",Monitoring:"monitoring"};
+const dialog=(name:string)=>{const el=document.querySelector<HTMLElement>(`.component-inspection-${PLACE[name]}`);expect(el).not.toBeNull();return within(el!);};
 const networkView=(name:string)=>{if(screen.queryByRole("button",{name:"Network management"}))open("Network management");expect(dialog("Network").getByRole("heading",{name})).toBeTruthy();};
 async function accept() {
   open("Hint");fireEvent.click(within(screen.getByRole("dialog",{name:"Hint"})).getByRole("button",{name:/Got it|Upgrade database/}));
@@ -178,7 +180,7 @@ it.each([4,5,6])("keeps Chapter %s summaries outside component inspections",chap
  expect(screen.getByRole("dialog",{name:"Read Cache"}).textContent).not.toMatch(/Workload:|Growth due|Waiting for workload growth/);
  expect(dialog("Read Cache").getByRole("button",{name:/Tune cache ceiling/})).toBeTruthy();
  fireEvent.click(dialog("Read Cache").getByRole("button",{name:"Close"}));open("App Server");
- expect(screen.getByRole("dialog",{name:"App Servers"}).textContent).not.toMatch(/Stay online|Stable after restoration|Normal demand|spike demand/);
+ expect(document.querySelector<HTMLElement>(".component-inspection-app")!.textContent).not.toMatch(/Stay online|Stable after restoration|Normal demand|spike demand/);
  open("Server management");open("Autoscaling");expect(dialog("Servers").getByRole("button",{name:/Deploy autoscaling/})).toBeTruthy();
 });
 
@@ -194,7 +196,7 @@ it("describes a failed server's zero available capacity and shows that instance'
  const game=tick(decide(reliabilityCompany(),{type:"arm_reliability"}),8);
  const id=game.campaign!.reliabilityStage!.fault!.targetId;
  show(game);act(()=>inspectInRoom("app",id));await act(async()=>{});
- const popup=screen.getByRole("dialog",{name:"App Servers"});
+ const popup=document.querySelector<HTMLElement>(".component-inspection-app")!;
  expect(dialog("Servers").getByText("Down",{exact:true})).toBeTruthy();
  expect(popup.querySelector(".component-inspection-metric")?.textContent).toContain("0 available /");
  expect(popup.textContent).not.toMatch(/operating at full capacity|using all available capacity/);
@@ -206,7 +208,7 @@ it("describes a failed server's zero available capacity and shows that instance'
 
 it("groups unrouted serving capacity into one warning instead of repeating it per server",()=>{
  const game=tick(decide(combinedCompany(),{type:"set_routing",mode:"single",targets:["app-1"]}));show(game);open("App Server");open("Server management");
- const notes=screen.getByRole("dialog",{name:"App Servers"}).querySelectorAll(".inspection-warning");
+ const notes=document.querySelector<HTMLElement>(".component-inspection-app")!.querySelectorAll(".inspection-warning");
  expect(notes).toHaveLength(1);
  for(const app of game.campaign!.apps.filter(a=>!a.routed&&a.role!=="spare")) expect(notes[0].textContent).toContain(`Server ${app.id.slice(4)}`);
 });
@@ -235,7 +237,7 @@ it("walks Chapter 6 routing through its checklist before pending Run",async()=>{
 it("summarises a failed fleet without exposing server cards until management",()=>{
  const game=tick(decide(reliabilityCompany(),{type:"arm_reliability"}),8);
  show(game);open("App Server");
- const popup=screen.getByRole("dialog",{name:"App Servers"}),c=game.campaign!;
+ const popup=document.querySelector<HTMLElement>(".component-inspection-app")!,c=game.campaign!;
  expect(popup.querySelectorAll('[data-guidance-app]')).toHaveLength(0);
  expect(dialog("Servers").getByText("Warning",{exact:true})).toBeTruthy();
  expect(popup.querySelector(".component-inspection-metric")?.textContent).toContain(`${c.apps.filter(a=>a.health!=="failed").length} healthy`);
@@ -247,11 +249,11 @@ it("returns keyboard focus to the shortcut after initial and nested inspection d
  show(newGame());
  const shortcut=screen.getByRole("button",{name:"App Server"});
  shortcut.focus();fireEvent.click(shortcut);
- const popup=screen.getByRole("dialog",{name:"App Servers"});
+ const popup=document.querySelector<HTMLElement>(".component-inspection-app")!;
  fireEvent.keyDown(within(popup).getByRole("button",{name:"Close"}),{key:"Escape"});
  expect(document.activeElement).toBe(shortcut);
  fireEvent.click(shortcut);open("Server management");
- fireEvent.keyDown(screen.getByRole("dialog",{name:"App Servers"}),{key:"Escape"});
+ fireEvent.keyDown(document.querySelector<HTMLElement>(".component-inspection-app")!,{key:"Escape"});
  expect(document.activeElement).toBe(shortcut);
 });
 
