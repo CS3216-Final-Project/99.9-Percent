@@ -121,22 +121,24 @@ function CampaignGuidance() {
   </section>;
 }
 
-function RecoveryClock({ campaign: c }: { campaign: Campaign }) {
-  return <><div className="clock-row"><h3><Icon name="health" size={20} />Recovery progress</h3><strong>{c.incident!.stableSteps}/{Q.stableSteps} s</strong></div>
-    <Meter value={c.incident!.stableSteps / Q.stableSteps} tone="ok" label="Recovery progress" /></>;
+function RecoveryCount({ campaign: c }: { campaign: Campaign }) {
+  return <div className="clock-row"><h3><Icon name="health" size={20} />Recovery progress</h3><strong>{c.incident!.stableSteps}/{Q.stableSteps} s</strong></div>;
 }
 
-/** The countdown joins the pinned banner once stable seconds start; at zero it stays in the recovery card. */
+const RecoveryBar = ({ campaign: c }: { campaign: Campaign }) => <Meter value={c.incident!.stableSteps / Q.stableSteps} tone="ok" label="Recovery progress" />;
+
+/** The bar joins the pinned banner once stable seconds start; the count stays in the recovery card. */
 function PinnedRecovery({ campaign: c }: { campaign: Campaign }) {
   if (!c.incident || c.incident.stableSteps === 0) return null;
-  return <div className="incident-clock campaign-stability incident-pin-clock"><RecoveryClock campaign={c} /></div>;
+  return <div className="incident-pin-clock"><RecoveryBar campaign={c} /></div>;
 }
 
 function IncidentRecovery({ campaign: c }: { campaign: Campaign }) {
   const fault = currentFault(c);
   const failedAppActive = fault && fault.startedStep !== null && fault.restoredStep === null;
   return <section className="incident-clock campaign-stability" aria-label="Incident recovery">
-    {c.incident!.stableSteps === 0 ? <RecoveryClock campaign={c} /> : <Meter value={c.incident!.stableSteps / Q.stableSteps} tone="ok" label="Recovery progress" />}
+    <RecoveryCount campaign={c} />
+    {c.incident!.stableSteps === 0 && <RecoveryBar campaign={c} />}
     <p>Meet every condition for <b>{Q.stableSteps} consecutive game seconds</b>:</p>
     <ul className="recovery-conditions">
       <li><Icon name="latency" size={16} /><span>Latency below <b>{Q.latencyThresholdMs} ms</b></span></li>
