@@ -61,8 +61,8 @@
 .controls-dock .walk-button:hover { background: var(--night-4); color: var(--on-night); }
 .controls-dock .walk-button { width: 84px; }
 .controls-dock .walk-button.is-on { background: var(--go); color: var(--ink); }
-.controls-dock .room-menu > summary { position: relative; width: 142px; }
-.controls-dock .camera-menu > summary { width: 118px; }
+/* Floor, View mode and Camera show their icons only; each name stays in the summary for assistive technology and its tip. */
+.controls-dock .room-menu > summary { position: relative; }
 .controls-dock .time-menu > summary { width: 64px; padding-inline: 4px; gap: 4px; font-variant-numeric: tabular-nums; }
 .dock-panel {
   position: absolute; bottom: calc(100% + 10px); right: 12px; z-index: 130;
