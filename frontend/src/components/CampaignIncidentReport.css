@@ -10,21 +10,22 @@
   max-width: min(85%, 60ch);
   margin: 0;
   padding: 8px 14px;
-  border-radius: 18px;
+  border-radius: 10px;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 .campaign-incident-report > section h3 {
   align-self: flex-start;
   border: 1px solid var(--control-edge);
-  border-bottom-left-radius: 5px;
+  border-bottom-left-radius: 3px;
   background: var(--paper-2);
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
+  font-weight: 700;
   transform-origin: bottom left;
 }
 .campaign-incident-report > section p {
   align-self: flex-end;
-  border-bottom-right-radius: 5px;
+  border-bottom-right-radius: 3px;
   background: var(--ink);
   color: var(--on-night);
   box-shadow: 0 2px 6px rgb(29 24 52 / .14);
