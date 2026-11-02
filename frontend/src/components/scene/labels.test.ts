@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { LABEL_GAP, LABEL_TAIL, screenPoint, stackDown, stackUnder, type LabelSpot } from "./labels";
+import { LABEL_FULL_ZOOM, LABEL_GAP, LABEL_MIN_PX, LABEL_TAIL, screenPoint, stackDown, stackUnder, zoomScale, type LabelSpot } from "./labels";
 
 const WIDTH = 1280;
 const HEIGHT = 720;
@@ -129,6 +129,20 @@ describe("label placement", () => {
       expect(out[i] + LABEL_TAIL + LABEL_GAP).toBeLessThanOrEqual(out[i + 1] - heights[i + 1]);
     }
     expect(stackUnder([], 300)).toEqual([]);
+  });
+
+  it("draws labels full size from the opening zoom in, and shrinks them with the room as the view pulls back", () => {
+    for (const zoom of [LABEL_FULL_ZOOM, 64, 140]) expect(zoomScale(zoom, 34)).toBe(1);
+    expect(zoomScale(LABEL_FULL_ZOOM * 0.8, 34)).toBeCloseTo(0.8, 6);
+  });
+
+  it("never shrinks the shortest clickable label below the minimum target size, however far out the view is", () => {
+    for (const shortest of [26, 34, 48]) {
+      expect(zoomScale(10, shortest) * shortest).toBeCloseTo(LABEL_MIN_PX, 6);
+      expect(zoomScale(0, shortest) * shortest).toBeCloseTo(LABEL_MIN_PX, 6);
+    }
+    // A label already at or below the minimum, or none measured yet, keeps its full size.
+    for (const shortest of [LABEL_MIN_PX, 20, 0]) expect(zoomScale(10, shortest)).toBe(1);
   });
 
   it("is what separates a steady label from one a frame behind: projecting without it misses by pixels", () => {

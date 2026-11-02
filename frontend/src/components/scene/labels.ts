@@ -16,6 +16,21 @@ export function screenPoint(point: THREE.Vector3, camera: THREE.Camera, width: n
   return out.set((ndc.x * 0.5 + 0.5) * width, (-ndc.y * 0.5 + 0.5) * height);
 }
 
+/** Zoom, in pixels a metre, at and above which the overview shows labels at full size: the game opens here. */
+export const LABEL_FULL_ZOOM = 30;
+/** The smallest a clickable label may be drawn, in CSS pixels tall: WCAG 2.5.8's minimum pointer target. */
+export const LABEL_MIN_PX = 24;
+
+/**
+ * How large the overview draws its labels at this zoom, as a share of their full size. Zoomed out past
+ * LABEL_FULL_ZOOM they shrink in step with the room, so the markers of neighbouring machines stay apart instead
+ * of piling up, until the shortest clickable label (`shortest` CSS pixels tall at full size) reaches LABEL_MIN_PX.
+ */
+export function zoomScale(zoom: number, shortest: number): number {
+  const least = shortest > LABEL_MIN_PX ? LABEL_MIN_PX / shortest : 1;
+  return THREE.MathUtils.clamp(zoom / LABEL_FULL_ZOOM, least, 1);
+}
+
 /** Pixels a label's marker tail reaches below its anchor point (the ::after triangle under the pill). */
 export const LABEL_TAIL = 9;
 /** Breathing room between two labels stacked on the same machine. */

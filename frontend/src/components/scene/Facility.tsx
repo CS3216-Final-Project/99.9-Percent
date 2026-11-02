@@ -79,7 +79,7 @@ import { bindViewFade, bothFloors, cameras, lookApi, lookingFromAvatar, viewNow 
 import { Ceiling } from "./Ceiling";
 import { ViewOverlay } from "./ViewOverlay";
 import { Minimap } from "./Minimap";
-import { screenPoint, stackDown, stackUnder } from "./labels";
+import { screenPoint, stackDown, stackUnder, zoomScale } from "./labels";
 import { EQUIPMENT, ROOM_PALETTE } from "./palette";
 import { trafficModel } from "./traffic";
 import { CampaignTraffic, Gate } from "./TrafficFlow";
@@ -877,24 +877,29 @@ function LabelAnchors({ footprints }: { footprints: Record<EquipmentId, Footprin
  */
 function placeLabels(camera: THREE.Camera, size: { width: number; height: number }) {
   const deep = (camera as THREE.PerspectiveCamera).isPerspectiveCamera === true;
+  // The overview shrinks every label alike as it zooms out, keeping the shortest button a comfortable target.
+  // Sizes below are read from layout, which a transform leaves alone, so they are scaled to match what is drawn.
+  let shortest = Infinity;
+  if (!deep) labelEls.forEach((el) => { if (el instanceof HTMLButtonElement && el.offsetHeight) shortest = Math.min(shortest, el.offsetHeight); });
+  const fit = deep ? 1 : zoomScale((camera as THREE.OrthographicCamera).zoom, shortest === Infinity ? 0 : shortest);
   // Pack the app labels from their true spots and sizes, not a fixed pitch: routed ones carry a load bar and a
   // status note that make them taller than a constant assumes, and machines spread across the floor already keep
   // some marks apart, so a label drops only below the ones it really overlaps.
   const appSpots = campaignAppIds.map((id) => {
     const el = labelEls.get(id);
     const pos = anchors.get(id);
-    const h = el?.offsetHeight ?? 0;
+    const h = (el?.offsetHeight ?? 0) * fit;
     // Behind a view from the avatar an anchor can project mirrored, so those views keep a plain stack.
     if (deep || !pos) return { x: 0, y: 0, w: 1, h };
     screenPoint(pos, camera, size.width, size.height, labelAt);
-    return { x: labelAt.x, y: labelAt.y, w: el?.offsetWidth ?? 0, h };
+    return { x: labelAt.x, y: labelAt.y, w: (el?.offsetWidth ?? 0) * fit, h };
   });
-  const appBottoms = stackDown(appSpots, -10);
+  const appBottoms = stackDown(appSpots, -10 * fit);
   const appCeilings = inSpikes && size.width <= 900 ? stackUnder(appSpots.map((s) => s.h), size.height * 0.4) : null;
   anchors.forEach((pos, key) => {
     const el = labelEls.get(key);
     if (!el) return;
-    let scale = 1;
+    let scale = fit;
     if (deep) {
       // In perspective a point behind the camera projects to a mirrored place on screen, so its label is hidden.
       camera.updateMatrixWorld();
@@ -908,11 +913,11 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
     let { x, y } = labelAt;
     // In a campaign, spread the labels of the app servers and the gateway apart, and keep the cache's on a narrow screen.
     const slot = campaignAppIds.indexOf(key);
-    if (labelEls.has("app-1") && key === "app") y -= 100;
-    else if (labelEls.has("app-1") && key === "gateway") y -= 30;
+    if (labelEls.has("app-1") && key === "app") y -= 100 * fit;
+    else if (labelEls.has("app-1") && key === "gateway") y -= 30 * fit;
     else if (slot >= 0) y = appBottoms[slot];
     // The In gate stands just west of the gateway: lift its count clear of the Network label.
-    if (key === TRAFFIC_IN) y -= 38;
+    if (key === TRAFFIC_IN) y -= 38 * fit;
     // The mobile bottom panel occupies at most 56% of the room. Spread the
     // growing pool above it by slot order, even when permanent IDs have gaps.
     if (appCeilings && slot >= 0) {
@@ -928,8 +933,8 @@ function placeLabels(camera: THREE.Camera, size: { width: number; height: number
   // The Read Cache stands beside the database, so from some views their markers meet: stack the cache's above.
   const cache = placed.get("cache"), db = placed.get("db"), cacheEl = labelEls.get("cache"), dbEl = labelEls.get("db");
   if (cache && db && cacheEl && dbEl) {
-    const h = Math.max(cacheEl.offsetHeight, dbEl.offsetHeight) + 12;
-    if (Math.abs(cache.x - db.x) < (cacheEl.offsetWidth + dbEl.offsetWidth) / 2 && Math.abs(cache.y - db.y) < h) cache.y = Math.min(cache.y, db.y - h);
+    const h = (Math.max(cacheEl.offsetHeight, dbEl.offsetHeight) + 12) * fit;
+    if (Math.abs(cache.x - db.x) < ((cacheEl.offsetWidth + dbEl.offsetWidth) / 2) * fit && Math.abs(cache.y - db.y) < h) cache.y = Math.min(cache.y, db.y - h);
   }
   placed.forEach(({ x, y, scale }, key) => {
     const el = labelEls.get(key)!;

@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { test, expect, expectRoom, seedClassicSave, unlockChallenge } from "./fixtures";
+import { test, expect, expectRoom, openCameraControls, seedClassicSave, unlockChallenge } from "./fixtures";
 import { advanceTurn, newLegacyGame } from "../src/sim";
 
 type Point = { x: number; y: number };
@@ -63,4 +63,42 @@ test("turning the room with Q and E keeps the company in place", async ({ page }
     expect(overshoot, `labels swung ${Math.round(overshoot)}px off course while turning with ${key.toUpperCase()}`).toBeLessThan(8);
   }
   await page.screenshot({ path: "test-results/camera-turned.png" });
+});
+
+test("zooming out shrinks the equipment labels with the room, never below a clickable size", async ({ page }) => {
+  test.slow();
+  await unlockChallenge(page);
+  await page.addInitScript(() => localStorage.setItem("nn.mode.v1", "classic"));
+  await seedClassicSave(page, advanceTurn(newLegacyGame(1)));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue week 2" }).click();
+  await expectRoom(page);
+
+  const labels = page.locator(".eq-labels .eq-label:not(.is-quiet)");
+  const database = page.locator(".eq-labels").getByRole("button", { name: "Database", exact: true });
+  /** Each shown label's height on screen, after the scene's transform, and the height its layout gives it. */
+  const heights = () => labels.evaluateAll(els => els.map(el => ({ shown: el.getBoundingClientRect().height, laid: (el as HTMLElement).offsetHeight })));
+  await openCameraControls(page);
+  const zoomIn = page.getByRole("button", { name: "Zoom in", exact: true });
+  const zoomOut = page.getByRole("button", { name: "Zoom out", exact: true });
+
+  // Zoomed in, every label shows at its full size.
+  for (let i = 0; i < 4; i++) await zoomIn.click();
+  await expect.poll(async () => (await heights()).every(h => Math.abs(h.shown - h.laid) < 0.5)).toBe(true);
+  const full = (await database.boundingBox())!;
+
+  // Pulled right back, the labels shrink with the room, all by the same share, but stay a 24 px target.
+  for (let i = 0; i < 12; i++) await zoomOut.click();
+  await expect.poll(async () => (await database.boundingBox())!.height).toBeLessThan(full.height * 0.9);
+  const shrunk = await heights();
+  const shares = shrunk.map(h => h.shown / h.laid);
+  for (const share of shares) expect(share).toBeCloseTo(shares[0], 2);
+  for (const h of shrunk) expect(h.shown).toBeGreaterThanOrEqual(24 - 0.5);
+  const small = (await database.boundingBox())!;
+  expect(small.width).toBeLessThan(full.width * 0.9);
+  await page.screenshot({ path: "test-results/camera-zoomed-out.png" });
+
+  // A shrunk label is still the machine's control.
+  await database.click();
+  await expect(database).toHaveAttribute("aria-pressed", "true");
 });
