@@ -94,8 +94,6 @@
 .app .controls-dock .dock-menu > summary:hover { background: #ecdfc9; }
 .app .controls-dock .dock-menu[open] > summary { background: var(--selection); }
 .controls-dock .dock-menu > summary > .icon:last-child { margin-left: auto; flex: none; }
-.app .controls-dock .room-menu > summary { width: 148px; }
-.app .controls-dock .view-mode-menu > summary { width: 148px; }
 .app .controls-dock .view-mode-menu.is-walking > summary { background: var(--tile-green); color: var(--tile-green-ink); }
 .app .controls-dock .floor-number { border-radius: 8px; background: #e6d8c0; color: #594766; font-variant-numeric: tabular-nums; }
 .app .controls-dock .dock-panel { border: 1px solid var(--control-edge); border-radius: 20px; box-shadow: var(--lift); }
