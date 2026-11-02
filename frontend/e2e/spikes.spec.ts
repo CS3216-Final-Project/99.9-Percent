@@ -68,7 +68,7 @@ test("spikes: manual planning installs, scales and routes capacity through room 
  await (await infrastructureAction(page,/Add server/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:2,resumeClock:false});
  // Render the installed rack while physical game time stays paused.
  await page.clock.runFor(1000);
- await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();const scaleReveal=page.getByRole("dialog",{name:"App Servers"});await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Close"}).click();await (await infrastructureAction(page,/Scale up App 3/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3,resumeClock:false});
+ await page.getByRole("main").getByRole("button",{name:"Server 3",exact:true}).click();const scaleReveal=page.getByRole("dialog",{name:"App Servers"});await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Close"}).click();await (await infrastructureAction(page,/Scale up Server 3/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3,resumeClock:false});
  await routeAllApps(page,undefined,()=>advanceCampaignStep(page,{resumeClock:false}));
  const c=(await savedGame(page)).campaign!,expected=manualSpikePlan().campaign!;
  expect(c.step).toBe(n+6);
