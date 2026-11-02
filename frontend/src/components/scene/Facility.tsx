@@ -23,6 +23,7 @@ import { loadExploration, saveExploration, type SavedCameraView } from "@/game/e
 import { canInspectEquipment, inspectInRoom, isSheetView, roomPaused, trafficViewOn, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { nextViewpoint } from "@/game/viewpoints";
+import { OPENING_TRAFFIC_NOTE, openingTrafficCue, startsOpeningTraffic } from "@/game/openingTrafficCue";
 import { isPhoneEdition } from "@/phone/edition";
 import {
   AISLE_Z,
@@ -346,6 +347,17 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
         focusing.current = s.cameraFocus.anchor;
         touched.current = true;
         homing.current = false;
+      }),
+    [],
+  );
+
+  // The Opening's first Run looks at the In gate, where the customers' requests are about to climb.
+  useEffect(
+    () =>
+      useGame.subscribe((s, prev) => {
+        if (s.generation !== prev.generation || !startsOpeningTraffic(prev.game.campaign, s.game.campaign)) return;
+        if (s.floor !== "servers") s.goToFloor("servers", "tour");
+        s.focusCamera(TRAFFIC_IN);
       }),
     [],
   );
@@ -1020,11 +1032,13 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
 /** In and Out, with this second's requests: the gap between the two is what the company is losing. */
 export function GateCounts({ c }: { c: Campaign }) {
   const m = c.snapshot;
+  const cue = openingTrafficCue(c);
   return (
     <>
-      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.admitted)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}`}>
+      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}${cue ? " is-cued" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.admitted)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}${cue ? `. ${OPENING_TRAFFIC_NOTE[cue]}` : ""}`}>
         <b>In</b> {num(m.admitted)}/s
-        {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away — no revenue, counts against uptime</span>}
+        {cue && <span className="gate-cue" aria-hidden>{OPENING_TRAFFIC_NOTE[cue]}</span>}
+        {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away - no revenue, counts against uptime</span>}
       </span>
       <span className="wall-tag gate-tag gate-out" ref={bindLabel(TRAFFIC_OUT)} aria-label={`Out: ${num(m.successful)} requests per second served`}>
         <b>Out</b> {num(m.successful)}/s
