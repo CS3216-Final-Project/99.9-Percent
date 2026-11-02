@@ -23,15 +23,20 @@ test("Opening legacy prevention: later history survives and recognition unlocks 
   await expectRoom(page);
   const recognition = page.getByRole("dialog", { name: "First growth challenge handled" });
   await expect(recognition).toContainText("You spotted the bottleneck early and prevented an outage.");
-  // Like a chat: each question then its answer rises in turn, and the answers sit on the right.
+  // Like a chat: each question then its answer pops up in turn, as bubbles from the left and replies on the right.
   const lines = recognition.locator(".campaign-incident-report > section > :is(h3, p)");
-  const rise = await lines.evaluateAll(els => els.map(el => { const a = el.getAnimations()[0], s = getComputedStyle(el); return { tag: el.tagName, align: s.textAlign, delay: Number(a?.effect?.getTiming().delay ?? -1) }; }));
-  expect(rise.length).toBeGreaterThanOrEqual(4);
-  for (const [i, line] of rise.entries()) {
-    expect(line.align).toBe(line.tag === "P" ? "right" : "start");
-    if (i) expect(line.delay).toBeGreaterThan(rise[i - 1].delay);
+  const delays = await lines.evaluateAll(els => els.map(el => Number(el.getAnimations()[0]?.effect?.getTiming().delay ?? -1)));
+  expect(delays.length).toBeGreaterThanOrEqual(4);
+  for (let i = 1; i < delays.length; i++) expect(delays[i]).toBeGreaterThan(delays[i - 1]);
+  await expect.poll(() => lines.evaluateAll(els => els.every(el => el.getAnimations().every(a => a.playState === "finished")))).toBe(true);
+  const bubbles = await lines.evaluateAll(els => els.map(el => {
+    const box = el.getBoundingClientRect(), row = el.parentElement!.getBoundingClientRect();
+    return { tag: el.tagName, left: box.left - row.left, right: row.right - box.right, fill: getComputedStyle(el).backgroundColor };
+  }));
+  for (const b of bubbles) {
+    expect(b.fill).not.toBe("rgba(0, 0, 0, 0)");
+    expect(Math.round(b.tag === "P" ? b.right : b.left)).toBe(0);
   }
-  await expect.poll(() => lines.evaluateAll(els => els.every(el => getComputedStyle(el).opacity === "1"))).toBe(true);
   await expect(page.locator(".campaign-gold-attention")).toHaveCount(0);
   await expect(recognition.locator("details")).toHaveCount(1);
   await expect(recognition.locator("details")).not.toHaveAttribute("open");

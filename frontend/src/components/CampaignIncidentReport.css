@@ -4,19 +4,40 @@
 .campaign-recovery-report > .modal-body { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .campaign-recovery-report .campaign-incident-report { min-height: 0; overflow-y: auto; }
 .campaign-recovery-report .modal-foot { flex: none; }
-.campaign-incident-report > section { margin-block: 10px; }
-.campaign-incident-report > section h3 { margin-bottom: 4px; }
-.campaign-incident-report > section p { margin-block: 0; line-height: 1.5; }
-/* Answers sit on the right, as replies to the questions on the left. */
-.campaign-incident-report > section p { text-align: right; }
-/* As the report pops up, each question and then its answer rises into place like a chat message. */
+/* A report reads as a chat: each question is a bubble from the left, its answer a reply bubble on the right. */
+.campaign-incident-report > section { display: flex; flex-direction: column; gap: 6px; margin-block: 14px; }
+.campaign-incident-report > section > :is(h3, p) {
+  max-width: min(85%, 60ch);
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 18px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.campaign-incident-report > section h3 {
+  align-self: flex-start;
+  border: 1px solid var(--control-edge);
+  border-bottom-left-radius: 5px;
+  background: var(--paper-2);
+  font-size: var(--text-md);
+  transform-origin: bottom left;
+}
+.campaign-incident-report > section p {
+  align-self: flex-end;
+  border-bottom-right-radius: 5px;
+  background: var(--ink);
+  color: var(--on-night);
+  box-shadow: 0 2px 6px rgb(29 24 52 / .14);
+  transform-origin: bottom right;
+}
+/* As the report pops up, each question and then its answer pops up from its side like a chat message. */
 @media (prefers-reduced-motion: no-preference) {
   .campaign-recovery-report .campaign-incident-report > section > :is(h3, p) {
     animation: report-line-rise .36s cubic-bezier(.16, 1, .3, 1) both;
     animation-delay: calc(.15s + var(--turn, 0) * .12s);
   }
 }
-@keyframes report-line-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes report-line-rise { from { opacity: 0; transform: translateY(12px) scale(.94); } }
 .campaign-recovery-report .campaign-report-shell { display: flex; min-height: 0; }
 .campaign-recovery-report .modal-foot { padding-top: 10px; }
 .campaign-incident-report .report-metrics .row { flex-wrap: wrap; gap: 4px 12px; }

@@ -3,7 +3,7 @@ import type { ReportLesson } from "@/game/campaignReport";
 import { ReportTechnicalOpen } from "./useReportTechnicalOpen";
 import "./CampaignIncidentReport.css";
 
-/** A line's turn in the popup's chat-like entrance: each question, then its answer. */
+/** A bubble's turn in the popup's chat-like entrance: each question, then its answer. */
 const line = (turn: number) => ({ "--turn": turn }) as CSSProperties;
 
 /** `summary` follows "What happened?", so the numbers that carry the lesson come before the advice. */
