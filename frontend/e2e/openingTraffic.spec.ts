@@ -8,12 +8,17 @@ function decide(game: GameState, action: Action) {
   return result.state;
 }
 
-/** How far the In gate's label sits from the middle of the room, in pixels. */
+/**
+ * How far the In gate's label sits from the middle of the part of the room the side panel leaves open, in pixels:
+ * that middle is where the camera centres what it is asked to look at (see components/roomArea.ts).
+ */
 async function gateOffset(page: import("@playwright/test").Page) {
   return page.evaluate(() => {
-    const canvas = document.querySelector("main canvas")!.getBoundingClientRect();
+    const stage = document.querySelector("main canvas")!.getBoundingClientRect();
+    const panel = document.querySelector(".campaign-panel")?.getBoundingClientRect();
+    const right = panel && panel.width > 0 && panel.left - stage.left > stage.width * 0.4 ? panel.left : stage.right;
     const gate = document.querySelector(".gate-in")!.getBoundingClientRect();
-    return Math.hypot(gate.left + gate.width / 2 - (canvas.left + canvas.width / 2), gate.top + gate.height / 2 - (canvas.top + canvas.height / 2));
+    return Math.hypot(gate.left + gate.width / 2 - (stage.left + right) / 2, gate.top + gate.height / 2 - (stage.top + stage.bottom) / 2);
   });
 }
 
@@ -40,8 +45,10 @@ test("the Opening's first Run looks at the In gate and announces the growth unti
   await advanceCampaignStep(page, { seconds: 1 });
   await expect(gate).toHaveClass(/is-cued/);
   await expect(gate).toHaveAccessibleName("In: 300 requests per second. More customers are arriving. Requests are about to climb.");
-  // The view comes to the gate, wherever it was looking before.
-  await expect.poll(() => gateOffset(page), { timeout: 45_000 }).toBeLessThan(Math.min(60, before));
+  // The view comes to the gate from wherever it was looking. It frames the gate's foot on the floor, so the label
+  // above it lands near, not on, the middle of the open room; it must end up far closer than it started.
+  await expect.poll(() => gateOffset(page), { timeout: 45_000 }).toBeLessThan(before * 0.75);
+  await expect(gate).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: info.outputPath("opening-traffic-rising.png") });
 
   await advanceCampaignStep(page, { seconds: 3 });
