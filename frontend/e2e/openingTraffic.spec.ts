@@ -24,11 +24,13 @@ test("the Opening's first Run looks at the In gate and announces the growth unti
   await page.route("**/api/**", route => route.abort());
   let game = decide(newGame(7, "opening-traffic-browser", 2), { type: "begin_introduction" });
   for (const equipment of INTRODUCTION_COMPONENTS) game = decide(decide(game, { type: "incident_inspect", equipment }), { type: "acknowledge_introduction", equipment });
-  game = decide(game, { type: "complete_introduction", handoff: "opening" });
   await seedSave(page, game);
   await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   await expectRoom(page);
+  // Finish the introduction the way a player does, so the Opening begins exactly as it does for them.
+  await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Complete Introduction", exact: true }).click();
+  await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
   await page.getByRole("dialog", { name: "Tip, step 1 of 1", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
 
   const gate = page.locator(".gate-in");
