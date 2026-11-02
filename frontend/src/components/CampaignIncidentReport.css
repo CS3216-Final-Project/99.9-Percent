@@ -7,7 +7,8 @@
 /* A report reads as a chat: each question is a bubble from the left, its answer a reply bubble on the right. */
 .campaign-incident-report > section { display: flex; flex-direction: column; gap: 6px; margin-block: 14px; }
 .campaign-incident-report > section > :is(h3, p) {
-  max-width: min(85%, 60ch);
+  /* Neither side ever reaches past 60% of the report, so the left/right conversation stays readable. */
+  max-width: 60%;
   margin: 0;
   padding: 8px 14px;
   border-radius: 10px;
