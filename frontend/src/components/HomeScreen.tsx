@@ -161,7 +161,7 @@ export function ModeCard({ mode, summary, lastPlayed, locked, unsaved, busy, aut
           <Icon name="play" />{label}
         </button>
         {canRestart && <button type="button" className={`btn${confirmNew ? " btn-danger is-confirming" : ""}`} disabled={busy} onClick={restart} onBlur={() => setConfirmNew(false)}>
-          {confirmNew ? (mode === "classic" ? "Lose this run? Press again" : "Lose this company? Press again") : newLabel}
+          <Icon name="refresh" size={20} />{confirmNew ? (mode === "classic" ? "Lose this run? Press again" : "Lose this company? Press again") : newLabel}
         </button>}
       </div>
       {confirmNew && <Callout compact tone="warn" icon="alert" kicker="Are you sure?">

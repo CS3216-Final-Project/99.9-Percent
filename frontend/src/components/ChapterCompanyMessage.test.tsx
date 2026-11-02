@@ -13,6 +13,7 @@ import { useGame } from "@/game/store";
 import { ChapterCompanyMessage } from "./ChapterCompanyMessage";
 import { CampaignAttentionHost } from "./CampaignAttention";
 import { CampaignHeader, CampaignPanel, CampaignControls } from "./CampaignUI";
+import Tutorial from "./Tutorial";
 import { setConfirming } from "./actionConfirmation";
 
 const companies = [newGame(), dataCompany("read-heavy", false), dataCompany(), spikeCompany(false), preparedReliability(), combinedCompany()];
@@ -21,12 +22,17 @@ const message = () => screen.queryByRole("dialog", { name: "Company Message" });
 const next = () => within(message()!).queryByRole("button", { name: "Next" });
 /** Advances through the colleague's lines to the mission, then acknowledges it. */
 const readThrough = () => { while (next()) fireEvent.click(next()!); fireEvent.click(within(message()!).getByRole("button", { name: "Got it" })); };
+const pointerLockDescriptor = Object.getOwnPropertyDescriptor(document, "pointerLockElement");
 beforeEach(() => {
   localStorage.clear(); useGame.setState(useGame.getInitialState(), true);
   vi.spyOn(document, "hasFocus").mockReturnValue(true);
+  if (!pointerLockDescriptor) Object.defineProperty(document, "pointerLockElement", { configurable: true, get: () => null });
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ x: 10, y: 10, top: 10, left: 10, right: 54, bottom: 54, width: 44, height: 44, toJSON: () => ({}) });
 });
-afterEach(() => { cleanup(); setConfirming(null); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  cleanup(); setConfirming(null); vi.restoreAllMocks(); vi.unstubAllGlobals();
+  if (!pointerLockDescriptor) Reflect.deleteProperty(document, "pointerLockElement");
+});
 const host = () => <CampaignAttentionHost><CampaignHeader/><CampaignPanel/><CampaignControls/></CampaignAttentionHost>;
 
 it.each(companies.map((game, i) => [i + 1, game] as const))("shows the actual chapter %i colleague and mission once in StrictMode", (chapter, game) => {
@@ -170,6 +176,43 @@ it("defers without consuming a receipt and sequences the Chapter 4 cue after dis
   expect(screen.queryByRole("dialog",{name:/^Chapter 4:/})).toBeNull();
   readThrough();
   expect(message()).toBeNull(); expect(screen.getByRole("dialog",{name:"Chapter 4: Prepare"})).toBeTruthy();
+});
+
+it("shows Jordan's caching scene before the Data Strategy guide, which then follows it", () => {
+  const guide = () => screen.queryByRole("dialog", { name: /Chapter guide/ });
+  useGame.setState({ game: companies[2], ready: true, started: true, onboarding: false, tour: {track:"data",step:0} });
+  render(<CampaignAttentionHost><Tutorial/></CampaignAttentionHost>);
+  // The colleague explains caching first; the guide that points at Read Cache waits behind the scene.
+  expect(message()).not.toBeNull(); expect(message()!.textContent).toContain("Jordan");
+  expect(guide()).toBeNull();
+  readThrough();
+  expect(message()).toBeNull(); expect(guide()).not.toBeNull();
+  // The consumed receipt keeps the scene from re-firing while the guide is up.
+  expect(message()).toBeNull(); expect(localStorage.getItem(chapterCompanyMessage(companies[2])!.key)).not.toBeNull();
+});
+
+it("keeps the open dialogue and its queued stage cue in order across tab hide, window blur and pointer lock", () => {
+  useGame.setState({ game: companies[3], ready: true, started: true, onboarding: false, tour: null });
+  render(host()); expect(message()).not.toBeNull();
+  fireEvent.click(next()!); const reading = message()!.textContent;
+  const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+  const focus = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+  const lock = vi.spyOn(document, "pointerLockElement", "get").mockReturnValue(document.createElement("canvas"));
+  fireEvent(window, new Event("blur")); fireEvent(document, new Event("visibilitychange")); fireEvent(document, new Event("pointerlockchange"));
+  // Suspension must not drop the scene or let the queued cue jump ahead of it.
+  expect(message()!.textContent).toBe(reading); expect(screen.queryByRole("dialog", { name: /^Chapter 4:/ })).toBeNull();
+  hidden.mockReturnValue(false); focus.mockReturnValue(true); lock.mockReturnValue(null);
+  fireEvent(window, new Event("focus")); fireEvent(document, new Event("visibilitychange")); fireEvent(document, new Event("pointerlockchange"));
+  expect(message()!.textContent).toBe(reading); readThrough();
+  // The queued cue then survives the same suspension instead of being consumed unseen.
+  const cue = () => screen.queryByRole("dialog", { name: "Chapter 4: Prepare" });
+  expect(cue()).not.toBeNull();
+  hidden.mockReturnValue(true); focus.mockReturnValue(false); lock.mockReturnValue(document.createElement("canvas"));
+  fireEvent(window, new Event("blur")); fireEvent(document, new Event("visibilitychange")); fireEvent(document, new Event("pointerlockchange"));
+  expect(cue()).not.toBeNull();
+  hidden.mockReturnValue(false); focus.mockReturnValue(true); lock.mockReturnValue(null);
+  fireEvent(window, new Event("focus")); fireEvent(document, new Event("visibilitychange")); fireEvent(document, new Event("pointerlockchange"));
+  fireEvent.click(within(cue()!).getByRole("button", { name: "Got it" })); expect(cue()).toBeNull();
 });
 
 it.each(["incident", "review", "prevention", "recognition", "next", "menu", "confirmation", "classic"])("respects %s priority without consuming the introduction", priority => {

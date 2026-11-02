@@ -138,3 +138,8 @@ it("real spare promotion cannot recover a service with insufficient surviving ca
  expect(g.campaign!.apps).toHaveLength(3);expect(g.phase).toBe("incident");
  expect(g.campaign!.incident!.stableSteps).toBe(0);expect(g.campaign!.snapshot.app.backlog).toBeGreaterThan(0);
 });
+it("an application-failure incident closes after natural restoration without another response",()=>{
+ let s=act(reliabilityCompany(),{type:"arm_reliability"});const f=s.campaign!.reliabilityStage!.fault!;let opened=false;
+ for(let i=0;i<80&&!(opened&&!s.campaign!.incident);i++){if(s.phase==="review")s=act(s,{type:"acknowledge_review"});s=tick(s);opened||=!!s.campaign!.incident;}
+ expect(opened).toBe(true);expect(s.campaign!.reliabilityStage!.fault!.restoreSource).toBe("natural");expect(s.campaign!.step).toBeGreaterThan(f.naturalStep);expect(s.campaign!.incident).toBeNull();
+});

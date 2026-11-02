@@ -31,7 +31,7 @@ async function session(subject='one',expired=false) {
   const token=randomToken(),csrf=randomToken();await db.insert(gameSessions).values({tokenHash:hash(token),accountId:account.id,csrfToken:csrf,expiresAt:new Date(Date.now()+(expired?-1000:60000))});
   return {account,cookie:`nn_session=${token}`,csrf};
 }
-async function put(s:Awaited<ReturnType<typeof session>>,revision:number,runId='company',value:ReturnType<typeof envelope>&{legacyPreventionInputs?:number}=envelope(runId)) {
+async function put(s:Awaited<ReturnType<typeof session>>,revision:number,runId='company',value:ReturnType<typeof envelope>&{legacyPreventionInputs?:number;legacyIncidentStep?:number;legacyScalingStep?:number}=envelope(runId)) {
   return request(app).put(`/api/runs/${runId}`).set('Cookie',s.cookie).set('Origin',origin).set('X-CSRF-Token',s.csrf).send({expectedRevision:revision,envelope:value});
 }
 async function attempt() {
@@ -65,12 +65,19 @@ it('stores, lists and resumes only the owner’s run',async()=>{
   const denied=await put(b,0);expect(denied.status).toBe(409);expect(denied.body.current).toBeUndefined();
   expect((await put(b,1)).status).toBe(409);expect((await db.select().from(gameRuns))[0].revision).toBe(1);
 });
-it.each([4,5,6,7,8])('accepts schema %s replay saves and preserves their payload',async(schemaVersion)=>{
+it.each([4,5,6,7,8,9,10])('accepts schema %s replay saves and preserves their payload',async(schemaVersion)=>{
   const s=await session(),value={...envelope(),schemaVersion,inputs:[{step:0,action:{type:'enter_data'}}]};
   const saved=await put(s,0,'company',value);expect(saved.status).toBe(200);expect(saved.body.envelope).toEqual(value);
   const resumed=await request(app).get('/api/runs/company').set('Cookie',s.cookie);
   expect(resumed.body.envelope).toEqual(value);
-  expect((await put(s,1,'company',{...value,schemaVersion:9})).status).toBe(400);
+  expect((await put(s,1,'company',{...value,schemaVersion:11})).status).toBe(400);
+  expect((await db.select().from(gameRuns))[0].revision).toBe(1);
+});
+it('preserves schema-10 legacy step boundaries and rejects invalid ones without updating the run',async()=>{
+  const s=await session(),value={...envelope(),schemaVersion:10,step:4,legacyIncidentStep:2,legacyScalingStep:4};
+  expect((await put(s,0,'company',value)).status).toBe(200);
+  expect((await request(app).get('/api/runs/company').set('Cookie',s.cookie)).body.envelope).toEqual(value);
+  for(const bad of [-1,0.5,5])for(const key of ['legacyIncidentStep','legacyScalingStep'])expect((await put(s,1,'company',{...value,[key]:bad})).status).toBe(400);
   expect((await db.select().from(gameRuns))[0].revision).toBe(1);
 });
 it('preserves the schema-7 historical input prefix and rejects invalid prefixes without updating the run',async()=>{
@@ -93,7 +100,7 @@ it('atomically claims a guest run once without reassignment',async()=>{
 });
 it('rejects incompatible saves, mismatched IDs and invalid revisions',async()=>{
   const s=await session();
-  for(const e of [{...envelope(),schemaVersion:1}, {...envelope(),schemaVersion:9}, {...envelope(),runId:'other'}, {...envelope(),inputs:null}, {...envelope(),step:1_000_001}, {...envelope(),runtime:{remainderMs:1000}}])
+  for(const e of [{...envelope(),schemaVersion:1}, {...envelope(),schemaVersion:11}, {...envelope(),runId:'other'}, {...envelope(),inputs:null}, {...envelope(),step:1_000_001}, {...envelope(),runtime:{remainderMs:1000}}])
     expect((await put(s,0,'company',e as ReturnType<typeof envelope>)).status).toBe(400);
   expect((await put(s,-1)).status).toBe(400);expect(await db.select().from(gameRuns)).toEqual([]);
 });

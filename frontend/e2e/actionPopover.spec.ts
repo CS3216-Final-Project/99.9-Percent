@@ -83,8 +83,8 @@ test("Stay Online guide unlocks Health Checks in Tech and confirms its purchase"
   await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("tablist")).toHaveCount(0);
   await expect(guide(3)).toContainText("Click Monitoring.");
   await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Monitoring",exact:true}).click();
-  const monitoring=page.getByRole("dialog",{name:"Monitoring inspected",exact:true});
-  await expect(guide(3)).toContainText("Press Inspect details.");
+  const monitoring=page.getByRole("dialog",{name:"Monitoring", exact: true});
+  await expect(guide(3)).toContainText("Press the Monitoring disc to inspect details.");
   await monitoring.getByRole("button",{name:"Inspect details",exact:true}).click();
   await expect(guide(3)).toContainText("Press Deploy Health Checks.");
   await monitoring.getByRole("button",{name:/^Deploy Health Checks/}).click();

@@ -53,6 +53,7 @@ import { OnWall } from "./walls";
 import { arcadeGame, startArcade, stepArcade, stopArcade } from "./arcade";
 import { drawBreakout } from "./breakout";
 import { now } from "./ride";
+import { worldNow } from "./worldClock";
 import { avatar, napBlend, onBusy } from "./walk";
 import { viewFocus } from "./zoneSounds";
 
@@ -680,9 +681,9 @@ const PONG = { period: RALLY_PERIOD, at: RALLY_PERIOD / 2 - SWING_CONTACT };
 
 function PingPongBall() {
   const ball = useRef<THREE.Mesh>(null);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     // A rally that never ends.
-    ball.current?.position.set(...ballAt(clock.elapsedTime));
+    ball.current?.position.set(...ballAt(worldNow()));
   });
   return (
     <mesh ref={ball}>
@@ -733,8 +734,8 @@ function FoosballRods() {
   const base = useMemo(() => new THREE.Matrix4(), []);
   const step = useMemo(() => new THREE.Matrix4(), []);
   const out = useMemo(() => new THREE.Matrix4(), []);
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime;
+  useFrame(() => {
+    const t = worldNow();
     let k = 0;
     FOOS_FIGURES.forEach((n, i) => {
       // Each rod twists back and forth at its own pace and slides a little, as hands work the handles.
@@ -841,10 +842,10 @@ function Zzz({ position }: { position: V3 }) {
   const materials = useMemo(() => Array.from({ length: ZZZ.count }, () => new THREE.SpriteMaterial({ map: zzzTexture(), transparent: true, depthWrite: false })), []);
   useEffect(() => () => materials.forEach((m) => m.dispose()), [materials]);
   const sprites = useRef<(THREE.Sprite | null)[]>([]);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     sprites.current.forEach((sprite, i) => {
       if (!sprite) return;
-      const phase = (clock.elapsedTime / ZZZ.period + i / ZZZ.count) % 1;
+      const phase = (worldNow() / ZZZ.period + i / ZZZ.count) % 1;
       sprite.position.set(position[0] - phase * 0.25, position[1] + phase * 0.7, position[2]);
       const size = 0.2 + phase * 0.22;
       sprite.scale.set(size, size, 1);
@@ -873,11 +874,11 @@ function Steam({ position }: { position: V3 }) {
   const materials = useMemo(() => Array.from({ length: 4 }, () => new THREE.SpriteMaterial({ map: puffTexture(), color: new THREE.Color(1.25, 1.3, 1.35), transparent: true, depthWrite: false, toneMapped: false })), []);
   useEffect(() => () => materials.forEach((m) => m.dispose()), [materials]);
   const sprites = useRef<(THREE.Sprite | null)[]>([]);
-  useFrame(({ clock }) => {
+  useFrame(() => {
     sprites.current.forEach((sprite, i) => {
       if (!sprite) return;
       // Each wisp climbs clear of the machine's top before it fades.
-      const phase = (clock.elapsedTime / 3 + i / 4) % 1;
+      const phase = (worldNow() / 3 + i / 4) % 1;
       sprite.position.set(position[0] + Math.sin(phase * 5 + i) * 0.04, position[1] + phase * 0.6, position[2]);
       const size = 0.06 + phase * 0.2;
       sprite.scale.set(size, size, 1);
@@ -919,7 +920,7 @@ function ArcadeScreen({ variant, x }: { variant: string; x: number }) {
       return;
     }
     const fps = avatar.busy?.prop === "arcade" ? 20 : 8;
-    const frame = Math.floor(clock.elapsedTime * fps);
+    const frame = Math.floor(worldNow() * fps);
     if (frame === shown.current) return;
     shown.current = frame;
     game.draw(frame);
@@ -952,8 +953,8 @@ export function NapPodLight() {
 export function Beacon({ on }: { on: boolean }) {
   const lamp = useRef<THREE.MeshStandardMaterial>(null);
   const halo = useRef<THREE.MeshBasicMaterial>(null);
-  useFrame(({ clock }) => {
-    const pulse = on ? 0.5 + 0.5 * Math.sin(clock.elapsedTime * 8) : 0;
+  useFrame(() => {
+    const pulse = on ? 0.5 + 0.5 * Math.sin(worldNow() * 8) : 0;
     if (lamp.current) lamp.current.emissiveIntensity = on ? 0.6 + pulse * 2.4 : 0.15;
     if (halo.current) halo.current.opacity = pulse * 0.45;
   });
@@ -978,8 +979,8 @@ export function Beacon({ on }: { on: boolean }) {
 
 function WallClock({ position }: { position: V3 }) {
   const hand = useRef<THREE.Mesh>(null);
-  useFrame(({ clock }) => {
-    if (hand.current) hand.current.rotation.z = -clock.elapsedTime * 0.6;
+  useFrame(() => {
+    if (hand.current) hand.current.rotation.z = -worldNow() * 0.6;
   });
   return (
     <group position={position}>

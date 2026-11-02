@@ -26,7 +26,7 @@ function format(key: string, value: Value): string {
     if (/^[[{]/.test(value)) {
       try { return format(key, JSON.parse(value) as Value); } catch { /* Not JSON after all: show it as text. */ }
     }
-    return value.replace(/^app-(\d+)$/, "App $1").replaceAll("-", " ");
+    return value.replace(/^app-(\d+)$/, "Server $1").replaceAll("-", " ");
   }
   if (!Array.isArray(value) && typeof value === "object" && Array.isArray((value as { targets?: unknown }).targets)) {
     const r = value as { mode?: string; targets: string[] };

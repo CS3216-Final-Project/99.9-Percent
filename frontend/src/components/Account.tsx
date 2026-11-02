@@ -130,7 +130,7 @@ function SignIn({ Heading }: { Heading: HeadingTag }) {
     <p className="account-lede">Sign in to save your Guided Mode company to the cloud and continue it on another device. Without an account, progress saves in this browser.</p>
     {status === "unavailable"
       ? <Callout compact tone="warn" icon="alert" kicker="Accounts offline" live="status"
-          action={<button type="button" className="btn btn-small" onClick={() => void restoreAccount()}>Try again</button>}>
+          action={<button type="button" className="btn btn-small" onClick={() => void restoreAccount()}><Icon name="refresh" size={20} />Try again</button>}>
           Accounts are unavailable right now. You can keep playing; progress saves in this browser.
         </Callout>
       : <p className="account-status" role="status">{status === "checking" || status === "unchecked" ? "Checking your account…" : cloudStatus}</p>}
@@ -291,8 +291,8 @@ function CloudSaves({ onLoaded, Heading }: { onLoaded?: () => void; Heading: Hea
     {hasConflict && <Callout compact tone="warn" icon="alert" kicker="Two versions">
       The cloud has a different version of this save, probably from another device. Both are kept. Choose which one to continue:
       <span className="btn-row cloud-conflict-actions">
-        <button type="button" className="btn btn-small" disabled={s.cloudBusy} onClick={() => void s.keepLocalConflict().then(refresh)}>Keep this browser’s version</button>
-        <button type="button" className="btn btn-small" disabled={s.cloudBusy} onClick={() => void load(local!)}>Load the cloud version</button>
+        <button type="button" className="btn btn-small" disabled={s.cloudBusy} onClick={() => void s.keepLocalConflict().then(refresh)}><Icon name="save" size={20} />Keep this browser’s version</button>
+        <button type="button" className="btn btn-small" disabled={s.cloudBusy} onClick={() => void load(local!)}><Icon name="download" size={20} />Load the cloud version</button>
       </span>
     </Callout>}
     {ownershipError && <Callout compact tone="critical" icon="alert" kicker="Cannot read" live="alert">

@@ -12,7 +12,7 @@ for(const width of [1440,390])test.describe(`infrastructure introduction ${width
   await expect(panel.getByRole("button",{name:"Complete Introduction",exact:true})).toBeDisabled();
   await expect(page.getByRole("button",{name:"Run",exact:true})).toBeDisabled();
   await panel.getByRole("button",{name:"Monitoring",exact:true}).click();
-  const wrong=page.getByRole("dialog",{name:"Monitoring inspected",exact:true});
+  const wrong=page.getByRole("dialog",{name:"Monitoring", exact: true});
   await wrong.getByRole("button",{name:"Close",exact:true}).click();
   await expect(panel.getByRole("region",{name:"Introduction Progress"})).toContainText("0/4");
   for(const [i,name] of ["Network","App Server","Database","Monitoring"].entries()) {
@@ -21,7 +21,7 @@ for(const width of [1440,390])test.describe(`infrastructure introduction ${width
    const hint=page.getByRole("dialog",{name:"Hint",exact:true});await expect(hint).toContainText(name==="App Server"?"App Servers":name);
    await hint.getByRole("button",{name:"Got it",exact:true}).click();await panel.getByRole("button",{name,exact:true}).click();
    const popup=page.locator(".component-inspection");await expect(popup).toBeVisible();await expect(gold).toHaveCount(0);
-   await expect(popup.locator(".component-inspection-summary .inspection-scanner")).toBeVisible();
+   await expect(popup.locator(".component-inspection-summary .inspection-disc")).toBeVisible();
    await expect(popup.getByRole("button",{name:/Add server|Upgrade database|Limit to/})).toHaveCount(0);
    await popup.getByRole("button",{name:"Inspect details",exact:true}).click();
    await popup.getByRole("button",{name:"Got it",exact:true}).click();
@@ -69,6 +69,8 @@ for(const width of [1440,390])test.describe(`infrastructure introduction ${width
    const panel=page.getByRole("complementary",{name:"System metrics"});
    for(const name of ["Network","App Server","Database","Monitoring"]){await panel.getByRole("button",{name,exact:true}).click();await page.locator(".component-inspection").getByRole("button",{name:"Got it",exact:true}).click();}
    await panel.getByRole("button",{name:"Complete Introduction",exact:true}).click();
+   // The chapter opens with a one-card tip pointing at the Hint button; dismiss it to reach the company message.
+   await page.getByRole("dialog",{name:"Tip, step 1 of 1",exact:true}).getByRole("button",{name:"Got it",exact:true}).click();
    await expect(message).toContainText("Customers want our website to stay fast");await expect(message).not.toContainText("I'm Maya");
   });
  });

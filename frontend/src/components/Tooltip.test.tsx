@@ -141,6 +141,21 @@ describe("tooltip layer", () => {
     expect(tooltip()).toBeNull();
   });
 
+  it("stays quiet on a spotlighted control, whose guide card already explains it", () => {
+    render(<Harness />);
+    const open = screen.getByRole("button", { name: "Open" });
+    over(open);
+    settle();
+    expect(tooltip()).not.toBeNull();
+    // A spotlight lighting the hovered control drops the bubble so it cannot cover the card's buttons.
+    open.dataset.spotlight = "true";
+    settle(50);
+    expect(tooltip()).toBeNull();
+    out(open); over(open);
+    settle();
+    expect(tooltip()).toBeNull();
+  });
+
   it("follows a changing explanation while it is open", () => {
     const view = render(<Harness text="Cash: $100" />);
     const open = screen.getByRole("button", { name: "Open" });

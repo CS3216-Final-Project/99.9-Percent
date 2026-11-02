@@ -91,7 +91,7 @@ describe("opening UI", () => {
     expect(panel.queryByRole("region", { name: "Scaling controls" })).toBeNull();
     for(const name of ["Network","App Server","Database","Monitoring"])expect(panel.getByRole("button",{name})).toBeTruthy();
     fireEvent.click(panel.getByRole("button", { name: "Network" }));
-    const network=within(screen.getByRole("dialog", { name: "Network inspected" }));
+    const network=within(screen.getByRole("dialog", { name: "Network" }));
     expect(network.queryByRole("button", { name: /Limit to|Deploy load balancer/ })).toBeNull();
     fireEvent.click(network.getByRole("button", { name: "Inspect details" }));
     expect(network.getByRole("region", { name: "Network readings" })).toBeTruthy();

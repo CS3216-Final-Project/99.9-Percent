@@ -192,7 +192,7 @@ test("in walk mode, clicking equipment walks the avatar to it, and Space then in
   await expect(label(page, "Monitoring")).toHaveAttribute("aria-pressed", "true");
   await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 40_000 });
   // An inspection started in the room opens the diagnostic card, with its scan, over the inspector.
-  const reveal = page.getByRole("dialog", { name: "Monitoring inspected" });
+  const reveal = page.getByRole("dialog", { name: "Monitoring", exact: true });
   await expect(reveal).toBeVisible();
   await expect(reveal.locator(".inspection-status")).toContainText("Healthy");
   await expect(reveal).toContainText("dashboards");
@@ -253,7 +253,7 @@ test("Guided Mode: the avatar inspects the Deploy office and the panel reports c
   // The office's labels are visible in Guided Mode; clicking one walks the avatar over.
   await label(page, "Deploy").click();
   await expect(prompt(page)).toContainText("Inspect Deploy", { timeout: 40_000 });
-  const deployReveal = page.getByRole("dialog", { name: "Deploy inspected" });
+  const deployReveal = page.getByRole("dialog", { name: "Deploy", exact: true });
   await expect(deployReveal).toBeVisible();
   await expect(metrics).toContainText("Deploy · Company operations");
   await deployReveal.getByRole("button", { name: "Return to room" }).click();
@@ -288,7 +288,7 @@ test("walking away from the meeting leaves its nearby presentation sound behind"
   // timed key presses travel far enough on every renderer. Its arrival prompt proves the avatar
   // is on the open floor, well beyond the presentation's 11 m reach.
   await label(page, "Growth").click();
-  const growthReveal = page.getByRole("dialog", { name: "Growth inspected" });
+  const growthReveal = page.getByRole("dialog", { name: "Growth", exact: true });
   await expect(growthReveal).toBeVisible();
   await growthReveal.getByRole("button", { name: "Return to room" }).click();
   await expect(prompt(page)).toContainText("Inspect Growth", { timeout: 40_000 });
@@ -459,7 +459,7 @@ test("restores the mode, floor, walk position and camera view after a reload", a
   await expect(prompt(page)).toContainText("Ride up");
   // Send the avatar to the monitoring room, so its spot is worth remembering.
   await label(page, "Monitoring").click();
-  const restoreReveal = page.getByRole("dialog", { name: "Monitoring inspected" });
+  const restoreReveal = page.getByRole("dialog", { name: "Monitoring", exact: true });
   await expect(restoreReveal).toBeVisible();
   await restoreReveal.getByRole("button", { name: "Return to room" }).click();
   await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 40_000 });

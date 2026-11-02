@@ -4,6 +4,7 @@ import { Room } from "@/components/Game";
 import MachineAlerts from "@/components/MachineAlerts";
 import { useAppClassName } from "@/components/useGameRuntime";
 import { useGame } from "@/game/store";
+import { incidentActive } from "@/sim/step";
 import { shownSheetState, useSheetState } from "./layout/sheetState";
 import { PhoneOverlays } from "./PhoneOverlays";
 import { PhoneCoach } from "./regions/PhoneCoach";
@@ -32,7 +33,7 @@ import { PhoneTopStrip } from "./regions/PhoneTopStrip";
 export function PhoneGameLayout() {
   const className = useAppClassName();
   const chapters = useGame((s) => s.started && !!s.game.campaign);
-  const sheet = shownSheetState(useSheetState(), useGame((s) => s.game.phase === "incident"));
+  const sheet = shownSheetState(useSheetState(), useGame((s) => incidentActive(s.game)));
   return <RoomControlsHost><CampaignAttentionHost><div className={`${className} phone-app`} data-edition="phone" data-sheet={sheet} data-chapters={chapters || undefined}>
     <PhoneTopStrip />
     <main className="stage">

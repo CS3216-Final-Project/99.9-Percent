@@ -5,10 +5,11 @@ import { SERVER_ROOMS, SERVER_ZONE_NAMES, ZONE_NAMES } from "./floorplan";
 import { inCabin, RIDER_SPOTS } from "./lift";
 import { findPath, nearestFree } from "./navgrid";
 import { atElevator, facing, followPath, turnTowards } from "./player";
-import { now, ride, riding } from "./ride";
+import { ride, riding } from "./ride";
 import { apart, clearOf, radiusOf, sidestep, sweptIntrudes, type Body } from "./spacing";
 import { carDoors, carStandsAt, errandNow, holdDoors, sendCar, stepErrand, type Errand } from "./trips";
 import { avatar, gridHere, LOBBY } from "./walk";
+import { worldNow } from "./worldClock";
 
 /*
  * People about the building who are not the company's own crew: they wander from one part of a floor to another,
@@ -33,7 +34,7 @@ export interface Visitor {
   doing: Doing;
   /** Where it is walking, from a path over the floor's grid. */
   path: [number, number][];
-  /** When a stop ends, in seconds on the page's clock. */
+  /** When a stop ends, in seconds on the world's clock. */
   until: number;
   /** The floor it means to be on. */
   bound: Floor;
@@ -140,7 +141,7 @@ function nextGoal(v: Visitor, t: number, around: (floor: Floor) => Body[]): void
 }
 
 /** Fill the building with `count` people, about half on each floor, from `seed`. */
-export function populate(count: number, seed: number, t = now()): void {
+export function populate(count: number, seed: number, t = worldNow()): void {
   crowd = { visitors: [], rng: { rngState: seed | 0 || 1 }, last: -Infinity, rested: -Infinity };
   const r = crowd.rng;
   for (let i = 0; i < count; i++) {
@@ -246,7 +247,7 @@ function setDown(v: Visitor, to: Floor): void {
   if (v.doing === "board") Object.assign(v, { doing: "wait", seat: null, path: [] });
   else if (v.doing === "aboard") {
     const out = near(to, [LOBBY[0] + 0.6, LOBBY[1]], 0.5) ?? LOBBY;
-    Object.assign(v, { floor: to, x: out[0], z: out[1], seat: null, bound: to, doing: "linger", until: now() + 1, path: [] });
+    Object.assign(v, { floor: to, x: out[0], z: out[1], seat: null, bound: to, doing: "linger", until: worldNow() + 1, path: [] });
   }
 }
 
@@ -263,7 +264,7 @@ export function playerDeparts(from: Floor, to: Floor): void {
  * An errand ended: the car rests a while before the next. Cut short before it came home, its riders are set down
  * where they were going.
  */
-export function errandEnded(e: Errand, t = now()): void {
+export function errandEnded(e: Errand, t = worldNow()): void {
   crowd.rested = t;
   if (e.phase === "home") return;
   for (const v of crowd.visitors) if (v.doing === "aboard" || v.doing === "board") setDown(v, v.bound);
