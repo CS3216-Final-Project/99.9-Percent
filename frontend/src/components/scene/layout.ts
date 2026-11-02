@@ -49,13 +49,13 @@ export function dbSlot(index: number): { x: number; z: number } {
 /** Where the cold aisle cable runs, between the two rows of app servers. */
 export const AISLE_Z = -4.9;
 
+/** The office has two pods of engineer desks. Headcount is unlimited; hires beyond these desks are not drawn. */
+export const TEAM_DESKS = 8;
+
 /**
  * Engineers sit in pods of four: two desks facing two, monitors back to back.
  * `rot` turns the desk; at 0 the engineer sits on the +z side facing -z.
  */
-/** The office has two pods of engineer desks. Headcount is unlimited; hires beyond these desks are not drawn. */
-export const TEAM_DESKS = 8;
-
 export function deskSlot(index: number): { x: number; z: number; rot: number } {
   const pod = Math.floor(index / 4);
   const k = index % 4;

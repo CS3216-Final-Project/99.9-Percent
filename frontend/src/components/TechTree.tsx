@@ -8,7 +8,7 @@ import { TRAFFIC_SPIKES } from "@/sim/scenarios/trafficSpikes";
 import { APPLICATION_RELIABILITY } from "@/sim/scenarios/applicationReliability";
 import { researchBalance } from "@/sim/reliability";
 
-import { BALANCE, BRANCHES, costs, missingPrerequisites, taskPercent, TECH, TECH_ORDER, techStatus, type EquipmentId, type GameState, type TechId, type TechStatus } from "@/sim";
+import { BALANCE, BRANCHES, costs, missingPrerequisites, taskPercent, TECH, TECH_ORDER, techStatus, type EquipmentId, type GameState, type TechId, type TechStatus, serverName } from "@/sim";
 import { moneyFull, num, pct } from "@/game/format";
 import { canInspectEquipment, inspectInRoom, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
@@ -16,7 +16,6 @@ import { tipProps } from "./tips";
 import { TECH_ICON } from "./presentation";
 import { CampaignUnavailable } from "./CampaignInfrastructure";
 import { Act, Chip, Concept, ReleaseRow, TaskRow } from "./ui";
-import { serverName } from "@/sim";
 
 const NODE_W = 204;
 const NODE_H = 60;

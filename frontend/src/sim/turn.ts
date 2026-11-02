@@ -174,7 +174,7 @@ function absorbFailure(s: GameState, failure: HostFailure, notes: string[]): { u
           "instance_failure",
           `${serverName(failure.hostId)} stopped responding.`,
           ["You had built a Standby Server and Automatic Failover."],
-          `Health checks noticed within seconds and promoted the standby as ${fresh.id}. A replacement standby cost ${money(BALANCE.server.replaceCost)}.`,
+          `Health checks noticed within seconds and promoted the standby as ${serverName(fresh.id)}. A replacement standby cost ${money(BALANCE.server.replaceCost)}.`,
           BALANCE.server.replaceCost,
         ),
       );

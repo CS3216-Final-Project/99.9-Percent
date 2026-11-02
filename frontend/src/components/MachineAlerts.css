@@ -13,7 +13,12 @@
   pointer-events: none;
 }
 
-.machine-alerts:empty {
+.machine-alert-list {
+  display: grid;
+  gap: 8px;
+}
+
+.machine-alert-list:empty {
   display: none;
 }
 
@@ -35,7 +40,11 @@
   animation: machine-alert-in 0.2s ease-out;
 }
 
-.machine-alert:hover {
+div.machine-alert {
+  cursor: default;
+}
+
+button.machine-alert:hover {
   background: rgb(176 18 40 / 0.78);
 }
 
@@ -70,8 +79,104 @@
   from { opacity: 0; transform: translateX(-8px); }
 }
 
+/* The week's warning signs: a folding card under the dead-machine alerts. */
+.machine-warnings {
+  pointer-events: auto;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--control-edge);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--lift);
+  font-size: var(--text-sm);
+}
+
+.machine-warnings summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: inherit;
+}
+
+.machine-warnings summary::-webkit-details-marker {
+  display: none;
+}
+
+.machine-warnings summary > .icon:first-child {
+  color: var(--warn-ink);
+}
+
+.machine-warnings summary strong {
+  font-size: var(--text-md);
+}
+
+.machine-warnings-count {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--paper-3);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.machine-warnings-chevron {
+  margin-left: auto;
+  transition: transform 0.2s ease-out;
+}
+
+.machine-warnings[open] .machine-warnings-chevron {
+  transform: rotate(180deg);
+}
+
+.machine-warnings ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 12px 4px;
+}
+
+.machine-warnings li + li {
+  border-top: 1px solid var(--paper-3);
+}
+
+.machine-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font-size: var(--text-sm);
+}
+
+.machine-warning > .icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warn-ink);
+}
+
+.machine-warning.tone-critical > .icon {
+  color: var(--critical-ink);
+}
+
+.machine-warning > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.machine-warning:hover {
+  text-decoration: underline;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .machine-alert { animation: none; }
+  .machine-warnings-chevron { transition: none; }
 }
 
 /* On phones the alerts sit just under the top strip, above the room. */

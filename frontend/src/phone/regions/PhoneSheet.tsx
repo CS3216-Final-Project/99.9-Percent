@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
-import { equipmentInfo, metrics, type EquipmentId } from "@/sim";
+import { equipmentInfo, metrics, serverName, type EquipmentId } from "@/sim";
 import { incidentActive } from "@/sim/step";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { clock, num } from "@/game/format";
@@ -13,7 +13,6 @@ import { EQUIPMENT_ICON } from "@/components/presentation";
 import SidePanel from "@/components/SidePanel";
 import { getSheetState, setSheetState, SHEET_STATES, shownSheetState, useSheetState, type SheetState } from "../layout/sheetState";
 import "../layout/phone-layout.css";
-import { serverName } from "@/sim";
 
 /**
  * Region: sheet. A bottom sheet over the room with Guided Mode's scheduled deployments and System metrics, or

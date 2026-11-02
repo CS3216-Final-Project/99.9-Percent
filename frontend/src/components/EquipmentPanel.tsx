@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
@@ -25,7 +25,16 @@ export function EquipmentPanel({ children, label, className = "" }: { children: 
     setLeaving(!open);
   }
   const collapsed = !open && !leaving;
+  // An interrupted leave (the layout switching to phone or reduced motion mid-slide) cancels instead of ending.
   useEffect(() => {
+    const el = content.current;
+    if (!leaving || !el) return;
+    const cancel = (e: AnimationEvent) => { if (e.target === el && e.animationName === "panel-leave") setLeaving(false); };
+    el.addEventListener("animationcancel", cancel);
+    return () => el.removeEventListener("animationcancel", cancel);
+  }, [leaving]);
+  // Before paint, so phones and reduced motion collapse without a frame of the inert, leaving panel.
+  useLayoutEffect(() => {
     if (!leaving || !content.current) return;
     const name = getComputedStyle(content.current).animationName;
     if (!name || name === "none") setLeaving(false);

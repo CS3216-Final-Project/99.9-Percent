@@ -23,6 +23,7 @@ import {
   type GameState,
   type Metrics,
   type TechId,
+  serverName,
 } from "@/sim";
 import { moneyFull, num, pct } from "@/game/format";
 import { inspectOrSelect, useGame } from "@/game/store";
@@ -33,7 +34,6 @@ import { tipProps } from "./tips";
 import { EQUIPMENT_ICON, moodIcon, STATE_META, TECH_ICON, utilTone } from "./presentation";
 import IncidentPanel from "./IncidentPanel";
 import { Act, Chip, Gauge, ReleaseRow, Row, TaskRow } from "./ui";
-import { serverName } from "@/sim";
 
 function loadGauge(label: string, util: number, m: Metrics, tip: string) {
   return <Gauge icon="load" label={label} value={util} text={m.hasMonitoring ? pct(util) : loadBand(util)} tone={utilTone(util)} tip={tip} />;
@@ -438,7 +438,10 @@ function EquipmentChoices({ shown }: { shown: EquipmentId | null }) {
   </section>;
 }
 
-/** The equipment picker stays put; the selected machine's details, or the incident, open below it. */
+/**
+ * The equipment picker stays put with the selected machine's details below it. An incident takes the whole panel:
+ * its Find the cause buttons are the only way to start a timed investigation, so the picker steps aside.
+ */
 export default function SidePanel() {
   const phase = useGame(s => s.game.phase);
   // A machine's details stay with its floor, however the view left it.
@@ -447,7 +450,6 @@ export default function SidePanel() {
   const [kept, setKept] = useState(shown);
   if (shown && shown !== kept) setKept(shown);
   return <EquipmentPanel label="Details">
-    <EquipmentChoices shown={shown} />
-    {phase === "incident" ? <IncidentPanel /> : <Reveal open={!!shown}>{kept && <Inspector id={kept} />}</Reveal>}
+    {phase === "incident" ? <IncidentPanel /> : <><EquipmentChoices shown={shown} /><Reveal open={!!shown}>{kept && <Inspector id={kept} />}</Reveal></>}
   </EquipmentPanel>;
 }

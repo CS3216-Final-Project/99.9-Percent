@@ -15,6 +15,7 @@ import { autoPostmortem } from "./postmortem";
 import { applyRelease, releaseTitle, revertDeploy } from "./releases";
 import { rand } from "./rng";
 import { addAppHost, clone, logEvent, newId } from "./state";
+import { serverName } from "./names";
 import { has, isResearchTech, missingPrerequisites, TECH, techStatus } from "./tech";
 import { acknowledgeReview } from "./turn";
 import type { Action, ActionResult, DeployRecord, FailureReason, GameState } from "./types";
@@ -121,16 +122,16 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       s.totals.serversAdded += 1;
       s.lastCapacityTurn.app = s.turn;
       const host = addAppHost(s);
-      logEvent(s, "decision", `Added app server ${host.id} (${money(BALANCE.server.setupCost)}).`);
-      return ok(s, `${host.id} is in service.`);
+      logEvent(s, "decision", `Added ${serverName(host.id)} (${money(BALANCE.server.setupCost)}).`);
+      return ok(s, `${serverName(host.id)} is in service.`);
     }
 
     case "remove_server": {
       if (s.infra.appHosts.length <= 1) return fail("limit_reached", "You need at least one app server.");
       const host = s.infra.appHosts[s.infra.appHosts.length - 1];
       s.infra.appHosts.pop();
-      logEvent(s, "decision", `Decommissioned app server ${host.id} to save on running costs.`);
-      return ok(s, `${host.id} decommissioned.`);
+      logEvent(s, "decision", `Decommissioned ${serverName(host.id)} to save on running costs.`);
+      return ok(s, `${serverName(host.id)} decommissioned.`);
     }
 
     case "replace_host": {
@@ -146,15 +147,15 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       }
       const host = s.infra.appHosts.find((h) => h.id === action.hostId);
       if (!host) return fail("not_found", "That server no longer exists.");
-      if (host.status === "healthy") return fail("invalid", `${host.id} is healthy.`);
+      if (host.status === "healthy") return fail("invalid", `${serverName(host.id)} is healthy.`);
       const broke = needCash(s, BALANCE.server.replaceCost);
       if (broke) return broke;
       s.cash -= BALANCE.server.replaceCost;
       s.totals.invested += BALANCE.server.replaceCost;
       s.infra.appHosts = s.infra.appHosts.filter((h) => h.id !== host.id);
       const fresh = addAppHost(s);
-      logEvent(s, "decision", `Replaced ${host.id} with ${fresh.id} before it could fail (${money(BALANCE.server.replaceCost)}).`);
-      return ok(s, `${host.id} replaced by ${fresh.id}.`);
+      logEvent(s, "decision", `Replaced ${serverName(host.id)} with ${serverName(fresh.id)} before it could fail (${money(BALANCE.server.replaceCost)}).`);
+      return ok(s, `${serverName(host.id)} replaced by ${serverName(fresh.id)}.`);
     }
 
     case "start_tech": {

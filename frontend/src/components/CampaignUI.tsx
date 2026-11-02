@@ -67,7 +67,7 @@ import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { Campaign, CampaignPostmortem, ScheduledAction, TraceEvent } from "@/sim/campaignTypes";
 import type { Action } from "@/sim";
-import { completedTechIds, TECH_ORDER, type EventKind, type EquipmentId } from "@/sim";
+import { completedTechIds, serverName, TECH_ORDER, type EventKind, type EquipmentId } from "@/sim";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
@@ -77,7 +77,6 @@ import { ModeSwitch } from "./ModeSwitch";
 import { EventFeed, HistoryTabs, LineChart, type HistoryTab } from "./Views";
 import { ViewSheet, ViewTabs } from "./ViewSheet";
 import { Callout, Concept, Meter, Modal, Row, Stat } from "./ui";
-import { serverName } from "@/sim";
 
 const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(c / 100);
 const PLACES = ["gateway", "app", "cache", "db", "monitoring"] as const;
