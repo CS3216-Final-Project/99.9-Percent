@@ -66,32 +66,32 @@ export function stackDown(spots: LabelSpot[], first = 0): number[] {
 }
 
 /**
- * Y positions that keep every label clear of every earlier one, whatever placed them. `spots` carry each label's
- * centre x, bottom y and drawn size, earliest first; an earlier label keeps its place and a later one that would
- * cover it moves to the nearest height, up or down, where it clears all of them by the tail and gap of `clearance`.
- * Taking the nearest free height keeps a label close to its machine and slides it smoothly as the view turns.
+ * Y positions that keep labels from covering each other, whatever placed them. `spots` carry each label's centre x,
+ * bottom y and drawn size. Labels only ever rise: the lowest on screen keeps its place and each higher one that
+ * would cover a label below it lifts just clear, by the tail and gap of `clearance`. Rising keeps every marker above
+ * its machine and out from under a panel along the bottom, and a label lifts smoothly as a neighbour slides under it.
+ * No label rises past `top`, the room's upper edge; one that would has nowhere clear to go and keeps to the edge.
  */
-export function separate(spots: LabelSpot[], clearance = LABEL_TAIL + LABEL_GAP): number[] {
+export function separate(spots: LabelSpot[], clearance = LABEL_TAIL + LABEL_GAP, top = -Infinity): number[] {
   const out = new Array<number>(spots.length);
-  for (let i = 0; i < spots.length; i++) {
+  const order = spots.map((_, i) => i).sort((a, b) => spots[b].y - spots[a].y);
+  order.forEach((i, k) => {
     const s = spots[i];
-    const near: number[] = [];
-    for (let j = 0; j < i; j++) if (Math.abs(spots[j].x - s.x) < (spots[j].w + s.w) / 2) near.push(j);
+    const below = order.slice(0, k).filter((j) => Math.abs(spots[j].x - s.x) < (spots[j].w + s.w) / 2);
     // A hair of slack, so a height computed to touch a neighbour exactly is not lost to rounding.
-    const free = (y: number) => near.every((j) => y - s.h >= out[j] + clearance - 1e-6 || y + clearance <= out[j] - spots[j].h + 1e-6);
-    // The free heights nearest the label's own lie just above or just below a label it would meet; past the
-    // highest or lowest of those there is always room.
+    const free = (y: number) => below.every((j) => y - s.h >= out[j] + clearance - 1e-6 || y + clearance <= out[j] - spots[j].h + 1e-6);
+    // The free heights nearest the label's own lie at it or just above a label it would meet; above the highest
+    // of those there is always room.
     let best = s.y;
     if (!free(best)) {
-      best = Infinity;
-      for (const j of near) {
-        for (const y of [out[j] - spots[j].h - clearance, out[j] + s.h + clearance]) {
-          if (Math.abs(y - s.y) < Math.abs(best - s.y) && free(y)) best = y;
-        }
+      best = -Infinity;
+      for (const j of below) {
+        const y = out[j] - spots[j].h - clearance;
+        if (y < s.y && y > best && free(y)) best = y;
       }
     }
-    out[i] = best;
-  }
+    out[i] = Math.min(s.y, Math.max(best, top + s.h));
+  });
   return out;
 }
 

@@ -145,16 +145,35 @@ describe("label placement", () => {
     for (const shortest of [LABEL_MIN_PX, 20, 0]) expect(zoomScale(10, shortest)).toBe(1);
   });
 
-  it("moves a label that covers an earlier one the shorter way clear of it, leaving the earlier label in place", () => {
+  it("lifts the higher of two covering labels just clear of the lower, which keeps its place", () => {
     // Guided Mode's Servers label lands just below and right of Network's, covering its icon.
     const network = { x: 200, y: 140, w: 130, h: 34 };
     const servers = { x: 230, y: 160, w: 150, h: 45 };
-    const [n, s] = separate([network, servers]);
-    expect(n).toBe(140);
-    expect(s - servers.h).toBe(n + LABEL_TAIL + LABEL_GAP);
-    // Mostly above it instead, the later label goes up.
-    const [, above] = separate([network, { ...servers, y: 120 }]);
-    expect(above).toBe(network.y - network.h - LABEL_TAIL - LABEL_GAP);
+    for (const spots of [[network, servers], [servers, network]]) {
+      const ys = separate(spots);
+      const n = ys[spots.indexOf(network)], s = ys[spots.indexOf(servers)];
+      expect(s).toBe(160);
+      expect(n).toBe(s - servers.h - LABEL_TAIL - LABEL_GAP);
+    }
+  });
+
+  it("never lowers a label, so a stack pinned above a bottom panel stays where it was put", () => {
+    // The phone's spike stage packs the app servers' labels under a ceiling above the bottom sheet.
+    const heights = [34, 40, 40];
+    const apps = stackUnder(heights, 400).map((y, i) => ({ x: 600, y, w: 140, h: heights[i] }));
+    // The Servers label hangs over the top of that stack, covering the first app server's label.
+    const servers = { x: 520, y: 280, w: 150, h: 45 };
+    const ys = separate([servers, ...apps]);
+    expect(ys.slice(1)).toEqual(apps.map((a) => a.y));
+    expect(ys[0]).toBe(apps[0].y - apps[0].h - LABEL_TAIL - LABEL_GAP);
+    ys.forEach((y, i) => expect(y).toBeLessThanOrEqual([servers, ...apps][i].y));
+  });
+
+  it("stops a lifted label at the room's top edge rather than pushing it out of sight", () => {
+    const low = { x: 100, y: 60, w: 120, h: 34 };
+    const high = { x: 110, y: 50, w: 120, h: 34 };
+    const [, y] = separate([low, high], LABEL_TAIL + LABEL_GAP, 0);
+    expect(y - high.h).toBe(0);
   });
 
   it("leaves labels that already clear each other where they are", () => {
