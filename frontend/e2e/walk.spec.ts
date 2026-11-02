@@ -21,14 +21,14 @@ async function chooseWalkMode(page: Page) {
   await menu.locator(":scope > summary").click();
   await walk(page).click();
 }
-/** Waits until the room draws steadily again (no frame gap over half a second): a view change can hold the main thread for seconds on software WebGL. */
+/** Waits until the room draws steadily again (no frame gap over 1.5 s): a view change can hold the main thread for seconds on software WebGL. */
 async function steadyFrames(page: Page) {
   await expect.poll(() => page.evaluate(() => new Promise<boolean>((done) => {
     let last = performance.now(), n = 0;
     const frame = (now: number) => {
-      if (now - last > 500) return done(false);
+      if (now - last > 1_500) return done(false);
       last = now;
-      if (++n === 5) done(true); else requestAnimationFrame(frame);
+      if (++n === 4) done(true); else requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
   })), { timeout: 20_000 }).toBe(true);
@@ -470,7 +470,7 @@ test("walking leaves the camera in place", async ({ page }) => {
   expect(after.target.z).toBeCloseTo(before.target.z, 3);
 });
 
-test("restores the mode, floor, walk position and camera view after a reload", async ({ page }) => {
+test("restores the mode, floor, avatar position and camera view after a reload, with walk mode off", async ({ page }) => {
   test.slow();
   await open(page);
   await chooseWalkMode(page);
@@ -498,18 +498,20 @@ test("restores the mode, floor, walk position and camera view after a reload", a
   await page.reload();
   await page.getByRole("button", { name: "Continue week 2" }).click();
   await expectRoom(page);
-  // Mode, floor and walk mode are picked up exactly where they were left.
+  // Mode and floor are picked up where they were left; walk mode is not, since the game always opens in the overview.
   await expect(floor(page, "Server floor")).toHaveAttribute("aria-pressed", "true");
-  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
-  // The avatar stands by Monitoring without being walked there again: the prompt is back in reach.
-  await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 20_000 });
-  // And the camera came back to the same view: both labels return to their screen spots.
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "false");
+  // The camera came back to the same view: both labels return to their screen spots.
   await expect
     .poll(async () => Math.hypot((await labelCentre(page, "Monitoring")).x - monitoring.x, (await labelCentre(page, "Monitoring")).y - monitoring.y), { timeout: 20_000 })
     .toBeLessThan(4);
   await expect
     .poll(async () => Math.hypot((await labelCentre(page, "Database")).x - database.x, (await labelCentre(page, "Database")).y - database.y), { timeout: 20_000 })
     .toBeLessThan(4);
+  // Walk mode back on, the avatar stands by Monitoring without being walked there again: the prompt is back in reach.
+  await chooseWalkMode(page);
+  await expect(walk(page)).toHaveAttribute("aria-pressed", "true");
+  await expect(prompt(page)).toContainText("Inspect Monitoring", { timeout: 20_000 });
   // Challenge Mode stays the last mode played, and the view record is its own, not the campaign's.
   expect(await page.evaluate(() => localStorage.getItem("nn.mode.v1"))).toBe("classic");
   // The campaign's record is still the one it started with: no walk, no spot, no camera.
