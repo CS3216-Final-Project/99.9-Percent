@@ -2,7 +2,7 @@ import { infrastructureAction, closeInspection, followHintComponent, inspectEqui
 import type { Locator, Page } from "@playwright/test";
 import { advanceTurn, newGame, newLegacyGame } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
-import { reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
+import { act, reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
 import { expect, expectRoom, seedClassicSave, seedSave, test, unlockChallenge } from "./fixtures";
 
 /*
@@ -103,6 +103,18 @@ test("Guided Mode: choosing equipment in the room opens the sheet to half on tha
   await expect(sheet(page)).toHaveAttribute("data-state", "half");
   await expect(page.locator(".phone-sheet-summary")).toContainText("App Server");
   await expect(page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "App Server", exact: true })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Guided Mode: scheduled deployments lead the sheet and Deploy now fast-forwards them", async ({ page, withoutRoom }) => {
+  await withoutRoom();
+  const unlocked = act(reliabilityCompany(), { type: "unlock_reliability", tech: "health_checks" });
+  await openGuided(page, { width: 390, height: 844 }, act(unlocked, { type: "deploy_health_checks" }));
+  await handle(page).tap();
+  const deployments = sheet(page).getByRole("complementary", { name: "Pending deployments" });
+  await expect(deployments).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await deployments.getByRole("button", { name: "Deploy now" }).tap();
+  await expect(deployments).toBeHidden({ timeout: 15_000 });
 });
 
 test("Guided Mode incident: the sheet stays at least half open with every response and the quote's decision in reach", async ({ page, withoutRoom }) => {

@@ -385,6 +385,19 @@
 /* Closed to its handle, the sheet's contents leave the page's focus order and accessibility tree. */
 .phone-app[data-edition="phone"] .phone-sheet[data-state="peek"] .phone-sheet-body { visibility: hidden; }
 
+/* Guided Mode's scheduled deployments lead the sheet as a plain section instead of floating over the room. */
+.phone-app[data-edition="phone"] .phone-sheet .pending-deployments {
+  width: auto;
+  max-height: none;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid var(--control-edge);
+  border-radius: 0;
+  box-shadow: none;
+}
+.phone-app[data-edition="phone"] .phone-sheet .pending-skip { min-height: 44px; }
+
 /* The desktop panel becomes the sheet's plain contents: no floating card, no hide and show of its own. */
 .phone-app[data-edition="phone"] .phone-sheet .equipment-shell {
   position: static;

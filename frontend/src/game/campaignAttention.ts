@@ -2,7 +2,7 @@ import { introductionActive } from "@/sim/introduction";
 import { introductionInstruction } from "./introduction";
 import type { Action, GameState } from "@/sim";
 import type { Autoscaler, Campaign, ScheduledAction } from "@/sim/campaignTypes";
-import { admissionCeiling, allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData, incidentAwaitingResponse } from "@/sim/step";
+import { admissionCeiling, admissionLimitFor, allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData, incidentAwaitingResponse } from "@/sim/step";
 import { recoverySafe, reportsAcknowledged } from "@/sim/reliability";
 import { currentFault, finalRequirements, stableManagement, canStartGrowth } from "@/sim/combinedCampaign";
 import { preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
@@ -143,7 +143,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
   // Launch Week never recommends turning traffic away: the lesson is capacity, and limiting costs uptime.
   const launchLive = !!c.launchWeek && c.launchWeek.completedStep === null;
   if (["database", "application", "unrouted", "failure"].includes(decision.reason) && c.limit === null && !launchLive)
-    offer({ type: "set_traffic_limit", enabled: true }, `Limit to ~${admissionCeiling(c)} requests/s`, "Temporary admission relief is free. Rejected requests earn no revenue and count against uptime; full-demand chapter checks may still require removing the limit later.");
+    offer({ type: "set_traffic_limit", enabled: true }, `Limit to ~${admissionLimitFor(c)} requests/s`, "Temporary admission relief is free. Rejected requests earn no revenue and count against uptime; full-demand chapter checks may still require removing the limit later.");
   if (decision.reason === "full-demand" && c.limit !== null && c.routing.targets.length) {
     const m = c.snapshot, allocation = allocateTraffic(m.incoming, c.routing.targets);
     const observedDbLoad = m.admitted > 0 ? Math.ceil(m.db.demand * m.incoming / m.admitted) : Infinity;

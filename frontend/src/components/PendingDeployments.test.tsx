@@ -74,3 +74,13 @@ it("disables the rush like every other campaign action", () => {
   show(game);
   expect(screen.getByRole("button", { name: /Deploy now/ }).hasAttribute("disabled")).toBe(true);
 });
+
+it("never arms the rush while the clock cannot run", () => {
+  show(pendingGame(30, dataCompany()));
+  act(() => useGame.setState({ view: "tech" }));
+  const button = screen.getByRole("button", { name: /Deploy now/ });
+  expect(button.hasAttribute("disabled")).toBe(true);
+  act(() => useGame.getState().rushDeploy());
+  expect(useGame.getState().running).toBe(false);
+  expect(useGame.getState().deployRush).toBe(false);
+});

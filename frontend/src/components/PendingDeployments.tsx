@@ -2,7 +2,7 @@ import { introductionActive } from "@/sim/introduction";
 import { pendingStop } from "@/sim/step";
 import { milestoneBlocks } from "@/game/campaignGuidance";
 import { ACTION_NAMES } from "@/game/reportEvents";
-import { useGame } from "@/game/store";
+import { campaignClockAvailable, useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
 import "./PendingDeployments.css";
@@ -15,9 +15,10 @@ const appName = (id: string) => `App ${id.slice(4)}`;
  */
 export function PendingDeployments() {
   const { game, deployRush, rushDeploy, cancelDeployRush } = useGame();
+  const clockAvailable = useGame(campaignClockAvailable);
   const c = game.campaign;
   if (!c || !c.pending.length || introductionActive(c)) return null;
-  const disabled = pendingStop(c) !== null || milestoneBlocks(game) || game.phase === "review" || game.phase === "ended";
+  const disabled = !clockAvailable || pendingStop(c) !== null || milestoneBlocks(game) || game.phase === "review" || game.phase === "ended";
   return <aside className="pending-deployments" aria-label="Pending deployments">
     <h3><Icon name="time" size={16} />Deployments</h3>
     <ul>

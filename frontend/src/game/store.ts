@@ -1149,7 +1149,7 @@ export const useGame = create<Store>()((set, get) => {
       if (!running && !persist() && !get().saveBlocked) get().notify("Could not save. Play continues in memory.", "error");
     },
     setSpeed: (speed) => set({ speed, deployRush: false }),
-    rushDeploy: () => { set({ deployRush: true }); get().setRunning(true); },
+    rushDeploy: () => { get().setRunning(true); if (get().running) set({ deployRush: true }); },
     cancelDeployRush: () => set({ deployRush: false }),
 
     newRun: (opts = {}) => {

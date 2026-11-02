@@ -279,3 +279,10 @@ it("leaves a collapsed side panel collapsed when a machine is inspected from the
   act(()=>inspectInRoom("app","app-1"));await act(async()=>{});
   expect(useGame.getState().panelOpen).toBe(false);
 });
+it.each([1,2] as const)("the scenario-%s traffic-limit label names the cap the limit applies",async version=>{
+ const game=advanceSteps(newGame(undefined,undefined,version),6).state;show(game);
+ open("Network");const label=dialog("Network").getByRole("button",{name:/Limit to ~/}).textContent!;
+ const named=Number(/Limit to ~([\d,]+)/.exec(label)![1].replace(/,/g,""));
+ const applied=tick(decide(game,{type:"set_traffic_limit",enabled:true}),3).campaign!.limit;
+ expect(named).toBe(applied);
+});

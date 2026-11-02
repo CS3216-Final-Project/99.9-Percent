@@ -9,14 +9,15 @@ import { CampaignPanel } from "@/components/CampaignUI";
 import { ClassicViewSheet } from "@/components/Game";
 import { Icon, type IconName } from "@/components/icons";
 import OperationsRail from "@/components/OperationsRail";
+import { PendingDeployments } from "@/components/PendingDeployments";
 import { EQUIPMENT_ICON } from "@/components/presentation";
 import SidePanel from "@/components/SidePanel";
 import { getSheetState, setSheetState, SHEET_STATES, shownSheetState, useSheetState, type SheetState } from "../layout/sheetState";
 import "../layout/phone-layout.css";
 
 /**
- * Region: sheet. A bottom sheet over the room with Guided Mode's System metrics, or Challenge Mode's equipment panel
- * and weekly operations. Its handle shows the headline readings and opens it to peek, half or full; the room's canvas
+ * Region: sheet. A bottom sheet over the room with Guided Mode's scheduled deployments and System metrics, or
+ * Challenge Mode's equipment panel and weekly operations. Its handle shows the headline readings and opens it to peek, half or full; the room's canvas
  * keeps its size whatever the sheet does. Challenge Mode's Tech, Team and History views open over the room as well.
  */
 export function PhoneSheet() {
@@ -97,7 +98,7 @@ function MetricsSheet({ campaign }: { campaign: boolean }) {
       </div>
     </div>
     <div ref={body} id={bodyId} className="phone-sheet-body">
-      {campaign ? <CampaignPanel /> : <><SidePanel /><OperationsRail /></>}
+      {campaign ? <><PendingDeployments /><CampaignPanel /></> : <><SidePanel /><OperationsRail /></>}
     </div>
   </div>;
 }

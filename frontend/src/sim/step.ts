@@ -65,6 +65,10 @@ export function admissionCeiling(c: Campaign): number {
     const serving = caps.length ? Math.min(...caps) * caps.length : 0;
     return Math.floor(Math.min(serving + launchWeekAutoscaleBonus(c), c.dbCapacity) * 0.9);
 }
+/** The cap a traffic limit applies once it engages: the live ceiling on version-2 companies, the opening's fixed limit otherwise. */
+export function admissionLimitFor(c: Campaign): number {
+    return c.scenarioVersion === 2 ? admissionCeiling(c) : openingTuning(c).admissionLimit;
+}
 /**
  * Launch Week leniency: an overload the player has already paid to fix never opens an incident. The check is
  * on the scheduled change itself, so a cancelled or undersized fix loses its cover at once.
@@ -184,12 +188,16 @@ export function qualifiesForRecovery(m: Snapshot): boolean {
  * The open incident still lacks its recorded response: an uncancelled capacity, routing,
  * admission or restoration decision engaged at or after the step its cause began. Stability
  * alone never closes such an incident, so a player who does nothing sees no recovery.
+ * An application failure's own restoration, natural or manual, answers its incident, since the
+ * chapters keep natural restoration as a valid way through.
  * Incidents replayed from saves written before the rule (no `responseDueFrom`) never await one.
  */
 export function incidentAwaitingResponse(c: Campaign): boolean {
     const due = c.incident?.responseDueFrom;
-    return due !== undefined &&
-        !c.actions.some(a => a.cancelledStep === undefined && (a.activatedStep ?? a.requestedStep) >= due);
+    if (due === undefined) return false;
+    const fault = currentFault(c);
+    if (c.incident!.kind === "application-failure" && !!fault && fault.id === c.incident!.failureId && fault.restoredStep !== null) return false;
+    return !c.actions.some(a => a.cancelledStep === undefined && (a.activatedStep ?? a.requestedStep) >= due);
 }
 /**
  * Whether the incident presentation applies: the phase is "incident", a campaign incident object is
@@ -277,7 +285,7 @@ export function stepInPlace(s: GameState): StopReason {
         }
         if(action.type==="promotion"){c.promotion!.activatedStep=c.step;trace(c,"promotion-started",{actionId:action.id,increment:400,endStep:c.promotion!.endStep});}
         if (action.type === "limit")
-            c.limit = c.scenarioVersion === 2 ? admissionCeiling(c) : openingTuning(c).admissionLimit;
+            c.limit = admissionLimitFor(c);
         if (action.type === "unlimit")
             c.limit = null;
         c.actions.find(a => a.id === action.id)!.activatedStep = c.step;
