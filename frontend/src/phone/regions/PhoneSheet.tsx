@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
-import { equipmentInfo, metrics, type EquipmentId } from "@/sim";
+import { equipmentInfo, metrics, serverName, type EquipmentId } from "@/sim";
 import { incidentActive } from "@/sim/step";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { clock, num } from "@/game/format";
@@ -8,7 +8,6 @@ import { useGame } from "@/game/store";
 import { CampaignPanel } from "@/components/CampaignUI";
 import { ClassicViewSheet } from "@/components/Game";
 import { Icon, type IconName } from "@/components/icons";
-import OperationsRail from "@/components/OperationsRail";
 import { PendingDeployments } from "@/components/PendingDeployments";
 import { EQUIPMENT_ICON } from "@/components/presentation";
 import SidePanel from "@/components/SidePanel";
@@ -17,7 +16,7 @@ import "../layout/phone-layout.css";
 
 /**
  * Region: sheet. A bottom sheet over the room with Guided Mode's scheduled deployments and System metrics, or
- * Challenge Mode's equipment panel and weekly operations. Its handle shows the headline readings and opens it to peek, half or full; the room's canvas
+ * Challenge Mode's equipment panel. Its handle shows the headline readings and opens it to peek, half or full; the room's canvas
  * keeps its size whatever the sheet does. Challenge Mode's Tech, Team and History views open over the room as well.
  */
 export function PhoneSheet() {
@@ -98,7 +97,7 @@ function MetricsSheet({ campaign }: { campaign: boolean }) {
       </div>
     </div>
     <div ref={body} id={bodyId} className="phone-sheet-body">
-      {campaign ? <><PendingDeployments /><CampaignPanel /></> : <><SidePanel /><OperationsRail /></>}
+      {campaign ? <><PendingDeployments /><CampaignPanel /></> : <SidePanel />}
     </div>
   </div>;
 }
@@ -130,7 +129,7 @@ function GuidedPeek() {
   const slow = m.latencyMs >= Q.latencyThresholdMs;
   const failing = m.serviceErrorRate !== null && m.serviceErrorRate >= Q.errorThreshold;
   const name = shown ? GUIDED_NAMES[shown] : undefined;
-  const app = shown === "app" && c.apps.length > 1 && appId ? ` · App ${appId.slice(4)}` : "";
+  const app = shown === "app" && c.apps.length > 1 && appId ? ` · ${serverName(appId)}` : "";
   return <>
     {c.incident ? <PeekTitle icon="incident" tone="critical" short={`${c.incident.stableSteps}/${Q.stableSteps} s`}>Incident · {c.incident.stableSteps}/{Q.stableSteps} s<span className="visually-hidden"> stable</span></PeekTitle>
       : name && shown ? <PeekTitle icon={EQUIPMENT_ICON[shown]}>{name}{app}</PeekTitle>

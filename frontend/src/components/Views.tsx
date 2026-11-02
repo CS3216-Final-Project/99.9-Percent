@@ -58,9 +58,9 @@ export function EngineersView() {
         <Act icon="debt" label={paying ? "Debt paydown queued" : "Pay down debt"} note={paying ? undefined : `${BALANCE.debt.paydownEffort} wk`} disabled={locked || paying} onClick={() => act({ type: "start_debt_paydown" })} />
         <Act
           icon="hire"
-          label={game.engineers >= BALANCE.engineer.max ? "Office is full" : "Hire engineer"}
-          price={game.engineers >= BALANCE.engineer.max ? undefined : BALANCE.engineer.hireCost}
-          disabled={locked || game.engineers >= BALANCE.engineer.max}
+          label="Hire engineer"
+          price={BALANCE.engineer.hireCost}
+          disabled={locked}
           onClick={() => act({ type: "hire_engineer" })}
           tip={`Then ${moneyFull(BALANCE.engineer.salary)} a week.`}
         />

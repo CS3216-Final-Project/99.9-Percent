@@ -267,5 +267,5 @@ export function useAppClassName(): string {
   const incident = useGame((s) => incidentActive(s.game));
   const touring = useGame((s) => s.tour?.track ?? null);
   // A Guided Mode failure can burn while the phase stays "management"; the panel still takes the alert border.
-  return `app phase-${phase}${incident && phase !== "incident" ? " phase-incident" : ""}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " has-operations-rail" : ""}`;
+  return `app phase-${phase}${incident && phase !== "incident" ? " phase-incident" : ""}${campaign && started ? " has-chapters" : ""}${touring ? ` is-touring tour-${touring}` : ""}${started ? "" : " is-title"}${started && !campaign ? " is-classic" : ""}`;
 }

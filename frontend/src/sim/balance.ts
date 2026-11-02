@@ -73,8 +73,6 @@ export const BALANCE = {
   engineer: {
     salary: 1_600,
     hireCost: 5_000,
-    max: 8,
-    maxPerTask: 3,
   },
 
   debt: {

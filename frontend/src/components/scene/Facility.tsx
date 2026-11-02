@@ -20,7 +20,7 @@ import {
 } from "@/sim";
 import type { GameMode, GraphicsQuality } from "@/game/persist";
 import { loadExploration, saveExploration, type SavedCameraView } from "@/game/exploration";
-import { canInspectEquipment, inspectInRoom, roomPaused, trafficViewOn, useGame } from "@/game/store";
+import { canInspectEquipment, inspectInRoom, isSheetView, roomPaused, trafficViewOn, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { nextViewpoint } from "@/game/viewpoints";
 import { isPhoneEdition } from "@/phone/edition";
@@ -91,6 +91,7 @@ import { IN_GATE, OUT_GATE } from "./trafficLayout";
 import { PathGlow } from "./SpotBeams";
 import { num } from "@/game/format";
 import type { Campaign } from "@/sim/campaignTypes";
+import { serverName } from "@/sim";
 
 function useSceneModel(): SceneModel {
   const key = useGame((s) => JSON.stringify(buildModel(s.game)));
@@ -375,7 +376,7 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.closest('[role="dialog"], [role="menu"], [role="listbox"]'))) return;
       if (document.querySelector(".modal-backdrop, .company-message-backdrop")) return;
       const current = useGame.getState();
-      if (e.ctrlKey || e.metaKey || e.altKey || !current.started || current.view === "tech" || current.view === "history" || lookingFromAvatar()) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || !current.started || isSheetView(current.view) || lookingFromAvatar()) return;
       if (e.key === "q" || e.key === "Q") cameraApi.rotateBy(-TURN);
       else if (e.key === "e" || e.key === "E") cameraApi.rotateBy(TURN);
     };
@@ -1057,7 +1058,7 @@ function Labels({ landed }: { landed: Floor | null }) {
       {EQUIPMENT_ORDER.filter((id) => floorOf(id) === landed && canInspectEquipment(game, id) && (!trafficView || ["gateway", "app", "db", "cache"].includes(id)) && (m.opening ? ["gateway","app","db","monitoring","team","deploy","growth",...(c?.dataStage?["cache"]:[])].includes(id) : (id !== "replica" && id !== "backup") || m.built[id])).map((id) => (
         <Label key={id} id={id} m={m} />
       ))}
-      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}`} onClick={()=>inspectInRoom("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{`App ${a.id.slice(4)}`}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span><LoadBar ratio={loadOf(c,m,a.id)} /></button>)}
+      {servers&&c?.openingMilestone?.acknowledged&&c.apps.map((a,i)=><button key={a.id} ref={bindLabel(a.id)} data-eq={a.id} className={`eq-label tone-${a.routed?m.hosts[i]:"absent"}${selected==="app"&&selectedAppId===a.id?" is-selected":""}${appsAffected?" is-affected":""}`} aria-pressed={selected==="app"&&selectedAppId===a.id} aria-label={serverName(a.id)} onClick={()=>inspectInRoom("app",a.id)} onFocus={()=>useGame.getState().hover("app")} onBlur={()=>useGame.getState().hover(null)}>{serverName(a.id)}<span className="eq-note">{a.health==="failed"?`failed · ${a.detectedHealth??"unknown"}`:a.role==="spare"?"spare · unrouted":a.routed?"routed":"unrouted"}</span><LoadBar ratio={loadOf(c,m,a.id)} /></button>)}
     </div>
   );
 }
@@ -1681,7 +1682,7 @@ function WalkControls() {
     const down = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       const view = useGame.getState().view;
-      if (view === "tech" || view === "history") return;
+      if (isSheetView(view)) return;
       if (typing(el) || inOverlay(el) || e.ctrlKey || e.metaKey || e.altKey) return;
       const arrow = e.code.startsWith("Arrow");
       const steering = movesAvatar(e.code) || e.code === "ShiftLeft" || e.code === "ShiftRight";
@@ -1940,7 +1941,7 @@ export default function Facility() {
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable || el.closest('[role="dialog"], [role="menu"], [role="listbox"]'))) return;
       const current = useGame.getState();
-      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !current.started || current.view === "tech" || current.view === "history") return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !current.started || isSheetView(current.view)) return;
       e.preventDefault();
       if (view) {
         const s = useGame.getState();

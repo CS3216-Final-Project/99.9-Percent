@@ -1,5 +1,6 @@
 import type { Campaign, CampaignPostmortem, TraceEvent } from "./campaignTypes";
 import { currentFault } from "./combinedCampaign";
+import { serverName } from "./names";
 export function trace(c: Campaign, type: string, data: TraceEvent["data"] = {}): void {
     c.trace.push({ id: c.nextEventId++, step: c.step, type, data });
 }
@@ -28,14 +29,14 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
     const constraint = primary === "db" ? opening.db : opening.instances!.find(a=>a.id===primary)!;
     const explanations = [
         inc.kind==="application-failure"?`At step ${inc.openedStep}, three consecutive steps of failure-attributed request losses opened an application-failure incident. Detection and promotion are separate delayed effects.`:!opening.instances ? `At step ${inc.openedStep}, database demand was ${opening.db.demand} ops/s against ${opening.db.capacity} ops/s capacity. Three consecutive overloaded steps opened the incident.` :
-            `At step ${inc.openedStep}, ${primary === "db" ? "database" : primary.replace("app-","App ")} demand was ${constraint.demand} ${primary==="db"?"ops/s":"requests/s"} against ${constraint.capacity} capacity. Three consecutive overloaded steps on this component opened the incident.`,
+            `At step ${inc.openedStep}, ${primary === "db" ? "database" : serverName(primary)} demand was ${constraint.demand} ${primary==="db"?"ops/s":"requests/s"} against ${constraint.capacity} capacity. Three consecutive overloaded steps on this component opened the incident.`,
         inc.kind==="application-failure"?"The recorded application failure reduced useful capacity without increasing incoming traffic. Compare actual health, detection and configured/effective recipients.":opening.spikes?.activePulse&&spikeEvent?`Temporary demand pulse ${spikeEvent.data.pulse} began at step ${spikeEvent.step}, changing incoming traffic to ${spikeEvent.data.to} req/s; compare admitted demand and each dependency.`:opening.data&&workloadEvent?`Workload changed to ${workloadEvent.data.profile} at step ${workloadEvent.step}; compare logical work and uncached DB demand with capacity.`:events.some(e => e.type === "traffic-change") ? "The recorded traffic increase initiated the overload." :
             `The incident followed an admission or capacity change at step ${demandEvent?.step ?? start?.step}; compare its recorded effect with the opening metrics.`,
     ];
     const fault=currentFault(c);
     // Only a fault that was still unrestored during this episode explains it.
     if(fault?.startedStep!==null&&fault&&fault.startedStep<=c.step&&(fault.restoredStep===null||fault.restoredStep>=episodeStart)) {
-        const name=(id:string)=>`App ${id.slice(4)}`;
+        const name=serverName;
         explanations.push(`${name(fault.targetId)} failed at step ${fault.startedStep}. Failed recipients process no work; retained queues remain until restoration. Health checking detects failure but creates no capacity. A spare helps only when routed.`);
         for(const e of events.filter(e=>e.step>=fault.startedStep!)) {
             if(e.type==="health-change-detected")explanations.push(`At step ${e.step}, ${name(String(e.data.appId))} was detected ${e.data.detectedHealth} by ${e.data.source==="probe"?"Health Checks":"manual inspection"}. Detection delay: ${e.data.delay} step(s).`);

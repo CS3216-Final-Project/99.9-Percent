@@ -1,7 +1,7 @@
 "use client";
 import { EquipmentPanel } from "./EquipmentPanel";
 
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   BALANCE,
   churnRate,
@@ -23,11 +23,13 @@ import {
   type GameState,
   type Metrics,
   type TechId,
+  serverName,
 } from "@/sim";
 import { moneyFull, num, pct } from "@/game/format";
-import { useGame } from "@/game/store";
-import { selectedInView } from "@/game/floors";
+import { inspectOrSelect, useGame } from "@/game/store";
+import { floorOf, FLOOR_NAME, selectedInView, type Floor } from "@/game/floors";
 import { Icon } from "./icons";
+import { Reveal } from "./Reveal";
 import { tipProps } from "./tips";
 import { EQUIPMENT_ICON, moodIcon, STATE_META, TECH_ICON, utilTone } from "./presentation";
 import IncidentPanel from "./IncidentPanel";
@@ -116,7 +118,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
             <Act primary tour="primary" icon="plus" label="Add server" price={BALANCE.server.setupCost} disabled={locked || atLimit} onClick={() => act({ type: "add_server" })} />
           )}
           {sick.map((h) => (
-            <Act key={h.id} icon="refresh" label={`Replace ${h.id}`} price={BALANCE.server.replaceCost} disabled={locked} onClick={() => act({ type: "replace_host", hostId: h.id })} />
+            <Act key={h.id} icon="refresh" label={`Replace ${serverName(h.id)}`} price={BALANCE.server.replaceCost} disabled={locked} onClick={() => act({ type: "replace_host", hostId: h.id })} />
           ))}
           <More>
             <p className="muted">{info.about}</p>
@@ -301,7 +303,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
               icon="hire"
               label="Hire engineer"
               price={BALANCE.engineer.hireCost}
-              disabled={locked || game.engineers >= BALANCE.engineer.max}
+              disabled={locked}
               onClick={() => act({ type: "hire_engineer" })}
               tip={`Then ${moneyFull(BALANCE.engineer.salary)} a week.`}
             />
@@ -417,28 +419,37 @@ function Inspector({ id }: { id: EquipmentId }) {
   );
 }
 
-function EquipmentChoices() {
+const PLACES: EquipmentId[] = ["gateway", "app", "db", "monitoring", "team", "deploy", "growth"];
+/** The machines first, then the office: each floor gets its own row of chips. */
+const CHOICE_FLOORS: Floor[] = ["servers", "office"];
+
+/** Always on top of the panel: one compact chip per piece of equipment, marked when it is selected or in trouble. */
+function EquipmentChoices({ shown }: { shown: EquipmentId | null }) {
   const game = useGame(s => s.game);
-  const select = useGame(s => s.select);
-  const places: EquipmentId[] = ["gateway", "app", "db", "monitoring", "team", "deploy", "growth"];
-  return <section className="panel-section">
+  return <section className="panel-section equipment-choices" aria-label="Inspect equipment">
     <h2 className="step-head">Inspect equipment</h2>
-    <p className="muted">Choose equipment to see its readings and available actions.</p>
-    <div className="chips">{places.map(id => {
-      const name = equipmentInfo(game, id).name;
-      return <button type="button" className="chip" key={id} aria-label={`Inspect ${name}`} onClick={() => select(id)}>
-        <span className="chip-icon"><Icon name={EQUIPMENT_ICON[id]} size={16} /></span>{name}
+    {CHOICE_FLOORS.map(floor => <div className="chips" role="group" aria-label={FLOOR_NAME[floor]} key={floor}>{PLACES.filter(id => floorOf(id) === floor).map(id => {
+      const info = equipmentInfo(game, id);
+      const alert = info.state === "critical" || info.state === "down";
+      return <button type="button" className={`chip${shown === id ? " is-selected" : ""}${alert ? " is-alert" : ""}`} key={id} aria-label={`Inspect ${info.name}`} aria-pressed={shown === id} onClick={() => inspectOrSelect(id)}>
+        <span className="chip-icon"><Icon name={EQUIPMENT_ICON[id]} size={16} /></span>{info.name}
       </button>;
-    })}</div>
+    })}</div>)}
   </section>;
 }
 
-/** Equipment starts available; individual inspections stay with the floor in view. */
+/**
+ * The equipment picker stays put with the selected machine's details below it. An incident takes the whole panel:
+ * its Find the cause buttons are the only way to start a timed investigation, so the picker steps aside.
+ */
 export default function SidePanel() {
   const phase = useGame(s => s.game.phase);
   // A machine's details stay with its floor, however the view left it.
   const shown = useGame(s => selectedInView(s.selected, s.floor));
+  // The details keep the last machine while they fold away.
+  const [kept, setKept] = useState(shown);
+  if (shown && shown !== kept) setKept(shown);
   return <EquipmentPanel label="Details">
-    {phase === "incident" ? <IncidentPanel /> : shown ? <Inspector id={shown} /> : <EquipmentChoices />}
+    {phase === "incident" ? <IncidentPanel /> : <><EquipmentChoices shown={shown} /><Reveal open={!!shown}>{kept && <Inspector id={kept} />}</Reveal></>}
   </EquipmentPanel>;
 }

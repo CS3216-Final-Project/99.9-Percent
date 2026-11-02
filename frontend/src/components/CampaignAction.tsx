@@ -20,6 +20,7 @@ import { confirmingAction, setConfirming, subscribeConfirming } from "./actionCo
 import { guidanceActionId } from "@/game/campaignAttention";
 import { milestoneBlocks } from "@/game/campaignGuidance";
 import { InspectionPurchaseContext, useCampaignAttention } from "./useCampaignAttention";
+import { serverName } from "@/sim";
 
 /** Equipment roles shown in the quote's supporting facts. */
 const MACHINES: Partial<Record<EquipmentId, { name: string; does: string }>> = {
@@ -171,7 +172,7 @@ export function CampaignAction(props: ComponentProps<typeof Act> & { decision?: 
     : label.startsWith("Limit to") ? "Reduces incoming traffic to give your servers room to recover."
     : PURCHASE_DESCRIPTIONS[label] ?? props.tip;
   // A per-app action sits next to that app's marker; anything else next to the machine's own.
-  const anchor = isScale ? c.apps.find(a => `Scale up App ${a.id.slice(4)}` === label)?.id ?? "app" : affected[0];
+  const anchor = isScale ? c.apps.find(a => `Scale up ${serverName(a.id)}` === label)?.id ?? "app" : affected[0];
   const toggle = () => {
     if (open) { setConfirming(null); return; }
     setConfirming(label);

@@ -5,6 +5,7 @@ import { openingTuning } from "./launchWeek";
 import { BALANCE, PROMOS } from "./balance";
 import { has, TECH } from "./tech";
 import type { EquipmentId, GameState, PromoId, Release, TechId, Warning } from "./types";
+import { serverName } from "./names";
 
 /* ------------------------------------------------------------------ */
 /* Capacity                                                            */
@@ -160,6 +161,16 @@ export function assignedEngineers(s: GameState): number {
 
 export function freeEngineers(s: GameState): number {
   return Math.max(0, s.engineers - assignedEngineers(s));
+}
+
+/** Whole percent of a task done, rounded down so it never reads 100% before the work ships. */
+export function taskPercent(task: { effort: number; progress: number }): number {
+  return Math.floor((task.progress / task.effort) * 100 + 1e-6);
+}
+
+/** The most engineers a task takes: one per week of its effort, so no task is staffed past a one-week finish. */
+export function maxTaskStaff(task: { effort: number }): number {
+  return Math.max(1, Math.ceil(task.effort - 1e-9));
 }
 
 /** Weeks until a task finishes at its current staffing, or null if nobody is on it. */
@@ -339,6 +350,21 @@ function pct(v: number): string {
   return `${Math.round(v * 100)}%`;
 }
 
+/** A machine that has died and serves nothing until it is replaced or recovered. */
+export interface DeadMachine {
+  equipment: "app" | "db";
+  hostId: string;
+}
+
+/** Every dead machine in a Challenge Mode company, database first. */
+export function deadMachines(s: GameState): DeadMachine[] {
+  if (s.campaign) return [];
+  const dead: DeadMachine[] = [];
+  if (s.infra.dbHost.status === "failed") dead.push({ equipment: "db", hostId: s.infra.dbHost.id });
+  for (const h of s.infra.appHosts) if (h.status === "failed") dead.push({ equipment: "app", hostId: h.id });
+  return dead;
+}
+
 /**
  * Warning signs for the week being planned. Preventable failures always show
  * up here first; monitoring decides how precise the wording is.
@@ -418,7 +444,7 @@ export function currentWarnings(s: GameState): Warning[] {
         code: "host_degraded",
         level: "warn",
         equipment: "app",
-        text: named ? `${h.id} is failing. Replace it.` : "A server keeps rebooting. Replace it.",
+        text: named ? `${serverName(h.id)} is failing. Replace it.` : "A server keeps rebooting. Replace it.",
         detail: faultDetail,
       });
     }

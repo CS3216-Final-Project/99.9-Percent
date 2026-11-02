@@ -16,6 +16,7 @@ import { chapterAdvance } from "./chapterCompletion";
 import { previewCampaignAction } from "./campaignFinance";
 import { chapter4Stage, chapter4Performance } from "./chapter4Guidance";
 import { chapter6Attention, combinedDatabaseDemand } from "./chapter6Guidance";
+import { serverName } from "@/sim";
 
 export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "growth" | "risk" | "menu" | "finance" | "research";
 export interface AttentionDecision {
@@ -120,7 +121,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
   }
   if (decision.reason === "application") {
     for (const instance of c.snapshot.instances ?? []) if (instance.routed && instance.health !== "failed" && instance.demand > instance.capacity)
-      offer({ type: "scale_up", appId: instance.id }, `Scale up App ${instance.id.slice(4)}`, `This server receives ${instance.demand} requests/s against ${instance.capacity} capacity. Scaling changes this server only.`);
+      offer({ type: "scale_up", appId: instance.id }, `Scale up ${serverName(instance.id)}`, `This server receives ${instance.demand} requests/s against ${instance.capacity} capacity. Scaling changes this server only.`);
     if (c.loadBalancer || c.launchWeek) offer({ type: "add_server" }, "Add server", "Another server adds installed capacity after activation. You must then route traffic to it; installation alone does not relieve the current bottleneck.");
   }
   if (decision.reason === "unrouted") {
@@ -129,17 +130,17 @@ export function campaignAttention(game: GameState): AttentionDecision {
     if (targets.length === routableApps(c).length && targets.length > 1) {
       const allocation = allocateTraffic(c.snapshot.admitted, targets);
       if (targets.every(id => c.apps.find(a => a.id === id)!.capacity >= allocation[id]))
-        offer({ type: "set_routing", mode: "balanced", targets }, "All apps", "Share admitted traffic across the installed serving apps. Their current capacities support this allocation; database capacity is unchanged.");
+        offer({ type: "set_routing", mode: "balanced", targets }, "All servers", "Share admitted traffic across the installed serving servers. Their current capacities support this allocation; database capacity is unchanged.");
       // Chapter 4's equal allocation may overload a new base server even when
       // aggregate installed capacity fits. Prepare that server before routing.
       if (decision.chapter === 4) for (const app of c.apps.filter(a => !a.routed && a.tier === "base"))
         if (allocation[app.id] > app.capacity && allocation[app.id] < P.appCapacity)
-          offer({ type: "scale_up", appId: app.id }, `Scale up App ${app.id.slice(4)}`, "The new server needs more capacity before it can share the observed traffic.");
+          offer({ type: "scale_up", appId: app.id }, `Scale up ${serverName(app.id)}`, "The new server needs more capacity before it can share the observed traffic.");
     }
     if (!c.loadBalancer) offer({ type: "deploy_load_balancer" }, "Deploy load balancing", "An installed serving app is unrouted. Installation enables routing choices; you must configure traffic separately afterward.");
   }
   if (["failure", "round-restoration", "isolated-failure"].includes(decision.reason))
-    for (const app of c.apps) if (app.health === "failed") offer({ type: "restore_app", appId: app.id }, `Restore App ${app.id.slice(4)}`, "This server is currently failed. Restoration is free and takes three game seconds; service recovery still requires observations.");
+    for (const app of c.apps) if (app.health === "failed") offer({ type: "restore_app", appId: app.id }, `Restore ${serverName(app.id)}`, "This server is currently failed. Restoration is free and takes three game seconds; service recovery still requires observations.");
   // Launch Week never recommends turning traffic away: the lesson is capacity, and limiting costs uptime.
   const launchLive = !!c.launchWeek && c.launchWeek.completedStep === null;
   if (["database", "application", "unrouted", "failure"].includes(decision.reason) && c.limit === null && !launchLive)
@@ -195,17 +196,17 @@ function actionMessage({action}: GuidanceAction, c: Campaign): string {
   switch (action.type) {
     case "start_db_upgrade": return "Your database is overloaded. Upgrade it to handle more requests.";
     case "scale_up": return c.launchWeek && c.launchWeek.completedStep === null
-      ? `Keep up with traffic: scale up App ${action.appId.slice(4)}, then the other app. Limiting traffic instead hurts your uptime and reputation.`
-      : `App ${action.appId.slice(4)} is overloaded. Scale it up to handle more requests.`;
+      ? `Keep up with traffic: scale up ${serverName(action.appId)}, then the other server. Limiting traffic instead hurts your uptime and reputation.`
+      : `${serverName(action.appId)} is overloaded. Scale it up to handle more requests.`;
     case "add_server": return c.launchWeek && c.launchWeek.completedStep === null
       ? "One App Server can't keep up with this traffic. Buy a second server to share it."
       : "Your app servers need more capacity. Add a server, then connect it after installation.";
-    case "set_routing": return "Your new server isn't receiving traffic. Check every app in Send traffic to.";
+    case "set_routing": return "Your new server isn't receiving traffic. Check every server in Send traffic to.";
     case "deploy_load_balancer": return c.apps.length > 1 ? "Your new server isn't receiving traffic. Install load balancing so you can connect it."
       : "One app server can't absorb this spike. Install load balancing so a second server can share the traffic.";
     case "deploy_cache": return "Repeated lookups are overloading your database. Deploy Read Cache to reduce that work as it warms up.";
     case "tune_cache": return "Your cache could handle more repeat requests. Tune it to reduce database work.";
-    case "restore_app": return `App ${action.appId.slice(4)} has failed. Restore it to bring it back online.`;
+    case "restore_app": return `${serverName(action.appId)} has failed. Restore it to bring it back online.`;
     case "set_traffic_limit": return action.enabled ? "Your equipment is overloaded. Temporarily limit traffic to give it room to recover; rejected requests won't earn money and count against uptime." : "Your company is ready to serve more traffic. Remove the limit to check it at full demand.";
     default: return "Check the highlighted action to continue.";
   }
@@ -251,7 +252,7 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
 
 /** Narrates the controller's queued work as its own action, in the Server management vocabulary. */
 function autoscalerPendingMessage(a: ScheduledAction, controller: Autoscaler | null | undefined): string {
-  const name = (id: string | undefined) => (id ? `App ${id.slice(4)}` : "a server");
+  const name = (id: string | undefined) => (id ? serverName(id) : "a server");
   switch (a.type) {
     case "add-app": return `Autoscaling is installing ${name(a.targetId)} for the extra load; it joins routing next. Press Run to watch it finish.`;
     case "scale-up": return `Autoscaling is scaling up ${name(a.targetId)} for the extra load. Press Run to watch it finish.`;
@@ -442,7 +443,7 @@ function baseAttention(game: GameState): AttentionDecision {
     const deployPending = pending.some(a => a.type === "deploy-autoscaler");
     // Once enabled, the arc becomes observation: narrate the controller's own work until
     // the player looks at its result in Server management.
-    const appName = (id: string | undefined) => (id ? `App ${id.slice(4)}` : "a server");
+    const appName = (id: string | undefined) => (id ? serverName(id) : "a server");
     const lastAct = [...c.trace].reverse().find(t => t.step >= d.enteredStep && t.type.startsWith("autoscale-"));
     const actSeen = !lastAct || c.trace.some(t => t.type === "inspection" && t.id > lastAct.id && t.data.component === "app");
     const describeAct = (t: NonNullable<typeof lastAct>): string => {
@@ -507,9 +508,9 @@ function baseAttention(game: GameState): AttentionDecision {
         const peak = Math.max(0, ...first.map(m => m.incoming));
         const allocation = targets.length ? allocateTraffic(peak, targets.map(a => a.id)) : {};
         const small = targets.find(a => a.capacity < allocation[a.id] && allocation[a.id] < P.appCapacity && a.tier === "base");
-        const advice = small ? plan({ type: "scale_up", appId: small.id }, `The first spike exposed a small server. Scale up App ${small.id.slice(4)} before sharing the next spike.`)
+        const advice = small ? plan({ type: "scale_up", appId: small.id }, `The first spike exposed a small server. Scale up ${serverName(small.id)} before sharing the next spike.`)
           : targets.every(a => a.capacity >= allocation[a.id]) && targets.some(a => !a.routed)
-          ? plan({ type: "set_routing", mode: "balanced", targets: targets.map(a => a.id) }, "Your prepared servers can share the observed spike. Connect All apps before the next one.")
+          ? plan({ type: "set_routing", mode: "balanced", targets: targets.map(a => a.id) }, "Your prepared servers can share the observed spike. Connect All servers before the next one.")
           : targets.some(a => a.capacity < allocation[a.id]) && targets.length < T.maximum
           ? plan({ type: "add_server" }, "Serving more of the observed spike needs application capacity. You can add a server, prepare it, then connect it.") : null;
         if (advice) return advice;

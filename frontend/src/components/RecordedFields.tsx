@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { serverName } from "@/sim";
 
 type Value = unknown;
 const dollars = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
@@ -25,11 +26,11 @@ function format(key: string, value: Value): string {
     if (/^[[{]/.test(value)) {
       try { return format(key, JSON.parse(value) as Value); } catch { /* Not JSON after all: show it as text. */ }
     }
-    return value.replace(/^app-(\d+)$/, "App $1").replaceAll("-", " ");
+    return value.replace(/^app-(\d+)$/, "Server $1").replaceAll("-", " ");
   }
   if (!Array.isArray(value) && typeof value === "object" && Array.isArray((value as { targets?: unknown }).targets)) {
     const r = value as { mode?: string; targets: string[] };
-    return `${r.targets.map(t => t.replace("app-", "App ")).join(", ")}${r.mode ? ` (${r.mode})` : ""}`;
+    return `${r.targets.map(serverName).join(", ")}${r.mode ? ` (${r.mode})` : ""}`;
   }
   if (Array.isArray(value)) return value.every(v => typeof v !== "object" || v === null) ? value.map(v => format(key, v)).join(", ") || "none" : `${value.length} recorded ${value.length === 1 ? "entry" : "entries"}`;
   return "recorded";

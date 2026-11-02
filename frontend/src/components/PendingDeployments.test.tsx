@@ -25,14 +25,14 @@ function show(game: GameState) {
 it("lists each scheduled deployment with its remaining game seconds", () => {
   show(pendingGame(30));
   const box = screen.getByRole("complementary", { name: "Pending deployments" });
-  expect(box.textContent).toContain("Add server (App 2)");
+  expect(box.textContent).toContain("Add server (Server 2)");
   expect(box.textContent).toContain("in 30 s");
   expect(screen.getByRole("button", { name: /Deploy now/ })).toBeTruthy();
 });
 
 it("fills each deployment's progress bar as its activation delay elapses", () => {
   show(pendingGame(10, dataCompany()));
-  const name = { name: "Add server (App 2) deployment" };
+  const name = { name: "Add server (Server 2) deployment" };
   const bar = screen.getByRole("progressbar", name);
   expect(bar.getAttribute("aria-valuenow")).toBe("0");
   expect(bar.getAttribute("aria-valuetext")).toBe("in 10 s");

@@ -329,14 +329,14 @@ test("action guidance reaches the routing checkboxes without applying them autom
     await expect(gold(page)).toHaveAttribute(attribute,value);
     await gold(page).click();
   }
-  await expect(gold(page)).toHaveAccessibleName(/^App \d+$/);
+  await expect(gold(page)).toHaveAccessibleName(/^Server \d+$/);
   await expect(gold(page)).toHaveCount(1); await expect(gold(page)).toBeInViewport({ratio:1});
   expect((await savedGame(page)).campaign!.routing.targets).toEqual(["app-1"]);
   await gold(page).click();
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="routing")).toBe(true);
 });
 
-test("action guidance selects the overloaded App 3 before its exact scaling control", async ({page,installClock,withoutRoom}) => {
+test("action guidance selects the overloaded Server 3 before its exact scaling control", async ({page,installClock,withoutRoom}) => {
   await withoutRoom();
   await installClock();
   let game=tick(act(spikeCompany(false),{type:"add_server"}),2);
@@ -348,8 +348,8 @@ test("action guidance selects the overloaded App 3 before its exact scaling cont
   await card.getByRole("button",{name:"Got it", exact:true}).click();
   await expect(gold(page)).toHaveAccessibleName("App Server"); await gold(page).click();
   await expect(gold(page)).toHaveAccessibleName("Server management");await gold(page).click();
-  await expect(gold(page)).toHaveAccessibleName(/^App 3:/); await gold(page).click();
-  await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Scale up App 3/); await expect(gold(page)).toBeInViewport({ratio:1});
+  await expect(gold(page)).toHaveAccessibleName(/^Server 3:/); await gold(page).click();
+  await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Scale up Server 3/); await expect(gold(page)).toBeInViewport({ratio:1});
   await gold(page).click(); await expect(gold(page)).toHaveAccessibleName("Confirm");
   await gold(page).click(); await expect(gold(page)).toHaveCount(0);
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="scale-up" && a.targetId==="app-3")).toBe(true);
@@ -388,7 +388,7 @@ test("action guidance restoration confirms the existing free action",async ({pag
   await closeInspection(page); await page.getByRole("button",{name:"Hint",exact:true}).click();
   const card=page.getByRole("dialog",{name:"Hint",exact:true});
   await card.getByRole("button",{name:"Got it", exact:true}).click();
-  await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Restore App/); await expect(gold(page)).toBeInViewport({ratio:1});
+  await followHintComponent(page); await expect(gold(page)).toHaveAccessibleName(/^Restore Server/); await expect(gold(page)).toBeInViewport({ratio:1});
   await gold(page).click();await expect(gold(page)).toHaveAccessibleName("Confirm");
   await gold(page).click();await expect(gold(page)).toHaveCount(0);
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="restore-app")).toBe(true);

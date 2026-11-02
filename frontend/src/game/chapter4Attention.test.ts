@@ -59,7 +59,7 @@ it("narrates the controller's own queued work instead of a generic activation", 
   controller.campaign!.pending.push({ id: "work-1", type: "add-app", requestedStep: d.enteredStep, activationStep: d.enteredStep + 10, costCents: 0, activatedStep: null, source: "autoscaler", targetId: "app-3" });
   const advice = campaignAttention(controller);
   expect(advice).toMatchObject({ attention: "run", reason: "activation-add-app" });
-  expect(advice.message).toContain("Autoscaling is installing App 3");
+  expect(advice.message).toContain("Autoscaling is installing Server 3");
 });
 
 it("narrates what the controller did until the player inspects Server management", () => {
@@ -70,7 +70,7 @@ it("narrates what the controller did until the player inspects Server management
   c.trace.push({ id: lastId + 1, step: c.step, type: "autoscale-scale-out-decided", data: { targetId: "app-3" } });
   const advice = campaignAttention(acted);
   expect(advice).toMatchObject({ attention: "hint", reason: "spike-autoscale-acted", target: "app" });
-  expect(advice.message).toContain("Autoscaling provisioned App 3");
+  expect(advice.message).toContain("Autoscaling provisioned Server 3");
   // Once Server management has been inspected since the act, guidance returns to the chapter.
   acted.campaign!.trace.push({ id: lastId + 2, step: acted.campaign!.step, type: "inspection", data: { component: "app" } });
   expect(campaignAttention(acted)).toMatchObject({ attention: "run", reason: "spike-stability" });

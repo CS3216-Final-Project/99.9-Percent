@@ -8,7 +8,7 @@ The desktop edition's code paths and rendering are unchanged by it.
 
 - Guided Mode: Chapter 0 (walkthrough), Opening, and Scaling & Routing.
 - Challenge Mode (Classic): the full 26-week game, unlocked once the phone's Guided Mode is complete.
-- Menu: run card, Resume, the few run controls a mode needs (How to play, Exit, Tutorial, New game), the mode switch, and the Sound and Graphics tabs.
+- Menu: run card, Resume, the few run controls a mode needs (How to play, Exit, Tutorial, New game), the mode switch, the Info tab (the AWS reference), and the Sound and Graphics tabs.
 - Home screen: a one-line note under the tagline that the full experience is on a laptop, the two mode cards and the anonymous analytics notice (OK / Opt out).
 - Not on a phone: Account, sign-in and cloud saves, the Saves tab and save import/export, the avatar picker, the Playtest tab, Give feedback and observer notes, Save now (autosave still runs).
 
@@ -56,7 +56,7 @@ Replace a region's body without touching the others.
 | --- | --- | --- | --- |
 | Top strip | `regions/PhoneTopStrip.tsx`, `layout/PhoneChapterRow.tsx` | One row: logo (from 400 px), Cash, App Health or Health, Users and revenue behind one tap, sound, Menu; Guided Mode's one-line chapter row | Layout |
 | Room | `PhoneGameLayout.tsx` (`main.stage` with `Room`) | Shared 3D room, filling the space between the top strip and the dock at a fixed size | Shared; layout sizing by Layout |
-| Sheet | `regions/PhoneSheet.tsx`, `layout/sheetState.ts` | Bottom sheet over the room (peek, half, full) holding `CampaignPanel`, or `SidePanel` and `OperationsRail`; Challenge Mode's `ClassicViewSheet` | Layout |
+| Sheet | `regions/PhoneSheet.tsx`, `layout/sheetState.ts` | Bottom sheet over the room (peek, half, full) holding `CampaignPanel`, or `SidePanel`; Challenge Mode's `ClassicViewSheet` | Layout |
 | Dock | `regions/PhoneDock.tsx` | One row: views (or a Views menu), Navigation, clock, speed menu (with +1s and +5s in Guided Mode), Run/Pause or Next week | Layout |
 | Coach | `regions/PhoneCoach.tsx`, `tutorial/` | One fixed-size coach strip below the top strip for every guide: Launch Week's spotlight steps, chapter guides and tips | Tutorial |
 | Overlays | `PhoneOverlays.tsx`, `PhoneHome.tsx`, `PhoneMenu.tsx`, `PhoneCampaignComplete.tsx` | Phone home, menu, completion; shared dialogs | Foundation (this seam) |

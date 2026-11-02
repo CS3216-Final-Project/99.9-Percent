@@ -22,7 +22,7 @@ it("shows live provisioning, counters, delayed routing and per-instance shared s
  fireEvent.click(screen.getByRole("button",{name:"App Server"}));
  fireEvent.click(screen.getByRole("button",{name:"Server management"}));fireEvent.click(screen.getByRole("button",{name:"Autoscaling"}));expect(screen.getByRole("region",{name:"Autoscaling"}).textContent).toContain("3 game seconds, followed by 1 routing game second");
  fireEvent.click(screen.getByRole("button",{name:"Back to Server management"}));expect(document.querySelector(".inspection-warning")?.textContent).toContain("installed capacity does not receive traffic");
- fireEvent.click(within(screen.getByRole("region",{name:"Application instances"})).getByRole("button",{name:/App 3:/}));expect(useGame.getState().selectedAppId).toBe("app-3");
+ fireEvent.click(within(screen.getByRole("region",{name:"Application instances"})).getByRole("button",{name:/Server 3:/}));expect(useGame.getState().selectedAppId).toBe("app-3");
  expect(screen.getAllByRole("status").some(x=>x.textContent?.includes("Routing change: activates in 1"))).toBe(true);
 });
 it("pending recognition stays visible after saved-state presentation and acknowledgement",()=>{

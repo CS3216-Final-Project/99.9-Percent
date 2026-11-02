@@ -1,5 +1,5 @@
 import { introductionActive } from "@/sim/introduction";
-import { equipmentInfo } from "@/sim";
+import { equipmentInfo, serverName } from "@/sim";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { inspectInRoom, opensComponentDialog, useGame } from "@/game/store";
 import { Icon } from "./icons";
@@ -49,14 +49,13 @@ export default function InspectionReveal() {
               <Icon name={state.icon} size={12} />
               {state.word}
             </span>
-            {inspection.appId && <span className="inspection-instance">App {inspection.appId.slice(4)}</span>}
+            {inspection.appId && <span className="inspection-instance">{serverName(inspection.appId)}</span>}
           </p>
           <p className="muted">{info.summary}</p>
           <p>{investigating ? "Evidence arrives here when the timed investigation completes; the inspector below tracks it." : info.about}</p>
         </div>
       </div>
       <div className="modal-foot">
-        <span className="muted">The inspector keeps the details.</span>
         <button type="button" className="btn btn-primary" onClick={dismiss}>
           Return to room
         </button>
@@ -205,7 +204,7 @@ function ComponentInspection() {
         </span>
         <span className="inspection-disc-badge"><Icon name={lens} size={16}/></span>
       </button>
-      <p className="inspection-status"><span className={`state state-${stateKey}`}><Icon name={state.icon} size={12}/>{word}</span>{server&&<span>App {selected.id.slice(4)}</span>}</p>
+      <p className="inspection-status"><span className={`state state-${stateKey}`}><Icon name={state.icon} size={12}/>{word}</span>{server&&<span>{serverName(selected.id)}</span>}</p>
       <p className="component-inspection-metric">{metric}</p>
       {component&&component.capacity>0&&<Meter value={component.demand/component.capacity} tone={state.tone==="muted"?"accent":state.tone} label={`${place==="db"?"Database":"Server"} load`}/>}
       <p>{description}</p>
@@ -213,8 +212,8 @@ function ComponentInspection() {
   const detailsArea=(content:ReactNode)=>details&&<div id="inspection-details" className="inspection-details">{content}</div>;
   const failedApps=c.apps.filter(a=>a.health==="failed"),unrouted=c.apps.filter(a=>!routes.includes(a.id)&&a.role!=="spare"&&a.health!=="failed");
   const overloaded=m.instances?.filter(a=>a.routed&&a.demand>a.capacity);
-  const warning=failedApps.length?`${failedApps.map(a=>`App ${a.id.slice(4)}`).join(", ")} failed. Check surviving capacity and recovery options.`
-    :unrouted.length?`${unrouted.map(a=>`App ${a.id.slice(4)}`).join(", ")}: installed capacity does not receive traffic until Network routing includes ${unrouted.length===1?"this app":"these apps"}.`
+  const warning=failedApps.length?`${failedApps.map(a=>serverName(a.id)).join(", ")} failed. Check surviving capacity and recovery options.`
+    :unrouted.length?`${unrouted.map(a=>serverName(a.id)).join(", ")}: installed capacity does not receive traffic until Network routing includes ${unrouted.length===1?"this server":"these servers"}.`
     :overloaded?.length?"A routed server is overloaded. Inspect its demand and available capacity.":null;
   return <Modal title={title} icon={{kind:state.tone,name:EQUIPMENT_ICON[place]}} onClose={confirming?undefined:dismiss} className={`component-inspection component-inspection-${place}`}>
     <div className="inspection-subview" data-inspection-view={page} ref={subview} tabIndex={-1}>
@@ -222,12 +221,12 @@ function ComponentInspection() {
     {appManagement?<>
       <h3 className="inspection-management-heading"><Icon name="server" size={20}/>Server management</h3>
       <dl className="inspection-fleet-summary" aria-label="Server counts"><Row label="Installed" value={c.apps.length}/><Row label="Healthy" value={c.apps.filter(a=>a.health!=="failed").length}/><Row label="Currently routed" value={routes.length}/></dl>
-      <section aria-label="Application instances" className="inspection-server-cards">{c.apps.map(a=><button type="button" key={a.id} data-guidance-app={a.id} className="inspection-server-card" data-health={a.health??"healthy"} aria-pressed={selectedAppId===a.id} aria-label={`App ${a.id.slice(4)}: ${a.health??"healthy"}; ${routes.includes(a.id)?"Receiving traffic":"Installed - not receiving traffic"}`} onClick={()=>inspectInRoom("app",a.id)}><strong><Icon name="server" size={16}/>App {a.id.slice(4)}</strong><span className="inspection-server-health">{a.health??"healthy"}</span><span className="inspection-server-route" data-routed={routes.includes(a.id)}>{a.role==="spare"?"Standby spare":routes.includes(a.id)?"Receiving traffic":"Not receiving traffic"}</span></button>)}</section>
+      <section aria-label="Application instances" className="inspection-server-cards">{c.apps.map(a=><button type="button" key={a.id} data-guidance-app={a.id} className="inspection-server-card" data-health={a.health??"healthy"} aria-pressed={selectedAppId===a.id} aria-label={`${serverName(a.id)}: ${a.health??"healthy"}; ${routes.includes(a.id)?"Receiving traffic":"Installed - not receiving traffic"}`} onClick={()=>inspectInRoom("app",a.id)}><strong><Icon name="server" size={16}/>{serverName(a.id)}</strong><span className="inspection-server-health">{a.health??"healthy"}</span><span className="inspection-server-route" data-routed={routes.includes(a.id)}>{a.role==="spare"?"Standby spare":routes.includes(a.id)?"Receiving traffic":"Not receiving traffic"}</span></button>)}</section>
       {warning&&<p role="note" className="inspection-warning">{warning}</p>}
       <div className="component-inspection-controls">{c.spikeStage?entry("autoscaling","Autoscaling"):<p className="inspection-autoscaling-info"><Icon name="info" size={16}/><span>Autoscaling becomes available in Traffic Spikes.</span></p>}</div>
       {technical()}
     </>:server?<>
-      <h3 tabIndex={-1}>App {selected.id.slice(4)}</h3>{summary}
+      <h3 tabIndex={-1}>{serverName(selected.id)}</h3>{summary}
       <dl className="rows"><Row label="Installed capacity" value={`${num(selected.capacity)} requests/s`}/><Row label="Current demand" value={instance?`${num(instance.demand)} requests/s`:"Not yet observed"}/><Row label="Routing" value={routes.includes(selected.id)?"Receiving traffic":selected.role==="spare"?"Standby spare":"Not receiving traffic"}/></dl>
       {controls("server")}{detailsArea(reading(selected.id))}
     </>:place==="app"&&page==="autoscaling"?<>

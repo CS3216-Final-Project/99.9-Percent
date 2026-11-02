@@ -2132,6 +2132,31 @@ button:disabled {
   margin-bottom: 8px;
 }
 
+/* Where the browser can tween to an auto height, More's contents slide open and closed instead of snapping. */
+@supports (interpolate-size: allow-keywords) {
+  .more {
+    interpolate-size: allow-keywords;
+  }
+
+  .more::details-content {
+    height: 0;
+    overflow: clip;
+    opacity: 0;
+    transition: height 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease-out, content-visibility 0.24s allow-discrete;
+  }
+
+  .more[open]::details-content {
+    height: auto;
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .more::details-content {
+      transition: none;
+    }
+  }
+}
+
 .rows {
   margin: 6px 0;
   display: grid;
@@ -2333,6 +2358,26 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.task-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-progress .meter {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-pct {
+  flex: none;
+  min-width: 4ch;
+  text-align: right;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .task-top .muted {
@@ -2646,7 +2691,7 @@ button:disabled {
 .tree-map {
   flex: none;
   width: 100%;
-  /* Narrow enough that all nine nodes fit beside the detail panel next to Classic's Operations rail. */
+  /* Narrow enough that all nine nodes fit beside the detail panel. */
   min-width: 760px;
   max-width: 2200px;
   margin: auto;
@@ -3670,6 +3715,11 @@ button:disabled {
 
 .inspection-reveal.modal {
   animation: inspection-pop 0.28s ease-out;
+}
+
+/* Return to room is the footer's only control, so it keeps the right edge. */
+.inspection-reveal .modal-foot {
+  justify-content: flex-end;
 }
 
 @keyframes inspection-pop {
@@ -5098,11 +5148,6 @@ button:disabled {
     min-width: 0;
     padding: 8px 14px;
     font-size: var(--text-lg);
-  }
-  .sheet {
-    position: fixed;
-    inset: 0;
-    z-index: 90;
   }
   .tree,
   .eng {

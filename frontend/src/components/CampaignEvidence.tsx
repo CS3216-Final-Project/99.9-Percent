@@ -5,6 +5,7 @@ import { Icon, type IconName } from "./icons";
 import { ratioOf, utilTone } from "./presentation";
 import { tipProps } from "./tips";
 import { Meter } from "./ui";
+import { serverName } from "@/sim";
 
 /*
  * Guided Mode's inspected evidence as short icon rows and load bars: the same authoritative snapshot values the
@@ -13,7 +14,6 @@ import { Meter } from "./ui";
 
 export type RowTone = "ok" | "warn" | "critical" | "muted";
 
-const appName = (id: string) => `App ${id.slice(4)}`;
 
 export function EvidenceRow({ icon, label, value, tone }: { icon: IconName; label: string; value: ReactNode; tone?: RowTone }) {
   return <div className="evidence-row" data-tone={tone}><dt><Icon name={icon} size={14} />{label}</dt><dd>{value}</dd></div>;
@@ -34,16 +34,16 @@ export function ApplicationInstances({ campaign: c, recipients, selectedAppId, o
   return <section aria-label="Application instances">
     <dl className="evidence-rows">
       <EvidenceRow icon="shuffle" label="Load balancer" value={c.loadBalancer ? "Deployed" : "Not deployed"} tone={c.loadBalancer ? "ok" : "muted"} />
-      <EvidenceRow icon="incoming" label="Receiving new traffic" value={recipients.map(appName).join(", ") || "None"} tone={recipients.length ? undefined : "warn"} />
+      <EvidenceRow icon="incoming" label="Receiving new traffic" value={recipients.map(serverName).join(", ") || "None"} tone={recipients.length ? undefined : "warn"} />
     </dl>
     <div className="instance-cards">{c.apps.map(a => {
       const x = m.instances?.find(i => i.id === a.id), receiving = recipients.includes(a.id), pressed = selectedAppId === a.id;
       const status = receiving ? "Receiving traffic" : "Installed - not receiving traffic";
       const tone = x ? utilTone(ratioOf(x.demand, x.capacity)) : "ok";
       return <button type="button" key={a.id} data-guidance-app={a.id} className={`instance-card${pressed ? " is-selected" : ""}`} aria-pressed={pressed}
-        aria-label={`${appName(a.id)}: ${status}${x ? `. ${x.demand} of ${x.capacity} req/s, processed ${x.processed}, backlog ${x.backlog}` : ""}`}
+        aria-label={`${serverName(a.id)}: ${status}${x ? `. ${x.demand} of ${x.capacity} req/s, processed ${x.processed}, backlog ${x.backlog}` : ""}`}
         {...tipProps(`Capacity ${a.capacity} req/s; backlog ${a.backlog}. ${status}`)} onClick={() => onSelect(a.id)}>
-        <span className="instance-head"><Icon name="server" size={14} /><strong>{appName(a.id)}</strong>
+        <span className="instance-head"><Icon name="server" size={14} /><strong>{serverName(a.id)}</strong>
           <span className="instance-status" data-receiving={receiving}><span className="instance-dot" />{receiving ? "Receiving" : "Not receiving"}</span></span>
         {x ? <>
           <span className="instance-bar" data-tone={tone}><span style={{ width: `${Math.min(1, ratioOf(x.demand, x.capacity)) * 100}%` }} /></span>
@@ -51,7 +51,7 @@ export function ApplicationInstances({ campaign: c, recipients, selectedAppId, o
         </> : <span className="instance-figures"><span>capacity <b>{num(a.capacity)}</b> req/s</span><span>backlog <b>{num(a.backlog)}</b></span></span>}
       </button>;
     })}</div>
-    {inspection ? unrouted.length>0&&<p role="note" className="evidence-note" aria-label={`${unrouted.map(a=>appName(a.id)).join(", ")} routing status`}>{unrouted.map(a=>appName(a.id)).join(", ")}: installed capacity does not receive traffic until Network routing includes {unrouted.length===1?"this app":"these apps"}.</p>
-      : unrouted.map(a => <p role="note" className="evidence-note" aria-label={`${appName(a.id)} routing status`} key={a.id}>Installed capacity does not receive traffic until routing includes this app.</p>)}
+    {inspection ? unrouted.length>0&&<p role="note" className="evidence-note" aria-label={`${unrouted.map(a=>serverName(a.id)).join(", ")} routing status`}>{unrouted.map(a=>serverName(a.id)).join(", ")}: installed capacity does not receive traffic until Network routing includes {unrouted.length===1?"this server":"these servers"}.</p>
+      : unrouted.map(a => <p role="note" className="evidence-note" aria-label={`${serverName(a.id)} routing status`} key={a.id}>Installed capacity does not receive traffic until routing includes this server.</p>)}
   </section>;
 }

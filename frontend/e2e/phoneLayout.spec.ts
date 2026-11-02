@@ -265,7 +265,7 @@ for (const mode of ["Guided", "Challenge"] as const) {
   });
 }
 
-test("Challenge Mode: equipment and weekly operations share the sheet, and the views open between the strip and the dock", async ({ page, withoutRoom }) => {
+test("Challenge Mode: equipment fills the sheet, and the views open between the strip and the dock", async ({ page, withoutRoom }) => {
   await withoutRoom();
   await openChallenge(page, { width: 360, height: 640 });
   await expect(sheet(page)).toHaveAttribute("data-state", "peek");
@@ -273,7 +273,7 @@ test("Challenge Mode: equipment and weekly operations share the sheet, and the v
   await handle(page).tap();
   await expect(sheet(page)).toHaveAttribute("data-state", "half");
   await expect(page.getByRole("complementary", { name: "Details" })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "Operations" })).toBeAttached();
+  await expect(page.getByRole("complementary", { name: "Operations" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Next week", exact: true })).toBeInViewport({ ratio: 1 });
 
   // Tech, Team and History fold into Views where they do not fit beside the time controls.
@@ -284,7 +284,10 @@ test("Challenge Mode: equipment and weekly operations share the sheet, and the v
   await expect(tree).toBeVisible();
   const view = await box(tree);
   expect(view.x).toBe(0);
-  expect(view.y).toBe(0);
+  // The top strip stays above the view, so cash and settings remain in reach.
+  const strip = await box(page.locator(".phone-top"));
+  await expect(page.locator(".phone-top")).toBeVisible();
+  expect(view.y).toBeCloseTo(strip.y + strip.height, 0);
   expect(view.width).toBe(page.viewportSize()!.width);
   expect(view.y + view.height).toBeCloseTo((await box(dock(page))).y, 0);
   await tree.getByRole("button", { name: "Back to room", exact: true }).tap();

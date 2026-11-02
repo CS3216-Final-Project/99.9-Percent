@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
-import { BALANCE, releaseRisk, taskEta, testEffort, type GameState, type Release, type Task } from "@/sim";
+import { maxTaskStaff, releaseRisk, taskEta, taskPercent, testEffort, type GameState, type Release, type Task } from "@/sim";
 import { moneyFull, pct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
@@ -112,6 +112,19 @@ export function Meter({ value, tone = "accent", label }: { value: number; tone?:
   return (
     <div className={`meter tone-${tone}`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v * 100)} aria-label={label}>
       <div className="meter-fill" style={{ width: `${v * 100}%` }} />
+    </div>
+  );
+}
+
+/**
+ * How far an engineering task has got. The bar and percentage show the work done; the weeks left beside it say when
+ * it finishes at the current staffing.
+ */
+export function TaskProgress({ task, stalled }: { task: Pick<Task, "title" | "progress" | "effort">; stalled: boolean }) {
+  return (
+    <div className="task-progress">
+      <Meter value={task.progress / task.effort} label={`${task.title} progress`} tone={stalled ? "warn" : "accent"} />
+      <span className="task-pct" aria-hidden="true">{taskPercent(task)}%</span>
     </div>
   );
 }
@@ -228,13 +241,13 @@ export function TaskRow({ game, task }: { game: GameState; task: Task }) {
           </button>
         )}
       </div>
-      <Meter value={task.progress / task.effort} label={`${task.title} progress`} tone={eta === null ? "warn" : "accent"} />
+      <TaskProgress task={task} stalled={eta === null} />
       <div className="task-bottom">
         <span className={eta === null ? "text-warn" : "muted"}>
           <Icon name={eta === null ? "alert" : "latency"} size={12} />
           {eta === null ? "No engineers" : `${eta} wk left`}
         </span>
-        <div className="stepper" role="group" aria-label={`Engineers on ${task.title}`} {...tipProps(`Up to ${BALANCE.engineer.maxPerTask} engineers. More finish sooner.`)}>
+        <div className="stepper" role="group" aria-label={`Engineers on ${task.title}`} {...tipProps(task.assigned >= maxTaskStaff(task) ? `At most ${maxTaskStaff(task)}: one engineer per week of work.` : "More engineers finish sooner.")}>
           <button type="button" disabled={locked || task.assigned <= 0} onClick={() => act({ type: "assign_engineers", taskId: task.id, count: task.assigned - 1 })} aria-label="Remove an engineer">
             −
           </button>
@@ -244,7 +257,7 @@ export function TaskRow({ game, task }: { game: GameState; task: Task }) {
           </span>
           <button
             type="button"
-            disabled={locked || task.assigned >= BALANCE.engineer.maxPerTask}
+            disabled={locked || task.assigned >= maxTaskStaff(task)}
             onClick={() => act({ type: "assign_engineers", taskId: task.id, count: task.assigned + 1 })}
             aria-label="Add an engineer"
           >
@@ -305,15 +318,22 @@ export function ReleaseRow({ game, release }: { game: GameState; release: Releas
           >
             <Icon name="ship" />
             <span className="act-label">Deploy</span>
-            <span className={`price risk-${tone}`}>{pct(risk)} risk</span>
+            <span className="act-meta">
+              <span className={`price risk risk-${tone}`}>
+                <Icon name={tone === "ok" ? "check" : "alert"} size={12} />
+                {pct(risk)} risk
+              </span>
+            </span>
           </button>
           {!release.tested && (
             <button type="button" className="act" disabled={locked} onClick={() => act({ type: "test_release", releaseId: release.id })} {...tipProps("Engineers test it before it ships.")}>
               <Icon name="test" />
               <span className="act-label">Test first</span>
-              <span className="price">
-                <Icon name="latency" size={12} />
-                {weeks} wk
+              <span className="act-meta">
+                <span className="price">
+                  <Icon name="latency" size={12} />
+                  {weeks} wk
+                </span>
               </span>
             </button>
           )}

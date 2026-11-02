@@ -39,11 +39,11 @@ test("spikes: explicit continuation, delayed autoscaling, retirement and reload 
  const n=(await savedGame(page)).campaign!.spikeStage!.enteredStep;
  await advanceCampaignStep(page,{seconds:9, resumeClock:false});
  expect((await savedGame(page)).campaign!.spikeStage!.controller!.highSteps).toBe(2);
- await clockTo(page,n+10);await expect(page.getByRole("status").filter({hasText:"Add server (App 3)"})).toContainText("activates in 3 game second(s)");
+ await clockTo(page,n+10);await expect(page.getByRole("status").filter({hasText:"Add server (Server 3)"})).toContainText("activates in 3 game second(s)");
  await clockTo(page,n+13);let c=(await savedGame(page)).campaign!;expect(c.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(c.snapshot.app.capacity).toBe(3200);
  // Paint the new room label while the company stays paused.
  await page.clock.runFor(1000);
- await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await expect(page.getByRole("dialog",{name:"App Servers"})).toContainText("Not receiving traffic");
+ await page.getByRole("main").getByRole("button",{name:"Server 3",exact:true}).click();await expect(page.getByRole("dialog",{name:"App Servers"})).toContainText("Not receiving traffic");
  const app3Reveal=page.getByRole("dialog",{name:"App Servers"});await expect(app3Reveal).toBeVisible();await app3Reveal.getByRole("button",{name:"Close"}).click();
  await page.screenshot({path:"test-results/phase5-desktop.png",fullPage:true});
  c=(await savedGame(page)).campaign!;
@@ -68,7 +68,7 @@ test("spikes: manual planning installs, scales and routes capacity through room 
  await (await infrastructureAction(page,/Add server/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:2,resumeClock:false});
  // Render the installed rack while physical game time stays paused.
  await page.clock.runFor(1000);
- await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();const scaleReveal=page.getByRole("dialog",{name:"App Servers"});await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Close"}).click();await (await infrastructureAction(page,/Scale up App 3/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3,resumeClock:false});
+ await page.getByRole("main").getByRole("button",{name:"Server 3",exact:true}).click();const scaleReveal=page.getByRole("dialog",{name:"App Servers"});await expect(scaleReveal).toBeVisible();await scaleReveal.getByRole("button",{name:"Close"}).click();await (await infrastructureAction(page,/Scale up Server 3/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();await advanceCampaignStep(page,{seconds:3,resumeClock:false});
  await routeAllApps(page,undefined,()=>advanceCampaignStep(page,{resumeClock:false}));
  const c=(await savedGame(page)).campaign!,expected=manualSpikePlan().campaign!;
  expect(c.step).toBe(n+6);
@@ -116,7 +116,7 @@ test("spikes: disabling keeps paid installation and allows an explicit manual ro
  await (await infrastructureAction(page,"Disable autoscaling")).click();
  await closeInspection(page);await runTo(page,before.step+3);
  const idle=(await savedGame(page)).campaign!;expect(idle.apps.find(a=>a.id==="app-3")!.routed).toBe(false);expect(idle.cashCents).toBe(before.cashCents);expect(idle.pending.some(a=>a.type==="routing")).toBe(false);
- await page.getByRole("main").getByRole("button",{name:"App 3",exact:true}).click();await expect(page.getByRole("dialog",{name:"App Servers"})).toContainText("Not receiving traffic");
+ await page.getByRole("main").getByRole("button",{name:"Server 3",exact:true}).click();await expect(page.getByRole("dialog",{name:"App Servers"})).toContainText("Not receiving traffic");
  const idleReveal=page.getByRole("dialog",{name:"App Servers"});await expect(idleReveal).toBeVisible();await idleReveal.getByRole("button",{name:"Close"}).click();
  await routeAllApps(page,undefined,async()=>{await runTo(page,(await savedGame(page)).campaign!.step+1)});
  const routed=(await savedGame(page)).campaign!;expect(routed.apps.find(a=>a.id==="app-3")!.routed).toBe(true);expect(routed.spikeStage!.controller!.enabled).toBe(false);expect(api.every(url=>new URL(url).pathname==="/api/session")).toBe(true);

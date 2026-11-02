@@ -22,14 +22,14 @@ it("exposes actual and detected health and surviving capacity",()=>{
  const readings=within(panel).getByRole("region",{name:"Servers readings"});
  expect(within(readings).getByText("Routed capacity").parentElement?.querySelector("dd")?.textContent).toBe("1,600 req/s");
  expect(within(readings).getByText("Spare capacity").parentElement?.querySelector("dd")?.textContent).toBe("1,600 req/s");
- expect(within(panel).getByRole("button",{name:"Restore App 2 · free · 3 game seconds"})).toBeTruthy();
+ expect(within(panel).getByRole("button",{name:"Restore Server 2 · free · 3 game seconds"})).toBeTruthy();
 });
 it("uses effective routing for labels and selects an inspected application",()=>{
  show(tick(act(preparedReliability(),{type:"arm_reliability"}),9));
  fireEvent.click(screen.getByRole("button",{name:"App Server"}));fireEvent.click(screen.getByRole("button",{name:"Server management"}));
  const instances=screen.getByRole("region",{name:"Application instances"});
- expect(within(instances).getByRole("button",{name:/App 2: failed; Installed - not receiving traffic/})).toBeTruthy();
- fireEvent.click(within(instances).getByRole("button",{name:/App 2: failed/}));
+ expect(within(instances).getByRole("button",{name:/Server 2: failed; Installed - not receiving traffic/})).toBeTruthy();
+ fireEvent.click(within(instances).getByRole("button",{name:/Server 2: failed/}));
  expect(useGame.getState().selectedAppId).toBe("app-2");expect(useGame.getState().selected).toBe("app");
 });
 it("disables failover deployment without a reserved spare and purchases that exhaust cash",()=>{
@@ -62,5 +62,5 @@ it("keeps the recorded reliability outcome available after acknowledgement",()=>
  cleanup();const acknowledged=useGame.getState().game;useGame.setState({view:"history"});show(acknowledged);
  fireEvent.click(screen.getByRole("tab",{name:/^Incidents/}));
  fireEvent.click(screen.getByRole("button",{name:/Stay Online outcome/}));
- expect(screen.getByRole("region",{name:"Historical reliability outcome"}).textContent).toContain("App 3");
+ expect(screen.getByRole("region",{name:"Historical reliability outcome"}).textContent).toContain("Server 3");
 });

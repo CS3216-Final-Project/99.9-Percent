@@ -88,12 +88,6 @@ const BASICS: Step[] = [
     enter: clear,
     done: (s) => s.game.turn > 1,
   },
-  {
-    title: "Follow this tip",
-    hint: () => "It always suggests a good next move.",
-    target: () => ".next-chip",
-    nextLabel: "Got it",
-  },
 ];
 
 const INCIDENT: Step[] = [

@@ -16,12 +16,12 @@ import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
 import { HomeScreen } from "./HomeScreen";
 import InspectionReveal from "./InspectionReveal";
+import MachineAlerts from "./MachineAlerts";
 import SidePanel from "./SidePanel";
 import TechTree from "./TechTree";
 import Tutorial from "./Tutorial";
 import { Callout, Meter, Stat } from "./ui";
 import { EngineersView, HistoryView } from "./Views";
-import OperationsRail from "./OperationsRail";
 import { ViewSheet, ViewTabs, type ViewTab } from "./ViewSheet";
 import { TimeMenu } from "./TimeMenu";
 import { AUTO_SECONDS, useAppClassName, useGameRuntime } from "./useGameRuntime";
@@ -225,11 +225,10 @@ export default function Game() {
   return (
     <RoomControlsHost><CampaignAttentionHost><div className={className}>
       {campaign ? <CampaignHeader /> : <TopBar />}
-      {started && !campaign && <OperationsRail />}
       <main className="stage">
         <Room />
       </main>
-      {campaign ? <>{started && <><CampaignPanel /><PendingDeployments /></>}<CampaignControls /><CampaignOverlays /></> : <><SidePanel /><ClassicViewSheet /><BottomBar /></>}
+      {campaign ? <>{started && <><CampaignPanel /><PendingDeployments /></>}<CampaignControls /><CampaignOverlays /></> : <><MachineAlerts /><SidePanel /><ClassicViewSheet /><BottomBar /></>}
       <ToastHost />
       {!campaign && !started && <HomeScreen />}
       {!campaign && started && view === "menu" && <Menu />}

@@ -57,6 +57,7 @@ import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
 import { MenuMap } from "./MenuMap";
+import { MenuReference } from "./MenuReference";
 import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { MenuActions, MenuRun, MenuTile } from "./MenuRun";
 import { useMenuExit } from "./MenuExit";
@@ -66,7 +67,7 @@ import { SoundSettings } from "./SoundSettings";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import type { Campaign, CampaignPostmortem, ScheduledAction, TraceEvent } from "@/sim/campaignTypes";
 import type { Action } from "@/sim";
-import { completedTechIds, TECH_ORDER, type EventKind, type EquipmentId } from "@/sim";
+import { completedTechIds, serverName, TECH_ORDER, type EventKind, type EquipmentId } from "@/sim";
 import { AnalyticsSettings } from "./AnalyticsSettings";
 import { FeedbackButton } from "./FeedbackButton";
 import { Icon } from "./icons";
@@ -86,7 +87,6 @@ const OFFICE_EVIDENCE = {
   deploy: { name: "Deploy", text: "Infrastructure changes activate after their listed delay." },
   growth: { name: "Growth", text: "Growth stages increase demand on the system." },
 } as const;
-const appName = (id: string) => `App ${id.slice(4)}`;
 function RequirementList({items}:{items:Requirement[]}) {
   return <ul className="progression-requirements">{items.map(r=><li key={r.id} data-requirement={r.id} data-met={r.met}><Icon name={r.met?"check":"close"} size={12} /> {r.label}</li>)}</ul>;
 }
@@ -201,10 +201,10 @@ export function CampaignPanel() {
       <LaunchResearch/>
       {unlocked&&!c.launchWeek&&!c.scaling?.consumed&&<p className="muted">{c.dbCapacity<P.dbCapacity&&!c.scalingConsent?"Next growth waits for a paid database upgrade to 2,000 ops/s.":c.incident||c.dbBacklog||c.apps.some(a=>a.backlog)?"Growth waits until the incident and backlogs clear.":c.scaling?.dueStep?`Growth due at game second ${c.scaling.dueStep} while ready.`:"Growth readiness is checked on the next game second."}</p>}
       {c.pending.map(a => <div className="working campaign-working" role="status" key={a.id}>
-        <span>{a.source==="autoscaler"?"Autoscaler: ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
+        <span>{a.source==="autoscaler"?"Autoscaler: ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${serverName(a.targetId)})`:""}: activates in {a.activationStep - c.step} game second(s)</span>
         <Meter value={(c.step - a.requestedStep) / (a.activationStep - a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`} />
       </div>)}
-      {c.apps.some(a=>!a.routed) && <p className="muted">{c.apps.filter(a=>!a.routed).map(a=>appName(a.id)).join(", ")}: Installed, not receiving traffic</p>}
+      {c.apps.some(a=>!a.routed) && <p className="muted">{c.apps.filter(a=>!a.routed).map(a=>serverName(a.id)).join(", ")}: Installed, not receiving traffic</p>}
       {c.limit!==null&&<Callout compact tone={m.rejected*5>m.incoming?"critical":"warn"} icon="network" kicker="Traffic limit active">{num(m.admitted)} admitted / {num(m.rejected)} turned away req/s. Turned-away requests earn no revenue and count against uptime. <strong>Infrastructure and salaries still cost the same.</strong></Callout>}
     </section>
   </EquipmentPanel>;
@@ -308,11 +308,11 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
       <section aria-label="Essential live status" className="mission-status">
         {financialRisk&&<Callout compact tone="warn" icon="cash" kicker={financialRisk.kind==="blocked"?"Capacity funding blocked":"Money at risk"}><span role="note">{financialRisk.message}</span></Callout>}
         {c.limit!==null&&<Callout compact tone="warn" icon="network" kicker="Traffic limit active">{num(m.admitted)} admitted / {num(m.rejected)} rejected req/s. Rejected requests earn no revenue; operating costs remain.</Callout>}
-        {fault?.startedStep!=null&&fault.restoredStep===null&&<p role="status"><span className="state state-critical"><Icon name="alert" size={12} />Incident</span> {appName(fault.targetId)} failed and is not restored. Service recovery and server restoration are separate requirements.</p>}
+        {fault?.startedStep!=null&&fault.restoredStep===null&&<p role="status"><span className="state state-critical"><Icon name="alert" size={12} />Incident</span> {serverName(fault.targetId)} failed and is not restored. Service recovery and server restoration are separate requirements.</p>}
         {showMetrics&&<dl className="rows"><Row label="Latency" value={`${m.latencyMs.toFixed(0)} ms`}/><Row label="Service errors" value={m.serviceErrorRate===null?"Not yet measured":`${(m.serviceErrorRate*100).toFixed(2)}%`}/><Row label="Queued requests" value={num(m.app.backlog+m.db.backlog)}/></dl>}
         {c.incident&&<IncidentRecovery campaign={c}/>}
         {c.pending.map(a=><div className="working campaign-working" role="status" key={a.id}>
-          <span>{a.source==="autoscaler"?"Autoscaler: ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${appName(a.targetId)})`:""}: activates in {a.activationStep-c.step} game second(s)</span>
+          <span>{a.source==="autoscaler"?"Autoscaler: ":""}{ACTION_NAMES[a.type]}{a.targetId?` (${serverName(a.targetId)})`:""}: activates in {a.activationStep-c.step} game second(s)</span>
           <Meter value={(c.step-a.requestedStep)/(a.activationStep-a.requestedStep)} label={`${ACTION_NAMES[a.type]} activation`}/>
         </div>)}
       </section>
@@ -373,7 +373,7 @@ export function CampaignEquipmentActions({equipment,actionView}:{equipment:Equip
       {c.reliabilityStage&&at("app","gateway","monitoring")&&(!actionView||actionView==="server"||actionView==="failover")&&<ReliabilityControls disabled={disabled} busy={installPending(c)} equipment={equipment} appId={actionView==="server"?selectedApp.id:undefined}/>}
       {unlocked && at("app","gateway") && (!actionView||["server","balancing","routing"].includes(actionView)) && <section aria-label="Scaling controls" className="scaling-controls">
         <ul className="actions">
-          {at("app")&&show("server")&&<li><Act icon={scaleLocked?"lock":"scaleUp"} label={`Scale up ${appName(selectedApp.id)}`} price={P.appCostCents/100} note={scaleLocked?"After load balancing":`${P.appDelay} game seconds`} disabled={disabled||busy||scaleLocked||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip={scaleLocked?"Locked until a load balancer shares traffic across two app servers. Launch Week teaches spreading load first.":"Increases only the selected application's capacity. Database capacity stays unchanged."} decision={{type:"scale_up",appId:selectedApp.id}} onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>}
+          {at("app")&&show("server")&&<li><Act icon={scaleLocked?"lock":"scaleUp"} label={`Scale up ${serverName(selectedApp.id)}`} price={P.appCostCents/100} note={scaleLocked?"After load balancing":`${P.appDelay} game seconds`} disabled={disabled||busy||scaleLocked||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip={scaleLocked?"Locked until a load balancer shares traffic across two app servers. Launch Week teaches spreading load first.":"Increases only the selected application's capacity. Database capacity stays unchanged."} decision={{type:"scale_up",appId:selectedApp.id}} onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>}
           {at("gateway")&&show("balancing")&&<li><Act icon="shuffle" label="Deploy load balancing" price={P.lbCostCents/100} note={`${P.lbDelay} game seconds`} disabled={disabled||busy||c.loadBalancer||c.cashCents<=P.lbCostCents} tip="Installs a load balancer. Traffic changes only after you explicitly configure routing." decision={{type:"deploy_load_balancer"}} onClick={()=>act({type:"deploy_load_balancer"})}/></li>}
         </ul>
         {at("gateway")&&show("routing")&&<><fieldset className="route-choice route-checks" disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Send traffic to · changes next game second</legend>
@@ -381,7 +381,7 @@ export function CampaignEquipmentActions({equipment,actionView}:{equipment:Equip
             const targets=(routed?c.routing.targets.filter(t=>t!==a.id):[...c.routing.targets,a.id]).sort((x,y)=>Number(x.split("-")[1])-Number(y.split("-")[1]));
             const decision:Action={type:"set_routing",mode:"balanced",targets};
             const advised=routingAdvice?.type==="set_routing"&&routingAdvice.mode==="balanced"&&routingAdvice.targets.includes(a.id)!==routed?routingAdvice:undefined;
-            return <button type="button" role="checkbox" aria-checked={routed} key={a.id} className="route-check" disabled={last} data-guidance-action={guidanceActionId(advised??decision)} onClick={()=>{if(!last)act(decision);}} {...tipProps(last?"At least one app must keep receiving traffic.":routed?`Stop sending traffic to ${appName(a.id)}.`:`Send traffic to ${appName(a.id)}.`)}><span className="route-box" aria-hidden="true"><Icon name="check" size={12}/></span>{appName(a.id)}</button>;})}
+            return <button type="button" role="checkbox" aria-checked={routed} key={a.id} className="route-check" disabled={last} data-guidance-action={guidanceActionId(advised??decision)} onClick={()=>{if(!last)act(decision);}} {...tipProps(last?"At least one server must keep receiving traffic.":routed?`Stop sending traffic to ${serverName(a.id)}.`:`Send traffic to ${serverName(a.id)}.`)}><span className="route-box" aria-hidden="true"><Icon name="check" size={12}/></span>{serverName(a.id)}</button>;})}
         </fieldset>
         <CampaignUnavailable action={{type:"set_routing",mode:"balanced",targets:routableApps(c).map(a=>a.id)}} disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")} />{!c.loadBalancer&&<p role="note">Deploy load balancing before configuring routing.</p>}{c.pending.some(a=>a.type==="routing"||a.type==="retire-app")&&<p role="note">A routing or retirement change is pending; wait for activation.</p>}</>}
       </section>}
@@ -414,7 +414,7 @@ function SpikeControls({disabled,busy}:{disabled:boolean;busy:boolean}) {
    <Meter value={(a?.lowSteps??0)/T.lowSteps} tone="ok" label="Low-utilization observations toward retirement"/>
    <p>Scale out above {T.high/100}% for {T.highSteps} game seconds. Empty controller apps may retire below {T.low/100}% for {T.lowSteps} safe game seconds; minimum {T.minimum}. Cooldown remaining: {Math.max(0,(a?.cooldownUntil??0)-c.step)} game seconds.</p>
    <Meter value={a?1-Math.max(0,a.cooldownUntil-c.step)/T.cooldown:1} tone="accent" label="Controller cooldown progress"/>
-   <p>Automatic provisioning takes {T.provisionDelay} game seconds, followed by {T.routingDelay} routing game second. {a?.joiningAppId?`Joining ${a.joiningAppId.replace("app-","App ")}; installed capacity may still be unrouted.`:"No automatic app awaiting routing."}</p>
+   <p>Automatic provisioning takes {T.provisionDelay} game seconds, followed by {T.routingDelay} routing game second. {a?.joiningAppId?`Joining ${serverName(a.joiningAppId)}; installed capacity may still be unrouted.`:"No automatic server awaiting routing."}</p>
    <p>Application automation cannot increase DB capacity, cache effectiveness or admitted traffic. Manual investments and traffic limiting remain available.</p>
   </details>
  </section>;
@@ -506,6 +506,7 @@ function CampaignMenu({ initialTab }: { initialTab: MenuTab }) {
         <ModeSwitch to="classic" />
       </>}
       {tab === "map" && <MenuMap />}
+      {tab === "info" && <MenuReference />}
       {tab === "sound" && <SoundSettings />}
       {tab === "graphics" && <GraphicsSettings />}
       {tab === "controls" && <ControlSettings />}
@@ -744,9 +745,9 @@ function ReliabilityOutcome({campaign:c}:{campaign:Campaign}) {
     <Callout compact tone="success" icon="health" kicker={completion?.data.limited?"Stable, with traffic limited":"Stable service"}>
       {completion?.data.incidentOccurred?"The failure opened an incident, and you reviewed its recovery.":"The test completed without opening an incident."} Service then stayed stable for five game seconds after the restore.
     </Callout>
-    <dl className="rows"><Row label="Application failure" value={`${appName(f.targetId)} · game second ${f.startedStep}`} />
+    <dl className="rows"><Row label="Application failure" value={`${serverName(f.targetId)} · game second ${f.startedStep}`} />
       <Row label="Failure detected" value={detection?`Game second ${detection.step} · ${detection.data.source==="probe"?"Health Checks":"manual inspection"}`:"Not detected before restoration"} />
-      <Row label="Spare promotion" value={promotion?`${appName(String(promotion.data.appId))} · game second ${promotion.step}`:"No automatic promotion"} />
+      <Row label="Spare promotion" value={promotion?`${serverName(String(promotion.data.appId))} · game second ${promotion.step}`:"No automatic promotion"} />
       <Row label="Restoration" value={`Game second ${f.restoredStep} · ${f.restoreSource==="manual"?"requested restore":"returned on its own"}`} />
       <Row label="Outcome recorded" value={`Game second ${d.completedStep}`} />
       <Row label="Company rejected requests at completion" value={num(Number(completion?.data.rejected??0))} />
@@ -793,16 +794,16 @@ function ReliabilityControls({disabled,busy,equipment,appId}:{disabled:boolean;b
       {at("gateway")&&d.failover&&<li><Act icon="switch" label={d.failover.enabled?"Disable failover":"Enable failover"} price={0} disabled={disabled} decision={{type:"set_failover",enabled:!d.failover!.enabled}} onClick={()=>act({type:"set_failover",enabled:!d.failover!.enabled})} /></li>}
     </ul>
     {at("app")&&appId&&c.apps.filter(a=>a.id===appId).map(a=><Fragment key={a.id}>
-      <span>{appName(a.id)} · {a.health??"healthy"} · detected {a.detectedHealth??"unknown"} · {a.role??"serving"} · {recipients.includes(a.id)?"receiving traffic":"not receiving traffic"}</span>
-      {a.health==="failed"&&<Act icon="health" label={`Restore ${appName(a.id)} · free · 3 game seconds`} price={0} note="3 game seconds" disabled={disabled||busy} tip="Restore this failed server for free. Restoration takes three game seconds; service recovery still needs healthy observations." decision={{type:"restore_app",appId:a.id}} onClick={()=>act({type:"restore_app",appId:a.id})}/>}
-      {!a.routed&&a.role!=="spare"&&<CampaignDecisionButton className="btn btn-small" disabled={disabled||busy||!d.owned.includes("standby")||!!d.spareId} decision={{type:"reserve_spare",appId:a.id}} onClick={()=>act({type:"reserve_spare",appId:a.id})}><Icon name="plug" size={16} />Reserve {appName(a.id)} as spare · 1 game second</CampaignDecisionButton>}
+      <span>{serverName(a.id)} · {a.health??"healthy"} · detected {a.detectedHealth??"unknown"} · {a.role??"serving"} · {recipients.includes(a.id)?"receiving traffic":"not receiving traffic"}</span>
+      {a.health==="failed"&&<Act icon="health" label={`Restore ${serverName(a.id)} · free · 3 game seconds`} price={0} note="3 game seconds" disabled={disabled||busy} tip="Restore this failed server for free. Restoration takes three game seconds; service recovery still needs healthy observations." decision={{type:"restore_app",appId:a.id}} onClick={()=>act({type:"restore_app",appId:a.id})}/>}
+      {!a.routed&&a.role!=="spare"&&<CampaignDecisionButton className="btn btn-small" disabled={disabled||busy||!d.owned.includes("standby")||!!d.spareId} decision={{type:"reserve_spare",appId:a.id}} onClick={()=>act({type:"reserve_spare",appId:a.id})}><Icon name="plug" size={16} />Reserve {serverName(a.id)} as spare · 1 game second</CampaignDecisionButton>}
       {a.role==="spare"&&<CampaignDecisionButton className="btn btn-small" disabled={disabled||busy} decision={{type:"release_spare"}} onClick={()=>act({type:"release_spare"})}><Icon name="switch" size={16} />Release spare · 1 game second</CampaignDecisionButton>}
     </Fragment>)}
     {at("app")&&!appId&&<div className="instance-choices">{c.apps.map(a=><div key={a.id} className="chip">
-      <span>{appName(a.id)} · {a.health??"healthy"} · detected {a.detectedHealth??"unknown"} · {a.role??"serving"} · {recipients.includes(a.id)?"receiving traffic":"not receiving traffic"}</span>
-      <button className="btn btn-small" disabled={disabled} onClick={()=>inspectInRoom("app",a.id)}>Inspect {appName(a.id)} health · free</button>
-      {a.health==="failed"&&<CampaignDecisionButton className="btn btn-small" disabled={disabled||busy} decision={{type:"restore_app",appId:a.id}} onClick={()=>act({type:"restore_app",appId:a.id})}><Icon name="health" size={16} />Restore {appName(a.id)} · free · 3 game seconds</CampaignDecisionButton>}
-      {!a.routed&&a.role!=="spare"&&<CampaignDecisionButton className="btn btn-small" disabled={disabled||busy||!d.owned.includes("standby")||!!d.spareId} decision={{type:"reserve_spare",appId:a.id}} onClick={()=>act({type:"reserve_spare",appId:a.id})}><Icon name="plug" size={16} />Reserve {appName(a.id)} as spare · 1 game second</CampaignDecisionButton>}
+      <span>{serverName(a.id)} · {a.health??"healthy"} · detected {a.detectedHealth??"unknown"} · {a.role??"serving"} · {recipients.includes(a.id)?"receiving traffic":"not receiving traffic"}</span>
+      <button className="btn btn-small" disabled={disabled} onClick={()=>inspectInRoom("app",a.id)}>Inspect {serverName(a.id)} health · free</button>
+      {a.health==="failed"&&<CampaignDecisionButton className="btn btn-small" disabled={disabled||busy} decision={{type:"restore_app",appId:a.id}} onClick={()=>act({type:"restore_app",appId:a.id})}><Icon name="health" size={16} />Restore {serverName(a.id)} · free · 3 game seconds</CampaignDecisionButton>}
+      {!a.routed&&a.role!=="spare"&&<CampaignDecisionButton className="btn btn-small" disabled={disabled||busy||!d.owned.includes("standby")||!!d.spareId} decision={{type:"reserve_spare",appId:a.id}} onClick={()=>act({type:"reserve_spare",appId:a.id})}><Icon name="plug" size={16} />Reserve {serverName(a.id)} as spare · 1 game second</CampaignDecisionButton>}
       {a.role==="spare"&&<CampaignDecisionButton className="btn btn-small" disabled={disabled||busy} decision={{type:"release_spare"}} onClick={()=>act({type:"release_spare"})}><Icon name="switch" size={16} />Release spare · 1 game second</CampaignDecisionButton>}
     </div>)}</div>}
 

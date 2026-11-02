@@ -91,8 +91,8 @@ it("keeps Monitoring research prerequisites discoverable without an invalid purc
 it("keeps App scaling and adding together and routing prerequisites with Network",()=>{
   show(dataCompany("read-heavy",false));open("App Server");
   expect(dialog("Servers").getByRole("button",{name:/Add server/})).toBeTruthy();
-  expect(dialog("Servers").queryByRole("button",{name:/Scale up App/})).toBeNull();open("Server management");fireEvent.click(document.querySelector<HTMLElement>('[data-guidance-app="app-1"]')!);
-  expect(dialog("Servers").getByRole("button",{name:/Scale up App/})).toBeTruthy();
+  expect(dialog("Servers").queryByRole("button",{name:/Scale up Server/})).toBeNull();open("Server management");fireEvent.click(document.querySelector<HTMLElement>('[data-guidance-app="app-1"]')!);
+  expect(dialog("Servers").getByRole("button",{name:/Scale up Server/})).toBeTruthy();
   fireEvent.click(dialog("Servers").getByRole("button",{name:"Close"}));open("Network");
   networkView("Load balancing");expect(dialog("Network").getByRole("button",{name:/Deploy load balancing/}).hasAttribute("disabled")).toBe(true);
   networkView("Routing");expect(dialog("Network").getByRole("group",{name:/Send traffic to/})).toBeTruthy();
@@ -201,14 +201,14 @@ it("describes a failed server's zero available capacity and shows that instance'
  fireEvent.click(dialog("Servers").getByRole("button",{name:"Inspect details"}));
  const evidence=screen.getByRole("region",{name:"Servers readings"}),instance=game.campaign!.snapshot.instances!.find(a=>a.id===id)!;
  expect(evidence.querySelectorAll(".evidence-rows dd")[0].textContent).toBe(`${instance.demand.toLocaleString("en-US")} requests/s`);
- expect(dialog("Servers").getByRole("button",{name:new RegExp(`^Restore App ${id.slice(4)}`)}).hasAttribute("disabled")).toBe(false);
+ expect(dialog("Servers").getByRole("button",{name:new RegExp(`^Restore Server ${id.slice(4)}`)}).hasAttribute("disabled")).toBe(false);
 });
 
 it("groups unrouted serving capacity into one warning instead of repeating it per server",()=>{
  const game=tick(decide(combinedCompany(),{type:"set_routing",mode:"single",targets:["app-1"]}));show(game);open("App Server");open("Server management");
  const notes=screen.getByRole("dialog",{name:"App Servers"}).querySelectorAll(".inspection-warning");
  expect(notes).toHaveLength(1);
- for(const app of game.campaign!.apps.filter(a=>!a.routed&&a.role!=="spare")) expect(notes[0].textContent).toContain(`App ${app.id.slice(4)}`);
+ for(const app of game.campaign!.apps.filter(a=>!a.routed&&a.role!=="spare")) expect(notes[0].textContent).toContain(`Server ${app.id.slice(4)}`);
 });
 
 it("transfers a specific server recommendation through instance selection before Scale up",async()=>{
@@ -217,7 +217,7 @@ it("transfers a specific server recommendation through instance selection before
  await accept();expect(gold()[0].textContent).toBe("App Server");fireEvent.click(gold()[0]);await act(async()=>{});
  expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toContain("Server management");fireEvent.click(gold()[0]);await act(async()=>{});
  expect(gold()).toHaveLength(1);expect(gold()[0].getAttribute("data-guidance-app")).toBe("app-3");
- fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()[0].textContent).toBe("Scale up App 3");
+ fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()[0].textContent).toBe("Scale up Server 3");
  fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("Confirm");
 });
 it("walks Chapter 6 routing through its checklist before pending Run",async()=>{
@@ -226,7 +226,7 @@ it("walks Chapter 6 routing through its checklist before pending Run",async()=>{
  expect(campaignAttention(game).action?.action).toEqual({type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]});show(game);
  await accept();expect(gold()[0].textContent).toBe("Network");fireEvent.click(gold()[0]);await act(async()=>{});
  expect(gold()[0].textContent).toContain("Network management");fireEvent.click(gold()[0]);await act(async()=>{});
- expect(gold()[0].getAttribute("role")).toBe("checkbox");expect(gold()[0].textContent).toBe("App 2");
+ expect(gold()[0].getAttribute("role")).toBe("checkbox");expect(gold()[0].textContent).toBe("Server 2");
  fireEvent.click(gold()[0]);await act(async()=>{});
  expect(screen.queryByRole("dialog",{name:"Network"})).toBeNull();
  expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1","app-2"]});

@@ -1,4 +1,5 @@
 import type { CampaignPostmortem, Snapshot, TraceEvent } from "@/sim/campaignTypes";
+import { serverName } from "@/sim";
 
 function increased(data: TraceEvent["data"], after: string, before: string) {
   const a = data[after], b = data[before];
@@ -79,7 +80,7 @@ export function incidentLesson(report: CampaignPostmortem) {
 export function incidentTitle(report: CampaignPostmortem) {
   const opening = report.snapshots.find(s => s.step === report.openedStep) ?? report.snapshots[0];
   const failed = opening?.instances?.find(a => a.health === "failed" && a.routed && a.demand > 0);
-  if (failed) return `${failed.id.replace("app-", "App ")} failed`;
+  if (failed) return `${serverName(failed.id)} failed`;
   if ((opening?.reliability?.failedDeliveries ?? 0) > 0) return "Server failure";
   const db = !!opening && opening.db.demand > opening.db.capacity;
   const app = !!opening && (opening.instances?.some(a => a.demand > a.capacity) || opening.app.demand > opening.app.capacity);

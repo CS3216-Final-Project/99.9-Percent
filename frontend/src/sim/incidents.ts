@@ -12,6 +12,7 @@ import {
 import { revertDeploy, rollbackTarget } from "./releases";
 import { addAppHost, logEvent, newId } from "./state";
 import { has } from "./tech";
+import { serverName } from "./names";
 import type {
   ActiveIncident,
   AttemptOutcome,
@@ -128,7 +129,7 @@ function contributingFactors(s: GameState, seed: IncidentSeed, cause: IncidentCa
   if (seed.type === "instance_failure") {
     const host = seed.target === "db" ? s.infra.dbHost : s.infra.appHosts.find((h) => h.id === seed.hostId);
     if (host?.degradedTurn !== undefined && warned.includes("host_degraded")) {
-      out.push(`${host.id} showed faults since week ${host.degradedTurn} and was not replaced.`);
+      out.push(`${seed.target === "db" ? "The database machine" : serverName(host.id)} showed faults since week ${host.degradedTurn} and was not replaced.`);
     }
     if (s.techDebt >= 50) out.push(`High tech debt (${Math.round(s.techDebt)}) wears machines out faster.`);
     if (seed.target === "app") {
@@ -304,8 +305,8 @@ function buildEvidence(s: GameState, inc: ActiveIncident, equipment: EquipmentId
           : "Servers are fine. The same error repeats in the log.";
       } else if (appDown) {
         text = precise
-          ? `${c.hostId}: no response. The others are healthy.${selfHealingFleet(s) ? "" : " Traffic still goes to it."}`
-          : `${c.hostId} does not respond.${n > 1 ? " The others do." : ""}`;
+          ? `${serverName(c.hostId!)}: no response. The others are healthy.${selfHealingFleet(s) ? "" : " Traffic still goes to it."}`
+          : `${serverName(c.hostId!)} does not respond.${n > 1 ? " The others do." : ""}`;
       } else {
         text = precise ? "CPU 10%. Cannot connect to the database." : "Servers are fine but cannot get any data.";
       }
@@ -350,7 +351,7 @@ function buildEvidence(s: GameState, inc: ActiveIncident, equipment: EquipmentId
       if (inc.type === "app_overload") alerts.push("server CPU");
       if (inc.type === "db_saturation") alerts.push("response time", "database CPU");
       if (inc.type === "deploy_regression") alerts.push("error log volume");
-      if (appDown) alerts.push(has(s, "health_checks") ? `${c.hostId} heartbeat` : "server errors");
+      if (appDown) alerts.push(has(s, "health_checks") ? `${serverName(c.hostId!)} heartbeat` : "server errors");
       if (dbDown) alerts.push("database heartbeat");
       text = `Alerts: ${alerts.join(", ")}.`;
       if (level === 2) {
@@ -362,7 +363,7 @@ function buildEvidence(s: GameState, inc: ActiveIncident, equipment: EquipmentId
               : inc.type === "deploy_regression"
                 ? "requests fail inside app code."
                 : appDown
-                  ? `requests to ${c.hostId} never return.`
+                  ? `requests to ${serverName(c.hostId!)} never return.`
                   : "every database call fails.";
         text += ` Trace: ${trace}`;
       }
@@ -727,7 +728,7 @@ function completeRecovery(s: GameState, inc: ActiveIncident): void {
         const newId = replaceAppHost(s, inc.cause.hostId ?? "");
         s.cash -= BALANCE.server.replaceCost;
         inc.damage.moneySpent += BALANCE.server.replaceCost;
-        finishAttempt(s, inc, "Failed over to the standby server", "fixed", `The standby took over as ${newId}. A new standby cost ${money(BALANCE.server.replaceCost)}.`);
+        finishAttempt(s, inc, "Failed over to the standby server", "fixed", `The standby took over as ${serverName(newId)}. A new standby cost ${money(BALANCE.server.replaceCost)}.`);
       } else if (dbDown && has(s, "replicas")) {
         s.infra.dbHost = { id: "db-primary", status: "healthy", bornTurn: s.turn };
         s.cash -= BALANCE.db.replaceCost;
@@ -784,7 +785,7 @@ function completeRecovery(s: GameState, inc: ActiveIncident): void {
         p.cost = cost;
         const fresh = replaceAppHost(s, dead.id);
         const cured = appDown || (inc.type === "app_overload" && reassessLoad(s, inc));
-        finishAttempt(s, inc, `Replaced ${dead.id}`, cured ? "fixed" : "partial", `${dead.id} was dead. ${fresh} replaced it.`);
+        finishAttempt(s, inc, `Replaced ${serverName(dead.id)}`, cured ? "fixed" : "partial", `${serverName(dead.id)} was dead. ${serverName(fresh)} replaced it.`);
       } else {
         const cost = Math.round(BALANCE.db.replaceCost * I.emergencyCostMult);
         s.cash -= cost;

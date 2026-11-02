@@ -39,7 +39,7 @@ export function actionComponent(name:string|RegExp):Component {
   if (/database/i.test(label)) return "db";
   if (/cache/i.test(label)) return "cache";
   if (/health checks/i.test(label)) return "monitoring";
-  if (/limit|routing|balanc|failover|All apps|App \d+ only/i.test(label)) return "gateway";
+  if (/limit|routing|balanc|failover|All servers|Server \d+ only/i.test(label)) return "gateway";
   return "app";
 }
 
@@ -54,7 +54,7 @@ export async function infrastructureAction(page:Page,name:string|RegExp,componen
   if(component==="app") {
     const view=/autoscal/i.test(label)?"autoscaling":/Scale up|Restore|Reserve|Release|Install spare/i.test(label)?"server":"overview";
     if(view==="server") {
-      const id=label.match(/App (\d+)/)?.[1];
+      const id=label.match(/Server (\d+)/)?.[1];
       const target=id?scope.locator(`[data-guidance-app="app-${id}"]`):/Release spare/i.test(label)?scope.locator('[data-guidance-app]').filter({hasText:"Standby spare"}).first():scope.locator('[data-guidance-app]').first();
       if(!await scope.getByRole("button",{name,exact:typeof name==="string"}).isVisible()) {
         for(let i=0;i<3&&await scope.locator('[data-inspection-back]').isVisible();i++)await scope.locator('[data-inspection-back]').click();
@@ -67,7 +67,7 @@ export async function infrastructureAction(page:Page,name:string|RegExp,componen
     }
   }
   if(component==="gateway") {
-    const view=/failover|balanc|routing|All apps|App \d+ only/i.test(label)?"management":"overview";
+    const view=/failover|balanc|routing|All servers|Server \d+ only/i.test(label)?"management":"overview";
     if(await scope.locator('.inspection-subview').getAttribute('data-inspection-view')!==view) {
       for(let i=0;i<2&&await scope.locator('[data-inspection-back]').isVisible();i++)await scope.locator('[data-inspection-back]').click();
       if(view!=="overview") await scope.locator('[data-inspection-entry="management"]').click();

@@ -35,13 +35,13 @@ export async function chapter6Preparation(page: Page, touch = false) {
   // Follow the routing subview, then tick each highlighted Send-traffic checkbox. A pick queues a
   // routing change that activates on the next game second (Run), after which guidance re-highlights
   // the next unrouted app - so keep following the gold control until every app is routed.
-  await accept(/^App \d+$/); await press(gold);
+  await accept(/^Server \d+$/); await press(gold);
   const unrouted = () => savedGame(page).then(g => g.campaign!.apps.filter(a => !g.campaign!.routing.targets.includes(a.id)).length);
   for (let i = 0; i < 4 && await unrouted(); i++) {
     await closeInspection(page); await accept(/^Run$/); await press(gold); await page.clock.runFor(2500);
     await press(page.getByRole("button", { name: "Pause", exact: true }));
     if (await unrouted() === 0) break;
-    await accept(/^App \d+$/); await press(gold);
+    await accept(/^Server \d+$/); await press(gold);
   }
   expect((await savedGame(page)).campaign!.limit).toBe(500);
   // Deliver the same game ticks via the existing 2× control, with half as many WebGL frames.

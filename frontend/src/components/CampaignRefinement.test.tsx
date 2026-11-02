@@ -109,8 +109,8 @@ it("traffic-limit warning explains rejection without inventing extra charges or 
 });
 it("Scale Up describes the selected server rather than implying another installed instance", () => {
   useGame.setState({game:dataCompany(),ready:true,started:true,onboarding:false,selectedAppId:"app-1"});
-  render(<CampaignAction label="Scale up App 1" price={2000} note="3 game seconds" onClick={()=>{}}/>);
-  fireEvent.click(inspectionAction(/Scale up App 1/));
+  render(<CampaignAction label="Scale up Server 1" price={2000} note="3 game seconds" onClick={()=>{}}/>);
+  fireEvent.click(inspectionAction(/Scale up Server 1/));
   expect(screen.queryByText(/Makes this App Server larger/)).toBeNull();
   expect(screen.getByText("Total upkeep").closest(".purchase-tile")!.textContent).toContain("$1,100 / 60s (+$400)");
 });

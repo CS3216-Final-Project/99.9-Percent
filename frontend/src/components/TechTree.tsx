@@ -8,7 +8,7 @@ import { TRAFFIC_SPIKES } from "@/sim/scenarios/trafficSpikes";
 import { APPLICATION_RELIABILITY } from "@/sim/scenarios/applicationReliability";
 import { researchBalance } from "@/sim/reliability";
 
-import { BALANCE, BRANCHES, costs, missingPrerequisites, TECH, TECH_ORDER, techStatus, type EquipmentId, type GameState, type TechId, type TechStatus } from "@/sim";
+import { BALANCE, BRANCHES, costs, missingPrerequisites, taskPercent, TECH, TECH_ORDER, techStatus, type EquipmentId, type GameState, type TechId, type TechStatus, serverName } from "@/sim";
 import { moneyFull, num, pct } from "@/game/format";
 import { canInspectEquipment, inspectInRoom, useGame } from "@/game/store";
 import { Icon, type IconName } from "./icons";
@@ -67,7 +67,7 @@ function statusLine(game: GameState, id: TechId, status: TechStatus): string {
   if (status === "ready") return "Ready to ship";
   if (status === "in_progress") {
     const task = game.tasks.find((t) => id === "larger_database" ? t.kind === "db_upgrade" : t.techId === id);
-    return task ? `Building ${pct(task.progress / task.effort)}` : "Building";
+    return task ? `Building ${taskPercent(task)}%` : "Building";
   }
   if (status === "locked") return "Locked";
   if(game.campaign)return campaignAvailability(id);
@@ -271,7 +271,7 @@ const CAMPAIGN_ACTION: Partial<Record<TechId, string>> = { larger_servers: "scal
 function deployment(c: NonNullable<GameState["campaign"]>, id: TechId): string | null {
   const r = c.reliabilityStage;
   if (id === "health_checks") return r?.checksStep !== null && r?.checksStep !== undefined ? "Deployed" : "Not deployed";
-  if (id === "standby") return r?.spareId ? `Standing by: App ${r.spareId.slice(4)}` : "No reserved spare";
+  if (id === "standby") return r?.spareId ? `Standing by: ${serverName(r.spareId)}` : "No reserved spare";
   if (id === "auto_failover") return r?.failover ? (r.failover.enabled ? "Deployed and enabled" : "Deployed and disabled") : "Not deployed";
   if (id === "autoscaling") return c.spikeStage?.controller ? (c.spikeStage.controller.enabled ? "Deployed and enabled" : "Deployed and disabled") : "Not deployed";
   return null;

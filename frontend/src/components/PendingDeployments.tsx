@@ -1,4 +1,5 @@
 import { introductionActive } from "@/sim/introduction";
+import { serverName } from "@/sim";
 import { pendingStop } from "@/sim/step";
 import { milestoneBlocks } from "@/game/campaignGuidance";
 import { ACTION_NAMES } from "@/game/reportEvents";
@@ -6,8 +7,6 @@ import { campaignClockAvailable, useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { tipProps } from "./tips";
 import "./PendingDeployments.css";
-
-const appName = (id: string) => `App ${id.slice(4)}`;
 
 /**
  * Scheduled upgrades and deployments wait out their activation delay off the left edge of the room.
@@ -23,7 +22,7 @@ export function PendingDeployments() {
     <h3><Icon name="time" size={16} />Deployments</h3>
     <ul>
       {c.pending.map(a => {
-        const name = `${ACTION_NAMES[a.type]}${a.targetId ? ` (${appName(a.targetId)})` : ""}`;
+        const name = `${ACTION_NAMES[a.type]}${a.targetId ? ` (${serverName(a.targetId)})` : ""}`;
         const remaining = a.activationStep - c.step;
         const delay = a.activationStep - a.requestedStep;
         const progress = delay > 0 ? Math.min(1, Math.max(0, (c.step - a.requestedStep) / delay)) : 1;

@@ -3,6 +3,7 @@ import { BALANCE, PROMOS } from "./balance";
 import {
   clamp,
   freeEngineers,
+  maxTaskStaff,
   maxServers,
   promoCooldownLeft,
   promoCost,
@@ -14,6 +15,7 @@ import { autoPostmortem } from "./postmortem";
 import { applyRelease, releaseTitle, revertDeploy } from "./releases";
 import { rand } from "./rng";
 import { addAppHost, clone, logEvent, newId } from "./state";
+import { serverName } from "./names";
 import { has, isResearchTech, missingPrerequisites, TECH, techStatus } from "./tech";
 import { acknowledgeReview } from "./turn";
 import type { Action, ActionResult, DeployRecord, FailureReason, GameState } from "./types";
@@ -120,16 +122,16 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       s.totals.serversAdded += 1;
       s.lastCapacityTurn.app = s.turn;
       const host = addAppHost(s);
-      logEvent(s, "decision", `Added app server ${host.id} (${money(BALANCE.server.setupCost)}).`);
-      return ok(s, `${host.id} is in service.`);
+      logEvent(s, "decision", `Added ${serverName(host.id)} (${money(BALANCE.server.setupCost)}).`);
+      return ok(s, `${serverName(host.id)} is in service.`);
     }
 
     case "remove_server": {
       if (s.infra.appHosts.length <= 1) return fail("limit_reached", "You need at least one app server.");
       const host = s.infra.appHosts[s.infra.appHosts.length - 1];
       s.infra.appHosts.pop();
-      logEvent(s, "decision", `Decommissioned app server ${host.id} to save on running costs.`);
-      return ok(s, `${host.id} decommissioned.`);
+      logEvent(s, "decision", `Decommissioned ${serverName(host.id)} to save on running costs.`);
+      return ok(s, `${serverName(host.id)} decommissioned.`);
     }
 
     case "replace_host": {
@@ -145,15 +147,15 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       }
       const host = s.infra.appHosts.find((h) => h.id === action.hostId);
       if (!host) return fail("not_found", "That server no longer exists.");
-      if (host.status === "healthy") return fail("invalid", `${host.id} is healthy.`);
+      if (host.status === "healthy") return fail("invalid", `${serverName(host.id)} is healthy.`);
       const broke = needCash(s, BALANCE.server.replaceCost);
       if (broke) return broke;
       s.cash -= BALANCE.server.replaceCost;
       s.totals.invested += BALANCE.server.replaceCost;
       s.infra.appHosts = s.infra.appHosts.filter((h) => h.id !== host.id);
       const fresh = addAppHost(s);
-      logEvent(s, "decision", `Replaced ${host.id} with ${fresh.id} before it could fail (${money(BALANCE.server.replaceCost)}).`);
-      return ok(s, `${host.id} replaced by ${fresh.id}.`);
+      logEvent(s, "decision", `Replaced ${serverName(host.id)} with ${serverName(fresh.id)} before it could fail (${money(BALANCE.server.replaceCost)}).`);
+      return ok(s, `${serverName(host.id)} replaced by ${serverName(fresh.id)}.`);
     }
 
     case "start_tech": {
@@ -171,7 +173,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (broke) return broke;
       s.cash -= def.cost;
       s.totals.invested += def.cost;
-      const assigned = Math.min(freeEngineers(s), 2, BALANCE.engineer.maxPerTask);
+      const assigned = Math.min(freeEngineers(s), 2, maxTaskStaff(def));
       s.tasks.push({
         id: newId(s, "task"),
         kind: "tech",
@@ -203,7 +205,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (broke) return broke;
       s.cash -= def.cost;
       s.totals.invested += def.cost;
-      const assigned = Math.min(freeEngineers(s), 2, BALANCE.engineer.maxPerTask);
+      const assigned = Math.min(freeEngineers(s), 2, maxTaskStaff(def));
       const title = releaseTitle("db_upgrade", { dbTier: tier });
       s.tasks.push({
         id: newId(s, "task"),
@@ -243,9 +245,8 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       if (!task) return fail("not_found", "That task no longer exists.");
       const count = Math.round(action.count);
       if (!Number.isFinite(count) || count < 0) return fail("invalid", "Engineer count must be zero or more.");
-      if (count > BALANCE.engineer.maxPerTask) {
-        return fail("limit_reached", `At most ${BALANCE.engineer.maxPerTask} engineers can work on one task.`);
-      }
+      const most = maxTaskStaff(task);
+      if (count > most) return fail("limit_reached", `${task.title} takes at most ${most} engineer${most === 1 ? "" : "s"}, one per week of work.`);
       const delta = count - task.assigned;
       if (delta > freeEngineers(s)) return fail("no_engineers", "No engineers are free. Take someone off another task or hire.");
       task.assigned = count;
@@ -266,7 +267,6 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
     }
 
     case "hire_engineer": {
-      if (s.engineers >= BALANCE.engineer.max) return fail("limit_reached", `The office seats ${BALANCE.engineer.max} engineers.`);
       const broke = needCash(s, BALANCE.engineer.hireCost);
       if (broke) return broke;
       s.cash -= BALANCE.engineer.hireCost;

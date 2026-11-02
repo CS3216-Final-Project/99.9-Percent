@@ -4,7 +4,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { MapControls as MapControlsImpl } from "three-stdlib";
-import { useGame } from "@/game/store";
+import { isSheetView, useGame } from "@/game/store";
 import { fromAvatar, type Viewpoint } from "@/game/viewpoints";
 import { SHAFT } from "./floorplan";
 import { ROOM } from "./layout";
@@ -322,7 +322,7 @@ export function ViewRig() {
       if (document.querySelector(".component-inspection")) return;
       const state = useGame.getState();
       // The workspace owns Escape even when opening it released the mouse from walk mode.
-      if (state.view === "tech" || state.view === "history") return;
+      if (isSheetView(state.view)) return;
       if (state.roomInspection) {
         e.stopImmediatePropagation();
         state.dismissRoomInspection();
@@ -349,7 +349,7 @@ export function ViewRig() {
     const keys = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       const view = useGame.getState().view;
-      if (view === "tech" || view === "history") return;
+      if (isSheetView(view)) return;
       if (!looking() || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable || el.closest('[role="dialog"], [role="menu"], [role="listbox"]'))) return;
       // As in the overview, where Q swings the camera round to the right and E to the left.

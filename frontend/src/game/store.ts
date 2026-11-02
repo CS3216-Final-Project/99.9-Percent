@@ -80,6 +80,11 @@ import { isPhoneEdition } from "@/phone/edition";
 import { clampLookSpeed, DEFAULT_CONTROLS, type ControlSettings } from "./controls";
 
 export type View = "tech" | "engineers" | "history" | "menu" | "guidance" | "scorecard" | null;
+/** The views that open from the dock as focused workspaces over the room. */
+export type SheetView = Extract<View, "tech" | "engineers" | "history">;
+export function isSheetView(view: View): view is SheetView {
+  return view === "tech" || view === "engineers" || view === "history";
+}
 export type Speed = 0.5 | 1 | 2;
 
 /**
@@ -104,7 +109,7 @@ export interface Tour {
 export type Walkthrough = "basics";
 const isWalkthrough = (track: TourTrack): track is Walkthrough => track === "basics";
 /** How many lessons the remaining walkthrough has. */
-export const WALKTHROUGH_STEPS: Record<Walkthrough, number> = { basics: 5 };
+export const WALKTHROUGH_STEPS: Record<Walkthrough, number> = { basics: 4 };
 const lastStep = (track: Walkthrough) => WALKTHROUGH_STEPS[track] - 1;
 
 /** What started a walkthrough: the first visit, resuming a fresh run, a new company, the menu or the home screen. */

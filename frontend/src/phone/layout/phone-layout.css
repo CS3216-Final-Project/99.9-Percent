@@ -382,6 +382,8 @@
 @media (min-height: 701px) {
   .phone-app[data-edition="phone"] .phone-sheet-body:has(.campaign-panel) { scroll-padding-top: 64px; }
 }
+/* The sheet is short, so the equipment picker scrolls away with the rest instead of covering the control it reveals. */
+.phone-app[data-edition="phone"] .phone-sheet .equipment-choices { position: static; }
 /* Closed to its handle, the sheet's contents leave the page's focus order and accessibility tree. */
 .phone-app[data-edition="phone"] .phone-sheet[data-state="peek"] .phone-sheet-body { visibility: hidden; }
 
@@ -419,44 +421,32 @@
   border-radius: 0;
   box-shadow: none;
   background: transparent;
+  /* The sheet moves itself; its contents do not slide in again. */
+  animation: none;
 }
 .phone-app[data-edition="phone"] .phone-sheet .side .panel-section { padding: 12px 14px 16px; }
 .phone-app[data-edition="phone"] .phone-sheet .campaign-panel .incident-investigate > .chips { gap: 6px; }
 .phone-app[data-edition="phone"] .phone-sheet .campaign-panel .incident-investigate .chip { min-height: 44px; }
 
-/* Challenge Mode's weekly operations follow the equipment in the same sheet, always expanded. */
-.phone-app[data-edition="phone"] .phone-sheet .operations-rail {
-  max-height: none;
-  margin: 0;
-  border: 0;
-  border-top: 1px solid var(--paper-3);
-  background: transparent;
-  color: var(--ink);
-  box-shadow: none;
-}
-.phone-app[data-edition="phone"] .phone-sheet .operations-toggle { display: none; }
-.phone-app[data-edition="phone"] .phone-sheet .operations-title { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 14px 0; font-size: var(--text-md); }
-.phone-app[data-edition="phone"] .phone-sheet .operations-body { display: block; max-height: none; }
 
 /* ------------------------------------------------------------------ */
 /* Views over the room (Tech, Team, History)                           */
 /* ------------------------------------------------------------------ */
 
-/* They leave the top strip and the dock in place, with the shared 8 px gap. */
+/* Focused views cover the top strip and room, ending exactly where the persistent clock dock starts. */
 .phone-app[data-edition="phone"] .sheet {
   position: fixed;
-  inset: var(--phone-top) var(--phone-safe-right) var(--phone-dock) var(--phone-safe-left);
-  z-index: 33;
-  margin: 8px;
-}
-
-/* Focused views cover the top strip and room, ending exactly where the persistent clock dock starts. */
-.phone-app[data-edition="phone"] .sheet:is(.sheet-tech, .sheet-history) {
-  position: fixed;
   inset: 0 0 var(--phone-dock);
+  z-index: 33;
   margin: 0;
   padding-top: var(--phone-safe-top);
   padding-inline: var(--phone-safe-left) var(--phone-safe-right);
+}
+
+/* Challenge Mode keeps its top strip (cash, health and settings) above the focused views. */
+.phone-app[data-edition="phone"].is-classic .sheet {
+  top: var(--phone-top);
+  padding-top: 0;
 }
 
 /* ------------------------------------------------------------------ */
