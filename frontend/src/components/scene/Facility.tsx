@@ -1874,13 +1874,13 @@ function RoomDock({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) 
   const host = useRoomControlsHost();
   if (!host) return null;
   return createPortal(<>
-    <DockMenu className="room-menu" label={<><Icon name="floor" size={20} /><span className="desktop-room-name">Floor</span><span className="mobile-room-name">Navigation</span><span className="floor-number summary-floor-number">{FLOOR_NUMBER[floor]}</span>{attention !== "none" && <span className={`floor-badge tone-${attention}`}><span className="visually-hidden">{attention === "alert" ? "Incident on another floor" : "Another floor needs a look"}</span></span>}</>}>
+    <DockMenu className="room-menu" tip="Floor" label={<><Icon name="floor" size={20} /><span className="desktop-room-name visually-hidden">Floor</span><span className="mobile-room-name">Navigation</span><span className="floor-number summary-floor-number">{FLOOR_NUMBER[floor]}</span>{attention !== "none" && <span className={`floor-badge tone-${attention}`}><span className="visually-hidden">{attention === "alert" ? "Incident on another floor" : "Another floor needs a look"}</span></span>}</>}>
       <h3>Choose a floor</h3>
       <FloorMenu />
       <div className="mobile-room-tools"><h3>View mode</h3><ViewModeOptions stage={stage} /><h3>Camera</h3><CameraTools /></div>
     </DockMenu>
-    <div className="desktop-walk"><DockMenu className={`view-mode-menu${walking ? " is-walking" : ""}`} label={<><Icon name="explore" size={20} /><span>View mode</span></>}><h3>View mode</h3><ViewModeOptions stage={stage} /></DockMenu></div>
-    <DockMenu className="camera-menu" label={<><Icon name="camera" size={20} /><span>Camera</span></>}><h3>Camera</h3><CameraTools /></DockMenu>
+    <div className="desktop-walk"><DockMenu className={`view-mode-menu${walking ? " is-walking" : ""}`} tip="View mode" label={<><Icon name="explore" size={20} /><span className="visually-hidden">View mode</span></>}><h3>View mode</h3><ViewModeOptions stage={stage} /></DockMenu></div>
+    <DockMenu className="camera-menu" tip="Camera" label={<><Icon name="camera" size={20} /><span className="visually-hidden">Camera</span></>}><h3>Camera</h3><CameraTools /></DockMenu>
   </>, host);
 }
 
