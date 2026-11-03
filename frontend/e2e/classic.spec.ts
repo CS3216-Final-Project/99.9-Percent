@@ -65,7 +65,14 @@ test('completes the first-week tutorial on the basic look, purchases equipment a
   // Weeks wait for the choice.
   await page.keyboard.press('n');
   expect((await savedGame(page)).turn).toBe(2);
+  // Tab keeps to the cards, the way a modal should, and reaches Start building once one is chosen.
+  await page.keyboard.press('Tab');
+  await expect(picker.getByRole('radio', { name: 'Social media' })).toBeFocused();
   await picker.getByRole('radio', { name: 'Online game' }).check();
+  await page.keyboard.press('Tab');
+  await expect(picker.getByRole('button', { name: 'Start building', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(picker.getByRole('radio', { name: 'Online game' })).toBeFocused();
   await page.screenshot({ path: test.info().outputPath('app-profile-picked.png') });
   await picker.getByRole('button', { name: 'Start building', exact: true }).click();
   await expect(picker).toBeHidden();

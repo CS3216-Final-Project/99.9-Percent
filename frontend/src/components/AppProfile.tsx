@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { APP_PROFILE_CHOICES, APP_PROFILES, PROMOS, PROMO_ORDER, type AppProfileDef, type AppProfileId } from "@/sim";
 import { choosingAppProfile, useGame } from "@/game/store";
@@ -78,9 +78,22 @@ function Picker() {
     root.current?.querySelector<HTMLInputElement>("input[type=radio]")?.focus();
     return () => { if (previous?.isConnected) previous.focus(); };
   }, []);
+  // Tab stays on the cards and Start building: the cards are one radio group, so one stop, then the button once a card is
+  // chosen. Without this, Tab walks out of the modal into the dimmed game, whose shortcuts then apply behind the cards.
+  const tab = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Tab" || !root.current) return;
+    const radios = Array.from(root.current.querySelectorAll<HTMLInputElement>("input[type=radio]"));
+    const start = root.current.querySelector<HTMLButtonElement>(".app-profile-start");
+    const stops: HTMLElement[] = [radios.find((r) => r.checked) ?? radios[0], ...(start && !start.disabled ? [start] : [])];
+    const at = radios.includes(document.activeElement as HTMLInputElement) ? 0 : stops.indexOf(document.activeElement as HTMLElement);
+    e.preventDefault();
+    stops[(at + (e.shiftKey ? -1 : 1) + stops.length) % stops.length]?.focus();
+  };
   return createPortal(
-    <div className="app-profile-backdrop" role="presentation">
-      <div ref={root} className="app-profile-picker" role="dialog" aria-modal="true" aria-labelledby={`${group}-title`} aria-describedby={`${group}-lede`}>
+    // A press on the dimmed room keeps focus on the cards.
+    <div className="app-profile-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}>
+      <div ref={root} className="app-profile-picker" role="dialog" aria-modal="true" aria-labelledby={`${group}-title`} aria-describedby={`${group}-lede`}
+        tabIndex={-1} onKeyDown={tab}>
         <header className="app-profile-head">
           <h2 id={`${group}-title`}>What are you building?</h2>
           <p id={`${group}-lede`}>Each kind of app brings different users and leans on different machines. You choose once for this company.</p>

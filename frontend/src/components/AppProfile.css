@@ -59,7 +59,10 @@
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s;
 }
-.app-profile-card:hover { border-color: var(--profile-accent); background: #fff; }
+/* Only a real pointer hovers: on touch a tapped card would keep the hover border after another is chosen. */
+@media (hover: hover) {
+  .app-profile-card:hover { border-color: var(--profile-accent); background: #fff; }
+}
 .app-profile-card.is-on {
   border-color: var(--go);
   box-shadow: 0 0 0 3px var(--go), var(--lift);
@@ -112,6 +115,8 @@
   padding: 14px 16px 16px;
 }
 .app-profile-pitch {
+  /* Two lines held for every pitch, so the Needs lists start level across a row of cards. */
+  min-height: 2lh;
   font-family: var(--font-body);
   font-size: var(--text-md);
   font-weight: 600;
@@ -159,8 +164,8 @@
 .app-profile-start { flex: none; min-width: 190px; gap: 8px; }
 
 /* The top bar's button sits where Guided Mode keeps Hint, in the profile's own tile colour. */
-.app-profile-btn { background: var(--profile-tile); color: var(--profile-ink); border-color: color-mix(in srgb, var(--profile-ink) 30%, transparent); }
-.app-profile-btn:hover:not(:disabled), .app-profile-btn.is-open { background: var(--paper); }
+.topbar .icon-btn.app-profile-btn { background: var(--profile-tile); color: var(--profile-ink); border-color: color-mix(in srgb, var(--profile-ink) 30%, transparent); }
+.topbar .icon-btn.app-profile-btn:hover:not(:disabled), .topbar .icon-btn.app-profile-btn.is-open { background: var(--paper); }
 
 .app-profile-popover {
   position: fixed;
@@ -206,7 +211,7 @@
   .app-profile-cards { grid-template-columns: 1fr; gap: 10px; }
   .app-profile-art { display: none; }
   .app-profile-card-head { text-align: left; }
-  .app-profile-pitch { text-align: left; }
+  .app-profile-pitch { min-height: 0; text-align: left; }
   /* The room's own panels must not read through behind the stacked cards. */
   .app-profile-backdrop { background: rgb(14 11 30 / 0.94); }
   /* Start building stays pinned to the bottom edge, edge to edge, with the cards fading out above it. */

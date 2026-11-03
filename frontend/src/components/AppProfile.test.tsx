@@ -32,8 +32,17 @@ describe("choosing what the company builds", () => {
     act(() => useGame.getState().advance());
     expect(useGame.getState().game.turn).toBe(1);
 
+    // Tab keeps to the cards, and reaches Start building once a card is chosen: it never walks out into the game.
+    fireEvent.keyDown(cards[0], { key: "Tab" });
+    expect(document.activeElement).toBe(cards[0]);
     fireEvent.click(within(picker).getByRole("radio", { name: "Online game" }));
     expect((start as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.keyDown(cards[1], { key: "Tab" });
+    expect(document.activeElement).toBe(start);
+    fireEvent.keyDown(start, { key: "Tab" });
+    expect(document.activeElement).toBe(cards[1]);
+    fireEvent.keyDown(cards[1], { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(start);
     fireEvent.click(start);
     expect(useGame.getState().game.appProfile).toBe("gaming");
     expect(screen.queryByRole("dialog", { name: "What are you building?" })).toBeNull();
