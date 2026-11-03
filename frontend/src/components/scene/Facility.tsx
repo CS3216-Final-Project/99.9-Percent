@@ -45,6 +45,7 @@ import { tipProps } from "../tips";
 import { INFRASTRUCTURE_TIPS } from "@/game/infrastructureHelp";
 import { openRoomArea } from "../roomArea";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
+import { useMediaQuery } from "../useMediaQuery";
 import { ActivityEffects } from "./activities";
 import { ArcadePanel } from "./ArcadePanel";
 import { serveArcade } from "./arcade";
@@ -1900,6 +1901,8 @@ function FloorMenu() {
 /** Renderer actions stay with the scene; only their DOM is placed in the shared dock. */
 function RoomDock({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) {
   const floor = useGame(s => s.floor);
+  // At phone width the menu shows its "Navigation" name, so it needs no tip.
+  const narrowDock = useMediaQuery("(max-width: 640px)");
   const walking = useGame(s => s.walking);
   const model = useSceneModel();
   const other = floor === "servers" ? "office" : "servers";
@@ -1907,7 +1910,7 @@ function RoomDock({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) 
   const host = useRoomControlsHost();
   if (!host) return null;
   return createPortal(<>
-    <DockMenu className="room-menu" tip="Floor" label={<><Icon name="floor" size={20} /><span className="desktop-room-name visually-hidden">Floor</span><span className="mobile-room-name">Navigation</span><span className="floor-number summary-floor-number">{FLOOR_NUMBER[floor]}</span>{attention !== "none" && <span className={`floor-badge tone-${attention}`}><span className="visually-hidden">{attention === "alert" ? "Incident on another floor" : "Another floor needs a look"}</span></span>}</>}>
+    <DockMenu className="room-menu" tip={narrowDock ? undefined : "Floor"} label={<><Icon name="floor" size={20} /><span className="desktop-room-name visually-hidden">Floor</span><span className="mobile-room-name">Navigation</span><span className="floor-number summary-floor-number">{FLOOR_NUMBER[floor]}</span>{attention !== "none" && <span className={`floor-badge tone-${attention}`}><span className="visually-hidden">{attention === "alert" ? "Incident on another floor" : "Another floor needs a look"}</span></span>}</>}>
       <h3>Choose a floor</h3>
       <FloorMenu />
       <div className="mobile-room-tools"><h3>View mode</h3><ViewModeOptions stage={stage} /><h3>Camera</h3><CameraTools /></div>
