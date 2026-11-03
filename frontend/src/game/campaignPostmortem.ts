@@ -28,7 +28,7 @@ export function incidentLesson(report: CampaignPostmortem) {
   const automatic = during.some(e => e.type === "autoscale-scale-out-decided");
   const restored = during.some(e => e.type === "instance-restored");
   const promoted = during.some(e => e.type === "failover-activated");
-  const eased = during.some(e => ["traffic-spike-ended", "scenario-pressure-ended", "promotion-ended"].includes(e.type));
+  const eased = during.some(e => ["traffic-spike-ended", "promotion-ended"].includes(e.type));
   const changes: string[] = [];
   if (restored) changes.push("a failed server was restored");
   if (promoted) changes.push("a spare server joined the traffic route");

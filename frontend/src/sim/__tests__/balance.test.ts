@@ -142,5 +142,5 @@ describe("reliability financial alternatives",()=>{
  });
 });
 
-// Phase 7 strategy checks use the same public actions and physical engine.
-import "./combinedBalanceCases";
+// Whole-campaign strategy checks use the same public actions and physical engine.
+import "./campaignBalanceCases";

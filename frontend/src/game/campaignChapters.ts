@@ -1,4 +1,3 @@
-import { canEnterCombined } from "@/sim/combinedCampaign";
 import type { Action, GameState } from "@/sim";
 import { canEnterReliability } from "@/sim/reliability";
 import { campaignGuidance } from "./campaignGuidance";
@@ -19,7 +18,6 @@ export function campaignChapters(game: GameState, tutorialDone = true) {
     { id: "data", name: "Data Strategy", shortName: "Data Strategy", description: "Explore how caching and different workloads affect your database.", completed: !!c.spikeStage, available: model.dataAvailable },
     { id: "spikes", name: "Traffic Spikes & Autoscaling", shortName: "Traffic Spikes", description: "Handle changing demand and explore automatic scaling.", completed: !!c.spikeStage?.acknowledged, available: model.spikesAvailable },
     { id: "reliability", name: "Stay Online", shortName: "Stay Online", description: "Prepare for application failures and keep service running.", completed: !!c.reliabilityStage?.acknowledged, available: canEnterReliability(game) },
-    { id: "combined", name: "Grow the Company", shortName: "Grow the Company", description: "Serve growing demand, review each growth outcome and complete the company campaign.", completed: !!c.combinedStage?.acknowledged, available: canEnterCombined(game) },
   ];
   return chapters.map((chapter, index) => {
     const current = chapter.name === model.stage;
@@ -28,9 +26,9 @@ export function campaignChapters(game: GameState, tutorialDone = true) {
   });
 }
 
-const CHAPTER_ENTRIES: ReadonlySet<Action["type"]> = new Set(["enter_scaling", "enter_data", "enter_spikes", "enter_reliability", "enter_combined"]);
+const CHAPTER_ENTRIES: ReadonlySet<Action["type"]> = new Set(["enter_scaling", "enter_data", "enter_spikes", "enter_reliability", "complete_campaign"]);
 
-/** Whether an action moves the company into the next chapter. */
+/** Whether an action moves the company into the next chapter, or completes the campaign after the last one. */
 export const isChapterEntry = (action: Action) => CHAPTER_ENTRIES.has(action.type);
 
 /** The chapter whose requirements are met while the company waits for the player to continue past it. */

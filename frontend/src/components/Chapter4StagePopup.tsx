@@ -2,14 +2,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "./icons";
 import type { chapter4Stage } from "@/game/chapter4Guidance";
-import type { chapter6Stage } from "@/game/chapter6Guidance";
 import { presentationReceipts, recordPresentationReceipt } from "@/game/presentationReceipts";
 
 export function Chapter4StagePopup({ model }: { model: NonNullable<ReturnType<typeof chapter4Stage>> }) {
   return <ChapterStagePopup chapter={4} model={model} />;
-}
-export function Chapter6StagePopup({ model }: { model: NonNullable<ReturnType<typeof chapter6Stage>> }) {
-  return <ChapterStagePopup chapter={6} model={model} />;
 }
 interface StageModel { key: string; cues: { id: string; title: string; message: string; tone?: "prepare" | "pressure" | "recovery" }[] }
 function ChapterStagePopup({ chapter, model }: { chapter: number; model: StageModel }) {

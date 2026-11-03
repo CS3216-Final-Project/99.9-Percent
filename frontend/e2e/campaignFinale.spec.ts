@@ -1,6 +1,6 @@
 import type { Page, TestInfo } from "@playwright/test";
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
-import { finishedCompany } from "../src/sim/__tests__/combinedFixture";
+import { reliabilityOutcome } from "../src/game/__fixtures__/reliabilityOutcome";
 
 test.use({ reviewCampaignFinale: false, edition: "desktop" });
 const CAST = [["Maya", "maya"], ["Jordan", "jordan"], ["Sam", "sam"], ["Taylor", "taylor"], ["Alex", "alex"]] as const;
@@ -8,9 +8,10 @@ const CAST = [["Maya", "maya"], ["Jordan", "jordan"], ["Sam", "sam"], ["Taylor",
 async function finaleJourney(page: Page, info: TestInfo, touch: boolean) {
   test.setTimeout(180_000);
   const press = (control: ReturnType<Page["locator"]>) => touch ? control.tap() : control.click();
-  await page.route("**/api/**", r => r.abort()); await seedSave(page, finishedCompany()); await page.goto("/");
+  await page.route("**/api/**", r => r.abort()); await seedSave(page, reliabilityOutcome()); await page.goto("/");
   await press(page.getByRole("button", { name: "Continue company", exact: true })); await expectRoom(page);
-  await press(page.getByRole("button", { name: "Complete campaign", exact: true }));
+  // Stay Online is the last chapter: its outcome completes the campaign.
+  await press(page.getByRole("dialog", { name: "Reliability outcome", exact: true }).getByRole("button", { name: "Complete campaign", exact: true }));
   const scene = page.getByRole("dialog", { name: "Campaign finale", exact: true }), scorecard = page.getByRole("dialog", { name: "Campaign complete", exact: true });
   await expect(scene).toBeVisible(); await expect(scene).toHaveAttribute("aria-modal", "true"); await expect(scorecard).toHaveCount(0);
   await expect(page.locator("#root")).toHaveAttribute("inert", "");
@@ -30,7 +31,7 @@ async function finaleJourney(page: Page, info: TestInfo, touch: boolean) {
     // Desktop reads on with the keyboard, touch by tapping the dialogue box.
     if (touch) await press(copy); else await page.keyboard.press("Enter");
   }
-  await expect(scene.getByLabel("Campaign results")).toContainText("50,000");
+  await expect(scene.getByLabel("Campaign results")).toContainText("Incidents");
   const end = scene.getByRole("button", { name: "See the scorecard", exact: true });
   await expect(end).toBeFocused(); await expect(end).toBeInViewport({ ratio: 1 });
   expect(await scene.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);

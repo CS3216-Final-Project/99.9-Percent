@@ -4,7 +4,6 @@ import { newGame } from "../src/sim";
 import { act, spikeCompany } from "../src/sim/__tests__/spikeFixtures";
 import { dataCompany } from "../src/sim/__tests__/dataFixture";
 import { reliabilityCompany } from "../src/sim/__tests__/reliabilityFixture";
-import { combinedCompany } from "../src/sim/__tests__/combinedFixture";
 import { recoveredOpening } from "../src/game/__fixtures__/openingOutcome";
 
 export function companyMessageGame(chapter: number) {
@@ -12,8 +11,7 @@ export function companyMessageGame(chapter: number) {
   if (chapter === 2) return act(act(recoveredOpening(), {type:"acknowledge_review"}), {type:"acknowledge_milestone"});
   if (chapter === 3) return dataCompany();
   if (chapter === 4) return spikeCompany(false);
-  if (chapter === 5) return reliabilityCompany();
-  return combinedCompany();
+  return reliabilityCompany();
 }
 export async function companyMessageJourney(page: Page, info: TestInfo, chapter: number, touch = false) {
   const game = companyMessageGame(chapter);
@@ -46,7 +44,7 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   // P is the game's Run/Pause shortcut; inside the dialogue it must not start the clock.
   await page.keyboard.press("p"); await expect(card).toBeVisible(); await expect(run).toBeVisible();
   await expect(page.getByRole("button",{name:"Pause",exact:true,includeHidden:true})).toHaveCount(0);
-  const [name, character] = [["Maya","maya"],["Alex","alex"],["Jordan","jordan"],["Sam","sam"],["Taylor","taylor"],["Alex","alex"]][chapter - 1];
+  const [name, character] = [["Maya","maya"],["Alex","alex"],["Jordan","jordan"],["Sam","sam"],["Taylor","taylor"]][chapter - 1];
   await expect(card.locator(".dialogue-plate")).toContainText(name);
   const portrait = card.getByRole("img",{name:new RegExp(`^${name}, `)});
   await expect(portrait).toHaveAttribute("src",`/characters/${character}.webp`);
@@ -68,13 +66,13 @@ export async function companyMessageJourney(page: Page, info: TestInfo, chapter:
   await expect(card).toBeInViewport({ratio:1});
   await expect(card.getByRole("button",{name:"Got it",exact:true})).toBeInViewport({ratio:1});
   expect(await card.evaluate(el=>el.scrollWidth <= el.clientWidth)).toBe(true);
-  await expect(page.getByRole("dialog",{name:/^Chapter [46]:/})).toHaveCount(0);
+  await expect(page.getByRole("dialog",{name:/^Chapter 4:/})).toHaveCount(0);
   const before = (await savedGame(page)).campaign!;
   await page.screenshot({path:info.outputPath(`company-message-chapter-${chapter}${touch?"-touch":""}.png`)});
   await press(card.getByRole("button", {name:chapter % 2 ? "Got it" : "Dismiss company message",exact:true}));
   await expect(card).toHaveCount(0);
   await expect(backdrop).toHaveCount(0); await expect(page.locator("#root")).not.toHaveAttribute("inert", "");
-  if (chapter === 4 || chapter === 6) {
+  if (chapter === 4) {
     const cue = page.getByRole("dialog",{name:new RegExp(`^Chapter ${chapter}:`)});
     await expect(cue).toBeVisible(); await expect(page.getByRole("dialog")).toHaveCount(1);
     await press(cue.getByRole("button",{name:"Got it",exact:true}));

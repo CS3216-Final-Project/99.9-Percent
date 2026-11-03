@@ -5,7 +5,6 @@ import { newGame, newLegacyGame } from "@/sim";
 import { act as decide, tick, spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { preparedReliability } from "@/sim/__tests__/reliabilityFixture";
-import { combinedCompany } from "@/sim/__tests__/combinedFixture";
 import { preventedOpening, recoveredOpening } from "@/game/__fixtures__/openingOutcome";
 import { chapterCompanyMessage } from "@/game/chapterCompanyMessage";
 import { makeEnvelope, decodeSave } from "@/game/saveEnvelope";
@@ -16,8 +15,8 @@ import { CampaignHeader, CampaignPanel, CampaignControls } from "./CampaignUI";
 import Tutorial from "./Tutorial";
 import { setConfirming } from "./actionConfirmation";
 
-const companies = [newGame(), dataCompany("read-heavy", false), dataCompany(), spikeCompany(false), preparedReliability(), combinedCompany()];
-const senders = [["Maya", "Customer Support"], ["Alex", "CEO"], ["Jordan", "Software Engineer"], ["Sam", "Marketing"], ["Taylor", "Operations Engineer"], ["Alex", "CEO"]];
+const companies = [newGame(), dataCompany("read-heavy", false), dataCompany(), spikeCompany(false), preparedReliability()];
+const senders = [["Maya", "Customer Support"], ["Alex", "CEO"], ["Jordan", "Software Engineer"], ["Sam", "Marketing"], ["Taylor", "Operations Engineer"]];
 const message = () => screen.queryByRole("dialog", { name: "Company Message" });
 const next = () => within(message()!).queryByRole("button", { name: "Next" });
 /** Advances through the colleague's lines to the mission, then acknowledges it. */
@@ -149,14 +148,10 @@ it("welcomes a new company from Maya before its introduction, and Opening then s
   expect(chapterCompanyMessage(newGame())!.lines[0]).toContain("I'm Maya");
 });
 
-it("uses truthful Opening copy and the actual final target", () => {
+it("uses truthful Opening copy", () => {
   const said = (game: Parameters<typeof chapterCompanyMessage>[0]) => chapterCompanyMessage(game)!.lines.join(" ");
   const healthy = newGame(); expect(said(healthy)).not.toContain("reporting");
   expect(said(tick(healthy, 5))).toContain("getting slower");
-  const custom = structuredClone(companies[5]); custom.campaign!.combinedStage!.finalUserTarget = 75000;
-  expect(said(custom)).toContain("75,000"); expect(said(custom)).not.toContain("50,000");
-  custom.campaign!.combinedStage!.users = 75000;
-  expect(said(custom)).toContain("finish the final Campaign checks");
   expect(chapterCompanyMessage(newLegacyGame())).toBeNull();
 });
 

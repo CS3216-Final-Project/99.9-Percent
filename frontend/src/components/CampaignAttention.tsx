@@ -16,8 +16,7 @@ import { cardStyle, type Box, type Place } from "./spotlight";
 import "./CampaignAttention.css";
 import { CampaignAttentionContext, useCampaignAttention } from "./useCampaignAttention";
 import { chapter4Stage } from "@/game/chapter4Guidance";
-import { chapter6Stage } from "@/game/chapter6Guidance";
-import { Chapter4StagePopup, Chapter6StagePopup } from "./Chapter4StagePopup";
+import { Chapter4StagePopup } from "./Chapter4StagePopup";
 import { chapterCompanyMessage } from "@/game/chapterCompanyMessage";
 import { ChapterCompanyMessage } from "./ChapterCompanyMessage";
 
@@ -56,7 +55,6 @@ const TARGETS: Record<GuidanceTarget, string> = {
   requirements: ".chapter-actions > button:last-child",
   next: ".chapter-advance",
   reliability: '[data-guidance="arm_reliability"]',
-  growth: '[data-guidance="start_growth_wave"]',
   risk: '[aria-label="Scaling growth risk"] > button',
   menu: ".menu-btn",
   finance: '[aria-label="View finances"]',
@@ -136,7 +134,6 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const markedTarget = useRef<HTMLElement | null>(null);
   const decision = useMemo(() => campaignAttention(game), [game]);
   const spikeStage = chapter4Stage(game);
-  const growthStage = chapter6Stage(game);
   const companyMessage = chapterCompanyMessage(game);
   const intro=introductionActive(game.campaign);
   const available = !!game.campaign && started && (!practice||intro);
@@ -451,8 +448,6 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       // Launch Week's colleague introduction comes once, before the first Run.
       ? available && !narrativeBlocked && !view && !running && game.phase === "management" && !game.campaign!.incident && game.campaign!.step === 0
       : available && !narrativeBlocked && !view && !openNow && !acceptedNow && !pauseGold && !resumeGold && !game.campaign?.incident && game.phase === "management" && !decision.reason.match(/^(review|next)$/))}>
-    {growthStage &&
-      <Chapter6StagePopup key={`${growthStage.key}:${growthStage.stage}`} model={growthStage} />}
     {spikeStage &&
       <Chapter4StagePopup key={`${spikeStage.key}:${spikeStage.stage}`} model={spikeStage} />}
     </ChapterCompanyMessage>}

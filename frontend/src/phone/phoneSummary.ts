@@ -10,7 +10,7 @@ export function phoneCampaignSummary(game: GameState | null, tutorialDone: boole
   if (!game?.campaign) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Guided Mode" };
   const ended = game.phase === "ended";
   const { chapter, done } = savedChapter(game, tutorialDone);
-  const progress = ended ? "Company closed"
+  const progress = ended ? (game.outcome === "won" ? "All chapters complete" : "Company closed")
     : scopeComplete(PHONE_SCOPE, game) || (chapter.number > 0 && !chapterInScope(PHONE_SCOPE, chapter.id as ScopedChapter)) ? "Phone campaign complete"
     : chapter.number === 0 ? "Launch Week in progress" : `Chapter ${chapter.number} of ${PHONE_CHAPTERS}: ${chapter.name}`;
   return { progress, resumable: true, ended, tutorialDone, continueLabel: ended ? "See how it ended" : "Continue company", chapter: chapter.number, chapterDone: done };

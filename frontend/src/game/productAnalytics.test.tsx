@@ -38,7 +38,7 @@ it("counts actual Campaign play once under StrictMode, never the title screen", 
   expect(named("gameplay_session_started")).toHaveLength(1);
   expect(named("gameplay_chapter_started")[0].properties.chapter_id).toBe("launch-week");
   expect(named("gameplay_run_started")[0].properties).toMatchObject({
-    mode: "campaign", build_id: "test-build", content_version: "launch-week-v1", eligible_started_run: true,
+    mode: "campaign", build_id: "test-build", content_version: "five-chapters-v1", eligible_started_run: true,
   });
 });
 
