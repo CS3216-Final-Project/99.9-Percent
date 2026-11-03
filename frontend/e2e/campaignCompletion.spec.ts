@@ -4,6 +4,8 @@ import {test,expect,seedSave,savedGame} from "./fixtures";
 import {completedReliability,act,scalingTrap} from "../src/sim/__tests__/completionFixture";
 import {reliabilityOutcome} from "../src/game/__fixtures__/reliabilityOutcome";
 import {canCompleteCampaign} from "../src/sim/campaignCompletion";
+import {makeEnvelope} from "../src/game/saveEnvelope";
+import {CHAPTER_TOURS,DEFAULT_META} from "../src/game/persist";
 import type {Page} from "@playwright/test";
 // These public-control journeys never select equipment in the 3D room; the Opening suite covers the real renderer.
 test.beforeEach(async ({withoutRoom}) => { await withoutRoom(); });
@@ -63,6 +65,26 @@ test("campaign: a fresh guest completes every chapter and the campaign through p
  // Stay Online is the last chapter; Next completes the campaign once the company is settled.
  await operateUntil(page,canCompleteCampaign);await pause(page);
  await page.getByRole("button",{name:"Next: Complete campaign",exact:true}).click();await expect(page.getByRole("dialog",{name:"Campaign complete"})).toBeVisible();const final=await savedGame(page);expect(final.outcome).toBe("won");expect(final.campaign!.runId).toBe(original);expect(final.campaign!.scorecard!.wholeRunUptime).not.toBeNull();await page.reload();await page.getByRole("button",{name:"See how it ended",exact:true}).click();await expect(page.getByRole("dialog",{name:"Campaign complete"})).toBeVisible();});
+test("campaign: a company saved in the removed Grow the Company chapter opens completed at Stay Online",async({page})=>{
+ const g=completedReliability(),entry=g.campaign!.step,e=makeEnvelope(g,0,1234);
+ // Recorded by an earlier build: entered Grow the Company from Stay Online, then played on in it.
+ const chapter6=[{step:entry,action:{type:"enter_combined"}},{step:entry+5,action:{type:"start_growth_wave"}},{step:entry+9,action:{type:"add_server"}}];
+ const original=JSON.stringify({...e,step:entry+300,inputs:[...e.inputs,...chapter6]});
+ await page.route("**/api/**",r=>r.abort());
+ await page.addInitScript(({save,meta})=>{if(localStorage.getItem("nn.campaign.save.v1")===null){localStorage.setItem("nn.campaign.save.v1",save);localStorage.setItem("nn.campaign.meta.v1",meta);}},
+  {save:original,meta:JSON.stringify({...DEFAULT_META,tutorialDone:true,incidentGuideDone:true,chapterTours:[...CHAPTER_TOURS],runsStarted:1})});
+ await page.goto("/");
+ await page.getByRole("button",{name:"See how it ended",exact:true}).click();
+ await expect(page.getByRole("dialog",{name:"Campaign complete"})).toBeVisible();
+ await expect(page.getByRole("alert")).toHaveCount(0);
+ expect(await savedGame(page)).toMatchObject({phase:"ended",outcome:"won",campaign:{step:entry,runId:g.campaign!.runId,apps:g.campaign!.apps.map(a=>({id:a.id}))}});
+ await page.getByRole("button",{name:"Inspect final company",exact:true}).click();
+ await page.getByRole("button",{name:"View chapters",exact:true}).click();
+ await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Stay Online"})).toContainText("Completed");
+ await page.reload();await page.getByRole("button",{name:"See how it ended",exact:true}).click();
+ await expect(page.getByRole("dialog",{name:"Campaign complete"})).toBeVisible();
+ expect((await savedGame(page)).outcome).toBe("won");
+});
 test("campaign: bankruptcy has an inspectable scorecard without awarding success",async({page, installClock, withoutRoom})=>{
   await withoutRoom();
  await installClock();let s=completedReliability();s=act(s,{type:"set_traffic_limit",enabled:true}); // real ongoing settlements exhaust the company

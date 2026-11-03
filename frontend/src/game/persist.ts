@@ -2,7 +2,7 @@ import { emptyMeasurement, type Measurement, type PlaytestEvent } from "./teleme
 import { DEFAULT_AVATAR, isAvatar, type AvatarId } from "./avatars";
 import { clampFov, FOV } from "./viewpoints";
 import { controlsOf, DEFAULT_CONTROLS, type ControlSettings } from "./controls";
-import { decodeSave, makeEnvelope, replaceable, retiredChapterStart } from "./saveEnvelope";
+import { decodeSave, makeEnvelope } from "./saveEnvelope";
 import { BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
 
 /**
@@ -173,20 +173,24 @@ export function exportGame(game: GameState, remainderMs = 0, measurement: Measur
 export function saveGame(game:GameState,remainderMs=0,explicitReset=false,measurement:Measurement=emptyMeasurement()):boolean {
   let current:string|null;
   try {current=window.localStorage.getItem(SAVE_KEY);}catch{return false;}
-  if(!explicitReset && current !== lastWrittenCampaign && !replaceable(current))return false;
+  // Never replace an existing save unless its payload can actually be replayed; bytes this session wrote already were.
+  const decoded=current===null||current===lastWrittenCampaign?null:decodeSave(current);
+  if(!explicitReset && decoded && decoded.status!=="ok")return false;
   // Back up the actual main-format bytes before upgrading the active slot.
   if (current !== null) {
     let source;
     try {source=JSON.parse(current);} catch {if(!explicitReset)return false;}
+    const backup=SAVE_KEY+".backup.v"+source?.schemaVersion+"."+source?.runId+"."+source?.savedAt;
     try {
-      // A company recorded in the removed Grow the Company chapter loads rewound, so its original is kept too.
-      if(Array.isArray(source?.inputs) && ([1,2,3,4,5,6,7].includes(source.schemaVersion) || (source.schemaVersion === 8 && !source.serviceMeasurementStart) || retiredChapterStart(source.inputs) >= 0)) {
-        const backup=SAVE_KEY+".backup.v"+source.schemaVersion+"."+source.runId+"."+source.savedAt;
+      if(Array.isArray(source?.inputs) && ([1,2,3,4,5,6,7].includes(source.schemaVersion) || (source.schemaVersion === 8 && !source.serviceMeasurementStart))) {
         const prior=window.localStorage.getItem(backup);
         if(prior!==null && prior!==current)return false;
         if(prior===null)window.localStorage.setItem(backup,current);
       }
     } catch { return false; }
+    // Play in the removed Grow the Company chapter is discarded on load and cannot be resumed by any build that
+    // saves here, so its original is kept only if there is room, and never stops the completed company saving.
+    if(decoded?.status==="ok" && decoded.retiredChapter && read(backup)===null)write(backup,current);
   }
   const raw = JSON.stringify(makeEnvelope(game,remainderMs,Date.now(),measurement));
   const saved = write(SAVE_KEY, raw);

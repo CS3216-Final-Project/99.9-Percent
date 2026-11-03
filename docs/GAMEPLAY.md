@@ -137,7 +137,8 @@ Its outcome ends on the completion menu with Stay in this chapter or Complete ca
 Complete campaign needs the acknowledged reliability outcome, normal 2,400 req/s traffic, positive cash, no incident, read reports, empty queues, finished queued changes, every server up and healthy requests.
 It ends the run as won, records the final scorecard, freezes the clock and keeps the company inspectable.
 A company that stays keeps operating, and Next in the chapter bar offers Complete campaign, disabled with its unmet requirements, until the company is ready.
-Before the final scorecard, the five colleagues celebrate once per run: Maya, Jordan, Sam, Taylor, then Alex each speak one line built from the recorded scorecard, and the last line shows uptime (when known) and incidents.
+Before the final scorecard, the five colleagues celebrate once per run: Maya, Jordan, Sam, Taylor, then Alex each speak one line.
+Taylor's line counts the recorded incidents, and the last line shows uptime (when known) and incidents from the recorded scorecard.
 Skipping it at any line counts as seeing it; leaving it part way, for example by reloading, plays it again from the start.
 
 The final scorecard separates settled and pending revenue, setup and operating costs, and salaries.
@@ -145,8 +146,10 @@ It reports rejected demand separately from service errors, plus architecture, te
 Confirmed replay archives the old company and scorecard and starts a new run ID and seed.
 
 Grow the Company, a former sixth chapter of growth waves and promotions, was removed.
-A save recorded in it loads at the step where it entered that chapter, with only its earlier inputs, so the company resumes after Stay Online and can complete the campaign.
-The browser keeps the original save as a backup when the rewound company is first saved.
+A company saved after entering it had already completed Stay Online, so it loads with the campaign completed at the step it entered that chapter.
+Everything it did in that chapter is discarded without notice, however that chapter went, including bankruptcy.
+The entry is the first attempt that chapter accepted; a refused attempt, and the Stay Online play after it, are kept.
+When the completed company is first saved, the browser keeps the original save as a backup if storage has room; a full storage never stops the save.
 
 ### Guidance
 

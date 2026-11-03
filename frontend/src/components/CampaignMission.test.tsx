@@ -78,6 +78,8 @@ it("shows a completed campaign with its scorecard and no further requirement",()
   const game=decide(completedReliability(),{type:"complete_campaign"});show(game);
   expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("Campaign complete");
   expect(screen.getByRole("region",{name:"Current unmet condition"}).textContent).toContain("Campaign complete.");
+  // Completing needed every Stay Online requirement, and the ended run still shows them all met.
+  expect(screen.getByText(/current requirements met$/).textContent).toBe("12 / 12 current requirements met");
   expect(screen.getByRole("button",{name:"View run scorecard"})).toBeTruthy();
 });
 it("shows the actual pending deployment and recalculates after its activation",()=>{

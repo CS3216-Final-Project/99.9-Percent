@@ -157,5 +157,6 @@ Menu > Playtest exports them as JSON, together with observer notes and the parti
 
 - Guided Mode records come from the engine trace (`projectEvents` in `telemetry.ts`): run and session starts, inspections, every player and autoscaler action requested and activated, traffic changes, incidents opened and recovered, chapter entries and completions, prevention progress, reliability events, campaign completion with its final scorecard, and bankruptcy.
   Each record has an event ID, run, session, build, scenario and physical step.
+  A company saved in the removed Grow the Company chapter keeps its recorded events, and loading it completed at Stay Online records nothing for that completion.
 - Both modes also record floor switches, walk mode, view changes, map use and avatar changes; Challenge Mode also records its walkthrough starts, completions and skips.
 - Challenge Mode records runs started and finished, incidents started and completed, hints, ratings, voluntary replays, resumes, imports and mode switches.
