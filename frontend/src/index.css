@@ -1458,6 +1458,22 @@ button:disabled {
 .gate-in.is-rejecting { border-color: var(--warn); }
 .gate-in.is-rejecting b { color: var(--warn); }
 .gate-in.is-rejecting .gate-note { color: var(--warn); font-weight: 700; animation: blink 1.2s steps(2, jump-none) infinite; }
+/* The Opening's first Run: the In gate announces the coming growth in its own gold until the jump has been seen. */
+.gate-in.is-cued { box-shadow: 0 0 0 2px var(--go), 0 0 18px var(--go); animation: gate-cue 1.6s ease-in-out infinite; }
+.gate-cue {
+  max-width: 22ch;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--go);
+  white-space: normal;
+}
+@keyframes gate-cue {
+  50% { box-shadow: 0 0 0 2px var(--go), 0 0 4px var(--go); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gate-in.is-cued { animation: none; }
+}
 
 @keyframes blink {
   50% {
