@@ -638,7 +638,8 @@ button:disabled {
   left: var(--tip-arrow, 50%);
   width: 10px;
   height: 10px;
-  margin-left: -5px;
+  /* Half its width plus the tooltip's border: `left` counts from inside that border. */
+  margin-left: -7px;
   background: var(--night);
   border: 2px solid var(--night-line);
   transform: rotate(45deg);

@@ -486,6 +486,7 @@
 .stepper button:hover:not(:disabled) { background: var(--control-hover); }
 .stepper button:active:not(:disabled) { background: var(--control-active); }
 .tooltip, .tooltip-arrow { border-width: 1px; }
+.tooltip-arrow { margin-left: -6px; }
 
 .eq-icon { border-radius: 8px; background: var(--tile-green); color: var(--tile-green-ink); }
 .eq-label.tone-warn .eq-icon { background: #ffe3ba; color: var(--warn-ink); }
