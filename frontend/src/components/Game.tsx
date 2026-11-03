@@ -6,7 +6,7 @@ import { PendingDeployments } from "./PendingDeployments";
 import "./ControlsDock.css";
 
 import { lazy, Suspense, useEffect } from "react";
-import { BALANCE, completedTechIds, metrics, TECH_ORDER, weekLimit } from "@/sim";
+import { completedTechIds, metrics, TECH_ORDER, userGoal, weekLimit } from "@/sim";
 import { clock, compact, money, num, signedMoney, uptimePct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
@@ -49,6 +49,7 @@ export function TopBar() {
   const m = metrics(game);
   const health = healthOf(game);
   const inc = game.phase === "incident" ? game.incident : null;
+  const goal = userGoal(game);
 
   return (
     <header className={`topbar${inc ? " is-incident" : ""}`}>
@@ -63,11 +64,13 @@ export function TopBar() {
         </Stat>
         <Stat icon="users" kind="users" label="Users" tip={usersGoalTip(game)}>
           <strong>{num(game.users)}</strong>
-          <span className="stat-goal">
-            <Meter value={game.users / BALANCE.targetUsers} label="Progress to the user goal" />
-            <Icon name="goal" size={12} />
-            <span className="muted">{compact(BALANCE.targetUsers)}</span>
-          </span>
+          {goal !== null && (
+            <span className="stat-goal">
+              <Meter value={game.users / goal} label={`Progress to ${num(goal)} users`} />
+              <Icon name="goal" size={12} />
+              <span className="muted">{compact(goal)}</span>
+            </span>
+          )}
         </Stat>
         <Stat icon="revenue" kind="revenue" label="Revenue" tip="Earned from customers each week. It drops when the service is failing.">
           <strong>{money(m.revenue)}</strong>
@@ -195,8 +198,8 @@ export function ToastHost() {
     <div className="toast" onClick={dismiss}>
       <Callout
         tone={toast.kind === "error" ? "critical" : toast.kind === "success" ? "success" : "info"}
-        icon={toast.kind === "error" ? "alert" : toast.kind === "success" ? "check" : "info"}
-        kicker={toast.kind === "error" ? "Problem" : toast.kind === "success" ? "Done" : "Note"}
+        icon={toast.milestone ? "goal" : toast.kind === "error" ? "alert" : toast.kind === "success" ? "check" : "info"}
+        kicker={toast.milestone ? "Milestone" : toast.kind === "error" ? "Problem" : toast.kind === "success" ? "Done" : "Note"}
         live={toast.kind === "error" ? "alert" : "status"}
       >
         {toast.text}

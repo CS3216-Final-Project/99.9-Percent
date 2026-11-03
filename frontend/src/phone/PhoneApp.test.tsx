@@ -110,6 +110,12 @@ describe("phone edition", () => {
     expect(time.textContent).toContain(`Week ${won.turn}`);
     expect(time.textContent).toContain("No deadline");
     expect(within(time).queryByRole("progressbar", { name: "Weeks played" })).toBeNull();
+    // The Users goal moves on to the next milestone above the company's peak.
+    fireEvent.click(screen.getByRole("button", { name: "Users and revenue" }));
+    const numbers = screen.getByRole("region", { name: "Company numbers" });
+    expect(within(numbers).getByRole("progressbar", { name: "Progress to 100,000 users" })).toBeTruthy();
+    expect(numbers.textContent).toContain("Goal 100k");
+    fireEvent.click(screen.getByRole("button", { name: "Users and revenue" }));
     const glance = within(openMenu()).getByRole("region", { name: "At a glance" });
     expect(within(glance).getAllByRole("definition")[0].textContent).toBe(String(won.turn));
   });

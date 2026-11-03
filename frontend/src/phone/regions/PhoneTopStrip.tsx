@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { BALANCE, metrics } from "@/sim";
+import { metrics, userGoal } from "@/sim";
 import { incidentActive } from "@/sim/step";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { compact, money, num, signedMoney, uptimePct } from "@/game/format";
@@ -107,13 +107,14 @@ function ClassicHeadline() {
 function ClassicNumbers() {
   const game = useGame((s) => s.game);
   const m = metrics(game);
+  const goal = userGoal(game);
   return <>
     <Stat icon="users" kind="users" label="Users" tip={usersGoalTip(game)}>
       <strong>{num(game.users)}</strong>
-      <span className="stat-goal">
-        <Meter value={game.users / BALANCE.targetUsers} label="Progress to the user goal" />
-        <span className="muted">Goal {compact(BALANCE.targetUsers)}</span>
-      </span>
+      {goal !== null && <span className="stat-goal">
+        <Meter value={game.users / goal} label={`Progress to ${num(goal)} users`} />
+        <span className="muted">Goal {compact(goal)}</span>
+      </span>}
     </Stat>
     <Stat icon="revenue" kind="revenue" label="Revenue" tip="Earned from customers each week. It drops when the service is failing.">
       <strong>{money(m.revenue)}/wk</strong>

@@ -288,6 +288,19 @@ export function weekLimit(s: GameState): number | null {
   return s.seriesAWeek === undefined ? BALANCE.maxTurns : null;
 }
 
+/** Challenge Mode's user goals: the Series A target, then the milestones a company that plays on past it climbs. */
+export const USER_MILESTONES: readonly number[] = [BALANCE.targetUsers, 100_000, 1_000_000, 10_000_000, 100_000_000];
+
+/**
+ * The user count Challenge Mode's Users meter climbs towards: the Series A target until it is secured, then the first
+ * milestone above the company's peak, or null once it has passed the last. Measured from the peak, so a goal reached
+ * stays reached when users dip.
+ */
+export function userGoal(s: GameState): number | null {
+  if (s.seriesAWeek === undefined) return BALANCE.targetUsers;
+  return USER_MILESTONES.find((m) => m > s.totals.peakUsers) ?? null;
+}
+
 /** A Challenge Mode run that has just secured its Series A, and so may carry on past it. */
 export function canKeepPlaying(s: GameState): boolean {
   return !s.campaign && s.phase === "ended" && s.outcome === "won" && s.seriesAWeek === undefined;

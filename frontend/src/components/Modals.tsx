@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { BALANCE, buildReport, weekLimit } from "@/sim";
-import { money, moneyFull, num, uptimePct } from "@/game/format";
+import { compact, money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { useGame } from "@/game/store";
 import { AccountSection, CloudSavesSection } from "./Account";
@@ -141,7 +141,7 @@ export function EndReport() {
         <div>
           <Concept kind="users" icon="users" />
           <dt>Users</dt>
-          <dd>{num(r.users)}</dd>
+          <dd>{r.users >= 10_000_000 ? compact(r.users) : num(r.users)}</dd>
         </div>
         <div>
           <Concept kind="health" icon="health" />

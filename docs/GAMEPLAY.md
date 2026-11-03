@@ -254,6 +254,9 @@ Challenge Mode is the migrated prototype ([prototype-migration.md](prototype-mig
   Choosing it carries the same company on with no deadline and no second win: growth, incidents, surges and costs continue, and only bankruptcy ends it.
   The save records the week the Series A was secured, and the final report keeps the credit for it, so a later bankruptcy is not scored as a run that never won.
   A won run that has not chosen yet reopens on its report from the home screen.
+  Playing on, the Users goal climbs through milestones of 100,000, 1,000,000, 10,000,000 and 100,000,000 users, after which there is no goal.
+  The goal is the first milestone above the company's peak users, so a milestone once reached stays reached when users dip.
+  The milestones are presentation only: they change no rule or score and are not saved.
 
 ## Saves
 

@@ -77,3 +77,11 @@ it("opens How to play on Got it, not on its Close button", () => {
   render(<StrictMode><HowToPlay /></StrictMode>);
   expect(document.activeElement).toBe(screen.getByRole("button", { name: "Got it" }));
 });
+
+it("rounds users from ten million so a company that grew past every milestone still fits its tile", () => {
+  cleanup();
+  useGame.setState({ game: { ...newLegacyGame("rating"), users: 123_456_789, cash: 82_177_907_364, outcome: "bankrupt", phase: "ended", seriesAWeek: 20 } });
+  render(<StrictMode><EndReport /></StrictMode>);
+  expect(screen.getByText("Users", { selector: ".stats dt" }).nextElementSibling?.textContent).toBe("123M");
+  expect(screen.getByText("Cash", { selector: ".stats dt" }).nextElementSibling?.textContent).toBe("$82.18B");
+});

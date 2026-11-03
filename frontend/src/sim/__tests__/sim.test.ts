@@ -23,6 +23,8 @@ import {
   type GameState,
   type RecoveryId,
   type TechId,
+  userGoal,
+  USER_MILESTONES,
 } from "../index";
 import { balanced, handleIncident, runBot } from "./bots";
 
@@ -618,6 +620,24 @@ describe("playing on past the Series A", () => {
       if (!r.ok) expect(r.reason).toBe("wrong_phase");
       expect(buildReport(s).canKeepPlaying).toBe(false);
     }
+  });
+
+  it("raises the user goal through each milestone above the company's peak, then drops it", () => {
+    expect(USER_MILESTONES).toEqual([BALANCE.targetUsers, 100_000, 1_000_000, 10_000_000, 100_000_000]);
+    // Until the Series A is secured the goal is its target, even once a won run has passed it.
+    expect(userGoal(newLegacyGame(1))).toBe(BALANCE.targetUsers);
+    expect(userGoal(won())).toBe(BALANCE.targetUsers);
+    const on = must(won(), { type: "keep_playing" });
+    expect(on.totals.peakUsers).toBeLessThan(100_000);
+    expect(userGoal(on)).toBe(100_000);
+    const at = (peakUsers: number, users = peakUsers) => userGoal({ ...on, users, totals: { ...on.totals, peakUsers } });
+    expect(at(100_000)).toBe(1_000_000);
+    expect(at(2_500_000)).toBe(10_000_000);
+    expect(at(99_999_999)).toBe(100_000_000);
+    // A dip below a milestone already reached does not bring it back.
+    expect(at(150_000, 80_000)).toBe(1_000_000);
+    // Past the last milestone there is no goal, only the count.
+    expect(at(100_000_000)).toBeNull();
   });
 
   it("continues identically after a save and reload", () => {

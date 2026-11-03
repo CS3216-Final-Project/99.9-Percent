@@ -220,7 +220,7 @@ export function RunCharts({ game, compactSet = false }: { game: GameState; compa
   const monitored = game.techDone.includes("monitoring");
   return (
     <div className="charts">
-      <LineChart title="Users" series={[{ name: "Users", color: CHART_COLORS.users, values: h.map((r) => r.users) }]} turns={turns} format={compact} target={BALANCE.targetUsers} targetLabel="Goal" />
+      <LineChart title="Users" series={[{ name: "Users", color: CHART_COLORS.users, values: h.map((r) => r.users) }]} turns={turns} format={compact} target={BALANCE.targetUsers} targetLabel={game.seriesAWeek === undefined ? "Goal" : "Series A"} />
       <LineChart title="Cash" series={[{ name: "Cash", color: CHART_COLORS.cash, values: h.map((r) => r.cash) }]} turns={turns} format={money} />
       {!compactSet && (
         <>
