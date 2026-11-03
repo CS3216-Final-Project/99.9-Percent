@@ -3,7 +3,7 @@ import { DEFAULT_AVATAR, isAvatar, type AvatarId } from "./avatars";
 import { clampFov, FOV } from "./viewpoints";
 import { controlsOf, DEFAULT_CONTROLS, type ControlSettings } from "./controls";
 import { decodeSave, makeEnvelope } from "./saveEnvelope";
-import { BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
+import { APP_PROFILES, BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
 
 /**
  * Local browser persistence. Every read and write is wrapped because storage
@@ -236,6 +236,7 @@ function looksLikeClassicGame(g: unknown): g is GameState {
   return (
     s.version === SAVE_VERSION &&
     s.campaign === undefined &&
+    (s.appProfile === undefined || s.appProfile === null || (typeof s.appProfile === "string" && Object.hasOwn(APP_PROFILES, s.appProfile))) &&
     Number.isSafeInteger(s.turn) && s.turn! >= 1 &&
     [s.seed, s.rngState, s.cash, s.users, s.satisfaction, s.techDebt, s.engineers, s.nextId].every(Number.isFinite) &&
     typeof s.phase === "string" &&

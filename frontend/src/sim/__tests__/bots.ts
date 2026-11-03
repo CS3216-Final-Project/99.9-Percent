@@ -13,6 +13,7 @@ import {
   TECH,
   techStatus,
   type Action,
+  type AppProfileId,
   type GameState,
   type RecoveryId,
   type TechId,
@@ -158,8 +159,9 @@ export interface RunResult {
   turns: number;
 }
 
-export function runBot(seed: number, strategy: Strategy, skill: IncidentSkill): RunResult {
+export function runBot(seed: number, strategy: Strategy, skill: IncidentSkill, profile?: AppProfileId): RunResult {
   let s = newLegacyGame(seed);
+  if (profile) s = act(s, { type: "choose_app_profile", profile });
   let guard = 0;
   while (s.phase !== "ended" && guard++ < 200) {
     if (s.phase === "management") {

@@ -56,6 +56,9 @@ export interface TechDef {
 
 export type PromoId = "social" | "launch" | "targeted";
 
+/** What kind of app a Challenge Mode company builds (see appProfiles.ts). */
+export type AppProfileId = "general" | "social" | "gaming" | "ecommerce" | "streaming";
+
 export interface PromoDef {
   id: PromoId;
   name: string;
@@ -386,6 +389,11 @@ export interface GameState {
   turn: number;
   phase: Phase;
   outcome: Outcome | null;
+  /**
+   * The app this Challenge Mode company builds. Null until a new company picks one in its first week; missing in
+   * runs saved before profiles existed, which play the original balance.
+   */
+  appProfile?: AppProfileId | null;
 
   cash: number;
   users: number;
@@ -461,6 +469,7 @@ export type Action =
   | { type: "set_routing"; mode: "single" | "balanced"; targets: string[] }
   | { type: "set_traffic_limit"; enabled: boolean }
   | { type: "launch_promotion"; promo: PromoId }
+  | { type: "choose_app_profile"; profile: AppProfileId }
   | { type: "add_server" }
   | { type: "remove_server" }
   | { type: "replace_host"; hostId: string }
