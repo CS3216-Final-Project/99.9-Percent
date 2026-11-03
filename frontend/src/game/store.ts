@@ -92,8 +92,11 @@ export type Speed = 0.5 | 1 | 2;
  * Challenge Mode's first-week walkthrough ("basics") and first-incident guide ("incident"); Guided Mode's Opening
  * walkthrough ("campaign") and the short guide for each later chapter, named after it.
  */
-/** A one-card Guided Mode tip shown the first time something happens; see Meta.tipsSeen. */
-export type TipTour = GuidedTip;
+/**
+ * A one-card Guided Mode tip shown the first time something happens; see Meta.tipsSeen. The Hint tip is not a card:
+ * it labels the Hint button's idle glow until the player first opens Hint (CampaignAttention.tsx).
+ */
+export type TipTour = Exclude<GuidedTip, "hint">;
 export type TourTrack = "basics" | "incident" | "campaign" | ChapterTour | TipTour;
 
 /** The chapter a Guided Mode company has entered, if it is past the Opening. */
@@ -354,6 +357,8 @@ interface Store {
   tourNext: () => void;
   tourBack: () => void;
   endTour: (completed: boolean) => void;
+  /** Remember that a one-time Guided Mode tip has done its job, so it does not show again in this browser. */
+  seeTip: (tip: GuidedTip) => void;
   dismissChapterComplete: () => void;
   /**
    * Answer the end of the chapter the company has just finished (see game/chapterCompletion.ts): stay in it, or
@@ -560,12 +565,10 @@ export const useGame = create<Store>()((set, get) => {
           Object.assign(patch,{meta,tour:{track:chapter,step:0},running:false});
         }
       }
-      // Completing the introduction spotlights the Hint button once: it keeps helping in later chapters.
       // The first settled operating week explains itself once, paused, at the first calm moment in the Opening
       // (its incident can still be running when the week settles), unless another guide is already showing.
       const tips=(patch.meta??get().meta).tipsSeen??[];
-      const tip:GuidedTip|null=!was?.completedIntroduction?.completed&&c.completedIntroduction?.completed&&!tips.includes("hint")?"hint"
-        :c.settlements.length>0&&!tips.includes("settlement")?"settlement":null;
+      const tip:TipTour|null=c.settlements.length>0&&!tips.includes("settlement")?"settlement":null;
       if(was?.runId===c.runId&&tip&&!chapterTourOf(c)&&!get().tutorialCompany
         &&!get().tour&&!patch.tour&&next.phase==="management"&&!awaitingAcknowledgement(next)) {
         const meta={...(patch.meta??get().meta),tipsSeen:[...tips,tip]};
@@ -1342,6 +1345,13 @@ export const useGame = create<Store>()((set, get) => {
     tourBack: () => {
       const tour = get().tour;
       if (tour) set({ tour: { ...tour, step: Math.max(0, tour.step - 1) } });
+    },
+    seeTip: (tip) => {
+      const meta = get().meta, seen = meta.tipsSeen ?? [];
+      if (seen.includes(tip)) return;
+      const next = { ...meta, tipsSeen: [...seen, tip] };
+      if (!saveMeta(next, get().mode)) get().notify("Onboarding preferences could not be saved.", "error");
+      set({ meta: next });
     },
     dismissChapterComplete: () => set({ chapterComplete: null }),
     finishChapter: (choice) => {
