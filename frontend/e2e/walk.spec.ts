@@ -600,8 +600,11 @@ test("naps in first person: eyes close and open", async ({ page }) => {
   await steadyFrames(page);
   const eyelids = page.locator(".view-eyelids");
   await page.keyboard.press("Space");
-  // The lids close over the view as the avatar settles, then open again as it wakes.
-  await expect(eyelids).toHaveAttribute("data-eyes", "shut", { timeout: 4_000 });
+  await expect(prompt(page)).toContainText("Resting in a nap pod");
+  // The lids close over the view as the avatar settles, then open again as it wakes. The 9 s nap keeps them shut
+  // from about 2.3 s to 6.8 s of its own time, which a starved CI runner can reach well after 4 s of wall time, so
+  // wait for as long as the nap lasts; the shut stretch is far longer than any frame gap, so it is never skipped.
+  await expect(eyelids).toHaveAttribute("data-eyes", "shut", { timeout: 12_000 });
   await expect(eyelids).toHaveAttribute("data-eyes", "open", { timeout: 12_000 });
   await expect(prompt(page)).toContainText("Rest in a nap pod");
 });
