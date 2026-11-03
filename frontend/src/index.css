@@ -332,7 +332,8 @@ button:disabled {
 .app.is-title .eq-labels,
 .app.is-title .camera-buttons,
 .app.is-title .floor-menu,
-.app.is-title .side {
+.app.is-title .side,
+.app.is-title .equipment-shell {
   display: none;
 }
 
@@ -3718,6 +3719,11 @@ button:disabled {
   justify-content: flex-end;
 }
 
+/* A dialog that ends a chapter is wide enough for Stay and Continue to sit side by side; phones still wrap them. */
+.modal:has(.chapter-end-foot) {
+  width: min(560px, 100%);
+}
+
 .chapter-end-extra {
   margin-right: auto;
 }
@@ -5335,10 +5341,16 @@ button:disabled {
 .incident .campaign-guidance { margin-top: 10px; }
 /* Tighter rhythm than the shared defaults so the whole overview fits a laptop-height panel. */
 .campaign-panel .panel-head { margin-bottom: 10px; }
-/* The banner (plus the recovery countdown once it starts) pins inside the panel's own scroll box;
-   top cancels the head's -14px bleed margin so it still sticks flush to the panel's top edge. */
-.campaign-panel .panel-head { position: sticky; top: -14px; z-index: 5; flex-wrap: wrap; }
-.campaign-panel .incident-pin-clock { flex: 1 1 100%; margin-top: 8px; }
+/* The banner (plus the recovery bar once it starts) pins inside the panel's own scroll box. Its bleed margin already
+   puts it flush with the panel's top edge, so it sticks from the first pixel of scroll and never slides. */
+.campaign-panel .panel-head { position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+/* A short phone's bottom sheet is barely taller than the banner: pinned there, it would hide everything under it. */
+@media (max-width: 900px) and (max-height: 740px) {
+  .campaign-panel .panel-head { position: relative; }
+}
+/* The pinned recovery bar spans the banner under its title, on a paper track that reads against the stripes. */
+.campaign-panel .panel-head > .incident-pin-clock { display: block; flex: 1 1 100%; margin-top: 2px; }
+.campaign-panel .incident-pin-clock .meter { height: 12px; background: var(--paper); border-color: var(--paper); border-radius: 4px; }
 .campaign-panel .incident-symptoms { margin-top: 10px; }
 .campaign-panel .impact { margin: 8px 0; }
 .campaign-panel .step-head { margin-bottom: 6px; }
@@ -5362,6 +5374,8 @@ button:disabled {
 .history-notes > .more { padding-top: 12px; }
 .history-card { padding-top: 12px; }
 .history-incidents { display: grid; gap: 10px; }
+/* The tab bar sits clearly apart from the charts, events or incidents under it. */
+.history-tabset > .tab-panel { padding-top: 16px; }
 
 @media (max-width: 480px) {
   .history-tabset .segment { padding-inline: 4px; }

@@ -1,4 +1,4 @@
-import { infrastructureAction, closeInspection } from "./componentInspection";
+import { infrastructureAction, inspectEquipment, closeInspection } from "./componentInspection";
 import { advanceCampaignStep, setGameSpeed, seedSave } from "./fixtures";
 import {test,expect,savedGame} from "./fixtures";
 
@@ -16,15 +16,16 @@ test("Opening prevention: fresh player verifies prevention and explicitly unlock
  await (await infrastructureAction(page,/Upgrade database/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
  await advanceCampaignStep(page,{seconds:4-(await savedGame(page)).campaign!.step,resumeClock:false});
  let c=(await savedGame(page)).campaign!;expect(c.consumedEvents).toContain("opening-growth");expect(c.incident).toBeNull();expect(c.reports).toEqual([]);
- const guidance=page.getByRole("region",{name:"Guided Mode requirements"}),progress=page.getByRole("region",{name:"Opening prevention progress"});
- await expect(progress).toContainText("Stable service: 0 / 5");await expect(progress.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","false");
- // The prevention checks sit under their one chapter requirement, so the chapter keeps its three.
- await expect(guidance.locator("[data-requirement]")).toHaveCount(3);await expect(guidance.locator('[data-requirement="admission"]')).toHaveCount(0);
+ const guidance=page.getByRole("region",{name:"Guided Mode requirements"});
+ // Prevention is a silent path: the panel keeps the chapter's three requirements and lists none of its checks.
+ await expect(guidance.locator("[data-requirement]")).toHaveCount(3);
+ await expect(page.getByRole("region",{name:"Opening prevention progress"})).toHaveCount(0);
+ await expect(page.getByRole("complementary",{name:"System metrics"})).not.toContainText("both valid paths");
  await (await infrastructureAction(page,/Remove traffic limit/)).click(); await page.getByRole("button", { name: "Confirm", exact: true }).click();
- await progress.getByRole("button",{name:"Inspect Application"}).click();await closeInspection(page);await progress.getByRole("button",{name:"Inspect Database"}).click();await closeInspection(page);
+ await inspectEquipment(page,"app");await closeInspection(page);await inspectEquipment(page,"db");await closeInspection(page);
  await advanceCampaignStep(page,{seconds:2});
- await expect(progress).toContainText("Stable service: 2 / 5");await expect(progress.locator('[data-requirement="admission"]')).toHaveAttribute("data-met","true");c=(await savedGame(page)).campaign!;
- await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);await expect(progress).toContainText("Stable service: 2 / 5");
+ c=(await savedGame(page)).campaign!;expect(c.openingPrevention!.stableSteps).toBe(2);
+ await page.reload();await page.getByRole("button",{name:"Continue company",exact:true}).click();expect((await savedGame(page)).campaign).toEqual(c);
  await advanceCampaignStep(page,{seconds:3});
  const outcome=page.getByRole("dialog",{name:"Prevention review"});await expect(outcome).toContainText("First growth prevented");
  c=(await savedGame(page)).campaign!;expect(c.openingRecovered).toBe(false);expect(c.reports).toEqual([]);expect(c.openingMilestone).toBeNull();

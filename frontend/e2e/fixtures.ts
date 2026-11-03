@@ -40,8 +40,8 @@ export const test = base.extend<{ healthyBrowser: void; chapterCompletions: void
     await use();
   }, { auto: true }],
   /**
-   * A run opens in first person until the player chooses a view. Journeys play as someone who chose the overview, in
-   * both modes, unless they say otherwise with test.use({ overviewChosen: false }); a record a journey seeds itself wins.
+   * Every run opens in the overview. Journeys play as someone who chose it, in both modes, unless they say otherwise
+   * with test.use({ overviewChosen: false }); a record a journey seeds itself wins.
    */
   overviewChosen: [true, { option: true }],
   chosenView: [async ({ context, overviewChosen }, use) => {

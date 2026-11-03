@@ -11,6 +11,22 @@ export async function bootChapter6(page: Page, game: GameState) {
   await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 60_000));
 }
 
+/**
+ * Follows a routing hint inside the Network window: each highlighted server in turn, then the window's Close, which the
+ * hint lights once the picks match its advice and which sends them as one routing change.
+ */
+export async function followRoutingPicks(page: Page, press: (button: Locator) => Promise<void>) {
+  const gold = page.locator(".campaign-gold-attention");
+  for (let i = 0; i < 6 && await gold.evaluate(node => node.matches(".route-check")); i++) {
+    const name = (await gold.textContent())!;
+    await press(gold); await expect(gold).not.toHaveAccessibleName(name);
+  }
+  await expect(gold).toHaveAccessibleName("Close");
+  await press(gold);
+  await expect(page.locator(".component-inspection")).toHaveCount(0);
+  await expect.poll(async () => (await savedGame(page)).campaign!.pending.some(a => a.type === "routing")).toBe(true);
+}
+
 export async function chapter6Preparation(page: Page, touch = false) {
   const press = (button: Locator) => touch ? button.tap() : button.click();
   let game = tick(act(strategyPredecessor(true), { type: "set_traffic_limit", enabled: true }));
@@ -32,17 +48,13 @@ export async function chapter6Preparation(page: Page, touch = false) {
     await press(hint.getByRole("button", { name: "Got it", exact: true }));
     await followHintComponent(page);await expect(gold).toHaveCount(1); await expect(gold).toHaveAccessibleName(name); await expect(gold).toBeEnabled();
   };
-  // Follow the routing subview, then tick each highlighted Send-traffic checkbox. A pick queues a
-  // routing change that activates on the next game second (Run), after which guidance re-highlights
-  // the next unrouted app - so keep following the gold control until every app is routed.
-  await accept(/^Server \d+$/); await press(gold);
-  const unrouted = () => savedGame(page).then(g => g.campaign!.apps.filter(a => !g.campaign!.routing.targets.includes(a.id)).length);
-  for (let i = 0; i < 4 && await unrouted(); i++) {
-    await closeInspection(page); await accept(/^Run$/); await press(gold); await page.clock.runFor(2500);
-    await press(page.getByRole("button", { name: "Pause", exact: true }));
-    if (await unrouted() === 0) break;
-    await accept(/^Server \d+$/); await press(gold);
-  }
+  // Follow the routing subview: the hint leads through each Send-traffic checkbox and then the window's Close, which
+  // sends the picks as one routing change; Run then activates it.
+  await accept(/^Server \d+$/); await followRoutingPicks(page, press);
+  await accept(/^Run$/); await press(gold); await page.clock.runFor(2500);
+  await press(page.getByRole("button", { name: "Pause", exact: true }));
+  const routed = await savedGame(page);
+  expect(routed.campaign!.apps.filter(a => !routed.campaign!.routing.targets.includes(a.id))).toEqual([]);
   expect((await savedGame(page)).campaign!.limit).toBe(500);
   // Deliver the same game ticks via the existing 2× control, with half as many WebGL frames.
   await setGameSpeed(page, 2);

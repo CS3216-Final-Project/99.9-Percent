@@ -1,38 +1,17 @@
-/* A height tween: the grid row grows from 0fr to 1fr, so the contents need no measured height. */
-.reveal {
-  display: grid;
-  grid-template-rows: 0fr;
-  opacity: 0;
-  transition: grid-template-rows 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease-out;
+/* Closed is no height; open is the contents' own height. Reveal.tsx tweens the measured height between the two. */
+.reveal:not([data-open]) {
+  height: 0;
 }
 
-.reveal[data-open] {
-  grid-template-rows: 1fr;
-  opacity: 1;
-}
-
-.reveal-inner {
-  min-height: 0;
+.reveal:is(:not([data-open]), [data-moving]) {
   overflow: hidden;
 }
 
-.reveal[data-settled] > .reveal-inner {
-  overflow: visible;
+/* A block formatting context, so the contents' margins stay inside the measured height. */
+.reveal-inner {
+  display: flow-root;
 }
 
-.reveal:not([data-open]) > .reveal-inner {
+.reveal:not([data-open]):not([data-moving]) > .reveal-inner {
   visibility: hidden;
-  transition: visibility 0s 0.26s;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .reveal,
-  .reveal:not([data-open]) > .reveal-inner {
-    transition: none;
-  }
-
-  /* No tween runs, so there is no transition end to wait for. */
-  .reveal[data-open] > .reveal-inner {
-    overflow: visible;
-  }
 }

@@ -5,6 +5,7 @@ import { campaignAttention, firstIncidentStop, guidanceActionId, incidentNeedsPa
 import { previewCampaignAction } from "@/game/campaignFinance";
 import type { Action, EquipmentId } from "@/sim";
 import { campaignClockAvailable, useGame } from "@/game/store";
+import { draftAction } from "@/game/routingDraft";
 import { isPhoneEdition } from "@/phone/edition";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { watchIdleAttention } from "./idleAttention";
@@ -86,6 +87,9 @@ function inspectionNavigation(action:Action|undefined,game:ReturnType<typeof use
 const blockingModal = () => [...document.querySelectorAll(".modal-backdrop")].some(node =>
   !node.querySelector(":scope > .component-inspection") && !node.closest(".component-inspection"));
 
+/** The inspection window's own Close, which also sends routing picked in it. */
+const INSPECTION_CLOSE = '.component-inspection > .modal-head button[aria-label="Close"]';
+
 /** What opens the folded equipment and actions: the desktop panel's reopen button, or the phone sheet's handle at peek. */
 const PANEL_ENTRY = '.panel-reopen, .phone-sheet-handle[aria-expanded="false"]';
 
@@ -107,7 +111,7 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const game = useGame(s => s.game), started = useGame(s => s.started), running = useGame(s => s.running);
   const tour = useGame(s => s.tour), practice = useGame(s => s.tutorialCompany), generation = useGame(s => s.generation);
   const view = useGame(s => s.view), selected = useGame(s => s.selected), panel = useGame(s => s.panelOpen), floor = useGame(s => s.floor);
-  const inspection=useGame(s=>s.roomInspection);
+  const inspection=useGame(s=>s.roomInspection), routingDraft=useGame(s=>s.routingDraft);
   const clockAvailable = useGame(campaignClockAvailable);
   const resumeSignal = useGame(s => s.resumeOffer);
   const confirming = useSyncExternalStore(subscribeConfirming, confirmingAction);
@@ -170,6 +174,12 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const actionControl = `${actionSelector}.campaign-action-card > button.act, button${actionSelector}`;
   const targetSelector = intro ? equipment ? equipmentEntry : "[data-introduction-complete]" : metricsStep ? ".component-inspection .component-inspection-summary" : inEquipment ? recommendedAction ? actionControl : '.component-inspection-controls > button' : equipment ? equipmentEntry : recommendedAction ? actionControl : guidanceTarget ? TARGETS[guidanceTarget] : "";
   const acceptedNow = accepted === key;
+  // Routing picked in the Network window waits for the window to close, so closing it takes Run's place in sending a
+  // change: the advised picks lead on to the window's Close, and an unsent pick lights it after the idle wait.
+  const drafted = inspection?.equipment === "gateway" && game.campaign ? draftAction(game.campaign, routingDraft) : null;
+  const advisedRouting = recommendedAction?.action.type === "set_routing" ? recommendedAction.action : null;
+  const draftDone = inEquipment && !!drafted && !!advisedRouting && [...advisedRouting.targets].sort().join(",") === [...drafted.targets].sort().join(",");
+  const [draftIdle, setDraftIdle] = useState(false);
   const spotlightSelector = riskConfirmation ? '[data-guidance="accept_scaling_risk"]' : targetSelector;
   const openNow = opened === key && available && !blocked;
   const incidentKey = `${generation}:${game.campaign?.runId}:${game.campaign?.incident?.id}`;
@@ -382,13 +392,14 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
         reveal(node);
       }
       if (node) node.dataset.guidanceStep = "true";
-      target = (inspection && equipment && !inEquipment ? visibleControl('.component-inspection > .modal-head button[aria-label="Close"]') : null) ?? (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node ? visibleControl('[data-guidance-step="true"]') : null) ?? visibleControl('.sheet-head [data-return-to-room]') ??
+      target = (inspection && equipment && !inEquipment || draftDone ? visibleControl(INSPECTION_CLOSE) : null) ?? (guidanceTarget === "run" && !clockAvailable ? null : !closed ? visibleControl(spotlightSelector) : null) ?? (node ? visibleControl('[data-guidance-step="true"]') : null) ?? visibleControl('.sheet-head [data-return-to-room]') ??
         (guidanceTarget !== "run" && guidanceTarget !== "next" && guidanceTarget !== "requirements" && guidanceTarget !== "menu" && guidanceTarget !== "finance" ? visibleControl(PANEL_ENTRY) : null);
       if (node) delete node.dataset.guidanceStep;
       target?.classList.add("campaign-gold-attention");
       markedTarget.current = target;
     };
-    const interact = (event: Event) => { if (event.target instanceof Node && target?.contains(event.target) && target.matches(spotlightSelector) && (inEquipment || !equipment)) setAccepted(null); };
+    // A routing pick only drafts the change, so the hint carries on to the next pick and then the window's Close.
+    const interact = (event: Event) => { if (event.target instanceof Node && target?.contains(event.target) && target.matches(spotlightSelector) && !target.matches(".route-check") && (inEquipment || !equipment)) setAccepted(null); };
     update();
     const observer = new MutationObserver(update);
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open", "disabled", "hidden"] });
@@ -396,7 +407,18 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("resize", update); document.addEventListener("scroll", update, true); document.addEventListener("transitionend", update, true); document.addEventListener("animationend", update, true);
     document.addEventListener("click", interact, true);
     return () => { clear(); observer.disconnect(); document.querySelectorAll('[data-guidance-step]').forEach(n => n.removeAttribute('data-guidance-step')); window.removeEventListener("resize", update); document.removeEventListener("scroll", update, true); document.removeEventListener("transitionend", update, true); document.removeEventListener("animationend", update, true); document.removeEventListener("click", interact, true); };
-  }, [acceptedNow, available, blocked, guidanceTarget, spotlightSelector, key, panel, view, running, clockAvailable, selected, recommendedAction, riskConfirmation, equipment, inEquipment, equipmentEntry, inspection, game, intro]);
+  }, [acceptedNow, available, blocked, guidanceTarget, spotlightSelector, key, panel, view, running, clockAvailable, selected, recommendedAction, riskConfirmation, equipment, inEquipment, equipmentEntry, inspection, game, intro, draftDone, routingDraft]);
+  const unsent = !!drafted;
+  useEffect(() => {
+    if (!unsent || !available || blocked) return;
+    return watchIdleAttention(setDraftIdle);
+  }, [unsent, available, blocked]);
+  useLayoutEffect(() => {
+    if (!draftIdle || acceptedNow) return;
+    const target = visibleControl(INSPECTION_CLOSE);
+    target?.classList.add("campaign-gold-attention");
+    return () => target?.classList.remove("campaign-gold-attention");
+  }, [draftIdle, acceptedNow]);
 
   useLayoutEffect(() => {
     if (!openNow) return;
@@ -439,7 +461,9 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
       why={isPhoneEdition() ? undefined : "If it doesn't work, fix something else and let it run again."} onDone={() => setIncidentSeen(firstIncident)} />, document.body)}
     {launchStep && !intro && createPortal(<LaunchTutorialCard box={spotBox} label={openingTutorial ? "Chapter 1 guide" : undefined} place={guidanceTarget === "run" || guidanceTarget === "menu" ? "top" : "left"} title={metricsStep ? "Read the metrics" : openingTutorial ? "Run, then observe" : launchStepTitle(decision.reason, recommendedAction?.action.type)}
       prompt={compactOpeningPrompt ?? (metricsStep ? decision.reason === "database" ? "Database demand is above its capacity, so work queues up and requests fail. That is the overload." : "App Server demand is above its capacity, so requests pile up as backlog and fail. That is the overload." : openingTutorial ? "Press Run to advance game time. Customers bring requests; compare their demand with your equipment's capacity." : decision.target === "run" && running ? decision.message.replace("Press Run", "Keep running") : decision.message)}
-      why={compactOpeningPrompt ? undefined : metricsStep ? "Press Next to see how to fix it. Review the price and activation delay before confirming." : decision.observation !== decision.message ? decision.observation : undefined}
+      why={metricsStep ? "Press Next to see how to fix it. Review the price and activation delay before confirming."
+        // The Opening's Run card is complete on its own; the decision's observation there is the engine's schedule note.
+        : openingTutorial ? undefined : decision.observation !== decision.message ? decision.observation : undefined}
       doneLabel={metricsStep ? "Next" : undefined} onDone={() => metricsStep ? setMetricsSeen(metricsKey) : setLaunchDone(key)} />, document.body)}
     {openNow && createPortal(<div ref={card} id="campaign-hint-card" className="campaign-hint-card" role="dialog" aria-modal="false" aria-label="Hint" tabIndex={-1} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
       <div className="campaign-hint-heading"><h3><Icon name="bulb" />Hint</h3><button type="button" className="icon-btn" aria-label="Close Hint" onClick={close}><Icon name="close" /></button></div>

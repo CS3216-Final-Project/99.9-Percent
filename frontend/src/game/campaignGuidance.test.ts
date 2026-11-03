@@ -2,6 +2,7 @@
 import {campaignGuidance,campaignObjective} from "./campaignGuidance";
 import {newGame,applyAction,type GameState,type Action} from "../sim";
 import {advanceSteps,canEnterData} from "../sim/step";
+import {preventionRequirements} from "../sim/openingPrevention";
 import {canEnterSpikes} from "../sim/autoscaling";
 import {dataCompany,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
 import {reliabilityCompany} from "../sim/__tests__/reliabilityFixture";
@@ -10,7 +11,7 @@ function decision(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw 
 function recovered(){return advanceSteps(decision(advanceSteps(newGame(),6).state,{type:"start_db_upgrade"}),30).state;}
 function scaling(){return decision(decision(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"});}
 function prevented(){return advanceSteps(decision(decision(newGame(),{type:"set_traffic_limit",enabled:true}),{type:"start_db_upgrade"}),4).state;}
-function row(g:GameState,id:string){const m=campaignGuidance(g);return [...m.requirements,...m.preventionChecks].find(r=>r.id===id)!;}
+function row(g:GameState,id:string){return campaignGuidance(g).requirements.find(r=>r.id===id)!;}
 it("objectives follow actual phase before chapter without replacing required actions",()=>{
  const g=scaling();
  expect(campaignObjective(g)).toBe("Prepare the system for the next growth wave.");
@@ -63,19 +64,20 @@ it("keeps Grow the Company's restoration row whether or not a wave has failed a 
  expect(g.campaign!.combinedStage!.currentRound!.fault!.restoredStep).toBeNull();
  expect(campaignGuidance(g).requirements).toHaveLength(calm);expect(row(g,"restored").met).toBe(false);
 });
-it("nests the prevention path's checks under its single chapter requirement",()=>{
+it("keeps the Opening to its three requirements while prevention is possible, with no prevention text",()=>{
  const m=campaignGuidance(prevented());
+ expect(m.prevention).toBe(true);
  expect(m.requirements.map(r=>r.id)).toEqual(["growth","outcome","milestone"]);
- expect(m.preventionChecks.map(r=>r.id)).toEqual(["incident","cash","admission","queues","healthy","app-inspection","db-inspection","observations","review"]);
- expect(campaignGuidance(newGame()).preventionChecks).toEqual([]);
+ expect(row(prevented(),"outcome").label).toBe("First growth handled and reviewed");
+ expect(m.optional).toBeNull();expect(m.notice).toBeNull();expect(m.waiting).toBeNull();
 });
-it("preventive limit explains full-demand qualification and leaves removal actionable",()=>{
- const g=prevented(),m=campaignGuidance(g);expect(m.prevention).toBe(true);expect(m.notice).toBe("Traffic limiting prevents full-demand qualification. Remove the limit and serve the full 800 req/s to continue the prevention path.");expect(row(g,"admission").met).toBe(false);expect(row(g,"app-inspection").met).toBe(false);expect(applyAction(g,{type:"set_traffic_limit",enabled:false}).ok).toBe(true);
+it("a preventive limit blocks full-demand prevention and leaves removal actionable",()=>{
+ const g=prevented(),r=preventionRequirements(g.campaign!);expect(r.fullDemand).toBe(false);expect(r.applicationInspected).toBe(false);expect(applyAction(g,{type:"set_traffic_limit",enabled:false}).ok).toBe(true);
 });
 it("new inspections and observations update prevention without auto-completing it",()=>{
  let g=prevented();g=decision(g,{type:"incident_inspect",equipment:"app"});g=decision(g,{type:"incident_inspect",equipment:"db"});g=decision(g,{type:"set_traffic_limit",enabled:false});
- g=advanceSteps(g,2).state;expect(row(g,"observations").label).toBe("Stable observations: 2 / 5");expect(row(g,"db-inspection").met).toBe(true);expect(campaignGuidance(g).notice).toBeNull();
- expect(campaignGuidance(g).requirements.some(r=>r.id==="recovery")).toBe(false);expect(campaignGuidance(g).optional).toContain("both valid paths");
+ g=advanceSteps(g,2).state;expect(g.campaign!.openingPrevention!.stableSteps).toBe(2);expect(preventionRequirements(g.campaign!).databaseInspected).toBe(true);expect(campaignGuidance(g).notice).toBeNull();
+ expect(campaignGuidance(g).requirements.some(r=>r.id==="recovery")).toBe(false);expect(campaignGuidance(g).optional).toBeNull();
  g=advanceSteps(g,3).state;expect(campaignGuidance(g).pendingAction?.label).toBe("Review outcome");expect(g.campaign!.openingMilestone).toBeNull();expect(g.campaign!.openingRecovered).toBe(false);
  g=decision(g,{type:"acknowledge_prevention_review"});expect(campaignGuidance(g).pendingAction?.label).toBe("Complete Opening");expect(campaignGuidance(g).stage).toBe("Opening");expect(row(g,"recovery").met).toBe(true);expect(row(g,"review").met).toBe(true);expect(row(g,"milestone").met).toBe(false);
 });
@@ -106,7 +108,7 @@ it.each(["growth","cash","milestone","management","incident","queues","reports",
 });
 it("Data optional investments and contrast are never mandatory",()=>{
  const g=dataCompany();g.campaign!.readCache=null;g.campaign!.dataStage!.contrastConsumed=false;
- expect(campaignGuidance(g).pendingAction?.action?.type).toBe("enter_spikes");expect(campaignGuidance(g).requirements.some(r=>/cache|contrast|upgrade/i.test(r.label))).toBe(false);expect(campaignGuidance(g).optional).toContain("optional");
+ expect(campaignGuidance(g).pendingAction?.action?.type).toBe("enter_spikes");expect(campaignGuidance(g).requirements.some(r=>/cache|contrast|upgrade/i.test(r.label))).toBe(false);expect(campaignGuidance(g).optional).toBeNull();
 });
 it("Data omits generic waiting copy but explains blocked readiness",()=>{
  const g=dataCompany();g.campaign!.dataStage!.consumed=false;g.campaign!.dataStage!.dueStep=999999;

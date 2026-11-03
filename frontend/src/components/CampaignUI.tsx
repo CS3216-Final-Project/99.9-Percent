@@ -55,6 +55,7 @@ import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
 import { CampaignIncidentReport, CampaignRecoveryReview, CapacityAfterFailure } from "./CampaignIncidentReport";
 import { inspectInRoom, useGame } from "@/game/store";
+import { draftedTargets } from "@/game/routingDraft";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
@@ -113,32 +114,27 @@ function CampaignGuidance() {
     {action&&!action.action&&<button className="btn btn-primary" onClick={()=>useGame.getState().openView(null)}>{action.label}<Icon name="next" /></button>}
     {c.scaling&&!c.dataStage&&!c.scaling.consumed&&!c.scalingConsent&&<ScalingRiskConsent/>}
     {c.scorecard&&<button className="btn" onClick={()=>useGame.getState().openView("scorecard")}><Icon name="goal" size={16} />View run scorecard</button>}
-    {model.prevention&&!c.openingPrevention?.outcome&&<section className="prevention-guidance" aria-label="Opening prevention progress">
-      <p role="status">Stable service: {c.openingPrevention?.stableSteps??0} / {Q.stableSteps} game seconds. Pausing adds no time; unhealthy service restarts the counter.</p>
-      <Meter value={(c.openingPrevention?.stableSteps??0)/Q.stableSteps} tone="ok" label="Stable service progress"/>
-      <RequirementList items={model.preventionChecks}/>
-      <div className="btn-row"><button className="btn btn-small" onClick={()=>inspectInRoom("app","app-1")}><Icon name="server" size={16} />Inspect Application</button><button className="btn btn-small" onClick={()=>inspectInRoom("db")}><Icon name="database" size={16} />Inspect Database</button></div>
-    </section>}
 
   </section>;
 }
 
-function RecoveryClock({ campaign: c }: { campaign: Campaign }) {
-  return <><div className="clock-row"><h3><Icon name="health" size={20} />Recovery progress</h3><strong>{c.incident!.stableSteps}/{Q.stableSteps} s</strong></div>
-    <Meter value={c.incident!.stableSteps / Q.stableSteps} tone="ok" label="Recovery progress" /></>;
+function RecoveryCount({ campaign: c }: { campaign: Campaign }) {
+  return <div className="clock-row"><h3><Icon name="health" size={20} />Recovery progress</h3><strong>{c.incident!.stableSteps}/{Q.stableSteps} s</strong></div>;
 }
 
-/** The countdown joins the pinned banner once stable seconds start; at zero it stays in the recovery card. */
+const RecoveryBar = ({ campaign: c }: { campaign: Campaign }) => <Meter value={c.incident!.stableSteps / Q.stableSteps} tone="ok" label="Recovery progress" />;
+
+/** The bar always sits in the pinned banner, empty until stable seconds start; the count stays in the recovery card. */
 function PinnedRecovery({ campaign: c }: { campaign: Campaign }) {
-  if (!c.incident || c.incident.stableSteps === 0) return null;
-  return <div className="incident-clock campaign-stability incident-pin-clock"><RecoveryClock campaign={c} /></div>;
+  if (!c.incident) return null;
+  return <div className="incident-pin-clock"><RecoveryBar campaign={c} /></div>;
 }
 
 function IncidentRecovery({ campaign: c }: { campaign: Campaign }) {
   const fault = currentFault(c);
   const failedAppActive = fault && fault.startedStep !== null && fault.restoredStep === null;
   return <section className="incident-clock campaign-stability" aria-label="Incident recovery">
-    {c.incident!.stableSteps === 0 ? <RecoveryClock campaign={c} /> : <Meter value={c.incident!.stableSteps / Q.stableSteps} tone="ok" label="Recovery progress" />}
+    <RecoveryCount campaign={c} />
     <p>Meet every condition for <b>{Q.stableSteps} consecutive game seconds</b>:</p>
     <ul className="recovery-conditions">
       <li><Icon name="latency" size={16} /><span>Latency below <b>{Q.latencyThresholdMs} ms</b></span></li>
@@ -351,7 +347,9 @@ function ContrastWorkload({disabled}:{disabled:boolean}) {
 /** The original purchase/decision controls, shared by the walkthrough panel and equipment dialogs. */
 export type EquipmentActionView="fleet"|"server"|"autoscaling"|"network"|"balancing"|"routing"|"failover";
 export function CampaignEquipmentActions({equipment,actionView}:{equipment:EquipmentId;actionView?:EquipmentActionView}) {
-  const {game,act,selectedAppId}=useGame(),c=game.campaign!;
+  const {game,act,selectedAppId,routingDraft,toggleRoutingDraft}=useGame(),c=game.campaign!;
+  // These controls live in an inspection window, so routing picks wait for it to close (see routingDraft in the store).
+  const routed=draftedTargets(c,routingDraft);
   const busy=c.pending.some(a=>!["limit","unlimit","routing"].includes(a.type));
   const unlocked=!!c.openingMilestone?.acknowledged||!!c.launchWeek;
   const dbLocked=!!c.launchWeek&&c.launchWeek.completedStep===null&&c.step<LW.growthStep;
@@ -378,12 +376,12 @@ export function CampaignEquipmentActions({equipment,actionView}:{equipment:Equip
           {at("app")&&show("server")&&<li><Act icon={scaleLocked?"lock":"scaleUp"} label={`Scale up ${serverName(selectedApp.id)}`} price={P.appCostCents/100} note={scaleLocked?"After load balancing":`${P.appDelay} game seconds`} disabled={disabled||busy||scaleLocked||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip={scaleLocked?"Locked until a load balancer shares traffic across two app servers. Launch Week teaches spreading load first.":"Increases only the selected application's capacity. Database capacity stays unchanged."} decision={{type:"scale_up",appId:selectedApp.id}} onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>}
           {at("gateway")&&show("balancing")&&<li><Act icon="shuffle" label="Deploy load balancing" price={P.lbCostCents/100} note={`${P.lbDelay} game seconds`} disabled={disabled||busy||c.loadBalancer||c.cashCents<=P.lbCostCents} tip="Installs a load balancer. Traffic changes only after you explicitly configure routing." decision={{type:"deploy_load_balancer"}} onClick={()=>act({type:"deploy_load_balancer"})}/></li>}
         </ul>
-        {at("gateway")&&show("routing")&&<><fieldset className="route-choice route-checks" disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Send traffic to · changes next game second</legend>
-          {routableApps(c).map(a=>{const routed=c.routing.targets.includes(a.id),last=routed&&c.routing.targets.length===1;
-            const targets=(routed?c.routing.targets.filter(t=>t!==a.id):[...c.routing.targets,a.id]).sort((x,y)=>Number(x.split("-")[1])-Number(y.split("-")[1]));
+        {at("gateway")&&show("routing")&&<><fieldset className="route-choice route-checks" disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Send traffic to · applies when you close this window</legend>
+          {routableApps(c).map(a=>{const on=routed.includes(a.id),last=on&&routed.length===1;
+            const targets=(on?routed.filter(t=>t!==a.id):[...routed,a.id]).sort((x,y)=>Number(x.split("-")[1])-Number(y.split("-")[1]));
             const decision:Action={type:"set_routing",mode:"balanced",targets};
-            const advised=routingAdvice?.type==="set_routing"&&routingAdvice.mode==="balanced"&&routingAdvice.targets.includes(a.id)!==routed?routingAdvice:undefined;
-            return <button type="button" role="checkbox" aria-checked={routed} key={a.id} className="route-check" disabled={last} data-guidance-action={guidanceActionId(advised??decision)} onClick={()=>{if(!last)act(decision);}} {...tipProps(last?"At least one server must keep receiving traffic.":routed?`Stop sending traffic to ${serverName(a.id)}.`:`Send traffic to ${serverName(a.id)}.`)}><span className="route-box" aria-hidden="true"><Icon name="check" size={12}/></span>{serverName(a.id)}</button>;})}
+            const advised=routingAdvice?.type==="set_routing"&&routingAdvice.mode==="balanced"&&routingAdvice.targets.includes(a.id)!==on?routingAdvice:undefined;
+            return <button type="button" role="checkbox" aria-checked={on} key={a.id} className="route-check" disabled={last} data-guidance-action={guidanceActionId(advised??decision)} onClick={()=>{if(!last)toggleRoutingDraft(a.id);}} {...tipProps(last?"At least one server must keep receiving traffic.":on?`Stop sending traffic to ${serverName(a.id)}.`:`Send traffic to ${serverName(a.id)}.`)}><span className="route-box" aria-hidden="true"><Icon name="check" size={12}/></span>{serverName(a.id)}</button>;})}
         </fieldset>
         <CampaignUnavailable action={{type:"set_routing",mode:"balanced",targets:routableApps(c).map(a=>a.id)}} disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")} />{!c.loadBalancer&&<p role="note">Deploy load balancing before configuring routing.</p>}{c.pending.some(a=>a.type==="routing"||a.type==="retire-app")&&<p role="note">A routing or retirement change is pending; wait for activation.</p>}</>}
       </section>}

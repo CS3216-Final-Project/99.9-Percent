@@ -1,12 +1,15 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "./icons";
+import { tipProps } from "./tips";
 
 /**
  * A disclosure that leaves the clock and primary action visible. `name` is how a guide refers to the menu when a
- * control it points at is folded inside (for example "Views").
+ * control it points at is folded inside (for example "Views"). `tip` names a trigger that shows only its icon, while the
+ * menu is closed: open, its panel sits where the tip would and carries the name itself.
  */
-export function DockMenu({ label, children, className = "", name }: { label: ReactNode; children: ReactNode; className?: string; name?: string }) {
+export function DockMenu({ label, children, className = "", name, tip }: { label: ReactNode; children: ReactNode; className?: string; name?: string; tip?: string }) {
   const ref = useRef<HTMLDetailsElement>(null);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     const menu = ref.current;
     const dock = menu?.closest<HTMLElement>(".controls-dock");
@@ -56,8 +59,8 @@ export function DockMenu({ label, children, className = "", name }: { label: Rea
       document.removeEventListener("keydown", escape, true);
     };
   }, []);
-  return <details ref={ref} name="bottom-controls" className={`dock-menu ${className}`} data-menu-name={name}>
-    <summary>{label}<Icon name="down" size={12} /></summary>
+  return <details ref={ref} name="bottom-controls" className={`dock-menu ${className}`} data-menu-name={name} onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary {...tipProps(open ? undefined : tip, "above")} aria-description={undefined}>{label}<Icon name="down" size={12} /></summary>
     <div className="dock-panel">{children}</div>
   </details>;
 }
