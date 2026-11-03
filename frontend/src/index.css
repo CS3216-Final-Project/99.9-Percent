@@ -1227,12 +1227,14 @@ button:disabled {
   z-index: 5;
 }
 
-/* Positioned every frame by the scene, which projects each anchor to the screen. */
+/* Positioned every frame by the scene, which projects each anchor to the screen. A label scaled down for zoom or
+   distance shrinks towards its marker's foot, so it still stands on its machine. */
 .eq-labels > * {
   position: absolute;
   left: 0;
   top: 0;
   visibility: hidden;
+  transform-origin: 50% 100%;
   will-change: transform;
   animation: label-arrive 0.3s ease-out both;
 }

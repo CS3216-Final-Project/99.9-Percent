@@ -16,6 +16,21 @@ export function screenPoint(point: THREE.Vector3, camera: THREE.Camera, width: n
   return out.set((ndc.x * 0.5 + 0.5) * width, (-ndc.y * 0.5 + 0.5) * height);
 }
 
+/** Zoom, in pixels a metre, at and above which the overview shows labels at full size: the game opens here. */
+export const LABEL_FULL_ZOOM = 30;
+/** The smallest a clickable label may be drawn, in CSS pixels tall: WCAG 2.5.8's minimum pointer target. */
+export const LABEL_MIN_PX = 24;
+
+/**
+ * How large the overview draws its labels at this zoom, as a share of their full size. Zoomed out past
+ * LABEL_FULL_ZOOM they shrink in step with the room, so the markers of neighbouring machines stay apart instead
+ * of piling up, until the shortest clickable label (`shortest` CSS pixels tall at full size) reaches LABEL_MIN_PX.
+ */
+export function zoomScale(zoom: number, shortest: number): number {
+  const least = shortest > LABEL_MIN_PX ? LABEL_MIN_PX / shortest : 1;
+  return THREE.MathUtils.clamp(zoom / LABEL_FULL_ZOOM, least, 1);
+}
+
 /** Pixels a label's marker tail reaches below its anchor point (the ::after triangle under the pill). */
 export const LABEL_TAIL = 9;
 /** Breathing room between two labels stacked on the same machine. */
@@ -47,6 +62,36 @@ export function stackDown(spots: LabelSpot[], first = 0): number[] {
     }
     out[i] = bottom;
   }
+  return out;
+}
+
+/**
+ * Y positions that keep labels from covering each other, whatever placed them. `spots` carry each label's centre x,
+ * bottom y and drawn size. Labels only ever rise: the lowest on screen keeps its place and each higher one that
+ * would cover a label below it lifts just clear, by the tail and gap of `clearance`. Rising keeps every marker above
+ * its machine and out from under a panel along the bottom, and a label lifts smoothly as a neighbour slides under it.
+ * No label rises past `top`, the room's upper edge; one that would has nowhere clear to go and keeps to the edge.
+ */
+export function separate(spots: LabelSpot[], clearance = LABEL_TAIL + LABEL_GAP, top = -Infinity): number[] {
+  const out = new Array<number>(spots.length);
+  const order = spots.map((_, i) => i).sort((a, b) => spots[b].y - spots[a].y);
+  order.forEach((i, k) => {
+    const s = spots[i];
+    const below = order.slice(0, k).filter((j) => Math.abs(spots[j].x - s.x) < (spots[j].w + s.w) / 2);
+    // A hair of slack, so a height computed to touch a neighbour exactly is not lost to rounding.
+    const free = (y: number) => below.every((j) => y - s.h >= out[j] + clearance - 1e-6 || y + clearance <= out[j] - spots[j].h + 1e-6);
+    // The free heights nearest the label's own lie at it or just above a label it would meet; above the highest
+    // of those there is always room.
+    let best = s.y;
+    if (!free(best)) {
+      best = -Infinity;
+      for (const j of below) {
+        const y = out[j] - spots[j].h - clearance;
+        if (y < s.y && y > best && free(y)) best = y;
+      }
+    }
+    out[i] = Math.min(s.y, Math.max(best, top + s.h));
+  });
   return out;
 }
 
