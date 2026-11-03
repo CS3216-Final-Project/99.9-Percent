@@ -56,6 +56,18 @@ it("uses the shared ten-second deadline for the growth explanation, then a fresh
   act(() => vi.advanceTimersByTime(9999)); expect(gold()).toHaveLength(0);
   act(() => vi.advanceTimersByTime(1)); expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
 });
+it("does not retire the Hint label when Hint is opened during the introduction", () => {
+  show(decide(newGame(7, "intro-hint", 2), { type: "begin_introduction" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  expect(screen.getByRole("dialog", { name: "Hint" })).toBeTruthy();
+  expect(useGame.getState().meta.tipsSeen).not.toContain("hint");
+});
+it("labels Hint's glow only for a player who has never opened Hint", () => {
+  useGame.setState({ meta: { ...useGame.getState().meta, tipsSeen: ["hint"] } });
+  show(scaling()); act(() => vi.advanceTimersByTime(10_000));
+  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
+  expect(screen.queryByText("Press Hint to see what to try next.")).toBeNull();
+});
 it.each([
   ["chapter Next", dataCompany, /^Next:/],
   ["reliability start", reliabilityCompany, "Start reliability test"],
@@ -363,8 +375,13 @@ it("spotlights only the Opening's first Run, then guides through the Hint flow",
   noSpot();
   act(() => vi.advanceTimersByTime(10_000));
   expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Hint");
+  // Hint's first advice labels its glow, without pausing anything or taking the clicks.
+  expect(screen.getByText("Press Hint to see what to try next.").closest('[role="status"]')?.textContent).toBe("Stuck?Press Hint to see what to try next.");
+  expect(useGame.getState().tour).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   expect(screen.getByRole("dialog", { name: "Hint" }).textContent).toContain("Your database is overloaded. Upgrade it to handle more requests.");
+  expect(screen.queryByText("Press Hint to see what to try next.")).toBeNull();
+  expect(useGame.getState().meta.tipsSeen).toContain("hint");
   acceptHint();
   expect(gold()).toHaveLength(1); expect(gold()[0].textContent).toContain("Upgrade database");
   fireEvent.click(gold()[0]);

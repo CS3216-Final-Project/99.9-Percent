@@ -5,6 +5,8 @@ interface GuidanceUI {
   pauseGold: boolean;
   resumeGold: boolean;
   hintGold: boolean;
+  /** Hint glows for a player who has never opened it, so its glow is labelled. */
+  hintNudge: boolean;
   confirmationGold: boolean;
   opened: boolean;
   /** A colleague scene is on screen; guides wait behind it rather than interleave. */
@@ -13,7 +15,7 @@ interface GuidanceUI {
   openHint: () => void;
   riskOpen: (open: boolean) => void;
 }
-export const CampaignAttentionContext = createContext<GuidanceUI>({ available: false, runGold: false, pauseGold: false, resumeGold: false, hintGold: false, confirmationGold: false, opened: false, dialogueOpen: false, button: null, openHint: () => {}, riskOpen: () => {} });
+export const CampaignAttentionContext = createContext<GuidanceUI>({ available: false, runGold: false, pauseGold: false, resumeGold: false, hintGold: false, hintNudge: false, confirmationGold: false, opened: false, dialogueOpen: false, button: null, openHint: () => {}, riskOpen: () => {} });
 export const useCampaignAttention = () => useContext(CampaignAttentionContext);
 
 /** Reuse purchase previews inside the shared component dialog without moving the camera. */
