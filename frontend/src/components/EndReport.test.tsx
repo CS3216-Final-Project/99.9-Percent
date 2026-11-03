@@ -60,3 +60,14 @@ describe("the end-of-run rating", () => {
     expect(sendFeedback).not.toHaveBeenCalled();
   });
 });
+
+it("rounds cash in the millions so a long-running company's tile is never cut short", () => {
+  cleanup();
+  useGame.setState({ game: { ...newLegacyGame("rating"), cash: -1_768_920, outcome: "bankrupt", phase: "ended", seriesAWeek: 20 } });
+  render(<StrictMode><EndReport /></StrictMode>);
+  expect(screen.getByText("Cash", { selector: ".stats dt" }).nextElementSibling?.textContent).toBe("-$1.77M");
+});
+
+it("keeps cash under a million exact", () => {
+  expect(screen.getByText("Cash", { selector: ".stats dt" }).nextElementSibling?.textContent).toMatch(/^\$\d{1,3}(,\d{3})*$/);
+});

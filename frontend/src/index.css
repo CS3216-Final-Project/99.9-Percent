@@ -3713,6 +3713,25 @@ button:disabled {
   margin: 0;
 }
 
+/* On a phone the end report's three or four actions would wrap raggedly, so they form an even grid instead: two
+   equal columns with the primary action last on the right, one column on the narrowest screens. A lone primary
+   (Play again after a loss) takes the whole row. */
+@media (max-width: 640px) {
+  .report-foot {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+  }
+
+  .report-foot .btn-row {
+    display: contents;
+  }
+
+  .report-foot .btn-row > .btn:last-child:nth-child(2) {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Stay and Continue sit together on the right; an extra action such as Copy result keeps the left. When a narrow
    dialog wraps them, each wrapped line stays right-aligned under the one before. */
 .chapter-end-foot {
@@ -4849,6 +4868,20 @@ button:disabled {
 .rating-buttons {
   display: flex;
   gap: 6px;
+}
+
+/* On a phone the five ratings share the row evenly, so the narrowest screens never push 5 past the card's edge. */
+@media (max-width: 640px) {
+  .rating-buttons {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .rating .rating-buttons button {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
 }
 
 .rating-buttons button {

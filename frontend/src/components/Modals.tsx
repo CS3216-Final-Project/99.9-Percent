@@ -151,7 +151,8 @@ export function EndReport() {
         <div>
           <Concept kind="cash" icon="cash" />
           <dt>Cash</dt>
-          <dd>{moneyFull(r.cash)}</dd>
+          {/* Exact to the dollar until a company that played on banks millions, which would not fit the tile. */}
+          <dd>{Math.abs(r.cash) >= 1_000_000 ? money(r.cash) : moneyFull(r.cash)}</dd>
         </div>
         <div>
           <Concept kind="critical" icon="incident" />
@@ -232,7 +233,7 @@ export function EndReport() {
         <RunCharts game={game} compactSet />
       </details>
 
-      <div className="modal-foot">
+      <div className="modal-foot report-foot">
         <button type="button" className="btn btn-quiet" onClick={() => openView("history")}>
           <Icon name="history" size={16} />
           History
