@@ -15,6 +15,14 @@ import { campaignAppHealth } from "@/game/campaignAppHealth";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { Meter, Modal, Row } from "./ui";
 import { takeOrigin } from "./inspectionOrigin";
+import { Settled } from "./CountUp";
+import { useCountUp } from "./useCountUp";
+
+/** The Network's traffic this second, counting to each new second's figures like the readings below it. */
+function GatewayTraffic({ incoming, admitted, rejected }: { incoming: number; admitted: number; rejected: number }) {
+  const text = (i: number, a: number, r: number) => `${num(i)} incoming / ${num(a)} accepted / ${num(r)} rejected requests/s`;
+  return <Settled shown={text(useCountUp(incoming), useCountUp(admitted), useCountUp(rejected))} final={text(incoming, admitted, rejected)} />;
+}
 
 /**
  * The diagnostic card an inspection started in the 3D room opens: the equipment's scanner on the left, the
@@ -136,7 +144,7 @@ function ComponentInspection() {
   const health=campaignAppHealth(game);
   const unit=place==="db"?"operations/s":"requests/s";
   let stateKey: keyof typeof STATE_META=info.state;
-  let word=STATE_META[stateKey].word, metric=info.summary, description=info.about;
+  let word=STATE_META[stateKey].word, metric: ReactNode=info.summary, description=info.about;
   if (failed) {
     stateKey="down";word="Down";
     metric=`0 available / ${num(installed?.capacity??0)} installed requests/s`;
@@ -162,7 +170,7 @@ function ComponentInspection() {
     description=health.interpretation;
   } else if (place==="gateway") {
     stateKey=c.limit===null?"ok":"warn";word=c.limit===null?"Healthy":"Traffic limited";
-    metric=`${num(m.incoming)} incoming / ${num(m.admitted)} accepted / ${num(m.rejected)} rejected requests/s`;
+    metric=<GatewayTraffic incoming={m.incoming} admitted={m.admitted} rejected={m.rejected}/>;
     description=c.limit===null?"All incoming traffic is admitted.":"Traffic limiting protects capacity but rejects customers; rejected requests earn no revenue.";
   }
   const routes=c.reliabilityStage?effectiveTargets(c):c.routing.targets;

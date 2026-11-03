@@ -1441,6 +1441,7 @@ button:disabled {
   padding: 3px 8px;
   font-size: var(--text-sm);
   color: var(--on-night);
+  font-variant-numeric: tabular-nums;
 }
 .gate-tag b {
   font-weight: 700;
