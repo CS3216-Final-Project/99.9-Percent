@@ -32,10 +32,12 @@ test("graded spikes: a failed test stops on its debrief, survives reload and sch
   await boot(page, game);
   const debrief = await runUntilDialog(page, "Spike 2 test failed");
   await expect(debrief).toContainText("80% served - the test needs 95%");
-  await expect(debrief).toContainText("Not enough server capacity");
+  await expect(debrief).toContainText("Too few servers");
+  await expect(debrief.getByRole("term").filter({ hasText: "Routed capacity" })).toBeVisible();
+  await expect(debrief).toContainText("3,200 / 4,000 req/s");
   // Every request is accounted for: those still queued when the spike ended count as unserved too.
   await expect(debrief).toContainText("64,000 were served, 0 rejected, 14,000 failed and 2,000 were still queued when it ended");
-  await expect(debrief).toContainText("Spike 3 starts in 20 game seconds");
+  await expect(debrief).toContainText("Spike 3 starts in 20 game seconds. The clock stays paused");
   await expect(debrief.getByRole("button", { name: "Prepare for Spike 3" })).toBeFocused();
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeDisabled();
   await page.screenshot({ path: info.outputPath("debrief.png") });

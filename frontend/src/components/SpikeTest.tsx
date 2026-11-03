@@ -9,11 +9,11 @@ import "./CampaignIncidentReport.css";
 const num = (n: number) => n.toLocaleString("en-US");
 const dollars = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
 const CAUSE_TITLE: Record<SpikeDebrief["cause"], string> = {
-  limit: "The traffic limit rejected requests",
-  database: "The database was the bottleneck",
+  limit: "Requests were rejected",
+  database: "The database overloaded",
   "autoscaler-delay": "Autoscaling arrived late",
   "uneven-servers": "A small server overloaded",
-  servers: "Not enough server capacity",
+  servers: "Too few servers",
 };
 
 /** A failed spike test: what it served, what held it back, and what to change before the next spike starts. */
@@ -24,9 +24,11 @@ export function SpikeDebriefDialog({ campaign, debrief, onContinue }: { campaign
       <Callout tone="warn" icon="load" kicker={`${d.share} served - the test needs ${PASS_SHARE}`}>
         Spike {d.pulse} sent {num(d.incoming)} requests: {num(d.served)} were served, {num(d.rejected)} rejected{d.queued ? `, ${num(d.failed)} failed and ${num(d.queued)} were still queued when it ended` : ` and ${num(d.failed)} failed`}.
       </Callout>
-      <section><h3>{CAUSE_TITLE[d.cause]}</h3><p>{d.finding}</p></section>
+      <section><h3>{CAUSE_TITLE[d.cause]}</h3>
+        <dl className="rows spike-target"><Row label={d.target.label} value={`${num(d.target.have)} / ${num(d.target.need)} ${d.target.unit}`} /></dl>
+        <p>{d.finding}</p></section>
       <section><h3>What to change</h3><p>{d.fix}</p></section>
-      <section><h3>Next test</h3><p>Spike {d.next.pulse} starts in {d.next.inSeconds} game seconds, at game second {d.next.startStep}. The clock stays paused until you press Run, so you can make changes first.</p></section>
+      <section><h3>Next test</h3><p>Spike {d.next.pulse} starts in {d.next.inSeconds} game seconds. The clock stays paused until you press Run, so you can make changes first.</p></section>
       <details className="more report-technical"><summary>View Technical Details</summary><RecordedFields data={campaign.spikeStage!.pulses!.find(p => p.pulse === d.pulse)!} /></details>
     </div>
     <div className="modal-foot"><span className="muted">The same company continues.</span><button className="btn btn-primary" data-autofocus onClick={onContinue}>Prepare for Spike {d.next.pulse}<Icon name="next" /></button></div>

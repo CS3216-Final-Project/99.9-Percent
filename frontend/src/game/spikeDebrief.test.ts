@@ -21,6 +21,7 @@ describe("failed spike debrief", () => {
     const g = untilOffset(graded(), 68), d = spikeDebrief(g)!;
     expect(d).toMatchObject({ pulse: 2, share: "80%", cause: "servers", next: { pulse: 3, inSeconds: 20 } });
     expect(d.finding).toContain("3,200 req/s");expect(d.finding).toContain("4,000 req/s");
+    expect(d.target).toEqual({ label: "Routed capacity", have: 3200, need: 4000, unit: "req/s" });
     expect(spikeDebrief(act(g, { type: "acknowledge_spike_attempt" }))).toBeNull();
   });
   it("blames the traffic limit when its rejections are most of what went unserved", () => {
@@ -31,7 +32,9 @@ describe("failed spike debrief", () => {
     let g = install(graded(), [{ type: "add_server" }, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] }], [2, 1]);
     g = untilOffset(g, 68);
     const d = spikeDebrief(g)!;
-    expect(d.cause).toBe("uneven-servers");expect(d.finding).toContain("Server 3");expect(d.fix).toContain("Scale up Server 3");
+    expect(d.cause).toBe("uneven-servers");expect(d.finding).toContain("Server 3");
+    // Its share of the 4,000 req/s spike, against what it can carry.
+    expect(d.target).toEqual({ label: "Server 3 capacity", have: 1000, need: 1333, unit: "req/s" });expect(d.fix).toContain("Scale up Server 3");
   });
   it("blames the database when it caps the spike, even while the servers also overload", () => {
     // Without the optional read cache, the 3,000 ops/s database caps service at 3,000 req/s.
@@ -39,6 +42,8 @@ describe("failed spike debrief", () => {
     expect(p).toMatchObject({ served: 60000, appOverloadSteps: 20, dbOverloadSteps: 20 });
     const d = spikeDebrief(g)!;
     expect(d.cause).toBe("database");
+    // Without the cache every request of the 4,000 req/s spike becomes database work.
+    expect(d.target).toEqual({ label: "Database capacity", have: 3000, need: 4000, unit: "ops/s" });
     // The database is already at its largest, so the only way forward is the cache.
     expect(d.fix).toContain("Deploy the read cache");expect(d.fix).not.toMatch(/larger database/i);
     // A third large server only sends the database more work it cannot do.
@@ -94,7 +99,7 @@ describe("failed spike debrief", () => {
   });
   it("routes an installed server before suggesting new ones", () => {
     const g = untilOffset(install(graded(), [{ type: "add_server" }], [3]), 68), d = spikeDebrief(g)!;
-    expect(d.cause).toBe("servers");expect(d.fix).toMatch(/^Route Server 3/);
+    expect(d.cause).toBe("servers");expect(d.fix).toMatch(/^Before the next spike, route Server 3/);
   });
   it("asks to switch autoscaling back on rather than deploy it again", () => {
     const g = untilOffset(tick(act(graded(true), { type: "set_autoscaling", enabled: false })), 68), d = spikeDebrief(g)!;
