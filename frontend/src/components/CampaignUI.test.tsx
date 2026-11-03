@@ -4,11 +4,11 @@ import {render,screen,within,fireEvent,cleanup,act} from "@testing-library/react
 import {beforeEach,afterEach,it,expect} from "vitest";
 import {CampaignPanel} from "./CampaignUI";
 import {CampaignChapters} from "./CampaignChapters";
-import {inspectOrSelect,useGame} from "../game/store";
+import {inspectInRoom,inspectOrSelect,useGame} from "../game/store";
 import {dataCompany} from "../sim/__tests__/dataFixture";
 import {protectedCombined} from "../sim/__tests__/combinedFixture";
 import {pauseTransition} from "../sim/__tests__/pauseFixture";
-import {advanceSteps} from "../sim/step";
+import {advanceSteps,applyCampaignInput} from "../sim/step";
 import {applyAction,newGame,type GameState} from "../sim";
 beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),true);});
 afterEach(cleanup);
@@ -22,22 +22,19 @@ it.each([1,2,3,4,5,6])("keeps the incident banner and recovery affordances visib
  expect(screen.getByRole("heading",{name:"Service slowdown"})).toBeTruthy();
  expect(screen.getByRole("region",{name:"Incident recovery"})).toBeTruthy();
 });
-it("pins the stable-service countdown with the incident banner only once counting starts",()=>{
+it("keeps the recovery bar in the pinned incident banner from zero, and the count in the card",()=>{
  const game=structuredClone(incidentTransitions.get(1)!).incident;
- show(game);
  const head=()=>screen.getByRole("region",{name:"Incident"}).querySelector(".panel-head")! as HTMLElement;
- // At zero stable seconds only the banner is pinned; the counter stays in the recovery card.
- expect(head().querySelector(".incident-pin-clock")).toBeNull();
- expect(within(screen.getByRole("region",{name:"Incident recovery"})).getByRole("heading",{name:"Recovery progress"})).toBeTruthy();
- // Once counting, the counter renders inside the pinned banner, not duplicated in the card.
- cleanup();
- game.campaign!.incident!.stableSteps=2;
- show(game);
- expect(within(head()).getByText("2/5 s")).toBeTruthy();
- expect(within(head()).getByRole("heading",{name:"Recovery progress"})).toBeTruthy();
- expect(within(screen.getByRole("region",{name:"Incident recovery"})).getByRole("progressbar",{name:"Recovery progress"}).getAttribute("aria-valuenow")).toBe("40");
- expect(within(screen.getByRole("region",{name:"Incident recovery"})).queryByRole("heading",{name:"Recovery progress"})).toBeNull();
- expect(screen.getAllByRole("heading",{name:"Recovery progress"})).toHaveLength(1);
+ const card=()=>screen.getByRole("region",{name:"Incident recovery"});
+ for(const [steps,now,count] of [[0,"0","0/5 s"],[2,"40","2/5 s"]] as const){
+  cleanup();game.campaign!.incident!.stableSteps=steps;show(game);
+  // The bar never moves: it is in the banner at zero as well, so progress does not make it jump there.
+  expect(within(head()).getByRole("progressbar",{name:"Recovery progress"}).getAttribute("aria-valuenow")).toBe(now);
+  expect(within(card()).queryByRole("progressbar",{name:"Recovery progress"})).toBeNull();
+  expect(within(card()).getByRole("heading",{name:"Recovery progress"})).toBeTruthy();
+  expect(within(card()).getByText(count)).toBeTruthy();
+  expect(screen.getAllByRole("progressbar",{name:"Recovery progress"})).toHaveLength(1);
+ }
 });
 it("shows all Opening requirements without a disclosure or generic growth-waiting message",()=>{
  show(newGame());const requirements=screen.getByRole("region",{name:"Guided Mode requirements"});
@@ -125,6 +122,10 @@ it("routes each app through its checkbox and keeps the last routed one checked",
  expect(boxes.map(b=>b.textContent)).toEqual(["Server 1","Server 2"]);
  expect(boxes.map(b=>b.getAttribute("aria-checked"))).toEqual(["true","true"]);
  fireEvent.click(within(route).getByRole("checkbox",{name:"Server 2"}));
+ // Picks in the window wait for it to close, then go as one routing change.
+ expect(within(route).getByRole("checkbox",{name:"Server 2"}).getAttribute("aria-checked")).toBe("false");
+ expect(useGame.getState().game.campaign!.pending.some(a=>a.type==="routing")).toBe(false);
+ fireEvent.click(screen.getByRole("button",{name:"Close"}));
  expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1"]});
  fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));route=screen.getByRole("group",{name:/Send traffic to/});
  const reason=screen.getByText("Routing requires deployed load balancing, valid active targets and a changed configuration.");
@@ -145,7 +146,51 @@ it("leaves a reserved spare out of the routing checklist",()=>{
  expect(boxes.map(b=>b.textContent)).toEqual(["Server 1","Server 3"]);
  expect(boxes.map(b=>b.getAttribute("aria-checked"))).toEqual(["true","true"]);
  fireEvent.click(within(route).getByRole("checkbox",{name:"Server 3"}));
+ fireEvent.click(screen.getByRole("button",{name:"Close"}));
  expect(useGame.getState().game.campaign!.pending.find(a=>a.type==="routing")!.routing).toEqual({mode:"balanced",targets:["app-1"]});
+},15_000);
+
+const openRouting=()=>{fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));return screen.getByRole("group",{name:/Send traffic to/});};
+const queue=(action:Parameters<typeof applyCampaignInput>[1])=>{const next=applyCampaignInput(useGame.getState().game,action);expect(next.result.ok).toBe(true);act(()=>useGame.setState({game:next.state}));};
+const routingPending=()=>useGame.getState().game.campaign!.pending.filter(a=>a.type==="routing").map(a=>a.routing!.targets);
+it("drops routing picks with a notice when another routing change is queued while the Network window is open",()=>{
+ show(dataCompany("read-heavy",false));
+ fireEvent.click(within(openRouting()).getByRole("checkbox",{name:"Server 2"}));
+ // The autoscaler queues routing on its own; that closes the window, and the picks can no longer go.
+ queue({type:"set_routing",mode:"balanced",targets:["app-2"]});
+ expect(screen.queryByRole("dialog",{name:"Network management"})).toBeNull();
+ expect(routingPending()).toEqual([["app-2"]]);
+ expect(useGame.getState().toast).toMatchObject({kind:"info",text:"Another routing change is pending, so your traffic picks were not sent."});
+ // Nothing was tried and refused, so the campaign's history holds no rejection.
+ expect(useGame.getState().lastAction?.type).not.toBe("set_routing");
+});
+it("sends routing picks when the Network window closes for another queued change",()=>{
+ show(dataCompany("read-heavy",false));
+ fireEvent.click(within(openRouting()).getByRole("checkbox",{name:"Server 2"}));
+ queue({type:"set_traffic_limit",enabled:true});
+ expect(screen.queryByRole("dialog",{name:"Network management"})).toBeNull();
+ expect(routingPending()).toEqual([["app-1"]]);
+});
+it("sends routing picks when the player inspects another machine from the Network window",()=>{
+ show(dataCompany("read-heavy",false));
+ fireEvent.click(within(openRouting()).getByRole("checkbox",{name:"Server 2"}));
+ act(()=>inspectInRoom("db"));
+ expect(routingPending()).toEqual([["app-1"]]);
+ expect(screen.getByRole("dialog",{name:"Database"})).toBeTruthy();
+});
+it("applies routing picks on top of routing that changed while the Network window was open",()=>{
+ show(protectedCombined());
+ fireEvent.click(within(openRouting()).getByRole("checkbox",{name:"Server 3"}));
+ // A failover queued before the window opened promotes the spare while it is open.
+ const game=structuredClone(useGame.getState().game),c=game.campaign!;
+ c.apps.find(a=>a.id==="app-2")!.role="serving";c.reliabilityStage!.spareId=null;c.routing={mode:"balanced",targets:["app-1","app-2","app-3"]};
+ c.apps.forEach(a=>a.routed=c.routing.targets.includes(a.id));
+ act(()=>useGame.setState({game}));
+ const route=screen.getByRole("group",{name:/Send traffic to/});
+ expect(within(route).getAllByRole("checkbox").map(b=>`${b.textContent}:${b.getAttribute("aria-checked")}`)).toEqual(["Server 1:true","Server 2:true","Server 3:false"]);
+ fireEvent.click(screen.getByRole("button",{name:"Close"}));
+ // Only the player's pick changes: the promoted spare keeps its traffic.
+ expect(routingPending()).toEqual([["app-1","app-2"]]);
 },15_000);
 
 it("opens shared equipment readings and dismisses without advancing or purchasing",()=>{

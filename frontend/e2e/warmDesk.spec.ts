@@ -33,6 +33,29 @@ for (const width of [1440, 390, 320]) test(`Warm Desk navigation and selected ic
     const value = (await stat.locator('.stat-body > strong').boundingBox())!;
     expect(icon.x + icon.width).toBeLessThanOrEqual(value.x);
   }
+  if (width > 640) {
+    // Floor, View mode and Camera are icon buttons: each keeps its name for assistive technology and shows it as a tip.
+    for (const [menu, name] of [[".room-menu", "Floor"], [".view-mode-menu", "View mode"], [".camera-menu", "Camera"]] as const) {
+      const summary = dock.locator(`${menu} > summary`);
+      await expect(summary).toHaveAccessibleName(new RegExp(`^${name}`));
+      await expect(summary).toHaveAttribute("data-tip", name);
+      await expect(summary.getByText(name, { exact: true })).toHaveClass(/visually-hidden/);
+      expect((await summary.boundingBox())!.width).toBeLessThan(100);
+    }
+    // Open, the panel sits where the tip would and names itself, so hovering its trigger shows no tip over it.
+    const camera = dock.locator(".camera-menu > summary");
+    await camera.click();
+    await camera.hover();
+    await expect(camera).not.toHaveAttribute("data-tip");
+    // Well past the tip's 200ms show delay, nothing has appeared.
+    await page.waitForTimeout(600);
+    await expect(page.locator(".tooltip")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(camera).toHaveAttribute("data-tip", "Camera");
+  } else {
+    // At phone width the menu shows its Navigation name, so it has no tip naming it otherwise.
+    await expect(dock.locator(".room-menu > summary")).not.toHaveAttribute("data-tip");
+  }
   const mode = width > 640 ? dock.locator(".view-mode-menu") : dock.locator(".room-menu");
   const trigger = mode.locator(":scope > summary");
   await expectFlatPress(page, trigger);

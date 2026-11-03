@@ -75,9 +75,16 @@ export function TooltipLayer() {
       clearTimer();
       if (current.current?.el === el && current.current.via === "hover") set(null);
     };
+    // Escape dismisses: focus it hands back to a trigger (a closed menu's summary, a modal's opener) shows no tip.
+    let escaping = false;
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      escaping = true;
+      window.setTimeout(() => { escaping = false; });
+    };
     const onFocusIn = (e: FocusEvent) => {
       const el = triggerOf(e.target);
-      if (!el || !textOf(el) || !showsOnFocus(el)) return;
+      if (escaping || !el || !textOf(el) || !showsOnFocus(el)) return;
       clearTimer();
       set({ el, text: textOf(el), via: "focus" });
     };
@@ -103,11 +110,14 @@ export function TooltipLayer() {
       ["scroll", hide],
     ];
     for (const [type, fn] of on) document.addEventListener(type, fn, { capture: true, passive: true });
+    // On the window, so it runs before any document handler that stops Escape and moves focus.
+    window.addEventListener("keydown", onEscape, { capture: true, passive: true });
     window.addEventListener("resize", hide);
     window.addEventListener("blur", hide);
     return () => {
       clearTimer();
       for (const [type, fn] of on) document.removeEventListener(type, fn, { capture: true });
+      window.removeEventListener("keydown", onEscape, { capture: true });
       window.removeEventListener("resize", hide);
       window.removeEventListener("blur", hide);
     };

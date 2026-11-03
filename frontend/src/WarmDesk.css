@@ -94,8 +94,6 @@
 .app .controls-dock .dock-menu > summary:hover { background: #ecdfc9; }
 .app .controls-dock .dock-menu[open] > summary { background: var(--selection); }
 .controls-dock .dock-menu > summary > .icon:last-child { margin-left: auto; flex: none; }
-.app .controls-dock .room-menu > summary { width: 148px; }
-.app .controls-dock .view-mode-menu > summary { width: 148px; }
 .app .controls-dock .view-mode-menu.is-walking > summary { background: var(--tile-green); color: var(--tile-green-ink); }
 .app .controls-dock .floor-number { border-radius: 8px; background: #e6d8c0; color: #594766; font-variant-numeric: tabular-nums; }
 .app .controls-dock .dock-panel { border: 1px solid var(--control-edge); border-radius: 20px; box-shadow: var(--lift); }
@@ -394,20 +392,26 @@
 .modal-menu .menu-grid > div { display: flex; }
 .modal-menu .menu-grid > div > .menu-tile { width: 100%; }
 .equipment-shell { grid-area: stage; justify-self: end; align-self: start; position: relative; z-index: 28; display: flex; flex-direction: column; min-height: 0; width: var(--side-w); max-width: calc(100% - 24px); max-height: calc(100% - 24px); margin: 12px; pointer-events: none; }
-.equipment-shell > .side { pointer-events: auto; width: 100%; margin: 0; max-height: 100%; min-height: 0; flex: 0 1 auto; box-shadow: var(--lift); }
+/* No elastic overscroll: a fast flick at either end would pull the pinned banner away and show the ground behind it. */
+.equipment-shell > .side { overscroll-behavior: none; pointer-events: auto; width: 100%; margin: 0; max-height: 100%; min-height: 0; flex: 0 1 auto; box-shadow: var(--lift); }
 .equipment-shell > .side[hidden] { display: none; }
 .panel-toggle { position: absolute; left: -48px; top: 8px; background: var(--paper); pointer-events: auto; box-shadow: var(--lift); }
-.panel-reopen { align-self: end; pointer-events: auto; background: var(--paper); box-shadow: var(--lift); }
+/* The label clips rather than wraps while the button grows into it from the hide button's size. */
+.panel-reopen { position: relative; align-self: end; justify-content: flex-start; overflow: hidden; white-space: nowrap; pointer-events: auto; background: var(--paper); box-shadow: var(--lift); }
+.panel-reopen > .icon { flex: none; }
+.toggle-sheet-icon { display: none; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.panel-reopen > .toggle-sheet-icon { transform: rotate(180deg); }
+/* The panel is a flex item with its own z-index, so the button stays above it while the panel slides away. */
+.equipment-shell > :is(.panel-toggle, .panel-reopen) { z-index: 29; }
+/* While the panel leaves, the reopen button already sits where the collapsed panel will leave it. */
+.equipment-shell.is-leaving > .panel-reopen { position: absolute; top: 0; right: 0; }
 .equipment-shell.is-collapsed { width: auto; }
 /* Hiding and showing the panel slides it toward and away from its edge instead of snapping. */
 .equipment-shell > .side:not([hidden]) { animation: panel-enter 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .equipment-shell.is-leaving > .side { animation: panel-leave 0.2s cubic-bezier(0.4, 0, 1, 1) forwards; }
-.equipment-shell.is-leaving > .panel-toggle { opacity: 0; transition: opacity 0.12s ease-out; }
-.panel-reopen { animation: panel-reopen-enter 0.18s ease-out; }
 @keyframes panel-enter { from { opacity: 0; transform: translateX(24px) scale(0.98); } }
 @keyframes panel-leave { to { opacity: 0; transform: translateX(24px) scale(0.98); } }
-@keyframes panel-reopen-enter { from { opacity: 0; transform: translateX(8px); } }
-@media (prefers-reduced-motion: reduce) { .equipment-shell > .side:not([hidden]), .equipment-shell.is-leaving > .side, .panel-reopen { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .equipment-shell > .side:not([hidden]), .equipment-shell.is-leaving > .side { animation: none; } .toggle-sheet-icon { transition: none; } }
 .equipment-readings { padding: 12px; background: var(--control-inset); border-radius: var(--radius); }
 .readings-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .readings-head h3 { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -457,7 +461,11 @@
   .equipment-shell { width: auto; max-width: 100%; justify-self: stretch; align-self: end; margin: 0; max-height: 56%; }
   .equipment-shell > .side { width: 100%; border: 1px solid var(--control-edge); border-bottom: 0; border-radius: 20px 20px 0 0; }
   .panel-toggle { left: auto; right: 10px; top: -48px; }
-  .equipment-shell.is-collapsed { justify-self: end; align-self: start; margin: 12px; }
+  /* The sheet rises from the bottom, so its button stays at the bottom edge and its chevron points the way it moves. */
+  .equipment-shell.is-collapsed { justify-self: end; align-self: end; margin: 12px; }
+  .equipment-shell.is-leaving > .panel-reopen { top: auto; right: 12px; bottom: 12px; }
+  .toggle-side-icon { display: none; }
+  .toggle-sheet-icon { display: block; }
   @keyframes panel-enter { from { opacity: 0; transform: translateY(24px); } }
   @keyframes panel-leave { to { opacity: 0; transform: translateY(24px); } }
 }
