@@ -36,7 +36,6 @@ test("the Opening's first Run looks at the In gate and announces the growth unti
   // Finish the introduction the way a player does, so the Opening begins exactly as it does for them.
   await page.getByRole("complementary", { name: "System metrics" }).getByRole("button", { name: "Complete Introduction", exact: true }).click();
   await expect(page.getByLabel("Current chapter", { exact: true })).toHaveText("Opening");
-  await page.getByRole("dialog", { name: "Tip, step 1 of 1", exact: true }).getByRole("button", { name: "Got it", exact: true }).click();
 
   const gate = page.locator(".gate-in");
   await expect(gate).not.toHaveClass(/is-cued/);
