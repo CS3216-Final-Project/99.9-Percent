@@ -1344,7 +1344,7 @@ export const useGame = create<Store>()((set, get) => {
       const meta = get().meta, seen = meta.tipsSeen ?? [];
       if (seen.includes(tip)) return;
       const next = { ...meta, tipsSeen: [...seen, tip] };
-      saveMeta(next);
+      if (!saveMeta(next, get().mode)) get().notify("Onboarding preferences could not be saved.", "error");
       set({ meta: next });
     },
     dismissChapterComplete: () => set({ chapterComplete: null }),

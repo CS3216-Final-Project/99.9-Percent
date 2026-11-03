@@ -439,8 +439,9 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     return () => { window.removeEventListener("resize", place); document.removeEventListener("pointerdown", outside, true); };
   }, [openNow]);
   const hintGold = candidate && idle === timerKey && decision.attention === "hint";
-  const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, resumeGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold, hintNudge: hintGold && !hintTipSeen, opened: openNow, dialogueOpen: introOpen, button, riskOpen,
-    openHint: () => { if (!blocked) { if (!openNow) useGame.getState().seeTip("hint"); setPauseOffer(null); setResumeOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
+  const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, resumeGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold, hintNudge: hintGold && !hintTipSeen && !introOpen, opened: openNow, dialogueOpen: introOpen, button, riskOpen,
+    // Only the real company learns Hint from opening it: the introduction and a practice replay never show the nudge.
+    openHint: () => { if (!blocked) { if (!openNow && !intro && !practice) useGame.getState().seeTip("hint"); setPauseOffer(null); setResumeOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
   const close = () => { setOpened(null); button.current?.focus(); };
   const compactOpeningPrompt = openingTutorial && isPhoneEdition() && decision.reason === "opening-growth"
     ? "Press Run to advance time and watch customer demand."
@@ -484,7 +485,7 @@ export function CampaignHintButton() {
   // While the nudge labels the button, the hover tooltip would only repeat it on top of it.
   return <>
     <button ref={button} type="button" className={`icon-btn campaign-hint${hintGold ? " campaign-gold-attention" : ""}`} aria-label="Hint" aria-haspopup="dialog" aria-expanded={opened} aria-controls={opened ? "campaign-hint-card" : undefined} {...tipProps(hintNudge ? undefined : HINT_TIP, "below")} aria-description={HINT_TIP} data-tip-title="Hint" onClick={openHint}><Icon name="bulb" /></button>
-    {hintNudge && button && <HintNudge anchor={button} />}
+    {hintNudge && <HintNudge anchor={button} />}
   </>;
 }
 
@@ -492,14 +493,16 @@ export function CampaignHintButton() {
  * The first time Hint has advice and the player has sat idle, its glow says what it is for, in the tooltip's style,
  * until the player first opens Hint. It never pauses the game or takes a click.
  */
-function HintNudge({ anchor }: { anchor: RefObject<HTMLButtonElement | null> }) {
+function HintNudge({ anchor }: { anchor: RefObject<HTMLButtonElement | null> | null }) {
   const box = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     let frame = 0;
     const place = () => {
-      const node = box.current, el = anchor.current;
-      if (node && el) {
-        const r = el.getBoundingClientRect();
+      const node = box.current, el = anchor?.current, r = el?.getBoundingClientRect();
+      // A chapter stage card sits over the header, and a button without a box has nowhere to point.
+      const away = !r || !r.width || !r.height || !!document.querySelector(".chapter-stage-popup");
+      if (node) node.style.visibility = away ? "hidden" : "";
+      if (node && r && !away) {
         const p = placeTip({ left: r.left, top: r.top, width: r.width, height: r.height }, { width: node.offsetWidth, height: node.offsetHeight }, { width: document.documentElement.clientWidth, height: window.innerHeight });
         node.style.left = `${p.left}px`; node.style.top = `${p.top}px`;
         node.style.setProperty("--tip-arrow", `${p.arrow}px`); node.dataset.side = p.side;

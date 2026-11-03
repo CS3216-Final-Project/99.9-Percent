@@ -122,6 +122,7 @@ Phones show a shorter version that fits the coach strip.
 The card shows only while no game time has run and nothing has been recorded since the incident opened, so a reload derives it from the company; Got it, Run, Hint, an inspection or any other recorded input retire it, an obstructing view hides it for a moment, and idle Hint gold waits for it.
 Hint is explained when it first has advice, not before: while Hint glows gold after the idle wait for a player who has never opened it, a label in the tooltip's style points at the button ("Stuck? Press Hint to see what to try next.") in place of its hover tooltip.
 The label never pauses the game or takes a click, returns with each glow until the player first opens Hint, and is then gone for good in this browser (`Meta.tipsSeen`).
+Opening Hint during the introduction or a practice replay does not count, and the label hides while a colleague dialogue or chapter stage card is open or the button has no box on screen.
 The coach responds to recorded state, honors manual Hint and obstructing views, and never advances time or purchases anything itself. Reload derives the appropriate lesson from the current company; older Opening saves retain their existing Hint flow.
 
 

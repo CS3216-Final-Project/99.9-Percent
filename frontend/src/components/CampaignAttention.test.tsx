@@ -57,6 +57,12 @@ it("uses the shared ten-second deadline for the growth explanation, then a fresh
   act(() => vi.advanceTimersByTime(9999)); expect(gold()).toHaveLength(0);
   act(() => vi.advanceTimersByTime(1)); expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
 });
+it("does not retire the Hint label when Hint is opened during the introduction", () => {
+  show(decide(newGame(7, "intro-hint", 2), { type: "begin_introduction" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  expect(screen.getByRole("dialog", { name: "Hint" })).toBeTruthy();
+  expect(useGame.getState().meta.tipsSeen).not.toContain("hint");
+});
 it("labels Hint's glow only for a player who has never opened Hint", () => {
   useGame.setState({ meta: { ...useGame.getState().meta, tipsSeen: ["hint"] } });
   show(scaling()); act(() => vi.advanceTimersByTime(10_000));
