@@ -38,3 +38,23 @@ test('closing the Network window with the routing as it was queues nothing', asy
   await expect(network).toBeHidden();
   expect((await savedGame(page)).campaign!.pending.some(a => a.type === 'routing')).toBe(false);
 });
+
+test('an unsent routing pick lights the Network window\'s Close after the idle wait, as Run is lit for a pending one', async ({ page, withoutRoom, installClock }) => {
+  await withoutRoom();
+  await installClock();
+  await seedSave(page, dataCompany());
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue company', exact: true }).click();
+  const network = await openGatewayManagement(page);
+  const gold = page.locator('.campaign-gold-attention');
+  await page.clock.runFor(11_000);
+  // With nothing picked there is nothing to send, so the window's Close stays plain.
+  await expect(gold).toHaveCount(0);
+  await network.getByRole('checkbox', { name: 'Server 2', exact: true }).click();
+  await page.clock.runFor(11_000);
+  await expect(gold).toHaveCount(1);
+  await expect(gold).toHaveAccessibleName('Close');
+  await gold.click();
+  await expect(network).toBeHidden();
+  await expect.poll(async () => (await savedGame(page)).campaign!.pending.filter(a => a.type === 'routing').map(a => a.routing?.targets)).toEqual([['app-1']]);
+});
