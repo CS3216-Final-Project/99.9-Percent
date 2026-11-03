@@ -7,6 +7,7 @@ import { useGame } from "@/game/store";
 import { AppHealthEntry } from "@/components/CampaignAppHealth";
 import { FinanceEntry } from "@/components/CampaignFinance";
 import { healthOf } from "@/components/health";
+import { usersGoalTip } from "@/components/presentation";
 import { Icon } from "@/components/icons";
 import { SoundButton } from "@/components/SoundButton";
 import { tipProps } from "@/components/tips";
@@ -107,7 +108,7 @@ function ClassicNumbers() {
   const game = useGame((s) => s.game);
   const m = metrics(game);
   return <>
-    <Stat icon="users" kind="users" label="Users" tip={`Your goal: ${num(BALANCE.targetUsers)} by week ${BALANCE.maxTurns}. Every user adds traffic.`}>
+    <Stat icon="users" kind="users" label="Users" tip={usersGoalTip(game)}>
       <strong>{num(game.users)}</strong>
       <span className="stat-goal">
         <Meter value={game.users / BALANCE.targetUsers} label="Progress to the user goal" />

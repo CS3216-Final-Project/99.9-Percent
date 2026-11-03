@@ -235,6 +235,7 @@ function looksLikeClassicGame(g: unknown): g is GameState {
     [s.seed, s.rngState, s.cash, s.users, s.satisfaction, s.techDebt, s.engineers, s.nextId].every(Number.isFinite) &&
     typeof s.phase === "string" &&
     PHASES.has(s.phase) &&
+    (s.seriesAWeek === undefined || (Number.isSafeInteger(s.seriesAWeek) && s.seriesAWeek >= 1 && s.outcome !== "won")) &&
     !!s.infra &&
     Array.isArray(s.infra.appHosts) &&
     s.infra.appHosts.length > 0 &&
@@ -485,6 +486,8 @@ export type AnalyticsName =
   | "incident_completed"
   | "hint_used"
   | "run_finished"
+  | "endless_started"
+  | "endless_finished"
   | "voluntary_replay"
   | "rating_submitted"
   | "save_resumed"

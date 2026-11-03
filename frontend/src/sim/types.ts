@@ -386,6 +386,11 @@ export interface GameState {
   turn: number;
   phase: Phase;
   outcome: Outcome | null;
+  /**
+   * Challenge Mode: the week the Series A was secured, once the player chose to keep playing. The run then has no
+   * deadline or win, and only bankruptcy ends it. Missing in runs that have not continued past the Series A.
+   */
+  seriesAWeek?: number;
 
   cash: number;
   users: number;
@@ -480,6 +485,7 @@ export type Action =
   | { type: "incident_action"; recovery: RecoveryId }
   | { type: "incident_hint" }
   | { type: "acknowledge_review" }
+  | { type: "keep_playing" }
   | { type: "acknowledge_milestone"; enterScaling?: boolean }
   | { type: "acknowledge_prevention_review" };
 

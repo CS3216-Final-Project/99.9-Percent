@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BALANCE, buildReport } from "@/sim";
+import { BALANCE, buildReport, weekLimit } from "@/sim";
 import { money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { useGame } from "@/game/store";
@@ -19,6 +19,7 @@ import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { ModeSwitch } from "./ModeSwitch";
 import { SaveFiles } from "./SaveFiles";
 import { SoundSettings } from "./SoundSettings";
+import { tipProps } from "./tips";
 import { Callout, Concept, Modal } from "./ui";
 import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { PostmortemBody, RunCharts } from "./Views";
@@ -118,6 +119,7 @@ const RATING_REPLY: Record<number, string> = {
 export function EndReport() {
   const game = useGame((s) => s.game);
   const newRun = useGame((s) => s.newRun);
+  const act = useGame((s) => s.act);
   const rate = useGame((s) => s.rate);
   const rating = useGame((s) => s.rating);
   const openView = useGame((s) => s.openView);
@@ -240,10 +242,16 @@ export function EndReport() {
             <Icon name="refresh" size={16} />
             Same seed
           </button>
-          <button type="button" className="btn btn-primary" autoFocus onClick={() => newRun({ voluntary: true })}>
+          <button type="button" className={`btn${r.canKeepPlaying ? "" : " btn-primary"}`} data-autofocus={r.canKeepPlaying ? undefined : true} onClick={() => newRun({ voluntary: true })}>
             <Icon name="play" size={16} />
             Play again
           </button>
+          {r.canKeepPlaying && (
+            <button type="button" className="btn btn-primary" data-autofocus onClick={() => act({ type: "keep_playing" })} {...tipProps("Carry this company on with no deadline. Only running out of cash ends the run.")}>
+              <Icon name="next" size={16} />
+              Keep playing
+            </button>
+          )}
         </div>
       </div>
     </Modal>
@@ -310,7 +318,8 @@ export function Menu() {
   };
 
   const close = () => openView(null);
-  const week = Math.min(game.turn, BALANCE.maxTurns);
+  const limit = weekLimit(game);
+  const week = limit === null ? game.turn : Math.min(game.turn, limit);
   // Shown beside whichever control asked for the confirmation.
   const warning = (
     <Callout compact tone="warn" icon="alert" kicker="Are you sure?">
@@ -330,7 +339,7 @@ export function Menu() {
         title="At a glance"
         saved={saveStatus === "saved"}
         stats={[
-          { icon: "week", kind: "go", label: "Week", value: `${week} / ${BALANCE.maxTurns}` },
+          { icon: "week", kind: "go", label: "Week", value: limit === null ? String(week) : `${week} / ${limit}` },
           { icon: "users", kind: "users", label: "Users", value: num(game.users) },
           { icon: "cash", kind: "cash", label: "Cash", value: money(game.cash) },
         ]}

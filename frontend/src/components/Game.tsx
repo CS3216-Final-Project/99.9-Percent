@@ -6,11 +6,12 @@ import { PendingDeployments } from "./PendingDeployments";
 import "./ControlsDock.css";
 
 import { lazy, Suspense, useEffect } from "react";
-import { BALANCE, completedTechIds, metrics, TECH_ORDER } from "@/sim";
+import { BALANCE, completedTechIds, metrics, TECH_ORDER, weekLimit } from "@/sim";
 import { clock, compact, money, num, signedMoney, uptimePct } from "@/game/format";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { healthOf } from "./health";
+import { usersGoalTip } from "./presentation";
 import { SoundButton } from "./SoundButton";
 import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
@@ -60,7 +61,7 @@ export function TopBar() {
           <strong className={game.cash < 10_000 ? "text-critical" : ""}>{money(game.cash)}</strong>
           <span className={m.net >= 0 ? "text-ok" : "text-warn"}>{signedMoney(m.net)}/wk</span>
         </Stat>
-        <Stat icon="users" kind="users" label="Users" tip={`Your goal: ${num(BALANCE.targetUsers)} by week ${BALANCE.maxTurns}. Every user adds traffic.`}>
+        <Stat icon="users" kind="users" label="Users" tip={usersGoalTip(game)}>
           <strong>{num(game.users)}</strong>
           <span className="stat-goal">
             <Meter value={game.users / BALANCE.targetUsers} label="Progress to the user goal" />
@@ -99,7 +100,9 @@ export function TopBar() {
 function WeekClock() {
   const game = useGame((s) => s.game);
   const inc = game.phase === "incident" ? game.incident : null;
-  const week = Math.min(game.turn, BALANCE.maxTurns);
+  // Past the Series A there is no last week: the count runs on and the strip of weeks left goes.
+  const limit = weekLimit(game);
+  const week = limit === null ? game.turn : Math.min(game.turn, limit);
   return (
     <div className={`week${inc ? " is-incident" : ""}`}>
       <span className="brand-week">
@@ -110,15 +113,17 @@ function WeekClock() {
           </>
         ) : (
           <>
-            Week <strong>{week}</strong>/{BALANCE.maxTurns}
+            Week <strong>{week}</strong>{limit !== null && `/${limit}`}
           </>
         )}</span>
       </span>
-      <span className="week-track" aria-hidden="true">
-        {Array.from({ length: BALANCE.maxTurns }, (_, i) => (
-          <i key={i} className={i + 1 < week ? "is-past" : i + 1 === week ? "is-now" : ""} />
-        ))}
-      </span>
+      {limit !== null && (
+        <span className="week-track" aria-hidden="true">
+          {Array.from({ length: limit }, (_, i) => (
+            <i key={i} className={i + 1 < week ? "is-past" : i + 1 === week ? "is-now" : ""} />
+          ))}
+        </span>
+      )}
     </div>
   );
 }

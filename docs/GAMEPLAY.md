@@ -11,7 +11,7 @@ The home screen offers two modes, each with its own save.
 | Mode | Internal name | Clock | Goal |
 | --- | --- | --- | --- |
 | Guided Mode | `campaign` | Continuous game seconds, settled every 60 seconds as an operating week | Learn infrastructure concepts through a walkthrough and six chapters |
-| Challenge Mode | `classic` | Weekly turns, 26 weeks | Reach 50,000 users before week 26 without going bankrupt |
+| Challenge Mode | `classic` | Weekly turns, 26 weeks | Reach 50,000 users before week 26 without going bankrupt, then optionally keep playing with no deadline |
 
 Challenge Mode is locked until the first five Guided Mode chapters (Opening to Stay Online) are complete.
 Once unlocked, a player can switch between modes without losing either save.
@@ -250,6 +250,10 @@ Challenge Mode is the migrated prototype ([prototype-migration.md](prototype-mig
 - The workload assumes 60% of database demand is cache-eligible, and writes are never cached.
 - Promotions need no research: Social push from the start, Launch campaign at 5,000 users and Targeted campaign at 10,000 users.
 - Legacy definitions from the 17-node prototype tree remain only so old saves resume; removed research cannot be started again, and progress counts only the nine nodes.
+- Reaching 50,000 users secures the Series A and ends the run on its report, which offers Keep playing.
+  Choosing it carries the same company on with no deadline and no second win: growth, incidents, surges and costs continue, and only bankruptcy ends it.
+  The save records the week the Series A was secured, and the final report keeps the credit for it, so a later bankruptcy is not scored as a run that never won.
+  A won run that has not chosen yet reopens on its report from the home screen.
 
 ## Saves
 

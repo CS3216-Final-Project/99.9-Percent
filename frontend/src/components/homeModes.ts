@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BALANCE, type GameState } from "@/sim";
+import { BALANCE, canKeepPlaying, weekLimit, type GameState } from "@/sim";
 import { campaignChapters } from "@/game/campaignChapters";
 import { loadClassicGame, loadGame, loadMeta, type GameMode } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
@@ -40,8 +40,12 @@ export function campaignSummary(game: GameState | null, tutorialDone: boolean): 
 
 export function classicSummary(game: GameState | null, tutorialDone: boolean): Summary {
   if (!game || game.campaign || isFreshRun(game)) return { progress: null, resumable: false, ended: false, tutorialDone, continueLabel: "Start Challenge Mode" };
+  // A run that has just secured its Series A reopens on its report, where it can still keep playing.
+  if (canKeepPlaying(game)) return { progress: "Series A secured", resumable: true, ended: false, tutorialDone, continueLabel: "See your results" };
   const ended = game.phase === "ended";
-  return { progress: ended ? (game.outcome === "won" ? "Last company reached the goal" : "Last company closed") : `Week ${game.turn} of ${BALANCE.maxTurns}`, resumable: !ended, ended, tutorialDone,
+  const limit = weekLimit(game);
+  const week = limit === null ? `Week ${game.turn}: Series A secured` : `Week ${game.turn} of ${limit}`;
+  return { progress: ended ? "Last company closed" : week, resumable: !ended, ended, tutorialDone,
     continueLabel: ended ? "Start Challenge Mode" : `Continue week ${game.turn}` };
 }
 

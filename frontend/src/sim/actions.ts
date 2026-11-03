@@ -17,7 +17,7 @@ import { rand } from "./rng";
 import { addAppHost, clone, logEvent, newId } from "./state";
 import { serverName } from "./names";
 import { has, isResearchTech, missingPrerequisites, TECH, techStatus } from "./tech";
-import { acknowledgeReview } from "./turn";
+import { acknowledgeReview, keepPlaying } from "./turn";
 import type { Action, ActionResult, DeployRecord, FailureReason, GameState } from "./types";
 
 function money(v: number): string {
@@ -383,6 +383,10 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
     case "acknowledge_review": {
       if (prev.phase !== "review") return fail("wrong_phase", "There is nothing to review.");
       return ok(acknowledgeReview(prev));
+    }
+    case "keep_playing": {
+      const next = keepPlaying(prev);
+      return next ? ok(next, "No more deadline. Keep the company growing.") : fail("wrong_phase", "Only a run that just secured the Series A can keep playing.");
     }
     default: return fail("invalid", "This action requires Guided Mode.");
   }

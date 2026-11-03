@@ -1,4 +1,5 @@
-import type { EquipmentId, EquipmentState, EventKind, Postmortem, TechId } from "@/sim";
+import { BALANCE, type EquipmentId, type EquipmentState, type EventKind, type GameState, type Postmortem, type TechId } from "@/sim";
+import { num } from "@/game/format";
 import type { IconName } from "./icons";
 import type { ConceptKind } from "./ui";
 
@@ -77,6 +78,14 @@ export const OUTCOME_ICON: Record<Postmortem["outcome"], IconName> = {
 
 export function outcomeTone(pm: Postmortem): "ok" | "warn" | "critical" {
   return pm.outcome === "failed" ? "critical" : pm.outcome === "mitigated" ? "warn" : "ok";
+}
+
+/** Challenge Mode's Users tooltip: the goal and its deadline, or the Series A already secured. */
+export function usersGoalTip(game: GameState): string {
+  const goal = game.seriesAWeek === undefined
+    ? `Your goal: ${num(BALANCE.targetUsers)} by week ${BALANCE.maxTurns}.`
+    : `Series A secured in week ${game.seriesAWeek}. There is no deadline now; keep growing.`;
+  return `${goal} Every user adds traffic.`;
 }
 
 /** Series colours, shared by both modes' history charts. */

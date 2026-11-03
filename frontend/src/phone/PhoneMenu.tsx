@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BALANCE } from "@/sim";
+import { BALANCE, weekLimit } from "@/sim";
 import { money, num } from "@/game/format";
 import { challengeAvailable, guidedScopeComplete, useGame } from "@/game/store";
 import { GraphicsSettings } from "@/components/GraphicsSettings";
@@ -59,9 +59,10 @@ function GuidedRun() {
 function ChallengeRun() {
   const game = useGame((s) => s.game);
   const saved = useGame((s) => s.saveStatus === "saved");
-  const week = Math.min(game.turn, BALANCE.maxTurns);
+  const limit = weekLimit(game);
+  const week = limit === null ? game.turn : Math.min(game.turn, limit);
   return <MenuRun title="At a glance" saved={saved} stats={[
-    { icon: "week", kind: "go", label: "Week", value: `${week} / ${BALANCE.maxTurns}` },
+    { icon: "week", kind: "go", label: "Week", value: limit === null ? String(week) : `${week} / ${limit}` },
     { icon: "users", kind: "users", label: "Users", value: num(game.users) },
     { icon: "cash", kind: "cash", label: "Cash", value: money(game.cash) },
   ]} />;

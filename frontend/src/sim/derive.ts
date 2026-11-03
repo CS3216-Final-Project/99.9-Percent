@@ -283,6 +283,16 @@ export function churnRate(satisfaction: number): number {
   return BALANCE.growth.baseChurn + Math.max(0, 70 - satisfaction) * BALANCE.growth.churnPerSatPoint;
 }
 
+/** Challenge Mode's last week, or null once the Series A is secured and the company plays on without one. */
+export function weekLimit(s: GameState): number | null {
+  return s.seriesAWeek === undefined ? BALANCE.maxTurns : null;
+}
+
+/** A Challenge Mode run that has just secured its Series A, and so may carry on past it. */
+export function canKeepPlaying(s: GameState): boolean {
+  return !s.campaign && s.phase === "ended" && s.outcome === "won" && s.seriesAWeek === undefined;
+}
+
 /** Overall availability across the run, as a fraction (0.9995 = 99.95%). */
 export function uptime(s: GameState): number {
   if(s.campaign){const c=s.campaign.cumulative;return c.successful+c.failed?c.successful/(c.successful+c.failed):1;}

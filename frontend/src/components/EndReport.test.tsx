@@ -21,6 +21,11 @@ const reply = () => screen.getByRole("status").textContent;
 const feedback = () => screen.queryByRole("textbox", { name: "Your feedback" });
 const ratings = () => readAnalytics().filter((e) => e.name === "rating_submitted").map((e) => e.data?.rating);
 
+it("opens on Play again, not on a rating, and offers no Keep playing to a bankrupt run", () => {
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Play again" }));
+  expect(screen.queryByRole("button", { name: "Keep playing" })).toBeNull();
+});
+
 describe("the end-of-run rating", () => {
   it("replies to the chosen rating and updates when the choice changes", () => {
     expect(reply()).toBe("1 no, 5 loved it");

@@ -1,10 +1,14 @@
 import { BALANCE } from "./balance";
-import { clamp, uptime } from "./derive";
+import { canKeepPlaying, clamp, uptime } from "./derive";
 import { BRANCHES, completedTechIds, TECH, TECH_ORDER } from "./tech";
 import type { Branch, GameState, Outcome } from "./types";
 
 export interface EndReport {
   outcome: Outcome;
+  /** The week the Series A was secured, whether the run ended there or played on; null if it never was. */
+  seriesAWeek: number | null;
+  /** A won run that can still carry on past its Series A. */
+  canKeepPlaying: boolean;
   headline: string;
   summary: string;
   grade: "S" | "A" | "B" | "C" | "D";
@@ -52,15 +56,17 @@ export function buildReport(s: GameState): EndReport {
     automatic: pms.filter((p) => p.outcome === "auto_mitigated").length,
   };
 
+  // A run that played on past its Series A keeps the credit for it, so continuing never costs the win.
+  const seriesAWeek = s.seriesAWeek ?? (outcome === "won" ? s.totals.weeks : null);
   const progress = clamp(s.totals.peakUsers / BALANCE.targetUsers, 0, 1);
   // 98.5% scores nothing, 99.99% scores full marks.
   const uptimeScore = clamp((up - 0.985) / 0.0149, 0, 1);
-  const speed = outcome === "won" ? clamp((BALANCE.maxTurns - s.totals.weeks) / 10, 0, 1) : 0;
+  const speed = seriesAWeek !== null ? clamp((BALANCE.maxTurns - seriesAWeek) / 10, 0, 1) : 0;
   const solvency = outcome === "bankrupt" ? 0 : clamp(s.cash / 100_000, 0, 1);
   let score = Math.round(progress * 50 + uptimeScore * 25 + speed * 15 + solvency * 10);
-  if (outcome === "bankrupt") score = Math.min(score, 45);
+  if (outcome === "bankrupt" && seriesAWeek === null) score = Math.min(score, 45);
   const grade: EndReport["grade"] =
-    outcome === "won" && score >= 88 && up >= 0.999 ? "S" : score >= 75 ? "A" : score >= 58 ? "B" : score >= 40 ? "C" : "D";
+    seriesAWeek !== null && score >= 88 && up >= 0.999 ? "S" : score >= 75 ? "A" : score >= 58 ? "B" : score >= 40 ? "C" : "D";
 
   const completed = completedTechIds(s);
   const focus = BRANCHES.map((b) => ({
@@ -92,12 +98,16 @@ export function buildReport(s: GameState): EndReport {
   const summary =
     outcome === "won"
       ? `${BALANCE.targetUsers.toLocaleString("en-US")} users in ${s.totals.weeks} weeks.`
+      : outcome === "bankrupt" && s.seriesAWeek !== undefined
+        ? `Series A in week ${s.seriesAWeek}, then out of cash in week ${s.totals.weeks} after peaking at ${s.totals.peakUsers.toLocaleString("en-US")} users.`
       : outcome === "bankrupt"
         ? `Bankrupt in week ${s.totals.weeks}, at ${s.totals.peakUsers.toLocaleString("en-US")} users.`
         : `${Math.round(s.users).toLocaleString("en-US")} of ${BALANCE.targetUsers.toLocaleString("en-US")} users by week ${s.totals.weeks}.`;
 
   return {
     outcome,
+    seriesAWeek,
+    canKeepPlaying: canKeepPlaying(s),
     headline,
     summary,
     grade,

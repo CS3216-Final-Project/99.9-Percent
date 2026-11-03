@@ -624,7 +624,9 @@ export const useGame = create<Store>()((set, get) => {
 
     if (!prev.outcome && next.outcome) {
       const report = buildReport(next);
-      track("run_finished", {
+      // A run finishes once, at its Series A; playing on afterwards ends separately.
+      const endless = next.seriesAWeek !== undefined;
+      track(endless ? "endless_finished" : "run_finished", {
         outcome: report.outcome,
         weeks: report.weeks,
         users: report.users,
@@ -633,8 +635,12 @@ export const useGame = create<Store>()((set, get) => {
         incidents: report.incidents.total,
         seed: next.seed,
       });
-      meta = { ...meta, runsFinished: meta.runsFinished + 1 };
+      if (!endless) meta = { ...meta, runsFinished: meta.runsFinished + 1 };
       patch.running = false;
+    }
+
+    if (prev.seriesAWeek === undefined && next.seriesAWeek !== undefined) {
+      track("endless_started", { week: next.seriesAWeek, users: Math.round(next.users), seed: next.seed });
     }
 
     if (next.phase === "ended") {

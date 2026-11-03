@@ -3,6 +3,7 @@ import { BALANCE, PROMOS } from "./balance";
 import {
   arpu,
   autoscaleServers,
+  canKeepPlaying,
   churnRate,
   clamp,
   costs,
@@ -471,12 +472,15 @@ function finishTurn(s: GameState): void {
   if (s.cash < 0) {
     s.outcome = "bankrupt";
     logEvent(s, "incident", "The company has run out of cash.");
-  } else if (s.users >= BALANCE.targetUsers) {
-    s.outcome = "won";
-    logEvent(s, "milestone", `You reached ${num(BALANCE.targetUsers)} users. The Series A is yours.`);
-  } else if (s.turn >= BALANCE.maxTurns) {
-    s.outcome = "deadline";
-    logEvent(s, "info", "The Series A meeting arrived before you reached the target.");
+  } else if (s.seriesAWeek === undefined) {
+    // Past the Series A there is no target or deadline left; only cash can end the run.
+    if (s.users >= BALANCE.targetUsers) {
+      s.outcome = "won";
+      logEvent(s, "milestone", `You reached ${num(BALANCE.targetUsers)} users. The Series A is yours.`);
+    } else if (s.turn >= BALANCE.maxTurns) {
+      s.outcome = "deadline";
+      logEvent(s, "info", "The Series A meeting arrived before you reached the target.");
+    }
   }
 
   // Set up the next week.
@@ -517,5 +521,16 @@ export function acknowledgeReview(prev: GameState): GameState {
   const s = clone(prev);
   s.reviewId = null;
   s.phase = s.outcome ? "ended" : "management";
+  return s;
+}
+
+/** After the Series A, carry the same company on with no deadline. Null when the run has not just been won. */
+export function keepPlaying(prev: GameState): GameState | null {
+  if (!canKeepPlaying(prev)) return null;
+  const s = clone(prev);
+  s.seriesAWeek = s.totals.weeks;
+  s.outcome = null;
+  s.phase = "management";
+  logEvent(s, "milestone", "With the Series A banked, the company keeps growing. Only running out of cash ends the run now.");
   return s;
 }
