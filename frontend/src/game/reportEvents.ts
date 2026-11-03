@@ -12,6 +12,17 @@ const dollars = (cents: unknown) => new Intl.NumberFormat("en-US", { style: "cur
 const app = (id: unknown) => typeof id === "string" ? serverName(id) : "Unknown server";
 const component = (id: unknown) => id === "db" ? "Database" : id === "app" ? "Application" : app(id);
 const actionName = (type: unknown) => ACTION_NAMES[type as Intervention] ?? (typeof type === "string" ? type.replaceAll("-", " ") : "Infrastructure change");
+/** Chapter entries by the button the player pressed; Grow the Company's survives as a refused attempt in old saves. */
+const DECISION_NAMES: Record<string, string> = {
+  enter_scaling: "Continue to Scaling & Routing", enter_data: "Continue to Data Strategy", enter_spikes: "Continue to Traffic Spikes",
+  enter_reliability: "Continue to Stay Online", enter_combined: "Continue to Grow the Company",
+};
+/** A player decision, recorded by its action type such as `set_traffic_limit`, in words. */
+const decisionName = (type: unknown) => {
+  if (typeof type !== "string") return "Decision";
+  const text = DECISION_NAMES[type] ?? type.replaceAll(/[-_]/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
 /** One glanceable label for each reason the controller pauses; an empty reason means it resumed observing. */
 const BLOCKED_LABELS: Record<string, string> = {
   "Reliability test in progress": "reliability test",
@@ -68,7 +79,7 @@ export function describeEvents(events: TraceEvent[], context: TraceEvent[] = eve
         change("Admitted traffic", d.admittedBefore, d.admittedAfter, " req/s"), change("Routed capacity", d.effectiveBefore, d.effectiveAfter, " req/s"),
         d.routingAfter && routing(d.routingAfter) !== routing(d.routingBefore) ? `Route now ${routing(d.routingAfter)}` : null,
         typeof d.cacheTarget === "number" ? `Cache target ${Number(d.cacheTarget) / 100}%` : null);
-      case "action-rejected": return line(`${actionName(d.action)} rejected`, d.reason ? String(d.reason) : null);
+      case "action-rejected": return line(`${decisionName(d.action)} rejected`, d.reason ? String(d.reason) : null);
       case "incident-opened": return line("Incident opened", d.component ? `Bottleneck: ${component(d.component)}` : null);
       case "incident-recovered": return line("Incident recovered");
       case "recovery-streak": return line("Recovery progress", `Stable seconds ${num(d.from)} to ${num(d.to)}`);
