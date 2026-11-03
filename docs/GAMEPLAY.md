@@ -75,8 +75,10 @@ There are two ways to complete the Opening; both award the same `opening-stabili
   A failing step resets the streak; pausing, reading and reloading add no observations.
   The player reviews the prevention outcome and presses Continue company.
 
-The panel lists three chapter requirements for the whole Opening: growth, a verified prevention outcome or recovered incident, and the milestone.
-While prevention is still possible, its own checks are listed under Opening prevention progress rather than as extra chapter requirements.
+The panel lists three chapter requirements for the whole Opening: growth, the first growth handled and reviewed, and the milestone.
+Prevention is not explained or tracked in the panel.
+It only becomes possible after the growth, seconds before the incident is due, when its checks can rarely still be met, so listing them read as noise.
+A player who does prevent the incident still gets the prevention review and the same milestone.
 
 The prevention rules are in `frontend/src/sim/openingPrevention.ts`.
 
@@ -164,6 +166,9 @@ Guidance never changes the rules; it reads the same state the engine uses.
 - Chapter requirements list each gate as met or unmet, without revealing future deadlines.
 - Each chapter keeps the same requirement rows for its whole length, so its count never changes mid-chapter; a row that stops applying, such as Scaling's database headroom after its growth wave, stays listed as met.
 - Hint is player-requested and points at an existing control; optional attention cues for Run and Next defer to required reviews and guides.
+- The Opening's first Run (its first game second) moves the view to the server floor's In gate, where requests enter.
+  The gate glows and says requests are about to climb until the growth arrives, then that they climbed, and the callout ends four seconds after the growth.
+  Only companies that came through the introduction get it; it is presentation only and never part of the save.
 - Each chapter opens with an optional Company Message from a colleague (Maya, Alex, Jordan, Sam, Taylor, then Alex) stating its mission.
   A new company's introduction opens with Maya's welcome first, asking the player to check out the machines; Opening's message then skips her greeting.
   The colleague speaks a few short lines in their own voice, which the player reads one at a time, and the last line carries the mission.

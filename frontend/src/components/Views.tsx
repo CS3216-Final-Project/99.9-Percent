@@ -141,17 +141,18 @@ export function LineChart({
 }) {
   const W = 340;
   const H = 170;
-  const L = 44;
   const R = 12;
   const T = 10;
   const B = 22;
   const all = series.flatMap((s) => s.values);
   const lo = min ?? Math.min(0, ...all);
   const hi = max ?? niceMax(Math.max(target ?? 0, ...all, 1));
+  const ticks = [lo, lo + (hi - lo) / 2, hi];
+  // The left margin fits the longest tick label ("1,000 ms"), which a fixed margin cut off at the chart's edge.
+  const L = Math.max(44, Math.ceil(Math.max(...ticks.map((t) => format(t).length)) * 6.8) + 10);
   const n = Math.max(1, turns.length - 1);
   const x = (i: number) => L + ((W - L - R) * i) / n;
   const y = (v: number) => T + (H - T - B) * (1 - (v - lo) / (hi - lo || 1));
-  const ticks = [lo, lo + (hi - lo) / 2, hi];
   const hit = Math.max(3, Math.min(8, (W - L - R) / n / 2));
 
   return (

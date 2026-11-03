@@ -23,6 +23,7 @@ import { loadExploration, saveExploration, type SavedCameraView } from "@/game/e
 import { canInspectEquipment, inspectInRoom, isSheetView, roomPaused, trafficViewOn, useGame } from "@/game/store";
 import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/floors";
 import { nextViewpoint } from "@/game/viewpoints";
+import { OPENING_TRAFFIC_NOTE, openingTrafficCue, startsOpeningTraffic } from "@/game/openingTrafficCue";
 import { isPhoneEdition } from "@/phone/edition";
 import {
   AISLE_Z,
@@ -44,6 +45,7 @@ import { tipProps } from "../tips";
 import { INFRASTRUCTURE_TIPS } from "@/game/infrastructureHelp";
 import { openRoomArea } from "../roomArea";
 import { EQUIPMENT_ICON, STATE_META } from "../presentation";
+import { useMediaQuery } from "../useMediaQuery";
 import { ActivityEffects } from "./activities";
 import { ArcadePanel } from "./ArcadePanel";
 import { serveArcade } from "./arcade";
@@ -346,6 +348,17 @@ function CameraRig({ footprints, built, floor, mode }: { footprints: Record<Equi
         focusing.current = s.cameraFocus.anchor;
         touched.current = true;
         homing.current = false;
+      }),
+    [],
+  );
+
+  // The Opening's first Run looks at the In gate, where the customers' requests are about to climb.
+  useEffect(
+    () =>
+      useGame.subscribe((s, prev) => {
+        if (s.generation !== prev.generation || !startsOpeningTraffic(prev.game.campaign, s.game.campaign)) return;
+        if (s.floor !== "servers") s.goToFloor("servers", "tour");
+        s.focusCamera(TRAFFIC_IN);
       }),
     [],
   );
@@ -1039,11 +1052,13 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
 /** In and Out, with this second's requests: the gap between the two is what the company is losing. */
 export function GateCounts({ c }: { c: Campaign }) {
   const m = c.snapshot;
+  const cue = openingTrafficCue(c);
   return (
     <>
-      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.admitted)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}`}>
+      <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}${cue ? " is-cued" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.admitted)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}${cue ? `. ${OPENING_TRAFFIC_NOTE[cue]}` : ""}`}>
         <b>In</b> {num(m.admitted)}/s
-        {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away — no revenue, counts against uptime</span>}
+        {cue && <span className="gate-cue" aria-hidden>{OPENING_TRAFFIC_NOTE[cue]}</span>}
+        {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away - no revenue, counts against uptime</span>}
       </span>
       <span className="wall-tag gate-tag gate-out" ref={bindLabel(TRAFFIC_OUT)} aria-label={`Out: ${num(m.successful)} requests per second served`}>
         <b>Out</b> {num(m.successful)}/s
@@ -1886,6 +1901,8 @@ function FloorMenu() {
 /** Renderer actions stay with the scene; only their DOM is placed in the shared dock. */
 function RoomDock({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) {
   const floor = useGame(s => s.floor);
+  // At phone width the menu shows its "Navigation" name, so it needs no tip.
+  const narrowDock = useMediaQuery("(max-width: 640px)");
   const walking = useGame(s => s.walking);
   const model = useSceneModel();
   const other = floor === "servers" ? "office" : "servers";
@@ -1893,13 +1910,13 @@ function RoomDock({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) 
   const host = useRoomControlsHost();
   if (!host) return null;
   return createPortal(<>
-    <DockMenu className="room-menu" label={<><Icon name="floor" size={20} /><span className="desktop-room-name">Floor</span><span className="mobile-room-name">Navigation</span><span className="floor-number summary-floor-number">{FLOOR_NUMBER[floor]}</span>{attention !== "none" && <span className={`floor-badge tone-${attention}`}><span className="visually-hidden">{attention === "alert" ? "Incident on another floor" : "Another floor needs a look"}</span></span>}</>}>
+    <DockMenu className="room-menu" tip={narrowDock ? undefined : "Floor"} label={<><Icon name="floor" size={20} /><span className="desktop-room-name visually-hidden">Floor</span><span className="mobile-room-name">Navigation</span><span className="floor-number summary-floor-number">{FLOOR_NUMBER[floor]}</span>{attention !== "none" && <span className={`floor-badge tone-${attention}`}><span className="visually-hidden">{attention === "alert" ? "Incident on another floor" : "Another floor needs a look"}</span></span>}</>}>
       <h3>Choose a floor</h3>
       <FloorMenu />
       <div className="mobile-room-tools"><h3>View mode</h3><ViewModeOptions stage={stage} /><h3>Camera</h3><CameraTools /></div>
     </DockMenu>
-    <div className="desktop-walk"><DockMenu className={`view-mode-menu${walking ? " is-walking" : ""}`} label={<><Icon name="explore" size={20} /><span>View mode</span></>}><h3>View mode</h3><ViewModeOptions stage={stage} /></DockMenu></div>
-    <DockMenu className="camera-menu" label={<><Icon name="camera" size={20} /><span>Camera</span></>}><h3>Camera</h3><CameraTools /></DockMenu>
+    <div className="desktop-walk"><DockMenu className={`view-mode-menu${walking ? " is-walking" : ""}`} tip="View mode" label={<><Icon name="explore" size={20} /><span className="visually-hidden">View mode</span></>}><h3>View mode</h3><ViewModeOptions stage={stage} /></DockMenu></div>
+    <DockMenu className="camera-menu" tip="Camera" label={<><Icon name="camera" size={20} /><span className="visually-hidden">Camera</span></>}><h3>Camera</h3><CameraTools /></DockMenu>
   </>, host);
 }
 

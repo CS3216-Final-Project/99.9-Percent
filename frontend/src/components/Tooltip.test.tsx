@@ -118,6 +118,25 @@ describe("tooltip layer", () => {
     window.removeEventListener("keydown", behind);
   });
 
+  it("stays closed when an Escape that closes a menu hands focus back to its trigger", () => {
+    render(<Harness />);
+    const open = screen.getByRole("button", { name: "Open" });
+    vi.spyOn(open, "matches").mockReturnValue(true);
+    // A menu's own Escape handler stops the key and returns focus to its tipped trigger.
+    const menu = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopImmediatePropagation(); open.focus(); } };
+    document.addEventListener("keydown", menu, true);
+    act(() => screen.getByText("Term").focus());
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    expect(tooltip()).toBeNull();
+    document.removeEventListener("keydown", menu, true);
+
+    // The next keyboard focus explains again.
+    settle(0);
+    act(() => open.blur());
+    act(() => open.focus());
+    expect(tooltip()?.textContent).toContain("Opens the thing");
+  });
+
   it("closes when the control is pressed, scrolled away from or removed", () => {
     const view = render(<Harness />);
     const open = screen.getByRole("button", { name: "Open" });

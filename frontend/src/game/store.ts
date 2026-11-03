@@ -9,6 +9,7 @@ import { chapterEnd } from "./chapterCompletion";
 import { FULL_SCOPE, scopeAllows, scopeComplete, type PlayScope } from "./scope";
 import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
+import { draftAction, draftRefusal, toggleDraft, type RoutingDraft } from "./routingDraft";
 import type { Campaign } from "@/sim/campaignTypes";
 
 import { create } from "zustand";
@@ -245,6 +246,12 @@ interface Store {
   selectApp: (id: string) => void;
   /** Ephemeral room or Campaign shortcut inspection asking for its reveal, or none. */
   roomInspection: RoomInspection | null;
+  /**
+   * Routing picked in an open inspection but not yet sent: the window would close on the first pending change, so the
+   * picks collect here and become one routing change when the window closes, however it closes. Never saved.
+   */
+  routingDraft: RoutingDraft | null;
+  toggleRoutingDraft: (appId: string) => void;
   dismissRoomInspection: () => void;
   /**
    * The floor of the building in view. Choosing a piece of equipment takes the view to its floor; an incident never
@@ -504,28 +511,10 @@ export const useGame = create<Store>()((set, get) => {
     return { floor };
   }
   /**
-   * How the room is seen as the title screen gives way to a mode's run on `floor`. A `?floor=` address shows that
-   * floor from above. A player who has never chosen how to see the room starts in third person, unless a guide is
-   * about to point things out, which it does from above. Otherwise walk mode comes back as the last visit left it,
-   * with its view, when it was on this floor.
+   * How the room is seen as the title screen gives way to a run: always from above, with walk mode off. Follow and
+   * first person are the player's to choose once the run is on screen; opening the game never lands in them.
    */
-  function openingView(mode: GameMode, floor: Floor, guided: boolean): { walking: boolean; viewpoint: Viewpoint } {
-    const overview = { walking: false, viewpoint: "overview" as const };
-    if (typeof window !== "undefined" && floorFromSearch(window.location.search) !== null) return overview;
-    const exploration = loadExploration(mode);
-    // A phone opens from above, where its layout is made to be read, and has no first person to come back to.
-    const phone = isPhoneEdition();
-    const opened = !exploration.viewChosen
-      ? (guided || phone ? overview : { walking: true, viewpoint: "follow" as const })
-      : exploration.walking && exploration.floor === floor ? { walking: true, viewpoint: offeredViewpoint(exploration.viewpoint, phone) } : overview;
-    // The walk is timed from here, like one the player starts.
-    if (opened.walking) walkStart = performance.now();
-    return opened;
-  }
-  /** Guides point at the room from above: a walk the player never chose gives way to one, and is not remembered as left. */
-  function makeWayForGuide(): void {
-    if (get().walking && !loadExploration(get().mode).viewChosen) get().setWalking(false, false);
-  }
+  const openingView = () => ({ walking: false, viewpoint: "overview" as const });
   /** An event for the analytics, wherever this mode keeps them. */
   function record(name: "view_changed" | "map_toggled" | "map_walked", data: Record<string, string | number | boolean>) {
     if (get().game.campaign) uiEvent(name, data);
@@ -575,7 +564,6 @@ export const useGame = create<Store>()((set, get) => {
         if(open) patch.tour=null;
         const seen=(patch.meta??get().meta).chapterTours;
         if(!seen.includes(chapter)) {
-          makeWayForGuide();
           const meta={...(patch.meta??get().meta),chapterTours:[...seen,chapter]};
           saveMeta(meta);
           Object.assign(patch,{meta,tour:{track:chapter,step:0},running:false});
@@ -700,6 +688,7 @@ export const useGame = create<Store>()((set, get) => {
       selected: null,
       selectedAppId: null,
       roomInspection: null,
+      routingDraft: null,
       hovered: null,
       affected: [], previewAction: null, spotlight: [],
       cameraFocus: null,
@@ -718,7 +707,7 @@ export const useGame = create<Store>()((set, get) => {
         track("save_resumed", { mode, week: loaded.game.turn, phase: loaded.game.phase });
         const tour: Tour | null = !meta.tutorialDone && isFreshRun(loaded.game) ? { track: "basics", step: 0 } : null;
         // A run resumed mid-incident starts paused so nothing burns while the player reorients.
-        set({ ...fresh, game: loaded.game, tour, ...(started ? openingView(mode, urlFloor ?? exploration.floor, !!tour) : {}) });
+        set({ ...fresh, game: loaded.game, tour, ...(started ? openingView() : {}) });
         if (tour) recordTour("started", tour, { from: "resume" });
         return;
       }
@@ -729,7 +718,7 @@ export const useGame = create<Store>()((set, get) => {
       track("run_started", { mode, seed: game.seed, run: nextMeta.runsStarted });
       const tour: Tour | null = meta.tutorialDone ? null : { track: "basics", step: 0 };
       // Switching into an empty classic mode starts a company; boot, which only shows the title, does not.
-      set({ ...fresh, game, meta: nextMeta, tour, lastIntro: started ? intro("begin") : null, ...(started ? openingView(mode, urlFloor ?? exploration.floor, !!tour) : {}) });
+      set({ ...fresh, game, meta: nextMeta, tour, lastIntro: started ? intro("begin") : null, ...(started ? openingView() : {}) });
       if (tour) recordTour("started", tour, { from: "first_visit" });
       if (!saved) get().notify("Could not save. Play continues in memory.", "error");
       else if (loaded.status === "corrupt") get().notify("Saved Challenge Mode run was unreadable. Started a new one.", "error");
@@ -880,6 +869,8 @@ export const useGame = create<Store>()((set, get) => {
     setPanelOpen: open => set({panelOpen: open}),
     selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({panelOpen:true,selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
     roomInspection: null,
+    routingDraft: null,
+    toggleRoutingDraft: appId => { const c=get().game.campaign; if(c) set({routingDraft:toggleDraft(c,get().routingDraft,appId)}); },
     dismissRoomInspection: () => {
       const inspection=get().roomInspection;
       // Only acknowledging a popup actually opened by the player can complete a component step.
@@ -889,6 +880,7 @@ export const useGame = create<Store>()((set, get) => {
           get().act({type:"acknowledge_introduction",equipment:inspection.equipment});
       }
       set({roomInspection:null});
+      sendRoutingDraft();
     },
     // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
     floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
@@ -994,7 +986,7 @@ export const useGame = create<Store>()((set, get) => {
     play: () => {
       if(get().started)return;
       // A fresh classic run says "Play" on the title screen and a resumed one "Continue", so only the first is a start.
-      if(get().mode === "classic") { set({started:true,...openingView("classic",get().floor,!!get().tour),...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
+      if(get().mode === "classic") { set({started:true,...openingView(),...(isFreshRun(get().game)?{lastIntro:intro("begin")}:{})}); return; }
       const state=get();
       // Practice resume is offered by the saved flag; a fresh visit plays the company itself.
       if (state.hasRun && state.meta.walkthroughStep !== null && !state.tutorialCompany) { get().startTour("campaign", "resume"); return; }
@@ -1003,7 +995,7 @@ export const useGame = create<Store>()((set, get) => {
       if (game.campaign!.openingMilestone?.acknowledged && !game.campaign!.scaling && game.phase!=="ended" && !chapterAnnounced(state.meta,game.campaign!.runId,"opening")) game=applyCampaignInput(game,{type:"enter_scaling"}).state;
       const meta=state.hasRun?state.meta:{...state.meta,runsStarted:state.meta.runsStarted+1};
       const measurement=projectEvents(beginSession(state.measurement,game,crypto.randomUUID(),new Date().toISOString()),game,new Date().toISOString());
-      set({game,hasRun:true,meta,measurement,started:true,running:false,...openingView("campaign",state.floor,!state.hasRun && !meta.tutorialDone),
+      set({game,hasRun:true,meta,measurement,started:true,running:false,...openingView(),
         // Starting a fresh company replaces the game, like a new run.
         ...(state.hasRun?{}:{generation:state.generation+1,lastAction:null,lastIntro:intro("begin")}),
         tour:null,activeMark:document.hidden?null:performance.now()});
@@ -1323,13 +1315,12 @@ export const useGame = create<Store>()((set, get) => {
         const meta = practiceAt(s.meta, true);
         set({ game, measurement, tutorialCompany: company, meta, activeMark: document.hidden ? null : performance.now(), generation: s.generation + 1, remainderMs: 0,
           tour: null, view: null, started: true, running: false, deployRush: false, onboarding: false, tutorialAttempt: s.tutorialAttempt + 1,
-          lastAction: null, lastIntro: null, chapterComplete: null, selectedAppId: null, roomInspection: null,
+          lastAction: null, lastIntro: null, chapterComplete: null, selectedAppId: null, roomInspection: null, routingDraft: null,
           affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, techFocus: null, rating: null, toast: null });
         persist();
         return;
       }
       if (track_ === "campaign") return;
-      makeWayForGuide();
       const campaign = !!get().game.campaign;
       const tour: Tour = { track: track_, step: 0 };
       const begins = get().tour?.track !== track_;
@@ -1380,7 +1371,7 @@ export const useGame = create<Store>()((set, get) => {
       if (company) {
         persist(); clearTutorialPractice();
         set({ ...company, tutorialCompany: null, meta: practiceAt(meta, false), generation: get().generation + 1, selected: null, selectedAppId: null,
-          roomInspection: null, affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, view: null, techFocus: null,
+          roomInspection: null, routingDraft: null, affected: [], previewAction: null, spotlight: [], hovered: null, cameraFocus: null, view: null, techFocus: null,
           tour: null, running: false, deployRush: false, lastAction: null, toast: null, activeMark: document.hidden ? null : performance.now() });
         return;
       }
@@ -1513,12 +1504,29 @@ let roomInspectionSeq = 0;
  * Classic panels keep their existing inline `inspectOrSelect` flow.
  */
 export function inspectInRoom(id: EquipmentId, appId?: string): void {
+  if (!canInspectEquipment(useGame.getState().game, id)) return;
+  // Leaving the Network window for another inspection sends its picks, as closing it would.
+  sendRoutingDraft();
   const { game, panelOpen } = useGame.getState();
-  if (!canInspectEquipment(game, id)) return;
   inspectOrSelect(id, appId);
   // A Guided Mode machine's dialog holds its readings and actions, so the side panel stays as the player left it;
   // Challenge Mode's reveal points to the panel's inspector, which selecting opens.
-  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) }, ...(opensComponentDialog(game, id) ? { panelOpen } : {}) });
+  useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) }, routingDraft: null, ...(opensComponentDialog(game, id) ? { panelOpen } : {}) });
+}
+
+/**
+ * Sends the routing picked in a Network window as one change and clears the picks. The window may have closed because
+ * something else needed the player, so a change the engine would now refuse is never sent: the player is told the
+ * picks were dropped instead of seeing a rejection or losing them unnoticed.
+ */
+function sendRoutingDraft(): void {
+  const { game, routingDraft, act, notify } = useGame.getState(), c = game.campaign;
+  if (!routingDraft) return;
+  useGame.setState({ routingDraft: null });
+  const action = c && draftAction(c, routingDraft);
+  if (!action) return;
+  const refusal = draftRefusal(game, action);
+  if (refusal || !act(action)) notify(refusal ?? "The Network window closed before your traffic picks could be sent.", "info");
 }
 
 /** Whether inspecting this machine opens Guided Mode's component dialog rather than Challenge Mode's reveal. */

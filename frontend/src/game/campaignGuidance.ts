@@ -53,8 +53,6 @@ export function campaignGuidance(g: GameState) {
  const queuesEmpty=c.dbBacklog===0&&c.apps.every(a=>a.backlog===0);
  const requirements:Requirement[]=[];
  const finalGoals:Requirement[]=[];
- /** The prevention path's own checks, nested under its one chapter requirement so the chapter's count stays put. */
- const preventionChecks:Requirement[]=[];
  const add=(id:string,label:string,met:boolean)=>requirements.push({id,label,met});
  let waiting:string|null=null,notice:string|null=null,optional:string|null=null;
  let pendingAction:GuidanceAction|null=null;
@@ -113,7 +111,6 @@ export function campaignGuidance(g: GameState) {
   add("queues","Application and Database queues empty",queuesEmpty);
   add("reports","All recovered incident reports acknowledged",reportsAcknowledged);
   add("healthy","Healthy latency and service errors with completed requests",qualifiesForRecovery(c.snapshot));
-  optional="Workload contrast is optional; cache purchase and database upgrades are not required for continuation.";
   if(!c.dataStage.consumed&&!canEnterData(g))notice="Data growth waits for management, empty queues, no active incident and acknowledged reports.";
   if(spikesAvailable)pendingAction={label:"Continue to Traffic Spikes",action:{type:"enter_spikes"}};
  } else if(openingDone&&!c.scaling) {
@@ -133,24 +130,11 @@ export function campaignGuidance(g: GameState) {
   if(!c.scaling?.consumed&&!c.scalingConsent&&c.dbCapacity<P.dbCapacity&&c.cashCents<=P.dbCostCents)notice="Next growth requires paid database headroom, but current cash cannot fund that investment. Pending revenue is available only after settlement; inspect finances and operating costs before advancing. Solvency alone does not guarantee an affordable growth investment.";
   if(dataAvailable)pendingAction={label:"Continue to Data Strategy",action:{type:"enter_data"}};
  } else if(prevention) {
-  const r=preventionRequirements(c);
-  const check=(id:string,label:string,met:boolean)=>preventionChecks.push({id,label,met});
-  const reviewed=!!c.openingPrevention?.outcome?.acknowledged;
-  add("growth","Opening growth occurred",r.growth);
-  add("outcome","Verified prevention outcome or recovered incident acknowledged",reviewed);
+  // Prevention stays a valid path, but its checks are not listed: they appear only seconds before the incident is due,
+  // when they can rarely still be met, so the panel keeps the chapter's three requirements.
+  add("growth","Opening growth occurred",preventionRequirements(c).growth);
+  add("outcome","First growth handled and reviewed",!!c.openingPrevention?.outcome?.acknowledged);
   add("milestone","Opening milestone acknowledged",openingDone);
-  check("incident","No Opening incident opened",r.noIncident);
-  check("cash","Positive company cash",r.positiveCash);
-  check("admission","Full 800 req/s admitted; traffic limit inactive",r.fullDemand);
-  check("queues","Application and Database queues empty",r.emptyQueues);
-  check("healthy","Healthy latency and service errors",r.healthy);
-  check("app-inspection","Application inspected after growth",r.applicationInspected);
-  check("db-inspection","Database inspected after growth",r.databaseInspected);
-  check("observations",`Stable observations: ${c.openingPrevention?.stableSteps??0} / 5`,!!c.openingPrevention?.outcome);
-  check("review","Prevention outcome acknowledged",reviewed);
-  optional="Verified prevention and incident recovery are both valid paths. For prevention, meet every requirement, acknowledge the outcome, then complete the Opening recognition to continue.";
-  if(c.limit!==null)notice="Traffic limiting prevents full-demand qualification. Remove the limit and serve the full 800 req/s to continue the prevention path.";
-  else if(Object.values(r).every(Boolean)&&!c.openingPrevention?.outcome)waiting="Observe five consecutive new game seconds. Pausing adds no observations; a failing game second resets the streak.";
   if(pendingPreventionReview(c))pendingAction={label:"Review outcome"};
   else if(c.openingPrevention?.outcome?.acknowledged)waiting="Prevention recorded. Complete the verified Opening recognition to continue to Scaling & Routing.";
  } else if(c.launchWeek) {
@@ -167,7 +151,7 @@ export function campaignGuidance(g: GameState) {
   if(c.incident)waiting="Restore stable service and observe measured recovery. Use Run and Pause to inspect real changes.";
  } else {
   add("growth","Opening growth occurred",c.consumedEvents.includes("opening-growth"));
-  add("outcome","Verified prevention outcome or recovered incident acknowledged",false);
+  add("outcome","First growth handled and reviewed",false);
   add("milestone","Opening milestone acknowledged",false);
  }
  // Required acknowledgements take priority over stage continuation in every stage.
@@ -179,5 +163,5 @@ export function campaignGuidance(g: GameState) {
  if(g.phase==="ended") { pendingAction=null;waiting=null;notice=""+(g.outcome==="won"?"Campaign complete. Inspect your scorecard and final architecture before explicitly starting a new company.":"The company is bankrupt. Review final evidence and explicitly restart from the Menu.")+""; }
  const incomplete=requirements.filter(r=>!r.met),completed=requirements.filter(r=>r.met);
  const lockReason=c.spikeStage&&!c.combinedStage?notice:pendingAction?`Next action: ${pendingAction.label}.`:incomplete.length?incomplete[0].label:waiting;
- return {stage,nextStage,openingDone,dataAvailable,spikesAvailable,pendingMilestone,prevention,preventionChecks,finalGoals,requirements,incomplete,completed,pendingAction,waiting,notice,optional,lockReason};
+ return {stage,nextStage,openingDone,dataAvailable,spikesAvailable,pendingMilestone,prevention,finalGoals,requirements,incomplete,completed,pendingAction,waiting,notice,optional,lockReason};
 }

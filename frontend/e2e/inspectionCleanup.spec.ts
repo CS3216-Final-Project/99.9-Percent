@@ -20,6 +20,9 @@ async function settledCamera(page:Page) {
 }
 
 test("inspection camera: pan and rotate survive live rerenders",async({page,installClock})=>{
+  // Advancing every WebGL frame costs more than wall time on software-rendered CI: this journey's recorded
+  // duration is 55 s, so the default 60 s left it timing out on a slow runner.
+  test.setTimeout(120_000);
   await installClock();await page.route("**/api/**",route=>route.abort());
   await seedSave(page,newGame(1,"inspection-camera"));await page.goto("/");
   await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
