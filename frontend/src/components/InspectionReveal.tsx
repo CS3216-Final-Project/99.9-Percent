@@ -20,7 +20,7 @@ import { useCountUp } from "./useCountUp";
 
 /** The Network's traffic this second, counting to each new second's figures like the readings below it. */
 function GatewayTraffic({ incoming, admitted, rejected }: { incoming: number; admitted: number; rejected: number }) {
-  const text = (i: number, a: number, r: number) => `${num(i)} incoming / ${num(a)} accepted / ${num(r)} rejected requests/s`;
+  const text = (i: number, a: number, r: number) => `${num(i)} incoming / ${num(a)} admitted / ${num(r)} rejected requests/s`;
   return <Settled shown={text(useCountUp(incoming), useCountUp(admitted), useCountUp(rejected))} final={text(incoming, admitted, rejected)} />;
 }
 
