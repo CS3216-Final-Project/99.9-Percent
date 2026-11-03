@@ -14,7 +14,7 @@ it("lets new players compare both modes without starting a run for them", () => 
   const choices = screen.getByRole("region", { name: "Choose how you want to play" });
   const guided = within(choices).getByRole("region", { name: "Guided Mode" });
   const challenge = within(choices).getByRole("region", { name: "Challenge Mode" });
-  expect(guided.textContent).toContain("six infrastructure chapters");
+  expect(guided.textContent).toContain("five infrastructure chapters");
   expect(challenge.textContent).toContain("50,000 users in 26 weeks");
   expect(within(choices).getByRole("button", { name: "Start Guided Mode" })).toBeTruthy();
   // Challenge Mode is locked until Chapter 5 is complete, and its teaser has nothing to press.

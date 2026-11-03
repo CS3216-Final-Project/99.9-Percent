@@ -3,8 +3,7 @@ import { introductionInstruction } from "./introduction";
 import type { Action, GameState } from "@/sim";
 import type { Autoscaler, Campaign, ScheduledAction } from "@/sim/campaignTypes";
 import { admissionCeiling, admissionLimitFor, allocateTraffic, canEnterData, pendingStop, qualifiesForRecovery, routableApps, databaseUpgrade, classifyData, incidentAwaitingResponse } from "@/sim/step";
-import { recoverySafe, reportsAcknowledged } from "@/sim/reliability";
-import { currentFault, finalRequirements, stableManagement, canStartGrowth } from "@/sim/combinedCampaign";
+import { currentFault, recoverySafe, reportsAcknowledged } from "@/sim/reliability";
 import { preventionAvailable, preventionRequirements } from "@/sim/openingPrevention";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
@@ -15,10 +14,9 @@ import { campaignChapters } from "./campaignChapters";
 import { chapterAdvance } from "./chapterCompletion";
 import { previewCampaignAction } from "./campaignFinance";
 import { chapter4Stage, chapter4Performance } from "./chapter4Guidance";
-import { chapter6Attention, combinedDatabaseDemand } from "./chapter6Guidance";
 import { serverName } from "@/sim";
 
-export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "growth" | "risk" | "menu" | "finance" | "research";
+export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "risk" | "menu" | "finance" | "research";
 export interface AttentionDecision {
   chapter: number;
   key: string;
@@ -48,7 +46,6 @@ export function spotlightMachines(decision: AttentionDecision, action: Action | 
     case "deploy_health_checks": return ["monitoring"];
     case "install_spare": case "reserve_spare": case "release_spare": case "deploy_failover": return ["standby"];
     case "pick_launch_tech": return [action.tech === "caching" ? "cache" : "app"];
-    case "run_promotion": return ["growth"];
     case "set_routing": case "deploy_load_balancer": case "set_traffic_limit": return ["gateway"];
     case "add_server": case "deploy_autoscaler": return ["app"];
     default: break;
@@ -105,8 +102,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
       : "Your database may struggle when more users arrive. Check Chapter requirements before continuing.";
     return { ...decision, attention: upgrade || risk ? "hint" : null, message, growthChoices: { upgrade, risk }, key: `${decision.key}:${!!upgrade}:${risk}` };
   }
-  if (c?.combinedStage) return chapter6Attention(game, decision);
-  if (!c || decision.attention === "run" || !["database", "application", "unrouted", "failure", "round-restoration", "isolated-failure", "full-demand"].includes(decision.reason)) return decision;
+  if (!c || decision.attention === "run" || !["database", "application", "unrouted", "failure", "isolated-failure"].includes(decision.reason)) return decision;
   const actions: GuidanceAction[] = [];
   const offer = (action: Action, label: string, evidence: string) => {
     if (previewCampaignAction(game, action).ok) actions.push({ action, label, evidence });
@@ -139,21 +135,12 @@ export function campaignAttention(game: GameState): AttentionDecision {
     }
     if (!c.loadBalancer) offer({ type: "deploy_load_balancer" }, "Deploy load balancing", "An installed serving app is unrouted. Installation enables routing choices; you must configure traffic separately afterward.");
   }
-  if (["failure", "round-restoration", "isolated-failure"].includes(decision.reason))
+  if (["failure", "isolated-failure"].includes(decision.reason))
     for (const app of c.apps) if (app.health === "failed") offer({ type: "restore_app", appId: app.id }, `Restore ${serverName(app.id)}`, "This server is currently failed. Restoration is free and takes three game seconds; service recovery still requires observations.");
   // Launch Week never recommends turning traffic away: the lesson is capacity, and limiting costs uptime.
   const launchLive = !!c.launchWeek && c.launchWeek.completedStep === null;
   if (["database", "application", "unrouted", "failure"].includes(decision.reason) && c.limit === null && !launchLive)
     offer({ type: "set_traffic_limit", enabled: true }, `Limit to ~${admissionLimitFor(c)} requests/s`, "Temporary admission relief is free. Rejected requests earn no revenue and count against uptime; full-demand chapter checks may still require removing the limit later.");
-  if (decision.reason === "full-demand" && c.limit !== null && c.routing.targets.length) {
-    const m = c.snapshot, allocation = allocateTraffic(m.incoming, c.routing.targets);
-    const observedDbLoad = m.admitted > 0 ? Math.ceil(m.db.demand * m.incoming / m.admitted) : Infinity;
-    // Justification from observed workload, not a new action-availability rule or recovery forecast.
-    if (c.dbCapacity >= observedDbLoad && c.routing.targets.every(id => {
-      const app = c.apps.find(a => a.id === id);
-      return app && app.health !== "failed" && app.role !== "spare" && !app.backlog && app.capacity >= allocation[id];
-    })) offer({ type: "set_traffic_limit", enabled: false }, "Remove traffic limit", "Full-demand validation requires removing the limit. Current capacities fit the observed workload at full incoming demand; conditions can still change after admitting more traffic.");
-  }
   const find = (type: Action["type"]) => actions.find(x => x.action.type === type);
   let action: GuidanceAction | undefined;
   if (decision.reason === "database") {
@@ -174,8 +161,7 @@ export function campaignAttention(game: GameState): AttentionDecision {
     if (!action && c.snapshot.app.demand < c.snapshot.app.capacity + Q.appCapacity) action = find("add_server");
     if (!action && launchLive) action = find("add_server");
   } else if (decision.reason === "unrouted") action = find("set_routing") ?? find("scale_up") ?? find("deploy_load_balancer");
-  else if (["failure", "round-restoration", "isolated-failure"].includes(decision.reason)) action = find("restore_app");
-  else if (decision.reason === "full-demand") action = find("set_traffic_limit");
+  else if (["failure", "isolated-failure"].includes(decision.reason)) action = find("restore_app");
   if (!action && !launchLive && c.limit === null && c.snapshot.admitted > admissionCeiling(c) && admissionReliefFits(game)) action = find("set_traffic_limit");
   const message = decision.reason === "unrouted" && action?.action.type === "scale_up"
     ? "Your new server needs more capacity before sharing traffic. Scale it up, then connect it." : action ? actionMessage(action, c) : decision.message;
@@ -216,7 +202,7 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
   if (reason.startsWith("activation-")) return "Your change is being installed. Press Run to let it finish, then check your app.";
   if (["recovery", "draining", "reliability-stability"].includes(reason))
     return "Your app is recovering. Keep it running to make sure everything is stable.";
-  if (["spike-stability", "prevention-stability", "final-stability"].includes(reason)) return "Your company looks stable. Keep it running to finish the stability checks.";
+  if (["spike-stability", "prevention-stability"].includes(reason)) return "Your company looks stable. Keep it running to finish the stability checks.";
   const messages: Record<string,string> = {
     inactive: "Hints are available in Guided Mode.", ended: "This company has ended. Review its scorecard.",
     review: "An outcome is ready. Finish its review before continuing.", next: "This chapter is complete. Use Next to continue.",
@@ -224,11 +210,7 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     application: "Your app servers are struggling. Check App Server to find what needs attention.",
     unrouted: "An installed server isn't receiving traffic. Check Network before changing its connections.",
     failure: "A server has failed. Check App Server health before choosing a response.",
-    "round-restoration": "A server still needs repair. Check App Server health to see what needs restoring.",
     "missing-review": "A report needs attention. Open Menu to export your company details for investigation.",
-    "growth-decision": "Your company is ready to grow. Choose Start next growth wave when you're ready.",
-    "full-demand": "Your company must handle all incoming traffic. Check Network before removing any limits.",
-    "final-requirements": "Some company requirements are unfinished. Open View chapters to see what's missing.",
     arm: "Your company is ready. Choose Start reliability test to see how it handles a failure.",
     "arm-requirements": "Your company isn't ready for the reliability test. Open View chapters to see what's needed.",
     "isolated-failure": "Service is stable, but a server is still offline. Check App Server and choose Restore App.",
@@ -246,7 +228,7 @@ function shortMessage(reason: string, target: GuidanceTarget | null): string {
     "launch-score": "Launch Week is complete. Check your uptime score, then stay in Launch Week or continue to Scaling & Routing.",
   };
   if (messages[reason]) return messages[reason];
-  if (["opening-growth", "scaling-growth", "data-growth", "spike-pulses", "scheduled-failure", "growth-wave", "growth-readiness"].includes(reason)) return "Press Run to see what happens next.";
+  if (["opening-growth", "scaling-growth", "data-growth", "spike-pulses", "scheduled-failure"].includes(reason)) return "Press Run to see what happens next.";
   return target === "db" ? "Work is building up. Check Database to see what needs attention." : target === "network" ? "Check Network to understand which traffic your company is serving." : "Check App Server to see what needs attention.";
 }
 
@@ -301,7 +283,7 @@ function baseAttention(game: GameState): AttentionDecision {
         pending.some(x => x.type === "restore-app" && x.activationStep === a.activationStep)) return false;
       const targets = [...c.routing.targets.filter(id => c.apps.find(x => x.id === id)?.detectedHealth !== "unhealthy"), spare.id];
       const allocation = allocateTraffic(m.admitted, targets);
-      return !dbOver && (c.combinedStage ? c.dbCapacity >= combinedDatabaseDemand(game, m.admitted) : c.dbCapacity >= m.admitted) && targets.every(id => {
+      return !dbOver && c.dbCapacity >= m.admitted && targets.every(id => {
         const app = c.apps.find(x => x.id === id);
         return app && app.health !== "failed" && (app.backlog ? app.capacity > allocation[id] : app.capacity >= allocation[id]);
       });
@@ -313,7 +295,7 @@ function baseAttention(game: GameState): AttentionDecision {
     if (a.type === "routing" && a.routing) {
       const targets = a.routing.targets, allocation = allocateTraffic(m.admitted, targets);
       const safeRoute = !fault || fault.restoredStep !== null || !targets.includes(fault.targetId) && !c.apps.find(x => x.id === fault.targetId)?.backlog;
-      return safeRoute && (c.combinedStage ? c.dbCapacity >= combinedDatabaseDemand(game, m.admitted) : c.dbCapacity >= m.admitted) && targets.every(id => {
+      return safeRoute && c.dbCapacity >= m.admitted && targets.every(id => {
         const app = c.apps.find(x => x.id === id);
         return app && app.health !== "failed" && app.role !== "spare" && (app.backlog ? app.capacity > allocation[id] : app.capacity >= allocation[id]);
       });
@@ -390,20 +372,6 @@ function baseAttention(game: GameState): AttentionDecision {
   if (!reportsAcknowledged(c)) return hint("missing-review", "A recorded report lacks an acknowledgement, but no review is active.", "Open Menu to export company evidence for investigation. Guidance cannot repair the saved state.", "menu");
   const empty = !c.dbBacklog && c.apps.every(a => !a.backlog);
   if (!qualifies || !empty) return hint("readings", "The current service readings do not yet satisfy the next chapter checks.", m.db.backlog ? "Open Database to inspect waiting work before continuing." : "Open App Server to inspect waiting work and service readings before continuing.", m.db.backlog ? "db" : "app");
-  if (c.combinedStage) {
-    const d = c.combinedStage, r = d.currentRound;
-    if (canStartGrowth(game)) return progression("growth-decision", "The company is ready for another growth wave.", "Choose Start next growth wave when you are ready.", "growth");
-    if (r) {
-      if (r.pressureEndedStep !== null && r.fault && r.fault.restoredStep === null)
-        return hint("round-restoration", "Service may be stable, but the failed application has not been restored.", "Inspect App Server health. The wave's final observations require restoration.", "app");
-      if (r.pressureEndedStep === null || stableManagement(game, true))
-        return run("growth-wave", r.pressureEndedStep === null ? "The accepted growth wave needs game time to develop." : `Pressure ended. Stable full-demand observations: ${r.stableSteps} / 5.`);
-    }
-    if (!stableManagement(game, true)) return hint("full-demand", "Growth checks require healthy service at full demand with finished actions.", "Read Chapter requirements. A traffic limit can help recovery but blocks full-demand growth checks.", c.limit !== null ? "network" : "requirements");
-    if (d.nextRoundIndex < 3) return run("growth-readiness", `Readiness observations: ${d.readinessSteps} / 5. Finish any active promotion before the next wave.`);
-    if (finalRequirements(game)) return run("final-stability", `Final stable observations: ${d.finalStableSteps} / 5.`);
-    return hint("final-requirements", "Some final company requirements remain incomplete.", "Use View chapters to review the journey, and compare the Chapter requirements in Equipment & actions.", "requirements");
-  }
   if (c.reliabilityStage) {
     const d = c.reliabilityStage;
     if (!fault) {

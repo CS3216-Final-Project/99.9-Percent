@@ -6,7 +6,7 @@ import {preventionRequirements} from "../sim/openingPrevention";
 import {canEnterSpikes} from "../sim/autoscaling";
 import {dataCompany,spikeCompany,untilOffset,act,tick} from "../sim/__tests__/spikeFixtures";
 import {reliabilityCompany} from "../sim/__tests__/reliabilityFixture";
-import {combinedCompany,finishRound} from "../sim/__tests__/combinedFixture";
+import {completedReliability} from "../sim/__tests__/completionFixture";
 function decision(g:GameState,a:Action){const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;}
 function recovered(){return advanceSteps(decision(advanceSteps(newGame(),6).state,{type:"start_db_upgrade"}),30).state;}
 function scaling(){return decision(decision(recovered(),{type:"acknowledge_review"}),{type:"acknowledge_milestone"});}
@@ -56,13 +56,13 @@ it("keeps Stay Online's arming row, met, once the test has started",()=>{
  expect(counts(reliabilityCompany(),20,(g,i)=>i===3?decision(g,{type:"arm_reliability"}):g)).toEqual([12]);
  expect(row(decision(reliabilityCompany(),{type:"arm_reliability"}),"pending").met).toBe(true);
 });
-it("keeps Grow the Company's restoration row whether or not a wave has failed a server",{timeout:30_000},()=>{
- let g=combinedCompany();const calm=campaignGuidance(g).requirements.length;expect(row(g,"restored").met).toBe(true);
- for(let i=0;i<2;i++){g=tick(g,5);g=decision(g,{type:"start_growth_wave"});g=finishRound(g);g=decision(g,{type:"acknowledge_growth"});}
- // The third wave fails a server under load.
- g=decision(tick(g,5),{type:"start_growth_wave"});
- expect(g.campaign!.combinedStage!.currentRound!.fault!.restoredStep).toBeNull();
- expect(campaignGuidance(g).requirements).toHaveLength(calm);expect(row(g,"restored").met).toBe(false);
+it("offers Complete campaign after Stay Online, and names what a busy company still waits for",{timeout:30_000},()=>{
+ const g=completedReliability(),m=campaignGuidance(g);
+ expect(m.pendingAction).toEqual({label:"Complete campaign",action:{type:"complete_campaign"}});
+ expect(campaignObjective(g)).toBe("Stay Online is complete. Complete the campaign with Next when you are ready.");
+ const busy=campaignGuidance(decision(g,{type:"add_server"}));
+ expect(busy.pendingAction).toBeNull();
+ expect(busy.notice).toBe("The campaign can be completed once queued changes have finished.");
 });
 it("keeps the Opening to its three requirements while prevention is possible, with no prevention text",()=>{
  const m=campaignGuidance(prevented());

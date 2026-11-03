@@ -101,7 +101,7 @@ export type TourTrack = "basics" | "incident" | "campaign" | ChapterTour | TipTo
 
 /** The chapter a Guided Mode company has entered, if it is past the Opening. */
 function chapterTourOf(c: Campaign): ChapterTour | null {
-  return c.combinedStage ? "combined" : c.reliabilityStage ? "reliability" : c.spikeStage ? "spikes" : c.dataStage ? "data" : c.scaling ? "scaling" : null;
+  return c.reliabilityStage ? "reliability" : c.spikeStage ? "spikes" : c.dataStage ? "data" : c.scaling ? "scaling" : null;
 }
 
 export interface Tour {
@@ -394,7 +394,6 @@ const ACKNOWLEDGEMENTS = {
 /** The only action accepted while a recognition or milestone awaits the player; time stays paused meanwhile. */
 function requiredAcknowledgement(g: GameState): Action["type"] | null {
   const c = g.campaign!, stop = pendingStop(c);
-  if (stop === "combined-review") return c.combinedStage?.finalReview ? "complete_campaign" : "acknowledge_growth";
   if (stop) return ACKNOWLEDGEMENTS[stop];
   return milestoneBlocks(g) ? "acknowledge_milestone" : null;
 }
@@ -1038,7 +1037,7 @@ export const useGame = create<Store>()((set, get) => {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
         const wasRunning = get().running;
-        if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","enter_combined","start_growth_wave","acknowledge_growth","complete_campaign","accept_scaling_risk"].includes(action.type)) set({running:false});
+        if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","complete_campaign","accept_scaling_risk"].includes(action.type)) set({running:false});
         record(result.ok);
         commit(state);
         if (!result.ok) get().notify(result.message, "error");

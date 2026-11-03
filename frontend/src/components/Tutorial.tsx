@@ -184,12 +184,6 @@ const CHAPTERS = {
       },
     },
   ],
-  combined: chapter(
-    "Grow the company",
-    "Three growth waves use everything you have built.",
-    "Start each wave when you are ready, then review how it went.",
-    '.campaign-panel [aria-label="Next step"]',
-  ),
 } satisfies Record<string, Step[]>;
 
 /** One-card Guided Mode tips, shown the first time something happens instead of being taught up front. */

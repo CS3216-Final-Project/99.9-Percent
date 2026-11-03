@@ -6,7 +6,6 @@ import { act, tick } from "@/sim/__tests__/spikeFixtures";
 import { spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
-import { combinedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
 import { respondToIncident } from "@/sim/__tests__/reliabilityFixture";
 import { incidentAwaitingResponse } from "@/sim/step";
 import { installPending } from "@/sim/reliability";
@@ -28,7 +27,7 @@ describe("recorded incident lessons", () => {
     if (g.phase !== "incident") throw Error("Expected an actual incident");
     return g;
   };
-  it.each([1, 2, 3, 4, 5, 6])("reads an engine-generated Chapter %i report without mutating its records", { timeout: 30_000 }, chapter => {
+  it.each([1, 2, 3, 4, 5])("reads an engine-generated Chapter %i report without mutating its records", { timeout: 30_000 }, chapter => {
     let g: GameState;
     if (chapter === 1) g = upgradeRecovery();
     else if (chapter === 2) {
@@ -36,13 +35,9 @@ describe("recorded incident lessons", () => {
       g = recovered(act(incident(act(g, { type: "accept_scaling_risk" })), { type: "set_traffic_limit", enabled: true }));
     } else if (chapter === 3) g = recovered(act(incident(dataCompany()), { type: "deploy_cache" }));
     else if (chapter === 4) g = recovered(act(incident(spikeCompany(false)), { type: "set_traffic_limit", enabled: true }));
-    else if (chapter === 5) {
+    else {
       g = incident(act(reliabilityCompany(), { type: "arm_reliability" }));
       g = recovered(act(g, { type: "restore_app", appId: g.campaign!.reliabilityStage!.fault!.targetId }));
-    } else {
-      g = combinedCompany();
-      for (let i = 0; i < 2; i++) g = act(finishRound(act(tick(g, 5), { type: "start_growth_wave" })), { type: "acknowledge_growth" });
-      g = recovered(incident(act(tick(g, 5), { type: "start_growth_wave" })));
     }
     const r = g.campaign!.reports.at(-1)!; const before = JSON.stringify(r); const lesson = incidentLesson(r);
     expect(lesson.wrong).not.toContain("does not establish"); expect(lesson.changed).toContain("recovery was confirmed");
@@ -155,15 +150,15 @@ describe("capacity after a server failure", () => {
 });
 
 it("names the actual overload when the announced failed server was already outside the route", () => {
-  let g=combinedCompany();
-  for(let i=0;i<2;i++){
-    g=act(tick(g,5),{type:"start_growth_wave"});
-    g=act(finishRound(g),{type:"acknowledge_growth"});
-  }
-  g=act(tick(g,5),{type:"start_growth_wave"});
-  g=act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2"]});
-  for(let i=0;i<100&&g.phase!=="review";i++){const c=g.campaign!;g=c.incident&&incidentAwaitingResponse(c)&&!installPending(c)?respondToIncident(g):tick(g);}
-  expect(g.phase).toBe("review");
+  // Stay Online's failure begins on app-3; routing every request to app-1 alone then overloads it.
+  let g=tick(act(reliabilityCompany(),{type:"arm_reliability"}),8);
+  expect(g.campaign!.reliabilityStage!.fault).toMatchObject({targetId:"app-3",restoredStep:null});
+  expect(g.campaign!.reliabilityStage!.fault!.startedStep).not.toBeNull();
+  g=act(g,{type:"set_routing",mode:"balanced",targets:["app-1"]});
+  for(let i=0;i<20&&g.phase!=="incident";i++)g=tick(g);
+  expect(g.campaign!.incident?.primaryComponent).toBe("app-1");
+  // Routing the healthy pair again is the recorded response.
+  g=recovered(act(g,{type:"set_routing",mode:"balanced",targets:["app-1","app-2"]}));
   const report=g.campaign!.reports.at(-1)!,opening=report.snapshots.find(s=>s.step===report.openedStep)!;
   expect(opening.instances!.find(a=>a.id==="app-3")).toMatchObject({health:"failed",routed:false,demand:0});
   expect(opening.reliability!.failedDeliveries).toBe(0);

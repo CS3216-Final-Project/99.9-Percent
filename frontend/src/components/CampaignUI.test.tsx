@@ -6,7 +6,7 @@ import {CampaignPanel} from "./CampaignUI";
 import {CampaignChapters} from "./CampaignChapters";
 import {inspectInRoom,inspectOrSelect,useGame} from "../game/store";
 import {dataCompany} from "../sim/__tests__/dataFixture";
-import {protectedCombined} from "../sim/__tests__/combinedFixture";
+import {protectedCompany} from "../sim/__tests__/completionFixture";
 import {pauseTransition} from "../sim/__tests__/pauseFixture";
 import {advanceSteps,applyCampaignInput} from "../sim/step";
 import {applyAction,newGame,type GameState} from "../sim";
@@ -14,8 +14,8 @@ beforeEach(()=>{localStorage.clear();useGame.setState(useGame.getInitialState(),
 afterEach(cleanup);
 function show(game:GameState){useGame.setState({game,ready:true,started:true,onboarding:false});render(<><CampaignChapters/><CampaignPanel/><InspectionReveal/></>);}
 // Construct engine-heavy companies once outside each UI interaction deadline.
-const incidentTransitions=new Map([1,2,3,4,5,6].map(chapter=>[chapter,pauseTransition(chapter)]));
-it.each([1,2,3,4,5,6])("keeps the incident banner and recovery affordances visible during a Chapter %i incident",chapter=>{
+const incidentTransitions=new Map([1,2,3,4,5].map(chapter=>[chapter,pauseTransition(chapter)]));
+it.each([1,2,3,4,5])("keeps the incident banner and recovery affordances visible during a Chapter %i incident",chapter=>{
  show(structuredClone(incidentTransitions.get(chapter)!).incident);
  expect(useGame.getState().game.phase).toBe("incident");
  expect(screen.getByRole("region",{name:"Incident"})).toBeTruthy();
@@ -140,7 +140,7 @@ it("routes each app through its checkbox and keeps the last routed one checked",
  expect(useGame.getState().game.campaign!.routing.targets).toEqual(["app-1"]);
 });
 it("leaves a reserved spare out of the routing checklist",()=>{
- const g=protectedCombined();expect(g.campaign!.apps.find(a=>a.id==="app-2")!.role).toBe("spare");
+ const g=protectedCompany();expect(g.campaign!.apps.find(a=>a.id==="app-2")!.role).toBe("spare");
  show(g);fireEvent.click(screen.getByRole("button",{name:"Network"}));fireEvent.click(screen.getByRole("button",{name:"Network management"}));const route=screen.getByRole("group",{name:/Send traffic to/});
  const boxes=within(route).getAllByRole("checkbox");
  expect(boxes.map(b=>b.textContent)).toEqual(["Server 1","Server 3"]);
@@ -179,7 +179,7 @@ it("sends routing picks when the player inspects another machine from the Networ
  expect(screen.getByRole("dialog",{name:"Database"})).toBeTruthy();
 });
 it("applies routing picks on top of routing that changed while the Network window was open",()=>{
- show(protectedCombined());
+ show(protectedCompany());
  fireEvent.click(within(openRouting()).getByRole("checkbox",{name:"Server 3"}));
  // A failover queued before the window opened promotes the spare while it is open.
  const game=structuredClone(useGame.getState().game),c=game.campaign!;

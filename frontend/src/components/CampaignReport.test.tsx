@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 import { newGame } from "@/sim";
 import { captureScorecard } from "@/sim/campaignScorecard";
 import { act, tick } from "@/sim/__tests__/spikeFixtures";
-import { combinedCompany, finishRound, finishedCompany } from "@/sim/__tests__/combinedFixture";
+import { reliabilityOutcome } from "@/game/__fixtures__/reliabilityOutcome";
 import { useGame } from "@/game/store";
 import { CampaignOverlays } from "./CampaignUI";
 import CampaignScorecard from "./CampaignScorecard";
@@ -33,28 +33,17 @@ it("keeps prevention evidence in one accordion and acknowledges the same company
   expect(useGame.getState().game.campaign!.step).toBe(game.campaign!.step);
 });
 
-it("preserves growth review evidence and explicit acknowledgement", () => {
-  const game = finishRound(act(tick(combinedCompany(), 5), { type: "start_growth_wave" }));
+it("completes the campaign from Stay Online's outcome and resets the single accordion on the scorecard", () => {
+  const game = reliabilityOutcome();
   useGame.setState({ game, ready: true, started: true, onboarding: false }); render(<CampaignOverlays/>);
-  const details = checkReport();
-  expect(details.querySelector("pre")).toBeNull();
-  expect(within(details).getByText("Started game second")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Continue company" }));
-  expect(useGame.getState().game.campaign!.combinedStage!.completedRounds.at(-1)!.acknowledged).toBe(true);
-  expect(useGame.getState().game.campaign!.cashCents).toBe(game.campaign!.cashCents);
-});
-
-it("keeps final review explicit and resets the single accordion on completion", () => {
-  const game = finishedCompany();
-  useGame.setState({ game, ready: true, started: true, onboarding: false }); render(<CampaignOverlays/>);
-  const details = checkReport();
-  fireEvent.click(within(details).getByText("View Technical Details"));
-  expect(details.textContent).toContain("50,000");
+  const outcome = screen.getByRole("dialog", { name: "Reliability outcome" });
+  fireEvent.click(within(outcome).getByText("View Technical Details"));
   expect(useGame.getState().game.outcome).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Complete campaign" }));
+  fireEvent.click(within(outcome).getByRole("button", { name: "Complete campaign" }));
   expect(useGame.getState().game.outcome).toBe("won");
   fireEvent.click(within(screen.getByRole("dialog", { name: "Campaign finale" })).getByRole("button", { name: "Skip to the scorecard" }));
   checkReport();
+  expect(screen.getByRole("region", { name: "Run scorecard" }).textContent).toContain("Campaign complete");
 });
 
 it("does not invent a recovery on a no-incident record, and retains all scorecard evidence", () => {

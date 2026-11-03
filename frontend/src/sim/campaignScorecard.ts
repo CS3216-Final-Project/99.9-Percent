@@ -28,7 +28,6 @@ export function recurringCost(c:Campaign):number {
 }
 export function captureScorecard(s:GameState,outcome:"won"|"bankrupt"):CampaignScorecard {
  const c=s.campaign!,m=c.serviceMeasurement??emptyServiceMeasurement(c.step+1,"since-upgrade"),d=c.reliabilityStage;
- const promotions=c.actions.filter(a=>a.type==="promotion").reduce((n,a)=>n+a.costCents,0);
  const deployed:string[]=[];
  if(c.apps.some(a=>a.tier==="large"))deployed.push("larger_servers");
  if(c.loadBalancer)deployed.push("load_balancing");if(c.spikeStage?.controller)deployed.push("autoscaling");
@@ -36,13 +35,13 @@ export function captureScorecard(s:GameState,outcome:"won"|"bankrupt"):CampaignS
  if(c.readCache?.tuned)deployed.push("cache_tuning");if(d?.checksStep!=null)deployed.push("health_checks");
  if(c.apps.some(a=>a.role==="spare")||c.actions.some(a=>["create-spare","reserve-spare"].includes(a.type)&&a.activatedStep!==null))deployed.push("standby");
  if(d?.failover)deployed.push("auto_failover");
- return {runId:c.runId,seed:s.seed,outcome,capturedStep:c.step,users:c.combinedStage?.users??2000,
- finalUserTarget:c.combinedStage?.finalUserTarget??null,cashCents:c.cashCents,revenueCents:c.revenueCents,pendingRevenueCents:c.ledger.successes*openingTuning(c).revenueCents,
- infrastructureSetupCents:c.investedCents-promotions,promotionCents:promotions,
+ return {runId:c.runId,seed:s.seed,outcome,capturedStep:c.step,
+ cashCents:c.cashCents,revenueCents:c.revenueCents,pendingRevenueCents:c.ledger.successes*openingTuning(c).revenueCents,
+ infrastructureSetupCents:c.investedCents,
  infrastructureOperatingCents:c.settlements.reduce((n,x)=>n+x.appCents+x.dbCents+(x.lbCents??0)+(x.cacheCents??0)+(x.controllerCents??0)+(x.checksCents??0)+(x.failoverCents??0),0),
  salaryCents:c.settlements.reduce((n,x)=>n+x.salaryCents,0),rejectedDemand:c.cumulative.rejected,
  opportunityCents:c.cumulative.rejected*openingTuning(c).revenueCents,failedDemand:c.cumulative.failed,incidentCount:c.trace.filter(t=>t.type==="incident-opened").length,
- recurringCents:recurringCost(c),measurement:clone(m),combinedMeasurement:c.combinedStage?clone(c.combinedStage.service):null,
+ recurringCents:recurringCost(c),measurement:clone(m),
  wholeRunUptime:m.scope==="full-run"&&m.eligibleSteps?m.healthySteps/m.eligibleSteps:null,
  wholeRunLargestOutage:m.scope==="full-run"?m.longestDegradedSteps:null,ownedTechIds:completedTechIds(s),deployedTechIds:deployed,
  architecture:clone({apps:c.apps,routing:c.routing,loadBalancer:c.loadBalancer,dbCapacity:c.dbCapacity,readCache:c.readCache,

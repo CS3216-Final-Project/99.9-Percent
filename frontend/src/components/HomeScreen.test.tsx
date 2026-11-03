@@ -31,7 +31,7 @@ it("shows Guided Mode first with Challenge Mode locked until the chapters are do
   const choices = boot("campaign");
   const guided = card(choices, "Guided Mode"), challenge = card(choices, "Challenge Mode");
   expect(choices.compareDocumentPosition(guided) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(guided.textContent).toContain("six infrastructure chapters");
+  expect(guided.textContent).toContain("five infrastructure chapters");
   // The locked teaser names the goal in words and has nothing to press.
   expect(challenge.textContent).toContain("Grow to 50,000 users in 26 weeks on your own.");
   expect(challenge.textContent).toContain("Unlocks after Chapter 5: Stay Online.");
@@ -47,8 +47,8 @@ it("shows a Guided Mode run in progress beside Challenge Mode, and switches with
   const choices = boot("campaign");
   const campaign = card(choices, "Guided Mode"), classic = card(choices, "Challenge Mode");
   expect(campaign.textContent).toContain("Last played");
-  expect(campaign.textContent).toMatch(/Saved game\s*Chapter 1 of 6: Opening/);
-  expect(campaign.textContent).toContain("Work through six infrastructure chapters at your own pace.");
+  expect(campaign.textContent).toMatch(/Saved game\s*Chapter 1 of 5: Opening/);
+  expect(campaign.textContent).toContain("Work through five infrastructure chapters at your own pace.");
   expect(within(campaign).getByRole("button", { name: "Continue company" })).toBeTruthy();
   expect(classic.textContent).toContain("No saved game");
   // Reading the other mode for its card must not write a Classic save.
@@ -83,7 +83,7 @@ it("names the chapter that unlocks Challenge Mode and how far the Guided Mode co
   saveMeta({ ...DEFAULT_META, tutorialDone: true });
   saveGame(newGame(4, "campaign-locked"), 0, true);
   const challenge = card(boot("campaign"), "Challenge Mode");
-  expect(challenge.textContent).toContain("Unlocks after Chapter 5: Stay Online. You are on Chapter 1 of 6.");
+  expect(challenge.textContent).toContain("Unlocks after Chapter 5: Stay Online. You are on Chapter 1 of 5.");
   expect(within(challenge).queryAllByRole("button")).toHaveLength(0);
 });
 
@@ -164,9 +164,9 @@ it("reads a company past the Opening by its own chapter, even where this browser
   saveGame(act(act(recovered, "acknowledge_review"), "acknowledge_milestone"), 0, true);
   const choices = boot("campaign");
   const guided = card(choices, "Guided Mode");
-  expect(guided.textContent).toMatch(/Saved game\s*Chapter 2 of 6: Scaling & Routing/);
+  expect(guided.textContent).toMatch(/Saved game\s*Chapter 2 of 5: Scaling & Routing/);
   expect(guided.textContent).not.toContain("Finish Launch Week");
-  expect(card(choices, "Challenge Mode").textContent).toContain("You are on Chapter 2 of 6.");
+  expect(card(choices, "Challenge Mode").textContent).toContain("You are on Chapter 2 of 5.");
 });
 
 it("names a finished Guided Mode company as complete, not closed", () => {
