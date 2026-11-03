@@ -271,7 +271,7 @@ Each profile scales the same equipment's workload and market against that origin
 The read cache still removes at most 36% of database work (50% tuned), so a profile's cacheable share only matters below that.
 The lag column is the peak load at which the weekly satisfaction penalty starts; it reaches its maximum at full load as before.
 Promotion prices are unchanged, so a profile's favourite promotion buys more users per dollar.
-The top bar keeps the choice in the place Guided Mode keeps Hint, and its card lists what the profile changes.
+The top bar keeps the choice in the place Guided Mode keeps Hint (on phones, among the numbers behind Users and revenue), and its card lists what the profile changes.
 
 ## Saves
 

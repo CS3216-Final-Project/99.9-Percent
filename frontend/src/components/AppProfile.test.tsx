@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { newLegacyGame } from "@/sim";
 import { choosingAppProfile, useGame } from "@/game/store";
-import { AppProfileButton, AppProfilePicker } from "./AppProfile";
+import { AppProfileButton, AppProfilePicker, AppProfileSection } from "./AppProfile";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -63,12 +63,25 @@ describe("choosing what the company builds", () => {
     expect(document.activeElement).toBe(button);
   });
 
+  it("keeps the choice among the phone strip's numbers, opening to the same notes", () => {
+    company({ game: { ...newLegacyGame(1), appProfile: "gaming" } });
+    const { container } = render(<AppProfileSection />);
+    const row = container.querySelector("details")!;
+    expect(row.querySelector("summary")?.textContent).toBe("Your appOnline game");
+    expect(row.open).toBe(false);
+    fireEvent.click(row.querySelector("summary")!);
+    expect(row.open).toBe(true);
+    expect(within(row).getByText("Lag tolerance").nextSibling?.textContent).toBe("Low: notices lag at half load");
+    expect(row.textContent).toContain("Players leave the moment it lags");
+  });
+
   it("shows nothing for a run saved before profiles existed", () => {
     const legacy = newLegacyGame(1);
     delete legacy.appProfile;
     company({ game: legacy });
-    render(<><AppProfileButton /><AppProfilePicker /></>);
+    const { container } = render(<><AppProfileButton /><AppProfilePicker /><AppProfileSection /></>);
     expect(screen.queryByRole("button", { name: /^Your app/ })).toBeNull();
+    expect(container.querySelector(".app-profile-section")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

@@ -56,6 +56,36 @@ function ProfileDetails({ p, headingLevel = 3 }: { p: AppProfileDef; headingLeve
   </>;
 }
 
+function Effects({ p }: { p: AppProfileDef }) {
+  return <dl className="app-profile-effects">
+    {effects(p).map((e) => <div key={e.label}><dt>{e.label}</dt><dd>{e.value}</dd></div>)}
+  </dl>;
+}
+
+/**
+ * The company's kind of app on phones, among the numbers in the top strip's dropdown rather than as a button of its
+ * own, so the strip keeps room for Cash and Health. A row like the dropdown's numbers, which opens to the same notes
+ * as the desktop top bar's card.
+ */
+export function AppProfileSection() {
+  const id = useGame((s) => (s.game.campaign ? null : s.game.appProfile ?? null));
+  if (!id) return null;
+  const p = APP_PROFILES[id];
+  return <details className="app-profile-section" data-profile={id}>
+    <summary>
+      <span className="app-profile-section-icon" aria-hidden="true"><Icon name={PROFILE_ICON[id]} size={16} /></span>
+      <span className="app-profile-section-body"><span className="app-profile-section-label">Your app</span><strong>{p.name}</strong></span>
+      <Icon name="down" size={14} className="app-profile-section-chevron" />
+    </summary>
+    <div className="app-profile-section-detail">
+      <p className="app-profile-section-pitch">{p.pitch}</p>
+      <ProfileDetails p={p} headingLevel={4} />
+      <h4 className="app-profile-subhead">Against a general app</h4>
+      <Effects p={p} />
+    </div>
+  </details>;
+}
+
 /**
  * The choice of what the company builds, shown over the room right after the first-week tutorial, or at once for a
  * player who has done it. The four cards read like a hand of options: pick one, read what it asks of the
@@ -115,7 +145,7 @@ function Picker() {
           })}
         </div>
         <footer className="app-profile-foot">
-          <span className="app-profile-note">{picked ? `${APP_PROFILES[picked].name}: ${APP_PROFILES[picked].pitch}` : "Pick a card. Its button in the top bar keeps these notes."}</span>
+          <span className="app-profile-note">{picked ? `${APP_PROFILES[picked].name}: ${APP_PROFILES[picked].pitch}` : "Pick a card. The top bar keeps its notes for later."}</span>
           <button type="button" className="btn btn-primary app-profile-start" disabled={!picked}
             onClick={() => { if (picked) act({ type: "choose_app_profile", profile: picked }); }}>
             <Icon name="play" />Start building
@@ -173,9 +203,7 @@ export function AppProfileButton() {
         </div>
         <ProfileDetails p={p} headingLevel={4} />
         <h4 className="app-profile-subhead">Against a general app</h4>
-        <dl className="app-profile-effects">
-          {effects(p).map((e) => <div key={e.label}><dt>{e.label}</dt><dd>{e.value}</dd></div>)}
-        </dl>
+        <Effects p={p} />
       </div>,
       document.body,
     )}

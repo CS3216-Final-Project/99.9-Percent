@@ -161,7 +161,28 @@
   justify-content: space-between;
 }
 .app-profile-note { color: var(--on-night-soft); font-size: var(--text-sm); }
-.app-profile-start { flex: none; min-width: 190px; gap: 8px; }
+/* The commitment wears the chosen card's gold; until a card is chosen it is a quiet outline on the night. */
+.app-profile-foot .btn.app-profile-start {
+  flex: none;
+  min-width: 190px;
+  gap: 8px;
+  background: var(--go);
+  color: var(--ink);
+  border-color: var(--go-active);
+  box-shadow: var(--press);
+  font-weight: 700;
+}
+.app-profile-foot .btn.app-profile-start:hover:not(:disabled) { background: var(--go-hover); }
+.app-profile-foot .btn.app-profile-start:active:not(:disabled) { background: var(--go-active); box-shadow: none; }
+.app-profile-foot .btn.app-profile-start:disabled {
+  opacity: 1;
+  background: transparent;
+  color: var(--on-night-soft);
+  border: 1px dashed color-mix(in srgb, var(--on-night-soft) 45%, transparent);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.app-profile-foot .btn.app-profile-start:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 /* The top bar's button sits where Guided Mode keeps Hint, in the profile's own tile colour. */
 .topbar .icon-btn.app-profile-btn { background: var(--profile-tile); color: var(--profile-ink); border-color: color-mix(in srgb, var(--profile-ink) 30%, transparent); }
@@ -202,6 +223,44 @@
 .app-profile-effects dt { flex: none; color: var(--text-soft); white-space: nowrap; }
 .app-profile-effects dd { margin: 0; font-family: var(--font-num); font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
 
+/* Phones: the same notes as a row among the top strip's numbers, opening in place. */
+.app-profile-section {
+  grid-column: 1 / -1;
+  border-radius: 12px;
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.app-profile-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 6px 8px;
+  list-style: none;
+  cursor: pointer;
+  border-radius: 12px;
+}
+.app-profile-section > summary::-webkit-details-marker { display: none; }
+.app-profile-section > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.app-profile-section-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--profile-tile);
+  color: var(--profile-ink);
+}
+.app-profile-section-body { display: grid; flex: 1; min-width: 0; row-gap: 1px; }
+.app-profile-section-label { font-size: var(--text-xs); color: var(--text-soft); }
+.app-profile-section-body > strong { font-size: var(--text-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-profile-section-chevron { flex: none; color: var(--text-soft); transition: transform .18s ease-out; }
+.app-profile-section[open] .app-profile-section-chevron { transform: rotate(180deg); }
+.app-profile-section-detail { display: flex; flex-direction: column; gap: 6px; padding: 0 10px 10px; }
+.app-profile-section-pitch { margin: 0; font-size: var(--text-sm); color: var(--text-soft); }
+.app-profile-section .app-profile-risk { margin-top: 0; }
+
 @media (max-width: 960px) {
   .app-profile-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -227,5 +286,5 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .app-profile-card { transition: none; }
+  .app-profile-card, .app-profile-section-chevron { transition: none; }
 }

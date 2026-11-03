@@ -9,7 +9,7 @@ import { FinanceEntry } from "@/components/CampaignFinance";
 import { healthOf } from "@/components/health";
 import { Icon } from "@/components/icons";
 import { SoundButton } from "@/components/SoundButton";
-import { AppProfileButton } from "@/components/AppProfile";
+import { AppProfileSection } from "@/components/AppProfile";
 import { tipProps } from "@/components/tips";
 import { Meter, Stat } from "@/components/ui";
 import { PhoneChapterRow } from "../layout/PhoneChapterRow";
@@ -17,7 +17,7 @@ import "../layout/phone-layout.css";
 
 /**
  * Region: top strip. One row the room never loses: the logo, Cash, the health or incident status, the company's
- * other numbers behind one tap, sound and Menu. Guided Mode adds a one-line chapter row underneath.
+ * other numbers (and, in Challenge Mode, what the company builds) behind one tap, sound and Menu. Guided Mode adds a one-line chapter row underneath.
  * During an incident the whole strip takes the red striped treatment.
  */
 export function PhoneTopStrip() {
@@ -64,7 +64,6 @@ export function PhoneTopStrip() {
           {statsOpen && (campaign ? <GuidedNumbers /> : <ClassicNumbers />)}
         </div>
       </div>
-      {!campaign && <AppProfileButton />}
       <SoundButton />
       <button type="button" className="icon-btn menu-btn" aria-label="Menu" {...tipProps("Menu")} onClick={() => openView("menu")}><Icon name="menu" /></button>
     </div>
@@ -123,5 +122,6 @@ function ClassicNumbers() {
     <Stat icon="health" kind="health" label="Uptime" tip="The share of requests served across the whole run.">
       <strong>{uptimePct(m.uptime)}</strong>
     </Stat>
+    <AppProfileSection />
   </>;
 }
