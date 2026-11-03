@@ -1,5 +1,5 @@
 import { introductionActive } from "@/sim/introduction";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { campaignAttention, firstIncidentStop, guidanceActionId, incidentNeedsPause, spotlightMachines, type GuidanceTarget } from "@/game/campaignAttention";
 import { previewCampaignAction } from "@/game/campaignFinance";
@@ -10,7 +10,7 @@ import { isPhoneEdition } from "@/phone/edition";
 import { confirmingAction, subscribeConfirming } from "./actionConfirmation";
 import { watchIdleAttention } from "./idleAttention";
 import { Icon } from "./icons";
-import { tipProps } from "./tips";
+import { placeTip, tipProps } from "./tips";
 import { Spotlight } from "./SpotOverlay";
 import { cardStyle, type Box, type Place } from "./spotlight";
 import "./CampaignAttention.css";
@@ -110,6 +110,7 @@ function reveal(node: HTMLElement) {
 export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   const game = useGame(s => s.game), started = useGame(s => s.started), running = useGame(s => s.running);
   const tour = useGame(s => s.tour), practice = useGame(s => s.tutorialCompany), generation = useGame(s => s.generation);
+  const hintTipSeen = useGame(s => !!s.meta.tipsSeen?.includes("hint"));
   const view = useGame(s => s.view), selected = useGame(s => s.selected), panel = useGame(s => s.panelOpen), floor = useGame(s => s.floor);
   const inspection=useGame(s=>s.roomInspection), routingDraft=useGame(s=>s.routingDraft);
   const clockAvailable = useGame(campaignClockAvailable);
@@ -437,8 +438,9 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
     window.addEventListener("resize", place); document.addEventListener("pointerdown", outside, true);
     return () => { window.removeEventListener("resize", place); document.removeEventListener("pointerdown", outside, true); };
   }, [openNow]);
-  const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, resumeGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold: candidate && idle === timerKey && decision.attention === "hint", opened: openNow, dialogueOpen: introOpen, button, riskOpen,
-    openHint: () => { if (!blocked) { setPauseOffer(null); setResumeOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
+  const hintGold = candidate && idle === timerKey && decision.attention === "hint";
+  const context = { available: available && !launchTutorial, confirmationGold: available && !!confirming && !covered && !tour && !hidden && !locked && focused, pauseGold, resumeGold, runGold: candidate && idle === timerKey && decision.attention === "run", hintGold, hintNudge: hintGold && !hintTipSeen, opened: openNow, dialogueOpen: introOpen, button, riskOpen,
+    openHint: () => { if (!blocked) { if (!openNow) useGame.getState().seeTip("hint"); setPauseOffer(null); setResumeOffer(null); setAccepted(null); setGrowthChoice(null); setIdle(null); setOpened(openNow ? null : key); } } };
   const close = () => { setOpened(null); button.current?.focus(); };
   const compactOpeningPrompt = openingTutorial && isPhoneEdition() && decision.reason === "opening-growth"
     ? "Press Run to advance time and watch customer demand."
@@ -474,9 +476,43 @@ export function CampaignAttentionHost({ children }: { children: ReactNode }) {
   </CampaignAttentionContext.Provider>;
 }
 
+const HINT_TIP = "Need help? See what to try next.";
+
 export function CampaignHintButton() {
-  const { available, button, opened, hintGold, openHint } = useCampaignAttention();
-  return available ? <button ref={button} type="button" className={`icon-btn campaign-hint${hintGold ? " campaign-gold-attention" : ""}`} aria-label="Hint" aria-haspopup="dialog" aria-expanded={opened} aria-controls={opened ? "campaign-hint-card" : undefined} {...tipProps("Need help? See what to try next.", "below")} data-tip-title="Hint" onClick={openHint}><Icon name="bulb" /></button> : null;
+  const { available, button, opened, hintGold, hintNudge, openHint } = useCampaignAttention();
+  if (!available) return null;
+  // While the nudge labels the button, the hover tooltip would only repeat it on top of it.
+  return <>
+    <button ref={button} type="button" className={`icon-btn campaign-hint${hintGold ? " campaign-gold-attention" : ""}`} aria-label="Hint" aria-haspopup="dialog" aria-expanded={opened} aria-controls={opened ? "campaign-hint-card" : undefined} {...tipProps(hintNudge ? undefined : HINT_TIP, "below")} aria-description={HINT_TIP} data-tip-title="Hint" onClick={openHint}><Icon name="bulb" /></button>
+    {hintNudge && button && <HintNudge anchor={button} />}
+  </>;
+}
+
+/**
+ * The first time Hint has advice and the player has sat idle, its glow says what it is for, in the tooltip's style,
+ * until the player first opens Hint. It never pauses the game or takes a click.
+ */
+function HintNudge({ anchor }: { anchor: RefObject<HTMLButtonElement | null> }) {
+  const box = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    let frame = 0;
+    const place = () => {
+      const node = box.current, el = anchor.current;
+      if (node && el) {
+        const r = el.getBoundingClientRect();
+        const p = placeTip({ left: r.left, top: r.top, width: r.width, height: r.height }, { width: node.offsetWidth, height: node.offsetHeight }, { width: document.documentElement.clientWidth, height: window.innerHeight });
+        node.style.left = `${p.left}px`; node.style.top = `${p.top}px`;
+        node.style.setProperty("--tip-arrow", `${p.arrow}px`); node.dataset.side = p.side;
+      }
+      frame = requestAnimationFrame(place);
+    };
+    place();
+    return () => cancelAnimationFrame(frame);
+  }, [anchor]);
+  return createPortal(<div ref={box} className="tooltip hint-nudge" role="status">
+    <span className="tooltip-text"><strong className="tooltip-title">Stuck?</strong>Press Hint to see what to try next.</span>
+    <span className="tooltip-arrow" aria-hidden="true" />
+  </div>, document.body);
 }
 
 /** The Launch Week tutorial's steps: run, walk the incident through its fix, then finish the settled week. */
