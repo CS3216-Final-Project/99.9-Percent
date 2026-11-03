@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { advanceTurn, applyAction, BALANCE, needsAppProfile, dbLoadFactor, forecast, newGame, newLegacyGame, promoUsers, type AppProfileId, type GameState } from "../index";
+import { advanceTurn, applyAction, BALANCE, needsAppProfile, dbLoadFactor, equipmentInfo, forecast, newGame, newLegacyGame, promoUsers, type AppProfileId, type GameState } from "../index";
 import { act, handleIncident } from "./bots";
 
 const chosen = (profile: AppProfileId, seed = 1) => act(newLegacyGame(seed), { type: "choose_app_profile", profile });
@@ -45,6 +45,15 @@ describe("what each kind of app asks of the infrastructure", () => {
     expect(relief("ecommerce")).toBeCloseTo(0.35);
     expect(relief("streaming")).toBeCloseTo(0.5);
     expect(dbLoadFactor(cached(chosen("ecommerce")))).toBeGreaterThan(dbLoadFactor(cached(chosen("streaming"))) * 1.5);
+  });
+
+  it("labels the cache with the share of database work it removes, whatever each request costs", () => {
+    // A warm, tuned cache removes 50% of a catalogue's database work but only 35% of a store's (its writes never cache).
+    expect(equipmentInfo(cached(chosen("streaming")), "cache").summary).toBe("-50% database load");
+    expect(equipmentInfo(cached(chosen("ecommerce")), "cache").summary).toBe("-35% database load");
+    expect(equipmentInfo(cached(chosen("gaming")), "cache").summary).toBe("-50% database load");
+    // A cold cache on a database-heavy store removes nothing yet; it never reads as extra load.
+    expect(equipmentInfo({ ...cached(chosen("ecommerce")), cacheWarmth: 0 }, "cache").summary).toBe("-0% database load");
   });
 
   it("gives gaming the most traffic per user and the store the least", () => {

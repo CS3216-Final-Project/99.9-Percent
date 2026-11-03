@@ -55,14 +55,17 @@ export function dbCapacity(s: GameState): number {
   return tier.capacity * (has(s, "replicas") ? BALANCE.db.replicaCapacityMult : 1);
 }
 
+/** Share of the app's database work the read cache absorbs (0 without one): capped by what the app can cache. */
+export function cacheRelief(s: GameState): number {
+  if (s.campaign || !has(s, "caching")) return 0;
+  const reduction = has(s, "cache_tuning") ? BALANCE.db.tunedCacheReduction : BALANCE.db.cacheReduction;
+  return Math.min(appProfile(s).cacheEligibleShare, reduction) * clamp(s.cacheWarmth ?? 1, 0, 1);
+}
+
 /** Database queries generated per request that the app tier serves. */
 export function dbLoadFactor(s: GameState): number {
   if(s.campaign)return 1;
-  const profile = appProfile(s);
-  const reduction = has(s, "cache_tuning") ? BALANCE.db.tunedCacheReduction : BALANCE.db.cacheReduction;
-  const eligibleReduction = Math.min(profile.cacheEligibleShare, reduction);
-  const warmth = clamp(s.cacheWarmth ?? 1, 0, 1);
-  return BALANCE.db.queriesPerRequest * profile.dbLoad * (has(s, "caching") ? 1 - eligibleReduction * warmth : 1);
+  return BALANCE.db.queriesPerRequest * appProfile(s).dbLoad * (1 - cacheRelief(s));
 }
 
 export interface Utilisation {
@@ -617,7 +620,7 @@ export function equipmentInfo(s: GameState, id: EquipmentId): EquipmentInfo {
         "Cache",
         "Answers repeat requests so the database does not have to.",
         "caching",
-        `-${pct(1 - dbLoadFactor(s) / BALANCE.db.queriesPerRequest)} database load`,
+        `-${pct(cacheRelief(s))} database load`,
       );
     case "db": {
       let state = utilState(m.dbUtil);
