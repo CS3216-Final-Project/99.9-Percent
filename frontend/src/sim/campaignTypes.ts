@@ -70,6 +70,8 @@ export interface SpikeStage {
  controller: Autoscaler | null; baselineStableSteps: number; completedStep: number | null; acknowledged: boolean;
  /** Version 2 only: the spike demand chosen for the company's workload, and each spike's result. */
  peak?: number; pulses?: SpikePulse[];
+ /** Version 2 only: routed capacity, and the part of it left unused, summed over observations outside every spike. */
+ calm?: { capacity: number; idle: number };
 }
 export interface ReadCache { activatedStep: number; warmth: number; target: number; tuned: boolean }
 export interface Routing { mode: "single" | "balanced"; targets: string[] }

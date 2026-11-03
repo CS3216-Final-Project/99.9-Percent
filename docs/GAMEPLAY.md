@@ -117,8 +117,12 @@ The first spike is practice and is not graded.
 The second spike, and every retry, passes when at least 95% of its incoming requests succeed.
 Rejected requests count as unserved, so a traffic limit cannot pass the test.
 When a test fails, the clock stops on a debrief showing the served share, the main cause (traffic limit, database, autoscaling delay, a small server in an evenly split pool, or too little server capacity) and what to change.
+The database is named whenever it overloaded in at least as many spike seconds as the servers, because more servers only send it more work; its advice lists only the cache, cache tuning or database upgrade the company can still buy.
+Server capacity that joined part-way through a spike is reported with the second it arrived.
 Another spike of the same size starts 20 game seconds after the failed one ended, and retries continue until one passes.
-Incidents during the chapter close after five stable seconds without a recorded response, because the spike tests judge the response instead.
+A company that goes bankrupt on the second a spike ends is not graded or given another spike; the bankruptcy ends the run.
+Incidents opened before the chapter completes close after five stable seconds without a recorded response, because the spike tests judge the response instead.
+After completion, incidents need a recorded response again.
 
 Companies that entered Traffic Spikes before the graded test keep the original rules: two spikes of 4,000 req/s, completion after both, and incidents that need a recorded response.
 The difference is recorded in the entry input, so their saves replay unchanged.
@@ -134,7 +138,7 @@ It watches routed processed work divided by routed capacity:
 
 Manually installed or vertically upgraded apps are never retired, and there are no refunds.
 After a passed test, five stable baseline steps complete the chapter, which the player then acknowledges.
-The completion dialog scores the passed spike's served share, the number of graded spikes taken, setup spending, the share of routed capacity idle between spikes, and the changes made by the player and by autoscaling.
+The completion dialog scores the passed spike's served share, the number of graded spikes taken, setup spending, the share of routed capacity idle outside the spikes from entry to completion, and the changes made by the player and by autoscaling.
 The score never affects completion.
 
 ### Chapter 5: Stay Online

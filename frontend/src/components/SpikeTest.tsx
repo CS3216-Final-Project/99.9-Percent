@@ -41,7 +41,7 @@ export function SpikeScoreSummary({ score }: { score: SpikeScore }) {
       <Row label={`Spike ${score.pulse} served`} value={`${score.share} of requests`} />
       <Row label="Graded spikes taken" value={score.attempts === 1 ? "1, passed first time" : `${score.attempts}`} />
       <Row label="Setup spending this chapter" value={dollars(score.setupCents)} />
-      {score.idleShare && <Row label="Capacity idle between spikes" value={score.idleShare} />}
+      {score.idleShare && <Row label="Capacity idle outside spikes" value={score.idleShare} />}
       <Row label="Changes made by you / by autoscaling" value={`${score.manual} / ${score.automatic}`} />
     </dl>
     <p>Idle capacity still costs money every week. Autoscaling removes the servers it added once demand falls; servers you add by hand stay until you change them.</p>

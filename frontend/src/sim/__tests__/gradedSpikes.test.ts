@@ -89,6 +89,25 @@ it.each(["read-heavy","write-heavy"] as const)("autoscaling alone passes the %s 
  expect(g.campaign!.actions.some(a=>a.source==="autoscaler"&&a.type==="add-app")).toBe(true);
 });
 
+it("ends a company that goes bankrupt as a test fails, without a debrief that could never be read",()=>{
+ // Cash settles every 60 seconds and spikes end every 40: entering at step 212 makes a settlement land on a spike's last second.
+ let g=act(tick(dataCompany(),18),{type:"enter_spikes",version:2});
+ expect(g.campaign!.spikeStage!.enteredStep).toBe(212);
+ // An unrouted server keeps costing money while the limit turns the spikes away, so every test fails.
+ g=tick(act(act(g,{type:"add_server"}),{type:"set_traffic_limit",enabled:true}));
+ for(let i=0;i<400&&g.phase!=="ended";i++){
+  if(pendingSpikeDebrief(g.campaign!))g=act(g,{type:"acknowledge_spike_attempt"});
+  if(g.phase==="review")g=act(g,{type:"acknowledge_review"});
+  g=tick(g);
+ }
+ const c=g.campaign!,d=c.spikeStage!;
+ expect(g.outcome).toBe("bankrupt");
+ expect(d.deadlines.filter((_,i)=>i%2)).toContain(c.step);
+ expect(pendingSpikeDebrief(c)).toBeNull();
+ expect(c.trace.filter(t=>t.step===c.step).map(t=>t.type)).not.toContain("traffic-spike-scheduled");
+ expect(applyAction(g,{type:"acknowledge_spike_attempt"}).ok).toBe(false);
+});
+
 it("closes chapter incidents on stable service alone, without a recorded response",()=>{
  let g=untilOffset(graded(),12);
  expect(spikeIncidentsSelfResolve(g.campaign!)).toBe(true);
@@ -99,6 +118,16 @@ it("closes chapter incidents on stable service alone, without a recorded respons
  // The original chapter keeps its rule: the same overload waits for a response.
  const original=untilOffset(spikeCompany(false),12);
  expect(original.campaign!.incident!.responseDueFrom).toBe(original.campaign!.incident!.openedStep);
+});
+
+it("asks for a recorded response again once the chapter is complete",()=>{
+ let g=act(finish(prepared(graded())),{type:"acknowledge_spikes"});
+ expect(spikeIncidentsSelfResolve(g.campaign!)).toBe(false);
+ // Routing the 2,400 req/s baseline to one 1,600 req/s server overloads it.
+ g=act(g,{type:"set_routing",mode:"single",targets:["app-1"]});
+ for(let i=0;i<20&&!g.campaign!.incident;i++)g=tick(g);
+ const incident=g.campaign!.incident!;
+ expect(incident).not.toBeNull();expect(incident.responseDueFrom).toBe(incident.openedStep);
 });
 
 it("accepts the debrief while a postmortem from the same second waits",()=>{

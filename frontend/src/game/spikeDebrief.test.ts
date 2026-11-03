@@ -32,11 +32,49 @@ describe("failed spike debrief", () => {
     const d = spikeDebrief(g.campaign!)!;
     expect(d.cause).toBe("uneven-servers");expect(d.finding).toContain("Server 3");expect(d.fix).toContain("Scale up Server 3");
   });
-  it("prefers the database when it overloaded more often than the servers", () => {
-    const g = untilOffset(graded(), 68);
-    // The diagnosis reads only the recorded counts; overriding them isolates the database branch.
-    const p = g.campaign!.spikeStage!.pulses!.at(-1)!;p.dbOverloadSteps = 15;p.appOverloadSteps = 4;
+  it("blames the database when it caps the spike, even while the servers also overload", () => {
+    // Without the optional read cache, the 3,000 ops/s database caps service at 3,000 req/s.
+    const g = untilOffset(spikeCompany(false, "read-heavy", 2, { cache: false }), 68), p = g.campaign!.spikeStage!.pulses!.at(-1)!;
+    expect(p).toMatchObject({ served: 60000, appOverloadSteps: 20, dbOverloadSteps: 20 });
+    const d = spikeDebrief(g.campaign!)!;
+    expect(d.cause).toBe("database");
+    // The database is already at its largest, so the only way forward is the cache.
+    expect(d.fix).toContain("Deploy the read cache");expect(d.fix).not.toMatch(/larger database/i);
+    // A third large server only sends the database more work it cannot do.
+    let more = install(act(g, { type: "acknowledge_spike_attempt" }), [{ type: "add_server" }, { type: "scale_up", appId: "app-3" }, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] }], [2, 3, 1]);
+    more = untilOffset(more, 108);
+    expect(more.campaign!.spikeStage!.pulses!.at(-1)!.served).toBe(60000);
+    expect(spikeDebrief(more.campaign!)!.cause).toBe("database");
+  });
+  it("blames the database rather than autoscaling's delay when the database caps the spike", () => {
+    const g = untilOffset(spikeCompany(true, "write-heavy", 2, { cache: false }), 68);
+    expect(g.campaign!.trace.some(t => t.type === "autoscale-scale-out-decided")).toBe(true);
     expect(spikeDebrief(g.campaign!)!.cause).toBe("database");
+  });
+  it("suggests a larger database only while one can be bought", () => {
+    const g = untilOffset(spikeCompany(false, "read-heavy", 2, { cache: false }), 68);
+    // Advice reads the purchase currently offered; a 2,000 ops/s database is one upgrade short of the largest.
+    g.campaign!.dbCapacity = 2000;
+    expect(spikeDebrief(g.campaign!)!.fix).toContain("upgrade the database to 3,000 ops/s");
+    const cached = untilOffset(graded(), 68), d = cached.campaign!;
+    const p = d.spikeStage!.pulses!.at(-1)!;p.dbOverloadSteps = 20;
+    // With the cache deployed and the database at its largest, tuning is what remains.
+    expect(spikeDebrief(d)!.fix).toContain("Tune the read cache");
+  });
+  it("names capacity that arrived during the spike instead of crediting it to the whole spike", () => {
+    let g = untilOffset(graded(), 56, true);
+    g = install(g, [{ type: "add_server" }, { type: "scale_up", appId: "app-3" }, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] }], [2, 3, 1]);
+    g = untilOffset(g, 68);
+    const d = spikeDebrief(g.campaign!)!;
+    expect(d.cause).toBe("servers");
+    expect(d.finding).toBe("Your routed servers handled 3,200 req/s when the spike began and reached 4,800 req/s only 14 seconds in. The spike brought 4,000 req/s.");
+    expect(d.fix).toContain("before the spike starts");
+  });
+  it("does not blame the small server when every server in a mixed pool overloaded", () => {
+    let g = install(graded(), [{ type: "add_server" }, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-3"] }], [2, 1]);
+    g = untilOffset(g, 68);
+    // 2,000 req/s each overloads both the 1,600 req/s large server and the 1,000 req/s base server.
+    expect(spikeDebrief(g.campaign!)!.cause).toBe("servers");
   });
   it("explains autoscaling's reaction time with the seconds it took", () => {
     const g = untilOffset(graded(true), 68);
@@ -56,6 +94,9 @@ describe("passed spike score", () => {
     expect(score).toMatchObject({ pulse: 2, share: "100%", attempts: 1, setupCents: 300000, manual: 3, automatic: 0 });
     expect(score.idleShare).toMatch(/^\d+%$/);
     expect(spikeScore(untilOffset(graded(), 40).campaign!)).toBeNull();
+    // The score is recorded as the chapter runs, so it survives readings leaving the retained window.
+    g.campaign!.recent = [];
+    expect(spikeScore(g.campaign!)!.idleShare).toBe(score.idleShare);
   });
 });
 

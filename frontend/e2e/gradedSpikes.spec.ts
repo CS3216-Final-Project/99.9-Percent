@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { test, expect, expectRoom, savedGame, seedSave } from "./fixtures";
-import { act, spikeCompany, tick, untilOffset } from "../src/sim/__tests__/spikeFixtures";
+import { act, dataCompany, spikeCompany, tick, untilOffset } from "../src/sim/__tests__/spikeFixtures";
 import type { GameState } from "../src/sim";
 
 async function boot(page: Page, game: GameState) {
@@ -47,6 +47,22 @@ test("graded spikes: a failed test stops on its debrief, survives reload and sch
   expect(read.step).toBe(failedAt.step);
   expect(read.spikeStage!.pulses!.at(-1)).toMatchObject({ pulse: 2, result: "failed", reviewed: true });
   expect(read.spikeStage!.deadlines.slice(4)).toEqual([failedAt.spikeStage!.enteredStep + 88, failedAt.spikeStage!.enteredStep + 108]);
+});
+
+test("graded spikes: going bankrupt as a test fails shows the bankruptcy dialog, not a debrief", async ({ page, installClock, withoutRoom }, info) => {
+  await withoutRoom(); await installClock();
+  // Entering at step 212 lines a cash settlement up with Spike 4's last second; an unrouted server and the limit fail every test.
+  let game = act(tick(dataCompany(), 18), { type: "enter_spikes", version: 2 });
+  game = tick(act(act(game, { type: "add_server" }), { type: "set_traffic_limit", enabled: true }));
+  game = untilOffset(game, 140, true);
+  await boot(page, game);
+  const bankrupt = await runUntilDialog(page, "Company bankrupt");
+  await expect(page.getByRole("dialog", { name: /test failed$/ })).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath("bankrupt.png") });
+  const saved = (await savedGame(page)).campaign!;
+  expect(saved.spikeStage!.deadlines.filter((_, i) => i % 2)).toContain(saved.step);
+  await bankrupt.getByRole("button", { name: "Close" }).click();
+  await expect(bankrupt).toHaveCount(0);
 });
 
 test("graded spikes: a passed test opens the completion dialog with its cost score", async ({ page, installClock, withoutRoom }, info) => {
