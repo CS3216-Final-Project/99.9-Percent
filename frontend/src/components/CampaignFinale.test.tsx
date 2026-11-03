@@ -24,7 +24,9 @@ it("only celebrates a won campaign, with every colleague in order and true numbe
   const model = campaignFinale(won)!;
   expect(model.lines.map(l => l.speaker)).toEqual(["maya", "jordan", "sam", "taylor", "alex"]);
   expect(model.lines.every(l => l.mood === "celebrating")).toBe(true);
-  expect(model.lines.at(-1)!.text).toContain("kept our customers online");
+  // No line claims what the scorecard cannot back: the Opening's database often did fall behind, and chapters are not in-world.
+  expect(model.lines.map(l => l.text).join(" ")).not.toMatch(/chapter|kept up/i);
+  expect(model.lines.at(-1)!.text).toContain("one server");
   expect(model.stats.map(s => s.label)).toEqual(["Uptime", "Incidents"]);
   expect(model.stats.find(s => s.label === "Incidents")!.value).toBe(String(won.campaign!.scorecard!.incidentCount));
   const quiet = structuredClone(won), once = structuredClone(won), unknown = structuredClone(won);
