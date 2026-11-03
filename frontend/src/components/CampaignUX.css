@@ -51,6 +51,7 @@
 .mission-dashboard .mission-objectives [data-state="current"] { color: var(--warn-ink); }
 .mission-dashboard .mission-condition { border-left: 3px solid var(--warn-ink); padding-left: 10px; display: grid; gap: 4px; }
 .mission-dashboard .mission-condition.is-failure { border-color: var(--critical-ink); }
+.mission-dashboard .mission-condition.is-met { border-color: var(--ok-ink); }
 .mission-dashboard .mission-condition.is-failure h4 { color: var(--critical-ink); }
 .mission-dashboard .mission-status:empty { display: none; }
 .mission-dashboard .mission-next > section { display: grid; gap: 6px; }

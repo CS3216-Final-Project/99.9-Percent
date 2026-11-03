@@ -72,12 +72,15 @@ it("keeps a company that stayed after Stay Online in its final chapter, with Com
   expect(progress).toContain("Stay Online");expect(progress).toContain("Outcome acknowledged");
   expect(screen.getByRole("region",{name:"Next step"}).textContent).toContain("Use Next in the chapter bar to continue.");
   expect(screen.queryByRole("button",{name:"Complete campaign"})).toBeNull();
-  expect(screen.queryByRole("button",{name:/Run promotion|Start next growth wave/})).toBeNull();
+  // Nothing is unmet, so the panel does not call its readiness an unmet condition.
+  expect(screen.queryByRole("region",{name:"Current unmet condition"})).toBeNull();
+  expect(screen.getByRole("region",{name:"Current status"}).textContent).toContain("Ready: Complete campaign");
 });
 it("shows a completed campaign with its scorecard and no further requirement",()=>{
   const game=decide(completedReliability(),{type:"complete_campaign"});show(game);
   expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("Campaign complete");
-  expect(screen.getByRole("region",{name:"Current unmet condition"}).textContent).toContain("Campaign complete.");
+  expect(screen.queryByRole("region",{name:"Current unmet condition"})).toBeNull();
+  expect(screen.getByRole("region",{name:"Current status"}).textContent).toContain("Campaign complete.");
   // Completing needed every Stay Online requirement, and the ended run still shows them all met.
   expect(screen.getByText(/current requirements met$/).textContent).toBe("12 / 12 current requirements met");
   expect(screen.getByRole("button",{name:"View run scorecard"})).toBeTruthy();
