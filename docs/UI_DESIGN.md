@@ -22,8 +22,13 @@ The whole playable game uses Warm Classic: title and account screens, both modes
 - **Clock:** calendar Week N, clock current second / 60 s and slim weekly progress. This is an operating week, not a maximum game duration. No separate Total seconds line. Preserve the authoritative elapsed counter for saves, tutorial logic and test instrumentation.
 - **Workspace:** open by default; Hide equipment and actions collapses it to Equipment & actions. Reopening restores focus. Entering an incident, or selecting equipment in Challenge Mode, reveals it; inspecting a machine in Guided Mode opens its dialog and leaves the workspace as the player left it. It stays available during the mandatory guide and purchase quotes. No redundant System overview heading or divider.
 - **Inspection:** timer, error and backlog symptom icons sit above the plain Inspect equipment heading. In Campaign Chapters 1-6, room equipment and the accessible shortcuts open the same centered component dialog, titled with the machine's name: its disc, current status, live demand/capacity or component summary, and only related infrastructure actions. The disc is the Inspect details control: it reveals the existing precise readings and About disclosure below the actions, and pressed again hides them. App selection stays inside the Servers dialog. The shared purchase preview opens above it with cost, upkeep, activation time, effect and actionable Confirm/Cancel; Cancel restores focus to the action, and an accepted deployment closes inspection. Background controls remain blocked until the dialog closes. Chapter guides and practice companies use the same dialogs, with no Analysis/Actions tabs; a one-card chapter guide or tip ends, with its spotlight, as soon as the player opens any equipment; a step whose control lives in a dialog (Deploy Health Checks) points at its shortcut first and stays up over the open dialog. Challenge Mode retains its existing inline inspections. No separate Full system evidence section or repeated measurement timestamp. Preserve units and distinguish installed/routed capacity, measured/configured cache values, and actual/detected health. Accepted Hint follows the visible shortcut, any required instance or routing disclosure, the existing action and valid immediate Confirm; inspection does not alter the recommendation or advance time. Keep chapter lessons and completion counters in the workspace, with live component diagnostics and prerequisites in the dialog. Distinguish exact saturation (At capacity) from excess demand (Overloaded); failed or unrouted capacity must be described as unavailable, rather than full. Group unrouted serving-app warnings instead of repeating them per server.
+- **Routing:** in the Network window, Send traffic to picks collect as a draft and go as one routing change when the window closes, however it closes, including when the game closes it or the player inspects another machine.
+  Only the picks are kept, never a copy of the routing, so a failover or another change landing while the window is open stays and the picks apply on top of it.
+  If another routing, retirement or failover change is pending when the window closes, the picks are dropped with a notice rather than sent and refused.
+  An accepted Hint leads from each advised server to the window's Close, and an unsent pick lights Close after the same idle wait that lights Run for a pending change.
 - **Incident recovery:** keep chapter requirements above the Latency, Errors and Backlog cards during both healthy play and incidents.
-  The red banner pins to the top of the scrolling panel; once the stable-service counter starts, the counter pins there with the banner (at zero it stays in the card below).
+  The red banner pins to the top of the scrolling panel and carries the green recovery bar from zero, so the bar never jumps there once progress starts.
+  The Recovery progress card below keeps only the n/5 s count.
   Below those readings, show Recovery progress with its game-second counter and always-visible conditions: latency below 500 ms, service errors below 1%, and accepted traffic with completed requests, for five consecutive game seconds.
   Explain that an unhealthy second resets progress and pausing freezes it.
   For an active failed server, also show that it must be restored or isolated from traffic with an empty queue.
@@ -143,7 +148,8 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
 - **Incident:** retain the red banner and symptom-focused title, a compact progress area, three impact tiles, then **Inspect equipment** and **Actions**, without number badges. Equipment controls mirror the room. Selected equipment is highlighted and its latest observation is shown. Keep the permitted responses equally prominent; no full metrics table before the response list.
 - **Bottom bar:** one dock in both modes.
   Labeled Tech, Team and History tabs sit on the left (Team is Challenge-only).
-  Navigation groups Floor, View mode and Camera as matching dropdowns.
+  Navigation groups Floor, View mode and Camera as matching icon dropdowns; each keeps its name for assistive technology and shows it as a tip while its menu is closed.
+  At phone width they fold into one Navigation menu that shows its name and has no tip.
   View mode offers Overview, Walk mode, Follow and First person; camera adjustments and keyboard shortcuts remain disclosures.
   In a view from the avatar the camera's zoom brings Follow closer or farther, and its rotate buttons swing the view.
   Time groups the clock, selected speed and fixed-size primary action on the right.
@@ -157,6 +163,9 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   Escape closes a menu and returns focus to its trigger; clicking outside closes it.
   Reserve control dimensions across states and counts.
 - **Review:** report in a shared modal with outcome tag, time range, spending and evidence-based explanations. Raw snapshots belong in a disclosure. Continue returns to the same company.
+  Outcome reports and postmortems read as a chat: each question is a paper bubble on the left and each answer a dark reply bubble on the right, neither wider than 75% of the report, and a capacity summary's readings table is a reply bubble too.
+  A report's lone action, such as Continue company, sits on the right.
+  When a report pops up, each question and then its answer pops up from its side in turn; reduced motion shows them at once, and History keeps the bubbles without the entrance.
 - **Views:** Tech, Team and History open as full-page night workspaces above the bottom clock dock, titled "Tech tree", "Team" and "History" (Team is Challenge-only).
   In Challenge Mode they sit below the top bar.
   The active view tab stays pressed; the title receives focus on entry and Back to room or Esc restores the opener (the visible Views summary when its phone menu has closed).
