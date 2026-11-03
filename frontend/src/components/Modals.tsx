@@ -66,7 +66,7 @@ export function HowToPlay() {
       </ul>
       <div className="modal-foot">
         <span />
-        <button type="button" className="btn btn-primary" autoFocus onClick={finish}>
+        <button type="button" className="btn btn-primary" data-autofocus onClick={finish}>
           Got it
         </button>
       </div>
@@ -95,7 +95,7 @@ export function PostmortemModal() {
       <PostmortemBody pm={pm} />
       <div className="modal-foot">
         <span />
-        <button type="button" className="btn btn-primary" autoFocus onClick={() => act({ type: "acknowledge_review" })}>
+        <button type="button" className="btn btn-primary" data-autofocus onClick={() => act({ type: "acknowledge_review" })}>
           <Icon name="next" size={20} />Continue
         </button>
       </div>

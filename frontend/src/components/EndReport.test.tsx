@@ -5,7 +5,7 @@ import { newLegacyGame } from "@/sim";
 import { readAnalytics } from "@/game/persist";
 import { useGame } from "@/game/store";
 import { sendFeedback } from "@/lib/feedback";
-import { EndReport } from "./Modals";
+import { EndReport, HowToPlay } from "./Modals";
 
 vi.mock("@/lib/feedback", () => ({ sendFeedback: vi.fn() }));
 beforeEach(() => {
@@ -70,4 +70,10 @@ it("rounds cash in the millions so a long-running company's tile is never cut sh
 
 it("keeps cash under a million exact", () => {
   expect(screen.getByText("Cash", { selector: ".stats dt" }).nextElementSibling?.textContent).toMatch(/^\$\d{1,3}(,\d{3})*$/);
+});
+
+it("opens How to play on Got it, not on its Close button", () => {
+  cleanup();
+  render(<StrictMode><HowToPlay /></StrictMode>);
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Got it" }));
 });
