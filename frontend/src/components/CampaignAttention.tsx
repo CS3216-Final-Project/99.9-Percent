@@ -502,8 +502,10 @@ function HintNudge({ anchor }: { anchor: RefObject<HTMLButtonElement | null> | n
       // A chapter stage card sits over the header, and a button without a box has nowhere to point.
       const away = !r || !r.width || !r.height || !!document.querySelector(".chapter-stage-popup");
       if (node) node.style.visibility = away ? "hidden" : "";
-      if (node && r && !away) {
-        const p = placeTip({ left: r.left, top: r.top, width: r.width, height: r.height }, { width: node.offsetWidth, height: node.offsetHeight }, { width: document.documentElement.clientWidth, height: window.innerHeight });
+      if (node && el && r && !away) {
+        // Point at the gold ring around the glowing button, not into it.
+        const s = getComputedStyle(el), ring = s.outlineStyle === "none" ? 0 : (parseFloat(s.outlineWidth) || 0) + (parseFloat(s.outlineOffset) || 0);
+        const p = placeTip({ left: r.left - ring, top: r.top - ring, width: r.width + 2 * ring, height: r.height + 2 * ring },{ width: node.offsetWidth, height: node.offsetHeight }, { width: document.documentElement.clientWidth, height: window.innerHeight });
         node.style.left = `${p.left}px`; node.style.top = `${p.top}px`;
         node.style.setProperty("--tip-arrow", `${p.arrow}px`); node.dataset.side = p.side;
       }
