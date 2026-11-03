@@ -168,6 +168,7 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   A report's lone action, such as Continue company, sits on the right.
   When a report pops up, each question and then its answer pops up from its side in turn; reduced motion shows them at once, and History keeps the bubbles without the entrance.
   Challenge Mode's end-of-run report opens focused on its primary action, never on a rating: Play again, or Keep playing beside it when the run has just secured its Series A.
+  On phones its actions form an even grid, two columns with the primary action last (one column on the narrowest phones), and its five ratings share their row, so nothing wraps raggedly or runs past the card; cash of a million or more is rounded like the top bar's.
 - **Views:** Tech, Team and History open as full-page night workspaces above the bottom clock dock, titled "Tech tree", "Team" and "History" (Team is Challenge-only).
   In Challenge Mode they sit below the top bar.
   The active view tab stays pressed; the title receives focus on entry and Back to room or Esc restores the opener (the visible Views summary when its phone menu has closed).
