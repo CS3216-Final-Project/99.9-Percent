@@ -423,6 +423,8 @@ function baseAttention(game: GameState): AttentionDecision {
     const inspected = (component: string) => !!stage && c.trace.some(t => t.type === "inspection" && t.id > stage.eventId && t.step >= stage.since && t.data.component === component);
     const inspection = (component: "app" | "network" | "monitoring", message: string) => ({ ...hint(`spike-${stage?.stage}-inspect`, "Inspect current evidence for this traffic stage.", message, component), message });
     const limited = c.limit !== null;
+    // A graded test counts rejected requests as unserved, so a limit there is never advice to keep.
+    const limitCost = gradedSpikes(d) ? "rejected requests count against the test" : "";
     // The chapter's headline option lives inside App Server > Server management; a validated unlock,
     // deploy or enable action lets the spotlight walk into it instead of leaving players hunting.
     const autoscaling = (): GuidanceAction | null => {
@@ -486,7 +488,7 @@ function baseAttention(game: GameState): AttentionDecision {
       return advice.action ? advice : null;
     };
     if (stage?.stage === "prepare" && !inspected("app"))
-      return inspection("app", limited ? "Check App Server capacity before the spike. Your traffic limit protects service by rejecting requests." : "Check App Server capacity before the spike. Upgrades are optional; Run when you are ready.");
+      return inspection("app", limited ? `Check App Server capacity before the spike. ${limitCost ? `Your traffic limit rejects requests, and ${limitCost}.` : "Your traffic limit protects service by rejecting requests."}` : "Check App Server capacity before the spike. Upgrades are optional; Run when you are ready.");
     if (stage?.stage === "prepare" && !d.controller?.enabled && !deployPending) return autoscalingStep();
     if (deployPending)
       return { ...run("spike-autoscale-deploy", "The autoscaling controller is installing."), message: "The autoscaling controller is installing. Press Run to finish deployment; it enables itself and starts watching routed load." };
@@ -530,7 +532,7 @@ function baseAttention(game: GameState): AttentionDecision {
       if (limited && c.dbCapacity >= fullDb && c.routing.targets.length) {
         const allocation = allocateTraffic(peak, c.routing.targets);
         if (c.routing.targets.every(id => { const app = c.apps.find(a => a.id === id); return app && app.health !== "failed" && app.role !== "spare" && !app.backlog && app.capacity >= allocation[id]; })) {
-          const advice = plan({ type: "set_traffic_limit", enabled: false }, "Prepared capacity fits the next spike. You may remove the traffic limit to test serving more users, or keep your strategy.");
+          const advice = plan({ type: "set_traffic_limit", enabled: false }, limitCost ? `Prepared capacity fits the next spike. Remove the traffic limit: ${limitCost}.` : "Prepared capacity fits the next spike. You may remove the traffic limit to test serving more users, or keep your strategy.");
           if (advice) return advice;
         }
       }
@@ -572,7 +574,7 @@ function baseAttention(game: GameState): AttentionDecision {
       }
       const advice = run("spike-pulses", "The announced traffic pulses still need game time to develop or end.");
       const remaining = d.deadlines.find(step => step > c.step)! - c.step;
-      return { ...advice, message: limited ? `Keep the limit to protect service; it rejects users. Press Run to observe the next pulse boundary in ${remaining} game seconds.`
+      return { ...advice, message: limited ? `${limitCost ? `Your traffic limit rejects requests, and ${limitCost}.` : "Keep the limit to protect service; it rejects users."} Press Run to observe the next pulse boundary in ${remaining} game seconds.`
         : `Press Run to observe the next pulse boundary in ${remaining} game seconds, then check your readings.` };
     }
     // Earlier diagnosis checks establish healthy service, empty queues and acknowledged

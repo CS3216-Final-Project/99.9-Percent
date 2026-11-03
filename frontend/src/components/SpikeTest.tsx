@@ -9,10 +9,10 @@ import "./CampaignIncidentReport.css";
 const num = (n: number) => n.toLocaleString("en-US");
 const dollars = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
 const CAUSE_TITLE: Record<SpikeDebrief["cause"], string> = {
-  limit: "The traffic limit turned requests away",
+  limit: "The traffic limit rejected requests",
   database: "The database was the bottleneck",
   "autoscaler-delay": "Autoscaling arrived late",
-  "uneven-servers": "One server took more than it could carry",
+  "uneven-servers": "A small server overloaded",
   servers: "Not enough server capacity",
 };
 
@@ -22,7 +22,7 @@ export function SpikeDebriefDialog({ campaign, debrief, onContinue }: { campaign
   return <Modal title={`Spike ${d.pulse} test failed`} className="campaign-recovery-report spike-test-report" icon={{ kind: "warn", name: "alert" }}>
     <div className="campaign-incident-report">
       <Callout tone="warn" icon="load" kicker={`${d.share} served - the test needs ${PASS_SHARE}`}>
-        Spike {d.pulse} sent {num(d.incoming)} requests: {num(d.served)} were served, {num(d.rejected)} rejected and {num(d.failed)} failed.
+        Spike {d.pulse} sent {num(d.incoming)} requests: {num(d.served)} were served, {num(d.rejected)} rejected{d.queued ? `, ${num(d.failed)} failed and ${num(d.queued)} were still queued when it ended` : ` and ${num(d.failed)} failed`}.
       </Callout>
       <section><h3>{CAUSE_TITLE[d.cause]}</h3><p>{d.finding}</p></section>
       <section><h3>What to change</h3><p>{d.fix}</p></section>

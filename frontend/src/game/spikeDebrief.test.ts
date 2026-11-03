@@ -7,6 +7,7 @@ import { autoscaleSpot, SPOTLIGHT_SECONDS } from "./autoscaleSpotlight";
 import { chapter4Stage } from "./chapter4Guidance";
 import { campaignGuidance, campaignObjective } from "./campaignGuidance";
 import { describeEvents } from "./reportEvents";
+import { campaignAttention } from "./campaignAttention";
 
 const graded = (auto = false) => spikeCompany(auto, "read-heavy", 2);
 /** Installs and routes `apps` extra servers, reading any postmortem on the way. */
@@ -17,26 +18,26 @@ function install(g: GameState, actions: Parameters<typeof act>[1][], steps: numb
 
 describe("failed spike debrief", () => {
   it("names missing server capacity and when the next test starts", () => {
-    const g = untilOffset(graded(), 68), d = spikeDebrief(g.campaign!)!;
+    const g = untilOffset(graded(), 68), d = spikeDebrief(g)!;
     expect(d).toMatchObject({ pulse: 2, share: "80%", cause: "servers", next: { pulse: 3, inSeconds: 20 } });
     expect(d.finding).toContain("3,200 req/s");expect(d.finding).toContain("4,000 req/s");
-    expect(spikeDebrief(act(g, { type: "acknowledge_spike_attempt" }).campaign!)).toBeNull();
+    expect(spikeDebrief(act(g, { type: "acknowledge_spike_attempt" }))).toBeNull();
   });
   it("blames the traffic limit when its rejections are most of what went unserved", () => {
     const g = untilOffset(tick(act(graded(), { type: "set_traffic_limit", enabled: true })), 68);
-    expect(spikeDebrief(g.campaign!)!.cause).toBe("limit");
+    expect(spikeDebrief(g)!.cause).toBe("limit");
   });
   it("explains an even split overloading the one small server in a mixed pool", () => {
     let g = install(graded(), [{ type: "add_server" }, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] }], [2, 1]);
     g = untilOffset(g, 68);
-    const d = spikeDebrief(g.campaign!)!;
+    const d = spikeDebrief(g)!;
     expect(d.cause).toBe("uneven-servers");expect(d.finding).toContain("Server 3");expect(d.fix).toContain("Scale up Server 3");
   });
   it("blames the database when it caps the spike, even while the servers also overload", () => {
     // Without the optional read cache, the 3,000 ops/s database caps service at 3,000 req/s.
     const g = untilOffset(spikeCompany(false, "read-heavy", 2, { cache: false }), 68), p = g.campaign!.spikeStage!.pulses!.at(-1)!;
     expect(p).toMatchObject({ served: 60000, appOverloadSteps: 20, dbOverloadSteps: 20 });
-    const d = spikeDebrief(g.campaign!)!;
+    const d = spikeDebrief(g)!;
     expect(d.cause).toBe("database");
     // The database is already at its largest, so the only way forward is the cache.
     expect(d.fix).toContain("Deploy the read cache");expect(d.fix).not.toMatch(/larger database/i);
@@ -44,44 +45,76 @@ describe("failed spike debrief", () => {
     let more = install(act(g, { type: "acknowledge_spike_attempt" }), [{ type: "add_server" }, { type: "scale_up", appId: "app-3" }, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] }], [2, 3, 1]);
     more = untilOffset(more, 108);
     expect(more.campaign!.spikeStage!.pulses!.at(-1)!.served).toBe(60000);
-    expect(spikeDebrief(more.campaign!)!.cause).toBe("database");
+    expect(spikeDebrief(more)!.cause).toBe("database");
   });
   it("blames the database rather than autoscaling's delay when the database caps the spike", () => {
     const g = untilOffset(spikeCompany(true, "write-heavy", 2, { cache: false }), 68);
     expect(g.campaign!.trace.some(t => t.type === "autoscale-scale-out-decided")).toBe(true);
-    expect(spikeDebrief(g.campaign!)!.cause).toBe("database");
+    expect(spikeDebrief(g)!.cause).toBe("database");
   });
   it("suggests a larger database only while one can be bought", () => {
     const g = untilOffset(spikeCompany(false, "read-heavy", 2, { cache: false }), 68);
     // Advice reads the purchase currently offered; a 2,000 ops/s database is one upgrade short of the largest.
     g.campaign!.dbCapacity = 2000;
-    expect(spikeDebrief(g.campaign!)!.fix).toContain("upgrade the database to 3,000 ops/s");
+    expect(spikeDebrief(g)!.fix).toContain("upgrade the database to 3,000 ops/s");
     const cached = untilOffset(graded(), 68), d = cached.campaign!;
     const p = d.spikeStage!.pulses!.at(-1)!;p.dbOverloadSteps = 20;
     // With the cache deployed and the database at its largest, tuning is what remains.
-    expect(spikeDebrief(d)!.fix).toContain("Tune the read cache");
+    expect(spikeDebrief(cached)!.fix).toContain("Tune the read cache");
   });
   it("names capacity that arrived during the spike instead of crediting it to the whole spike", () => {
     let g = untilOffset(graded(), 56, true);
     g = install(g, [{ type: "add_server" }, { type: "scale_up", appId: "app-3" }, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] }], [2, 3, 1]);
     g = untilOffset(g, 68);
-    const d = spikeDebrief(g.campaign!)!;
+    const d = spikeDebrief(g)!;
     expect(d.cause).toBe("servers");
     expect(d.finding).toBe("Your routed servers handled 3,200 req/s when the spike began and reached 4,800 req/s only 14 seconds in. The spike brought 4,000 req/s.");
-    expect(d.fix).toContain("before the spike starts");
+    expect(d.fix).toBe("That capacity would have been enough. Keep it routed before the next spike starts.");
   });
   it("does not blame the small server when every server in a mixed pool overloaded", () => {
     let g = install(graded(), [{ type: "add_server" }, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-3"] }], [2, 1]);
     g = untilOffset(g, 68);
     // 2,000 req/s each overloads both the 1,600 req/s large server and the 1,000 req/s base server.
-    expect(spikeDebrief(g.campaign!)!.cause).toBe("servers");
+    expect(spikeDebrief(g)!.cause).toBe("servers");
+  });
+  it("accounts for requests still queued when the spike ended", () => {
+    const d = spikeDebrief(untilOffset(graded(), 68))!;
+    expect(d).toMatchObject({ incoming: 80000, served: 64000, rejected: 0, failed: 14000, queued: 2000 });
+  });
+  it("only asks for the limit to come off when the routed servers already fit the spike", () => {
+    let g = install(graded(), [{ type: "add_server" }, { type: "scale_up", appId: "app-3" }, { type: "set_routing", mode: "balanced", targets: ["app-1", "app-2", "app-3"] }], [2, 3, 1]);
+    g = untilOffset(tick(act(g, { type: "set_traffic_limit", enabled: true })), 68);
+    const d = spikeDebrief(g)!;
+    expect(d.cause).toBe("limit");
+    expect(d.fix).toBe("Your routed servers already handle 4,800 req/s, enough for 4,000 req/s. Remove the traffic limit before the next spike.");
+  });
+  it("names the capacity a limited company still needs", () => {
+    const d = spikeDebrief(untilOffset(tick(act(graded(), { type: "set_traffic_limit", enabled: true })), 68))!;
+    expect(d.fix).toMatch(/^Your routed servers handle 3,200 req\/s, short of 4,000 req\/s\. .*then remove the traffic limit before the next spike\.$/);
+  });
+  it("routes an installed server before suggesting new ones", () => {
+    const g = untilOffset(install(graded(), [{ type: "add_server" }], [3]), 68), d = spikeDebrief(g)!;
+    expect(d.cause).toBe("servers");expect(d.fix).toMatch(/^Route Server 3/);
+  });
+  it("asks to switch autoscaling back on rather than deploy it again", () => {
+    const g = untilOffset(tick(act(graded(true), { type: "set_autoscaling", enabled: false })), 68), d = spikeDebrief(g)!;
+    expect(d.cause).toBe("servers");
+    expect(d.fix).toContain("turn autoscaling back on");expect(d.fix).not.toMatch(/deploy autoscaling/i);
+  });
+  it("never recommends a purchase the company cannot afford", () => {
+    const servers = untilOffset(graded(), 68);servers.campaign!.cashCents = 100;
+    const fix = spikeDebrief(servers)!.fix;
+    expect(fix).not.toMatch(/add a server|scale up|deploy autoscaling/i);expect(fix).toContain("cash");
+    const database = untilOffset(spikeCompany(false, "read-heavy", 2, { cache: false }), 68);database.campaign!.cashCents = 100;
+    const dbFix = spikeDebrief(database)!.fix;
+    expect(dbFix).not.toMatch(/^.*Deploy the read cache/);expect(dbFix).toContain("read cache");expect(dbFix).toContain("cash");
   });
   it("explains autoscaling's reaction time with the seconds it took", () => {
     const g = untilOffset(graded(true), 68);
-    expect(spikeDebrief(g.campaign!)).toBeNull();
+    expect(spikeDebrief(g)).toBeNull();
     // Autoscaling passes this test; marking it failed isolates how its recorded delay is explained.
     const p = g.campaign!.spikeStage!.pulses!.at(-1)!;p.result = "failed";p.reviewed = false;
-    const d = spikeDebrief(g.campaign!)!;
+    const d = spikeDebrief(g)!;
     expect(d.cause).toBe("autoscaler-delay");expect(d.finding).toMatch(/reacted \d+ seconds into the spike and Server \d began serving \d+ seconds in/);
   });
 });
@@ -131,6 +164,15 @@ describe("graded chapter guidance", () => {
     let g = graded();const ids = () => campaignGuidance(g).requirements.map(r => r.id);
     const first = ids();
     for (const offset of [20, 68, 90]) { g = untilOffset(g, offset, true);expect(ids()).toEqual(first); }
+  });
+  it("never tells a graded company to keep a traffic limit that fails the test", () => {
+    let g = tick(act(graded(), { type: "set_traffic_limit", enabled: true }));
+    for (const offset of [2, 10, 50]) {
+      g = untilOffset(g, offset, true);
+      const a = campaignAttention(g), text = `${a.message} ${a.recommendation}`;
+      expect(text).not.toMatch(/keep the limit|keep your strategy|optional/i);
+    }
+    expect(campaignAttention(untilOffset(g, 50, true)).message).toContain("count against the test");
   });
   it("describes grading events in the event log", () => {
     const g = untilOffset(graded(), 68), lines = describeEvents(g.campaign!.trace).map(e => [e.title, e.detail].join(" · "));

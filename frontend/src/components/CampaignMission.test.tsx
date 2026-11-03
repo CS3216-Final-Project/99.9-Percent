@@ -36,6 +36,17 @@ for(const [offset,stage] of [[0,"Preparing"],[8,"Spike 1 active"],[28,"Between s
     expect(screen.getByRole("region",{name:"Essential live status"}).textContent).toContain(offset===0?"Traffic limit: activates in 1":"Traffic limit active");
   });
 
+it("names the graded spike in progress and keeps the spike test as the current objective through retries",()=>{
+  // Two large servers fail every graded test, so the chapter schedules Spike 3 after Spike 2's debrief.
+  let game=untilOffset(spikeCompany(false,"read-heavy",2),68);game=decide(game,{type:"acknowledge_spike_attempt"});
+  show(game);
+  const progress=()=>screen.getByRole("region",{name:"Chapter Progress"}).textContent!;
+  expect(progress()).toContain("Spike 3 in 20 s");
+  expect(progress()).toContain("A graded spike served at least 95% of its requests (last test: 80%)");
+  cleanup();show(untilOffset(game,92,true));
+  expect(progress()).toContain("Spike 3 active");expect(progress()).not.toContain("Spike 2 active");
+});
+
 it("keeps optional autoscaling evidence in App Servers, not the mission",()=>{
   show(spikeCompany());expect(screen.queryByText("Controller evidence and costs")).toBeNull();
   fireEvent.click(screen.getByRole("button",{name:"App Server"}));

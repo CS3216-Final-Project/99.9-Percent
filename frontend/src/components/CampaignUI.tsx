@@ -251,6 +251,15 @@ function EquipmentShortcuts({disabled}:{disabled:boolean}) {
       </div>);
 }
 
+/** Chapter 4's stage: graded companies retry spikes, so the label names the spike in progress and counts down to the next one. */
+function spikeStageLabel(c:Campaign,spike:ReturnType<typeof chapter4Stage>):string {
+  const stage=spike?.stage??"recover";
+  if(!spike?.graded||(stage!=="spike1"&&stage!=="spike2"&&stage!=="between"))return {prepare:"Preparing",spike1:"Spike 1 active",between:"Between spikes",spike2:"Spike 2 active",recover:"Review / stability verification"}[stage];
+  if(stage!=="between")return `Spike ${spike.pulse} active`;
+  const start=c.spikeStage!.deadlines[2*spike.pulse];
+  return start===undefined?"Between spikes":`Spike ${spike.pulse+1} in ${start-c.step} s`;
+}
+
 /** A compact projection of existing gates and advice. No new progression or saved state. */
 function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const {game,act,running}=useGame(),c=game.campaign!,m=c.snapshot;
@@ -272,8 +281,8 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const condition=game.phase==="ended"?model.notice:reviewing?action.label:unmet?`Still needed: ${unmet.label}`:(action?`Ready: ${action.label}`:"All current requirements met.");
   const stage=combined?(combined.acknowledged?"Campaign complete":combined.finalReview?"Final review":pendingCombined(c)?"Growth outcome review":combined.currentRound?`Growth wave ${combined.currentRound.index+1} ${combined.currentRound.startedStep===null?"scheduled":combined.currentRound.pressureEndedStep===null?"active":"recovery"}`:combined.nextRoundIndex===3?"Final checks":"Prepare for full demand")
     :reliability?(reliability.acknowledged?"Outcome acknowledged":pendingReliability(c)?"Outcome review":!reliability.fault?"Preparation":reliability.fault.startedStep===null?"Failure scheduled":reliability.fault.restoredStep===null?"Failure / recovery":"Stability verification")
-    :c.spikeStage!.acknowledged?"Outcome acknowledged":pendingSpikeAcknowledgement(c)?"Spike outcome review":({prepare:"Preparing",spike1:"Spike 1 active",between:"Between spikes",spike2:"Spike 2 active",recover:"Review / stability verification"}[spike?.stage??"recover"]);
-  const objectiveIds=combined?[]:reliability?["armed","observed","restored","observations","recognition"]:["pulses","observations","recognition"];
+    :c.spikeStage!.acknowledged?"Outcome acknowledged":pendingSpikeAcknowledgement(c)?"Spike outcome review":spikeStageLabel(c,spike);
+  const objectiveIds=combined?[]:reliability?["armed","observed","restored","observations","recognition"]:["test","pulses","observations","recognition"];
   const objectives=[...model.requirements.filter(r=>objectiveIds.includes(r.id)),...(combined?model.finalGoals.filter(r=>r.id==="completion"):[])];
   const currentObjective=objectives.find(r=>!r.met)?.id;
   const nextAdvice=decision.attention==="run"?decision.message:decision.reason==="spike-plan"?decision.recommendation:decision.action?`Suggested action: ${decision.action.label}.`:decision.recommendation;
@@ -587,7 +596,7 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
   </Modal>;
   if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_prevention_review"})} /></Modal>;
   // A failed spike test's debrief comes first: a postmortem from the same second waits behind it.
-  const debrief = spikeDebrief(c);
+  const debrief = spikeDebrief(game);
   if (debrief && view !== "menu" && view !== "history") return <SpikeDebriefDialog key={`${c.runId}:${debrief.pulse}`} campaign={c} debrief={debrief} onContinue={() => act({ type: "acknowledge_spike_attempt" })} />;
   if (game.phase === "review") {
     const report = c.reports[c.reports.length - 1];
