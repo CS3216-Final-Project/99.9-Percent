@@ -199,7 +199,7 @@
 .app-profile-popover .app-profile-risk { margin-top: 0; }
 .app-profile-effects { display: grid; gap: 2px; margin: 0; font-size: var(--text-sm); }
 .app-profile-effects > div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px dashed var(--control-edge); }
-.app-profile-effects dt { color: var(--text-soft); }
+.app-profile-effects dt { flex: none; color: var(--text-soft); white-space: nowrap; }
 .app-profile-effects dd { margin: 0; font-family: var(--font-num); font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
 
 @media (max-width: 960px) {
@@ -212,8 +212,8 @@
   .app-profile-art { display: none; }
   .app-profile-card-head { text-align: left; }
   .app-profile-pitch { min-height: 0; text-align: left; }
-  /* The room's own panels must not read through behind the stacked cards. */
-  .app-profile-backdrop { background: rgb(14 11 30 / 0.94); }
+  /* The room's own panels must not read through behind the stacked cards or the heading. */
+  .app-profile-backdrop { background: rgb(14 11 30); }
   /* Start building stays pinned to the bottom edge, edge to edge, with the cards fading out above it. */
   .app-profile-foot {
     position: sticky;
