@@ -9,6 +9,7 @@ import { chapterEnd } from "./chapterCompletion";
 import { FULL_SCOPE, scopeAllows, scopeComplete, type PlayScope } from "./scope";
 import { clearTutorialPractice, loadTutorialPractice, saveTutorialPractice, type TutorialCompany } from "./tutorialPractice";
 import { advanceSteps, applyCampaignInput, pendingStop } from "@/sim/step";
+import { draftAction, draftRefusal, toggleDraft, type RoutingDraft } from "./routingDraft";
 import type { Campaign } from "@/sim/campaignTypes";
 
 import { create } from "zustand";
@@ -246,10 +247,10 @@ interface Store {
   roomInspection: RoomInspection | null;
   /**
    * Routing picked in an open inspection but not yet sent: the window would close on the first pending change, so the
-   * picks collect here and become one routing change when the player closes it. Never saved.
+   * picks collect here and become one routing change when the window closes, however it closes. Never saved.
    */
-  routingDraft: string[] | null;
-  setRoutingDraft: (targets: string[] | null) => void;
+  routingDraft: RoutingDraft | null;
+  toggleRoutingDraft: (appId: string) => void;
   dismissRoomInspection: () => void;
   /**
    * The floor of the building in view. Choosing a piece of equipment takes the view to its floor; an incident never
@@ -860,18 +861,17 @@ export const useGame = create<Store>()((set, get) => {
     selectApp: id => { if (get().game.campaign?.apps.some(a => a.id === id)) set({panelOpen:true,selected:"app",selectedAppId:id,...floorPatch("servers","select")}); },
     roomInspection: null,
     routingDraft: null,
-    setRoutingDraft: targets => set({routingDraft: targets}),
+    toggleRoutingDraft: appId => { const c=get().game.campaign; if(c) set({routingDraft:toggleDraft(c,get().routingDraft,appId)}); },
     dismissRoomInspection: () => {
-      const inspection=get().roomInspection,draft=get().routingDraft,c=get().game.campaign;
+      const inspection=get().roomInspection;
       // Only acknowledging a popup actually opened by the player can complete a component step.
       if(inspection && introductionActive(get().game.campaign)) {
         const intro=get().game.campaign!.launchWeek!.introduction!;
         if(intro.inspected===inspection.equipment && nextIntroductionComponent(get().game.campaign!)===inspection.equipment)
           get().act({type:"acknowledge_introduction",equipment:inspection.equipment});
       }
-      set({roomInspection:null,routingDraft:null});
-      // Closing the window sends the routing picked in it as one change.
-      if(draft&&c&&draft.join(",")!==c.routing.targets.join(","))get().act({type:"set_routing",mode:"balanced",targets:draft});
+      set({roomInspection:null});
+      sendRoutingDraft();
     },
     // The server floor first: the machines are what the opening, the tutorial's first step and every incident are about.
     floor: (typeof window === "undefined" ? null : floorFromSearch(window.location.search)) ?? "servers",
@@ -1494,12 +1494,29 @@ let roomInspectionSeq = 0;
  * Classic panels keep their existing inline `inspectOrSelect` flow.
  */
 export function inspectInRoom(id: EquipmentId, appId?: string): void {
+  if (!canInspectEquipment(useGame.getState().game, id)) return;
+  // Leaving the Network window for another inspection sends its picks, as closing it would.
+  sendRoutingDraft();
   const { game, panelOpen } = useGame.getState();
-  if (!canInspectEquipment(game, id)) return;
   inspectOrSelect(id, appId);
   // A Guided Mode machine's dialog holds its readings and actions, so the side panel stays as the player left it;
   // Challenge Mode's reveal points to the panel's inspector, which selecting opens.
   useGame.setState({ roomInspection: { seq: ++roomInspectionSeq, equipment: id, ...(appId ? { appId } : {}) }, routingDraft: null, ...(opensComponentDialog(game, id) ? { panelOpen } : {}) });
+}
+
+/**
+ * Sends the routing picked in a Network window as one change and clears the picks. The window may have closed because
+ * something else needed the player, so a change the engine would now refuse is never sent: the player is told the
+ * picks were dropped instead of seeing a rejection or losing them unnoticed.
+ */
+function sendRoutingDraft(): void {
+  const { game, routingDraft, act, notify } = useGame.getState(), c = game.campaign;
+  if (!routingDraft) return;
+  useGame.setState({ routingDraft: null });
+  const action = c && draftAction(c, routingDraft);
+  if (!action) return;
+  const refusal = draftRefusal(game, action);
+  if (refusal || !act(action)) notify(refusal ?? "The Network window closed before your traffic picks could be sent.", "info");
 }
 
 /** Whether inspecting this machine opens Guided Mode's component dialog rather than Challenge Mode's reveal. */

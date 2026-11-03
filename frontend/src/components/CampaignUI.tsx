@@ -53,6 +53,7 @@ import { useCampaignAttention } from "./useCampaignAttention";
 import { CampaignHintButton } from "./CampaignAttention";
 import { CampaignIncidentReport, CampaignRecoveryReview, CapacityAfterFailure } from "./CampaignIncidentReport";
 import { inspectInRoom, useGame } from "@/game/store";
+import { draftedTargets } from "@/game/routingDraft";
 import { GraphicsSettings } from "./GraphicsSettings";
 import { ControlSettings } from "./ControlSettings";
 import { AvatarSettings } from "./AvatarPicker";
@@ -344,9 +345,9 @@ function ContrastWorkload({disabled}:{disabled:boolean}) {
 /** The original purchase/decision controls, shared by the walkthrough panel and equipment dialogs. */
 export type EquipmentActionView="fleet"|"server"|"autoscaling"|"network"|"balancing"|"routing"|"failover";
 export function CampaignEquipmentActions({equipment,actionView}:{equipment:EquipmentId;actionView?:EquipmentActionView}) {
-  const {game,act,selectedAppId,roomInspection,routingDraft,setRoutingDraft}=useGame(),c=game.campaign!;
-  // In an inspection window, routing picks wait for the window to close (see routingDraft in the store).
-  const drafting=!!roomInspection,routed=drafting?routingDraft??c.routing.targets:c.routing.targets;
+  const {game,act,selectedAppId,routingDraft,toggleRoutingDraft}=useGame(),c=game.campaign!;
+  // These controls live in an inspection window, so routing picks wait for it to close (see routingDraft in the store).
+  const routed=draftedTargets(c,routingDraft);
   const busy=c.pending.some(a=>!["limit","unlimit","routing"].includes(a.type));
   const unlocked=!!c.openingMilestone?.acknowledged||!!c.launchWeek;
   const dbLocked=!!c.launchWeek&&c.launchWeek.completedStep===null&&c.step<LW.growthStep;
@@ -373,12 +374,12 @@ export function CampaignEquipmentActions({equipment,actionView}:{equipment:Equip
           {at("app")&&show("server")&&<li><Act icon={scaleLocked?"lock":"scaleUp"} label={`Scale up ${serverName(selectedApp.id)}`} price={P.appCostCents/100} note={scaleLocked?"After load balancing":`${P.appDelay} game seconds`} disabled={disabled||busy||scaleLocked||selectedApp.tier!=="base"||c.cashCents<=P.appCostCents} tip={scaleLocked?"Locked until a load balancer shares traffic across two app servers. Launch Week teaches spreading load first.":"Increases only the selected application's capacity. Database capacity stays unchanged."} decision={{type:"scale_up",appId:selectedApp.id}} onClick={()=>act({type:"scale_up",appId:selectedApp.id})}/></li>}
           {at("gateway")&&show("balancing")&&<li><Act icon="shuffle" label="Deploy load balancing" price={P.lbCostCents/100} note={`${P.lbDelay} game seconds`} disabled={disabled||busy||c.loadBalancer||c.cashCents<=P.lbCostCents} tip="Installs a load balancer. Traffic changes only after you explicitly configure routing." decision={{type:"deploy_load_balancer"}} onClick={()=>act({type:"deploy_load_balancer"})}/></li>}
         </ul>
-        {at("gateway")&&show("routing")&&<><fieldset className="route-choice route-checks" disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Send traffic to · {drafting?"applies when you close this window":"changes next game second"}</legend>
+        {at("gateway")&&show("routing")&&<><fieldset className="route-choice route-checks" disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")}><legend>Send traffic to · applies when you close this window</legend>
           {routableApps(c).map(a=>{const on=routed.includes(a.id),last=on&&routed.length===1;
             const targets=(on?routed.filter(t=>t!==a.id):[...routed,a.id]).sort((x,y)=>Number(x.split("-")[1])-Number(y.split("-")[1]));
             const decision:Action={type:"set_routing",mode:"balanced",targets};
             const advised=routingAdvice?.type==="set_routing"&&routingAdvice.mode==="balanced"&&routingAdvice.targets.includes(a.id)!==on?routingAdvice:undefined;
-            return <button type="button" role="checkbox" aria-checked={on} key={a.id} className="route-check" disabled={last} data-guidance-action={guidanceActionId(advised??decision)} onClick={()=>{if(last)return;if(drafting)setRoutingDraft(targets);else act(decision);}} {...tipProps(last?"At least one server must keep receiving traffic.":on?`Stop sending traffic to ${serverName(a.id)}.`:`Send traffic to ${serverName(a.id)}.`)}><span className="route-box" aria-hidden="true"><Icon name="check" size={12}/></span>{serverName(a.id)}</button>;})}
+            return <button type="button" role="checkbox" aria-checked={on} key={a.id} className="route-check" disabled={last} data-guidance-action={guidanceActionId(advised??decision)} onClick={()=>{if(!last)toggleRoutingDraft(a.id);}} {...tipProps(last?"At least one server must keep receiving traffic.":on?`Stop sending traffic to ${serverName(a.id)}.`:`Send traffic to ${serverName(a.id)}.`)}><span className="route-box" aria-hidden="true"><Icon name="check" size={12}/></span>{serverName(a.id)}</button>;})}
         </fieldset>
         <CampaignUnavailable action={{type:"set_routing",mode:"balanced",targets:routableApps(c).map(a=>a.id)}} disabled={disabled||!c.loadBalancer||c.pending.some(a=>a.type==="routing"||a.type==="retire-app")} />{!c.loadBalancer&&<p role="note">Deploy load balancing before configuring routing.</p>}{c.pending.some(a=>a.type==="routing"||a.type==="retire-app")&&<p role="note">A routing or retirement change is pending; wait for activation.</p>}</>}
       </section>}
