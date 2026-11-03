@@ -2,7 +2,7 @@ import { emptyMeasurement, type Measurement, type PlaytestEvent } from "./teleme
 import { DEFAULT_AVATAR, isAvatar, type AvatarId } from "./avatars";
 import { clampFov, FOV } from "./viewpoints";
 import { controlsOf, DEFAULT_CONTROLS, type ControlSettings } from "./controls";
-import { decodeSave, makeEnvelope, replaceable } from "./saveEnvelope";
+import { decodeSave, makeEnvelope, replaceable, retiredChapterStart } from "./saveEnvelope";
 import { BALANCE, PROMOS, TECH, SAVE_VERSION, type GameState } from "@/sim";
 
 /**
@@ -35,7 +35,7 @@ let lastWrittenCampaign: string | null = null;
 export type GameMode = "campaign" | "classic";
 
 /** The Guided Mode chapters after the Opening, each with a short guide shown when the company first enters it. */
-export const CHAPTER_TOURS = ["scaling", "data", "spikes", "reliability", "combined"] as const;
+export const CHAPTER_TOURS = ["scaling", "data", "spikes", "reliability"] as const;
 export type ChapterTour = (typeof CHAPTER_TOURS)[number];
 /**
  * Chapter ends remembered for one company: Scaling & Routing and Data Strategy, announced once, and an Opening the
@@ -179,7 +179,8 @@ export function saveGame(game:GameState,remainderMs=0,explicitReset=false,measur
     let source;
     try {source=JSON.parse(current);} catch {if(!explicitReset)return false;}
     try {
-      if(([1,2,3,4,5,6,7].includes(source?.schemaVersion) || (source?.schemaVersion === 8 && !source.serviceMeasurementStart)) && Array.isArray(source.inputs)) {
+      // A company recorded in the removed Grow the Company chapter loads rewound, so its original is kept too.
+      if(Array.isArray(source?.inputs) && ([1,2,3,4,5,6,7].includes(source.schemaVersion) || (source.schemaVersion === 8 && !source.serviceMeasurementStart) || retiredChapterStart(source.inputs) >= 0)) {
         const backup=SAVE_KEY+".backup.v"+source.schemaVersion+"."+source.runId+"."+source.savedAt;
         const prior=window.localStorage.getItem(backup);
         if(prior!==null && prior!==current)return false;

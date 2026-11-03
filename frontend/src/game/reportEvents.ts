@@ -3,7 +3,7 @@ import { serverName } from "@/sim";
 const REPORT_LEAD_SECONDS = 3;
 export const ACTION_NAMES: Record<Intervention, string> = {
   "add-app": "Add server", "upgrade-db": "Database upgrade", limit: "Traffic limit", unlimit: "Remove traffic limit", "scale-up": "Application scale up", "deploy-lb": "Load balancer deployment", routing: "Routing change", cache: "Read Cache deployment", "cache-tuning": "Cache tuning",
-  "deploy-autoscaler": "Autoscaling controller deployment", "retire-app": "Safe application retirement", "health-checks": "Health Checks deployment", "create-spare": "Spare application install", "reserve-spare": "Reserve spare", "release-spare": "Release spare", failover: "Automatic Failover deployment", "promote-spare": "Promote spare", "restore-app": "Restore application", promotion: "Promotion",
+  "deploy-autoscaler": "Autoscaling controller deployment", "retire-app": "Safe application retirement", "health-checks": "Health Checks deployment", "create-spare": "Spare application install", "reserve-spare": "Reserve spare", "release-spare": "Release spare", failover: "Automatic Failover deployment", "promote-spare": "Promote spare", "restore-app": "Restore application",
 };
 
 
@@ -90,8 +90,6 @@ export function describeEvents(events: TraceEvent[], context: TraceEvent[] = eve
       case "autoscale-instance-retired": return line(`Autoscaler: -${app(d.targetId)}`, "retired");
       case "autoscale-retirement-cancelled": return line(`Autoscaler: kept ${app(d.targetId)}`, d.reason ? String(d.reason) : null);
       case "autoscaler-blocked": return d.reason ? line("Autoscaler: paused", blockedLabel(d.reason)) : line("Autoscaler: observing");
-      case "scenario-started": return line(`Growth wave ${Number(d.index) + 1} started`, d.template ? `${String(d.template).replaceAll("-", " ")}` : null, `Peak ${num(d.peak)} req/s`);
-      case "scenario-pressure-ended": return line("Growth wave eased", `Back to ${num(d.baseline)} req/s`);
       case "promotion-started": return line("Promotion started", d.increment ? `+${num(d.increment)} req/s` : null, `Until game second ${d.endStep}`);
       case "promotion-ended": return line("Promotion ended", `Back to ${num(d.baseline)} req/s`);
       default: { const text = e.type.replaceAll("-", " "); return line(text.charAt(0).toUpperCase() + text.slice(1)); }

@@ -4,7 +4,7 @@ import { advanceSteps } from "@/sim/step";
 import { campaignAttention as guidance, firstIncidentStop, spotlightMachines } from "./campaignAttention";
 import { act, tick, dataCompany, spikeCompany } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "@/sim/__tests__/reliabilityFixture";
-import { combinedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
+import { completedReliability } from "@/sim/__tests__/completionFixture";
 import { dataCompany as enteredDataCompany } from "@/sim/__tests__/dataFixture";
 
 it("identifies Opening's real scheduled event and is immutable/deterministic", () => {
@@ -103,18 +103,15 @@ it("recognises a queued valid failover and rejects it when its recorded route is
   game.campaign!.pending.find(a => a.type === "promote-spare")!.expectedRouting = "stale";
   expect(guidance(game).attention).toBe("hint");
 });
-it("distinguishes growth readiness, wave decision, accepted wave and outcome", { timeout: 30_000 }, () => {
-  let game = combinedCompany();
-  expect(guidance(game)).toMatchObject({ chapter: 6, attention: "run", reason: "growth-readiness" });
-  game = tick(game, 5); expect(guidance(game)).toMatchObject({ attention: "progression", target: "growth" });
-  game = act(game, { type: "start_growth_wave" }); expect(guidance(game).attention).toBe("run");
-  game = finishRound(game); expect(guidance(game).attention).toBeNull();
+it("points at Next for Complete campaign only once the company after Stay Online can complete it", { timeout: 30_000 }, () => {
+  const game = completedReliability();
+  expect(guidance(game)).toMatchObject({ chapter: 5, attention: "progression", reason: "next", target: "next" });
+  expect(guidance(act(game, { type: "add_server" })).reason).not.toBe("next");
+  expect(guidance(act(game, { type: "complete_campaign" }))).toMatchObject({ attention: null, reason: "ended" });
 });
-it("does not impose a blanket traffic-limit rule on reliability; full-demand growth is different", { timeout: 30_000 }, () => {
+it("does not impose a blanket traffic-limit rule on reliability", { timeout: 30_000 }, () => {
   const reliability = tick(act(reliabilityCompany(), { type: "set_traffic_limit", enabled: true }), 1);
   expect(guidance(reliability).target).toBe("reliability");
-  const growth = tick(act(combinedCompany(), { type: "set_traffic_limit", enabled: true }), 1);
-  expect(guidance(growth)).toMatchObject({ attention: "hint", reason: "full-demand" });
 });
 it("does not reveal future fault details and keeps passive time out of the stage key", () => {
   let game = act(reliabilityCompany(), { type: "arm_reliability" });
@@ -140,13 +137,9 @@ it("offers actual routed server scaling and an existing routing choice, rather t
   expect(guidance(game).actions?.some(x => x.action.type === "scale_up" && x.action.appId === "app-3")).toBe(true);
   expect(guidance(game).actions?.some(x => x.action.type === "deploy_autoscaler")).toBe(false);
 });
-it("restoration targets the observed failure and full-demand guidance targets the existing unlimit control", { timeout: 30_000 }, () => {
+it("restoration targets the observed failure", { timeout: 30_000 }, () => {
   const failure = tick(act(reliabilityCompany(), { type: "arm_reliability" }), 8);
   expect(guidance(failure).actions?.some(x => x.action.type === "restore_app")).toBe(true);
-  const limited = tick(act(combinedCompany(), { type: "set_traffic_limit", enabled: true }), 1);
-  expect(guidance(limited).actions?.map(x => x.action)).toEqual([{ type: "set_traffic_limit", enabled: false }]);
-  limited.campaign!.snapshot.incoming = 1_000_000;
-  expect(guidance(limited).actions?.some(x => x.action.type === "set_traffic_limit" && !x.action.enabled)).toBe(false);
 });
 
 it("offers cache only for observed read pressure, never as a write-pressure prescription", () => {
@@ -190,8 +183,7 @@ it.each([
   ["Spikes", () => spikeCompany(false)],
   ["Reliability", () => reliabilityCompany()],
   ["Reliability failure", () => tick(act(reliabilityCompany(), { type: "arm_reliability" }), 8)],
-  ["Growth", () => combinedCompany()],
-  ["Growth readiness", () => tick(combinedCompany(), 5)],
+  ["Stay Online complete", () => completedReliability()],
 ] as const)("keeps %s's displayed Hint short while retaining its internal evidence", { timeout: 30_000 }, (_stage, company) => {
   const hint = guidance(company());
   expect(hint.message.split(/\s+/).length).toBeLessThan(25);

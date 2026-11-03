@@ -6,7 +6,7 @@ import type { Intervention } from "@/sim/campaignTypes";
 import { appSlot, dbSlot, POS } from "./layout";
 import { changeOf, changeOfScheduled, ghostParts, installing } from "./ghostSpec";
 
-const INTERVENTIONS: Intervention[] = ["add-app", "upgrade-db", "limit", "unlimit", "scale-up", "deploy-lb", "routing", "cache", "cache-tuning", "deploy-autoscaler", "retire-app", "health-checks", "create-spare", "reserve-spare", "release-spare", "failover", "promote-spare", "restore-app", "promotion"];
+const INTERVENTIONS: Intervention[] = ["add-app", "upgrade-db", "limit", "unlimit", "scale-up", "deploy-lb", "routing", "cache", "cache-tuning", "deploy-autoscaler", "retire-app", "health-checks", "create-spare", "reserve-spare", "release-spare", "failover", "promote-spare", "restore-app"];
 
 function company() {
   const s = newGame(1), c = s.campaign!;
@@ -37,7 +37,7 @@ describe("ghost previews", () => {
       [{ type: "deploy_autoscaler" }, "deploy-autoscaler"], [{ type: "deploy_health_checks" }, "health-checks"],
       [{ type: "install_spare" }, "create-spare"], [{ type: "reserve_spare", appId: "app-2" }, "reserve-spare"],
       [{ type: "release_spare" }, "release-spare"], [{ type: "deploy_failover" }, "failover"],
-      [{ type: "restore_app", appId: "app-1" }, "restore-app"], [{ type: "run_promotion" }, "promotion"],
+      [{ type: "restore_app", appId: "app-1" }, "restore-app"],
     ];
     for (const [action, kind] of cases) expect(changeOf(action, c)?.kind, action.type).toBe(kind);
     expect(changeOf({ type: "acknowledge_review" }, c)).toBeNull();

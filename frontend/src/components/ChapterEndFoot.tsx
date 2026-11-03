@@ -14,7 +14,7 @@ export function ChapterEndFoot({ end, extra }: { end: ChapterEnd; extra?: ReactN
   const reason = useId();
   const blocked = !!end.proceed && end.blockers.length > 0;
   return <>
-    {blocked && <Callout compact tone="warn" icon="alert" kicker="Not yet"><span id={reason} role="note">{waitsFor(end.next.name, end.blockers)} Stay in this chapter and continue later with Next in the chapter bar.</span></Callout>}
+    {blocked && <Callout compact tone="warn" icon="alert" kicker="Not yet"><span id={reason} role="note">{end.final ? waitsFor("The campaign", end.blockers, "can be completed") : waitsFor(end.next.name, end.blockers)} Stay in this chapter and continue later with Next in the chapter bar.</span></Callout>}
     <div className="modal-foot chapter-end-foot">
       {extra && <span className="chapter-end-extra">{extra}</span>}
       {/* The dialog opens on Continue when it is possible, so Enter keeps meaning "carry on" as before, and otherwise on Stay. */}

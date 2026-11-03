@@ -25,7 +25,7 @@ export function chapter4Performance(game: GameState) {
 /** Presentation of recorded events only; no clock, dispatcher or progression state. */
 export function chapter4Stage(game: GameState) {
   const c = game.campaign, d = c?.spikeStage;
-  if (!c || !d || c.reliabilityStage || c.combinedStage || d.acknowledged || game.phase === "ended") return null;
+  if (!c || !d || c.reliabilityStage || d.acknowledged || game.phase === "ended") return null;
   const events = d.consumed;
   const stage: SpikeStage = events.includes("spike-2-end") ? "recover" : events.includes("spike-2-start") ? "spike2"
     : events.includes("spike-1-end") ? "between" : events.includes("spike-1-start") ? "spike1" : "prepare";

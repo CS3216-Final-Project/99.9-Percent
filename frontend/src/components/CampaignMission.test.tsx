@@ -6,7 +6,7 @@ import { campaignGuidance } from "@/game/campaignGuidance";
 import { campaignAttention } from "@/game/campaignAttention";
 import { spikeCompany, untilOffset, act as decide, tick } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "@/sim/__tests__/reliabilityFixture";
-import { combinedCompany, finishedCompany, finishRound } from "@/sim/__tests__/combinedFixture";
+import { completedReliability } from "@/sim/__tests__/completionFixture";
 import { CampaignPanel } from "./CampaignUI";
 import InspectionReveal from "./InspectionReveal";
 
@@ -20,11 +20,11 @@ function requirements(game:GameState) {
   const disclosure=screen.getByText("View all requirements").closest("details")!;
   expect(disclosure.open).toBe(false);fireEvent.click(screen.getByText("View all requirements"));
   const model=campaignGuidance(game);
-  for(const r of [...model.requirements,...model.finalGoals]) {
+  for(const r of model.requirements) {
     const row=disclosure.querySelector(`[data-requirement="${r.id}"]`)!;
     expect(row.textContent).toContain(r.label);expect(row.getAttribute("data-met")).toBe(String(r.met));
   }
-  expect(disclosure.querySelectorAll("[data-requirement]")).toHaveLength(model.requirements.length+model.finalGoals.length);
+  expect(disclosure.querySelectorAll("[data-requirement]")).toHaveLength(model.requirements.length);
 }
 for(const [offset,stage] of [[0,"Preparing"],[8,"Spike 1 active"],[28,"Between spikes"],[48,"Spike 2 active"],[68,"Review / stability verification"]] as const)
   it(`projects Chapter 4 ${stage} from consumed events with the complete authoritative checklist`,()=>{
@@ -66,59 +66,24 @@ it("shows actual verification progress after natural restoration",()=>{
   show(game);requirements(game);
   expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain(`Stable service: ${game.campaign!.reliabilityStage!.stableSteps} / 5`);
 });
-for(const state of ["readiness","wave","outcome","final","complete"] as const) it(`shows Chapter 6 ${state}, final goals and business action without old milestones`,()=>{
-  let game=state==="final"||state==="complete"?finishedCompany():combinedCompany();
-  if(state==="complete")game=decide(game,{type:"complete_campaign"});
-  if(state==="wave"||state==="outcome")game=decide(tick(game,5),{type:"start_growth_wave"});
-  if(state==="outcome")game=finishRound(game);
-  show(game);requirements(game);
-  expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("Grow the Company");
-  expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain(`Growth outcomes acknowledged: ${game.campaign!.combinedStage!.completedRounds.length} / 3`);
-  expect(screen.queryByRole("region",{name:"Stay Online"})).toBeNull();
-  expect(screen.queryByText("Scaling growth recorded: 1,400 requests/s before data growth.")).toBeNull();
-  expect(screen.queryByRole("button",{name:/Run promotion/})).toBeNull();
+it("keeps a company that stayed after Stay Online in its final chapter, with Complete campaign behind Next",()=>{
+  const game=completedReliability();show(game);requirements(game);
+  const progress=screen.getByRole("region",{name:"Chapter Progress"}).textContent;
+  expect(progress).toContain("Stay Online");expect(progress).toContain("Outcome acknowledged");
+  expect(screen.getByRole("region",{name:"Next step"}).textContent).toContain("Use Next in the chapter bar to continue.");
+  expect(screen.queryByRole("button",{name:"Complete campaign"})).toBeNull();
+  expect(screen.queryByRole("button",{name:/Run promotion|Start next growth wave/})).toBeNull();
 });
-it("fills a readiness progress bar toward enabling the next growth wave",()=>{
-  const bar=()=>screen.getByRole("progressbar",{name:"Full-demand readiness progress"});
-  const nextStep=()=>within(screen.getByRole("region",{name:"Next step"}));
-  const progress=()=>within(screen.getByRole("region",{name:"Chapter Progress"}));
-  const game=combinedCompany();
-  show(game);
-  expect(nextStep().getByText("Full-demand readiness: 0 / 5")).toBeTruthy();
-  expect(progress().queryByText(/Full-demand readiness/)).toBeNull();
-  expect(bar().getAttribute("aria-valuenow")).toBe("0");
-  act(()=>useGame.setState({game:tick(game,3)}));
-  expect(nextStep().getByText("Full-demand readiness: 3 / 5")).toBeTruthy();
-  expect(bar().getAttribute("aria-valuenow")).toBe("60");
-  act(()=>useGame.setState({game:tick(useGame.getState().game,2)}));
-  expect(nextStep().getByText("Full-demand readiness: 5 / 5")).toBeTruthy();
-  expect(bar().getAttribute("aria-valuenow")).toBe("100");
-  expect(screen.getByRole("button",{name:"Start next growth wave"}).hasAttribute("disabled")).toBe(false);
-  act(()=>useGame.setState({game:decide(useGame.getState().game,{type:"start_growth_wave"})}));
-  expect(screen.queryByRole("progressbar",{name:"Full-demand readiness progress"})).toBeNull();
-});
-it("fills a wave stability progress bar while a growth wave runs",()=>{
-  const bar=()=>screen.getByRole("progressbar",{name:"Wave stability progress"});
-  const nextStep=()=>within(screen.getByRole("region",{name:"Next step"}));
-  let game=combinedCompany();
-  game=decide(tick(game,5),{type:"start_growth_wave"});
-  show(game);
-  expect(nextStep().getByText("Wave stability: 0 / 5")).toBeTruthy();
-  expect(bar().getAttribute("aria-valuenow")).toBe("0");
-  act(()=>useGame.setState({game:finishRound(game)}));
-  expect(nextStep().getByText("Wave stability: 5 / 5")).toBeTruthy();
-  expect(bar().getAttribute("aria-valuenow")).toBe("100");
+it("shows a completed campaign with its scorecard and no further requirement",()=>{
+  const game=decide(completedReliability(),{type:"complete_campaign"});show(game);
+  expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("Campaign complete");
+  expect(screen.getByRole("region",{name:"Current unmet condition"}).textContent).toContain("Campaign complete.");
+  expect(screen.getByRole("button",{name:"View run scorecard"})).toBeTruthy();
 });
 it("shows the actual pending deployment and recalculates after its activation",()=>{
-  const game=decide(combinedCompany(),{type:"add_server"});show(game);
+  const game=decide(decide(reliabilityCompany(),{type:"arm_reliability"}),{type:"add_server"});show(game);
   expect(screen.getByRole("region",{name:"Essential live status"}).textContent).toContain("Add server (Server 4): activates in");
   const advanced=tick(game,2);act(()=>useGame.setState({game:advanced}));
   expect(screen.getByRole("region",{name:"Essential live status"}).textContent).not.toContain("Add server (Server 4): activates in");
   const decision=campaignAttention(advanced);expect(screen.getByRole("region",{name:"Next step"}).textContent).toContain(decision.attention==="run"?decision.message:decision.reason==="spike-plan"?decision.recommendation:decision.action?.label??decision.recommendation);
-});
-it("does not hide a low-cash capacity warning in the requirement disclosure",()=>{
-  const game=combinedCompany(),c=game.campaign!;c.cashCents=56000;c.limit=500;
-  c.apps.forEach(a=>a.capacity=1000);c.dbCapacity=600;c.readCache=null;
-  show(game);expect(screen.getByRole("region",{name:"Essential live status"}).textContent).toMatch(/Money at risk|Capacity funding blocked/);
-  requirements(game);
 });

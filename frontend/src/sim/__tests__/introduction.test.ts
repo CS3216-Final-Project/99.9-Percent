@@ -8,7 +8,6 @@ import { campaignChapters } from "../../game/campaignChapters";
 import { dataCompany } from "./dataFixture";
 import { spikeCompany } from "./spikeFixtures";
 import { reliabilityCompany } from "./reliabilityFixture";
-import { combinedCompany } from "./combinedFixture";
 import { INTRODUCTION_COMPONENTS } from "../introduction";
 import { decodeSave,makeEnvelope } from "../../game/saveEnvelope";
 const act=(g:GameState,a:Action)=>{const r=applyAction(g,a);if(!r.ok)throw Error(r.message);return r.state;};
@@ -77,13 +76,13 @@ it("retains historical unversioned introduction completion and permits explicit 
  const corrected=act(loaded.game,{type:"complete_introduction",handoff:"opening"});expect(corrected.campaign!.inputs.slice(0,prefix.length)).toEqual(prefix);
  expect(corrected.campaign!.cashCents).toBe(2000000);expect(corrected.campaign!.scaling).toBeNull();expect(JSON.stringify(makeEnvelope(old,0,123))).toBe(raw);
 });
-it("keeps canonical chapter identities through Chapter 6, including legacy Launch Week saves",()=>{
- const games=[completed(),act(advanceSteps(act(advanceSteps(completed(),6).state,{type:"start_db_upgrade"}),30).state,{type:"acknowledge_review"}),dataCompany(),spikeCompany(),reliabilityCompany(),combinedCompany()];
+it("keeps canonical chapter identities through Chapter 5, including legacy Launch Week saves",()=>{
+ const games=[completed(),act(advanceSteps(act(advanceSteps(completed(),6).state,{type:"start_db_upgrade"}),30).state,{type:"acknowledge_review"}),dataCompany(),spikeCompany(),reliabilityCompany()];
  games[1]=act(games[1],{type:"acknowledge_milestone"});
- expect(games.map(g=>campaignChapters(g).find(c=>c.current)?.name)).toEqual(["Opening","Scaling & Routing","Data Strategy","Traffic Spikes & Autoscaling","Stay Online","Grow the Company"]);
- expect(games.map(g=>campaignChapters(g).find(c=>c.current)?.number)).toEqual([1,2,3,4,5,6]);
- expect(games.map(g=>campaignAttention(g).chapter)).toEqual([1,2,3,4,5,6]);
- expect(games.map(g=>chapterCompanyMessage(g)?.chapter)).toEqual([1,2,3,4,5,6]);
+ expect(games.map(g=>campaignChapters(g).find(c=>c.current)?.name)).toEqual(["Opening","Scaling & Routing","Data Strategy","Traffic Spikes & Autoscaling","Stay Online"]);
+ expect(games.map(g=>campaignChapters(g).find(c=>c.current)?.number)).toEqual([1,2,3,4,5]);
+ expect(games.map(g=>campaignAttention(g).chapter)).toEqual([1,2,3,4,5]);
+ expect(games.map(g=>chapterCompanyMessage(g)?.chapter)).toEqual([1,2,3,4,5]);
  // The introduction (entry 0) opens with Maya's welcome rather than Opening's message.
  expect(chapterCompanyMessage(fresh())).toMatchObject({chapter:0,speaker:"maya"});
  let legacy=fresh();for(const id of INTRODUCTION_COMPONENTS)legacy=explore(legacy,id);legacy=act(legacy,{type:"complete_introduction"});

@@ -6,7 +6,7 @@ import { preparedReliability } from "@/sim/__tests__/reliabilityFixture";
 import { pauseTransition } from "@/sim/__tests__/pauseFixture";
 import { incidentNeedsPause, campaignAttention } from "./campaignAttention";
 
-it.each([1, 2, 3, 4, 5, 6])("recognises the observed Chapter %i incident without a chapter script or mutation", { timeout: 30_000 }, chapter => {
+it.each([1, 2, 3, 4, 5])("recognises the observed Chapter %i incident without a chapter script or mutation", { timeout: 30_000 }, chapter => {
   const { before, incident } = pauseTransition(chapter); const original = structuredClone(incident);
   expect(incidentNeedsPause(before)).toBe(false);
   expect(incidentNeedsPause(incident), campaignAttention(incident).reason).toBe(true);

@@ -41,12 +41,33 @@ export type Validation = {
     status: "corrupt" | "unsupported";
 };
 const integer = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0;
+/** Decisions of Grow the Company, the former Chapter 6. `complete_campaign` was only ever recorded after its entry. */
+const RETIRED_ACTIONS = ["enter_combined", "start_growth_wave", "acknowledge_growth", "run_promotion"];
+/** Where a save recorded Grow the Company's first decision, or -1 when it never reached that chapter. */
+export function retiredChapterStart(inputs: readonly CampaignInput[]): number {
+    return inputs.findIndex(i => RETIRED_ACTIONS.includes(i?.action?.type));
+}
+/**
+ * Grow the Company was removed. A company recorded in it resumes at the step it entered, with only the inputs
+ * before that, which is the end of Stay Online. Boundaries recorded later are clamped to the rewound run.
+ */
+function rewindRetiredChapter(e: SaveEnvelope): SaveEnvelope {
+    const cut = retiredChapterStart(e.inputs);
+    if (cut < 0) return e;
+    const step = e.inputs[cut].step, inputs = e.inputs.slice(0, cut);
+    const clamp = (n: number | undefined) => n === undefined ? undefined : Math.min(n, step);
+    return { ...e, step, inputs,
+        ...(e.legacyPreventionInputs !== undefined ? { legacyPreventionInputs: Math.min(e.legacyPreventionInputs, inputs.length) } : {}),
+        ...(e.legacyIncidentStep !== undefined ? { legacyIncidentStep: clamp(e.legacyIncidentStep) } : {}),
+        ...(e.legacyScalingStep !== undefined ? { legacyScalingStep: clamp(e.legacyScalingStep) } : {}),
+        ...(e.serviceMeasurementStart ? { serviceMeasurementStart: { ...e.serviceMeasurementStart, fromStep: Math.min(e.serviceMeasurementStart.fromStep, step + 1) } } : {}) };
+}
 const isInput = (i: CampaignInput) => !!i && typeof i === "object" && integer(i.step) &&
     !!i.action && typeof i.action === "object" && typeof i.action.type === "string";
 export function validateEnvelope(value: unknown): Validation {
     if (!value || typeof value !== "object")
         return { status: "corrupt" };
-    const e = value as SaveEnvelope;
+    let e = value as SaveEnvelope;
     const legacy = (e as {schemaVersion: number}).schemaVersion === 1;
     const phase3 = (e as {schemaVersion: number}).schemaVersion === 3;
     const phase4 = (e as {schemaVersion: number}).schemaVersion === 4;
@@ -76,6 +97,8 @@ export function validateEnvelope(value: unknown): Validation {
         (!phase6 && !phase7 && !phase8 && !phase9 && e.schemaVersion!==SCHEMA_VERSION && legacyPreventionInputs!==0))return {status:"corrupt"};
     const combinedActions = ["enter_combined", "start_growth_wave", "acknowledge_growth", "complete_campaign", "accept_scaling_risk", "run_promotion"];
     if (!phase7 && !phase8 && !phase9 && e.schemaVersion !== SCHEMA_VERSION && e.inputs.some(i => combinedActions.includes(i.action.type))) return {status:"corrupt"};
+    const rewound = retiredChapterStart(e.inputs) >= 0;
+    if (rewound) e = rewindRetiredChapter(e);
     // Incidents opened while replaying older saves keep their original self-resolving rule.
     const legacyIncidentStep = e.schemaVersion === SCHEMA_VERSION ? e.legacyIncidentStep ?? 0 : e.step;
     if (!integer(legacyIncidentStep) || legacyIncidentStep > e.step ||
@@ -103,6 +126,7 @@ export function validateEnvelope(value: unknown): Validation {
         if(legacy && game.campaign!.foundation)game.campaign!.foundation.inputs=game.campaign!.inputs.length;
         const measurement: Measurement = legacy
             ? {...emptyMeasurement(), origin:"phase1", runStarted:true, cursor:game.campaign!.trace.length}
+            : rewound ? {...e.runtime.measurement, cursor:Math.min(e.runtime.measurement.cursor, game.campaign!.trace.length)}
             : e.runtime.measurement;
         if(!measurementValid(measurement) || measurement.cursor > game.campaign!.trace.length ||
             measurement.pending.some(event => event.runId !== e.runId)) return {status:"corrupt"};

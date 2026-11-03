@@ -75,7 +75,7 @@ export type ModeInfo = { name: string; icon: IconName; pace?: string; about: str
 export const MODES: Record<GameMode, ModeInfo> = {
   campaign: {
     name: "Guided Mode", icon: "server",
-    about: "Launch Week teaches the controls, game time and finances as your service opens, then six infrastructure chapters follow. Inspect problems, upgrade servers and pause whenever you need.",
+    about: "Launch Week teaches the controls, game time and finances as your service opens, then five infrastructure chapters follow. Inspect problems, upgrade servers and pause whenever you need.",
   },
   classic: {
     name: "Challenge Mode", icon: "week",
@@ -86,8 +86,8 @@ export const MODES: Record<GameMode, ModeInfo> = {
 /** Guided Mode's pitch once its company has started: finish Launch Week, then the chapters. */
 export function campaignAbout(summary: Summary): string {
   if (!summary.resumable) return MODES.campaign.about;
-  if (summary.chapter === 0) return "Finish Launch Week to learn the controls, game time and finances, then tackle six infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.";
-  return "Work through six infrastructure chapters at your own pace. Inspect problems, upgrade servers and pause whenever you need.";
+  if (summary.chapter === 0) return "Finish Launch Week to learn the controls, game time and finances, then tackle five infrastructure chapters. Inspect problems, upgrade servers and pause whenever you need.";
+  return "Work through five infrastructure chapters at your own pace. Inspect problems, upgrade servers and pause whenever you need.";
 }
 
 /** A home screen's mode controls: play or continue a mode, start a new one and replay its tutorial. */

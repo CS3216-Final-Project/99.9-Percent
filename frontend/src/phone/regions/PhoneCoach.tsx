@@ -7,7 +7,7 @@ import { useCoachOffsets, useGuideSheet } from "../tutorial/coachLayout";
 import "../tutorial/phone-tutorial.css";
 
 /** How far each spotlight guide opens the System metrics sheet: chapter guides point at the chapter's new controls. */
-const GUIDE_SHEET: Partial<Record<TourTrack, SheetState>> = { scaling: "half", data: "half", spikes: "half", reliability: "half", combined: "half" };
+const GUIDE_SHEET: Partial<Record<TourTrack, SheetState>> = { scaling: "half", data: "half", spikes: "half", reliability: "half" };
 
 /**
  * Region: coach. The guide that teaches the game: chapter guides and Challenge Mode's first week. Launch Week's
