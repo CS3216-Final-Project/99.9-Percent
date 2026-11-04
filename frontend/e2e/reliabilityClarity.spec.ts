@@ -16,8 +16,9 @@ test("Chapter 5 clarity: incident report keeps its evidence and Continue company
   const dialog = page.getByRole("dialog", { name: "Incident postmortem", exact: true });
   await expect(dialog.getByRole("heading", { level: 3 })).toHaveText(["What happened?", "Capacity after the failure", "How did you respond?", "What could be improved?", "Key takeaway"]);
   // The capacity summary joins the chat: its heading is Taylor's question on the right, its readings and story the
-  // player's answers on the left, and every bubble enters in reading order.
-  const bubbles = dialog.locator(".campaign-incident-report section > :is(h3, p, dl)");
+  // player's answers on the left, and every bubble enters in reading order. The evidence in the closed Technical
+  // Details is not part of the chat.
+  const bubbles = dialog.locator(":is(.campaign-incident-report, .report-lesson-summary) > section > :is(h3, p, dl)");
   const turns = await bubbles.evaluateAll(els => els.map(el => {
     const box = el.getBoundingClientRect(), row = el.parentElement!.getBoundingClientRect(), face = getComputedStyle(el, "::before");
     return { tag: el.tagName, left: box.left - row.left, right: row.right - box.right, share: box.width / row.width, face: face.content === "none" ? null : face.backgroundImage, delay: Number(el.getAnimations()[0]?.effect?.getTiming().delay ?? -1) };
