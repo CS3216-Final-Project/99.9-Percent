@@ -3763,6 +3763,20 @@ button:disabled {
   margin-right: auto;
 }
 
+/* The finished campaign's two ways to look back share a row, and Continue to Challenge Mode takes the full row under
+   them; where they cannot share one (a phone), every action takes its own full row. */
+.modal:has(.campaign-complete-foot) {
+  width: min(560px, 100%);
+}
+
+.campaign-complete-foot > .btn {
+  flex: 1 1 auto;
+}
+
+.campaign-complete-foot > :is(.btn-primary, .btn-danger) {
+  flex-basis: 100%;
+}
+
 .modal-body h4 {
   margin-top: 18px;
 }

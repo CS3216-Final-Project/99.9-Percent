@@ -12,7 +12,7 @@ export function CampaignCompleteFoot() {
   const [unsaved, setUnsaved] = useState(false);
   return <>
     {unsaved && <Callout compact tone="warn" icon="alert" kicker="Not saved">This company could not be saved, so switching now loses it. Press "Switch and lose this company" again to switch anyway.</Callout>}
-    <div className="modal-foot chapter-end-foot">
+    <div className="modal-foot campaign-complete-foot">
       <button className="btn" onClick={() => openView("guidance")}><Icon name="eyes" size={16} />Inspect final company</button>
       <button className="btn" onClick={() => openView("menu")}><Icon name="refresh" size={16} />Export or start a new company</button>
       <button className={`btn ${unsaved ? "btn-danger" : "btn-primary"}`} data-autofocus onClick={() => { if (!switchMode("classic", { discard: unsaved })) setUnsaved(true); }}>
