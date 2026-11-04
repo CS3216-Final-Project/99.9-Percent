@@ -1,5 +1,6 @@
 import { introductionActive } from "@/sim/introduction";
 import type { GameState } from "@/sim";
+import type { Campaign } from "@/sim/campaignTypes";
 import { COLLEAGUES, type ColleagueId } from "./colleagues";
 
 const CHAPTERS = {
@@ -10,6 +11,14 @@ const CHAPTERS = {
   4: { speaker: "sam", lines: ["Sam from Marketing! Guess who's about to set the internet on fire?", "Our next campaign could bring a sudden rush of visitors. Like, a lot of visitors. All at once.", "Are our systems ready? Because the post goes live soon."], mission: "Observe traffic spikes and weigh capacity, autoscaling and rejected traffic." },
   5: { speaker: "taylor", lines: ["Taylor, Operations. Third coffee. Don't mind me.", "Servers fail. Not if, when. I've been paged at 3 a.m. enough times to know.", "What happens if one of ours goes down? Let's prepare before something goes wrong."], mission: "Prepare for server failures and verify stable recovery." },
 } as const satisfies Record<number, { speaker: ColleagueId; lines: readonly string[]; mission: string }>;
+
+/** The chapter the company was playing at a game second, from the steps its chapters were entered. */
+export function chapterAt(c: Campaign, step: number) {
+  const entered = (stage: { enteredStep: number } | null | undefined) => !!stage && stage.enteredStep <= step;
+  return entered(c.reliabilityStage) ? 5 : entered(c.spikeStage) ? 4 : entered(c.dataStage) ? 3 : entered(c.scaling) ? 2 : 1;
+}
+/** The colleague who introduced the chapter the company was playing at a game second, and so speaks for its reports. */
+export const reportSpeaker = (c: Campaign, step: number): ColleagueId => CHAPTERS[chapterAt(c, step)].speaker;
 
 /** Identity comes from the actual entered stage, never a timer or an unlocked Next button. */
 export function chapterCompanyMessage(game: GameState) {

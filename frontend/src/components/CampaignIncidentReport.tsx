@@ -15,7 +15,7 @@ const dollars = (c: number) => new Intl.NumberFormat("en-US", { style: "currency
 export function CampaignIncidentReport({ report, reliability }: { report: CampaignPostmortem; reliability?: ReliabilityLesson }) {
   const lesson = reliability ? { happened: reliability.happened, response: reliability.recovered, improve: reliability.improve, takeaway: reliability.takeaway } : incidentSummary(report);
   const capacity = survivingCapacity(report.snapshots);
-  return <CampaignReport lesson={lesson} summary={capacity && <CapacityAfterFailure {...capacity} />}><IncidentEvidence report={report}/></CampaignReport>;
+  return <CampaignReport at={report.openedStep} lesson={lesson} summary={capacity && <CapacityAfterFailure {...capacity} />}><IncidentEvidence report={report}/></CampaignReport>;
 }
 const num = (n: number) => n.toLocaleString("en-US");
 const appNames = (ids: string[]) => ids.map(serverName).join(" and ");

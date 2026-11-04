@@ -19,5 +19,5 @@ function ScorecardEvidence({card}:{card:Scorecard}) {
 }
 
 export default function CampaignScorecard({card}:{card:Scorecard}) {
- return <section className="campaign-report-shell" aria-label="Run scorecard"><CampaignReport key={`${card.runId}:${card.capturedStep}`} lesson={scorecardSummary(card)}><ScorecardEvidence card={card}/></CampaignReport></section>;
+ return <section className="campaign-report-shell" aria-label="Run scorecard"><CampaignReport key={`${card.runId}:${card.capturedStep}`} at={card.capturedStep} lesson={scorecardSummary(card)}><ScorecardEvidence card={card}/></CampaignReport></section>;
 }

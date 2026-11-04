@@ -582,20 +582,20 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
   }
   if(milestoneBlocks(game)&&c.launchWeek&&end?.chapter==="opening")return <LaunchScore campaign={c} end={end} onClose={stay} />;
   if(c.openingMilestone&&!c.openingMilestone.acknowledged&&!c.launchWeek&&end)return <Modal title="First growth challenge handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={stay}>
-    <CampaignReport lesson={outcomeSummary(c,"opening")}><p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
+    <CampaignReport at={c.step} lesson={outcomeSummary(c,"opening")}><p>{c.openingMilestone.outcomeId?"You handled Opening growth without an incident.":"You recovered your first production incident."} Your company is still operating. Your architecture, cash and pending work are preserved.</p>
     <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p><RecordedFields data={c.openingMilestone}/></CampaignReport>
     <ChapterEndFoot end={end} />
   </Modal>;
   if(pendingSpikeAcknowledgement(c) && end && view!=="menu" && view!=="history") {
     const score = spikeScore(c);
-    return <Modal title={score ? "Spike test passed" : "Spike response handled"} className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={stay}><CampaignReport lesson={outcomeSummary(c,"spikes")} summary={score && <SpikeScoreSummary score={score} />}><p>{score ? `Spike ${score.pulse} served ${score.share} of its requests, and five baseline game seconds then qualified for stable service.` : "Both demand pulses ended and five baseline game seconds qualified for stable service."} The same company continues with its investments and operating costs.</p><RecordedFields data={{stage:c.spikeStage,observations:c.recent.filter(m=>m.spikes)}}/></CampaignReport><ChapterEndFoot end={end} /></Modal>;
+    return <Modal title={score ? "Spike test passed" : "Spike response handled"} className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={stay}><CampaignReport at={c.step} lesson={outcomeSummary(c,"spikes")} summary={score && <SpikeScoreSummary score={score} />}><p>{score ? `Spike ${score.pulse} served ${score.share} of its requests, and five baseline game seconds then qualified for stable service.` : "Both demand pulses ended and five baseline game seconds qualified for stable service."} The same company continues with its investments and operating costs.</p><RecordedFields data={{stage:c.spikeStage,observations:c.recent.filter(m=>m.spikes)}}/></CampaignReport><ChapterEndFoot end={end} /></Modal>;
   }
   // It pauses the clock when it appears, so it shows over History and guidance rather than waiting behind them.
   if(chapterComplete&&chapterComplete===finishedChapter(game)&&view!=="menu"&&end)return completeSlot ? completeSlot(chapterComplete) : <ChapterComplete chapter={chapterComplete} end={end} onClose={stay} />;
   const finale = campaignFinale(game);
   if(finale&&!["guidance","menu","history","tech"].includes(view??""))return <CampaignFinale key={finale.key} finale={finale}><Modal title="Campaign complete" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard!}/><div className="modal-foot"><button className="btn" onClick={()=>openView("guidance")}><Icon name="eyes" size={16} />Inspect final company</button><button className="btn" onClick={()=>openView("menu")}><Icon name="refresh" size={16} />Export or start a new company</button></div></Modal></CampaignFinale>;
   if (game.phase === "ended" && game.outcome !== "won" && view === null) return <Modal title="Company bankrupt" className="campaign-recovery-report" tone="alert" icon={{ kind: "critical", name: "cash" }} onClose={() => openView("menu")}>
-    <CampaignReport lesson={c.scorecard?scorecardSummary(c.scorecard):{happened:"The company ran out of cash.",response:"No specific recovery is established by the retained record.",improve:"Compare operating costs with earned revenue before expanding.",takeaway:"Capacity must be affordable to operate."}}><Callout tone="critical" icon="cash" kicker="Company closed">Cash reached {dollars(c.cashCents)} after settlement at game second {c.step}. Final metrics and history remain available.</Callout>
+    <CampaignReport at={c.step} lesson={c.scorecard?scorecardSummary(c.scorecard):{happened:"The company ran out of cash.",response:"No specific recovery is established by the retained record.",improve:"Compare operating costs with earned revenue before expanding.",takeaway:"Capacity must be affordable to operate."}}><Callout tone="critical" icon="cash" kicker="Company closed">Cash reached {dollars(c.cashCents)} after settlement at game second {c.step}. Final metrics and history remain available.</Callout>
     <p>Last period revenue: {dollars(c.settlements.at(-1)?.revenueCents??0)}. Infrastructure: {dollars(infrastructureCents(c.settlements.at(-1)))}. Salaries: {dollars(c.settlements.at(-1)?.salaryCents??0)}.</p>
     <p>Upfront investment: {dollars(c.investedCents)}. Rejected demand: {c.cumulative.rejected} requests (not an extra cash charge).</p>{c.scorecard&&<RecordedFields data={c.scorecard}/>}</CampaignReport>
     <div className="modal-foot"><button className="btn btn-quiet" onClick={() => openView("history")}><Icon name="history" size={16} />View history</button><button className="btn btn-primary" onClick={() => openView("menu")}><Icon name="refresh" size={16} />Export or start a new company</button></div>
@@ -614,7 +614,7 @@ function ChapterComplete({ chapter, end, onClose }: { chapter: AnnouncedChapter;
   const { game } = useGame();
   const done = COMPLETIONS[chapter];
   return <Modal title={done.title} className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={onClose}>
-    <CampaignReport lesson={outcomeSummary(game.campaign!,chapter)}>
+    <CampaignReport at={game.campaign!.step} lesson={outcomeSummary(game.campaign!,chapter)}>
       <p>{done.text} Your architecture, cash and investments carry forward.</p><p>Next: {end.next.name}. {end.next.description}</p>
       <RecordedFields data={{stage:chapter==="scaling"?game.campaign!.scaling:game.campaign!.dataStage,snapshot:game.campaign!.snapshot}}/>
     </CampaignReport>
@@ -733,7 +733,7 @@ function ReliabilityOutcome({campaign:c}:{campaign:Campaign}) {
   const related=c.reports.filter(r=>r.snapshots.some(m=>m.reliability?.faultId===f.id));
   const capacity=survivingCapacity(related.flatMap(r=>r.snapshots).filter(m=>m.step>=f.startedStep!));
   return <>
-    <CampaignReport summary={capacity&&<CapacityAfterFailure {...capacity}/>} lesson={lesson?{happened:lesson.happened,response:lesson.recovered,improve:lesson.improve,takeaway:lesson.takeaway}: {happened:"The reliability test completed.",response:"The saved records do not show a specific repair.",takeaway:"Verify service after restoring a server."}}>
+    <CampaignReport at={d.completedStep??c.step} summary={capacity&&<CapacityAfterFailure {...capacity}/>} lesson={lesson?{happened:lesson.happened,response:lesson.recovered,improve:lesson.improve,takeaway:lesson.takeaway}: {happened:"The reliability test completed.",response:"The saved records do not show a specific repair.",takeaway:"Verify service after restoring a server."}}>
     <Callout compact tone="success" icon="health" kicker={completion?.data.limited?"Stable, with traffic limited":"Stable service"}>
       {completion?.data.incidentOccurred?"The failure opened an incident, and you reviewed its recovery.":"The test completed without opening an incident."} Service then stayed stable for five game seconds after the restore.
     </Callout>
@@ -751,7 +751,7 @@ function ReliabilityOutcome({campaign:c}:{campaign:Campaign}) {
 
 const PREPARATION_NAMES: Partial<Record<ScheduledAction["type"], string>> = {"upgrade-db":"Database upgrade","add-app":"Additional application",limit:"Traffic limit",unlimit:"Traffic limit removal"};
 function PreventionOutcome({campaign}:{campaign:Campaign}) {
-  return <CampaignReport lesson={outcomeSummary(campaign,"prevention")}><PreventionEvidence campaign={campaign}/></CampaignReport>;
+  return <CampaignReport at={campaign.openingPrevention?.outcome?.qualifiedStep??campaign.step} lesson={outcomeSummary(campaign,"prevention")}><PreventionEvidence campaign={campaign}/></CampaignReport>;
 }
 function PreventionEvidence({campaign}:{campaign:Campaign}) {
   const o=campaign.openingPrevention!.outcome!,m=o.snapshots.at(-1)!;

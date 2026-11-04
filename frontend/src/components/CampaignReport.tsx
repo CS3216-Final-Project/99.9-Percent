@@ -1,5 +1,9 @@
 import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
 import type { ReportLesson } from "@/game/campaignReport";
+import { avatarPicture } from "@/game/avatars";
+import { reportSpeaker } from "@/game/chapterCompanyMessage";
+import { colleaguePortrait } from "@/game/colleagues";
+import { useGame } from "@/game/store";
 import { ReportTechnicalOpen } from "./useReportTechnicalOpen";
 import "./CampaignIncidentReport.css";
 
@@ -13,11 +17,23 @@ export function ReportSections({ lesson, summary }: { lesson: ReportLesson; summ
   const turn = (i: number) => 2 * i + (i > 0 && summary ? 3 : 0);
   return <>{!sections.length && summary}{sections.map(([title, text], i) => <Fragment key={title}><section><h3 style={line(turn(i))}>{title}</h3><p style={line(turn(i) + 1)}>{text}</p></section>{i === 0 && summary && <div className="report-lesson-summary" style={line(2)}>{summary}</div>}</Fragment>)}</>;
 }
+/**
+ * The player's avatar asks the questions and the colleague of the chapter the report is about answers them, so each
+ * bubble carries a small picture of its speaker.
+ */
+function useReportSpeakers(at: number) {
+  const colleague = useGame(s => s.game.campaign ? reportSpeaker(s.game.campaign, at) : null);
+  const avatar = useGame(s => s.avatar);
+  if (!colleague) return {};
+  return { "data-speaker": colleague, style: { "--report-player": `url("${avatarPicture(avatar)}")`, "--report-colleague": `url("${colleaguePortrait(colleague).src}")` } as CSSProperties };
+}
 /** One disclosure per report. Evidence children must not introduce nested accordions. */
 /** `summary` holds the few numbers that carry the lesson; they stay visible outside the technical disclosure. */
-export function CampaignReport({ lesson, summary, children }: { lesson: ReportLesson; summary?: ReactNode; children: ReactNode }) {
+/** `at` is the game second the report speaks for, which decides the colleague who answers. */
+export function CampaignReport({ lesson, summary, at, children }: { lesson: ReportLesson; summary?: ReactNode; at: number; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  return <div className="campaign-incident-report"><ReportSections lesson={lesson} summary={summary}/>
+  const speakers = useReportSpeakers(at);
+  return <div className="campaign-incident-report" {...speakers}><ReportSections lesson={lesson} summary={summary}/>
     <details className="more report-technical" onToggle={event => { if (event.target === event.currentTarget) setOpen(event.currentTarget.open); }}><summary>View Technical Details</summary><ReportTechnicalOpen.Provider value={open}>{children}</ReportTechnicalOpen.Provider></details>
   </div>;
 }

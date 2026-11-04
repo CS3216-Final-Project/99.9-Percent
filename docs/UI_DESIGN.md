@@ -170,7 +170,10 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   Escape closes a menu and returns focus to its trigger; clicking outside closes it.
   Reserve control dimensions across states and counts.
 - **Review:** report in a shared modal with outcome tag, time range, spending and evidence-based explanations. Raw snapshots belong in a disclosure. Continue returns to the same company.
-  Outcome reports and postmortems read as a chat: each question is a paper bubble on the left and each answer a dark reply bubble on the right, neither wider than 75% of the report, and a capacity summary's readings table is a reply bubble too.
+  Outcome reports and postmortems read as a chat: the player asks each question in a dark bubble on the right, and the colleague who introduced the report's chapter (Maya for Launch Week and the Opening, then Alex, Jordan, Sam and Taylor) answers in a paper bubble on the left.
+  No bubble, with the room kept for its speaker's picture, is wider than 75% of the report, and a capacity summary's heading is a question and its readings table and story are answers.
+  A small round picture of the speaker sits beside the bottom of each bubble on its outer side: the player's current avatar for questions and the colleague's portrait for answers, shown once at the end of a run of answers.
+  An incident report keeps the colleague of the chapter it happened in, even when read later from History.
   A report's lone action, such as Continue company, sits on the right.
   When a report pops up, each question and then its answer pops up from its side in turn; reduced motion shows them at once, and History keeps the bubbles without the entrance.
   Challenge Mode's end-of-run report opens focused on its primary action, never on a rating: Play again, or Keep playing beside it when the run has just secured its Series A.
