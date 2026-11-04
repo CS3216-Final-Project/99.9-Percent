@@ -69,6 +69,7 @@ export async function recoveryJourney(page: Page, info: TestInfo, touch = false,
   await expect(report.locator(".timeline-readout b")).toHaveText(`Game second ${first.step}`);
   await timeline.focus(); await page.keyboard.press("End");
   await expect(timeline).toHaveAttribute("aria-valuenow", String(recoveredReport.snapshots.at(-1)!.step));
+  await timeline.scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath("timeline.png") });
   for (const explanation of recoveredReport.explanations) await expect(report).toContainText(explanation);
   const recoveryEvents = recoveredReport.events.filter(event => event.type === "recovery-streak");
   expect(recoveryEvents.length).toBeGreaterThan(0);

@@ -65,14 +65,19 @@ test("Automatic Failover confirmation stays centered with its equipment highligh
   await purchaseActions(page,g,[[/^Deploy Automatic Failover/,"app"]]);
 });
 
-test("Stay Online guide unlocks Health Checks in Tech and confirms its purchase, one box per click",async({page})=>{
+test("Stay Online guide unlocks Health Checks in Tech and confirms its purchase, one box per click",async({page},info)=>{
   await page.route("**/api/**",r=>r.abort());
   await seedSave(page,readyReliability(),{chapterTours:["scaling","data","spikes"]});
   await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).click();await expectRoom(page);
+  // Traffic Spikes' panel is headed with the chapter's own name.
+  await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("heading",{name:"Traffic Spikes & Autoscaling",exact:true})).toBeVisible();
+  await page.screenshot({path:info.outputPath("panel-traffic-spikes.png")});
   await page.getByRole("button",{name:"Next: Continue to Stay Online",exact:true}).click();
   const guide=(step:number)=>page.getByRole("dialog",{name:`Chapter guide, step ${step} of 9`,exact:true});
+  const boxes=(done:number)=>expect(page.locator(".tour-dots i.is-done")).toHaveCount(done);
   await guide(1).getByRole("button",{name:"Got it",exact:true}).click();
-  await expect(guide(2)).toContainText("Open Tech.");
+  await expect(guide(2)).toContainText("Open Tech.");await boxes(1);
+  await page.screenshot({path:info.outputPath("guide-step-2-of-9.png")});
   await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Tech",exact:true}).click();
   await expect(guide(3)).toContainText("Click Health Checks.");
   await page.getByRole("button",{name:"Health Checks: Research available",exact:true}).click();
@@ -82,14 +87,16 @@ test("Stay Online guide unlocks Health Checks in Tech and confirms its purchase,
   await page.getByRole("navigation",{name:"Views"}).getByRole("button",{name:"Tech",exact:true}).click();
   // The guide keeps the normal panel: no tabs, and Deploy Health Checks is reached through Monitoring's inspection.
   await expect(page.getByRole("complementary",{name:"System metrics"}).getByRole("tablist")).toHaveCount(0);
-  await expect(guide(6)).toContainText("Click Monitoring.");
+  await expect(guide(6)).toContainText("Click Monitoring.");await boxes(5);
+  await page.screenshot({path:info.outputPath("guide-step-6-of-9.png")});
   await page.getByRole("complementary",{name:"System metrics"}).getByRole("button",{name:"Monitoring",exact:true}).click();
   const monitoring=page.getByRole("dialog",{name:"Monitoring", exact: true});
   await expect(guide(7)).toContainText("Press the Monitoring disc to inspect details.");
   await monitoring.getByRole("button",{name:"Inspect details",exact:true}).click();
   await expect(guide(8)).toContainText("Press Deploy Health Checks.");
   await monitoring.getByRole("button",{name:/^Deploy Health Checks/}).click();
-  await expect(guide(9)).toContainText("Press Confirm.");
+  await expect(guide(9)).toContainText("Press Confirm.");await boxes(8);
+  await page.screenshot({path:info.outputPath("guide-step-9-of-9.png")});
   const confirmation=page.getByRole("region",{name:"Confirm Deploy Health Checks",exact:true});
   await expect(page.locator('.eq-label[data-eq="monitoring"]')).toHaveClass(/is-affected/);
   await confirmation.getByRole("button",{name:"Confirm",exact:true}).click();
