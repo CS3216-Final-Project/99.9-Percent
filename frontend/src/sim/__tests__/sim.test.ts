@@ -23,8 +23,10 @@ import {
   type GameState,
   type RecoveryId,
   type TechId,
+  userGoal,
+  USER_MILESTONES,
 } from "../index";
-import { balanced, runBot } from "./bots";
+import { balanced, handleIncident, runBot } from "./bots";
 
 function must(s: GameState, action: Action): GameState {
   const r = applyAction(s, action);
@@ -550,5 +552,98 @@ describe("campaign", () => {
     }
     expect(s.outcome).toBe("deadline");
     expect(s.totals.weeks).toBe(BALANCE.maxTurns);
+  });
+});
+
+describe("playing on past the Series A", () => {
+  const won = (() => {
+    let state: GameState | undefined;
+    return () => (state ??= runBot(BALANCE.introSeed, balanced, "expert").state);
+  })();
+
+  /** Plays whole weeks the way the expert bot does, stopping early only if the run ends. */
+  function playWeeks(start: GameState, weeks: number): GameState {
+    let s = start;
+    const until = s.totals.weeks + weeks;
+    let guard = 0;
+    while (s.phase !== "ended" && s.totals.weeks < until && guard++ < 400) {
+      if (s.phase === "management") s = advanceTurn(balanced(s));
+      else if (s.phase === "incident") s = handleIncident(s, "expert");
+      else s = must(s, { type: "acknowledge_review" });
+    }
+    return s;
+  }
+
+  it("carries the same company on with the Series A recorded and the original run untouched", () => {
+    const before = won();
+    expect(before).toMatchObject({ phase: "ended", outcome: "won" });
+    const snapshot = JSON.stringify(before);
+    const s = must(before, { type: "keep_playing" });
+    expect(s).toMatchObject({ phase: "management", outcome: null, seriesAWeek: before.totals.weeks, turn: before.turn, cash: before.cash, users: before.users });
+    expect(s.log.at(-1)?.text).toMatch(/only running out of cash ends the run/i);
+    expect(JSON.stringify(before)).toBe(snapshot);
+  });
+
+  it("runs past the deadline and does not win again", () => {
+    const start = must(won(), { type: "keep_playing" });
+    // Enough cash that only the deadline or a second win could end these weeks.
+    const s = playWeeks({ ...start, cash: 5_000_000 }, BALANCE.maxTurns - start.totals.weeks + 4);
+    expect(s.totals.weeks).toBeGreaterThan(BALANCE.maxTurns);
+    expect(s.users).toBeGreaterThanOrEqual(BALANCE.targetUsers);
+    expect(s.outcome).toBeNull();
+    expect(s.phase).not.toBe("ended");
+    expect(s.log.filter((e) => /Series A is yours/.test(e.text))).toHaveLength(1);
+  });
+
+  it("still ends in bankruptcy, and the report keeps the Series A credit", () => {
+    const winner = won();
+    // An over-hired team whose payroll outruns a 50,000-user company's revenue, with little cash left.
+    const s = playWeeks({ ...must(winner, { type: "keep_playing" }), cash: 1_000, engineers: 100 }, 3);
+    expect(s).toMatchObject({ phase: "ended", outcome: "bankrupt", seriesAWeek: winner.totals.weeks });
+    const report = buildReport(s);
+    expect(report).toMatchObject({ outcome: "bankrupt", seriesAWeek: winner.totals.weeks, canKeepPlaying: false });
+    expect(report.summary).toContain(`Series A in week ${winner.totals.weeks}`);
+    // Without the credit a bankruptcy is capped at 45; keeping the win must not score like never reaching it.
+    const neverWon = buildReport({ ...s, seriesAWeek: undefined });
+    expect(neverWon.score).toBeLessThanOrEqual(45);
+    expect(report.score).toBeGreaterThan(neverWon.score);
+    expect(applyAction(s, { type: "keep_playing" }).ok).toBe(false);
+  });
+
+  it("is only offered to a run that has just secured its Series A", () => {
+    expect(buildReport(won()).canKeepPlaying).toBe(true);
+    const bankrupt = advanceTurn({ ...clone(newLegacyGame(1)), cash: 2000 });
+    expect(bankrupt.outcome).toBe("bankrupt");
+    for (const s of [newLegacyGame(1), bankrupt, must(won(), { type: "keep_playing" })]) {
+      const r = applyAction(s, { type: "keep_playing" });
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.reason).toBe("wrong_phase");
+      expect(buildReport(s).canKeepPlaying).toBe(false);
+    }
+  });
+
+  it("raises the user goal through each milestone above the company's peak, then drops it", () => {
+    expect(USER_MILESTONES).toEqual([BALANCE.targetUsers, 100_000, 1_000_000, 10_000_000, 100_000_000]);
+    // Until the Series A is secured the goal is its target, even once a won run has passed it.
+    expect(userGoal(newLegacyGame(1))).toBe(BALANCE.targetUsers);
+    expect(userGoal(won())).toBe(BALANCE.targetUsers);
+    const on = must(won(), { type: "keep_playing" });
+    expect(on.totals.peakUsers).toBeLessThan(100_000);
+    expect(userGoal(on)).toBe(100_000);
+    const at = (peakUsers: number, users = peakUsers) => userGoal({ ...on, users, totals: { ...on.totals, peakUsers } });
+    expect(at(100_000)).toBe(1_000_000);
+    expect(at(2_500_000)).toBe(10_000_000);
+    expect(at(99_999_999)).toBe(100_000_000);
+    // A dip below a milestone already reached does not bring it back.
+    expect(at(150_000, 80_000)).toBe(1_000_000);
+    // Past the last milestone there is no goal, only the count.
+    expect(at(100_000_000)).toBeNull();
+  });
+
+  it("continues identically after a save and reload", () => {
+    const s = playWeeks(must(won(), { type: "keep_playing" }), 2);
+    expect(s.phase).toBe("management");
+    const reloaded = JSON.parse(JSON.stringify(s)) as GameState;
+    expect(playWeeks(reloaded, 3)).toEqual(playWeeks(s, 3));
   });
 });

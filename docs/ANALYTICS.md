@@ -92,7 +92,7 @@ Increment it in `productAnalytics.ts` when the set or meaning of chapters or wal
 | `gameplay_launch_score` | Launch Week finishes | `nines`, `uptime` |
 
 Guided Mode completion means chapters 1 to 5, the same set that unlocks Challenge Mode.
-Chapter 0 is not reported as a chapter, and once a run is complete the observer stops measuring it, so play after Stay Online produces no session or duration events.
+Chapter 0 is not reported as a chapter, and once a run is complete the observer stops measuring it, so play after Stay Online, and Challenge Mode play after Keep playing past the Series A, produce no session or duration events.
 Reopening or importing a completed save baselines its milestones and emits no retrospective completion.
 
 Tutorial events cover Challenge Mode's first-week tutorial only (`tutorial_track` `basics`); Guided Mode's Launch Week reports `gameplay_launch_beat`, `gameplay_launch_pick` (the research choice) and `gameplay_launch_score` (the final uptime nines) instead.
@@ -160,3 +160,4 @@ Menu > Playtest exports them as JSON, together with observer notes and the parti
   A company saved in the removed Grow the Company chapter keeps its recorded events, and loading it completed at Stay Online records nothing for that completion.
 - Both modes also record floor switches, walk mode, view changes, map use and avatar changes; Challenge Mode also records its walkthrough starts, completions and skips.
 - Challenge Mode records runs started and finished, incidents started and completed, hints, ratings, voluntary replays, resumes, imports and mode switches.
+  A run finishes once, at its outcome; choosing Keep playing after the Series A records `endless_started`, and the later bankruptcy records `endless_finished` instead of a second `run_finished`.

@@ -23,11 +23,14 @@ import {
   newGame,
   needsAppProfile,
   newLegacyGame,
+  USER_MILESTONES,
+  userGoal,
   type Action,
   type EquipmentId,
   type GameState,
   type TechId,
 } from "@/sim";
+import { num } from "./format";
 import {
   clearSave,
   decodeClassicSave,
@@ -153,6 +156,8 @@ export interface Toast {
   id: number;
   text: string;
   kind: "info" | "error" | "success";
+  /** A milestone reads as one rather than as a finished action. */
+  milestone?: boolean;
 }
 
 /** The player's latest decision and whether the game accepted it. */
@@ -635,7 +640,9 @@ export const useGame = create<Store>()((set, get) => {
 
     if (!prev.outcome && next.outcome) {
       const report = buildReport(next);
-      track("run_finished", {
+      // A run finishes once, at its Series A; playing on afterwards ends separately.
+      const endless = next.seriesAWeek !== undefined;
+      track(endless ? "endless_finished" : "run_finished", {
         outcome: report.outcome,
         weeks: report.weeks,
         users: report.users,
@@ -644,8 +651,20 @@ export const useGame = create<Store>()((set, get) => {
         incidents: report.incidents.total,
         seed: next.seed,
       });
-      meta = { ...meta, runsFinished: meta.runsFinished + 1 };
+      if (!endless) meta = { ...meta, runsFinished: meta.runsFinished + 1 };
       patch.running = false;
+    }
+
+    if (prev.seriesAWeek === undefined && next.seriesAWeek !== undefined) {
+      track("endless_started", { week: next.seriesAWeek, users: Math.round(next.users), seed: next.seed });
+    }
+
+    // Past the Series A, each user milestone the company passes moves the Users goal on; say so once.
+    const goal = userGoal(next);
+    if (prev.seriesAWeek !== undefined && goal !== userGoal(prev)) {
+      const reached = USER_MILESTONES.findLast((m) => m <= next.totals.peakUsers) ?? BALANCE.targetUsers;
+      patch.toast = { id: toastId++, kind: "success", milestone: true,
+        text: goal === null ? `${num(reached)} users reached. Every milestone passed: keep growing.` : `${num(reached)} users reached. Next goal: ${num(goal)}.` };
     }
 
     if (next.phase === "ended") {
@@ -1073,9 +1092,11 @@ export const useGame = create<Store>()((set, get) => {
       if (game.phase !== "management" || (game.campaign && (!get().started || awaitingAcknowledgement(game)))) return;
       if (choosingAppProfile(get())) return;
       const next = advanceTurn(game);
+      const toast = get().toast;
       commit(next);
       const r = next.lastReport;
-      if (next.phase === "management" && r && r.turn === game.turn) {
+      // A milestone announced by this week outranks its routine summary.
+      if (next.phase === "management" && r && r.turn === game.turn && get().toast === toast) {
         const gained = r.usersAfter - r.usersBefore;
         get().notify(
           `Week ${r.turn}: ${gained >= 0 ? "+" : ""}${Math.round(gained).toLocaleString("en-US")} users, ${r.net >= 0 ? "+" : "-"}$${Math.abs(Math.round(r.net)).toLocaleString("en-US")}`,
