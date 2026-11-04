@@ -396,6 +396,7 @@ const ACKNOWLEDGEMENTS = {
   "reliability-review": "acknowledge_reliability",
   "prevention-review": "acknowledge_prevention_review",
   "spike-acknowledgement": "acknowledge_spikes",
+  "spike-debrief": "acknowledge_spike_attempt",
 } as const;
 /** The only action accepted while a recognition or milestone awaits the player; time stays paused meanwhile. */
 function requiredAcknowledgement(g: GameState): Action["type"] | null {
@@ -1053,6 +1054,7 @@ export const useGame = create<Store>()((set, get) => {
     act: (action) => {
       // Version new completions while preserving historical replay inputs.
       if(action.type==="complete_introduction")action={...action,handoff:"opening"};
+      if(action.type==="enter_spikes")action={...action,version:2};
       const game = get().game, c = game.campaign;
       const acknowledgement = c && requiredAcknowledgement(game);
       // Launch Week's research pick still comes before its milestone, which waits for it.

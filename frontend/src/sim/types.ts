@@ -459,7 +459,9 @@ export type Action =
   | { type: "restore_app"; appId: string }
   | { type: "arm_reliability" }
   | { type: "acknowledge_reliability" }
-  | { type: "enter_spikes" }
+  /** `version: 2` enters the graded chapter; recorded inputs without it replay the original rules. */
+  | { type: "enter_spikes"; version?: 2 }
+  | { type: "acknowledge_spike_attempt" }
   | { type: "unlock_autoscaling" }
   | { type: "deploy_autoscaler" }
   | { type: "set_autoscaling"; enabled: boolean }

@@ -10,10 +10,11 @@ import { LAUNCH_WEEK as LW } from "@/sim/scenarios/launchWeek";
 import { launchResearchPending, milestoneBlocks } from "./campaignGuidance";
 import { APPLICATION_SCALING as P } from "@/sim/scenarios/applicationScaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
+import { gradedSpikes, spikePeak, spikeTestPassed } from "@/sim/autoscaling";
 import { campaignChapters } from "./campaignChapters";
 import { chapterAdvance } from "./chapterCompletion";
 import { previewCampaignAction } from "./campaignFinance";
-import { chapter4Stage, chapter4Performance } from "./chapter4Guidance";
+import { chapter4Stage, chapter4Performance, PASS_SHARE } from "./chapter4Guidance";
 import { serverName } from "@/sim";
 
 export type GuidanceTarget = "run" | "db" | "app" | "network" | "monitoring" | "requirements" | "next" | "reliability" | "risk" | "menu" | "finance" | "research";
@@ -390,6 +391,8 @@ function baseAttention(game: GameState): AttentionDecision {
     const inspected = (component: string) => !!stage && c.trace.some(t => t.type === "inspection" && t.id > stage.eventId && t.step >= stage.since && t.data.component === component);
     const inspection = (component: "app" | "network" | "monitoring", message: string) => ({ ...hint(`spike-${stage?.stage}-inspect`, "Inspect current evidence for this traffic stage.", message, component), message });
     const limited = c.limit !== null;
+    // A graded test counts rejected requests as unserved, so a limit there is never advice to keep.
+    const limitCost = gradedSpikes(d) ? "rejected requests count against the test" : "";
     // The chapter's headline option lives inside App Server > Server management; a validated unlock,
     // deploy or enable action lets the spotlight walk into it instead of leaving players hunting.
     const autoscaling = (): GuidanceAction | null => {
@@ -453,7 +456,7 @@ function baseAttention(game: GameState): AttentionDecision {
       return advice.action ? advice : null;
     };
     if (stage?.stage === "prepare" && !inspected("app"))
-      return inspection("app", limited ? "Check App Server capacity before the spike. Your traffic limit protects service by rejecting requests." : "Check App Server capacity before the spike. Upgrades are optional; Run when you are ready.");
+      return inspection("app", limited ? `Check App Server capacity before the spike. ${limitCost ? `Your traffic limit rejects requests, and ${limitCost}.` : "Your traffic limit protects service by rejecting requests."}` : "Check App Server capacity before the spike. Upgrades are optional; Run when you are ready.");
     if (stage?.stage === "prepare" && !d.controller?.enabled && !deployPending) return autoscalingStep();
     if (deployPending)
       return { ...run("spike-autoscale-deploy", "The autoscaling controller is installing."), message: "The autoscaling controller is installing. Press Run to finish deployment; it enables itself and starts watching routed load." };
@@ -466,24 +469,26 @@ function baseAttention(game: GameState): AttentionDecision {
       const appStruggled = performance.appStruggled;
       const dbDemand = performance.dbDemand;
       const tradeoff = performance.rejected ? " Limiting protected admitted traffic but turned users away." : "";
+      // A graded company must change something to pass the next test, so its advice never calls changes optional.
+      const graded = gradedSpikes(d), nextSpike = performance.pulse + 1;
       const plan = (action: Action, message: string): AttentionDecision | null => {
         if (!previewCampaignAction(game, action).ok) return null;
-        const advice = hint("spike-plan", "The first pulse exposed a capacity constraint. Preparation remains optional.", message, action.type === "set_routing" || action.type === "set_traffic_limit" ? "network" : action.type === "start_db_upgrade" ? "db" : "app");
-        return { ...advice, action: { action, label: "Prepare for the next spike", evidence: performance.summary }, message: `${performance.summary}${tradeoff} ${message} Changes are optional.`, key: `${advice.key}:${guidanceActionId(action)}` };
+        const advice = hint("spike-plan", graded ? `Spike ${performance.pulse} exposed a capacity constraint. Fix it before the next test.` : "The first pulse exposed a capacity constraint. Preparation remains optional.", message, action.type === "set_routing" || action.type === "set_traffic_limit" ? "network" : action.type === "start_db_upgrade" ? "db" : "app");
+        return { ...advice, action: { action, label: "Prepare for the next spike", evidence: performance.summary }, message: `${performance.summary}${tradeoff} ${message}${graded ? "" : " Changes are optional."}`, key: `${advice.key}:${guidanceActionId(action)}` };
       };
       if ((appStruggled || performance.rejected > 0) && (!d.controller?.enabled || limited)) {
         const targets = routableApps(c).filter(a => a.health !== "failed");
         const peak = Math.max(0, ...first.map(m => m.incoming));
         const allocation = targets.length ? allocateTraffic(peak, targets.map(a => a.id)) : {};
         const small = targets.find(a => a.capacity < allocation[a.id] && allocation[a.id] < P.appCapacity && a.tier === "base");
-        const advice = small ? plan({ type: "scale_up", appId: small.id }, `The first spike exposed a small server. Scale up ${serverName(small.id)} before sharing the next spike.`)
+        const advice = small ? plan({ type: "scale_up", appId: small.id }, `The ${performance.pulse === 1 ? "first" : "last"} spike exposed a small server. Scale up ${serverName(small.id)} before sharing the next spike.`)
           : targets.every(a => a.capacity >= allocation[a.id]) && targets.some(a => !a.routed)
           ? plan({ type: "set_routing", mode: "balanced", targets: targets.map(a => a.id) }, "Your prepared servers can share the observed spike. Connect All servers before the next one.")
           : targets.some(a => a.capacity < allocation[a.id]) && targets.length < T.maximum
           ? plan({ type: "add_server" }, "Serving more of the observed spike needs application capacity. You can add a server, prepare it, then connect it.") : null;
         if (advice) return advice;
       }
-      const peak = Math.max(T.peak, ...first.map(m => m.incoming));
+      const peak = Math.max(spikePeak(d), ...first.map(m => m.incoming));
       const data = first.at(-1)?.data;
       const fullDb = data ? classifyData(peak, data.readShare, data.cacheableReadShare, Math.min(c.readCache?.warmth ?? 0, c.readCache?.target ?? 0)).databaseNewDemand : peak;
       if (dbDemand > c.dbCapacity || performance.rejected > 0 && fullDb > c.dbCapacity) {
@@ -495,7 +500,7 @@ function baseAttention(game: GameState): AttentionDecision {
       if (limited && c.dbCapacity >= fullDb && c.routing.targets.length) {
         const allocation = allocateTraffic(peak, c.routing.targets);
         if (c.routing.targets.every(id => { const app = c.apps.find(a => a.id === id); return app && app.health !== "failed" && app.role !== "spare" && !app.backlog && app.capacity >= allocation[id]; })) {
-          const advice = plan({ type: "set_traffic_limit", enabled: false }, "Prepared capacity fits the next spike. You may remove the traffic limit to test serving more users, or keep your strategy.");
+          const advice = plan({ type: "set_traffic_limit", enabled: false }, limitCost ? `Prepared capacity fits the next spike. Remove the traffic limit: ${limitCost}.` : "Prepared capacity fits the next spike. You may remove the traffic limit to test serving more users, or keep your strategy.");
           if (advice) return advice;
         }
       }
@@ -508,14 +513,15 @@ function baseAttention(game: GameState): AttentionDecision {
           if (advice) return advice;
         }
       }
-      const evaluated = c.trace.some(t => t.type === "inspection" && t.step >= d.deadlines[0] && t.data.component === "monitoring");
-      if (!evaluated) return inspection("monitoring", `${performance.summary}${tradeoff} Check Monitoring to evaluate errors, queues and your strategy before Spike 2; changes are optional.`);
+      const evaluated = c.trace.some(t => t.type === "inspection" && t.step >= d.deadlines[2 * performance.pulse - 2] && t.data.component === "monitoring");
+      if (!evaluated) return inspection("monitoring", `${performance.summary}${tradeoff} Check Monitoring to evaluate errors, queues and your strategy before Spike ${nextSpike}${graded ? "." : "; changes are optional."}`);
       // After the player has evaluated the first pulse, narrate what the controller did
       // with it or resume the unfinished arc.
       const observing = autoscalingObserve() ?? resumeAutoscaling();
       if (observing) return observing;
       const advice = run("spike-pulses", performance.summary);
-      return { ...advice, message: `${performance.summary}${tradeoff} Keep your strategy or make an optional change. Press Run to test it during Spike 2.` };
+      return { ...advice, message: graded ? `${performance.summary}${tradeoff} Spike ${nextSpike} is graded: serve at least ${PASS_SHARE} of its requests. Press Run when you are ready.`
+        : `${performance.summary}${tradeoff} Keep your strategy or make an optional change. Press Run to test it during Spike 2.` };
     }
     const observing = autoscalingObserve() ?? resumeAutoscaling();
     if (observing) return observing;
@@ -524,7 +530,7 @@ function baseAttention(game: GameState): AttentionDecision {
     if (d.completedStep === null && pulsePending) {
       // Removing an active cap is optional. Check the announced peak as well as
       // current demand, so the quiet interval does not cause an unsafe ON/OFF loop.
-      const demand = Math.max(m.incoming, T.peak), allocation = c.routing.targets.length ? allocateTraffic(demand, c.routing.targets) : {};
+      const demand = Math.max(m.incoming, spikePeak(d)), allocation = c.routing.targets.length ? allocateTraffic(demand, c.routing.targets) : {};
       const dbDemand = m.admitted > 0 ? Math.ceil(m.db.demand * demand / m.admitted) : Infinity;
       if (limited && c.dbCapacity >= dbDemand && c.routing.targets.length && c.routing.targets.every(id => {
         const app = c.apps.find(a => a.id === id);
@@ -536,13 +542,15 @@ function baseAttention(game: GameState): AttentionDecision {
       }
       const advice = run("spike-pulses", "The announced traffic pulses still need game time to develop or end.");
       const remaining = d.deadlines.find(step => step > c.step)! - c.step;
-      return { ...advice, message: limited ? `Keep the limit to protect service; it rejects users. Press Run to observe the next pulse boundary in ${remaining} game seconds.`
+      return { ...advice, message: limited ? `${limitCost ? `Your traffic limit rejects requests, and ${limitCost}.` : "Keep the limit to protect service; it rejects users."} Press Run to observe the next pulse boundary in ${remaining} game seconds.`
         : `Press Run to observe the next pulse boundary in ${remaining} game seconds, then check your readings.` };
     }
     // Earlier diagnosis checks establish healthy service, empty queues and acknowledged
     // reports. Match the remaining baseline-observation conditions, not traffic alone.
-    if (d.completedStep === null && c.step >= d.deadlines[3] && game.phase === "management" && c.incomingRate === T.baseline)
-      return { ...run("spike-stability", `Both pulses ended. Stable baseline observations: ${d.baselineStableSteps} / 5.`), message: `Both spikes ended. Press Run to verify stability: ${d.baselineStableSteps} of 5 observations.${limited ? " Your limit still rejects requests." : ""}` };
+    if (d.completedStep === null && c.step >= d.deadlines.at(-1)! && spikeTestPassed(d) && game.phase === "management" && c.incomingRate === T.baseline) {
+      const graded = gradedSpikes(d);
+      return { ...run("spike-stability", `${graded ? "The spike test passed" : "Both pulses ended"}. Stable baseline observations: ${d.baselineStableSteps} / 5.`), message: `${graded ? "The spike test passed" : "Both spikes ended"}. Press Run to verify stability: ${d.baselineStableSteps} of 5 observations.${limited ? " Your limit still rejects requests." : ""}` };
+    }
     return hint("requirements", "No remaining traffic pulse or qualifying baseline observation is identified.", "Use View chapters to compare the unfinished Chapter requirements with the current readings.", "requirements");
   }
   if (c.dataStage && !c.dataStage.consumed && canEnterData(game)) return run("data-growth", "The company is ready to observe the scheduled workload increase.");

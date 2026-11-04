@@ -94,6 +94,9 @@ export function describeEvents(events: TraceEvent[], context: TraceEvent[] = eve
       case "traffic-scheduled": return line("More traffic scheduled", `Arrives at game second ${d.dueStep}`);
       case "traffic-spike-started": return line("Traffic spike started", `Incoming ${num(d.to)} req/s`);
       case "traffic-spike-ended": return line("Traffic spike ended", `Incoming ${num(d.to)} req/s`);
+      case "traffic-spike-graded": return line(d.result === "practice" ? `Practice spike ${d.pulse} ended` : `Spike ${d.pulse} test ${d.result}`, `${Math.floor(Number(d.servedBasisPoints) / 100)}% of requests served`);
+      case "traffic-spike-scheduled": return line(`Spike ${d.pulse} scheduled`, `Starts at game second ${d.startStep}`, `${num(d.peak)} req/s`);
+      case "spike-attempt-acknowledged": return line(`Spike ${d.pulse} result reviewed`);
       case "workload-changed": return line("Workload changed", d.profile ? `${String(d.profile).replaceAll("-", " ")} workload` : null, typeof d.to === "number" && `${num(d.to)} req/s`);
       case "autoscale-scale-out-decided": return line(`Autoscaler: +${app(d.targetId)}`);
       case "autoscale-scale-up-decided": return line(`Autoscaler: ↑${app(d.targetId)}`);

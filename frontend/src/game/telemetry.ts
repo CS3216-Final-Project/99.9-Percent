@@ -49,14 +49,15 @@ export function projectEvents(previous:Measurement,g:GameState,now:string):Measu
     const inSpikes=!!spikeEntry&&t.id>=spikeEntry.id;
     const reliabilityEntry=c.trace.find(x=>x.type==="reliability-stage-entered");
     const inReliability=!!reliabilityEntry&&t.id>=reliabilityEntry.id;
-    const emit=(name:string,payload:Payload=t.data,suffix="")=>{event(m,g,name,{...payload,...(inSpikes?{stageId:"traffic-spikes",stageVersion:1}:{}),...(inReliability?{stageId:"application-reliability",stageVersion:1}:{}),...(c.dataStage&&inData?{dataStageId:c.dataStage.id,dataStageVersion:c.dataStage.version,profile:t.data.profile??c.trace.filter(x=>x.id<=t.id&&(x.type==="workload-changed"||x.type==="data-stage-entered")).at(-1)?.data.profile??c.dataStage.profile}:{}),...(c.scaling&&t.step>=c.scaling.enteredStep?{continuationId:c.scaling.id,continuationVersion:c.scaling.version}:{})},now,id+suffix);const record=m.pending.find(e=>e.eventId===id+suffix);if(record)record.physicalStep=t.step;};
+    const emit=(name:string,payload:Payload=t.data,suffix="")=>{event(m,g,name,{...payload,...(inSpikes?{stageId:"traffic-spikes",stageVersion:c.spikeStage?.version??1}:{}),...(inReliability?{stageId:"application-reliability",stageVersion:1}:{}),...(c.dataStage&&inData?{dataStageId:c.dataStage.id,dataStageVersion:c.dataStage.version,profile:t.data.profile??c.trace.filter(x=>x.id<=t.id&&(x.type==="workload-changed"||x.type==="data-stage-entered")).at(-1)?.data.profile??c.dataStage.profile}:{}),...(c.scaling&&t.step>=c.scaling.enteredStep?{continuationId:c.scaling.id,continuationVersion:c.scaling.version}:{})},now,id+suffix);const record=m.pending.find(e=>e.eventId===id+suffix);if(record)record.physicalStep=t.step;};
     const spikeNames:Record<string,string>={
       "spike-stage-entered":"traffic_spike_stage_entered","progression-awarded":"progression_awarded","autoscaling-unlocked":"autoscaling_unlocked",
       "traffic-spikes-announced":"traffic_spikes_announced","traffic-spike-started":"traffic_spike_started","traffic-spike-ended":"traffic_spike_ended",
       "autoscaling-enabled":"autoscaling_enabled","autoscaling-disabled":"autoscaling_disabled","autoscaler-blocked":"autoscaling_blocked",
       "autoscale-scale-out-decided":"autoscale_scale_out_decided","autoscale-scale-up-decided":"autoscale_scale_up_decided","autoscale-scale-in-eligible":"autoscale_scale_in_eligible",
       "autoscale-retirement-cancelled":"autoscale_retirement_cancelled","autoscale-instance-retired":"autoscale_instance_retired",
-      "traffic-spike-stage-completed":"traffic_spike_stage_completed","spike-stage-acknowledged":"traffic_spike_stage_acknowledged"};
+      "traffic-spike-stage-completed":"traffic_spike_stage_completed","spike-stage-acknowledged":"traffic_spike_stage_acknowledged",
+      "traffic-spike-graded":"traffic_spike_graded","traffic-spike-scheduled":"traffic_spike_scheduled","spike-attempt-acknowledged":"traffic_spike_attempt_acknowledged"};
     if(spikeNames[t.type])emit(spikeNames[t.type],{...t.data,...(t.type==="traffic-spike-stage-completed"?timing():{})});
     const preventionNames:Record<string,string>={
       "opening-prevention-eligible":"opening_prevention_eligible",

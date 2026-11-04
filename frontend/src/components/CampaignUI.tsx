@@ -26,6 +26,8 @@ import { pendingPreventionReview } from "@/sim/openingPrevention";
 import { APPLICATION_RELIABILITY as R } from "@/sim/scenarios/applicationReliability";
 import { campaignAttention, guidanceActionId, incidentNeedsPause } from "@/game/campaignAttention";
 import { chapter4Stage } from "@/game/chapter4Guidance";
+import { spikeDebrief, spikeScore } from "@/game/spikeDebrief";
+import { SpikeDebriefDialog, SpikeScoreSummary } from "./SpikeTest";
 import { previewCampaignAction } from "@/game/campaignFinance";
 import { campaignGuidance, milestoneBlocks, type Requirement } from "@/game/campaignGuidance";
 import { launchWeekScalingOpen, openingTuning } from "@/sim/launchWeek";
@@ -243,6 +245,15 @@ function EquipmentShortcuts({disabled}:{disabled:boolean}) {
       </div>);
 }
 
+/** Chapter 4's stage: graded companies retry spikes, so the label names the spike in progress and counts down to the next one. */
+function spikeStageLabel(c:Campaign,spike:ReturnType<typeof chapter4Stage>):string {
+  const stage=spike?.stage??"recover";
+  if(!spike?.graded||(stage!=="spike1"&&stage!=="spike2"&&stage!=="between"))return {prepare:"Preparing",spike1:"Spike 1 active",between:"Between spikes",spike2:"Spike 2 active",recover:"Review / stability verification"}[stage];
+  if(stage!=="between")return `Spike ${spike.pulse} active`;
+  const start=c.spikeStage!.deadlines[2*spike.pulse];
+  return start===undefined?"Between spikes":`Spike ${spike.pulse+1} in ${start-c.step} s`;
+}
+
 /** A compact projection of existing gates and advice. No new progression or saved state. */
 function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const {game,act,running}=useGame(),c=game.campaign!,m=c.snapshot;
@@ -262,8 +273,8 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
   const conditionTitle=game.phase!=="ended"&&(reviewing||unmet)?"Current unmet condition":"Current status";
   const stage=game.phase==="ended"&&game.outcome==="won"?"Campaign complete"
     :reliability?(reliability.acknowledged?"Outcome acknowledged":pendingReliability(c)?"Outcome review":!reliability.fault?"Preparation":reliability.fault.startedStep===null?"Failure scheduled":reliability.fault.restoredStep===null?"Failure / recovery":"Stability verification")
-    :c.spikeStage!.acknowledged?"Outcome acknowledged":pendingSpikeAcknowledgement(c)?"Spike outcome review":({prepare:"Preparing",spike1:"Spike 1 active",between:"Between spikes",spike2:"Spike 2 active",recover:"Review / stability verification"}[spike?.stage??"recover"]);
-  const objectiveIds=reliability?["armed","observed","restored","observations","recognition"]:["pulses","observations","recognition"];
+    :c.spikeStage!.acknowledged?"Outcome acknowledged":pendingSpikeAcknowledgement(c)?"Spike outcome review":spikeStageLabel(c,spike);
+  const objectiveIds=reliability?["armed","observed","restored","observations","recognition"]:["test","pulses","observations","recognition"];
   const objectives=model.requirements.filter(r=>objectiveIds.includes(r.id));
   const currentObjective=objectives.find(r=>!r.met)?.id;
   const nextAdvice=decision.attention==="run"?decision.message:decision.reason==="spike-plan"?decision.recommendation:decision.action?`Suggested action: ${decision.action.label}.`:decision.recommendation;
@@ -561,6 +572,9 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
     <ChapterEndFoot end={end} />
   </Modal>;
   if (pendingPreventionReview(c)) return <Modal title="Prevention review" wide className="campaign-recovery-report" icon={{ kind: "ok", name: "health" }}><PreventionOutcome campaign={c} /><ContinueFoot label="Continue company" onClick={()=>act({type:"acknowledge_prevention_review"})} /></Modal>;
+  // A failed spike test's debrief comes first: a postmortem from the same second waits behind it.
+  const debrief = spikeDebrief(game);
+  if (debrief && view !== "menu" && view !== "history") return <SpikeDebriefDialog key={`${c.runId}:${debrief.pulse}`} campaign={c} debrief={debrief} onContinue={() => act({ type: "acknowledge_spike_attempt" })} />;
   if (game.phase === "review") {
     const report = c.reports[c.reports.length - 1];
     if (!tutorialCompany) return <CampaignRecoveryReview key={`${c.runId}:${report.id}:${report.recoveredStep}`} runId={c.runId} report={report} reliability={reliabilityLesson(c, report)} onContinue={() => act({ type: "acknowledge_review" })} />;
@@ -572,7 +586,10 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
     <p>{c.limit!==null?"The traffic limit remains active: rejected demand still has a revenue trade-off.":"Your company is serving its current demand."} Next: application scaling and routing.</p><RecordedFields data={c.openingMilestone}/></CampaignReport>
     <ChapterEndFoot end={end} />
   </Modal>;
-  if(pendingSpikeAcknowledgement(c) && end && view!=="menu" && view!=="history") return <Modal title="Spike response handled" className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={stay}><CampaignReport lesson={outcomeSummary(c,"spikes")}><p>Both demand pulses ended and five baseline game seconds qualified for stable service. The same company continues with its investments and operating costs.</p><RecordedFields data={{stage:c.spikeStage,observations:c.recent.filter(m=>m.spikes)}}/></CampaignReport><ChapterEndFoot end={end} /></Modal>;
+  if(pendingSpikeAcknowledgement(c) && end && view!=="menu" && view!=="history") {
+    const score = spikeScore(c);
+    return <Modal title={score ? "Spike test passed" : "Spike response handled"} className="campaign-recovery-report" icon={{ kind: "go", name: "goal" }} onClose={stay}><CampaignReport lesson={outcomeSummary(c,"spikes")} summary={score && <SpikeScoreSummary score={score} />}><p>{score ? `Spike ${score.pulse} served ${score.share} of its requests, and five baseline game seconds then qualified for stable service.` : "Both demand pulses ended and five baseline game seconds qualified for stable service."} The same company continues with its investments and operating costs.</p><RecordedFields data={{stage:c.spikeStage,observations:c.recent.filter(m=>m.spikes)}}/></CampaignReport><ChapterEndFoot end={end} /></Modal>;
+  }
   // It pauses the clock when it appears, so it shows over History and guidance rather than waiting behind them.
   if(chapterComplete&&chapterComplete===finishedChapter(game)&&view!=="menu"&&end)return completeSlot ? completeSlot(chapterComplete) : <ChapterComplete chapter={chapterComplete} end={end} onClose={stay} />;
   const finale = campaignFinale(game);

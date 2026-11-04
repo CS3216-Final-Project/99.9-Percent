@@ -1,7 +1,7 @@
 import { currentFault, researchBalance } from "./reliability";
 import type { Action, ActionResult, GameState } from "./types";
-import type { Campaign, ScheduledAction, SpikeObservation } from "./campaignTypes";
-import { TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
+import type { Campaign, ScheduledAction, SpikeObservation, SpikePulse, SpikeStage } from "./campaignTypes";
+import { GRADED_SPIKES as G, TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
 import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
 import { APPLICATION_SCALING as P } from "./scenarios/applicationScaling";
 import { allocateAppId, allocateTraffic, qualifiesForRecovery } from "./step";
@@ -11,6 +11,48 @@ import { trace } from "./trace";
 export function pendingSpikeAcknowledgement(c:Campaign|undefined):boolean {
  return !!c?.spikeStage && c.spikeStage.completedStep!==null && !c.spikeStage.acknowledged;
 }
+/** Whether the stage grades its spikes (version 2); version-1 companies keep the timed chapter. */
+export const gradedSpikes=(d:SpikeStage|null|undefined):boolean=>d?.version===2;
+/** Incoming demand during this stage's spikes. */
+export const spikePeak=(d:SpikeStage):number=>d.peak??T.peak;
+/** The spike whose window holds step `at`, counted from 1; null outside every spike. */
+export function pulseAt(d:SpikeStage,at:number):number|null {
+ for(let i=0;i+1<d.deadlines.length;i+=2)if(at>=d.deadlines[i]&&at<d.deadlines[i+1])return i/2+1;
+ return null;
+}
+/** The failed spike test whose debrief the player has not read yet. */
+export function pendingSpikeDebrief(c:Campaign|undefined):SpikePulse|null {
+ return c?.spikeStage?.pulses?.find(p=>p.result==="failed"&&!p.reviewed)??null;
+}
+/** Whether a graded spike has passed, which version-2 completion requires. */
+export const spikeTestPassed=(d:SpikeStage):boolean=>!gradedSpikes(d)||!!d.pulses?.some(p=>p.result==="passed");
+/** Incidents during the graded chapter close on stable service alone: the spike tests grade the response. */
+export const spikeIncidentsSelfResolve=(c:Campaign):boolean=>gradedSpikes(c.spikeStage)&&c.spikeStage!.completedStep===null&&!c.reliabilityStage;
+/**
+ * Accumulates the completed observation into its spike, or into the calm capacity the score reports, and grades each
+ * spike once its window ends.
+ */
+function observePulses(c:Campaign,d:SpikeStage):void {
+ const m=c.snapshot,n=pulseAt(d,m.step);
+ if(n===null&&m.app.capacity>0){d.calm!.capacity+=m.app.capacity;d.calm!.idle+=Math.max(0,m.app.capacity-m.app.processed);}
+ if(n!==null){
+  let p=d.pulses!.find(x=>x.pulse===n);
+  if(!p){p={pulse:n,startStep:d.deadlines[2*n-2],endStep:d.deadlines[2*n-1],graded:n>1,incoming:0,served:0,rejected:0,failed:0,appOverloadSteps:0,dbOverloadSteps:0,result:null,reviewed:n===1};d.pulses!.push(p);}
+  p.incoming+=m.incoming;p.served+=m.successful;p.rejected+=m.rejected;p.failed+=m.failed;
+  if(m.instances?.some(x=>x.routed&&x.demand>x.capacity))p.appOverloadSteps++;
+  if(m.db.demand>m.db.capacity)p.dbOverloadSteps++;
+ }
+ for(const p of d.pulses!){
+  if(p.result!==null||c.step<p.endStep)continue;
+  p.result=!p.graded?"practice":p.served*10000>=p.incoming*G.passBasisPoints?"passed":"failed";
+  trace(c,"traffic-spike-graded",{pulse:p.pulse,result:p.result,incoming:p.incoming,served:p.served,rejected:p.rejected,failed:p.failed,
+   servedBasisPoints:p.incoming?Math.floor(p.served*10000/p.incoming):0,passBasisPoints:G.passBasisPoints,appOverloadSteps:p.appOverloadSteps,dbOverloadSteps:p.dbOverloadSteps});
+  if(p.result==="failed"){
+   const start=p.endStep+G.retryGapSteps;d.deadlines.push(start,start+G.pulseSteps);
+   trace(c,"traffic-spike-scheduled",{pulse:p.pulse+1,startStep:start,endStep:start+G.pulseSteps,peak:spikePeak(d)});
+  }
+ }
+}
 export function canEnterSpikes(s:GameState):boolean {
  const c=s.campaign;
  return !!c?.dataStage?.consumed && !c.spikeStage && s.phase==="management" && c.cashCents>0 &&
@@ -19,15 +61,15 @@ export function canEnterSpikes(s:GameState):boolean {
 }
 export function spikeInput(c:Campaign, at=c.step):number {
  const d=c.spikeStage;if(!d)return c.incomingRate;
- return (at>=d.deadlines[0]&&at<d.deadlines[1])||(at>=d.deadlines[2]&&at<d.deadlines[3])?T.peak:T.baseline;
+ return pulseAt(d,at)!==null?spikePeak(d):T.baseline;
 }
 export function advanceSpikeTraffic(c:Campaign):void {
  const d=c.spikeStage;if(!d)return;
- for(let i=0;i<4;i++) {
+ for(let i=0;i<d.deadlines.length;i++) {
   const id=`spike-${Math.floor(i/2)+1}-${i%2?"end":"start"}`;
   if(c.step>=d.deadlines[i]&&!d.consumed.includes(id)) {
    d.consumed.push(id);c.consumedEvents.push(id);const from=c.incomingRate;
-   c.incomingRate=i%2?T.baseline:T.peak;
+   c.incomingRate=i%2?T.baseline:spikePeak(d);
    trace(c,i%2?"traffic-spike-ended":"traffic-spike-started",{eventId:id,from,to:c.incomingRate,scheduledStep:d.deadlines[i],pulse:Math.floor(i/2)+1});
   }
  }
@@ -35,7 +77,7 @@ export function advanceSpikeTraffic(c:Campaign):void {
 export function spikeObservation(c:Campaign):SpikeObservation {
  const a=c.spikeStage?.controller, xs=c.snapshot.instances?.filter(x=>x.routed)??[];
  const capacity=xs.reduce((n,x)=>n+x.capacity,0),work=xs.reduce((n,x)=>n+x.processed,0);
- return {activePulse:spikeInput(c)===T.peak?(c.step<c.spikeStage!.deadlines[1]?1:2):null,
+ return {activePulse:c.spikeStage?pulseAt(c.spikeStage,c.step):null,
  routedBusyBasisPoints:capacity?Math.floor(work*10000/capacity):0, installed:c.apps.length,routed:c.routing.targets.length,
  enabled:a?.enabled??false,highSteps:a?.highSteps??0,lowSteps:a?.lowSteps??0,cooldownUntil:a?.cooldownUntil??0,blockedReason:a?.blockedReason??null};
 }
@@ -74,6 +116,8 @@ export function activateRetirement(c:Campaign,action:ScheduledAction):boolean {
 }
 export function runAutoscaler(s:GameState):void {
  const c=s.campaign!,d=c.spikeStage,a=d?.controller;if(!d)return;
+ // A bankrupt company stops here: a test that ends with it is neither graded nor retried.
+ if(gradedSpikes(d)&&d.completedStep===null&&s.phase!=="ended")observePulses(c,d);
  if(s.phase!=="review"&&s.phase!=="ended"&&a){
   if(c.reliabilityStage?.fault&&!c.reliabilityStage.acknowledged)blocked(c,"Reliability test in progress");
   else if(!a.enabled)blocked(c,"Controller disabled");
@@ -116,25 +160,35 @@ export function runAutoscaler(s:GameState):void {
    }
   }
  }
- if(s.phase==="management"&&!pendingSpikeAcknowledgement(c)&&d.completedStep===null&&c.step>=d.deadlines[3]) {
+ if(s.phase==="management"&&!pendingSpikeAcknowledgement(c)&&d.completedStep===null&&c.step>=d.deadlines.at(-1)!&&spikeTestPassed(d)) {
   const ready=c.incomingRate===T.baseline&&!c.incident&&!c.dbBacklog&&c.apps.every(x=>!x.backlog)&&qualifiesForRecovery(c.snapshot)&&c.reports.every(r=>c.trace.some(t=>t.type==="review-acknowledged"&&t.data.incidentId===r.id));
   d.baselineStableSteps=ready?d.baselineStableSteps+1:0;
-  if(d.baselineStableSteps>=5){d.completedStep=c.step;trace(c,"traffic-spike-stage-completed",{recognitionId:"spike-response",physicalDuration:c.step-d.enteredStep,cashCents:c.cashCents,investedCents:c.investedCents,settledCostCents:c.costsCents,controllerExposure:c.ledger.controllerNumerator??0,controllerRemainder:c.remainders.controller??0,limitActive:c.limit!==null,rejected:c.cumulative.rejected,installed:c.apps.length,routed:c.routing.targets.length,manualRequests:c.actions.filter(x=>x.requestedStep>=d.enteredStep&&x.source!=="autoscaler").length,automaticRequests:c.actions.filter(x=>x.requestedStep>=d.enteredStep&&x.source==="autoscaler").length});}
+  if(d.baselineStableSteps>=5){d.completedStep=c.step;trace(c,"traffic-spike-stage-completed",{recognitionId:"spike-response",physicalDuration:c.step-d.enteredStep,cashCents:c.cashCents,investedCents:c.investedCents,settledCostCents:c.costsCents,controllerExposure:c.ledger.controllerNumerator??0,controllerRemainder:c.remainders.controller??0,limitActive:c.limit!==null,rejected:c.cumulative.rejected,installed:c.apps.length,routed:c.routing.targets.length,manualRequests:c.actions.filter(x=>x.requestedStep>=d.enteredStep&&x.source!=="autoscaler").length,automaticRequests:c.actions.filter(x=>x.requestedStep>=d.enteredStep&&x.source==="autoscaler").length,
+   ...(gradedSpikes(d)?{stageVersion:d.version,spikes:d.pulses!.length,attempts:d.pulses!.filter(p=>p.graded).length}:{})});}
  }
  c.snapshot.spikes=spikeObservation(c);
 }
 type Rejection=Extract<ActionResult,{ok:false}>;
 /** Applies a spike decision to `s` in place. `undefined` means the action belongs elsewhere; checks precede mutation. */
 export function spikeAction(s:GameState,action:Action):Rejection|null|undefined {
- if(!["enter_spikes","unlock_autoscaling","deploy_autoscaler","set_autoscaling","acknowledge_spikes"].includes(action.type))return undefined;
+ if(!["enter_spikes","acknowledge_spike_attempt","unlock_autoscaling","deploy_autoscaler","set_autoscaling","acknowledge_spikes"].includes(action.type))return undefined;
  const fail=(message:string):Rejection=>({ok:false,reason:"invalid",message});
- if(s.phase==="review"||s.phase==="ended")return fail("Finish review before changing progression.");
  const c=s.campaign!,d=c.spikeStage;
+ // A debrief only records that it was read, so it may come before a postmortem from the same second.
+ if(action.type==="acknowledge_spike_attempt"){
+  const p=pendingSpikeDebrief(c);
+  if(!p||s.phase==="ended")return fail("No spike test result awaits review.");
+  p.reviewed=true;trace(c,"spike-attempt-acknowledged",{pulse:p.pulse,nextStartStep:d!.deadlines.at(-2)!});
+  return null;
+ }
+ if(s.phase==="review"||s.phase==="ended")return fail("Finish review before changing progression.");
  if(action.type==="enter_spikes"){
   if(!canEnterSpikes(s))return fail("Requires consumed data growth, stable service, drained work and acknowledged reports.");
-  c.spikeStage={id:T.id,version:T.version,configuration:JSON.stringify(T),enteredStep:c.step,deadlines:T.offsets.map(x=>c.step+x),consumed:[],researchEarned:1,researchSpent:c.launchWeek?.tech==="autoscaling"?1:0,controller:null,baselineStableSteps:0,completedStep:null,acknowledged:false};
-  trace(c,"spike-stage-entered",{stageId:T.id,stageVersion:T.version,configuration:JSON.stringify(T),cashCents:c.cashCents,investedCents:c.investedCents,settledCostCents:c.costsCents,rejected:c.cumulative.rejected});
-  trace(c,"progression-awarded",{recognitionId:"data-readiness",research:1});trace(c,"traffic-spikes-announced",{deadlines:JSON.stringify(c.spikeStage.deadlines),baseline:T.baseline,peak:T.peak});
+  const graded=action.version===G.version,configuration=JSON.stringify(graded?{...T,...G,version:G.version}:T);
+  c.spikeStage={id:T.id,version:graded?G.version:T.version,configuration,enteredStep:c.step,deadlines:T.offsets.map(x=>c.step+x),consumed:[],researchEarned:1,researchSpent:c.launchWeek?.tech==="autoscaling"?1:0,controller:null,baselineStableSteps:0,completedStep:null,acknowledged:false,
+   ...(graded?{peak:G.peaks[c.dataStage!.profile],pulses:[],calm:{capacity:0,idle:0}}:{})};
+  trace(c,"spike-stage-entered",{stageId:T.id,stageVersion:c.spikeStage.version,configuration,cashCents:c.cashCents,investedCents:c.investedCents,settledCostCents:c.costsCents,rejected:c.cumulative.rejected});
+  trace(c,"progression-awarded",{recognitionId:"data-readiness",research:1});trace(c,"traffic-spikes-announced",{deadlines:JSON.stringify(c.spikeStage.deadlines),baseline:T.baseline,peak:spikePeak(c.spikeStage)});
  } else if(!d)return fail("Enter Traffic Spikes & Autoscaling first.");
  else if(action.type==="acknowledge_spikes"){
   if(!pendingSpikeAcknowledgement(c))return fail("No spike recognition awaits acknowledgement.");d.acknowledged=true;trace(c,"spike-stage-acknowledged");

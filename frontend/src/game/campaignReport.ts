@@ -51,9 +51,13 @@ export function outcomeSummary(c: Campaign, kind: OutcomeKind): ReportLesson {
     data: ["The company met the database workload chapter requirements.", "Compare read and write pressure before changing the database or cache.", "A cache helps repeated reads; writes still need database capacity."],
     spikes: ["Both traffic spikes ended and baseline service passed its stability checks.", "Compare served and rejected traffic before preparing for another peak.", "A limit protects admitted traffic by turning other users away."],
   };
-  const [happened, improve] = facts[kind];
-  let takeaway = facts[kind][2];
+  let [happened, improve, takeaway] = facts[kind];
   if (kind === "spikes" && !samples.some(m => m.rejected > 0)) takeaway = "Prepare capacity for peaks, then compare service during and after each spike.";
+  if (kind === "spikes" && c.spikeStage?.version === 2) {
+    happened = "A graded spike was served well enough to pass, and baseline service then passed its stability checks.";
+    improve = "Compare idle capacity between spikes with what the spike needed: capacity that only waits still costs money.";
+    takeaway = "Capacity must already be serving when a spike arrives; autoscaling helps only after it has seen the load and installed servers.";
+  }
   let response = responses(events, from, end, entry?.id);
   if (kind === "prevention" && response.startsWith("No new")) response = "Existing capacity handled the increase; no new corrective activation was recorded.";
   return { happened, response: response + tradeoff(samples), improve, takeaway };

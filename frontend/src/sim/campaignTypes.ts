@@ -53,10 +53,25 @@ export interface Autoscaler {
  activatedStep: number; enabled: boolean; highSteps: number; lowSteps: number; cooldownUntil: number;
  managedAppIds: string[]; joiningAppId: string | null; expectedRouting: string; blockedReason: string | null;
 }
+/** One traffic spike's served share; version-2 stages grade every spike after the first. */
+export interface SpikePulse {
+ pulse: number; startStep: number; endStep: number; graded: boolean;
+ incoming: number; served: number; rejected: number; failed: number;
+ /** Observations in which a routed server, or the database, received more than its capacity. */
+ appOverloadSteps: number; dbOverloadSteps: number;
+ result: null | "practice" | "passed" | "failed";
+ /** A failed test waits for its debrief before time moves again. */
+ reviewed: boolean;
+}
 export interface SpikeStage {
- id: "traffic-spikes"; version: 1; configuration: string; enteredStep: number;
+ id: "traffic-spikes"; version: 1 | 2; configuration: string; enteredStep: number;
+ /** Start and end step of each spike in pairs; a failed version-2 test appends the next pair. */
  deadlines: number[]; consumed: string[]; researchEarned: 1; researchSpent: 0 | 1;
  controller: Autoscaler | null; baselineStableSteps: number; completedStep: number | null; acknowledged: boolean;
+ /** Version 2 only: the spike demand chosen for the company's workload, and each spike's result. */
+ peak?: number; pulses?: SpikePulse[];
+ /** Version 2 only: routed capacity, and the part of it left unused, summed over observations outside every spike. */
+ calm?: { capacity: number; idle: number };
 }
 export interface ReadCache { activatedStep: number; warmth: number; target: number; tuned: boolean }
 export interface Routing { mode: "single" | "balanced"; targets: string[] }
@@ -122,8 +137,9 @@ export interface CampaignIncident {
     id: string;
     openedStep: number;
     /** An uncancelled scheduled action engaged at or after this step is the incident's recorded
-     * response; stability alone cannot close the incident until one exists. Undefined only for
-     * incidents replayed from saves recorded before the requirement, which still self-resolve. */
+     * response; stability alone cannot close the incident until one exists. Undefined for incidents
+     * replayed from saves recorded before the requirement and for incidents opened during graded
+     * Traffic Spikes, which both self-resolve. */
     responseDueFrom?: number;
     stableSteps: number;
     snapshots: Snapshot[];

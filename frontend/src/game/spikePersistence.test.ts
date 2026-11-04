@@ -40,6 +40,14 @@ it("replays pending provisioning, disabled policy and protected upgrades exactly
  g=act(g,{type:"set_autoscaling",enabled:false});expect(saveGame(g)).toBe(true);
  const loaded=loadGame();if(loaded.status!=="ok")throw Error("load");expect(loaded.game).toEqual(g);
 });
+it("enters a company through the store into the graded chapter and records the version for replay",()=>{
+ expect(saveGame(dataCompany())).toBe(true);
+ useGame.getState().boot();useGame.getState().play();
+ expect(useGame.getState().act({type:"enter_spikes"})).toBe(true);
+ const c=useGame.getState().game.campaign!;
+ expect(c.spikeStage).toMatchObject({version:2,peak:4000,pulses:[]});
+ expect(c.inputs.at(-1)!.action).toEqual({type:"enter_spikes",version:2});
+});
 it("pending completion blocks the shared clock after reload until explicit acknowledgement",()=>{
  let g=act(spikeCompany(false),{type:"set_traffic_limit",enabled:true});g=untilOffset(g,72);expect(saveGame(g)).toBe(true);
  useGame.getState().boot();useGame.getState().play();
