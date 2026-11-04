@@ -6,8 +6,9 @@ test("Chapter 5 clarity: short outcome, retained details and explicit acknowledg
   await installClock(); await reliabilityClarity(page, info);
 });
 
-test("game text is not selectable: dragging across a report highlights nothing", async ({ page, installClock }, info) => {
-  await installClock();
+test("game text is not selectable: dragging across a report highlights nothing", async ({ page, installClock, withoutRoom }, info) => {
+  // Selection is the page's own behaviour; the software-drawn room only slows every pointer move and screenshot.
+  await withoutRoom(); await installClock();
   await page.route("**/api/**", route => route.abort()); await seedSave(page, reliabilityOutcome(true)); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
   const outcome = page.getByRole("dialog", { name: "Reliability outcome", exact: true });
@@ -16,7 +17,7 @@ test("game text is not selectable: dragging across a report highlights nothing",
   const drag = async () => {
     await page.evaluate(() => getSelection()?.removeAllRanges());
     await page.mouse.move(chat.x + chat.width * 0.3, chat.y + 30); await page.mouse.down();
-    await page.mouse.move(chat.x + chat.width * 0.7, chat.y + Math.min(260, chat.height - 10), { steps: 5 }); await page.mouse.up();
+    await page.mouse.move(chat.x + chat.width * 0.7, chat.y + Math.min(260, chat.height - 10), { steps: 2 }); await page.mouse.up();
     return page.evaluate(() => getSelection()?.toString().trim() ?? "");
   };
   // The same drag selects the chat once text selection is allowed again, as it was before game text was made
