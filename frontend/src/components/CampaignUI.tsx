@@ -16,6 +16,7 @@ import CampaignScorecard from "./CampaignScorecard";
 import LaunchIntro from "./LaunchIntro";
 import LaunchScore from "./LaunchScore";
 import { CampaignFinale } from "./CampaignFinale";
+import { CampaignCompleteFoot } from "./CampaignCompleteFoot";
 import { campaignFinale } from "@/game/campaignFinale";
 import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
 import { TRAFFIC_SPIKES as T } from "@/sim/scenarios/trafficSpikes";
@@ -593,7 +594,7 @@ function CampaignDialog({ menu, chapterComplete: completeSlot }: Pick<CampaignOv
   // It pauses the clock when it appears, so it shows over History and guidance rather than waiting behind them.
   if(chapterComplete&&chapterComplete===finishedChapter(game)&&view!=="menu"&&end)return completeSlot ? completeSlot(chapterComplete) : <ChapterComplete chapter={chapterComplete} end={end} onClose={stay} />;
   const finale = campaignFinale(game);
-  if(finale&&!["guidance","menu","history","tech"].includes(view??""))return <CampaignFinale key={finale.key} finale={finale}><Modal title="Campaign complete" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard!}/><div className="modal-foot"><button className="btn" onClick={()=>openView("guidance")}><Icon name="eyes" size={16} />Inspect final company</button><button className="btn" onClick={()=>openView("menu")}><Icon name="refresh" size={16} />Export or start a new company</button></div></Modal></CampaignFinale>;
+  if(finale&&!["guidance","menu","history","tech"].includes(view??""))return <CampaignFinale key={finale.key} finale={finale}><Modal title="Campaign complete" className="campaign-recovery-report" onClose={()=>openView("guidance")}><CampaignScorecard card={c.scorecard!}/><CampaignCompleteFoot /></Modal></CampaignFinale>;
   if (game.phase === "ended" && game.outcome !== "won" && view === null) return <Modal title="Company bankrupt" className="campaign-recovery-report" tone="alert" icon={{ kind: "critical", name: "cash" }} onClose={() => openView("menu")}>
     <CampaignReport at={c.step} lesson={c.scorecard?scorecardSummary(c.scorecard):{happened:"The company ran out of cash.",response:"No specific recovery is established by the retained record.",improve:"Compare operating costs with earned revenue before expanding.",takeaway:"Capacity must be affordable to operate."}}><Callout tone="critical" icon="cash" kicker="Company closed">Cash reached {dollars(c.cashCents)} after settlement at game second {c.step}. Final metrics and history remain available.</Callout>
     <p>Last period revenue: {dollars(c.settlements.at(-1)?.revenueCents??0)}. Infrastructure: {dollars(infrastructureCents(c.settlements.at(-1)))}. Salaries: {dollars(c.settlements.at(-1)?.salaryCents??0)}.</p>

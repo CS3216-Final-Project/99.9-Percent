@@ -125,8 +125,22 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The game reads as an app rather than a page: clicking, dragging and long-pressing through panels, dialogues and
+   the room never highlight their text. What a player types, and a seed they may want to copy, stay selectable. */
 body {
   overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable]:not([contenteditable="false"]),
+code {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 h1,
@@ -3747,6 +3761,20 @@ button:disabled {
 
 .chapter-end-extra {
   margin-right: auto;
+}
+
+/* The finished campaign's two ways to look back share a row, and Continue to Challenge Mode takes the full row under
+   them; where they cannot share one (a phone), every action takes its own full row. */
+.modal:has(.campaign-complete-foot) {
+  width: min(560px, 100%);
+}
+
+.campaign-complete-foot > .btn {
+  flex: 1 1 auto;
+}
+
+.campaign-complete-foot > :is(.btn-primary, .btn-danger) {
+  flex-basis: 100%;
 }
 
 .modal-body h4 {

@@ -11,6 +11,9 @@ export async function reliabilityClarity(page: Page, info: TestInfo, touch = fal
   await expect(outcome).toContainText("requested a free server restore");
   await expect(outcome.getByText("Application failure", { exact: true })).toBeHidden();
   await page.screenshot({ path: info.outputPath("reliability-summary.png") });
+  // The disclosure slides open on a CSS transition and its contents stay content-visibility hidden until a frame runs
+  // it; on CI the software-drawn room behind the dialog can hold off frames for seconds. Reduced motion opens it at once.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const details = outcome.getByText("View Technical Details", { exact: true });
   if (touch) await details.tap(); else await details.click();
   await expect(outcome.getByText("Application failure", { exact: true })).toBeVisible();

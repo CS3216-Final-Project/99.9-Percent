@@ -18,6 +18,8 @@ async function finaleJourney(page: Page, info: TestInfo, touch: boolean) {
   expect((await savedGame(page)).outcome).toBe("won");
   const next = scene.getByRole("button", { name: "Next", exact: true }), copy = scene.locator(".dialogue-copy");
   await expect(next).toBeFocused();
+  // Clicking or tapping through the scene reads on rather than highlighting its text.
+  expect(await copy.evaluate(el => getComputedStyle(el).userSelect)).toBe("none");
   for (const [i, [name, id]] of CAST.entries()) {
     await expect(scene.locator(".dialogue-progress")).toHaveAttribute("aria-label", `Line ${i + 1} of ${CAST.length}`);
     await expect(scene.locator(".dialogue-plate")).toContainText(name);
@@ -42,6 +44,14 @@ async function finaleJourney(page: Page, info: TestInfo, touch: boolean) {
   await page.reload(); await press(page.getByRole("button", { name: "See how it ended", exact: true }));
   await expect(scorecard).toBeVisible(); await expect(scene).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+  // Finishing Guided Mode carries on into Challenge Mode, keeping the finished company saved.
+  const challenge = scorecard.getByRole("button", { name: "Continue to Challenge Mode", exact: true });
+  await challenge.scrollIntoViewIfNeeded(); await expect(challenge).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: info.outputPath(`campaign-complete-scorecard${touch ? "-touch" : ""}.png`) });
+  await press(challenge);
+  await expect(scorecard).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("nn.mode.v1"))).toBe("classic");
+  expect((await savedGame(page)).outcome).toBe("won");
 }
 
 test("campaign finale: every colleague celebrates, then the scorecard, and it never replays", async ({ page }, info) => {

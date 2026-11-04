@@ -81,18 +81,16 @@ it("advances one line at a time from the dialogue box and keeps the mission unti
   expect(message()!.querySelectorAll(".dialogue-progress > [data-read]")).toHaveLength(model.lines.length);
 });
 
-it("lets the player select text without reading on, and reads on with Enter while the dialogue itself has focus", () => {
+it("reads on by clicking the dialogue's text, and with Enter while the dialogue itself has focus", () => {
   const model = chapterCompanyMessage(companies[3])!;
   render(<ChapterCompanyMessage model={model} enabled/>);
-  const copy = message()!.querySelector(".dialogue-copy")!, line = copy.querySelector(".dialogue-line")!;
-  expect(fireEvent.mouseDown(copy)).toBe(true);
-  window.getSelection()!.selectAllChildren(line); fireEvent.click(line);
-  expect(copy.textContent).toContain(model.lines[0]);
-  window.getSelection()!.removeAllRanges();
+  const copy = message()!.querySelector(".dialogue-copy")!;
   message()!.focus(); fireEvent.keyDown(message()!, { key: "Enter" });
   expect(copy.textContent).toContain(model.lines[1]);
   fireEvent.keyDown(message()!, { key: "Tab", shiftKey: true });
   expect(document.activeElement).toBe(next());
+  fireEvent.click(copy.querySelector(".dialogue-line")!);
+  expect(copy.textContent).toContain(model.lines[2]);
 });
 
 it("preloads every portrait of the scene and hides a portrait that fails to load", () => {
