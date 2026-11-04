@@ -11,23 +11,6 @@ export async function reliabilityClarity(page: Page, info: TestInfo, touch = fal
   await expect(outcome).toContainText("requested a free server restore");
   await expect(outcome.getByText("Application failure", { exact: true })).toBeHidden();
   await page.screenshot({ path: info.outputPath("reliability-summary.png") });
-  if (!touch) {
-    // Dragging across the chat highlights nothing. The same drag does select it once text selection is allowed again,
-    // as it was before game text was made unselectable, so the gesture really spans text.
-    const chat = (await outcome.locator(".campaign-incident-report").boundingBox())!;
-    const drag = async () => {
-      await page.evaluate(() => getSelection()?.removeAllRanges());
-      await page.mouse.move(chat.x + chat.width * 0.3, chat.y + 30); await page.mouse.down();
-      await page.mouse.move(chat.x + chat.width * 0.7, chat.y + Math.min(260, chat.height - 10), { steps: 10 }); await page.mouse.up();
-      return page.evaluate(() => getSelection()?.toString().trim() ?? "");
-    };
-    const selectable = await page.addStyleTag({ content: "body { user-select: text !important; }" });
-    expect(await drag()).not.toBe("");
-    await page.screenshot({ path: info.outputPath("selection-allowed.png") });
-    await selectable.evaluate(node => (node as Element).remove());
-    expect(await drag()).toBe("");
-    await page.screenshot({ path: info.outputPath("selection-blocked.png") });
-  }
   // The disclosure slides open on a CSS transition and its contents stay content-visibility hidden until a frame runs
   // it; on CI the software-drawn room behind the dialog can hold off frames for seconds. Reduced motion opens it at once.
   await page.emulateMedia({ reducedMotion: "reduce" });

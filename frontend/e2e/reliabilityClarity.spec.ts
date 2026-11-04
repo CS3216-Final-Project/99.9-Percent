@@ -6,6 +6,30 @@ test("Chapter 5 clarity: short outcome, retained details and explicit acknowledg
   await installClock(); await reliabilityClarity(page, info);
 });
 
+test("game text is not selectable: dragging across a report highlights nothing", async ({ page, installClock }, info) => {
+  await installClock();
+  await page.route("**/api/**", route => route.abort()); await seedSave(page, reliabilityOutcome(true)); await page.goto("/");
+  await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
+  const outcome = page.getByRole("dialog", { name: "Reliability outcome", exact: true });
+  await expect(outcome.getByRole("heading", { level: 3 })).toHaveCount(5);
+  const chat = (await outcome.locator(".campaign-incident-report").boundingBox())!;
+  const drag = async () => {
+    await page.evaluate(() => getSelection()?.removeAllRanges());
+    await page.mouse.move(chat.x + chat.width * 0.3, chat.y + 30); await page.mouse.down();
+    await page.mouse.move(chat.x + chat.width * 0.7, chat.y + Math.min(260, chat.height - 10), { steps: 5 }); await page.mouse.up();
+    return page.evaluate(() => getSelection()?.toString().trim() ?? "");
+  };
+  // The same drag selects the chat once text selection is allowed again, as it was before game text was made
+  // unselectable, so the gesture really spans text.
+  const selectable = await page.addStyleTag({ content: "body { user-select: text !important; }" });
+  expect(await drag()).not.toBe("");
+  await page.screenshot({ path: info.outputPath("selection-allowed.png") });
+  await selectable.evaluate(node => (node as Element).remove());
+  expect(await drag()).toBe("");
+  await page.screenshot({ path: info.outputPath("selection-blocked.png") });
+  await expect(outcome).toBeVisible();
+});
+
 test("Chapter 5 clarity: incident report keeps its evidence and Continue company acknowledgement", async ({ page, installClock }) => {
   await installClock();
   const completed = reliabilityOutcome(), c = completed.campaign!, report = c.reports.at(-1)!;
