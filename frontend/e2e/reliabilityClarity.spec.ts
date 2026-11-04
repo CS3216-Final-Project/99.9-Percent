@@ -9,6 +9,8 @@ test("Chapter 5 clarity: short outcome, retained details and explicit acknowledg
 test("game text is not selectable: dragging across a report highlights nothing", async ({ page, installClock, withoutRoom }, info) => {
   // Selection is the page's own behaviour; the software-drawn room only slows every pointer move and screenshot.
   await withoutRoom(); await installClock();
+  // Every chat bubble is in place at once, rather than popping up one by one under the drag.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("**/api/**", route => route.abort()); await seedSave(page, reliabilityOutcome(true)); await page.goto("/");
   await page.getByRole("button", { name: "Continue company", exact: true }).click(); await expectRoom(page);
   const outcome = page.getByRole("dialog", { name: "Reliability outcome", exact: true });
