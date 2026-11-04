@@ -255,5 +255,23 @@ for (const [width, height] of [[390, 844], [320, 568]]) {
     expect(after.turn).toBe(2);
     expect(after.infra.appHosts).toHaveLength(2);
     expect(after.totals.promosRun).toBe(1);
+
+    // Then the company says what it builds: the cards stack, and Start building stays in reach.
+    const picker = page.getByRole("dialog", { name: "What are you building?" });
+    await picker.getByRole("radio", { name: "Music streaming" }).check();
+    const build = picker.getByRole("button", { name: "Start building", exact: true });
+    await expect(build).toBeInViewport();
+    await page.screenshot({ path: `${SHOTS}/phone-challenge-${width}x${height}-05-app-profile.png` });
+    await build.tap();
+    // The strip keeps no button for it, so Cash and Health stay whole; the choice is among the company's numbers.
+    await expect(page.getByRole("button", { name: /^Your app/ })).toHaveCount(0);
+    for (const value of await page.locator(".phone-top .phone-headline strong").all()) {
+      expect(await value.evaluate(el => el.scrollWidth <= el.clientWidth + 1), "Cash and Health are not cut").toBe(true);
+    }
+    await page.getByRole("button", { name: "Users and revenue", exact: true }).tap();
+    const numbers = page.getByRole("region", { name: "Company numbers" });
+    await numbers.getByText("Music streaming", { exact: true }).tap();
+    await expect(numbers).toContainText("Listeners stream all day");
+    await page.screenshot({ path: `${SHOTS}/phone-challenge-${width}x${height}-06-your-app.png` });
   });
 }

@@ -6,7 +6,7 @@ import { pauseTransition } from "../src/sim/__tests__/pauseFixture";
 import { bootPause, pauseArrival } from "./incidentPause";
 
 // Opening's native first incident already stops; its separate negative case preserves that rule.
-for (const chapter of [2, 3, 4, 5, 6]) test(`incident Pause: immediate running Chapter ${chapter} transition`, async ({ page, installClock , withoutRoom}, info) => {
+for (const chapter of [2, 3, 4, 5]) test(`incident Pause: immediate running Chapter ${chapter} transition`, async ({ page, installClock , withoutRoom}, info) => {
   await withoutRoom();
   await installClock(); await pauseArrival(page, info, chapter);
 });
@@ -79,7 +79,7 @@ test("incident Pause: deliberate continued-running activity dismisses once, not 
 });
 
 // A real captured mouse is the normal first-person play path, not a blocking dialog.
-for (const chapter of [2, 3, 4, 5, 6]) test(`incident Pause: first-person Chapter ${chapter} arrival keeps Pause through releasing the mouse`, async ({ page, installClock }) => {
+for (const chapter of [2, 3, 4, 5]) test(`incident Pause: first-person Chapter ${chapter} arrival keeps Pause through releasing the mouse`, async ({ page, installClock }) => {
   // First person loads the room twice over and Chapter 3 also waits out the hint delay: about a minute on CI.
   test.setTimeout(120_000);
   await installClock(); const pair = pauseTransition(chapter); await bootPause(page, pair.before);

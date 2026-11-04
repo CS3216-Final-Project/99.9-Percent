@@ -1,6 +1,6 @@
 import type { Action, GameState } from "@/sim";
 import { pendingSpikeAcknowledgement } from "@/sim/autoscaling";
-import { canEnterCombined, combinedEntryGates } from "@/sim/combinedCampaign";
+import { canCompleteCampaign, completionGates } from "@/sim/campaignCompletion";
 import { canEnterReliability, pendingReliability, reliabilityEntryGates } from "@/sim/reliability";
 import { applyCampaignInput } from "@/sim/step";
 import { campaignChapters, finishedChapter, isChapterEntry } from "./campaignChapters";
@@ -8,16 +8,19 @@ import { campaignGuidance, launchResearchPending, milestoneBlocks } from "./camp
 import { entryBlockers } from "./entryGates";
 import { FULL_SCOPE, scopeAllows, type PlayScope } from "./scope";
 
-/** A Guided Mode chapter that is followed by another one. */
+/** A Guided Mode chapter that ends with a choice: one followed by another chapter, or Stay Online, the last. */
 export type EndedChapter = "opening" | "scaling" | "data" | "spikes" | "reliability";
 
 /**
  * The end of a chapter, while the company waits for the player to choose: stay and keep operating, or continue into
- * the next chapter. Recognitions (Opening, Traffic Spikes, Stay Online) are acknowledged by either choice.
+ * the next chapter. After Stay Online, the last chapter, Continue completes the campaign instead. Recognitions
+ * (Opening, Traffic Spikes, Stay Online) are acknowledged by either choice.
  */
 export interface ChapterEnd {
   chapter: EndedChapter;
   next: { name: string; description: string };
+  /** Continue completes the campaign rather than entering another chapter. */
+  final: boolean;
   /** Applied in order for Stay in this chapter; empty when there is nothing to acknowledge. */
   stay: Action[];
   /** Applied in order for Continue; null when this edition's Guided Mode ends here. */
@@ -30,20 +33,23 @@ export interface ChapterEnd {
 /** The control that moves the company into the next chapter, while one is on offer. */
 export interface ChapterAdvance { label: string; action: Action; ready: boolean; blockers: string[] }
 
-const NEXT_CHAPTER: Record<EndedChapter, string> = { opening: "scaling", scaling: "data", data: "spikes", spikes: "reliability", reliability: "combined" };
+const NEXT_CHAPTER: Record<Exclude<EndedChapter, "reliability">, string> = { opening: "scaling", scaling: "data", data: "spikes", spikes: "reliability" };
+/** What Continue offers after Stay Online, the last chapter. */
+const COMPLETION = { name: "Complete campaign", description: "End the run and review the company's final scorecard." };
 
 /** Whether the company has just finished a chapter and waits for the player to stay or continue. */
 export function chapterEnd(game: GameState, scope: PlayScope = FULL_SCOPE): ChapterEnd | null {
   const c = game.campaign;
   if (!c || game.phase === "ended") return null;
-  const end = (chapter: EndedChapter, stay: Action[], proceed: Action[], blockers: string[] = []): ChapterEnd => {
+  const end = (chapter: Exclude<EndedChapter, "reliability">, stay: Action[], proceed: Action[], blockers: string[] = []): ChapterEnd => {
     const next = campaignChapters(game).find(x => x.id === NEXT_CHAPTER[chapter])!;
-    return { chapter, next: { name: next.name, description: next.description }, stay, proceed: scopeAllows(scope, proceed.at(-1)!) ? proceed : null, label: `Continue to ${next.shortName}`, blockers };
+    return { chapter, next: { name: next.name, description: next.description }, final: false, stay, proceed: scopeAllows(scope, proceed.at(-1)!) ? proceed : null, label: `Continue to ${next.shortName}`, blockers };
   };
   if (pendingReliability(c)) {
     const ack: Action = { type: "acknowledge_reliability" };
     const after = applyCampaignInput(game, ack).state;
-    return end("reliability", [ack], [ack, { type: "enter_combined" }], entryBlockers(canEnterCombined(after), combinedEntryGates(after), "Stay Online"));
+    return { chapter: "reliability", next: COMPLETION, final: true, stay: [ack], proceed: [ack, { type: "complete_campaign" }], label: COMPLETION.name,
+      blockers: entryBlockers(canCompleteCampaign(after), completionGates(after), "Stay Online") };
   }
   if (pendingSpikeAcknowledgement(c)) {
     const ack: Action = { type: "acknowledge_spikes" };
@@ -59,8 +65,8 @@ export function chapterEnd(game: GameState, scope: PlayScope = FULL_SCOPE): Chap
 }
 
 /**
- * The next chapter on offer in the chapter bar. Stay Online and Grow the Company stay on offer after their
- * predecessor's recognition, disabled with the reasons, until the company is ready for them.
+ * The next chapter on offer in the chapter bar, or Complete campaign after Stay Online. Stay Online and Complete
+ * campaign stay on offer after their predecessor's recognition, disabled with the reasons, until the company is ready.
  */
 export function chapterAdvance(game: GameState): ChapterAdvance | null {
   const c = game.campaign!;
@@ -68,7 +74,7 @@ export function chapterAdvance(game: GameState): ChapterAdvance | null {
   if (next?.action && isChapterEntry(next.action)) return { label: next.label, action: next.action, ready: true, blockers: [] };
   if (game.phase === "ended") return null;
   if (!c.reliabilityStage && c.spikeStage?.acknowledged) return offer("Continue to Stay Online", { type: "enter_reliability" }, canEnterReliability(game), reliabilityEntryGates(game), "Traffic Spikes");
-  if (!c.combinedStage && c.reliabilityStage?.acknowledged) return offer("Continue to Grow the Company", { type: "enter_combined" }, canEnterCombined(game), combinedEntryGates(game), "Stay Online");
+  if (c.reliabilityStage?.acknowledged) return offer(COMPLETION.name, { type: "complete_campaign" }, canCompleteCampaign(game), completionGates(game), "Stay Online");
   return null;
 }
 

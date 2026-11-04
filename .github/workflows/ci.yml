@@ -81,8 +81,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: node --test scripts/browser-shards.test.mjs
-      # Exhaustive bounds run in the required balance job, without coverage instrumentation.
-      - run: npm run test:coverage -- --exclude='src/sim/__tests__/balanceBounds*.test.ts'
+      - run: npm run test:coverage
       - uses: actions/upload-artifact@v4
         if: always()
         with:

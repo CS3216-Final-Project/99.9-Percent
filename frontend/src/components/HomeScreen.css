@@ -200,18 +200,32 @@
   gap: 10px;
 }
 
-.mode-actions:has(> :nth-child(2)) {
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-}
-
 .mode-actions .btn {
   width: 100%;
   min-height: 48px;
 }
 
-/* A restart asking for its second press stacks under the main button, so its longer label stays on one line. */
-.mode-actions:has(> .is-confirming) {
-  grid-template-columns: minmax(0, 1fr);
+/*
+ * Play beside a restart, each label on one line: play takes nearly all the spare width, until the two no longer
+ * fit side by side and the restart wraps below at full width. A restart asking for its second press always does.
+ */
+.mode-actions:has(> :nth-child(2)) {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.mode-actions:has(> :nth-child(2)) > .btn {
+  flex: 100 1 auto;
+  width: auto;
+  white-space: nowrap;
+}
+
+.mode-actions:has(> :nth-child(2)) > .btn + .btn {
+  flex: 1 0 auto;
+}
+
+.mode-actions > .btn.is-confirming {
+  flex: 1 0 100%;
 }
 
 .mode-option .mode-tutorial {

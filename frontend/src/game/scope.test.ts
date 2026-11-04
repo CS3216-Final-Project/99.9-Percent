@@ -10,10 +10,10 @@ afterEach(() => localStorage.clear());
 
 describe("scope rules", () => {
   it("plays every chapter in full and stops the phone after Scaling & Routing", () => {
-    expect(chapterInScope(FULL_SCOPE, "combined")).toBe(true);
+    expect(chapterInScope(FULL_SCOPE, "reliability")).toBe(true);
     expect(chapterInScope(PHONE_SCOPE, "opening")).toBe(true);
     expect(chapterInScope(PHONE_SCOPE, "scaling")).toBe(true);
-    for (const later of ["data", "spikes", "reliability", "combined"] as const) expect(chapterInScope(PHONE_SCOPE, later)).toBe(false);
+    for (const later of ["data", "spikes", "reliability"] as const) expect(chapterInScope(PHONE_SCOPE, later)).toBe(false);
   });
 
   it("refuses only the entries into chapters beyond the scope", () => {

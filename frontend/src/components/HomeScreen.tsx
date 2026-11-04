@@ -27,10 +27,10 @@ function ChallengeTeaser({ guided }: { guided: Summary }) {
     <div className="mode-teaser-text">
       <h2 id="classic-heading">{MODES.classic.name}</h2>
       <p>Grow to {num(BALANCE.targetUsers)} users in {BALANCE.maxTurns} weeks on your own.</p>
-      <p className="mode-teaser-unlock">Unlocks after Chapter {UNLOCK_CHAPTER}: Stay Online.{reached > 0 && ` You are on Chapter ${reached} of 6.`}</p>
+      <p className="mode-teaser-unlock">Unlocks after Chapter {UNLOCK_CHAPTER}: Stay Online.{reached > 0 && ` You are on Chapter ${reached} of 5.`}</p>
     </div>
     <ol className="mode-teaser-pips" aria-hidden="true">
-      {[1, 2, 3, 4, 5, 6].map((n) => <li key={n} className={done(n) ? "is-done" : n === reached ? "is-here" : n === UNLOCK_CHAPTER ? "is-goal" : undefined} />)}
+      {[1, 2, 3, 4, 5].map((n) => <li key={n} className={done(n) ? "is-done" : n === reached ? "is-here" : n === UNLOCK_CHAPTER ? "is-goal" : undefined} />)}
     </ol>
   </section>;
 }

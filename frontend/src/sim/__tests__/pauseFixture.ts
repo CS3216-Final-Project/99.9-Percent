@@ -2,7 +2,6 @@ import { newGame, type GameState } from "../index";
 import { act, tick, spikeCompany } from "./spikeFixtures";
 import { dataCompany } from "./dataFixture";
 import { reliabilityCompany } from "./reliabilityFixture";
-import { combinedCompany, finishRound } from "./combinedFixture";
 
 export function nextIncident(g: GameState) {
   for (let i = 0; i < 150; i++) {
@@ -29,11 +28,6 @@ export function pauseTransition(chapter: number, runId?: string) {
     g = act(act(act(g, { type: "acknowledge_review" }), { type: "acknowledge_milestone" }), { type: "accept_scaling_risk" });
   } else if (chapter === 3) g = dataCompany();
   else if (chapter === 4) g = spikeCompany(false);
-  else if (chapter === 5) g = act(reliabilityCompany(), { type: "arm_reliability" });
-  else {
-    g = combinedCompany();
-    for (let i = 0; i < 2; i++) g = act(finishRound(act(tick(g, 5), { type: "start_growth_wave" })), { type: "acknowledge_growth" });
-    g = act(tick(g, 5), { type: "start_growth_wave" });
-  }
+  else g = act(reliabilityCompany(), { type: "arm_reliability" });
   return nextIncident(g);
 }

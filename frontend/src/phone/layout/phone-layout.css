@@ -144,6 +144,10 @@
   border: 1px solid var(--control-edge);
   border-radius: 18px;
   box-shadow: var(--lift);
+  /* An opened row (Challenge Mode's app notes) scrolls inside the drop rather than off a short screen. */
+  max-height: calc(100dvh - var(--phone-safe-top) - var(--phone-strip) - var(--phone-dock) - 8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .phone-app[data-edition="phone"] .phone-stats[hidden] { display: none; }
 .phone-app[data-edition="phone"] .phone-stats .stat { min-height: 52px; padding: 6px 8px; gap: 8px; align-items: center; background: var(--paper-2); border-radius: 12px; }

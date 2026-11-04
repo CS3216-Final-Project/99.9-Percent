@@ -43,6 +43,7 @@ export function newLegacyGame(seedInput: number | string = BALANCE.introSeed): G
     turn: 1,
     phase: "management",
     outcome: null,
+    appProfile: null,
 
     cash: BALANCE.start.cash,
     users: BALANCE.start.users,
@@ -112,6 +113,7 @@ export function newLegacyGame(seedInput: number | string = BALANCE.introSeed): G
 export function newGame(seedInput: number | string = BALANCE.introSeed, runId = "headless-run", scenarioVersion: 1 | 2 = 1): GameState {
   const s = newLegacyGame(seedInput);
   s.campaign = initialCampaign(runId, scenarioVersion);
+  delete s.appProfile;
   s.log = []; s.upcomingSurge = null;
   return projectCampaign(s);
 }

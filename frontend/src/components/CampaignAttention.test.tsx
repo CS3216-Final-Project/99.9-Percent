@@ -12,7 +12,6 @@ import { setConfirming } from "./actionConfirmation";
 import { TooltipLayer } from "./Tooltip";
 import { act as decide, tick, dataCompany } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
-import { combinedCompany } from "@/sim/__tests__/combinedFixture";
 import { INTRODUCTION_COMPONENTS } from "@/sim/introduction";
 
 beforeEach(() => {
@@ -72,17 +71,20 @@ it("labels Hint's glow only for a player who has never opened Hint", () => {
 it.each([
   ["chapter Next", dataCompany, /^Next:/],
   ["reliability start", reliabilityCompany, "Start reliability test"],
-  ["growth start", () => tick(combinedCompany(), 5), "Start next growth wave"],
 ] as const)("gives %s sole progression attention without dispatching", (_name, make, name) => {
   show(make()); const before = useGame.getState().game;
   act(() => vi.advanceTimersByTime(10000)); expect(gold()).toHaveLength(1);
   expect(gold()[0]).toBe(screen.getByRole("button", { name })); expect(useGame.getState().game).toBe(before);
 });
+const acceptRisk = () => {
+  fireEvent.click(screen.getByRole("button", { name: "Consider growth with current capacity" }));
+  fireEvent.click(screen.getByRole("button", { name: "Accept growth risk" }));
+};
 it("lights Run after a decision pauses a company that could keep running, clearing when it restarts", () => {
-  show(tick(combinedCompany(), 5));
+  show(scaling());
   act(() => useGame.getState().setRunning(true));
   expect(useGame.getState().running).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  acceptRisk();
   expect(useGame.getState().running).toBe(false);
   expect(gold()).toHaveLength(1);
   expect(gold()[0]).toBe(screen.getByRole("button", { name: "Run" }));
@@ -91,18 +93,19 @@ it("lights Run after a decision pauses a company that could keep running, cleari
   expect(gold()).toHaveLength(0);
 });
 it("shows no Run invitation for a decision that pauses an already-paused company", () => {
-  show(tick(combinedCompany(), 5));
-  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  show(scaling());
+  acceptRisk();
   expect(useGame.getState().running).toBe(false);
   expect(gold()).toHaveLength(0);
 });
 it("shows no Run invitation when a modal owns the pause, and does not replay it afterwards", async () => {
-  show(tick(combinedCompany(), 5));
+  show(scaling());
   act(() => useGame.getState().setRunning(true));
+  fireEvent.click(screen.getByRole("button", { name: "Consider growth with current capacity" }));
   const modal = document.createElement("div");
   modal.className = "modal-backdrop";
   document.body.append(modal);
-  fireEvent.click(screen.getByRole("button", { name: "Start next growth wave" }));
+  fireEvent.click(screen.getByRole("button", { name: "Accept growth risk" }));
   expect(useGame.getState().running).toBe(false);
   expect(gold()).toHaveLength(0);
   await act(async () => { modal.remove(); });
@@ -305,13 +308,6 @@ it("offers both real growth strategies and transfers accepted risk without dispa
   expect(useGame.getState().game).toEqual(before);
   fireEvent.click(gold()[0]); expect(useGame.getState().game.campaign!.scalingConsent).toEqual({ policyVersion: 1, acceptedStep: before.campaign!.step });
   expect(gold()).toHaveLength(0);
-});
-it("lights Run after accepting the growth risk pauses a running company", () => {
-  show(scaling()); act(() => useGame.getState().setRunning(true));
-  fireEvent.click(screen.getByRole("button", { name: "Consider growth with current capacity" }));
-  fireEvent.click(screen.getByRole("button", { name: "Accept growth risk" }));
-  expect(useGame.getState().running).toBe(false);
-  expect(gold()).toHaveLength(1); expect(gold()[0].getAttribute("aria-label")).toBe("Run");
 });
 it("offers only the valid risk strategy when database preparation is unaffordable", () => {
   const game = scaling(); game.campaign!.cashCents = 1; show(game);

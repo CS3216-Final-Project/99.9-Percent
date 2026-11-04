@@ -5,7 +5,7 @@ import { newGame, type GameState } from "../src/sim";
 import { advanceSteps } from "../src/sim/step";
 import { act, tick, spikeCompany, dataCompany, untilOffset } from "../src/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "../src/sim/__tests__/reliabilityFixture";
-import { combinedCompany } from "../src/sim/__tests__/combinedFixture";
+import { completedReliability } from "../src/sim/__tests__/completionFixture";
 import { dataCompany as enteredDataCompany } from "../src/sim/__tests__/dataFixture";
 
 async function boot(page: Page, game: GameState) {
@@ -76,7 +76,7 @@ test("guidance Chapter 4 investigation: Hint owns idle attention and transfers t
 
 for (const [chapter, company, expected] of [
   [1, newGame, "Run"], [2, scaling, "Hint"], [3, dataCompany, /^Next:/],
-  [4, () => spikeCompany(false), "Hint"], [5, reliabilityCompany, "Start reliability test"], [6, combinedCompany, "Run"],
+  [4, () => spikeCompany(false), "Hint"], [5, reliabilityCompany, "Start reliability test"], ["5 complete", completedReliability, /^Next:/],
   ["2 accepted risk", () => act(scaling(), { type: "accept_scaling_risk" }), "Run"],
   ["3 workload", enteredDataCompany, "Run"],
 ] as const) test(`guidance Chapter ${chapter}: authoritative idle priority`, async ({ page, installClock, withoutRoom }) => {
@@ -372,7 +372,6 @@ for (const [label,company] of [
 });
 
 for (const [name,company] of [
-  ["Start next growth wave",()=>tick(combinedCompany(),5)],
   ["Start reliability test",reliabilityCompany],
 ] as const) test(`action guidance mandatory control: ${name}`,async ({page,installClock,withoutRoom})=>{
   await withoutRoom();
@@ -397,7 +396,7 @@ test("action guidance restoration confirms the existing free action",async ({pag
   expect((await savedGame(page)).campaign!.pending.some(a=>a.type==="restore-app")).toBe(true);
 });
 
-for (const [chapter,label,company] of [[2,"Upgrade database",scaling],[6,"Add server",combinedCompany]] as const)
+for (const [chapter,label,company] of [[2,"Upgrade database",scaling],[5,"Add server",completedReliability]] as const)
   test(`action confirmation chapter ${chapter}: ${label}`,async ({page,installClock,withoutRoom})=>{
   await withoutRoom();
     await installClock(); await boot(page,company());
@@ -423,7 +422,7 @@ test("action guidance preparation: required risk choice retains ownership and ne
 for(const [chapter,company,target] of [
   [1,newGame,"Run"],[2,scaling,"Upgrade database"],
   [3,enteredDataCompany,"Run"],[4,()=>spikeCompany(false),"App Server"],
-  [5,reliabilityCompany,"Start reliability test"],[6,combinedCompany,"Run"],
+  [5,reliabilityCompany,"Start reliability test"],
 ] as const) test(`simple Hint Chapter ${chapter}: one explanation and valid next choices`,async ({page,installClock,withoutRoom},info)=>{
   await withoutRoom();
   await installClock(); await boot(page,company());

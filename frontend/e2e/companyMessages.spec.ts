@@ -4,7 +4,7 @@ import { recoveredOpening } from "../src/game/__fixtures__/openingOutcome";
 import { newGame } from "../src/sim";
 
 test.use({reviewCompanyMessage:false,reviewRecoveryNotice:false});
-for (const chapter of [1,2,3,4,5,6]) test(`company message: Chapter ${chapter} sender, dismissal and reload`, async ({page, withoutRoom}, info) => {
+for (const chapter of [1,2,3,4,5]) test(`company message: Chapter ${chapter} sender, dismissal and reload`, async ({page, withoutRoom}, info) => {
   await withoutRoom();
   await companyMessageJourney(page, info, chapter);
 });

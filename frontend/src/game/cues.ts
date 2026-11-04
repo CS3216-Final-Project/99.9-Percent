@@ -23,6 +23,7 @@ const ACTION_CUE: Partial<Record<Action["type"], Cue>> = {
   deploy_cache: "clunk",
   hire_engineer: "hire",
   launch_promotion: "promo",
+  choose_app_profile: "unlock",
   deploy_release: "confirm",
   test_release: "confirm",
   start_tech: "confirm",

@@ -7,6 +7,7 @@ import {
   maxServers,
   promoCooldownLeft,
   promoCost,
+  promoSpike,
   releaseRisk,
   testEffort,
 } from "./derive";
@@ -16,6 +17,7 @@ import { applyRelease, releaseTitle, revertDeploy } from "./releases";
 import { rand } from "./rng";
 import { addAppHost, clone, logEvent, newId } from "./state";
 import { serverName } from "./names";
+import { APP_PROFILE_CHOICES, APP_PROFILE_LAST_TURN, APP_PROFILES } from "./appProfiles";
 import { has, isResearchTech, missingPrerequisites, TECH, techStatus } from "./tech";
 import { acknowledgeReview, keepPlaying } from "./turn";
 import type { Action, ActionResult, DeployRecord, FailureReason, GameState } from "./types";
@@ -38,6 +40,7 @@ function needCash(s: GameState, cost: number): ActionResult | null {
 }
 
 const MANAGEMENT_ONLY = new Set<Action["type"]>([
+  "choose_app_profile",
   "launch_promotion",
   "add_server",
   "remove_server",
@@ -81,6 +84,16 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
     case "acknowledge_prevention_review":
     case "acknowledge_milestone":
     case "set_traffic_limit": return fail("invalid", "Guided Mode action only.");
+    case "choose_app_profile": {
+      // A company picks what it builds once, right after the first-week tutorial at the latest (APP_PROFILE_LAST_TURN);
+      // runs saved before profiles existed keep the balance they started with.
+      if (s.appProfile !== null || s.turn > APP_PROFILE_LAST_TURN) return fail("already_done", "This company already knows what it builds.");
+      if (!APP_PROFILE_CHOICES.includes(action.profile)) return fail("invalid", "Unknown kind of app.");
+      s.appProfile = action.profile;
+      logEvent(s, "decision", `Your company builds: ${APP_PROFILES[action.profile].name}. ${APP_PROFILES[action.profile].risk}`);
+      return ok(s, `${APP_PROFILES[action.profile].name} chosen.`);
+    }
+
     case "launch_promotion": {
       const def = PROMOS[action.promo];
       if (!def) return fail("invalid", "Unknown promotion.");
@@ -101,7 +114,7 @@ export function applyAction(prev: GameState, action: Action): ActionResult {
       s.totals.promosRun += 1;
       s.activePromos.push(def.id);
       s.promoCooldowns[def.id] = s.turn + def.cooldown;
-      logEvent(s, "decision", `Launched ${def.name} for ${money(cost)}: about +${Math.round(def.spike * 100)}% peak traffic this week.`);
+      logEvent(s, "decision", `Launched ${def.name} for ${money(cost)}: about +${Math.round(promoSpike(s, def.id) * 100)}% peak traffic this week.`);
       return ok(s, `${def.name} will run this week.`);
     }
 

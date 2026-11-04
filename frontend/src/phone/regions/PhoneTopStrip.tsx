@@ -10,6 +10,7 @@ import { healthOf } from "@/components/health";
 import { usersGoalTip } from "@/components/presentation";
 import { Icon } from "@/components/icons";
 import { SoundButton } from "@/components/SoundButton";
+import { AppProfileSection } from "@/components/AppProfile";
 import { tipProps } from "@/components/tips";
 import { Meter, Stat } from "@/components/ui";
 import { PhoneChapterRow } from "../layout/PhoneChapterRow";
@@ -17,7 +18,7 @@ import "../layout/phone-layout.css";
 
 /**
  * Region: top strip. One row the room never loses: the logo, Cash, the health or incident status, the company's
- * other numbers behind one tap, sound and Menu. Guided Mode adds a one-line chapter row underneath.
+ * other numbers (and, in Challenge Mode, what the company builds) behind one tap, sound and Menu. Guided Mode adds a one-line chapter row underneath.
  * During an incident the whole strip takes the red striped treatment.
  */
 export function PhoneTopStrip() {
@@ -123,5 +124,6 @@ function ClassicNumbers() {
     <Stat icon="health" kind="health" label="Uptime" tip="The share of requests served across the whole run.">
       <strong>{uptimePct(m.uptime)}</strong>
     </Stat>
+    <AppProfileSection />
   </>;
 }

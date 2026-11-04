@@ -21,6 +21,7 @@ import {
   incidentTick,
   inspectable,
   newGame,
+  needsAppProfile,
   newLegacyGame,
   USER_MILESTONES,
   userGoal,
@@ -104,7 +105,7 @@ export type TourTrack = "basics" | "incident" | "campaign" | ChapterTour | TipTo
 
 /** The chapter a Guided Mode company has entered, if it is past the Opening. */
 function chapterTourOf(c: Campaign): ChapterTour | null {
-  return c.combinedStage ? "combined" : c.reliabilityStage ? "reliability" : c.spikeStage ? "spikes" : c.dataStage ? "data" : c.scaling ? "scaling" : null;
+  return c.reliabilityStage ? "reliability" : c.spikeStage ? "spikes" : c.dataStage ? "data" : c.scaling ? "scaling" : null;
 }
 
 export interface Tour {
@@ -399,7 +400,6 @@ const ACKNOWLEDGEMENTS = {
 /** The only action accepted while a recognition or milestone awaits the player; time stays paused meanwhile. */
 function requiredAcknowledgement(g: GameState): Action["type"] | null {
   const c = g.campaign!, stop = pendingStop(c);
-  if (stop === "combined-review") return c.combinedStage?.finalReview ? "complete_campaign" : "acknowledge_growth";
   if (stop) return ACKNOWLEDGEMENTS[stop];
   return milestoneBlocks(g) ? "acknowledge_milestone" : null;
 }
@@ -410,6 +410,14 @@ const awaitingAcknowledgement = (g: GameState) => !!g.campaign && requiredAcknow
 export function trafficViewOn(s: { game: GameState; meta: Meta }): boolean {
   const c = s.game.campaign;
   return !!c && !!s.meta.trafficView;
+}
+
+/**
+ * Whether a Challenge Mode company is waiting for the player to say what it builds: right after the first-week tutorial,
+ * or at once for a player who has done it or skipped it. Weeks do not move on meanwhile.
+ */
+export function choosingAppProfile(s: Pick<Store, "game" | "tour" | "started" | "onboarding">): boolean {
+  return s.started && !s.onboarding && s.tour?.track !== "basics" && s.game.phase === "management" && needsAppProfile(s.game);
 }
 
 /** Whether the room holds still: whenever Guided Mode's clock is paused, and while Challenge Mode's incident clock is. */
@@ -1057,7 +1065,7 @@ export const useGame = create<Store>()((set, get) => {
         // Rejections are recorded too: they are part of the campaign's history and its replay.
         const { state, result } = applyCampaignInput(get().game, action);
         const wasRunning = get().running;
-        if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","enter_combined","start_growth_wave","acknowledge_growth","complete_campaign","accept_scaling_risk"].includes(action.type)) set({running:false});
+        if (result.ok && ["enter_data","enter_spikes","acknowledge_spikes","enter_reliability","acknowledge_reliability","complete_campaign","accept_scaling_risk"].includes(action.type)) set({running:false});
         record(result.ok);
         commit(state);
         if (!result.ok) get().notify(result.message, "error");
@@ -1082,6 +1090,7 @@ export const useGame = create<Store>()((set, get) => {
     advance: () => {
       const { game } = get();
       if (game.phase !== "management" || (game.campaign && (!get().started || awaitingAcknowledgement(game)))) return;
+      if (choosingAppProfile(get())) return;
       const next = advanceTurn(game);
       const toast = get().toast;
       commit(next);

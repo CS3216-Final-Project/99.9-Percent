@@ -17,7 +17,7 @@ export interface PlayScope {
 }
 
 /** Guided Mode's gameplay chapters after the walkthrough, in the order a company enters them. */
-export const SCOPED_CHAPTERS = ["opening", "scaling", "data", "spikes", "reliability", "combined"] as const;
+export const SCOPED_CHAPTERS = ["opening", "scaling", "data", "spikes", "reliability"] as const;
 export type ScopedChapter = (typeof SCOPED_CHAPTERS)[number];
 
 /** The action that moves a company into each chapter after the Opening. */
@@ -26,7 +26,6 @@ const ENTRIES: Partial<Record<Action["type"], ScopedChapter>> = {
   enter_data: "data",
   enter_spikes: "spikes",
   enter_reliability: "reliability",
-  enter_combined: "combined",
 };
 
 export const FULL_SCOPE: PlayScope = {
@@ -40,7 +39,7 @@ export const PHONE_SCOPE: PlayScope = {
   id: "phone",
   lastChapter: "scaling",
   challengeLocked: "Complete Scaling & Routing in Guided Mode to unlock Challenge Mode.",
-  endOfGuided: "On a phone, Guided Mode ends with Scaling & Routing. Its remaining four chapters are played on a larger screen, such as a tablet or computer.",
+  endOfGuided: "On a phone, Guided Mode ends with Scaling & Routing. Its remaining three chapters are played on a larger screen, such as a tablet or computer.",
 };
 
 /** Whether `chapter` is played in this scope. */
@@ -77,6 +76,5 @@ function chapterReached(game: GameState, chapter: ScopedChapter): boolean {
     case "data": return !!c.dataStage;
     case "spikes": return !!c.spikeStage;
     case "reliability": return !!c.reliabilityStage;
-    case "combined": return !!c.combinedStage;
   }
 }
