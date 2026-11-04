@@ -133,10 +133,10 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   The Guided Mode and Challenge Mode cards follow, Guided first, stacked on narrow screens; the section is named “Choose how you want to play” for assistive technology.
   Each card has a short explanation, a saved-game box and its own primary button; the phone edition adds a pace line.
   Guided Mode's explanation follows its save: begin with Launch Week, finish Launch Week, or work through the five chapters.
-  The saved-game box reads “Launch Week in progress” while a company is in Launch Week (or, for a version-1 company, in the Opening before the retired walkthrough was done), “Chapter n of 5: name” after that, and “All chapters complete” or “Company closed” once the company has ended; Challenge Mode reads “Week n of 26”, “Last company reached the goal” or “Last company closed”; otherwise “No saved game”.
+  The saved-game box reads “Launch Week in progress” while a company is in Launch Week (or, for a version-1 company, in the Opening before the retired walkthrough was done), “Chapter n of 5: name” after that, and “All chapters complete” or “Company closed” once the company has ended; Challenge Mode reads “Week n of 26”, “Series A secured” for a run that has just won, “Week n: Series A secured” once it plays on, or “Last company closed”; otherwise “No saved game”.
   The chapter comes from the company itself, so an imported or cloud save past the Opening shows its chapter even in a browser that never finished Launch Week.
   Guided Mode's button is Start Guided Mode, Continue company, or See how it ended for a company that has ended, which also offers New company.
-  Challenge Mode's is Start Challenge Mode or Continue week n, and a run in progress adds New game.
+  Challenge Mode's is Start Challenge Mode, See your results for a run that has just secured its Series A (reopening its report), or Continue week n, and a run in progress adds New game.
   New company and New game replace a save, so the first press turns the button red as “Lose this company? Press again” or “Lose this run? Press again” with a warning, as in the menu.
   A completed Launch Week offers Replay Launch Week and a completed Challenge Mode guide offers Replay tutorial: Challenge Mode's restarts the first week, Guided Mode's starts a fresh practice company and restores the original company on Finish or Exit, and a company that has ended has none.
   Until Chapter 5, Stay Online, is complete, Challenge Mode is not a card: the Guided Mode card stands alone and a short teaser below it, with no controls, names the goal (“Grow to 50,000 users in 26 weeks on your own.”), says “Unlocks after Chapter 5: Stay Online.”, adds the player's current chapter once there is one, and shows five chapter pips, the last of which is the goal.
@@ -162,6 +162,9 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   Run/Pause stays the only primary time control, showing Pause in the dock's cream while the clock runs and Run in gold while it is paused, with its icon and label naming the action.
   While the clock is paused the room holds still too: the crew, visitors, city, machines, traffic and the time of day stop where they are and carry on from there, while the camera, the avatar, its rides and the pointer's previews stay live.
   Challenge uses Next week, optional auto-advance in Time controls, and Pause/Resume during incidents, coloured the same way.
+  Once a Challenge Mode run plays on past its Series A, its clock reads Week n with no week strip (the phone's reads No deadline in place of "of 26"), and the menu's At a glance shows the week without a total.
+  Its Users meter and goal label (the phone's "Goal" readout) then show the next user milestone, the tooltip names it, a success toast announces each milestone as it is passed (in place of that week's summary toast), and past 100,000,000 users only the count remains.
+  The History chart's line at 50,000 users is labelled Series A instead of Goal.
   At narrow widths the clock, speed and primary action occupy the top row; labeled view tabs and Navigation occupy the second.
   Menus open above the entire dock so the clock and primary action remain reachable.
   Escape closes a menu and returns focus to its trigger; clicking outside closes it.
@@ -170,6 +173,8 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   Outcome reports and postmortems read as a chat: each question is a paper bubble on the left and each answer a dark reply bubble on the right, neither wider than 75% of the report, and a capacity summary's readings table is a reply bubble too.
   A report's lone action, such as Continue company, sits on the right.
   When a report pops up, each question and then its answer pops up from its side in turn; reduced motion shows them at once, and History keeps the bubbles without the entrance.
+  Challenge Mode's end-of-run report opens focused on its primary action, never on a rating: Play again, or Keep playing beside it when the run has just secured its Series A.
+  On phones its actions form an even grid, two columns with the primary action last (one column on the narrowest phones), and its five ratings share their row, so nothing wraps raggedly or runs past the card; cash of a million or more is rounded like the top bar's, and so are users from ten million.
 - **Views:** Tech, Team and History open as full-page night workspaces above the bottom clock dock, titled "Tech tree", "Team" and "History" (Team is Challenge-only).
   In Challenge Mode they sit below the top bar.
   The active view tab stays pressed; the title receives focus on entry and Back to room or Esc restores the opener (the visible Views summary when its phone menu has closed).
@@ -289,6 +294,8 @@ At desktop size, verify all three Opening responses remain reachable through the
 ## Review before changing UI
 
 Compare the result with the current committed game's UI and this guide, not only with a standalone mockup. Existing visual references are in [the prototype migration notes](prototype-migration.md); source components and current browser renders are the maintained baseline.
+
+Compact numbers carry a k, M or B suffix in the largest unit they reach (950k, 2.7M users, $82.18B), rounding up into the next unit rather than printing 1000k; the incident panel's Users lost tile is compact from 10,000 so it never cuts off.
 
 Inspect title, healthy management, active incident, selected equipment, pending response, recovery report, history and Menu on desktop (1440 × 900) and a narrow touch viewport (about 390 px wide). Also check an unavailable action and long/large values. Confirm that warnings, control order, icon meanings and selected states remain familiar, exact evidence remains available, and actions have not gained or lost gameplay effects.
 

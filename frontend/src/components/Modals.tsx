@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BALANCE, buildReport } from "@/sim";
-import { money, moneyFull, num, uptimePct } from "@/game/format";
+import { BALANCE, buildReport, weekLimit } from "@/sim";
+import { compact, money, moneyFull, num, uptimePct } from "@/game/format";
 import { clearAnalytics, readAnalytics, type AnalyticsEvent } from "@/game/persist";
 import { useGame } from "@/game/store";
 import { AccountSection, CloudSavesSection } from "./Account";
@@ -19,6 +19,7 @@ import { MenuTabs, type MenuTab } from "./MenuTabs";
 import { ModeSwitch } from "./ModeSwitch";
 import { SaveFiles } from "./SaveFiles";
 import { SoundSettings } from "./SoundSettings";
+import { tipProps } from "./tips";
 import { Callout, Concept, Modal } from "./ui";
 import { OUTCOME_ICON, OUTCOME_LABEL, outcomeTone } from "./presentation";
 import { PostmortemBody, RunCharts } from "./Views";
@@ -65,7 +66,7 @@ export function HowToPlay() {
       </ul>
       <div className="modal-foot">
         <span />
-        <button type="button" className="btn btn-primary" autoFocus onClick={finish}>
+        <button type="button" className="btn btn-primary" data-autofocus onClick={finish}>
           Got it
         </button>
       </div>
@@ -94,7 +95,7 @@ export function PostmortemModal() {
       <PostmortemBody pm={pm} />
       <div className="modal-foot">
         <span />
-        <button type="button" className="btn btn-primary" autoFocus onClick={() => act({ type: "acknowledge_review" })}>
+        <button type="button" className="btn btn-primary" data-autofocus onClick={() => act({ type: "acknowledge_review" })}>
           <Icon name="next" size={20} />Continue
         </button>
       </div>
@@ -118,6 +119,7 @@ const RATING_REPLY: Record<number, string> = {
 export function EndReport() {
   const game = useGame((s) => s.game);
   const newRun = useGame((s) => s.newRun);
+  const act = useGame((s) => s.act);
   const rate = useGame((s) => s.rate);
   const rating = useGame((s) => s.rating);
   const openView = useGame((s) => s.openView);
@@ -139,7 +141,7 @@ export function EndReport() {
         <div>
           <Concept kind="users" icon="users" />
           <dt>Users</dt>
-          <dd>{num(r.users)}</dd>
+          <dd>{r.users >= 10_000_000 ? compact(r.users) : num(r.users)}</dd>
         </div>
         <div>
           <Concept kind="health" icon="health" />
@@ -149,7 +151,8 @@ export function EndReport() {
         <div>
           <Concept kind="cash" icon="cash" />
           <dt>Cash</dt>
-          <dd>{moneyFull(r.cash)}</dd>
+          {/* Exact to the dollar until a company that played on banks millions, which would not fit the tile. */}
+          <dd>{Math.abs(r.cash) >= 1_000_000 ? money(r.cash) : moneyFull(r.cash)}</dd>
         </div>
         <div>
           <Concept kind="critical" icon="incident" />
@@ -230,7 +233,7 @@ export function EndReport() {
         <RunCharts game={game} compactSet />
       </details>
 
-      <div className="modal-foot">
+      <div className="modal-foot report-foot">
         <button type="button" className="btn btn-quiet" onClick={() => openView("history")}>
           <Icon name="history" size={16} />
           History
@@ -240,10 +243,16 @@ export function EndReport() {
             <Icon name="refresh" size={16} />
             Same seed
           </button>
-          <button type="button" className="btn btn-primary" autoFocus onClick={() => newRun({ voluntary: true })}>
+          <button type="button" className={`btn${r.canKeepPlaying ? "" : " btn-primary"}`} data-autofocus={r.canKeepPlaying ? undefined : true} onClick={() => newRun({ voluntary: true })}>
             <Icon name="play" size={16} />
             Play again
           </button>
+          {r.canKeepPlaying && (
+            <button type="button" className="btn btn-primary" data-autofocus onClick={() => act({ type: "keep_playing" })} {...tipProps("Carry this company on with no deadline. Only running out of cash ends the run.")}>
+              <Icon name="next" size={16} />
+              Keep playing
+            </button>
+          )}
         </div>
       </div>
     </Modal>
@@ -310,7 +319,8 @@ export function Menu() {
   };
 
   const close = () => openView(null);
-  const week = Math.min(game.turn, BALANCE.maxTurns);
+  const limit = weekLimit(game);
+  const week = limit === null ? game.turn : Math.min(game.turn, limit);
   // Shown beside whichever control asked for the confirmation.
   const warning = (
     <Callout compact tone="warn" icon="alert" kicker="Are you sure?">
@@ -330,7 +340,7 @@ export function Menu() {
         title="At a glance"
         saved={saveStatus === "saved"}
         stats={[
-          { icon: "week", kind: "go", label: "Week", value: `${week} / ${BALANCE.maxTurns}` },
+          { icon: "week", kind: "go", label: "Week", value: limit === null ? String(week) : `${week} / ${limit}` },
           { icon: "users", kind: "users", label: "Users", value: num(game.users) },
           { icon: "cash", kind: "cash", label: "Cash", value: money(game.cash) },
         ]}

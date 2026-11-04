@@ -1,6 +1,6 @@
 import { introductionActive } from "@/sim/introduction";
 import { useSyncExternalStore } from "react";
-import { BALANCE, completedTechIds, metrics, TECH_ORDER } from "@/sim";
+import { completedTechIds, metrics, TECH_ORDER, weekLimit } from "@/sim";
 import { OPENING_DB as Q } from "@/sim/scenarios/openingDatabaseIncident";
 import { incidentActive, pendingStop } from "@/sim/step";
 import { clock } from "@/game/format";
@@ -98,7 +98,8 @@ function ChallengeDock() {
   const m = metrics(game);
   const management = game.phase === "management";
   const inc = game.phase === "incident" ? game.incident : null;
-  const week = Math.min(game.turn, BALANCE.maxTurns);
+  const limit = weekLimit(game);
+  const week = limit === null ? game.turn : Math.min(game.turn, limit);
   // Views appear once they have something to show, as on the desktop.
   const hasWork = game.tasks.length > 0 || game.releases.length > 0 || game.turn > 1;
   const tabs: ViewTab[] = [
@@ -116,8 +117,10 @@ function ChallengeDock() {
           <span className="dock-second"><strong>{clock(inc.elapsed)}</strong></span>
         </> : <>
           <span className="brand-week"><Icon name="week" size={14} /><span>Week <strong>{week}</strong></span></span>
-          <span className="dock-second">of {BALANCE.maxTurns}</span>
-          <Meter value={week / BALANCE.maxTurns} label="Weeks played" />
+          {limit === null ? <span className="dock-second">No deadline</span> : <>
+            <span className="dock-second">of {limit}</span>
+            <Meter value={week / limit} label="Weeks played" />
+          </>}
         </>}
       </div>
       <TimeMenu automatic={management} />

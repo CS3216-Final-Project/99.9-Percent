@@ -2,9 +2,11 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
-import { DEFAULT_META, saveMeta } from "@/game/persist";
+import { DEFAULT_META, saveClassicGame, saveMeta, saveMode } from "@/game/persist";
 import { FULL_SCOPE, PHONE_SCOPE } from "@/game/scope";
 import { useGame } from "@/game/store";
+import { BALANCE } from "@/sim";
+import { balanced, runBot } from "@/sim/__tests__/bots";
 import { finishingScaling } from "@/sim/__tests__/dataFixture";
 import { setEditionForTests } from "./edition";
 import { PHONE_MENU_TABS } from "./PhoneMenu";
@@ -92,6 +94,30 @@ describe("phone edition", () => {
     expect(within(menu).getByText("Phone campaign complete")).toBeTruthy();
     fireEvent.click(within(within(menu).getByRole("region", { name: "Game mode" })).getByRole("button", { name: "Switch to Challenge Mode" }));
     expect(useGame.getState().mode).toBe("classic");
+  });
+
+  it("keeps a Challenge Mode company going past its Series A with no deadline in the dock or menu", async () => {
+    const won = runBot(BALANCE.introSeed, balanced, "expert").state;
+    saveMeta({ ...DEFAULT_META, challengeUnlocked: true });
+    saveMeta({ ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, runsStarted: 1 }, "classic");
+    saveMode("classic");
+    saveClassicGame(won);
+    const choices = await renderPhone();
+    fireEvent.click(within(choices).getByRole("button", { name: "See your results" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Series A secured" })).getByRole("button", { name: "Keep playing" }));
+
+    const time = screen.getByRole("group", { name: "Time" });
+    expect(time.textContent).toContain(`Week ${won.turn}`);
+    expect(time.textContent).toContain("No deadline");
+    expect(within(time).queryByRole("progressbar", { name: "Weeks played" })).toBeNull();
+    // The Users goal moves on to the next milestone above the company's peak.
+    fireEvent.click(screen.getByRole("button", { name: "Users and revenue" }));
+    const numbers = screen.getByRole("region", { name: "Company numbers" });
+    expect(within(numbers).getByRole("progressbar", { name: "Progress to 100,000 users" })).toBeTruthy();
+    expect(numbers.textContent).toContain("Goal 100k");
+    fireEvent.click(screen.getByRole("button", { name: "Users and revenue" }));
+    const glance = within(openMenu()).getByRole("region", { name: "At a glance" });
+    expect(within(glance).getAllByRole("definition")[0].textContent).toBe(String(won.turn));
   });
 
   it("describes a finished phone company on the home screen and lets it start Challenge Mode", async () => {

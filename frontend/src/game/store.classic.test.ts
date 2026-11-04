@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { advanceTurn, newLegacyGame as newGame } from '../sim';
+import { advanceTurn, BALANCE, newLegacyGame as newGame } from '../sim';
+import { balanced, runBot } from '../sim/__tests__/bots';
 import { DEFAULT_META, loadClassicGame as loadGame, readAnalytics, saveClassicGame as saveGame, saveMeta, saveMode } from './persist';
 import { useGame } from './store';
 
@@ -110,6 +111,31 @@ describe('game lifecycle', () => {
     expect(readAnalytics().filter(e => e.name === 'incident_completed')).toHaveLength(1);
     expect(useGame.getState().meta.firstIncidentCompleted).toBe(true);
     expect(loadGame()).toMatchObject({ status: 'ok', game: useGame.getState().game });
+  });
+
+  it('finishes a run once at its Series A, and records the end of playing on separately', () => {
+    const won = runBot(BALANCE.introSeed, balanced, 'expert').state;
+    saveGame(won);
+    saveMeta({ ...DEFAULT_META, tutorialDone: true, incidentGuideDone: true, runsStarted: 1, runsFinished: 1 }, 'classic');
+    useGame.getState().boot();
+    useGame.getState().play();
+    expect(useGame.getState().act({ type: 'keep_playing' })).toBe(true);
+    // An over-hired team whose payroll outruns the company's revenue, with little cash left.
+    useGame.setState({ game: { ...useGame.getState().game, cash: 1_000, engineers: 100 } });
+    useGame.getState().advance();
+    // The week opens with the database incident a 70,000-user company meets; letting it run out settles the week.
+    expect(useGame.getState().game.phase).toBe('incident');
+    useGame.getState().setRunning(true);
+    for (let i = 0; i < 400 && useGame.getState().game.phase === 'incident'; i++) useGame.getState().tick(1);
+    expect(useGame.getState().act({ type: 'acknowledge_review' })).toBe(true);
+    expect(useGame.getState().game).toMatchObject({ phase: 'ended', outcome: 'bankrupt', seriesAWeek: won.totals.weeks });
+    expect(useGame.getState().running).toBe(false);
+    const names = readAnalytics().map(e => e.name);
+    expect(names.filter(n => n === 'endless_started')).toHaveLength(1);
+    expect(names.filter(n => n === 'endless_finished')).toHaveLength(1);
+    expect(names.filter(n => n === 'run_finished')).toHaveLength(0);
+    expect(useGame.getState().meta.runsFinished).toBe(1);
+    expect(useGame.getState().act({ type: 'keep_playing' })).toBe(false);
   });
 
   it('resets transient UI and saves the requested seed when replaying', () => {
