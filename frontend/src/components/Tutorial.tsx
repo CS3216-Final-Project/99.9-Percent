@@ -41,6 +41,8 @@ interface Step {
   inTech?: boolean;
   /** A one-card guide the player follows by opening equipment: inspecting any of it completes the card. */
   endsOnInspection?: boolean;
+  /** A step the player finishes in several clicks: how many, and which one is next. Each click gets its own box. */
+  clicks?: { count: number; at: (s: Snapshot) => number };
 }
 
 const label = (id: string) => `.eq-label[data-eq="${id}"]`;
@@ -120,6 +122,10 @@ const DEPLOY_CHECKS = '.component-inspection [data-tour="deploy-checks"]';
 const MONITORING_DETAILS = ".component-inspection-monitoring [data-inspection-details]";
 const checksStep = (s: Snapshot) =>
   s.roomInspection?.equipment !== "monitoring" ? "inspect" : document.querySelector(DEPLOY_CHECKS) ? "deploy" : "details";
+/** Unlock Health Checks: open Tech, select Health Checks, unlock it. */
+const unlockClick = (s: Snapshot) => (s.view !== "tech" ? 0 : s.techFocus !== "health_checks" ? 1 : 2);
+/** Deploy Health Checks: close Tech, open Monitoring, inspect its details, deploy, confirm. */
+const deployClick = (s: Snapshot) => (s.view === "tech" ? 0 : confirmingChecks() ? 4 : { inspect: 1, details: 2, deploy: 3 }[checksStep(s)]);
 const CHAPTERS = {
   scaling: chapter(
     "Scale and route",
@@ -149,9 +155,9 @@ const CHAPTERS = {
     {
       title: "Unlock Health Checks",
       why: "This chapter's capabilities are unlocked in Tech with research points.",
-      hint: (s) => (s.view !== "tech" ? "Open Tech." : s.techFocus !== "health_checks" ? "Click Health Checks." : "Press Unlock Health Checks."),
-      target: (s) =>
-        s.view !== "tech" ? TECH_TAB : s.techFocus !== "health_checks" ? '.node[data-tech="health_checks"]' : `.tree-detail ${PRIMARY}`,
+      hint: (s) => ["Open Tech.", "Click Health Checks.", "Press Unlock Health Checks."][unlockClick(s)],
+      target: (s) => [TECH_TAB, '.node[data-tech="health_checks"]', `.tree-detail ${PRIMARY}`][unlockClick(s)],
+      clicks: { count: 3, at: unlockClick },
       inTech: true,
       done: (s) => !!s.game.campaign?.reliabilityStage?.owned.includes("health_checks"),
     },
@@ -159,24 +165,16 @@ const CHAPTERS = {
       title: "Deploy Health Checks",
       why: "Unlocking does not deploy it.",
       hint: (s) =>
-        s.view === "tech"
-          ? "Close Tech."
-          : confirmingChecks()
-            ? "Press Confirm."
-            : checksStep(s) === "inspect"
-              ? "Click Monitoring."
-              : checksStep(s) === "details"
-                ? "Press the Monitoring disc to inspect details."
-                : s.game.campaign && installPending(s.game.campaign)
-                  ? "Run until the current install finishes, then press Deploy Health Checks."
-                  : "Press Deploy Health Checks.",
+        [
+          "Close Tech.",
+          "Click Monitoring.",
+          "Press the Monitoring disc to inspect details.",
+          s.game.campaign && installPending(s.game.campaign) ? "Run until the current install finishes, then press Deploy Health Checks." : "Press Deploy Health Checks.",
+          "Press Confirm.",
+        ][deployClick(s)],
       // The confirmation opens over the inspection; light it up rather than leaving it under the dim.
-      target: (s) =>
-        s.view === "tech"
-          ? TECH_TAB
-          : confirmingChecks()
-            ? ".component-purchase, .campaign-action-popover"
-            : { inspect: shortcut("monitoring"), details: MONITORING_DETAILS, deploy: DEPLOY_CHECKS }[checksStep(s)],
+      target: (s) => [TECH_TAB, shortcut("monitoring"), MONITORING_DETAILS, DEPLOY_CHECKS, ".component-purchase, .campaign-action-popover"][deployClick(s)],
+      clicks: { count: 5, at: deployClick },
       inTech: true,
       done: (s) => {
         const c = s.game.campaign;
@@ -382,19 +380,23 @@ function SpotlightTutorial() {
   const docked = isPhoneEdition();
   // The fixed-height strip scrolls under its Skip and Next, so what to do comes before the reason, as in Guided Mode.
   const whyFirst = !campaign && !docked;
+  // One box per click, so a step taken in several clicks fills several boxes.
+  const clicks = (x: Step) => x.clicks?.count ?? 1;
+  const total = steps.reduce((n, x) => n + clicks(x), 0);
+  const now = steps.slice(0, tour.step).reduce((n, x) => n + clicks(x), 0) + (step.clicks?.at(s) ?? 0);
   return (
     <Spotlight box={box} track={tour.track} docked={docked}>
       <div
         ref={card}
         className="tour-card"
         role="dialog"
-        aria-label={`${name}, step ${tour.step + 1} of ${steps.length}`}
+        aria-label={`${name}, step ${now + 1} of ${total}`}
         tabIndex={-1}
         style={docked ? undefined : cardStyle(box, placeFor(selector), viewport.w, viewport.h, edge, cardHeight)}
       >
         <div className="tour-dots" aria-hidden="true">
-          {steps.map((_, i) => (
-            <i key={i} className={i < tour.step ? "is-done" : i === tour.step ? "is-now" : ""} />
+          {Array.from({ length: total }, (_, i) => (
+            <i key={i} className={i < now ? "is-done" : i === now ? "is-now" : ""} />
           ))}
         </div>
         <h3>{step.title}</h3>
