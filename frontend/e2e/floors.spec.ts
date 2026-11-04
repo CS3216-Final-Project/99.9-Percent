@@ -107,7 +107,7 @@ test("the tutorial takes the view to its step's floor once, and never pulls the 
 });
 
 test("the first incident's guide takes a player on the office floor down to the machines", async ({ page }) => {
-  await seedBeforeIncident(page, { ...newLegacyGame(1), users: 4500 });
+  await seedBeforeIncident(page, { ...newLegacyGame(1), appProfile: "general", users: 4500 });
   await page.goto("/?floor=office");
   await page.getByRole("button", { name: /^(Start Challenge Mode|Continue week)/ }).click();
   await expect(label(page, "Growth")).toBeVisible();

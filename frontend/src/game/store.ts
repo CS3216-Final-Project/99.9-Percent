@@ -21,6 +21,7 @@ import {
   incidentTick,
   inspectable,
   newGame,
+  needsAppProfile,
   newLegacyGame,
   type Action,
   type EquipmentId,
@@ -405,6 +406,14 @@ const awaitingAcknowledgement = (g: GameState) => !!g.campaign && requiredAcknow
 export function trafficViewOn(s: { game: GameState; meta: Meta }): boolean {
   const c = s.game.campaign;
   return !!c && !!s.meta.trafficView;
+}
+
+/**
+ * Whether a Challenge Mode company is waiting for the player to say what it builds: right after the first-week tutorial,
+ * or at once for a player who has done it or skipped it. Weeks do not move on meanwhile.
+ */
+export function choosingAppProfile(s: Pick<Store, "game" | "tour" | "started" | "onboarding">): boolean {
+  return s.started && !s.onboarding && s.tour?.track !== "basics" && s.game.phase === "management" && needsAppProfile(s.game);
 }
 
 /** Whether the room holds still: whenever Guided Mode's clock is paused, and while Challenge Mode's incident clock is. */
@@ -1064,6 +1073,7 @@ export const useGame = create<Store>()((set, get) => {
     advance: () => {
       const { game } = get();
       if (game.phase !== "management" || (game.campaign && (!get().started || awaitingAcknowledgement(game)))) return;
+      if (choosingAppProfile(get())) return;
       const next = advanceTurn(game);
       commit(next);
       const r = next.lastReport;

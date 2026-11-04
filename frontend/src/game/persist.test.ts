@@ -28,6 +28,14 @@ describe("campaign data preservation", () => {
     expect(loadClassicGame()).toEqual({ status: "ok", game: JSON.parse(JSON.stringify(classic)) });
     expect(loadMeta("classic").tutorialDone).toBe(true);
   });
+  it("keeps a Challenge company's kind of app, accepts saves from before it existed and rejects an unknown one", () => {
+    const chosen = { ...newLegacyGame(3), appProfile: "gaming" as const };
+    expect(saveClassicGame(chosen)).toBe(true);
+    expect(loadClassicGame()).toEqual({ status: "ok", game: chosen });
+    const { appProfile: _, ...before } = newLegacyGame(3);
+    expect(decodeClassicSave(JSON.stringify({ game: before })).status).toBe("ok");
+    expect(decodeClassicSave(JSON.stringify({ game: { ...before, appProfile: "crypto" } })).status).toBe("corrupt");
+  });
   it("handles storage failures without destroying in-memory state", () => {
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("quota"); });
     expect(saveGame(newGame())).toBe(false);

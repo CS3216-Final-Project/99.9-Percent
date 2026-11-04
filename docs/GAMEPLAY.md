@@ -271,6 +271,28 @@ Challenge Mode is the migrated prototype ([prototype-migration.md](prototype-mig
 - Promotions need no research: Social push from the start, Launch campaign at 5,000 users and Targeted campaign at 10,000 users.
 - Legacy definitions from the 17-node prototype tree remain only so old saves resume; removed research cannot be started again, and progress counts only the nine nodes.
 
+### App profiles
+
+A new Challenge Mode company says what it builds: Social media, Online game, Online store or Music streaming (`frontend/src/sim/appProfiles.ts`).
+The cards appear right after the first-week tutorial, at the start of week 2, or in week 1 for a player who has done or skipped the tutorial.
+Weeks do not advance while the choice is waiting, and the engine accepts it only once and only up to week 2.
+Until then, and in runs saved before profiles existed, the company plays the original balance as a General app.
+
+Each profile scales the same equipment's workload and market against that original balance:
+
+| Profile | Traffic per user | Database work per request | Cacheable reads | Revenue per user | Users notice lag from | Promotions |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| General | 1.0x | 1.0x | 60% | 1.0x | 70% load | As listed |
+| Social media | 1.0x | 1.15x | 70% | 0.9x | 70% load | Social push 1.6x users and 1.2x spike, Launch 1.2x users, Targeted 0.8x users |
+| Online game | 1.25x | 0.7x | 70% | 1.05x | 50% load | Launch 1.4x users and 1.3x spike, Targeted 0.9x users |
+| Online store | 0.85x | 1.35x | 35% | 1.25x | 70% load | Targeted 1.5x users and 1.3x spike, Launch 1.1x users and 1.4x spike, Social push 0.7x users |
+| Music streaming | 1.15x | 1.0x | 85% | 1.0x | 80% load | Social push 1.25x users |
+
+The read cache still removes at most 36% of database work (50% tuned), so a profile's cacheable share only matters below that.
+The lag column is the peak load at which the weekly satisfaction penalty starts; it reaches its maximum at full load as before.
+Promotion prices are unchanged, so a profile's favourite promotion buys more users per dollar.
+The top bar keeps the choice in the place Guided Mode keeps Hint (on phones, among the numbers behind Users and revenue), and its card lists what the profile changes.
+
 ## Saves
 
 Both modes autosave on transitions, on a ten-second timer while in the foreground and on page lifecycle events.

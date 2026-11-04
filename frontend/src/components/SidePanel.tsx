@@ -15,6 +15,7 @@ import {
   PROMOS,
   promoCooldownLeft,
   promoCost,
+  promoSpike,
   promoUsers,
   serverUpkeep,
   TECH,
@@ -232,7 +233,7 @@ function Body({ id, game, m }: { id: EquipmentId; game: GameState; m: Metrics })
                     {def.name}
                   </strong>
                   <span className="muted">
-                    +{num(promoUsers(game, pid))} users, +{pct(def.spike)} traffic
+                    +{num(promoUsers(game, pid))} users, +{pct(promoSpike(game, pid))} traffic
                   </span>
                 </div>
                 {!unlocked ? (

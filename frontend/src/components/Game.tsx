@@ -13,6 +13,7 @@ import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { healthOf } from "./health";
 import { SoundButton } from "./SoundButton";
+import { AppProfileButton, AppProfilePicker } from "./AppProfile";
 import { tipProps } from "./tips";
 import { EndReport, HowToPlay, Menu, PostmortemModal } from "./Modals";
 import { HomeScreen } from "./HomeScreen";
@@ -84,6 +85,7 @@ export function TopBar() {
         </Stat>
       </div>
 
+      <AppProfileButton />
       <SoundButton />
       <button type="button" className="icon-btn menu-btn" onClick={() => openView("menu")} aria-label="Menu" {...tipProps("Menu")}>
         <Icon name="menu" />
@@ -234,6 +236,7 @@ export default function Game() {
       {!campaign && !started && <HomeScreen />}
       {!campaign && started && view === "menu" && <Menu />}
       {!campaign && started && onboarding && <HowToPlay />}
+      {!campaign && <AppProfilePicker />}
       {started && <Tutorial />}
       {started && <InspectionReveal />}
       {!campaign && started && phase === "review" && <PostmortemModal />}

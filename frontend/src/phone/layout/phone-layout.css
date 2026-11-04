@@ -144,6 +144,10 @@
   border: 1px solid var(--control-edge);
   border-radius: 18px;
   box-shadow: var(--lift);
+  /* An opened row (Challenge Mode's app notes) scrolls inside the drop rather than off a short screen. */
+  max-height: calc(100dvh - var(--phone-safe-top) - var(--phone-strip) - var(--phone-dock) - 8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .phone-app[data-edition="phone"] .phone-stats[hidden] { display: none; }
 .phone-app[data-edition="phone"] .phone-stats .stat { min-height: 52px; padding: 6px 8px; gap: 8px; align-items: center; background: var(--paper-2); border-radius: 12px; }
@@ -151,7 +155,7 @@
 .phone-app[data-edition="phone"] .phone-stats .stat-body { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 1px; font-size: var(--text-xs); }
 .phone-app[data-edition="phone"] .phone-stats .stat-body > .tip { display: block; font-size: var(--text-xs); color: var(--text-soft); }
 .phone-app[data-edition="phone"] .phone-stats .stat-body > strong { font-size: var(--text-md); white-space: nowrap; }
-.phone-app[data-edition="phone"] .phone-stats .stat-body > span { display: block; color: var(--text-soft); line-height: 1.3; }
+.phone-app[data-edition="phone"] .phone-stats .stat-body > span { display: block; color: var(--text-soft); line-height: 1.3; white-space: normal; }
 .phone-app[data-edition="phone"] .phone-stats .stat-goal { display: flex; align-items: center; gap: 6px; }
 .phone-app[data-edition="phone"] .phone-stats .stat-goal .meter { flex: 1; }
 .phone-app[data-edition="phone"] .phone-stats .phone-stat-note { color: var(--warn-ink); }

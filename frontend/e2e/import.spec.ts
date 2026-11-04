@@ -47,7 +47,8 @@ test("recovers a pre-update run and exports/imports Challenge Mode files from ei
   await withoutRoom();
   await unlockChallenge(page);
   const { advanceTurn, newLegacyGame } = await import("../src/sim");
-  const game = advanceTurn(newLegacyGame(777));
+  // Saves from before profiles existed carry no profile and keep the original balance.
+  const { appProfile: _, ...game } = advanceTurn(newLegacyGame(777));
   const original = JSON.stringify({ savedAt: 1, game });
   await page.addInitScript(raw => {
     if (localStorage.getItem("nn.save.v1") === null) {
