@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { BALANCE, canKeepPlaying, weekLimit, type GameState } from "@/sim";
 import { campaignChapters } from "@/game/campaignChapters";
 import { loadClassicGame, loadGame, loadMeta, type GameMode } from "@/game/persist";
 import { isFreshRun, useGame } from "@/game/store";
 import { num } from "@/game/format";
 import type { IconName } from "./icons";
+import { useModeSwitch } from "./useModeSwitch";
 
 /** What a mode's card says about its saved game. Nothing here changes a save. */
 export interface Summary {
@@ -96,17 +97,11 @@ export function campaignAbout(summary: Summary): string {
 
 /** A home screen's mode controls: play or continue a mode, start a new one and replay its tutorial. */
 export function useModeLauncher(summary: (mode: GameMode) => Summary) {
-  const [unsaved, setUnsaved] = useState<GameMode | null>(null);
+  const { unsaved, switchTo } = useModeSwitch();
 
   /** Run `then` in mode `m`, switching first when it is not the loaded mode. */
   const inMode = (m: GameMode, then?: () => void) => {
-    const s = useGame.getState();
-    if (m !== s.mode && !s.switchMode(m, { discard: unsaved === m })) {
-      if (!useGame.getState().cloudBusy) setUnsaved(m);
-      return;
-    }
-    setUnsaved(null);
-    then?.();
+    if (switchTo(m)) then?.();
   };
   const fresh = () => {
     const s = useGame.getState();

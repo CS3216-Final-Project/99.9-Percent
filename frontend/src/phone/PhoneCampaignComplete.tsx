@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { useGame } from "@/game/store";
 import { Icon } from "@/components/icons";
 import { Callout, Modal } from "@/components/ui";
+import { useModeSwitch } from "@/components/useModeSwitch";
 
 /**
  * Shown once when the company finishes the last chapter the phone edition plays, in place of the desktop's offer to
@@ -10,11 +10,9 @@ import { Callout, Modal } from "@/components/ui";
 export function PhoneCampaignComplete() {
   const dismiss = useGame((s) => s.dismissChapterComplete);
   const endOfGuided = useGame((s) => s.scope.endOfGuided);
-  const [unsaved, setUnsaved] = useState(false);
-  const playChallenge = () => {
-    if (!useGame.getState().switchMode("classic", { discard: unsaved })) { setUnsaved(true); return; }
-    dismiss();
-  };
+  const { unsaved: lost, switchTo } = useModeSwitch();
+  const unsaved = lost === "classic";
+  const playChallenge = () => { if (switchTo("classic")) dismiss(); };
   return <Modal title="Phone campaign complete" icon={{ kind: "go", name: "goal" }} onClose={dismiss}>
     <p>Your added capacity and routing carried the growth wave. You have finished Guided Mode on your phone.</p>
     <p>{endOfGuided} Your company is saved in this browser and keeps operating here.</p>

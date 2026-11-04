@@ -351,6 +351,11 @@ interface Store {
    * Refuses (returning false) when the current run cannot be saved, unless `discard` accepts losing it.
    */
   switchMode: (mode: GameMode, opts?: { discard?: boolean }) => boolean;
+  /**
+   * Whether nothing but saving stands in the way of switching to `mode`: no cloud action is in progress and the mode
+   * is unlocked. After a refused switch it tells a failed save, which may be overridden, from the other refusals.
+   */
+  canSwitchMode: (mode: GameMode) => boolean;
   saveNow: (quiet?: boolean) => boolean;
   /** Replace the current company with an exported save. Returns false if the file is not a usable save. */
   importSave: (raw: string) => boolean;
@@ -1261,6 +1266,7 @@ export const useGame = create<Store>()((set, get) => {
       enter(mode, true);
       return true;
     },
+    canSwitchMode: (mode) => !get().cloudBusy && (mode !== "classic" || challengeUnlockedNow()),
 
     saveNow: (quiet = false) => {
       if(get().game.campaign) get().measureTime();

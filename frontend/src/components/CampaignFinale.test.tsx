@@ -102,6 +102,18 @@ it("asks before losing a finished company that cannot be saved, then switches wh
   expect(useGame.getState().mode).toBe("classic");
 });
 
+it("waits out a cloud action without claiming the finished company could not be saved", () => {
+  show(); useGame.setState({ hasRun: true }); fireEvent.click(within(finale()!).getByRole("button", { name: "Skip to the scorecard" }));
+  useGame.setState({ cloudBusy: true });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("campaign");
+  expect(useGame.getState().toast?.text).toBe("Wait for the cloud operation before replacing this company.");
+  expect(scorecard()!.textContent).not.toContain("could not be saved");
+  useGame.setState({ cloudBusy: false });
+  fireEvent.click(within(scorecard()!).getByRole("button", { name: "Continue to Challenge Mode" }));
+  expect(useGame.getState().mode).toBe("classic");
+});
+
 it("preloads every celebrating portrait when the finale opens", () => {
   const requested: string[] = [];
   vi.stubGlobal("Image", class { set src(value: string) { requested.push(value); } });

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import type { GameMode } from "@/game/persist";
 import { useGame } from "@/game/store";
 import { Icon } from "./icons";
 import { Callout } from "./ui";
+import { useModeSwitch } from "./useModeSwitch";
 
 const ABOUT: Record<GameMode, string> = {
   campaign: "Guided Mode teaches infrastructure concepts through five guided chapters of continuous play.",
@@ -20,10 +20,10 @@ const NAME: Record<GameMode, string> = { campaign: "Guided Mode", classic: "Chal
 export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Finish Chapter 5, Stay Online, in Guided Mode to unlock Challenge Mode.", lockedLabel = "Finish Chapter 5 to unlock", about = ABOUT[to] }: {
   to: GameMode; locked?: boolean; lockedText?: string; lockedLabel?: string; about?: string;
 }) {
-  const switchMode = useGame((s) => s.switchMode);
+  const { unsaved: lost, switchTo } = useModeSwitch();
+  const unsaved = lost === to;
   const defaultLocked = useGame((s) => to === "classic" && s.mode !== "classic" && !s.meta.challengeUnlocked && s.game.campaign?.reliabilityStage?.acknowledged !== true);
   const locked = lockedOverride ?? defaultLocked;
-  const [unsaved, setUnsaved] = useState(false);
   const from: GameMode = to === "campaign" ? "classic" : "campaign";
   return (
     <section className="menu-section" aria-label="Game mode">
@@ -49,9 +49,7 @@ export function ModeSwitch({ to, locked: lockedOverride, lockedText = "Finish Ch
           <button
             type="button"
             className={`btn ${unsaved ? "btn-danger" : ""}`}
-            onClick={() => {
-              if (!switchMode(to, { discard: unsaved })) setUnsaved(true);
-            }}
+            onClick={() => switchTo(to)}
           >
             <Icon name="switch" size={20} />
             {unsaved ? "Switch and lose this run" : `Switch to ${NAME[to]}`}
