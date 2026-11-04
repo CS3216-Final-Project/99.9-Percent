@@ -4,7 +4,7 @@ import { useGame, inspectInRoom } from "@/game/store";
 import { newGame, type GameState } from "@/sim";
 import { advanceSteps, step } from "@/sim/step";
 import { act as decide, tick, spikeCompany, untilOffset } from "@/sim/__tests__/spikeFixtures";
-import { combinedCompany } from "@/sim/__tests__/combinedFixture";
+import { completedReliability } from "@/sim/__tests__/completionFixture";
 import { dataCompany } from "@/sim/__tests__/dataFixture";
 import { reliabilityCompany } from "@/sim/__tests__/reliabilityFixture";
 import { campaignAttention } from "@/game/campaignAttention";
@@ -100,15 +100,11 @@ it("keeps App scaling and adding together and routing prerequisites with Network
   networkView("Routing");expect(dialog("Network").getByRole("group",{name:/Send traffic to/})).toBeTruthy();
   open("Back to Network");expect(dialog("Network").getByRole("button",{name:/Limit to ~/})).toBeTruthy();
 });
-it.each([4,6])("routes Chapter %s traffic-limit advice to its real Network action, not About",async chapter=>{
-  let game=chapter===4?spikeCompany(false):combinedCompany();
-  if (chapter===4) {
-    game=tick(decide(game,{type:"add_server"}),2);
-    game=tick(decide(game,{type:"scale_up",appId:"app-3"}),3);
-    game=tick(decide(game,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}));
-  }
-  game=tick(decide(game,{type:"set_traffic_limit",enabled:true}));
-  if(chapter===4) game=untilOffset(game,8);
+it("routes Chapter 4 traffic-limit advice to its real Network action, not About",async()=>{
+  let game=tick(decide(spikeCompany(false),{type:"add_server"}),2);
+  game=tick(decide(game,{type:"scale_up",appId:"app-3"}),3);
+  game=tick(decide(game,{type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]}));
+  game=untilOffset(tick(decide(game,{type:"set_traffic_limit",enabled:true})),8);
   show(game);const decision=campaignAttention(game);expect(decision.action?.action.type).toBe("set_traffic_limit");
   await accept();expect(gold()[0].textContent).toBe("Network");fireEvent.click(gold()[0]);await act(async()=>{});
   expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toContain("Remove traffic limit");
@@ -168,14 +164,14 @@ it("completes accepted Monitoring inspection and recalculates without a stale sp
  expect(screen.queryByRole("button",{name:"Confirm"})).toBeNull();
 });
 
-it.each([4,5,6])("keeps Chapter %s summaries outside component inspections",chapter=>{
- show(chapter===4?spikeCompany(false):chapter===5?reliabilityCompany():combinedCompany());
- if(chapter>=5) expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain(chapter===5?"Stay Online":"Grow the Company");
+it.each([4,5])("keeps Chapter %s summaries outside component inspections",chapter=>{
+ show(chapter===4?spikeCompany(false):reliabilityCompany());
+ if(chapter===5) expect(screen.getByRole("region",{name:"Chapter Progress"}).textContent).toContain("Stay Online");
  open("Network");const network=screen.getByRole("dialog",{name:"Network"});
  expect(network.textContent).not.toMatch(/Stay online|Stable after restoration|Workload:|Normal demand|Opening campaign/);
  expect(dialog("Network").getByRole("button",{name:/traffic limit|Limit to/})).toBeTruthy();
  networkView("Routing");expect(dialog("Network").getByRole("group",{name:/Send traffic to/})).toBeTruthy();
- if(chapter>=5) {networkView("Automatic failover");expect(dialog("Network").getByRole("button",{name:/Deploy Automatic Failover/})).toBeTruthy();}
+ if(chapter===5) {networkView("Automatic failover");expect(dialog("Network").getByRole("button",{name:/Deploy Automatic Failover/})).toBeTruthy();}
  fireEvent.click(dialog("Network").getByRole("button",{name:"Close"}));open("Read Cache");
  expect(screen.getByRole("dialog",{name:"Read Cache"}).textContent).not.toMatch(/Workload:|Growth due|Waiting for workload growth/);
  expect(dialog("Read Cache").getByRole("button",{name:/Tune cache ceiling/})).toBeTruthy();
@@ -207,7 +203,7 @@ it("describes a failed server's zero available capacity and shows that instance'
 });
 
 it("groups unrouted serving capacity into one warning instead of repeating it per server",()=>{
- const game=tick(decide(combinedCompany(),{type:"set_routing",mode:"single",targets:["app-1"]}));show(game);open("App Server");open("Server management");
+ const game=tick(decide(completedReliability(),{type:"set_routing",mode:"single",targets:["app-1"]}));show(game);open("App Server");open("Server management");
  const notes=document.querySelector<HTMLElement>(".component-inspection-app")!.querySelectorAll(".inspection-warning");
  expect(notes).toHaveLength(1);
  for(const app of game.campaign!.apps.filter(a=>!a.routed&&a.role!=="spare")) expect(notes[0].textContent).toContain(`Server ${app.id.slice(4)}`);
@@ -222,9 +218,8 @@ it("transfers a specific server recommendation through instance selection before
  fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()[0].textContent).toBe("Scale up Server 3");
  fireEvent.click(gold()[0]);await act(async()=>{});expect(gold()).toHaveLength(1);expect(gold()[0].textContent).toBe("Confirm");
 });
-it("walks Chapter 6 routing through its checklist before pending Run",async()=>{
- let game=tick(decide(combinedCompany(),{type:"set_traffic_limit",enabled:true}));
- game=tick(decide(game,{type:"set_routing",mode:"single",targets:["app-1"]}));
+it("walks routing after Stay Online through its checklist before pending Run",async()=>{
+ const game=tick(decide(completedReliability(),{type:"set_routing",mode:"single",targets:["app-1"]}));
  expect(campaignAttention(game).action?.action).toEqual({type:"set_routing",mode:"balanced",targets:["app-1","app-2","app-3"]});show(game);
  await accept();expect(gold()[0].textContent).toBe("Network");fireEvent.click(gold()[0]);await act(async()=>{});
  expect(gold()[0].textContent).toContain("Network management");fireEvent.click(gold()[0]);await act(async()=>{});

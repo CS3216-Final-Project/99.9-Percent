@@ -1,6 +1,6 @@
 import { test, expect, seedSave, savedGame, chapterComplete, advanceCampaignStep } from "./fixtures";
 import { dataCompany, finishingScaling } from "../src/sim/__tests__/dataFixture";
-import { completedReliability } from "../src/sim/__tests__/combinedFixture";
+import { completedReliability } from "../src/sim/__tests__/completionFixture";
 import { newGame } from "../src/sim";
 import { readyReliability, act, tick, respondToIncident } from "../src/sim/__tests__/reliabilityFixture";
 import { canEnterReliability, installPending } from "../src/sim/reliability";
@@ -19,14 +19,14 @@ test("chapter bar stays visible and follows the same company into Data Strategy"
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   
   const bar = page.getByRole("region", { name: "Guided Mode chapters" });
-  await expect(bar).toContainText("Chapter 2 of 6");
+  await expect(bar).toContainText("Chapter 2 of 5");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Scaling & Routing");
   await expect(bar.getByRole("list", { name: "Chapter progress" })).toHaveCount(0);
   await expect(bar.getByLabel("Current objective")).toContainText("Prepare the system for the next growth wave.");
   const before = await savedGame(page);
   await bar.getByRole("button", { name: "View chapters" }).press("Enter");
   const dialog = page.getByRole("dialog", { name: "Guided Mode chapters" });
-  await expect(dialog.getByRole("listitem")).toHaveCount(7);
+  await expect(dialog.getByRole("listitem")).toHaveCount(6);
   await expect(dialog.getByRole("listitem").filter({ hasText: "Data Strategy" })).toContainText("Available next");
   await expect(dialog.getByRole("listitem").filter({ hasText: "Stay Online" })).toContainText("Locked");
   expect(await savedGame(page)).toEqual(before);
@@ -35,7 +35,7 @@ test("chapter bar stays visible and follows the same company into Data Strategy"
   await expect(dialog).toBeHidden();
   await expect(bar.getByRole("button", { name: "View chapters" })).toBeFocused();
   await bar.getByRole("button", { name: "Next: Continue to Data Strategy", exact: true }).press("Space");
-  await expect(bar).toContainText("Chapter 3 of 6");
+  await expect(bar).toContainText("Chapter 3 of 5");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Data Strategy");
   expect((await savedGame(page)).campaign!.runId).toBe(before.campaign!.runId);
   await page.getByRole("complementary", { name: "System metrics" }).evaluate(el => { el.scrollTop = el.scrollHeight; });
@@ -99,7 +99,7 @@ test("compact chapter summary, objective and Next stay clear at desktop and lapt
   await page.getByRole("button", { name: "Continue company", exact: true }).click();
   
   const bar = page.getByRole("region", { name: "Guided Mode chapters" });
-  await expect(bar.getByRole("button", { name: "Next: Continue to Grow the Company", exact: true })).toHaveText("Next");
+  await expect(bar.getByRole("button", { name: "Next: Complete campaign", exact: true })).toHaveText("Next");
   for (const [width,height] of [[1101,900],[1366,768],[1440,900]]) {
     await page.setViewportSize({ width, height });
     const collisions = await bar.evaluate(el => {

@@ -25,6 +25,7 @@ import { attentionOn, FLOOR_NAME, FLOORS, floorOf, type Floor } from "@/game/flo
 import { nextViewpoint } from "@/game/viewpoints";
 import { OPENING_TRAFFIC_NOTE, openingTrafficCue, startsOpeningTraffic } from "@/game/openingTrafficCue";
 import { isPhoneEdition } from "@/phone/edition";
+import { useCountUp } from "../useCountUp";
 import {
   AISLE_Z,
   appSlot,
@@ -1050,19 +1051,23 @@ function Label({ id, m }: { id: EquipmentId; m: SceneModel }) {
   );
 }
 
-/** In and Out, with this second's requests: the gap between the two is what the company is losing. */
+/**
+ * In and Out, with this second's requests: the gap between the two is what the company is losing. The figures count
+ * to each new second's together, so the gap stays true while they move; the accessible names give the settled ones.
+ */
 export function GateCounts({ c }: { c: Campaign }) {
   const m = c.snapshot;
   const cue = openingTrafficCue(c);
+  const admitted = useCountUp(m.admitted), rejected = useCountUp(m.rejected), successful = useCountUp(m.successful);
   return (
     <>
       <span className={`wall-tag gate-tag gate-in${m.rejected * 5 > m.incoming ? " is-rejecting" : ""}${cue ? " is-cued" : ""}`} ref={bindLabel(TRAFFIC_IN)} aria-label={`In: ${num(m.admitted)} requests per second${m.rejected ? `, ${num(m.rejected)} turned away` : ""}${cue ? `. ${OPENING_TRAFFIC_NOTE[cue]}` : ""}`}>
-        <b>In</b> {num(m.admitted)}/s
+        <b>In</b> {num(admitted)}/s
         {cue && <span className="gate-cue" aria-hidden>{OPENING_TRAFFIC_NOTE[cue]}</span>}
-        {m.rejected > 0 && <span className="gate-note">{num(m.rejected)}/s turned away - no revenue, counts against uptime</span>}
+        {rejected > 0 && <span className="gate-note">{num(rejected)}/s turned away - no revenue, counts against uptime</span>}
       </span>
       <span className="wall-tag gate-tag gate-out" ref={bindLabel(TRAFFIC_OUT)} aria-label={`Out: ${num(m.successful)} requests per second served`}>
-        <b>Out</b> {num(m.successful)}/s
+        <b>Out</b> {num(successful)}/s
       </span>
     </>
   );

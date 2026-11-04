@@ -2,13 +2,13 @@ import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { newGame } from "@/sim";
-import { act, finishedCompany } from "@/sim/__tests__/combinedFixture";
+import { act, completedReliability } from "@/sim/__tests__/completionFixture";
 import { campaignFinale } from "@/game/campaignFinale";
 import { makeEnvelope } from "@/game/saveEnvelope";
 import { useGame } from "@/game/store";
 import { CampaignOverlays } from "./CampaignUI";
 
-const won = act(finishedCompany(), { type: "complete_campaign" });
+const ready = completedReliability(), won = act(ready, { type: "complete_campaign" });
 const finale = () => screen.queryByRole("dialog", { name: "Campaign finale" });
 const scorecard = () => screen.queryByRole("dialog", { name: "Campaign complete" });
 const next = () => within(finale()!).queryByRole("button", { name: "Next" });
@@ -19,18 +19,21 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("only celebrates a won campaign, with every colleague in order and true numbers", () => {
   expect(campaignFinale(newGame())).toBeNull();
-  expect(campaignFinale(finishedCompany())).toBeNull();
+  expect(campaignFinale(ready)).toBeNull();
   expect(campaignFinale({ ...won, outcome: "bankrupt" })).toBeNull();
   const model = campaignFinale(won)!;
   expect(model.lines.map(l => l.speaker)).toEqual(["maya", "jordan", "sam", "taylor", "alex"]);
   expect(model.lines.every(l => l.mood === "celebrating")).toBe(true);
-  expect(model.lines.at(-1)!.text).toContain(won.campaign!.scorecard!.users.toLocaleString("en-US"));
-  expect(model.stats.find(s => s.label === "Users")!.value).toBe("50,000");
+  // No line claims what the scorecard cannot back: the Opening's database often did fall behind, and chapters are not in-world.
+  expect(model.lines.map(l => l.text).join(" ")).not.toMatch(/chapter|kept up/i);
+  expect(model.lines.at(-1)!.text).toContain("one server");
+  expect(model.stats.map(s => s.label)).toEqual(["Uptime", "Incidents"]);
+  expect(model.stats.find(s => s.label === "Incidents")!.value).toBe(String(won.campaign!.scorecard!.incidentCount));
   const quiet = structuredClone(won), once = structuredClone(won), unknown = structuredClone(won);
   quiet.campaign!.scorecard!.incidentCount = 0; once.campaign!.scorecard!.incidentCount = 1; unknown.campaign!.scorecard!.wholeRunUptime = null;
   expect(campaignFinale(quiet)!.lines[3].text).toContain("Not a single incident");
   expect(campaignFinale(once)!.lines[3].text).toMatch(/^1 incident,/);
-  expect(campaignFinale(unknown)!.stats.map(s => s.label)).toEqual(["Users", "Incidents"]);
+  expect(campaignFinale(unknown)!.stats.map(s => s.label)).toEqual(["Incidents"]);
 });
 
 it("plays the celebration once before the scorecard, switching speaker and portrait each line", () => {
@@ -45,7 +48,7 @@ it("plays the celebration once before the scorecard, switching speaker and portr
     expect(finale()!.querySelector(".dialogue-stats") !== null).toBe(i === model.lines.length - 1);
     if (next()) fireEvent.click(next()!);
   }
-  expect(within(finale()!).getByLabelText("Campaign results").textContent).toContain("50,000");
+  expect(within(finale()!).getByLabelText("Campaign results").textContent).toContain(model.stats.at(-1)!.value);
   fireEvent.click(within(finale()!).getByRole("button", { name: "See the scorecard" }));
   expect(finale()).toBeNull(); expect(scorecard()).not.toBeNull();
   cleanup(); show(); expect(finale()).toBeNull(); expect(scorecard()).not.toBeNull();

@@ -52,7 +52,7 @@ function gradedCopy(d: Stage, stage: SpikeStage, pulse: number, last: SpikePulse
 /** Presentation of recorded events only; no clock, dispatcher or progression state. */
 export function chapter4Stage(game: GameState) {
   const c = game.campaign, d = c?.spikeStage;
-  if (!c || !d || c.reliabilityStage || c.combinedStage || d.acknowledged || game.phase === "ended") return null;
+  if (!c || !d || c.reliabilityStage || d.acknowledged || game.phase === "ended") return null;
   const graded = gradedSpikes(d), { started, ended } = progress(d);
   const pulse = Math.max(1, started);
   // Version 1 ends after its second spike; a graded company stays between spikes until a test passes.

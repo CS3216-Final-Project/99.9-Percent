@@ -429,12 +429,8 @@ export interface GameState {
 /* ------------------------------------------------------------------ */
 
 export type Action =
-  | { type:"enter_combined"; finalUserTarget?:number; sequence?:import("./scenarios/combinedCampaign").CombinedScenario[] }
-  | { type:"start_growth_wave" }
-  | { type:"acknowledge_growth" }
   | { type:"complete_campaign" }
   | { type:"accept_scaling_risk" }
-  | { type:"run_promotion" }
   | { type: "begin_introduction" }
   | { type: "acknowledge_introduction"; equipment: EquipmentId }
   | { type: "complete_introduction"; handoff?: "opening" }

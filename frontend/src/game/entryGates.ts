@@ -1,7 +1,7 @@
-import type { combinedEntryGates } from "@/sim/combinedCampaign";
+import type { completionGates } from "@/sim/campaignCompletion";
 import type { reliabilityEntryGates } from "@/sim/reliability";
 
-type Gate = keyof ReturnType<typeof reliabilityEntryGates> | keyof ReturnType<typeof combinedEntryGates>;
+type Gate = keyof ReturnType<typeof reliabilityEntryGates> | keyof ReturnType<typeof completionGates>;
 
 /** A chapter entry gate as the player sees it: a clause that completes "<chapter> opens once ...". */
 const GATE_LABELS: Record<Gate, string> = {
@@ -26,6 +26,6 @@ export function entryBlockers(ready: boolean, gates: Partial<Record<Gate, boolea
   return unmet.length ? unmet : [`${previous} is finished`];
 }
 
-/** One sentence naming what a chapter still waits for, for notes and disabled controls. */
-export const waitsFor = (chapter: string, unmet: string[]) =>
-  `${chapter} opens once ${unmet.length > 1 ? `${unmet.slice(0, -1).join(", ")} and ${unmet.at(-1)}` : unmet[0]}.`;
+/** One sentence naming what a chapter, or another step such as completing the campaign, still waits for. */
+export const waitsFor = (chapter: string, unmet: string[], opens = "opens") =>
+  `${chapter} ${opens} once ${unmet.length > 1 ? `${unmet.slice(0, -1).join(", ")} and ${unmet.at(-1)}` : unmet[0]}.`;

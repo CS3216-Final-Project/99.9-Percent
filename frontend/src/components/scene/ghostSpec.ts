@@ -17,9 +17,7 @@ export type GhostPart =
   /** The traffic limit, drawn as a firewall across the aisle between In and the gateway. */
   | { type: "wall"; x: number; z: number; tone: GhostTone }
   /** A ring on the floor: a repair, a health probe or a spare being set aside. */
-  | { type: "pulse"; x: number; z: number; tone: GhostTone }
-  /** Extra requests arriving at In, for a promotion. */
-  | { type: "burst"; x: number; z: number };
+  | { type: "pulse"; x: number; z: number; tone: GhostTone };
 
 /** The intervention a campaign action would schedule, or null for actions the room does not preview. */
 export function changeOf(action: Action, c: Campaign): Change | null {
@@ -40,7 +38,6 @@ export function changeOf(action: Action, c: Campaign): Change | null {
     case "deploy_failover": return { kind: "failover", targetId: c.reliabilityStage?.spareId ?? undefined };
     case "restore_app": return { kind: "restore-app", targetId: action.appId };
     case "pick_launch_tech": return { kind: action.tech === "caching" ? "cache" : "deploy-autoscaler" };
-    case "run_promotion": return { kind: "promotion" };
     default: return null;
   }
 }
@@ -146,9 +143,6 @@ export function ghostParts(change: Change, c: Campaign, layout: FloorLayout, ext
       break;
     case "restore-app":
       pulse(change.targetId);
-      break;
-    case "promotion":
-      parts.push({ type: "burst", x: IN_GATE.x, z: IN_GATE.z });
       break;
   }
   return parts;

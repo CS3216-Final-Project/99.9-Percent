@@ -1,9 +1,6 @@
 import { infrastructureAction, inspectEquipment, closeInspection, purchasePreview, followHintComponent, expectInspectionsOnly } from "./componentInspection";
 import { reliabilityClarity } from "./reliabilityClarity";
 import { campaignReportJourney } from "./campaignReports";
-import { chapter6FinanceJourney } from "./chapter6Finance";
-import { act as chapter6Act, tick as chapter6Tick, combinedCompany as chapter6Company, promotionRiskCompany } from "../src/sim/__tests__/combinedFixture";
-import { chapter6Preparation, bootChapter6 } from "./chapter6Guidance";
 import { appHealthDuringOpening, appHealthJourney, appHealthProblem } from "./appHealth";
 import type { Page } from "@playwright/test";
 import { keyboardDetails, purchaseLayout } from "./purchaseLayout";
@@ -250,7 +247,7 @@ test("current chapter is prominent and the full journey opens on touch", async (
   await page.getByRole("button", { name: "Continue company", exact: true }).tap();
 
   const bar = page.getByRole("region", { name: "Guided Mode chapters" });
-  await expect(bar).toContainText("Chapter 4 of 6");
+  await expect(bar).toContainText("Chapter 4 of 5");
   await expect(bar.getByLabel("Current chapter", { exact: true })).toHaveText("Traffic Spikes & Autoscaling");
   await expect(bar.getByRole("button", { name: "View chapters" })).toBeInViewport();
   expect(await bar.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
@@ -258,7 +255,7 @@ test("current chapter is prominent and the full journey opens on touch", async (
   const before = await savedGame(page);
   await bar.getByRole("button", { name: "View chapters" }).tap();
   const dialog = page.getByRole("dialog", { name: "Guided Mode chapters" });
-  await expect(dialog.getByRole("listitem")).toHaveCount(7);
+  await expect(dialog.getByRole("listitem")).toHaveCount(6);
   await expect(dialog.getByRole("heading", { name: "Stay Online" })).toBeVisible();
   await dialog.getByRole("button", { name: "Back to company" }).tap();
   await expect(dialog).toBeHidden();
@@ -268,7 +265,7 @@ test("current chapter is prominent and the full journey opens on touch", async (
 
 for (const next of [false,true]) test(`compact chapter bar keeps goal and navigation reachable on touch, Next=${next}`, async ({page,withoutRoom}) => {
   await withoutRoom();
-  const {completedReliability}=await import("../src/sim/__tests__/combinedFixture");
+  const {completedReliability}=await import("../src/sim/__tests__/completionFixture");
   await page.route("**/api/**",route=>route.abort());
   await seedSave(page,next?completedReliability():newGame());
   await page.goto("/");
@@ -291,15 +288,16 @@ for (const next of [false,true]) test(`compact chapter bar keeps goal and naviga
     const view=bar.getByRole("button",{name:"View chapters"});
     await view.tap();
     const dialog=page.getByRole("dialog",{name:"Guided Mode chapters"});
-    await expect(dialog.getByRole("listitem")).toHaveCount(7);
+    await expect(dialog.getByRole("listitem")).toHaveCount(6);
     await dialog.getByRole("button",{name:"Back to company"}).tap();
     await expect(view).toBeFocused();
   }
   expect(await savedGame(page)).toEqual(before);
   if(next) {
-    await bar.getByRole("button",{name:"Next: Continue to Grow the Company"}).tap();
-    await expect(bar.getByLabel("Current chapter",{exact:true})).toHaveText("Grow the Company");
-    expect((await savedGame(page)).campaign!.runId).toBe(before.campaign!.runId);
+    await bar.getByRole("button",{name:"Next: Complete campaign"}).tap();
+    await expect(page.getByRole("dialog",{name:"Campaign complete",exact:true})).toBeVisible();
+    const after=await savedGame(page);
+    expect(after.outcome).toBe("won");expect(after.campaign!.runId).toBe(before.campaign!.runId);
   }
 });
 
@@ -506,7 +504,7 @@ test("traffic spikes: touch selects an instance after retirement and re-provisio
  await page.getByRole("button",{name:"Menu",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Menu",exact:true})).toBeVisible();
 });
 
-test("combined: touch scorecard, completed guidance, technology inspection and paused reload",async({page,withoutRoom})=>{await withoutRoom();const {finishedCompany}=await import("../src/sim/__tests__/combinedFixture");await page.route("**/api/**",r=>r.abort());await seedSave(page,finishedCompany());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Grow the Company");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Grow the Company"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await page.getByRole("region",{name:"Run scorecard"}).getByText("View Technical Details",{exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("50,000");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"See how it ended",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
+test("completed campaign: touch scorecard, completed guidance, technology inspection and paused reload",async({page,withoutRoom})=>{await withoutRoom();const {reliabilityOutcome}=await import("../src/game/__fixtures__/reliabilityOutcome");await page.route("**/api/**",r=>r.abort());await seedSave(page,reliabilityOutcome());await page.goto("/");await page.getByRole("button",{name:"Continue company",exact:true}).tap();await page.getByRole("dialog",{name:"Reliability outcome",exact:true}).getByRole("button",{name:"Complete campaign",exact:true}).tap();await page.getByRole("button",{name:"Inspect final company",exact:true}).tap();await expect(page.getByLabel("Current chapter")).toHaveText("Stay Online");await page.getByRole("button",{name:"View chapters",exact:true}).tap();await expect(page.getByRole("dialog",{name:"Guided Mode chapters"}).getByRole("listitem").filter({hasText:"Stay Online"})).toContainText("Completed");await page.getByRole("button",{name:"Back to company",exact:true}).tap();await page.getByRole("button",{name:"View run scorecard",exact:true}).tap();await page.getByRole("region",{name:"Run scorecard"}).getByText("View Technical Details",{exact:true}).tap();await expect(page.getByRole("region",{name:"Run scorecard"})).toContainText("Campaign complete");await page.getByRole("button",{name:"Close",exact:true}).tap();await page.getByRole("button",{name:"Tech",exact:true}).tap();await expect(page.getByRole("region",{name:"Tech tree"}).locator("[data-tech]")).toHaveCount(9);await page.reload();await page.getByRole("button",{name:"See how it ended",exact:true}).tap();expect((await savedGame(page)).outcome).toBe("won");});
 
 for(const width of [390,320]) test(`Campaign UX: the touch opening and secondary controls fit at ${width}px`,async({page})=>{
  // The room is drawn in software, and its labels settle only as the camera brings each machine above the panel.
@@ -650,30 +648,6 @@ for (const width of [390, 320]) test(`incident Pause: immediate touch attention 
 });
 
 
-test("Chapter 6 guidance: 320px touch preparation, actionable routing and safe removal", async ({ page, installClock, withoutRoom}) => {
-  await withoutRoom();
-  await installClock(); await page.setViewportSize({ width: 320, height: 568 });
-  await chapter6Preparation(page, true);
-});
-
-
-for (const milestone of ["wave", "recovery", "final"] as const)
-  test(`Chapter 6 guidance: 320px touch ${milestone} milestone colours`, async ({ page, installClock, withoutRoom}, info) => {
-  await withoutRoom();
-    await installClock(); await page.setViewportSize({ width: 320, height: 568 });
-    const wave = chapter6Act(chapter6Tick(chapter6Company(), 5), { type: "start_growth_wave" });
-    const game = milestone === "wave" ? wave : milestone === "recovery" ? chapter6Tick(wave, 24) : promotionRiskCompany();
-    const title = milestone === "wave" ? "Growth wave 1" : milestone === "recovery" ? "Recover at full demand" : "Final checks";
-    await bootChapter6(page, game);
-    const cue = page.getByRole("dialog", { name: `Chapter 6: ${title}`, exact: true });
-    await expectCueColours(cue, milestone === "wave" ? "pressure" : "recovery");
-    await expect(cue.locator("h3 > .icon")).toBeInViewport({ ratio: 1 });
-    await expect(cue.getByRole("button", { name: "Dismiss chapter guidance", exact: true })).toBeInViewport({ ratio: 1 });
-    await page.screenshot({ path: info.outputPath(`${milestone}-320.png`) });
-    await cue.getByRole("button", { name: "Got it", exact: true }).tap();
-    await expect(cue).toHaveCount(0);
-  });
-
 
 test("Chapter 5 clarity: outcome and details remain usable on 320px touch", async ({ page, installClock, withoutRoom}, info) => {
   await withoutRoom();
@@ -681,19 +655,13 @@ test("Chapter 5 clarity: outcome and details remain usable on 320px touch", asyn
   await reliabilityClarity(page, info, true);
 });
 
-for (const kind of ["spikes", "completion"] as const) {
+for (const kind of ["spikes"] as const) {
   test(`Campaign report: ${kind} summary and acknowledgement on 320px touch`, async ({ page, installClock, withoutRoom}, info) => {
   await withoutRoom();
     await installClock(); await page.setViewportSize({ width: 320, height: 568 });
     await campaignReportJourney(page, info, kind, true);
   });
 }
-
-test("Chapter 6 finances: funding warning and existing cash spotlight on 320px touch", async ({ page, installClock, withoutRoom}, info) => {
-  await withoutRoom();
-  await installClock(); await page.setViewportSize({ width: 320, height: 568 });
-  await chapter6FinanceJourney(page, info, true);
-});
 
 test("Launch Week cold open and research sheet remain usable by touch at 390px", async ({ page, withoutRoom}, info) => {
   await withoutRoom();

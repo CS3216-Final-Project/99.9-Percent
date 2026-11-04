@@ -23,7 +23,7 @@ it.each([
   render(<CampaignChapters />);
   const bar = screen.getByRole("region", { name: "Guided Mode chapters" });
   expect(within(bar).getByLabelText("Current chapter").textContent).toBe(name);
-  expect(bar.textContent).toContain(`Chapter ${number} of 6`);
+  expect(bar.textContent).toContain(`Chapter ${number} of 5`);
   expect(within(bar).queryByRole("list", { name: "Chapter progress" })).toBeNull();
   expect(within(bar).getByLabelText("Current objective").textContent).not.toBe("");
   expect(within(bar).getAllByRole("button", { name: "View chapters" })).toHaveLength(1);
@@ -57,7 +57,7 @@ it("explains a disabled Next without changing its engine gate", () => {
   expect(useGame.getState().game).toBe(game);
 });
 
-it("opens Chapter 0 and the six gameplay chapters without advancing the company and stays paused on close", () => {
+it("opens Chapter 0 and the five gameplay chapters without advancing the company and stays paused on close", () => {
   const game = newGame();
   useGame.setState({ game, started: true, ready: true, running: true });
   render(<CampaignChapters />);
@@ -65,7 +65,7 @@ it("opens Chapter 0 and the six gameplay chapters without advancing the company 
   expect(useGame.getState().running).toBe(false);
   expect(useGame.getState().game).toBe(game);
   const dialog = screen.getByRole("dialog", { name: "Guided Mode chapters" });
-  expect(within(dialog).getAllByRole("listitem")).toHaveLength(7);
+  expect(within(dialog).getAllByRole("listitem")).toHaveLength(6);
   expect(dialog.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
   expect(within(dialog).getByRole("heading", { name: "Stay Online" }).closest("li")!.textContent).toContain("Locked");
   fireEvent.click(within(dialog).getByRole("button", { name: "Back to company" }));

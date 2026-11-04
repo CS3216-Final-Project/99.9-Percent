@@ -18,6 +18,11 @@ describe("readable recorded events", () => {
     expect(describeEvents([event(1, 5, "action-activated", { actionId: "old" })])[0]).toMatchObject({ title: "Infrastructure change activated", detail: null });
     expect(describeEvents([event(2, 5, "future-trace-event")])[0].title).toBe("Future trace event");
   });
+  it("names a refused decision in words, including the retired Grow the Company entry kept in old saves", () => {
+    const titles = describeEvents([event(1, 3, "action-rejected", { action: "enter_combined", reason: "Review the reliability outcome first." }),
+      event(2, 4, "action-rejected", { action: "set_traffic_limit" }), event(3, 5, "action-rejected", { action: "enter_reliability" })]).map(e => e.title);
+    expect(titles).toEqual(["Continue to Grow the Company rejected", "Set traffic limit rejected", "Continue to Stay Online rejected"]);
+  });
   it("makes routing and failure evidence readable without exposing stored JSON", () => {
     const route = JSON.stringify({ mode: "balanced", targets: ["app-1", "app-2"] });
     const result = describeEvents([event(1, 3, "action-requested", { actionId: "r", type: "routing", routing: route }),

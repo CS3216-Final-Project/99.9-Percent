@@ -82,36 +82,12 @@ function GhostPulse({ part, flashing }: { part: Extract<GhostPart, { type: "puls
   );
 }
 
-/** A promotion's extra customers, gold dots pouring in at the In gate. */
-function GhostBurst({ part }: { part: Extract<GhostPart, { type: "burst" }> }) {
-  const mesh = useRef<THREE.InstancedMesh>(null);
-  const dummy = useMemo(() => new THREE.Object3D(), []);
-  const still = useMemo(() => reducedMotion(), []);
-  useFrame(({ clock }) => {
-    if (!mesh.current) return;
-    for (let i = 0; i < 18; i++) {
-      const p = still ? i / 18 : (clock.elapsedTime * 0.6 + i / 18) % 1;
-      dummy.position.set(part.x - 2.5 + p * 2.6, 0.12, part.z + ((i % 3) - 1) * 0.3);
-      dummy.updateMatrix();
-      mesh.current.setMatrixAt(i, dummy.matrix);
-    }
-    mesh.current.instanceMatrix.needsUpdate = true;
-  });
-  return (
-    <instancedMesh ref={mesh} args={[undefined, undefined, 18]}>
-      <boxGeometry args={[0.2, 0.08, 0.2]} />
-      <meshBasicMaterial color={GHOST.add} toneMapped={false} />
-    </instancedMesh>
-  );
-}
-
 function Part({ part, flashing }: { part: GhostPart; flashing: boolean }) {
   switch (part.type) {
     case "rack": return <GhostRack part={part} flashing={flashing} />;
     case "cable": return <GhostCable points={part.points} tone={part.tone} flashing={flashing} />;
     case "wall": return <GhostWall part={part} flashing={flashing} />;
     case "pulse": return <GhostPulse part={part} flashing={flashing} />;
-    case "burst": return <GhostBurst part={part} />;
   }
 }
 

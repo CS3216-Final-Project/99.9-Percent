@@ -1,5 +1,5 @@
 import type { Campaign, CampaignPostmortem, TraceEvent } from "./campaignTypes";
-import { currentFault } from "./combinedCampaign";
+import { currentFault } from "./reliability";
 import { serverName } from "./names";
 export function trace(c: Campaign, type: string, data: TraceEvent["data"] = {}): void {
     c.trace.push({ id: c.nextEventId++, step: c.step, type, data });
@@ -49,16 +49,7 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
             const capacity=bypass.reliability!.healthyRoutedCapacity;
             explanations.push(`At step ${bypass.step}, the failed instance was bypassed. Surviving routed capacity was ${capacity} req/s against ${bypass.admitted} req/s admitted traffic. ${bypass.admitted>capacity?"Traffic exceeded surviving capacity, so correct rerouting still left the applications overloaded.":"Surviving capacity could handle admitted traffic; retained queues and database pressure still determine recovery."}`);
         }
-        explanations.push(`At recovery, healthy routed capacity was ${c.snapshot.reliability?.healthyRoutedCapacity??0} req/s. ${c.combinedStage?"Autoscaling observed only healthy routed capacity during growth pressure":"Autoscaling was suspended during the test"}; installed spare and failed apps still incurred upkeep.`);
-    }
-    if(c.combinedStage) {
-        for(const e of events) {
-            if(e.type==="scenario-started")explanations.push(`At step ${e.step}, growth round ${Number(e.data.index)+1} (${e.data.template}) began: users rose to ${e.data.users} and demand peaked at ${e.data.peak} req/s.`);
-            if(e.type==="scenario-pressure-ended")explanations.push(`At step ${e.step}, round pressure ended and demand returned to the ${e.data.baseline} req/s baseline.`);
-            if(e.type==="promotion-started")explanations.push(`At step ${e.step}, a promotion added ${e.data.increment} req/s until step ${e.data.endStep}.`);
-            if(e.type==="promotion-ended")explanations.push(`At step ${e.step}, the promotion ended and demand returned to the ${e.data.baseline} req/s baseline.`);
-        }
-        explanations.push("Registrations are a growth opportunity; only successful requests earn revenue.");
+        explanations.push(`At recovery, healthy routed capacity was ${c.snapshot.reliability?.healthyRoutedCapacity??0} req/s. Autoscaling was suspended during the test; installed spare and failed apps still incurred upkeep.`);
     }
     if(c.spikeStage) {
       for(const e of events.filter(x=>["traffic-spike-started","traffic-spike-ended","autoscale-scale-out-decided","autoscaler-blocked","autoscale-instance-retired"].includes(x.type)))
@@ -94,8 +85,6 @@ export function causalPostmortem(c: Campaign): CampaignPostmortem {
             explanations.push(`Database capacity increased from ${d.dbBefore} to ${d.dbAfter} ops/s. ${drainage}`);
         else if (Number(d.admittedAfter) < Number(d.admittedBefore))
             explanations.push(`Admitted demand fell from ${d.admittedBefore} to ${d.admittedAfter} requests/s, rejecting demand. ${drainage}`);
-        else if (action.type === "promotion")
-            explanations.push(`Promotion activated at step ${effect.step}, costing $${action.costCents/100} and adding temporary demand. It creates demand opportunity, not infrastructure capacity or a guaranteed recovery.`);
         else if(action.type==="cache"||action.type==="cache-tuning")
             explanations.push(`${action.type === "cache" ? "Read Cache" : "Cache tuning"} activated at step ${effect.step}; target ${Number(d.cacheTarget)/100}%. Warm-up and eligible reads determine actual hits; writes and non-cacheable reads continue to DB. Compare recorded demand rather than treating activation as recovery.`);
         else if (action.type === "routing" || action.type === "scale-up")

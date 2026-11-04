@@ -1,8 +1,7 @@
 import { spikeCompany, act, tick, replay } from "./spikeFixtures";
 import { incidentAwaitingResponse } from "../step";
 import { openingTuning } from "../launchWeek";
-import { installPending } from "../reliability";
-import { currentFault } from "../combinedCampaign";
+import { currentFault, installPending } from "../reliability";
 import { TRAFFIC_SPIKES as T } from "../scenarios/trafficSpikes";
 import type { Action, GameState } from "../types";
 export { act, tick, replay };

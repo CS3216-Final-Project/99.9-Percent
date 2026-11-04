@@ -1,5 +1,4 @@
-import { combinedInput, currentFault } from "./combinedCampaign";
-import { researchBalance } from "./reliability";
+import { currentFault, researchBalance } from "./reliability";
 import type { Action, ActionResult, GameState } from "./types";
 import type { Campaign, ScheduledAction, SpikeObservation, SpikePulse, SpikeStage } from "./campaignTypes";
 import { GRADED_SPIKES as G, TRAFFIC_SPIKES as T } from "./scenarios/trafficSpikes";
@@ -28,7 +27,7 @@ export function pendingSpikeDebrief(c:Campaign|undefined):SpikePulse|null {
 /** Whether a graded spike has passed, which version-2 completion requires. */
 export const spikeTestPassed=(d:SpikeStage):boolean=>!gradedSpikes(d)||!!d.pulses?.some(p=>p.result==="passed");
 /** Incidents during the graded chapter close on stable service alone: the spike tests grade the response. */
-export const spikeIncidentsSelfResolve=(c:Campaign):boolean=>gradedSpikes(c.spikeStage)&&c.spikeStage!.completedStep===null&&!c.reliabilityStage&&!c.combinedStage;
+export const spikeIncidentsSelfResolve=(c:Campaign):boolean=>gradedSpikes(c.spikeStage)&&c.spikeStage!.completedStep===null&&!c.reliabilityStage;
 /**
  * Accumulates the completed observation into its spike, or into the calm capacity the score reports, and grades each
  * spike once its window ends.
@@ -61,12 +60,11 @@ export function canEnterSpikes(s:GameState):boolean {
  qualifiesForRecovery(c.snapshot) && c.reports.every(r=>c.trace.some(t=>t.type==="review-acknowledged"&&t.data.incidentId===r.id));
 }
 export function spikeInput(c:Campaign, at=c.step):number {
- if(c.combinedStage)return combinedInput(c,at);
  const d=c.spikeStage;if(!d)return c.incomingRate;
  return pulseAt(d,at)!==null?spikePeak(d):T.baseline;
 }
 export function advanceSpikeTraffic(c:Campaign):void {
- const d=c.spikeStage;if(!d||c.combinedStage)return;
+ const d=c.spikeStage;if(!d)return;
  for(let i=0;i<d.deadlines.length;i++) {
   const id=`spike-${Math.floor(i/2)+1}-${i%2?"end":"start"}`;
   if(c.step>=d.deadlines[i]&&!d.consumed.includes(id)) {
@@ -77,9 +75,9 @@ export function advanceSpikeTraffic(c:Campaign):void {
  }
 }
 export function spikeObservation(c:Campaign):SpikeObservation {
- const a=c.spikeStage?.controller, xs=c.snapshot.instances?.filter(x=>x.routed&&(!c.combinedStage||x.health!=="failed"))??[];
+ const a=c.spikeStage?.controller, xs=c.snapshot.instances?.filter(x=>x.routed)??[];
  const capacity=xs.reduce((n,x)=>n+x.capacity,0),work=xs.reduce((n,x)=>n+x.processed,0);
- return {activePulse:!c.combinedStage&&c.spikeStage?pulseAt(c.spikeStage,c.step):null,
+ return {activePulse:c.spikeStage?pulseAt(c.spikeStage,c.step):null,
  routedBusyBasisPoints:capacity?Math.floor(work*10000/capacity):0, installed:c.apps.length,routed:c.routing.targets.length,
  enabled:a?.enabled??false,highSteps:a?.highSteps??0,lowSteps:a?.lowSteps??0,cooldownUntil:a?.cooldownUntil??0,blockedReason:a?.blockedReason??null};
 }
@@ -97,7 +95,6 @@ function blocked(c:Campaign,reason:string|null):void {
 }
 export function canRetire(c:Campaign,id:string,preview=false):boolean {
  const a=c.spikeStage?.controller, target=c.apps.find(x=>x.id===id);
- if(c.combinedStage&&currentFault(c)?.restoredStep===null&&c.step>=currentFault(c)!.startStep)return false;
  if(currentFault(c)?.targetId===id&&currentFault(c)?.restoredStep===null)return false;
  if(target?.health==="failed"||target?.role==="spare")return false;
  if(!a || !target || !a.managedAppIds.includes(id)||target.tier!=="base"||target.backlog || c.incident || c.dbBacklog || c.apps.some(x=>x.backlog) ||
@@ -137,14 +134,13 @@ export function runAutoscaler(s:GameState):void {
   else {
    const o=spikeObservation(c);
    // Integer cross products preserve strict threshold boundaries without rounding.
-   const xs=c.snapshot.instances!.filter(x=>x.routed&&(!c.combinedStage||x.health!=="failed")),capacity=xs.reduce((n,x)=>n+x.capacity,0),work=xs.reduce((n,x)=>n+x.processed,0);
+   const xs=c.snapshot.instances!.filter(x=>x.routed),capacity=xs.reduce((n,x)=>n+x.capacity,0),work=xs.reduce((n,x)=>n+x.processed,0);
    const legacy=c.step<=(c.legacyScalingStep??-1);
    const upgrades=legacy?[]:a.managedAppIds.filter(id=>{const t=c.apps.find(x=>x.id===id);return !!t&&t.tier==="base"&&t.health!=="failed"&&t.role!=="spare"&&c.routing.targets.includes(id);})
     .sort((x,y)=>(xs.find(i=>i.id===y)?.processed??0)-(xs.find(i=>i.id===x)?.processed??0)||Number(x.slice(4))-Number(y.slice(4)));
    const canScaleOut=c.apps.length<T.maximum&&c.cashCents>Q.appCostCents,canScaleUp=upgrades.length>0&&c.cashCents>P.appCostCents;
    const saturated=work*10000>capacity*T.high;
-   if(c.combinedStage&&capacity===0)blocked(c,"No healthy routed capacity");
-   else if(saturated&&!canScaleOut&&!canScaleUp)blocked(c,!upgrades.length&&c.apps.length>=T.maximum?"Maximum four instances reached":"Insufficient cash for provisioning");
+   if(saturated&&!canScaleOut&&!canScaleUp)blocked(c,!upgrades.length&&c.apps.length>=T.maximum?"Maximum four instances reached":"Insufficient cash for provisioning");
    else {blocked(c,null);
    a.highSteps=saturated?a.highSteps+1:0;
    const candidates=a.managedAppIds.filter(id=>canRetire(c,id)).sort((x,y)=>Number(y.slice(4))-Number(x.slice(4)));

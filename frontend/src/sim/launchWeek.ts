@@ -2,7 +2,6 @@ import type { Campaign } from "./campaignTypes";
 import type { Action, ActionResult, GameState } from "./types";
 type Rejection = Extract<ActionResult, { ok: false }>;
 const fail = (message: string): Rejection => ({ ok: false, reason: "invalid", message });
-import { promotionActive } from "./combinedCampaign";
 import { researchBalance } from "./reliability";
 import { trace } from "./trace";
 import { OPENING_DB as Q } from "./scenarios/openingDatabaseIncident";
@@ -12,6 +11,11 @@ import { LAUNCH_WEEK as L } from "./scenarios/launchWeek";
 /** Shared opening tuning: version-2 companies read Launch Week's numbers, version 1 reads the original. */
 export function openingTuning(c: Pick<Campaign, "scenarioVersion">): typeof Q | typeof L {
     return c.scenarioVersion === 2 ? L : Q;
+}
+/** Whether Launch Week's scripted promotion is running at step `at`. */
+export function promotionActive(c: Campaign, at = c.step): boolean {
+    const p = c.promotion;
+    return !!p && at >= p.activationStep && at < p.endStep;
 }
 /** Demand for the current step: the scripted promotion multiplies the base rate while it runs. */
 export function launchWeekRate(c: Campaign, at = c.step): number {
