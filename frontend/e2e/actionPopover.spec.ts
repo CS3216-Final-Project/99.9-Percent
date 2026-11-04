@@ -96,6 +96,9 @@ test("Stay Online guide unlocks Health Checks in Tech and confirms its purchase,
   await expect(guide(8)).toContainText("Press Deploy Health Checks.");
   await monitoring.getByRole("button",{name:/^Deploy Health Checks/}).click();
   await expect(guide(9)).toContainText("Press Confirm.");await boxes(8);
+  // Opened from Monitoring's details as they fade in, the preview is still centred on the screen, not on the details.
+  const preview=(await page.locator(".component-purchase").boundingBox())!,screen=page.viewportSize()!;
+  expect(Math.abs(preview.x+preview.width/2-screen.width/2)).toBeLessThan(1);expect(Math.abs(preview.y+preview.height/2-screen.height/2)).toBeLessThan(1);
   await page.screenshot({path:info.outputPath("guide-step-9-of-9.png")});
   const confirmation=page.getByRole("region",{name:"Confirm Deploy Health Checks",exact:true});
   await expect(page.locator('.eq-label[data-eq="monitoring"]')).toHaveClass(/is-affected/);

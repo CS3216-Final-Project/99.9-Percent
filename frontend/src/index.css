@@ -5540,9 +5540,11 @@ button:disabled {
 }
 /* The shell that grows from the pressed button onto the card while it opens (InspectionReveal.tsx). */
 .inspection-morph { position: fixed; box-sizing: border-box; margin: 0; border: 1px solid var(--control-edge); box-shadow: var(--lift); pointer-events: none; }
+/* The details fade in without moving: a transform would make them the containing block of a purchase preview opened
+   from their actions (Monitoring's Deploy Health Checks), pinning the preview to the details instead of the screen. */
 .inspection-details { display: grid; gap: 10px; animation: inspection-details-open 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes inspection-details-open {
-  from { opacity: 0; transform: translateY(-6px); }
+  from { opacity: 0; }
 }
 /* Without motion the disc swaps faces in place instead of turning over. */
 @media (prefers-reduced-motion: reduce) {
