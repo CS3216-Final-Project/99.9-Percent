@@ -580,8 +580,10 @@ test("plays the arcade: a real brick breaker served and steered, left by Escape"
   await expect(prompt(page)).toContainText("Play the arcade");
 });
 
-test("naps in first person: eyes close and open", async ({ page }) => {
+test("naps in first person: eyes close and open", async ({ page, installClock }) => {
   test.slow();
+  // The nap runs on the page's clock, which keeps real time until the nap starts.
+  await installClock();
   // Resume mid-walk through the avatar's eyes, at the nap room's door.
   await page.addInitScript(() => localStorage.setItem("nn.classic.exploration.v1", JSON.stringify({ version: 1, floor: "office", walking: true, viewpoint: "first", viewChosen: true, avatar: { floor: "office", x: 10.0, z: 6.6, yaw: Math.PI / 2 }, camera: null })));
   await page.goto("/");
@@ -596,15 +598,30 @@ test("naps in first person: eyes close and open", async ({ page }) => {
   await page.keyboard.press("v");
   await expect(page.locator(".view-overlay")).toHaveAttribute("data-viewpoint", "first", { timeout: 20_000 });
   await expect(prompt(page)).toContainText("Rest in a nap pod", { timeout: 20_000 });
-  // The lids are sampled by the room's frames, so the view must be drawing steadily before the nap starts.
   await steadyFrames(page);
   const eyelids = page.locator(".view-eyelids");
+  // The lids follow the nap's own 9 s, sampled by the room's frames. Software WebGL has stalled frames for over 5 s
+  // as the view goes into the pod, longer than the lids stay shut, so the nap's time is held and each stretch drawn
+  // on purpose: a few frames at each point in the nap.
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 1_000));
   await page.keyboard.press("Space");
+  let napped = 0;
+  const napAt = async (seconds: number) => {
+    await page.clock.fastForward(Math.round((seconds - napped) * 1_000) - 100);
+    await page.clock.runFor(100);
+    napped = seconds;
+  };
+  await napAt(0.2);
   await expect(prompt(page)).toContainText("Resting in a nap pod");
-  // The lids close over the view as the avatar settles, then open again as it wakes. The 9 s nap keeps them shut
-  // from about 2.3 s to 6.8 s of its own time, which a starved CI runner can reach well after 4 s of wall time, so
-  // wait for as long as the nap lasts; the shut stretch is far longer than any frame gap, so it is never skipped.
-  await expect(eyelids).toHaveAttribute("data-eyes", "shut", { timeout: 12_000 });
-  await expect(eyelids).toHaveAttribute("data-eyes", "open", { timeout: 12_000 });
+  await expect(eyelids).toHaveAttribute("data-eyes", "open");
+  // The lids close over the view as the avatar settles, stay shut through the sleep, then open again as it wakes.
+  await napAt(2);
+  await expect(eyelids).toHaveAttribute("data-eyes", "closing");
+  await napAt(4.5);
+  await expect(eyelids).toHaveAttribute("data-eyes", "shut");
+  await napAt(7.6);
+  await expect(eyelids).toHaveAttribute("data-eyes", "opening");
+  await napAt(9.5);
+  await expect(eyelids).toHaveAttribute("data-eyes", "open");
   await expect(prompt(page)).toContainText("Rest in a nap pod");
 });

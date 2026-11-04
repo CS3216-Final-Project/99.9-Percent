@@ -235,6 +235,7 @@ The coach responds to recorded state, honors manual Hint and obstructing views, 
   The equipment itself keeps its group name.
 - **Panel motion:** Hiding the equipment panel slides and fades it toward its edge before it collapses to **Equipment & actions**, and showing it slides it back in; on phones the sheet does the moving instead.
   The selected equipment's details fold open and closed under the picker with a short height tween, keeping their contents while they close; More disclosures tween the same way where the browser can animate to an auto height.
+  Opening one shows its contents at once, readable and in the accessibility tree before the first frame of the slide, while the height and fade tween; closing keeps them until the fold ends.
   Reduced motion turns both off.
 
 ## Player feedback

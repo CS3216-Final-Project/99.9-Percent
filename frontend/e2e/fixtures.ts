@@ -183,6 +183,35 @@ export async function savedGame(page: Page): Promise<GameState> {
   return JSON.parse(JSON.stringify(result.game)) as GameState;
 }
 
+/**
+ * Stops the page's animation clock (Chromium DevTools), so whatever the next action starts stays on its first frame
+ * however slowly the browser draws or answers; the returned function restarts the clock. Playwright's clock does not
+ * reach CSS transitions or Web Animations.
+ */
+export async function holdAnimationClock(page: Page) {
+  const devtools = await page.context().newCDPSession(page);
+  await devtools.send('Animation.enable');
+  await devtools.send('Animation.setPlaybackRate', { playbackRate: 0 });
+  return async () => {
+    await devtools.send('Animation.setPlaybackRate', { playbackRate: 1 });
+    await devtools.detach();
+  };
+}
+
+/**
+ * Opens a More disclosure by its summary and waits for its slide to end. Its contents are there at once, but until the
+ * slide has grown they are clipped and do not count towards the scroll height, so scrolling to them must wait. Chrome
+ * fires no transition events for `::details-content`: the slide has ended once it is opaque and holds its height.
+ */
+export async function openDisclosure(summary: Locator) {
+  await summary.click();
+  await expect.poll(() => summary.locator('..').evaluate(details => new Promise<boolean>(done => {
+    const slide = () => getComputedStyle(details, '::details-content');
+    const height = slide().height;
+    requestAnimationFrame(() => requestAnimationFrame(() => done(slide().opacity === '1' && slide().height === height)));
+  }))).toBe(true);
+}
+
 export async function expectRoom(page: Page, timeout?: number) {
   const room = page.getByRole('main');
   if (roomlessTargets.has(page) || roomlessTargets.has(page.context())) {
