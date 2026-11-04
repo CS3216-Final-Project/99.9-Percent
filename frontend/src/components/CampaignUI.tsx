@@ -98,7 +98,7 @@ function CampaignGuidance() {
   const model=campaignGuidance(game),action=model.pendingAction;
 
   return <section className="campaign-guidance" aria-label="Guided Mode guidance">
-    {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">Chapter requirements<span> · {model.completed.length}/{model.requirements.length}</span></h3>
+    {model.requirements.length>0&&<section className="campaign-requirements" aria-label="Guided Mode requirements"><h3 className="campaign-requirements-heading">{model.stage}<span> · {model.completed.length}/{model.requirements.length}</span></h3>
       <RequirementList items={model.requirements}/>
       {model.waiting&&<p role="status">{model.waiting}</p>}
       {model.notice&&<p role="note">{model.notice}</p>}
@@ -289,7 +289,7 @@ function CampaignMissionDashboard({disabled}:{disabled:boolean}) {
         <PinnedRecovery campaign={c} />
       </header>}
       <section aria-label="Chapter Progress" className="mission-progress">
-        <h3>{reliability?"Stay Online":"Chapter Progress"}</h3>
+        <h3>{model.stage}</h3>
         <p className="mission-stage">{stage}</p>
         <Meter value={model.completed.length/Math.max(1,model.requirements.length)} label="Chapter requirements progress" tone="ok"/>
         <p className="mission-complete">{model.completed.length} / {model.requirements.length} current requirements met</p>

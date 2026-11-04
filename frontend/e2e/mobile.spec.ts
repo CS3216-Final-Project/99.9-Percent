@@ -375,7 +375,7 @@ test("investigates and responds through the incident panel on touch", async ({ p
   const panel = page.getByRole("complementary", { name: "System metrics" });
   await expect(page.getByRole("banner")).toHaveClass(/is-incident/);
   const requirements = panel.getByRole("region", { name: "Guided Mode requirements", exact: true });
-  await expect(requirements.getByRole("heading", { name: /Chapter requirements/ })).toBeVisible();
+  await expect(requirements.getByRole("heading", { name: /^Opening/ })).toBeVisible();
   const requirementBox = (await requirements.boundingBox())!;
   const latencyBox = (await panel.getByText("Latency · ms", { exact: true }).boundingBox())!;
   expect(requirementBox.y + requirementBox.height).toBeLessThanOrEqual(latencyBox.y);

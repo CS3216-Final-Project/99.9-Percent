@@ -121,7 +121,7 @@ describe("opening UI", () => {
     expect(useGame.getState().running).toBe(false);
     const id = useGame.getState().game.campaign!.runId;
     expect(screen.getByRole("heading", { name: "Recovery progress" })).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Guided Mode requirements" }).textContent).toContain("Chapter requirements");
+    expect(within(screen.getByRole("region", { name: "Guided Mode requirements" })).getByRole("heading", { name: /^Launch Week/ })).toBeTruthy();
     const recovery = screen.getByRole("region", { name: "Incident recovery" });
     expect(recovery.textContent).toContain("Latency below 500 ms");
     expect(recovery.textContent).toContain("Service errors below 1%");

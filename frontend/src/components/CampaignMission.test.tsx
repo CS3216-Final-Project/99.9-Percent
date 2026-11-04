@@ -4,6 +4,7 @@ import { useGame } from "@/game/store";
 import type { GameState } from "@/sim";
 import { campaignGuidance } from "@/game/campaignGuidance";
 import { campaignAttention } from "@/game/campaignAttention";
+import { campaignChapters } from "@/game/campaignChapters";
 import { spikeCompany, untilOffset, act as decide, tick } from "@/sim/__tests__/spikeFixtures";
 import { reliabilityCompany, preparedReliability } from "@/sim/__tests__/reliabilityFixture";
 import { completedReliability } from "@/sim/__tests__/completionFixture";
@@ -46,6 +47,13 @@ it("names the graded spike in progress and keeps the spike test as the current o
   cleanup();show(untilOffset(game,92,true));
   expect(progress()).toContain("Spike 3 active");expect(progress()).not.toContain("Spike 2 active");
 });
+
+for(const [name,company] of [["Traffic Spikes & Autoscaling",spikeCompany],["Stay Online",reliabilityCompany]] as const)
+  it(`titles the mission panel ${name}, the chapter the chapter bar marks current`,()=>{
+    const game=company();show(game);
+    expect(campaignChapters(game).find(c=>c.current)?.name).toBe(name);
+    expect(within(screen.getByRole("region",{name:"Chapter Progress"})).getByRole("heading",{level:3}).textContent).toBe(name);
+  });
 
 it("keeps optional autoscaling evidence in App Servers, not the mission",()=>{
   show(spikeCompany());expect(screen.queryByText("Controller evidence and costs")).toBeNull();
